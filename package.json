@@ -4,22 +4,52 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node scripts/prepare-web.mjs",
+    "build": "npm run build:apps && node scripts/prepare-web.mjs",
+    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks",
+    "build:teaching": "node scripts/build-spa.mjs teaching",
+    "build:knowledge": "node scripts/build-spa.mjs knowledge",
+    "build:tasks": "node scripts/build-spa.mjs tasks",
     "generate:auth": "node scripts/generate-auth-secrets.mjs",
     "prepare:web": "node scripts/prepare-web.mjs",
     "dev": "node scripts/prepare-web.mjs && node scripts/serve.mjs",
     "test": "node --test tests/unit/*.test.js tests/integration/*.test.js",
     "test:unit": "node --test tests/unit/*.test.js",
     "test:integration": "node --test tests/integration/*.test.js",
-    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/fitness.spec.mjs",
+    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/hub-count.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/mind.spec.mjs tests/browser/fitness.spec.mjs tests/browser/morphing-popover.spec.mjs tests/browser/hub-compose.spec.mjs tests/browser/view-on-map.spec.mjs tests/browser/card-swipe.spec.mjs tests/browser/shortcuts.spec.mjs",
     "validate:fixtures": "node scripts/validate-fixtures.mjs",
     "import:mind": "node scripts/import-mind-notion.mjs"
   },
   "dependencies": {
-    "js-yaml": "4.3.0"
+    "@annotorious/annotorious": "^3.8.10",
+    "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
+    "@floating-ui/dom": "^1.8.0",
+    "@netlify/blobs": "^9.1.2",
+    "@tiptap/core": "^3.31.3",
+    "@tiptap/markdown": "^3.31.3",
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
+    "@uppy/core": "^4.5.3",
+    "heic-to": "^1.1.2",
+    "js-yaml": "4.3.0",
+    "jscanify": "^1.4.0",
+    "maplibre-gl": "^5.24.0",
+    "media-chrome": "^4.19.2",
+    "minisearch": "^7.2.0",
+    "pdfjs-dist": "^5.4.296",
+    "photoswipe": "^5.4.4",
+    "wavesurfer.js": "^7.12.11"
   },
   "devDependencies": {
-    "playwright": "1.61.1"
+    "@types/d3-force": "^3.0.10",
+    "d3-force": "^3.0.0",
+    "katex": "^0.16.47",
+    "playwright": "1.61.1",
+    "ts-fsrs": "^5.4.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2",
+    "zod": "^3.25.76"
   },
   "engines": {
     "node": ">=22"

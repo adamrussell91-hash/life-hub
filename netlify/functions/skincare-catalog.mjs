@@ -7,7 +7,8 @@ import {
   methodNotAllowed,
   misconfiguredResponse,
   preflightResponse,
-  readCookie,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
 import {
@@ -16,14 +17,14 @@ import {
   GitHubConfigurationError
 } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 import {
   SKINCARE_CATALOG_PATH,
   appendProduct,
   emptyCatalog,
   parseCatalog,
   retireProduct
-} from '../../js/app/skincare-catalog.js';
+} from '../../apps/life/js/app/skincare-catalog.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const REPOSITORY_MESSAGE = 'The repository is temporarily unavailable.';
@@ -53,7 +54,7 @@ export function createSkincareCatalogHandler({
 
     let session;
     try {
-      session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }

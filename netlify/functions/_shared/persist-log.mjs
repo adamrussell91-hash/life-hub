@@ -1,14 +1,19 @@
 import { load } from 'js-yaml';
-import { parseEventDocument, TYPE_DOMAINS } from '../../../js/core/records.js';
+import { parseEventDocument, TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
 import {
   applyLogToCentralNode,
-  formatLogDate
-} from '../../../js/core/central-node-write.js';
+  appendRecentAction,
+  buildNutritionStatusLine,
+  formatLogDate,
+  humanizeDayType,
+  shouldUpdateWorkoutStatus,
+  upsertStatusField
+} from '../../../apps/life/js/core/central-node-write.js';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog
-} from '../../../js/core/governance-log.js';
+} from '../../../apps/life/js/core/governance-log.js';
 import { AGENTS } from './agent-directory.mjs';
 import { decodeBlob } from './decode-blob.mjs';
 import { loadCentralNodeSeed } from './load-central-node-seed.mjs';
@@ -24,7 +29,7 @@ export function renderMarkdown(record, notes) {
   return `---\n${frontmatter}\n---\n${body}`;
 }
 
-export function describeRecordForLog(record, notes) {
+export function describeRecordForLog(record, notes, { medicalAppend = false } = {}) {
   const label = typeof notes === 'string' && notes.trim() !== '' ? notes.trim() : null;
   switch (record.type) {
     case 'meal': {
@@ -37,9 +42,25 @@ export function describeRecordForLog(record, notes) {
       return `Logged ${what}${macros ? ` (${macros})` : ''}.`;
     }
     case 'workout': {
-      const duration = record.duration_min != null ? `${record.duration_min}-min ` : '';
-      const title = record.title ? ` (${record.title})` : '';
-      return `Logged a ${duration}${record.day_type ?? 'workout'} session${title}.`;
+      const title = typeof record.title === 'string' ? record.title.trim() : '';
+      const dayLabel = humanizeDayType(record.day_type);
+      const moveCount = Array.isArray(record.exercises) && record.exercises.length > 0
+        ? `${record.exercises.length} moves`
+        : null;
+      const duration = record.duration_min != null ? `${record.duration_min} min` : null;
+      const focus = Array.isArray(record.focus)
+        ? record.focus.map(item => String(item).trim()).filter(Boolean).slice(0, 3).join('/')
+        : null;
+      const detail = [moveCount, duration, focus].filter(Boolean).join(', ');
+      const label = typeof notes === 'string' && notes.trim() !== ''
+        ? notes.trim().replace(/\s+/g, ' ')
+        : null;
+      const head = title
+        ? `Logged ${title}`
+        : `Logged a ${dayLabel} session`;
+      const mid = detail ? ` (${detail})` : '';
+      const verdict = label ? ` — ${label}` : '';
+      return `${head}${mid}${verdict}.`;
     }
     case 'skincare':
       return `Logged ${record.routine ?? ''} skincare${record.completed === false ? ' (incomplete)' : ''}.`.replace(/\s+/g, ' ');
@@ -54,10 +75,17 @@ export function describeRecordForLog(record, notes) {
     case 'measurements':
       return 'Logged body measurements.';
     case 'medical':
-      return `Logged medical visit: ${record.title || 'visit'}.`;
+      return medicalAppend
+        ? `Updated medical visit: ${record.title || 'visit'}.`
+        : `Logged medical visit: ${record.title || 'visit'}.`;
     default:
       return `Logged a ${record.type} record.`;
   }
+}
+
+export function shouldSyncCentralNode(record) {
+  if (record?.type === 'workout' && !shouldUpdateWorkoutStatus(record)) return false;
+  return true;
 }
 
 export async function persistLogEntry(client, { record, notes, path, existingSha, nowDateKey }) {
@@ -68,11 +96,17 @@ export async function persistLogEntry(client, { record, notes, path, existingSha
     message: `feat(chat): log ${record.type} for ${record.date}`
   });
   let centralNodeUpdated = false;
-  try {
-    const cn = await syncCentralNodeAfterLog(client, record, notes);
-    centralNodeUpdated = cn?.updated === true;
-  } catch {
-    centralNodeUpdated = false;
+  if (!shouldSyncCentralNode(record)) {
+    // Planned workouts must not touch Status / Recent Actions. A no-op sync
+    // used to report centralNodeUpdated:false and flash a save error in chat.
+    centralNodeUpdated = true;
+  } else {
+    try {
+      const cn = await syncCentralNodeAfterLog(client, record, notes);
+      centralNodeUpdated = cn?.updated === true;
+    } catch {
+      centralNodeUpdated = false;
+    }
   }
   let governanceUpdated = false;
   if (record.type === 'mind_session' && typeof record.insight === 'string' && record.insight.trim()) {
@@ -116,7 +150,7 @@ async function syncCentralNodeAfterLog(client, record, notes) {
     record,
     actionLine,
     nutritionTotals,
-    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements', 'medical'].includes(record.type)
+    flagNotes: ['meal', 'skincare', 'weight', 'composition', 'measurements', 'medical', 'workout'].includes(record.type)
       ? notes
       : null
   });
@@ -132,22 +166,38 @@ async function syncCentralNodeAfterLog(client, record, notes) {
 }
 
 async function sumDayMealTotals(client, tree, record) {
-  const domain = TYPE_DOMAINS.meal;
-  const [year, month] = record.date.split('-');
-  const prefix = `data/${domain}/${year}/${month}/${record.date}-`;
-  const mealPaths = tree
-    .filter(item => item.type === 'blob' && item.path.startsWith(prefix) && item.path.endsWith('.md'))
-    .map(item => item.path);
-
-  const totals = {
+  const seed = {
     calories: Number(record.calories) || 0,
     protein_g: Number(record.protein_g) || 0,
     fat_g: Number(record.fat_g) || 0
   };
-  if (record.sodium_mg != null) totals.sodium_mg = Number(record.sodium_mg) || 0;
-  if (record.calcium_mg != null) totals.calcium_mg = Number(record.calcium_mg) || 0;
-  if (record.polyphenol_score != null) totals.polyphenol_score = Number(record.polyphenol_score) || 0;
+  if (record.sodium_mg != null) seed.sodium_mg = Number(record.sodium_mg) || 0;
+  if (record.calcium_mg != null) seed.calcium_mg = Number(record.calcium_mg) || 0;
+  if (record.polyphenol_score != null) seed.polyphenol_score = Number(record.polyphenol_score) || 0;
 
+  const siblings = await sumDayMealFiles(client, tree, {
+    date: record.date,
+    skipMeal: record.meal
+  });
+  if (!siblings) return seed;
+  return addMealTotals(seed, siblings);
+}
+
+/** Sum remaining meal files for a date. Returns null when none remain. */
+export async function sumDayMealFiles(client, tree, { date, skipMeal = null, excludePaths = [] } = {}) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const domain = TYPE_DOMAINS.meal;
+  const [year, month] = date.split('-');
+  const prefix = `data/${domain}/${year}/${month}/${date}-`;
+  const excluded = new Set(excludePaths);
+  const mealPaths = tree
+    .filter(item => item.type === 'blob'
+      && item.path.startsWith(prefix)
+      && item.path.endsWith('.md')
+      && !excluded.has(item.path))
+    .map(item => item.path);
+
+  let totals = null;
   for (const path of mealPaths) {
     const blobEntry = tree.find(item => item.path === path);
     if (!blobEntry) continue;
@@ -161,25 +211,95 @@ async function sumDayMealTotals(client, tree, record) {
     try {
       const parsed = parseEventDocument(text, path, load);
       if (parsed.record?.type !== 'meal') continue;
-      if (parsed.record.meal === record.meal) continue;
-      totals.calories += Number(parsed.record.calories) || 0;
-      totals.protein_g += Number(parsed.record.protein_g) || 0;
-      totals.fat_g += Number(parsed.record.fat_g) || 0;
-      if (parsed.record.sodium_mg != null) {
-        totals.sodium_mg = (totals.sodium_mg ?? 0) + (Number(parsed.record.sodium_mg) || 0);
-      }
-      if (parsed.record.calcium_mg != null) {
-        totals.calcium_mg = (totals.calcium_mg ?? 0) + (Number(parsed.record.calcium_mg) || 0);
-      }
+      if (skipMeal && parsed.record.meal === skipMeal) continue;
+      const next = {
+        calories: Number(parsed.record.calories) || 0,
+        protein_g: Number(parsed.record.protein_g) || 0,
+        fat_g: Number(parsed.record.fat_g) || 0
+      };
+      if (parsed.record.sodium_mg != null) next.sodium_mg = Number(parsed.record.sodium_mg) || 0;
+      if (parsed.record.calcium_mg != null) next.calcium_mg = Number(parsed.record.calcium_mg) || 0;
       if (parsed.record.polyphenol_score != null) {
-        totals.polyphenol_score = (totals.polyphenol_score ?? 0) + (Number(parsed.record.polyphenol_score) || 0);
+        next.polyphenol_score = Number(parsed.record.polyphenol_score) || 0;
       }
+      totals = totals ? addMealTotals(totals, next) : next;
     } catch {
-      // Ignore unreadable siblings; still publish totals from the confirmed record.
+      // Ignore unreadable siblings.
+    }
+  }
+  return totals;
+}
+
+function addMealTotals(a, b) {
+  const out = {
+    calories: (a.calories || 0) + (b.calories || 0),
+    protein_g: (a.protein_g || 0) + (b.protein_g || 0),
+    fat_g: (a.fat_g || 0) + (b.fat_g || 0)
+  };
+  if (a.sodium_mg != null || b.sodium_mg != null) {
+    out.sodium_mg = (a.sodium_mg ?? 0) + (b.sodium_mg ?? 0);
+  }
+  if (a.calcium_mg != null || b.calcium_mg != null) {
+    out.calcium_mg = (a.calcium_mg ?? 0) + (b.calcium_mg ?? 0);
+  }
+  if (a.polyphenol_score != null || b.polyphenol_score != null) {
+    out.polyphenol_score = (a.polyphenol_score ?? 0) + (b.polyphenol_score ?? 0);
+  }
+  return out;
+}
+
+/**
+ * After meal file deletes land, refresh Status Nutrition from remaining meals
+ * and upsert a Recent Action line per removed slot.
+ */
+export async function syncCentralNodeAfterMealDeletes(client, deletions) {
+  if (!Array.isArray(deletions) || deletions.length === 0) {
+    return { updated: false, reason: 'nothing_to_sync' };
+  }
+
+  const current = await client.resolveTree();
+  const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+
+  let content;
+  let existingSha;
+  if (entry) {
+    content = decodeBlob(await client.readBlob(entry.sha));
+    if (content === null) return { updated: false, reason: 'decode_failed' };
+    existingSha = entry.sha;
+  } else {
+    content = loadCentralNodeSeed();
+    if (!content) return { updated: false, reason: 'missing_seed' };
+    existingSha = undefined;
+  }
+
+  let updated = content;
+  const dates = [...new Set(deletions.map(item => item.date).filter(Boolean))];
+  for (const date of dates) {
+    const totals = await sumDayMealFiles(client, current.tree, { date });
+    updated = upsertStatusField(
+      updated,
+      'Nutrition',
+      buildNutritionStatusLine(totals ?? {})
+    );
+  }
+
+  for (const deletion of deletions) {
+    for (const meal of deletion.meals ?? []) {
+      // "for {meal}" keeps the same Recent Actions fingerprint as Logged lines.
+      const actionLine = `\n**${formatLogDate(deletion.date)}:** Brisket: Removed meal log for ${meal}.`;
+      updated = appendRecentAction(updated, actionLine);
     }
   }
 
-  return totals;
+  if (updated === content) return { updated: false, reason: 'unchanged' };
+
+  await client.writeFile({
+    path: CENTRAL_NODE_PATH,
+    content: updated,
+    ...(existingSha ? { sha: existingSha } : {}),
+    message: 'chore(central-node): sync meal delete into Status'
+  });
+  return { updated: true };
 }
 
 async function appendMindInsight(client, record, nowDateKey) {

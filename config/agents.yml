@@ -48,3 +48,24 @@ agents:
     colour: '#2D2D2D'
     colour_source: confirmed
     name_triggers: [general hammond, hammond]
+  - name: Ann O'Tation
+    slug: ann
+    domain: teaching
+    tab: Teaching
+    colour: '#5B141A'
+    colour_source: confirmed
+    name_triggers: [ann o'tation, ann otation, ann]
+  - name: Professor Clementine Haig
+    slug: clementine
+    domain: knowledge
+    tab: Knowledge
+    colour: '#3B57A8'
+    colour_source: confirmed
+    name_triggers: [professor clementine haig, clementine haig, clementine, haig]
+  - name: Clare DeMind
+    slug: clare
+    domain: tasks
+    tab: Tasks
+    colour: '#F7DD4C'
+    colour_source: confirmed
+    name_triggers: [clare demind, clare dèmind, clare]

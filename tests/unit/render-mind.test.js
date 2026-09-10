@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { CLINICAL_CHART_SLOTS } from '../../js/app/chart-kit/clinical-slots.js';
-import { firstSentence, renderMind } from '../../js/app/render-mind.js';
+import { CLINICAL_CHART_SLOTS } from '../../apps/life/js/app/chart-kit/clinical-slots.js';
+import { firstSentence, mindBoardColumns, MIND_BOARD_GAP, renderMind } from '../../apps/life/js/app/render-mind.js';
 
 function el(tag = 'div') {
   let text = '';
@@ -163,6 +163,9 @@ function fakeRoot() {
   energyCenter.hidden = true;
   const energyStatus = el('p');
   energyStatus.dataset.mind = 'energy-status';
+  const energyMeta = el('div');
+  energyMeta.dataset.mind = 'energy-meta';
+  energyMeta.hidden = true;
   const energyPeriod = el('p');
   energyPeriod.dataset.mind = 'energy-period';
   const energyTrend = el('p');
@@ -170,7 +173,8 @@ function fakeRoot() {
   const energyHint = el('p');
   energyHint.dataset.mind = 'energy-hint';
   energyHint.hidden = true;
-  energyCenter.append(energyStatus, energyPeriod, energyTrend);
+  energyCenter.append(energyStatus);
+  energyMeta.append(energyPeriod, energyTrend);
   const hero = el('div');
   hero.id = 'mind-hero';
   const themes = el('div');
@@ -200,16 +204,6 @@ function fakeRoot() {
   tileInsights.id = 'mind-tile-insights';
   const tileFactors = el('article');
   tileFactors.id = 'mind-tile-factors';
-  const tileStreak = el('article');
-  tileStreak.id = 'mind-tile-streak';
-  const streakRing = el('svg');
-  streakRing.id = 'mind-streak-ring';
-  const streakTrack = el('circle');
-  streakTrack.dataset.role = 'track';
-  const streakFill = el('circle');
-  streakFill.dataset.role = 'fill';
-  streakRing.append(streakTrack, streakFill);
-  tileStreak.append(streakRing);
   const tileConstellation = el('article');
   tileConstellation.id = 'mind-tile-constellation';
   const constellation = el('svg');
@@ -241,11 +235,6 @@ function fakeRoot() {
   streamHint.dataset.mind = 'stream-hint';
   streamHint.hidden = true;
   tileStream.append(streamWrap, streamFoot, streamHint);
-  const tileTransitions = el('article');
-  tileTransitions.id = 'mind-tile-transitions';
-  const sankeySvg = el('svg');
-  sankeySvg.id = 'mind-sankey';
-  tileTransitions.append(sankeySvg);
   const tileBump = el('article');
   tileBump.id = 'mind-tile-bump';
   const bumpSvg = el('svg');
@@ -326,6 +315,7 @@ function fakeRoot() {
     '[data-mind="energy-legend"]': energyLegend,
     '[data-mind="energy-center"]': energyCenter,
     '[data-mind="energy-status"]': energyStatus,
+    '[data-mind="energy-meta"]': energyMeta,
     '[data-mind="energy-period"]': energyPeriod,
     '[data-mind="energy-trend"]': energyTrend,
     '[data-mind="energy-hint"]': energyHint,
@@ -340,15 +330,11 @@ function fakeRoot() {
     '#mind-board': board,
     '#mind-thread-sheet': threadSheet,
     '#mind-tile-factors': tileFactors,
-    '#mind-tile-streak': tileStreak,
-    '#mind-streak-ring': streakRing,
     '#mind-tile-constellation': tileConstellation,
     '#mind-constellation': constellation,
     '#mind-tension': tension,
     '#mind-tile-stream': tileStream,
     '#mind-stream': streamSvg,
-    '#mind-tile-transitions': tileTransitions,
-    '#mind-sankey': sankeySvg,
     '#mind-tile-bump': tileBump,
     '#mind-bump': bumpSvg,
     '#mind-tile-chord': tileChord,
@@ -497,6 +483,9 @@ test('renderMind renders energy orbit, session mood-shift, insights, and silence
 
   assert.equal(root._energyEmpty.hidden, true);
   assert.equal(root._energyStatus.textContent, 'Mostly Low');
+  assert.match(root.querySelector('[data-mind="energy-period"]').textContent, /Past/i);
+  assert.equal(root.querySelector('[data-mind="energy-period"]').parentNode?.dataset?.mind, 'energy-meta');
+  assert.equal(root.querySelector('[data-mind="energy-meta"]').hidden, false);
   const energyPoints = root._energyOrbit.querySelectorAll('[data-role="point"]');
   assert.equal(energyPoints.length, 3);
   assert.equal(energyPoints[0].dataset.energy, 'low');
@@ -543,6 +532,17 @@ test('renderMind hides hero in the empty state and does not require launchers', 
 test('firstSentence keeps one clause', () => {
   assert.equal(firstSentence('Rest is not a prize. Keep going.'), 'Rest is not a prize.');
   assert.equal(firstSentence(''), '');
+});
+
+test('mindBoardColumns follows Mind v2 narrow/default/wide breakpoints', () => {
+  assert.equal(MIND_BOARD_GAP, 12);
+  assert.equal(mindBoardColumns(400), 1);
+  assert.equal(mindBoardColumns(560), 2);
+  assert.equal(mindBoardColumns(899), 2);
+  assert.equal(mindBoardColumns(900), 3);
+  assert.equal(mindBoardColumns(1099), 3);
+  assert.equal(mindBoardColumns(1100), 4);
+  assert.equal(mindBoardColumns(1216), 4);
 });
 
 test('renderMind caps insights to three scan rows', () => {
@@ -600,19 +600,16 @@ test('chord arcs, ribbons, and legend use distinct theme slot colours', () => {
   assert.ok(swatches.every(swatch => CLINICAL_CHART_SLOTS.includes(swatch)));
 });
 
-test('renderMind paints honest empty instead of sparse chord, sankey, radial, and tension', () => {
+test('renderMind paints honest empty instead of sparse chord, radial, and tension', () => {
   const root = fakeRoot();
   renderMind(root, emptyModel({
     empty: false,
     themeCooccurrence: [{ themeA: 'work', themeB: 'shame', count: 1 }],
-    moodTransitions: [{ from: 'low', to: 'good', count: 1 }],
     moodSeries: [],
     tensions: []
   }));
   assert.match(root.querySelector('#mind-tile-chord').textContent, /Need 3 paired themes/);
   assert.equal(root.querySelector('#mind-chord').children.length, 0);
-  assert.match(root.querySelector('#mind-tile-transitions').textContent, /Need 3 transitions/);
-  assert.equal(root.querySelector('#mind-sankey').children.length, 0);
   assert.match(root.querySelector('#mind-tile-radial').textContent, /Need /);
   assert.equal(root.querySelector('#mind-radial-year').children.length, 0);
   const tension = root.querySelector('#mind-tension');
@@ -620,16 +617,14 @@ test('renderMind paints honest empty instead of sparse chord, sankey, radial, an
   assert.match(tension.textContent, /Need /);
 });
 
-test('renderMind paints factor bars and streak label', () => {
+test('renderMind paints factor bars', () => {
   const root = fakeRoot();
   renderMind(root, {
     ...emptyModel(),
     empty: false,
-    factorEffects: [{ key: 'walk', label: 'walk', effect: 1.5, direction: 'positive' }],
-    consistency: { daysWithEntry: 10, windowDays: 30, streak: 3 }
+    factorEffects: [{ key: 'walk', label: 'walk', effect: 1.5, direction: 'positive' }]
   });
   assert.match(root.querySelector('#mind-tile-factors').textContent, /walk/);
-  assert.match(root.querySelector('#mind-tile-streak').textContent, /3/);
 });
 
 test('renderMind draws constellation nodes and keeps empty tension as honest empty', () => {
@@ -817,9 +812,9 @@ test('renderMind paints an interactive theme rank bump chart', () => {
 });
 
 test('index.html Mind board has no Talk launchers or cadence heatmap', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const start = html.indexOf('id="mind-dashboard"');
-  const end = html.indexOf('id="central-node-dashboard"');
+  const end = html.indexOf('id="shortcuts-dashboard"');
   const mind = html.slice(start, end);
   assert.doesNotMatch(mind, /id="mind-launcher-vera"/);
   assert.doesNotMatch(mind, /id="mind-launcher-penelope"/);
@@ -828,7 +823,10 @@ test('index.html Mind board has no Talk launchers or cadence heatmap', async () 
   assert.doesNotMatch(mind, /id="mind-cadence"/);
   assert.doesNotMatch(mind, /id="mind-heatmap-diary"/);
   assert.match(mind, /id="mind-themes"/);
-  assert.match(mind, /id="mind-tile-streak"/);
+  assert.doesNotMatch(mind, /id="mind-tile-streak"/);
+  assert.doesNotMatch(mind, /id="mind-tile-transitions"/);
+  assert.doesNotMatch(mind, /Am I showing up/);
+  assert.doesNotMatch(mind, /What follows a Low day/);
   assert.match(mind, /data-mind-range="year"/);
   assert.match(mind, /id="mind-mood-radial-label"/);
   assert.match(mind, /id="mind-energy-orbit"/);

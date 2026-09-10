@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { comparePeriods } from '../../js/core/trends.js';
+import { comparePeriods } from '../../apps/life/js/core/trends.js';
 import {
   buildNutritionModel,
   PROTEIN_TREND_CONFIG,
   polyphenolVsAim
-} from '../../js/app/nutrition-model.js';
+} from '../../apps/life/js/app/nutrition-model.js';
 
 const records = [
   { type: 'meal', date: '2026-07-30', meal: 'breakfast', calories: 520, protein_g: 38, fat_g: 12, sodium_mg: 420, calcium_mg: 380, polyphenol_score: 6 },
@@ -89,6 +89,36 @@ test('compares this week\'s average protein against the previous week\'s using t
 
   // This week: (140 + 0 + 0 + 60 + 0 + 0 + 80) / 7 = 40. Previous week (07-17..07-23): 210 / 7 = 30.
   assert.deepEqual(model.proteinTrend, comparePeriods(40, 30, PROTEIN_TREND_CONFIG));
+});
+
+test('photo-logged meal macros land on the week chart series', () => {
+  // Same shape as live Brisket photo → Confirm (nutrition-label fixture).
+  const photoMeal = [{
+    record: {
+      type: 'meal',
+      date: '2026-07-30',
+      meal: 'lunch',
+      calories: 514,
+      protein_g: 42,
+      fat_g: 14.5,
+      carbs_g: 55,
+      sodium_mg: 780,
+      calcium_mg: 30,
+      polyphenol_score: 1,
+      omega3: 'none'
+    },
+    body: 'Test Chicken Pasta from photo — on track',
+    path: 'data/nutrition/2026/07/2026-07-30-lunch.md',
+    legacy: false
+  }];
+  const model = buildNutritionModel({ events: photoMeal, targetsConfig, date: '2026-07-30' });
+  const today = model.week.find(day => day.date === '2026-07-30');
+  assert.equal(today.protein_g, 42);
+  assert.equal(today.calories, 514);
+  assert.equal(today.carbs_g, 55);
+  assert.equal(today.fat_g, 14.5);
+  assert.equal(model.mealsToday.length, 1);
+  assert.equal(model.nutrition.protein_g, 42);
 });
 
 test('polyphenolVsAim labels score against aim without pretending it is a percent', () => {
@@ -193,4 +223,36 @@ test('day-specific day type and recovery bonus resolve per day within the week s
   // logged and would give every day proteinTarget: 120 if the loop had a copy-paste bug reusing
   // the outer date instead of each day's own).
   assert.equal(laterDay.proteinTarget, 120);
+});
+
+test('active nutrition challenges appear on the model with day scoreboard cells', () => {
+  const model = buildNutritionModel({
+    events,
+    targetsConfig,
+    date: '2026-07-30',
+    nutritionChallenges: {
+      challenges: [{
+        id: 'no-refined-sugar-2026-07-28',
+        title: 'No refined sugar',
+        rule: 'No refined sugar',
+        start: '2026-07-28',
+        end: '2026-08-03',
+        status: 'active',
+        days: {
+          '2026-07-28': { result: 'clean' },
+          '2026-07-29': { result: 'miss', note: 'sauce' },
+          '2026-07-30': { result: 'pending' },
+          '2026-07-31': { result: 'pending' },
+          '2026-08-01': { result: 'pending' },
+          '2026-08-02': { result: 'pending' },
+          '2026-08-03': { result: 'pending' }
+        }
+      }]
+    }
+  });
+
+  assert.equal(model.challenges.length, 1);
+  assert.equal(model.challenges[0].title, 'No refined sugar');
+  assert.deepEqual(model.challenges[0].tally, { clean: 1, miss: 1, pending: 5, total: 7 });
+  assert.equal(model.challenges[0].days.find(day => day.date === '2026-07-30').isToday, true);
 });

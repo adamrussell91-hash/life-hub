@@ -8,10 +8,10 @@ const registry = load(await readFile(new URL('../../config/agents.yml', import.m
 test('agent registry preserves the approved roster and confirmed colours', () => {
   const bySlug = Object.fromEntries(registry.agents.map(agent => [agent.slug, agent]));
   assert.deepEqual(Object.keys(bySlug).sort(), [
-    'brisket', 'chadwick', 'hammond', 'hyaluronica', 'penelope', 'sara', 'vera'
+    'ann', 'brisket', 'chadwick', 'clare', 'clementine', 'hammond', 'hyaluronica', 'penelope', 'sara', 'vera'
   ]);
   assert.deepEqual(Object.fromEntries(
-    ['chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'brisket', 'hammond']
+    ['chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'brisket', 'hammond', 'ann', 'clementine', 'clare']
       .map(slug => [slug, { colour: bySlug[slug].colour, colour_source: bySlug[slug].colour_source }])
   ), {
     chadwick: { colour: '#D9683A', colour_source: 'confirmed' },
@@ -20,7 +20,10 @@ test('agent registry preserves the approved roster and confirmed colours', () =>
     sara: { colour: '#BED3BC', colour_source: 'confirmed' },
     vera: { colour: '#37598A', colour_source: 'confirmed' },
     brisket: { colour: '#EEB046', colour_source: 'confirmed' },
-    hammond: { colour: '#2D2D2D', colour_source: 'confirmed' }
+    hammond: { colour: '#2D2D2D', colour_source: 'confirmed' },
+    ann: { colour: '#5B141A', colour_source: 'confirmed' },
+    clementine: { colour: '#3B57A8', colour_source: 'confirmed' },
+    clare: { colour: '#F7DD4C', colour_source: 'confirmed' }
   });
   assert.deepEqual(bySlug.hammond, {
     name: 'General Hammond',

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createFitnessLoggerController } from '../../js/app/fitness-logger-controller.js';
+import { createFitnessLoggerController } from '../../apps/life/js/app/fitness-logger-controller.js';
 
 class FakeEl {
   constructor(tag = 'div') {
@@ -214,5 +214,68 @@ test('finish includes duration_min from accumulated elapsed', async () => {
   await controller.finish();
 
   assert.equal(confirms[0].candidate.fields.duration_min, 2);
+  controller.destroy();
+});
+
+test('finish keeps a duration the athlete typed instead of overwriting it', async () => {
+  const { controller, confirms, advance } = makeController();
+  controller.mount(session());
+  controller.getDraft().duration_min = 40;
+  controller.startTimer();
+  advance(125_000);
+  await controller.finish();
+  assert.equal(confirms[0].candidate.fields.duration_min, 40);
+  controller.destroy();
+});
+
+test('add, reorder, and session extras land on the completed confirm payload', async () => {
+  const { controller, confirms } = makeController();
+  controller.mount(session());
+  controller.addExercise('Face Pull');
+  controller.reorderExercise(1, 0);
+  const draft = controller.getDraft();
+  draft.avg_hr = 128;
+  draft.calories_kcal = 220;
+  draft.distance_km = 0;
+  draft.recovery_flag_next_day = true;
+  draft.pain_flags = [{ site: 'right shoulder', note: 'twinge' }];
+  draft.exercises[0].sets[0].weight_kg = 12;
+  draft.exercises[0].sets[0].reps = 15;
+  await controller.finish();
+
+  const fields = confirms[0].candidate.fields;
+  assert.equal(fields.status, 'completed');
+  assert.equal(fields.exercises[0].name, 'Face Pull');
+  assert.equal(fields.exercises[1].name, 'Bench');
+  assert.equal(fields.exercises[0].sets[0].weight_kg, 12);
+  assert.equal(fields.exercises[0].sets[0].reps, 15);
+  assert.equal(fields.avg_hr, 128);
+  assert.equal(fields.calories_kcal, 220);
+  assert.equal(fields.distance_km, 0);
+  assert.equal(fields.recovery_flag_next_day, true);
+  assert.deepEqual(fields.pain_flags, [{ site: 'right shoulder', note: 'twinge' }]);
+  controller.destroy();
+});
+
+test('adding an exercise jumps the swipe to the new card', () => {
+  const { controller } = makeController();
+  controller.mount(session());
+  assert.equal(controller.getExerciseIndex(), 0);
+  controller.addExercise('Cable fly');
+  assert.equal(controller.getExerciseIndex(), 1);
+  assert.equal(controller.getExpandedExerciseIndex(), 1);
+  controller.addExercise('Curl');
+  assert.equal(controller.getExerciseIndex(), 2);
+  controller.removeExercise(2);
+  assert.equal(controller.getExerciseIndex(), 1);
+  controller.destroy();
+});
+
+test('removeExercise drops a movement from the draft', () => {
+  const { controller } = makeController();
+  controller.mount(session());
+  controller.addExercise('Push-Up');
+  controller.removeExercise(0);
+  assert.deepEqual(controller.getDraft().exercises.map(item => item.name), ['Push-Up']);
   controller.destroy();
 });

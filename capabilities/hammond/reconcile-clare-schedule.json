@@ -1,0 +1,15 @@
+{
+  "id": "hammond.reconcile-clare-schedule",
+  "tool_name": "reconcile_clare_schedule",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Reconcile Clare schedule return against Hammond constraints.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

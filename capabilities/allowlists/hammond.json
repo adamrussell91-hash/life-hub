@@ -1,0 +1,32 @@
+{
+  "agent": "hammond",
+  "write_globs": [
+    "central-node.md",
+    "data/governance/**",
+    "data/hammond/**",
+    "data/challenges/**",
+    "data/remember/**",
+    "data/research/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**",
+    "teaching:unit:*",
+    "tasks:project:*",
+    "tasks:task:*",
+    "tasks:work_block:*",
+    "tasks:work_session:*"
+  ],
+  "read_globs": [
+    "central-node.md",
+    "data/**",
+    "data/widgets/**",
+    "data/os/**",
+    "intuition/**",
+    "teaching:unit:*",
+    "tasks:project:*",
+    "tasks:task:*",
+    "tasks:work_block:*",
+    "tasks:work_session:*"
+  ],
+  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules."
+}

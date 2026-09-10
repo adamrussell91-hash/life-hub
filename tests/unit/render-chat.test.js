@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appendMessage, appendRecordProposal, appendCnPatchProposal, renderInlineMarkdown } from '../../js/app/render-chat.js';
+import { appendMessage, appendRecordProposal, appendCnPatchProposal, appendActionProposal, formatActionWriteDisplay, renderChatMarkdown, renderInlineMarkdown, scrollChatIfPinned, syncAssistantMessageTails } from '../../apps/life/js/app/render-chat.js';
 
 class FakeElement {
   constructor(tag) {
@@ -13,6 +13,14 @@ class FakeElement {
     this.parent = null;
     this.scrollTop = 0;
     this.scrollHeight = 0;
+    this.attributes = new Map();
+    this.type = '';
+    this.checked = false;
+    this.value = '';
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
   }
 
   append(...nodes) {
@@ -83,12 +91,71 @@ test('renderInlineMarkdown treats plain text with no markers as a single span', 
   assert.equal(bubble.children[0].textContent, 'Just plain text here.');
 });
 
+test('scrollChatIfPinned does not jump to the floor while a turn is pinned', () => {
+  const list = {
+    scrollTop: 12,
+    scrollHeight: 800,
+    querySelector(selector) {
+      if (selector === '[data-chat-turn-anchor]') return { id: 'user-turn' };
+      return null;
+    }
+  };
+  scrollChatIfPinned(list, true);
+  assert.equal(list.scrollTop, 12, 'follow() owns scroll while the user turn is anchored');
+
+  const idle = {
+    scrollTop: 12,
+    scrollHeight: 800,
+    querySelector() { return null; }
+  };
+  scrollChatIfPinned(idle, true);
+  assert.equal(idle.scrollTop, 800);
+});
+
 test('appendMessage still sets plain textContent for simple system-style bubbles', () => {
   const root = new FakeDocument();
   const item = appendMessage(root, { role: 'assistant', text: '🔍 Searched the web: pizza' });
   const body = item.children.find(child => child.className === 'chat-message__body');
   assert.equal(body.textContent, '🔍 Searched the web: pizza');
-  assert.equal(item.className, 'chat-message chat-message--assistant');
+  assert.match(item.className, /chat-message chat-message--assistant/);
+  assert.match(item.className, /chat-message--latest/);
+});
+
+test('appendMessage keeps attached images visible in the user bubble', () => {
+  const root = new FakeDocument();
+  const item = appendMessage(root, {
+    role: 'user',
+    text: 'Can you read that image?',
+    attachments: [
+      {
+        id: 'att_1',
+        kind: 'image',
+        mime: 'image/jpeg',
+        name: 'board.jpg',
+        dataUrl: 'data:image/jpeg;base64,abc123'
+      }
+    ]
+  });
+  const gallery = item.children.find(child => child.className === 'chat-message__attachments');
+  assert.ok(gallery, 'user bubble must keep a visible attachment gallery');
+  const img = gallery.children[0];
+  assert.equal(img.tagName, 'img');
+  assert.equal(img.src, 'data:image/jpeg;base64,abc123');
+  assert.equal(img.alt, 'board.jpg');
+  assert.equal(img.className, 'chat-message__attachment-image');
+});
+
+test('renderInlineMarkdown turns headings, quotes, and fenced code into structured blocks', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, '# Title\n> quoted\n```js\nconst x = 1;\n```', { multiline: true });
+
+  assert.equal(container.children[0].tagName, 'h3');
+  assert.equal(container.children[0].children[0].textContent, 'Title');
+  assert.equal(container.children[1].tagName, 'blockquote');
+  assert.equal(container.children[1].children[0].textContent, 'quoted');
+  assert.equal(container.children[2].tagName, 'pre');
+  assert.equal(container.children[2].children[0].textContent, 'const x = 1;');
 });
 
 test('renderInlineMarkdown groups consecutive "- " lines into a single bulleted list', () => {
@@ -154,6 +221,16 @@ test('renderInlineMarkdown without { multiline: true } renders embedded newlines
   assert.equal(container.children[0].textContent, 'Here are the options:\n- Option A\n- Option B');
 });
 
+function findByClass(node, name) {
+  const classes = String(node?.className ?? '').split(/\s+/);
+  if (classes.includes(name)) return node;
+  for (const child of node?.children ?? []) {
+    const found = findByClass(child, name);
+    if (found) return found;
+  }
+  return null;
+}
+
 test('appendRecordProposal adds a read-only exercises summary with cable types', () => {
   const root = new FakeDocument();
   const { card } = appendRecordProposal(root, {
@@ -179,15 +256,45 @@ test('appendRecordProposal adds a read-only exercises summary with cable types',
     notes: 'Good session.'
   });
 
-  const summary = card.children.find(child => child.className === 'record-proposal__exercises');
+  const summary = findByClass(card, 'record-proposal__exercises');
   assert.ok(summary);
   assert.equal(summary.tagName, 'ul');
   assert.equal(summary.children.length, 2);
-  assert.equal(summary.children[0].children[0].tagName, 'strong');
-  assert.match(summary.children[0].children[0].textContent, /Chest Press @ 0°/);
-  assert.match(summary.children[0].children[1].textContent, /Set 1: 32 kg × 10 reps · cable: concentric/);
-  assert.match(summary.children[1].children[0].textContent, /Bicep Curl/);
-  assert.match(summary.children[1].children[1].textContent, /cable: constant force/);
+  const firstCopy = summary.children[0].children[1];
+  assert.equal(firstCopy.children[0].tagName, 'strong');
+  assert.match(firstCopy.children[0].textContent, /Chest Press @ 0°/);
+  assert.match(firstCopy.children[1].textContent, /Set 1: 32 kg × 10 reps · cable: concentric/);
+  const secondCopy = summary.children[1].children[1];
+  assert.match(secondCopy.children[0].textContent, /Bicep Curl/);
+  assert.match(secondCopy.children[1].textContent, /cable: constant force/);
+});
+
+test('appendRecordProposal renders a planned workout as a save-to-Fitness card', () => {
+  const root = new FakeDocument();
+  const { card, confirm } = appendRecordProposal(root, {
+    path: 'data/fitness/2026/07/2026-07-30-test.md',
+    record: {
+      type: 'workout',
+      date: '2026-07-30',
+      title: 'Upper Body',
+      session_kind: 'strength',
+      status: 'planned',
+      duration_min: 35,
+      exercises: [
+        { name: 'Bench Press', sets: [{}, {}, {}, {}] },
+        { name: 'Push-Up', sets: [{}, {}, {}, {}] }
+      ]
+    },
+    notes: ''
+  });
+
+  assert.equal(findByClass(card, 'workout-plan-card__day').textContent, 'Thursday');
+  assert.equal(findByClass(card, 'workout-plan-card__title').textContent, 'Upper Body');
+  assert.equal(findByClass(card, 'workout-plan-card__meta').textContent, '35 min');
+  assert.equal(findByClass(card, 'workout-plan-card__sets').textContent, '4 sets');
+  assert.equal(confirm.textContent, 'Save to Fitness');
+  // Planned workouts expose day_type / duration_min / status (+ notes) as editable pairs.
+  assert.equal(card.children.find(child => child.className === 'record-proposal__fields').children.length, 6);
 });
 
 test('appendRecordProposal renders protocol lint warnings without disabling Confirm', () => {
@@ -278,16 +385,18 @@ test('appendCnPatchProposal renders summary, section/op, affected detail, and Co
     card.children.find(child => child.className === 'cn-patch-proposal__meta')?.textContent,
     'constraints · delete_lines'
   );
-  assert.equal(
-    card.children.find(child => child.className === 'cn-patch-proposal__detail')?.textContent,
-    'Steroid taper'
-  );
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.match(collectCardText(diffs), /Steroid taper/);
   assert.equal(confirm.textContent, 'Confirm');
   assert.equal(discard.textContent, 'Discard');
+  assert.match(card.className, /confirm-card/);
+  assert.match(confirm.className, /btn--primary/);
+  assert.match(discard.className, /btn--ghost/);
   assert.equal(root.querySelector('#chat-messages').children.includes(card), true);
 });
 
-test('appendCnPatchProposal includes truncated payload.text in the detail line', () => {
+test('appendCnPatchProposal includes truncated payload.text in structured diffs', () => {
   const root = new FakeDocument();
   const longText = `${'Keep surplus and hold the line. '.repeat(12)}tail`;
   const { card } = appendCnPatchProposal(root, {
@@ -302,12 +411,13 @@ test('appendCnPatchProposal includes truncated payload.text in the detail line',
     }
   });
 
-  const detail = card.children.find(child => child.className === 'cn-patch-proposal__detail')?.textContent ?? '';
-  assert.match(detail, /^old directive · /);
-  const textPart = detail.slice('old directive · '.length);
-  assert.ok(textPart.length <= 160);
-  assert.match(textPart, /…$/);
-  assert.doesNotMatch(detail, /tail/);
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  const blob = collectCardText(diffs);
+  assert.match(blob, /old directive/);
+  assert.match(blob, /Keep surplus and hold the line/);
+  assert.match(blob, /…/);
+  assert.doesNotMatch(blob, /tail/);
 });
 
 function collectCardText(node) {
@@ -351,3 +461,227 @@ test('renderInlineMarkdown keeps bullet lines in one list even when a blank line
   assert.equal(container.children[0].children[0].children[0].textContent, 'One');
   assert.equal(container.children[0].children[1].children[0].textContent, 'Two');
 });
+
+test('renderInlineMarkdown groups consecutive numbered lines into an ordered list', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'Steps:\n1. First\n2. Second with **bold**', { multiline: true });
+
+  assert.equal(container.children.length, 2);
+  const list = container.children[1];
+  assert.equal(list.tagName, 'ol');
+  assert.equal(list.children.length, 2);
+  assert.equal(list.children[0].children[0].textContent, 'First');
+  assert.equal(list.children[1].children[1].tagName, 'strong');
+  assert.equal(list.children[1].children[1].textContent, 'bold');
+});
+
+test('renderChatMarkdown turns a flattened workout dump into stacked exercise rows', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, [
+    '1. **Bar Squat** — legs first while you\'re fresh - Set 1: 10 reps x 25kg (cable: none) - Set 2: 10 reps x 25kg (cable: none) - Set 3: 10 reps x 25kg (cable: none)',
+    '2. **Bar Row** — pull that back thick - Set 1: 10 reps x 26kg (cable: constant force) - Set 2: 10 reps x 26kg (cable: constant force) - Set 3: 10 reps x 26kg (cable: constant force)',
+    '3. **Bar Press** — chest gets its pump, always - Set 1: 10 reps x 30kg (cable: constant force)'
+  ].join(' '));
+
+  const card = findByClass(container, 'chat-workout');
+  assert.ok(card);
+  const exercises = findByClass(card, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 3);
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Squat');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__cue').textContent, 'legs first while you\'re fresh');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-n').textContent, '3 sets');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 25 kg');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-cable').textContent, 'constant force');
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__name').textContent, 'Bar Row');
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__set-cable').textContent, 'constant force');
+});
+
+test('renderChatMarkdown parses compact loads and between-set arms', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, [
+    '1. Bar Squat — 10x25kg, 10x25kg, 10x25kg (cable: none) - *between sets:* Bar Bicep Curl — 10x5kg, 10x5kg (cable: none)',
+    '2. Bar Press — 20 reps x 20kg (cable: constant force)'
+  ].join('\n'));
+
+  const exercises = findByClass(container, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 2);
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Squat');
+  assert.equal(findByClass(exercises.children[0], 'chat-workout__set-n').textContent, '3 sets');
+  assert.match(findByClass(exercises.children[0], 'chat-workout__between').textContent, /Bar Bicep Curl/);
+  assert.equal(findByClass(exercises.children[1], 'chat-workout__set-load').textContent, '20 × 20 kg');
+});
+
+test('renderChatMarkdown leaves ordinary chat as multiline markdown', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderChatMarkdown(root, container, 'First.\n\nSecond.');
+
+  assert.equal(container.children.length, 2);
+  assert.equal(container.children[0].tagName, 'p');
+  assert.equal(container.children[0].children[0].textContent, 'First.');
+  assert.equal(container.children[1].children[0].textContent, 'Second.');
+});
+
+test('appendActionProposal renders intent, path diffs, and Confirm/Discard', () => {
+  const root = new FakeDocument();
+  const { card, confirm, discard, acceptedPaths } = appendActionProposal(root, {
+    proposal: {
+      agent: 'brisket',
+      intent: 'open a 7-day no-refined-sugar tracker',
+      writes: [{
+        path: 'data/challenges/2026-08-01-no-sugar.json',
+        mode: 'create',
+        diff: 'new challenge file'
+      }]
+    }
+  });
+
+  assert.ok(card);
+  assert.match(card.className, /action-proposal/);
+  assert.equal(
+    card.children.find(child => child.className === 'action-proposal__summary')?.textContent,
+    'open a 7-day no-refined-sugar tracker'
+  );
+  assert.equal(
+    card.children.find(child => child.className === 'action-proposal__meta')?.textContent,
+    'via brisket'
+  );
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  const writeRow = diffs.children[0].children[0];
+  assert.equal(writeRow.className, 'action-proposal__write');
+  assert.equal(writeRow.children[0].type, 'checkbox');
+  assert.equal(writeRow.children[0].checked, true);
+  assert.equal(writeRow.children[0].value, 'data/challenges/2026-08-01-no-sugar.json');
+  assert.match(writeRow.children[1].textContent, /data\/challenges\/2026-08-01-no-sugar\.json/);
+  assert.match(diffs.children[0].children[1].textContent, /create: new challenge file/);
+  assert.deepEqual(acceptedPaths(), ['data/challenges/2026-08-01-no-sugar.json']);
+  writeRow.children[0].checked = false;
+  assert.deepEqual(acceptedPaths(), []);
+  assert.equal(confirm.textContent, 'Confirm');
+  assert.equal(discard.textContent, 'Discard');
+});
+
+test('appendActionProposal shows task titles, not blob ids or create: new task noise', () => {
+  const root = new FakeDocument();
+  const { card, acceptedPaths } = appendActionProposal(root, {
+    proposal: {
+      agent: 'clare',
+      intent: 'Create 5 tasks',
+      writes: [
+        {
+          path: 'tasks:task:task_mtsnw74u_6jekrv',
+          mode: 'create',
+          content: JSON.stringify({ id: 'task_mtsnw74u_6jekrv', title: 'Email all teachers re: tomorrow\'s arrangements' }),
+          diff: 'new task: Email all teachers re: tomorrow\'s arrangements'
+        },
+        {
+          path: 'tasks:task:task_mtsnw74u_pq8qvd',
+          mode: 'create',
+          content: JSON.stringify({ id: 'task_mtsnw74u_pq8qvd', title: 'Block lunch tomorrow' }),
+          diff: 'new task: Block lunch tomorrow'
+        }
+      ]
+    }
+  });
+
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.equal(diffs.children.length, 2);
+
+  const first = diffs.children[0];
+  const firstRow = first.children[0];
+  assert.equal(firstRow.children[0].value, 'tasks:task:task_mtsnw74u_6jekrv');
+  assert.equal(firstRow.children[1].tagName, 'span');
+  assert.equal(firstRow.children[1].className, 'action-proposal__label');
+  assert.equal(firstRow.children[1].textContent, 'Email all teachers re: tomorrow\'s arrangements');
+  assert.equal(firstRow.children[0].attributes.get('aria-label'), 'Accept Email all teachers re: tomorrow\'s arrangements');
+  // No secondary "create: new task: …" line for plain creates.
+  assert.equal(first.children.length, 1);
+
+  const second = diffs.children[1];
+  assert.equal(second.children[0].children[1].textContent, 'Block lunch tomorrow');
+
+  // Visible labels are titles only; accept values keep the blob path for Confirm.
+  assert.deepEqual(
+    diffs.children.map(li => li.children[0].children[1].textContent),
+    [
+      'Email all teachers re: tomorrow\'s arrangements',
+      'Block lunch tomorrow'
+    ]
+  );
+  assert.deepEqual(acceptedPaths(), [
+    'tasks:task:task_mtsnw74u_6jekrv',
+    'tasks:task:task_mtsnw74u_pq8qvd'
+  ]);
+});
+
+test('formatActionWriteDisplay falls back to cleaned diff when content has no title', () => {
+  const display = formatActionWriteDisplay({
+    path: 'tasks:task:task_abc',
+    mode: 'create',
+    content: '{}',
+    diff: 'new task: Mark Year 11 papers'
+  });
+  assert.equal(display.label, 'Mark Year 11 papers');
+  assert.equal(display.detail, null);
+  assert.equal(display.useCode, false);
+  assert.equal(display.path, 'tasks:task:task_abc');
+});
+
+test('formatActionWriteDisplay keeps useful update detail without dumping the blob id', () => {
+  const display = formatActionWriteDisplay({
+    path: 'tasks:task:task_appraisal',
+    mode: 'overwrite',
+    content: JSON.stringify({ id: 'task_appraisal', title: 'Appraisal prep' }),
+    diff: 'reschedule Appraisal prep → 2026-09-10'
+  });
+  assert.equal(display.label, 'Appraisal prep');
+  assert.equal(display.detail, 'reschedule Appraisal prep → 2026-09-10');
+  assert.equal(display.useCode, false);
+});
+
+test('appendCnPatchProposal renders structured diff rows for match/text payloads', () => {
+  const root = new FakeDocument();
+  const { card } = appendCnPatchProposal(root, {
+    patch: {
+      section: 'cross_agent',
+      op: 'replace_line',
+      payload: {
+        summary: 'Nudge Brisket',
+        match: 'old directive',
+        text: 'new directive'
+      }
+    }
+  });
+  const diffs = card.children.find(child => child.className === 'action-proposal__diffs');
+  assert.ok(diffs);
+  assert.ok(diffs.children.length >= 1);
+  const blob = collectCardText(card);
+  assert.match(blob, /old directive/);
+  assert.match(blob, /new directive/);
+});
+
+test('syncAssistantMessageTails marks only the last bubble in a consecutive assistant run', () => {
+  const list = new FakeElement('ul');
+  const user = new FakeElement('li');
+  user.className = 'chat-message chat-message--user';
+  const a1 = new FakeElement('li');
+  a1.className = 'chat-message chat-message--assistant';
+  const a2 = new FakeElement('li');
+  a2.className = 'chat-message chat-message--assistant';
+  const a3 = new FakeElement('li');
+  a3.className = 'chat-message chat-message--assistant chat-message--status';
+  list.append(user, a1, a2, a3);
+
+  syncAssistantMessageTails(list);
+
+  assert.doesNotMatch(user.className, /chat-message--tail/);
+  assert.doesNotMatch(a1.className, /chat-message--tail/);
+  assert.doesNotMatch(a2.className, /chat-message--tail/);
+  assert.match(a3.className, /chat-message--tail/);
+});
+

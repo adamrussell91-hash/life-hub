@@ -1,3 +1,10 @@
+import {
+  UMBRELLA_PASSPHRASE_HASH_ENV,
+  UMBRELLA_SESSION_COOKIE,
+  UMBRELLA_SESSION_SECRET_ENV
+} from './umbrella-auth.mjs';
+import { isAllowedRequestOrigin } from './umbrella-origins.mjs';
+
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store'
@@ -10,10 +17,15 @@ export function jsonResponse(status, body, headers = {}) {
   });
 }
 
-export function errorResponse(status, code, message, retryable, headers = {}) {
+export function okResponse(status, data, headers = {}) {
+  return jsonResponse(status, { ok: true, data }, headers);
+}
+
+export function errorResponse(status, code, message, retryable, headers = {}, data = undefined) {
   return jsonResponse(status, {
     ok: false,
-    error: { code, message, retryable }
+    error: { code, message, retryable },
+    ...(data !== undefined ? { data } : {})
   }, headers);
 }
 
@@ -26,12 +38,10 @@ export function requireSameOrigin(request) {
 
 // The site (GitHub Pages) and this API (Netlify Functions) are different origins by
 // design, so a request is allowed if it's same-origin (local dev, direct calls) OR
-// from the one explicitly configured SITE_ORIGIN.
+// from SITE_ORIGIN / the umbrella app origin list (Life + Teaching Pages).
 export function requireAllowedOrigin(request, env) {
   if (requireSameOrigin(request)) return true;
-  const origin = request.headers.get('origin');
-  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
-  return Boolean(allowed) && origin === allowed;
+  return isAllowedRequestOrigin(request.headers.get('origin'), env);
 }
 
 export function guardRequestOrigin(request, env) {
@@ -42,13 +52,12 @@ export function guardRequestOrigin(request, env) {
 
 export function corsHeaders(request, env) {
   const origin = request.headers.get('origin');
-  const allowed = typeof env?.SITE_ORIGIN === 'string' ? env.SITE_ORIGIN : '';
-  if (!allowed || origin !== allowed) return {};
+  if (!isAllowedRequestOrigin(origin, env)) return {};
   return {
-    'access-control-allow-origin': allowed,
+    'access-control-allow-origin': origin,
     'access-control-allow-credentials': 'true',
-    'access-control-allow-headers': 'content-type',
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, if-none-match, accept',
+    'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     vary: 'origin'
   };
 }
@@ -75,13 +84,23 @@ export function readCookie(request, name) {
   return null;
 }
 
+export function readUmbrellaSessionCookie(request) {
+  return readCookie(request, UMBRELLA_SESSION_COOKIE);
+}
+
+export function umbrellaSessionSecret(env) {
+  return env?.[UMBRELLA_SESSION_SECRET_ENV];
+}
+
 export function methodNotAllowed(allow) {
   return errorResponse(405, 'method_not_allowed', 'This method is not allowed.', false, { allow });
 }
 
 export function isConfigured(env) {
-  return typeof env?.LIFE_HUB_PASSPHRASE_HASH === 'string' && env.LIFE_HUB_PASSPHRASE_HASH.length > 0 &&
-    typeof env?.SESSION_SECRET === 'string' && Buffer.byteLength(env.SESSION_SECRET, 'utf8') >= 32;
+  const passphrase = env?.[UMBRELLA_PASSPHRASE_HASH_ENV];
+  const sessionSecret = env?.[UMBRELLA_SESSION_SECRET_ENV];
+  return typeof passphrase === 'string' && passphrase.length > 0 &&
+    typeof sessionSecret === 'string' && Buffer.byteLength(sessionSecret, 'utf8') >= 32;
 }
 
 export function misconfiguredResponse() {

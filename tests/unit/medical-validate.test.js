@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
-import { parseEventDocument, TYPE_DOMAINS } from '../../js/core/records.js';
-import { validateRecord } from '../../js/core/validate.js';
+import { parseEventDocument, TYPE_DOMAINS } from '../../apps/life/js/core/records.js';
+import { validateRecord } from '../../apps/life/js/core/validate.js';
 
 const common = {
   schema_version: 1,

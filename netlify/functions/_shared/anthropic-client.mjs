@@ -2,12 +2,13 @@ const ANTHROPIC_ORIGIN = 'https://api.anthropic.com';
 const API_VERSION = '2023-06-01';
 const MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 8192;
-// A session build can call search_exercise_library / save_exercise_library_entry
-// once per move (5-9 exercises) before ever reaching log_entry if the model
-// doesn't batch those calls in one turn -- 6 rounds was too tight for that
-// realistic, non-batched pattern and silently ended turns with no proposal.
-const MAX_TOOL_ROUNDS = 9;
-const MAX_PAUSE_CONTINUATIONS = 3;
+// High enough that iterative web_search / pause_turn research can finish,
+// and that a session build can call search_exercise_library /
+// save_exercise_library_entry once per move (5-9 exercises) before log_entry
+// when the model doesn't batch those calls. These are runaway-loop brakes,
+// not a research budget — 6/9 was too tight for either pattern.
+export const MAX_TOOL_ROUNDS = 24;
+export const MAX_PAUSE_CONTINUATIONS = 20;
 
 export class AnthropicClientError extends Error {
   constructor(code, retryable) {
@@ -18,13 +19,13 @@ export class AnthropicClientError extends Error {
   }
 }
 
-export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
+export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANTHROPIC_ORIGIN } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
   }
 
   return {
-    async *streamMessage({ system, messages, tools, signal, executeTools }) {
+    async *streamMessage({ system, messages, tools, signal, executeTools, toolChoice = null, maxTokens = null }) {
       let roundMessages = messages;
       let pauseContinuations = 0;
 
@@ -32,15 +33,24 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
         const pendingResults = [];
         const roundState = { assistantBlocks: [], stopReason: null };
         let sawDone = false;
+        // Force a tool on round 0 only when activation requires retrieval.
+        // Strip server web_search for that forced round so "any" cannot dodge domain reads.
+        const forceRound = round === 0 && toolChoice;
+        const roundTools = forceRound
+          ? (tools ?? []).filter(tool => tool?.name !== 'web_search' && tool?.type !== 'web_search_20250305')
+          : tools;
 
         for await (const event of streamOnce({
           apiKey,
           fetchImpl,
+          baseUrl,
           system,
           messages: roundMessages,
-          tools,
+          tools: roundTools,
+          toolChoice: forceRound ? toolChoice : null,
           signal,
-          roundState
+          roundState,
+          maxTokens
         })) {
           if (event.type === 'done') {
             sawDone = true;
@@ -105,10 +115,12 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
         }
 
         if (
-          roundState.stopReason === 'pause_turn'
+          (roundState.stopReason === 'pause_turn' || roundState.stopReason === 'max_tokens')
           && pauseContinuations < MAX_PAUSE_CONTINUATIONS
           && roundState.assistantBlocks.length > 0
         ) {
+          // Continue after pause_turn (server tools) and max_tokens so a long
+          // Vera/Brisket reply is not left mid-sentence when the token budget trips.
           pauseContinuations += 1;
           roundMessages = [
             ...roundMessages,
@@ -126,10 +138,21 @@ export function createAnthropicClient({ apiKey, fetchImpl = fetch } = {}) {
   };
 }
 
-async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal, roundState }) {
+async function* streamOnce({
+  apiKey,
+  fetchImpl,
+  baseUrl = ANTHROPIC_ORIGIN,
+  system,
+  messages,
+  tools,
+  toolChoice = null,
+  signal,
+  roundState,
+  maxTokens = null
+}) {
   let response;
   try {
-    response = await fetchImpl(`${ANTHROPIC_ORIGIN}/v1/messages`, {
+    response = await fetchImpl(`${String(baseUrl).replace(/\/$/, '')}/v1/messages`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
@@ -138,7 +161,7 @@ async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal,
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
         // Sonnet 5 thinks by default; thinking tokens count toward max_tokens and
         // routinely burn 40s+ before the first visible token on CN audits — past
         // Netlify's function budget, which surfaces as a stalled/empty chat turn.
@@ -146,6 +169,7 @@ async function* streamOnce({ apiKey, fetchImpl, system, messages, tools, signal,
         system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral', ttl: '1h' } }],
         messages,
         tools,
+        ...(toolChoice ? { tool_choice: toolChoice } : {}),
         stream: true
       }),
       signal
@@ -210,6 +234,23 @@ function sanitizeAssistantBlocks(blocks) {
   });
 }
 
+
+function sourcesFromWebSearchToolResult(block) {
+  const content = Array.isArray(block?.content) ? block.content : [];
+  const sources = [];
+  for (const item of content) {
+    if (!item || item.type !== 'web_search_result') continue;
+    const url = typeof item.url === 'string' ? item.url.trim() : '';
+    if (!url) continue;
+    const title = typeof item.title === 'string' && item.title.trim() ? item.title.trim() : url;
+    const snippet = typeof item.page_age === 'string' && item.page_age.trim()
+      ? item.page_age.trim()
+      : undefined;
+    sources.push(snippet ? { title, url, snippet } : { title, url });
+  }
+  return sources;
+}
+
 function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'content_block_start') {
     const block = event.payload.content_block;
@@ -232,6 +273,12 @@ function* interpretEvent(event, toolBuffers, roundState) {
     } else if (block && typeof blockType === 'string') {
       // Complete blocks (web_search_tool_result, redacted_thinking, etc.).
       roundState?.assistantBlocks.push(structuredClone(block));
+      if (blockType === 'web_search_tool_result') {
+        const sources = sourcesFromWebSearchToolResult(block);
+        if (sources.length) {
+          yield { type: 'sources', heading: 'Sources', sources };
+        }
+      }
     }
     return;
   }
@@ -297,6 +344,14 @@ function* interpretEvent(event, toolBuffers, roundState) {
   if (event.name === 'message_delta') {
     const reason = event.payload.delta?.stop_reason;
     if (reason != null && roundState) roundState.stopReason = reason;
+    const usage = event.payload.usage;
+    if (usage && (usage.input_tokens != null || usage.output_tokens != null)) {
+      yield {
+        type: 'usage',
+        inputTokens: Number(usage.input_tokens) || 0,
+        outputTokens: Number(usage.output_tokens) || 0
+      };
+    }
     return;
   }
   if (event.name === 'message_stop') yield { type: 'done' };

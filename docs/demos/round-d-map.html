@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Round D — MapLibre place spine</title>
+  <link href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <style>
+    html, body { margin: 0; height: 100%; font-family: Inter, system-ui, sans-serif; }
+    #map { position: absolute; inset: 0; }
+    .panel {
+      position: absolute; z-index: 2; left: 1rem; top: 1rem; max-width: 22rem;
+      background: rgba(250,248,242,.94); backdrop-filter: blur(8px);
+      border-radius: 1rem; padding: 1rem 1.1rem; box-shadow: 0 8px 28px rgba(10,21,54,.18);
+      color: #0a1536;
+    }
+    .panel h1 { font-size: 1.05rem; margin: 0 0 .35rem; }
+    .panel p { margin: 0 0 .75rem; font-size: .9rem; opacity: .85; }
+    .panel ul { margin: 0; padding: 0; list-style: none; display: grid; gap: .35rem; }
+    .panel button {
+      width: 100%; text-align: left; border: 0; border-radius: .65rem; padding: .55rem .7rem;
+      background: #fff; cursor: pointer; font: inherit; color: inherit;
+    }
+    .panel button:hover, .panel button.is-active { outline: 2px solid #4a7bb5; }
+    .popup { font: 600 .9rem Inter, system-ui, sans-serif; }
+    .popup small { display: block; font-weight: 400; opacity: .75; margin-top: .2rem; }
+  </style>
+</head>
+<body>
+  <div id="map" role="application" aria-label="Places map"></div>
+  <aside class="panel">
+    <h1>Trusted place renderer</h1>
+    <p>Domain places → MapLibre. Agents emit place ids, not map config. Tiles: OpenFreeMap (no key).</p>
+    <ul id="list"></ul>
+  </aside>
+  <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+  <script type="module">
+    // Sample Life Hub–shaped place objects (medical / venue style — string addresses today).
+    // Round D enables: lat/lng + place_id as first-class fields; map is a representation, not a store.
+    const places = [
+      {
+        id: 'place_northshore_private',
+        name: 'North Shore Private Hospital',
+        address: '3 Westbourne St, St Leonards NSW',
+        kind: 'medical',
+        lng: 151.1936,
+        lat: -33.8225
+      },
+      {
+        id: 'place_prosper_nutrition',
+        name: 'Prosper Nutrition',
+        address: 'Lane Cove NSW',
+        kind: 'medical',
+        lng: 151.1689,
+        lat: -33.8142
+      },
+      {
+        id: 'place_mq_centre',
+        name: 'Macquarie Centre',
+        address: 'Macquarie Park NSW',
+        kind: 'venue',
+        lng: 151.1197,
+        lat: -33.7765
+      },
+      {
+        id: 'place_pathfinders',
+        name: 'Pathfinders program venue',
+        address: 'Northern Sydney',
+        kind: 'teaching',
+        lng: 151.2093,
+        lat: -33.8688
+      }
+    ];
+
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [151.17, -33.84],
+      zoom: 11
+    });
+    map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+    const list = document.getElementById('list');
+    const markers = new Map();
+
+    function focusPlace(place) {
+      map.flyTo({ center: [place.lng, place.lat], zoom: 14, essential: true });
+      list.querySelectorAll('button').forEach((b) => b.classList.toggle('is-active', b.dataset.id === place.id));
+      const marker = markers.get(place.id);
+      marker?.getPopup()?.addTo(map);
+    }
+
+    for (const place of places) {
+      const popup = new maplibregl.Popup({ offset: 18 }).setHTML(
+        `<div class="popup">${place.name}<small>${place.kind} · ${place.address}</small></div>`
+      );
+      const marker = new maplibregl.Marker({ color: place.kind === 'medical' ? '#4a7bb5' : '#e07a3d' })
+        .setLngLat([place.lng, place.lat])
+        .setPopup(popup)
+        .addTo(map);
+      markers.set(place.id, marker);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.id = place.id;
+      btn.textContent = place.name;
+      btn.addEventListener('click', () => focusPlace(place));
+      list.append(btn);
+    }
+
+    // Agent Tool UI contract demo: structured payload, trusted renderer.
+    window.__hubMapPayloadExample = {
+      type: 'map_places',
+      focus: 'place_northshore_private',
+      places: places.map(({ id, name, address, kind, lng, lat }) => ({ id, name, address, kind, lng, lat }))
+    };
+  </script>
+</body>
+</html>

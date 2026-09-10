@@ -1,0 +1,14 @@
+{
+  "id": "challenge-progress",
+  "approved": true,
+  "approved_by": "adam",
+  "approved_on": "2026-08-31",
+  "title": "Challenge progress",
+  "description": "Single progress bar + title for an open challenge",
+  "fields": {
+    "challenge_id": "string",
+    "title": "string",
+    "progress_pct": "number",
+    "subtitle": "string?"
+  }
+}

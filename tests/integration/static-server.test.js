@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { execFile } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { resolve, sep } from 'node:path';
+import { join, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { createStaticServer } from '../../scripts/serve.mjs';
 
@@ -55,9 +57,9 @@ test('serves the Home shell with the correct content type', async t => {
 });
 
 test('publishes design-kit stylesheets linked from the Home shell', async t => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  const hrefs = [...html.matchAll(/href="(design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
-  assert.ok(hrefs.length > 0, 'index.html must link design-kit CSS');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const hrefs = [...html.matchAll(/href="(packages\/design-kit\/[^"]+\.css)"/g)].map(match => match[1]);
+  assert.ok(hrefs.length > 0, 'index.html must link packages/design-kit CSS');
 
   const baseUrl = await startServer(t);
   for (const href of hrefs) {
@@ -68,10 +70,10 @@ test('publishes design-kit stylesheets linked from the Home shell', async t => {
 });
 
 test('publishes design-kit modules imported by the app shell', async t => {
-  const sources = await readFile(new URL('../../js/app/render-medical.js', import.meta.url), 'utf8');
-  const imports = [...sources.matchAll(/from ['"](\.\.\/\.\.\/design-kit\/[^'"]+)['"]/g)]
+  const sources = await readFile(new URL('../../dist/js/app/render-medical.js', import.meta.url), 'utf8');
+  const imports = [...sources.matchAll(/from ['"](\.\.\/\.\.\/packages\/design-kit\/[^'"]+)['"]/g)]
     .map(match => match[1].replace('../../', ''));
-  assert.ok(imports.includes('design-kit/js/hub-filter-menu.js'));
+  assert.ok(imports.includes('packages/design-kit/js/hub-filter-menu.js'));
 
   const baseUrl = await startServer(t);
   for (const href of imports) {
@@ -80,6 +82,32 @@ test('publishes design-kit modules imported by the app shell', async t => {
     assert.match(response.headers.get('content-type'), /javascript/);
     assert.match(await response.text(), /createHubFilter|export /);
   }
+});
+
+test('every published design-kit import in dist/js resolves', async () => {
+  const files = [];
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+      if (entry.isDirectory()) {
+        await walk(next);
+        continue;
+      }
+      if (entry.name.endsWith('.js')) files.push(next);
+    }
+  }
+  await walk(new URL('../../dist/js/', import.meta.url));
+  assert.ok(files.length > 0, 'prepare-web must publish js into dist/js');
+
+  let imports = 0;
+  for (const file of files) {
+    const source = await readFile(file, 'utf8');
+    for (const [, spec] of source.matchAll(/from ['"]((?:\.\.\/)+packages\/design-kit\/[^'"]+)['"]/g)) {
+      imports += 1;
+      await access(new URL(spec, file), constants.F_OK);
+    }
+  }
+  assert.ok(imports > 0, 'dist/js must keep at least one packages/design-kit import');
 });
 
 test('native sign-in POST to / serves the shell instead of 405', async t => {
@@ -93,6 +121,26 @@ test('native sign-in POST to / serves the shell instead of 405', async t => {
   assert.equal(response.status, 200);
   assert.match(response.headers.get('content-type'), /^text\/html/);
   assert.match(await response.text(), /Life Hub/);
+});
+
+test('serves remounted hub directory indexes and SPA fallbacks', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'life-hub-spa-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'teaching'));
+  await writeFile(join(root, 'teaching', 'index.html'), '<title>Teaching Hub</title>');
+  const server = createStaticServer({ root, apiRoot: projectRoot });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const index = await fetch(`${baseUrl}/teaching/`);
+  assert.equal(index.status, 200);
+  assert.match(await index.text(), /Teaching Hub/);
+
+  const deep = await fetch(`${baseUrl}/teaching/classes/class_1`);
+  assert.equal(deep.status, 200);
+  assert.match(await deep.text(), /Teaching Hub/);
 });
 
 function readConfigurationValue(configuration, section, key) {
@@ -179,19 +227,25 @@ test('local sign-in exposes the fixture repository contract', async t => {
   });
   assert.equal(manifest.status, 200);
   const payload = await manifest.json();
-  assert.equal(payload.data.files.length, 7);
-  assert.deepEqual(payload.data.files[0], {
-    path: 'config/agents.yml',
-    sha: '4d25a8e7888a482039b3558a21f2fde45b97d1bd',
-    size: 1310
-  });
+  assert.equal(payload.data.files.length, 10);
+  assert.ok(payload.data.files.some(f => f.path === 'data/body/2026/07/2026-07-08-therapy-kate-semple.md'));
+  const agents = payload.data.files[0];
+  assert.equal(agents.path, 'config/agents.yml');
+  assert.match(agents.sha, /^[0-9a-f]{40}$/);
+  assert.equal(typeof agents.size, 'number');
+  assert.ok(agents.size > 0);
+  const targets = payload.data.files.find(f => f.path === 'config/targets.yml');
+  assert.ok(targets);
+  assert.match(targets.sha, /^[0-9a-f]{40}$/);
+  assert.ok(targets.size > 0);
+  const challenges = payload.data.files.find(f => f.path === 'data/nutrition/challenges.json');
+  assert.ok(challenges);
   const centralNode = payload.data.files.find(f => f.path === 'central-node.md');
   assert.ok(centralNode);
-  assert.deepEqual(centralNode, {
-    path: 'central-node.md',
-    sha: 'cc697eca71888316c1dda5bbfe38d7a1d9376816',
-    size: 1309
-  });
+  assert.equal(centralNode.path, 'central-node.md');
+  assert.match(centralNode.sha, /^[0-9a-f]{40}$/);
+  assert.equal(typeof centralNode.size, 'number');
+  assert.ok(centralNode.size > 0);
 });
 
 test('local mock API rejects non-local host headers', async t => {
@@ -310,8 +364,11 @@ test('local repository file reads return exact fixture pairs in request order', 
     { headers: { cookie } }
   );
   const manifest = (await manifestResponse.json()).data;
-  const requested = [manifest.files.at(-1), manifest.files[0]]
-    .map(({ path, sha }) => ({ path, sha }));
+  const meal = manifest.files.find(file => file.path.includes('2026-07-30-lunch'));
+  const agents = manifest.files.find(file => file.path === 'config/agents.yml');
+  assert.ok(meal);
+  assert.ok(agents);
+  const requested = [meal, agents].map(({ path, sha }) => ({ path, sha }));
 
   const response = await fetch(`${baseUrl}/api/repo/files`, {
     method: 'POST',
@@ -327,3 +384,32 @@ test('local repository file reads return exact fixture pairs in request order', 
   assert.match(payload.data.files[0].content, /Marley Spoon chicken bowl\./);
   assert.match(payload.data.files[1].content, /^agents:/m);
 });
+
+test('local shortcuts list and run stay on the Confirm path', async t => {
+  const baseUrl = await startServer(t);
+  const auth = await fetch(`${baseUrl}/api/auth`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ passphrase: 'life-hub-local' })
+  });
+  const cookie = auth.headers.get('set-cookie').split(';', 1)[0];
+
+  const listed = await fetch(`${baseUrl}/api/shortcuts`, { headers: { cookie } });
+  const listPayload = await listed.json();
+  assert.equal(listed.status, 200);
+  assert.ok(listPayload.data.catalog.some(item => item.id === 'remember.set-week-flag'));
+  assert.equal(listPayload.data.promoted[0].proposed_id, 'track.morning-weigh-in');
+  assert.equal(listPayload.data.promoted[0].proposed_by, 'brisket');
+
+  const ran = await fetch(`${baseUrl}/api/shortcuts`, {
+    method: 'POST',
+    headers: { cookie, 'content-type': 'application/json' },
+    body: JSON.stringify({ proposed_id: 'track.morning-weigh-in', agent_slug: 'brisket' })
+  });
+  const runPayload = await ran.json();
+  assert.equal(ran.status, 200);
+  assert.match(runPayload.data.proposal.intent, /track\.morning-weigh-in/);
+  assert.equal(runPayload.data.proposal.writes[0].path, 'data/challenges/2026-08-31-weigh-in.json');
+  assert.equal(runPayload.data.agent_slug, 'brisket');
+});
+

@@ -1,0 +1,584 @@
+{
+  "version": "0.5.0",
+  "generated_from": "capability definition files (single source of truth)",
+  "capabilities": {
+    "os.propose-action": {
+      "file": "propose-action.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_propose_action"
+    },
+    "log.entry": {
+      "file": "log/log-entry.json",
+      "agents": [
+        "brisket",
+        "chadwick",
+        "hyaluronica",
+        "penelope",
+        "sara",
+        "vera"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "central_node",
+        "domain_tab"
+      ],
+      "tool_name": "log_entry",
+      "legacy_tool": "log_entry"
+    },
+    "log.delete-meal": {
+      "file": "log/delete-meal.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "central_node",
+        "nutrition_tab",
+        "governance_log"
+      ],
+      "tool_name": "delete_meal"
+    },
+    "publish.cn-patch": {
+      "file": "publish/cn-patch.json",
+      "agents": [
+        "hammond",
+        "clare",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "central_node",
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_central_node_patch",
+      "legacy_tool": "propose_central_node_patch"
+    },
+    "publish.governance-log-entry": {
+      "file": "publish/governance-log-entry.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log"
+      ],
+      "tool_name": "append_governance_log",
+      "legacy_tool": "append_governance_log"
+    },
+    "lookup.save-food-library": {
+      "file": "lookup/save-food-library.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "food_library"
+      ],
+      "tool_name": "save_food_library_entry",
+      "legacy_tool": "save_food_library_entry"
+    },
+    "lookup.save-exercise-library": {
+      "file": "lookup/save-exercise-library.json",
+      "agents": [
+        "chadwick"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "exercise_library"
+      ],
+      "tool_name": "save_exercise_library_entry",
+      "legacy_tool": "save_exercise_library_entry"
+    },
+    "remember.set-week-flag": {
+      "file": "remember/set-week-flag.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context"
+      ],
+      "tool_name": "remember_set_week_flag"
+    },
+    "remember.note-context": {
+      "file": "remember/note-context.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context"
+      ],
+      "tool_name": "remember_note_context"
+    },
+    "remember.write-memory": {
+      "file": "remember/write-memory.json",
+      "agents": [
+        "chadwick",
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log",
+        "agent_context",
+        "confirm_card"
+      ],
+      "tool_name": "remember_write_memory"
+    },
+    "track.open-challenge": {
+      "file": "track/open-challenge.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_open_challenge"
+    },
+    "track.log-progress": {
+      "file": "track/log-progress.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "governance_log"
+      ],
+      "tool_name": "track_log_progress"
+    },
+    "track.close-challenge": {
+      "file": "track/close-challenge.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "track_close_challenge"
+    },
+    "coordinate.request-cn-write": {
+      "file": "coordinate/request-cn-write.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "central_node",
+        "governance_log"
+      ],
+      "tool_name": "coordinate_request_cn_write"
+    },
+    "research.save-brief": {
+      "file": "research/save-brief.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "research_save_brief"
+    },
+    "research.expiring-brief": {
+      "file": "research/expiring-brief.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "research_expiring_brief"
+    },
+    "publish.surface-widget": {
+      "file": "publish/surface-widget.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "hub_tab",
+        "governance_log"
+      ],
+      "tool_name": "publish_surface_widget"
+    },
+    "plan.week-meals": {
+      "file": "plan/week-meals.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "nutrition_tab",
+        "governance_log"
+      ],
+      "tool_name": "plan_week_meals"
+    },
+    "lookup.food-brand-au": {
+      "file": "lookup/food-brand-au.json",
+      "agents": [
+        "brisket"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "food_library"
+      ],
+      "tool_name": "lookup_food_brand_au"
+    },
+    "os.capability-scoreboard": {
+      "file": "os/capability-scoreboard.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "os_capability_scoreboard"
+    },
+    "intuition.edit-pack": {
+      "file": "intuition/edit-pack.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "agent_context",
+        "governance_log"
+      ],
+      "tool_name": "intuition_edit_pack"
+    },
+    "os.promote-shortcut": {
+      "file": "os/promote-shortcut.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_promote_shortcut"
+    },
+    "os.list-promoted-shortcuts": {
+      "file": "os/list-promoted-shortcuts.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "os_list_promoted_shortcuts"
+    },
+    "os.run-promoted-shortcut": {
+      "file": "os/run-promoted-shortcut.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "os_run_promoted_shortcut"
+    },
+    "tasks.create": {
+      "file": "tasks/create-task.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "create_task"
+    },
+    "tasks.update": {
+      "file": "tasks/update-task.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "update_task"
+    },
+    "clare.clarify": {
+      "file": "clare/clarify.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "clarify_dump"
+    },
+    "clare.project-health": {
+      "file": "clare/project-health.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "project_health"
+    },
+    "clare.waiting": {
+      "file": "clare/waiting.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "waiting_review"
+    },
+    "clare.weekly-review": {
+      "file": "clare/weekly-review.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "weekly_review"
+    },
+    "clare.project-plan": {
+      "file": "clare/project-plan.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "project_plan"
+    },
+    "clare.context-match": {
+      "file": "clare/context-match.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "context_match"
+    },
+    "clare.compose-schedule": {
+      "file": "clare/compose-schedule.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "compose_schedule"
+    },
+    "clare.focus-block": {
+      "file": "clare/focus-block.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "focus_block"
+    },
+    "clare.shutdown": {
+      "file": "clare/shutdown.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "shutdown_day"
+    },
+    "clare.deadline-runway": {
+      "file": "clare/deadline-runway.json",
+      "agents": [
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "confirm_card"
+      ],
+      "tool_name": "deadline_runway"
+    },
+    "hammond.horizons": {
+      "file": "hammond/horizons.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "horizons_chain"
+    },
+    "hammond.portfolio": {
+      "file": "hammond/portfolio.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "portfolio_meter"
+    },
+    "hammond.capacity": {
+      "file": "hammond/capacity.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "capacity_day"
+    },
+    "hammond.multiscale": {
+      "file": "hammond/multiscale.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "multiscale_plan"
+    },
+    "hammond.pace": {
+      "file": "hammond/pace.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "pace_audit"
+    },
+    "hammond.threefold": {
+      "file": "hammond/threefold.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "threefold_audit"
+    },
+    "hammond.attention": {
+      "file": "hammond/attention.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "attention_audit"
+    },
+    "hammond.depth": {
+      "file": "hammond/depth.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "depth_budget"
+    },
+    "hammond.strategic-review": {
+      "file": "hammond/strategic-review.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "strategic_review"
+    },
+    "hammond.week-mission-handoff": {
+      "file": "hammond/week-mission-handoff.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "week_mission_handoff"
+    },
+    "hammond.reconcile-clare-schedule": {
+      "file": "hammond/reconcile-clare-schedule.json",
+      "agents": [
+        "hammond"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat",
+        "governance_log"
+      ],
+      "tool_name": "reconcile_clare_schedule"
+    }
+  }
+}

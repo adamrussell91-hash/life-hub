@@ -1,0 +1,246 @@
+import { buildCalendarMarkers } from '../core/search.js';
+import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart, isCalendarDate } from '../core/time.js';
+
+const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {
+  weekday: 'narrow'
+}).format(new Date(`${date}T12:00:00+10:00`));
+
+const monthLabel = yearMonth => new Intl.DateTimeFormat('en-AU', {
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'Australia/Sydney'
+}).format(new Date(`${yearMonth}-01T12:00:00+10:00`));
+
+export function yearMonthFromDate(date) {
+  if (!isCalendarDate(date)) throw new TypeError(`Invalid calendar date: ${date}`);
+  return date.slice(0, 7);
+}
+
+export function shiftYearMonth(yearMonth, delta) {
+  const [year, month] = yearMonth.split('-').map(Number);
+  const index = year * 12 + (month - 1) + delta;
+  const nextYear = Math.floor(index / 12);
+  const nextMonth = (index % 12) + 1;
+  return `${String(nextYear).padStart(4, '0')}-${String(nextMonth).padStart(2, '0')}`;
+}
+
+export function monthGridRange(yearMonth) {
+  const first = `${yearMonth}-01`;
+  if (!isCalendarDate(first)) throw new TypeError(`Invalid year-month: ${yearMonth}`);
+  const [year, month] = yearMonth.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const last = `${yearMonth}-${String(lastDay).padStart(2, '0')}`;
+  const start = getSydneyWeekStart(first);
+  const end = addCalendarDays(getSydneyWeekStart(last), 6);
+  return { start, end, first, last };
+}
+
+export function eventDetailTitle(record, body = '') {
+  if (!record) return 'Event';
+  switch (record.type) {
+    case 'meal':
+      return record.meal ? String(record.meal) : 'Meal';
+    case 'workout':
+      return record.title || 'Workout';
+    case 'diary':
+      return record.mood ? `Diary · ${record.mood}` : 'Diary';
+    case 'skincare': {
+      if (String(body).startsWith('Procedure:')) {
+        return String(body).split('\n')[0].replace(/^Procedure:\s*/, '').replace(/\.\s*$/, '') || 'Procedure';
+      }
+      return record.routine === 'am' ? 'Skincare · AM' : record.routine === 'pm' ? 'Skincare · PM' : 'Skincare';
+    }
+    case 'weight':
+    case 'composition':
+    case 'measurements':
+    case 'bloods':
+      return 'Body';
+    case 'medical':
+      return record.title || 'Medical';
+    case 'sleep':
+      return 'Sleep';
+    case 'scheduled_lesson':
+      return record.title || 'Lesson';
+    case 'task':
+      return record.title || 'Task';
+    case 'work_block':
+      return record.title || 'Work block';
+    case 'knowledge_page':
+      return record.title || 'Page';
+    default:
+      return record.type || 'Event';
+  }
+}
+
+export function eventBrief(event) {
+  const record = event?.record;
+  if (!record) return '';
+  switch (record.type) {
+    case 'meal': {
+      const parts = [];
+      if (record.protein_g != null) parts.push(`${record.protein_g}g protein`);
+      if (record.calories != null) parts.push(`${record.calories} kcal`);
+      return parts.join(' · ');
+    }
+    case 'workout': {
+      const parts = [];
+      if (record.duration_min != null) parts.push(`${record.duration_min} min`);
+      if (record.status) parts.push(String(record.status));
+      return parts.join(' · ');
+    }
+    case 'skincare': {
+      if (String(event.body ?? '').startsWith('Procedure:')) return 'Procedure';
+      if (record.routine === 'am') return 'AM routine';
+      if (record.routine === 'pm') return 'PM routine';
+      return '';
+    }
+    case 'weight':
+      return record.weight_kg != null ? `${record.weight_kg} kg` : '';
+    case 'composition': {
+      const parts = [];
+      if (record.weight_kg != null) parts.push(`${record.weight_kg} kg`);
+      if (record.body_fat_pct != null) parts.push(`${record.body_fat_pct}% BF`);
+      return parts.join(' · ');
+    }
+    case 'measurements': {
+      const parts = [];
+      if (record.waist != null) parts.push(`waist ${record.waist}`);
+      if (record.chest != null) parts.push(`chest ${record.chest}`);
+      if (!parts.length && record.hips != null) parts.push(`hips ${record.hips}`);
+      return parts.join(' · ');
+    }
+    case 'bloods': {
+      const n = Array.isArray(record.markers) ? record.markers.length : 0;
+      return n ? `${n} marker${n === 1 ? '' : 's'}` : '';
+    }
+    case 'medical':
+      return record.provider || record.record_type || '';
+    case 'diary': {
+      const parts = [];
+      if (record.mood) parts.push(String(record.mood));
+      if (record.energy) parts.push(`${record.energy} energy`);
+      if (record.mood_score != null) parts.push(`score ${record.mood_score}`);
+      return parts.join(' · ');
+    }
+    case 'sleep':
+      return record.duration_h != null ? `${record.duration_h} h sleep` : '';
+    case 'scheduled_lesson':
+      return record.delivery_status ? `Teaching · ${record.delivery_status}` : 'Teaching';
+    case 'task':
+      return record.status ? `Tasks · ${record.status}` : 'Tasks';
+    case 'work_block': {
+      const parts = ['Work block'];
+      if (record.depth) parts.push(String(record.depth));
+      if (record.status) parts.push(String(record.status));
+      if (record.ghost) parts.push('ghost');
+      return parts.join(' · ');
+    }
+    case 'knowledge_page':
+      return record.area ? `Knowledge · ${record.area}` : 'Knowledge';
+    case 'heart':
+      return record.resting_hr != null ? `RHR ${record.resting_hr}` : '';
+    default:
+      return String(event.body ?? '').trim().slice(0, 80);
+  }
+}
+
+export function resolveCalendarDayClick(expandedDate, clickedDate) {
+  if (clickedDate === expandedDate) {
+    return { selectedDate: clickedDate, expandedDate: null };
+  }
+  return { selectedDate: clickedDate, expandedDate: clickedDate };
+}
+
+function eventDurationMin(record) {
+  if (record?.type === 'workout' && record.duration_min != null) return Number(record.duration_min);
+  if (record?.type === 'work_block' && record.duration_min != null) return Number(record.duration_min);
+  if (record?.type === 'sleep' && record.duration_h != null) return Number(record.duration_h) * 60;
+  return 60;
+}
+
+export function eventsForDate(events, date) {
+  return (events ?? [])
+    .filter(event => event?.record?.date === date)
+    .map(event => ({
+      id: event.record.id ?? event.path,
+      path: event.path,
+      type: event.record.type,
+      time: event.record.time ?? null,
+      durationMin: eventDurationMin(event.record),
+      title: eventDetailTitle(event.record, event.body),
+      brief: eventBrief(event),
+      snippet: String(event.body ?? '').trim().slice(0, 160),
+      categories: buildCalendarMarkers([event])[date] ?? [],
+      ghost: Boolean(event.record.ghost),
+      depth: event.record.depth ?? null,
+      status: event.record.status ?? null
+    }))
+    .sort((a, b) => {
+      const timeA = a.time ?? '99:99';
+      const timeB = b.time ?? '99:99';
+      return timeA.localeCompare(timeB) || a.type.localeCompare(b.type) || a.title.localeCompare(b.title);
+    });
+}
+
+export function buildCalendarModel({
+  events,
+  date,
+  selectedDate,
+  viewMonth,
+  planningLens = false,
+  mission = null,
+  protectedWindows = [],
+  ghostPreview = false
+}) {
+  if (!date) throw new RangeError('Calendar display date is unavailable');
+  const selected = selectedDate && isCalendarDate(selectedDate) ? selectedDate : date;
+  const month = viewMonth && /^\d{4}-\d{2}$/.test(viewMonth) ? viewMonth : yearMonthFromDate(selected);
+  const markers = buildCalendarMarkers(events ?? []);
+  const weekStart = getSydneyWeekStart(selected);
+  const weekDates = enumerateDateKeys(weekStart, addCalendarDays(weekStart, 6));
+  const { start, end } = monthGridRange(month);
+  const monthDates = enumerateDateKeys(start, end);
+  const eventsByDate = Object.fromEntries(
+    weekDates.concat(monthDates).filter((day, index, all) => all.indexOf(day) === index)
+      .map(day => [day, eventsForDate(events, day)])
+  );
+
+  const protectedByDate = {};
+  for (const day of weekDates) {
+    protectedByDate[day] = (protectedWindows ?? [])
+      .filter((w) => w.date === day || (!w.date && day === selected))
+      .map((w) => ({ ...w, date: day }));
+  }
+
+  return {
+    date,
+    selectedDate: selected,
+    viewMonth: month,
+    monthLabel: monthLabel(month),
+    weekStart,
+    planningLens: Boolean(planningLens),
+    ghostPreview: Boolean(ghostPreview),
+    mission: mission ?? null,
+    protectedByDate,
+    weekDays: weekDates.map(day => ({
+      date: day,
+      letter: weekdayLetter(day),
+      categories: markers[day] ?? [],
+      events: eventsByDate[day] ?? [],
+      protected: protectedByDate[day] ?? [],
+      isToday: day === date,
+      isSelected: day === selected
+    })),
+    monthDays: monthDates.map(day => ({
+      date: day,
+      day: Number(day.slice(8, 10)),
+      categories: markers[day] ?? [],
+      events: eventsByDate[day] ?? [],
+      inMonth: day.startsWith(month),
+      isToday: day === date,
+      isSelected: day === selected
+    })),
+    dayEvents: eventsByDate[selected] ?? eventsForDate(events, selected),
+    eventsByDate
+  };
+}

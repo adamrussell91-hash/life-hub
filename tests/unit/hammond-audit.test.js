@@ -3,19 +3,51 @@ import assert from 'node:assert/strict';
 import {
   AUDIT_PHASES,
   isHammondAuditTrigger,
+  isHammondAuditSkipIntakeTrigger,
+  startAuditSessionFromMessage,
   normalizeAuditSession,
   buildHammondAuditContract,
   nextAuditPhase
 } from '../../netlify/functions/_shared/hammond-audit.mjs';
 
-test('detects CN audit / weekly / monthly / goal audit phrases', () => {
+test('detects CN audit / weekly audit / monthly / goal audit phrases', () => {
   assert.equal(isHammondAuditTrigger('Hammond, run a Central Node audit'), true);
-  assert.equal(isHammondAuditTrigger('weekly review please'), true);
+  assert.equal(isHammondAuditTrigger('weekly audit please'), true);
   assert.equal(isHammondAuditTrigger('monthly audit'), true);
   assert.equal(isHammondAuditTrigger('time for a goal audit'), true);
   assert.equal(isHammondAuditTrigger('cn audit'), true);
+  assert.equal(isHammondAuditTrigger('weekly review please'), false, 'weekly review is recap+plan, not a CN audit');
   assert.equal(isHammondAuditTrigger('log lunch'), false);
   assert.equal(isHammondAuditTrigger('Hammond, what is the protein target?'), false);
+});
+
+test('isHammondAuditSkipIntakeTrigger requires both a trigger phrase and a skip marker', () => {
+  assert.equal(isHammondAuditSkipIntakeTrigger('Hammond, goal audit, skip intake'), true);
+  assert.equal(isHammondAuditSkipIntakeTrigger('auto weekly audit, no intake'), true);
+  assert.equal(isHammondAuditSkipIntakeTrigger('weekly audit'), false, 'a bare trigger must not skip intake');
+  assert.equal(isHammondAuditSkipIntakeTrigger('auto weekly review, no intake'), false, 'weekly review is not an audit');
+  assert.equal(isHammondAuditSkipIntakeTrigger('skip intake'), false, 'a skip marker with no trigger phrase is not a trigger at all');
+  assert.equal(isHammondAuditSkipIntakeTrigger('log lunch'), false);
+});
+
+test('startAuditSessionFromMessage bootstraps at triage for a plain trigger', () => {
+  assert.deepEqual(
+    startAuditSessionFromMessage('Hammond, run the weekly audit'),
+    { kind: 'cn_audit', phase: 'triage', intakeCount: 0 }
+  );
+});
+
+test('startAuditSessionFromMessage bootstraps straight past intake for a skip-intake trigger', () => {
+  assert.deepEqual(
+    startAuditSessionFromMessage('Hammond, goal audit, skip intake'),
+    { kind: 'cn_audit', phase: 'stale_drift', intakeCount: 3 }
+  );
+});
+
+test('startAuditSessionFromMessage returns null for a non-trigger message', () => {
+  assert.equal(startAuditSessionFromMessage('log lunch'), null);
+  assert.equal(startAuditSessionFromMessage('skip intake'), null);
+  assert.equal(startAuditSessionFromMessage('Hammond, run the weekly review'), null);
 });
 
 test('normalizeAuditSession accepts only known cn_audit phases', () => {
@@ -48,7 +80,25 @@ test('lock contract requires governance log and CN patch tools', () => {
   const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'lock', intakeCount: 2 });
   assert.match(text, /append_governance_log/);
   assert.match(text, /propose_central_node_patch/);
+  assert.match(text, /Cross-Domain Tension/);
+  assert.match(text, /Hammond→Clare/);
+  assert.match(text, /Hammond→Ann/);
   assert.doesNotMatch(text, /Do not invent a database write/);
+});
+
+test('stale_drift contract requires Other hubs Tasks and Teaching', () => {
+  const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'stale_drift', intakeCount: 2 });
+  assert.match(text, /Other hubs/);
+  assert.match(text, /Tasks/);
+  assert.match(text, /[Tt]eaching|[Ll]esson/);
+  assert.match(text, /Do not run open loops or lock yet/i);
+});
+
+test('open_loops contract includes open Tasks and upcoming lessons', () => {
+  const text = buildHammondAuditContract({ kind: 'cn_audit', phase: 'open_loops', intakeCount: 2 });
+  assert.match(text, /Tasks/);
+  assert.match(text, /lesson/i);
+  assert.match(text, /Do not lock yet/i);
 });
 
 test('nextAuditPhase advances and clears after lock', () => {

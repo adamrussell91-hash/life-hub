@@ -1,0 +1,13 @@
+{
+  "id": "vyvanse-appetite-window",
+  "agents": [
+    "brisket"
+  ],
+  "capacities": [
+    "plan.week-meals",
+    "log.entry",
+    "track.open-challenge"
+  ],
+  "summary": "Vyvanse suppresses appetite for hours after the morning dose; realistic first eating window is often afternoon.",
+  "guidance": "Do not treat skipped breakfast/lunch on a workday as a discipline failure. Coach environmental setup over willpower."
+}

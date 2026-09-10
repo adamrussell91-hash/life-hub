@@ -1,4 +1,5 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { mergeMedicalFields, resolveMedicalLogCandidate, parseMedicalEventTolerant } from '../../apps/life/js/app/medical-normalize.js';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
   errorResponse,
@@ -6,16 +7,25 @@ import {
   isConfigured,
   methodNotAllowed,
   misconfiguredResponse,
+  okResponse,
   preflightResponse,
-  readCookie,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
+import {
+  chatJobOwnerKey,
+  defaultGetChatJobStore
+} from './_shared/chat-job-store.mjs';
+import { defaultInvokeChatBackground } from './_shared/chat-job-run.mjs';
 import { createGitHubClient, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { selectManifestEntries } from './_shared/repo-policy.mjs';
 import { routeAgent, findAgent, ROUTER_SLUG } from './_shared/agent-directory.mjs';
 import { buildSystemPrompt } from './_shared/persona.mjs';
-import { normalizeProtocolId, protocolSteerBlock } from '../../js/app/agent-protocols.js';
+import { CENTRAL_NODE_UNAVAILABLE_MARKER, HUB_CONTEXT_UNAVAILABLE_MARKER } from '../../apps/life/js/core/context-integrity.js';
+import { loadHubAgentContext } from './_shared/hub-agent-context.mjs';
+import { normalizeProtocolId, protocolSteerBlock } from '../../apps/life/js/app/agent-protocols.js';
 import { loadChadwickProtocol } from './_shared/load-chadwick-protocol.mjs';
 import { loadHyaluronicaProtocol } from './_shared/load-hyaluronica-protocol.mjs';
 import { loadPenelopeProtocol } from './_shared/load-penelope-protocol.mjs';
@@ -23,20 +33,97 @@ import { loadVeraProtocol, VERA_INTAKE_PATH } from './_shared/load-vera-protocol
 import { loadBrisketProtocol } from './_shared/load-brisket-protocol.mjs';
 import { loadSaraProtocol } from './_shared/load-sara-protocol.mjs';
 import { loadHammondProtocol } from './_shared/load-hammond-protocol.mjs';
-import { normalizeAuditSession, buildHammondAuditContract } from './_shared/hammond-audit.mjs';
+import {
+  loadClareProtocol,
+  loadAnnProtocol,
+  loadClementineProtocol
+} from './_shared/load-hub-protocols.mjs';
+import { activationForTurn, classifyIntent } from './_shared/capabilities/activation-policy.mjs';
+import { runSurfaceAgentTurn } from './_shared/agent-surface.mjs';
+import { proposeAction } from './_shared/agent-kernel.mjs';
+import {
+  AGENT_TURNS_PATH,
+  parseTurnStoreFile,
+  persistTurnWithClient
+} from './_shared/agent-turn-store.mjs';
+import { parseMemoryStore } from './_shared/agent-memory.mjs';
+import { REMEMBER_LAYERED_MEMORIES_PATH } from './_shared/capabilities/stores.mjs';
+import {
+  getNutritionSnapshot,
+  getNutritionAdherence,
+  getNutritionTargets,
+  searchNutritionRecords,
+  getWeightTrend,
+  searchDiaryRecords,
+  getDiaryRange,
+  searchSkincareRecords,
+  getSkincareAdherence,
+  getTasksFocus,
+  searchTasks,
+  getTask,
+  searchTeaching,
+  getTeachingContext,
+  searchKnowledge,
+  inspectHubSignals,
+  selectNutritionEntries,
+  selectSkincareHistoryEntries
+} from './_shared/domain-retrieval.mjs';
+import { listKnowledgePages } from './_shared/knowledge-data.mjs';
+import {
+  buildUserContent,
+  MAX_CHAT_IMAGE_BYTES,
+  MAX_CHAT_BODY_BYTES,
+  normalizeChatAttachments
+} from '../../packages/design-kit/js/hub-chat-attachments.js';
+import {
+  visualActivationContext,
+  sharedVisualIntelligenceBlock,
+  agentVisualCueBlock,
+  materializeHistoryWithVisualEvidence,
+  collectVisualEvidenceFromHistory,
+  normalizeVisualEvidenceList,
+  recordVisualEvidenceToolSchema,
+  visualTraceFields,
+  listHasMeaningfulVisualEvidence,
+  mergeVisualEvidenceLists
+} from '../../packages/design-kit/js/hub-visual-evidence.js';
+import { streamWithVisualEvidenceCapture } from './_shared/visual-evidence-capture.mjs';
+import {
+  normalizeAuditSession,
+  buildHammondAuditContract,
+  startAuditSessionFromMessage,
+  nextAuditPhase,
+  SKIP_INTAKE_RE as AUDIT_SKIP_INTAKE_RE
+} from './_shared/hammond-audit.mjs';
 import {
   extractConstraints,
   extractCrossAgentCoordination,
   extractRecentAgentActions,
+  extractThisWeek,
   extractTodaysStatus
-} from '../../js/core/constraints.js';
+} from '../../apps/life/js/core/constraints.js';
+import {
+  NUTRITION_CHALLENGES_PATH,
+  emptyNutritionChallenges,
+  parseNutritionChallenges,
+  serializeNutritionChallenges,
+  upsertNutritionChallengeSchema,
+  markNutritionChallengeDaySchema,
+  listNutritionChallengesSchema,
+  validateUpsertNutritionChallengeInput,
+  validateMarkNutritionChallengeDayInput,
+  upsertNutritionChallenge,
+  markNutritionChallengeDay,
+  formatNutritionChallengesForPrompt,
+  tallyChallenge
+} from '../../apps/life/js/core/nutrition-challenges.js';
+import { syncChallengeToCentralNode } from '../../apps/life/js/core/nutrition-challenge-cn.js';
 import { summarizeRecentHistory } from './_shared/digest.mjs';
 import { TARGETS_CONFIG } from './_shared/targets-config.mjs';
-import { logEntryToolSchema, validateLogEntry, buildCanonicalPath, buildRecordSlug } from './_shared/chat-schema.mjs';
+import { validateLogEntry, buildCanonicalPath, buildRecordSlug, logEntryRejectionPayload } from './_shared/chat-schema.mjs';
 import { persistLogEntry, describeRecordForLog } from './_shared/persist-log.mjs';
 import {
   FOOD_LIBRARY_PATH,
-  foodLibraryEntrySchema,
   formatFoodLibraryForPrompt,
   parseFoodLibrary,
   upsertFoodLibraryEntry,
@@ -47,38 +134,102 @@ import {
   EXERCISE_LIBRARY_PATH,
   formatExerciseLibraryForPrompt,
   parseExerciseLibrary,
-  saveExerciseLibraryEntrySchema,
   searchExerciseLibrary,
-  searchExerciseLibrarySchema,
   upsertExerciseLibraryEntry,
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
+import {
+  attachWorkoutNotes,
+  combineSessionAdherenceDays,
+  compareWorkoutWindows,
+  daysSinceLastCompletedWorkout,
+  formatRecentWorkoutsForPrompt,
+  formatRegionStrengthForPrompt,
+  formatWorkoutWindowCompareForPrompt,
+  getLastWorkout,
+  getRegionStrength,
+  mergeWorkoutEntries,
+  searchWorkoutRecords,
+  selectRecentWorkoutEntries,
+  selectWorkoutEntriesInRange,
+  workoutWindowBounds
+} from './_shared/workout-history.mjs';
+import {
+  fitnessHistoryBounds,
+  executeFitnessReadTool
+} from './_shared/fitness-tools.mjs';
 import {
   applySaveSkincareLibraryEntry,
   applySetSkincareRoutineMembership,
   executeListSkincareRoutines,
   executeSearchSkincareLibrary,
-  formatSkincareRoutinesForPrompt,
-  listSkincareRoutinesSchema,
-  saveSkincareLibraryEntrySchema,
-  searchSkincareLibrarySchema,
-  setSkincareRoutineMembershipSchema
+  formatSkincareRoutinesForPrompt
 } from './_shared/skincare-library-tools.mjs';
 import {
-  proposeCentralNodePatchSchema,
-  appendGovernanceLogSchema,
   validateCentralNodePatchInput,
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
-  applyCentralNodePatch
+  applyCentralNodePatch,
+  assertAgentMayApplyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
+import { buildSecondOpinionChoice } from './_shared/second-opinion.mjs';
+import {
+  PENDING_CN_PATCHES_PATH,
+  createPendingCnPatchId,
+  parsePendingCnPatches,
+  serializePendingCnPatches,
+  addPendingCnPatch,
+  purgeStalePendingCnPatches,
+  formatPendingCnPatchesForPrompt
+} from './_shared/cn-patch-queue.mjs';
+import { buildAgentTools } from './_shared/capabilities/registry.mjs';
+import {
+  buildPromotedShortcutToolSchemas,
+  findPromotedDraftByToolName,
+  isPromotedShortcutToolName,
+  loadPromotedShortcutDrafts
+} from './_shared/capabilities/promoted-shortcut-tools.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  createPendingActionId,
+  parsePendingActions,
+  serializePendingActions,
+  addPendingAction,
+  validateProposeActionInput,
+  classifyWriteTarget,
+  snapshotGithubBases,
+  snapshotBlobBases
+} from './_shared/capabilities/propose-action.mjs';
+import {
+  TASK_PREFIX,
+  defaultGetTasksStore,
+  listJSON as listTasksJSON,
+  getJSON as getTasksJSON
+} from './_shared/tasks-blobs.mjs';
+import {
+  CLASS_PREFIX,
+  DRAFT_LESSON_PREFIX,
+  SCHEDULED_LESSON_PREFIX,
+  UNIT_PREFIX,
+  defaultGetContentStore as defaultGetTeachingStore,
+  listJSON as listTeachingJSON
+} from './_shared/teaching-blobs.mjs';
+import { isShortcutTool, executeShortcut } from './_shared/capabilities/shortcuts.mjs';
+import { executeClareWork, isClareWorkTool, statedPlannerInputs, markWeeklyReviewAwaitingConfirm, markScheduleDiffAwaitingConfirm, loadWorkflowState } from './_shared/clare-work.mjs';
+import { buildProductivityCardEvent } from './_shared/productivity-card-map.mjs';
+import { loadTimedLifeEventsFromTree, LifeEventSourceUnavailableError } from './_shared/life-schedule-events.mjs';
+import {
+  executeHammondProductivity,
+  isHammondProductivityTool
+} from './_shared/hammond-productivity.mjs';
+import { loadIntuitionFor, formatIntuitionForPrompt } from './_shared/capabilities/intuition.mjs';
 import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog,
   recentGovernanceTail
-} from '../../js/core/governance-log.js';
-import { rollStaleSections, purgeStaleRecentActions } from '../../js/core/central-node-write.js';
+} from '../../apps/life/js/core/governance-log.js';
+import { rollStaleSections, purgeStaleRecentActions } from '../../apps/life/js/core/central-node-write.js';
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   emptyProductLibrary,
@@ -86,16 +237,16 @@ import {
   parseProductLibrary,
   seedProductLibraryFromDefaults,
   upgradeOtherProductCategories
-} from '../../js/app/skincare-product-library.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
 import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   emptyMembership,
   migrateMembershipFromCatalog,
   parseMembership,
   seedMembershipFromDefaults
-} from '../../js/app/skincare-routine-membership.js';
-import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-routine-membership.js';
+import { SKINCARE_CATALOG_PATH, parseCatalog } from '../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 import {
   formatTemplatesForPrompt,
   isTemplatePath,
@@ -103,33 +254,75 @@ import {
   summarizeTemplatesFromContents
 } from './_shared/workout-templates.mjs';
 import { selectLatestBodyEntries, formatBodyStateForPrompt } from './_shared/body-state.mjs';
+import {
+  selectRecentSkincareEntries,
+  selectRecentNutritionEntries,
+  formatTreatmentStateForPrompt,
+  formatNutritionSkinWeekForPrompt,
+  isProcedureBody
+} from './_shared/treatment-state.mjs';
+import {
+  constraintsNeedClinicalContext,
+  formatSaraClinicalContextForPrompt
+} from './_shared/sara-clinical-context.mjs';
 import { selectHammondFitnessEntries, selectHammondEventEntries, summarizeHammondDigest, formatCentralNodeModelForPrompt, getWindowStart, getCnModelWindowStart } from './_shared/hammond-digest.mjs';
+import {
+  WEEK_PACK_UNAVAILABLE_MARKER,
+  buildHammondWeekPack,
+  formatHammondWeekPackForPrompt,
+  getWeekReview
+} from './_shared/hammond-week.mjs';
 import {
   getMindDigestWindowStart,
   selectMindEntries,
   selectOnThisDayEntries,
   summarizeDiaryForPrompt,
   summarizeMindSessionsForPrompt,
+  summarizeTodaysMindSession,
   simultaneousSilenceFlag,
   divergenceLine,
   excerptOnThisDay,
   hammondDiaryDigestForTurn,
   recentSystemNoteTail
 } from './_shared/mind-digest.mjs';
-import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
+import {
+  getMindSession,
+  searchMindRecords
+} from './_shared/mind-session-read.mjs';
+import {
+  selectMedicalEntries,
+  selectBloodsEntries,
+  searchMedicalRecords,
+  briefMedicalAppointmentWithFallback
+} from './_shared/medical-overview-read.mjs';
+import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
+import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
-import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../js/core/time.js';
-import { parseEventDocument } from '../../js/core/records.js';
+import { resolveForcedChadwickPlan } from './_shared/chadwick-plan-force.mjs';
+import { coerceChatWorkoutProposal } from '../../apps/life/js/core/workout-plan-detect.js';
+import {
+  forceStatusFor,
+  isLogFinalize,
+  isThinMindTurn,
+  isVeraFlushMessage,
+  shouldStripWebSearch
+} from '../../apps/life/js/core/log-finalize-detect.js';
+import { keepNewestHistory } from '../../apps/life/js/core/chat-history.js';
+import { getSydneyDateKey, getSydneyTimestamp, addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
+import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { load as loadYaml } from 'js-yaml';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
-const MAX_BODY_BYTES = 24 * 1024;
+// Phone photos ship as base64 data URLs (≈4/3 of raw). Cap under Netlify's ~6MB
+// function payload while fitting up to three MAX_CHAT_IMAGE_BYTES images.
+const MAX_ATTACHMENT_WIRE_BYTES = Math.ceil(MAX_CHAT_IMAGE_BYTES * 4 / 3) + 256;
+const MAX_BODY_BYTES = Math.min(
+  MAX_CHAT_BODY_BYTES,
+  48 * 1024 + 3 * MAX_ATTACHMENT_WIRE_BYTES
+);
 const MAX_MESSAGE_LENGTH = 4000;
-const MAX_HISTORY_MESSAGES = 8;
-const MAX_HISTORY_ENTRY_CHARS = 1500;
-const MAX_HISTORY_TOTAL_CHARS = 6000;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 
 export const config = { path: '/api/chat' };
@@ -141,7 +334,11 @@ export function createChatHandler({
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
   createAnthropicClient: createAnthropic = createAnthropicClient,
-  now = Date.now
+  now = Date.now,
+  loadHubAgentContext: loadHubContext = loadHubAgentContext,
+  getTasksStore = defaultGetTasksStore,
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -158,7 +355,7 @@ export function createChatHandler({
 
     let session;
     try {
-      session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }
@@ -182,8 +379,17 @@ export function createChatHandler({
 
     const slug = routeAgent(parsed.message, parsed.priorAgentSlug);
     const agent = slug === ROUTER_SLUG ? null : findAgent(slug);
-    const hammondAuditContract = slug === 'hammond' && parsed.auditSession
-      ? buildHammondAuditContract(parsed.auditSession)
+    // The browser client owns its own audit-session state machine and always
+    // supplies auditSession once one is active. A caller with no client-side
+    // state to carry across turns (a headless/scheduled trigger) gets one
+    // bootstrapped here from the message text alone -- purely additive, so the
+    // existing browser flow (which always sends its own auditSession) is
+    // unaffected.
+    const effectiveAuditSession = slug === 'hammond'
+      ? (parsed.auditSession ?? startAuditSessionFromMessage(parsed.message))
+      : null;
+    const hammondAuditContract = effectiveAuditSession
+      ? buildHammondAuditContract(effectiveAuditSession)
       : '';
     const today = getSydneyDateKey(new Date(now()));
     // Chat only needs a thin digest (today + yesterday). A full week of blob
@@ -193,10 +399,41 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
+    const needsSaraClinicalContext = slug === 'sara';
+    const needsWorkoutHistory = slug === 'chadwick' || needsSaraClinicalContext;
     const needsSkincareLibrary = slug === 'hyaluronica';
+    const needsTreatmentContext = slug === 'hyaluronica';
     const needsHammondTools = slug === 'hammond';
-    const needsBodyState = slug === 'chadwick' || slug === 'brisket';
+    const needsHubRetrieval = needsHammondTools || slug === 'clare' || slug === 'ann';
+    // Nutrition history is for adherence/overview retrieval — not every meal log turn
+    // (those stay on the thin today+yesterday digest budget).
+    const nutritionHistoryNeeded = slug === 'brisket' && (
+      classifyIntent('brisket', parsed.message).id === 'nutrition_overview'
+      || classifyIntent('brisket', parsed.message).id === 'history_search'
+    );
+    const needsNutritionHistory = nutritionHistoryNeeded;
+    const needsSkincareHistory = slug === 'hyaluronica';
+    const needsKnowledgeSearch = slug === 'clementine';
+    const needsPenelopeDiaryTools = slug === 'penelope';
+    const hubContextPromise = needsHubRetrieval
+      ? loadHubContext({ env, now: new Date(now()) }).catch(() => HUB_CONTEXT_UNAVAILABLE_MARKER)
+      : Promise.resolve('');
+    const needsNutritionChallenges = slug === 'brisket';
+    // Brisket writes challenge scoreboards onto Central Node; keep markdown mutable.
+    const needsCentralNodeWrite = needsHammondTools
+      || needsNutritionChallenges
+      || slug === 'clare'
+      || slug === 'ann';
+    const needsBodyState = slug === 'chadwick' || slug === 'brisket' || slug === 'sara';
+    const needsSaraMedical = slug === 'sara';
     const needsMindDigest = slug === 'vera' || slug === 'penelope';
+    // Finalize / Vera flush must not burn the Netlify budget on mind blob
+    // bodies or web_search before log_entry can fire — that was the empty-turn
+    // "reply got cut off" loop across agents.
+    const logFinalize = Boolean(allowedTypes?.length) && isLogFinalize(parsed.message);
+    const veraFlush = slug === 'vera' && isVeraFlushMessage(parsed.message);
+    const thinMindLoad = isThinMindTurn({ slug, message: parsed.message });
+    const stripWebSearch = shouldStripWebSearch({ slug, message: parsed.message });
     const mindFrom = needsMindDigest ? getMindDigestWindowStart(today) : null;
     // Hammond alone gets a wider, path-only window for the 90-day longitudinal
     // digest -- deliberately separate from `from`/`manifest`/`dataEntries` above,
@@ -216,39 +453,62 @@ export function createChatHandler({
     }
 
     const nowInstant = new Date(now());
-    const tools = [
-      // Chadwick's protocol asks him to research evidence-based physique programming
-      // (see "Using evidence and external sources"); the default budget of 2 is one
-      // lookup, not a research pass, so he alone gets a raised cap.
-      { type: 'web_search_20250305', name: 'web_search', max_uses: slug === 'chadwick' ? 5 : 2 },
-      ...(allowedTypes ? [logEntryToolSchema(allowedTypes)] : []),
-      ...(needsFoodLibrary ? [foodLibraryEntrySchema()] : []),
-      ...(needsExerciseLibrary ? [searchExerciseLibrarySchema(), saveExerciseLibraryEntrySchema()] : []),
-      ...(needsSkincareLibrary
-        ? [
-            listSkincareRoutinesSchema(),
-            searchSkincareLibrarySchema(),
-            saveSkincareLibraryEntrySchema(),
-            setSkincareRoutineMembershipSchema()
-          ]
-        : []),
-      ...(needsHammondTools
-        ? [proposeCentralNodePatchSchema(), appendGovernanceLogSchema()]
-        : [])
-    ];
+    // Base tools are built after repo tree load so promoted-shortcut drafts can
+    // become per-draft named tools without mutating capabilities/registry.json.
+    let tools = [];
+    let promotedShortcutDrafts = [];
 
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        const send = event => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        const send = event => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+          } catch {
+            /* Client disconnected or the stream already closed. */
+          }
+        };
         send({ type: 'agent', slug });
-        if (hammondAuditContract && parsed.auditSession) {
+        if (hammondAuditContract && effectiveAuditSession) {
           send({
             type: 'audit_phase',
-            phase: parsed.auditSession.phase,
-            intakeCount: parsed.auditSession.intakeCount
+            phase: effectiveAuditSession.phase,
+            intakeCount: effectiveAuditSession.intakeCount
           });
         }
+
+        // Lock-in from an already-parsed plan in history: emit Confirm immediately.
+        // Skip Anthropic + GitHub so "lock it onto Fitness" stays instant. Cue-less
+        // cards are acceptable here — Adam already agreed the list in chat; the late
+        // force path still runs when lock-in needs a model pass for a fresh plan.
+        const forcedPlan = resolveForcedChadwickPlan({
+          slug,
+          userMessage: parsed.message,
+          today,
+          messages: [
+            ...materializeHistoryWithVisualEvidence(parsed.history),
+            { role: 'user', content: parsed.userContent ?? parsed.message }
+          ]
+        });
+        if (forcedPlan) {
+          send({ type: 'status', text: 'Locking the plan onto Fitness…' });
+          send({ type: 'text', delta: 'On Fitness — confirm to save the plan.' });
+          const validation = validateLogEntry(forcedPlan, {
+            id: `${forcedPlan.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+            now: getSydneyTimestamp(nowInstant)
+          });
+          if (validation.valid) {
+            await persistOrProposeLogEntry({
+              client, slug, today, validation, send, userMessage: parsed.message
+            });
+          } else {
+            send({ type: 'record_rejected', errors: validation.errors });
+          }
+          send({ type: 'done' });
+          controller.close();
+          return;
+        }
+
         send({ type: 'status', text: 'Loading your logs…' });
 
         let digest = '';
@@ -260,11 +520,21 @@ export function createChatHandler({
         let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
         let governanceLogSha;
         let governanceLogTail = '';
+        let pendingCnPatches = [];
+        let pendingCnPatchesSha;
+        let pendingActions = [];
+        let pendingActionsSha;
         let hammondDigest = '';
         let hammondCnSummary = '';
+        let hammondEvents = [];
+        let hammondWeekPack = '';
+        let hammondLifeLoadFailed = false;
         let foodLibraryEntries = [];
         let foodLibrary = '';
         let foodLibrarySha;
+        let nutritionChallenges = emptyNutritionChallenges();
+        let nutritionChallengesText = '';
+        let nutritionChallengesSha;
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
@@ -280,20 +550,61 @@ export function createChatHandler({
           : emptyMembership();
         let skincareMembershipSha;
         let workoutTemplates = '';
+        let lastWorkouts = '';
+        let workoutWindowCompare = '';
+        let regionStrength = '';
+        let workoutRecords = [];
+        let nutritionRecords = [];
+        let skincareHistoryRecords = [];
+        let hubTasks = [];
+        let hubProjects = [];
+        let hubAreas = [];
+        let hubGoals = [];
+        let hubWorkBlocks = [];
+        let hubWorkSessions = [];
+        let hubPlanningProfile = null;
+        let hubPlanningDirection = null;
+        let hubTasksStore = null;
+        let hubClasses = [];
+        let hubLessons = [];
+        let hubUnits = [];
+        let hubLoadErrors = {};
+        let knowledgePages = [];
+        let knowledgeLoadError = null;
+        let sourceMeta = {};
+        let activation = {
+          intentClass: 'none',
+          requiredTools: [],
+          forceToolChoice: false,
+          catalogueBlock: '',
+          activationBlock: ''
+        };
         let bodyState = '';
+        let compositionRecords = [];
+        let measurementRecords = [];
+        let physiqueTargetRatio = null;
+        let templateContents = [];
+        let treatmentState = '';
+        let nutritionSkinWeek = '';
+        let saraClinicalContext = '';
         let sessionAdherenceDays = null;
         let mindDiaryDigest = '';
         let hammondDiaryDigest = '';
         let hammondMindAmbient = '';
         let mindSessionDigest = '';
+        let mindTodaySession = '';
         let mindSilence = '';
         let mindDivergence = '';
         let onThisDay = '';
         let daysSinceLastEntry = null;
         let daysSinceLastMindSession = null;
         let veraIntake = '';
+        let mindEvents = [];
+        let medicalEvents = [];
+        let repoTree = [];
         try {
           const current = await client.resolveTree();
+          repoTree = current.tree ?? [];
           const manifest = selectManifestEntries(current.tree, { from, to: today });
           const dataEntries = manifest.filter(entry => entry.path.startsWith('data/'));
           const centralNodeEntry = current.tree.find(entry => entry.path === 'central-node.md' && entry.type === 'blob');
@@ -302,10 +613,22 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === GOVERNANCE_LOG_PATH && entry.type === 'blob')
             : null;
           governanceLogSha = governanceLogEntry?.sha;
+          const pendingCnPatchesEntry = needsHammondTools
+            ? current.tree.find(entry => entry.path === PENDING_CN_PATCHES_PATH && entry.type === 'blob')
+            : null;
+          pendingCnPatchesSha = pendingCnPatchesEntry?.sha;
+          const pendingActionsEntry = current.tree.find(
+            entry => entry.path === PENDING_ACTIONS_PATH && entry.type === 'blob'
+          );
+          pendingActionsSha = pendingActionsEntry?.sha;
           const foodLibraryEntry = needsFoodLibrary
             ? current.tree.find(entry => entry.path === FOOD_LIBRARY_PATH && entry.type === 'blob')
             : null;
           foodLibrarySha = foodLibraryEntry?.sha;
+          const nutritionChallengesEntry = needsNutritionChallenges
+            ? current.tree.find(entry => entry.path === NUTRITION_CHALLENGES_PATH && entry.type === 'blob')
+            : null;
+          nutritionChallengesSha = nutritionChallengesEntry?.sha;
           const exerciseLibraryEntry = needsExerciseLibrary
             ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -327,11 +650,45 @@ export function createChatHandler({
           const templateEntries = needsWorkoutTemplates
             ? current.tree.filter(entry => entry.type === 'blob' && isTemplatePath(entry.path)).slice(0, MAX_PROMPT_TEMPLATES)
             : [];
+          const chadwickRecentEntries = needsWorkoutHistory
+            ? selectRecentWorkoutEntries(current.tree)
+            : [];
+          const workoutCompareBounds = slug === 'chadwick' ? workoutWindowBounds(today) : null;
+          const workoutCompareEntries = workoutCompareBounds
+            ? selectWorkoutEntriesInRange(current.tree, {
+              from: workoutCompareBounds.previousFrom,
+              to: workoutCompareBounds.currentTo
+            })
+            : [];
+          const fitnessHistory = slug === 'chadwick' ? fitnessHistoryBounds(today) : null;
+          const fitnessHistoryEntries = fitnessHistory
+            ? selectWorkoutEntriesInRange(current.tree, {
+              from: fitnessHistory.from,
+              to: fitnessHistory.to
+            })
+            : [];
+          const chadwickWorkoutEntries = mergeWorkoutEntries(
+            chadwickRecentEntries,
+            workoutCompareEntries,
+            fitnessHistoryEntries
+          );
           // Chadwick's eyes on Adam's body: a bounded read (latest 1-2 per type from the
           // already-fetched tree, never a history scan) -- see body-state.mjs.
           const bodyEntries = needsBodyState
-            ? selectLatestBodyEntries(current.tree, { limit: 2 })
+            ? selectLatestBodyEntries(current.tree, { limit: needsSaraMedical ? 8 : 2 })
             : { composition: [], measurements: [] };
+          const skincareLookbackEntries = needsTreatmentContext
+            ? selectRecentSkincareEntries(current.tree, { today })
+            : [];
+          const skincareHistoryEntries = needsSkincareHistory
+            ? selectSkincareHistoryEntries(current.tree, { today, lookbackDays: 30, limit: 40 })
+            : [];
+          const nutritionWeekEntries = (needsTreatmentContext || needsSaraClinicalContext)
+            ? selectRecentNutritionEntries(current.tree, { today })
+            : [];
+          const nutritionHistoryEntries = needsNutritionHistory
+            ? selectNutritionEntries(current.tree, { today, lookbackDays: 30, limit: 80 })
+            : [];
           // Hammond's 90-day fitness reads: bounded to the wider hammondFrom window,
           // never a full-history scan -- see hammond-digest.mjs.
           const hammondFitnessEntries = needsHammondTools
@@ -348,7 +705,7 @@ export function createChatHandler({
           const mindEntries = needsMindDigest
             ? selectMindEntries(current.tree, { from: mindFrom, to: today })
             : [];
-          const onThisDayEntries = slug === 'penelope'
+          const onThisDayEntries = slug === 'penelope' && !thinMindLoad
             ? selectOnThisDayEntries(current.tree, today)
             : [];
           const veraIntakeEntry = slug === 'vera'
@@ -359,14 +716,20 @@ export function createChatHandler({
             dataBlobs,
             centralNodeBlob,
             governanceLogBlob,
+            pendingCnPatchesBlob,
+            pendingActionsBlob,
             foodLibraryBlob,
+            nutritionChallengesBlob,
             exerciseLibraryBlob,
             skincareLibraryBlob,
             skincareMembershipBlob,
             skincareCatalogBlob,
             templateBlobs,
+            chadwickWorkoutBlobs,
             compositionBlobs,
             measurementBlobs,
+            skincareLookbackBlobs,
+            nutritionWeekBlobs,
             hammondFitnessBlobs,
             hammondCnBlobs,
             mindBlobs,
@@ -376,25 +739,176 @@ export function createChatHandler({
             Promise.all(dataEntries.map(entry => client.readBlob(entry.sha))),
             centralNodeEntry ? client.readBlob(centralNodeEntry.sha) : null,
             governanceLogEntry ? client.readBlob(governanceLogEntry.sha) : null,
+            pendingCnPatchesEntry ? client.readBlob(pendingCnPatchesEntry.sha) : null,
+            pendingActionsEntry ? client.readBlob(pendingActionsEntry.sha) : null,
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
+            nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
             Promise.all(templateEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(chadwickWorkoutEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.composition.map(entry => client.readBlob(entry.sha))),
             Promise.all(bodyEntries.measurements.map(entry => client.readBlob(entry.sha))),
+            Promise.all(skincareLookbackEntries.map(entry => client.readBlob(entry.sha))),
+            Promise.all(nutritionWeekEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondFitnessEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(hammondCnEntries.map(entry => client.readBlob(entry.sha))),
-            Promise.all(mindEntries.map(entry => client.readBlob(entry.sha))),
+            // Thin mind turns: keep path list for days-since; skip body reads.
+            Promise.all(thinMindLoad ? [] : mindEntries.map(entry => client.readBlob(entry.sha))),
             Promise.all(onThisDayEntries.map(entry => client.readBlob(entry.sha))),
             veraIntakeEntry ? client.readBlob(veraIntakeEntry.sha) : null
           ]);
+
+          if (nutritionHistoryEntries.length || skincareHistoryEntries.length) {
+            const [nutritionHistoryBlobs, skincareHistoryBlobs] = await Promise.all([
+              Promise.all(nutritionHistoryEntries.map(entry => client.readBlob(entry.sha))),
+              Promise.all(skincareHistoryEntries.map(entry => client.readBlob(entry.sha)))
+            ]);
+            for (let index = 0; index < nutritionHistoryEntries.length; index += 1) {
+              try {
+                const content = decodeBlob(nutritionHistoryBlobs[index]);
+                if (content == null) continue;
+                const { record } = parseEventDocument(content, nutritionHistoryEntries[index].path, loadYaml);
+                if (record?.type === 'meal') nutritionRecords.push(record);
+              } catch {
+                // Skip unreadable meal files.
+              }
+            }
+            for (let index = 0; index < skincareHistoryEntries.length; index += 1) {
+              try {
+                const content = decodeBlob(skincareHistoryBlobs[index]);
+                if (content == null) continue;
+                const parsed = parseEventDocument(content, skincareHistoryEntries[index].path, loadYaml);
+                const body = typeof parsed.body === 'string' ? parsed.body : '';
+                skincareHistoryRecords.push({
+                  ...(parsed.record ?? {}),
+                  date: parsed.record?.date,
+                  notes: parsed.record?.notes,
+                  path: skincareHistoryEntries[index].path,
+                  body,
+                  is_procedure: isProcedureBody(body)
+                });
+              } catch {
+                // Skip unreadable skincare files.
+              }
+            }
+          }
+
+          if (needsHubRetrieval) {
+            try {
+              const [tasksStore, teachingStore] = await Promise.all([
+                getTasksStore(env),
+                getTeachingStore(env)
+              ]);
+              hubTasksStore = tasksStore;
+              const [
+                tasks,
+                projects,
+                areas,
+                goals,
+                workBlocks,
+                workSessions,
+                planningProfile,
+                planningDirection,
+                classes,
+                lessons,
+                units,
+                scheduled
+              ] = await Promise.all([
+                listTasksJSON(tasksStore, TASK_PREFIX).catch(err => {
+                  hubLoadErrors.tasks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'projects/').catch(err => {
+                  hubLoadErrors.projects = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'areas/').catch(err => {
+                  hubLoadErrors.areas = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'goals/').catch(err => {
+                  hubLoadErrors.goals = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_blocks/').catch(err => {
+                  hubLoadErrors.work_blocks = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTasksJSON(tasksStore, 'work_sessions/').catch(err => {
+                  hubLoadErrors.work_sessions = err?.code || 'load_failed';
+                  return [];
+                }),
+                getTasksJSON(tasksStore, 'meta/planning_profile').catch(() => null),
+                getTasksJSON(tasksStore, 'meta/planning_direction').catch(() => null),
+                listTeachingJSON(teachingStore, CLASS_PREFIX).catch(err => {
+                  hubLoadErrors.classes = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, DRAFT_LESSON_PREFIX).catch(err => {
+                  hubLoadErrors.lessons = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, UNIT_PREFIX).catch(err => {
+                  hubLoadErrors.units = err?.code || 'load_failed';
+                  return [];
+                }),
+                listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX).catch(err => {
+                  hubLoadErrors.scheduledLessons = err?.code || 'load_failed';
+                  return [];
+                })
+              ]);
+              hubTasks = Array.isArray(tasks) ? tasks : [];
+              hubProjects = Array.isArray(projects) ? projects : [];
+              hubAreas = Array.isArray(areas) ? areas : [];
+              hubGoals = Array.isArray(goals) ? goals : [];
+              hubWorkBlocks = Array.isArray(workBlocks) ? workBlocks : [];
+              hubWorkSessions = Array.isArray(workSessions) ? workSessions : [];
+              hubPlanningProfile =
+                planningProfile && typeof planningProfile === 'object' ? planningProfile : null;
+              hubPlanningDirection =
+                planningDirection && typeof planningDirection === 'object'
+                  ? planningDirection
+                  : null;
+              hubClasses = Array.isArray(classes) ? classes : [];
+              hubLessons = [
+                ...(Array.isArray(lessons) ? lessons : []),
+                ...(Array.isArray(scheduled) ? scheduled : [])
+              ];
+              hubUnits = Array.isArray(units) ? units : [];
+            } catch (err) {
+              hubLoadErrors.hub = err?.code || 'load_failed';
+            }
+          }
+
+          if (needsKnowledgeSearch) {
+            try {
+              knowledgePages = await listKnowledgePages({ env, fetchImpl });
+              if (!Array.isArray(knowledgePages)) knowledgePages = [];
+            } catch (err) {
+              knowledgeLoadError = err?.code || 'load_failed';
+              knowledgePages = [];
+            }
+          }
 
           const files = dataEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(dataBlobs[index]) }))
             .filter(file => file.content !== null);
           digest = summarizeRecentHistory(files, TARGETS_CONFIG, today);
+
+          if (slug === 'brisket' && nutritionRecords.length === 0) {
+            for (const file of files) {
+              if (!file.path?.startsWith('data/nutrition/')) continue;
+              try {
+                const { record } = parseEventDocument(file.content, file.path, loadYaml);
+                if (record?.type === 'meal') nutritionRecords.push(record);
+              } catch {
+                // Skip unreadable thin-window meals.
+              }
+            }
+          }
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
@@ -402,17 +916,31 @@ export function createChatHandler({
               ? purgeStaleRecentActions(rollStaleSections(decodedCentralNode, today), today)
               : decodedCentralNode;
             constraints = extractConstraints(centralNodeForTurn);
+            // Chadwick needs This Week so the EP day-before rule can see Veronica.
+            const needsThisWeek = needsNutritionChallenges || slug === 'chadwick';
             centralNodeLog = [
               extractTodaysStatus(centralNodeForTurn),
+              needsThisWeek ? extractThisWeek(centralNodeForTurn) : '',
               extractCrossAgentCoordination(centralNodeForTurn),
               extractRecentAgentActions(centralNodeForTurn)
             ].filter(Boolean).join('\n\n');
+            if (needsCentralNodeWrite) {
+              centralNodeMarkdown = centralNodeForTurn;
+            }
             if (needsHammondTools) {
               centralNodeFull = centralNodeForTurn;
-              centralNodeMarkdown = centralNodeForTurn;
             }
           }
 
+          if (needsNutritionChallenges) {
+            const decodedChallenges = nutritionChallengesBlob
+              ? decodeBlob(nutritionChallengesBlob)
+              : null;
+            nutritionChallenges = decodedChallenges !== null
+              ? parseNutritionChallenges(decodedChallenges)
+              : emptyNutritionChallenges();
+            nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+          }
           if (needsHammondTools) {
             const decodedGovernanceLog = governanceLogBlob ? decodeBlob(governanceLogBlob) : null;
             if (decodedGovernanceLog !== null) {
@@ -421,7 +949,13 @@ export function createChatHandler({
               governanceLog = emptyGovernanceLog();
             }
             governanceLogTail = recentGovernanceTail(governanceLog);
+
+            const decodedPendingCnPatches = pendingCnPatchesBlob ? decodeBlob(pendingCnPatchesBlob) : null;
+            pendingCnPatches = purgeStalePendingCnPatches(parsePendingCnPatches(decodedPendingCnPatches), today);
           }
+
+          const decodedPendingActions = pendingActionsBlob ? decodeBlob(pendingActionsBlob) : null;
+          pendingActions = parsePendingActions(decodedPendingActions);
 
           const decodedFoodLibrary = foodLibraryBlob ? decodeBlob(foodLibraryBlob) : null;
           if (decodedFoodLibrary !== null) {
@@ -434,6 +968,23 @@ export function createChatHandler({
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
             sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
+          }
+
+          if (needsWorkoutHistory) {
+            workoutRecords = parseHammondFitnessRecords(chadwickWorkoutEntries, chadwickWorkoutBlobs);
+            lastWorkouts = formatRecentWorkoutsForPrompt(workoutRecords);
+            if (slug === 'chadwick') {
+              workoutWindowCompare = formatWorkoutWindowCompareForPrompt(
+                compareWorkoutWindows(workoutRecords, today)
+              );
+              regionStrength = formatRegionStrengthForPrompt(
+                getRegionStrength(workoutRecords, today)
+              );
+            }
+            sessionAdherenceDays = combineSessionAdherenceDays(
+              daysSinceLastCompletedWorkout(workoutRecords, today),
+              sessionAdherenceDays
+            );
           }
 
           const decodedCatalog = skincareCatalogBlob ? decodeBlob(skincareCatalogBlob) : null;
@@ -472,22 +1023,81 @@ export function createChatHandler({
               : seedMembershipFromDefaults(SKINCARE_ROUTINES, skincareLibrary);
           }
 
-          const templateContents = templateEntries
+          const templateContentsLoaded = templateEntries
             .map((entry, index) => ({ path: entry.path, content: decodeBlob(templateBlobs[index]) }))
             .filter(file => file.content !== null);
+          templateContents = templateContentsLoaded;
           workoutTemplates = formatTemplatesForPrompt(summarizeTemplatesFromContents(templateContents));
 
           if (needsBodyState) {
-            const compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
-            const measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
-            const targetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
-            bodyState = formatBodyStateForPrompt({ compositionRecords, measurementRecords, targetRatio });
+            compositionRecords = parseBodyRecords(bodyEntries.composition, compositionBlobs);
+            measurementRecords = parseBodyRecords(bodyEntries.measurements, measurementBlobs);
+            physiqueTargetRatio = loadPhysiqueTarget().shoulder_waist_ratio;
+            bodyState = formatBodyStateForPrompt({
+              compositionRecords,
+              measurementRecords,
+              targetRatio: physiqueTargetRatio
+            });
+          }
+
+          if (needsTreatmentContext) {
+            const skincareEvents = [];
+            for (let index = 0; index < skincareLookbackEntries.length; index += 1) {
+              const content = decodeBlob(skincareLookbackBlobs[index]);
+              if (content === null) continue;
+              try {
+                const parsed = parseEventDocument(content, skincareLookbackEntries[index].path, loadYaml);
+                skincareEvents.push({ ...parsed, path: skincareLookbackEntries[index].path });
+              } catch {
+                // Skip unreadable skincare logs rather than breaking the turn.
+              }
+            }
+            const procedureEvents = skincareEvents.filter(event => isProcedureBody(event.body));
+            treatmentState = formatTreatmentStateForPrompt({
+              procedureEvents,
+              constraintsText: constraints,
+              today
+            });
+
+            const mealRecords = [];
+            for (let index = 0; index < nutritionWeekEntries.length; index += 1) {
+              const content = decodeBlob(nutritionWeekBlobs[index]);
+              if (content === null) continue;
+              try {
+                const { record } = parseEventDocument(content, nutritionWeekEntries[index].path, loadYaml);
+                if (record) mealRecords.push(record);
+              } catch {
+                // Skip unreadable meal logs rather than breaking the turn.
+              }
+            }
+            nutritionSkinWeek = formatNutritionSkinWeekForPrompt({ mealRecords, today });
+          }
+
+          if (needsSaraClinicalContext) {
+            const mealRecords = [];
+            for (let index = 0; index < nutritionWeekEntries.length; index += 1) {
+              const content = decodeBlob(nutritionWeekBlobs[index]);
+              if (content === null) continue;
+              try {
+                const { record } = parseEventDocument(content, nutritionWeekEntries[index].path, loadYaml);
+                if (record) mealRecords.push(record);
+              } catch {
+                // Skip unreadable meal logs rather than breaking the turn.
+              }
+            }
+            saraClinicalContext = formatSaraClinicalContextForPrompt({
+              constraintsText: constraints,
+              mealRecords,
+              workoutRecords,
+              today
+            });
           }
 
           if (needsHammondTools) {
             const fitnessRecords = parseHammondFitnessRecords(hammondFitnessEntries, hammondFitnessBlobs);
             hammondDigest = summarizeHammondDigest({ tree: current.tree, fitnessRecords, today });
             const cnEvents = parseHammondEventDocuments(hammondCnEntries, hammondCnBlobs);
+            hammondEvents = cnEvents;
             hammondCnSummary = formatCentralNodeModelForPrompt(buildCentralNodeModel({
               events: cnEvents,
               targetsConfig: TARGETS_CONFIG,
@@ -507,21 +1117,45 @@ export function createChatHandler({
             mindSilence = simultaneousSilenceFlag({ tree: current.tree, today });
           }
           if (needsMindDigest) {
-            const mindFiles = mindEntries
-              .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
-              .filter(file => file.content !== null);
-            const mindEvents = [];
-            for (const file of mindFiles) {
-              try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
-              catch { /* skip */ }
+            if (thinMindLoad) {
+              const diaryDates = mindEntries
+                .map(entry => {
+                  const match = /\/(\d{4}-\d{2}-\d{2})-diary(?:-|\.md)/.exec(entry.path ?? '');
+                  return match?.[1] ?? null;
+                })
+                .filter(Boolean)
+                .sort();
+              const lastDiary = diaryDates.at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+              if (slug === 'vera') {
+                const sessionDates = mindEntries
+                  .map(entry => {
+                    const match = /\/(\d{4}-\d{2}-\d{2})-session(?:-|\.md)/.exec(entry.path ?? '');
+                    return match?.[1] ?? null;
+                  })
+                  .filter(Boolean)
+                  .sort();
+                const lastSession = sessionDates.at(-1);
+                if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
+              }
+            } else {
+              const mindFiles = mindEntries
+                .map((entry, index) => ({ path: entry.path, content: decodeBlob(mindBlobs[index]) }))
+                .filter(file => file.content !== null);
+              mindEvents = [];
+              for (const file of mindFiles) {
+                try { mindEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+                catch { /* skip */ }
+              }
+              mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
+              mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
+              mindTodaySession = slug === 'vera' ? summarizeTodaysMindSession(mindEvents, today) : '';
+              mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
+              const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
+              const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
+              if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
+              if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
             }
-            mindDiaryDigest = summarizeDiaryForPrompt(mindEvents, today);
-            mindSessionDigest = summarizeMindSessionsForPrompt(mindEvents, today);
-            mindDivergence = slug === 'vera' ? divergenceLine(mindEvents, today) : '';
-            const lastDiary = mindEvents.filter(e => e.record.type === 'diary').map(e => e.record.date).sort().at(-1);
-            const lastSession = mindEvents.filter(e => e.record.type === 'mind_session').map(e => e.record.date).sort().at(-1);
-            if (lastDiary) daysSinceLastEntry = daysBetween(lastDiary, today);
-            if (lastSession) daysSinceLastMindSession = daysBetween(lastSession, today);
           }
           if (slug === 'penelope' && onThisDayBlobs?.length) {
             const file = onThisDayEntries
@@ -542,25 +1176,50 @@ export function createChatHandler({
               } catch { /* skip */ }
             }
           }
+          if (needsSaraMedical) {
+            const medicalEntries = selectMedicalEntries(current.tree);
+            const bloodsEntries = selectBloodsEntries(current.tree);
+            const medicalBlobs = await Promise.all([
+              ...medicalEntries.map(entry => client.readBlob(entry.sha)),
+              ...bloodsEntries.map(entry => client.readBlob(entry.sha))
+            ]);
+            const medicalFiles = [...medicalEntries, ...bloodsEntries]
+              .map((entry, index) => ({ path: entry.path, content: decodeBlob(medicalBlobs[index]) }))
+              .filter(file => file.content !== null);
+            medicalEvents = [];
+            for (const file of medicalFiles) {
+              try { medicalEvents.push(parseEventDocument(file.content, file.path, loadYaml)); }
+              catch { /* skip unreadable medical/bloods blobs */ }
+            }
+          }
           if (veraIntakeBlob) {
             veraIntake = decodeBlob(veraIntakeBlob) || '';
           }
         } catch {
+          // Fail-visible: do not continue as if Central Node were empty-by-design.
           digest = '';
           constraints = '';
-          centralNodeLog = '';
+          centralNodeLog = CENTRAL_NODE_UNAVAILABLE_MARKER;
           centralNodeFull = '';
           centralNodeMarkdown = '';
           centralNodeSha = undefined;
           governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
           governanceLogSha = undefined;
           governanceLogTail = '';
+          pendingCnPatches = [];
+          pendingCnPatchesSha = undefined;
           hammondDigest = '';
           hammondCnSummary = '';
+          hammondEvents = [];
+          hammondWeekPack = '';
+          hammondLifeLoadFailed = needsHammondTools;
           hammondMindAmbient = '';
           foodLibraryEntries = [];
           foodLibrary = '';
           foodLibrarySha = undefined;
+          nutritionChallenges = emptyNutritionChallenges();
+          nutritionChallengesText = '';
+          nutritionChallengesSha = undefined;
           exerciseLibraryEntries = [];
           exerciseLibrary = '';
           exerciseLibrarySha = undefined;
@@ -573,17 +1232,72 @@ export function createChatHandler({
             : emptyMembership();
           skincareMembershipSha = undefined;
           workoutTemplates = '';
+          lastWorkouts = '';
+          workoutWindowCompare = '';
+          regionStrength = '';
+          workoutRecords = [];
           bodyState = '';
+          treatmentState = '';
+          nutritionSkinWeek = '';
+          saraClinicalContext = '';
           sessionAdherenceDays = null;
           mindDiaryDigest = '';
           mindSessionDigest = '';
+          mindTodaySession = '';
           mindSilence = '';
           mindDivergence = '';
           onThisDay = '';
           daysSinceLastEntry = null;
           daysSinceLastMindSession = null;
           veraIntake = '';
+          mindEvents = [];
+          medicalEvents = [];
+          repoTree = [];
         }
+
+        try {
+          promotedShortcutDrafts = await loadPromotedShortcutDrafts(
+            repoTree,
+            async sha => decodeBlob(await client.readBlob(sha)),
+            { limit: 12 }
+          );
+        } catch {
+          promotedShortcutDrafts = [];
+        }
+        const priorVisualEvidence = collectVisualEvidenceFromHistory(parsed.history);
+        const visualCtx = visualActivationContext(parsed.message, parsed.attachments, {
+          priorVisualEvidence
+        });
+        const needsVisualEvidenceTool =
+          visualCtx.hasVisualEvidence || listHasMeaningfulVisualEvidence(priorVisualEvidence);
+        let recordedVisualEvidence = [];
+        tools = [
+          ...buildAgentTools({
+            slug,
+            protocolId: typeof protocolId === 'string' ? protocolId : null,
+            allowedTypes,
+            stripWebSearch,
+            needsFoodLibrary,
+            needsExerciseLibrary,
+            needsSkincareLibrary,
+            needsHammondTools,
+            needsVeraMindTools: slug === 'vera',
+            needsSaraMedicalTools: needsSaraMedical,
+            needsPenelopeDiaryTools,
+            message: visualCtx.hasVisualEvidence ? null : parsed.message,
+            attachments: parsed.attachments,
+            keepFullDomainTools: visualCtx.keepFullDomainTools
+          }),
+          ...(needsNutritionChallenges
+            ? [
+                listNutritionChallengesSchema(),
+                upsertNutritionChallengeSchema(),
+                markNutritionChallengeDaySchema()
+              ]
+            : []),
+          ...buildPromotedShortcutToolSchemas(promotedShortcutDrafts),
+          ...(needsVisualEvidenceTool ? [recordVisualEvidenceToolSchema()] : [])
+        ];
 
         const chadwickProtocol = slug === 'chadwick' ? loadChadwickProtocol() : '';
         const hyaluronicaProtocol = slug === 'hyaluronica' ? loadHyaluronicaProtocol() : '';
@@ -592,9 +1306,165 @@ export function createChatHandler({
         const brisketProtocol = slug === 'brisket' ? loadBrisketProtocol() : '';
         const saraProtocol = slug === 'sara' ? loadSaraProtocol() : '';
         const hammondProtocol = slug === 'hammond' ? loadHammondProtocol() : '';
+        const clareProtocol = slug === 'clare' ? loadClareProtocol() : '';
+        const annProtocol = slug === 'ann' ? loadAnnProtocol() : '';
+        const clementineProtocol = slug === 'clementine' ? loadClementineProtocol() : '';
         const skincareRoutines = needsSkincareLibrary
           ? formatSkincareRoutinesForPrompt(skincareMembership, skincareLibrary)
           : '';
+        const intuitionPacks = loadIntuitionFor({ agentSlug: slug });
+        const intuitionPrompt = formatIntuitionForPrompt(intuitionPacks);
+        const capacityOneLiners = promptOneLinersForAgent(slug);
+        const hubContext = needsHubRetrieval ? await hubContextPromise : '';
+        if (needsHammondTools) {
+          hammondWeekPack = hammondLifeLoadFailed
+            ? WEEK_PACK_UNAVAILABLE_MARKER
+            : formatHammondWeekPackForPrompt(buildHammondWeekPack({
+              events: hammondEvents,
+              tasks: hubTasks,
+              lessons: hubLessons,
+              classes: hubClasses,
+              centralNodeMarkdown,
+              today,
+              loadErrors: hubLoadErrors
+            }));
+        }
+        sourceMeta = {
+          ...(slug === 'chadwick' ? {
+            fitness_sessions: {
+              count: workoutRecords.length,
+              note: 'bounded loaded window — call tools for dashboard/compare/pain/load'
+            }
+          } : {}),
+          ...(needsNutritionHistory ? {
+            nutrition_meals: { count: nutritionRecords.length, note: '≈30-day meal window loaded' }
+          } : {}),
+          ...(needsBodyState ? {
+            body_composition: { count: compositionRecords.length },
+            body_measurements: { count: measurementRecords.length }
+          } : {}),
+          ...(needsMindDigest ? {
+            mind_events: {
+              count: mindEvents.length,
+              note: thinMindLoad ? 'paths only (thin turn)' : 'bodies loaded'
+            }
+          } : {}),
+          ...(needsSkincareHistory ? {
+            skincare_history: { count: skincareHistoryRecords.length }
+          } : {}),
+          ...(needsHubRetrieval ? {
+            tasks: hubLoadErrors.tasks ? { error: hubLoadErrors.tasks } : { count: hubTasks.length },
+            teaching_classes: hubLoadErrors.classes
+              ? { error: hubLoadErrors.classes }
+              : { count: hubClasses.length },
+            teaching_lessons: (hubLoadErrors.lessons || hubLoadErrors.scheduledLessons)
+              ? { error: hubLoadErrors.lessons || hubLoadErrors.scheduledLessons }
+              : { count: hubLessons.length }
+          } : {}),
+          ...(needsKnowledgeSearch ? {
+            knowledge_pages: knowledgeLoadError
+              ? { error: knowledgeLoadError }
+              : { count: knowledgePages.length }
+          } : {}),
+          ...(hubContext === HUB_CONTEXT_UNAVAILABLE_MARKER
+            ? { other_hubs: { error: 'umbrella_store_load_failed' } }
+            : {})
+        };
+        activation = activationForTurn({
+          slug,
+          message: parsed.message,
+          sourceMeta,
+          attachments: parsed.attachments,
+          hasVisualEvidence: visualCtx.hasVisualEvidence,
+          visualContext: visualCtx
+        });
+        let layeredMemories = [];
+        let memoryLoadError = null;
+        const memoryEntry = repoTree.find(entry => entry.path === REMEMBER_LAYERED_MEMORIES_PATH && entry.type === 'blob');
+        if (memoryEntry?.sha) {
+          try {
+            const parsedMemory = parseMemoryStore(decodeBlob(await client.readBlob(memoryEntry.sha)));
+            if (!parsedMemory.ok) memoryLoadError = parsedMemory.error;
+            else layeredMemories = parsedMemory.items;
+          } catch {
+            memoryLoadError = 'memory_load_failed';
+          }
+        }
+        const evidenceStores = {
+          workouts: workoutRecords,
+          meals: nutritionRecords,
+          composition: compositionRecords,
+          measurements: measurementRecords,
+          mindEvents,
+          skincare: skincareHistoryRecords,
+          medicalEvents,
+          tasks: hubTasks,
+          projects: hubProjects,
+          classes: hubClasses,
+          lessons: hubLessons,
+          units: hubUnits,
+          pages: knowledgePages,
+          loadErrors: hubLoadErrors,
+          hammondDigest,
+          hammondEvents,
+          centralNodeMarkdown,
+          nutritionChallenges,
+          templates: [],
+          stressFlags: [],
+          inbox: [],
+          memories: layeredMemories,
+          memoryLoadError
+        };
+        const surfaceTurn = runSurfaceAgentTurn({
+          surface: 'life',
+          slug,
+          message: parsed.message,
+          today,
+          sourceMeta,
+          now: nowInstant,
+          stores: evidenceStores,
+          tools,
+          env,
+          flag: parsed.agentKernel
+        });
+        const evidencePack = surfaceTurn.pack;
+        if (surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none') {
+          tools = surfaceTurn.tools;
+        }
+        const kernelEvent = surfaceTurn.trace;
+        if (kernelEvent) send(kernelEvent);
+        let agentTurns = {};
+        let agentTurnsSha;
+        const persistKernelTurn = async ({ required = false } = {}) => {
+          if (!surfaceTurn.kernel?.id) {
+            return required ? { ok: false, error: 'no_kernel_turn' } : { ok: true, skipped: true };
+          }
+          try {
+            const entry = repoTree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+            if (entry && !agentTurnsSha) {
+              agentTurns = parseTurnStoreFile(decodeBlob(await client.readBlob(entry.sha)));
+              agentTurnsSha = entry.sha;
+            }
+            const saved = await persistTurnWithClient({
+              client,
+              existingTurns: agentTurns,
+              existingSha: agentTurnsSha,
+              state: surfaceTurn.kernel
+            });
+            agentTurns = saved.turns;
+            agentTurnsSha = saved.sha;
+            return { ok: true };
+          } catch {
+            return { ok: false, error: 'checkpoint_failed' };
+          }
+        };
+        await persistKernelTurn();
+        // Pack already retrieved domain evidence. Keep tools for continuation /
+        // writes, but do not force a tool round when the pack is answerable.
+        // Kernel sufficiency replaces “any section present” for Chadwick/Clare pilots.
+        const forceToolChoice = surfaceTurn.enabled && surfaceTurn.kernel?.plan?.workflow !== 'none'
+          ? surfaceTurn.forceToolChoice
+          : activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
           digest,
@@ -605,7 +1475,9 @@ export function createChatHandler({
           governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
           hammondDigest,
           hammondCnSummary,
+          pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',
           foodLibrary,
+          nutritionChallenges: nutritionChallengesText,
           chadwickProtocol,
           hyaluronicaProtocol,
           penelopeProtocol,
@@ -614,32 +1486,417 @@ export function createChatHandler({
           brisketProtocol,
           saraProtocol,
           hammondProtocol,
+          clareProtocol,
+          annProtocol,
+          clementineProtocol,
           hammondAuditContract,
           workoutTemplates,
+          lastWorkouts,
+          workoutWindowCompare,
+          regionStrength,
           exerciseLibrary,
           skincareRoutines,
+          treatmentState,
+          nutritionSkinWeek,
+          saraClinicalContext,
           bodyState,
           daysSinceLastSession: sessionAdherenceDays,
           mindDiaryDigest,
           hammondDiaryDigest,
+          hammondWeekPack,
           hammondMindAmbient,
           mindSessionDigest,
+          mindTodaySession,
           mindSilence,
           mindDivergence,
           onThisDay,
           daysSinceLastEntry,
           daysSinceLastMindSession,
-          protocolSteer: protocolSteerBlock(slug, parsed.protocolId)
+          protocolSteer: protocolSteerBlock(slug, parsed.protocolId),
+          intuition: intuitionPrompt,
+          capacities: capacityOneLiners,
+          hubContext,
+          activationCatalogue: activation.catalogueBlock,
+          activationDirective: activation.activationBlock,
+          visualIntelligenceBlock: sharedVisualIntelligenceBlock(),
+          agentVisualCueBlock: agentVisualCueBlock(slug),
+          evidencePackBlock: surfaceTurn.promptBlock,
+          kernelBlock: surfaceTurn.interpretationBlock || ''
         });
 
+        let pendingLogRejection = null;
+        let governanceLogAppendedThisTurn = false;
+        let turnErrored = false;
+        // Persists a Confirm-class Central Node patch to the durable pending queue
+        // before emitting its Confirm card, so it survives past this one response
+        // instead of living only in the SSE stream + DOM (see cn-patch-queue.mjs).
+        // Best-effort: a queue write failure still lets the same-turn Confirm work,
+        // it just won't be resurfaceable in a later turn if this one gets dropped.
+        const proposeCentralNodePatch = async patch => {
+          let persistedId = null;
+          try {
+            const entry = { id: createPendingCnPatchId(), createdAt: today, slug, patch };
+            const nextQueue = addPendingCnPatch(pendingCnPatches, entry);
+            const result = await client.writeFile({
+              path: PENDING_CN_PATCHES_PATH,
+              content: serializePendingCnPatches(nextQueue),
+              ...(pendingCnPatchesSha ? { sha: pendingCnPatchesSha } : {}),
+              message: `chore(cn-patch-queue): propose ${patch.payload.summary}`
+            });
+            pendingCnPatches = nextQueue;
+            pendingCnPatchesSha = result.sha;
+            persistedId = entry.id;
+          } catch {
+            // Swallowed — see comment above.
+          }
+          send({ type: 'cn_patch_proposal', patch, id: persistedId });
+          return persistedId;
+        };
+
+        // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
+        const proposeOsAction = async (proposal, extras = {}) => {
+          let persistedId = null;
+          try {
+            let bases = snapshotGithubBases(proposal.writes, repoTree);
+            try {
+              const needsTasks = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+              const needsTeaching = proposal.writes.some(write => classifyWriteTarget(write.path).store === 'teaching');
+              if (needsTasks || needsTeaching) {
+                const blobStores = {};
+                if (needsTasks) blobStores.tasks = await getTasksStore(env);
+                if (needsTeaching) blobStores.teaching = await getTeachingStore(env);
+                bases = { ...bases, ...await snapshotBlobBases(proposal.writes, blobStores) };
+              }
+            } catch {
+              // Queue the GitHub write anyway; confirm skips the stale check without blob bases.
+            }
+            const pendingId = createPendingActionId();
+            let turnId = null;
+            let actionId = null;
+            let resumeUnavailable = false;
+            let checkpointError = null;
+            if (surfaceTurn.kernel) {
+              proposeAction(surfaceTurn.kernel, {
+                intent: proposal.intent,
+                snapshot: bases,
+                idempotencyKey: pendingId
+              });
+              const checkpoint = await persistKernelTurn({ required: true });
+              if (checkpoint.ok) {
+                turnId = surfaceTurn.kernel.id;
+                actionId = surfaceTurn.kernel.actions?.at(-1)?.id ?? null;
+              } else {
+                resumeUnavailable = true;
+                checkpointError = checkpoint.error;
+              }
+            }
+            const entry = {
+              id: pendingId,
+              createdAt: today,
+              slug,
+              proposal,
+              bases,
+              turnId,
+              actionId,
+              ...(resumeUnavailable ? { resumeUnavailable, checkpointError } : {}),
+              ...(extras && typeof extras === 'object' ? extras : {})
+            };
+            const nextQueue = addPendingAction(pendingActions, entry);
+            const result = await client.writeFile({
+              path: PENDING_ACTIONS_PATH,
+              content: serializePendingActions(nextQueue),
+              ...(pendingActionsSha ? { sha: pendingActionsSha } : {}),
+              message: `chore(propose-action): queue ${proposal.intent}`.slice(0, 200)
+            });
+            pendingActions = nextQueue;
+            pendingActionsSha = result.sha;
+            persistedId = entry.id;
+            send({
+              type: 'action_proposal',
+              proposal,
+              id: persistedId,
+              turnBound: Boolean(turnId),
+              ...(resumeUnavailable ? { resumeUnavailable: true } : {})
+            });
+            return persistedId;
+          } catch {
+            // Queue write failed — same-turn Confirm card still emits without a durable id.
+          }
+          send({ type: 'action_proposal', proposal, id: persistedId });
+          return persistedId;
+        };
         try {
-          send({ type: 'status', text: 'Thinking…' });
-          for await (const event of anthropic.streamMessage({
+          const emit = event => {
+            if (event.type === 'record_proposal' || event.type === 'record_saved') {
+              pendingLogRejection = null;
+            }
+            send(event);
+          };
+
+          send({
+            type: 'status',
+            text: (logFinalize || veraFlush) ? forceStatusFor(slug) : 'Thinking…',
+            ...(visualCtx.hasVisualEvidence || priorVisualEvidence.length
+              ? {
+                  visual: visualTraceFields({
+                    attachments: parsed.attachments,
+                    visualEvidence: recordedVisualEvidence.length
+                      ? recordedVisualEvidence
+                      : priorVisualEvidence,
+                    visualContextRestored: priorVisualEvidence.length > 0,
+                    toolsUnnarrowed: visualCtx.keepFullDomainTools,
+                    modelHasImageBlocks: visualCtx.hasVisualEvidence
+                  })
+                }
+              : {})
+          });
+          const streamOpts = {
+            slug,
+            userMessage: parsed.message,
+            today,
             system,
-            messages: [...parsed.history, { role: 'user', content: parsed.message }],
+            messages: [
+              ...materializeHistoryWithVisualEvidence(parsed.history),
+              { role: 'user', content: parsed.userContent ?? parsed.message }
+            ],
             tools,
+            toolChoice: forceToolChoice ? { type: 'any' } : null,
             signal: request.signal,
             executeTools: async event => {
+              if (event.name === 'record_visual_evidence') {
+                const items = normalizeVisualEvidenceList(event.input?.items);
+                recordedVisualEvidence = mergeVisualEvidenceLists(recordedVisualEvidence, items);
+                send({ type: 'visual_evidence', items: recordedVisualEvidence });
+                send({
+                  type: 'status',
+                  text: 'Noted visual evidence…',
+                  visual: visualTraceFields({
+                    attachments: parsed.attachments,
+                    visualEvidence: items,
+                    visualContextRestored: priorVisualEvidence.length > 0,
+                    toolsUnnarrowed: visualCtx.keepFullDomainTools,
+                    modelHasImageBlocks: visualCtx.hasVisualEvidence
+                  })
+                });
+                return JSON.stringify({ ok: true, recorded: items.length });
+              }
+              if (event.name === 'get_mind_session') {
+                send({ type: 'status', text: 'Checking Life Hub records…' });
+                const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
+                const result = await getMindSession({
+                  date,
+                  events: mindEvents,
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(result);
+              }
+              if (event.name === 'search_mind_records') {
+                send({ type: 'status', text: 'Searching mind records…' });
+                return JSON.stringify(searchMindRecords(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'search_diary_records') {
+                send({ type: 'status', text: 'Searching diary history…' });
+                return JSON.stringify(searchDiaryRecords(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'get_diary_range') {
+                send({ type: 'status', text: 'Reading diary range…' });
+                return JSON.stringify(getDiaryRange(mindEvents, event.input ?? {}));
+              }
+              if (event.name === 'get_nutrition_snapshot') {
+                send({ type: 'status', text: 'Reading Nutrition dashboard…' });
+                return JSON.stringify(getNutritionSnapshot(nutritionRecords, today, {
+                  nutritionChallenges
+                }));
+              }
+              if (event.name === 'get_nutrition_adherence') {
+                send({ type: 'status', text: 'Reading nutrition adherence…' });
+                return JSON.stringify(getNutritionAdherence(nutritionRecords, today));
+              }
+              if (event.name === 'get_nutrition_targets') {
+                send({ type: 'status', text: 'Reading nutrition targets…' });
+                return JSON.stringify(getNutritionTargets(today));
+              }
+              if (event.name === 'search_nutrition_records') {
+                send({ type: 'status', text: 'Searching nutrition records…' });
+                return JSON.stringify(searchNutritionRecords(nutritionRecords, event.input ?? {}));
+              }
+              if (event.name === 'get_weight_trend') {
+                send({ type: 'status', text: 'Reading weight trend…' });
+                return JSON.stringify(getWeightTrend({ compositionRecords, measurementRecords }));
+              }
+              if (event.name === 'search_skincare_records') {
+                send({ type: 'status', text: 'Searching skincare history…' });
+                return JSON.stringify(searchSkincareRecords(skincareHistoryRecords, event.input ?? {}));
+              }
+              if (event.name === 'get_skincare_adherence') {
+                send({ type: 'status', text: 'Reading skincare adherence…' });
+                return JSON.stringify(getSkincareAdherence(
+                  skincareHistoryRecords,
+                  today,
+                  event.input ?? {}
+                ));
+              }
+              if (event.name === 'get_tasks_focus') {
+                send({ type: 'status', text: 'Reading Tasks focus…' });
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'tasks_unavailable',
+                    detail: hubLoadErrors.tasks,
+                    store: 'tasks_hub'
+                  });
+                }
+                return JSON.stringify(getTasksFocus(hubTasks, hubProjects, { now: nowInstant }));
+              }
+              if (event.name === 'search_tasks') {
+                send({ type: 'status', text: 'Searching tasks…' });
+                if (hubLoadErrors.tasks) {
+                  return JSON.stringify({ ok: false, error: 'tasks_unavailable', store: 'tasks_hub' });
+                }
+                return JSON.stringify(searchTasks(hubTasks, event.input ?? {}));
+              }
+              if (event.name === 'get_task') {
+                send({ type: 'status', text: 'Reading task…' });
+                return JSON.stringify(getTask(hubTasks, event.input ?? {}));
+              }
+              if (event.name === 'search_teaching') {
+                send({ type: 'status', text: 'Searching Teaching…' });
+                return JSON.stringify(searchTeaching({
+                  query: event.input?.query,
+                  classes: hubClasses,
+                  lessons: hubLessons,
+                  units: hubUnits,
+                  limit: event.input?.limit
+                }));
+              }
+              if (event.name === 'get_teaching_context') {
+                send({ type: 'status', text: 'Reading Teaching context…' });
+                return JSON.stringify(getTeachingContext({
+                  classes: hubClasses,
+                  lessons: hubLessons,
+                  units: hubUnits,
+                  query: event.input?.query,
+                  now: nowInstant
+                }));
+              }
+              if (event.name === 'search_knowledge') {
+                send({ type: 'status', text: 'Searching Knowledge corpus…' });
+                if (knowledgeLoadError) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'knowledge_unavailable',
+                    detail: knowledgeLoadError,
+                    store: 'knowledge_hub'
+                  });
+                }
+                return JSON.stringify(searchKnowledge(knowledgePages, event.input ?? {}));
+              }
+              if (event.name === 'inspect_hub_signals') {
+                send({ type: 'status', text: 'Inspecting cross-hub signals…' });
+                return JSON.stringify(inspectHubSignals({
+                  tasks: hubTasks,
+                  classes: hubClasses,
+                  scheduledLessons: hubLessons,
+                  loadErrors: hubLoadErrors,
+                  hammondDigest,
+                  now: nowInstant
+                }));
+              }
+              if (event.name === 'get_week_review') {
+                send({ type: 'status', text: 'Reading the week…' });
+                return JSON.stringify(getWeekReview({
+                  events: hammondEvents,
+                  tasks: hubTasks,
+                  lessons: hubLessons,
+                  classes: hubClasses,
+                  centralNodeMarkdown,
+                  today,
+                  loadErrors: {
+                    ...hubLoadErrors,
+                    ...(hammondLifeLoadFailed ? { life: 'load_failed' } : {})
+                  }
+                }));
+              }
+              if (slug === 'hammond' && isHammondProductivityTool(event.name)) {
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
+                send({ type: 'status', text: 'Working…' });
+                const hammondResult = await executeHammondProductivity(event.name, event.input ?? {}, {
+                  tasks: hubTasks,
+                  projects: hubProjects,
+                  areas: hubAreas,
+                  goals: hubGoals,
+                  sessions: hubWorkSessions,
+                  workSessions: hubWorkSessions,
+                  blocks: hubWorkBlocks,
+                  workBlocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
+                  planning_direction: hubPlanningDirection,
+                  lessons: hubLessons,
+                  now: nowInstant,
+                  tasksStore: hubTasksStore,
+                  executeClareWork
+                });
+                const hammondCard = buildProductivityCardEvent(event.name, hammondResult);
+                if (hammondCard) send(hammondCard);
+                return JSON.stringify(hammondResult);
+              }
+              if (event.name === 'search_medical_records') {
+                send({ type: 'status', text: 'Searching Medical Overview…' });
+                return JSON.stringify(searchMedicalRecords(medicalEvents, event.input ?? {}));
+              }
+              if (event.name === 'brief_medical_appointment') {
+                send({ type: 'status', text: 'Reading Medical Overview…' });
+                const date = typeof event.input?.date === 'string' ? event.input.date.trim() : '';
+                const result = await briefMedicalAppointmentWithFallback({
+                  date,
+                  events: medicalEvents,
+                  tree: repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha)),
+                  parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
+                });
+                return JSON.stringify(result);
+              }
+              if (event.name === 'get_last_workout') {
+                send({ type: 'status', text: 'Checking last workout…' });
+                return JSON.stringify(getLastWorkout(workoutRecords));
+              }
+              if (event.name === 'search_workout_records') {
+                send({ type: 'status', text: 'Searching workout history…' });
+                return JSON.stringify(searchWorkoutRecords(workoutRecords, event.input ?? {}));
+              }
+              if (event.name === 'compare_workout_windows') {
+                send({ type: 'status', text: 'Comparing training windows…' });
+                return JSON.stringify(compareWorkoutWindows(workoutRecords, today));
+              }
+              if (event.name === 'get_region_strength') {
+                send({ type: 'status', text: 'Reading region strength…' });
+                return JSON.stringify(getRegionStrength(workoutRecords, today, event.input ?? {}));
+              }
+              const fitnessRead = executeFitnessReadTool(event.name, {
+                workouts: workoutRecords,
+                today,
+                compositionRecords,
+                measurementRecords,
+                templates: templateContents,
+                targetRatio: physiqueTargetRatio,
+                input: event.input ?? {}
+              });
+              if (fitnessRead != null) {
+                send({
+                  type: 'status',
+                  text: event.name === 'analyse_training_evidence'
+                    ? 'Interpreting training evidence…'
+                    : 'Reading Fitness records…'
+                });
+                return JSON.stringify(fitnessRead);
+              }
               if (event.name === 'search_exercise_library') {
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
               }
@@ -692,6 +1949,147 @@ export function createChatHandler({
                     calories: entry.calories,
                     protein_g: entry.protein_g,
                     fat_g: entry.fat_g
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'list_nutrition_challenges') {
+                const includeCompleted = event.input?.include_completed === true;
+                const text = formatNutritionChallengesForPrompt(nutritionChallenges, {
+                  today,
+                  includeCompleted
+                });
+                return JSON.stringify({
+                  ok: true,
+                  challenges: text || 'No nutrition challenges on file.',
+                  count: nutritionChallenges.challenges?.length ?? 0
+                });
+              }
+              if (event.name === 'upsert_nutrition_challenge') {
+                const draft = validateUpsertNutritionChallengeInput(event.input, { today });
+                if (!draft) {
+                  return JSON.stringify({ ok: false, error: 'invalid_challenge' });
+                }
+                try {
+                  const outcome = upsertNutritionChallenge(nutritionChallenges, draft);
+                  const serialized = serializeNutritionChallenges({ challenges: outcome.challenges });
+                  const fileResult = await client.writeFile({
+                    path: NUTRITION_CHALLENGES_PATH,
+                    content: serialized,
+                    ...(nutritionChallengesSha ? { sha: nutritionChallengesSha } : {}),
+                    message: `chore(nutrition-challenge): ${outcome.created ? 'open' : 'update'} ${outcome.challenge.id}`
+                  });
+                  nutritionChallenges = { challenges: outcome.challenges };
+                  nutritionChallengesSha = fileResult.sha;
+                  nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+
+                  let cnSynced = false;
+                  if (centralNodeMarkdown) {
+                    const nextCn = syncChallengeToCentralNode(centralNodeMarkdown, outcome.challenge, {
+                      actionLine: outcome.created
+                        ? `- Brisket: opened nutrition challenge tracker — ${outcome.challenge.title} (${outcome.challenge.start}→${outcome.challenge.end}).`
+                        : `- Brisket: updated nutrition challenge tracker — ${outcome.challenge.title}.`
+                    });
+                    if (nextCn && nextCn !== centralNodeMarkdown) {
+                      const cnResult = await client.writeFile({
+                        path: 'central-node.md',
+                        content: nextCn,
+                        ...(centralNodeSha ? { sha: centralNodeSha } : {}),
+                        message: `chore(cn): nutrition challenge ${outcome.challenge.title}`
+                      });
+                      centralNodeMarkdown = nextCn;
+                      centralNodeSha = cnResult.sha;
+                      cnSynced = true;
+                      send({
+                        type: 'central_node_patched',
+                        summary: `Nutrition challenge: ${outcome.challenge.title}`,
+                        risk: 'auto'
+                      });
+                    }
+                  }
+
+                  const tally = tallyChallenge(outcome.challenge);
+                  send({
+                    type: 'nutrition_challenge_upserted',
+                    id: outcome.challenge.id,
+                    title: outcome.challenge.title,
+                    created: outcome.created
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    status: outcome.created ? 'created' : 'updated',
+                    id: outcome.challenge.id,
+                    title: outcome.challenge.title,
+                    start: outcome.challenge.start,
+                    end: outcome.challenge.end,
+                    tally,
+                    central_node_synced: cnSynced,
+                    path: NUTRITION_CHALLENGES_PATH
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'mark_nutrition_challenge_day') {
+                const mark = validateMarkNutritionChallengeDayInput(event.input);
+                if (!mark) {
+                  return JSON.stringify({ ok: false, error: 'invalid_mark' });
+                }
+                try {
+                  const outcome = markNutritionChallengeDay(nutritionChallenges, mark);
+                  if (!outcome) {
+                    return JSON.stringify({ ok: false, error: 'challenge_or_date_not_found' });
+                  }
+                  const serialized = serializeNutritionChallenges({ challenges: outcome.challenges });
+                  const fileResult = await client.writeFile({
+                    path: NUTRITION_CHALLENGES_PATH,
+                    content: serialized,
+                    ...(nutritionChallengesSha ? { sha: nutritionChallengesSha } : {}),
+                    message: `chore(nutrition-challenge): mark ${mark.date} ${mark.result}`
+                  });
+                  nutritionChallenges = { challenges: outcome.challenges };
+                  nutritionChallengesSha = fileResult.sha;
+                  nutritionChallengesText = formatNutritionChallengesForPrompt(nutritionChallenges, { today });
+
+                  let cnSynced = false;
+                  if (centralNodeMarkdown) {
+                    const nextCn = syncChallengeToCentralNode(centralNodeMarkdown, outcome.challenge, {
+                      actionLine: `- Brisket: challenge day ${mark.date} → ${mark.result}${mark.note ? ` (${mark.note})` : ''}.`,
+                      updateFlags: mark.result !== 'pending'
+                    });
+                    if (nextCn && nextCn !== centralNodeMarkdown) {
+                      const cnResult = await client.writeFile({
+                        path: 'central-node.md',
+                        content: nextCn,
+                        ...(centralNodeSha ? { sha: centralNodeSha } : {}),
+                        message: `chore(cn): challenge day ${mark.date} ${mark.result}`
+                      });
+                      centralNodeMarkdown = nextCn;
+                      centralNodeSha = cnResult.sha;
+                      cnSynced = true;
+                      send({
+                        type: 'central_node_patched',
+                        summary: `Challenge ${mark.date}: ${mark.result}`,
+                        risk: 'auto'
+                      });
+                    }
+                  }
+
+                  const tally = tallyChallenge(outcome.challenge);
+                  send({
+                    type: 'nutrition_challenge_marked',
+                    id: outcome.challenge.id,
+                    date: mark.date,
+                    result: mark.result
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    id: outcome.challenge.id,
+                    date: mark.date,
+                    result: mark.result,
+                    tally,
+                    central_node_synced: cnSynced
                   });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
@@ -754,24 +2152,46 @@ export function createChatHandler({
                 }
               }
               if (event.name === 'log_entry') {
-                const validation = validateLogEntry(event.input, {
-                  id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+                if (event.input?.type === 'mind_session') {
+                  send({ type: 'status', text: 'Saving your session…' });
+                }
+                let medicalInput = event.input;
+                if (event.input?.type === 'medical') {
+                  try {
+                    medicalInput = await resolveMedicalLogCandidate(client, event.input, {
+                      today,
+                      loadYaml,
+                      decodeBlob
+                    });
+                  } catch {
+                    // GitHub blips must not kill the SSE turn — fall back to the raw payload.
+                    medicalInput = event.input;
+                  }
+                }
+                const validation = validateLogEntry(medicalInput, {
+                  id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                   now: getSydneyTimestamp(nowInstant)
                 });
                 if (!validation.valid) {
-                  send({ type: 'record_rejected', errors: validation.errors });
-                  return JSON.stringify({ ok: false, errors: validation.errors });
+                  pendingLogRejection = { errors: validation.errors };
+                  return JSON.stringify(logEntryRejectionPayload(medicalInput, validation.errors));
                 }
-                const outcome = await persistOrProposeLogEntry({
-                  client, slug, today, validation, send
-                });
-                if (outcome.status === 'written') {
-                  return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                try {
+                  const outcome = await persistOrProposeLogEntry({
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                  });
+                  if (outcome.status === 'written') {
+                    return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
+                  }
+                  if (outcome.error === 'write_failed') {
+                    return JSON.stringify({ ok: false, error: 'write_failed' });
+                  }
+                  return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
+                } catch {
+                  const errors = ['Could not prepare that record. Retry with a simpler payload.'];
+                  pendingLogRejection = { errors };
+                  return JSON.stringify(logEntryRejectionPayload(medicalInput, errors));
                 }
-                if (outcome.error === 'write_failed') {
-                  return JSON.stringify({ ok: false, error: 'write_failed' });
-                }
-                return JSON.stringify({ ok: true, status: 'awaiting_confirm' });
               }
               if (event.name === 'append_governance_log') {
                 const entry = validateGovernanceLogAppendInput(event.input);
@@ -789,7 +2209,15 @@ export function createChatHandler({
                   });
                   governanceLog = next;
                   governanceLogSha = result.sha;
+                  governanceLogAppendedThisTurn = true;
                   send({ type: 'governance_log_appended', entryType: dated.entryType });
+                  if (dated.entryType === 'Major Decision' || dated.chosen) {
+                    const choice = buildSecondOpinionChoice({
+                      title: dated.title || dated.entryType,
+                      decisionId: dated.decisionId
+                    });
+                    if (choice) send(choice);
+                  }
                   return JSON.stringify({ ok: true, path: GOVERNANCE_LOG_PATH });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
@@ -800,15 +2228,19 @@ export function createChatHandler({
                 if (!patch) {
                   return JSON.stringify({ ok: false, error: 'invalid_patch' });
                 }
+                if (!assertAgentMayApplyCentralNodePatch(slug, patch)) {
+                  return JSON.stringify({ ok: false, error: 'patch_not_allowed' });
+                }
                 const risk = classifyCentralNodePatchRisk(patch);
                 if (risk === 'confirm') {
                   // Anthropic client swallows tool_call when executeTools returns
                   // non-null — emit Confirm SSE here (same as central_node_patched).
-                  send({ type: 'cn_patch_proposal', patch });
+                  const pendingId = await proposeCentralNodePatch(patch);
                   return JSON.stringify({
                     ok: true,
                     status: 'awaiting_confirm',
-                    summary: patch.payload.summary
+                    summary: patch.payload.summary,
+                    ...(pendingId ? { pendingId } : {})
                   });
                 }
                 if (!centralNodeMarkdown) {
@@ -841,33 +2273,319 @@ export function createChatHandler({
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
               }
+              
+              if (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts)) {
+                const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+                const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+                const shortcutInput = promotedDraft
+                  ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                  : (event.input ?? {});
+                const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
+                  client,
+                  agentSlug: slug,
+                  today,
+                  repoTree,
+                  readBlob: async sha => decodeBlob(await client.readBlob(sha))
+                });
+                if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                  const proposalInput = shortcutResult.proposal;
+                  const validated = validateProposeActionInput(proposalInput, { agentSlug: slug });
+                  if (!validated.ok) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: validated.error,
+                      ...(validated.detail ? { detail: validated.detail } : {})
+                    });
+                  }
+                  const pendingId = await proposeOsAction(validated.proposal);
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    intent: validated.proposal.intent,
+                    writes: validated.proposal.writes.map(write => ({
+                      path: write.path,
+                      mode: write.mode,
+                      diff: write.diff
+                    })),
+                    ...(pendingId ? { pendingId } : {}),
+                    ...(shortcutResult.loan ? { loan: shortcutResult.loan } : {})
+                  });
+                }
+                return JSON.stringify(shortcutResult);
+              }
+              if (event.name === 'os_propose_action') {
+                const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  intent: validated.proposal.intent,
+                  writes: validated.proposal.writes.map(write => ({
+                    path: write.path,
+                    mode: write.mode,
+                    diff: write.diff
+                  })),
+                  ...(pendingId ? { pendingId } : {})
+                });
+              }
+              if (slug === 'clare' && isClareWorkTool(event.name)) {
+                // executeTools swallows tool_call events; re-emit so clients/live
+                // acceptance can observe the deterministic productivity trajectory.
+                send({
+                  type: 'tool_call',
+                  id: event.id,
+                  name: event.name,
+                  input: event.input ?? {}
+                });
+                send({ type: 'status', text: 'Working…' });
+                const stated = statedPlannerInputs(parsed.message);
+                let hubLifeEvents = [];
+                if (event.name === 'compose_schedule' || event.name === 'plan_work') {
+                  try {
+                    const dateHint = typeof event.input?.date === 'string'
+                      ? event.input.date
+                      : today;
+                    const loadLife = typeof getLifeEvents === 'function'
+                      ? getLifeEvents
+                      : async ({ dates }) => loadTimedLifeEventsFromTree({
+                        client,
+                        tree: repoTree,
+                        dates
+                      });
+                    hubLifeEvents = await loadLife({
+                      dates: [dateHint].filter(Boolean),
+                      client,
+                      tree: repoTree
+                    });
+                  } catch (error) {
+                    // Fail closed: incomplete calendar truth must not produce a Schedule Diff proposal.
+                    const code = error instanceof LifeEventSourceUnavailableError
+                      || error?.code === 'schedule_validation_unavailable'
+                      ? 'schedule_validation_unavailable'
+                      : 'schedule_context_unavailable';
+                    return JSON.stringify({
+                      ok: false,
+                      error: code,
+                      message: 'Authoritative Life calendar events could not be loaded. Schedule was not composed.'
+                    });
+                  }
+                }
+                const result = await executeClareWork(event.name, event.input ?? {}, {
+                  tasks: hubTasks,
+                  projects: hubProjects,
+                  lessons: hubLessons,
+                  workBlocks: hubWorkBlocks,
+                  work_blocks: hubWorkBlocks,
+                  planning_profile: hubPlanningProfile,
+                  lifeEvents: hubLifeEvents,
+                  events: hubLifeEvents,
+                  protocol: clareProtocol,
+                  now: nowInstant,
+                  energy: stated.energy,
+                  capacity_minutes: stated.capacity_minutes,
+                  workday: stated.workday,
+                  tasksStore: hubTasksStore
+                });
+                if (result?.kind === 'propose' && result.proposal) {
+                  const validated = validateProposeActionInput(result.proposal, { agentSlug: slug });
+                  if (!validated.ok) {
+                    return JSON.stringify({
+                      ok: false,
+                      error: validated.error,
+                      ...(validated.detail ? { detail: validated.detail } : {})
+                    });
+                  }
+                  const pendingId = await proposeOsAction(validated.proposal, {
+                    ...(result.workflow_kind ? { workflowKind: result.workflow_kind } : {}),
+                    ...(result.workflow_id ? { workflowId: result.workflow_id } : {}),
+                    ...(result.schedule_context ? { scheduleContext: result.schedule_context } : {})
+                  });
+                  let workflowState = result.state ?? null;
+                  if (pendingId && result.workflow_kind === 'weekly_review' && result.workflow_id && hubTasksStore) {
+                    workflowState = await markWeeklyReviewAwaitingConfirm(hubTasksStore, result.workflow_id, {
+                      pendingActionId: pendingId
+                    });
+                  }
+                  if (pendingId && result.workflow_kind === 'schedule_diff' && hubTasksStore) {
+                    workflowState = await markScheduleDiffAwaitingConfirm(hubTasksStore, {
+                      pendingActionId: pendingId,
+                      scheduleContext: result.schedule_context,
+                      proposed: result.proposed,
+                      date: result.schedule_context?.date,
+                      writes: Array.isArray(result.proposal?.writes)
+                        ? result.proposal.writes.map((w) => ({ path: w.path, diff: w.diff }))
+                        : null
+                    });
+                  }
+                  const proposeCard = buildProductivityCardEvent(event.name, {
+                    ...result,
+                    ...(workflowState ? { state: workflowState } : {})
+                  }, {
+                    pendingId: pendingId || undefined
+                  });
+                  // Only emit a Confirmable Schedule Diff card when a durable pending id exists.
+                  if (proposeCard && pendingId) send(proposeCard);
+                  if (!pendingId) {
+                    // Leave preparing / non-active workflow — never promote awaiting_confirm without an id.
+                    if (hubTasksStore && result.workflow_kind === 'schedule_diff') {
+                      try {
+                        workflowState = await loadWorkflowState(hubTasksStore, 'schedule_diff:current');
+                      } catch {
+                        workflowState = workflowState || null;
+                      }
+                    }
+                    return JSON.stringify({
+                      ok: false,
+                      error: 'pending_queue_persist_failed',
+                      status: workflowState?.status || 'preparing',
+                      ...(workflowState ? { state: workflowState } : {})
+                    });
+                  }
+                  return JSON.stringify({
+                    ok: true,
+                    status: 'awaiting_confirm',
+                    intent: validated.proposal.intent,
+                    writes: validated.proposal.writes.map(write => ({
+                      path: write.path,
+                      mode: write.mode,
+                      diff: write.diff
+                    })),
+                    pendingId,
+                    ...(result.session_id ? { session_id: result.session_id } : {}),
+                    ...(workflowState ? { state: workflowState } : result.state ? { state: result.state } : {})
+                  });
+                }
+                const card = buildProductivityCardEvent(event.name, result);
+                if (card) send(card);
+                return JSON.stringify(result);
+              }
               return null;
             }
+          };
+          for await (const event of streamWithVisualEvidenceCapture(anthropic, {
+            ...streamOpts,
+            needsVisualCapture: visualCtx.hasVisualEvidence,
+            getRecordedVisualEvidence: () => recordedVisualEvidence,
+            setRecordedVisualEvidence: (items) => {
+              recordedVisualEvidence = mergeVisualEvidenceLists([], items);
+            },
+            onVisualEvidence: (items, meta) => {
+              send({ type: 'visual_evidence', items: recordedVisualEvidence, captureSource: meta?.captureSource });
+            },
+            attachments: parsed.attachments,
+            priorVisualEvidence,
+            keepFullDomainTools: visualCtx.keepFullDomainTools,
+            hasVisualEvidence: visualCtx.hasVisualEvidence
           })) {
             if (event.type === 'tool_call' && event.name === 'log_entry') {
-              const validation = validateLogEntry(event.input, {
-                id: `${event.input?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
+              let medicalInput = event.input;
+              if (event.input?.type === 'medical') {
+                try {
+                  medicalInput = await resolveMedicalLogCandidate(client, event.input, {
+                    today,
+                    loadYaml,
+                    decodeBlob
+                  });
+                } catch {
+                  medicalInput = event.input;
+                }
+              }
+              const validation = validateLogEntry(medicalInput, {
+                id: `${medicalInput?.type ?? 'entry'}-${today}-${randomBytes(3).toString('hex')}`,
                 now: getSydneyTimestamp(nowInstant)
               });
               if (validation.valid) {
-                await persistOrProposeLogEntry({ client, slug, today, validation, send });
+                try {
+                  await persistOrProposeLogEntry({
+                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                  });
+                } catch {
+                  pendingLogRejection = {
+                    errors: ['Could not prepare that record. Retry with a simpler payload.']
+                  };
+                }
               } else {
-                send({ type: 'record_rejected', errors: validation.errors });
+                pendingLogRejection = { errors: validation.errors };
               }
             } else if (event.type === 'tool_call' && event.name === 'propose_central_node_patch') {
               const patch = validateCentralNodePatchInput(event.input);
-              if (patch && classifyCentralNodePatchRisk(patch) === 'confirm') {
-                send({ type: 'cn_patch_proposal', patch });
+              if (patch && assertAgentMayApplyCentralNodePatch(slug, patch) && classifyCentralNodePatchRisk(patch) === 'confirm') {
+                await proposeCentralNodePatch(patch);
               } else {
                 send(event);
+              }
+            } else if (
+              event.type === 'tool_call'
+              && (isShortcutTool(event.name) || isPromotedShortcutToolName(event.name, promotedShortcutDrafts))
+            ) {
+              const promotedDraft = findPromotedDraftByToolName(event.name, promotedShortcutDrafts);
+              const shortcutName = promotedDraft ? 'os_run_promoted_shortcut' : event.name;
+              const shortcutInput = promotedDraft
+                ? { proposed_id: promotedDraft.proposed_id, ...(event.input ?? {}) }
+                : (event.input ?? {});
+              const shortcutResult = await executeShortcut(shortcutName, shortcutInput, {
+                client,
+                agentSlug: slug,
+                today,
+                repoTree,
+                readBlob: async sha => decodeBlob(await client.readBlob(sha))
+              });
+              if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                const validated = validateProposeActionInput(shortcutResult.proposal, { agentSlug: slug });
+                if (validated.ok) await proposeOsAction(validated.proposal);
+                else send({ type: 'action_rejected', error: validated.error, ...(validated.detail ? { detail: validated.detail } : {}) });
+              } else {
+                send(event);
+              }
+            } else if (event.type === 'tool_call' && event.name === 'os_propose_action') {
+              const validated = validateProposeActionInput(event.input, { agentSlug: slug });
+              if (validated.ok) {
+                await proposeOsAction(validated.proposal);
+              } else {
+                send({
+                  type: 'action_rejected',
+                  error: validated.error,
+                  ...(validated.detail ? { detail: validated.detail } : {})
+                });
               }
             } else {
               send(event);
             }
           }
         } catch (error) {
+          turnErrored = true;
           send({ type: 'error', code: error instanceof AnthropicClientError ? error.code : 'anthropic_unavailable' });
         } finally {
+          if (pendingLogRejection) {
+            send({ type: 'record_rejected', errors: pendingLogRejection.errors });
+          }
+          // Server-side phase advancement for a headless/scheduled caller with no
+          // client-side audit state machine of its own (see effectiveAuditSession
+          // above) -- gives it a simple contract: read the next session off this
+          // event, resend it as auditSession next turn, stop once it's null.
+          // Skipped on a turn error (nothing meaningful happened to advance from),
+          // and mirrors chat-controller.js's advanceAuditSession: lock cannot
+          // advance without append_governance_log having actually fired this turn.
+          if (effectiveAuditSession && !turnErrored) {
+            const phase = effectiveAuditSession.phase;
+            const nextSession = phase === 'lock' && !governanceLogAppendedThisTurn
+              ? effectiveAuditSession
+              : nextAuditPhase(effectiveAuditSession, (phase === 'triage' || phase === 'intake')
+                ? {
+                    askedIntakeQuestion: true,
+                    skipRemainingIntake: AUDIT_SKIP_INTAKE_RE.test(parsed.message),
+                    intakeComplete: AUDIT_SKIP_INTAKE_RE.test(parsed.message)
+                  }
+                : {});
+            send({ type: 'audit_next_session', session: nextSession });
+          }
           controller.close();
         }
       }
@@ -880,38 +2598,90 @@ export function createChatHandler({
   };
 }
 
-async function persistOrProposeLogEntry({ client, slug, today, validation, send }) {
+async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage }) {
+  let proposal = validation;
+  if (slug === 'chadwick' && proposal.record?.type === 'workout') {
+    proposal = coerceChatWorkoutProposal(proposal, { userMessage });
+  }
   const path = buildCanonicalPath({
-    type: validation.record.type,
-    date: validation.record.date,
-    slug: buildRecordSlug(validation.record)
+    type: proposal.record.type,
+    date: proposal.record.date,
+    slug: buildRecordSlug(proposal.record)
   });
-  const autoWrite = slug === 'vera' && validation.record.type === 'mind_session';
-  if (autoWrite) {
+
+  let existingSha = null;
+
+  if (validation.record.type === 'medical') {
     try {
       const current = await client.resolveTree();
-      const existingSha = current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
+      const existingEntry = current.tree.find(entry => entry.path === path && entry.type === 'blob');
+      if (existingEntry?.sha) {
+        existingSha = existingEntry.sha;
+        const text = decodeBlob(await client.readBlob(existingEntry.sha));
+        if (text) {
+          const existing = parseMedicalEventTolerant(text, path, loadYaml);
+          if (existing) {
+            const merged = mergeMedicalFields(existing.record, validation.record, {
+              notes: validation.notes,
+              existingNotes: existing.body
+            });
+            const remerged = validateLogEntry({
+              type: 'medical',
+              date: validation.record.date,
+              time: validation.record.time,
+              notes: merged.notes,
+              fields: merged.fields
+            }, {
+              id: existing.record.id,
+              now: validation.record.updated_at,
+              source: existing.record.source ?? 'chat'
+            });
+            if (remerged.valid) {
+              proposal = {
+                ...remerged,
+                record: {
+                  ...remerged.record,
+                  created_at: existing.record.created_at ?? remerged.record.created_at
+                }
+              };
+            }
+          }
+        }
+      }
+    } catch {
+      // Best-effort append — fall back to the original proposal.
+    }
+  }
+
+  const autoWriteMindSession = slug === 'vera' && proposal.record.type === 'mind_session';
+  const autoWriteMedicalAppend = slug === 'sara' && proposal.record.type === 'medical' && existingSha != null;
+  if (autoWriteMindSession || autoWriteMedicalAppend) {
+    try {
+      const current = await client.resolveTree();
+      const sha = existingSha ?? current.tree.find(e => e.path === path && e.type === 'blob')?.sha;
       const persisted = await persistLogEntry(client, {
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
-        existingSha,
+        existingSha: sha,
         nowDateKey: today
       });
       send({
         type: 'record_saved',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
-        summary: describeRecordForLog(validation.record, validation.notes),
+        summary: describeRecordForLog(proposal.record, proposal.notes, {
+          medicalAppend: autoWriteMedicalAppend
+        }),
         centralNodeUpdated: persisted.centralNodeUpdated
       });
       return { ok: true, status: 'written', path };
     } catch {
       send({
         type: 'record_proposal',
-        record: validation.record,
-        notes: validation.notes,
+        record: proposal.record,
+        notes: proposal.notes,
         path,
         warnings: [],
         autoWriteFailed: true
@@ -921,12 +2691,12 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send 
   }
   send({
     type: 'record_proposal',
-    record: validation.record,
-    notes: validation.notes,
+    record: proposal.record,
+    notes: proposal.notes,
     path,
     // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
     // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-    warnings: lintWorkoutProposal(validation.record)
+    warnings: lintWorkoutProposal(proposal.record)
   });
   return { ok: true, status: 'awaiting_confirm' };
 }
@@ -960,31 +2730,21 @@ async function parseRequest(request) {
   if (!body || typeof body.message !== 'string' || body.message.trim().length === 0 || body.message.length > MAX_MESSAGE_LENGTH) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid chat message.', false, PRIVATE_CACHE) };
   }
+  const attachments = normalizeChatAttachments(body.attachments);
   return {
     message: body.message,
+    attachments,
+    userContent: buildUserContent(body.message, attachments),
     history: sanitizeHistory(body.history),
     priorAgentSlug: typeof body.priorAgentSlug === 'string' ? body.priorAgentSlug : undefined,
     auditSession: normalizeAuditSession(body.auditSession),
-    protocolId: normalizeProtocolId(body.protocolId)
+    protocolId: normalizeProtocolId(body.protocolId),
+    agentKernel: body.agentKernel === true
   };
 }
 
 function sanitizeHistory(value) {
-  if (!Array.isArray(value)) return [];
-  let totalChars = 0;
-  const sanitized = [];
-  for (const entry of value.slice(-MAX_HISTORY_MESSAGES)) {
-    if (!entry || typeof entry !== 'object') continue;
-    if (entry.role !== 'user' && entry.role !== 'assistant') continue;
-    if (typeof entry.content !== 'string' || entry.content.trim() === '') continue;
-    const content = entry.content.length > MAX_HISTORY_ENTRY_CHARS
-      ? entry.content.slice(0, MAX_HISTORY_ENTRY_CHARS)
-      : entry.content;
-    totalChars += content.length;
-    if (totalChars > MAX_HISTORY_TOTAL_CHARS) break;
-    sanitized.push({ role: entry.role, content });
-  }
-  return sanitized;
+  return keepNewestHistory(value);
 }
 
 async function readAtMost(stream, limit) {
@@ -1045,8 +2805,10 @@ function parseHammondFitnessRecords(entries, blobs) {
     const content = decodeBlob(blobs[index]);
     if (content === null) continue;
     try {
-      const { record } = parseEventDocument(content, entries[index].path, loadYaml);
-      if (record) records.push(record);
+      const { record, body } = parseEventDocument(content, entries[index].path, loadYaml);
+      // Notes are the markdown body (not YAML). Without this, Chadwick's recent-session
+      // prompt and get_last_workout/search tools never see session verdicts Adam wrote.
+      if (record) records.push(attachWorkoutNotes(record, body));
     } catch {
       // Skip an unreadable/invalid fitness record rather than breaking the chat turn.
     }
@@ -1080,4 +2842,86 @@ function withPrivateCache(response) {
   return new Response(response.body, { status: response.status, headers });
 }
 
-export default createChatHandler();
+export function createChatStartHandler({
+  env = process.env,
+  getStore = defaultGetChatJobStore,
+  invokeBackground = defaultInvokeChatBackground,
+  fetchImpl = fetch,
+  verifySessionToken: verify = verifySessionToken,
+  serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
+  now = Date.now,
+  ...handlerDeps
+} = {}) {
+  return async function chatStartHandler(request) {
+    if (request.method === 'OPTIONS') return preflightResponse(request, env);
+    return withCors(await start(request), request, env);
+  };
+
+  async function start(request) {
+    if (request.method !== 'POST') return withPrivateCache(methodNotAllowed('POST'));
+    const originError = guardRequestOrigin(request, env);
+    if (originError) return withPrivateCache(originError);
+    if (!isConfigured(env) || typeof env.ANTHROPIC_API_KEY !== 'string' || env.ANTHROPIC_API_KEY.length === 0) {
+      return withPrivateCache(misconfiguredResponse());
+    }
+
+    let session;
+    try {
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
+    } catch {
+      return withPrivateCache(misconfiguredResponse());
+    }
+    if (!session.valid) {
+      return errorResponse(401, 'unauthenticated', 'Please sign in to continue.', false, {
+        ...PRIVATE_CACHE,
+        'set-cookie': clearCookie()
+      });
+    }
+
+    const parsed = await parseRequest(request);
+    if (parsed.error) return parsed.error;
+
+    const jobBody = JSON.stringify({
+      message: parsed.message,
+      ...(parsed.attachments?.length ? { attachments: parsed.attachments } : {}),
+      ...(parsed.history?.length ? { history: parsed.history } : {}),
+      ...(parsed.priorAgentSlug ? { priorAgentSlug: parsed.priorAgentSlug } : {}),
+      ...(parsed.auditSession ? { auditSession: parsed.auditSession } : {}),
+      ...(parsed.protocolId ? { protocolId: parsed.protocolId } : {}),
+      ...(parsed.agentKernel ? { agentKernel: true } : {})
+    });
+
+    let kicked = false;
+    try {
+      const jobId = randomUUID();
+      const store = await getStore();
+      await store.create(jobId, {
+        owner: chatJobOwnerKey(request.headers.get('cookie') ?? ''),
+        body: jobBody,
+        url: request.url,
+        cookie: request.headers.get('cookie') ?? '',
+        origin: request.headers.get('origin') ?? ''
+      });
+      kicked = await invokeBackground(request, jobId, env, fetchImpl);
+      if (kicked) return withPrivateCache(okResponse(202, { jobId }));
+    } catch {
+      kicked = false;
+    }
+
+    // Background job did not start — stream this turn live so chat still works.
+    return createChatHandler({
+      env,
+      fetchImpl,
+      verifySessionToken: verify,
+      serializeExpiredSessionCookie: clearCookie,
+      now,
+      ...handlerDeps
+    })(new Request(request.url, {
+      method: 'POST',
+      headers: request.headers,
+      body: jobBody
+    }));
+  }
+}
+
+export default createChatStartHandler();

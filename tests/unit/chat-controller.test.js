@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatController } from '../../js/app/chat-controller.js';
-import { agentColour } from '../../js/app/agent-colour.js';
-import { isAgentStatusLine, isGenericStatusCopy } from '../../js/app/agent-protocols.js';
+import { createChatController } from '../../apps/life/js/app/chat-controller.js';
+import { agentColour } from '../../apps/life/js/app/agent-colour.js';
+import { isAgentStatusLine, isGenericStatusCopy } from '../../apps/life/js/app/agent-protocols.js';
 
 class FakeElement extends EventTarget {
   constructor(tag) {
@@ -16,7 +16,14 @@ class FakeElement extends EventTarget {
     this.hidden = false;
     this.children = [];
     this.parent = null;
+    this.attributes = new Map();
+    this.offsetTop = 0;
+    this.offsetHeight = 0;
+    this.clientHeight = 0;
+    this.scrollHeight = 0;
+    this.scrollTop = 0;
     this.style = {
+      height: '0px',
       props: new Map(),
       setProperty(name, value) {
         this.props.set(name, value);
@@ -25,6 +32,50 @@ class FakeElement extends EventTarget {
         return this.props.get(name) ?? '';
       }
     };
+    this.classList = {
+      add: (...names) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        for (const name of names) set.add(name);
+        this.className = [...set].join(' ');
+      },
+      remove: (...names) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        for (const name of names) set.delete(name);
+        this.className = [...set].join(' ');
+      },
+      toggle: (name, force) => {
+        const set = new Set((this.className || '').split(/\s+/).filter(Boolean));
+        const shouldAdd = force ?? !set.has(name);
+        if (shouldAdd) set.add(name);
+        else set.delete(name);
+        this.className = [...set].join(' ');
+        return shouldAdd;
+      },
+      contains: (name) => (this.className || '').split(/\s+/).includes(name)
+    };
+  }
+
+  get isConnected() {
+    return this.parent != null;
+  }
+
+  get nextSibling() {
+    if (!this.parent) return null;
+    const idx = this.parent.children.indexOf(this);
+    if (idx < 0) return null;
+    return this.parent.children[idx + 1] ?? null;
+  }
+
+  get lastElementChild() {
+    return this.children[this.children.length - 1] ?? null;
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, String(value));
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
   }
 
   append(...nodes) {
@@ -32,6 +83,18 @@ class FakeElement extends EventTarget {
       this.children.push(node);
       node.parent = this;
     }
+  }
+
+  insertBefore(node, ref) {
+    if (node.parent) node.remove();
+    const idx = this.children.indexOf(ref);
+    if (idx === -1) {
+      this.append(node);
+      return node;
+    }
+    this.children.splice(idx, 0, node);
+    node.parent = this;
+    return node;
   }
 
   replaceChildren(...nodes) {
@@ -53,12 +116,38 @@ class FakeElement extends EventTarget {
     if (selector === '.chat-message__avatar') {
       return this.children.find(child => child.className === 'chat-message__avatar') ?? null;
     }
+    if (selector === '.confirm-card__actions') {
+      return this.children.find(child => child.className === 'confirm-card__actions') ?? null;
+    }
+    if (selector === '.confirm-card__receipt') {
+      const actions = this.children.find(child => child.className === 'confirm-card__actions');
+      return actions?.children?.find(child => child.className === 'confirm-card__receipt')
+        ?? this.children.find(child => child.className === 'confirm-card__receipt')
+        ?? null;
+    }
+    if (selector?.startsWith?.('[') && selector.endsWith(']')) {
+      const attr = selector.slice(1, -1);
+      return this.children.find(child => child.attributes?.has(attr)) ?? null;
+    }
     return null;
   }
 
   querySelectorAll(selector) {
     if (selector === '[data-agent-slug]') {
       return this.children.filter(child => child.dataset?.agentSlug);
+    }
+    if (selector === 'button, input, textarea, select') {
+      const out = [];
+      const walk = (node) => {
+        if (/^(button|input|textarea|select)$/i.test(node.tagName)) out.push(node);
+        for (const child of node.children ?? []) walk(child);
+      };
+      walk(this);
+      return out;
+    }
+    if (selector?.startsWith?.('[') && selector.endsWith(']')) {
+      const attr = selector.slice(1, -1);
+      return this.children.filter(child => child.attributes?.has(attr));
     }
     return [];
   }
@@ -95,6 +184,21 @@ class FakeDocument {
   createElement(tag) {
     return new FakeElement(tag);
   }
+}
+
+function findProposalCard(list, token = 'record-proposal') {
+  return list.children.find(child => child.className.includes(token));
+}
+
+function findProposalButton(proposal, token) {
+  const actions = proposal.children.find(child => child.className === 'confirm-card__actions');
+  return actions?.children.find(child => child.className.includes(token)) ?? null;
+}
+
+function proposalHasConfirmButton(item) {
+  if (item.className.includes('record-proposal__confirm')) return true;
+  const actions = item.children?.find(child => child.className === 'confirm-card__actions');
+  return actions?.children?.some(child => child.className.includes('record-proposal__confirm')) ?? false;
 }
 
 function fakeChatApi({ record, path, confirmImpl }) {
@@ -164,8 +268,8 @@ test('confirm shows Saving… while the request is in flight then restores on fa
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -192,7 +296,7 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
+  const proposal = findProposalCard(list);
   assert.ok(proposal, 'a record proposal card should have been appended');
 
   const fields = proposal.children.find(child => child.tagName === 'dl');
@@ -206,7 +310,7 @@ test('editing a numeric and a boolean field before confirming sends the coerced 
   inputsByField.get('duration_minutes').value = '45';
   inputsByField.get('completed').value = 'true';
 
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -230,12 +334,16 @@ test('a confirm that reports centralNodeUpdated:false shows an ephemeral warning
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Saved/
+  );
   assert.equal(
     root.querySelector('#chat-error').textContent,
     'Logged, but Central Node didn\u2019t update — try Refresh.'
@@ -254,8 +362,8 @@ test('a confirm that reports centralNodeUpdated:true does not show the Central N
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -282,12 +390,16 @@ test('a diary confirm that reports dayoneSent:false shows a Day One warning with
   await controller.send('Penelope, diary time');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
-  assert.match(proposal.children[0]?.textContent ?? '', /Saved/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Saved/
+  );
   assert.match(root.querySelector('#chat-error').textContent, /Day One email didn.t send/i);
 });
 
@@ -307,8 +419,8 @@ test('confirming a completed workout with a reported PB appends an in-voice Chad
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -335,8 +447,8 @@ test('confirming a completed workout with no PB does not append a hype line', as
   await controller.send('Chadwick, log today\'s session');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   const bubbleCountBefore = list.children.length;
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -356,8 +468,8 @@ test('a non-workout confirm never appends a PB hype line even if personalBests i
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -383,8 +495,8 @@ test('a write_conflict on first confirm prompts a retry, and confirming again se
   await controller.send('Hyaluronica, log tonight\'s routine');
 
   const list = root.querySelector('#chat-messages');
-  const proposal = list.children.find(child => child.className === 'record-proposal');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
 
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
@@ -406,12 +518,35 @@ function messageBubbles(root) {
   return root.querySelector('#chat-messages').children.filter(child => child.className?.startsWith('chat-message'));
 }
 
+function nodeText(node) {
+  if (node.children?.length) return node.children.map(nodeText).join('');
+  return node.textContent ?? '';
+}
+
 function bubbleText(bubble) {
   const body = bubble.children.find(child => child.className === 'chat-message__body');
-  if (!body) return bubble.textContent ?? '';
-  if (body.children.length) return body.children.map(node => node.textContent).join('');
-  return body.textContent ?? '';
+  return nodeText(body ?? bubble);
 }
+
+test('a markdown heading in streamed text starts a new bubble instead of one growing wall of text', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Here is the picture.\n# Claim\nProtein is the lever.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('brisket, what should I eat');
+
+  const bubbles = messageBubbles(root);
+  assert.equal(bubbles.length, 3, 'expected the user bubble plus two separate assistant bubbles');
+  assert.equal(bubbleText(bubbles[1]), 'Here is the picture.');
+  assert.match(bubbleText(bubbles[2]), /Claim/);
+  assert.match(bubbleText(bubbles[2]), /Protein is the lever/);
+});
 
 test('a paragraph break in streamed text starts a new bubble instead of one growing wall of text', async () => {
   const root = new FakeDocument();
@@ -452,7 +587,9 @@ test('a search event ends the current bubble so text before and after it does no
   const bubbles = messageBubbles(root);
   assert.equal(bubbles.length, 4, 'user bubble, pre-search text, the search note, and post-search text');
   assert.equal(bubbleText(bubbles[1]), 'Let me check that.');
-  assert.equal(bubbleText(bubbles[2]), '🔍 Searched the web: McChicken nutrition');
+  assert.match(bubbles[2].className, /chat-message--structured/);
+  assert.match(nodeText(bubbles[2]), /Searched the web/);
+  assert.match(nodeText(bubbles[2]), /McChicken nutrition/);
   assert.equal(bubbleText(bubbles[3]), 'Found it, 452 kcal.');
 });
 
@@ -471,7 +608,7 @@ test('a second message within the memory window carries the prior turn as histor
   const controller = createChatController({ root, chatApi, now: () => clock });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 60_000; // one minute later, still well inside the 20-minute window
+  clock += 60_000; // one minute later, still well inside the 45-minute window
   await controller.send('actually make that 3 eggs');
 
   assert.equal(sendCalls.length, 2);
@@ -484,7 +621,7 @@ test('a second message within the memory window carries the prior turn as histor
   assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
 });
 
-test('memory expires after the window so a stale conversation does not stick to the wrong agent', async () => {
+test('memory expires after the window but the thread stays with the same agent', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   let clock = Date.parse('2026-08-01T18:00:00Z');
@@ -499,11 +636,11 @@ test('memory expires after the window so a stale conversation does not stick to 
   const controller = createChatController({ root, chatApi, now: () => clock });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 21 * 60_000; // just past the 20-minute memory window
+  clock += 46 * 60_000; // just past the 45-minute memory window
   await controller.send('what should I have for lunch');
 
   assert.deepEqual(sendCalls[1].history, []);
-  assert.equal(sendCalls[1].priorAgentSlug, undefined);
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
 });
 
 test('bold markdown in streamed text renders as a strong element, not literal asterisks', async () => {
@@ -569,7 +706,7 @@ test('a real recent agent reply still wins over the default hint', async () => {
   assert.equal(sendCalls[1].priorAgentSlug, 'brisket', 'the real conversation with Brisket must win over the Hammond default hint');
 });
 
-test('the default hint returns once the memory window lapses, instead of staying stuck or falling to undefined', async () => {
+test('a real agent reply still wins over the default hint after the memory window lapses', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   let clock = Date.parse('2026-08-01T18:00:00Z');
@@ -586,10 +723,31 @@ test('the default hint returns once the memory window lapses, instead of staying
   });
 
   await controller.send('Brisket, log 2 eggs for breakfast');
-  clock += 21 * 60_000;
+  clock += 46 * 60_000;
   await controller.send('how is my week looking');
 
-  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
+  assert.equal(sendCalls[1].priorAgentSlug, 'brisket');
+});
+
+test('a selected agent keeps the thread even if the stream names someone else', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Eat the protein, buddy.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  await controller.send('Chadwick said I should eat more protein');
+
+  const assistant = messageBubbles(root).find(bubble => bubble.dataset?.agent);
+  assert.equal(assistant?.dataset.agent, 'brisket');
+  assert.equal(controller.getSelectedAgentSlug(), 'brisket');
+  assert.equal(sendCalls[0].priorAgentSlug, 'brisket');
 });
 
 test('omitting the default hint entirely preserves today\'s existing behaviour (undefined when nothing is sticky)', async () => {
@@ -647,6 +805,57 @@ function statusBubbles(root) {
   return messageBubbles(root).filter(bubble => bubble.className?.includes('chat-message--status'));
 }
 
+test('status rotates update text without remounting a bubble that is already last', async () => {
+  const root = new FakeDocument();
+  let resolveSecond;
+  const secondStatus = new Promise(resolve => {
+    resolveSecond = resolve;
+  });
+  let resolveDone;
+  const finish = new Promise(resolve => {
+    resolveDone = resolve;
+  });
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'status', text: 'tick-1' };
+      await secondStatus;
+      yield { type: 'status', text: 'tick-2' };
+      await finish;
+      yield { type: 'text', delta: 'About 520 kcal.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.selectAgent('brisket');
+  const pending = controller.send('bacon egg roll');
+  await flushMicrotasks();
+
+  const first = statusBubbles(root)[0];
+  assert.ok(first);
+  const before = bubbleText(first);
+  assert.equal(isAgentStatusLine('brisket', before), true);
+  let removes = 0;
+  const originalRemove = first.remove.bind(first);
+  first.remove = () => {
+    removes += 1;
+    originalRemove();
+  };
+
+  resolveSecond();
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  const second = statusBubbles(root)[0];
+  assert.equal(second, first, 'status rotate must keep the same DOM node');
+  assert.equal(isAgentStatusLine('brisket', bubbleText(second)), true);
+  assert.equal(removes, 0, 'already-last status bubble must not remount on rotate');
+
+  resolveDone();
+  await pending;
+  assert.equal(statusBubbles(root).length, 0);
+});
+
 test('a search followed by a saved-library note keeps a sticky Researching… status until real text arrives', async () => {
   const root = new FakeDocument();
   let resolveGate;
@@ -675,8 +884,9 @@ test('a search followed by a saved-library note keeps a sticky Researching… st
   assert.match(duringStatus[0].className, /chat-message--status/);
 
   const list = root.querySelector('#chat-messages');
+  const threadItems = list.children.filter(child => !child.attributes?.has('data-chat-turn-spacer'));
   assert.equal(
-    list.children[list.children.length - 1],
+    threadItems[threadItems.length - 1],
     duringStatus[0],
     'the sticky status bubble should sit below the search chip and library confirmation, not above them'
   );
@@ -819,6 +1029,85 @@ test('applies the agent accent colour when the stream names the agent', async ()
   await controller.send('hey chadwick');
 
   assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '#D9683A');
+});
+
+function findChoiceCard(root) {
+  const list = root.querySelector('#chat-messages');
+  const item = list.children.find(child => String(child.className).includes('chat-message--structured'));
+  return item?.children?.[0] ?? null;
+}
+
+function findChoiceOption(card, id) {
+  const walk = (node) => {
+    if (node?.dataset?.choiceId === id) return node;
+    for (const child of node?.children ?? []) {
+      const hit = walk(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(card);
+}
+
+function findChoiceConfirm(card) {
+  const walk = (node) => {
+    if (String(node?.className || '').includes('btn--primary')) return node;
+    for (const child of node?.children ?? []) {
+      const hit = walk(child);
+      if (hit) return hit;
+    }
+    return null;
+  };
+  return walk(card);
+}
+
+test('confirming a second-opinion choice pins that agent for the next send', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      if (sendCalls.length === 1) {
+        yield { type: 'agent', slug: 'hammond' };
+        yield {
+          type: 'choice',
+          title: 'Ask for a second look?',
+          hint: 'Another agent can append to “AOTFW sources”.',
+          confirmLabel: 'Ask',
+          choices: [
+            { id: 'sara', label: 'Ask Sara about AOTFW sources' },
+            { id: 'chadwick', label: 'Ask Chadwick about AOTFW sources' },
+            { id: 'clare', label: 'Ask Clare about AOTFW sources' },
+            { id: 'ann', label: 'Ask Ann about AOTFW sources' }
+          ]
+        };
+        yield { type: 'done' };
+        return;
+      }
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: 'Looking at the block.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({
+    root,
+    chatApi,
+    getDefaultAgentSlug: () => 'hammond'
+  });
+
+  await controller.send('Log the AOTFW decision');
+  assert.equal(sendCalls[0].priorAgentSlug, 'hammond');
+
+  const card = findChoiceCard(root);
+  assert.ok(card, 'a second-opinion choice card should have been appended');
+  findChoiceOption(card, 'chadwick').dispatchEvent(new Event('click'));
+  findChoiceConfirm(card).dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  assert.equal(sendCalls.length, 2);
+  assert.equal(sendCalls[1].priorAgentSlug, 'chadwick');
+  assert.equal(controller.getSelectedAgentSlug(), 'chadwick');
 });
 
 test('selectAgent updates accent immediately from roster even without agentsConfig', () => {
@@ -1119,6 +1408,34 @@ test('text reply does not show empty-turn recovery', async () => {
   assert.ok(messageBubbles(root).every(b => !bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
 });
 
+test('partial text without a done event shows cut-off recovery (dropped stream / 60s kill)', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: 'Mostly from that skim milk — nic' };
+      // Stream dies — no done event (Netlify sync kill / dropped SSE).
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('large skinny latte');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
+test('turn_incomplete error shows cut-off recovery even after partial text', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'vera' };
+      yield { type: 'text', delta: 'When you pic' };
+      yield { type: 'error', code: 'turn_incomplete' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('keep going');
+  assert.ok(messageBubbles(root).some(b => bubbleText(b).includes(EMPTY_TURN_RECOVERY)));
+});
+
 test('clearUnread notifies listeners that chat is read, independent of any send', () => {
   const root = new FakeDocument();
   const chatApi = { async *send() {} };
@@ -1129,6 +1446,71 @@ test('clearUnread notifies listeners that chat is read, independent of any send'
 
   assert.deepEqual(calls, [false]);
 });
+
+test('nudge when Chadwick dumps a numbered plan with no record_proposal', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'chadwick' };
+      yield {
+        type: 'text',
+        delta: [
+          "Here's the plan:",
+          '1. Bar Press — Set 1: 10 reps x 30kg (cable: constant force)',
+          '2. Bar Row — Set 1: 10 reps x 27kg (cable: constant force)',
+          '3. Bar Squat — Set 1: 10 reps x 25kg (cable: none)',
+          '4. Seated Curl — Set 1: 12 reps x 8kg (cable: constant force)'
+        ].join('\n')
+      };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('build a full body session');
+
+  const bubbles = messageBubbles(root);
+  assert.ok(
+    bubbles.some(bubble => /lock it onto Fitness/i.test(bubbleText(bubble)) && /Confirm card/i.test(bubbleText(bubble))),
+    'expected a nudge when Chadwick listed a plan in chat only'
+  );
+
+  const planBody = bubbles
+    .map(bubble => bubble.children.find(child => child.className === 'chat-message__body'))
+    .find(body => findNestedClass(body, 'chat-workout'));
+  assert.ok(planBody, 'expected the dumped plan to render as a structured workout');
+  const exercises = findNestedClass(planBody, 'chat-workout__exercises');
+  assert.equal(exercises.children.length, 4);
+  assert.equal(findNestedClass(exercises.children[0], 'chat-workout__name').textContent, 'Bar Press');
+  assert.equal(findNestedClass(exercises.children[0], 'chat-workout__set-load').textContent, '10 × 30 kg');
+});
+
+test('nudge when Brisket claims in the books without a Confirm card', async () => {
+  const root = new FakeDocument();
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'brisket' };
+      yield { type: 'text', delta: "It's in the books, buddy." };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('log lunch');
+  assert.ok(
+    messageBubbles(root).some(b => /stayed in chat only/i.test(bubbleText(b)) && /Confirm card/i.test(bubbleText(b))),
+    'expected a missing-log nudge when Brisket claimed a save without proposing'
+  );
+});
+
+function findNestedClass(node, name) {
+  const classes = String(node?.className ?? '').split(/\s+/);
+  if (classes.includes(name)) return node;
+  for (const child of node?.children ?? []) {
+    const found = findNestedClass(child, name);
+    if (found) return found;
+  }
+  return null;
+}
 
 test('nudge when exercise library saved but no record_proposal in the turn', async () => {
   const root = new FakeDocument();
@@ -1207,6 +1589,34 @@ test('omitting isChatVisible/onUnreadChange entirely preserves existing behaviou
 
   await assert.doesNotReject(controller.send('log a snack'));
   assert.doesNotThrow(() => controller.clearUnread());
+});
+
+test('a long Chadwick plan is sent in history with the numbered list still intact', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  const plan = [
+    `${'Bro. '.repeat(300)}Here's the full session:`,
+    '1. Bar Press — 10x30kg',
+    '2. Bar Row — 10x27kg',
+    '3. Bar Squat — 10x25kg',
+    '10. One Grip Russian Twist — 20x6kg'
+  ].join('\n');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'chadwick' };
+      yield { type: 'text', delta: sendCalls.length === 1 ? plan : 'Locked.' };
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+
+  await controller.send('option b');
+  await controller.send('ok lets put it into action');
+
+  const historyText = sendCalls[1].history.map(entry => entry.content).join('\n');
+  assert.match(historyText, /One Grip Russian Twist/);
+  assert.match(historyText, /Bar Press/);
 });
 
 test('API history carries up to 30 prior messages inside the memory window', async () => {
@@ -1344,7 +1754,7 @@ test('selecting another agent clears auditSession so later sends omit it', async
   assert.equal(sendCalls[1].auditSession, undefined);
 });
 
-test('stream naming a non-Hammond agent clears auditSession for the next send', async () => {
+test('stream naming a non-Hammond agent does not steal a Hammond thread or drop the audit', async () => {
   const root = new FakeDocument();
   const sendCalls = [];
   const chatApi = {
@@ -1353,12 +1763,9 @@ test('stream naming a non-Hammond agent clears auditSession for the next send', 
       if (sendCalls.length === 1) {
         yield { type: 'agent', slug: 'hammond' };
         yield { type: 'text', delta: 'Triage first.' };
-      } else if (sendCalls.length === 2) {
-        yield { type: 'agent', slug: 'brisket' };
-        yield { type: 'text', delta: 'Logging lunch instead.' };
       } else {
         yield { type: 'agent', slug: 'brisket' };
-        yield { type: 'text', delta: 'Done.' };
+        yield { type: 'text', delta: 'Logging lunch instead.' };
       }
       yield { type: 'done' };
     }
@@ -1370,7 +1777,10 @@ test('stream naming a non-Hammond agent clears auditSession for the next send', 
   await controller.send('and a snack');
 
   assert.ok(sendCalls[0].auditSession);
-  assert.equal(sendCalls[2].auditSession, undefined);
+  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
+  assert.equal(sendCalls[2].priorAgentSlug, 'hammond');
+  assert.ok(sendCalls[2].auditSession);
+  assert.equal(controller.getSelectedAgentSlug(), 'hammond');
 });
 
 test('cancel audit clears auditSession so the cancel send omits it', async () => {
@@ -1413,8 +1823,10 @@ test('non-trigger Hammond messages without a session do not attach auditSession'
   });
 
   await controller.send('what is the protein target?');
+  await controller.send('Hammond, weekly review');
 
   assert.equal(sendCalls[0].auditSession, undefined);
+  assert.equal(sendCalls[1].auditSession, undefined, 'weekly review is recap+plan, not a CN audit');
 });
 
 test('startNewChat clears auditSession so the next send omits it', async () => {
@@ -1570,7 +1982,7 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   const list = root.querySelector('#chat-messages');
   const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
   assert.ok(proposal, 'expected a CN patch proposal card');
-  const confirmButton = proposal.children.find(child => child.className === 'record-proposal__confirm');
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
   confirmButton.dispatchEvent(new Event('click'));
   await flushMicrotasks();
 
@@ -1578,7 +1990,78 @@ test('cn_patch_proposal Confirm posts kind cn_patch with the patch candidate', a
   assert.equal(confirmCalls[0].kind, 'cn_patch');
   assert.equal(confirmCalls[0].slug, 'hammond');
   assert.deepEqual(confirmCalls[0].candidate, patch);
-  assert.match(proposal.children[0]?.textContent ?? '', /Central Node updated: Remove taper constraint/);
+  assert.match(
+    proposal.querySelector('.confirm-card__receipt')?.textContent
+      ?? nodeText(proposal),
+    /Central Node updated: Remove taper constraint/
+  );
+});
+
+test('cn_patch_proposal Confirm includes the pending id when the propose SSE carried one', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'long_term_trends',
+    op: 'condense',
+    payload: { summary: 'Condense Trends' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch, id: 'cnp_abc123' };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { path: 'central-node.md', summary: patch.payload.summary };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, run the weekly review');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = findProposalCard(list);
+  const confirmButton = findProposalButton(proposal, 'record-proposal__confirm');
+  confirmButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(confirmCalls[0].id, 'cnp_abc123');
+  assert.deepEqual(confirmCalls[0].candidate, patch);
+});
+
+test('cn_patch_proposal Discard also dismisses the server-side queue entry when an id is present', async () => {
+  const root = new FakeDocument();
+  const patch = {
+    section: 'long_term_trends',
+    op: 'condense',
+    payload: { summary: 'Condense Trends' }
+  };
+  const confirmCalls = [];
+  const chatApi = {
+    async *send() {
+      yield { type: 'agent', slug: 'hammond' };
+      yield { type: 'cn_patch_proposal', patch, id: 'cnp_abc123' };
+      yield { type: 'done' };
+    },
+    async confirm(payload) {
+      confirmCalls.push(payload);
+      return { ok: true };
+    }
+  };
+  const controller = createChatController({ root, chatApi });
+  await controller.send('Hammond, run the weekly review');
+
+  const list = root.querySelector('#chat-messages');
+  const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
+  const discardButton = findProposalButton(proposal, 'record-proposal__discard');
+  discardButton.dispatchEvent(new Event('click'));
+  await flushMicrotasks();
+
+  assert.equal(list.children.includes(proposal), false);
+  assert.equal(confirmCalls.length, 1);
+  assert.equal(confirmCalls[0].kind, 'cn_patch_dismiss');
+  assert.equal(confirmCalls[0].id, 'cnp_abc123');
 });
 
 test('cn_patch_proposal Discard removes the card without confirming', async () => {
@@ -1605,7 +2088,7 @@ test('cn_patch_proposal Discard removes the card without confirming', async () =
 
   const list = root.querySelector('#chat-messages');
   const proposal = list.children.find(child => child.className.includes('cn-patch-proposal'));
-  const discardButton = proposal.children.find(child => child.className === 'record-proposal__discard');
+  const discardButton = findProposalButton(proposal, 'record-proposal__discard');
   discardButton.dispatchEvent(new Event('click'));
 
   assert.equal(confirmCalls.length, 0);
@@ -1638,14 +2121,43 @@ test('record_saved appends the summary without a Confirm card and notifies onRec
   );
   assert.ok(hasSummary, 'expected the record_saved summary in a message body');
 
-  const hasConfirm = list.children.some(item =>
-    item.className === 'record-proposal__confirm'
-    || item.children?.some(child => child.className === 'record-proposal__confirm')
-  );
+  const hasConfirm = list.children.some(item => proposalHasConfirmButton(item));
   assert.equal(hasConfirm, false, 'auto-saved sessions must not show a Confirm card');
   assert.equal(written.length, 1);
   assert.equal(written[0].type, 'record_saved');
   assert.equal(written[0].summary, summary);
+});
+
+test('record_saved summary is included in chat history for the next turn', async () => {
+  const root = new FakeDocument();
+  const sendCalls = [];
+  let clock = Date.parse('2026-08-26T07:00:00Z');
+  const chatApi = {
+    async *send(message, options) {
+      sendCalls.push({ message, ...options });
+      yield { type: 'agent', slug: 'vera' };
+      if (sendCalls.length === 1) {
+        yield {
+          type: 'record_saved',
+          summary: 'Logged a mind session (Weekend permission).',
+          record: { type: 'mind_session' }
+        };
+      } else {
+        yield { type: 'text', delta: 'It is saved.' };
+      }
+      yield { type: 'done' };
+    }
+  };
+  const controller = createChatController({ root, chatApi, now: () => clock });
+
+  await controller.send('close the session');
+  clock += 60_000;
+  await controller.send('did it log?');
+
+  assert.deepEqual(sendCalls[1].history, [
+    { role: 'user', content: 'close the session' },
+    { role: 'assistant', content: 'Logged a mind session (Weekend permission).' }
+  ]);
 });
 
 test('central_node_patched appends a success chat line without using the error banner', async () => {

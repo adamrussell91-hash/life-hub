@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createSessionApi } from '../../js/app/api-session.js';
-import { createAppController } from '../../js/app/app-controller.js';
+import { createSessionApi } from '../../apps/life/js/app/api-session.js';
+import { createAppController, sectionFromHash } from '../../apps/life/js/app/app-controller.js';
 
 const EXPIRY = '2026-08-01T18:00:00.000Z';
 const NOW = new Date('2026-08-01T01:00:00.000Z');
@@ -196,7 +196,7 @@ function liveData(overrides = {}) {
 function harness(options = {}) {
   const root = new FakeDocument();
   const windowTarget = new EventTarget();
-  windowTarget.location = { hostname: options.hostname ?? '' };
+  windowTarget.location = { hostname: options.hostname ?? '', hash: options.hash ?? '' };
   const clock = createClock();
   const sessionStorage = memoryStorage(options.sessionMarker
     ? { 'life-hub:session-expiry': options.sessionMarker }
@@ -304,10 +304,12 @@ function harness(options = {}) {
     buildHomeModel: input => ({ date: input.date, source: input }),
     renderHome(documentRoot, model) {
       calls.renders += 1;
+      calls.lastHomeModel = model;
       documentRoot.querySelector('#home-dashboard').hidden = false;
       documentRoot.querySelector('#app').dataset.state = 'ready';
       documentRoot.querySelector('#app-status').textContent = `Loaded ${model.date}`;
     },
+    tasksApi: options.tasksApi,
     renderWarnings() {},
     renderUnavailable(documentRoot, message) {
       documentRoot.querySelector('#unavailable-panel').hidden = false;
@@ -324,11 +326,17 @@ function harness(options = {}) {
       calls.fitnessRenders = (calls.fitnessRenders ?? 0) + 1;
       documentRoot.querySelector('#fitness-dashboard').hidden = false;
     },
+    fitnessTemplateLibrary: options.fitnessTemplateLibrary,
     buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
     renderCentralNode(documentRoot, model) {
       calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
       documentRoot.querySelector('#central-node-dashboard').hidden = false;
     },
+    renderGovernance(...args) {
+      calls.governanceRenders = (calls.governanceRenders ?? 0) + 1;
+      options.renderGovernance?.(...args);
+    },
+    packCnBoard: options.packCnBoard,
     agentColour: (agentsConfig, slug) => `#colour-for-${slug}`,
     chatClearUnread: () => {
       calls.chatClearUnreads = (calls.chatClearUnreads ?? 0) + 1;
@@ -1058,6 +1066,44 @@ test('the floating chat button opens the chat panel into the Fitness section, th
   assert.equal(state.chatPanelCalls.opens[0].accentColour, '#colour-for-chadwick');
 });
 
+test('opening Fitness paints again after an idle template library becomes ready', async () => {
+  let status = 'idle';
+  let resolveLoad;
+  const loaded = new Promise(resolve => { resolveLoad = resolve; });
+  const library = {
+    templates: [],
+    libraryByName: null,
+    getState() { return { status, templates: this.templates, libraryByName: this.libraryByName }; },
+    ensureLoaded() { return loaded.then(() => this.getState()); },
+    openTemplate() {}
+  };
+  const state = harness({ fitnessTemplateLibrary: library });
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+  assert.equal(state.calls.fitnessRenders, 1);
+  status = 'ready';
+  resolveLoad();
+  await loaded;
+  await Promise.resolve();
+  assert.equal(state.calls.fitnessRenders, 2);
+});
+
+test('opening Fitness does not paint twice when the template library is already ready', async () => {
+  const library = {
+    status: 'ready',
+    templates: [],
+    libraryByName: null,
+    getState() { return this; },
+    async ensureLoaded() { return this; },
+    openTemplate() {}
+  };
+  const state = harness({ fitnessTemplateLibrary: library });
+  await state.controller.start();
+  state.root.fitnessNavigation.dispatchEvent(new Event('click'));
+  await Promise.resolve();
+  assert.equal(state.calls.fitnessRenders, 1);
+});
+
 test('a completed refresh while viewing Fitness re-renders the dashboard', async () => {
   const state = harness({
     liveResults: [
@@ -1074,6 +1120,30 @@ test('a completed refresh while viewing Fitness re-renders the dashboard', async
   assert.equal(state.calls.fitnessRenders, 2);
 });
 
+test('sectionFromHash maps #central-node onto the Central Node section', () => {
+  assert.equal(sectionFromHash('#central-node'), 'central-node');
+  assert.equal(sectionFromHash('#central-node-dashboard'), 'central-node');
+  assert.equal(sectionFromHash('#home'), 'home');
+  assert.equal(sectionFromHash('#unknown'), null);
+});
+
+test('authenticated start honours #central-node instead of forcing Home', async () => {
+  const state = harness({ hash: '#central-node' });
+  await state.controller.start();
+  assert.equal(state.controller.getCurrentSection(), 'central-node');
+  assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
+});
+
+test('hashchange after sign-in opens Central Node', async () => {
+  const state = harness();
+  await state.controller.start();
+  assert.equal(state.controller.getCurrentSection(), 'home');
+  state.windowTarget.location.hash = '#central-node';
+  state.windowTarget.dispatchEvent(new Event('hashchange'));
+  assert.equal(state.controller.getCurrentSection(), 'central-node');
+  assert.equal(state.root.querySelector('#central-node-dashboard').hidden, false);
+});
+
 test('clicking the Central Node nav item shows the dashboard and builds/renders it from the latest loaded sync data', async () => {
   const state = harness();
   await state.controller.start();
@@ -1084,6 +1154,17 @@ test('clicking the Central Node nav item shows the dashboard and builds/renders 
   assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
   assert.equal(state.calls.centralNodeRenders, 1);
   assert.equal(state.controller.getCurrentSection(), 'central-node');
+});
+
+test('packs the central node board after rendering governance', async () => {
+  const order = [];
+  const state = harness({
+    renderGovernance() { order.push('governance'); },
+    packCnBoard() { order.push('pack'); }
+  });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  assert.deepEqual(order, ['governance', 'pack']);
 });
 
 test('the Central Node floating chat button opens the chat panel into its section, themed with Hammond\'s colour', async () => {
@@ -1366,3 +1447,4 @@ test('a completed refresh while viewing Central Node re-renders the dashboard an
 
   assert.equal(state.calls.centralNodeRenders, 2);
 });
+

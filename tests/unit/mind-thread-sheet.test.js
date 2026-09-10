@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { openMindThreadSheet, closeMindThreadSheet } from '../../js/app/mind-thread-sheet.js';
+import { openMindThreadSheet, closeMindThreadSheet } from '../../apps/life/js/app/mind-thread-sheet.js';
 
 function el(tag = 'div') {
   let text = '';

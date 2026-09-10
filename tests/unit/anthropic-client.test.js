@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnthropicClient, AnthropicClientError } from '../../netlify/functions/_shared/anthropic-client.mjs';
+import {
+  createAnthropicClient,
+  AnthropicClientError,
+  MAX_TOOL_ROUNDS,
+  MAX_PAUSE_CONTINUATIONS
+} from '../../netlify/functions/_shared/anthropic-client.mjs';
 
 function frame(name, payload) {
   return `event: ${name}\ndata: ${JSON.stringify(payload)}\n\n`;
@@ -201,6 +206,159 @@ test('yields fire-and-forget tool_calls when executeTools returns null', async (
     { type: 'tool_call', id: 'call_1', name: 'log_entry', input: { type: 'meal' } },
     { type: 'done' }
   ]);
+});
+
+test('tool and pause-turn limits are runaway brakes, not a web-search budget', () => {
+  assert.ok(MAX_TOOL_ROUNDS >= 16, `expected a high tool-round brake, got ${MAX_TOOL_ROUNDS}`);
+  assert.ok(MAX_PAUSE_CONTINUATIONS >= 10, `expected a high pause-turn brake, got ${MAX_PAUSE_CONTINUATIONS}`);
+});
+
+test('keeps continuing pause_turn past the old 3-search cap so research can iterate', async () => {
+  let calls = 0;
+  const pauseFrames = n => [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: `srvtoolu_${n}`, name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: `{"query":"pass ${n}"}` }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'pause_turn' } }),
+    frame('message_stop', {})
+  ];
+  const doneFrames = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Found it.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(calls <= 4 ? pauseFrames(calls) : doneFrames);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'keep looking' }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+  })) events.push(event);
+
+  assert.equal(calls, 5, 'four pause_turns plus a finishing turn');
+  assert.ok(events.some(event => event.type === 'text' && event.delta === 'Found it.'));
+});
+
+test('continues when stop_reason is max_tokens so long replies are not left mid-sentence', async () => {
+  const first = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'Mostly from that skim milk — nic' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'max_tokens' } }),
+    frame('message_stop', {})
+  ];
+  const second = [
+    frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'e — calcium is solid too.' } }),
+    frame('content_block_stop', { index: 0 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+
+  let calls = 0;
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => {
+      calls += 1;
+      return sseResponse(calls === 1 ? first : second);
+    }
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'latte' }]
+  })) events.push(event);
+
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    events.filter(e => e.type === 'text' || e.type === 'done').map(e => e.type === 'text' ? e.delta : e.type),
+    ['Mostly from that skim milk — nic', 'e — calcium is solid too.', 'done']
+  );
+});
+
+
+test('emits sources from web_search_tool_result with title and url', async () => {
+  const frames = [
+    frame('content_block_start', {
+      index: 0,
+      content_block: { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search' }
+    }),
+    frame('content_block_delta', {
+      index: 0,
+      delta: { type: 'input_json_delta', partial_json: '{"query":"McChicken nutrition AU"}' }
+    }),
+    frame('content_block_stop', { index: 0 }),
+    frame('content_block_start', {
+      index: 1,
+      content_block: {
+        type: 'web_search_tool_result',
+        tool_use_id: 'srvtoolu_1',
+        content: [
+          {
+            type: 'web_search_result',
+            url: 'https://example.com/mcchicken',
+            title: 'McChicken nutrition',
+            page_age: 'May 2026'
+          },
+          {
+            type: 'web_search_result',
+            url: 'https://example.com/calories',
+            title: 'Fast food calories'
+          }
+        ]
+      }
+    }),
+    frame('content_block_start', { index: 2, content_block: { type: 'text' } }),
+    frame('content_block_delta', { index: 2, delta: { type: 'text_delta', text: 'About 400 kcal.' } }),
+    frame('content_block_stop', { index: 2 }),
+    frame('message_delta', { delta: { stop_reason: 'end_turn' } }),
+    frame('message_stop', {})
+  ];
+
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    fetchImpl: async () => sseResponse(frames)
+  });
+
+  const events = [];
+  for await (const event of client.streamMessage({
+    system: 's',
+    messages: [{ role: 'user', content: 'mcchicken calories' }],
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+  })) events.push(event);
+
+  assert.deepEqual(
+    events.filter(e => e.type === 'search' || e.type === 'sources' || e.type === 'text' || e.type === 'done'),
+    [
+      { type: 'search', query: 'McChicken nutrition AU' },
+      {
+        type: 'sources',
+        heading: 'Sources',
+        sources: [
+          { title: 'McChicken nutrition', url: 'https://example.com/mcchicken', snippet: 'May 2026' },
+          { title: 'Fast food calories', url: 'https://example.com/calories' }
+        ]
+      },
+      { type: 'text', delta: 'About 400 kcal.' },
+      { type: 'done' }
+    ]
+  );
 });
 
 test('continues when stop_reason is pause_turn by re-sending assistant content as-is', async () => {
@@ -479,4 +637,26 @@ test('a realistic session-build sequence of single continuing tool calls (e.g. e
 
   assert.equal(calls, CONTINUING_ROUNDS + 1, 'expected the round budget to allow one round per tool call plus the final proposal round');
   assert.ok(events.some(e => e.type === 'tool_call' && e.id === 'call_final' && e.name === 'log_entry'));
+});
+test('createAnthropicClient uses injectable baseUrl for mock servers', async () => {
+  const seen = [];
+  const client = createAnthropicClient({
+    apiKey: 'k',
+    baseUrl: 'https://mock.anthropic.test',
+    fetchImpl: async (url) => {
+      seen.push(String(url));
+      return sseResponse([
+        frame('content_block_start', { index: 0, content_block: { type: 'text' } }),
+        frame('content_block_delta', { index: 0, delta: { type: 'text_delta', text: 'hi' } }),
+        frame('content_block_stop', { index: 0 }),
+        frame('message_stop', {})
+      ]);
+    }
+  });
+  const chunks = [];
+  for await (const event of client.streamMessage({ system: 's', messages: [], tools: [] })) {
+    chunks.push(event);
+  }
+  assert.equal(seen[0], 'https://mock.anthropic.test/v1/messages');
+  assert.ok(chunks.some((c) => c.type === 'text' || c.type === 'done'));
 });

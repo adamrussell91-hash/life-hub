@@ -1,0 +1,7 @@
+{
+  "id": "bone-iron-watch",
+  "agents": ["sara"],
+  "capacities": ["log.entry", "research.save-brief", "coordinate.request-cn-write"],
+  "summary": "Crohn's + steroid eras raise osteopenia and iron-repletion monitoring priority.",
+  "guidance": "When labs, bone, ferritin, or steroid/Entocort taper language appears, pull matching Medical Overview visits/bloods before synthesising. Prefer AU guideline framing; flag Chadwick for weight-bearing and Brisket for calcium/iron-friendly intake via compact CN lines when another agent must act."
+}

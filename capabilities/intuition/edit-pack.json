@@ -1,0 +1,15 @@
+{
+  "id": "intuition.edit-pack",
+  "tool_name": "intuition_edit_pack",
+  "verb": "Intuition",
+  "agents": [
+    "*"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Update a standing intuition pack you own (judgment priors only \u2014 never gates capacity). Prefer this when a bad week taught a durable lesson.",
+  "surfaces": [
+    "agent_context",
+    "governance_log"
+  ]
+}

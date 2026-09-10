@@ -1,13 +1,16 @@
-import { copyFile, cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { access, copyFile, cp, mkdir, readdir, rm, readFile, writeFile } from 'node:fs/promises';
+import { rewritePublishedKitSpecifiers } from './lib/rewrite-published-kit-imports.mjs';
 
 const projectRoot = new URL('../', import.meta.url);
+const lifeRoot = new URL('../apps/life/', import.meta.url);
 const publishRoot = new URL('../dist/', import.meta.url);
 const publishedDirectories = ['assets', 'css', 'js'];
 const publishedFiles = ['index.html', 'manifest.webmanifest', 'service-worker.js'];
+const spaApps = ['teaching', 'knowledge', 'tasks'];
 
 async function copyDesignKitStyles() {
-  const kitRoot = new URL('design-kit/', projectRoot);
-  const kitPublish = new URL('design-kit/', publishRoot);
+  const kitRoot = new URL('packages/design-kit/', projectRoot);
+  const kitPublish = new URL('packages/design-kit/', publishRoot);
   await mkdir(kitPublish, { recursive: true });
   const names = (await readdir(kitRoot)).filter(name => name.endsWith('.css'));
   await Promise.all(names.map(name => copyFile(
@@ -18,19 +21,44 @@ async function copyDesignKitStyles() {
 
 async function copyDesignKitModules() {
   await cp(
-    new URL('design-kit/js/', projectRoot),
-    new URL('design-kit/js/', publishRoot),
+    new URL('packages/design-kit/js/', projectRoot),
+    new URL('packages/design-kit/js/', publishRoot),
     { recursive: true }
   );
 }
 
-async function copyHubTile() {
-  const iconPublish = new URL('icons/', publishRoot);
-  await mkdir(iconPublish, { recursive: true });
-  await copyFile(
-    new URL('design-kit/icons/life-hub.svg', projectRoot),
-    new URL('life-hub.svg', iconPublish)
+async function copyDesignKitIcons() {
+  await cp(
+    new URL('packages/design-kit/icons/', projectRoot),
+    new URL('packages/design-kit/icons/', publishRoot),
+    { recursive: true }
   );
+}
+
+async function copyBuiltSpa(name) {
+  const from = new URL(`apps/${name}/dist/`, projectRoot);
+  try {
+    await access(from);
+  } catch {
+    return false;
+  }
+  await cp(from, new URL(`${name}/`, publishRoot), { recursive: true });
+  return true;
+}
+
+async function rewritePublishedKitImports(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  await Promise.all(entries.map(async entry => {
+    const next = new URL(entry.name + (entry.isDirectory() ? '/' : ''), directory);
+    if (entry.isDirectory()) {
+      await rewritePublishedKitImports(next);
+      return;
+    }
+    if (!entry.name.endsWith('.js')) return;
+    const source = await readFile(next, 'utf8');
+    const published = rewritePublishedKitSpecifiers(source, next, publishRoot);
+    if (published !== source) await writeFile(next, published);
+  }));
 }
 
 export async function prepareWeb() {
@@ -39,18 +67,26 @@ export async function prepareWeb() {
 
   await Promise.all([
     ...publishedDirectories.map(directory => cp(
-      new URL(`${directory}/`, projectRoot),
+      new URL(`${directory}/`, lifeRoot),
       new URL(`${directory}/`, publishRoot),
       { recursive: true }
     )),
     ...publishedFiles.map(file => copyFile(
-      new URL(file, projectRoot),
+      new URL(file, lifeRoot),
       new URL(file, publishRoot)
     )),
     copyDesignKitStyles(),
     copyDesignKitModules(),
-    copyHubTile()
+    copyDesignKitIcons()
   ]);
+
+  await rewritePublishedKitImports(new URL('js/', publishRoot));
+
+  await Promise.all(spaApps.map(name => copyBuiltSpa(name)));
+  await copyFile(
+    new URL('scripts/pages-spa-fallback.html', projectRoot),
+    new URL('404.html', publishRoot)
+  );
 
   const vendorDirectory = new URL('vendor/', publishRoot);
   await mkdir(vendorDirectory, { recursive: true });

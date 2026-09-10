@@ -10,10 +10,10 @@ import {
   pickStatusLine,
   protocolSteerBlock,
   protocolsForSlug
-} from '../../js/app/agent-protocols.js';
+} from '../../apps/life/js/app/agent-protocols.js';
 
 test('every Life Hub agent has user-facing pills and 10–12 status lines', () => {
-  const slugs = ['brisket', 'chadwick', 'hyaluronica', 'sara', 'penelope', 'vera', 'hammond'];
+  const slugs = ['brisket', 'chadwick', 'hyaluronica', 'sara', 'penelope', 'vera', 'hammond', 'ann', 'clementine', 'clare'];
   assert.deepEqual(Object.keys(AGENT_PROTOCOLS).sort(), [...slugs].sort());
   for (const slug of slugs) {
     const pack = protocolsForSlug(slug);
@@ -40,6 +40,15 @@ test('Brisket’s pills match the approved user-facing protocols', () => {
   );
 });
 
+test('Chadwick’s pills separate saving a plan from logging actuals', () => {
+  assert.deepEqual(
+    protocolsForSlug('chadwick').pills.map(pill => pill.label),
+    ['Save plan', 'Log actuals', 'Missed a day', "How's the program", 'Form / safety']
+  );
+  assert.match(findProtocol('chadwick', 'next-session').steer, /status planned/i);
+  assert.match(findProtocol('chadwick', 'log-session').steer, /actuals/i);
+});
+
 test('findProtocol only resolves ids that belong to that agent', () => {
   assert.equal(findProtocol('brisket', 'log-meal')?.label, 'Log a meal');
   assert.equal(findProtocol('chadwick', 'log-meal'), null);
@@ -63,6 +72,12 @@ test('pickStatusLine stays in that agent’s voice and skips the previous line',
   assert.notEqual(first, second);
   assert.equal(isAgentStatusLine('chadwick', first), true);
   assert.equal(isAgentStatusLine('brisket', first), false);
+});
+
+test('Clare status lines do not call the list a dump', () => {
+  for (const line of AGENT_STATUS_LINES.clare) {
+    assert.doesNotMatch(line, /dump/i);
+  }
 });
 
 test('normalizeProtocolId accepts kit-style ids only', () => {

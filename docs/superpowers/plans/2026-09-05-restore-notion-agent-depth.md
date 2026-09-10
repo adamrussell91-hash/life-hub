@@ -1,0 +1,223 @@
+# Restore full Notion-era personality and protocol depth — Chadwick, Penelope, Hyaluronica, Sara, Clare, Ann
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
+
+**Date:** 2026-09-05 (v3 — revised after a second Cursor review, of v2; see "What changed from v2" below, and "What changed from v1" further down for the first round)
+**Repo:** this monorepo (`life-hub`) — touches `apps/life`, `apps/tasks`, and `apps/teaching`
+**Requested by:** Adam.
+
+---
+
+## What changed from v2, and why
+
+A second Cursor review caught four more real problems, all now fixed in place below (not repeated here — see the sections themselves):
+
+1. **B3 (Sara) had a quiet Pass 2 hole of its own.** v2 implied she already had enough visibility for the bone/iron/exercise cross-references. She doesn't — confirmed by reading `chat.mjs`'s gates directly: `needsNutritionChallenges` is `slug === 'brisket'` only, `needsWorkoutHistory` is `slug === 'chadwick'` only. She does already get `bodyState` (that part was true). B3 now names exactly which claims were half-true and forces an explicit Option 1 (new bounded read) vs Option 2 (restrict wording) choice before shipping.
+2. **B2's procedure-detection signal was a guess, and the real one already exists in this codebase.** Clinic procedures aren't a shelf "Other" category — they're skincare log entries whose `body` starts with `Procedure:`, a signal `apps/tasks/src/domain/clare-protocols.ts` already uses correctly today. B2 now points at that exact precedent instead of inventing a new, wrong one.
+3. **Two v1 items had quietly disappeared in v2 without a deferral note** — Hyaluronica's New Medication Protocol and nutrition→skin weekly check, and Sara's explicit "never hardcode a stale 2026 date" reminder. Restored below with sees/writes/today lines rather than left to be "rediscovered" as gaps by whoever implements this next.
+4. **B4 needed a reconcile table before any code gets written**, mapping Notion's 7 ADHD tools onto the 3 `ClareToolkitId`s that already exist (`shatter-start`, `time-map`, `open-loops`) so the restore produces 4 new IDs plus 3 fuller specs on existing IDs — not 7 new pills sitting next to near-duplicates. Table added to B4.
+
+## What changed from v1, and why
+
+v1 of this plan was a doc-diff (Notion vs GitHub) dressed up as an implementation plan. A Cursor review caught real problems in it:
+
+1. It restored rules ("check nutrition calcium," "research Sydney weather," "query reflection history," "predictive morning sweep") without proving the data those rules need actually reaches the agent's prompt, or that a write path exists. Prompt text asking for something the agent structurally cannot see produces a confident, wrong agent — worse than the current thin version.
+2. Penelope's weather/calendar research was not migration damage — `docs/superpowers/specs/2026-08-13-mind-session-memory-design.md` line 172 explicitly put it out of scope, on purpose. v1 called this an accidental reversal. Wrong.
+3. Chadwick's live voice string already says "unfiltered," "horny," "crude locker-room jokes... mandatory," "never gorgeous." v1 treated this as a gap needing more explicit prompt text. That diagnosis was incomplete — see the new §1 below.
+4. v1 said this was "almost entirely prompt edits." False for Clare (real protocol IDs + Tasks-Hub UI + domain code) and Ann (a genuine multi-file feature: schema, storage, prompt wiring, tests).
+5. A path reference was ambiguous (`js/core/validate.js` "in `apps/life`" — should just say `apps/life/js/core/validate.js`) and the Cursor-only "never push" convention was copied in without noting that a cloud/remote Claude Code session (like the one that wrote this plan) pushes and opens PRs directly as its normal workflow — that line only applies to a *local* Cursor session working this same plan.
+
+Adam's instruction after seeing that review: **don't just flag a gap and stop — for every Notion function that doesn't actually work in Life Hub today, specify the real code and data path that makes it work.** That's what this version does. Every restored rule below carries a `sees: / writes: / today:` line stating exactly what data the agent already receives, whether a write path exists, and whether today's answer is "works," "needs new code" (with the specific file and shape), or "verify before assuming" where this plan's author couldn't fully confirm the current wiring.
+
+Bands, per Adam's request to ship this in stages rather than one blob:
+
+- **Band A** — safe now. Prompt/voice text only, and the data or tool the rule needs is already reaching the agent today. Low risk, ship first.
+- **Band B** — protocol text *and* real code together. The rule needs a data path, a tool trigger, or a UI surface that doesn't exist yet, specified concretely below. Do not ship the prompt half without the code half — that's exactly the failure mode this revision exists to avoid.
+- **Band C** — its own project. Ann's reflection coach needs a chat surface that doesn't exist at all yet, not just storage. Scope it as a real design slice, not a line item in this plan.
+
+Two hard exclusions carried over unchanged from v1, per Adam's explicit confirmation:
+
+1. **Clementine's university-based writing-supervisor protocols** — intentionally dropped, out of scope, do not touch Clementine at all.
+2. **Sterling Blackwood** — not coming across to GitHub, that's fine, do not create this agent or reference it anywhere.
+
+---
+
+## Band A — ship now
+
+### A1. Chadwick — restore the voice as far as it can actually go (`apps/life`)
+
+**Files:** `netlify/functions/_shared/agent-directory.mjs` (`chadwick` `voice` string), `netlify/functions/_shared/persona.mjs` (`chadwickBlocks` — reorder, don't just append).
+
+**Read this before editing anything:** the live voice string already instructs "unfiltered, horny frat-boy... zero boundaries... crude locker room jokes are mandatory... sexually-charged banter." Adam's actual report is that in real use, Chadwick has never once produced a genuinely crude or sexually explicit line. That means the honest diagnosis is not "the instruction isn't explicit enough" — it's that the instruction isn't landing at all. Two separate causes, both real, and they need different fixes:
+
+**Cause 1 — a hard model ceiling that no prompt text clears.** Chadwick's replies are generated by `claude-sonnet-5` via the Anthropic API (`netlify/functions/_shared/anthropic-client.mjs`, confirmed — no moderation layer or content filter sits between the model and the response; `sanitizeHistory` in `chat.mjs` only trims old turns). A Claude model will not generate explicit descriptions of bodily fluids or genitals, in any comedic frame, regardless of how a system prompt instructs it. This is not a Life Hub bug and there is no code path that changes it — restoring Notion's most literal wording (which the current file already approximates) will not cross this line no matter how it's phrased. **Do not spend further engineering effort trying to prompt past this specific ceiling — it will keep failing the same way.**
+
+**Cause 2 — genuinely fixable: the voice instruction is likely being drowned out.** `chadwickBlocks` in `persona.mjs` is a long wall of K1 cable-mode / `coach_cues` schema / logging-protocol instructions, appended *after* `agent.voice` in the array `persona.mjs` joins into the final system prompt. It's plausible the model is weighting the dense, specific procedural compliance instructions over the one voice paragraph earlier in the prompt — which would explain why even the PG-13/innuendo-level crude humor a Claude model *will* produce under a clear, close instruction isn't showing up either. This part is fixable:
+
+- **Reorder, don't just edit:** move a short, sharp voice-reinforcement line to the *end* of the assembled prompt (after `chadwickBlocks`, not before) — models weight instructions nearer generation time more heavily, and right now the last thing Chadwick "reads" before replying is a wall of cable-type schema rules, not his own voice. Add, as the literal last entry in the `chadwickBlocks` array: *"Before sending this reply: does it read like an enthusiastic, filthy-minded gym bro, or like a fitness app that happened to say 'bro' once? If the latter, rewrite it before sending — at least one genuinely crude, playful, innuendo-heavy line has to be in there, not just hype."*
+- **Restore Notion's worked examples** as calibration — these teach the register far better than an abstract adjective list. Put them in `agent-directory.mjs`'s `voice` string itself (or a sibling voice-only fixture, e.g. `config/chadwick-voice-examples.md` loaded the same way other voice material loads), **not** in `chadwick-protocol.md** — that file's own header says "Your voice lives in code and never changes; this document is the rulebook for *what* you program and *how* you log it," and dumping voice calibration into the operating manual fights the repo's own protocol/personality split. Restore:
+  > - Bro this chest press is gonna make your pecs POP. I'm already thinking about what it's gonna look like in the showers, and honestly? Solid.
+  > - Dude, cable crunches look stupid but your core is going to be so shredded that next time someone sees your abs they're gonna need a napkin.
+  > - Alright big guy, last set, push that weight up. Tricep city. Arms looking so good I'm gonna need a cold shower after this session.
+  > - Mate, those cable glute kickbacks are making your posterior absolutely immaculate. I don't say that to everyone. Just the special ones. *quietly* just you.
+- **Set the actual ceiling explicitly, in-prompt, so the model isn't guessing conservatively:** add one line making clear the register wanted is bawdy/innuendo/body-hype, not literal — this gives the model permission to go as far as cause 2 allows without it defaulting to the safest possible reading of "crude": *"Crude means bawdy, cheeky, double-entendre, borderline-inappropriate hype about his physique — think a horny gym bro's actual voice, not a PG fitness app. It does not mean literal anatomical description; push right up to that line, not past it."*
+
+**sees:** the full voice string and all of `chadwickBlocks`, every turn — nothing missing here, this is pure prompt-salience engineering, no new data path needed.
+**writes:** n/a, voice-only.
+**today:** partially works (hype/address-terms/energy all land); the crude-humor instruction specifically does not land, for the two reasons above. Fix cause 2 fully; cause 1 has a hard, honest ceiling — say so to Adam again once this ships, don't let a second silent failure happen.
+
+Do not touch the K1/programming logic in `chadwick-protocol.md` (EP coordination, aesthetic bias, arm/core rules, safety overrides) — none of that is in question, leave it exactly as-is.
+
+---
+
+### A2. Penelope — restore the diary calibration examples only (`apps/life`)
+
+**File:** `config/penelope-protocol.md`, "Notes field = Adam's voice" section.
+
+**sees:** nothing new needed — this is calibration text for how the model writes an entry it's already producing every time. No data dependency.
+**writes:** n/a.
+**today:** the abstract rule survived ("raw, blunt, conversational... honest about difficulty without despair as the default") but the four worked examples that actually anchor that register did not. Restore them verbatim:
+
+> *Low Energy Drift:* Did a bit of study this morning but it didn't feel like much. Made coffee. Put washing on. Looked at my notes again and then ended up scrolling for an hour. I'll try again tonight. I probably need a plan.
+>
+> *Small Win, Muted:* Got called into work which is good. I need the money. Classes were fine, nothing amazing but nothing terrible either. Came home tired and watched a couple of episodes of something. It's not a big achievement but at least the day moved forward.
+>
+> *Domestic Normal:* We went to the shops and forgot half the things we needed. Typical. Cooked dinner anyway and it turned out alright. Nothing special. He fell asleep on the couch and I cleaned up around him. Quiet night.
+>
+> *Rough Day, Not Tragic:* Felt like shit all day honestly. Cold is still hanging around and I had zero energy. Ate pizza for breakfast which is what it is. Didn't do much else. But I logged my food and sorted some stuff out which is more than the last few days. Tomorrow will probably be the same but whatever, it's fine.
+>
+> CRITICAL TONE RULE: there is a difference between low mood and despair. If in doubt, read the entry back and ask: does this sound like a normal person venting, or does it sound like a farewell letter? If the latter, rewrite it.
+
+**Do not** restore the Sydney weather/event research instruction here — see B1 below. It's a real product decision to reopen, not a default restore, and it needs code alongside it.
+
+---
+
+## Band B — protocol text and real code together
+
+### B1. Penelope — weather/calendar research (`apps/life`), *if Adam wants it reopened*
+
+This was deliberately scoped out in `docs/superpowers/specs/2026-08-13-mind-session-memory-design.md` ("Live weather/calendar from Notion stay out of scope"). Restoring it is reopening a considered decision, not undoing an accident — **confirm with Adam before implementing**, don't ship this on the strength of "full Notion amount."
+
+If reopened:
+
+**sees today:** Penelope has no web-search tool call wired into her turn at all (check `netlify/functions/chat.mjs`'s tool-registration block, around where `needsHammondTools`/similar gates decide which agents get which tools — confirm the exact gate name before editing, don't guess a name that doesn't exist).
+**writes:** n/a.
+**today: missing — needs code.** Concretely: register `web_search` for `slug === 'penelope'` in the same tool-building function Hammond/Sara/Brisket already use it from (grep those three for the actual call site rather than assuming a shared helper exists — they may each register it slightly differently). Add to `penelope-protocol.md`: *"Before interviewing, you may check Sydney weather and any major local event for today — use it the way you use Central Node context, to shape which question you ask next. Never recite it back as an inventory ('I see it rained today and there was an event on...')."* Add a test asserting Penelope's tool list includes `web_search` and no other agent's tool list changed.
+
+---
+
+### B2. Hyaluronica — Treatment State Override (`apps/life`)
+
+**sees today:** `hyaluronicaProtocol` text and `skincareRoutines` (current AM/PM membership only) — confirmed by reading `persona.mjs`'s `hyaluronicaBlocks`. No recent-procedure or upcoming-procedure signal reaches her prompt at all today. She has no tool to query her own skincare log history by category/date either (only `search_skincare_library`, `save_skincare_library_entry`, `set_skincare_routine_membership`, `list_skincare_routines` — none of these answer "was there a procedure logged in the last 14 days").
+**writes:** n/a — this is a read-only override gate.
+**today: missing — needs code, and the detection signal must be the real one, not a guess.** A prior draft of this plan assumed procedures were flagged by a shelf/library "Other" category — wrong, and it would both miss real treatment windows and false-positive on ordinary "Other" shelf products. The actual, already-established signal in this codebase is: a skincare log entry (`record.type === 'skincare'`) whose `body` text starts with the literal string `Procedure:`. This exact filter already exists and is proven correct — `apps/tasks/src/domain/clare-protocols.ts` uses it today (`String(entry.body ?? '').startsWith('Procedure:')`) to separate procedure logs from routine AM/PM logs when computing Clare's cross-hub digest. Build Hyaluronica's selector against that same signal, not a new invention: scan `data/skincare/**` for entries matching it, bounded to a 21-day-back window (covers the 14-day post-treatment window with margin), plus a check of Constraints & Priorities text for any explicitly-noted upcoming appointment within 7 days. Format as a new `treatmentState` prompt block (`persona.mjs`, `hyaluronicaBlocks`) surfacing: most recent procedure type + date if within 14 days, upcoming procedure if flagged in Constraints within 7 days, else "no active treatment window." Then restore the protocol text:
+
+> When a procedure is flagged as recent (within 14 days) or upcoming (within 7 days), shift into treatment-aware advice mode: routine optimisation pauses unless clearly safe and relevant. Advice prioritises protection, recovery, compatibility, and avoidance of contraindicated products over new suggestions. This applies equally to laser, peels, injectables, or any other procedure — not just laser.
+>
+> Priority order when multiple factors are present, highest wins: (1) current procedure/recovery state, (2) active reaction or irritation, (3) barrier integrity/sensitivity, (4) diagnosed skin conditions, (5) provider instructions, (6) current routine, (7) new product/ingredient optimisation.
+
+Also restore the **Ingredient Compatibility** check as pure prompt text (no new data needed — this is reasoning over what Adam already tells her he's using, same as today):
+
+> Before recommending a new ingredient, check it against the active stack already in use. Known interactions: vitamin C and a retinoid — don't layer same evening, morning + SPF is fine; niacinamide — generally safe, can reduce retinoid irritation; AHA/BHA and a retinoid — alternate nights, not the same evening; benzoyl peroxide can deactivate a retinoid — separate occasions; check photosensitivity given Sydney's UV.
+
+**Test:** a fixture with a skincare entry whose body starts `Procedure:` dated 3 days ago should produce `treatmentState` text naming it; a fixture with an ordinary (non-`Procedure:`) "Other"-style entry in the same window should **not** trigger the override (this is the specific false-positive case the wrong signal would have caused); a fixture with no procedure entry in the window should produce the "no active window" text; confirm the selector never fires for a non-Hyaluronica turn.
+
+**Also restore from v1's source material, not carried into the first draft of this section — do this now rather than let it quietly vanish a second time:**
+
+- **New Medication Protocol** — mostly Band A, not Band B: Hyaluronica already sees Constraints & Priorities text (shared block, every agent) and already has `web_search` per her existing protocol file. No new code needed, just the proactive instruction: *"If Constraints & Priorities shows a new medication (a fresh entry, a dose change, a new corticosteroid course), assess skin implications before anything else this turn — don't wait to be asked. Search for the medication's skin side effects and skincare interactions. Watch categories: immunosuppressants (infection risk, photosensitivity, acne/rosacea flares), corticosteroids/taper (barrier thinning, reduced healing — heightened monitoring for 4 weeks after a course ends), antibiotics (microbiome disruption, photosensitivity), new supplements (high-dose B vitamins can trigger acne, large-dose zinc can cause dryness)."* **Verify before shipping:** confirm Hyaluronica's `web_search` tool registration isn't gated behind something that excludes her (grep the tool-building site in `chat.mjs`, don't assume from the protocol file alone).
+- **Nutrition-to-skin weekly check** — genuinely Band B, and its exact scope needs one verification step first: every agent already receives a shared `digest` block (`persona.mjs` line 67, "Recent context") built from `summarizeRecentHistory` in `digest.mjs`. **Before writing any new code, read `digest.mjs` to confirm what window and what granularity it actually covers for nutrition** (the Hammond closed-loop plan's own fact table describes the *default* digest window as today+yesterday only, which would not be enough for a genuine 7-day protein/fat/calcium trend). If it's today/yesterday only, this needs a new bounded 7-day nutrition read for Hyaluronica specifically (mirror the shape of the existing `bodyState`/`workoutTemplates` selectors already gated per-slug in `chat.mjs`), formatted as weekly averages for calcium, protein, and fat/omega-3s. Then restore: *"At least once a week, check calcium (bone-skin axis), protein (collagen synthesis), and fat/omega-3s (barrier lipids) against the past 7 days. If consistently low, flag it with a skin-specific framing (e.g. 'babe your omega-3s have been basically nonexistent this week and your barrier is going to feel it') and suggest a fix."*
+
+---
+
+### B3. Sara — Bone/Iron/Taper protocols (`apps/life`)
+
+**sees today, confirmed by reading `chat.mjs`'s per-slug gates directly:** `saraProtocol` text, Constraints & Priorities (shared, every agent), the `search_medical_records`/`brief_medical_appointment` tools (used **when Adam asks**, not proactively), and — this matters, it's easy to assume otherwise — `bodyState` (`needsBodyState` includes `slug === 'sara'`, so she already gets composition/measurement records every turn). **What she does not get:** any nutrition digest (`needsNutritionChallenges` is `slug === 'brisket'` only — Sara gets nothing from the meal log) or workout/exercise history as a first-class block (`needsWorkoutHistory` is `slug === 'chadwick'` only). So "monitor calcium intake," "iron-rich food intake," and "cross-reference Chadwick's exercise log" are only half-true as protocol-only restores — she can ask about them via tools when Adam raises them, but nothing proactively surfaces them the way `bodyState` does.
+**writes:** existing `log_entry` (medical/weight/composition/measurements) — no change needed.
+**today: two of the three protocols below are fixable as protocol text using what already exists (osteopenia monitoring can lean on `bodyState`, which is already there); the nutrition/exercise cross-references genuinely cannot be honest as written without one of two fixes:**
+
+- **Option 1 (code):** a small bounded read, gated `slug === 'sara'` and further gated on Constraints actually showing bone/iron/taper is active (don't fetch this every Sara turn regardless of relevance — same discipline as the rest of this codebase's bounded-read gates), pulling a 7-day nutrition summary (protein, calcium) and Chadwick's recent exercise-completion signal, formatted the same way `bodyState` already is.
+- **Option 2 (wording only, ships today, no code):** don't claim she can "monitor" or "cross-reference" these continuously — restrict the protocol to what she can actually do: ask Adam directly when the topic comes up, or read whatever the shared `digest` block happens to already carry (verify what that includes before relying on it, per B2's digest.mjs note above).
+
+**Pick one explicitly before shipping this section — do not restore wording that implies Option 1's visibility while only building Option 2's plumbing.** Restore, as new sections in `sara-protocol.md`, calibrated to whichever option is chosen:
+
+> **Bone Health Protocol.** If Constraints & Priorities mentions osteopenia, low bone density, or a corticosteroid course: call `search_medical_records` for the most recent relevant labs/DEXA before answering, don't wait to be asked. Monitor calcium intake (~1000mg/day non-dairy target), Vitamin D status, weight-bearing exercise frequency (coordinate with Chadwick), and any new back pain flag. Include a calcium status line in any weekly health brief while this is active.
+>
+> **Iron Recovery Protocol.** If Constraints mentions a recent iron infusion or iron therapy change: proactively check for a follow-up blood test result via `search_medical_records`. Monitor fatigue/energy trends against Chadwick's exercise log, iron-rich food intake, and iron-absorption timing rules (vitamin C at night, no tea/coffee within an hour of an iron-rich meal, calcium and iron separated). At the next relevant test: compare ferritin to the pre-treatment baseline, note ferritin is an acute-phase reactant and may read high during inflammation, and weight transferrin saturation more heavily (>20% adequate, <15% likely still deficient).
+>
+> **Steroid/Taper Protocol.** If Constraints shows an active corticosteroid taper: watch for returning Crohn's symptoms (flag any immediately for GP/gastro contact), fatigue/adrenal-fatigue-like symptoms, skin changes (coordinate with Hyaluronica), and mood changes (coordinate with Vera). Treat the 4 weeks after full cessation as a clinical inflection point needing heightened monitoring across all of the above, not a return to baseline.
+
+**Standing reminder, carried forward from v1 and worth restating explicitly so it doesn't get silently dropped again: none of the three protocols above may hardcode a specific date, dose, or lab value from Notion** (the original Notion text had a real 6 March 2026 infusion date, a real 3 April 2026 taper schedule, a real 48 nmol/L Vitamin D reading — all stale now). Every trigger condition above must read "if Constraints & Priorities currently shows X," resolved from live data at prompt-build time, never a frozen string. This is the same discipline the existing "flare/calprotectin" line in the current file already gets right — use it as the template.
+
+**Verification, not new code (for the parts of this section that don't need Option 1):** confirm `search_medical_records`/`brief_medical_appointment` are actually registered as tools for `slug === 'sara'` unconditionally (not gated behind some other flag) before assuming this works — grep the tool-registration site in `chat.mjs`.
+
+---
+
+### B4. Clare — Predictive Layer, missing sprints, full ADHD toolkit (`apps/tasks`)
+
+**sees today:** confirmed by reading `apps/tasks/src/domain/life-context.ts` directly — `LifeContextDigest` has exactly four fields: `today_status` (Health line stripped), `this_week`, `this_month`, `clare_directives` (Cross-Agent lines routed to/from Clare only). **No exercise-gap, mood-streak, or meal-logged-today signal exists in this type at all.** This is not a gap in the protocol text — the data literally isn't there to read.
+**writes:** `Clare→Hammond`/`Clare→[Agent]` mailbox already wired (per the 2026-09-05 coordination spec) — keep this, it's good and unrelated to what's below.
+**today: split by signal — some need new code, some are Clare's own domain and already reachable:**
+
+- Task rescheduled 2+ times, appointment within 24h with no prep note — **these are Clare's own domain data** (Tasks Hub's own store), not cross-hub. No new cross-hub wiring needed; just add the query and the protocol text (see below).
+- High-load day + no meals logged, 3+ days no exercise, mood Low/Bad 3+ of 7 days — **these need new code.** They don't exist in `LifeContextDigest` and Life Hub's own aggregate functions that compute exercise streaks (`calculateWorkoutStreak`, `apps/life/js/core/aggregate.js`, confirmed present from the Hammond closed-loop plan's own fact table) aren't exposed cross-hub today. **Before writing new code, check whether `today_status`/`this_week`'s raw text already mentions these in prose** (Life Hub's own Today's Status heading may already narrate exercise/mood inline, since only the Health line is stripped) — if so, this may be a text-parsing addition to `life-context.ts` rather than a new cross-hub read. If the raw text doesn't reliably carry it, extend `LifeContextDigest` with `exercise_gap_days: number | null` and `mood_low_streak: number | null`, computed the same way Hammond's own digest computes them, exposed the same way Tasks/Teaching data already reaches Hammond (`hub-agent-context.mjs`, per the coordination spec) but in reverse — confirm with whoever owns that spec whether a reverse read (Tasks reading Life Hub aggregate data) already has a sanctioned path before building a new one from scratch.
+
+Restore the sprint table additions:
+
+> | `appointment-prep` | Adam mentions an upcoming appointment, or one is within 24 hours with no prep noted |
+> | `comms-followup` | "What follow-ups do I have / comms sweep / anything outstanding" |
+
+Appointment Prep sequence: pull the appointment record, related tasks/notes/pending items, offer to create prep tasks. Comms Follow-Up sequence: pull everything with a follow-up date at or past due, present in priority order, offer to create/update/resolve each, flag anything 7+ days overdue explicitly. **Both of these are real Tasks-Hub domain queries against Clare's own store — implement as actual protocol IDs with backing code, the same shape as the existing `morning-sweep`/`weekly-reset` entries, not markdown alone.**
+
+**Reconcile map — pin this before writing any code, so the restore doesn't produce near-duplicate pills sitting next to the originals.** `apps/tasks/src/domain/clare-protocols.ts` defines `ClareToolkitId = 'shatter-start' | 'time-map' | 'open-loops'` today — confirmed by reading the file directly. Map Notion's 7 named tools onto that:
+
+| Notion tool | Existing ID? | Action |
+|---|---|---|
+| Task Paralysis Shatterer | `shatter-start` | **Alias, don't duplicate.** Same tool, restore the fuller trigger/output spec below onto the existing ID. |
+| Time Blindness Auditor | `time-map` | **Alias, don't duplicate.** Same tool, restore the fuller spec onto the existing ID. |
+| Executive Function Externaliser | `open-loops` | **Alias, don't duplicate.** Same tool, restore the fuller spec onto the existing ID. |
+| Dopamine Menu Architect | none | **Net new.** Suggested ID: `dopamine-menu`. |
+| Body Doubling Simulator | none | **Net new.** Suggested ID: `body-double`. |
+| Context Switching Guide | none | **Net new.** Suggested ID: `context-switch`. |
+| Interest-Based Filter | none | **Net new.** Suggested ID: `interest-filter`. |
+
+So: restore the full trigger/output spec for all 7 below, but implement it as **3 existing IDs getting a fuller spec + 4 genuinely new IDs** — not 7 new pills, and not a second "Time Blindness Auditor" sitting next to "Time map."
+
+> 1. **Task Paralysis Shatterer** (`shatter-start`) — "I am staring at [Task] and can't start." Break into under-a-minute steps, give only the first, include a physical start cue.
+> 2. **Dopamine Menu Architect** (`dopamine-menu`, new) — "I am feeling under-stimulated, create a Dopamine Menu." Three lists: 5-min Appetizers, 20-min Entrees, 10-min Sides.
+> 3. **Body Doubling Simulator** (`body-double`, new) — "Act as my virtual body double for 30 minutes." Ask what "done" looks like, run 30 minutes with check-ins every 10.
+> 4. **Context Switching Guide** (`context-switch`, new) — "I just finished [A], need to start [B]." 3-minute palate-cleanser with a start/end cue, name the first step of B.
+> 5. **Interest-Based Filter** (`interest-filter`, new) — "Boring task: [X]. My hyperfixation: [Y]." Gamify X as a quest using Y, 3–5 stages with visible completion checks.
+> 6. **Time Blindness Auditor** (`time-map`) — "I think [Project] takes 20 minutes but it's usually 2 hours." Time map: 3 hidden sub-tasks usually missed, a realistic budget.
+> 7. **Executive Function Externaliser** (`open-loops`) — "Brain full of open loops, dumping below." Now/Later/Trash, one-sentence next step for Now only.
+
+Restore the Predictive Layer *only once its signals are real* (see above) — do not ship the prose ("high-load day + no meals logged → note to Brisket") ahead of the data existing, that's the exact mistake this revision is correcting.
+
+**Test:** unit tests for the two new sprint IDs against `apps/tasks`'s existing sprint-test conventions; a unit test per new/reconciled ADHD tool; if new digest fields are added, a fixture test asserting they compute correctly and degrade to `null` on missing data, not a crash.
+
+---
+
+## Band C — its own project, not a line item here
+
+### C1. Ann — reflection coach (`apps/teaching`)
+
+**sees today:** confirmed by reading `apps/teaching/src/ai/context.ts` directly. `AiContextInput` is entirely about in-editor lesson-block editing — `lesson`, `scope`, `selectedBlockId`, `searchPack`, `action`. There is no reflection-history field, no conversational Q&A shape, and **no chat surface for Ann outside the in-editor quick-action flow at all.** This is the single most important finding of this whole revision: restoring "ask 3–5 questions one at a time, react to the answer, store a reflection" is not a matter of adding a field to an existing prompt builder — Ann currently has nowhere for a multi-turn conversation to happen. Compare to Clare, who has an actual desk/chat surface (`#/clare`, `/api/clare` with `dump`/`brief` actions) that the reflection coach could be modeled on.
+
+**today: missing everything — needs a genuine feature slice, not a restore.** Scope as its own design doc (mirror `apps/tasks/docs/superpowers/specs/2026-08-25-clare-supercharge-design.md`'s shape, since that's the closest precedent for "give a thin hub agent a real conversational surface"), covering at minimum:
+
+- A chat/desk surface for Ann analogous to `#/clare`, likely `#/ann` or reachable from a lesson's own page — decide which based on whether reflection should happen per-lesson or as a standalone conversation; Notion's original was standalone.
+- A reflection schema (lesson link, date, subject, year level, unit, one-phrase reflection focus, framework applied, one strength + why, one growth area + why, pattern tags from a fixed list) under `apps/teaching/src/schemas/`.
+- Storage under `apps/teaching/src/storage/` following whatever pattern lesson/unit data already uses there (inspect it first — do not invent a new persistence shape without checking).
+- A query surface (by subject, year level, unit, pattern tag, most-recent-first) that a pre-lesson coaching turn can actually call — without this, any "coach the next lesson using patterns" instruction will confabulate patterns instead of reading real ones, exactly the failure mode Adam is trying to avoid.
+- Prompt content once the above exists: the deliberate-practice/reflective-practice/instructional-coaching framing, the 3-5-question post-lesson protocol, the HPGE research base (Gagné DMGT 2.0, VanTassel-Baska ICM, Renzulli Triad, Kaplan Depth and Complexity — applied selectively, not recited), the Periodic Synthesis Report shape, and the Monthly Hammond Handoff (additive to the mailbox already shipped for her — do not touch that wiring).
+
+Do not attempt this as prompt-only text against the current `context.ts`. It has no hook for any of it.
+
+---
+
+## Verification discipline for this whole plan
+
+For every item above, before marking it done: confirm the `sees:`/`writes:` claim against the actual file, not memory of Notion or of v1 of this plan. Where this revision says "verify before assuming" (B3's tool-gating, B4's raw-text-may-already-carry-it check), do that check first — it may shrink the amount of new code needed, or reveal it's larger than estimated here. Either outcome is fine; shipping a rule whose data path was never confirmed is not.
+
+Run each app's own test suite after its section (`apps/life`, `apps/tasks`, `apps/teaching` — check each app's own `package.json` for its actual test command, they are not guaranteed to match). Commit per band, not per agent — Band A can ship today; Band B items ship with their code half or not at all; Band C doesn't ship as part of this plan, it produces a design doc.
+
+**Ask Adam before:** implementing B1 (Penelope weather) without his explicit go-ahead on this specific reopened decision, touching Clementine or Sterling Blackwood, or removing any part of the Hammond↔Clare/Ann mailbox wiring the 2026-09-05 coordination spec already shipped.

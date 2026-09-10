@@ -1,0 +1,17 @@
+{
+  "id": "lookup.save-exercise-library",
+  "tool_name": "save_exercise_library_entry",
+  "verb": "Lookup",
+  "agents": ["chadwick"],
+  "risk": "auto",
+  "kind": "capacity",
+  "legacy_tool": "save_exercise_library_entry",
+  "inputs": {
+    "name": "string",
+    "target_area": "string"
+  },
+  "side_effects": ["Upserts an Exercise Library entry"],
+  "surfaces": ["exercise_library"],
+  "prompt_one_liner": "Save or refine an Exercise Library entry after researching a move.",
+  "reads": ["exercise_library"]
+}

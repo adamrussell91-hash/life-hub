@@ -7,7 +7,8 @@ import {
   methodNotAllowed,
   misconfiguredResponse,
   preflightResponse,
-  readCookie,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
 import {
@@ -19,7 +20,7 @@ import {
   SKINCARE_ROUTINE_MEMBERSHIP_PATH,
   addToRoutine,
   removeFromRoutine
-} from '../../js/app/skincare-routine-membership.js';
+} from '../../apps/life/js/app/skincare-routine-membership.js';
 import { loadOrSeedLibrary, loadOrSeedMembership, writeJson } from './_shared/skincare-store.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
@@ -50,7 +51,7 @@ export function createSkincareRoutinesHandler({
 
     let session;
     try {
-      session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
-import { parseCanonicalPath, parseEventDocument } from '../../js/core/records.js';
-import { validateRecord } from '../../js/core/validate.js';
-import * as recordValidation from '../../js/core/validate.js';
+import { parseCanonicalPath, parseEventDocument } from '../../apps/life/js/core/records.js';
+import { validateRecord } from '../../apps/life/js/core/validate.js';
+import * as recordValidation from '../../apps/life/js/core/validate.js';
 
 const valid = `---
 schema_version: 1
@@ -509,10 +509,24 @@ test('mind_session rejects a cross_agent_note with no arrow', () => {
   assert.ok(errors.some(e => /Sender→Recipient/.test(e)));
 });
 
-test('mind_session rejects a cross_agent_note addressed to Ann', () => {
-  const errors = validateRecord({
+test('mind_session accepts a well-formed Vera→Ann cross_agent_note now that Ann is implemented', () => {
+  assert.equal(validateRecord({
     ...mindSessionBase,
     cross_agent_note: 'Vera→Ann: teaching handoff.'
+  }).length, 0);
+});
+
+test('mind_session accepts a well-formed Vera→Clare cross_agent_note', () => {
+  assert.equal(validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Vera→Clare: load is colliding with rest.'
+  }).length, 0);
+});
+
+test('mind_session still rejects a cross_agent_note addressed to Clementine', () => {
+  const errors = validateRecord({
+    ...mindSessionBase,
+    cross_agent_note: 'Vera→Clementine: wiki note.'
   });
   assert.ok(errors.some(e => /implemented agent names/.test(e)));
 });
@@ -535,4 +549,44 @@ test('diary accepts a well-formed Penelope→Hammond cross_agent_note', () => {
 test('diary and mind_session stay valid when cross_agent_note is omitted', () => {
   assert.equal(validateRecord(diaryBase).length, 0);
   assert.equal(validateRecord(mindSessionBase).length, 0);
+});
+
+test('workout accepts a well-formed Chadwick→Sara cross_agent_note', () => {
+  const workout = {
+    schema_version: 1,
+    id: 'workout-1',
+    type: 'workout',
+    date: '2026-08-29',
+    time: '07:00',
+    created_at: '2026-08-29T07:00:00+10:00',
+    updated_at: '2026-08-29T07:00:00+10:00',
+    source: 'chat',
+    title: 'Biceps and Boobs, 20 mins',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    exercises: [{ name: 'Bar Press', sets: [{ reps: 8, weight_kg: 40, cable_type: 'constant_force' }] }],
+    cross_agent_note: 'Chadwick→Sara: right AC twinge on fly, parked.'
+  };
+  assert.equal(validateRecord(workout).length, 0);
+});
+
+test('workout rejects a cross_agent_note with the wrong sender', () => {
+  const errors = validateRecord({
+    schema_version: 1,
+    id: 'workout-2',
+    type: 'workout',
+    date: '2026-08-29',
+    time: '07:00',
+    created_at: '2026-08-29T07:00:00+10:00',
+    updated_at: '2026-08-29T07:00:00+10:00',
+    source: 'chat',
+    title: 'Session',
+    session_kind: 'strength',
+    day_type: 'workout_30',
+    status: 'completed',
+    exercises: [{ name: 'Curl', sets: [{ reps: 10, weight_kg: 10, cable_type: 'constant_force' }] }],
+    cross_agent_note: 'Vera→Sara: wrong sender.'
+  });
+  assert.ok(errors.some(e => /sender must be Chadwick/.test(e)));
 });

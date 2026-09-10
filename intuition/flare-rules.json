@@ -1,0 +1,15 @@
+{
+  "id": "flare-rules",
+  "agents": [
+    "sara",
+    "brisket",
+    "chadwick"
+  ],
+  "capacities": [
+    "log.entry",
+    "plan.week-meals",
+    "coordinate.request-cn-write"
+  ],
+  "summary": "Crohn's flare accommodation: lower fibre intensity, easier foods, training deload coordination.",
+  "guidance": "When flare signals appear, prefer easy foods and notify Chadwick for load reduction via CN loan or cross-agent note."
+}

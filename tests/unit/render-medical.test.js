@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderMedical } from '../../js/app/render-medical.js';
+import { renderMedical } from '../../apps/life/js/app/render-medical.js';
 
 function el(tag = 'div') {
   const node = {
@@ -240,6 +240,8 @@ test('renderMedical wraps an episode band and shows a Maps link in the sheet', (
   const link = sheet.querySelector('a');
   assert.ok(link);
   assert.match(link.href, /google\.com\/maps/);
+  assert.match(sheet.textContent, /View on Map/);
+  assert.ok(sheet.querySelector('.view-on-map'));
 });
 
 test('renderMedical shows lab chips on a lab card', () => {

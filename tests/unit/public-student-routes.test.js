@@ -1,0 +1,57 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { isPublicStudentApi } from '../../netlify/functions/_shared/public-student-routes.mjs';
+
+test('published Teaching student APIs are public', () => {
+  assert.equal(isPublicStudentApi('GET', '/api/published/lessons/week-1'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/published/units/unit-1'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/published/classes/11psycha'), true);
+  assert.equal(isPublicStudentApi('GET', '/api/media/file-1/file'), true);
+  assert.equal(isPublicStudentApi('POST', '/api/html-app-ai'), true);
+});
+
+test('operator APIs are not public student routes', () => {
+  assert.equal(isPublicStudentApi('POST', '/api/auth'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/repo/manifest'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/curriculum'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/lessons/week-1'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/lessons/week-1/versions'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/lessons/week-1/versions/1/restore'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/search'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/lessons/week-1/publish'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/media/upload'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/classes/class-1/schedule-unit'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/clare'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/pages'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/search'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/quiz'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/pages-save'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/quiz-save'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/quiz/items/note-1'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/auth-session'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/auth-login'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/clementine-coach'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/clementine-chat'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/capture'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/attachments-sign'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/attachments/note-1/att-1'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/tidy'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/knowledge/curator'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/knowledge/podcast/start'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/lesson-alchemist'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/alchemy-lab'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/compositions'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/trash'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/scope-sequences'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/export'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/ai/jobs'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/ai/jobs/tick'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/templates'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/stall'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/reviews'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/reviews'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/task-properties'), false);
+  assert.equal(isPublicStudentApi('PUT', '/api/task-properties'), false);
+  assert.equal(isPublicStudentApi('GET', '/api/stress-flags'), false);
+  assert.equal(isPublicStudentApi('POST', '/api/capacity'), false);
+});

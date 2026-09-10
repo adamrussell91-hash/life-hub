@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderHome } from '../../js/app/render-home.js';
+import { renderHome } from '../../apps/life/js/app/render-home.js';
 
 class FakeElement {
   constructor(tag) {

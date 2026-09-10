@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
-  formatDisplayDate, formatShortMonth,
+  formatDisplayDate, formatShortMonth, formatWeekday,
   getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
-} from '../../js/core/time.js';
+} from '../../apps/life/js/core/time.js';
 
 test('Sydney date key crosses the spring DST boundary by calendar date', () => {
   assert.equal(getSydneyDateKey(new Date('2026-10-03T15:30:00Z')), '2026-10-04');
@@ -56,6 +56,12 @@ test('calendar helpers reject impossible dates and preserve leap-day arithmetic'
     assert.throws(() => enumerateDateKeys(impossible, '2026-03-01'), TypeError);
     assert.throws(() => enumerateDateKeys('2026-02-01', impossible), TypeError);
   }
+});
+
+test('formatWeekday names the UTC calendar day', () => {
+  assert.equal(formatWeekday('2026-07-30'), 'Thursday');
+  assert.equal(formatWeekday('2026-08-01'), 'Saturday');
+  assert.equal(formatWeekday('not-a-date'), '');
 });
 
 test('formatDisplayDate is always DD/MM/YY', () => {

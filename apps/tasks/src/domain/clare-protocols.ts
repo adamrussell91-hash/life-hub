@@ -1,0 +1,216 @@
+export type ClareSprintId =
+  | 'morning-sweep'
+  | 'tomorrow-setup'
+  | 'weekly-reset'
+  | 'high-stakes'
+  | 'shrink-first-step'
+  | 'appointment-prep'
+  | 'comms-followup';
+
+export type ClareToolkitId =
+  | 'shatter-start'
+  | 'time-map'
+  | 'open-loops'
+  | 'dopamine-menu'
+  | 'body-double'
+  | 'context-switch'
+  | 'interest-filter';
+
+export type ClareProductivityId =
+  | 'weekly-review'
+  | 'plan-day'
+  | 'project-plan'
+  | 'waiting'
+  | 'shutdown';
+
+export type ClareProtocolId = ClareSprintId | ClareToolkitId | ClareProductivityId;
+
+export type ClareProtocol = {
+  id: ClareProtocolId;
+  label: string;
+  explain: string;
+};
+
+/** Named sprints from Clare’s operating manual. */
+export const CLARE_PROTOCOLS: readonly ClareProtocol[] = [
+  {
+    id: 'morning-sweep',
+    label: 'Morning sweep',
+    explain: 'Clare briefs today: the one thing that matters, then overdue, then flags.'
+  },
+  {
+    id: 'tomorrow-setup',
+    label: 'Tomorrow',
+    explain: 'Clare lays out tomorrow and asks what from today should carry forward.'
+  },
+  {
+    id: 'weekly-reset',
+    label: 'Weekly reset',
+    explain: 'Clare names the crunch days and the overdue items that need a decision.'
+  },
+  {
+    id: 'high-stakes',
+    label: 'High-stakes',
+    explain: 'Clare surfaces the deadline that has not moved, without a lecture.'
+  },
+  {
+    id: 'shrink-first-step',
+    label: 'Shrink first move',
+    explain: 'Clare turns the dump into the smallest honest first move you can start.'
+  },
+  {
+    id: 'appointment-prep',
+    label: 'Appointment prep',
+    explain: 'Clare pulls an upcoming appointment and related prep tasks/notes.'
+  },
+  {
+    id: 'comms-followup',
+    label: 'Comms follow-up',
+    explain: 'Clare lists follow-ups at or past due and offers to resolve each.'
+  }
+];
+
+/** Productivity OS entry pills — restrained set, not a second dozen. */
+export const CLARE_PRODUCTIVITY_PROTOCOLS: readonly ClareProtocol[] = [
+  {
+    id: 'weekly-review',
+    label: 'Weekly Review',
+    explain: 'Clare runs the eight-stage weekly review with confirm before write.'
+  },
+  {
+    id: 'plan-day',
+    label: 'Plan Day',
+    explain: 'Clare proposes work blocks for the day — ghost until you confirm.'
+  },
+  {
+    id: 'project-plan',
+    label: 'Project Plan',
+    explain: 'Clare walks purpose → outcome → next actions for one project.'
+  },
+  {
+    id: 'waiting',
+    label: 'Waiting',
+    explain: 'Clare lists waiting items and follow-ups that need a nudge.'
+  },
+  {
+    id: 'shutdown',
+    label: 'Shutdown',
+    explain: 'Clare closes the day: carry, defer, or leave each open loop.'
+  }
+];
+
+/** Main Clare tray: keep briefing sprints + productivity entries under twelve pills. */
+export const CLARE_VIEW_PROTOCOLS: readonly ClareProtocol[] = [
+  ...CLARE_PROTOCOLS.filter(
+    (p) => p.id !== 'appointment-prep' && p.id !== 'comms-followup' && p.id !== 'weekly-reset'
+  ),
+  ...CLARE_PRODUCTIVITY_PROTOCOLS
+];
+
+/** ADHD executive-function tools. Run from a dump, not as a silent write. */
+export const CLARE_ADHD_PROTOCOLS: readonly ClareProtocol[] = [
+  {
+    id: 'shatter-start',
+    label: 'Shatter this',
+    explain: 'Clare breaks a stuck task into a one-minute first move with a physical cue.'
+  },
+  {
+    id: 'time-map',
+    label: 'Time map',
+    explain: 'Clare names the hidden sub-tasks that usually blow the estimate.'
+  },
+  {
+    id: 'open-loops',
+    label: 'Open loops',
+    explain: 'Clare sorts the dump into Now, Later, and Trash, then proposes Now.'
+  },
+  {
+    id: 'dopamine-menu',
+    label: 'Dopamine menu',
+    explain: 'Clare builds 5-min / 20-min / 10-min stimulation options when under-stimulated.'
+  },
+  {
+    id: 'body-double',
+    label: 'Body double',
+    explain: 'Clare acts as a virtual body double for a 30-minute focus block.'
+  },
+  {
+    id: 'context-switch',
+    label: 'Context switch',
+    explain: 'Clare runs a 3-minute palate-cleanser between finished A and starting B.'
+  },
+  {
+    id: 'interest-filter',
+    label: 'Interest filter',
+    explain: 'Clare gamifies a boring task using a current hyperfixation as the quest frame.'
+  }
+];
+
+export function isClareSprint(id: ClareProtocolId | undefined): id is ClareSprintId {
+  return (
+    id === 'morning-sweep' ||
+    id === 'tomorrow-setup' ||
+    id === 'weekly-reset' ||
+    id === 'high-stakes' ||
+    id === 'shrink-first-step' ||
+    id === 'appointment-prep' ||
+    id === 'comms-followup'
+  );
+}
+
+export function isClareToolkit(id: ClareProtocolId | undefined): id is ClareToolkitId {
+  return (
+    id === 'shatter-start' ||
+    id === 'time-map' ||
+    id === 'open-loops' ||
+    id === 'dopamine-menu' ||
+    id === 'body-double' ||
+    id === 'context-switch' ||
+    id === 'interest-filter'
+  );
+}
+
+export function isBriefingProtocol(id: ClareProtocolId | undefined): boolean {
+  return (
+    id === 'morning-sweep' ||
+    id === 'tomorrow-setup' ||
+    id === 'weekly-reset' ||
+    id === 'high-stakes' ||
+    id === 'appointment-prep' ||
+    id === 'comms-followup'
+  );
+}
+
+export function isProductivityProtocol(id: ClareProtocolId | string | undefined): id is ClareProductivityId {
+  return (
+    id === 'weekly-review' ||
+    id === 'plan-day' ||
+    id === 'project-plan' ||
+    id === 'waiting' ||
+    id === 'shutdown'
+  );
+}
+
+/** Launch copy for empty-composer productivity protocol pills → /api/chat. */
+export const PRODUCTIVITY_LAUNCH_MESSAGES: Record<ClareProductivityId, string> = {
+  'weekly-review': 'Start Weekly Review',
+  'plan-day': 'Plan my day',
+  'project-plan': 'Start project planning',
+  waiting: 'Review waiting items',
+  shutdown: 'Run shutdown'
+};
+
+export const CLARE_WAIT_LINES = [
+  'Untangling the moving parts…',
+  'Putting a timer on the chaos…',
+  'Checking where this could pinch…',
+  'Finding the smallest honest first move…',
+  'Measuring the task against the week…',
+  'Testing the estimate for wishful thinking…',
+  'Choosing a framework that earns its keep…',
+  'Separating urgent from merely noisy…',
+  'Looking for effort hiding in the seams…',
+  'Turning the knot into a next action…',
+  'Checking the deadline has enough runway…',
+  'Making the plan smaller and truer…'
+] as const;

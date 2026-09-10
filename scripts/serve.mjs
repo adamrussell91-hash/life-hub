@@ -17,6 +17,8 @@ const MIME_TYPES = {
   '.yml': 'application/yaml; charset=utf-8'
 };
 
+const SPA_MOUNTS = new Set(['teaching', 'knowledge', 'tasks']);
+
 const send = (response, status, body, contentType = 'text/plain; charset=utf-8') => {
   response.writeHead(status, {
     'Content-Type': contentType,
@@ -25,6 +27,33 @@ const send = (response, status, body, contentType = 'text/plain; charset=utf-8')
   });
   response.end(body);
 };
+
+function isInsideRoot(rootPath, filePath) {
+  return filePath === rootPath || filePath.startsWith(`${rootPath}${sep}`);
+}
+
+async function resolvePublishedFile(rootPath, decodedPath) {
+  const relativePath = decodedPath === '/' ? 'index.html' : decodedPath.replace(/^\/+/, '');
+  const direct = resolve(rootPath, relativePath);
+  const candidates = [direct];
+  if (!extname(relativePath.replace(/\/+$/, ''))) {
+    candidates.push(resolve(direct, 'index.html'));
+  }
+  const mount = relativePath.split('/').find(Boolean);
+  if (SPA_MOUNTS.has(mount)) {
+    candidates.push(resolve(rootPath, mount, 'index.html'));
+  }
+  for (const filePath of candidates) {
+    if (!isInsideRoot(rootPath, filePath)) continue;
+    try {
+      const metadata = await stat(filePath);
+      if (metadata.isFile()) return filePath;
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+}
 
 export function createStaticServer({ root, apiRoot = new URL('../', import.meta.url), now, sessionMs } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
@@ -52,21 +81,14 @@ export function createStaticServer({ root, apiRoot = new URL('../', import.meta.
       return;
     }
 
-    const relativePath = decodedPath === '/' ? 'index.html' : decodedPath.replace(/^\/+/, '');
-    const filePath = resolve(rootPath, relativePath);
-    if (filePath !== rootPath && !filePath.startsWith(`${rootPath}${sep}`)) {
-      send(response, 400, 'Invalid path');
+    const filePath = await resolvePublishedFile(rootPath, decodedPath);
+    if (!filePath) {
+      send(response, 404, 'Not found');
       return;
     }
 
-    try {
-      const metadata = await stat(filePath);
-      if (!metadata.isFile()) throw new Error('not a file');
-      const body = request.method === 'HEAD' ? '' : await readFile(filePath);
-      send(response, 200, body, MIME_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream');
-    } catch {
-      send(response, 404, 'Not found');
-    }
+    const body = request.method === 'HEAD' ? '' : await readFile(filePath);
+    send(response, 200, body, MIME_TYPES[extname(filePath).toLowerCase()] ?? 'application/octet-stream');
   });
 }
 

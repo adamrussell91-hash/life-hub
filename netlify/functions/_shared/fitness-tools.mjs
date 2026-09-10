@@ -1,0 +1,778 @@
+/**
+ * Chadwick Fitness tool pack — thin wrappers over buildFitnessModel / charts /
+ * body-state / templates. Same numbers as the Fitness and Body pages.
+ */
+import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
+import {
+  buildFitnessModel,
+  normalizeExerciseName,
+  sessionVolume
+} from '../../../apps/life/js/app/fitness-model.js';
+import { collapseSetSplitExercises } from './workout-history.mjs';
+import {
+  computeShoulderWaistRatio,
+  formatBodyStateForPrompt
+} from './body-state.mjs';
+import {
+  parseTemplateMarkdown,
+  slugifyWorkoutTitle
+} from './workout-templates.mjs';
+
+/** Cover Fitness long-term (26w) + load horizon. */
+export const FITNESS_HISTORY_WEEKS = 26;
+
+function roundPct(value) {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.round(value * 10) / 10;
+}
+
+function roundKg(value) {
+  if (value == null || !Number.isFinite(value)) return null;
+  return Math.round(value * 10) / 10;
+}
+
+export function workoutEventsFromRecords(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(record => record && (record.type === 'workout' || record.type == null))
+    .map(record => ({ record: { ...record, type: 'workout' } }));
+}
+
+export function fitnessHistoryBounds(today, { weeks = FITNESS_HISTORY_WEEKS } = {}) {
+  if (!isCalendarDate(today) || !Number.isInteger(weeks) || weeks < 1) return null;
+  return {
+    weeks,
+    from: addCalendarDays(today, -(weeks * 7 - 1)),
+    to: today
+  };
+}
+
+function modelFor(records, today) {
+  if (!isCalendarDate(today)) return null;
+  return buildFitnessModel({
+    events: workoutEventsFromRecords(records),
+    date: today
+  });
+}
+
+function baseMeta(today, sameAs) {
+  return {
+    ok: true,
+    store: 'life_hub_fitness',
+    kind: 'calculation',
+    same_as: sameAs,
+    date: today
+  };
+}
+
+export function getFitnessSnapshot(records, today) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  const charts = model.charts ?? {};
+  const last = model.lastCompletedDate ?? null;
+  const lastRecord = last
+    ? (Array.isArray(records) ? records : []).find(record => record?.status === 'completed' && record.date === last)
+    : null;
+  return {
+    ...baseMeta(today, 'Fitness page header / week / month summary'),
+    last_completed_id: lastRecord?.id ?? null,
+    last_completed_path: lastRecord?.path ?? null,
+    streak_days: model.streak ?? null,
+    longest_streak_days: charts.longestStreak ?? null,
+    last_completed_date: last,
+    days_since_last_completed: last && last <= today ? daysBetween(last, today) : null,
+    week: {
+      completed: model.weekCompletedCount,
+      target: model.weekTarget,
+      remaining: model.weekRemaining,
+      volume_kg: roundKg(model.weekVolumeKg),
+      last_week_volume_kg: roundKg(model.lastWeekVolumeKg),
+      volume_delta_pct: roundPct(model.weekVolumeDeltaPct),
+      focus_hits: model.focusHits ?? []
+    },
+    month: {
+      completed_days: model.monthHitCount,
+      volume_kg: roundKg(model.monthVolumeKg),
+      avg_session_volume_kg: roundKg(model.avgSessionVolumeKg),
+      avg_duration_min: model.avgDurationMin
+    },
+    long_term: {
+      workouts_per_week: roundPct(model.longTerm?.workoutsPerWeek),
+      adherence_pct: roundPct(model.longTerm?.adherencePct),
+      volume_delta_pct: roundPct(model.longTerm?.volumeDeltaPct),
+      strength_delta_pct: roundPct(model.longTerm?.strengthDeltaPct)
+    },
+    next_planned: model.nextPlanned ?? null
+  };
+}
+
+export function getFitnessSnapshotSchema() {
+  return {
+    name: 'get_fitness_snapshot',
+    description:
+      'Read the Fitness page dashboard summary from Adam\'s loaded workout files: streak, this-week completed/target/volume vs last week, month volume, long-term adherence, next planned session. Use when he asks how training is going, whether he is on track this week, or for a Fitness overview — never invent streak/volume numbers or claim you cannot see the Fitness dashboard.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+export function getTrainingVolume(records, today) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  const weeks = (model.volumeWeeks ?? []).map(week => ({
+    week_start: week.weekStart,
+    volume_kg: roundKg(week.value)
+  }));
+  return {
+    ...baseMeta(today, 'Fitness page week/month volume tiles'),
+    how_to_read:
+      'These are kg tonnage (reps×weight), not session counts. Use compare_workout_windows for completed-session counts.',
+    this_week_volume_kg: roundKg(model.weekVolumeKg),
+    last_week_volume_kg: roundKg(model.lastWeekVolumeKg),
+    week_volume_delta_pct: roundPct(model.weekVolumeDeltaPct),
+    month_volume_kg: roundKg(model.monthVolumeKg),
+    avg_session_volume_kg: roundKg(model.avgSessionVolumeKg),
+    recent_volume_weeks: weeks,
+    long_term_volume_delta_pct: roundPct(model.longTerm?.volumeDeltaPct)
+  };
+}
+
+export function getTrainingVolumeSchema() {
+  return {
+    name: 'get_training_volume',
+    description:
+      'Read Fitness page training volume in kg (this week vs last week, month total, recent weekly tonnage, long-term volume %). Use when Adam asks if volume is up/down, how much tonnage he has done, or whether training load dropped — do not answer volume questions with compare_workout_windows session counts alone.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+export function getWorkingWeights(records, today, { query, limit = 12 } = {}) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  let lifts = (model.workingWeights ?? []).map(lift => ({
+    name: lift.name,
+    weight_kg: lift.weight_kg,
+    reps: lift.reps,
+    e1rm: roundKg(lift.e1rm),
+    date: lift.date
+  }));
+  if (query != null && String(query).trim()) {
+    const needle = String(query).trim().toLowerCase();
+    lifts = lifts.filter(lift => String(lift.name).toLowerCase().includes(needle));
+  }
+  const cap = Math.min(Math.max(Number(limit) || 12, 1), 30);
+  return {
+    ...baseMeta(today, 'Fitness page Working weights tile'),
+    window_days: 30,
+    count: Math.min(lifts.length, cap),
+    lifts: lifts.slice(0, cap)
+  };
+}
+
+export function getWorkingWeightsSchema() {
+  return {
+    name: 'get_working_weights',
+    description:
+      'Read Fitness page Working weights (30-day best e1RM leaders per lift) from loaded workout files. Optional query filters by exercise name. Use when Adam asks what he is working with on a lift, top working weights, or current training loads.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Optional case-insensitive exercise name fragment.' },
+        limit: { type: 'number', description: 'Max lifts to return (default 12, max 30).' }
+      }
+    }
+  };
+}
+
+export function getLongTermFitness(records, today) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  const lt = model.longTerm ?? {};
+  return {
+    ...baseMeta(today, 'Fitness page long-term trio tiles'),
+    weeks: 26,
+    workouts_per_week: roundPct(lt.workoutsPerWeek),
+    adherence_pct: roundPct(lt.adherencePct),
+    volume_delta_pct: roundPct(lt.volumeDeltaPct),
+    strength_delta_pct: roundPct(lt.strengthDeltaPct),
+    weekly_volume: (lt.weeklyVolume ?? []).map(week => ({
+      week_start: week.weekStart,
+      volume_kg: roundKg(week.value)
+    }))
+  };
+}
+
+export function getLongTermFitnessSchema() {
+  return {
+    name: 'get_long_term_fitness',
+    description:
+      'Read Fitness page long-term metrics (~26 weeks): workouts/week, adherence %, volume Δ %, strength Δ %, weekly volume series. Use for multi-month progress / adherence questions — never invent a long-term trend from a handful of recent sessions.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+export function getSessionComparisons(records, today) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  const hero = model.heroSession;
+  const comparisons = (model.comparisons ?? []).map(row => ({
+    name: row.name,
+    current_best: row.currentBest ?? null,
+    previous_best: row.previousBest ?? null,
+    e1rm: roundKg(row.e1rm),
+    previous_e1rm: roundKg(row.previousE1rm),
+    weight_delta_kg: row.weightDeltaKg ?? null,
+    is_pr: row.isPr === true,
+    first_logged: row.firstLogged === true
+  }));
+  return {
+    ...baseMeta(today, 'Fitness page last-session comparisons / PR flags'),
+    hero_session: hero
+      ? {
+        date: hero.date,
+        title: hero.title,
+        status: hero.status,
+        volume_kg: roundKg(sessionVolume(hero)),
+        duration_min: hero.duration_min ?? null,
+        focus: hero.focus ?? []
+      }
+      : null,
+    comparisons
+  };
+}
+
+export function getSessionComparisonsSchema() {
+  return {
+    name: 'get_session_comparisons',
+    description:
+      'Read Fitness page lift comparisons for the hero/last session vs prior performances (weight deltas, PR flags). Use when Adam asks whether he PRd or how last session compared to the previous hit on those lifts.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+export function getExerciseHistory(records, today, { query, limit = 5 } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
+  const needle = String(query ?? '').trim().toLowerCase();
+  if (!needle) return { ok: false, error: 'empty_query' };
+  const cap = Math.min(Math.max(Number(limit) || 5, 1), 12);
+  const sessions = (Array.isArray(records) ? records : [])
+    .filter(record => (record?.type === 'workout' || record?.type == null) && record.status === 'completed' && record.date)
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  const hits = [];
+  for (const record of sessions) {
+    const exercises = collapseSetSplitExercises(record.exercises);
+    for (const exercise of exercises) {
+      const name = String(exercise.name ?? '');
+      const normalized = normalizeExerciseName(name).toLowerCase();
+      if (!name.toLowerCase().includes(needle) && !normalized.includes(needle)) continue;
+      hits.push({
+        date: record.date,
+        title: record.title,
+        exercise: name,
+        sets: (exercise.sets ?? []).map(set => ({
+          reps: set.reps,
+          weight_kg: set.weight_kg,
+          ...(set.cable_type != null ? { cable_type: set.cable_type } : {})
+        })),
+        volume_kg: roundKg(sessionVolume({ status: 'completed', exercises: [exercise] }))
+      });
+      break;
+    }
+    if (hits.length >= cap) break;
+  }
+
+  return {
+    ...baseMeta(today, 'Completed workout files (exercise history)'),
+    query: String(query).trim(),
+    count: hits.length,
+    history: hits
+  };
+}
+
+export function getExerciseHistorySchema() {
+  return {
+    name: 'get_exercise_history',
+    description:
+      'Search loaded completed workouts for the last N times Adam performed an exercise (sets/reps/weight). Use when he asks what he did last time / last few times on a named lift — do not invent prior sets.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Exercise name fragment (required).' },
+        limit: { type: 'number', description: 'Max sessions to return (default 5, max 12).' }
+      },
+      required: ['query']
+    }
+  };
+}
+
+export function getLoadStatus(records, today) {
+  const model = modelFor(records, today);
+  if (!model) return { ok: false, error: 'invalid_date' };
+  const horizon = model.charts?.loadHorizon ?? [];
+  const series = Array.isArray(horizon) && horizon[0]?.points
+    ? horizon[0].points.map(point => ({
+      week_start: point.date,
+      volume_kg: roundKg(point.value),
+      acwr: roundPct(point.ratio),
+      band: point.band ?? null
+    }))
+    : [];
+  return {
+    ...baseMeta(today, 'Fitness charts load horizon / ACWR band'),
+    how_to_read:
+      'Acute:chronic weekly tonnage ratio. Bands flag underload / sweet spot / spike — check before pushing load hard.',
+    latest: series.at(-1) ?? null,
+    weeks: series
+  };
+}
+
+export function getLoadStatusSchema() {
+  return {
+    name: 'get_load_status',
+    description:
+      'Read Fitness load-horizon / acute:chronic volume ratio bands from loaded workouts. Use when Adam asks if he is ramping too hard, under-training, or whether this week\'s load is spiking.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+function painFlagsOf(record) {
+  if (Array.isArray(record?.pain_flags)) return record.pain_flags;
+  if (Array.isArray(record?.painFlags)) return record.painFlags;
+  return [];
+}
+
+export function getPainTrainingSummary(records, today, { limit = 20 } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
+  const model = modelFor(records, today);
+  const chartSites = (model?.charts?.painBySite ?? []).map(row => ({
+    site: row.site,
+    count: row.count
+  }));
+
+  const bySite = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    if (record?.status !== 'completed') continue;
+    for (const flag of painFlagsOf(record)) {
+      if (!flag || typeof flag !== 'object') continue;
+      const site = String(flag.site ?? flag.location ?? '').trim();
+      if (!site) continue;
+      const key = site.toLowerCase();
+      const entry = bySite.get(key) ?? {
+        site,
+        count: 0,
+        latest_date: null,
+        latest_note: null,
+        sessions: []
+      };
+      entry.count += 1;
+      if (!entry.latest_date || record.date > entry.latest_date) {
+        entry.latest_date = record.date;
+        entry.latest_note = typeof flag.note === 'string' ? flag.note.trim() : null;
+      }
+      if (entry.sessions.length < 5) {
+        entry.sessions.push({
+          date: record.date,
+          title: record.title,
+          id: record.id ?? null,
+          path: record.path ?? null,
+          note: typeof flag.note === 'string' ? flag.note.trim() : null
+        });
+      }
+      bySite.set(key, entry);
+    }
+  }
+
+  const sites = [...bySite.values()]
+    .sort((a, b) => b.count - a.count || String(b.latest_date).localeCompare(String(a.latest_date)))
+    .slice(0, Math.min(Math.max(Number(limit) || 20, 1), 40));
+
+  return {
+    ...baseMeta(today, 'Pain flags rolled up from completed workout files'),
+    chart_sites: chartSites,
+    site_count: sites.length,
+    sites
+  };
+}
+
+export function getPainTrainingSummarySchema() {
+  return {
+    name: 'get_pain_training_summary',
+    description:
+      'Roll up pain flags from loaded completed workouts by site (counts, latest note, recent sessions). Use before programming around injuries or when Adam asks where training has been hurting.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', description: 'Max sites to return (default 20).' }
+      }
+    }
+  };
+}
+
+export function getBodyState({
+  compositionRecords = [],
+  measurementRecords = [],
+  targetRatio
+} = {}) {
+  if (!compositionRecords.length && !measurementRecords.length) {
+    return { ok: true, store: 'life_hub_body', found: false, summary: '' };
+  }
+  const latestMeasurements = measurementRecords[0] ?? null;
+  const ratio = latestMeasurements ? computeShoulderWaistRatio(latestMeasurements) : null;
+  const summary = formatBodyStateForPrompt({
+    compositionRecords,
+    measurementRecords,
+    targetRatio
+  });
+  return {
+    ok: true,
+    store: 'life_hub_body',
+    found: true,
+    same_as: 'Body page latest composition / tape / shoulder:waist',
+    summary,
+    latest_composition: compositionRecords[0] ?? null,
+    latest_measurements: latestMeasurements,
+    shoulder_waist_ratio: ratio != null ? Math.round(ratio * 100) / 100 : null,
+    target_ratio: typeof targetRatio === 'number' ? targetRatio : null
+  };
+}
+
+export function getBodyStateSchema() {
+  return {
+    name: 'get_body_state',
+    description:
+      'Read the latest body composition, tape measurements, and shoulder:waist ratio toward Adam\'s physique target (same data as the Body page). Use when he asks about weight, body fat, tape, or ratio progress — call this rather than claiming you cannot see body metrics.',
+    input_schema: { type: 'object', properties: {} }
+  };
+}
+
+export function getWorkoutTemplate(templates, { query } = {}) {
+  const list = Array.isArray(templates) ? templates : [];
+  const needle = String(query ?? '').trim().toLowerCase();
+  if (!needle) return { ok: false, error: 'empty_query' };
+
+  const parsed = list
+    .map(entry => {
+      if (entry?.title && Array.isArray(entry?.exercises)) return entry;
+      if (typeof entry?.content === 'string') return parseTemplateMarkdown(entry.content);
+      if (typeof entry === 'string') return parseTemplateMarkdown(entry);
+      return null;
+    })
+    .filter(Boolean);
+
+  const matches = parsed.filter(template => {
+    const title = String(template.title ?? '').toLowerCase();
+    const slug = slugifyWorkoutTitle(template.title ?? '');
+    return title.includes(needle) || slug.includes(needle.replace(/\s+/g, '-'));
+  });
+
+  if (!matches.length) {
+    return {
+      ok: true,
+      store: 'life_hub_fitness_templates',
+      found: false,
+      query: String(query).trim(),
+      results: []
+    };
+  }
+
+  return {
+    ok: true,
+    store: 'life_hub_fitness_templates',
+    found: true,
+    query: String(query).trim(),
+    count: matches.length,
+    results: matches.slice(0, 5).map(template => ({
+      title: template.title,
+      session_kind: template.session_kind,
+      day_type: template.day_type,
+      focus: template.focus ?? [],
+      exercises: (template.exercises ?? []).map(exercise => ({
+        name: exercise.name,
+        sets: exercise.sets,
+        ...(exercise.bench_angle_deg != null ? { bench_angle_deg: exercise.bench_angle_deg } : {}),
+        ...(exercise.intensification != null ? { intensification: exercise.intensification } : {})
+      }))
+    }))
+  };
+}
+
+export function getWorkoutTemplateSchema() {
+  return {
+    name: 'get_workout_template',
+    description:
+      'Look up a saved workout template by title/fragment and return its full exercise list. Use when Adam says do X again / pull template Y and the template is not already fully spelled out in the prompt.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Template title or fragment (required).' }
+      },
+      required: ['query']
+    }
+  };
+}
+
+const SUBSTITUTE_MAP = Object.freeze({
+  'bench press': { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range when a flat bench is unavailable.' },
+  bench: { replacement: 'Dumbbell floor press', reason: 'Same horizontal press pattern with a shorter range when a flat bench is unavailable.' },
+  squat: { replacement: 'Leg press or goblet squat', reason: 'Keep a squat pattern when a bar or conventional squat setup is unavailable.' },
+  deadlift: { replacement: 'Romanian deadlift or hip hinge with dumbbells', reason: 'Keep the hinge when a conventional bar pull is unavailable.' },
+  'overhead press': { replacement: 'Landmine press or seated dumbbell press', reason: 'Keep an overhead or incline press pattern when a standing bar press is unavailable.' }
+});
+
+const SUBSTITUTION_QUERY = /substitut|swap|replace|instead of|can'?t do|cannot do|is out|don'?t want to|need a replacement|another option|what should i do instead/i;
+
+const LIFT_PAIN_SITES = Object.freeze({
+  'bench press': ['chest', 'pec', 'pecs', 'shoulder', 'shoulders', 'wrist', 'elbow'],
+  bench: ['chest', 'pec', 'pecs', 'shoulder', 'shoulders', 'wrist', 'elbow'],
+  squat: ['knee', 'knees', 'hip', 'hips', 'groin', 'adductor', 'quad', 'quads'],
+  deadlift: ['back', 'spine', 'hamstring', 'hamstrings', 'hip', 'hips'],
+  'overhead press': ['shoulder', 'shoulders', 'wrist', 'elbow', 'neck']
+});
+
+function supportingPainSession(site) {
+  const sessions = Array.isArray(site.sessions) ? site.sessions : [];
+  if (site.id || site.path) {
+    return {
+      id: site.id ?? null,
+      path: site.path ?? null,
+      date: site.latest_date ?? site.date ?? null,
+      note: site.latest_note ?? site.note ?? null
+    };
+  }
+  return sessions.find(session => session.date === site.latest_date)
+    ?? sessions.slice().sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))[0]
+    ?? null;
+}
+
+function compactPainSite(site) {
+  const session = supportingPainSession(site);
+  return {
+    site: site.site,
+    latest_date: site.latest_date ?? session?.date ?? null,
+    latest_note: site.latest_note ?? session?.note ?? null,
+    id: site.id ?? session?.id ?? null,
+    path: site.path ?? session?.path ?? null
+  };
+}
+
+function painAppliesToLift(site, lift) {
+  if (!lift || !site) return false;
+  const allowed = LIFT_PAIN_SITES[String(lift).toLowerCase()] ?? [];
+  const token = String(site).toLowerCase();
+  return allowed.some(part => token.includes(part));
+}
+
+function extractUserStatedCause(query) {
+  const lower = String(query ?? '').toLowerCase();
+  const body = lower.match(/\bmy\s+([a-z]+(?:\s+[a-z]+)?)\s+(?:is\s+)?(?:sore|hurts?|hurting|aching|pain(?:ful)?|tweaked|niggle|injured|irritat\w*|tender)/);
+  if (body) return body[0];
+  const because = lower.match(/\b(?:because|since)\s+([^.,;]+)/);
+  if (because) return because[1].trim();
+  const equipment = lower.match(/\b(?:no|missing|broken|taken|busy)\s+(bench|bar|rack|equipment)\b/);
+  if (equipment) return equipment[0];
+  return null;
+}
+
+function namedLiftInQuery(query) {
+  const needle = String(query ?? '').toLowerCase();
+  return Object.keys(SUBSTITUTE_MAP).find(name => needle.includes(name)) ?? null;
+}
+
+/**
+ * Shared evidence/interpretation boundary for substitution, pain, and progression.
+ * Only user_stated_current_turn or an explicit current_active_constraint may be a cause.
+ * Workout pain flags are historical_relevant_pain: context, never today's cause.
+ * There is no current-active-constraint persistence for workout pain in this kernel.
+ */
+export function classifyUnavailableCause(query, { lift = null, painSites = [] } = {}) {
+  const sites = Array.isArray(painSites) ? painSites : [];
+  const historical = sites.filter(site => painAppliesToLift(site.site, lift)).map(compactPainSite);
+  const unrelated = sites.filter(site => !painAppliesToLift(site.site, lift)).map(compactPainSite);
+  const userStated = extractUserStatedCause(query);
+  if (userStated) {
+    return {
+      status: 'user_stated',
+      kind: 'user_stated_current_turn',
+      user_stated_reason: userStated,
+      stored_reason: null,
+      current_active_constraint: null,
+      historical_relevant_pain: historical,
+      matching_stored_pain: historical,
+      unrelated_pain: unrelated
+    };
+  }
+  return {
+    status: 'unknown',
+    kind: 'unknown_cause',
+    user_stated_reason: null,
+    stored_reason: null,
+    current_active_constraint: null,
+    historical_relevant_pain: historical,
+    matching_stored_pain: historical,
+    unrelated_pain: unrelated
+  };
+}
+
+function completedWorkouts(records) {
+  return (Array.isArray(records) ? records : [])
+    .filter(record => (record?.type === 'workout' || record?.type == null) && record.status === 'completed' && record.date)
+    .slice()
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+}
+
+function sessionSignature(record) {
+  const lifts = (record.exercises ?? []).map(exercise => String(exercise.name ?? '').toLowerCase()).sort().join('|');
+  const volume = (record.exercises ?? []).reduce((sum, exercise) => (
+    sum + (exercise.sets ?? []).reduce((inner, set) => inner + (Number(set.weight_kg) || 0) * (Number(set.reps) || 0), 0)
+  ), 0);
+  return { lifts, volume: Math.round(volume) };
+}
+
+/**
+ * Evidence-based training notes. Does not write a programme or invent missing sessions.
+ */
+export function analyseTrainingEvidence(records, today, { query, pain, snapshot, windows } = {}) {
+  if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date', store: 'life_hub_fitness' };
+  const completed = completedWorkouts(records);
+  const snap = snapshot ?? getFitnessSnapshot(records, today);
+  const painSummary = pain ?? getPainTrainingSummary(records, today);
+  const compare = windows ?? null;
+  const needle = String(query ?? '').toLowerCase();
+  const recentCutoff = addCalendarDays(today, -14);
+  const recent = completed.filter(record => record.date >= recentCutoff);
+  const missingRecent = recent.length === 0;
+  const conflicts = [];
+  const byDate = new Map();
+  for (const record of completed.slice(0, 12)) {
+    const key = record.date;
+    const prev = byDate.get(key);
+    const sig = sessionSignature(record);
+    if (prev && (prev.lifts !== sig.lifts || Math.abs(prev.volume - sig.volume) > 200)) {
+      conflicts.push({
+        kind: 'session_disagreement',
+        date: key,
+        titles: [prev.title, record.title],
+        method: 'unresolved'
+      });
+    }
+    byDate.set(key, { ...sig, title: record.title });
+  }
+
+  const sites = Array.isArray(painSummary?.sites) ? painSummary.sites : [];
+  const painModifications = sites.map(site => ({
+    site: site.site,
+    latest_date: site.latest_date,
+    note: site.latest_note,
+    action: 'modify_or_skip',
+    boundary: 'Training modification only. Medical diagnosis stays with Sara.'
+  }));
+
+  let substitution = null;
+  if (SUBSTITUTION_QUERY.test(needle) || /no bench|no bar|equipment/i.test(needle)) {
+    const lift = namedLiftInQuery(needle);
+    substitution = lift
+      ? { from: lift, ...SUBSTITUTE_MAP[lift], evidence: 'pattern_map_plus_recent_sessions', confirmation_required: true }
+      : { from: null, replacement: null, reason: 'No named lift to substitute. Ask which exercise and what equipment is missing.', confirmation_required: true };
+  }
+  const cause = substitution || namedLiftInQuery(needle)
+    ? classifyUnavailableCause(query, { lift: substitution?.from ?? namedLiftInQuery(needle), painSites: sites })
+    : null;
+
+  let progression = null;
+  if (/progress|progressi|overload|increase|heavier|next (?:week|block)|programme change|program change/i.test(needle)) {
+    const last = recent[0] ?? completed[0] ?? null;
+    progression = missingRecent
+      ? { ok: false, reason: 'No completed sessions in the last 14 days. Do not progress from an empty window.' }
+      : {
+        ok: true,
+        last_date: last?.date ?? null,
+        last_title: last?.title ?? null,
+        note: 'Progress only the lifts that have recent completed evidence. Confirm before writing a programme change.',
+        confirmation_required: true
+      };
+  }
+
+  return {
+    ok: true,
+    store: 'life_hub_fitness',
+    kind: 'calculation',
+    date: today,
+    enough_evidence: !missingRecent && conflicts.length === 0,
+    missing_recent_sessions: missingRecent,
+    recent_count: recent.length,
+    last_completed_date: snap?.last_completed_date ?? completed[0]?.date ?? null,
+    days_since_last_completed: snap?.days_since_last_completed ?? null,
+    conflict: conflicts[0] ?? null,
+    conflicts,
+    pain_modifications: painModifications,
+    substitution,
+    cause,
+    progression,
+    compare_gap: compare && (compare.previous?.count === 0 || compare.current?.count === 0)
+      ? 'A comparison window has no sessions'
+      : null,
+    write_required: Boolean(substitution || progression),
+    confirmation_required: true,
+    how_to_read: cause
+      ? `Reasoning notes from retrieved sessions. ${cause.status === 'unknown' ? 'Unknown cause: do not invent why the lift is unavailable. Historical matching pain is context, not a current cause.' : cause.status === 'user_stated' ? 'Cause is user-stated in this turn, not a stored record. Historical matching pain remains context.' : cause.status === 'active' ? 'Cause is an explicit current active constraint.' : 'Historical matching pain is context, not a current cause.'} Unrelated pain is not an explanation. Missing or conflicting sessions stay named. No write without Confirm.`
+      : 'Reasoning notes from retrieved sessions. Missing or conflicting sessions stay named. No write without Confirm.'
+  };
+}
+
+export function analyseTrainingEvidenceSchema() {
+  return {
+    name: 'analyse_training_evidence',
+    description:
+      'Interpret retrieved training, pain, and load evidence: missing sessions, conflicting logs, substitutions, pain-aware modifications, and whether a programme change is even licensed. Does not write a workout.',
+    input_schema: { type: 'object', properties: { query: { type: 'string' } } }
+  };
+}
+
+export function chadwickFitnessToolSchemas() {
+  return [
+    getFitnessSnapshotSchema(),
+    getTrainingVolumeSchema(),
+    getWorkingWeightsSchema(),
+    getLongTermFitnessSchema(),
+    getSessionComparisonsSchema(),
+    getExerciseHistorySchema(),
+    getLoadStatusSchema(),
+    getPainTrainingSummarySchema(),
+    getBodyStateSchema(),
+    getWorkoutTemplateSchema(),
+    analyseTrainingEvidenceSchema()
+  ];
+}
+
+export const FITNESS_READ_TOOL_NAMES = Object.freeze(chadwickFitnessToolSchemas().map(schema => schema.name));
+
+/**
+ * Chat / kernel executor for the Chadwick fitness read set.
+ * Every name in chadwickFitnessToolSchemas() must resolve here.
+ */
+export function executeFitnessReadTool(name, {
+  workouts = [],
+  today,
+  compositionRecords = [],
+  measurementRecords = [],
+  templates = [],
+  targetRatio,
+  input = {}
+} = {}) {
+  if (name === 'get_fitness_snapshot') return getFitnessSnapshot(workouts, today);
+  if (name === 'get_training_volume') return getTrainingVolume(workouts, today);
+  if (name === 'get_working_weights') return getWorkingWeights(workouts, today, input);
+  if (name === 'get_long_term_fitness') return getLongTermFitness(workouts, today);
+  if (name === 'get_session_comparisons') return getSessionComparisons(workouts, today);
+  if (name === 'get_exercise_history') return getExerciseHistory(workouts, today, input);
+  if (name === 'get_load_status') return getLoadStatus(workouts, today);
+  if (name === 'get_pain_training_summary') return getPainTrainingSummary(workouts, today, input);
+  if (name === 'get_body_state') {
+    return getBodyState({ compositionRecords, measurementRecords, targetRatio });
+  }
+  if (name === 'get_workout_template') return getWorkoutTemplate(templates, input);
+  if (name === 'analyse_training_evidence') {
+    return analyseTrainingEvidence(workouts, today, { query: input.query ?? input.message ?? '' });
+  }
+  return null;
+}

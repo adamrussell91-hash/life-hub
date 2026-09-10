@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { load } from 'js-yaml';
-import { parseEventDocument } from '../../js/core/records.js';
+import { parseEventDocument } from '../../apps/life/js/core/records.js';
 
 const exec = promisify(execFile);
 
@@ -14,7 +14,7 @@ test('fixture validator reports the approved Home sample', async () => {
   const { stdout } = await exec(process.execPath, ['scripts/validate-fixtures.mjs']);
   const result = JSON.parse(stdout);
   assert.deepEqual(result, {
-    files: 5, valid: 5, invalid: 0,
+    files: 8, valid: 8, invalid: 0,
     home: { calories: 1130, protein_g: 80, fat_g: 27, day_type: 'workout_30', workout_streak: 1 }
   });
 });

@@ -214,14 +214,56 @@ test('applyCompletedWorkoutToLibrary matches case/whitespace variants without cr
   assert.equal(entries[0].best_weight_kg, 41);
 });
 
-test('applyCompletedWorkoutToLibrary leaves an exercise with no library match untouched', () => {
+test('applyCompletedWorkoutToLibrary seeds a stub row for an unknown exercise', () => {
   const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40 }];
   const record = workoutRecord([{ name: 'Brand New Move', sets: [{ reps: 8, weight_kg: 20, cable_type: 'concentric' }] }]);
 
   const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
 
-  assert.equal(entries.length, 1);
+  assert.equal(entries.length, 2);
   assert.equal(entries[0].name, 'Bar Press');
+  assert.equal(entries[1].name, 'Brand New Move');
+  assert.equal(entries[1].target_area, 'unspecified');
+  assert.equal(entries[1].working_weight_kg, 20);
+  assert.equal(entries[1].best_weight_kg, 20);
+  assert.equal(entries[1].times_performed, 1);
+  assert.equal(entries[1].in_rotation, false);
+  assert.deepEqual(pbs, []);
+});
+
+test('applyCompletedWorkoutToLibrary stamps last_pain from session pain_flags', () => {
+  const library = [{ name: 'Bar Press', target_area: 'Chest', best_weight_kg: 40, times_performed: 1 }];
+  const record = {
+    ...workoutRecord([{ name: 'Bar Press', sets: [{ reps: 8, weight_kg: 42, cable_type: 'concentric' }] }]),
+    pain_flags: [{ site: 'AC joint', note: 'pinch on last set' }]
+  };
+
+  const { entries } = applyCompletedWorkoutToLibrary(library, record, '2026-08-05T18:00:00+10:00');
+
+  assert.equal(entries[0].last_pain, 'AC joint: pinch on last set');
+  assert.match(formatExerciseLibraryForPrompt(entries), /pain AC joint: pinch on last set/);
+});
+
+test('applyCompletedWorkoutToLibrary matches Bar Press set N rows to Bar Press once', () => {
+  const library = [{
+    name: 'Bar Press',
+    target_area: 'Chest',
+    best_weight_kg: 40,
+    times_performed: 1,
+    last_performed: '2026-08-29'
+  }];
+  const record = workoutRecord([
+    { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+    { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+    { name: 'Bar Press set 3', sets: [{ reps: 12, weight_kg: 40, cable_type: 'constant_force' }] }
+  ], '2026-09-01');
+
+  const { entries, pbs } = applyCompletedWorkoutToLibrary(library, record, '2026-09-01T18:26:45+10:00');
+
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].last_performed, '2026-09-01');
+  assert.equal(entries[0].times_performed, 2);
+  assert.equal(entries[0].working_weight_kg, 40);
   assert.deepEqual(pbs, []);
 });
 

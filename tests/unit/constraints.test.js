@@ -8,7 +8,7 @@ import {
   extractThisMonth,
   extractThisWeek,
   extractTodaysStatus
-} from '../../js/core/constraints.js';
+} from '../../apps/life/js/core/constraints.js';
 
 const sample = `# Purpose
 Intro text.

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   proteinBandLayout,
   tubeLayout
-} from '../../js/app/bloods-instruments.js';
+} from '../../apps/life/js/app/bloods-instruments.js';
 
 function marker(key, value, {
   low = 0,

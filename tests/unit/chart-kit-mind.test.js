@@ -1,16 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildStreamPaths, buildThemeTopography } from '../../js/app/chart-kit/stream.js';
-import { buildSankeyFlow } from '../../js/app/chart-kit/sankey-flow.js';
-import { buildBumpLines, buildBumpChart } from '../../js/app/chart-kit/bump.js';
-import { buildRadialYear } from '../../js/app/chart-kit/radial-year.js';
-import { buildHorizonBands, buildMetricStrip, buildGroupedMetricBars } from '../../js/app/chart-kit/horizon.js';
-import { buildMoodRadial } from '../../js/app/chart-kit/mood-radial.js';
-import { buildEnergyOrbit } from '../../js/app/chart-kit/energy-orbit.js';
-import { CLINICAL_CHART_SLOTS } from '../../js/app/chart-kit/clinical-slots.js';
-import { buildWatchlistHeat } from '../../js/app/chart-kit/watchlist-heat.js';
-import { buildThemeOrbit } from '../../js/app/chart-kit/theme-orbit.js';
-import { buildThemeConstellation } from '../../js/app/chart-kit/theme-constellation.js';
+import { buildStreamPaths, buildThemeTopography } from '../../apps/life/js/app/chart-kit/stream.js';
+import { buildSankeyFlow } from '../../apps/life/js/app/chart-kit/sankey-flow.js';
+import { buildBumpLines, buildBumpChart } from '../../apps/life/js/app/chart-kit/bump.js';
+import { buildRadialYear } from '../../apps/life/js/app/chart-kit/radial-year.js';
+import { buildHorizonBands, buildMetricStrip, buildGroupedMetricBars } from '../../apps/life/js/app/chart-kit/horizon.js';
+import { buildMoodRadial } from '../../apps/life/js/app/chart-kit/mood-radial.js';
+import { buildEnergyOrbit } from '../../apps/life/js/app/chart-kit/energy-orbit.js';
+import { CLINICAL_CHART_SLOTS } from '../../apps/life/js/app/chart-kit/clinical-slots.js';
+import { buildWatchlistHeat } from '../../apps/life/js/app/chart-kit/watchlist-heat.js';
+import { buildThemeOrbit } from '../../apps/life/js/app/chart-kit/theme-orbit.js';
+import { buildThemeConstellation } from '../../apps/life/js/app/chart-kit/theme-constellation.js';
 
 test('Clinical Glass chart slots stay on the approved Life Hub tokens', () => {
   assert.deepEqual(CLINICAL_CHART_SLOTS, [
@@ -93,6 +93,31 @@ test('buildBumpChart puts rank 1 at the top and sizes dots by weekly count', () 
   assert.equal(work.dir, 'up');
   assert.equal(sleep.dir, 'down');
   assert.ok(chart.ranks[0].y < chart.ranks[1].y);
+});
+
+test('buildBumpChart thins week labels and accepts a compact plot', () => {
+  const weeks = [
+    '2026-07-13', '2026-07-20', '2026-07-27', '2026-08-03',
+    '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31'
+  ];
+  const ranks = weeks.map((week, index) => ({
+    week,
+    rankByTheme: { squat: index % 2 === 0 ? 1 : 2, press: index % 2 === 0 ? 2 : 1 }
+  }));
+  const chart = buildBumpChart({
+    ranks,
+    themes: ['squat', 'press'],
+    width: 320,
+    height: 200,
+    pad: { top: 12, right: 16, bottom: 28, left: 24 }
+  });
+  assert.equal(chart.width, 320);
+  assert.equal(chart.height, 200);
+  assert.equal(chart.pad.right, 16);
+  assert.ok(chart.weeks.filter(week => week.show).length < 8);
+  assert.equal(chart.weeks[0].show, true);
+  assert.equal(chart.weeks.at(-1).show, true);
+  assert.ok(chart.lines[0].points[0].x >= 24);
 });
 
 test('buildRadialYear has 365 ticks', () => {
@@ -414,6 +439,29 @@ test('buildThemeOrbit keeps three arms and an empty chart still has rings', () =
   assert.equal(empty.stars.length, 0);
   assert.equal(empty.arms.length, 3);
   assert.ok(empty.rings.length >= 3);
+});
+
+test('buildThemeConstellation keeps a single co-occurrence when minEdgeCount is 1', () => {
+  const dropped = buildThemeConstellation({
+    nodes: [
+      { key: 'chest-press', count: 1, colour: 'var(--wave)' },
+      { key: 'curl', count: 1, colour: 'var(--marine)' }
+    ],
+    edges: [{ themeA: 'chest-press', themeB: 'curl', count: 1 }]
+  });
+  assert.equal(dropped.edges.length, 0);
+  assert.equal(dropped.nodes.find(node => node.key === 'chest-press').colour, 'var(--wave)');
+
+  const kept = buildThemeConstellation({
+    nodes: [
+      { key: 'chest-press', count: 1, colour: 'var(--wave)' },
+      { key: 'curl', count: 1, colour: 'var(--marine)' }
+    ],
+    edges: [{ themeA: 'chest-press', themeB: 'curl', count: 1 }],
+    minEdgeCount: 1
+  });
+  assert.equal(kept.edges.length, 1);
+  assert.equal(kept.nodes.find(node => node.key === 'curl').colour, 'var(--marine)');
 });
 
 test('buildThemeConstellation lays themes on a baseline and raises stronger arcs', () => {

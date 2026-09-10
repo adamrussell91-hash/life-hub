@@ -1,0 +1,270 @@
+/* Shared hub motion — CountUp, fade/reveal, list stagger, magnet,
+ * opt-in kinetic text. Strength is the same on every hub. Overlays
+ * still control glass density only. Respects prefers-reduced-motion.
+ */
+
+:root {
+  --hub-motion-duration: 420ms;
+  --hub-motion-count: 560ms;
+  --hub-motion-stagger: 45ms;
+  --hub-motion-lift: 8px;
+  --hub-motion-magnet: 5px;
+}
+
+.hub-reveal {
+  opacity: 0;
+  transform: translateY(var(--hub-motion-lift));
+  transition:
+    opacity var(--hub-motion-duration) ease,
+    transform var(--hub-motion-duration) ease;
+  transition-delay: var(--hub-reveal-delay, 0ms);
+}
+
+.hub-reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.hub-reveal--gate {
+  transform: none;
+  transition-duration: 280ms;
+}
+
+.hub-magnet {
+  transition: translate 160ms ease;
+}
+
+.hub-count {
+  position: relative;
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-count.is-ticking > :not(.hub-count__fx) {
+  color: transparent;
+}
+
+.hub-count__fx {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--depth);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.hub-count.is-ticking > .hub-count__fx {
+  display: block;
+}
+
+.hub-list-item {
+  animation: hub-list-in var(--hub-motion-duration) ease both;
+  animation-delay: var(--hub-list-delay, 0ms);
+}
+
+@keyframes hub-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Abrupt board / palette remounts — opt in via playHubRemount(el). */
+@keyframes hub-remount-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hub-remount-in {
+  animation: hub-remount-in var(--hub-motion-duration) ease both;
+}
+
+/* Opt-in word/line/character reveal. Add .hub-kinetic to canvas titles.
+ * Not for the rail. startHubMotion() wraps the text. */
+.hub-kinetic {
+  position: relative;
+}
+
+.hub-kinetic--lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.hub-kinetic__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.hub-kinetic__mask {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: baseline;
+  padding-bottom: 0.18em;
+  margin-bottom: -0.18em;
+}
+
+.hub-kinetic__seg {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(var(--hub-motion-lift));
+  transition:
+    opacity var(--hub-motion-duration) ease,
+    transform var(--hub-motion-duration) ease;
+  transition-delay: var(--hub-kinetic-delay, 0ms);
+}
+
+.hub-kinetic--down .hub-kinetic__seg {
+  transform: translateY(calc(var(--hub-motion-lift) * -1));
+}
+
+.hub-kinetic--left .hub-kinetic__seg {
+  transform: translateX(var(--hub-motion-lift));
+}
+
+.hub-kinetic--right .hub-kinetic__seg {
+  transform: translateX(calc(var(--hub-motion-lift) * -1));
+}
+
+.hub-kinetic.is-in .hub-kinetic__seg {
+  opacity: 1;
+  transform: none;
+}
+
+/* Opt-in scroll-hide chrome. startHubMotion() watches [data-hub-scroll-hide].
+ * Scroll down past the threshold hides; scroll up (or back near top) reveals.
+ * In-flow: collapse so chat messages can grow. Overlay: slide away like a
+ * sticky header. */
+.hub-scroll-hide {
+  display: grid;
+  grid-template-rows: 1fr;
+  min-width: 0;
+  flex: 0 0 auto;
+  opacity: 1;
+  transition:
+    grid-template-rows 300ms ease-in-out,
+    opacity 300ms ease-in-out,
+    transform 300ms ease-in-out;
+}
+
+.hub-scroll-hide__inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: visible;
+}
+
+.hub-scroll-hide.is-hidden {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hub-scroll-hide.is-hidden .hub-scroll-hide__inner {
+  overflow: hidden;
+}
+
+.hub-scroll-hide--overlay {
+  display: block;
+}
+
+.hub-scroll-hide--overlay.is-hidden {
+  /* Keep in-flow size so the thread/scrollbar does not bounce. */
+  grid-template-rows: 1fr;
+  transform: translateY(-100%);
+}
+
+/* MorphingDialog — micro card → expanded overlay. Spring lives in JS. */
+.hub-morph-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+  background: color-mix(in srgb, var(--depth) 35%, transparent);
+  opacity: 0;
+  transition: opacity var(--hub-motion-duration) ease;
+}
+
+.hub-morph-dialog.is-in {
+  opacity: 1;
+}
+
+.hub-morph-dialog__frame {
+  position: relative;
+  width: min(100%, 32rem);
+  max-height: calc(100vh - var(--space-8));
+  max-height: calc(100dvh - var(--space-8));
+  overflow: auto;
+  /* Editors must be opaque — glass fill lets the page bleed through the form. */
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-4);
+  will-change: transform;
+}
+
+.hub-morph-dialog__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 2;
+}
+
+.hub-morph-dialog__origin {
+  visibility: hidden;
+}
+
+.hub-morph-dialog__animating {
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-reveal,
+  .hub-magnet,
+  .hub-list-item,
+  .hub-remount-in,
+  .hub-kinetic__seg,
+  .hub-morph-dialog {
+    animation: none;
+    transition: none;
+    transform: none;
+    translate: none;
+    opacity: 1;
+  }
+
+  .hub-scroll-hide {
+    transition: none;
+  }
+
+  .hub-count.is-ticking > :not(.hub-count__fx) {
+    color: inherit;
+  }
+
+  .hub-count__fx,
+  .hub-count.is-ticking > .hub-count__fx {
+    display: none;
+  }
+}

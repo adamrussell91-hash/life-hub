@@ -1,0 +1,381 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  FITNESS_SESSION_PATH,
+  MAX_RECENT_WORKOUTS,
+  attachWorkoutNotes,
+  collapseSetSplitExercises,
+  compareWorkoutWindows,
+  compareWorkoutWindowsSchema,
+  daysSinceLastCompletedWorkout,
+  formatRecentWorkoutsForPrompt,
+  formatRegionStrengthForPrompt,
+  formatWorkoutWindowCompareForPrompt,
+  getLastWorkout,
+  getLastWorkoutSchema,
+  getRegionStrength,
+  getRegionStrengthSchema,
+  lastCompletedWorkout,
+  mergeWorkoutEntries,
+  normalizeExerciseName,
+  searchWorkoutRecords,
+  searchWorkoutRecordsSchema,
+  selectRecentWorkoutEntries,
+  selectWorkoutEntriesInRange,
+  workoutWindowBounds
+} from '../../netlify/functions/_shared/workout-history.mjs';
+
+function session(overrides = {}) {
+  return {
+    type: 'workout',
+    status: 'completed',
+    date: '2026-09-01',
+    time: '16:28',
+    title: 'Planned session',
+    day_type: 'workout_30',
+    duration_min: 30,
+    focus: ['chest', 'arms'],
+    notes: 'TRUE superset alternation',
+    exercises: [
+      { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+      { name: 'Curl set 1', sets: [{ reps: 8, weight_kg: 37, cable_type: 'constant_force' }] },
+      { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+      { name: 'Curl set 2', sets: [{ reps: 10, weight_kg: 37, cable_type: 'constant_force' }] }
+    ],
+    ...overrides
+  };
+}
+
+test('FITNESS_SESSION_PATH matches dated session files and rejects templates', () => {
+  assert.ok(FITNESS_SESSION_PATH.test('data/fitness/2026/09/2026-09-01-workout-1628.md'));
+  assert.ok(!FITNESS_SESSION_PATH.test('data/fitness/templates/planned-session.md'));
+  assert.ok(!FITNESS_SESSION_PATH.test('data/fitness/2026/09'));
+});
+
+test('selectRecentWorkoutEntries returns the newest session files, newest first, capped', () => {
+  const tree = [
+    { type: 'blob', path: 'data/fitness/templates/chest-and-curls.md', sha: 't' },
+    { type: 'blob', path: 'data/fitness/2026/08/2026-08-29-workout-1857.md', sha: 'a' },
+    { type: 'blob', path: 'data/fitness/2026/09/2026-09-01-workout-1628.md', sha: 'b' },
+    { type: 'blob', path: 'data/fitness/2026/08/2026-08-06-workout-1610.md', sha: 'c' },
+    { type: 'tree', path: 'data/fitness/2026/09' }
+  ];
+  const entries = selectRecentWorkoutEntries(tree, { limit: 2 });
+  assert.deepEqual(entries.map(entry => entry.path), [
+    'data/fitness/2026/09/2026-09-01-workout-1628.md',
+    'data/fitness/2026/08/2026-08-29-workout-1857.md'
+  ]);
+  assert.equal(MAX_RECENT_WORKOUTS, 20);
+});
+
+test('selectRecentWorkoutEntries tolerates a non-array tree', () => {
+  assert.deepEqual(selectRecentWorkoutEntries(undefined), []);
+});
+
+test('normalizeExerciseName strips a trailing set N suffix', () => {
+  assert.equal(normalizeExerciseName('Bar Press set 1'), 'Bar Press');
+  assert.equal(normalizeExerciseName('Biceps Curl set 3'), 'Biceps Curl');
+  assert.equal(normalizeExerciseName('Flat Fly burnout'), 'Flat Fly burnout');
+  assert.equal(normalizeExerciseName('  Overhead Triceps  '), 'Overhead Triceps');
+});
+
+test('collapseSetSplitExercises merges interleaved set-N rows into real exercises', () => {
+  const collapsed = collapseSetSplitExercises(session().exercises);
+  assert.deepEqual(collapsed.map(exercise => exercise.name), ['Bar Press', 'Curl']);
+  assert.equal(collapsed[0].sets.length, 2);
+  assert.equal(collapsed[0].sets[1].weight_kg, 34);
+  assert.equal(collapsed[1].sets.length, 2);
+});
+
+test('collapseSetSplitExercises is idempotent on already-clean exercises', () => {
+  const clean = [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }];
+  assert.deepEqual(collapseSetSplitExercises(clean), clean);
+  assert.deepEqual(collapseSetSplitExercises(collapseSetSplitExercises(session().exercises)).map(e => e.name), [
+    'Bar Press',
+    'Curl'
+  ]);
+});
+
+test('lastCompletedWorkout prefers the newest completed session and ignores planned', () => {
+  const records = [
+    session({ date: '2026-08-08', title: 'Operation Snatched', status: 'planned' }),
+    session({ date: '2026-08-29', title: 'Biceps and Boobs, 20 mins', time: '18:57' }),
+    session({ date: '2026-09-01', title: 'Planned session', time: '16:28' })
+  ];
+  const last = lastCompletedWorkout(records);
+  assert.equal(last.title, 'Planned session');
+  assert.equal(last.date, '2026-09-01');
+});
+
+test('daysSinceLastCompletedWorkout uses the newest completed date, not planned', () => {
+  const records = [
+    session({ date: '2026-09-01', status: 'completed' }),
+    session({ date: '2026-09-04', status: 'planned', title: 'New pump' })
+  ];
+  assert.equal(daysSinceLastCompletedWorkout(records, '2026-09-05'), 4);
+  assert.equal(daysSinceLastCompletedWorkout([], '2026-09-05'), null);
+});
+
+test('formatRecentWorkoutsForPrompt names the last completed session and collapsed moves', () => {
+  const text = formatRecentWorkoutsForPrompt([
+    session({ date: '2026-08-29', title: 'Biceps and Boobs, 20 mins' }),
+    session({ date: '2026-09-01', title: 'Planned session' })
+  ]);
+  assert.match(text, /Last completed/);
+  assert.match(text, /2026-09-01/);
+  assert.match(text, /Planned session/);
+  assert.match(text, /Bar Press/);
+  assert.doesNotMatch(text, /Bar Press set 1/);
+  assert.match(text, /Biceps and Boobs/);
+});
+
+test('formatRecentWorkoutsForPrompt does not treat a newer planned file as the last trained session', () => {
+  const text = formatRecentWorkoutsForPrompt([
+    session({ date: '2026-09-05', title: 'The Full Send', status: 'planned' }),
+    session({ date: '2026-09-01', title: 'Planned session', status: 'completed' })
+  ]);
+  assert.match(text, /Last completed: 2026-09-01 · Planned session/);
+  assert.match(text, /Planned \(not yet trained\): 2026-09-05 · The Full Send/);
+  const lastCompletedIndex = text.indexOf('Last completed');
+  const plannedIndex = text.indexOf('Planned (not yet trained)');
+  assert.ok(lastCompletedIndex < plannedIndex);
+});
+
+test('formatRecentWorkoutsForPrompt is empty when there are no sessions', () => {
+  assert.equal(formatRecentWorkoutsForPrompt([]), '');
+  assert.equal(formatRecentWorkoutsForPrompt(undefined), '');
+});
+
+test('getLastWorkout returns the newest completed session with collapsed exercises', () => {
+  const result = getLastWorkout([
+    session({ date: '2026-08-29', title: 'Biceps and Boobs, 20 mins' }),
+    session({ date: '2026-09-01', title: 'Planned session' })
+  ]);
+  assert.equal(result.ok, true);
+  assert.equal(result.found, true);
+  assert.equal(result.session.title, 'Planned session');
+  assert.equal(result.session.date, '2026-09-01');
+  assert.deepEqual(result.session.exercises.map(exercise => exercise.name), ['Bar Press', 'Curl']);
+});
+
+test('getLastWorkout reports not found when only planned sessions exist', () => {
+  const result = getLastWorkout([session({ status: 'planned' })]);
+  assert.equal(result.ok, true);
+  assert.equal(result.found, false);
+});
+
+test('searchWorkoutRecords finds a session by title or exercise name', () => {
+  const records = [
+    session({ date: '2026-08-29', title: 'Biceps and Boobs, 20 mins', exercises: [
+      { name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }
+    ] }),
+    session({ date: '2026-08-06', title: 'Leg Day 20min', exercises: [
+      { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30, cable_type: 'none' }] }
+    ] })
+  ];
+  const byTitle = searchWorkoutRecords(records, { query: 'leg day' });
+  assert.equal(byTitle.ok, true);
+  assert.equal(byTitle.count, 1);
+  assert.equal(byTitle.results[0].title, 'Leg Day 20min');
+
+  const byMove = searchWorkoutRecords(records, { query: 'bar press' });
+  assert.equal(byMove.count, 1);
+  assert.equal(byMove.results[0].title, 'Biceps and Boobs, 20 mins');
+});
+
+test('searchWorkoutRecords rejects an empty query', () => {
+  assert.equal(searchWorkoutRecords([session()], { query: '  ' }).ok, false);
+});
+
+test('workout history tool schemas use the expected names', () => {
+  assert.equal(getLastWorkoutSchema().name, 'get_last_workout');
+  assert.equal(searchWorkoutRecordsSchema().name, 'search_workout_records');
+  assert.equal(compareWorkoutWindowsSchema().name, 'compare_workout_windows');
+  assert.equal(getRegionStrengthSchema().name, 'get_region_strength');
+});
+
+test('workoutWindowBounds is two adjacent 56-day windows ending today', () => {
+  const bounds = workoutWindowBounds('2026-08-11');
+  assert.deepEqual(bounds, {
+    weeks: 8,
+    currentFrom: '2026-06-17',
+    currentTo: '2026-08-11',
+    previousFrom: '2026-04-22',
+    previousTo: '2026-06-16'
+  });
+  assert.equal(workoutWindowBounds('not-a-date'), null);
+});
+
+test('compareWorkoutWindows counts completed sessions and ignores planned', () => {
+  const records = [
+    session({ date: '2026-07-20', title: 'Current A' }),
+    session({ date: '2026-07-20', title: 'Current B', time: '18:00' }),
+    session({ date: '2026-05-01', title: 'Previous' }),
+    session({ date: '2026-07-22', title: 'Not yet', status: 'planned' }),
+    session({ date: '2026-03-01', title: 'Too old' })
+  ];
+  const result = compareWorkoutWindows(records, '2026-08-11');
+  assert.equal(result.ok, true);
+  assert.equal(result.current.count, 2);
+  assert.equal(result.previous.count, 1);
+  assert.equal(result.delta, 1);
+  assert.equal(result.current.from, '2026-06-17');
+  assert.equal(result.previous.to, '2026-06-16');
+});
+
+test('formatWorkoutWindowCompareForPrompt is the number agents must quote', () => {
+  const text = formatWorkoutWindowCompareForPrompt(compareWorkoutWindows([
+    session({ date: '2026-07-20' })
+  ], '2026-08-11'));
+  assert.match(text, /Computed training volume/);
+  assert.match(text, /Last 8 weeks \(2026-06-17 to 2026-08-11\): 1 completed workout\./);
+  assert.match(text, /Previous 8 weeks \(2026-04-22 to 2026-06-16\): 0 completed workouts\./);
+  assert.match(text, /Delta: \+1\./);
+  assert.equal(formatWorkoutWindowCompareForPrompt({ ok: false }), '');
+});
+
+test('selectWorkoutEntriesInRange keeps dated session files and drops templates', () => {
+  const tree = [
+    { type: 'blob', path: 'data/fitness/templates/chest-and-curls.md', sha: 't' },
+    { type: 'blob', path: 'data/fitness/2026/05/2026-05-01-workout.md', sha: 'a' },
+    { type: 'blob', path: 'data/fitness/2026/07/2026-07-20-workout.md', sha: 'b' },
+    { type: 'blob', path: 'data/fitness/2026/03/2026-03-01-workout.md', sha: 'c' },
+    { type: 'tree', path: 'data/fitness/2026/07' }
+  ];
+  const entries = selectWorkoutEntriesInRange(tree, { from: '2026-04-22', to: '2026-08-11' });
+  assert.deepEqual(entries.map(entry => entry.path), [
+    'data/fitness/2026/05/2026-05-01-workout.md',
+    'data/fitness/2026/07/2026-07-20-workout.md'
+  ]);
+});
+
+test('mergeWorkoutEntries de-duplicates by path', () => {
+  const recent = [{ path: 'data/fitness/2026/08/2026-08-01-workout.md', sha: 'a' }];
+  const windowed = [
+    { path: 'data/fitness/2026/08/2026-08-01-workout.md', sha: 'a' },
+    { path: 'data/fitness/2026/05/2026-05-01-workout.md', sha: 'b' }
+  ];
+  assert.deepEqual(mergeWorkoutEntries(recent, windowed).map(entry => entry.path), [
+    'data/fitness/2026/08/2026-08-01-workout.md',
+    'data/fitness/2026/05/2026-05-01-workout.md'
+  ]);
+});
+
+test('attachWorkoutNotes copies markdown body onto the record (notes live in body, not YAML)', () => {
+  const record = session({ notes: undefined });
+  delete record.notes;
+  const hydrated = attachWorkoutNotes(record, 'Biceps and Boobs — AC clear, matched last loads\n');
+  assert.equal(hydrated.notes, 'Biceps and Boobs — AC clear, matched last loads');
+  assert.equal(record.notes, undefined);
+});
+
+test('attachWorkoutNotes prefers body over a stale frontmatter notes field', () => {
+  const hydrated = attachWorkoutNotes(
+    session({ notes: 'stale yaml' }),
+    'Fresh session verdict — groin quiet'
+  );
+  assert.equal(hydrated.notes, 'Fresh session verdict — groin quiet');
+});
+
+test('attachWorkoutNotes leaves the record alone when body is empty', () => {
+  const record = session({ notes: undefined });
+  delete record.notes;
+  assert.equal(attachWorkoutNotes(record, '  ').notes, undefined);
+  assert.equal(attachWorkoutNotes(record, null), record);
+});
+
+test('formatRecentWorkoutsForPrompt surfaces session notes and pain_flags on completed rows', () => {
+  const text = formatRecentWorkoutsForPrompt([
+    session({
+      date: '2026-09-01',
+      title: 'Planned session',
+      notes: 'Planned session — AC clear, matched last loads',
+      pain_flags: [{ site: 'right AC', note: 'mild twinge on fly' }]
+    })
+  ]);
+  assert.match(text, /Last completed: 2026-09-01 · Planned session/);
+  assert.match(text, /notes: Planned session — AC clear, matched last loads/);
+  assert.match(text, /pain: right AC: mild twinge on fly/);
+});
+
+test('getLastWorkout returns notes and pain_flags on the session', () => {
+  const result = getLastWorkout([
+    session({
+      notes: 'Matched loads — AC quiet',
+      pain_flags: [{ site: 'left groin', note: 'twinge set 1' }]
+    })
+  ]);
+  assert.equal(result.found, true);
+  assert.equal(result.session.notes, 'Matched loads — AC quiet');
+  assert.deepEqual(result.session.pain_flags, [{ site: 'left groin', note: 'twinge set 1' }]);
+});
+
+test('searchWorkoutRecords matches pain site / notes and returns them on hits', () => {
+  const records = [
+    session({
+      date: '2026-09-01',
+      title: 'Chest day',
+      notes: 'AC flared on flys',
+      pain_flags: [{ site: 'right AC', note: 'parked flys' }],
+      exercises: [{ name: 'Bar Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    })
+  ];
+  const byPain = searchWorkoutRecords(records, { query: 'right AC' });
+  assert.equal(byPain.count, 1);
+  assert.equal(byPain.results[0].notes, 'AC flared on flys');
+  assert.deepEqual(byPain.results[0].pain_flags, [{ site: 'right AC', note: 'parked flys' }]);
+
+  const byNote = searchWorkoutRecords(records, { query: 'flared' });
+  assert.equal(byNote.count, 1);
+});
+
+test('getRegionStrength matches Fitness page 30d vs prior 30d region tiles', () => {
+  const records = [
+    session({
+      date: '2026-06-20',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    }),
+    session({
+      date: '2026-08-01',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 38, cable_type: 'constant_force' }] }]
+    })
+  ];
+  const result = getRegionStrength(records, '2026-08-12');
+  assert.equal(result.ok, true);
+  assert.equal(result.same_as, 'Fitness page Region strength tiles');
+  assert.equal(result.windows.days, 30);
+  assert.equal(result.windows.current.from, '2026-07-14');
+  assert.equal(result.windows.prior.to, '2026-07-13');
+  const chest = result.regions.find(region => region.key === 'chest');
+  assert.equal(chest.best_set_delta_kg, -2);
+  assert.equal(chest.current_best_kg, 38);
+  assert.equal(chest.current_volume, 380);
+  assert.ok(Math.abs(chest.volume_delta_pct - (-5)) < 1e-9);
+
+  const filtered = getRegionStrength(records, '2026-08-12', { region: 'chest' });
+  assert.equal(filtered.regions.length, 1);
+  assert.equal(filtered.regions[0].key, 'chest');
+});
+
+test('formatRegionStrengthForPrompt is what Chadwick must quote for Fitness tiles', () => {
+  const text = formatRegionStrengthForPrompt(getRegionStrength([
+    session({
+      date: '2026-06-20',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 40, cable_type: 'constant_force' }] }]
+    }),
+    session({
+      date: '2026-08-01',
+      focus: ['chest'],
+      exercises: [{ name: 'Bench Press', sets: [{ reps: 10, weight_kg: 38, cable_type: 'constant_force' }] }]
+    })
+  ], '2026-08-12'));
+  assert.match(text, /Computed Region strength/);
+  assert.match(text, /Fitness page Region strength/);
+  assert.match(text, /Chest: best-set Δ -2 kg/);
+  assert.match(text, /volume -5%/);
+  assert.match(text, /get_region_strength/);
+  assert.equal(formatRegionStrengthForPrompt({ ok: false }), '');
+});

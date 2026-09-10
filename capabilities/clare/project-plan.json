@@ -1,0 +1,15 @@
+{
+  "id": "clare.project-plan",
+  "tool_name": "project_plan",
+  "verb": "Tasks",
+  "agents": [
+    "clare"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Natural project planning stages.",
+  "surfaces": [
+    "chat",
+    "confirm_card"
+  ]
+}

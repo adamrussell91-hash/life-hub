@@ -1,0 +1,143 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from '../../apps/life/js/app/chat-turn-anchor.js';
+
+function fakeNode(tag = 'li', props = {}) {
+  const node = {
+    tagName: tag,
+    className: '',
+    attributes: new Map(),
+    children: [],
+    parent: null,
+    offsetTop: props.offsetTop ?? 0,
+    offsetHeight: props.offsetHeight ?? 0,
+    clientHeight: props.clientHeight ?? 0,
+    scrollHeight: props.scrollHeight ?? 0,
+    scrollTop: props.scrollTop ?? 0,
+    style: { height: '0px' },
+    get isConnected() {
+      return this.parent != null;
+    },
+    setAttribute(name, value) {
+      this.attributes.set(name, String(value));
+    },
+    removeAttribute(name) {
+      this.attributes.delete(name);
+    },
+    append(...nodes) {
+      for (const child of nodes) {
+        this.children.push(child);
+        child.parent = this;
+      }
+    },
+    insertBefore(node, ref) {
+      if (node.parent) node.remove();
+      const idx = this.children.indexOf(ref);
+      if (idx === -1) {
+        this.append(node);
+        return node;
+      }
+      this.children.splice(idx, 0, node);
+      node.parent = this;
+      return node;
+    },
+    remove() {
+      if (!this.parent) return;
+      this.parent.children = this.parent.children.filter((child) => child !== this);
+      this.parent = null;
+    },
+    querySelector(selector) {
+      return this.children.find((child) => matches(child, selector)) ?? null;
+    },
+    querySelectorAll(selector) {
+      return this.children.filter((child) => matches(child, selector));
+    }
+  };
+  return node;
+}
+
+function matches(node, selector) {
+  if (selector.startsWith('[') && selector.endsWith(']')) {
+    const attr = selector.slice(1, -1);
+    return node.attributes?.has(attr);
+  }
+  return false;
+}
+
+test('beginChatTurnAnchor pins scroll to the user item without a layout spacer', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  list.append(userItem);
+  list.scrollHeight = 200;
+
+  const anchor = beginChatTurnAnchor(list, userItem);
+  assert.equal(typeof anchor.follow, 'function');
+  assert.equal(typeof anchor.release, 'function');
+  assert.equal(
+    list.children.find((child) => child.attributes.has('data-chat-turn-spacer')),
+    undefined,
+    'must not insert a layout spacer — that yanks desktop and mobile threads'
+  );
+  assert.equal(userItem.attributes.get('data-chat-turn-anchor'), '1');
+
+  list.scrollTop = 999;
+  userItem.offsetTop = 80;
+  list.scrollHeight = 400;
+  list.clientHeight = 400;
+  anchor.follow();
+  assert.equal(list.scrollTop, 72, 'follow should pin near the user item (offsetTop - 8)');
+
+  anchor.release();
+  assert.equal(userItem.attributes.has('data-chat-turn-anchor'), false);
+});
+
+test('beginChatTurnAnchor strips a leftover spacer from an older shell', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  const leftover = fakeNode('li');
+  leftover.setAttribute('data-chat-turn-spacer', '1');
+  leftover.className = 'chat-turn-spacer';
+  list.append(userItem, leftover);
+
+  beginChatTurnAnchor(list, userItem);
+  assert.equal(list.children.includes(leftover), false, 'leftover spacers still yank the thread');
+});
+
+test('appendChatThreadItem appends when there is no spacer', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  list.append(userItem);
+  beginChatTurnAnchor(list, userItem);
+  const card = fakeNode('li');
+  card.className = 'record-proposal confirm-card';
+  appendChatThreadItem(list, card);
+
+  assert.equal(list.children.at(-1), card);
+});
+
+test('appendChatThreadItem keeps new cards above a leftover turn spacer', () => {
+  const list = fakeNode('ul', { clientHeight: 400, scrollHeight: 200 });
+  const userItem = fakeNode('li', { offsetTop: 40 });
+  const spacer = fakeNode('li');
+  spacer.setAttribute('data-chat-turn-spacer', '1');
+  list.append(userItem, spacer);
+  const card = fakeNode('li');
+  card.className = 'record-proposal confirm-card';
+  appendChatThreadItem(list, card);
+
+  assert.equal(list.children.at(-1), spacer, 'leftover spacer must stay last');
+  assert.equal(list.children.at(-2), card, 'confirm card must land above the leftover spacer');
+});
+
+test('clearChatTurnAnchors strips anchors and leftover spacers', () => {
+  const list = fakeNode('ul');
+  const userItem = fakeNode('li');
+  const spacer = fakeNode('li');
+  userItem.setAttribute('data-chat-turn-anchor', '1');
+  spacer.setAttribute('data-chat-turn-spacer', '1');
+  list.append(userItem, spacer);
+
+  clearChatTurnAnchors(list);
+  assert.equal(userItem.attributes.has('data-chat-turn-anchor'), false);
+  assert.equal(list.children.includes(spacer), false);
+});

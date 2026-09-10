@@ -6,9 +6,10 @@ import {
   validateCentralNodePatchInput,
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
-  applyCentralNodePatch
+  applyCentralNodePatch,
+  assertAgentMayApplyCentralNodePatch
 } from '../../netlify/functions/_shared/hammond-tools.mjs';
-import { GOVERNANCE_ENTRY_TYPES } from '../../js/core/governance-log.js';
+import { GOVERNANCE_ENTRY_TYPES } from '../../apps/life/js/core/governance-log.js';
 
 test('schemas expose expected names', () => {
   assert.equal(proposeCentralNodePatchSchema().name, 'propose_central_node_patch');
@@ -120,6 +121,24 @@ test('validateGovernanceLogAppendInput requires entry_type and body', () => {
   assert.equal(entry.dateKey, undefined);
 });
 
+test('validateGovernanceLogAppendInput keeps chosen, reasoning, and revisit', () => {
+  const entry = validateGovernanceLogAppendInput({
+    entry_type: 'Major Decision',
+    body: 'Hold the extra unit.',
+    title: 'MEd load',
+    chosen: 'Drop one elective',
+    reasoning: 'Teaching clash',
+    revisit: '2026-10-01',
+    decision_id: 'med-load',
+    about: ['teaching:unit:unit_aotfw', 'life:decision:med-load']
+  });
+  assert.equal(entry.chosen, 'Drop one elective');
+  assert.equal(entry.reasoning, 'Teaching clash');
+  assert.equal(entry.revisit, '2026-10-01');
+  assert.equal(entry.decisionId, 'med-load');
+  assert.deepEqual(entry.about, ['teaching:unit:unit_aotfw', 'life:decision:med-load']);
+});
+
 test('validateGovernanceLogAppendInput keeps optional dateKey when provided', () => {
   const entry = validateGovernanceLogAppendInput({
     entry_type: "Coach's Notes",
@@ -127,6 +146,95 @@ test('validateGovernanceLogAppendInput keeps optional dateKey when provided', ()
     dateKey: '2026-08-09'
   });
   assert.equal(entry.dateKey, '2026-08-09');
+});
+
+function specialistLine(sender, text = 'task load spiked') {
+  return {
+    section: 'cross_agent',
+    op: 'append_line',
+    payload: { text: `${sender}→Hammond: ${text}`, summary: 'flag' }
+  };
+}
+
+test('clare may append Clare→ Cross-Agent lines', () => {
+  assert.equal(assertAgentMayApplyCentralNodePatch('clare', specialistLine('Clare')), true);
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('clare', {
+      section: 'cross_agent',
+      op: 'append_line',
+      payload: { text: '- Clare→Sara: deadline hits rest flag', summary: 'flag' }
+    }),
+    true
+  );
+});
+
+test('clare cannot patch other sections, ops, or senders', () => {
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('clare', {
+      section: 'constraints',
+      op: 'append_line',
+      payload: { text: 'Clare→Hammond: x', summary: 's' }
+    }),
+    false
+  );
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('clare', {
+      section: 'cross_agent',
+      op: 'replace_section',
+      payload: { text: 'Clare→Hammond: x', summary: 's' }
+    }),
+    false
+  );
+  assert.equal(assertAgentMayApplyCentralNodePatch('clare', specialistLine('Hammond')), false);
+});
+
+test('ann may append Ann→ Cross-Agent lines', () => {
+  assert.equal(assertAgentMayApplyCentralNodePatch('ann', specialistLine('Ann')), true);
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('ann', {
+      section: 'cross_agent',
+      op: 'append_line',
+      payload: { text: '- Ann→Hammond: 11PSYCHA sits on the flare flag', summary: 'flag' }
+    }),
+    true
+  );
+});
+
+test('ann cannot patch other sections, ops, or senders', () => {
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('ann', {
+      section: 'constraints',
+      op: 'append_line',
+      payload: { text: 'Ann→Hammond: x', summary: 's' }
+    }),
+    false
+  );
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('ann', {
+      section: 'cross_agent',
+      op: 'replace_section',
+      payload: { text: 'Ann→Hammond: x', summary: 's' }
+    }),
+    false
+  );
+  assert.equal(assertAgentMayApplyCentralNodePatch('ann', specialistLine('Clare')), false);
+  assert.equal(assertAgentMayApplyCentralNodePatch('ann', specialistLine('Hammond')), false);
+});
+
+test('hammond is unrestricted by the Clare/Ann gate', () => {
+  assert.equal(
+    assertAgentMayApplyCentralNodePatch('hammond', {
+      section: 'constraints',
+      op: 'append_line',
+      payload: { text: 'Hold evening load', summary: 's' }
+    }),
+    true
+  );
+});
+
+test('other slugs cannot apply a Central Node patch', () => {
+  assert.equal(assertAgentMayApplyCentralNodePatch('brisket', specialistLine('Clare')), false);
+  assert.equal(assertAgentMayApplyCentralNodePatch('clementine', specialistLine('Ann')), false);
 });
 
 test('re-exports classify and apply for chat wiring', () => {

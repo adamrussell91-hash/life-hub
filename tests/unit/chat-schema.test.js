@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug, DOMAIN_PROPERTIES } from '../../netlify/functions/_shared/chat-schema.mjs';
+import { buildCanonicalPath, logEntryToolSchema, validateLogEntry, buildRecordSlug, DOMAIN_PROPERTIES, logEntryRejectionPayload } from '../../netlify/functions/_shared/chat-schema.mjs';
 
 test('builds the canonical path for each writable record type', () => {
   assert.equal(buildCanonicalPath({ type: 'meal', date: '2026-08-01', slug: 'breakfast' }), 'data/nutrition/2026/08/2026-08-01-breakfast.md');
@@ -21,9 +21,36 @@ test('meal slugs are slot-only so same-day corrections overwrite', () => {
 });
 
 test('non-meal slugs still include time when present', () => {
-  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30' }), 'workout-0730');
+  assert.equal(buildRecordSlug({ type: 'workout', time: '07:30', status: 'completed' }), 'workout-0730');
   assert.equal(buildRecordSlug({ type: 'skincare', routine: 'am', time: '08:00' }), 'am-0800');
   assert.equal(buildRecordSlug({ type: 'diary', time: '21:15' }), 'diary-2115');
+});
+
+test('planned workouts use a title-stable slug so same-day sessions stay distinct', () => {
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:07', status: 'planned', title: 'The Full Send' }),
+    'workout-the-full-send'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '18:00', status: 'planned', title: 'Dog Walk Around the Block' }),
+    'workout-dog-walk-around-the-block'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned', title: 'The Full Send' }),
+    'workout-the-full-send'
+  );
+  assert.equal(
+    buildCanonicalPath({
+      type: 'workout',
+      date: '2026-09-05',
+      slug: buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned', title: 'The Full Send' })
+    }),
+    'data/fitness/2026/09/2026-09-05-workout-the-full-send.md'
+  );
+  assert.equal(
+    buildRecordSlug({ type: 'workout', time: '16:09', status: 'planned' }),
+    'workout-planned'
+  );
 });
 
 test('rejects an unknown type, invalid date, or invalid slug', () => {
@@ -36,6 +63,14 @@ test('the tool schema restricts type to the allowed list when supplied', () => {
   const schema = logEntryToolSchema(['meal']);
   assert.equal(schema.name, 'log_entry');
   assert.deepEqual(schema.input_schema.properties.type.enum, ['meal']);
+  assert.match(schema.description, /confirm/i);
+});
+
+test('mind_session-only tool schema describes immediate write', () => {
+  const schema = logEntryToolSchema(['mind_session']);
+  assert.match(schema.description, /immediately/i);
+  assert.match(schema.description, /no Confirm card/i);
+  assert.doesNotMatch(schema.description, /review and confirm before it is saved/);
 });
 
 const FULL_MEAL_FIELDS = {
@@ -195,11 +230,35 @@ test('the workout whitelist accepts every field validateWorkout actually recogni
         },
         sets: [{ reps: 8, weight_kg: 60, cable_type: 'concentric' }]
       }],
-      pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }]
+      pain_flags: [{ site: 'left shoulder', note: 'mild twinge' }],
+      cross_agent_note: 'Chadwick→Sara: left shoulder twinge on press, monitor.'
     }
   }, { id: 'workout-1', now: '2026-08-01T07:45:00+10:00' });
 
   assert.equal(result.valid, true, JSON.stringify(result.errors));
+});
+
+test('validateLogEntry collapses Bar Press set N rows into one Bar Press before save', () => {
+  const result = validateLogEntry({
+    type: 'workout',
+    date: '2026-09-01',
+    fields: {
+      title: 'Planned session',
+      session_kind: 'strength',
+      day_type: 'workout_30',
+      status: 'completed',
+      exercises: [
+        { name: 'Bar Press set 1', sets: [{ reps: 10, weight_kg: 30, cable_type: 'constant_force' }] },
+        { name: 'Curl set 1', sets: [{ reps: 8, weight_kg: 37, cable_type: 'constant_force' }] },
+        { name: 'Bar Press set 2', sets: [{ reps: 8, weight_kg: 34, cable_type: 'constant_force' }] },
+        { name: 'Curl set 2', sets: [{ reps: 10, weight_kg: 37, cable_type: 'constant_force' }] }
+      ]
+    }
+  }, { id: 'workout-2026-09-01-1', now: '2026-09-01T18:26:45+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.record.exercises.map(exercise => exercise.name), ['Bar Press', 'Curl']);
+  assert.equal(result.record.exercises[0].sets.length, 2);
 });
 
 test('the workout tool schema advertises coach_cues on each exercise so Chadwick knows to populate it', () => {
@@ -337,6 +396,29 @@ test('validates a well-formed medical log entry', () => {
   assert.equal(result.record.type, 'medical');
   assert.equal(result.record.title, 'GP review');
   assert.equal(result.notes, 'Check-in — stable vs last.');
+});
+
+test('normalizes a title-only medical log entry from chat', () => {
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '2026-08-26',
+    notes: 'Just had my stelara injection at the doctors',
+    fields: { title: 'Stelara injection' }
+  }, { id: 'med-2', now: '2026-08-26T21:33:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.record_type, 'Prescription');
+  assert.equal(result.record.lane, 'prescription');
+  assert.equal(result.record.location_kind, 'unknown');
+});
+
+test('logEntryRejectionPayload includes a retry hint for medical payloads', () => {
+  const payload = logEntryRejectionPayload(
+    { type: 'medical', date: '2026-08-01', fields: { title: 'Stelara injection' } },
+    ['lane must be one of: prescription']
+  );
+  assert.equal(payload.ok, false);
+  assert.equal(payload.status, 'validation_failed');
+  assert.match(payload.retry, /title.*notes only/i);
 });
 
 test('medical schema includes visit fields and episode', () => {

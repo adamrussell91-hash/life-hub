@@ -1,0 +1,15 @@
+{
+  "id": "remember.note-context",
+  "tool_name": "remember_note_context",
+  "verb": "Remember",
+  "agents": [
+    "*"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Leave a sticky context note visible to agents until it expires (e.g. traveling until Friday).",
+  "surfaces": [
+    "governance_log",
+    "agent_context"
+  ]
+}

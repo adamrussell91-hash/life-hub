@@ -1,0 +1,13 @@
+{
+  "id": "meal-plan-week",
+  "approved": true,
+  "approved_by": "adam",
+  "approved_on": "2026-09-01",
+  "title": "Meal plan week",
+  "description": "Seven-day meal plan summary for the Nutrition tab",
+  "fields": {
+    "week_id": "string",
+    "meals": "object",
+    "notes": "string?"
+  }
+}

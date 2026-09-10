@@ -1,0 +1,2106 @@
+import "./tokens.css";
+import "./style.css";
+import "./protocols/style.css";
+import { startHubMotion } from "../design-kit/js/hub-motion.js";
+import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
+import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
+import {
+  formatPdfHighlightMarkdown,
+  openHubPdfViewer,
+} from "../design-kit/js/hub-pdf-viewer.js";
+import { createJournalNav, createPinList } from "../design-kit/js/hub-surfaces.js";
+import { closeActiveMorphingDialog, morphFromRect } from "../design-kit/js/morphing-dialog.js";
+import { bindHubAccordion, hubSwitcherHtml } from "../../../packages/hub-switcher.js";
+import type { Attachment, Origin, Page, PageManifestEntry } from "./domain/page";
+import { newHubPageId } from "./domain/page";
+import {
+  USE_LOCAL_DATA,
+  getAttachmentUrl,
+  getPage,
+  fetchSession,
+  listPages,
+  login,
+  logout,
+  savePage,
+  searchPages,
+  signAttachment,
+  resolveTidyIntake,
+  startTidyIntake,
+  uploadSignedFile,
+  type KnowledgeIntakeJob,
+} from "./api/client";
+import { intakeBusyLabel, intakeReviewHtml } from "./tidy/intakeView";
+import { takeSignInQuery } from "./api/loginGate";
+import { isPageHash, pageHashForId, pageIdFromHash } from "./routing/pageHash";
+import { runCapture } from "./api/captureClient";
+import {
+  adoptComposeVoiceWave,
+  bindCaptureControls,
+  captureControlState,
+  captureFieldHtml,
+  createComposeVoiceWave,
+  createVoiceCapture,
+  ingestCaptureFile,
+} from "./capture";
+import type { ResearchFinding } from "./research/schema";
+import { escapeHtml, showToast } from "./lib/dom";
+import { hubUtilitiesHtml, titleRowHtml } from "./lib/hubChrome";
+import { bindKeyboardInset } from "./lib/keyboardInset";
+import { renderMarkdown } from "./lib/markdown";
+import { mountMarkdownTiptap, type MarkdownTiptapHandle } from "./compose/markdown-tiptap";
+import { resolveArchivePageId } from "./chat/noteLinks";
+import { cardSupportingText } from "./archive/cardText";
+import { archiveEmptyHtml } from "./archive/emptyList";
+import { goHome } from "./archive/goHome";
+import { paintVirtualList, virtualListWindow, type VirtualListPainted } from "./archive/virtualList";
+import { readerTopicPillsHtml } from "./archive/readerMeta";
+import {
+  emptyOriginFilter,
+  originFilterHtml,
+  originFilterTitle,
+  originLabelsForKind,
+  pageMatchesOriginFilter,
+  toggleOriginKind,
+  toggleOriginLabel,
+} from "./archive/originFilter";
+import { searchCluster } from "./archive/graphFocus";
+import { mountGraphPreview } from "./archive/graphPreview";
+import { buildArchiveGraph, topicKeywords, vocabularyPresent } from "./archive/keywordGraph";
+import { mountForceGraph } from "./archive/forceGraph";
+import {
+  SHOW_ALL_TUNING_CONTROLS,
+  applyShowAllTuning,
+  showAllTuning,
+  sliderValueForTuning,
+  tuningFromSlider,
+  type GraphMount,
+} from "./archive/forceGraphBehavior";
+import { buildShowAllGraph } from "./archive/showAllGraph";
+import {
+  SHOW_ALL_GROUPINGS,
+  showAllGroupingLabel,
+  showAllGroupingMeta,
+  type ShowAllGrouping,
+} from "./archive/showAllScope";
+import { buildSolarModel, type SolarModel } from "./archive/solarModel";
+import { UNIVERSE_BUILD, mountSolarView, resolveSearchHits } from "./archive/solarView";
+import {
+  applyUniverseViewState,
+  bindUniverseView,
+  graphFullscreenToolsHtml,
+  readUniverseDark,
+  shouldExitUniverseFullscreen,
+  universeExitHtml,
+  universeViewToolsHtml,
+  universeWrapClass,
+  writeUniverseDark,
+} from "./archive/universeChrome";
+import { bindUniverseKey, universeKeyHtml } from "./archive/universeKey";
+import { enterPodcastRail, leavePodcastRail, renderPodcastRail } from "./podcast/rail";
+import { enterQuizRail, leaveQuizRail, renderQuizRail } from "./quiz/view";
+import { mountUniversityTimeline } from "./university/timeline/mount";
+import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
+import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
+import type { GraphPreviewNote } from "./archive/graphPreview";
+import { connectedLinksHtml } from "./wiki/connectedHtml";
+import { LIVE_UNAVAILABLE, LIVE_WORKOUT_TOKEN } from "./wiki/liveTokens";
+import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
+import { inverseLinksHtml } from "./wiki/inverseLinksHtml";
+import { urlWatchHtml } from "./wiki/urlWatchHtml";
+import { addOrigin, isOriginKind, originKey, removeOrigin } from "./origin/normalize";
+import { resolvedOrigins } from "./origin/notesPlace";
+import { originComposeFieldHtml, originPillsHtml, parseOriginRemoveValue } from "./origin/pills";
+import { applyTopicTags, toggleTopicTag } from "./tidy/applyTags";
+import { remainingTopicTags, topicTagPickerHtml } from "./tidy/tagPicker";
+import { filterPickerOptions, optionPickerListHtml } from "./ui/optionPicker";
+import { syncKnowledgeMobileChrome } from "./mobile-chrome";
+import { renderProtocols } from "./protocols/view";
+import { notebookCards, notesForNotebook } from "./notebooks/catalog";
+import { bindNotebooksGrid, notebooksGridHtml } from "./notebooks/view";
+import { getQuizSchedule, saveQuiz } from "./api/quizClient";
+import { applyRating } from "./quiz/review";
+import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageReview";
+import { duePagesHtml, pageReviewActionsHtml } from "./quiz/pageReviewView";
+import { type PageReview, type QuizRating, type QuizStore } from "./quiz/schema";
+
+type View =
+  | "list"
+  | "graph"
+  | "timeline"
+  | "notebooks"
+  | "page"
+  | "compose"
+  | "chat"
+  | "podcast"
+  | "quiz"
+  | "protocols";
+type GraphMode = "constellation" | "showAll" | "universe";
+
+const app = document.querySelector<HTMLDivElement>("#app")!;
+const DESKTOP_ROW_HEIGHT = 68;
+const MOBILE_ROW_HEIGHT = 104;
+const OVERSCAN = 8;
+const PIN_KEY = "knowledge-hub:pinned-notes";
+
+function readPinnedIds(): string[] {
+  try {
+    const raw = localStorage.getItem(PIN_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePinnedIds(ids: string[]) {
+  localStorage.setItem(PIN_KEY, JSON.stringify(ids));
+}
+
+function isPinned(id: string) {
+  return readPinnedIds().includes(id);
+}
+
+function setPinned(id: string, pinned: boolean) {
+  const next = readPinnedIds().filter(entry => entry !== id);
+  if (pinned) next.unshift(id);
+  writePinnedIds(next);
+}
+
+function listRowHeight() {
+  return window.matchMedia("(max-width: 720px)").matches ? MOBILE_ROW_HEIGHT : DESKTOP_ROW_HEIGHT;
+}
+
+async function ensurePageReviews() {
+  if (quizStore) return;
+  try {
+    quizStore = await getQuizSchedule();
+    pageReviews = quizStore.page_reviews ?? [];
+  } catch {
+    quizStore = null;
+    pageReviews = [];
+  }
+}
+
+function dueReviewsFor(pages: Array<Page | PageManifestEntry>) {
+  return duePageReviews(
+    pages.map(page => ({
+      id: page.id,
+      title: page.title,
+      area: page.area,
+      tags: page.tags,
+      updated_at: "updated_at" in page ? page.updated_at : page.created_at,
+      created_at: page.created_at,
+    })),
+    pageReviews,
+  );
+}
+
+async function rateActivePage(rating: QuizRating) {
+  if (!activePage || !quizStore) {
+    showToast("Could not save review.");
+    return;
+  }
+  const current = pageReviews.find(review => review.page_id === activePage.id) ?? seedPageReview(activePage);
+  const next = applyRating(current, rating);
+  const reviews = upsertPageReview(pageReviews, next);
+  try {
+    quizStore = await saveQuiz({
+      schedule: quizStore.schedule,
+      items: [],
+      edges: quizStore.edges,
+      dumps: quizStore.dumps,
+      page_reviews: reviews,
+    });
+    pageReviews = quizStore.page_reviews ?? reviews;
+    showToast("Review saved");
+    render();
+  } catch {
+    showToast("Could not save review.");
+  }
+}
+
+let entries: PageManifestEntry[] = [];
+let visible: PageManifestEntry[] = [];
+let view: View = "notebooks";
+let protocolTeardown: (() => void) | null = null;
+let pageReturnView: View = "notebooks";
+let query = "";
+let keywordFilter = "";
+let originFilter = emptyOriginFilter();
+let originLabelQuery = "";
+let originLabelOpen = false;
+let composeTagQuery = "";
+let composeTagOpen = false;
+let composeOriginDraft: Origin | null = null;
+let composeOriginKind: Origin["kind"] = "degree";
+let activePage: Page | null = null;
+let pendingMorphOrigin: { left: number; top: number; width: number; height: number } | null = null;
+let tidyBusy = false;
+let tidyReviewJob: KnowledgeIntakeJob | null = null;
+let quizStore: QuizStore | null = null;
+let pageReviews: PageReview[] = [];
+let listScrollTop = 0;
+let listPainted: VirtualListPainted | null = null;
+let graphTeardown: (() => void) | null = null;
+let graphMount: GraphMount | null = null;
+let graphMode: GraphMode = "constellation";
+let showAllGrouping: ShowAllGrouping = "tags";
+let graphSearch = "";
+let orbitSpeed = 0.5;
+let universeKeyOpen = false;
+let universeDark = readUniverseDark(typeof localStorage === "undefined" ? null : localStorage);
+let graphFullscreen = false;
+let solarModelCache: { source: PageManifestEntry[]; model: SolarModel } | null = null;
+let showAllModelCache: { source: PageManifestEntry[]; grouping: ShowAllGrouping; model: ReturnType<typeof buildShowAllGraph> } | null = null;
+
+function getSolarModel() {
+  if (solarModelCache && solarModelCache.source === entries) return solarModelCache.model;
+  const model = buildSolarModel(entries);
+  solarModelCache = { source: entries, model };
+  return model;
+}
+
+type ComposeState = {
+  id: string;
+  title: string;
+  area: "notes" | "university";
+  tags: string[];
+  origins: Origin[];
+  body: string;
+  existing: Attachment[];
+  pending: File[];
+  titleError: string;
+  busy: boolean;
+  captureBusy: boolean;
+  recording: boolean;
+};
+
+let composeBodyEditor: MarkdownTiptapHandle | null = null;
+let compose: ComposeState | null = null;
+const composeVoiceWave = createComposeVoiceWave();
+const composeVoice = createVoiceCapture({
+  onFile: file => void ingestAndApply(file, "voice"),
+  waveformHost: composeVoiceWave,
+});
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+
+function blankCompose(origins: Origin[] = []): ComposeState {
+  return {
+    id: newHubPageId(),
+    title: "",
+    area: "notes",
+    tags: [],
+    origins,
+    body: "",
+    existing: [],
+    pending: [],
+    titleError: "",
+    busy: false,
+    captureBusy: false,
+    recording: false,
+  };
+}
+
+function composeFromPage(page: Page): ComposeState {
+  return {
+    id: page.id,
+    title: page.title,
+    area: page.area,
+    tags: [...page.tags],
+    origins: [...resolvedOrigins(page)],
+    body: page.body,
+    existing: [...page.attachments],
+    pending: [],
+    titleError: "",
+    busy: false,
+    captureBusy: false,
+    recording: false,
+  };
+}
+
+const icons = {
+  archive: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2"/><path d="M8 12h8"/></svg>`,
+  graph: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="2.2"/><circle cx="12" cy="6" r="2.2"/><circle cx="18" cy="14" r="2.2"/><path d="M8 11l3-3M13.5 8l3 4"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h11v8H5z"/><path d="M8 14v3l3-3h5"/></svg>`,
+  podcast: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="3"/><path d="M8 10a4 4 0 0 0 8 0"/><path d="M6 10a6 6 0 0 0 12 0"/><path d="M12 13v6M9 19h6"/></svg>`,
+  quiz: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8v16H8z"/><path d="M11 8h2M11 12h2M11 16h1"/></svg>`,
+  timeline: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h16"/><circle cx="6" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="18" cy="12" r="2"/></svg>`,
+  notebooks: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h11a2 2 0 0 1 2 2v14H8a2 2 0 0 0-2 2V4z"/><path d="M8 20a2 2 0 0 1 2-2h9"/><path d="M10 8h6M10 12h6"/></svg>`,
+  protocols: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`,
+};
+
+function kindBadge(attachment: Attachment) {
+  if (attachment.kind === "pdf") return "PDF";
+  if (attachment.kind === "audio") return "AUDIO";
+  if (attachment.kind === "image") {
+    const extension = attachment.filename.split(".").pop()?.toUpperCase();
+    return extension && extension.length <= 4 ? extension : "IMG";
+  }
+  const extension = attachment.filename.split(".").pop()?.toUpperCase();
+  return extension && extension.length <= 4 ? extension : "FILE";
+}
+
+function cardMeta(item: PageManifestEntry) {
+  return topicKeywords(item.tags)[0] ?? "";
+}
+
+function pageHeader(
+  eyebrow: string,
+  title: string,
+  actionsInner = "",
+  opts?: { portraitSrc?: string; portraitAlt?: string },
+) {
+  const utilities = hubUtilitiesHtml();
+  const actions =
+    actionsInner || utilities
+      ? `<div class="page-header__actions">${actionsInner}${utilities}</div>`
+      : "";
+  const portrait = opts?.portraitSrc
+    ? `<img class="chat-presence__portrait" src="${escapeHtml(opts.portraitSrc)}" alt="${escapeHtml(opts.portraitAlt ?? "")}" width="56" height="56" />`
+    : "";
+  return `<header class="topbar page-header${portrait ? " chat-presence-header" : ""}">
+      ${portrait}
+      <div class="page-header__copy">
+        <p class="eyebrow page-header__eyebrow">${eyebrow}</p>
+        ${titleRowHtml(title)}
+      </div>
+      ${actions}
+    </header>`;
+}
+
+function listTitle() {
+  return originFilterTitle(originFilter) || keywordFilter || "Archive";
+}
+
+function archiveIsUnfiltered() {
+  return !keywordFilter && !originFilter.kind;
+}
+
+function renderAttachments(page: Page) {
+  if (!page.attachments.length) return "";
+  return `<section class="attachments" aria-label="Attachments">
+    <h3>Attachments</h3>
+    <p class="attachments__hint">${
+      USE_LOCAL_DATA
+        ? "Linked files for this note. Downloads need the live API; UI preview is local-only."
+        : "Linked from this note. Downloads use a short-lived signed URL from private storage."
+    }</p>
+    <div class="file-list">
+      ${page.attachments
+        .map(
+          attachment => `<button class="file" type="button" data-attachment="${escapeHtml(attachment.id)}">
+            <span class="file-icon ${attachment.kind}">${kindBadge(attachment)}</span>
+            <span>
+              <span class="file-name">${escapeHtml(attachment.filename)}</span>
+              ${attachment.label ? `<span class="file-gloss">${escapeHtml(attachment.label)}</span>` : ""}
+            </span>
+            <span class="file-action">Download →</span>
+          </button>`,
+        )
+        .join("")}
+    </div>
+  </section>`;
+}
+
+function leaveSpecialRails() {
+  if (view === "podcast") leavePodcastRail();
+  if (view === "quiz") leaveQuizRail();
+  if (view === "chat") leaveChatRail();
+}
+
+function clearPageHash() {
+  if (isPageHash(location.hash)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+}
+
+function openChatWorkplace() {
+  enterChatRail();
+  view = "chat";
+  activePage = null;
+  compose = null;
+  render();
+}
+
+function filteredOrigin(): Origin | undefined {
+  if (!originFilter.kind || !originFilter.label) return undefined;
+  return { kind: originFilter.kind, label: originFilter.label };
+}
+
+function openCompose(origins: Origin[] = []) {
+  composeVoice.stopMic();
+  const seeded = origins.length ? origins : filteredOrigin() ? [filteredOrigin()!] : [];
+  compose = blankCompose(seeded);
+  resetComposeTagChrome();
+  if (seeded[0]) composeOriginKind = seeded[0].kind;
+  view = "compose";
+  render();
+}
+
+function openBookNote(book?: string) {
+  leaveSpecialRails();
+  compose = null;
+  activePage = null;
+  enterChatRail({
+    fresh: true,
+    hat: "fromBook",
+    bookContext: book ? { label: book } : undefined,
+  });
+  view = "chat";
+  if (isPageHash(location.hash)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+  render();
+}
+
+function openMakeNote() {
+  leaveSpecialRails();
+  compose = null;
+  activePage = null;
+  enterChatRail({
+    fresh: true,
+    hat: "makeNote",
+  });
+  view = "chat";
+  if (isPageHash(location.hash)) {
+    history.replaceState(null, "", `${location.pathname}${location.search}`);
+  }
+  render();
+}
+
+function newNoteMenuHtml(bookLabel?: string) {
+  const fromBookLabel = bookLabel ? `From “${escapeHtml(bookLabel)}”` : "From a book";
+  return `<div class="new-note">
+    <button class="btn" data-new-note-menu type="button" aria-haspopup="menu" aria-expanded="false">New note</button>
+    <div class="hub-menu new-note__menu" role="menu" hidden>
+      <p class="hub-menu__head">New note</p>
+      <button class="hub-menu__opt" role="menuitem" data-make-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Ask Clementine</span>
+          <span class="new-note__opt-detail">She researches the open web and files a tagged page</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-from-book type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">${fromBookLabel}</span>
+          <span class="new-note__opt-detail">Researched from a passage, stamped under the book</span>
+        </span>
+      </button>
+      <button class="hub-menu__opt" role="menuitem" data-blank-note type="button">
+        <span class="new-note__opt">
+          <span class="new-note__opt-title">Write it yourself</span>
+          <span class="new-note__opt-detail">Open a blank page and type</span>
+        </span>
+      </button>
+    </div>
+  </div>`;
+}
+
+const NEW_NOTE_FLOATING = { placement: "bottom-start" as const, offset: 6, padding: 12 };
+
+function bindNewNoteMenu(root: ParentNode, bookLabel?: string) {
+  const toggle = root.querySelector<HTMLButtonElement>("[data-new-note-menu]");
+  const menu = root.querySelector<HTMLElement>(".new-note__menu");
+  if (!toggle || !menu) return;
+
+  let docBound = false;
+  let stopFloating: (() => void) | undefined;
+  const onDocClick = (event: MouseEvent) => {
+    if (!(event.target instanceof Node) || menu.contains(event.target) || toggle.contains(event.target)) return;
+    close();
+  };
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key !== "Escape") return;
+    close();
+  };
+  const unbindDoc = () => {
+    if (!docBound) return;
+    document.removeEventListener("click", onDocClick, true);
+    document.removeEventListener("keydown", onKey, true);
+    docBound = false;
+  };
+  const bindDoc = () => {
+    if (docBound) return;
+    document.addEventListener("click", onDocClick, true);
+    document.addEventListener("keydown", onKey, true);
+    docBound = true;
+  };
+  const close = () => {
+    stopFloating?.();
+    stopFloating = undefined;
+    menu.hidden = true;
+    menu.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    unbindDoc();
+  };
+  const open = () => {
+    menu.hidden = false;
+    menu.classList.add("is-open");
+    toggle.setAttribute("aria-expanded", "true");
+    // Kit .hub-menu is position:fixed; CSS top/right alone lands off-screen on phones.
+    void positionHubFloating(toggle, menu, NEW_NOTE_FLOATING);
+    stopFloating = autoUpdateHubFloating(toggle, menu, NEW_NOTE_FLOATING);
+    queueMicrotask(bindDoc);
+  };
+
+  toggle.onclick = event => {
+    event.stopPropagation();
+    if (menu.classList.contains("is-open")) close();
+    else open();
+  };
+  root.querySelector<HTMLButtonElement>("[data-make-note]")!.onclick = () => {
+    close();
+    openMakeNote();
+  };
+  root.querySelector<HTMLButtonElement>("[data-from-book]")!.onclick = () => {
+    close();
+    openBookNote(bookLabel);
+  };
+  root.querySelector<HTMLButtonElement>("[data-blank-note]")!.onclick = () => {
+    close();
+    openCompose();
+  };
+}
+
+function resetOriginLabelChrome() {
+  originLabelQuery = "";
+  originLabelOpen = false;
+}
+
+function resetComposeTagChrome() {
+  composeTagQuery = "";
+  composeTagOpen = false;
+  composeOriginDraft = null;
+  composeOriginKind = "degree";
+}
+
+function goToHome() {
+  leaveSpecialRails();
+  const next = goHome({ view, query, keywordFilter, originFilter, activePage, compose });
+  view = next.view;
+  query = next.query;
+  keywordFilter = next.keywordFilter;
+  originFilter = next.originFilter;
+  activePage = next.activePage;
+  compose = next.compose;
+  resetOriginLabelChrome();
+  resetComposeTagChrome();
+  clearPageHash();
+  listScrollTop = 0;
+  void refreshVisible().then(render);
+}
+
+function shell(main: string) {
+  closeActiveMorphingDialog();
+  if (graphTeardown) {
+    graphTeardown();
+    graphTeardown = null;
+  }
+  app.innerHTML = `<div class="app-shell">
+    <aside class="rail hub-rail" aria-label="Knowledge Hub">
+      <div class="hub-rail__brand-block"><a href="#" class="hub-rail__brand" data-home>Knowledge Hub</a></div>
+      <nav class="rail__nav hub-rail__nav">
+        <button class="rail__btn hub-rail__link ${view === "list" && archiveIsUnfiltered() ? "is-current" : ""}" data-nav="all" type="button">${icons.archive}<span>Archive</span></button>
+        <button class="rail__btn hub-rail__link ${view === "notebooks" ? "is-current" : ""}" data-nav="notebooks" type="button">${icons.notebooks}<span>Notebooks</span></button>
+        <button class="rail__btn hub-rail__link ${view === "graph" ? "is-current" : ""}" data-nav="graph" type="button">${icons.graph}<span>Graph</span></button>
+        <button class="rail__btn hub-rail__link ${view === "timeline" ? "is-current" : ""}" data-nav="timeline" type="button">${icons.timeline}<span>Timeline</span></button>
+        <button class="rail__btn hub-rail__link ${view === "chat" ? "is-current" : ""}" data-nav="chat" type="button">${icons.chat}<span>Chat</span></button>
+        <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Thinking</span></button>
+        <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
+        <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
+      </nav>
+      ${hubSwitcherHtml("knowledge")}
+    </aside>
+    <main class="canvas">${main}</main>
+  </div>`;
+  bindHubAccordion(app);
+
+  app.querySelector<HTMLAnchorElement>("[data-home]")!.onclick = event => { event.preventDefault(); goToHome(); };
+
+  app.querySelectorAll<HTMLButtonElement>("[data-nav]").forEach(button => {
+    button.onclick = () => {
+      const next = button.dataset.nav!;
+      const special: Record<string, View> = {
+        notebooks: "notebooks",
+        graph: "graph",
+        timeline: "timeline",
+        chat: "chat",
+        podcast: "podcast",
+        quiz: "quiz",
+        protocols: "protocols",
+      };
+      if (special[next]) {
+        leaveSpecialRails();
+        if (next === "graph") graphSearch = (query.trim() || keywordFilter).trim();
+        view = special[next];
+        activePage = null;
+        clearPageHash();
+        if (next === "podcast") enterPodcastRail();
+        if (next === "quiz") enterQuizRail();
+        if (next === "chat") enterChatRail();
+        render();
+        return;
+      }
+      leaveSpecialRails();
+      keywordFilter = "";
+      originFilter = emptyOriginFilter();
+      resetOriginLabelChrome();
+      resetComposeTagChrome();
+      view = "list";
+      activePage = null;
+      clearPageHash();
+      listScrollTop = 0;
+      void refreshVisible().then(render);
+    };
+  });
+
+  app.querySelector<HTMLButtonElement>("[data-logout]")?.addEventListener("click", async () => {
+    await logout();
+    entries = [];
+    visible = [];
+    activePage = null;
+    renderLogin();
+  });
+
+  syncKnowledgeMobileChrome(app, view, {
+    goArchive: () => {
+      leaveSpecialRails();
+      keywordFilter = "";
+      originFilter = emptyOriginFilter();
+      resetOriginLabelChrome();
+      resetComposeTagChrome();
+      view = "list";
+      activePage = null;
+      clearPageHash();
+      listScrollTop = 0;
+      void refreshVisible().then(render);
+    },
+    goNotebooks: () => {
+      leaveSpecialRails();
+      view = "notebooks";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goGraph: () => {
+      leaveSpecialRails();
+      view = "graph";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goChat: () => {
+      leaveSpecialRails();
+      view = "chat";
+      activePage = null;
+      clearPageHash();
+      enterChatRail();
+      render();
+    },
+    goTimeline: () => {
+      leaveSpecialRails();
+      view = "timeline";
+      activePage = null;
+      clearPageHash();
+      render();
+    },
+    goPodcast: () => {
+      leaveSpecialRails();
+      view = "podcast";
+      activePage = null;
+      clearPageHash();
+      enterPodcastRail();
+      render();
+    },
+    goQuiz: () => {
+      leaveSpecialRails();
+      view = "quiz";
+      activePage = null;
+      clearPageHash();
+      enterQuizRail();
+      render();
+    },
+    goProtocols: () => {
+      leaveSpecialRails();
+      view = "protocols";
+      activePage = null;
+      clearPageHash();
+      render();
+    }
+  });
+}
+
+async function refreshVisible() {
+  const source = query ? await searchPages(query) : entries;
+  visible = source.filter(item => {
+    if (keywordFilter && !topicKeywords(item.tags).includes(keywordFilter)) return false;
+    if (!pageMatchesOriginFilter(item, originFilter)) return false;
+    return true;
+  });
+}
+
+function rowHtml(item: PageManifestEntry) {
+  const meta = cardMeta(item);
+  const supporting = cardSupportingText(item.title, item.excerpt);
+  const rowHeight = listRowHeight();
+  return `<button class="card" type="button" data-id="${escapeHtml(item.id)}" style="height:${rowHeight}px">
+    <p class="card__meta">${meta ? escapeHtml(meta) : "—"}</p>
+    <div class="card__body">
+      <h2 class="card__title">${escapeHtml(item.title)}</h2>
+      ${supporting ? `<p class="card__excerpt">${escapeHtml(supporting)}</p>` : ""}
+    </div>
+  </button>`;
+}
+
+function bindListRows(root: ParentNode) {
+  root.querySelectorAll<HTMLButtonElement>("[data-id]").forEach(button => {
+    button.onclick = () => {
+      const rect = button.getBoundingClientRect();
+      pendingMorphOrigin = rect.width > 0 && rect.height > 0 ? rect : null;
+      void openPage(button.dataset.id!);
+    };
+  });
+}
+
+function renderVirtualList(viewport: HTMLElement) {
+  const total = visible.length;
+  const window = virtualListWindow({
+    total,
+    scrollTop: listScrollTop,
+    viewportHeight: viewport.clientHeight || 560,
+    rowHeight: listRowHeight(),
+    overscan: OVERSCAN,
+  });
+  const html =
+    visible.slice(window.start, window.end).map(rowHtml).join("") ||
+    archiveEmptyHtml({
+      hasArchiveNotes: entries.length > 0,
+    });
+  const previous = listPainted;
+  listPainted = paintVirtualList(viewport, { ...window, html }, listPainted);
+  if (listPainted !== previous) bindListRows(viewport);
+}
+
+function renderList() {
+  shell(`
+    ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · reading migrated data · no Netlify deploy</p>` : ""}
+    ${pageHeader(
+      `Private archive${originFilter.kind ? " · origin" : keywordFilter ? " · keyword" : ""}`,
+      escapeHtml(listTitle()),
+      `${newNoteMenuHtml(originFilter.kind === "book" ? originFilter.label : undefined)}
+        <div class="viewbar">
+          <button class="viewbar__btn is-active" type="button">List</button>
+          <button class="viewbar__btn" data-jump-graph type="button">Graph</button>
+        </div>`,
+    )}
+    <div class="toolbar">
+      <input class="search" value="${escapeHtml(query)}" placeholder="Search titles, tags, excerpts…" aria-label="Search archive" />
+      ${
+        keywordFilter
+          ? `<div class="tag-pills">
+        <button class="tag-pill is-selected" data-clear-keyword type="button" aria-pressed="true">Clear “${escapeHtml(keywordFilter)}”</button>
+      </div>`
+          : ""
+      }
+    </div>
+    ${originFilterHtml(entries, originFilter, { labelQuery: originLabelQuery, labelOpen: originLabelOpen })}
+    ${duePagesHtml(dueReviewsFor(entries))}
+    <p class="list-count">${visible.length.toLocaleString()} notes</p>
+    <div data-hub-pins></div>
+    <div class="cards list-viewport" aria-label="Archive list"></div>
+  `);
+  // shell() remounts the viewport — drop the previous painted window so the
+  // first paint recreates spacer/window instead of assuming they still exist.
+  listPainted = null;
+
+  const pinHost = app.querySelector<HTMLElement>("[data-hub-pins]");
+  if (pinHost) {
+    const pinned = readPinnedIds()
+      .map(id => entries.find(entry => entry.id === id))
+      .filter((entry): entry is PageManifestEntry => Boolean(entry))
+      .map(entry => ({ id: entry.id, label: entry.title, pinned: true }));
+    if (pinned.length) {
+      createPinList({
+        wrap: pinHost,
+        items: pinned,
+        onPin: (id, next) => {
+          setPinned(id, next);
+          render();
+        },
+        onOpen: id => void openPage(id)
+      });
+    }
+  }
+  app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
+    button.onclick = () => void openPage(button.dataset.openPage!);
+  });
+  app.querySelector<HTMLButtonElement>("[data-jump-graph]")!.onclick = () => {
+    graphSearch = (query.trim() || keywordFilter).trim();
+    view = "graph";
+    render();
+  };
+  bindNewNoteMenu(app, originFilter.kind === "book" ? originFilter.label : undefined);
+  app.querySelector<HTMLButtonElement>("[data-clear-keyword]")?.addEventListener("click", () => {
+    keywordFilter = "";
+    listScrollTop = 0;
+    void refreshVisible().then(render);
+  });
+  const applyOriginFilter = () => {
+    listScrollTop = 0;
+    void refreshVisible().then(render);
+  };
+
+  app.querySelectorAll<HTMLButtonElement>("[data-origin-kind]").forEach(button => {
+    button.onclick = () => {
+      const kind = button.dataset.originKind ?? "";
+      if (!isOriginKind(kind)) return;
+      originFilter = toggleOriginKind(originFilter, kind);
+      originLabelQuery = "";
+      originLabelOpen = Boolean(originFilter.kind);
+      applyOriginFilter();
+    };
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-origin-label]").forEach(button => {
+    button.onclick = () => {
+      originFilter = toggleOriginLabel(originFilter, button.dataset.originLabel ?? "");
+      originLabelQuery = "";
+      originLabelOpen = !originFilter.label;
+      applyOriginFilter();
+    };
+  });
+  const bindOriginOptions = () => {
+    app.querySelectorAll<HTMLButtonElement>("[data-origin-option]").forEach(button => {
+      button.onclick = () => {
+        originFilter = toggleOriginLabel(originFilter, button.dataset.originOption ?? "");
+        originLabelQuery = "";
+        originLabelOpen = false;
+        applyOriginFilter();
+      };
+    });
+  };
+  bindOriginOptions();
+  app.querySelector<HTMLButtonElement>("[data-picker-open]")?.addEventListener("click", () => {
+    originLabelOpen = true;
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-picker-close]")?.addEventListener("click", () => {
+    originLabelOpen = false;
+    originLabelQuery = "";
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-clear-origin]")?.addEventListener("click", () => {
+    originFilter = emptyOriginFilter();
+    resetOriginLabelChrome();
+    applyOriginFilter();
+  });
+  const originSearch = app.querySelector<HTMLInputElement>("#origin-label-search");
+  const originKind = originFilter.kind;
+  if (originSearch && originKind) {
+    const rewriteOriginList = () => {
+      const list = app.querySelector("[data-picker-list]");
+      if (!list) return;
+      const remaining = originLabelsForKind(entries, originKind)
+        .filter(item => item.label.toLowerCase() !== originFilter.label.toLowerCase())
+        .map(item => ({ label: item.label, detail: String(item.count) }));
+      list.innerHTML = optionPickerListHtml({
+        options: filterPickerOptions(remaining, originLabelQuery),
+        optionAttr: "data-origin-option",
+        emptyLabel: "Nothing matches that.",
+      });
+      bindOriginOptions();
+    };
+    originSearch.oninput = () => {
+      originLabelQuery = originSearch.value;
+      rewriteOriginList();
+    };
+    originSearch.onkeydown = event => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      originLabelOpen = false;
+      originLabelQuery = "";
+      render();
+    };
+    originSearch.focus();
+    originSearch.setSelectionRange(originLabelQuery.length, originLabelQuery.length);
+  }
+
+  const input = app.querySelector<HTMLInputElement>(".search")!;
+  input.oninput = async event => {
+    query = (event.target as HTMLInputElement).value;
+    listScrollTop = 0;
+    await refreshVisible();
+    render();
+    const next = app.querySelector<HTMLInputElement>(".search")!;
+    next.value = query;
+    next.focus();
+    next.setSelectionRange(query.length, query.length);
+  };
+
+  const viewport = app.querySelector<HTMLElement>(".list-viewport")!;
+  viewport.scrollTop = listScrollTop;
+  renderVirtualList(viewport);
+  viewport.onscroll = () => {
+    listScrollTop = viewport.scrollTop;
+    renderVirtualList(viewport);
+  };
+}
+
+function orbitSpeedLabel(speed: number) {
+  return speed === 0 ? "Paused" : `${speed.toFixed(2)}×`;
+}
+
+function showAllTuningHtml() {
+  return `<div class="graph-tuning" role="group" aria-label="Show All tuning">
+    ${SHOW_ALL_TUNING_CONTROLS.map(control => {
+      const value = showAllTuning[control.key];
+      const slider = sliderValueForTuning(control);
+      return `<label class="graph-speed">
+        <span class="graph-speed__label">${escapeHtml(control.label)}</span>
+        <input type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${slider}" data-show-all-tune="${control.key}" aria-label="${escapeHtml(control.label)}" />
+        <output class="graph-speed__value" data-show-all-tune-value="${control.key}">${escapeHtml(control.format(value))}</output>
+      </label>`;
+    }).join("")}
+  </div>`;
+}
+
+function showAllModel() {
+  if (
+    showAllModelCache &&
+    showAllModelCache.source === entries &&
+    showAllModelCache.grouping === showAllGrouping
+  ) {
+    return showAllModelCache.model;
+  }
+  const model = buildShowAllGraph(entries, showAllGrouping);
+  showAllModelCache = { source: entries, grouping: showAllGrouping, model };
+  return model;
+}
+
+function showAllMetaText() {
+  if (showAllGrouping !== "tags") return showAllGroupingMeta(showAllGrouping);
+  const model = showAllModel();
+  const notes = model.nodes.filter(node => node.kind === "leaf").length;
+  const hubs = model.nodes.filter(node => node.kind === "major").length;
+  const noteLinks = model.links.filter(link => link.kind === "overlap" || link.kind === "backbone").length;
+  const hidden = Math.max(0, entries.length - notes);
+  const line = `${hubs} topics · ${notes} notes · ${noteLinks} links waiting on a click · at most 3 per note`;
+  return hidden ? `${line} · ${hidden} still untagged` : line;
+}
+
+function graphMetaText() {
+  const constellation = buildArchiveGraph(entries);
+  const meta =
+    constellation.majorCount === 0 && graphMode !== "showAll"
+      ? "No topic keywords yet · Universe still has a sun"
+      : graphMode === "constellation"
+        ? `${constellation.majorCount} topics · notes sit with their topic · click one to open it`
+        : graphMode === "showAll"
+          ? showAllMetaText()
+          : `Universe v${UNIVERSE_BUILD}`;
+  const searching = graphSearch.trim();
+  let searchHint = searching ? ` · search “${searching}”` : "";
+  if (searching) {
+    const hits =
+      graphMode === "universe"
+        ? resolveSearchHits(getSolarModel(), graphSearch).size
+        : searchCluster(
+            (graphMode === "showAll" ? showAllModel() : constellation).nodes,
+            graphSearch,
+          ).size;
+    if (!hits) searchHint += " · no matches";
+    else if (graphMode === "universe") searchHint += ` · ${hits} match${hits === 1 ? "" : "es"}`;
+  }
+  return `${meta}${searchHint}`;
+}
+
+function writeGraphChrome() {
+  const meta = app.querySelector(".graph-toolbar__meta");
+  if (meta) meta.textContent = graphMetaText();
+  app.querySelectorAll<HTMLButtonElement>("[data-show-all-group]").forEach(button => {
+    const active = button.dataset.showAllGroup === showAllGrouping;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
+
+function renderNotebooks() {
+  const cards = notebookCards(entries);
+  shell(`
+    ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · notebooks stay on this canvas</p>` : ""}
+    ${pageHeader("Knowledge", "Notebooks")}
+    ${notebooksGridHtml(cards)}
+  `);
+  bindNotebooksGrid(
+    app,
+    cards,
+    label =>
+      notesForNotebook(entries, label).map(entry => ({
+        id: entry.id,
+        title: entry.title,
+        excerpt: entry.excerpt,
+      })),
+    id => void openPage(id),
+  );
+}
+
+function renderTimeline() {
+  shell(`
+    ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · university timeline stays on this canvas</p>` : ""}
+    ${pageHeader("University", "Study timeline")}
+    <div data-hub-journal></div>
+    <section class="uni-tl" data-uni-timeline></section>
+  `);
+  const journal = app.querySelector<HTMLElement>("[data-hub-journal]");
+  if (journal) {
+    journal.replaceWith(createJournalNav({
+      current: "timeline",
+      sections: [
+        { id: "all", label: "Archive" },
+        { id: "graph", label: "Graph" },
+        { id: "timeline", label: "Timeline" }
+      ],
+      onSelect: (id) => document.querySelector<HTMLButtonElement>(`[data-nav="${id}"]`)?.click()
+    }).el);
+  }
+  const host = app.querySelector<HTMLElement>("[data-uni-timeline]");
+  if (host) graphTeardown = mountUniversityTimeline(host);
+}
+
+function renderGraph() {
+  const constellation = buildArchiveGraph(entries);
+  const excerptFor = (pageId: string) => entries.find(entry => entry.id === pageId)?.excerpt ?? "";
+
+  shell(`
+    ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · graph stays on this canvas</p>` : ""}
+    ${pageHeader(
+      "Private archive",
+      "Keyword graph",
+      `<div class="viewbar">
+        <button class="viewbar__btn" data-jump-list type="button">List</button>
+        <button class="viewbar__btn is-active" type="button">Graph</button>
+      </div>`,
+    )}
+    <div class="${universeWrapClass(graphMode === "universe" && universeDark, graphFullscreen)}">
+      <div class="graph-chrome">
+        <div class="graph-toolbar glass-panel">
+          <div class="graph-modes" role="group" aria-label="Graph mode">
+            <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Constellation</button>
+            <button type="button" data-graph-mode="showAll" class="${graphMode === "showAll" ? "is-active" : ""}">Show All</button>
+            <button type="button" data-graph-mode="universe" class="${graphMode === "universe" ? "is-active" : ""}">Universe</button>
+          </div>
+          ${
+            graphMode === "showAll"
+              ? `<div class="graph-modes" role="group" aria-label="Show All grouping">
+                  ${SHOW_ALL_GROUPINGS.map(
+                    grouping =>
+                      `<button type="button" data-show-all-group="${grouping}" aria-pressed="${grouping === showAllGrouping}" class="${grouping === showAllGrouping ? "is-active" : ""}">${showAllGroupingLabel(grouping)}</button>`,
+                  ).join("")}
+                </div>`
+              : ""
+          }
+          <input class="graph-search" type="search" placeholder="Search keywords and notes" value="${escapeHtml(graphSearch)}" />
+          ${graphMode === "showAll" ? showAllTuningHtml() : ""}
+          ${
+            graphMode === "universe"
+              ? `<label class="graph-speed">
+                  <span class="graph-speed__label">Orbit speed</span>
+                  <input type="range" min="0" max="1" step="0.05" value="${orbitSpeed}" data-orbit-speed />
+                  <output class="graph-speed__value" data-orbit-speed-value>${orbitSpeedLabel(orbitSpeed)}</output>
+                </label>
+                ${universeViewToolsHtml(universeDark, graphFullscreen)}`
+              : graphFullscreenToolsHtml(graphFullscreen)
+          }
+          <p class="graph-toolbar__meta">${escapeHtml(graphMetaText())}</p>
+        </div>
+        ${graphMode === "universe" ? universeKeyHtml(universeKeyOpen) : ""}
+      </div>
+      <div class="graph-stage"></div>
+      ${universeExitHtml(graphFullscreen)}
+    </div>
+  `);
+
+  app.querySelector<HTMLButtonElement>("[data-jump-list]")!.onclick = () => {
+    graphFullscreen = false;
+    document.body.classList.remove("is-universe-fullscreen");
+    view = "list";
+    render();
+  };
+
+  app.querySelectorAll<HTMLButtonElement>("[data-graph-mode]").forEach(button => {
+    button.onclick = () => {
+      const next = button.dataset.graphMode as GraphMode;
+      if (next === graphMode) return;
+      graphMode = next;
+      render();
+    };
+  });
+
+  app.querySelectorAll<HTMLButtonElement>("[data-show-all-group]").forEach(button => {
+    button.onclick = () => {
+      const next = button.dataset.showAllGroup as ShowAllGrouping;
+      if (!next || next === showAllGrouping) return;
+      showAllGrouping = next;
+      writeGraphChrome();
+      graphMount?.setModel(showAllModel());
+    };
+  });
+
+  const search = app.querySelector<HTMLInputElement>(".graph-search")!;
+  search.oninput = () => {
+    graphSearch = search.value;
+    graphMount?.setSearch(graphSearch);
+    writeGraphChrome();
+  };
+
+  app.querySelectorAll<HTMLInputElement>("[data-show-all-tune]").forEach(input => {
+    input.oninput = () => {
+      const control = SHOW_ALL_TUNING_CONTROLS.find(item => item.key === input.dataset.showAllTune);
+      if (!control) return;
+      const next = { [control.key]: tuningFromSlider(control, Number(input.value)) };
+      applyShowAllTuning(next);
+      const readout = app.querySelector<HTMLOutputElement>(`[data-show-all-tune-value="${control.key}"]`);
+      if (readout) readout.textContent = control.format(showAllTuning[control.key]);
+      graphMount?.setTuning(next);
+    };
+  });
+
+  const wrap = app.querySelector<HTMLElement>(".graph-wrap")!;
+  const stage = app.querySelector<HTMLElement>(".graph-stage")!;
+  applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
+  if (graphMode === "universe") {
+    bindUniverseKey(app, open => {
+      universeKeyOpen = open;
+    });
+  }
+  bindUniverseView(app, {
+    getDark: () => universeDark,
+    getFullscreen: () => graphFullscreen,
+    setDark: on => {
+      if (graphMode !== "universe") return;
+      universeDark = on;
+      writeUniverseDark(on, typeof localStorage === "undefined" ? null : localStorage);
+      applyUniverseViewState(wrap, document.body, universeDark, graphFullscreen);
+    },
+    setFullscreen: on => {
+      graphFullscreen = on;
+      applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, graphFullscreen);
+    },
+  });
+  const preview = mountGraphPreview(wrap, { onOpen: openPageInNewTab });
+  const onNoteSelect = (note: { pageId: string; title: string; excerpt: string } | null) => {
+    if (!note) {
+      preview.clear();
+      return;
+    }
+    const card = previewNote(note.pageId, note.title, note.excerpt || excerptFor(note.pageId));
+    preview.show(card);
+    pinChatOverlayNote({ pageId: card.pageId, title: card.title });
+  };
+
+  document.onkeydown = event => {
+    if (shouldExitUniverseFullscreen(event.key, graphFullscreen)) {
+      event.preventDefault();
+      graphFullscreen = false;
+      applyUniverseViewState(wrap, document.body, graphMode === "universe" && universeDark, false);
+      return;
+    }
+    if (event.key !== "Enter") return;
+    const open = preview.el.querySelector<HTMLButtonElement>("[data-open-note]");
+    if (open && !preview.el.hidden) open.click();
+  };
+
+  let mounted: GraphMount;
+  if (graphMode === "universe") {
+    const clock = { speed: orbitSpeed };
+    const slider = app.querySelector<HTMLInputElement>("[data-orbit-speed]");
+    const readout = app.querySelector<HTMLOutputElement>("[data-orbit-speed-value]");
+    if (slider) {
+      slider.oninput = () => {
+        orbitSpeed = Number(slider.value);
+        clock.speed = orbitSpeed;
+        if (readout) readout.textContent = orbitSpeedLabel(orbitSpeed);
+      };
+    }
+    mounted = mountSolarView(stage, getSolarModel(), {
+      search: graphSearch,
+      onNoteSelect,
+      clock,
+    });
+  } else {
+    mounted = mountForceGraph(
+      stage,
+      graphMode === "showAll" ? showAllModel() : constellation,
+      { onNoteSelect },
+      { variant: graphMode, search: graphSearch, excerptFor },
+    );
+  }
+  graphMount = mounted;
+  graphTeardown = () => {
+    document.onkeydown = null;
+    document.body.classList.remove("is-universe-fullscreen");
+    graphMount = null;
+    mounted();
+  };
+}
+
+function archiveNotes() {
+  return entries.map(entry => ({ pageId: entry.id, title: entry.title }));
+}
+
+async function openPage(id: string, title?: string) {
+  if (view !== "page") pageReturnView = view === "notebooks" ? "notebooks" : "list";
+  const resolved = resolveArchivePageId(id, title, archiveNotes());
+  try {
+    activePage = await getPage(resolved);
+  } catch {
+    const hits = title ? await searchPages(title).catch(() => []) : [];
+    const fallback = resolveArchivePageId(resolved, title, hits);
+    if (fallback === resolved) {
+      showToast("That note isn't in the archive.");
+      return;
+    }
+    try {
+      activePage = await getPage(fallback);
+    } catch {
+      showToast("That note isn't in the archive.");
+      return;
+    }
+  }
+  view = "page";
+  const next = pageHashForId(activePage.id);
+  if (location.hash !== next) location.hash = next;
+  render();
+}
+
+async function applyPageHash(): Promise<boolean> {
+  const id = pageIdFromHash(location.hash);
+  if (!id) return false;
+  try {
+    activePage = await getPage(id);
+    view = "page";
+    render();
+    return true;
+  } catch {
+    showToast("That note isn't in the archive.");
+    view = "notebooks";
+    render();
+    return false;
+  }
+}
+
+function findingCards(findings: ResearchFinding[]): string {
+  return findings
+    .map(
+      item => `<article class="alchemist-card glass-panel">
+        <p class="alchemist-card__icon">${escapeHtml(item.stance)}</p>
+        <h2>${escapeHtml(item.title)}</h2>
+        <p class="alchemist-card__why">${escapeHtml(item.analysis)}</p>
+        <p class="alchemist-card__excerpt">${escapeHtml(item.excerpt)}</p>
+        <button type="button" data-open-page="${escapeHtml(item.pageId)}">Open “${escapeHtml(item.title)}” →</button>
+      </article>`,
+    )
+    .join("");
+}
+
+function livePageBody(body: string) {
+  if (!body.includes(LIVE_WORKOUT_TOKEN)) return body;
+  return body.split(LIVE_WORKOUT_TOKEN).join(LIVE_UNAVAILABLE);
+}
+
+type LivePage = Page & {
+  live_body?: string;
+  decision_traces?: DecisionTrace[];
+  decision_traces_status?: string;
+  inverse_links?: { id: string; title?: string }[];
+  inverse_links_status?: string;
+  url_watches?: { url: string; status?: string }[];
+  url_watches_status?: string;
+};
+
+function renderPage(page: LivePage) {
+  const topics = topicKeywords(page.tags);
+  const openCompose = (draft: Origin | null = null) => {
+    compose = composeFromPage(page);
+    resetComposeTagChrome();
+    composeOriginDraft = draft;
+    view = "compose";
+    render();
+  };
+
+  shell(`
+    ${pageHeader(
+      topics[0] ? escapeHtml(topics[0]) : "Note",
+      escapeHtml(page.title),
+      `        <button class="btn btn--ghost reader__back" data-back type="button">← ${pageReturnView === "notebooks" ? "Notebooks" : "Archive"}</button>
+        <button class="btn btn--ghost" data-pin-note type="button">${isPinned(page.id) ? "Unpin" : "Pin"}</button>
+        <button class="btn btn--ghost" data-edit type="button">Edit</button>
+        <button class="btn btn--ghost reader__tidy" data-tidy type="button" ${tidyBusy || tidyReviewJob ? "disabled" : ""}>${tidyBusy ? intakeBusyLabel(tidyReviewJob?.phase) : "Clean up"}</button>
+        <button class="btn btn--ghost" data-open-chat type="button">Chat</button>
+        ${
+          resolvedOrigins(page).find(origin => origin.kind === "book")
+            ? `<button class="btn btn--ghost" data-from-book type="button">Note from this book</button>`
+            : ""
+        }`,
+    )}
+    <article class="reader" data-hub-morph-page>
+      ${
+        tidyReviewJob
+          ? intakeReviewHtml(tidyReviewJob)
+          : ""
+      }
+      ${dueReviewsFor([page]).length ? pageReviewActionsHtml() : ""}
+      ${originPillsHtml(resolvedOrigins(page), { openEdit: true })}
+      ${readerTopicPillsHtml(topics.slice(0, 6))}
+      <div class="reader__body">${renderMarkdown(page.live_body ?? livePageBody(page.body))}</div>
+      ${decisionTraceHtml(page.decision_traces, page.decision_traces_status)}
+      ${connectedLinksHtml(page, entries)}
+      ${inverseLinksHtml(page.inverse_links, page.inverse_links_status)}
+      ${urlWatchHtml(page.url_watches, page.url_watches_status)}
+      ${renderAttachments(page)}
+    </article>
+  `);
+
+  app.querySelectorAll<HTMLButtonElement>("[data-page-rate]").forEach(button => {
+    button.onclick = () => void rateActivePage(Number(button.dataset.pageRate) as QuizRating);
+  });
+  app.querySelector<HTMLButtonElement>("[data-pin-note]")?.addEventListener("click", () => {
+    setPinned(page.id, !isPinned(page.id));
+    showToast(isPinned(page.id) ? "Pinned" : "Unpinned");
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-back]")!.onclick = () => {
+    activePage = null;
+    view = pageReturnView === "notebooks" ? "notebooks" : "list";
+    render();
+  };
+  app.querySelector<HTMLButtonElement>("[data-edit]")!.onclick = () => openCompose();
+  app.querySelectorAll<HTMLButtonElement>("[data-edit-origins]").forEach(button => {
+    button.onclick = () => openCompose(parseOriginRemoveValue(button.dataset.editOrigins ?? ""));
+  });
+  app.querySelector<HTMLButtonElement>("[data-open-chat]")!.onclick = () => {
+    openChatOverlay({ note: { pageId: page.id, title: page.title } });
+  };
+  app.querySelector<HTMLButtonElement>("[data-from-book]")?.addEventListener("click", () => {
+    const book = resolvedOrigins(page).find(origin => origin.kind === "book");
+    openBookNote(book?.label);
+  });
+  app.querySelector<HTMLButtonElement>("[data-tidy]")!.onclick = async () => {
+    if (tidyBusy || tidyReviewJob) return;
+    tidyBusy = true;
+    render();
+    try {
+      const job = await startTidyIntake(page.id);
+      if (job.status === "error") throw new Error(job.error || "Clean up failed");
+      tidyReviewJob = job;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Clean up failed");
+    } finally {
+      tidyBusy = false;
+      render();
+    }
+  };
+  app.querySelector<HTMLButtonElement>("[data-tidy-discard]")?.addEventListener("click", async () => {
+    const job = tidyReviewJob;
+    tidyReviewJob = null;
+    render();
+    if (job) {
+      try {
+        await resolveTidyIntake(job.id, "rejected");
+      } catch {
+        // Discard still closes the card if the job is already gone.
+      }
+    }
+  });
+  app.querySelector<HTMLButtonElement>("[data-tidy-confirm]")?.addEventListener("click", async () => {
+    const job = tidyReviewJob;
+    if (!job || tidyBusy) return;
+    tidyBusy = true;
+    render();
+    try {
+      const next = await resolveTidyIntake(job.id, "accepted");
+      if (next.applied_page) activePage = next.applied_page;
+      else activePage = await getPage(page.id);
+      tidyReviewJob = null;
+      entries = await listPages();
+      await refreshVisible();
+      showToast("Cleaned up");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Clean up failed");
+    } finally {
+      tidyBusy = false;
+      render();
+    }
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-open-page]").forEach(button => {
+    button.onclick = () => void openPage(button.dataset.openPage!);
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-attachment]").forEach(button => {
+    button.onclick = async () => {
+      try {
+        const attachmentId = button.dataset.attachment!;
+        const attachment = page.attachments.find(item => item.id === attachmentId);
+        const { url } = await getAttachmentUrl(page.id, attachmentId);
+        if (attachment?.kind === "pdf") {
+          await openHubPdfViewer({
+            src: url,
+            title: attachment.filename,
+            attachmentId: attachment.id,
+            onHighlight: async highlight => {
+              const current = activePage;
+              if (!current || current.id !== page.id) return;
+              const block = formatPdfHighlightMarkdown(highlight);
+              if (!block.trim()) return;
+              const saved = await savePage({
+                ...current,
+                body: `${current.body || ""}${block}`,
+                updated_at: new Date().toISOString(),
+              });
+              activePage = saved;
+              Object.assign(page, saved);
+              const bodyEl = app.querySelector(".reader__body");
+              if (bodyEl) bodyEl.innerHTML = renderMarkdown(saved.body);
+              showToast("Highlight saved");
+            },
+          });
+          return;
+        }
+        window.location.assign(url);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : "Download unavailable");
+      }
+    };
+  });
+  const origin = pendingMorphOrigin;
+  pendingMorphOrigin = null;
+  if (origin) morphFromRect(origin, app.querySelector("[data-hub-morph-page]"));
+}
+
+async function ingestAndApply(file: File, kind: "voice" | "photo" | "pdf") {
+  if (!compose) return;
+  compose.captureBusy = true;
+  render();
+  const result = await ingestCaptureFile(
+    { file, kind, pageId: compose.id, area: compose.area, body: compose.body, title: compose.title },
+    { signAttachment, uploadSignedFile, runCapture, localData: USE_LOCAL_DATA },
+  );
+  if (result.attachment) compose.existing.push(result.attachment as Attachment);
+  if (result.ok) {
+    compose.body = result.body;
+    compose.title = result.title;
+  }
+  showToast(result.toast);
+  compose.captureBusy = false;
+  compose.recording = false;
+  render();
+}
+
+function paintComposeCaptureChrome() {
+  if (!compose) return;
+  const ui = captureControlState({
+    busy: compose.busy,
+    captureBusy: compose.captureBusy,
+    recording: compose.recording,
+    localData: USE_LOCAL_DATA,
+  });
+  const voiceBtn = app.querySelector<HTMLButtonElement>("[data-capture-voice]");
+  if (voiceBtn) {
+    voiceBtn.textContent = ui.voiceLabel;
+    voiceBtn.disabled = Boolean(ui.captureDisabled);
+  }
+  app
+    .querySelectorAll<HTMLButtonElement>(
+      "[data-capture-photo], [data-capture-scan], [data-capture-pdf], [data-capture-paste]",
+    )
+    .forEach(btn => {
+      btn.disabled = Boolean(ui.captureOthersDisabled);
+    });
+  const save = app.querySelector<HTMLButtonElement>("[data-compose-save]");
+  if (save) save.disabled = Boolean(USE_LOCAL_DATA || compose.busy || compose.captureBusy || compose.recording);
+}
+
+function renderCompose(state: ComposeState) {
+  bindKeyboardInset();
+  const files = [
+    ...state.existing.map(
+      (item, index) =>
+        `<li><span>${escapeHtml(item.filename)}</span><button type="button" data-remove-existing="${index}">Remove</button></li>`,
+    ),
+    ...state.pending.map(
+      (file, index) =>
+        `<li><span>${escapeHtml(file.name)} (new)</span><button type="button" data-remove-pending="${index}">Remove</button></li>`,
+    ),
+  ].join("");
+  const captureBusy = state.captureBusy || state.recording;
+
+  const composeLabel = state.id.startsWith("page_hub_") && !activePage ? "New note" : "Edit note";
+  shell(`
+    <section class="compose">
+      ${pageHeader(
+        composeLabel,
+        composeLabel,
+        `<button class="btn btn--ghost reader__back" data-compose-cancel type="button">← Cancel</button>`,
+      )}
+      ${USE_LOCAL_DATA ? `<p class="local-banner">Saving and capture need the live API (npx netlify dev).</p>` : ""}
+      <div class="compose__field">
+        <label for="compose-title">Title</label>
+        <input id="compose-title" value="${escapeHtml(state.title)}" />
+        ${state.titleError ? `<p class="compose__error">${escapeHtml(state.titleError)}</p>` : ""}
+      </div>
+      <div class="compose__field">
+        <label id="compose-tags-label">Tags</label>
+        <p class="compose__hint">Up to 3.</p>
+        <div role="group" aria-labelledby="compose-tags-label">
+          ${topicTagPickerHtml(state.tags, composeTagQuery, composeTagOpen)}
+        </div>
+      </div>
+      ${originComposeFieldHtml(
+        state.origins,
+        composeOriginDraft,
+        originLabelsForKind(entries, composeOriginDraft?.kind ?? composeOriginKind).map(item => item.label),
+        composeOriginKind,
+      )}
+      <div class="compose__field compose__field--body">
+        <label id="compose-body-label">Body (markdown)</label>
+        <div id="compose-body-host" class="compose__body-host" aria-labelledby="compose-body-label"></div>
+      </div>
+      ${captureFieldHtml({
+        busy: state.busy,
+        captureBusy: state.captureBusy,
+        recording: state.recording,
+        localData: USE_LOCAL_DATA,
+      })}
+      <div class="compose__field">
+        <label>Attachments</label>
+        <ul class="compose__files">${files || "<li>None</li>"}</ul>
+        <input id="compose-files" type="file" multiple />
+      </div>
+      <div class="compose__savebar">
+        <button class="btn btn--primary compose__save" data-compose-save type="button" ${
+          USE_LOCAL_DATA || state.busy || captureBusy ? "disabled" : ""
+        }>${state.busy ? "Saving…" : "Save"}</button>
+      </div>
+    </section>
+  `);
+
+  composeBodyEditor?.destroy();
+  composeBodyEditor = null;
+  const bodyHost = app.querySelector<HTMLElement>("#compose-body-host");
+  if (bodyHost && compose) {
+    composeBodyEditor = mountMarkdownTiptap({
+      markdown: compose.body,
+      ariaLabel: "Body (markdown)",
+      onMarkdown: (markdown) => {
+        if (compose) compose.body = markdown;
+      },
+    });
+    bodyHost.replaceChildren(composeBodyEditor.host);
+  }
+
+  adoptComposeVoiceWave(app, composeVoiceWave);
+  if (state.recording) composeVoiceWave.hidden = false;
+
+  const syncFields = () => {
+    if (!compose) return;
+    compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
+    if (composeBodyEditor) compose.body = composeBodyEditor.getMarkdown();
+  };
+
+  app.querySelector<HTMLButtonElement>("[data-compose-cancel]")!.onclick = () => {
+    composeBodyEditor?.destroy();
+    composeBodyEditor = null;
+    compose = null;
+    resetComposeTagChrome();
+    view = activePage ? "page" : "list";
+    render();
+  };
+  app.querySelectorAll<HTMLButtonElement>("[data-remove-existing]").forEach(button => {
+    button.onclick = () => {
+      if (!compose) return;
+      syncFields();
+      compose.existing.splice(Number(button.dataset.removeExisting), 1);
+      render();
+    };
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-remove-pending]").forEach(button => {
+    button.onclick = () => {
+      if (!compose) return;
+      syncFields();
+      compose.pending.splice(Number(button.dataset.removePending), 1);
+      render();
+    };
+  });
+  app.querySelector<HTMLInputElement>("#compose-files")!.onchange = event => {
+    if (!compose) return;
+    syncFields();
+    const list = Array.from((event.target as HTMLInputElement).files ?? []);
+    compose.pending.push(...list);
+    render();
+  };
+  app.querySelectorAll<HTMLButtonElement>("[data-tag-pill]").forEach(button => {
+    button.onclick = () => {
+      if (!compose) return;
+      syncFields();
+      compose.tags = toggleTopicTag(compose.tags, button.dataset.tagPill ?? "");
+      composeTagQuery = "";
+      composeTagOpen = false;
+      render();
+    };
+  });
+  const bindTagOptions = () => {
+    app.querySelectorAll<HTMLButtonElement>("[data-tag-option]").forEach(button => {
+      button.onclick = () => {
+        if (!compose) return;
+        syncFields();
+        compose.tags = toggleTopicTag(compose.tags, button.dataset.tagOption ?? "");
+        composeTagQuery = "";
+        composeTagOpen = false;
+        render();
+      };
+    });
+  };
+  bindTagOptions();
+  app.querySelector<HTMLButtonElement>("[data-picker-open]")?.addEventListener("click", () => {
+    if (!compose) return;
+    syncFields();
+    composeTagOpen = true;
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-picker-close]")?.addEventListener("click", () => {
+    if (!compose) return;
+    syncFields();
+    composeTagOpen = false;
+    composeTagQuery = "";
+    render();
+  });
+  const tagSearch = app.querySelector<HTMLInputElement>("#compose-tag-search");
+  if (tagSearch && compose) {
+    const draft = compose;
+    const rewriteTagList = () => {
+      const list = app.querySelector("[data-picker-list]");
+      if (!list) return;
+      list.innerHTML = optionPickerListHtml({
+        options: filterPickerOptions(remainingTopicTags(draft.tags), composeTagQuery),
+        optionAttr: "data-tag-option",
+        emptyLabel: "No tags match that.",
+      });
+      bindTagOptions();
+    };
+    tagSearch.oninput = () => {
+      composeTagQuery = tagSearch.value;
+      rewriteTagList();
+    };
+    tagSearch.onkeydown = event => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      syncFields();
+      composeTagOpen = false;
+      composeTagQuery = "";
+      render();
+    };
+    tagSearch.focus();
+    tagSearch.setSelectionRange(composeTagQuery.length, composeTagQuery.length);
+  }
+  const addOriginFromFields = () => {
+    if (!compose) return;
+    syncFields();
+    const kind = app.querySelector<HTMLSelectElement>("#compose-origin-kind")?.value ?? "";
+    const label = app.querySelector<HTMLInputElement>("#compose-origin-label")?.value ?? "";
+    if (!isOriginKind(kind) || !label.trim()) return;
+    const next = composeOriginDraft
+      ? addOrigin(removeOrigin(compose.origins, composeOriginDraft), { kind, label })
+      : addOrigin(compose.origins, { kind, label });
+    compose.origins = next;
+    composeOriginDraft = null;
+    render();
+  };
+  app.querySelector<HTMLSelectElement>("#compose-origin-kind")?.addEventListener("change", event => {
+    if (!compose) return;
+    syncFields();
+    const kind = (event.target as HTMLSelectElement).value;
+    if (!isOriginKind(kind)) return;
+    composeOriginKind = kind;
+    render();
+  });
+  app.querySelector<HTMLButtonElement>("[data-origin-add]")?.addEventListener("click", addOriginFromFields);
+  app.querySelector<HTMLInputElement>("#compose-origin-label")?.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      addOriginFromFields();
+    }
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-origin-remove]").forEach(button => {
+    button.onclick = () => {
+      if (!compose) return;
+      syncFields();
+      const target = parseOriginRemoveValue(button.dataset.originRemove ?? "");
+      if (!target) return;
+      compose.origins = removeOrigin(compose.origins, target);
+      if (composeOriginDraft && originKey(composeOriginDraft) === originKey(target)) {
+        composeOriginDraft = null;
+      }
+      render();
+    };
+  });
+  app.querySelectorAll<HTMLButtonElement>("[data-origin-edit]").forEach(button => {
+    button.onclick = () => {
+      if (!compose) return;
+      syncFields();
+      composeOriginDraft = parseOriginRemoveValue(button.dataset.originEdit ?? "");
+      if (composeOriginDraft) composeOriginKind = composeOriginDraft.kind;
+      render();
+    };
+  });
+  if (composeOriginDraft) {
+    app.querySelector<HTMLInputElement>("#compose-origin-label")?.focus();
+  }
+  app.querySelector<HTMLButtonElement>("[data-compose-save]")!.onclick = () => void saveCompose();
+  bindCaptureControls(app, {
+    syncFields,
+    onVoice: () => {
+      void composeVoice.toggle().then(status => {
+        if (!compose) return;
+        if (status === "denied") showToast("Microphone permission is required for voice capture");
+        if (status === "started") {
+          compose.recording = true;
+          paintComposeCaptureChrome();
+        }
+        if (status === "stopping") {
+          compose.recording = false;
+          compose.captureBusy = true;
+          paintComposeCaptureChrome();
+        }
+      });
+    },
+    onPhoto: file => void ingestAndApply(file, "photo"),
+    onPdf: file => void ingestAndApply(file, "pdf"),
+    onPaste: text => {
+      if (!composeBodyEditor) return;
+      const next = composeBodyEditor.getMarkdown();
+      composeBodyEditor.setMarkdown(next ? `${next}\n${text}` : text);
+      syncFields();
+      showToast("Pasted");
+    },
+  });
+}
+
+async function saveCompose() {
+  if (!compose || compose.busy) return;
+  compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
+  if (composeBodyEditor) compose.body = composeBodyEditor.getMarkdown();
+  if (!compose.title.trim()) {
+    compose.titleError = "Title is required";
+    render();
+    return;
+  }
+  compose.titleError = "";
+  compose.busy = true;
+  render();
+  const snapshot = compose;
+  try {
+    const uploaded: Attachment[] = [];
+    for (const file of snapshot.pending) {
+      if (file.size > MAX_FILE_BYTES) {
+        showToast(`${file.name} exceeds 20MB and was skipped`);
+        continue;
+      }
+      const signed = await signAttachment({
+        filename: file.name,
+        content_type: file.type || "application/octet-stream",
+        byte_size: file.size,
+        page_id: snapshot.id,
+        area: snapshot.area,
+      });
+      await uploadSignedFile(signed.put_url, file, file.type || "application/octet-stream");
+      uploaded.push(signed.attachment);
+    }
+    const now = new Date().toISOString();
+    const hub = snapshot.id.startsWith("page_hub_");
+    const page: Page = {
+      id: snapshot.id,
+      title: snapshot.title.trim(),
+      area: snapshot.area,
+      tags: applyTopicTags(snapshot.tags, snapshot.tags),
+      origins: snapshot.origins,
+      body: snapshot.body,
+      connected: activePage?.connected ?? [],
+      attachments: [...snapshot.existing, ...uploaded],
+      source: hub ? "hub" : activePage?.source,
+      source_notion_id: hub ? undefined : activePage?.source_notion_id,
+      source_notion_url: hub ? undefined : activePage?.source_notion_url,
+      created_at: activePage?.created_at ?? now,
+      updated_at: now,
+      schema_version: 1,
+    };
+    const saved = await savePage(page);
+    entries = await listPages();
+    activePage = saved;
+    composeBodyEditor?.destroy();
+    composeBodyEditor = null;
+    compose = null;
+    resetComposeTagChrome();
+    view = "page";
+    showToast("Saved");
+    await refreshVisible();
+    render();
+  } catch (error) {
+    snapshot.busy = false;
+    compose = snapshot;
+    showToast(error instanceof Error ? error.message : "Save failed");
+    render();
+  }
+}
+
+function openPageInNewTab(id: string) {
+  const url = `${location.pathname}${location.search}${pageHashForId(id)}`;
+  window.open(url, "_blank", "noopener");
+}
+
+function previewNote(pageId: string, title: string, excerpt: string): GraphPreviewNote {
+  const entry = entries.find(item => item.id === pageId);
+  return {
+    pageId,
+    title: entry?.title ?? title,
+    excerpt: excerpt || entry?.excerpt || "",
+    tags: entry?.tags,
+    origins: entry ? resolvedOrigins(entry) : [],
+  };
+}
+
+function afterSignedInPaint() {
+  bindKeyboardInset();
+  ensureChatOverlay({
+    visible: true,
+    onOpenPage: (pageId, title) => void openPage(pageId, title),
+    onSavedPage: async saved => {
+      entries = await listPages();
+      await refreshVisible();
+      if (activePage?.id === saved.id) activePage = saved;
+      render();
+    },
+    topicsFor: pageId => {
+      const entry = entries.find(item => item.id === pageId);
+      return entry ? topicKeywords(entry.tags) : [];
+    },
+    archiveNotes: archiveNotes(),
+    bookLabels: originLabelsForKind(entries, "book").map(item => item.label),
+  });
+}
+
+function render() {
+  if (view !== "protocols" && protocolTeardown) {
+    protocolTeardown();
+    protocolTeardown = null;
+  }
+  if (view !== "compose") composeVoice.stopMic();
+  if (view === "compose" && compose) renderCompose(compose);
+  else if (view === "page" && activePage) renderPage(activePage);
+  else if (view === "graph") renderGraph();
+  else if (view === "notebooks") renderNotebooks();
+  else if (view === "timeline") renderTimeline();
+  else if (view === "chat") {
+    renderChatRail({
+      app,
+      shell,
+      render,
+      onOpenPage: (pageId, title) => void openPage(pageId, title),
+      onSavedPage: async saved => {
+        entries = await listPages();
+        await refreshVisible();
+        await openPage(saved.id);
+      },
+      pageHeader,
+      archiveNotes: archiveNotes(),
+      bookLabels: originLabelsForKind(entries, "book").map(item => item.label),
+    });
+  } else if (view === "podcast") {
+    renderPodcastRail({
+      app,
+      tags: vocabularyPresent(entries.map(entry => entry.tags)),
+      shell,
+      render,
+      onOpenPage: pageId => void openPage(pageId),
+    });
+  } else if (view === "quiz") {
+    renderQuizRail({
+      app,
+      entries,
+      tags: vocabularyPresent(entries.map(entry => entry.tags)),
+      shell,
+      render,
+      onOpenPage: id => void openPage(id),
+    });
+  } else if (view === "protocols") {
+    protocolTeardown?.();
+    shell("<div class=\"protocols-root\"></div>");
+    const root = app.querySelector<HTMLElement>(".protocols-root");
+    if (root) protocolTeardown = renderProtocols({ host: root });
+  } else {
+    renderList();
+  }
+  afterSignedInPaint();
+}
+
+function showSignInError(message?: string) {
+  const error = app.querySelector<HTMLParagraphElement>(".sign-in__error");
+  if (!error) return;
+  if (!message) {
+    error.hidden = true;
+    error.textContent = "";
+    return;
+  }
+  error.hidden = false;
+  error.textContent = message;
+}
+
+function bindSignInEnter(form: HTMLFormElement) {
+  const input = form.querySelector<HTMLInputElement>("#sign-in-passphrase");
+  input?.addEventListener("keydown", event => {
+    if (event.key !== "Enter" || event.isComposing) return;
+    event.preventDefault();
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+      return;
+    }
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+}
+
+function renderLoadError() {
+  hideChatOverlay();
+  app.innerHTML = `<div class="app-shell">
+    <aside class="rail hub-rail" aria-label="Knowledge Hub">
+      <div class="hub-rail__brand-block"><a href="/" class="hub-rail__brand">Knowledge Hub</a></div>
+      ${hubSwitcherHtml("knowledge")}
+    </aside>
+    <main class="canvas">
+      <div class="sign-in__card">
+        <p class="sign-in__brand">Knowledge Hub</p>
+        <h1 class="sign-in__title">Couldn't load the archive</h1>
+        <p class="sign-in__error" role="alert">Signed in, but the archive did not load.</p>
+        <button class="btn btn--primary sign-in__submit" type="button" data-retry>Try again</button>
+      </div>
+    </main>
+  </div>`;
+  bindHubAccordion(app);
+  app.querySelector<HTMLButtonElement>("[data-retry]")!.onclick = () => {
+    void boot({ signedIn: true });
+  };
+  // Keep locked phone chrome even on the load-error shell.
+  syncKnowledgeMobileChrome(app, "list", {
+    goArchive: () => void boot({ signedIn: true }),
+    goGraph: () => void boot({ signedIn: true }),
+    goChat: () => void boot({ signedIn: true }),
+    goNotebooks: () => void boot({ signedIn: true }),
+    goTimeline: () => void boot({ signedIn: true }),
+    goPodcast: () => void boot({ signedIn: true }),
+    goQuiz: () => void boot({ signedIn: true })
+  });
+}
+
+function renderLogin(message?: string) {
+  hideChatOverlay();
+  app.innerHTML = `<div class="sign-in">
+    <form class="sign-in__card" method="post" action="#" novalidate>
+      <p class="sign-in__brand">Knowledge Hub</p>
+      <h1 class="sign-in__title">Sign in</h1>
+      <div class="sign-in__field">
+        <label class="sign-in__label" for="sign-in-passphrase">Passphrase</label>
+        <input class="sign-in__input" id="sign-in-passphrase" name="passphrase" type="password" required autocomplete="current-password" enterkeyhint="go" />
+      </div>
+      <p class="sign-in__error" role="alert" hidden></p>
+      <button class="btn btn--primary sign-in__submit" type="submit">Sign in</button>
+    </form>
+  </div>`;
+  showSignInError(message);
+  const form = app.querySelector<HTMLFormElement>("form.sign-in__card")!;
+  const input = form.querySelector<HTMLInputElement>("#sign-in-passphrase");
+  bindSignInEnter(form);
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    showSignInError();
+    const button = form.querySelector<HTMLButtonElement>(".sign-in__submit");
+    if (button) button.disabled = true;
+    try {
+      const ok = await login(input?.value ?? "");
+      if (!ok) {
+        showSignInError("Invalid passphrase");
+        return;
+      }
+      if (!(await fetchSession())) {
+        showSignInError("Unable to sign in. Please try again.");
+        return;
+      }
+      await boot({ signedIn: true });
+    } catch {
+      showSignInError("Unable to sign in. Please try again.");
+    } finally {
+      if (button) button.disabled = false;
+      input?.focus();
+    }
+  });
+  input?.focus();
+}
+
+async function boot(options?: { failedLoginMessage?: string; signedIn?: boolean }) {
+  try {
+    entries = await listPages();
+    await ensurePageReviews();
+    await refreshVisible();
+    view = "notebooks";
+    if (!(await applyPageHash())) render();
+    if (!(window as Window & { __khPageHashBound?: boolean }).__khPageHashBound) {
+      (window as Window & { __khPageHashBound?: boolean }).__khPageHashBound = true;
+      window.addEventListener("hashchange", () => {
+        void (async () => {
+          const opened = await applyPageHash();
+          if (!opened && view === "page") {
+            view = pageReturnView === "notebooks" ? "notebooks" : "list";
+            activePage = null;
+            render();
+          }
+        })();
+      });
+    }
+  } catch {
+    if (USE_LOCAL_DATA) {
+      app.innerHTML = `<div class="sign-in"><div class="sign-in__card"><h1 class="sign-in__title">Local data missing</h1><p class="sign-in__supporting">Run the migrator first, then restart <code>npm run dev</code>.</p></div></div>`;
+      return;
+    }
+    if (options?.failedLoginMessage) {
+      renderLogin(options.failedLoginMessage);
+      return;
+    }
+    const stillIn = options?.signedIn || await fetchSession().catch(() => false);
+    if (stillIn) {
+      renderLoadError();
+      return;
+    }
+    const bounced = takeSignInQuery(location.href);
+    if (bounced.message) history.replaceState(null, "", bounced.nextUrl);
+    renderLogin(bounced.message ?? undefined);
+  }
+}
+
+startHubMotion(document);
+document.addEventListener("keydown", event => {
+  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+  if ((event.target as HTMLElement | null)?.closest?.("input, textarea, [contenteditable]")) return;
+  event.preventDefault();
+  openHubCommandSearch({
+    placeholder: "Jump in Knowledge Hub",
+    groups: [{
+      heading: "Go to",
+      items: [
+        { id: "all", label: "Archive", hint: "Notes", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=all]")?.click() },
+        { id: "notebooks", label: "Notebooks", hint: "Covers", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=notebooks]")?.click() },
+        { id: "graph", label: "Graph", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=graph]")?.click() },
+        { id: "timeline", label: "Timeline", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=timeline]")?.click() },
+        { id: "chat", label: "Chat", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=chat]")?.click() },
+        { id: "protocols", label: "Thinking", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=protocols]")?.click() },
+        { id: "podcast", label: "Podcast", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=podcast]")?.click() },
+        { id: "quiz", label: "Quiz", onSelect: () => document.querySelector<HTMLButtonElement>("[data-nav=quiz]")?.click() }
+      ]
+    }]
+  });
+});
+boot();

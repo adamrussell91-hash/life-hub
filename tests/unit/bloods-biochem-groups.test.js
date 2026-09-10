@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   BIOCHEM_GROUPS,
   groupBiochemistryMarkers
-} from '../../js/app/bloods-biochem-groups.js';
+} from '../../apps/life/js/app/bloods-biochem-groups.js';
 
 const marker = key => ({ key, label: key });
 

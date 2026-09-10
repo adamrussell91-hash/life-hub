@@ -1,0 +1,15 @@
+{
+  "id": "hammond.pace",
+  "tool_name": "pace_audit",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Natural pace signals across weeks.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

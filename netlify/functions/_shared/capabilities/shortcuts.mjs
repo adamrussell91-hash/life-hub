@@ -1,0 +1,1437 @@
+/**
+ * Named capability shortcuts — thin wrappers over propose-action shapes.
+ * Auto risk → write immediately when allowlisted.
+ * Confirm risk → return { kind: 'propose', proposal } for Confirm.
+ */
+
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import {
+  CHALLENGES_DIR,
+  RESEARCH_DIR,
+  REMEMBER_WEEK_FLAGS_PATH,
+  REMEMBER_CONTEXT_NOTES_PATH,
+  REMEMBER_LAYERED_MEMORIES_PATH,
+  CN_LOANS_PATH,
+  WIDGETS_DIR,
+  OS_DIR,
+  slugify,
+  newId,
+  challengePath,
+  researchPath,
+  widgetPath,
+  resolveResearchTtl,
+  researchExpiresAt,
+  parseJsonBlob,
+  serializeJson,
+  findChallengePath,
+  isCalendarDate,
+  addCalendarDays
+} from './stores.mjs';
+import {
+  isPathAllowedForAgent,
+  capabilityIdsForAgent,
+  loadCapability,
+  loadRegistry,
+  capabilitiesRoot
+} from './registry.mjs';
+import {
+  CENTRAL_NODE_SECTIONS,
+  classifyCentralNodePatchRisk
+} from '../../../../apps/life/js/core/central-node-patch.js';
+import { applyIntuitionEdit } from './intuition.mjs';
+import { validateProposeActionInput } from './propose-action.mjs';
+import { newTaskId } from '../tasks-blobs.mjs';
+import {
+  addMemory,
+  applyReflection,
+  correctMemory,
+  createMemoryStore,
+  parseMemoryStore,
+  proposeReflection,
+  serializeMemoryStore
+} from '../agent-memory.mjs';
+import { findMealDeletePaths, isMealSlot } from '../delete-meal.mjs';
+import { explodeCompoundDumpTitle } from '../clare-dump.mjs';
+
+const CN_OPS = ['upsert_field', 'append_line', 'replace_section', 'delete_lines', 'condense'];
+
+function deny(message) {
+  return { kind: 'error', error: message };
+}
+
+function ok(message, data = {}) {
+  return { kind: 'ok', message, ...data };
+}
+
+function propose(proposal) {
+  return { kind: 'propose', proposal };
+}
+
+function assertAllow(agentSlug, path) {
+  if (!isPathAllowedForAgent(agentSlug, path, { mode: 'write' })) {
+    throw new Error(`Path not allowlisted for ${agentSlug}: ${path}`);
+  }
+}
+
+async function writeAllowlisted(client, agentSlug, path, content, message, sha) {
+  assertAllow(agentSlug, path);
+  return client.writeFile({
+    path,
+    content,
+    message,
+    ...(sha ? { sha } : {})
+  });
+}
+
+function repoTreeOf(ctx) {
+  return ctx.repoTree ?? ctx.repoTree ?? [];
+}
+
+function fileFromTree(tree, path) {
+  if (!Array.isArray(tree)) return null;
+  return tree.find(item => item.type === 'blob' && item.path === path) ?? null;
+}
+
+async function readJson(ctx, path, fallback) {
+  const entry = fileFromTree(repoTreeOf(ctx), path);
+  if (!entry?.sha) return { value: structuredClone(fallback), sha: null };
+  try {
+    const raw = await ctx.readBlob(entry.sha);
+    return { value: parseJsonBlob(raw, structuredClone(fallback)), sha: entry.sha };
+  } catch {
+    return { value: structuredClone(fallback), sha: entry.sha };
+  }
+}
+
+function buildProposal({ agentSlug, intent, writes, surfaces = ['governance_log'], reads = [] }) {
+  return {
+    intent,
+    reads,
+    writes: writes.map(write => ({
+      path: write.path,
+      mode: write.mode || 'create',
+      content: write.content,
+      diff: write.diff || `${write.mode || 'create'} ${write.path}`
+    })),
+    surfaces
+  };
+}
+
+const CREATE_TASK_MAX_ITEMS = 16;
+
+export function shortcutSchemas() {
+  return {
+    remember_set_week_flag: {
+      name: 'remember_set_week_flag',
+      description: 'Set or clear a week-scoped remember flag (auto when allowlisted).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          week_id: { type: 'string', description: 'ISO week id YYYY-Www' },
+          key: { type: 'string' },
+          value: {},
+          clear: { type: 'boolean' }
+        },
+        required: ['week_id', 'key'],
+        additionalProperties: false
+      }
+    },
+    remember_note_context: {
+      name: 'remember_note_context',
+      description: 'Append a durable context note for later turns (auto when allowlisted).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          note: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } }
+        },
+        required: ['note'],
+        additionalProperties: false
+      }
+    },
+    remember_write_memory: {
+      name: 'remember_write_memory',
+      description: 'Write or correct layered memory (user/agent/shared/episodic). Not a domain record. mode=reflect always waits for Confirm and cannot change safety or write permissions.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          mode: { type: 'string', enum: ['add', 'correct', 'reflect'] },
+          class: { type: 'string', enum: ['user', 'agent', 'shared', 'episodic'] },
+          text: { type: 'string' },
+          domain: { type: 'string' },
+          expires_at: { type: 'string', description: 'ISO timestamp; omitted means no expiry' },
+          memory_id: { type: 'string', description: 'Required for mode=correct' },
+          reason: { type: 'string' },
+          target: { type: 'string', enum: ['memory', 'protocol', 'eval_case'] },
+          impact: { type: 'string', enum: ['low', 'high', 'safety', 'permissions', 'write_allowlist'] }
+        },
+        required: ['mode', 'text'],
+        additionalProperties: false
+      }
+    },
+    track_open_challenge: {
+      name: 'track_open_challenge',
+      description: 'Propose opening a challenge (Confirm).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          goal: { type: 'string' },
+          metric: { type: 'string' },
+          start_date: { type: 'string' },
+          end_date: { type: 'string' },
+          notes: { type: 'string' }
+        },
+        required: ['title', 'goal'],
+        additionalProperties: false
+      }
+    },
+    track_log_progress: {
+      name: 'track_log_progress',
+      description: 'Log progress on an open challenge (auto when allowlisted).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string' },
+          entry: { type: 'string' },
+          value: {},
+          date: { type: 'string' }
+        },
+        required: ['challenge_id', 'entry'],
+        additionalProperties: false
+      }
+    },
+    track_close_challenge: {
+      name: 'track_close_challenge',
+      description: 'Propose closing a challenge with a verdict (Confirm). On dispute, propose a revised verdict.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          challenge_id: { type: 'string' },
+          verdict: { type: 'string', enum: ['met', 'missed', 'partial', 'abandoned'] },
+          summary: { type: 'string' },
+          revised: { type: 'boolean', description: 'True when revising after a dispute' }
+        },
+        required: ['challenge_id', 'verdict', 'summary'],
+        additionalProperties: false
+      }
+    },
+    coordinate_request_cn_write: {
+      name: 'coordinate_request_cn_write',
+      description:
+        'Request a Central Node write via CN loan. Auto-risk patches apply immediately; high-risk needs Confirm (Hammond does not re-Confirm if ask is auto).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          section: { type: 'string', enum: [...CENTRAL_NODE_SECTIONS] },
+          op: { type: 'string', enum: [...CN_OPS] },
+          path: { type: 'string' },
+          value: {},
+          reason: { type: 'string' }
+        },
+        required: ['section', 'op', 'reason'],
+        additionalProperties: false
+      }
+    },
+    research_save_brief: {
+      name: 'research_save_brief',
+      description: 'Save a research brief with per-domain TTL (Confirm).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          domain: {
+            type: 'string',
+            enum: ['clinical', 'nutrition', 'fitness', 'skincare', 'mind', 'retail', 'general']
+          },
+          summary: { type: 'string' },
+          sources: { type: 'array', items: { type: 'string' } },
+          body: { type: 'string' },
+          ttl_days: { type: 'number' }
+        },
+        required: ['title', 'domain', 'summary'],
+        additionalProperties: false
+      }
+    },
+    research_expiring_brief: {
+      name: 'research_expiring_brief',
+      description: 'List research briefs nearing expiry for this agent.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          within_days: { type: 'number' }
+        },
+        additionalProperties: false
+      }
+    },
+    publish_surface_widget: {
+      name: 'publish_surface_widget',
+      description: 'Publish one Adam-approved widget template instance (Confirm).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          template_id: { type: 'string' },
+          title: { type: 'string' },
+          props: { type: 'object' }
+        },
+        required: ['template_id', 'title'],
+        additionalProperties: false
+      }
+    },
+    plan_week_meals: {
+      name: 'plan_week_meals',
+      description: 'Propose a week meal plan write (Confirm).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          week_id: { type: 'string' },
+          meals: { type: 'object' },
+          notes: { type: 'string' }
+        },
+        required: ['week_id', 'meals'],
+        additionalProperties: false
+      }
+    },
+    delete_meal: {
+      name: 'delete_meal',
+      description:
+        'Propose deleting a confirmed meal slot for a date (Confirm). Removes the nutrition file(s) for that breakfast/lunch/dinner/snack — including numbered duplicates like snack-2 — and refreshes day Nutrition totals. Use when Adam asks to delete, remove, undo, or clear a meal/duplicate. Not for macro corrections (use log_entry overwrite for those).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: 'YYYY-MM-DD' },
+          meal: {
+            type: 'string',
+            enum: ['breakfast', 'lunch', 'dinner', 'snack'],
+            description: 'Meal slot to remove for that date'
+          }
+        },
+        required: ['date', 'meal'],
+        additionalProperties: false
+      }
+    },
+    lookup_food_brand_au: {
+      name: 'lookup_food_brand_au',
+      description:
+        'AU-first nutrition lookup reminder — search Australian sources, then cache with save_food_library_entry.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          brand: { type: 'string' },
+          product: { type: 'string' },
+          notes: { type: 'string' }
+        },
+        required: ['brand', 'product'],
+        additionalProperties: false
+      }
+    },
+    os_capability_scoreboard: {
+      name: 'os_capability_scoreboard',
+      description: 'Return this agent\'s capability scoreboard (surface when useful / when asked).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          detail: { type: 'boolean' }
+        },
+        additionalProperties: false
+      }
+    },
+    intuition_edit_pack: {
+      name: 'intuition_edit_pack',
+      description: 'Update a standing intuition pack this agent owns (judgment only — never gates capacity). Auto when allowlisted.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          pack_id: { type: 'string', description: 'Existing intuition pack id, e.g. flare-rules' },
+          summary: { type: 'string' },
+          guidance: { type: 'string' },
+          reason: { type: 'string', description: 'Why this prior is changing' }
+        },
+        required: ['pack_id', 'reason'],
+        additionalProperties: false
+      }
+    },
+    os_promote_shortcut: {
+      name: 'os_promote_shortcut',
+      description: 'Propose promoting a repeated durable pattern into a named shortcut draft for Adam to Confirm (does not mutate the live registry).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          proposed_id: { type: 'string', description: 'e.g. track.morning-weigh-in' },
+          tool_name: { type: 'string' },
+          summary: { type: 'string' },
+          example_intent: { type: 'string' },
+          example_writes: { type: 'array', items: { type: 'object' } },
+          risk: { type: 'string', enum: ['auto', 'confirm'] }
+        },
+        required: ['proposed_id', 'summary', 'example_intent'],
+        additionalProperties: false
+      }
+    },
+    os_list_promoted_shortcuts: {
+      name: 'os_list_promoted_shortcuts',
+      description: 'List Adam-confirmed promoted shortcut drafts under data/os/promoted-shortcuts (catalog only; does not execute them).',
+      input_schema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number' }
+        },
+        additionalProperties: false
+      }
+    },
+    os_run_promoted_shortcut: {
+      name: 'os_run_promoted_shortcut',
+      description: 'Run a promoted shortcut draft by proposed_id. Replays its example_writes (or provided writes) as a Confirm propose-action. Does not mutate the live capabilities registry.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          proposed_id: { type: 'string', description: 'e.g. track.morning-weigh-in' },
+          intent: { type: 'string', description: 'Optional intent override' },
+          writes: {
+            type: 'array',
+            items: { type: 'object' },
+            description: 'Optional write override; defaults to the draft example_writes'
+          }
+        },
+        required: ['proposed_id'],
+        additionalProperties: false
+      }
+    },
+    create_task: {
+      name: 'create_task',
+      description:
+        `Create one or more Tasks Hub rows (Confirm). Use this — not GitHub file paths and not Central Node — when Adam names work to capture. Pass title for one task, or items[] (at most ${CREATE_TASK_MAX_ITEMS}; call again for more). NEVER merge distinct actions into one title — one card per distinct piece of work. Never mention this limit or the tool name in chat.`,
+      input_schema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          description: { type: 'string' },
+          domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          due_date: { type: 'string', description: 'YYYY-MM-DD' },
+          due_time: { type: 'string' },
+          parent_project_id: { type: 'string' },
+          parent_task_id: { type: 'string' },
+          estimated_duration: { type: 'number' },
+          tags: { type: 'array', items: { type: 'string' } },
+          waiting_on: { type: 'string' },
+          waiting_since: { type: 'string' },
+          follow_up_at: { type: 'string' },
+          waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+          target_date: { type: 'string' },
+          review_at: { type: 'string' },
+          contexts: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                kind: { type: 'string' },
+                value: { type: 'string' }
+              }
+            }
+          },
+          cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+          depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] },
+          items: {
+            type: 'array',
+            description: 'Multiple tasks from one list. Each needs a title.',
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+                priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+                due_date: { type: 'string' },
+                due_time: { type: 'string' },
+                parent_project_id: { type: 'string' },
+                parent_task_id: { type: 'string' },
+                estimated_duration: { type: 'number' },
+                tags: { type: 'array', items: { type: 'string' } },
+                waiting_on: { type: 'string' },
+                waiting_since: { type: 'string' },
+                follow_up_at: { type: 'string' },
+                waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+                target_date: { type: 'string' },
+                review_at: { type: 'string' },
+                contexts: { type: 'array', items: { type: 'object' } },
+                cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+                depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] }
+              },
+              required: ['title'],
+              additionalProperties: false
+            }
+          }
+        },
+        additionalProperties: false
+      }
+    },
+    update_task: {
+      name: 'update_task',
+      description:
+        'Patch an existing Tasks Hub row (Confirm). Call get_task first when appending so you know the current shape. Use append_description to add notes without replacing the rest of the task.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          task_id: { type: 'string' },
+          title: { type: 'string' },
+          description: { type: 'string' },
+          append_description: { type: 'string', description: 'Appended to the existing description at Confirm time.' },
+          status: { type: 'string', enum: ['open', 'in_progress', 'done', 'deferred', 'dead'] },
+          priority: { type: 'string', enum: ['urgent', 'high', 'medium', 'low'] },
+          domain: { type: 'string', enum: ['teaching', 'life', 'wedding', 'health', 'other'] },
+          due_date: { type: 'string' },
+          due_time: { type: 'string' },
+          target_date: { type: 'string' },
+          review_at: { type: 'string' },
+          parent_project_id: { type: 'string' },
+          parent_task_id: { type: 'string' },
+          estimated_duration: { type: 'number' },
+          kind: { type: 'string' },
+          bucket: { type: 'string' },
+          tags: { type: 'array', items: { type: 'string' } },
+          waiting_on: { type: 'string' },
+          waiting_since: { type: 'string' },
+          follow_up_at: { type: 'string' },
+          waiting_status: { type: 'string', enum: ['waiting', 'follow_up_due', 'resolved'] },
+          contexts: { type: 'array', items: { type: 'object' } },
+          cognitive_load: { type: 'string', enum: ['low', 'medium', 'high'] },
+          depth: { type: 'string', enum: ['deep', 'shallow', 'admin'] }
+        },
+        required: ['task_id'],
+        additionalProperties: false
+      }
+    }
+  };
+}
+
+export function isShortcutTool(name) {
+  return Boolean(shortcutSchemas()[name]);
+}
+
+async function handleRememberSetWeekFlag(ctx, input) {
+  const weekId = String(input.week_id || '').trim();
+  const key = String(input.key || '').trim();
+  if (!weekId || !key) return deny('week_id and key are required');
+  const path = REMEMBER_WEEK_FLAGS_PATH;
+  const { value: data, sha } = await readJson(ctx, path, { weeks: {} });
+  if (!data.weeks || typeof data.weeks !== 'object') data.weeks = {};
+  if (!data.weeks[weekId] || typeof data.weeks[weekId] !== 'object') data.weeks[weekId] = {};
+  if (input.clear) delete data.weeks[weekId][key];
+  else data.weeks[weekId][key] = input.value ?? true;
+  data.updated_at = new Date().toISOString();
+  data.updated_by = ctx.agentSlug;
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(data),
+    `remember: week flag ${weekId}/${key}`,
+    sha
+  );
+  return ok(input.clear ? `Cleared ${key} for ${weekId}` : `Set ${key} for ${weekId}`, { path });
+}
+
+async function handleRememberNoteContext(ctx, input) {
+  const note = String(input.note || '').trim();
+  if (!note) return deny('note is required');
+  const path = REMEMBER_CONTEXT_NOTES_PATH;
+  const { value: data, sha } = await readJson(ctx, path, { notes: [] });
+  if (!Array.isArray(data.notes)) data.notes = [];
+  data.notes.push({
+    id: newId('note'),
+    agent_id: ctx.agentSlug,
+    note,
+    tags: Array.isArray(input.tags) ? input.tags.map(String) : [],
+    created_at: new Date().toISOString()
+  });
+  data.updated_at = new Date().toISOString();
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(data),
+    'remember: context note',
+    sha
+  );
+  return ok('Context note saved', { path });
+}
+
+async function handleRememberWriteMemory(ctx, input) {
+  const mode = String(input.mode || 'add').trim();
+  const text = String(input.text || '').trim();
+  if (!text) return deny('text is required');
+  if (mode === 'reflect') {
+    const reflection = proposeReflection({
+      target: input.target || 'memory',
+      impact: input.impact || 'low',
+      reason: input.reason || text,
+      payload: {
+        text,
+        class: input.class || 'agent',
+        domain: input.domain || null,
+        expires_at: input.expires_at || null
+      },
+      agent: ctx.agentSlug
+    });
+    if (reflection.forbidden) {
+      return deny(reflection.message);
+    }
+    if (reflection.target !== 'memory') {
+      return deny('Reflection of protocol or eval_case cannot write those files from this tool. Use os_propose_action after Adam confirms.');
+    }
+    const path = REMEMBER_LAYERED_MEMORIES_PATH;
+    const { value: data, sha } = await readJson(ctx, path, { version: 1, items: [] });
+    const store = createMemoryStore(parseMemoryStore(data).items);
+    const applied = applyReflection(store, reflection, { actor: ctx.agentSlug });
+    if (!applied.ok) return deny(applied.error);
+    return propose(
+      buildProposal({
+        agentSlug: ctx.agentSlug,
+        intent: reflection.message,
+        surfaces: ['confirm_card', 'governance_log'],
+        writes: [{
+          path,
+          mode: sha ? 'overwrite' : 'create',
+          content: serializeMemoryStore(applied.store),
+          diff: `reflection ${reflection.target}: ${text.slice(0, 80)}`
+        }]
+      })
+    );
+  }
+
+  const path = REMEMBER_LAYERED_MEMORIES_PATH;
+  const { value: data, sha } = await readJson(ctx, path, { version: 1, items: [] });
+  const store = createMemoryStore(parseMemoryStore(data).items);
+  let result;
+  if (mode === 'correct') {
+    result = correctMemory(store, {
+      id: input.memory_id,
+      text,
+      reason: input.reason
+    }, { actor: ctx.agentSlug });
+  } else {
+    result = addMemory(store, {
+      class: input.class || 'user',
+      agent: ctx.agentSlug,
+      domain: input.domain || null,
+      text,
+      expires_at: input.expires_at || null,
+      source: 'user'
+    }, { actor: ctx.agentSlug });
+  }
+  if (!result.ok) return deny(result.error);
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeMemoryStore(result.store),
+    mode === 'correct' ? 'remember: correct layered memory' : 'remember: write layered memory',
+    sha
+  );
+  return ok(mode === 'correct' ? 'Memory corrected' : 'Memory saved', {
+    path,
+    memory_id: result.item.id,
+    class: result.item.class
+  });
+}
+
+async function handleTrackOpenChallenge(ctx, input) {
+  const title = String(input.title || '').trim();
+  const goal = String(input.goal || '').trim();
+  if (!title || !goal) return deny('title and goal are required');
+  const start = isCalendarDate(input.start_date) ? input.start_date : ctx.today;
+  const end = isCalendarDate(input.end_date) ? input.end_date : addCalendarDays(start, 14);
+  const id = newId('ch');
+  const path = challengePath(start, title);
+  const body = {
+    id,
+    title,
+    goal,
+    metric: input.metric || null,
+    start_date: start,
+    end_date: end,
+    notes: input.notes || '',
+    status: 'open',
+    owner_agent: ctx.agentSlug,
+    progress: [],
+    created_at: new Date().toISOString()
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Open challenge: ${title}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `new challenge ${title} (${start} → ${end})`
+      }]
+    })
+  );
+}
+
+async function handleTrackLogProgress(ctx, input) {
+  const challengeId = String(input.challenge_id || '').trim();
+  const entry = String(input.entry || '').trim();
+  if (!challengeId || !entry) return deny('challenge_id and entry are required');
+  const path = findChallengePath(repoTreeOf(ctx), challengeId);
+  if (!path) return deny(`Challenge not found: ${challengeId}`);
+  const { value: challenge, sha } = await readJson(ctx, path, null);
+  if (!challenge || challenge.status === 'closed') return deny('Challenge is closed or missing');
+  if (!Array.isArray(challenge.progress)) challenge.progress = [];
+  challenge.progress.push({
+    at: new Date().toISOString(),
+    date: isCalendarDate(input.date) ? input.date : ctx.today,
+    entry,
+    value: input.value ?? null,
+    agent_id: ctx.agentSlug
+  });
+  challenge.updated_at = new Date().toISOString();
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(challenge),
+    `track: progress ${challengeId}`,
+    sha
+  );
+  return ok('Progress logged', { path, challenge_id: challengeId });
+}
+
+async function handleTrackCloseChallenge(ctx, input) {
+  const challengeId = String(input.challenge_id || '').trim();
+  const verdict = String(input.verdict || '').trim();
+  const summary = String(input.summary || '').trim();
+  if (!challengeId || !verdict || !summary) {
+    return deny('challenge_id, verdict, and summary are required');
+  }
+  const path = findChallengePath(repoTreeOf(ctx), challengeId);
+  if (!path) return deny(`Challenge not found: ${challengeId}`);
+  const { value: challenge } = await readJson(ctx, path, null);
+  if (!challenge) return deny('Challenge missing');
+  const closed = {
+    ...challenge,
+    status: 'closed',
+    verdict,
+    close_summary: summary,
+    closed_at: new Date().toISOString(),
+    closed_by: ctx.agentSlug,
+    revised_verdict: Boolean(input.revised)
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: input.revised
+        ? `Revise challenge verdict: ${challenge.title || challengeId}`
+        : `Close challenge: ${challenge.title || challengeId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'overwrite',
+        content: serializeJson(closed),
+        diff: `${verdict} — ${summary}`
+      }]
+    })
+  );
+}
+
+async function handleCoordinateRequestCnWrite(ctx, input) {
+  const section = String(input.section || '').trim();
+  const op = String(input.op || '').trim();
+  const reason = String(input.reason || '').trim();
+  if (!CENTRAL_NODE_SECTIONS.includes(section)) return deny(`Invalid section: ${section}`);
+  if (!CN_OPS.includes(op)) return deny(`Invalid op: ${op}`);
+  if (!reason) return deny('reason is required');
+  const patch = {
+    section,
+    op,
+    path: input.path || undefined,
+    value: input.value,
+    reason,
+    requested_by: ctx.agentSlug
+  };
+  const risk = classifyCentralNodePatchRisk(patch);
+  const loan = {
+    id: newId('loan'),
+    from_agent: ctx.agentSlug,
+    to_agent: 'hammond',
+    patch,
+    risk,
+    status: risk === 'auto' ? 'applied' : 'pending',
+    created_at: new Date().toISOString(),
+    inherit_lower_risk: true
+  };
+
+  const { value: loansDoc, sha } = await readJson(ctx, CN_LOANS_PATH, { loans: [] });
+  if (!Array.isArray(loansDoc.loans)) loansDoc.loans = [];
+  loansDoc.loans.push(loan);
+  loansDoc.updated_at = new Date().toISOString();
+  const content = serializeJson(loansDoc);
+
+  if (risk === 'auto') {
+    // Capability loan inherits lower risk — apply without Hammond Confirm.
+    await writeAllowlisted(
+      ctx.client,
+      ctx.agentSlug,
+      CN_LOANS_PATH,
+      content,
+      `coordinate: CN loan ${loan.id}`,
+      sha
+    );
+    return {
+      kind: 'loan_auto',
+      message: `CN loan applied (auto risk): ${section}/${op}`,
+      loan
+    };
+  }
+
+  return {
+    kind: 'loan_confirm',
+    message: `CN loan needs Confirm (risk=${risk})`,
+    proposal: buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `CN write: ${section}/${op}`,
+      surfaces: ['confirm_card', 'central_node', 'governance_log'],
+      writes: [{
+        path: CN_LOANS_PATH,
+        mode: sha ? 'overwrite' : 'create',
+        content,
+        diff: `pending CN loan ${loan.id}: ${reason}`
+      }]
+    }),
+    loan
+  };
+}
+
+async function handleResearchSaveBrief(ctx, input) {
+  const title = String(input.title || '').trim();
+  const domain = String(input.domain || 'general').trim();
+  const summary = String(input.summary || '').trim();
+  if (!title || !summary) return deny('title and summary are required');
+  const ttl = resolveResearchTtl(domain, input.ttl_days);
+  const created = new Date().toISOString();
+  const body = {
+    id: newId('rb'),
+    title,
+    domain,
+    summary,
+    body: input.body || '',
+    sources: Array.isArray(input.sources) ? input.sources.map(String) : [],
+    ttl_days: ttl,
+    created_at: created,
+    expires_at: researchExpiresAt(domain, created, ttl),
+    owner_agent: ctx.agentSlug
+  };
+  const path = researchPath(ctx.today, title);
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Save research: ${title}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `${domain} · TTL ${ttl}d — ${summary}`
+      }]
+    })
+  );
+}
+
+async function handleResearchExpiringBrief(ctx, input) {
+  const within = Number.isFinite(Number(input.within_days)) ? Number(input.within_days) : 7;
+  const cutoff = Date.now() + within * 86400000;
+  const files = repoTreeOf(ctx).filter(item =>
+    item.type === 'blob'
+    && typeof item.path === 'string'
+    && item.path.startsWith(`${RESEARCH_DIR}/`)
+    && item.path.endsWith('.json')
+  );
+  const expiring = [];
+  for (const file of files) {
+    try {
+      const raw = await ctx.readBlob(file.sha);
+      const brief = parseJsonBlob(raw, null);
+      if (!brief?.expires_at) continue;
+      if (brief.owner_agent && brief.owner_agent !== ctx.agentSlug) continue;
+      const exp = Date.parse(brief.expires_at);
+      if (Number.isFinite(exp) && exp <= cutoff) {
+        expiring.push({
+          id: brief.id,
+          title: brief.title,
+          domain: brief.domain,
+          expires_at: brief.expires_at,
+          path: file.path
+        });
+      }
+    } catch {
+      /* skip */
+    }
+  }
+  return ok(`Found ${expiring.length} brief(s) expiring within ${within}d`, { briefs: expiring });
+}
+
+function loadWidgetTemplate(templateId) {
+  const root = capabilitiesRoot();
+  const path = join(root, 'widgets', 'templates', `${templateId}.json`);
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+async function handlePublishSurfaceWidget(ctx, input) {
+  const templateId = String(input.template_id || '').trim();
+  const title = String(input.title || '').trim();
+  if (!templateId || !title) return deny('template_id and title are required');
+  const template = loadWidgetTemplate(templateId);
+  if (!template) return deny(`Template not found: ${templateId}`);
+  if (!template.approved) {
+    return deny(`Template ${templateId} is not Adam-approved yet — one at a time`);
+  }
+  const path = widgetPath(ctx.today, title);
+  const body = {
+    id: newId('wg'),
+    template_id: templateId,
+    title,
+    props: input.props && typeof input.props === 'object' ? input.props : {},
+    owner_agent: ctx.agentSlug,
+    created_at: new Date().toISOString(),
+    status: 'published'
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Publish widget: ${title}`,
+      surfaces: ['confirm_card', 'hub_tab', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `template=${templateId}`
+      }]
+    })
+  );
+}
+
+async function handlePlanWeekMeals(ctx, input) {
+  const weekId = String(input.week_id || '').trim();
+  if (!weekId || !input.meals || typeof input.meals !== 'object') {
+    return deny('week_id and meals are required');
+  }
+  const path = `data/nutrition/meal-plans/week-${slugify(weekId)}.json`;
+  const body = {
+    week_id: weekId,
+    meals: input.meals,
+    notes: input.notes || '',
+    planned_by: ctx.agentSlug,
+    updated_at: new Date().toISOString()
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Week meals: ${weekId}`,
+      surfaces: ['confirm_card', 'nutrition_tab', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: input.notes || 'Meal plan proposal'
+      }]
+    })
+  );
+}
+
+async function handleDeleteMeal(ctx, input) {
+  if (ctx.agentSlug !== 'brisket') {
+    return deny('Only Brisket can delete nutrition meal records');
+  }
+  const date = String(input.date || '').trim();
+  const meal = String(input.meal || '').trim();
+  if (!isCalendarDate(date)) return deny('date must be YYYY-MM-DD');
+  if (!isMealSlot(meal)) return deny('meal must be breakfast, lunch, dinner, or snack');
+
+  const paths = findMealDeletePaths(repoTreeOf(ctx), date, meal);
+  if (paths.length === 0) {
+    return deny(`No ${meal} record found for ${date}`);
+  }
+
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Delete ${meal} for ${date}`,
+      surfaces: ['confirm_card', 'nutrition_tab', 'central_node', 'governance_log'],
+      reads: paths,
+      writes: paths.map(path => ({
+        path,
+        mode: 'delete',
+        content: '',
+        diff: `Remove ${path.split('/').pop()}`
+      }))
+    })
+  );
+}
+
+async function handleLookupFoodBrandAu(_ctx, input) {
+  const brand = String(input.brand || '').trim();
+  const product = String(input.product || '').trim();
+  if (!brand || !product) return deny('brand and product are required');
+  return ok(
+    `AU lookup: search Australian sources only for ${brand} ${product} (FSANZ, brand .com.au, Coles/Woolworths, CalorieKing AU). Then cache with save_food_library_entry.`,
+    {
+      brand,
+      product,
+      region: 'AU',
+      notes: input.notes || '',
+      next_step: 'save_food_library_entry'
+    }
+  );
+}
+
+async function handleOsCapabilityScoreboard(ctx, input) {
+  const registry = loadRegistry();
+  const ids = capabilityIdsForAgent(ctx.agentSlug);
+  const rows = ids.map(id => {
+    const def = loadCapability(id);
+    return {
+      id,
+      risk: def?.risk || 'confirm',
+      one_liner: def?.prompt_one_liner || id
+    };
+  });
+  const detail = input.detail !== false;
+  const promoted = detail ? await handleOsListPromotedShortcuts(ctx, { limit: 12 }) : null;
+  return ok(`Capability scoreboard for ${ctx.agentSlug}`, {
+    agent_id: ctx.agentSlug,
+    count: rows.length,
+    capabilities: detail ? rows : rows.map(row => row.id),
+    registry_version: registry.version,
+    ...(detail && promoted?.kind === 'ok'
+      ? { promoted_shortcuts: promoted.drafts, promoted_shortcut_count: promoted.count }
+      : {})
+  });
+}
+
+
+
+
+
+async function handleIntuitionEditPack(ctx, input) {
+  const packId = String(input.pack_id || '').trim();
+  const reason = String(input.reason || '').trim();
+  if (!packId || !reason) return deny('pack_id and reason are required');
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(packId)) return deny('pack_id must be a kebab-case id');
+  const path = `intuition/${packId}.json`;
+  const { value: existing, sha } = await readJson(ctx, path, null);
+  if (!existing || typeof existing !== 'object') {
+    return deny(`Intuition pack not found: ${packId}`);
+  }
+  const agents = Array.isArray(existing.agents) ? existing.agents : [];
+  if (agents.length && !agents.includes(ctx.agentSlug) && !agents.includes('*')) {
+    return deny(`Agent ${ctx.agentSlug} does not own intuition pack ${packId}`);
+  }
+  const patched = applyIntuitionEdit(existing, {
+    id: packId,
+    summary: input.summary,
+    guidance: input.guidance
+  });
+  if (!patched) return deny('Invalid intuition edit');
+  if (typeof input.guidance === 'string' && input.guidance.trim()) {
+    patched.guidance = input.guidance.trim();
+  }
+  if (typeof input.summary === 'string' && input.summary.trim()) {
+    patched.summary = input.summary.trim();
+  }
+  patched.updated_at = new Date().toISOString();
+  patched.updated_by = ctx.agentSlug;
+  patched.last_edit_reason = reason;
+  await writeAllowlisted(
+    ctx.client,
+    ctx.agentSlug,
+    path,
+    serializeJson(patched),
+    `intuition: edit ${packId}`,
+    sha
+  );
+  return ok(`Updated intuition pack ${packId}`, { path, pack_id: packId, reason });
+}
+
+
+function promotedShortcutPath(proposedId) {
+  return `${OS_DIR}/promoted-shortcuts/${slugify(proposedId)}.json`;
+}
+
+function normalizeWrite(entry) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return null;
+  const path = typeof entry.path === 'string' ? entry.path.trim() : '';
+  const mode = typeof entry.mode === 'string' ? entry.mode.trim() : 'create';
+  const content = typeof entry.content === 'string' ? entry.content : null;
+  const diff = typeof entry.diff === 'string' ? entry.diff.trim() : '';
+  if (!path || content == null) return null;
+  return { path, mode, content, ...(diff ? { diff } : {}) };
+}
+
+async function handleOsListPromotedShortcuts(ctx, input) {
+  const limit = Number.isFinite(input?.limit) ? Math.min(Math.max(Math.floor(input.limit), 1), 50) : 20;
+  const tree = repoTreeOf(ctx);
+  const prefix = `${OS_DIR}/promoted-shortcuts/`;
+  const paths = (Array.isArray(tree) ? tree : [])
+    .filter(item => item?.type === 'blob' && typeof item.path === 'string' && item.path.startsWith(prefix) && item.path.endsWith('.json'))
+    .map(item => item.path)
+    .sort();
+  const drafts = [];
+  for (const path of paths.slice(0, limit)) {
+    const { value } = await readJson(ctx, path, null);
+    if (!value || typeof value !== 'object') continue;
+    drafts.push({
+      path,
+      proposed_id: value.proposed_id || null,
+      tool_name: value.tool_name || null,
+      summary: value.summary || null,
+      risk: value.risk || 'confirm',
+      status: value.status || null,
+      proposed_by: value.proposed_by || null,
+      write_count: Array.isArray(value.example_writes) ? value.example_writes.length : 0
+    });
+  }
+  return ok(`Found ${drafts.length} promoted shortcut draft(s)`, { drafts, count: drafts.length });
+}
+
+async function handleOsRunPromotedShortcut(ctx, input) {
+  const proposedId = String(input.proposed_id || '').trim();
+  if (!proposedId) return deny('proposed_id is required');
+  if (!/^[a-z][a-z0-9]*(?:\.[a-z0-9-]+)+$/.test(proposedId)) {
+    return deny('proposed_id must look like area.name (e.g. track.morning-weigh-in)');
+  }
+  const path = promotedShortcutPath(proposedId);
+  const { value: draft } = await readJson(ctx, path, null);
+  if (!draft || typeof draft !== 'object') {
+    return deny(`No promoted shortcut draft at ${path}. Promote + Confirm first.`);
+  }
+  const rawWrites = Array.isArray(input.writes) && input.writes.length
+    ? input.writes
+    : (Array.isArray(draft.example_writes) ? draft.example_writes : []);
+  const writes = rawWrites.map(normalizeWrite).filter(Boolean);
+  if (!writes.length) {
+    return deny('Draft has no example_writes. Pass writes when calling os_run_promoted_shortcut, or re-promote with example_writes.');
+  }
+  const intent = String(input.intent || draft.example_intent || draft.summary || `Run promoted shortcut: ${proposedId}`).trim();
+  const proposal = buildProposal({
+    agentSlug: ctx.agentSlug,
+    intent,
+    surfaces: ['confirm_card', 'governance_log'],
+    writes: writes.map(write => ({
+      path: write.path,
+      mode: write.mode,
+      content: write.content,
+      diff: write.diff || `${write.mode} ${write.path} via ${proposedId}`
+    })),
+    reads: [path]
+  });
+  const validated = validateProposeActionInput(proposal, { agentSlug: ctx.agentSlug });
+  if (!validated.ok) {
+    return deny(`Promoted shortcut writes failed allowlist/validation: ${validated.error}${validated.detail ? ` (${validated.detail})` : ''}`);
+  }
+  return propose(validated.proposal);
+}
+
+async function handleOsPromoteShortcut(ctx, input) {
+  const proposedId = String(input.proposed_id || '').trim();
+  const summary = String(input.summary || '').trim();
+  const exampleIntent = String(input.example_intent || '').trim();
+  if (!proposedId || !summary || !exampleIntent) {
+    return deny('proposed_id, summary, and example_intent are required');
+  }
+  if (!/^[a-z][a-z0-9]*(?:\.[a-z0-9-]+)+$/.test(proposedId)) {
+    return deny('proposed_id must look like area.name (e.g. track.morning-weigh-in)');
+  }
+  const toolName = String(input.tool_name || proposedId.replace(/\./g, '_').replace(/-/g, '_'));
+  const risk = input.risk === 'auto' ? 'auto' : 'confirm';
+  const id = newId('promo');
+  const path = promotedShortcutPath(proposedId);
+  const body = {
+    id,
+    proposed_id: proposedId,
+    tool_name: toolName,
+    summary,
+    example_intent: exampleIntent,
+    example_writes: Array.isArray(input.example_writes) ? input.example_writes : [],
+    risk,
+    status: 'ready',
+    proposed_by: ctx.agentSlug,
+    created_at: new Date().toISOString(),
+    note: 'Confirm materialises this draft under data/os. Run it later with os_run_promoted_shortcut (still Confirm for the concrete writes). Does not mutate capabilities/registry.'
+  };
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Promote shortcut: ${proposedId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path,
+        mode: 'create',
+        content: serializeJson(body),
+        diff: `${proposedId} (${risk}) — ${summary}`
+      }]
+    })
+  );
+}
+
+
+const TASK_DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
+const TASK_PRIORITIES = new Set(['urgent', 'high', 'medium', 'low']);
+const TASK_STATUSES = new Set(['open', 'in_progress', 'done', 'deferred', 'dead']);
+
+function asOptionalString(value) {
+  if (value == null) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
+function normalizeTaskItem(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const title = asOptionalString(raw.title);
+  if (!title) return null;
+  const domain = TASK_DOMAINS.has(raw.domain) ? raw.domain : 'other';
+  const priority = TASK_PRIORITIES.has(raw.priority) ? raw.priority : 'medium';
+  const tags = Array.isArray(raw.tags) ? raw.tags.map(String).filter(Boolean) : [];
+  const estimated = typeof raw.estimated_duration === 'number' && Number.isFinite(raw.estimated_duration)
+    ? raw.estimated_duration
+    : null;
+  return {
+    title,
+    description: typeof raw.description === 'string' ? raw.description : '',
+    domain,
+    priority,
+    due_date: asOptionalString(raw.due_date),
+    due_time: asOptionalString(raw.due_time),
+    parent_project_id: asOptionalString(raw.parent_project_id),
+    parent_task_id: asOptionalString(raw.parent_task_id),
+    estimated_duration: estimated,
+    tags,
+    waiting_on: asOptionalString(raw.waiting_on),
+    waiting_since: asOptionalString(raw.waiting_since),
+    follow_up_at: asOptionalString(raw.follow_up_at),
+    waiting_status: asOptionalString(raw.waiting_status),
+    target_date: asOptionalString(raw.target_date),
+    review_at: asOptionalString(raw.review_at),
+    contexts: Array.isArray(raw.contexts) ? raw.contexts : undefined,
+    cognitive_load: asOptionalString(raw.cognitive_load),
+    depth: asOptionalString(raw.depth)
+  };
+}
+
+function collectCreateTaskItems(input) {
+  const raw = Array.isArray(input?.items) && input.items.length
+    ? input.items.map(normalizeTaskItem).filter(Boolean)
+    : (() => {
+        const one = normalizeTaskItem(input);
+        return one ? [one] : [];
+      })();
+  const expanded = [];
+  for (const item of raw) {
+    const parts = explodeCompoundDumpTitle(item.title, {
+      preferredDomain: item.domain || 'teaching'
+    });
+    if (!parts?.length) {
+      expanded.push(item);
+      continue;
+    }
+    for (const part of parts) {
+      expanded.push({
+        ...item,
+        title: part.title,
+        domain: part.domain || item.domain,
+        priority: part.priority || item.priority,
+        due_date: part.due_date || item.due_date
+      });
+    }
+  }
+  return expanded;
+}
+
+function buildTaskRecord(item, { id, now }) {
+  const record = {
+    schema_version: 1,
+    id,
+    title: item.title,
+    description: item.description,
+    kind: 'task',
+    bucket: 'active',
+    step_order: 0,
+    domain: item.domain,
+    framework_used: null,
+    estimated_duration: item.estimated_duration,
+    actual_duration: null,
+    due_date: item.due_date,
+    created_at: now,
+    updated_at: now,
+    completed_at: null,
+    status: 'open',
+    blocked_since: null,
+    priority: item.priority,
+    parent_project_id: item.parent_project_id,
+    parent_task_id: item.parent_task_id,
+    depends_on: [],
+    tags: item.tags,
+    recurrence_rule: null,
+    due_time: item.due_time,
+    remind_at: null,
+    remind_dismissed_at: null,
+    attachments: [],
+    source: 'suggested_by_agent',
+    page_blocks: []
+  };
+  if (item.waiting_on) record.waiting_on = item.waiting_on;
+  if (item.waiting_since) record.waiting_since = item.waiting_since;
+  if (item.follow_up_at) record.follow_up_at = item.follow_up_at;
+  if (item.waiting_status) record.waiting_status = item.waiting_status;
+  if (item.target_date) record.target_date = item.target_date;
+  if (item.review_at) record.review_at = item.review_at;
+  if (item.contexts) record.contexts = item.contexts;
+  if (item.cognitive_load) record.cognitive_load = item.cognitive_load;
+  if (item.depth) record.depth = item.depth;
+  return record;
+}
+
+function handleCreateTask(ctx, input) {
+  const items = collectCreateTaskItems(input);
+  if (!items.length) return deny('title or items[].title is required');
+  if (items.length > CREATE_TASK_MAX_ITEMS) {
+    return deny(`at most ${CREATE_TASK_MAX_ITEMS} tasks per create_task call`);
+  }
+  const now = new Date().toISOString();
+  const writes = items.map(item => {
+    const id = newTaskId();
+    return {
+      path: `tasks:task:${id}`,
+      mode: 'create',
+      content: serializeJson(buildTaskRecord(item, { id, now })),
+      diff: `new task: ${item.title}`
+    };
+  });
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: items.length === 1 ? `Create task: ${items[0].title}` : `Create ${items.length} tasks`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes
+    })
+  );
+}
+
+function handleUpdateTask(ctx, input) {
+  const taskId = asOptionalString(input?.task_id);
+  if (!taskId) return deny('task_id is required');
+  const patch = {};
+  const title = asOptionalString(input.title);
+  const description = typeof input.description === 'string' ? input.description : null;
+  const append = asOptionalString(input.append_description);
+  if (title) patch.title = title;
+  if (description != null) patch.description = description;
+  if (append) patch.append_description = append;
+  if (TASK_STATUSES.has(input.status)) patch.status = input.status;
+  if (TASK_PRIORITIES.has(input.priority)) patch.priority = input.priority;
+  if (TASK_DOMAINS.has(input.domain)) patch.domain = input.domain;
+  if (asOptionalString(input.due_date)) patch.due_date = asOptionalString(input.due_date);
+  if (asOptionalString(input.due_time)) patch.due_time = asOptionalString(input.due_time);
+  if (asOptionalString(input.parent_project_id)) patch.parent_project_id = asOptionalString(input.parent_project_id);
+  if (asOptionalString(input.parent_task_id)) patch.parent_task_id = asOptionalString(input.parent_task_id);
+  if (typeof input.estimated_duration === 'number' && Number.isFinite(input.estimated_duration)) {
+    patch.estimated_duration = input.estimated_duration;
+  }
+  if (asOptionalString(input.kind)) patch.kind = asOptionalString(input.kind);
+  if (asOptionalString(input.bucket)) patch.bucket = asOptionalString(input.bucket);
+  if (Array.isArray(input.tags)) patch.tags = input.tags.map(String).filter(Boolean);
+  if (asOptionalString(input.waiting_on)) patch.waiting_on = asOptionalString(input.waiting_on);
+  if (asOptionalString(input.waiting_since)) patch.waiting_since = asOptionalString(input.waiting_since);
+  if (asOptionalString(input.follow_up_at)) patch.follow_up_at = asOptionalString(input.follow_up_at);
+  if (asOptionalString(input.waiting_status)) patch.waiting_status = asOptionalString(input.waiting_status);
+  if (asOptionalString(input.target_date)) patch.target_date = asOptionalString(input.target_date);
+  if (asOptionalString(input.review_at)) patch.review_at = asOptionalString(input.review_at);
+  if (Array.isArray(input.contexts)) patch.contexts = input.contexts;
+  if (asOptionalString(input.cognitive_load)) patch.cognitive_load = asOptionalString(input.cognitive_load);
+  if (asOptionalString(input.depth)) patch.depth = asOptionalString(input.depth);
+  if (!Object.keys(patch).length) return deny('update_task needs at least one field to change');
+  return propose(
+    buildProposal({
+      agentSlug: ctx.agentSlug,
+      intent: `Update task ${taskId}`,
+      surfaces: ['confirm_card', 'governance_log'],
+      writes: [{
+        path: `tasks:task:${taskId}`,
+        mode: 'append',
+        content: serializeJson(patch),
+        diff: `update ${taskId}: ${Object.keys(patch).join(', ')}`
+      }]
+    })
+  );
+}
+
+export async function executeShortcut(toolName, input, ctx) {
+  if (!shortcutSchemas()[toolName]) return deny(`Unknown shortcut: ${toolName}`);
+  try {
+    switch (toolName) {
+      case 'remember_set_week_flag':
+        return await handleRememberSetWeekFlag(ctx, input);
+      case 'remember_note_context':
+        return await handleRememberNoteContext(ctx, input);
+      case 'remember_write_memory':
+        return await handleRememberWriteMemory(ctx, input);
+      case 'track_open_challenge':
+        return await handleTrackOpenChallenge(ctx, input);
+      case 'track_log_progress':
+        return await handleTrackLogProgress(ctx, input);
+      case 'track_close_challenge':
+        return await handleTrackCloseChallenge(ctx, input);
+      case 'coordinate_request_cn_write':
+        return await handleCoordinateRequestCnWrite(ctx, input);
+      case 'research_save_brief':
+        return await handleResearchSaveBrief(ctx, input);
+      case 'research_expiring_brief':
+        return await handleResearchExpiringBrief(ctx, input);
+      case 'publish_surface_widget':
+        return await handlePublishSurfaceWidget(ctx, input);
+      case 'plan_week_meals':
+        return await handlePlanWeekMeals(ctx, input);
+      case 'delete_meal':
+        return await handleDeleteMeal(ctx, input);
+      case 'lookup_food_brand_au':
+        return await handleLookupFoodBrandAu(ctx, input);
+      case 'os_capability_scoreboard':
+        return await handleOsCapabilityScoreboard(ctx, input);
+      case 'intuition_edit_pack':
+        return await handleIntuitionEditPack(ctx, input);
+      case 'os_promote_shortcut':
+        return await handleOsPromoteShortcut(ctx, input);
+      case 'os_list_promoted_shortcuts':
+        return await handleOsListPromotedShortcuts(ctx, input);
+      case 'os_run_promoted_shortcut':
+        return await handleOsRunPromotedShortcut(ctx, input);
+      case 'create_task':
+        return handleCreateTask(ctx, input);
+      case 'update_task':
+        return handleUpdateTask(ctx, input);
+      default:
+        return deny(`Unhandled shortcut: ${toolName}`);
+    }
+  } catch (err) {
+    return deny(err?.message || String(err));
+  }
+}
+
+export {
+  CHALLENGES_DIR,
+  RESEARCH_DIR,
+  REMEMBER_WEEK_FLAGS_PATH,
+  REMEMBER_CONTEXT_NOTES_PATH,
+  REMEMBER_LAYERED_MEMORIES_PATH,
+  CN_LOANS_PATH,
+  WIDGETS_DIR,
+  OS_DIR
+};

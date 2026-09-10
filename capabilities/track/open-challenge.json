@@ -1,0 +1,15 @@
+{
+  "id": "track.open-challenge",
+  "tool_name": "track_open_challenge",
+  "verb": "Track",
+  "agents": [
+    "*"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Open a time-boxed tracker with a clear success rule. Prefer this over inventing a tracker in chat. Confirm before writing.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

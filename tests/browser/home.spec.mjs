@@ -158,10 +158,91 @@ test('signs in and renders the approved Home values at desktop width', async () 
   });
   assert.equal(await page.locator('[data-ring="protein"]').count(), 1);
   assert.equal(await page.locator('[data-progress="protein"]').count(), 0);
+
+  await page.waitForFunction(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    if (!total || !/\d+ of \d+/.test(total.textContent || '')) return false;
+    const wrap = total.closest('.hub-count');
+    return Boolean(wrap && !wrap.classList.contains('is-ticking') && wrap.querySelector('.hub-count__fx'));
+  });
+  const loggingOverlay = await page.evaluate(() => {
+    const total = document.querySelector('[data-value="logging"]');
+    const wrap = total?.closest('.hub-count');
+    const fx = wrap?.querySelector('.hub-count__fx');
+    return {
+      text: total?.textContent,
+      ticking: Boolean(wrap?.classList.contains('is-ticking')),
+      hasFx: Boolean(fx),
+      fxDisplay: fx ? getComputedStyle(fx).display : 'missing'
+    };
+  });
+  assert.equal(loggingOverlay.text, '3 of 5');
+  assert.equal(loggingOverlay.ticking, false);
+  assert.equal(loggingOverlay.hasFx, true);
+  assert.equal(loggingOverlay.fxDisplay, 'none');
   assert.match(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), /^2026-/);
   assert.equal(await page.locator('#sign-in-view').isHidden(), true);
   await assertNoSecretResponses();
   await context.close();
+});
+
+test('home cards do not grow a cursor-follow spotlight sheen', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  await signIn(page);
+
+  const card = page.locator('.metric-card').first();
+  await card.waitFor();
+  const box = await card.boundingBox();
+  assert.ok(box, 'expected a Home metric card');
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+  const sheen = await card.evaluate(el => ({
+    spotlight: el.classList.contains('hub-spotlight'),
+    spotX: el.style.getPropertyValue('--hub-spot-x'),
+    spotY: el.style.getPropertyValue('--hub-spot-y'),
+    afterImage: getComputedStyle(el, '::after').backgroundImage
+  }));
+  assert.equal(sheen.spotlight, false);
+  assert.equal(sheen.spotX, '');
+  assert.equal(sheen.spotY, '');
+  assert.equal(sheen.afterImage, 'none');
+  await context.close();
+});
+
+test('the Life Hub tile is deleted from favicon, sign-in, and every page title', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await page.goto(baseUrl);
+    await page.locator('#sign-in-view').waitFor();
+    assert.equal(await page.locator('#sign-in-view .sign-in__mark').count(), 0);
+    assert.equal(await page.locator('link[rel="icon"]').count(), 0);
+
+    await signIn(page);
+
+    const sections = [
+      ['home', 'Home'],
+      ['chat', 'Chat'],
+      ['nutrition', 'Nutrition'],
+      ['fitness', 'Fitness'],
+      ['body', 'Body'],
+      ['mind', 'Mind'],
+      ['skincare', 'Skincare'],
+      ['calendar', 'Calendar'],
+      ['central-node', 'Central Node'],
+      ['shortcuts', 'Shortcuts']
+    ];
+    for (const [section, title] of sections) {
+      await page.locator(`.desktop-rail button[data-section="${section}"]`).first().click();
+      await page.locator('#page-title', { hasText: title }).waitFor();
+      assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0, section);
+      assert.equal(await page.locator('.hub-mark').count(), 0, section);
+      assert.equal(await page.locator('.sign-in__mark').count(), 0, section);
+    }
+  } finally {
+    await context.close();
+  }
 });
 
 test('uses mobile navigation without overflow at 390 px after sign-in', async () => {
@@ -182,8 +263,8 @@ test('uses mobile navigation without overflow at 390 px after sign-in', async ()
 
   await page.locator('.mobile-nav [data-section="calendar"]').click();
   await page.locator('#calendar-dashboard:not([hidden])').waitFor();
-  assert.equal(await page.locator('#calendar-month-grid').count(), 1);
-  assert.ok((await page.locator('#calendar-week-strip button').count()) >= 7);
+  assert.equal(await page.locator('.hub-calendar__timegrid').count(), 1);
+  assert.ok((await page.locator('[data-calendar="compose-title"]').count()) >= 1);
   await assertNoSecretResponses();
   await context.close();
 });
@@ -367,4 +448,69 @@ test('rapid sign-in waits behind a delayed logout request', async () => {
   assert.equal(authRequests, 2);
   assert.equal(await page.evaluate(() => localStorage.getItem('life-hub:logout-pending')), null);
   await context.close();
+});
+
+test('home metric rings recover from a mid-flight data-sync-quiet freeze', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage();
+  try {
+    await signIn(page);
+    await page.locator('#home-dashboard .metric-ring-fill').first().waitFor();
+    await page.waitForFunction(() => {
+      const fill = document.querySelector('#home-dashboard [data-ring="calories"] .metric-ring-fill');
+      const stamp = fill?.dataset?.ringDashoffset;
+      const offset = fill?.getAttribute('stroke-dashoffset');
+      const circ = fill?.getAttribute('stroke-dasharray');
+      return Boolean(stamp && circ && offset != null && Number(offset) < Number(circ));
+    });
+
+    // Reproduce the post-log blank-ring state: stamps still name the intended fill,
+    // but the rings are empty under data-sync-quiet (Safari freezes mid-transition;
+    // Chromium can also be left empty if quiet lands before the fill is committed).
+    await page.evaluate(() => {
+      document.querySelector('#app').dataset.syncQuiet = 'true';
+      for (const fill of document.querySelectorAll('#home-dashboard .metric-ring-fill')) {
+        fill.style.transition = 'none';
+        fill.setAttribute('stroke-dashoffset', fill.getAttribute('stroke-dasharray'));
+      }
+    });
+
+    const frozen = await page.evaluate(() => {
+      const fill = document.querySelector('#home-dashboard [data-ring="calories"] .metric-ring-fill');
+      const circ = Number(fill.getAttribute('stroke-dasharray'));
+      const used = Number.parseFloat(getComputedStyle(fill).strokeDashoffset);
+      return {
+        hasStamp: Boolean(fill.dataset.ringDashoffset),
+        usedNearEmpty: used > circ * 0.85,
+        calories: document.querySelector('[data-value="calories"]')?.textContent
+      };
+    });
+    assert.equal(frozen.hasStamp, true);
+    assert.equal(frozen.usedNearEmpty, true);
+    assert.equal(frozen.calories, '1,130');
+
+    await page.evaluate(async () => {
+      const { settleMetricRings } = await import('/js/app/chart-kit/animate.js');
+      settleMetricRings(document);
+    });
+
+    const recovered = await page.evaluate(() => {
+      return [...document.querySelectorAll('#home-dashboard .metric-ring-fill')].map(fill => {
+        const circ = Number(fill.getAttribute('stroke-dasharray'));
+        const used = Number.parseFloat(getComputedStyle(fill).strokeDashoffset);
+        return {
+          attr: fill.getAttribute('stroke-dashoffset'),
+          stamp: fill.dataset.ringDashoffset,
+          filledPct: circ > 0 ? Math.round((1 - used / circ) * 100) : 0
+        };
+      });
+    });
+    assert.ok(recovered.length >= 3);
+    for (const ring of recovered) {
+      assert.equal(ring.attr, ring.stamp);
+      assert.ok(ring.filledPct > 0, `expected a visible fill, got ${ring.filledPct}`);
+    }
+  } finally {
+    await context.close();
+  }
 });

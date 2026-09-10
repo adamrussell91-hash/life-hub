@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { load } from 'js-yaml';
 import { readFile } from 'node:fs/promises';
-import { loadEventManifest } from '../../js/app/load-events.js';
-import { buildHomeModel, selectDisplayDate } from '../../js/app/home-model.js';
+import { loadEventManifest } from '../../apps/life/js/app/load-events.js';
+import { buildHomeModel, selectDisplayDate } from '../../apps/life/js/app/home-model.js';
 
 const manifest = JSON.parse(await readFile(new URL('../../fixtures/manifest.json', import.meta.url)));
 const targetsConfig = load(await readFile(new URL('../../config/targets.yml', import.meta.url), 'utf8'));
@@ -114,15 +114,19 @@ test('overFatCeiling is false on Home when fat is within the ceiling', async () 
   assert.equal(model.overFatCeiling, false);
 });
 
-test('hammondLine surfaces the oldest open governance entry with age', () => {
+test('hammondLine surfaces the latest Hammond review note', () => {
   const log = [
     '# Governance Log',
     '',
-    '## 2026-05-24 — Drift Detection',
-    '**Title:** MEd Sem 2',
-    '**Status:** Still Active',
+    '## 2026-03-10 — Mind Insight',
+    '**Title:** Mar 2026 — Pattern Review: First Year',
     '',
-    'Unactioned.',
+    'Historical synthesis.',
+    '',
+    '## 2026-08-09 — Weekly Review',
+    '**Title:** Lock is marking',
+    '',
+    'Protein held; one lock.',
     ''
   ].join('\n');
   const model = buildHomeModel({
@@ -131,15 +135,45 @@ test('hammondLine surfaces the oldest open governance entry with age', () => {
     date: '2026-08-11',
     governanceLogMarkdown: log
   });
-  assert.equal(model.hammondLine, 'Hammond: MEd Sem 2 — 79d open.');
+  assert.equal(model.hammondLine, 'Hammond: Lock is marking');
 });
 
-test('hammondLine is null when there is no open governance entry', () => {
+test('hammondLine is null when there is no recent Hammond review', () => {
   const model = buildHomeModel({
     events: [],
     targetsConfig,
     date: '2026-08-11',
     governanceLogMarkdown: '# Governance Log\n'
+  });
+  assert.equal(model.hammondLine, null);
+});
+
+test('hammondLine ignores a rotting Pattern Review and a stale review', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    '## 2026-03-10 — Mind Insight',
+    '**Title:** Mar 2026 — Pattern Review: First Year',
+    '',
+    'Historical synthesis.',
+    '',
+    '## 2026-05-24 — Drift Detection',
+    '**Title:** MEd Sem 2',
+    '**Status:** Still Active',
+    '',
+    'Unactioned.',
+    '',
+    '## 2026-07-01 — Weekly Review',
+    '**Title:** Old week',
+    '',
+    'Too old to show on Home.',
+    ''
+  ].join('\n');
+  const model = buildHomeModel({
+    events: [],
+    targetsConfig,
+    date: '2026-08-11',
+    governanceLogMarkdown: log
   });
   assert.equal(model.hammondLine, null);
 });

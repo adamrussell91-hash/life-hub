@@ -2,18 +2,31 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseDateRange, CONFIG_PATHS } from '../netlify/functions/_shared/repo-policy.mjs';
+import { dump } from 'js-yaml';
+import { parseDateRange, CONFIG_PATHS, RESEARCH_PATH } from '../netlify/functions/_shared/repo-policy.mjs';
+import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
+import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
+
+import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
+import { getSydneyTimestamp } from '../apps/life/js/core/time.js';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
-const SESSION_MS = 8 * 60 * 60 * 1000;
 const FIXTURE_FILES = [
   { path: 'config/agents.yml', source: 'config/agents.yml' },
   { path: 'config/targets.yml', source: 'config/targets.yml' },
   { path: 'central-node.md', source: 'tests/fixtures/valid/central-node.md' },
   {
+    path: 'data/fitness/2026/07/2026-07-24-leg-day.md',
+    source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-24-leg-day.md'
+  },
+  {
     path: 'data/fitness/2026/07/2026-07-30-chest-curls.md',
     source: 'tests/fixtures/valid/data/fitness/2026/07/2026-07-30-chest-curls.md'
+  },
+  {
+    path: 'data/fitness/2026/08/2026-08-29-upper-body.md',
+    source: 'tests/fixtures/valid/data/fitness/2026/08/2026-08-29-upper-body.md'
   },
   {
     path: 'data/mind/2026/07/2026-07-30-diary.md',
@@ -26,12 +39,47 @@ const FIXTURE_FILES = [
   {
     path: 'data/nutrition/2026/07/2026-07-30-lunch.md',
     source: 'tests/fixtures/valid/data/nutrition/2026/07/2026-07-30-lunch.md'
+  },
+  {
+    path: 'data/nutrition/challenges.json',
+    source: 'tests/fixtures/valid/data/nutrition/challenges.json'
+  },
+  {
+    path: 'data/body/2026/07/2026-07-08-therapy-kate-semple.md',
+    source: 'tests/fixtures/valid/data/body/2026/07/2026-07-08-therapy-kate-semple.md'
   }
 ];
+
+function confirmedPath(candidate, slug) {
+  const date = candidate?.date;
+  const domain = TYPE_DOMAINS[candidate?.type] ?? 'fitness';
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || typeof slug !== 'string') {
+    return `data/${domain}/mock/${slug}.md`;
+  }
+  return `data/${domain}/${date.slice(0, 4)}/${date.slice(5, 7)}/${date}-${slug}.md`;
+}
+
+function confirmedMarkdown(candidate, slug) {
+  const fields = candidate?.fields && typeof candidate.fields === 'object' ? candidate.fields : {};
+  const stamp = getSydneyTimestamp();
+  const front = {
+    schema_version: 1,
+    id: slug,
+    type: candidate.type,
+    date: candidate.date,
+    ...(candidate.time ? { time: candidate.time } : {}),
+    created_at: stamp,
+    updated_at: stamp,
+    source: 'chat',
+    ...fields
+  };
+  return `---\n${dump(front, { lineWidth: 120 })}---\n${candidate.notes ?? ''}\n`;
+}
 
 export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
   const sessions = new Map();
+  const confirmedFiles = new Map();
   let nextSessionId = 0;
 
   const readSession = request => {
@@ -53,7 +101,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/auth') {
+    if (url.pathname === '/api/auth-login' || url.pathname === '/api/auth') {
       if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
       const body = await readJson(request);
       if (!body || typeof body.passphrase !== 'string') {
@@ -72,7 +120,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
       return true;
     }
 
-    if (url.pathname === '/api/session') {
+    if (url.pathname === '/api/auth-session' || url.pathname === '/api/session') {
       if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
       const session = readSession(request);
       if (!session) return unauthenticated(response);
@@ -105,7 +153,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         error(response, 400, 'invalid_date_range', 'Provide a valid date range.', false);
         return true;
       }
-      const repository = await readFixtureRepository(rootPath);
+      const repository = await readFixtureRepository(rootPath, confirmedFiles);
       const files = repository.files.filter(file => isInRange(file.path, range));
       const manifestId = hash(`${repository.commitSha}\0${range.from}\0${range.to}`);
       const etag = `"${manifestId}"`;
@@ -137,7 +185,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         return true;
       }
 
-      const repository = await readFixtureRepository(rootPath);
+      const repository = await readFixtureRepository(rootPath, confirmedFiles);
       const allowed = new Map(repository.files
         .filter(file => isInRange(file.path, range))
         .map(file => [`${file.path}\0${file.sha}`, file]));
@@ -151,6 +199,56 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         data: {
           commitSha: repository.commitSha,
           files: files.map(({ path, sha, content }) => ({ path, sha, content }))
+        }
+      });
+      return true;
+    }
+
+    if (url.pathname === '/api/shortcuts') {
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        return methodNotAllowed(response, 'GET, POST');
+      }
+      if (!readSession(request)) return unauthenticated(response);
+      if (request.method === 'GET') {
+        json(response, 200, {
+          ok: true,
+          data: {
+            catalog: listNamedShortcuts(),
+            promoted: [{
+              proposed_id: 'track.morning-weigh-in',
+              tool_name: 'track_morning_weigh_in',
+              summary: 'Morning weigh-in tracker',
+              proposed_by: 'brisket',
+              write_count: 1,
+              risk: 'confirm',
+              status: 'ready'
+            }]
+          }
+        });
+        return true;
+      }
+      const body = await readJson(request);
+      const proposedId = typeof body?.proposed_id === 'string' ? body.proposed_id.trim() : '';
+      if (!proposedId) {
+        error(response, 400, 'invalid_input', 'proposed_id is required.', false);
+        return true;
+      }
+      const agentSlug = typeof body?.agent_slug === 'string' && body.agent_slug.trim()
+        ? body.agent_slug.trim()
+        : 'hammond';
+      json(response, 200, {
+        ok: true,
+        data: {
+          agent_slug: agentSlug,
+          proposal: {
+            intent: `Run promoted shortcut: ${proposedId}`,
+            agent: agentSlug,
+            writes: [{
+              path: 'data/challenges/2026-08-31-weigh-in.json',
+              mode: 'create',
+              content: '{\n  "title": "Morning weigh-in"\n}\n'
+            }]
+          }
         }
       });
       return true;
@@ -176,14 +274,52 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
         error(response, 400, 'invalid_request', 'Provide a valid confirmation request.', false);
         return true;
       }
+      const path = confirmedPath(body.candidate, body.slug);
+      const content = confirmedMarkdown(body.candidate, body.slug);
+      confirmedFiles.set(path, content);
       json(response, 200, {
         ok: true,
         data: {
-          path: `data/fitness/mock/${body.slug}.md`,
-          sha: hash(body.slug).slice(0, 40),
-          commitSha: hash('mock-commit').slice(0, 40)
+          path,
+          sha: hash(content).slice(0, 40),
+          commitSha: hash(`mock-commit\0${path}\0${content}`).slice(0, 40)
         }
       });
+      return true;
+    }
+
+    if (url.pathname === '/api/curriculum' ||
+        url.pathname === '/api/search' ||
+        url.pathname === '/api/outcomes' ||
+        url.pathname.startsWith('/api/outcomes/') ||
+        url.pathname === '/api/media/upload' ||
+        (url.pathname === '/api/media' || /^\/api\/media\/[^/]+$/.test(url.pathname)) ||
+        /^\/api\/(classes|units|lessons|years|subjects|scheduled-lessons)(\/|$)/.test(url.pathname)) {
+      if (!readSession(request)) return unauthenticated(response);
+      error(response, 503, 'blobs_unbound', 'Teaching content store is not bound.', true);
+      return true;
+    }
+
+    if (url.pathname === '/api/pages' || url.pathname.startsWith('/api/pages/') ||
+        url.pathname.startsWith('/api/knowledge/')) {
+      if (!readSession(request)) return unauthenticated(response);
+      error(response, 503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.', true);
+      return true;
+    }
+
+    if (url.pathname === '/api/lesson-alchemist') {
+      if (!request.headers.get('x-alchemist-secret')) {
+        return unauthenticated(response);
+      }
+      error(response, 503, 'knowledge_repo_unbound', 'Knowledge data repository is not bound.', true);
+      return true;
+    }
+
+    if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
+        url.pathname === '/api/clare' ||
+        /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {
+      if (!readSession(request)) return unauthenticated(response);
+      error(response, 503, 'tasks_blobs_unbound', 'Tasks content store is not bound.', true);
       return true;
     }
 
@@ -192,16 +328,25 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
   };
 }
 
-async function readFixtureRepository(rootPath) {
+function asRepoFile(path, content) {
+  return {
+    path,
+    content,
+    size: Buffer.byteLength(content),
+    sha: hash(content).slice(0, 40)
+  };
+}
+
+async function readFixtureRepository(rootPath, confirmedFiles = new Map()) {
   const files = await Promise.all(FIXTURE_FILES.map(async fixture => {
-    const content = await readFile(resolve(rootPath, fixture.source), 'utf8');
-    return {
-      path: fixture.path,
-      content,
-      size: Buffer.byteLength(content),
-      sha: hash(content).slice(0, 40)
-    };
+    const content = confirmedFiles.get(fixture.path)
+      ?? await readFile(resolve(rootPath, fixture.source), 'utf8');
+    return asRepoFile(fixture.path, content);
   }));
+  for (const [path, content] of confirmedFiles) {
+    if (files.some(file => file.path === path)) continue;
+    files.push(asRepoFile(path, content));
+  }
   const fingerprint = files.map(file => `${file.path}\0${file.sha}\0${file.size}`).join('\0');
   return {
     files,
@@ -211,7 +356,7 @@ async function readFixtureRepository(rootPath) {
 }
 
 function isInRange(path, { from, to }) {
-  if (CONFIG_PATHS.has(path)) return true;
+  if (CONFIG_PATHS.has(path) || RESEARCH_PATH.test(path)) return true;
   const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1];
   return date >= from && date <= to;
 }
@@ -303,27 +448,57 @@ function hash(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
+const FLAT_WORKOUT_DUMP = [
+  '1. **Bar Squat** — legs first while you\'re fresh - Set 1: 10 reps x 25kg (cable: none) - Set 2: 10 reps x 25kg (cable: none) - Set 3: 10 reps x 25kg (cable: none)',
+  '2. **Bar Row** — pull that back thick - Set 1: 10 reps x 26kg (cable: constant force) - Set 2: 10 reps x 26kg (cable: constant force) - Set 3: 10 reps x 26kg (cable: constant force)',
+  '3. **Bar Press** — chest gets its pump, always - Set 1: 10 reps x 30kg (cable: constant force) - Set 2: 10 reps x 30kg (cable: constant force) - Set 3: 10 reps x 30kg (cable: constant force)',
+  '4. **Goblet Squat** — burnout finisher for the legs - Set 1: 12 reps x 14kg (cable: none) - Set 2: 12 reps x 14kg (cable: none)',
+  '5. **Single Arm Row with Chest Supported** — unilateral back detail work - Set 1: 12 reps x 14kg (cable: constant force) - Set 2: 12 reps x 14kg (cable: constant force)',
+  '6. **Bent Over Fly** — rear delt/upper back finisher, that shoulder cap growth - Set 1: 15 reps x 9kg (cable: elastic) - Set 2: 15 reps x 9kg (cable: elastic)',
+  '7. **Cable Bar Curl** — because we always end on guns, that\'s the law - Set 1: 12 reps x 20kg (cable: eccentric) - Set 2: 12 reps x 20kg (cable: eccentric)',
+  '8. **Bent Leg Reverse Crunch** — core, keep that waistline tight while Brisket handles the rest - Set 1: 15 reps x 0kg (cable: none) - Set 2: 15 reps x 0kg (cable: none)'
+].join(' ');
+
 function streamMockChat(response, message) {
   response.writeHead(200, {
     'Content-Type': 'text/event-stream',
     ...PRIVATE_HEADERS,
     Connection: 'keep-alive'
   });
-  const isWorkout = /chad|chadwick|workout/i.test(message);
+  const isLockIn = /lock (it|this|the plan) (in|onto)|make (the|this|my) workout|is (it|this) ready|ready to go|start (the |this )?(workout|session)|put (it|this) on(to)? fitness/i.test(message);
+  const isWorkout = isLockIn || /chad|chadwick|workout/i.test(message);
+  const isPlanDump = !isLockIn && /full send|describe the (plan|session)|show (me )?the (plan|session)/i.test(message);
   const isMeal = /brisket|meal|breakfast|lunch|dinner|lasagna|snack|ate|food/i.test(message);
   const send = event => response.write(`data: ${JSON.stringify(event)}\n\n`);
   send({ type: 'agent', slug: isWorkout ? 'chadwick' : isMeal ? 'brisket' : 'router' });
   send({ type: 'status', text: 'Loading your logs…' });
   send({ type: 'status', text: 'Thinking…' });
-  if (isWorkout) {
-    send({ type: 'text', delta: 'Logging that session now.' });
+  if (isWorkout && isPlanDump) {
+    send({ type: 'text', delta: `Here's today's full send.\n${FLAT_WORKOUT_DUMP}` });
+  } else if (isWorkout) {
+    send({ type: 'text', delta: 'Here’s your workout for today. Start it when you’re ready.' });
     send({
       type: 'record_proposal',
-      path: 'data/fitness/2026/08/2026-08-01-workout.md',
+      path: 'data/fitness/2026/08/2026-08-29-upper-body.md',
       record: {
-        schema_version: 1, id: 'mock-workout-1', type: 'workout', date: '2026-08-01',
-        day_type: 'workout_30', status: 'completed', duration_min: 30, exercises: [],
-        created_at: '2026-08-01T18:00:00+10:00', updated_at: '2026-08-01T18:00:00+10:00', source: 'chat'
+        schema_version: 1,
+        id: 'mock-workout-1',
+        type: 'workout',
+        date: '2026-08-29',
+        title: 'Upper Body',
+        session_kind: 'strength',
+        day_type: 'workout_30',
+        status: 'planned',
+        duration_min: 35,
+        exercises: [
+          { name: 'Bench Press', sets: [{ reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }, { reps: 8, weight_kg: 36, cable_type: 'constant_force' }] },
+          { name: 'Decline Dumbbell Bench Press', sets: [{ reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }, { reps: 10, weight_kg: 20, cable_type: 'none' }] },
+          { name: 'Chair Dip', sets: [{ reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }] },
+          { name: 'Push-Up', sets: [{ reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }, { reps: 12, weight_kg: 0, cable_type: 'none' }] }
+        ],
+        created_at: '2026-08-29T07:30:00+10:00',
+        updated_at: '2026-08-29T07:30:00+10:00',
+        source: 'chat'
       }
     });
   } else if (isMeal) {

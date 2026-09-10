@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { renderSkincare } from '../../js/app/render-skincare.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
-import { formatDisplayDate } from '../../js/core/time.js';
+import { renderSkincare } from '../../apps/life/js/app/render-skincare.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
+import { formatDisplayDate } from '../../apps/life/js/core/time.js';
 
 class FakeElement {
   constructor(tag) {
@@ -326,6 +326,12 @@ test('beauty drawer keeps both routine cards in the track (one visible via data-
   assert.equal(root._routineCards.children[0].dataset.routine, 'am');
   assert.equal(root._routineCards.children[1].dataset.routine, 'pm');
   assert.equal(root._routineCards.className.includes('skincare-drawer-track'), true);
+  assert.equal(root._routineCards.children[0].hidden, true);
+  assert.equal(root._routineCards.children[1].hidden, false);
+
+  root._amTab.click();
+  assert.equal(root._routineCards.children[0].hidden, false);
+  assert.equal(root._routineCards.children[1].hidden, true);
 });
 
 test('prefers-reduced-motion marks the drawer for an instant swap', () => {
@@ -719,7 +725,7 @@ test('Just this time creates one-off without keep create', () => {
 });
 
 test('index.html leads Skincare with the consistency hero, heatmap, and legend; week-dots strip is gone', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
 
   const dashboardStart = html.indexOf('id="skincare-dashboard"');
   const heroIndex = html.indexOf('skincare-consistency-card', dashboardStart);
@@ -740,9 +746,9 @@ test('index.html leads Skincare with the consistency hero, heatmap, and legend; 
   assert.doesNotMatch(html, /skincare-week-dots/);
 });
 
-test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead of a dual-card grid', async () => {
-  const html = await readFile(new URL('../../index.html', import.meta.url), 'utf8');
-  const css = await readFile(new URL('../../css/app.css', import.meta.url), 'utf8');
+test('index.html uses an AM|PM beauty drawer (segment + hidden inactive card) instead of a dual-card grid', async () => {
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  const css = await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
 
   assert.match(html, /class="skincare-beauty-drawer"/);
   assert.match(html, /id="skincare-routine-segment"/);
@@ -753,8 +759,7 @@ test('index.html uses an AM|PM beauty drawer (segment + sliding track) instead o
   assert.match(html, /id="skincare-routine-cards"[^>]*class="[^"]*skincare-drawer-track/);
   assert.doesNotMatch(html, /id="skincare-routine-cards"[^>]*skincare-grid/);
 
-  assert.match(css, /skincare-drawer-track[\s\S]*320ms\s+cubic-bezier/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce[\s\S]*skincare-drawer-track[\s\S]*transition:\s*none/);
+  assert.match(css, /skincare-drawer-track > \.skincare-card\[hidden\]/);
 });
 
 test('Log button shows Logging… and disables until onLogRoutine settles', async () => {

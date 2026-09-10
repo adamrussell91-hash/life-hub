@@ -1,0 +1,547 @@
+import { fillExercisePlanList } from './render-workout-plan.js';
+import { muscleAssetPath, resolveMuscleMapKeys } from './muscle-maps.js';
+import { formatDisplayDate, formatWeekday } from '../core/time.js';
+import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { buildColumns } from './chart-kit/columns.js';
+import { renderFitnessCharts } from './render-fitness-charts.js';
+import { createRunWidget } from '../../../../packages/design-kit/js/hub-surfaces.js';
+
+const DAY_TYPE_LABELS = {
+  movement: 'Movement day',
+  workout_30: '30-minute workout',
+  workout_45_60: '45–60 minute workout'
+};
+
+const setText = (root, selector, value) => {
+  const element = root.querySelector(selector);
+  if (element) element.textContent = String(value);
+};
+
+const formatSignedPct = pct => {
+  if (pct == null || !Number.isFinite(pct)) return '—';
+  if (pct === 0) return '0%';
+  const sign = pct > 0 ? '+' : '−';
+  return `${sign}${Math.abs(pct).toFixed(1)}%`;
+};
+
+const formatSignedKg = kg => {
+  if (kg == null || !Number.isFinite(kg)) return '—';
+  if (kg === 0) return '0 kg';
+  const sign = kg > 0 ? '+' : '−';
+  const mag = Math.abs(kg);
+  const text = Number.isInteger(mag) ? String(mag) : mag.toFixed(1);
+  return `${sign}${text} kg`;
+};
+
+const formatKg = kg => {
+  if (kg == null || !Number.isFinite(kg) || kg <= 0) return '—';
+  const text = Number.isInteger(kg) ? kg.toLocaleString('en-AU') : kg.toFixed(1);
+  return `${text} kg`;
+};
+
+function createNode(host, name) {
+  if (host && typeof host.createElement === 'function') return host.createElement(name);
+  const doc = host?.ownerDocument;
+  if (doc && typeof doc.createElement === 'function') return doc.createElement(name);
+  return globalThis.document.createElement(name);
+}
+
+function assignedSrc(img) {
+  return img?.getAttribute?.('src') ?? img?.src ?? '';
+}
+
+function applyImgSrc(img, src) {
+  if (!img || assignedSrc(img) === src) return;
+  img.src = src;
+}
+
+export function renderFitness(root, model, { logger, templates, libraryByName, onSelectTemplate } = {}) {
+  setText(root, '[data-fitness="streak"]', model.streak);
+  setText(root, '[data-fitness="day-type"]', DAY_TYPE_LABELS[model.dayType] ?? model.dayType ?? '—');
+
+  renderStatus(root, model);
+  renderWorkingWeights(root, model.workingWeights);
+  renderFitnessCharts(root, model.charts);
+  renderRegions(root, model.regions);
+  renderRecentSessions(root, model.recentSessions);
+
+  const empty = root.querySelector('[data-fitness="hero-empty"]');
+  const heroWrap = root.querySelector('[data-fitness-hero]');
+  if (!model.heroSession) {
+    empty?.removeAttribute('hidden');
+    heroWrap?.setAttribute('hidden', '');
+    logger?.unmount?.();
+    renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), [], root);
+  } else {
+    empty?.setAttribute('hidden', '');
+    heroWrap?.removeAttribute('hidden');
+    renderHero(root, model.heroSession, { logger, libraryByName });
+  }
+
+  renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
+  renderFocusStrip(root, model.focusHits);
+  renderComparisons(root, model.comparisons);
+  renderRunWidget(root, model);
+
+  root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');
+}
+
+function renderRunWidget(root, model) {
+  const host = root.querySelector('[data-fitness="run-widget"]');
+  if (!host) return;
+  host.replaceChildren();
+  const sessionKm = Number(model.heroSession?.distance_km);
+  if (!(Number.isFinite(sessionKm) && sessionKm > 0)) {
+    host.setAttribute('hidden', '');
+    return;
+  }
+  host.removeAttribute('hidden');
+  createRunWidget({ root, wrap: host, distance: sessionKm, unit: 'km', label: 'Last session' });
+}
+
+export function renderMuscleStrip(container, keys, root) {
+  if (!container) return;
+  const wanted = Array.isArray(keys) ? keys : [];
+  const existing = [...(container.children ?? [])];
+  const unused = [...existing];
+  const next = [];
+  for (const key of wanted) {
+    const src = muscleAssetPath(key);
+    const reuseAt = unused.findIndex(node => assignedSrc(node) === src);
+    let img = reuseAt >= 0 ? unused.splice(reuseAt, 1)[0] : null;
+    if (!img) {
+      img = createNode(root ?? container, 'img');
+      img.className = 'fitness-muscle-strip__img';
+      img.decoding = 'async';
+      img.addEventListener?.('error', () => img.remove?.());
+    }
+    applyImgSrc(img, src);
+    img.alt = key.replace(/-/g, ' ');
+    next.push(img);
+  }
+  const same = existing.length === next.length && existing.every((node, i) => node === next[i]);
+  if (same) return;
+  container.replaceChildren(...next);
+}
+
+export function renderTemplateRail(root, templatesState, { libraryByName, onSelectTemplate } = {}) {
+  const rail = root.querySelector('#fitness-templates-rail');
+  const status = root.querySelector('#fitness-templates-status');
+  if (!rail) return;
+
+  const state = templatesState ?? { status: 'idle', templates: [] };
+  if (status) {
+    if (state.status === 'loading') status.textContent = 'Loading templates…';
+    else if (state.status === 'error') status.textContent = 'Templates unavailable — try Refresh.';
+    else if (state.status === 'ready' && (!state.templates || state.templates.length === 0)) {
+      status.textContent = 'Finish a workout and it’ll show up here.';
+    } else {
+      status.textContent = '';
+    }
+  }
+
+  rail.replaceChildren();
+  if (state.status !== 'ready' || !Array.isArray(state.templates)) return;
+
+  for (const template of state.templates) {
+    const card = root.createElement('button');
+    card.type = 'button';
+    card.className = 'fitness-template-card';
+    card.setAttribute('aria-label', `Open template ${template.title}`);
+
+    const strip = root.createElement('div');
+    strip.className = 'fitness-muscle-strip fitness-muscle-strip--card';
+    const keys = resolveMuscleMapKeys({
+      focus: template.focus,
+      exercises: template.exercises,
+      libraryByName
+    });
+    renderMuscleStrip(strip, keys, root);
+    card.append(strip);
+
+    const title = root.createElement('strong');
+    title.textContent = template.title ?? 'Template';
+    card.append(title);
+
+    const meta = root.createElement('span');
+    meta.className = 'fitness-template-card__meta';
+    meta.textContent = template.source_session_date ? `Last ${formatDisplayDate(template.source_session_date)}` : 'No actuals yet';
+    card.append(meta);
+
+    card.addEventListener('click', () => onSelectTemplate?.(template));
+    rail.append(card);
+  }
+}
+
+function renderStatus(root, model) {
+  const done = Number.isFinite(model.weekCompletedCount) ? model.weekCompletedCount : 0;
+  const target = Number.isFinite(model.weekTarget) && model.weekTarget > 0 ? model.weekTarget : 4;
+  setText(root, '[data-fitness="week-done"]', String(done));
+  setText(root, '[data-fitness="week-target"]', String(target));
+  applyRingTarget(root.querySelector('[data-fitness-ring="sessions"]'), { value: done, target }, { size: 72, strokeWidth: 7 });
+
+  const strip = root.querySelector('[data-fitness="week-strip"]');
+  if (strip) {
+    strip.replaceChildren();
+    for (const day of model.weekDots ?? []) {
+      const cell = root.createElement('span');
+      if (day.isToday) cell.classList.add('is-current');
+      if (day.completed) cell.dataset.hit = 'true';
+      const label = root.createElement('small');
+      label.textContent = (formatWeekday(day.date) || '?').slice(0, 1);
+      const dot = root.createElement('i');
+      cell.append(label, dot);
+      strip.append(cell);
+    }
+  }
+
+  const host = root.querySelector('#fitness-week-columns');
+  if (host) {
+    host.replaceChildren();
+    const chart = buildColumns([
+      { key: 'this', label: 'This week', value: Number(model.weekVolumeKg) || 0 },
+      { key: 'last', label: 'Last week', value: Number(model.lastWeekVolumeKg) || 0 }
+    ]);
+    for (const bar of chart.bars) {
+      const row = root.createElement('div');
+      row.className = 'fitness-share-row';
+      const name = root.createElement('strong');
+      name.textContent = bar.label;
+      const track = root.createElement('span');
+      track.className = 'fitness-share-row__track';
+      const fill = root.createElement('i');
+      fill.dataset.tone = bar.key === 'this' ? 'up' : 'same';
+      if (typeof fill.style?.setProperty === 'function') fill.style.setProperty('--bar', `${bar.heightPct}%`);
+      else {
+        fill.style = fill.style ?? {};
+        fill.style['--bar'] = `${bar.heightPct}%`;
+      }
+      track.append(fill);
+      const value = root.createElement('span');
+      value.textContent = formatKg(bar.value);
+      row.append(name, track, value);
+      host.append(row);
+    }
+  }
+
+  const next = root.querySelector('[data-fitness="next-planned"]');
+  if (next) {
+    if (model.nextPlanned?.date) {
+      const day = (formatWeekday(model.nextPlanned.date) || '').slice(0, 3);
+      next.textContent = `Next planned: ${model.nextPlanned.title ?? 'Session'} · ${day} ${formatDisplayDate(model.nextPlanned.date)}`;
+      next.removeAttribute('hidden');
+    } else {
+      next.textContent = '';
+      next.setAttribute('hidden', '');
+    }
+  }
+}
+
+function renderWorkingWeights(root, weights) {
+  const host = root.querySelector('#fitness-loads');
+  const card = root.querySelector('#fitness-loads-card');
+  if (!host) return;
+  host.replaceChildren();
+  const rows = Array.isArray(weights) ? weights : [];
+  setHidden(card, rows.length === 0);
+  for (const row of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-kv-row';
+    const name = root.createElement('strong');
+    name.textContent = row.name;
+    const load = root.createElement('span');
+    load.textContent = `${formatLoad(row)} · ${formatDisplayDate(row.date)}`;
+    item.append(name, load);
+    host.append(item);
+  }
+}
+
+function renderRecentSessions(root, sessions) {
+  const host = root.querySelector('#fitness-recent');
+  const card = root.querySelector('#fitness-recent-card');
+  if (!host) return;
+  host.replaceChildren();
+  const rows = Array.isArray(sessions) ? sessions : [];
+  setHidden(card, rows.length === 0);
+  for (const session of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-recent-row';
+    if (session.date) item.dataset.date = session.date;
+    const title = root.createElement('strong');
+    title.textContent = session.title ?? 'Session';
+    const meta = root.createElement('p');
+    const parts = [
+      formatWeekday(session.date),
+      formatDisplayDate(session.date),
+      formatKg(session.volume),
+      session.duration_min != null ? `${session.duration_min} min` : null,
+      session.exerciseCount ? `${session.exerciseCount} lifts` : null
+    ].filter(Boolean);
+    meta.textContent = parts.join(' · ');
+    item.append(title, meta);
+    host.append(item);
+  }
+}
+
+function regionCopyText(region) {
+  const volDelta = formatSignedPct(region.volumeDeltaPct);
+  const volNow = formatKg(region.currentVolume);
+  return volDelta !== '—'
+    ? `${volDelta} volume`
+    : volNow === '—' ? 'Volume —' : `${volNow} volume`;
+}
+
+function regionHeadlineText(region) {
+  return region.bestSetDeltaKg != null
+    ? formatSignedKg(region.bestSetDeltaKg)
+    : formatKg(region.currentBestKg);
+}
+
+function updateRegionCard(card, region) {
+  card.dataset.colour = region.colour ?? 'neutral';
+  const media = card.children?.[0];
+  const img = media?.children?.[0];
+  if (img && region.image) {
+    applyImgSrc(img, region.image);
+    img.alt = `${region.label} anatomy`;
+  }
+  const copy = card.children?.[1];
+  const label = copy?.children?.[0];
+  const headline = copy?.children?.[1];
+  const secondary = copy?.children?.[2];
+  if (label) label.textContent = region.label;
+  if (headline) {
+    headline.dataset.colour = region.colour ?? 'neutral';
+    headline.textContent = regionHeadlineText(region);
+  }
+  if (secondary) secondary.textContent = regionCopyText(region);
+}
+
+function createRegionCard(root, region) {
+  const card = root.createElement('div');
+  card.className = 'fitness-region-card';
+  card.dataset.region = region.key;
+  card.dataset.colour = region.colour ?? 'neutral';
+
+  const media = root.createElement('div');
+  media.className = 'fitness-region-card__media';
+  const img = root.createElement('img');
+  img.className = 'fitness-region-card__img';
+  img.src = region.image;
+  img.alt = `${region.label} anatomy`;
+  img.decoding = 'async';
+  img.addEventListener?.('error', () => {
+    media.classList.add('fitness-region-card__media--missing');
+    img.remove?.();
+  });
+  media.append(img);
+
+  const copy = root.createElement('div');
+  copy.className = 'fitness-region-card__copy';
+
+  const label = root.createElement('p');
+  label.className = 'metric-label';
+  label.textContent = region.label;
+
+  const headline = root.createElement('p');
+  headline.className = 'fitness-region-card__headline';
+  headline.dataset.colour = region.colour ?? 'neutral';
+  headline.textContent = regionHeadlineText(region);
+
+  const secondary = root.createElement('p');
+  secondary.className = 'metric-caption';
+  secondary.textContent = regionCopyText(region);
+
+  copy.append(label, headline, secondary);
+  card.append(media, copy);
+  return card;
+}
+
+function renderRegions(root, regions) {
+  const grid = root.querySelector('#fitness-region-grid');
+  const block = root.querySelector('.fitness-region-block');
+  if (!grid) return;
+  const visible = (regions ?? []).filter(region => (
+    region.currentBestKg != null || (Number(region.currentVolume) > 0)
+  ));
+  setHidden(block, visible.length === 0);
+
+  const existingByKey = new Map();
+  for (const child of grid.children ?? []) {
+    const key = child.dataset?.region;
+    if (key) existingByKey.set(key, child);
+  }
+
+  const next = visible.map(region => {
+    const card = existingByKey.get(region.key);
+    if (card) {
+      updateRegionCard(card, region);
+      return card;
+    }
+    return createRegionCard(root, region);
+  });
+
+  const current = [...(grid.children ?? [])];
+  if (current.length === next.length && current.every((node, i) => node === next[i])) return;
+  grid.replaceChildren(...next);
+}
+
+function setHidden(element, hidden) {
+  if (!element) return;
+  if (hidden) element.setAttribute('hidden', '');
+  else element.removeAttribute('hidden');
+}
+
+function renderHero(root, session, { logger, libraryByName } = {}) {
+  setText(root, '#fitness-hero-label', session.status === 'planned' ? 'Current session' : 'Last session');
+  setText(root, '[data-fitness="hero-day"]', formatWeekday(session.date) || '');
+  setText(root, '[data-fitness="hero-title"]', session.title ?? 'Session');
+  setText(root, '[data-fitness="hero-duration"]', session.duration_min != null ? `${session.duration_min} min` : '—');
+  setText(root, '[data-fitness="hero-status"]', session.status ?? '—');
+  setText(root, '[data-fitness="hero-volume"]', formatKg(session.volume));
+
+  const mapKeys = session.muscleMapKeys ?? resolveMuscleMapKeys({
+    focus: session.focus,
+    exercises: session.exercises,
+    libraryByName
+  });
+  renderMuscleStrip(root.querySelector('#fitness-muscle-maps'), mapKeys, root);
+
+  const tags = root.querySelector('#fitness-focus-tags');
+  if (tags) {
+    tags.replaceChildren();
+    for (const tag of session.focus ?? []) {
+      const pill = root.createElement('span');
+      pill.className = 'fitness-tag';
+      pill.textContent = String(tag);
+      tags.append(pill);
+    }
+  }
+
+  const list = root.querySelector('#fitness-exercise-list');
+  const preview = root.querySelector('[data-fitness="hero-preview"]');
+  const startBtn = root.querySelector('#fitness-start-workout');
+  const loggerEl = root.querySelector('#fitness-logger');
+  const notesEl = root.querySelector('[data-fitness="hero-notes"]');
+  const planned = session.status === 'planned';
+  const started = Boolean(logger?.getTimerState?.()?.everStarted);
+
+  if (list) {
+    fillExercisePlanList(root, list, {
+      exercises: session.exercises ?? [],
+      libraryByName,
+      detail: planned ? 'count' : 'sets'
+    });
+  }
+
+  if (planned && logger) {
+    setHidden(preview, started);
+    setHidden(startBtn, started);
+    setHidden(loggerEl, !started);
+    if (notesEl) {
+      notesEl.textContent = '';
+      notesEl.setAttribute('hidden', '');
+    }
+    if (started) {
+      logger.mount(session);
+    } else if (startBtn) {
+      startBtn.onclick = () => {
+        logger.mount(session);
+        logger.startTimer();
+        setHidden(preview, true);
+        setHidden(startBtn, true);
+        setHidden(loggerEl, false);
+      };
+    }
+  } else {
+    logger?.unmount?.();
+    setHidden(preview, false);
+    setHidden(startBtn, true);
+    notesEl?.removeAttribute('hidden');
+    if (notesEl) notesEl.textContent = session.notes?.trim() || '';
+  }
+
+  const pain = root.querySelector('#fitness-pain-flags');
+  if (pain) {
+    pain.replaceChildren();
+    for (const flag of session.pain_flags ?? []) {
+      const pill = root.createElement('span');
+      pill.className = 'fitness-tag';
+      pill.textContent = typeof flag === 'string' ? flag : (flag?.site ?? flag?.area ?? flag?.note ?? 'pain');
+      pain.append(pill);
+    }
+  }
+}
+
+function renderFocusStrip(root, focusHits) {
+  const strip = root.querySelector('#fitness-focus-strip');
+  const card = root.querySelector('#fitness-focus-card');
+  if (!strip) return;
+  strip.replaceChildren();
+  const hits = Array.isArray(focusHits) ? focusHits : [];
+  setHidden(card, hits.length === 0);
+  if (!hits.length) return;
+  for (const hit of hits) {
+    const pill = root.createElement('span');
+    pill.className = 'fitness-focus-pill';
+    const label = root.createElement('strong');
+    label.textContent = hit.label;
+    const count = root.createElement('span');
+    count.textContent = `×${hit.count}`;
+    pill.append(label, count);
+    strip.append(pill);
+  }
+}
+
+function renderComparisons(root, comparisons) {
+  const host = root.querySelector('#fitness-comparisons');
+  const card = root.querySelector('#fitness-comparisons-card');
+  if (!host) return;
+  host.replaceChildren();
+  const rows = (comparisons ?? []).filter(row => !row.firstLogged && row.previousBest);
+  setHidden(card, rows.length === 0);
+  if (!rows.length) return;
+  for (const row of rows) {
+    const item = root.createElement('div');
+    item.className = 'fitness-compare-row';
+    const name = root.createElement('strong');
+    name.textContent = row.name ?? 'Exercise';
+    const detail = root.createElement('p');
+    detail.textContent = `${formatLoad(row.currentBest)} vs ${formatLoad(row.previousBest)}`;
+    item.append(name, detail);
+    if (row.isPr) {
+      const badge = root.createElement('span');
+      badge.className = 'pr-badge';
+      badge.textContent = 'PR';
+      item.append(badge);
+    } else if (row.weightDeltaKg != null && Number.isFinite(row.weightDeltaKg) && row.weightDeltaKg !== 0) {
+      const delta = root.createElement('span');
+      delta.className = 'fitness-compare-delta';
+      delta.dataset.colour = row.weightDeltaKg > 0 ? 'green' : 'red';
+      delta.textContent = formatSignedKg(row.weightDeltaKg);
+      item.append(delta);
+    }
+    host.append(item);
+  }
+}
+
+function formatLoad(set) {
+  if (!set) return '—';
+  return `${set.weight_kg} kg × ${set.reps}`;
+}
+
+function renderHeatmap(root, month) {
+  const grid = root.querySelector('#fitness-heatmap');
+  if (!grid) return;
+  grid.replaceChildren();
+  const days = month ?? [];
+  const hits = days.filter(day => day.completed).length;
+  setText(root, '[data-fitness="month-hits"]', String(hits));
+  for (const day of days) {
+    const tile = root.createElement('span');
+    tile.className = 'heatmap-tile';
+    tile.dataset.hit = String(day.completed);
+    tile.title = formatDisplayDate(day.date);
+    grid.append(tile);
+  }
+}

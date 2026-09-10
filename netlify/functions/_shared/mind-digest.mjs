@@ -1,4 +1,4 @@
-import { addCalendarDays, daysBetween } from '../../../js/core/time.js';
+import { addCalendarDays, daysBetween } from '../../../apps/life/js/core/time.js';
 
 export const MIND_DIGEST_WINDOW_DAYS = 30;
 const MIND_PATH = /^data\/mind\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
@@ -117,6 +117,33 @@ export function summarizeMindSessionsForPrompt(events, today) {
     ...lines,
     gap != null ? `Days since last mind session: ${gap}.` : ''
   ].filter(Boolean).join('\n');
+}
+
+export function summarizeTodaysMindSession(events, today) {
+  if (typeof today !== 'string') return '';
+  const session = (events ?? []).find(e => e?.record?.type === 'mind_session' && e.record.date === today);
+  if (!session) {
+    return `Today's mind_session (${today}): not logged yet.`;
+  }
+  const r = session.record;
+  const path = session.path ?? `data/mind/${today.slice(0, 4)}/${today.slice(5, 7)}/${today}-session.md`;
+  const parts = [
+    `Today's mind_session (${today}): logged.`,
+    r.id ? `id: ${r.id}` : '',
+    r.session_type ? `type: ${r.session_type}` : '',
+    r.theme ? `theme: ${r.theme}` : '',
+    r.title ? `title: ${r.title}` : '',
+    Array.isArray(r.themes) && r.themes.length ? `themes: ${r.themes.join(', ')}` : '',
+    r.insight ? `insight: ${r.insight}` : '',
+    r.observation ? `observation: ${r.observation}` : '',
+    r.closing_question ? `closing_question: ${r.closing_question}` : '',
+    r.cross_agent_note ? `cross_agent_note: ${r.cross_agent_note}` : '',
+    (r.mood_at_open || r.mood_at_close)
+      ? `mood: ${r.mood_at_open ?? '—'}→${r.mood_at_close ?? '—'}`
+      : '',
+    `path: ${path}`
+  ].filter(Boolean);
+  return parts.join('\n');
 }
 
 function lastMindPathDate(tree, { session }) {

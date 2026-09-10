@@ -67,6 +67,33 @@ test('validates, writes, and returns the canonical path for a new record', async
   assert.equal(JSON.parse(calls[0].options.body).sha, undefined);
 });
 
+test('meal confirm derives path from meal slot even when request slug is the agent id', async () => {
+  // Photo Confirm often sends slug=brisket (agent id). Path must still be …-lunch.md.
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const lunch = {
+    type: 'meal',
+    date: '2026-08-01',
+    fields: {
+      meal: 'lunch', calories: 514, protein_g: 42, fat_g: 14.5, sodium_mg: 780,
+      calcium_mg: 30, polyphenol_score: 1, omega3: 'none'
+    }
+  };
+
+  const response = await handler(request({ candidate: lunch, slug: 'brisket' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-lunch.md');
+  assert.ok(!String(payload.data.path).includes('brisket'));
+  assert.equal(calls[0].options.method, 'PUT');
+  assert.match(String(calls[0].url), /2026-08-01-lunch\.md/);
+});
+
 test('reports a validation failure without contacting GitHub', async () => {
   const { calls, fetchImpl } = githubFetchStub();
   // NOTE: `now` must be mocked here too. The fixed `session` token above was issued at
@@ -232,7 +259,7 @@ test('confirm still succeeds and reports centralNodeUpdated:false when the centr
   assert.equal(putCalls.length, 1, 'only the meal write should happen; central-node.md must not be written on a decode failure');
 });
 
-test('appends Chadwick→Brisket Day Type on completed workout confirm', async () => {
+test('enriches Exercise status and Recent Actions on completed workout confirm (no Day Type directive)', async () => {
   const workoutCandidate = {
     type: 'workout',
     date: '2026-08-01',
@@ -289,7 +316,14 @@ test('appends Chadwick→Brisket Day Type on completed workout confirm', async (
   const writtenContent = Buffer.from(JSON.parse(centralNodePut.options.body).content, 'base64').toString('utf8');
   // Day Type is derived from the workout record itself, so no directive is written.
   assert.doesNotMatch(writtenContent, /Set Day Type to/);
-  assert.match(writtenContent, /\*\*Exercise:\*\* Chest and Curls · 26 min · completed\./);
+  assert.match(
+    writtenContent,
+    /\*\*Exercise:\*\* Chest and Curls · 26 min · 1 moves · chest\/arms · completed\./
+  );
+  assert.match(
+    writtenContent,
+    /\*\*1 Aug:\*\* Chadwick Flexington: Logged Chest and Curls \(1 moves, 26 min, chest\/arms\)\./
+  );
   assert.match(writtenContent, /Keep prior directives/);
 });
 
@@ -497,6 +531,139 @@ test('does not upsert a fitness template for a planned (not completed) workout',
   assert.ok(!calls.some(call => call.url.includes('data/fitness/templates/')), 'must not touch templates for a planned workout');
 });
 
+test('planned workout confirm does not write Central Node and reports the sync as fine', async () => {
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'The Full Send',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [{ name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 30, cable_type: 'none' }] }],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const response = await handler(request({ candidate: plannedCandidate, slug: 'workout-planned' }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.centralNodeUpdated, true);
+  assert.equal(payload.data.path, 'data/fitness/2026/08/2026-08-01-workout-planned.md');
+  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes('central-node.md')));
+});
+
+test('planned workout confirm amends the matching titled plan instead of a different same-day session', async () => {
+  const existingPath = 'data/fitness/2026/08/2026-08-01-workout-the-full-send.md';
+  const existingSha = 'e'.repeat(40);
+  const existingMarkdown = [
+    '---',
+    'title: "The Full Send"',
+    'session_kind: "strength"',
+    'status: "planned"',
+    'day_type: "workout_45_60"',
+    'schema_version: 1',
+    'id: "workout-old"',
+    'type: "workout"',
+    'date: "2026-08-01"',
+    'time: "16:07"',
+    '---',
+    ''
+  ].join('\n');
+  const plannedCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'The Full Send',
+      session_kind: 'strength',
+      day_type: 'workout_45_60',
+      status: 'planned',
+      recovery_flag_next_day: false,
+      exercises: [
+        { name: 'Bar Squat', sets: [{ reps: 10, weight_kg: 35, cable_type: 'none' }, { reps: 10, weight_kg: 35, cable_type: 'none' }] }
+      ],
+      pain_flags: []
+    }
+  };
+  const walkCandidate = {
+    type: 'workout',
+    date: '2026-08-01',
+    fields: {
+      title: 'Dog Walk Around the Block',
+      session_kind: 'walk',
+      day_type: 'movement',
+      status: 'planned',
+      duration_min: 35,
+      recovery_flag_next_day: false,
+      exercises: [],
+      pain_flags: []
+    }
+  };
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: existingPath, type: 'blob', sha: existingSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${existingSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(existingMarkdown, 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T16:00:00+10:00') });
+
+  const amendResponse = await handler(request({
+    candidate: plannedCandidate,
+    slug: 'workout-the-full-send',
+    overwrite: false
+  }));
+  const amendPayload = await amendResponse.json();
+  assert.equal(amendResponse.status, 200);
+  assert.equal(amendPayload.data.path, existingPath);
+  const amendPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes(existingPath));
+  assert.ok(amendPut, 'must overwrite the matching planned file');
+  assert.equal(JSON.parse(amendPut.options.body).sha, existingSha);
+
+  calls.length = 0;
+  const walkResponse = await handler(request({
+    candidate: walkCandidate,
+    slug: 'workout-dog-walk-around-the-block',
+    overwrite: false
+  }));
+  const walkPayload = await walkResponse.json();
+  assert.equal(walkResponse.status, 200);
+  assert.equal(walkPayload.data.path, 'data/fitness/2026/08/2026-08-01-workout-dog-walk-around-the-block.md');
+  assert.ok(calls.some(call => (
+    call.options?.method === 'PUT'
+    && call.url.includes('workout-dog-walk-around-the-block')
+  )), 'must create a second same-day planned file');
+  assert.ok(!calls.some(call => call.options?.method === 'PUT' && call.url.includes(existingPath)));
+});
 test('a failing template upsert never fails the confirm response', async () => {
   const workoutCandidate = {
     type: 'workout',
@@ -608,6 +775,233 @@ test('cn_patch confirm writes central-node.md for a confirm-class delete_lines p
   assert.match(JSON.parse(putCall.options.body).message, /chore\(cn\): Remove taper constraint/);
 });
 
+const PENDING_QUEUE_PATH = 'data/hammond/pending-cn-patches.json';
+
+function queuedEntry(id, patch = confirmPatch) {
+  return { id, createdAt: '2026-07-30', slug: 'hammond', patch };
+}
+
+test('cn_patch confirm loads the patch from the pending queue by id (ignoring a stale candidate) and dequeues it on success', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123'), queuedEntry('cnp_other', { ...confirmPatch, payload: { ...confirmPatch.payload, summary: 'Other' } })];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  // A deliberately different, invalid candidate -- proves the server prefers
+  // the stored patch found by id over whatever the client resubmitted.
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    id: 'cnp_abc123',
+    candidate: { section: 'not_a_real_section', op: 'append_line', payload: { summary: 'ignored' } }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.summary, 'Remove taper constraint');
+
+  const cnPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
+  assert.ok(cnPut);
+  const written = Buffer.from(JSON.parse(cnPut.options.body).content, 'base64').toString('utf8');
+  assert.doesNotMatch(written, /Steroid taper/);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('pending-cn-patches.json'));
+  assert.ok(queuePut, 'expected the queue to be rewritten to dequeue the confirmed entry');
+  const nextQueue = JSON.parse(Buffer.from(JSON.parse(queuePut.options.body).content, 'base64').toString('utf8'));
+  assert.equal(nextQueue.length, 1);
+  assert.equal(nextQueue[0].id, 'cnp_other');
+});
+
+test('cn_patch confirm falls back to the resubmitted candidate when the id is not found in the queue', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify([]), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'cn_patch',
+    slug: 'hammond',
+    id: 'cnp_gone',
+    candidate: confirmPatch
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.summary, 'Remove taper constraint');
+});
+
+test('cn_patch confirm write-conflict on central-node.md leaves the pending entry queued', async () => {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123')];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT' && url.includes('central-node.md')) {
+      return Response.json({ message: 'conflict' }, { status: 409 });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch', slug: 'hammond', id: 'cnp_abc123', candidate: confirmPatch }));
+  assert.equal(response.status, 409);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('pending-cn-patches.json'));
+  assert.equal(queuePut, undefined, 'the queue must not be touched when the Central Node write itself failed');
+});
+
+test('cn_patch_dismiss removes the queued entry and never touches central-node.md', async () => {
+  const queueSha = 'e'.repeat(40);
+  const queue = [queuedEntry('cnp_abc123'), queuedEntry('cnp_keep')];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }] });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond', id: 'cnp_abc123' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.data, { id: 'cnp_abc123', dismissed: true });
+  assert.equal(calls.some(call => call.url.includes('central-node.md')), false);
+
+  const queuePut = calls.find(call => call.options?.method === 'PUT');
+  assert.ok(queuePut);
+  const nextQueue = JSON.parse(Buffer.from(JSON.parse(queuePut.options.body).content, 'base64').toString('utf8'));
+  assert.deepEqual(nextQueue.map(entry => entry.id), ['cnp_keep']);
+});
+
+test('cn_patch_dismiss is idempotent for an unknown or already-removed id', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const treeFetchImpl = async (url, options) => {
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return fetchImpl(url, options);
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl: treeFetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond', id: 'cnp_never_existed' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.data, { id: 'cnp_never_existed', dismissed: true });
+  assert.equal(calls.some(call => call.options?.method === 'PUT'), false);
+});
+
+test('cn_patch_dismiss without an id is rejected', async () => {
+  const { fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({ env: validEnv, fetchImpl, now: () => Date.parse('2026-08-01T06:00:00Z') });
+
+  const response = await handler(request({ kind: 'cn_patch_dismiss', slug: 'hammond' }));
+  assert.equal(response.status, 400);
+});
+
 test('cn_patch confirm rejects auto-class patches with 400', async () => {
   const { calls, fetchImpl } = githubFetchStub();
   const handler = createChatConfirmHandler({
@@ -700,4 +1094,807 @@ test('cn_patch confirm rejects non-hammond slug', async () => {
   assert.equal(response.status, 400);
   assert.equal(payload.error.code, 'invalid_request');
   assert.equal(calls.length, 0);
+});
+
+test('action confirm writes allowlisted files and appends a Capability Action governance entry', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const proposal = {
+    capability: 'os.propose-action',
+    agent: 'brisket',
+    intent: 'open a 7-day no-refined-sugar tracker',
+    reads: [],
+    writes: [{
+      path: 'data/challenges/2026-08-01-no-sugar.json',
+      mode: 'create',
+      content: JSON.stringify({ title: 'No refined sugar', duration_days: 7 }, null, 2),
+      diff: 'new challenge file'
+    }],
+    surfaces: ['governance_log']
+  };
+
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: proposal
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.data.intent, 'open a 7-day no-refined-sugar tracker');
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('data/challenges/2026-08-01-no-sugar.json')));
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('data/governance/governance-log.md')));
+});
+
+test('action confirm rejects out-of-allowlist writes', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: {
+      intent: 'hack cn',
+      writes: [{ path: 'central-node.md', mode: 'overwrite', content: '# nope', diff: 'bad' }]
+    }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'invalid_action');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+});
+
+function memoryBlobStore(initial = {}) {
+  const data = { ...initial };
+  return {
+    async get(key) {
+      return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null;
+    },
+    async setJSON(key, value) {
+      data[key] = value;
+    },
+    data
+  };
+}
+
+function decodePut(call) {
+  return Buffer.from(JSON.parse(call.options.body).content, 'base64').toString('utf8');
+}
+
+test('action confirm returns 409 stale_write when a queued base no longer matches', async () => {
+  const queueSha = 'e'.repeat(40);
+  const fileSha = 'f'.repeat(40);
+  const path = 'data/challenges/2026-08-01-no-sugar.json';
+  const proposal = {
+    capability: 'os.propose-action',
+    agent: 'brisket',
+    intent: 'open a 7-day no-refined-sugar tracker',
+    reads: [],
+    writes: [{
+      path,
+      mode: 'overwrite',
+      content: JSON.stringify({ title: 'No refined sugar' }),
+      diff: 'replace challenge file'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [{
+    id: 'act_stale',
+    createdAt: '2026-08-01',
+    slug: 'brisket',
+    proposal,
+    bases: { [path]: { sha: 'old'.padEnd(40, '0'), missing: false } }
+  }];
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha },
+          { path, type: 'blob', sha: fileSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${fileSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from('{"title":"changed"}', 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    id: 'act_stale'
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'stale_write');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+});
+
+test('action confirm applies only accepted writes and records the decision', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+  const keep = 'data/challenges/2026-08-01-no-sugar.json';
+  const skip = 'data/remember/travel.md';
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    accept: [keep],
+    reason: 'Only the tracker this week',
+    revisit: '2026-09-12',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'brisket',
+      intent: 'open a tracker and a travel note',
+      reads: [],
+      writes: [
+        { path: keep, mode: 'create', content: '{"title":"No sugar"}', diff: 'new challenge' },
+        { path: skip, mode: 'create', content: 'Away\n', diff: 'new note' }
+      ],
+      surfaces: ['governance_log']
+    }
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.results.length, 1);
+  assert.equal(payload.data.results[0].path, keep);
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes(keep)));
+  assert.equal(calls.filter(call => call.options?.method === 'PUT' && call.url.includes('travel.md')).length, 0);
+  const govPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md'));
+  assert.ok(govPut);
+  const written = decodePut(govPut);
+  assert.match(written, /\*\*Chosen:\*\* Accepted `data\/challenges\/2026-08-01-no-sugar\.json`; rejected `data\/remember\/travel\.md`/);
+  assert.match(written, /\*\*Reasoning:\*\* Only the tracker this week/);
+  assert.match(written, /\*\*Revisit:\*\* 2026-09-12/);
+  assert.match(written, /skipped/);
+});
+
+test('action confirm writes a Tasks project blob and leaves GitHub files alone', async () => {
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'open the AOTFW project',
+      reads: [],
+      writes: [{
+        path: 'tasks:project:proj_aotfw',
+        mode: 'create',
+        content: JSON.stringify({ name: 'Artist of the Floating World', status: 'active' }),
+        diff: 'new project'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(store.data['projects/proj_aotfw'].name, 'Artist of the Floating World');
+  assert.equal(store.data['projects/proj_aotfw'].id, 'proj_aotfw');
+  assert.deepEqual(store.data['projects/_index'], ['proj_aotfw']);
+  assert.equal(
+    calls.filter(call => call.options?.method === 'PUT' && call.url.includes('tasks:project')).length,
+    0
+  );
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('governance-log.md')));
+  assert.equal(payload.data.results[0].path, 'tasks:project:proj_aotfw');
+});
+
+test('action confirm writes a Tasks task blob onto tasks/_index', async () => {
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const created = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'Create task: Draft appraisal SMART goals',
+      reads: [],
+      writes: [{
+        path: 'tasks:task:task_appraisal',
+        mode: 'create',
+        content: JSON.stringify({
+          title: 'Draft appraisal SMART goals',
+          domain: 'teaching',
+          description: 'Existing goals draft',
+          status: 'open'
+        }),
+        diff: 'new task'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  const createdPayload = await created.json();
+  assert.equal(created.status, 200);
+  assert.equal(store.data['tasks/task_appraisal'].title, 'Draft appraisal SMART goals');
+  assert.deepEqual(store.data['tasks/_index'], ['task_appraisal']);
+  assert.equal(createdPayload.data.results[0].path, 'tasks:task:task_appraisal');
+
+  const appended = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: 'Update task task_appraisal',
+      reads: [],
+      writes: [{
+        path: 'tasks:task:task_appraisal',
+        mode: 'append',
+        content: JSON.stringify({ append_description: 'Add evidence notes' }),
+        diff: 'append notes'
+      }],
+      surfaces: ['governance_log']
+    }
+  }));
+  assert.equal(appended.status, 200);
+  assert.equal(
+    store.data['tasks/task_appraisal'].description,
+    'Existing goals draft\n\nAdd evidence notes'
+  );
+});
+
+
+test('N: confirming pending A with B\'s write path is rejected; neither proposal is consumed or written', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathB]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'unknown_accept_path');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+  assert.equal(store.data['tasks/task_a'], undefined);
+  assert.equal(store.data['tasks/task_b'], undefined);
+  assert.equal(queue.map(entry => entry.id).join(','), 'act_a,act_b');
+});
+
+test('O: mixed accept list [A path, B path] fails atomically; A is not partially written', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  const queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathA, pathB]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'unknown_accept_path');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT').length, 0);
+  assert.equal(store.data['tasks/task_a'], undefined);
+  assert.equal(store.data['tasks/task_b'], undefined);
+});
+
+test('P: valid confirm of A persists A, consumes A, and leaves B pending', async () => {
+  const pathA = 'tasks:task:task_a';
+  const pathB = 'tasks:task:task_b';
+  const proposalA = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task A',
+    reads: [],
+    writes: [{
+      path: pathA,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task A', status: 'open' }),
+      diff: 'new task A'
+    }],
+    surfaces: ['governance_log']
+  };
+  const proposalB = {
+    capability: 'os.propose-action',
+    agent: 'clare',
+    intent: 'Create task B',
+    reads: [],
+    writes: [{
+      path: pathB,
+      mode: 'create',
+      content: JSON.stringify({ title: 'Task B', status: 'open' }),
+      diff: 'new task B'
+    }],
+    surfaces: ['governance_log']
+  };
+  let queue = [
+    { id: 'act_a', createdAt: '2026-08-01', slug: 'clare', proposal: proposalA },
+    { id: 'act_b', createdAt: '2026-08-01', slug: 'clare', proposal: proposalB }
+  ];
+  const queueSha = 'e'.repeat(40);
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      if (url.includes('pending-actions.json')) {
+        queue = JSON.parse(Buffer.from(JSON.parse(options.body).content, 'base64').toString('utf8'));
+      }
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_a',
+    accept: [pathA]
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(store.data['tasks/task_a'].title, 'Task A');
+  assert.equal(store.data['tasks/task_b'], undefined);
+  assert.equal(queue.length, 2);
+  const consumedA = queue.find((item) => item.id === 'act_a');
+  const pendingB = queue.find((item) => item.id === 'act_b');
+  assert.equal(consumedA?.status, 'consumed');
+  assert.ok(pendingB);
+  assert.notEqual(pendingB.status, 'consumed');
+  assert.ok(calls.some(call => call.options?.method === 'PUT' && call.url.includes('pending-actions.json')));
+});
+
+
+function clareTaskProposal(taskId, title) {
+  const path = `tasks:task:${taskId}`;
+  return {
+    path,
+    proposal: {
+      capability: 'os.propose-action',
+      agent: 'clare',
+      intent: `Create ${title}`,
+      reads: [],
+      writes: [{
+        path,
+        mode: 'create',
+        content: JSON.stringify({ title, status: 'open' }),
+        diff: `new ${title}`
+      }],
+      surfaces: ['governance_log']
+    }
+  };
+}
+
+function pendingActionsFetchImpl({ getQueue, setQueue, calls }) {
+  const queueSha = 'e'.repeat(40);
+  return async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [{ path: 'data/os/pending-actions.json', type: 'blob', sha: queueSha }]
+      });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({
+        encoding: 'base64',
+        content: Buffer.from(JSON.stringify(getQueue()), 'utf8').toString('base64')
+      });
+    }
+    if (options?.method === 'PUT') {
+      if (url.includes('pending-actions.json')) {
+        setQueue(JSON.parse(Buffer.from(JSON.parse(options.body).content, 'base64').toString('utf8')));
+      }
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+}
+
+test('Q: consumed pending id replay with same candidate is rejected; no second write', async () => {
+  const { path: pathQ, proposal } = clareTaskProposal('task_q', 'Task Q');
+  let queue = [{ id: 'act_q', createdAt: '2026-08-01', slug: 'clare', proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+
+  const first = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_q',
+    accept: [pathQ],
+    candidate: proposal
+  }));
+  assert.equal(first.status, 200);
+  assert.equal(store.data['tasks/task_q'].title, 'Task Q');
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_q');
+  assert.equal(queue[0].status, 'consumed');
+  const titleAfterFirst = store.data['tasks/task_q'].title;
+  const putsAfterFirst = calls.filter((call) => call.options?.method === 'PUT').length;
+
+  const replay = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_q',
+    accept: [pathQ],
+    candidate: proposal
+  }));
+  const replayPayload = await replay.json();
+  assert.equal(replay.status, 409);
+  assert.equal(replayPayload.error.code, 'pending_action_consumed');
+  assert.equal(store.data['tasks/task_q'].title, titleAfterFirst);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].status, 'consumed');
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, putsAfterFirst);
+});
+
+test('R: fake id plus valid candidate fails closed; candidate does not execute', async () => {
+  const { path: pathR, proposal } = clareTaskProposal('task_r', 'Task R');
+  let queue = [];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_does_not_exist',
+    accept: [pathR],
+    candidate: proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 404);
+  assert.equal(payload.error.code, 'pending_action_not_found');
+  assert.equal(store.data['tasks/task_r'], undefined);
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
+});
+
+test('S: wrong id plus valid A candidate rejects; A remains pending; nothing writes', async () => {
+  const a = clareTaskProposal('task_s_a', 'Task S A');
+  let queue = [{ id: 'act_s_a', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_unrelated',
+    accept: [a.path],
+    candidate: a.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 404);
+  assert.equal(payload.error.code, 'pending_action_not_found');
+  assert.equal(store.data['tasks/task_s_a'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_s_a');
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
+});
+
+test('T: existing A id plus tampered candidate B uses stored A only', async () => {
+  const a = clareTaskProposal('task_t_a', 'Task T A');
+  const b = clareTaskProposal('task_t_b', 'Task T B');
+  let queue = [{ id: 'act_t_a', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    id: 'act_t_a',
+    accept: [a.path],
+    candidate: b.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(store.data['tasks/task_t_a'].title, 'Task T A');
+  assert.equal(store.data['tasks/task_t_b'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_t_a');
+  assert.equal(queue[0].status, 'consumed');
+});
+
+test('U: agent ownership mismatch rejects; nothing writes; pending remains', async () => {
+  const a = clareTaskProposal('task_u', 'Task U');
+  let queue = [{ id: 'act_u', createdAt: '2026-08-01', slug: 'clare', proposal: a.proposal }];
+  const store = memoryBlobStore();
+  const calls = [];
+  const fetchImpl = pendingActionsFetchImpl({
+    getQueue: () => queue,
+    setQueue: (next) => { queue = next; },
+    calls
+  });
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getTasksStore: async () => store
+  });
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'brisket',
+    id: 'act_u',
+    accept: [a.path],
+    candidate: a.proposal
+  }));
+  const payload = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(payload.error.code, 'pending_action_agent_mismatch');
+  assert.equal(store.data['tasks/task_u'], undefined);
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, 'act_u');
+  assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
 });

@@ -1,0 +1,15 @@
+{
+  "id": "hammond.multiscale",
+  "tool_name": "multiscale_plan",
+  "verb": "Governance",
+  "agents": [
+    "hammond"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Quarter month week outcomes Hammond selects.",
+  "surfaces": [
+    "chat",
+    "governance_log"
+  ]
+}

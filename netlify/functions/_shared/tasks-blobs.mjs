@@ -1,0 +1,79 @@
+import { dedupeRecords, isIndexKey, listBlobKeys } from './blobs-list.mjs';
+import { UMBRELLA_BLOBS_SITE_ID, isUmbrellaBlobsHome } from './teaching-blobs.mjs';
+
+export const TASKS_CONTENT_STORE = 'tasks-hub-content';
+export const TASKS_BLOBS_SITE_ID = 'c6696619-f478-4ac1-b0cd-1e4cfd3101df';
+export const TASKS_BLOBS_SITE_ID_ENV = 'TASKS_BLOBS_SITE_ID';
+export const TASKS_BLOBS_TOKEN_ENV = 'NETLIFY_BLOBS_TOKEN';
+export const TASK_PREFIX = 'tasks/';
+export const TASKS_INDEX_KEY = 'tasks/_index';
+
+export { UMBRELLA_BLOBS_SITE_ID };
+
+export function tasksStoreOptions(env = process.env) {
+  const configured = typeof env?.[TASKS_BLOBS_SITE_ID_ENV] === 'string'
+    ? env[TASKS_BLOBS_SITE_ID_ENV].trim()
+    : '';
+  const siteID = configured || TASKS_BLOBS_SITE_ID;
+  const token = typeof env?.[TASKS_BLOBS_TOKEN_ENV] === 'string' ? env[TASKS_BLOBS_TOKEN_ENV] : '';
+  if (isUmbrellaBlobsHome(configured)) return TASKS_CONTENT_STORE;
+  if (token) return { name: TASKS_CONTENT_STORE, siteID, token };
+  return TASKS_CONTENT_STORE;
+}
+
+export async function defaultGetTasksStore(env = process.env) {
+  const { getStore } = await import('@netlify/blobs');
+  return getStore(tasksStoreOptions(env));
+}
+
+export async function getJSON(store, key) {
+  return store.get(key, { type: 'json' });
+}
+
+export async function setJSON(store, key, value) {
+  if (typeof store.setJSON === 'function') return store.setJSON(key, value);
+  if (typeof store.set === 'function') return store.set(key, JSON.stringify(value));
+  throw new Error('Tasks content store cannot write.');
+}
+
+export async function deleteKey(store, key) {
+  if (typeof store.delete !== 'function') {
+    throw new Error('Tasks content store cannot delete.');
+  }
+  return store.delete(key);
+}
+
+export async function listJSON(store, prefix) {
+  const keys = (await listBlobKeys(store, prefix)).filter(key => !isIndexKey(key));
+  const entries = await Promise.all(keys.map(key => getJSON(store, key)));
+  return dedupeRecords(entries);
+}
+
+export function taskKey(id) {
+  return `${TASK_PREFIX}${id}`;
+}
+
+export function newTaskId() {
+  return `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function readIndex(store, key) {
+  const index = await getJSON(store, key);
+  return Array.isArray(index) ? index.filter(id => typeof id === 'string') : [];
+}
+
+export async function writeIndex(store, key, ids) {
+  await setJSON(store, key, [...new Set(ids)]);
+}
+
+export async function readTaskIndex(store) {
+  return readIndex(store, TASKS_INDEX_KEY);
+}
+
+export async function writeTaskIndex(store, ids) {
+  return writeIndex(store, TASKS_INDEX_KEY, ids);
+}
+
+export function newRecordId(prefix) {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}

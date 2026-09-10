@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlannedCandidateFromTemplate } from '../../js/app/template-to-planned.js';
+import { buildPlannedCandidateFromTemplate } from '../../apps/life/js/app/template-to-planned.js';
 
 test('buildPlannedCandidateFromTemplate copies prescription into a planned workout', () => {
   const built = buildPlannedCandidateFromTemplate({
@@ -25,5 +25,13 @@ test('buildPlannedCandidateFromTemplate copies prescription into a planned worko
   assert.deepEqual(built.candidate.fields.focus, ['chest', 'arms']);
   assert.equal(built.candidate.fields.exercises[0].name, 'Cable Fly');
   assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
-  assert.equal(built.slug, 'workout-0730');
+  assert.equal(built.slug, 'workout-chest-and-curls');
+});
+
+test('buildPlannedCandidateFromTemplate coerces none cable_type to constant force', () => {
+  const built = buildPlannedCandidateFromTemplate({
+    title: 'Pull',
+    exercises: [{ name: 'Pull Up', sets: [{ reps: 8, weight_kg: 0, cable_type: 'none' }] }]
+  }, { date: '2026-08-07' });
+  assert.equal(built.candidate.fields.exercises[0].sets[0].cable_type, 'constant_force');
 });

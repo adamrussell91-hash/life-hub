@@ -5,10 +5,10 @@ import { createSkincareRoutinesHandler } from '../../netlify/functions/skincare-
 import {
   SKINCARE_PRODUCT_LIBRARY_PATH,
   slugifyProductId
-} from '../../js/app/skincare-product-library.js';
-import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../js/app/skincare-routine-membership.js';
-import { SKINCARE_CATALOG_PATH } from '../../js/app/skincare-catalog.js';
-import { SKINCARE_ROUTINES } from '../../js/app/skincare-routines-data.js';
+} from '../../apps/life/js/app/skincare-product-library.js';
+import { SKINCARE_ROUTINE_MEMBERSHIP_PATH } from '../../apps/life/js/app/skincare-routine-membership.js';
+import { SKINCARE_CATALOG_PATH } from '../../apps/life/js/app/skincare-catalog.js';
+import { SKINCARE_ROUTINES } from '../../apps/life/js/app/skincare-routines-data.js';
 
 const SECRET = 's'.repeat(32);
 const COMMIT_SHA = 'c'.repeat(40);

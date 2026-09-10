@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
+import { UMBRELLA_SESSION_COOKIE } from './umbrella-auth.mjs';
 import { promisify } from 'node:util';
 
 const scryptAsync = promisify(scrypt);
@@ -6,10 +7,12 @@ const SCRYPT_COST = 16_384;
 const SCRYPT_BLOCK_SIZE = 8;
 const SCRYPT_PARALLELIZATION = 1;
 const HASH_LENGTH = 32;
-const SESSION_MS = 8 * 60 * 60 * 1000;
-// SameSite=None (not Strict) because the site (GitHub Pages) and this cookie's issuer
-// (Netlify Functions) are different origins; Secure is required whenever SameSite=None.
-const SESSION_COOKIE_ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=None';
+export const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_REFRESH_AFTER_MS = SESSION_MS / 2;
+// life-hub.adam-russell.com and api.adam-russell.com share the same registrable domain,
+// so SameSite=Lax keeps the cookie first-party on mobile Safari while still sending it
+// on same-site cross-origin fetch(..., { credentials: 'include' }).
+const SESSION_COOKIE_ATTRIBUTES = 'Path=/; Secure; HttpOnly; SameSite=Lax';
 
 export async function createPassphraseHash(passphrase, { salt = randomBytes(16) } = {}) {
   const saltBuffer = Buffer.from(salt);
@@ -65,11 +68,18 @@ export function verifySessionToken(token, secret, now = Date.now()) {
 }
 
 export function serializeSessionCookie(token) {
-  return `life_hub_session=${token}; Max-Age=28800; ${SESSION_COOKIE_ATTRIBUTES}`;
+  const maxAgeSeconds = Math.floor(SESSION_MS / 1000);
+  return `${UMBRELLA_SESSION_COOKIE}=${token}; Max-Age=${maxAgeSeconds}; ${SESSION_COOKIE_ATTRIBUTES}`;
+}
+
+export function shouldRefreshSession(payload, now = Date.now()) {
+  if (!payload || !Number.isFinite(payload.iat) || !Number.isFinite(payload.exp)) return false;
+  const remaining = payload.exp - now;
+  return remaining > 0 && remaining <= SESSION_REFRESH_AFTER_MS;
 }
 
 export function serializeExpiredSessionCookie() {
-  return `life_hub_session=; Max-Age=0; ${SESSION_COOKIE_ATTRIBUTES}`;
+  return `${UMBRELLA_SESSION_COOKIE}=; Max-Age=0; ${SESSION_COOKIE_ATTRIBUTES}`;
 }
 
 async function derivePassphraseHash(passphrase, salt) {

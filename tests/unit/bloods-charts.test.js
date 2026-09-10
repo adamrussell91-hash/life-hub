@@ -16,7 +16,7 @@ import {
   buildFbcRadial,
   buildGlucoseMap,
   buildLipidRings
-} from '../../js/app/bloods-charts.js';
+} from '../../apps/life/js/app/bloods-charts.js';
 
 test('rangeBarLayout places an in-range value between the ends', () => {
   const layout = rangeBarLayout(20, 10, 30, { width: 320, padding: 10 });
@@ -158,7 +158,7 @@ test('nextComparePins pins two points then resets on a third', () => {
 });
 
 test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothing is letterboxed', () => {
-  const js = readFileSync(new URL('../../js/app/bloods-charts.js', import.meta.url), 'utf8');
+  const js = readFileSync(new URL('../../apps/life/js/app/bloods-charts.js', import.meta.url), 'utf8');
   const read = name => Number(new RegExp(`const ${name} = (\\d+)`).exec(js)?.[1]);
   const width = read('CHART_WIDTH');
   const height = read('CHART_HEIGHT');
@@ -175,7 +175,7 @@ test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothi
   assert.ok(width && height && meterWidth && meterHeight && combinedWidth && combinedHeight);
   assert.ok(radialWidth && radialHeight && glucoseWidth && glucoseHeight && ringsWidth && ringsHeight);
 
-  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   for (const [selector, ratio] of [
     ['\\.bloods-metric \\.body-chart', `${width} / ${height}`],
     ['\\.bloods-row__meter \\.body-chart', `${meterWidth} / ${meterHeight}`],
@@ -194,7 +194,7 @@ test('chart viewBoxes match the aspect ratio the stylesheet gives them, so nothi
 });
 
 test('biochemistry instrument viewBoxes match their CSS geometry', () => {
-  const js = readFileSync(new URL('../../js/app/bloods-instruments.js', import.meta.url), 'utf8');
+  const js = readFileSync(new URL('../../apps/life/js/app/bloods-instruments.js', import.meta.url), 'utf8');
   const read = name => Number(new RegExp(`(?:export )?const ${name} = (\\d+)`).exec(js)?.[1]);
   const meterWidth = read('INSTRUMENT_METER_WIDTH');
   const meterHeight = read('INSTRUMENT_METER_HEIGHT');
@@ -204,7 +204,7 @@ test('biochemistry instrument viewBoxes match their CSS geometry', () => {
   const proteinHeight = read('PROTEIN_HEIGHT');
   assert.ok(meterWidth && meterHeight && tubeWidth && tubeHeight && proteinWidth && proteinHeight);
 
-  const css = readFileSync(new URL('../../css/app.css', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8');
   for (const [selector, ratio] of [
     ['\\.bloods-instrument-meter\\s*', `${meterWidth} / ${meterHeight}`],
     ['\\.bloods-tube\\s*', `${tubeWidth} / ${tubeHeight}`],

@@ -1,0 +1,7 @@
+{
+  "id": "kate-semple-therapy",
+  "agents": ["sara"],
+  "capacities": ["log.entry", "research.save-brief"],
+  "summary": "Kate Semple psychology sessions are part of the MHCP / mental-health lane on Medical Overview.",
+  "guidance": "When Adam asks about Kate Semple visits (location, cost, insurance, last session), call search_medical_records before answering. Do not invent address or fee — retrieve from Medical Overview. Coordinate mood/anxiety handoffs to Vera via CN one-liners when clinically relevant."
+}

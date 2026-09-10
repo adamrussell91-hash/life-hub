@@ -76,6 +76,42 @@ test('an empty food library falls back to a plain web_search instruction', () =>
   assert.doesNotMatch(prompt, /Food Library:/);
 });
 
+
+test('Sara prompt mandates Medical Overview read tools and rejects Notion-as-store', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'sara',
+    digest: '',
+    constraints: '',
+    capacities: '- research.save-brief: Save a research brief',
+    intuition: 'Built intuition:\n- stelara-cycle: Stelara cadence'
+  });
+  assert.match(prompt, /search_medical_records/);
+  assert.match(prompt, /brief_medical_appointment/);
+  assert.match(prompt, /Medical Overview is the medical record in Life Hub/);
+  assert.match(prompt, /not Notion/);
+  assert.match(prompt, /capacities this turn/i);
+  assert.match(prompt, /stelara-cycle/);
+  assert.match(prompt, /tool-using specialist|domain read or write tool/i);
+});
+
+test('every agent prompt includes the os_propose_action open-hands mandate', () => {
+  for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'penelope', 'sara', 'vera', 'hammond']) {
+    const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
+    assert.match(prompt, /os_propose_action/);
+    assert.match(prompt, /never lack the ability to act/i);
+  }
+});
+
+test('shared prompt tells every agent to iterate on web search with no use cap', () => {
+  for (const slug of ['brisket', 'chadwick', 'hyaluronica', 'sara', 'hammond']) {
+    const prompt = buildSystemPrompt({ slug, digest: '', constraints: '' });
+    assert.match(prompt, /Web search has no use cap/);
+    assert.match(prompt, /work iteratively/);
+    assert.match(prompt, /first-result miss is not permission to guess/);
+    assert.doesNotMatch(prompt, /don't run multiple searches to cross-verify/);
+  }
+});
+
 test('a populated food library is included with instructions to check it before searching', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250' });
   assert.match(prompt, /check the Food Library below first/);
@@ -184,13 +220,18 @@ test('chadwick prompt omits the body state block when empty', () => {
   assert.doesNotMatch(prompt, /Body state/i);
 });
 
-test('non-chadwick, non-brisket agents never receive the body-state block', () => {
-  const prompt = buildSystemPrompt({
+test('sara receives a body-state snapshot; hyaluronica does not', () => {
+  const sara = buildSystemPrompt({
     slug: 'sara',
     bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
   });
-  assert.doesNotMatch(prompt, /reference body trend/i);
-  assert.doesNotMatch(prompt, /Shoulder:waist ratio: 1\.43/);
+  assert.match(sara, /Shoulder:waist ratio: 1\.43/);
+  assert.doesNotMatch(sara, /reference body trend/i);
+  const hyaluronica = buildSystemPrompt({
+    slug: 'hyaluronica',
+    bodyState: 'Shoulder:waist ratio: 1.43 (improving).'
+  });
+  assert.doesNotMatch(hyaluronica, /Shoulder:waist ratio: 1\.43/);
 });
 
 test('brisket prompt includes the body state block when provided, framed as his lane to address', () => {
@@ -210,9 +251,101 @@ test('brisket prompt omits the body state block when empty', () => {
 test('chadwick prompt reports days since last session and instructs him to lower the bar at 2+ missed days', () => {
   const prompt = buildSystemPrompt({ slug: 'chadwick', daysSinceLastSession: 3 });
   assert.match(prompt, /3 days since/i);
-  assert.match(prompt, /lower the bar/i);
   assert.match(prompt, /10-minute/i);
   assert.match(prompt, /never a guilt trip/i);
+  assert.match(prompt, /honor that shape|explicit override/i);
+  assert.match(prompt, /do not keep rewriting/i);
+});
+
+test('chadwick prompt includes recent sessions and tells him to answer last-workout questions from them', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    lastWorkouts: '- 2026-09-01 · completed · Planned session — Bar Press, Curl — notes: AC clear — pain: right AC: mild'
+  });
+  assert.match(prompt, /Recent sessions/);
+  assert.match(prompt, /2026-09-01/);
+  assert.match(prompt, /Planned session/);
+  assert.match(prompt, /get_last_workout|search_workout_records/);
+  assert.match(prompt, /never guess|do not claim you cannot see history|never say you have no record/i);
+  assert.match(prompt, /notes:|pain:/);
+  assert.match(prompt, /read them before programming|pain flags/i);
+});
+
+test('chadwick prompt tells him the default is a new unique session, not a rerun of the last title', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(prompt, /new uniquely titled session|NEW uniquely titled session/i);
+  assert.match(prompt, /unless Adam asks to repeat/i);
+});
+
+test('chadwick prompt omits the recent-sessions block when empty', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', lastWorkouts: '' });
+  assert.doesNotMatch(prompt, /Recent sessions/);
+});
+
+test('chadwick prompt includes computed 8-week training volume and forbids guessing it', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'chadwick',
+    workoutWindowCompare: [
+      'Computed training volume (do not re-count or estimate — this is the number):',
+      'Last 8 weeks (2026-06-17 to 2026-08-11): 12 completed workouts.',
+      'Previous 8 weeks (2026-04-22 to 2026-06-16): 9 completed workouts.',
+      'Delta: +3.'
+    ].join('\n')
+  });
+  assert.match(prompt, /Computed training volume/);
+  assert.match(prompt, /12 completed workouts/);
+  assert.match(prompt, /compare_workout_windows/);
+  assert.match(prompt, /not an estimate|Do not recount/i);
+});
+
+test('chadwick prompt delivers Region strength and forbids claiming the Fitness tile is unreadable', () => {
+  const withBlock = buildSystemPrompt({
+    slug: 'chadwick',
+    regionStrength: [
+      'Computed Region strength (identical to the Fitness page Region strength tiles):',
+      '- Chest: best-set Δ -2 kg (38 kg best); volume -5%'
+    ].join('\n')
+  });
+  assert.match(withBlock, /Computed Region strength/);
+  assert.match(withBlock, /Chest: best-set Δ -2 kg/);
+  assert.match(withBlock, /volume -5%/);
+  assert.match(withBlock, /get_region_strength/);
+
+  const fallback = buildSystemPrompt({ slug: 'chadwick' });
+  assert.match(fallback, /get_region_strength/);
+  assert.match(fallback, /never claim the tile is a computed widget you cannot read|never claim those tiles are UI-only/i);
+  assert.match(fallback, /get_fitness_snapshot/);
+  assert.match(fallback, /get_training_volume/);
+  assert.match(fallback, /get_body_state/);
+  assert.match(fallback, /get_workout_template/);
+  assert.match(fallback, /never claim those pages are UI-only widgets you cannot read/i);
+});
+
+test('non-chadwick agents never receive the Region strength block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    regionStrength: 'Computed Region strength (identical to the Fitness page Region strength tiles):'
+  });
+  assert.doesNotMatch(prompt, /Computed Region strength/);
+  assert.doesNotMatch(prompt, /get_region_strength/);
+});
+
+test('non-chadwick agents never receive the computed training volume block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    workoutWindowCompare: 'Computed training volume (do not re-count or estimate — this is the number):'
+  });
+  assert.doesNotMatch(prompt, /Computed training volume/);
+  assert.doesNotMatch(prompt, /compare_workout_windows/);
+});
+
+test('non-chadwick agents never receive the recent-sessions block', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    lastWorkouts: '- 2026-09-01 · completed · Planned session'
+  });
+  assert.doesNotMatch(prompt, /Recent sessions/);
+  assert.doesNotMatch(prompt, /get_last_workout/);
 });
 
 test('chadwick prompt omits the adherence line when days-since-last-session is unknown (null)', () => {
@@ -292,6 +425,9 @@ test('Chadwick prompt requires planned log_entry after design and CN-shaped prog
   assert.match(prompt, /MUST use/i);
   assert.match(prompt, /shape the prescription/i);
   assert.match(prompt, /mention that influence/i);
+  assert.match(prompt, /AMEND it/i);
+  assert.match(prompt, /put it into action|lock it in/i);
+  assert.match(prompt, /Never say locked in/i);
 });
 
 test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', () => {
@@ -299,6 +435,9 @@ test('the checked-in Chadwick protocol resolves the Job/stay-in-chat conflict', 
   assert.match(protocol, /design, build, or set today.s session/i);
   assert.match(protocol, /status: planned/i);
   assert.match(protocol, /Confirm card/i);
+  assert.match(protocol, /Amend, don't rebuild/i);
+  assert.match(protocol, /Honor an explicit override/i);
+  assert.doesNotMatch(protocol, /never the full programmed session/i);
   assert.doesNotMatch(protocol, /stay in chat until he asks to commit/i);
   assert.doesNotMatch(protocol, /When he asks you to lock today's session onto Fitness/);
 });
@@ -334,13 +473,31 @@ test('brisket prompt includes protocol when provided', () => {
   assert.match(prompt, /Brisket operating manual/);
   assert.match(prompt, /Food Library first/);
   assert.match(prompt, /compact verdict/i);
+  assert.match(prompt, /Nutrition lookup is a pipeline/);
+  assert.match(prompt, /comparable AU restaurant nutrition/);
+});
+
+test('food-search instructions require iterative venue resolution instead of one-shot guessing', () => {
+  const empty = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
+  const withLibrary = buildSystemPrompt({
+    slug: 'brisket',
+    digest: '',
+    constraints: '',
+    foodLibrary: '- Domino\'s Meatlovers Pizza (1 slice) — calories=250'
+  });
+  for (const prompt of [empty, withLibrary]) {
+    assert.match(prompt, /never .{0,2}too generic to search/i);
+    assert.match(prompt, /venue \+ location \+ item/);
+    assert.match(prompt, /do not guess and do not stop/i);
+    assert.doesNotMatch(prompt, /One solid Australian source is enough/);
+  }
 });
 
 test('shared logging prompt: proposals await Confirm; estimates are last resort; never fake a completed log', () => {
   const prompt = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '' });
   assert.match(prompt, /awaiting confirm|Confirm card|before that record is saved/i);
   assert.match(prompt, /do not (say|claim|tell).{0,60}(logged|saved to (Nutrition|today))/i);
-  assert.match(prompt, /Only fall back to a good-faith estimate when/i);
+  assert.match(prompt, /Only fall back to a labelled estimate after/i);
   assert.match(prompt, /partial|incomplete|re-search|ask Adam for the AU label/i);
   assert.match(prompt, /do not (call )?save_food_library_entry.{0,80}estimate/i);
 });
@@ -484,6 +641,30 @@ test('non-hammond prompts never include hammondCnSummary', () => {
   assert.equal(prompt.includes('Central Node computed snapshot'), false);
 });
 
+test('Hammond prompt includes pending Central Node patches when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    pendingCnPatches: '- [cnp_abc123] (proposed 2026-08-29): Condense Trends. (section: long_term_trends, op: condense)'
+  });
+  assert.match(prompt, /Pending Central Node patches awaiting Adam's Confirm/);
+  assert.match(prompt, /cnp_abc123/);
+  assert.match(prompt, /do not silently re-propose the same edit/);
+});
+
+test('Hammond prompt omits the pending patches block when none are provided', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond' });
+  assert.equal(prompt.includes('Pending Central Node patches'), false);
+});
+
+test('non-hammond prompts never include pendingCnPatches', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    pendingCnPatches: '- [cnp_abc123] (proposed 2026-08-29): Condense Trends. (section: long_term_trends, op: condense)'
+  });
+  assert.equal(prompt.includes('cnp_abc123'), false);
+  assert.equal(prompt.includes('Pending Central Node patches'), false);
+});
+
 test('non-hammond prompts never include hammondDigest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',
@@ -499,6 +680,21 @@ test('vera protocol restore includes diagnostic, ACE, and mind_session logging',
   assert.match(text, /Dropping Anchor/);
   assert.match(text, /mind_session/);
   assert.doesNotMatch(text, /You do not propose `log_entry`/);
+});
+
+test('vera protocol includes session verification and chat preview rules', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /Checking whether a session logged/);
+  assert.match(text, /Showing log content in chat/);
+  assert.match(text, /Never deny a save/);
+});
+
+test('vera protocol includes data and search routing for repo tools', () => {
+  const text = loadVeraProtocol();
+  assert.match(text, /Data & search/);
+  assert.match(text, /get_mind_session/);
+  assert.match(text, /search_mind_records/);
+  assert.match(text, /is not repo search/);
 });
 
 test('vera protocol retries a rejected log_entry and tells Adam what changed', () => {
@@ -521,6 +717,15 @@ test('penelope protocol retries a rejected log_entry and tells Adam what changed
   assert.match(text, /If `log_entry` returns an error/);
   assert.match(text, /omit `cross_agent_note`/);
   assert.match(text, /tell Adam/i);
+  assert.match(text, /confirm logged/i);
+  assert.match(text, /awaiting_confirm/);
+});
+
+test('penelope prompt requires same-turn log_entry on finalize and forbids vault theatre', () => {
+  const prompt = buildSystemPrompt({ slug: 'penelope' });
+  assert.match(prompt, /confirm logged/i);
+  assert.match(prompt, /awaiting_confirm/);
+  assert.match(prompt, /heading to the vault/i);
 });
 
 test('hammond protocol includes Mind domain brief and retrospective', () => {
@@ -535,12 +740,18 @@ test('vera prompt includes mind diary and session digest and lists mind_session'
     slug: 'vera',
     mindDiaryDigest: 'Diary (metadata only): 2026-08-10 mood low',
     mindSessionDigest: 'thread: What is the weekend actually for?',
+    mindTodaySession: "Today's mind_session (2026-08-26): logged.\ntheme: fear of authority",
     mindSilence: 'Mind silence: both quiet 8d'
   });
   assert.match(prompt, /mind_session/);
   assert.doesNotMatch(prompt, /You do not propose log_entry/);
   assert.match(prompt, /Diary \(metadata only\)/);
   assert.match(prompt, /What is the weekend actually for/);
+  assert.match(prompt, /Today's mind_session/);
+  assert.match(prompt, /fear of authority/);
+  assert.match(prompt, /never deny a save visible in tool results/i);
+  assert.match(prompt, /get_mind_session/);
+  assert.match(prompt, /search_mind_records/);
   assert.match(prompt, /Mind silence/);
 });
 
@@ -610,12 +821,111 @@ test('non-hammond prompts never include hammondMindAmbient', () => {
   assert.doesNotMatch(prompt, /Ambient leak/);
 });
 
+test('hammond prompt includes hubContext when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hubContext: 'Other hubs (live umbrella stores):\nTasks: Call Clare (life, open)'
+  });
+  assert.match(prompt, /Other hubs \(live umbrella stores\)/);
+  assert.match(prompt, /Call Clare/);
+});
+
+test('non-hammond prompts never include hubContext', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'brisket',
+    hubContext: 'Other hubs leak: Call Clare'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+  assert.doesNotMatch(prompt, /Call Clare/);
+});
+
 test('brisket prompt never receives mind diary digest', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',
     mindDiaryDigest: 'Diary leak'
   });
   assert.doesNotMatch(prompt, /Diary leak/);
+});
+
+test('clare prompt instructs Cross-Agent read before dump and a restricted CN patch', () => {
+  const prompt = buildSystemPrompt({ slug: 'clare' });
+  assert.match(prompt, /Hammond→Clare/);
+  assert.match(prompt, /before triaging a dump/);
+  assert.match(prompt, /propose_central_node_patch/);
+  assert.match(prompt, /cross_agent/);
+  assert.match(prompt, /Clare→\[Agent\]/);
+  assert.match(prompt, /create_task/);
+  assert.match(prompt, /update_task/);
+  assert.match(prompt, /Do not invent GitHub file paths for tasks/);
+  assert.match(prompt, /Never name tools, schemas, batch caps/);
+  assert.match(prompt, /split silently and keep adding/);
+  assert.match(prompt, /NEVER merge distinct pieces of work/);
+  assert.match(prompt, /One card per distinct action/);
+});
+
+test('clare prompt does not include hubContext even when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'clare',
+    hubContext: 'Other hubs leak: Call Clare'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+});
+
+test('ann prompt instructs Cross-Agent read before respond and a restricted CN patch', () => {
+  const prompt = buildSystemPrompt({ slug: 'ann' });
+  assert.match(prompt, /Hammond→Ann/);
+  assert.match(prompt, /before responding/);
+  assert.match(prompt, /propose_central_node_patch/);
+  assert.match(prompt, /cross_agent/);
+  assert.match(prompt, /Ann→\[Agent\]/);
+  assert.match(prompt, /lesson\/load/);
+});
+
+test('ann prompt does not include hubContext even when provided', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'ann',
+    hubContext: 'Other hubs leak: upcoming lesson'
+  });
+  assert.doesNotMatch(prompt, /Other hubs leak/);
+});
+
+test('hammond stale_drift prompt keeps Other hubs snapshot and Ann relay together', () => {
+  const prompt = buildSystemPrompt({
+    slug: 'hammond',
+    hubContext: 'Other hubs (live umbrella stores):\nTeaching: 11PSYCHA Thursday',
+    hammondAuditContract: 'Also use the Other hubs block already in this prompt (open Tasks, active classes, upcoming Teaching lessons).'
+  });
+  assert.match(prompt, /11PSYCHA Thursday/);
+  assert.match(prompt, /Other hubs block already in this prompt/);
+  assert.match(prompt, /Hammond→Ann/);
+  assert.doesNotMatch(prompt, /Clementine Blocks|clementineBlocks/);
+});
+
+test('hammond prompt relays to both Clare and Ann', () => {
+  const prompt = buildSystemPrompt({ slug: 'hammond' });
+  assert.match(prompt, /Hammond→Clare/);
+  assert.match(prompt, /Hammond→Ann/);
+  assert.match(prompt, /Clare→Hammond/);
+  assert.match(prompt, /Ann→Hammond/);
+  assert.match(prompt, /Do not address Clementine/);
+});
+
+test('non-clare prompts never include clareBlocks dump-triage prose', () => {
+  const prompt = buildSystemPrompt({ slug: 'brisket' });
+  assert.doesNotMatch(prompt, /before triaging a dump/);
+  assert.doesNotMatch(prompt, /Clare→\[Agent\]/);
+});
+
+test('non-ann prompts never include annBlocks lesson-collision prose', () => {
+  const prompt = buildSystemPrompt({ slug: 'clare' });
+  assert.doesNotMatch(prompt, /lesson\/load/);
+  assert.doesNotMatch(prompt, /Ann→\[Agent\]/);
+});
+
+test('clementine prompt does not gain a Knowledge coordination block', () => {
+  const prompt = buildSystemPrompt({ slug: 'clementine' });
+  assert.doesNotMatch(prompt, /propose_central_node_patch/);
+  assert.doesNotMatch(prompt, /Knowledge Hub coordination/);
 });
 
 test('protocolSteer is injected after voice so the model stays in character', () => {
@@ -629,4 +939,11 @@ test('protocolSteer is injected after voice so the model stays in character', ()
   const voiceAt = prompt.indexOf('You ARE Brisket Lasso');
   const steerAt = prompt.indexOf('Flare-up eating');
   assert.ok(voiceAt >= 0 && steerAt > voiceAt);
+});
+
+
+test('Chadwick persona requires web_search for exercise-science grounding', () => {
+  const prompt = buildSystemPrompt({ slug: 'chadwick', digest: '', constraints: '' });
+  assert.match(prompt, /actively use web_search for exercise-science sources/);
+  assert.match(prompt, /This Week on Central Node includes EP/);
 });

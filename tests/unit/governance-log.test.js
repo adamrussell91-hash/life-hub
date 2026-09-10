@@ -9,8 +9,13 @@ import {
   recentGovernanceTail,
   parseGovernanceEntries,
   openGovernanceEntries,
-  oldestOpenGovernanceEntry
-} from '../../js/core/governance-log.js';
+  oldestOpenGovernanceEntry,
+  latestHammondReview,
+  formatHammondReviewLine,
+  isOpenLoopEntry,
+  decisionTraces,
+  tracesForRef
+} from '../../apps/life/js/core/governance-log.js';
 
 test('path is data/governance/governance-log.md', () => {
   assert.equal(GOVERNANCE_LOG_PATH, 'data/governance/governance-log.md');
@@ -73,8 +78,31 @@ test('parseGovernanceEntries extracts date, type, status, title, and body', () =
     entryType: 'Drift Detection',
     title: 'Life worth enjoying',
     status: 'Still Active',
+    chosen: null,
+    reasoning: null,
+    revisit: null,
+    decisionId: null,
+    about: [],
     body: 'Stalled sleep goal.'
   });
+});
+
+test('formatGovernanceEntry writes Chosen, Reasoning, and Revisit as decision fields', () => {
+  const md = formatGovernanceEntry({
+    dateKey: '2026-09-05',
+    entryType: 'Capability Action',
+    title: 'Open a tracker',
+    status: 'Resolved',
+    chosen: 'Approved',
+    reasoning: 'Keep the no-sugar week honest',
+    revisit: '2026-09-12',
+    body: 'Wrote data/challenges/no-sugar.json'
+  });
+  const [entry] = parseGovernanceEntries(md);
+  assert.equal(entry.chosen, 'Approved');
+  assert.equal(entry.reasoning, 'Keep the no-sugar week honest');
+  assert.equal(entry.revisit, '2026-09-12');
+  assert.equal(entry.body, 'Wrote data/challenges/no-sugar.json');
 });
 
 test('parseGovernanceEntries returns [] for empty log', () => {
@@ -123,6 +151,56 @@ test('openGovernanceEntries includes malformed dateKey entries without ageDays',
   assert.equal(open[0].entryType, 'Drift Detection');
 });
 
+test('openGovernanceEntries skips Mind Insights and completed review notes', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-03-10',
+    entryType: 'Mind Insight',
+    title: 'Mar 2026 — Pattern Review: First Year',
+    body: 'Historical synthesis.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-09',
+    entryType: 'Weekly Review',
+    title: 'Lock is marking',
+    body: 'Protein held.'
+  });
+  assert.deepEqual(openGovernanceEntries(log, '2026-09-06'), []);
+});
+
+test('latestHammondReview returns the newest fresh review and ignores Pattern Reviews', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-03-10',
+    entryType: 'Mind Insight',
+    title: 'Mar 2026 — Pattern Review: First Year',
+    body: 'Historical synthesis.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-02',
+    entryType: 'Weekly Review',
+    title: 'Stale week',
+    body: 'Too old.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-05',
+    entryType: 'Weekly Review',
+    title: 'Lock is marking',
+    body: 'Protein held.'
+  });
+  const review = latestHammondReview(log, '2026-09-06');
+  assert.equal(review.title, 'Lock is marking');
+  assert.equal(formatHammondReviewLine(review), 'Hammond: Lock is marking');
+  assert.equal(latestHammondReview(log, '2026-10-01'), null);
+});
+
+test('isOpenLoopEntry is only unresolved drift / tension / decision / escalation', () => {
+  assert.equal(isOpenLoopEntry({ entryType: 'Drift Detection', status: 'Still Active' }), true);
+  assert.equal(isOpenLoopEntry({ entryType: 'Mind Insight' }), false);
+  assert.equal(isOpenLoopEntry({ entryType: 'Weekly Review' }), false);
+  assert.equal(isOpenLoopEntry({ entryType: 'Major Decision', status: 'Resolved' }), false);
+});
+
 test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
   let log = emptyGovernanceLog();
   log = appendGovernanceEntry(log, {
@@ -148,6 +226,140 @@ test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {
   const oldest = oldestOpenGovernanceEntry(log, '2026-08-11');
   assert.equal(oldest.dateKey, '2026-05-24');
   assert.equal(oldest.ageDays, 79);
+});
+
+test('format and parse keep chosen, reasoning, and revisit on a decision', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-01',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    status: 'Still Active',
+    chosen: 'Drop one elective',
+    reasoning: 'Two units plus teaching is too much.',
+    revisit: '2026-10-01',
+    body: 'Hold the extra unit for summer.'
+  });
+  const [entry] = parseGovernanceEntries(log);
+  assert.equal(entry.chosen, 'Drop one elective');
+  assert.equal(entry.reasoning, 'Two units plus teaching is too much.');
+  assert.equal(entry.revisit, '2026-10-01');
+  assert.equal(entry.body, 'Hold the extra unit for summer.');
+});
+
+test('format and parse keep a decision id and About hub-refs', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-09-01',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw', 'knowledge:page:page_aotfw', 'life:decision:aotfw-sources'],
+    chosen: 'Keep the unit linked',
+    body: 'Identity lives on the Knowledge page.'
+  });
+  const [entry] = parseGovernanceEntries(log);
+  assert.equal(entry.decisionId, 'aotfw-sources');
+  assert.deepEqual(entry.about, [
+    'teaching:unit:unit_aotfw',
+    'page_aotfw',
+    'life:decision:aotfw-sources'
+  ]);
+});
+
+test('decisionTraces groups by decision id ahead of title', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'Later wording',
+    decisionId: 'med-load',
+    about: ['teaching:unit:unit_aotfw'],
+    chosen: 'Drop one elective',
+    body: 'Later take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'First wording',
+    decisionId: 'med-load',
+    about: ['tasks:project:proj_aotfw'],
+    chosen: 'Take both units',
+    body: 'First take.'
+  });
+  const traces = decisionTraces(parseGovernanceEntries(log));
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].decisionId, 'med-load');
+  assert.deepEqual(traces[0].steps.map(step => step.chosen), [
+    'Take both units',
+    'Drop one elective'
+  ]);
+  assert.ok(traces[0].about.includes('teaching:unit:unit_aotfw'));
+  assert.ok(traces[0].about.includes('tasks:project:proj_aotfw'));
+});
+
+test('tracesForRef finds a thread by hub-ref or decision id', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw', 'page_aotfw'],
+    chosen: 'Keep the unit linked',
+    body: 'Later.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'AOTFW sources',
+    decisionId: 'aotfw-sources',
+    about: ['teaching:unit:unit_aotfw'],
+    chosen: 'Start the unit',
+    body: 'First.'
+  });
+  const entries = parseGovernanceEntries(log);
+  const byUnit = tracesForRef(entries, 'teaching:unit:unit_aotfw');
+  assert.equal(byUnit.length, 1);
+  assert.equal(byUnit[0].steps.length, 2);
+  const byDecision = tracesForRef(entries, 'life:decision:aotfw-sources');
+  assert.equal(byDecision[0].decisionId, 'aotfw-sources');
+  assert.equal(tracesForRef(entries, 'tasks:project:missing').length, 0);
+});
+
+test('decisionTraces groups same-title entries oldest-first', () => {
+  let log = emptyGovernanceLog();
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-06',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Drop one elective',
+    reasoning: 'Teaching clash',
+    body: 'Later take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-08-01',
+    entryType: 'Major Decision',
+    title: 'MEd load',
+    chosen: 'Take both units',
+    reasoning: 'Stay on timeline',
+    body: 'First take.'
+  });
+  log = appendGovernanceEntry(log, {
+    dateKey: '2026-09-02',
+    entryType: "Coach's Notes",
+    title: 'Unrelated',
+    body: 'One-off.'
+  });
+  const traces = decisionTraces(parseGovernanceEntries(log));
+  assert.equal(traces.length, 1);
+  assert.equal(traces[0].title, 'MEd load');
+  assert.deepEqual(traces[0].steps.map(step => step.chosen), [
+    'Take both units',
+    'Drop one elective'
+  ]);
+  assert.deepEqual(traces[0].steps.map(step => step.dateKey), [
+    '2026-08-01',
+    '2026-09-06'
+  ]);
 });
 
 test('Mind Insight is a valid governance entry type', () => {

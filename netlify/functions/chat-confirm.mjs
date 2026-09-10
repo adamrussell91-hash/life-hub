@@ -8,26 +8,101 @@ import {
   methodNotAllowed,
   misconfiguredResponse,
   preflightResponse,
-  readCookie,
+  readUmbrellaSessionCookie,
+  umbrellaSessionSecret,
   withCors
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
-import { buildCanonicalPath, validateLogEntry } from './_shared/chat-schema.mjs';
+import { buildCanonicalPath, buildRecordSlug, validateLogEntry } from './_shared/chat-schema.mjs';
+import { resolveWorkoutConfirmTarget } from './_shared/workout-confirm-path.mjs';
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import {
   applyCompletedWorkoutToLibrary,
   EXERCISE_LIBRARY_PATH,
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
-import { persistLogEntry, renderMarkdown } from './_shared/persist-log.mjs';
-import { getSydneyDateKey, getSydneyTimestamp } from '../../js/core/time.js';
+import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes } from './_shared/persist-log.mjs';
+import { mealDeletesFromWrites } from './_shared/delete-meal.mjs';
+import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
   validateCentralNodePatchInput,
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
 } from './_shared/hammond-tools.mjs';
+import {
+  PENDING_CN_PATCHES_PATH,
+  parsePendingCnPatches,
+  serializePendingCnPatches,
+  removePendingCnPatchById,
+  findPendingCnPatchById
+} from './_shared/cn-patch-queue.mjs';
+import {
+  PENDING_ACTIONS_PATH,
+  parsePendingActions,
+  serializePendingActions,
+  findPendingActionById,
+  markPendingActionConsumed,
+  markPendingActionExecuting,
+  markPendingActionPending,
+  markPendingActionDismissed,
+  isPendingActionExecutable,
+  getPendingActionStatus,
+  PENDING_ACTION_STATUS_EXECUTING,
+  PENDING_ACTION_STATUS_CONSUMED,
+  PENDING_ACTION_STATUS_DISMISSED,
+  validateProposeActionInput,
+  executeProposeActionWrites,
+  classifyWriteTarget,
+  snapshotGithubBases,
+  snapshotBlobBases,
+  detectStaleWrites,
+  selectAcceptedWrites,
+  applyScheduleOverrides,
+  promoteScheduleDiffWorkBlockWrites,
+  isScheduleDiffProposal,
+  decisionFieldsFromAction,
+  getTasksJSON,
+  getTeachingJSON
+} from './_shared/capabilities/propose-action.mjs';
+import {
+  AGENT_TURNS_PATH,
+  createMemoryTurnStore,
+  parseTurnStoreFile,
+  persistTurnWithClient
+} from './_shared/agent-turn-store.mjs';
+import { continueAfterConfirm, resumeConfirmedTurn } from './_shared/agent-confirm.mjs';
+import { createAnthropicClient } from './_shared/anthropic-client.mjs';
+import { defaultGetTasksStore, listJSON as listTasksJSON, getJSON as getTasksMetaJSON } from './_shared/tasks-blobs.mjs';
+import {
+  defaultGetContentStore as defaultGetTeachingStore,
+  listJSON as listTeachingJSON,
+  SCHEDULED_LESSON_PREFIX
+} from './_shared/teaching-blobs.mjs';
+import {
+  buildAuthoritativeHardBusy,
+  detectStaleScheduleCollisions,
+  workdayForDate
+} from './_shared/productivity-os.mjs';
+import {
+  markWeeklyReviewComplete,
+  markWeeklyReviewPendingConsumed,
+  reconcileWeeklyReviewIfPendingConsumed,
+  loadWorkflowState,
+  markScheduleDiffConfirmed,
+  markScheduleDiffDiscarded,
+  markScheduleDiffPendingConsumed,
+  markScheduleDiffPendingDismissed,
+  reconcileScheduleDiffIfPendingConsumed,
+  reconcileScheduleDiffIfPendingDismissed
+} from './_shared/clare-work.mjs';
+import { loadTimedLifeEventsFromTree } from './_shared/life-schedule-events.mjs';
+import {
+  GOVERNANCE_LOG_PATH,
+  appendGovernanceEntry,
+  emptyGovernanceLog
+} from '../../apps/life/js/core/governance-log.js';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -44,7 +119,12 @@ export function createChatConfirmHandler({
   verifySessionToken: verify = verifySessionToken,
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
-  now = Date.now
+  createAnthropicClient: createAnthropic = createAnthropicClient,
+  continueConversation,
+  now = Date.now,
+  getTasksStore = defaultGetTasksStore,
+  getTeachingStore = defaultGetTeachingStore,
+  getLifeEvents = null
 } = {}) {
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -59,7 +139,7 @@ export function createChatConfirmHandler({
 
     let session;
     try {
-      session = verify(readCookie(request, 'life_hub_session'), env.SESSION_SECRET, now());
+      session = verify(readUmbrellaSessionCookie(request), umbrellaSessionSecret(env), now());
     } catch {
       return withPrivateCache(misconfiguredResponse());
     }
@@ -76,6 +156,15 @@ export function createChatConfirmHandler({
     if (parsed.kind === 'cn_patch') {
       return handleCnPatchConfirm(parsed);
     }
+    if (parsed.kind === 'cn_patch_dismiss') {
+      return handleCnPatchDismiss(parsed);
+    }
+    if (parsed.kind === 'action') {
+      return handleActionConfirm(parsed);
+    }
+    if (parsed.kind === 'action_dismiss') {
+      return handleActionDismiss(parsed);
+    }
 
     const validation = validateLogEntry(parsed.candidate, {
       id: `${parsed.candidate.type}-${parsed.candidate.date}-${randomBytes(3).toString('hex')}`,
@@ -87,7 +176,18 @@ export function createChatConfirmHandler({
 
     let path;
     try {
-      path = buildCanonicalPath({ type: validation.record.type, date: validation.record.date, slug: parsed.slug });
+      // Meals always use the meal-slot slug from the record (breakfast/lunch/…).
+      // Never trust the request `slug` here — that field is overloaded as the
+      // agent id on other confirm kinds, and a photo Confirm with slug=brisket
+      // would write data/nutrition/…/…-brisket.md instead of …-lunch.md.
+      const pathSlug = validation.record.type === 'meal'
+        ? buildRecordSlug(validation.record)
+        : parsed.slug;
+      path = buildCanonicalPath({
+        type: validation.record.type,
+        date: validation.record.date,
+        slug: pathSlug
+      });
     } catch {
       return errorResponse(400, 'invalid_record', 'This record could not be validated.', false, PRIVATE_CACHE);
     }
@@ -101,13 +201,21 @@ export function createChatConfirmHandler({
     }
 
     let existingSha;
-    if (parsed.overwrite) {
-      try {
+    try {
+      if (validation.record.type === 'workout') {
+        const target = await resolveWorkoutConfirmTarget(client, {
+          record: validation.record,
+          slug: parsed.slug,
+          overwrite: parsed.overwrite
+        });
+        path = target.path;
+        existingSha = target.existingSha;
+      } else if (parsed.overwrite) {
         const current = await client.resolveTree();
         existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;
-      } catch (error) {
-        return mapRepositoryError(error);
       }
+    } catch (error) {
+      return mapRepositoryError(error);
     }
 
     try {
@@ -197,20 +305,30 @@ export function createChatConfirmHandler({
       return errorResponse(400, 'invalid_request', 'Central Node patches require the hammond slug.', false, PRIVATE_CACHE);
     }
 
-    const patch = validateCentralNodePatchInput(parsed.candidate);
-    if (!patch) {
-      return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
-    }
-
-    const risk = classifyCentralNodePatchRisk(patch);
-    if (risk !== 'confirm') {
-      return errorResponse(
-        400,
-        'auto_class_rejected',
-        'Auto-class Central Node patches cannot be confirmed via this endpoint.',
-        false,
-        PRIVATE_CACHE
-      );
+    // Fail fast on the resubmitted candidate, with zero GitHub calls, exactly like
+    // before the pending-patch queue existed -- but only for an id-less request.
+    // When an id is present the stored queue entry takes priority over whatever
+    // candidate came along with it (a caller might resubmit a stale/placeholder
+    // candidate alongside a good id), so that case always needs the queue fetch
+    // below rather than pre-rejecting on the candidate alone.
+    let candidatePatch = null;
+    if (!parsed.id) {
+      if (!parsed.candidate) {
+        return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+      }
+      candidatePatch = validateCentralNodePatchInput(parsed.candidate);
+      if (!candidatePatch) {
+        return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+      }
+      if (classifyCentralNodePatchRisk(candidatePatch) !== 'confirm') {
+        return errorResponse(
+          400,
+          'auto_class_rejected',
+          'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
     }
 
     let client;
@@ -223,19 +341,57 @@ export function createChatConfirmHandler({
 
     let content;
     let existingSha;
+    let queue = [];
+    let queueSha;
     try {
       const current = await client.resolveTree();
-      const entry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
-      if (!entry) {
+      const cnEntry = current.tree.find(item => item.path === CENTRAL_NODE_PATH && item.type === 'blob');
+      if (!cnEntry) {
         return errorResponse(404, 'central_node_missing', 'Central Node is not available.', true, PRIVATE_CACHE);
       }
-      content = decodeBlob(await client.readBlob(entry.sha));
+      // Prefer the server-stored patch (found by id) over a client-resubmitted
+      // payload -- the queue read only happens when an id was actually supplied.
+      const queueEntry = parsed.id
+        ? current.tree.find(item => item.path === PENDING_CN_PATCHES_PATH && item.type === 'blob')
+        : null;
+      const [cnBlob, queueBlob] = await Promise.all([
+        client.readBlob(cnEntry.sha),
+        queueEntry ? client.readBlob(queueEntry.sha) : Promise.resolve(null)
+      ]);
+      content = decodeBlob(cnBlob);
       if (content === null) {
         return errorResponse(503, 'central_node_unreadable', 'Central Node could not be read.', true, PRIVATE_CACHE);
       }
-      existingSha = entry.sha;
+      existingSha = cnEntry.sha;
+      if (queueEntry) {
+        queue = parsePendingCnPatches(decodeBlob(queueBlob));
+        queueSha = queueEntry.sha;
+      }
     } catch (error) {
       return mapRepositoryError(error);
+    }
+
+    const stored = parsed.id ? findPendingCnPatchById(queue, parsed.id) : null;
+    // Re-validate the stored payload rather than trusting it blindly -- it's
+    // server-written, but validation is cheap. Prefer it over the resubmitted
+    // candidate, which is only validated lazily here as a fallback for when an
+    // id was supplied but the queue entry is gone (already actioned, purged, or
+    // the propose-time queue write itself failed).
+    const storedPatch = stored ? validateCentralNodePatchInput(stored.patch) : null;
+    const fallbackCandidatePatch = candidatePatch ?? (parsed.candidate ? validateCentralNodePatchInput(parsed.candidate) : null);
+    const patch = storedPatch ?? fallbackCandidatePatch;
+    if (!patch) {
+      return errorResponse(400, 'invalid_patch', 'This Central Node patch could not be validated.', false, PRIVATE_CACHE);
+    }
+
+    if (classifyCentralNodePatchRisk(patch) !== 'confirm') {
+      return errorResponse(
+        400,
+        'auto_class_rejected',
+        'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+        false,
+        PRIVATE_CACHE
+      );
     }
 
     const next = applyCentralNodePatch(content, patch);
@@ -250,16 +406,1128 @@ export function createChatConfirmHandler({
         sha: existingSha,
         message: `chore(cn): ${patch.payload.summary}`
       });
-      return jsonResponse(200, {
-        ok: true,
-        data: {
-          path: CENTRAL_NODE_PATH,
-          summary: patch.payload.summary
-        }
-      }, PRIVATE_CACHE);
     } catch (error) {
       if (error instanceof GitHubClientError && error.code === 'write_conflict') {
         return errorResponse(409, 'write_conflict', 'Central Node changed while confirming. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+
+    // Central Node already wrote successfully -- a dequeue failure (conflict,
+    // transient error) must never surface as a failed confirmation. A stale
+    // entry left behind is cleaned up by the next read's mechanical TTL purge.
+    if (parsed.id) {
+      try {
+        await client.writeFile({
+          path: PENDING_CN_PATCHES_PATH,
+          content: serializePendingCnPatches(removePendingCnPatchById(queue, parsed.id)),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(cn-patch-queue): confirm ${patch.payload.summary}`
+        });
+      } catch {
+        // Swallowed -- see comment above.
+      }
+    }
+
+    return jsonResponse(200, {
+      ok: true,
+      data: {
+        path: CENTRAL_NODE_PATH,
+        summary: patch.payload.summary
+      }
+    }, PRIVATE_CACHE);
+  }
+
+  async function handleCnPatchDismiss(parsed) {
+    if (parsed.slug !== HAMMOND_SLUG) {
+      return errorResponse(400, 'invalid_request', 'Central Node patches require the hammond slug.', false, PRIVATE_CACHE);
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    try {
+      const current = await client.resolveTree();
+      const entry = current.tree.find(item => item.path === PENDING_CN_PATCHES_PATH && item.type === 'blob');
+      if (!entry) {
+        // Nothing to dismiss -- already gone (confirmed, purged, or never persisted). Idempotent.
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const queue = parsePendingCnPatches(decodeBlob(await client.readBlob(entry.sha)));
+      const next = removePendingCnPatchById(queue, parsed.id);
+      if (next.length !== queue.length) {
+        await client.writeFile({
+          path: PENDING_CN_PATCHES_PATH,
+          content: serializePendingCnPatches(next),
+          sha: entry.sha,
+          message: `chore(cn-patch-queue): dismiss ${parsed.id}`
+        });
+      }
+      return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'Pending patches changed while dismissing. Try again.', true, PRIVATE_CACHE);
+      }
+      return mapRepositoryError(error);
+    }
+  }
+
+  async function handleActionConfirm(parsed) {
+    // CASE A — no id: legacy candidate-only Confirm (deliberately retained).
+    // CASE B — id supplied: stored pending action is authoritative. Never fall
+    // back to a client candidate when the id is missing, consumed, invalid, or
+    // owned by another agent (pending-action identity invariant).
+    let candidateProposal = null;
+    if (!parsed.id) {
+      if (!parsed.candidate) {
+        return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+      }
+      const validated = validateProposeActionInput(parsed.candidate, { agentSlug: parsed.slug });
+      if (!validated.ok) {
+        return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+      }
+      candidateProposal = validated.proposal;
+    }
+
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    let queue = [];
+    let queueSha;
+    let tree;
+    try {
+      const current = await client.resolveTree();
+      tree = current.tree;
+      const queueEntry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+      if (queueEntry) {
+        queue = parsePendingActions(decodeBlob(await client.readBlob(queueEntry.sha)));
+        queueSha = queueEntry.sha;
+      }
+    } catch (error) {
+      return mapRepositoryError(error);
+    }
+
+    let proposal = null;
+    let stored = null;
+    if (parsed.id) {
+      stored = findPendingActionById(queue, parsed.id);
+      if (!stored) {
+        // Fail closed: a supplied id that is absent must NOT execute any client candidate.
+        return errorResponse(
+          404,
+          'pending_action_not_found',
+          'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Positive workflow consume stamp also blocks replay if queue cleanup lagged.
+      let workflowConsumed = false;
+      let scheduleDiffReconciled = null;
+      if (
+        stored?.workflowKind === 'weekly_review'
+        && typeof stored?.workflowId === 'string'
+        && stored.workflowId
+      ) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            const workflow = await loadWorkflowState(tasksStore, stored.workflowId);
+            if (
+              workflow
+              && workflow.pending_action_status === 'consumed'
+              && (
+                workflow.pending_action_id === parsed.id
+                || workflow.status === 'complete'
+              )
+            ) {
+              workflowConsumed = true;
+            }
+          }
+        } catch {
+          // Fall through to normal execution if workflow store is unavailable.
+        }
+      }
+      if (isScheduleDiffProposal(stored, stored?.proposal) && !isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Rejection is authoritative; workflow heal is best-effort.
+          }
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingActionStatus: 'dismissed',
+              pendingId: parsed.id
+            }
+          );
+        }
+        if (status === PENDING_ACTION_STATUS_CONSUMED) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              scheduleDiffReconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceConsumed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            scheduleDiffReconciled = null;
+          }
+          return errorResponse(
+            409,
+            'pending_action_consumed',
+            'This pending action was already executed and cannot run again.',
+            false,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: scheduleDiffReconciled?.status === 'confirmed'
+                ? 'confirmed'
+                : (scheduleDiffReconciled?.status || 'awaiting_reconciliation'),
+              pendingId: parsed.id
+            }
+          );
+        }
+      }
+      if (workflowConsumed) {
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (!isPendingActionExecutable(stored)) {
+        const status = getPendingActionStatus(stored);
+        if (status === PENDING_ACTION_STATUS_EXECUTING) {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        if (status === PENDING_ACTION_STATUS_DISMISSED) {
+          return errorResponse(
+            409,
+            'pending_action_dismissed',
+            'This pending action was discarded and cannot be confirmed.',
+            false,
+            PRIVATE_CACHE
+          );
+        }
+        return errorResponse(
+          409,
+          'pending_action_consumed',
+          'This pending action was already executed and cannot run again.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      if (typeof stored.slug === 'string' && stored.slug.trim() && stored.slug !== parsed.slug) {
+        return errorResponse(
+          403,
+          'pending_action_agent_mismatch',
+          'This pending action belongs to a different agent.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      const storedValidated = validateProposeActionInput(stored.proposal, {
+        agentSlug: stored.slug || parsed.slug
+      });
+      if (!storedValidated.ok) {
+        return errorResponse(
+          400,
+          'invalid_action',
+          'The stored pending action could not be validated.',
+          false,
+          PRIVATE_CACHE
+        );
+      }
+      // Client candidate is ignored entirely when id resolves.
+      proposal = storedValidated.proposal;
+    } else {
+      proposal = candidateProposal;
+    }
+    if (!proposal) {
+      return errorResponse(400, 'invalid_action', 'This proposed action could not be validated.', false, PRIVATE_CACHE);
+    }
+
+    // Re-check allowlist on confirm (defense in depth).
+    const recheck = validateProposeActionInput(proposal, { agentSlug: proposal.agent || parsed.slug });
+    if (!recheck.ok) {
+      return errorResponse(400, 'write_path_denied', 'A write path is outside this agent\'s allowlist.', false, PRIVATE_CACHE);
+    }
+
+    const selected = selectAcceptedWrites(proposal.writes, parsed.accept);
+    if (!selected.ok) {
+      return errorResponse(
+        400,
+        selected.error ?? 'invalid_accept',
+        selected.error === 'unknown_accept_path'
+          ? `Unknown accept path: ${selected.detail}`
+          : 'accept must be an array of write paths from this proposal.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const { accepted: acceptedRaw, rejected } = selected;
+
+    // Schedule Diff may send narrow start_time overrides keyed by stored write path.
+    // Server loads the proposal by id and only mutates allowed schedule coordinates.
+    const overridden = applyScheduleOverrides(acceptedRaw, parsed.schedule_overrides);
+    if (!overridden.ok) {
+      return errorResponse(
+        400,
+        overridden.error ?? 'invalid_schedule_overrides',
+        'schedule_overrides must reference accepted work_block writes and may only set start_time.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+    const accepted = overridden.writes;
+
+    const blobStoresResult = await loadBlobStoresForWrites(accepted, {
+      env,
+      getTasksStore,
+      getTeachingStore
+    });
+    if (!blobStoresResult.ok) {
+      return errorResponse(503, blobStoresResult.error, 'The blob store is temporarily unavailable.', true, PRIVATE_CACHE);
+    }
+    const blobStores = blobStoresResult.stores;
+
+    const scheduleCollision = await checkStaleWorkBlockCollisions(accepted, blobStores, {
+      stored,
+      client,
+      tree,
+      getLifeEvents
+    });
+    if (scheduleCollision?.unavailable) {
+      return errorResponse(
+        503,
+        'schedule_validation_unavailable',
+        'Authoritative schedule data could not be loaded. Confirm was not run.',
+        true,
+        PRIVATE_CACHE
+      );
+    }
+    if (scheduleCollision && !scheduleCollision.ok) {
+      return jsonResponse(409, {
+        ok: false,
+        error: 'stale_schedule_collision',
+        data: scheduleCollision.revised
+      }, PRIVATE_CACHE);
+    }
+
+    // Schedule Diff Confirm promotes durable work blocks to confirmed (server-side).
+    const acceptedForWrite = isScheduleDiffProposal(stored, proposal)
+      ? promoteScheduleDiffWorkBlockWrites(accepted, { stamp: new Date(now()).toISOString() })
+      : accepted;
+
+    const storedBases = stored?.bases && typeof stored.bases === 'object' && !Array.isArray(stored.bases)
+      ? stored.bases
+      : null;
+    if (storedBases && accepted.length) {
+      const current = {
+        ...snapshotGithubBases(accepted, tree),
+        ...await snapshotBlobBases(accepted, blobStores)
+      };
+      const stale = detectStaleWrites(accepted, storedBases, current);
+      if (stale.length) {
+        return errorResponse(
+          409,
+          'stale_write',
+          'A target file changed since this proposal. Discard and ask again.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+    }
+
+    const files = {};
+    for (const write of accepted) {
+      const target = classifyWriteTarget(write.path);
+      if (target.store === 'tasks' || target.store === 'teaching') {
+        try {
+          const record = await (target.store === 'tasks' ? getTasksJSON : getTeachingJSON)(
+            blobStores[target.store],
+            target.key
+          );
+          if (record && typeof record === 'object' && !Array.isArray(record)) {
+            files[write.path] = { record };
+          }
+        } catch (error) {
+          return mapRepositoryError(error);
+        }
+        continue;
+      }
+      const entry = tree.find(item => item.path === write.path && item.type === 'blob');
+      if (!entry) continue;
+      try {
+        const content = decodeBlob(await client.readBlob(entry.sha));
+        files[write.path] = { sha: entry.sha, content: content ?? '' };
+      } catch (error) {
+        return mapRepositoryError(error);
+      }
+    }
+
+    // Pre-execution fence: pending → executing before any durable proposal writes.
+    // Replay/concurrent confirm must fail closed once executing is persisted.
+    let executionFenced = !parsed.id;
+    if (parsed.id) {
+      const executionStartedAt = new Date(now()).toISOString();
+      let fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+      let fencePersisted = false;
+      let fenceError = null;
+      for (let attempt = 0; attempt < 2 && !fencePersisted; attempt += 1) {
+        try {
+          const written = await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(fenceQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): execute ${proposal.intent}`.slice(0, 200)
+          });
+          queue = fenceQueue;
+          queueSha = written?.sha || queueSha;
+          stored = findPendingActionById(queue, parsed.id) || stored;
+          fencePersisted = true;
+          executionFenced = true;
+        } catch (error) {
+          fenceError = error;
+          if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
+            break;
+          }
+          // Lost the SHA race — reload and fail closed if another request owns execution.
+          try {
+            const current = await client.resolveTree();
+            tree = current.tree;
+            const queueEntry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+            if (!queueEntry) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            queue = parsePendingActions(decodeBlob(await client.readBlob(queueEntry.sha)));
+            queueSha = queueEntry.sha;
+            stored = findPendingActionById(queue, parsed.id);
+            if (!stored) {
+              return errorResponse(
+                404,
+                'pending_action_not_found',
+                'No pending action matches this id. It may already be confirmed, discarded, or never existed.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            const status = getPendingActionStatus(stored);
+            if (status === PENDING_ACTION_STATUS_CONSUMED) {
+              return errorResponse(
+                409,
+                'pending_action_consumed',
+                'This pending action was already executed and cannot run again.',
+                false,
+                PRIVATE_CACHE
+              );
+            }
+            if (status === PENDING_ACTION_STATUS_EXECUTING || !isPendingActionExecutable(stored)) {
+              return errorResponse(
+                409,
+                'pending_action_execution_in_progress',
+                'This pending action is already executing. Do not retry blindly — wait for recovery.',
+                true,
+                PRIVATE_CACHE
+              );
+            }
+            fenceQueue = markPendingActionExecuting(queue, parsed.id, { executionStartedAt });
+          } catch (reloadError) {
+            return mapRepositoryError(reloadError);
+          }
+        }
+      }
+      if (!fencePersisted) {
+        if (fenceError instanceof GitHubClientError && fenceError.code === 'write_conflict') {
+          return errorResponse(
+            409,
+            'pending_action_execution_in_progress',
+            'This pending action is already executing. Do not retry blindly — wait for recovery.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return mapRepositoryError(fenceError || new Error('execution fence failed'));
+      }
+    }
+
+    const restorePendingIfSafe = async () => {
+      if (!parsed.id || !executionFenced) return;
+      try {
+        const restored = markPendingActionPending(queue, parsed.id, {
+          extra: { executionRolledBack: true }
+        });
+        const written = await client.writeFile({
+          path: PENDING_ACTIONS_PATH,
+          content: serializePendingActions(restored),
+          ...(queueSha ? { sha: queueSha } : {}),
+          message: `chore(propose-action): rollback execute ${parsed.id}`.slice(0, 200)
+        });
+        queue = restored;
+        queueSha = written?.sha || queueSha;
+      } catch {
+        // Leave executing if rollback cannot be persisted — fail closed on replay.
+      }
+    };
+
+    let writeResult = { ok: true, results: [] };
+    if (acceptedForWrite.length) {
+      try {
+        writeResult = await executeProposeActionWrites(client, { ...proposal, writes: acceptedForWrite }, {
+          files,
+          blobStores,
+          nowIso: () => new Date(now()).toISOString()
+        });
+      } catch (error) {
+        // Exception after fence: write outcome is uncertain — do not restore to pending.
+        if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+          return errorResponse(
+            409,
+            'pending_action_execution_unknown',
+            'A target file changed while confirming after execution began. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return errorResponse(
+          503,
+          'pending_action_execution_unknown',
+          'Execution began but the write outcome is uncertain. Do not retry blindly — recover before confirming again.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+      if (!writeResult.ok) {
+        const provenNone = !Array.isArray(writeResult.results) || writeResult.results.length === 0;
+        if (provenNone) {
+          await restorePendingIfSafe();
+        }
+        if (writeResult.error === 'already_exists') {
+          if (!provenNone) {
+            return errorResponse(
+              409,
+              'pending_action_execution_unknown',
+              'Execution may have partially applied. Do not retry blindly.',
+              true,
+              PRIVATE_CACHE
+            );
+          }
+          return errorResponse(409, 'write_conflict', `File already exists: ${writeResult.detail}`, true, PRIVATE_CACHE);
+        }
+        if (!provenNone) {
+          return errorResponse(
+            503,
+            'pending_action_execution_unknown',
+            'Execution may have partially applied. Do not retry blindly.',
+            true,
+            PRIVATE_CACHE
+          );
+        }
+        return errorResponse(400, writeResult.error ?? 'apply_failed', 'The proposed action could not be applied.', false, PRIVATE_CACHE);
+      }
+    }
+
+    let centralNodeUpdated = null;
+    const mealDeletions = mealDeletesFromWrites(accepted);
+    if (mealDeletions.length) {
+      try {
+        const cn = await syncCentralNodeAfterMealDeletes(client, mealDeletions);
+        centralNodeUpdated = cn?.updated === true;
+      } catch {
+        centralNodeUpdated = false;
+      }
+    }
+
+    const decision = decisionFieldsFromAction({
+      proposal,
+      accepted,
+      rejected,
+      reason: parsed.reason,
+      revisit: parsed.revisit
+    });
+
+    // Best-effort governance log + dequeue.
+    try {
+      const govEntry = tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
+      let govContent = emptyGovernanceLog();
+      let govSha;
+      if (govEntry) {
+        const decoded = decodeBlob(await client.readBlob(govEntry.sha));
+        if (decoded != null) {
+          govContent = decoded;
+          govSha = govEntry.sha;
+        }
+      }
+      const diffBody = [
+        `**Agent:** ${proposal.agent}`,
+        `**Intent:** ${proposal.intent}`,
+        `**Status:** ${accepted.length ? 'Approved' : 'Rejected'}`,
+        '',
+        ...accepted.map(write => `- \`${write.path}\` (${write.mode}): ${write.diff}`),
+        ...rejected.map(write => `- \`${write.path}\` (${write.mode}): skipped`)
+      ].join('\n');
+      const nextGov = appendGovernanceEntry(govContent, {
+        dateKey: getSydneyDateKey(new Date(now())),
+        entryType: 'Capability Action',
+        title: proposal.intent.slice(0, 120),
+        body: diffBody,
+        status: 'Resolved',
+        ...decision
+      });
+      await client.writeFile({
+        path: GOVERNANCE_LOG_PATH,
+        content: nextGov,
+        ...(govSha ? { sha: govSha } : {}),
+        message: `chore(governance): capability action by ${proposal.agent}`
+      });
+    } catch {
+      // Writes already landed; governance is audit trail only.
+    }
+
+    // Writes succeeded. The pending id must become non-replayable before any "success".
+    let pendingConsumed = !parsed.id; // legacy candidate-only confirms have no durable id
+    let pendingConsumeError = null;
+    let weeklyReviewCompleted = false;
+    let weeklyReviewCompletionError = null;
+    const isWeeklyReview =
+      stored?.workflowKind === 'weekly_review'
+      && typeof stored?.workflowId === 'string'
+      && Boolean(stored.workflowId);
+
+    if (parsed.id) {
+      const consumedAt = new Date(now()).toISOString();
+      const markedQueue = markPendingActionConsumed(queue, parsed.id, {
+        consumedAt,
+        extra: { writesApplied: true }
+      });
+      let consumePersisted = false;
+      for (let attempt = 0; attempt < 3 && !consumePersisted; attempt += 1) {
+        try {
+          await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(markedQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): consume ${proposal.intent}`.slice(0, 200)
+          });
+          queue = markedQueue;
+          pendingConsumed = true;
+          consumePersisted = true;
+        } catch (error) {
+          pendingConsumeError = error;
+        }
+      }
+
+      // Backup evidence on the Weekly Review workflow so load can heal even if queue cleanup drifts.
+      if (isWeeklyReview) {
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await markWeeklyReviewPendingConsumed(tasksStore, stored.workflowId, {
+              pendingActionId: parsed.id,
+              stamp: consumedAt
+            });
+          }
+        } catch {
+          // Queue consume is the primary replay gate; workflow stamp is secondary.
+        }
+      }
+
+      if (pendingConsumed && isScheduleDiffProposal(stored, proposal)) {
+        let scheduleDiffCompleted = false;
+        let scheduleDiffCompletionError = null;
+        const selectedWritePaths = accepted.map((w) => w.path);
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (!tasksStore) {
+            scheduleDiffCompletionError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            // No matching workflow (legacy pending) or newer workflow B bound to another id:
+            // do not require terminal mutation; never terminate B while confirming A.
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              scheduleDiffCompleted = true;
+            } else {
+              await markScheduleDiffPendingConsumed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              await markScheduleDiffConfirmed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: consumedAt,
+                selectedWritePaths
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffCompleted =
+                healed?.status === 'confirmed'
+                && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffCompleted) {
+                healed = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  healed?.status === 'confirmed'
+                  && healed?.pending_action_id === parsed.id;
+              }
+            }
+          }
+        } catch (error) {
+          scheduleDiffCompletionError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffCompleted = true;
+              } else {
+                const reconciled = await reconcileScheduleDiffIfPendingConsumed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: consumedAt,
+                  selectedWritePaths,
+                  queueEvidenceConsumed: true
+                });
+                scheduleDiffCompleted =
+                  reconciled?.status === 'confirmed'
+                  && reconciled?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffCompleted = false;
+          }
+        }
+
+        if (!scheduleDiffCompleted) {
+          return errorResponse(
+            503,
+            'schedule_diff_completion_pending',
+            'Writes landed and the pending action is consumed, but Schedule Diff workflow completion did not persist. Do not re-confirm writes — retry reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: true,
+              pendingId: parsed.id,
+              pendingActionStatus: 'consumed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'applied',
+                pendingAction: 'consumed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffCompletionError?.message
+                ? { detail: String(scheduleDiffCompletionError.message).slice(0, 200) }
+                : {})
+            }
+          );
+        }
+      }
+
+      if (!pendingConsumed) {
+        return errorResponse(
+          503,
+          'pending_action_consume_failed',
+          'Writes landed but the pending action could not be marked consumed. Do not re-confirm blindly — retry may be required after recovery.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consume_failed',
+              weeklyReview: isWeeklyReview ? 'awaiting_confirm' : null
+            }
+          }
+        );
+      }
+    }
+
+    if (pendingConsumed && isWeeklyReview) {
+      try {
+        const tasksStore = await getTasksStore(env);
+        if (tasksStore) {
+          await markWeeklyReviewComplete(tasksStore, stored.workflowId);
+          weeklyReviewCompleted = true;
+        }
+      } catch (error) {
+        weeklyReviewCompletionError = error;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (tasksStore) {
+            await reconcileWeeklyReviewIfPendingConsumed(tasksStore, stored.workflowId);
+            const healed = await loadWorkflowState(tasksStore, stored.workflowId);
+            weeklyReviewCompleted = healed?.status === 'complete';
+          }
+        } catch {
+          weeklyReviewCompleted = false;
+        }
+      }
+
+      if (!weeklyReviewCompleted) {
+        // Writes + consume landed; do not claim clean success or invite re-confirm.
+        return errorResponse(
+          503,
+          'weekly_review_completion_pending',
+          'Writes landed and the pending action is consumed, but Weekly Review completion did not persist. Do not re-confirm — reload/reconcile the review.',
+          true,
+          PRIVATE_CACHE,
+          {
+            writesApplied: true,
+            pendingId: parsed.id,
+            pendingActionStatus: 'consumed',
+            workflowId: stored.workflowId,
+            lifecycle: {
+              writes: 'applied',
+              pendingAction: 'consumed',
+              weeklyReview: 'awaiting_confirm'
+            }
+          }
+        );
+      }
+    }
+
+    let turnResume = null;
+    let continuation = null;
+    if (stored?.turnId) {
+      try {
+        const turnEntry = tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+        const turns = turnEntry
+          ? parseTurnStoreFile(decodeBlob(await client.readBlob(turnEntry.sha)))
+          : {};
+        const persist = createMemoryTurnStore(turns);
+        turnResume = resumeConfirmedTurn({
+          persist,
+          turnId: stored.turnId,
+          actionId: stored.actionId || stored.id,
+          decision: 'confirm',
+          currentRecords: stored.bases ?? {}
+        });
+        if (turnResume.state) {
+          const continued = await continueAfterConfirm({
+            persist,
+            state: turnResume.state,
+            writeOk: writeResult.ok === true && accepted.length > 0,
+            writeResult,
+            reloaded: {
+              writes: writeResult.results?.length ?? 0,
+              intent: proposal.intent
+            },
+            duplicate: turnResume.duplicate === true,
+            rejected: false,
+            now: new Date(now()),
+            invokeModel: turnResume.duplicate
+              ? undefined
+              : (continueConversation ?? (args => invokeConfirmContinuation(args, {
+                env,
+                fetchImpl,
+                createAnthropic
+              })))
+          });
+          continuation = {
+            status: continued.status,
+            reason: continued.reason ?? null,
+            text: continued.text || '',
+            invoked: continued.invoked === true
+          };
+          await persistTurnWithClient({
+            client,
+            existingTurns: JSON.parse(persist.exportJson()),
+            existingSha: turnEntry?.sha,
+            state: continued.state || turnResume.state
+          });
+        }
+      } catch {
+        // Writes already landed; turn resume is best-effort.
+      }
+    }
+
+    return jsonResponse(200, {
+      ok: true,
+      data: {
+        intent: proposal.intent,
+        results: writeResult.results,
+        ...(centralNodeUpdated != null ? { centralNodeUpdated } : {}),
+        ...(turnResume?.state?.id ? { turnId: turnResume.state.id, turnResumed: true } : {}),
+        ...(continuation ? { continuation } : {}),
+        lifecycle: {
+          writes: 'applied',
+          pendingAction: parsed.id ? 'consumed' : 'none',
+          weeklyReview: isWeeklyReview ? 'complete' : null
+        }
+      }
+    }, PRIVATE_CACHE);
+  }
+
+  async function handleActionDismiss(parsed) {
+    let client;
+    try {
+      client = createClient({ env, fetchImpl });
+    } catch (error) {
+      if (error instanceof GitHubConfigurationError) return withPrivateCache(misconfiguredResponse());
+      return repositoryError('github_unavailable', true);
+    }
+
+    try {
+      const current = await client.resolveTree();
+      const entry = current.tree.find(item => item.path === PENDING_ACTIONS_PATH && item.type === 'blob');
+      if (!entry) {
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      let queue = parsePendingActions(decodeBlob(await client.readBlob(entry.sha)));
+      let queueSha = entry.sha;
+      const dismissTarget = findPendingActionById(queue, parsed.id);
+      if (!dismissTarget) {
+        // Absence alone is not positive dismiss evidence — do not invent discarded.
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+      }
+      const dismissStatus = getPendingActionStatus(dismissTarget);
+      if (dismissStatus === PENDING_ACTION_STATUS_EXECUTING) {
+        return errorResponse(
+          409,
+          'pending_action_execution_in_progress',
+          'This pending action is executing and cannot be discarded.',
+          true,
+          PRIVATE_CACHE
+        );
+      }
+      if (dismissStatus === PENDING_ACTION_STATUS_CONSUMED) {
+        return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true, alreadyConsumed: true } }, PRIVATE_CACHE);
+      }
+      if (dismissStatus === PENDING_ACTION_STATUS_DISMISSED) {
+        // Idempotent replay — reconcile Schedule Diff from queue tombstone if needed.
+        if (isScheduleDiffProposal(dismissTarget, dismissTarget.proposal)) {
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                queueEvidenceDismissed: true,
+                stamp: new Date(now()).toISOString()
+              });
+            }
+          } catch {
+            // Already dismissed in queue; workflow heal is best-effort on replay.
+          }
+        }
+        return jsonResponse(200, {
+          ok: true,
+          data: { id: parsed.id, dismissed: true, alreadyDismissed: true }
+        }, PRIVATE_CACHE);
+      }
+
+      // Authoritative dismissal: persist pending → dismissed tombstone (do not remove).
+      const dismissedAt = new Date(now()).toISOString();
+      const next = markPendingActionDismissed(queue, parsed.id, { dismissedAt });
+      await client.writeFile({
+        path: PENDING_ACTIONS_PATH,
+        content: serializePendingActions(next),
+        sha: queueSha,
+        message: `chore(propose-action): dismiss ${parsed.id}`
+      });
+      queue = next;
+      const storedForDismiss = findPendingActionById(queue, parsed.id);
+
+      if (storedForDismiss && isScheduleDiffProposal(storedForDismiss, storedForDismiss.proposal)) {
+        let scheduleDiffDiscarded = false;
+        let scheduleDiffDiscardError = null;
+        try {
+          const tasksStore = await getTasksStore(env);
+          if (!tasksStore) {
+            scheduleDiffDiscardError = new Error('tasks_store_unavailable');
+          } else {
+            const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+            if (!existing || existing.pending_action_id !== parsed.id) {
+              // Legacy / newer workflow B — do not mutate unrelated schedule_diff:current.
+              scheduleDiffDiscarded = true;
+            } else {
+              await markScheduleDiffPendingDismissed(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: dismissedAt
+              });
+              await markScheduleDiffDiscarded(tasksStore, {
+                pendingActionId: parsed.id,
+                stamp: dismissedAt
+              });
+              let healed = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              scheduleDiffDiscarded =
+                healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              if (!scheduleDiffDiscarded) {
+                healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          }
+        } catch (error) {
+          scheduleDiffDiscardError = error;
+          try {
+            const tasksStore = await getTasksStore(env);
+            if (tasksStore) {
+              const existing = await loadWorkflowState(tasksStore, 'schedule_diff:current');
+              if (!existing || existing.pending_action_id !== parsed.id) {
+                scheduleDiffDiscarded = true;
+              } else {
+                const healed = await reconcileScheduleDiffIfPendingDismissed(tasksStore, {
+                  pendingActionId: parsed.id,
+                  stamp: dismissedAt,
+                  queueEvidenceDismissed: true
+                });
+                scheduleDiffDiscarded =
+                  healed?.status === 'discarded' && healed?.pending_action_id === parsed.id;
+              }
+            }
+          } catch {
+            scheduleDiffDiscarded = false;
+          }
+        }
+        if (!scheduleDiffDiscarded) {
+          return errorResponse(
+            503,
+            'schedule_diff_discard_pending',
+            'The pending action was dismissed, but Schedule Diff workflow discard did not persist. Do not Confirm — retry discard reconciliation.',
+            true,
+            PRIVATE_CACHE,
+            {
+              writesApplied: false,
+              pendingId: parsed.id,
+              pendingActionStatus: 'dismissed',
+              scheduleDiff: 'awaiting_reconciliation',
+              lifecycle: {
+                writes: 'none',
+                pendingAction: 'dismissed',
+                scheduleDiff: 'awaiting_reconciliation'
+              },
+              ...(scheduleDiffDiscardError?.message
+                ? { detail: String(scheduleDiffDiscardError.message).slice(0, 200) }
+                : {})
+            }
+          );
+        }
+      }
+
+      try {
+        const stored = storedForDismiss;
+        if (stored?.turnId) {
+          const turnEntry = current.tree.find(item => item.path === AGENT_TURNS_PATH && item.type === 'blob');
+          const turns = turnEntry
+            ? parseTurnStoreFile(decodeBlob(await client.readBlob(turnEntry.sha)))
+            : {};
+          const persist = createMemoryTurnStore(turns);
+          const rejected = resumeConfirmedTurn({
+            persist,
+            turnId: stored.turnId,
+            actionId: stored.actionId || stored.id,
+            decision: 'reject'
+          });
+          if (rejected.state) {
+            await persistTurnWithClient({
+              client,
+              existingTurns: JSON.parse(persist.exportJson()),
+              existingSha: turnEntry?.sha,
+              state: rejected.state
+            });
+          }
+        }
+      } catch {
+        // Dismissal of the pending card is enough if the turn file is missing.
+      }
+
+      // Log rejection for the audit trail.
+      try {
+        const stored = storedForDismiss;
+        const govEntry = current.tree.find(item => item.path === GOVERNANCE_LOG_PATH && item.type === 'blob');
+        let govContent = emptyGovernanceLog();
+        let govSha;
+        if (govEntry) {
+          const decoded = decodeBlob(await client.readBlob(govEntry.sha));
+          if (decoded != null) {
+            govContent = decoded;
+            govSha = govEntry.sha;
+          }
+        }
+        const intent = stored?.proposal?.intent ?? parsed.id;
+        const decision = decisionFieldsFromAction({
+          proposal: stored?.proposal,
+          accepted: [],
+          rejected: Array.isArray(stored?.proposal?.writes) ? stored.proposal.writes : [],
+          reason: parsed.reason,
+          revisit: parsed.revisit,
+          dismissed: true
+        });
+        const nextGov = appendGovernanceEntry(govContent, {
+          dateKey: getSydneyDateKey(new Date(now())),
+          entryType: 'Capability Action',
+          title: String(intent).slice(0, 120),
+          body: [
+            `**Agent:** ${stored?.slug ?? parsed.slug}`,
+            `**Intent:** ${intent}`,
+            '**Status:** Rejected'
+          ].join('\n'),
+          status: 'Resolved',
+          ...decision
+        });
+        await client.writeFile({
+          path: GOVERNANCE_LOG_PATH,
+          content: nextGov,
+          ...(govSha ? { sha: govSha } : {}),
+          message: `chore(governance): capability action rejected`
+        });
+      } catch {
+        // Best-effort.
+      }
+
+      return jsonResponse(200, { ok: true, data: { id: parsed.id, dismissed: true } }, PRIVATE_CACHE);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict') {
+        return errorResponse(409, 'write_conflict', 'Pending actions changed while dismissing. Try again.', true, PRIVATE_CACHE);
       }
       return mapRepositoryError(error);
     }
@@ -324,12 +1592,180 @@ async function parseRequest(request) {
   } catch {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
-  if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.slug !== 'string' ||
-      !SLUG.test(body.slug) || !body.candidate || typeof body.candidate !== 'object' || Array.isArray(body.candidate)) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || typeof body.slug !== 'string' || !SLUG.test(body.slug)) {
     return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
   }
-  const kind = body.kind === 'cn_patch' ? 'cn_patch' : 'log';
-  return { candidate: body.candidate, slug: body.slug, overwrite: body.overwrite === true, kind };
+
+  const id = typeof body.id === 'string' && body.id.trim() !== '' ? body.id.trim() : null;
+  const kind = body.kind === 'cn_patch'
+    ? 'cn_patch'
+    : body.kind === 'cn_patch_dismiss'
+      ? 'cn_patch_dismiss'
+      : body.kind === 'action'
+        ? 'action'
+        : body.kind === 'action_dismiss'
+          ? 'action_dismiss'
+          : 'log';
+
+  const extras = parseActionDecisionFields(body);
+
+  if (kind === 'cn_patch_dismiss' || kind === 'action_dismiss') {
+    if (!id) {
+      return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+    }
+    return { slug: body.slug, kind, id, ...extras };
+  }
+
+  const hasCandidate = body.candidate && typeof body.candidate === 'object' && !Array.isArray(body.candidate);
+  // action with id: server loads the stored pending proposal (authoritative).
+  // action without id: legacy candidate-only Confirm.
+  // cn_patch may still arrive as id and/or candidate (separate contract).
+  if ((kind === 'cn_patch' || kind === 'action') ? (!id && !hasCandidate) : !hasCandidate) {
+    return { error: errorResponse(400, 'invalid_request', 'Provide a valid confirmation request.', false, PRIVATE_CACHE) };
+  }
+
+  if (kind === 'action' && 'accept' in body && !Array.isArray(body.accept)) {
+    return { error: errorResponse(400, 'invalid_accept', 'accept must be an array of write paths.', false, PRIVATE_CACHE) };
+  }
+
+  if (kind === 'action' && 'schedule_overrides' in body && body.schedule_overrides != null && !Array.isArray(body.schedule_overrides)) {
+    return {
+      error: errorResponse(
+        400,
+        'invalid_schedule_overrides',
+        'schedule_overrides must be an array of { path, start_time }.',
+        false,
+        PRIVATE_CACHE
+      )
+    };
+  }
+
+  return {
+    candidate: body.candidate,
+    slug: body.slug,
+    overwrite: body.overwrite === true,
+    kind,
+    id,
+    accept: kind === 'action' && Array.isArray(body.accept) ? body.accept : null,
+    schedule_overrides:
+      kind === 'action' && Array.isArray(body.schedule_overrides) ? body.schedule_overrides : null,
+    ...extras
+  };
+}
+
+function parseActionDecisionFields(body) {
+  return {
+    reason: typeof body.reason === 'string' ? body.reason : null,
+    revisit: typeof body.revisit === 'string' ? body.revisit : null
+  };
+}
+
+async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeachingStore }) {
+  const stores = {};
+  const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
+  const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
+    || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
+  try {
+    if (needsTasks) stores.tasks = await getTasksStore(env);
+    if (needsTeaching) stores.teaching = await getTeachingStore(env);
+  } catch {
+    return { ok: false, error: 'blobs_unavailable' };
+  }
+  if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
+  if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
+  return { ok: true, stores };
+}
+
+function proposedBlocksFromWrites(writes) {
+  const blocks = [];
+  for (const write of writes ?? []) {
+    const target = classifyWriteTarget(write.path);
+    if (target.kind !== 'work_block') continue;
+    let record;
+    try {
+      record = JSON.parse(write.content);
+    } catch {
+      continue;
+    }
+    if (!record || typeof record !== 'object') continue;
+    if (!record.start_time || !record.date) continue;
+    blocks.push({
+      temp_id: record.id || target.id,
+      task_id: record.task_id ?? '',
+      title: record.title ?? 'Work block',
+      date: record.date,
+      start_time: record.start_time,
+      duration_minutes: Number(record.duration_minutes) || 60,
+      depth: record.depth || 'shallow',
+      selected: true
+    });
+  }
+  return blocks;
+}
+
+async function checkStaleWorkBlockCollisions(writes, blobStores, {
+  stored = null,
+  client = null,
+  tree = null,
+  getLifeEvents = null
+} = {}) {
+  const proposed = proposedBlocksFromWrites(writes);
+  if (!proposed.length) return { ok: true };
+  const dates = [...new Set(proposed.map((b) => b.date).filter(Boolean))];
+  const tasksStore = blobStores.tasks;
+  const teachingStore = blobStores.teaching;
+  let lessons = [];
+  let workBlocks = [];
+  let profile = null;
+  let lifeEvents = [];
+  try {
+    if (teachingStore) {
+      lessons = await listTeachingJSON(teachingStore, SCHEDULED_LESSON_PREFIX);
+    }
+    if (tasksStore) {
+      workBlocks = await listTasksJSON(tasksStore, 'work_blocks/');
+      profile = await getTasksMetaJSON(tasksStore, 'meta/planning_profile');
+    }
+    const loadLife = typeof getLifeEvents === 'function'
+      ? getLifeEvents
+      : async ({ dates: dayKeys, client: gh, tree: ghTree }) =>
+        loadTimedLifeEventsFromTree({ client: gh, tree: ghTree, dates: dayKeys });
+    lifeEvents = await loadLife({ dates, client, tree });
+  } catch {
+    // Fail closed: unavailable schedule truth must never look like "no conflict".
+    return {
+      ok: false,
+      unavailable: true,
+      error: 'schedule_validation_unavailable'
+    };
+  }
+
+  const planningProfile = profile && typeof profile === 'object' ? profile : null;
+  const trustedProtected = Array.isArray(stored?.scheduleContext?.protected_windows)
+    ? stored.scheduleContext.protected_windows
+    : Array.isArray(stored?.schedule_context?.protected_windows)
+      ? stored.schedule_context.protected_windows
+      : [];
+
+  for (const date of dates) {
+    const dayProposed = proposed.filter((b) => b.date === date);
+    const hardBusy = buildAuthoritativeHardBusy({
+      date,
+      lessons,
+      workBlocks,
+      planningProfile,
+      extraProtectedWindows: trustedProtected,
+      events: lifeEvents
+    });
+    const workday = workdayForDate(date, planningProfile);
+    const check = detectStaleScheduleCollisions({
+      proposedBlocks: dayProposed,
+      hardBusy,
+      workday
+    });
+    if (!check.ok) return check;
+  }
+  return { ok: true };
 }
 
 async function readAtMost(stream, limit) {
@@ -360,6 +1796,33 @@ async function readAtMost(stream, limit) {
     offset += chunk.byteLength;
   }
   return bytes;
+}
+
+async function invokeConfirmContinuation({ state, writeResult, reloaded, messages }, {
+  env,
+  fetchImpl,
+  createAnthropic
+}) {
+  const apiKey = typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
+  if (!apiKey) return { text: '', error: 'no_api_key' };
+  let text = '';
+  let usage = null;
+  try {
+    const client = createAnthropic({ apiKey, fetchImpl });
+    const packed = messages || { system: '', messages: [] };
+    for await (const event of client.streamMessage({
+      system: packed.system,
+      messages: packed.messages,
+      tools: [],
+      executeTools: async () => null
+    })) {
+      if (event.type === 'text' && typeof event.delta === 'string') text += event.delta;
+      if (event.type === 'usage') usage = event;
+    }
+  } catch {
+    return { text: '', error: 'model_failed', usage };
+  }
+  return { text: text.trim(), usage, error: text.trim() ? null : 'empty_continuation' };
 }
 
 function mapRepositoryError(error) {

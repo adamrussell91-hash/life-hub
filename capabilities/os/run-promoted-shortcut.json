@@ -1,0 +1,15 @@
+{
+  "id": "os.run-promoted-shortcut",
+  "tool_name": "os_run_promoted_shortcut",
+  "verb": "OS",
+  "agents": [
+    "*"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Replay a promoted shortcut draft's example writes as a Confirm propose-action. Does not mutate the live registry.",
+  "surfaces": [
+    "confirm_card",
+    "governance_log"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "plan.week-meals",
+  "tool_name": "plan_week_meals",
+  "verb": "Plan",
+  "agents": [
+    "brisket"
+  ],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Save a forward week meal plan. Fold in Marley Spoon default dinner and Vyvanse appetite-window intuition.",
+  "surfaces": [
+    "confirm_card",
+    "nutrition_tab",
+    "governance_log"
+  ]
+}

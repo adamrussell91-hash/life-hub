@@ -1,0 +1,21 @@
+---
+description: Activation and authority for the five Life Hub project skills.
+globs:
+alwaysApply: true
+---
+
+# Life Hub project skills
+
+Project skills live in `.cursor/skills/`. Read `.cursor/skills/README.md` for the pinned upstream SHA and overrides.
+
+Authority, in order: Adam's request, Ponytail and project guardrails, the design kit, `docs/consolidation/plan.md`, first-pass correctness, agent-context integrity, then these skills.
+
+## Activation
+
+- **diagnosing-bugs** — task-matched. Use for hard bugs, repeated failures, flakes, unclear runtime or integration failures, performance regressions, and any non-trivial case where the first attempted fix failed. This is the debug procedure. Do not also run Superpowers systematic-debugging.
+- **tdd** — only if Adam names `tdd` or says to use it. Not a blanket rule. Do not reach for it because a feature needs tests.
+- **code-review** — only if Adam names `code-review` or asks to run that skill. Life Hub standards override Fowler smells. Do not reach for it because a task is finishing.
+- **codebase-design** — only if Adam names `codebase-design` or asks to use that skill. Vocabulary, not a refactor licence. Do not reach for it because code is being designed.
+- **grilling** — only if Adam names `grilling` or asks to be grilled. He may stop it at any point. Do not reach for it because a plan is unclear.
+
+Do not install or invoke other Matt Pocock skills. Do not run `setup-matt-pocock-skills`. Do not create `CONTEXT.md`, `docs/adr/`, or `docs/agents/`.

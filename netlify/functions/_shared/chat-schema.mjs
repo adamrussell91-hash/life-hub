@@ -1,7 +1,10 @@
-import { TYPE_DOMAINS } from '../../../js/core/records.js';
-import { validateRecord } from '../../../js/core/validate.js';
-import { isCalendarDate } from '../../../js/core/time.js';
-import { buildMedicalSlug } from '../../../js/app/medical-model.js';
+import { TYPE_DOMAINS } from '../../../apps/life/js/core/records.js';
+import { validateRecord } from '../../../apps/life/js/core/validate.js';
+import { isCalendarDate } from '../../../apps/life/js/core/time.js';
+import { buildMedicalSlug } from '../../../apps/life/js/app/medical-model.js';
+import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/js/app/medical-normalize.js';
+import { collapseSetSplitExercises } from './workout-history.mjs';
+import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
 const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -45,6 +48,37 @@ const DOMAIN_PROPERTIES = {
             enum: ['drop_set', 'rest_pause', 'eccentric_overload', 'elastic_finisher', 'superset', 'other']
           },
           equipment: { type: 'string' },
+          superset_group: {
+            type: 'number',
+            description: 'Exercises sharing the same superset_group are performed back-to-back before resting.'
+          },
+          superset_label: {
+            type: 'string',
+            description: 'Optional card label for the pair, e.g. "1&2 superset".'
+          },
+          between_sets: {
+            type: 'object',
+            description: 'Optional between-set arm performed during rest on the main exercise.',
+            properties: {
+              name: { type: 'string' },
+              sets: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    reps: { type: 'number' },
+                    weight_kg: { type: 'number' },
+                    cable_type: {
+                      type: 'string',
+                      enum: ['constant_force', 'concentric', 'eccentric', 'elastic', 'rowing', 'none']
+                    }
+                  },
+                  required: ['reps', 'weight_kg', 'cable_type']
+                }
+              }
+            },
+            required: ['name']
+          },
           coach_cues: {
             type: 'object',
             description: 'Optional presence during the session (planned exercises only): a short line to show on starting this exercise, during rest between sets, and on the final set. Zero extra API calls -- generated once, up front, alongside the plan.',
@@ -80,6 +114,10 @@ const DOMAIN_PROPERTIES = {
         properties: { site: { type: 'string' }, note: { type: 'string' } },
         required: ['site']
       }
+    },
+    cross_agent_note: {
+      type: 'string',
+      description: 'Optional one-line Chadwick→Sara/Brisket directive when another agent must act. Format: Chadwick→Sara: ...'
     }
   },
   diary: {
@@ -133,9 +171,10 @@ const DOMAIN_PROPERTIES = {
     source_agent: { type: 'string', enum: ['vera', 'import'] }
   },
   medical: {
-    title: { type: 'string' },
+    title: { type: 'string', description: 'Short visit label, e.g. "Stelara injection". Required.' },
     record_type: {
       type: 'string',
+      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination.',
       enum: [
         'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
         'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
@@ -143,20 +182,29 @@ const DOMAIN_PROPERTIES = {
     },
     lane: {
       type: 'string',
+      description: 'Optional — inferred from record_type when omitted.',
       enum: [
         'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
         'dental', 'therapy', 'eye', 'appointment'
       ]
     },
-    date_end: { type: 'string' },
-    provider: { type: 'string' },
-    location: { type: 'string' },
-    location_kind: { type: 'string', enum: ['place', 'telehealth', 'unknown'] },
-    follow_up_date: { type: 'string' },
-    cost_aud: { type: 'number' },
-    insurance_status: { type: 'string' },
+    date_end: { type: 'string', description: 'Optional end date YYYY-MM-DD. Omit when unknown.' },
+    provider: { type: 'string', description: 'Optional clinician or clinic name.' },
+    location: { type: 'string', description: 'Optional place name.' },
+    location_kind: {
+      type: 'string',
+      enum: ['place', 'telehealth', 'unknown'],
+      description: 'Optional — defaults to place/telehealth/unknown from location text.'
+    },
+    follow_up_date: {
+      type: 'string',
+      description: 'Optional follow-up date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted. Omit when unknown. This stays on the same visit — a future maintenance dose on a new day is a separate medical visit with that date, not follow_up_date.'
+    },
+    cost_aud: { type: 'number', description: 'Optional out-of-pocket cost in AUD. Omit when unknown.' },
+    insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {
       type: 'object',
+      description: 'Optional episode grouping. Omit entirely unless grouping related visits.',
       properties: {
         id: { type: 'string' },
         title: { type: 'string' }
@@ -185,12 +233,14 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
 
   return {
     name: 'log_entry',
-    description: 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
+    description: allowedTypes.length === 1 && allowedTypes[0] === 'mind_session'
+      ? 'Write one mind_session record for Adam. Life Hub saves immediately (no Confirm card). Call at close or when Adam asks to record. Returns { ok: true, status: "written", path } on success.'
+      : 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
     input_schema: {
       type: 'object',
       properties: {
         type: { type: 'string', enum: allowedTypes },
-        date: { type: 'string', description: 'YYYY-MM-DD' },
+        date: { type: 'string', description: 'Visit/log date. Prefer YYYY-MM-DD; AU forms like 27/10 or 27/10/2026 are accepted for medical visits.' },
         time: { type: 'string', description: 'HH:MM, optional' },
         notes: { type: 'string', description: 'Optional free-text note saved as the record body, e.g. what food was eaten or how a workout felt. Not a domain field — do not put this in fields.' },
         fields: fieldsSchema
@@ -209,9 +259,23 @@ export function buildCanonicalPath({ type, date, slug }) {
   return `data/${domain}/${year}/${month}/${date}-${slug}.md`;
 }
 
+export const PLANNED_WORKOUT_SLUG = 'workout-planned';
+
+/**
+ * Path slug for a planned workout. Title-stable so amending the same session
+ * updates one file, while a different title the same day gets its own file
+ * (weights + walk, two pumps, etc.). Legacy untitled plans keep workout-planned.
+ */
+export function buildPlannedWorkoutSlug(title) {
+  const stem = slugifyWorkoutTitle(title);
+  if (!stem || stem === 'workout') return PLANNED_WORKOUT_SLUG;
+  return `workout-${stem}`;
+}
+
 /**
  * Stable path slug for a validated record.
  * Meals use slot-only slugs so same-day corrections overwrite the same file.
+ * Planned workouts key off title so multiple sessions can share a calendar day.
  */
 export function buildRecordSlug(record) {
   if (!record || typeof record !== 'object') throw new TypeError('record is required');
@@ -220,6 +284,9 @@ export function buildRecordSlug(record) {
       throw new TypeError(`Invalid meal slot: ${record.meal}`);
     }
     return record.meal;
+  }
+  if (record.type === 'workout' && record.status === 'planned') {
+    return buildPlannedWorkoutSlug(record.title);
   }
   if (record.type === 'mind_session') return 'session';
   if (record.type === 'medical') return buildMedicalSlug(record.title, record.time);
@@ -262,12 +329,22 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
     }
   }
 
+  const today = now.slice(0, 10);
+  const normalizedFields = type === 'medical'
+    ? normalizeMedicalFields(fields, { notes, today })
+    : type === 'workout' && Array.isArray(fields.exercises)
+      ? { ...fields, exercises: collapseSetSplitExercises(fields.exercises) }
+      : fields;
+  const resolvedDate = type === 'medical'
+    ? (coerceCalendarDate(date, { today }) ?? date)
+    : date;
+
   const record = {
-    ...fields,
+    ...normalizedFields,
     schema_version: 1,
     id,
     type,
-    date,
+    date: resolvedDate,
     time: time ?? now.slice(11, 16),
     created_at: now,
     updated_at: now,
@@ -278,3 +355,25 @@ export function validateLogEntry(candidate, { id, now, source = 'chat' } = {}) {
 }
 
 export { DOMAIN_PROPERTIES };
+
+export function logEntryRetryHint(input) {
+  if (!input || typeof input !== 'object') {
+    return 'Fix the payload and call log_entry again in this turn before telling Adam it failed.';
+  }
+  if (input.type === 'medical') {
+    return 'Call log_entry again with type medical, date (YYYY-MM-DD or AU D/M/YYYY), fields: { title }, and notes only. For a future maintenance dose use that day as date (new visit). Omit lane, record_type, and every other optional field. Do not mention schema errors to Adam.';
+  }
+  if (input.type === 'meal') {
+    return 'Call log_entry again with every required meal macro, valid time in HH:MM, and notes.';
+  }
+  return 'Read errors, fix the fields, call log_entry again in this turn before telling Adam it failed.';
+}
+
+export function logEntryRejectionPayload(input, errors) {
+  return {
+    ok: false,
+    status: 'validation_failed',
+    errors,
+    retry: logEntryRetryHint(input)
+  };
+}

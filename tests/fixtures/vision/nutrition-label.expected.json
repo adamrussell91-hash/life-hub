@@ -1,0 +1,9 @@
+{
+  "product": "Test Chicken Pasta",
+  "energy_kJ": 2150,
+  "protein_g": 42,
+  "fat_g": 14.5,
+  "carbohydrate_g": 55,
+  "sodium_mg": 780,
+  "serving_size_g": 400
+}

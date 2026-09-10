@@ -2,8 +2,9 @@ import {
   CENTRAL_NODE_SECTIONS,
   classifyCentralNodePatchRisk,
   applyCentralNodePatch
-} from '../../../js/core/central-node-patch.js';
-import { GOVERNANCE_ENTRY_TYPES } from '../../../js/core/governance-log.js';
+} from '../../../apps/life/js/core/central-node-patch.js';
+import { GOVERNANCE_ENTRY_TYPES } from '../../../apps/life/js/core/governance-log.js';
+import { formatHubRef, parseHubRef } from './hub-ref.mjs';
 
 export { classifyCentralNodePatchRisk, applyCentralNodePatch };
 
@@ -89,11 +90,47 @@ export function appendGovernanceLogSchema() {
         dateKey: {
           type: 'string',
           description: 'Optional YYYY-MM-DD; server may default when omitted'
+        },
+        chosen: {
+          type: 'string',
+          description: 'Option taken. Use the same Title on later entries to trace how it changed.'
+        },
+        reasoning: {
+          type: 'string',
+          description: 'Why this option won. A second agent can append another entry with the same Title.'
+        },
+        revisit: {
+          type: 'string',
+          description: 'Optional YYYY-MM-DD to look at this decision again'
+        },
+        decision_id: {
+          type: 'string',
+          description: 'Stable id for this thread. Knowledge cites it as life:decision:{id}.'
+        },
+        about: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Hub refs this decision is about (teaching:unit:…, tasks:project:…, page ids).'
         }
       },
       required: ['entry_type', 'body']
     }
   };
+}
+
+const SPECIALIST_CN_SENDERS = {
+  clare: 'Clare',
+  ann: 'Ann'
+};
+
+export function assertAgentMayApplyCentralNodePatch(slug, patch) {
+  if (slug === 'hammond') return true;
+  const sender = SPECIALIST_CN_SENDERS[slug];
+  if (!sender || !patch || typeof patch !== 'object') return false;
+  if (patch.section !== 'cross_agent' || patch.op !== 'append_line') return false;
+  const text = typeof patch.payload?.text === 'string' ? patch.payload.text.trim() : '';
+  const line = text.replace(/^-\s*/, '');
+  return line.startsWith(`${sender}\u2192`);
 }
 
 export function validateCentralNodePatchInput(input) {
@@ -158,6 +195,31 @@ export function validateGovernanceLogAppendInput(input) {
   }
   if (typeof input.dateKey === 'string' && input.dateKey.trim()) {
     entry.dateKey = input.dateKey.trim();
+  }
+  if (typeof input.chosen === 'string' && input.chosen.trim()) {
+    entry.chosen = input.chosen.trim();
+  }
+  if (typeof input.reasoning === 'string' && input.reasoning.trim()) {
+    entry.reasoning = input.reasoning.trim();
+  }
+  if (typeof input.revisit === 'string' && input.revisit.trim()) {
+    entry.revisit = input.revisit.trim();
+  }
+  if (typeof input.decision_id === 'string' && input.decision_id.trim()) {
+    entry.decisionId = input.decision_id.trim();
+  }
+  if (Array.isArray(input.about)) {
+    const about = [];
+    const seen = new Set();
+    for (const item of input.about) {
+      const parsed = parseHubRef(item);
+      if (!parsed) continue;
+      const stored = formatHubRef(parsed);
+      if (seen.has(stored)) continue;
+      seen.add(stored);
+      about.push(stored);
+    }
+    if (about.length) entry.about = about;
   }
 
   return entry;

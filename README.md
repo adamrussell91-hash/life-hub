@@ -2,6 +2,8 @@
 
 Private personal dashboard and conversational logging application.
 
+**Hub consolidation (Claude Code overseer):** [`docs/consolidation/OVERSEER.md`](docs/consolidation/OVERSEER.md) — role, scope, and checkpoint prompts. Claude Code also loads root [`CLAUDE.md`](CLAUDE.md) when opened in this repo.
+
 ## Current slice
 
 The site is hosted on **GitHub Pages** (via `.github/workflows/pages.yml`, on every push to `main`). **Netlify hosts nothing but the API Functions** — the GitHub token, passphrase verifier, session secret, and Anthropic key live only there, never in the deployed site. The two are different origins by design; every `/api/*` call is a cross-origin request from the GitHub Pages site to the Netlify Functions site, with an explicit `SITE_ORIGIN` allow-list and `credentials: 'include'` carrying the session cookie across.
@@ -63,7 +65,7 @@ Use `.env.example` only as a symbolic checklist. This branch and its pull reques
 
 `GITHUB_TOKEN_EXPIRES` is required and must be a real calendar date; the GitHub client rejects any other value as misconfiguration. There is no separate health-check endpoint or expiry banner — rotate the token yourself ahead of that date.
 
-**Point the site at the Functions.** Once the Netlify site exists, edit `js/app/config.js`'s `API_BASE_URL` to that site's URL (e.g. `https://your-site-name.netlify.app`) and commit it — this isn't a secret, just where the API lives, and the site won't be able to reach it otherwise.
+**Point the site at the Functions.** Once the Netlify site exists, edit `apps/life/js/app/config.js`'s `API_BASE_URL` to that site's URL (e.g. `https://your-site-name.netlify.app`) and commit it — this isn't a secret, just where the API lives, and the site won't be able to reach it otherwise.
 
 After deploying, inspect the Netlify deploy log and confirm it registered the `/api/auth` code-based rate limit: five requests per 60 seconds, aggregated by IP and domain. Do not promote a deploy if that rule is absent.
 

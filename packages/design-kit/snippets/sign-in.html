@@ -1,0 +1,24 @@
+<!-- Locked passphrase gate. Per hub: brand eyebrow text only.
+     Forbidden: .sign-in__mark / hub tile, supporting / purpose / privacy copy.
+     Enter submits via form submit (not click-only).
+     Load: tokens.css → overlays.css → actions.css → sign-in.css -->
+<div class="sign-in">
+  <form class="sign-in__card" method="post" action="#" novalidate>
+    <p class="sign-in__brand">Hub name</p>
+    <h1 class="sign-in__title">Sign in</h1>
+    <div class="sign-in__field">
+      <label class="sign-in__label" for="sign-in-passphrase">Passphrase</label>
+      <input
+        class="sign-in__input"
+        id="sign-in-passphrase"
+        name="passphrase"
+        type="password"
+        required
+        autocomplete="current-password"
+        enterkeyhint="go"
+      />
+    </div>
+    <p class="sign-in__error" role="alert" hidden></p>
+    <button class="btn btn--primary sign-in__submit" type="submit">Sign in</button>
+  </form>
+</div>

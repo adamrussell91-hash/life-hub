@@ -1,0 +1,27 @@
+{
+  "name": "Life Hub",
+  "short_name": "Life Hub",
+  "description": "A private, read-only view of your Life Hub.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FAF8F2",
+  "theme_color": "#0A1536",
+  "icons": [],
+  "share_target": {
+    "action": "./capture-inbox.html",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*", "application/pdf", "text/plain", "audio/*", "*/*"]
+        }
+      ]
+    }
+  }
+}

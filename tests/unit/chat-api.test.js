@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createChatApi } from '../../js/app/chat-api.js';
+import { createChatApi } from '../../apps/life/js/app/chat-api.js';
 
 function sseResponse(frames) {
   const encoder = new TextEncoder();
@@ -108,6 +108,46 @@ test('confirm passes kind through when provided', async () => {
   assert.equal(result.path, 'central-node.md');
 });
 
+test('confirm passes accept, reason, and revisit for action proposals', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { intent: 'open a tracker' } });
+  });
+  await chatApi.confirm({
+    kind: 'action',
+    slug: 'brisket',
+    candidate: { intent: 'open a tracker' },
+    accept: ['data/challenges/no-sugar.json'],
+    reason: 'Keep the week honest',
+    revisit: '2026-09-12'
+  });
+  assert.deepEqual(sentBody.accept, ['data/challenges/no-sugar.json']);
+  assert.equal(sentBody.reason, 'Keep the week honest');
+  assert.equal(sentBody.revisit, '2026-09-12');
+});
+
+test('confirm passes id through when provided, and can omit candidate entirely', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'central-node.md', summary: 'Condense Trends' } });
+  });
+  await chatApi.confirm({ kind: 'cn_patch', id: 'cnp_abc123', slug: 'hammond' });
+  assert.equal(sentBody.id, 'cnp_abc123');
+  assert.equal('candidate' in sentBody, false);
+});
+
+test('confirm omits id from the body when not provided', async () => {
+  let sentBody;
+  const chatApi = createChatApi(async (_url, init) => {
+    sentBody = JSON.parse(init.body);
+    return Response.json({ ok: true, data: { path: 'data/nutrition/x.md' } });
+  });
+  await chatApi.confirm({ candidate: { type: 'meal' }, slug: 'breakfast' });
+  assert.equal('id' in sentBody, false);
+});
+
 test('confirm omits kind from the body when not provided', async () => {
   let sentBody;
   const chatApi = createChatApi(async (_url, init) => {
@@ -124,6 +164,34 @@ test('confirm throws a structured error when the write fails', async () => {
     chatApi.confirm({ candidate: {}, slug: 'x' }),
     error => error.status === 409 && error.code === 'write_conflict'
   );
+});
+
+test('send polls job events when /api/chat returns a job id instead of SSE', async () => {
+  const calls = [];
+  const chatApi = createChatApi(async (url) => {
+    calls.push(String(url));
+    if (url === '/api/chat') {
+      return Response.json({ ok: true, data: { jobId: '11111111-1111-4111-8111-111111111111' } }, { status: 202 });
+    }
+    return Response.json({
+      ok: true,
+      data: {
+        events: calls.length === 2
+          ? [{ type: 'agent', slug: 'penelope' }, { type: 'text', delta: 'Filed.' }]
+          : [],
+        status: 'done',
+        next: 2
+      }
+    });
+  }, { pollMs: 1 });
+
+  const events = [];
+  for await (const event of chatApi.send('yep go for it')) events.push(event);
+  assert.deepEqual(events, [
+    { type: 'agent', slug: 'penelope' },
+    { type: 'text', delta: 'Filed.' }
+  ]);
+  assert.ok(calls[1].startsWith('/api/chat/events?job=11111111-1111-4111-8111-111111111111'));
 });
 
 test('createChatApi requires a fetch implementation', () => {

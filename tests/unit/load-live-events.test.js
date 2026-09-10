@@ -2,17 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { load } from 'js-yaml';
-import { buildHomeModel } from '../../js/app/home-model.js';
+import { buildHomeModel } from '../../apps/life/js/app/home-model.js';
 import {
   MAX_LOOKBACK_DAYS,
   loadLiveEvents as loadLiveEventsRaw,
   planBackfillWindows
-} from '../../js/app/load-live-events.js';
+} from '../../apps/life/js/app/load-live-events.js';
 
 function loadLiveEvents(opts) {
   return loadLiveEventsRaw({ maxLookbackDays: 40, ...opts });
 }
-import { addCalendarDays, daysBetween } from '../../js/core/time.js';
+import { addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
 
 const SHA = 'a'.repeat(40);
 const raw = (path, content) => ({ path, sha: SHA, content });
@@ -453,6 +453,29 @@ test('exposes parsed config/agents.yml and raw central-node.md content when both
   assert.equal(result.centralNodeMarkdown, centralNodeMarkdown);
 });
 
+test('exposes parsed nutrition challenge trackers when challenges.json is present', async () => {
+  const files = [
+    raw('data/nutrition/challenges.json', JSON.stringify({
+      challenges: [{
+        id: 'no-refined-sugar-2026-08-01',
+        title: 'No refined sugar',
+        rule: 'No refined sugar',
+        start: '2026-08-01',
+        end: '2026-08-07',
+        status: 'active',
+        days: {}
+      }]
+    }))
+  ];
+  const sync = async () => ({
+    files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+  assert.equal(result.nutritionChallenges.challenges[0].title, 'No refined sugar');
+});
+
 test('an unparseable config/agents.yml produces a warning instead of throwing, and central-node.md needs no parsing to fail', async () => {
   const files = [
     raw('config/agents.yml', 'agents: [invalid'),
@@ -484,6 +507,42 @@ test('agentsConfig and centralNodeMarkdown default to null when neither file is 
   assert.equal(result.agentsConfig, null);
   assert.equal(result.centralNodeMarkdown, null);
   assert.equal(result.governanceLogMarkdown, null);
+  assert.equal(result.weekFlags, null);
+});
+
+test('exposes parsed week-flags.json when present in the sync batch', async () => {
+  const files = [raw('data/remember/week-flags.json', JSON.stringify({
+    weeks: { '2026-06-01': { exam: 'MEd sit' } }
+  }))];
+  const sync = async ({ validateFile }) => {
+    assert.deepEqual(validateFile(files[0]), { valid: true });
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+      changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+
+  assert.equal(result.weekFlags.weeks['2026-06-01'].exam, 'MEd sit');
+});
+
+test('exposes research briefs when present in the sync batch', async () => {
+  const files = [raw('data/research/2026-08-01-knee-load.json', JSON.stringify({
+    title: 'Knee load after taper',
+    expires_at: '2026-08-11T00:00:00.000Z',
+    sources: ['https://example.edu/knee']
+  }))];
+  const sync = async ({ validateFile }) => {
+    assert.deepEqual(validateFile(files[0]), { valid: true });
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+      changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+  assert.equal(result.researchBriefs[0].title, 'Knee load after taper');
 });
 
 test('exposes raw governance-log.md content when present in the sync batch', async () => {

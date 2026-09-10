@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { addCalendarDays, enumerateDateKeys } from '../../js/core/time.js';
+import { addCalendarDays, enumerateDateKeys } from '../../apps/life/js/core/time.js';
 import {
   DOMAIN_PATH,
   WINDOW_DAYS,
@@ -12,7 +12,7 @@ import {
   summarizeHammondDigest,
   formatCentralNodeModelForPrompt
 } from '../../netlify/functions/_shared/hammond-digest.mjs';
-import { buildCentralNodeModel } from '../../js/app/central-node-model.js';
+import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 
 const TODAY = '2026-08-11';
 
@@ -39,6 +39,8 @@ test('DOMAIN_PATH matches only the 5 recognised Life Hub domains', () => {
   assert.ok(DOMAIN_PATH.test('data/skincare/2026/08/2026-08-01-am.md'));
   assert.ok(!DOMAIN_PATH.test('data/sleep/2026/08/2026-08-01-note.md'));
   assert.ok(!DOMAIN_PATH.test('data/heart/2026/08/2026-08-01-note.md'));
+  assert.ok(!DOMAIN_PATH.test('data/tasks/2026/08/2026-08-01-marking.md'));
+  assert.ok(!DOMAIN_PATH.test('scheduled_lessons/2026-08-01-11psycha.md'));
 });
 
 test('summarizes a 90-day gap and a current gap for a domain (happy path / domain detail)', () => {

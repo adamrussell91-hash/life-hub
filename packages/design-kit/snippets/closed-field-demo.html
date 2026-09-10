@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" data-hub="tasks">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Closed-field chip · design kit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+    />
+    <link rel="stylesheet" href="../tokens.css" />
+    <link rel="stylesheet" href="../overlays.css" />
+    <link rel="stylesheet" href="../actions.css" />
+    <link rel="stylesheet" href="../filters.css" />
+    <link rel="stylesheet" href="../morphing-popover.css" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        padding: var(--space-8);
+        font-family: var(--font-ui);
+        color: var(--ink);
+        background: var(--cotton);
+      }
+      main {
+        display: grid;
+        gap: var(--space-4);
+        max-width: 36rem;
+      }
+      .page-header__eyebrow {
+        margin: 0;
+        font-size: var(--text-2xs);
+        letter-spacing: var(--tracking-caps);
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      h1 {
+        margin: 0;
+        font-size: var(--text-xl);
+        font-weight: var(--weight-semibold);
+      }
+      .demo-copy,
+      #closed-field-log {
+        margin: 0;
+        color: var(--muted);
+        font-size: var(--text-sm);
+      }
+      .demo-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-3);
+        min-height: 12rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="page-header__eyebrow">Design kit</p>
+      <h1>Closed-field chip</h1>
+      <p class="demo-copy">
+        The chip is the trigger. It morphs into a closed list. Save commits. Discard, click-outside, and Escape keep the last saved value.
+      </p>
+      <div class="demo-row" id="closed-field-host"></div>
+      <p id="closed-field-log">Saved: In progress</p>
+    </main>
+    <script type="module">
+      import { createMorphingClosedFieldPopover } from '../js/morphing-popover.js';
+
+      const log = document.getElementById('closed-field-log');
+      const popover = createMorphingClosedFieldPopover({
+        root: document,
+        title: 'Status',
+        supporting: 'Closed list. Save writes it.',
+        value: 'in_progress',
+        options: [
+          { value: 'open', label: 'Open' },
+          { value: 'in_progress', label: 'In progress' },
+          { value: 'deferred', label: 'Deferred' },
+          { value: 'done', label: 'Done' }
+        ],
+        onSave(value) {
+          const labels = {
+            open: 'Open',
+            in_progress: 'In progress',
+            deferred: 'Deferred',
+            done: 'Done'
+          };
+          log.textContent = `Saved: ${labels[value] ?? value}`;
+        }
+      });
+      document.getElementById('closed-field-host').append(popover.el);
+    </script>
+  </body>
+</html>

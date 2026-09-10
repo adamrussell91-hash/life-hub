@@ -6,16 +6,22 @@ import {
   applyLogToCentralNode,
   buildMealFlagsLine,
   buildNutritionStatusLine,
+  dedupeCrossAgentSection,
+  dedupeRecentActions,
   formatStatusHeadingDate,
   formatThisMonthHeading,
   formatThisWeekHeading,
   humanizeDayType,
   purgeStaleRecentActions,
+  recentActionFingerprint,
   replaceTodaysStatus,
   rollStaleSections,
+  shouldAppendRecentAction,
   trimCrossAgentSection,
-  upsertStatusField
-} from '../../js/core/central-node-write.js';
+  upsertStatusField,
+  mergeFlagsIntoStatus,
+  buildWorkoutFlagsLine
+} from '../../apps/life/js/core/central-node-write.js';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +46,156 @@ test('formatStatusHeadingDate uses en-AU long form', () => {
 test('appendRecentAction inserts directly under the Recent Agent Actions heading', () => {
   const next = appendRecentAction(base, '\n**1 Aug:** Brisket Lasso: Logged breakfast.');
   assert.match(next, /## 📝 Recent Agent Actions\n\*\*1 Aug:\*\* Brisket Lasso: Logged breakfast\.\n\*\*1 Aug:\*\*/);
+});
+
+test('appendRecentAction replaces a same-fingerprint workout line instead of stacking clones', () => {
+  const withDupeSeed = [
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**28 Aug:** Brisket Lasso: Logged lunch.'
+  ].join('\n');
+
+  const next = appendRecentAction(
+    withDupeSeed,
+    '**29 Aug:** Chadwick Flexington: Logged a 30-min Workout session (Biceps and Boobs, 20 mins).'
+  );
+  const bullets = next.split('\n').filter(line => line.startsWith('**29 Aug:** Chadwick'));
+  assert.equal(bullets.length, 1);
+  assert.match(bullets[0], /30-min Workout session/);
+  assert.match(next, /\*\*28 Aug:\*\* Brisket Lasso: Logged lunch\./);
+});
+
+test('appendRecentAction is a no-op when the identical action line already exists', () => {
+  const line = '**1 Aug:** Brisket Lasso: Logged breakfast for breakfast (520 kcal).';
+  const content = `## 📝 Recent Agent Actions\n${line}`;
+  assert.equal(appendRecentAction(content, `\n${line}`), content);
+});
+
+test('dedupeRecentActions keeps the newest line of each fingerprint', () => {
+  const content = [
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**7 Aug:** Hyaluronica St. Claire: Logged pm skincare.',
+    '**7 Aug:** Hyaluronica St. Claire: Logged pm skincare.',
+    '*48-hour rolling window.*'
+  ].join('\n');
+  const next = dedupeRecentActions(content);
+  assert.equal(
+    next.split('\n').filter(line => line.includes('Biceps and Boobs')).length,
+    1
+  );
+  assert.equal(
+    next.split('\n').filter(line => line.includes('Logged pm skincare')).length,
+    1
+  );
+  assert.match(next, /48-hour rolling window/);
+});
+
+test('recentActionFingerprint treats duration-prefixed workout clones as the same action', () => {
+  assert.equal(
+    recentActionFingerprint(
+      '**29 Aug:** Chadwick Flexington: Logged a 30-min workout_30 session (Biceps and Boobs, 20 mins).'
+    ),
+    recentActionFingerprint(
+      '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+    )
+  );
+});
+
+test('shouldAppendRecentAction skips planned workouts but keeps completed ones', () => {
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'planned' }), false);
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'completed' }), true);
+  assert.equal(shouldAppendRecentAction({ type: 'workout', status: 'skipped' }), true);
+  assert.equal(shouldAppendRecentAction({ type: 'meal', meal: 'lunch' }), true);
+});
+
+test('applyLogToCentralNode does not touch Status or Recent Actions for planned workouts', () => {
+  const next = applyLogToCentralNode(base, {
+    record: {
+      type: 'workout',
+      date: '2026-08-01',
+      status: 'planned',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30'
+    },
+    actionLine: '\n**1 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+  });
+  assert.equal(next, base);
+});
+
+test('applyLogToCentralNode collapses stacked workout clones when a completed session lands', () => {
+  const spam = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Friday 29 August 2026)",
+    '**Exercise:** prior.',
+    '---',
+    '## 📝 Recent Agent Actions',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).',
+    '**29 Aug:** Chadwick Flexington: Logged a workout_30 session (Biceps and Boobs, 20 mins).'
+  ].join('\n');
+
+  const next = applyLogToCentralNode(spam, {
+    record: {
+      type: 'workout',
+      date: '2026-08-29',
+      status: 'completed',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30',
+      duration_min: 20,
+      focus: ['chest', 'arms'],
+      exercises: [{ name: 'Bar Press' }, { name: 'Curl' }]
+    },
+    actionLine:
+      '\n**29 Aug:** Chadwick Flexington: Logged Biceps and Boobs, 20 mins (2 moves, 20 min, chest/arms).',
+    flagNotes: 'Biceps and Boobs — AC clear, matched last loads'
+  });
+  const recent = next.slice(next.indexOf('## 📝 Recent Agent Actions'));
+  assert.equal(
+    recent.split('\n').filter(line => line.includes('Biceps and Boobs')).length,
+    1
+  );
+  assert.match(recent, /Logged Biceps and Boobs, 20 mins \(2 moves, 20 min, chest\/arms\)/);
+  assert.match(next, /\*\*Exercise:\*\* Biceps and Boobs, 20 mins · 20 min · 2 moves · chest\/arms · completed\./);
+  assert.match(next, /\*\*Flags:\*\* Biceps and Boobs — AC clear, matched last loads/);
+});
+
+test('completed workout with pain_flags writes Flags and Chadwick→Sara Cross-Agent lines', () => {
+  const baseWithXa = [
+    '# Purpose',
+    '---',
+    "## ⚡ Today's Status (Friday 29 August 2026)",
+    '**Health:** Stable.',
+    '---',
+    '## 🤝 Cross-Agent Coordination',
+    '- Keep me.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const next = applyLogToCentralNode(baseWithXa, {
+    record: {
+      type: 'workout',
+      date: '2026-08-29',
+      status: 'completed',
+      title: 'Biceps and Boobs, 20 mins',
+      day_type: 'workout_30',
+      duration_min: 20,
+      exercises: [{ name: 'Bar Press' }],
+      pain_flags: [{ site: 'right AC', note: 'mild twinge on fly, parked' }]
+    },
+    actionLine: '\n**29 Aug:** Chadwick Flexington: Logged Biceps and Boobs, 20 mins (1 moves, 20 min).'
+  });
+  assert.match(next, /\*\*Flags:\*\* right AC: mild twinge on fly, parked/);
+  assert.match(
+    next,
+    /Chadwick→Sara: Biceps and Boobs, 20 mins — right AC: mild twinge on fly, parked/
+  );
+  assert.match(next, /- Keep me\./);
 });
 
 test('buildNutritionStatusLine formats totals only', () => {
@@ -155,9 +311,70 @@ test('trimCrossAgentSection keeps the newest directives and drops the tail', () 
   assert.match(next, /- Directive 12\./);
   assert.doesNotMatch(next, /- Directive 13\./);
   assert.doesNotMatch(next, /- Directive 15\./);
+  assert.match(next, /life-hub:cross-agent-truncated kept=12 omitted=3/);
   // Non-directive content and later sections survive the trim.
   assert.match(next, /\*One-line directives only\.\*/);
   assert.match(next, /## 📝 Recent Agent Actions/);
+});
+
+test('dedupeCrossAgentSection collapses repeated same-thread lines from the same sender, keeping the newest', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    "- Vera→Hammond: Body-level question (what 'getting in trouble' feels like physically) has now been left open at close five times without landing. Strong recommend: next session open directly with this.",
+    "- Vera→Hammond: Body-level question (what getting in trouble feels like physically) has now been left open at close four times across today's sessions without landing.",
+    '- Penelope→Hammond: Adam reports persistent low mood, unrelated thread.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const next = dedupeCrossAgentSection(base);
+  assert.match(next, /left open at close five times/);
+  assert.doesNotMatch(next, /left open at close four times/);
+  assert.match(next, /Penelope→Hammond: Adam reports persistent low mood/);
+});
+
+test('dedupeCrossAgentSection leaves distinct threads from the same sender alone', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Chadwick→Sara: 26 Jul right AC deep ache recurring during everyday movement.',
+    '- Chadwick→Sara: 24 Jul mild AC noise on upright close grip curls during the session.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection keeps unparseable bullets untouched', () => {
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    '- Just a note with no sender arrow at all.',
+    '- Just a note with no sender arrow at all.',
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+  assert.equal(dedupeCrossAgentSection(base), base);
+});
+
+test('dedupeCrossAgentSection runs before trimCrossAgentSection so a duplicate never displaces a distinct line', () => {
+  const duplicatePair = [
+    '- Vera→Hammond: same open thread left open at close today, restated a second time, still not landing.',
+    '- Vera→Hammond: same open thread left open at close today, this is the first time it was raised.'
+  ];
+  const distinctOld = Array.from({ length: 11 }, (_, index) => `- Distinct directive ${index + 1}.`);
+  const base = [
+    '## 🤝 Cross-Agent Coordination',
+    ...duplicatePair,
+    ...distinctOld,
+    '---',
+    '## 📝 Recent Agent Actions'
+  ].join('\n');
+
+  const deduped = trimCrossAgentSection(dedupeCrossAgentSection(base), { maxLines: 12 });
+  assert.match(deduped, /restated a second time, still not landing/);
+  assert.match(deduped, /Distinct directive 11\./);
+
+  const notDeduped = trimCrossAgentSection(base, { maxLines: 12 });
+  assert.doesNotMatch(notDeduped, /Distinct directive 11\./);
 });
 
 test('trimCrossAgentSection leaves a short section untouched', () => {
@@ -318,18 +535,21 @@ test('purgeStaleRecentActions is a no-op when everything is current', () => {
   assert.equal(purgeStaleRecentActions(content, '2026-08-11'), content);
 });
 
-test('hammond protocol no longer mentions Sterling; central-node.md is untouched by Move 8', () => {
+test('hammond protocol no longer mentions Sterling', () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const protocol = readFileSync(join(root, 'config/hammond-protocol.md'), 'utf8');
   assert.doesNotMatch(protocol, /Sterling/);
   assert.match(protocol, /5\. Growth and learning/);
   assert.match(protocol, /6\. Comfort \/ convenience/);
+});
 
+test('seed central-node.md Agent Directory lists live Clare and Ann, not Clementine', () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const cn = readFileSync(join(root, 'central-node.md'), 'utf8');
-  assert.match(cn, /Clare DeMind/);
-  assert.match(cn, /Ann O'Tation/);
-  // Byte-for-byte guard: this move must not rewrite CN. Hash is stable for the
-  // checked-in file on this branch (assert length + Clare/Ann presence above).
+  const directorySection = cn.slice(cn.indexOf('## 🤖 Agent Directory'), cn.indexOf('## 🔴 Current Constraints'));
+  assert.match(directorySection, /Clare DeMind \(Tasks Agent\)/);
+  assert.match(directorySection, /Ann O'Tation \(Teaching Agent\)/);
+  assert.doesNotMatch(directorySection, /Clementine/);
   assert.ok(cn.length > 1000);
   assert.equal(createHash('sha256').update(cn).digest('hex').length, 64);
 });
@@ -371,9 +591,9 @@ test('mind_session upserts Mind status and Cross-Agent line', () => {
   assert.match(next, /Vera→Penelope: ask what the weekend is for\.\n- Old line\./);
 });
 
-test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () => {
+test('appendCrossAgentLine inserts newest-first and trim still caps at 24', () => {
   let content = `${base}\n## 🤝 Cross-Agent Coordination\n`;
-  for (let i = 0; i < 12; i += 1) content = appendCrossAgentLine(content, `- Old ${i}.`);
+  for (let i = 0; i < 24; i += 1) content = appendCrossAgentLine(content, `- Old ${i}.`);
   const next = appendCrossAgentLine(content, '- New line.');
   const trimmed = applyLogToCentralNode(next, {
     record: { type: 'diary', date: '2026-06-19', mood: 'good', energy: 'high' },
@@ -385,5 +605,27 @@ test('appendCrossAgentLine inserts newest-first and trim still caps at 12', () =
   const xaEndRel = xaRest.search(/\n## /);
   const xaSection = xaEndRel === -1 ? xaRest : xaRest.slice(0, xaEndRel);
   const bullets = xaSection.split('\n').filter(l => l.startsWith('- '));
-  assert.equal(bullets.length, 12);
+  assert.equal(bullets.length, 24);
+});
+
+
+test('mergeFlagsIntoStatus appends instead of clobbering, and workout flags allow 280 chars', () => {
+  const base = [
+    "# Purpose",
+    "---",
+    "## ⚡ Today's Status (Friday 19 June 2026)",
+    "**Flags:** Meal note — sodium high.",
+    "---"
+  ].join('\n');
+  const merged = mergeFlagsIntoStatus(base, '**Flags:** right AC: pinch on fly');
+  assert.match(merged, /Meal note — sodium high/);
+  assert.match(merged, /right AC: pinch on fly/);
+
+  const longNote = 'x'.repeat(200);
+  const flags = buildWorkoutFlagsLine(
+    { pain_flags: [{ site: 'left knee', note: 'grind' }] },
+    longNote
+  );
+  assert.ok(flags.length <= 280 + '**Flags:** '.length);
+  assert.match(flags, /left knee: grind/);
 });
