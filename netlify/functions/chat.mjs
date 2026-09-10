@@ -976,7 +976,7 @@ export function createChatHandler({
                 compareWorkoutWindows(workoutRecords, today)
               );
               regionStrength = formatRegionStrengthForPrompt(
-                getRegionStrength(workoutRecords, today)
+                getRegionStrength(workoutRecords, today, { library: exerciseLibraryEntries })
               );
             }
             sessionAdherenceDays = combineSessionAdherenceDays(
@@ -1875,7 +1875,10 @@ export function createChatHandler({
               }
               if (event.name === 'get_region_strength') {
                 send({ type: 'status', text: 'Reading region strength…' });
-                return JSON.stringify(getRegionStrength(workoutRecords, today, event.input ?? {}));
+                return JSON.stringify(getRegionStrength(workoutRecords, today, {
+                  ...(event.input ?? {}),
+                  library: exerciseLibraryEntries
+                }));
               }
               const fitnessRead = executeFitnessReadTool(event.name, {
                 workouts: workoutRecords,

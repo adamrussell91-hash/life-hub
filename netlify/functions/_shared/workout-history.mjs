@@ -1,5 +1,6 @@
 import { addCalendarDays, daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { buildFitnessModel, REGION_KEYS } from '../../../apps/life/js/app/fitness-model.js';
+import { buildLibraryByName } from '../../../apps/life/js/app/muscle-maps.js';
 
 export const FITNESS_SESSION_PATH =
   /^data\/fitness\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
@@ -394,12 +395,15 @@ function workoutEventsFromRecords(records) {
  * Same Region strength numbers as the Fitness page tiles — best working-weight
  * kg delta and regional volume % over current 30d vs prior 30d.
  */
-export function getRegionStrength(records, today, { region } = {}) {
+export function getRegionStrength(records, today, { region, libraryByName = null, library = null } = {}) {
   if (!isCalendarDate(today)) return { ok: false, error: 'invalid_date' };
   const windows = regionStrengthWindows(today);
+  const resolvedLibrary = libraryByName
+    ?? (Array.isArray(library) ? buildLibraryByName(library) : null);
   const model = buildFitnessModel({
     events: workoutEventsFromRecords(records),
-    date: today
+    date: today,
+    libraryByName: resolvedLibrary
   });
   let regions = (model.regions ?? []).map(entry => ({
     key: entry.key,
@@ -475,7 +479,7 @@ export function getRegionStrengthSchema() {
       properties: {
         region: {
           type: 'string',
-          description: `Optional region filter: ${REGION_KEYS.join(', ')} (or the label). Omit for all five.`
+          description: `Optional region filter: ${REGION_KEYS.join(', ')} (or the label). Omit for all regions.`
         }
       }
     }

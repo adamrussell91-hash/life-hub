@@ -8,32 +8,47 @@ const MONTH_DAYS = 30;
 const LONG_TERM_WEEKS = 26;
 const WORKOUT_TARGET_PER_WEEK = 4;
 
-export const REGION_KEYS = ['chest', 'arms', 'abs', 'legs', 'back'];
+export const REGION_KEYS = ['chest', 'shoulders', 'arms', 'abs', 'legs', 'back', 'full_body'];
 
 export const REGION_LABELS = {
   chest: 'Chest',
+  shoulders: 'Shoulders',
   arms: 'Arms',
   abs: 'Abs',
   legs: 'Legs',
-  back: 'Back'
+  back: 'Back',
+  full_body: 'Full Body'
 };
 
+/**
+ * Map workout focus tags and exercise-library target_area values onto the
+ * Region strength tiles. Library target_area is the source of truth for which
+ * tile an exercise feeds — names are only a last-resort fallback.
+ */
 const FOCUS_TO_REGION = {
   chest: 'chest',
+  shoulders: 'shoulders',
+  shoulder: 'shoulders',
   arms: 'arms',
   abs: 'abs',
   core: 'abs',
   legs: 'legs',
-  back: 'back'
+  glutes: 'legs',
+  back: 'back',
+  'full body': 'full_body',
+  full_body: 'full_body',
+  fullbody: 'full_body'
 };
 
-/** Name regex fallbacks — checked in REGION_KEYS order. */
+/** Last-resort name regexes when library target_area is unavailable. */
 const REGION_NAME_PATTERNS = [
   ['chest', /bench|\bchest\b|chest press|pec/i],
+  ['shoulders', /\b(shoulder|delt|deltoid|overhead press)\b/i],
   ['arms', /\b(curl|tricep|triceps|bicep|biceps)\b/i],
   ['abs', /\b(crunch|plank|ab|abs|core)\b/i],
   ['legs', /\b(squat|deadlift|leg|lunge|rdl|calf|calves)\b/i],
-  ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i]
+  ['back', /\b(row|pull[\s-]?up|pullup|lat|pulldown)\b/i],
+  ['full_body', /\bfull[\s_-]?body\b/i]
 ];
 
 export function canonicalExerciseName(name) {
@@ -97,11 +112,44 @@ function regionFromName(name) {
   return null;
 }
 
+function libraryMap(libraryByName) {
+  if (!libraryByName) return null;
+  if (libraryByName instanceof Map) return libraryByName;
+  if (typeof libraryByName === 'object') return new Map(Object.entries(libraryByName));
+  return null;
+}
+
+function regionFromLibrary(exercise, libraryByName) {
+  const library = libraryMap(libraryByName);
+  if (!library) return null;
+  const display = canonicalExerciseName(exercise?.name);
+  if (!display) return null;
+  const needle = normalizeExerciseName(display);
+  let entry = library.get(display) ?? library.get(needle) ?? null;
+  if (!entry) {
+    for (const [key, value] of library.entries()) {
+      if (normalizeExerciseName(key) === needle || normalizeExerciseName(value?.name) === needle) {
+        entry = value;
+        break;
+      }
+    }
+  }
+  return focusToRegion(entry?.target_area);
+}
+
 /**
- * Map an exercise to a strength region.
- * Prefer focus tags (exercise, then unique workout focus), then name regex.
+ * Map an exercise to a Region strength tile.
+ *
+ * Order:
+ * 1. exercise-library target_area (authoritative — names need not match the tile)
+ * 2. exercise-level focus tags (rare per-set override)
+ * 3. unique workout focus when the session has exactly one region
+ * 4. name regex last resort when the library row is missing
  */
-export function resolveExerciseRegion(exercise, workoutFocus = []) {
+export function resolveExerciseRegion(exercise, workoutFocus = [], libraryByName = null) {
+  const fromLibrary = regionFromLibrary(exercise, libraryByName);
+  if (fromLibrary) return fromLibrary;
+
   for (const tag of asFocusList(exercise?.focus ?? exercise?.focus_areas)) {
     const region = focusToRegion(tag);
     if (region) return region;
@@ -272,14 +320,14 @@ function exerciseVolume(exercise) {
   return total;
 }
 
-function regionMetricsForPeriod(events, from, to) {
+function regionMetricsForPeriod(events, from, to, libraryByName = null) {
   const bestByRegion = Object.fromEntries(REGION_KEYS.map(key => [key, null]));
   const volumeByRegion = Object.fromEntries(REGION_KEYS.map(key => [key, 0]));
 
   for (const { record } of events) {
     if (record.status !== 'completed' || record.date < from || record.date > to) continue;
     for (const exercise of record.exercises ?? []) {
-      const region = resolveExerciseRegion(exercise, record.focus);
+      const region = resolveExerciseRegion(exercise, record.focus, libraryByName);
       if (!region) continue;
       const weight = bestWorkingWeight(exercise);
       if (weight != null && (bestByRegion[region] == null || weight > bestByRegion[region])) {
@@ -292,13 +340,13 @@ function regionMetricsForPeriod(events, from, to) {
   return { bestByRegion, volumeByRegion };
 }
 
-function buildRegions(events, date) {
+function buildRegions(events, date, libraryByName = null) {
   const currentFrom = addCalendarDays(date, -(MONTH_DAYS - 1));
   const priorTo = addCalendarDays(currentFrom, -1);
   const priorFrom = addCalendarDays(priorTo, -(MONTH_DAYS - 1));
 
-  const current = regionMetricsForPeriod(events, currentFrom, date);
-  const prior = regionMetricsForPeriod(events, priorFrom, priorTo);
+  const current = regionMetricsForPeriod(events, currentFrom, date, libraryByName);
+  const prior = regionMetricsForPeriod(events, priorFrom, priorTo, libraryByName);
 
   return REGION_KEYS.map(key => {
     const currentBest = current.bestByRegion[key];
@@ -323,7 +371,7 @@ function buildRegions(events, date) {
   });
 }
 
-function buildLongTerm(events, date) {
+function buildLongTerm(events, date, libraryByName = null) {
   const endWeek = getSydneyWeekStart(date);
   const startWeek = addCalendarDays(endWeek, -7 * (LONG_TERM_WEEKS - 1));
   const seriesStart = startWeek;
@@ -360,8 +408,8 @@ function buildLongTerm(events, date) {
   const currentFrom = addCalendarDays(date, -(MONTH_DAYS - 1));
   const priorTo = addCalendarDays(currentFrom, -1);
   const priorFrom = addCalendarDays(priorTo, -(MONTH_DAYS - 1));
-  const current = regionMetricsForPeriod(events, currentFrom, date);
-  const prior = regionMetricsForPeriod(events, priorFrom, priorTo);
+  const current = regionMetricsForPeriod(events, currentFrom, date, libraryByName);
+  const prior = regionMetricsForPeriod(events, priorFrom, priorTo, libraryByName);
   const strengthPcts = [];
   for (const key of REGION_KEYS) {
     const pct = percentDelta(current.bestByRegion[key], prior.bestByRegion[key]);
@@ -481,8 +529,8 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
     });
   }
 
-  const regions = buildRegions(workoutEvts, date);
-  const longTerm = buildLongTerm(workoutEvts, date);
+  const regions = buildRegions(workoutEvts, date, libraryByName);
+  const longTerm = buildLongTerm(workoutEvts, date, libraryByName);
   const weekVolume = weekDates.map(day => ({
     date: day,
     volume: workoutEvts
