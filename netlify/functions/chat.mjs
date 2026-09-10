@@ -2283,6 +2283,7 @@ export function createChatHandler({
                   agentSlug: slug,
                   today,
                   repoTree,
+                  tasksStore: hubTasksStore,
                   readBlob: async sha => decodeBlob(await client.readBlob(sha))
                 });
                 if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
@@ -2308,6 +2309,9 @@ export function createChatHandler({
                     ...(pendingId ? { pendingId } : {}),
                     ...(shortcutResult.loan ? { loan: shortcutResult.loan } : {})
                   });
+                }
+                if (shortcutResult.kind === 'ok' && Array.isArray(shortcutResult.tasks) && shortcutResult.tasks.length) {
+                  send({ type: 'tasks_changed', tasks: shortcutResult.tasks });
                 }
                 return JSON.stringify(shortcutResult);
               }
@@ -2533,12 +2537,15 @@ export function createChatHandler({
                 agentSlug: slug,
                 today,
                 repoTree,
+                tasksStore: hubTasksStore,
                 readBlob: async sha => decodeBlob(await client.readBlob(sha))
               });
               if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
                 const validated = validateProposeActionInput(shortcutResult.proposal, { agentSlug: slug });
                 if (validated.ok) await proposeOsAction(validated.proposal);
                 else send({ type: 'action_rejected', error: validated.error, ...(validated.detail ? { detail: validated.detail } : {}) });
+              } else if (shortcutResult.kind === 'ok' && Array.isArray(shortcutResult.tasks) && shortcutResult.tasks.length) {
+                send({ type: 'tasks_changed', tasks: shortcutResult.tasks });
               } else {
                 send(event);
               }

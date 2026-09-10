@@ -33,6 +33,26 @@ export function rememberCreatedTask(task: Task): void {
   listed.set(task.id, normalizeTask(task));
 }
 
+export const TASKS_CHANGED = 'tasks-hub:tasks-changed';
+
+/** Cache + tell open Today/Board/Backlog views to live-insert. */
+export function notifyTasksChanged(tasks: Task[]): void {
+  const incoming = tasks.filter((task) => task && typeof task.id === 'string' && task.id);
+  if (!incoming.length) return;
+  for (const task of incoming) rememberCreatedTask(task);
+  window.dispatchEvent(new CustomEvent<Task[]>(TASKS_CHANGED, { detail: incoming }));
+}
+
+export function onTasksChanged(handler: (tasks: Task[]) => void): () => void {
+  const listener = (event: Event) => {
+    const detail = (event as CustomEvent<Task[]>).detail;
+    if (!Array.isArray(detail) || !detail.length) return;
+    handler(detail);
+  };
+  window.addEventListener(TASKS_CHANGED, listener);
+  return () => window.removeEventListener(TASKS_CHANGED, listener);
+}
+
 export function rememberUpdatedTask(task: Task): void {
   rememberCreatedTask(task);
 }

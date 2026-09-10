@@ -25,6 +25,7 @@ import { renderDashboardOverview } from '@/views/dashboard-overview';
 import { pageHeaderStatusSlot } from '@/shell/shell';
 import { requestToggleDone } from '@/views/dashboard';
 import { runningProjectIds } from '@/domain/dashboard-overview';
+import { onTasksChanged } from '@/services/task-cache';
 
 /** Session-scoped project / domain filters for Kanban. */
 let boardProjectFilter: string | 'all' = 'all';
@@ -475,9 +476,16 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   const columnNavHandle = initBoardColumnNav(board, columnNav);
   showBoardColumn = columnNavHandle.showColumn;
   teardownColumnNav = columnNavHandle.teardown;
-  teardownBoard = initBoard(board, {
+  const stopLiveIn = onTasksChanged((incoming) => {
+    for (const task of incoming) upsertTask(task);
+  });
+  const stopBoard = initBoard(board, {
     onCardMoved: (detail) => persistMove(detail, byId, confirmHost, upsertTask, () => void renderBoardView(canvas))
   });
+  teardownBoard = () => {
+    stopLiveIn();
+    stopBoard();
+  };
 }
 
 export type { Project };

@@ -47,7 +47,7 @@ If Adam opens with a dump, skip the briefing and process the dump.
 
 ## ADHD tools
 
-Shatter this, Time map, Open loops. Output is tight and action-led. Writes still wait for Confirm.
+Shatter this, Time map, Open loops. Output is tight and action-led. create_task writes immediately; other writes still wait for Confirm.
 
 ## Authority
 

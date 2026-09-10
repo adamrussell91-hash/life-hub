@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createClareChatController } from '@/chat/clare-controller';
 import { buildChatView } from '@/chat/build-chat-view';
 import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, resetTaskCache } from '@/services/task-cache';
 import { PRODUCTIVITY_LAUNCH_MESSAGES } from '@/domain/clare-protocols';
 
 vi.mock('@/services/client-api', () => ({
@@ -117,5 +118,38 @@ describe('Clare productivity chat routing', () => {
       })
     );
     expect(tasksApi.streamDumpWithClare).not.toHaveBeenCalled();
+  });
+
+  it('live-inserts tasks_changed events from /api/chat', async () => {
+    resetTaskCache();
+    const seen: Array<{ id: string; title: string }> = [];
+    const stop = onTasksChanged((tasks) => {
+      seen.push(...tasks.map((task) => ({ id: task.id, title: task.title })));
+    });
+    streamChat.mockImplementation(async function* () {
+      yield { type: 'text', delta: 'Added Buy bread.' };
+      yield {
+        type: 'tasks_changed',
+        tasks: [
+          {
+            id: 'task_clare',
+            title: 'Buy bread',
+            domain: 'life',
+            status: 'open',
+            due_date: '2026-09-10'
+          }
+        ]
+      };
+      yield { type: 'done' };
+    });
+    const root = buildChatView();
+    document.body.append(root);
+    const controller = createClareChatController({ root, isVisible: () => true });
+    await controller.start();
+    await controller.send('Add buy bread to today');
+    await vi.waitFor(() => expect(seen.some((task) => task.id === 'task_clare')).toBe(true));
+    expect(seen[0]?.title).toBe('Buy bread');
+    stop();
+    resetTaskCache();
   });
 });
