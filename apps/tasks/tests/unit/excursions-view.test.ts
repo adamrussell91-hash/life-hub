@@ -1,5 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-import { renderExcursionsView, renderNewExcursionPage } from '@/views/excursions';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { renderExcursionsView, renderNewExcursionPage, resetExcursionsViewStateForTests } from '@/views/excursions';
+import { closeCardMenu } from '@/views/card-menu';
+import { resetCollapsibleFiltersForTests } from '@/views/collapsible-filters';
 import { tasksApi } from '@/services/client-api';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
@@ -102,35 +104,53 @@ async function mount(): Promise<HTMLElement> {
 }
 
 describe('excursions dashboard', () => {
-  it('has one New excursion button and no template picker, since there is only one template', async () => {
+  beforeEach(() => {
+    resetExcursionsViewStateForTests();
+    resetCollapsibleFiltersForTests();
+  });
+
+  afterEach(() => {
+    closeCardMenu();
+    document.body.replaceChildren();
+  });
+
+  it('uses the projects toolbar chrome — filters, group-by, and a plus — with no template picker', async () => {
     location.hash = '#/excursions';
     const canvas = await mount();
 
     expect(canvas.querySelector('form')).toBeNull();
     expect(canvas.querySelector('.task-row')).toBeNull();
     expect(canvas.textContent).not.toContain('Templates');
+    expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
+    expect(canvas.querySelector('.projects-board')).not.toBeNull();
+    expect(canvas.querySelector('[aria-label="Filter excursions"]')).not.toBeNull();
+    expect(canvas.querySelector('[aria-label="Group by"]')?.textContent).toMatch(/Clearance/);
+    expect(canvas.querySelector('[aria-label="Group by"]')?.textContent).toMatch(/When/);
 
-    const add = canvas.querySelector<HTMLButtonElement>('.excursions-add');
+    const add = canvas.querySelector<HTMLButtonElement>('[aria-label="Add an excursion"]');
     expect(add).not.toBeNull();
-    expect(add?.classList.contains('btn--primary')).toBe(true);
-    expect(add?.textContent).toContain('New excursion');
+    expect(add?.classList.contains('icon-plus-btn')).toBe(true);
+    expect(add?.textContent).not.toContain('New excursion');
   });
 
-  it('routes New excursion straight to the confirm flow for the single template', async () => {
+  it('routes the plus button straight to the confirm flow for the single template', async () => {
     location.hash = '#/excursions';
     const canvas = await mount();
 
-    canvas.querySelector<HTMLButtonElement>('.excursions-add')!.click();
+    canvas.querySelector<HTMLButtonElement>('[aria-label="Add an excursion"]')!.click();
     expect(location.hash).toBe('#/excursions/new?template=ext_excursion');
   });
 
-  it('shows a Clearance Gate pill, countdown, task progress, and the next outstanding action', async () => {
+  it('puts excursion cards on a clearance lane with Open page, countdown, and next action', async () => {
     location.hash = '#/excursions';
     const canvas = await mount();
 
     const card = canvas.querySelector<HTMLElement>('.excursion-card');
     expect(card).not.toBeNull();
+    expect(card?.classList.contains('hub-card')).toBe(true);
+    expect(card?.classList.contains('pcard')).toBe(true);
     expect(card?.textContent).toContain('Ethics Olympiad heat');
+    expect(canvas.querySelector('.lane__title')?.textContent).toBe('Not cleared');
 
     const pill = card?.querySelector<HTMLElement>('.excursion-card__pill');
     expect(pill).not.toBeNull();
@@ -141,7 +161,9 @@ describe('excursions dashboard', () => {
     expect(card?.querySelector('.excursion-card__row-value')?.textContent).toContain('done');
     expect(card?.querySelector('.excursion-card__next')?.textContent).toContain('Draft permission note');
 
-    card?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const open = card?.querySelector<HTMLButtonElement>('.pcard__actions .btn');
+    expect(open?.textContent).toBe('Open page');
+    open?.click();
     expect(location.hash).toBe('#/project/proj_ex_ethics_seed');
   });
 
@@ -191,6 +213,35 @@ describe('excursions dashboard', () => {
 
     expect(canvas.textContent).toContain('No excursions yet. Create one above.');
     expect(canvas.querySelector('.excursion-list-meta')).toBeNull();
+    expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
+  });
+
+  it('regroups the board by when without refetching', async () => {
+    location.hash = '#/excursions';
+    const canvas = await mount();
+    const listsBefore = vi.mocked(tasksApi.listProjects).mock.calls.length;
+
+    const when = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'When'
+    );
+    when?.click();
+
+    expect(vi.mocked(tasksApi.listProjects)).toHaveBeenCalledTimes(listsBefore);
+    expect(canvas.querySelector('.canvas-status')).toBeNull();
+    const lane = canvas.querySelector('.lane__title')?.textContent;
+    expect(['This week', 'Upcoming', 'Unscheduled', 'Past']).toContain(lane);
+  });
+
+  it('filters the board from the search field', async () => {
+    location.hash = '#/excursions';
+    const canvas = await mount();
+    const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter excursions"]');
+    expect(field).not.toBeNull();
+    field!.value = 'no such trip';
+    field!.dispatchEvent(new Event('input'));
+
+    expect(canvas.textContent).toContain('No excursions match.');
+    expect(canvas.querySelector('.excursion-card')).toBeNull();
   });
 });
 

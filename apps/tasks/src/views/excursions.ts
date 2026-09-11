@@ -13,13 +13,23 @@ import {
 import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash, projectProgress } from '@/domain/cards';
+import { matchesProjectQuery } from '@/domain/projects-pulse';
+import { parseDue, startOfDay } from '@/domain/queries';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { hashQuery } from '@/shell/shell';
-import { plusIcon } from '@/shell/icons';
 import { deleteProjectNow } from '@/views/card-actions';
+import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import { renderComplianceBundle } from '@/views/excursion-compliance';
 import { renderCardMenu } from '@/views/card-menu';
-import { createHubField, el } from '@/views/hub-kit';
+import { renderLoadError, showViewLoading } from '@/views/feedback';
+import {
+  createHubField,
+  createHubPills,
+  createHubSearch,
+  createHubToolbar,
+  el
+} from '@/views/hub-kit';
+import { createPlusButton } from '@/views/plus-add';
 
 function showConfirm(
   host: HTMLElement,
@@ -223,14 +233,43 @@ function confirmCreate(
   );
 }
 
-function newExcursionButton(href: string): HTMLButtonElement {
-  const button = el('button', 'btn btn--primary excursions-add') as HTMLButtonElement;
-  button.type = 'button';
-  button.append(plusIcon(), document.createTextNode('New excursion'));
-  button.addEventListener('click', () => {
-    location.hash = href;
-  });
-  return button;
+type ExcursionsGroupBy = 'clearance' | 'when';
+
+type ExcursionLane = { id: string; title: string };
+
+const CLEARANCE_LANES: ExcursionLane[] = [
+  { id: 'not_cleared', title: 'Not cleared' },
+  { id: 'cleared', title: 'Cleared' },
+  { id: 'past', title: 'Past' }
+];
+
+const WHEN_LANES: ExcursionLane[] = [
+  { id: 'soon', title: 'This week' },
+  { id: 'upcoming', title: 'Upcoming' },
+  { id: 'unscheduled', title: 'Unscheduled' },
+  { id: 'past', title: 'Past' }
+];
+
+let excursionQuery = '';
+let excursionGroupBy: ExcursionsGroupBy = 'clearance';
+
+function eventDayDelta(project: Project, now: Date): number | null {
+  const event = parseDue(project.current_end_date);
+  if (!event) return null;
+  return Math.round((startOfDay(event).getTime() - startOfDay(now).getTime()) / 86_400_000);
+}
+
+function whenLaneId(project: Project, now: Date): string {
+  const days = eventDayDelta(project, now);
+  if (days === null) return 'unscheduled';
+  if (days < 0) return 'past';
+  if (days <= 7) return 'soon';
+  return 'upcoming';
+}
+
+function clearanceLaneId(project: Project, tasks: Task[], now: Date): string {
+  if (whenLaneId(project, now) === 'past') return 'past';
+  return excursionClearance(project, tasks).cleared ? 'cleared' : 'not_cleared';
 }
 
 function complianceSummary(project: Project): { on: number; total: number } | null {
@@ -240,10 +279,9 @@ function complianceSummary(project: Project): { on: number; total: number } | nu
 }
 
 /**
- * Purpose-built dashboard card — Clearance Gate, countdown, compliance
- * completion, and the next outstanding dated action. Replaces the generic
- * project-board card here: excursions run 0-3 at a time, so this shows
- * everything that matters at a glance instead of a kanban-style summary.
+ * Same hub-card / pcard chrome as Projects, with the excursion facts
+ * (clearance, countdown, compliance, next dated action) in place of
+ * energy / drift / impact.
  */
 function renderExcursionCard(
   project: Project,
@@ -255,35 +293,34 @@ function renderExcursionCard(
   const compliance = complianceSummary(project);
   const next = nextExcursionAction(project, tasks);
 
-  const card = el('article', 'excursion-card');
-  card.setAttribute('role', 'button');
-  card.tabIndex = 0;
-  card.setAttribute('aria-label', `Open ${project.title}`);
+  const card = el('article', 'hub-card pcard excursion-card');
+  card.dataset.projectId = project.id;
 
-  const head = el('div', 'excursion-card__head');
-  const titleCol = el('div', 'excursion-card__title-col');
-  titleCol.append(
-    el('p', 'excursion-card__title', project.title),
-    el('p', 'excursion-card__countdown', excursionCountdownLabel(project.current_end_date))
-  );
-  head.append(
-    titleCol,
+  const top = el('div', 'pcard__top');
+  top.append(el('span', 'pcard__title excursion-card__title', project.title));
+  top.append(
     el(
       'span',
-      `excursion-card__pill ${clearance.cleared ? 'is-go' : 'is-warn'}`,
+      `status-badge excursion-card__pill ${clearance.cleared ? 'status-badge--on_the_go is-go' : 'tint-peach is-warn'}`,
       clearance.cleared ? 'Cleared' : 'Not cleared'
-    ),
-    renderCardMenu(
-      `${project.title} options`,
-      [{ id: 'delete', label: 'Delete', danger: true, onSelect: () => actions.onDelete(project) }],
-      { heading: project.title, inline: true }
     )
   );
-  card.append(head);
+  top.append(
+    renderCardMenu(`${project.title} card menu`, [
+      { id: 'page', label: 'Full page', onSelect: () => actions.onOpen(project) },
+      { id: 'delete', label: 'Delete', danger: true, onSelect: () => actions.onDelete(project) }
+    ])
+  );
+  card.append(top);
 
-  const body = el('div', 'excursion-card__body');
+  const desc = project.arc_summary || project.description;
+  if (desc) card.append(el('p', 'pcard__desc', desc));
+  card.append(
+    el('p', 'pcard__desc excursion-card__countdown', excursionCountdownLabel(project.current_end_date))
+  );
+
   if (compliance) {
-    const row = el('div', 'excursion-card__row');
+    const row = el('div', 'pcard__row excursion-card__row');
     row.append(
       el('span', 'excursion-card__row-label', 'Compliance'),
       el('span', 'excursion-card__row-value', `${compliance.on}/${compliance.total}`)
@@ -297,44 +334,89 @@ function renderExcursionCard(
     const fill = el('div', 'hub-track__fill');
     fill.style.width = `${compliance.total ? Math.round((compliance.on / compliance.total) * 100) : 0}%`;
     track.append(fill);
-    body.append(row, track);
+    card.append(row, track);
   }
 
-  const taskRow = el('div', 'excursion-card__row');
+  const taskRow = el('div', 'pcard__row excursion-card__row');
   taskRow.append(
     el('span', 'excursion-card__row-label', 'Tasks'),
     el('span', 'excursion-card__row-value', `${progress.done}/${progress.total} done`)
   );
-  body.append(taskRow);
+  card.append(taskRow);
 
-  body.append(
+  card.append(
     next
       ? el(
           'p',
-          `excursion-card__next${next.overdue ? ' is-overdue' : ''}`,
+          `meta-line excursion-card__next${next.overdue ? ' is-overdue' : ''}`,
           `${next.overdue ? 'Overdue' : 'Next'}: ${next.label} — ${formatDisplayDate(next.dueDate)}`
         )
-      : el('p', 'excursion-card__next', 'Nothing dated outstanding.')
+      : el('p', 'meta-line excursion-card__next', 'Nothing dated outstanding.')
   );
-  card.append(body);
 
-  const open = () => actions.onOpen(project);
-  card.addEventListener('click', (event) => {
-    if (event.target instanceof Element && event.target.closest('.card-menu')) return;
-    open();
-  });
-  card.addEventListener('keydown', (event) => {
-    if (event.target !== card) return;
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      open();
-    }
-  });
+  if (project.current_end_date) {
+    card.append(
+      el('p', 'meta-line', `Target ${formatDisplayDate(project.current_end_date)}`)
+    );
+  }
+
+  const actionsRow = el('div', 'pcard__row pcard__actions');
+  const open = el('button', 'btn btn--ghost', 'Open page');
+  open.type = 'button';
+  open.addEventListener('click', () => actions.onOpen(project));
+  actionsRow.append(open);
+  card.append(actionsRow);
 
   return card;
 }
 
-/** Excursions dashboard — one template, so "New excursion" goes straight to the confirm flow. */
+function renderExcursionBoard(
+  excursions: Project[],
+  tasks: Task[],
+  now: Date,
+  actions: { onOpen: (project: Project) => void; onDelete: (project: Project) => void }
+): HTMLElement {
+  const visible = excursions.filter((project) => matchesProjectQuery(project, excursionQuery));
+  const lanes = excursionGroupBy === 'when' ? WHEN_LANES : CLEARANCE_LANES;
+  const grouped = lanes
+    .map((lane) => ({
+      ...lane,
+      cards: visible.filter((project) =>
+        excursionGroupBy === 'when'
+          ? whenLaneId(project, now) === lane.id
+          : clearanceLaneId(project, tasks, now) === lane.id
+      )
+    }))
+    .filter((lane) => lane.cards.length);
+
+  const grid = el('div', 'projects-board excursions-board');
+  grid.style.gridTemplateColumns = grouped.length
+    ? `repeat(${grouped.length}, minmax(0, 1fr))`
+    : 'minmax(0, 1fr)';
+  if (!grouped.length) {
+    grid.append(
+      el(
+        'p',
+        'empty-state',
+        excursions.length ? 'No excursions match.' : 'No excursions yet. Create one above.'
+      )
+    );
+    return grid;
+  }
+  for (const group of grouped) {
+    const lane = el('div', 'lane');
+    const head = el('div', 'lane__head');
+    head.append(el('span', 'lane__title', group.title), el('span', 'lane__count', String(group.cards.length)));
+    lane.append(head);
+    for (const project of group.cards) {
+      lane.append(renderExcursionCard(project, tasks, actions));
+    }
+    grid.append(lane);
+  }
+  return grid;
+}
+
+/** Excursions dashboard — Projects chrome, excursion facts on each card. */
 export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
   const prefillId = hashQuery().get('template');
   if (prefillId) {
@@ -342,39 +424,105 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
     return;
   }
 
-  canvas.replaceChildren(el('p', 'canvas-status', 'Loading excursions…'));
-  const [projects, tasks, templatesPayload] = await Promise.all([
-    tasksApi.listProjects(),
-    tasksApi.listTasks(),
-    tasksApi.listTemplates()
-  ]);
-  const templates = templatesPayload.excursion_templates as ExcursionTemplate[];
-  const excursions = projects.filter((p) => p.type === 'excursion');
+  showViewLoading(canvas, 'Loading…', '.excursions-board');
 
-  canvas.replaceChildren();
-  const confirmHost = el('div', 'excursion-confirm');
-  const listHost = el('div', 'excursion-card-grid');
-  const addRow = el('div', 'excursions-toolbar');
-  addRow.append(newExcursionButton(newExcursionHash(templates[0]?.id)));
-  canvas.append(addRow, confirmHost);
+  let excursions: Project[];
+  let tasks: Task[];
+  let templates: ExcursionTemplate[] = [];
+  try {
+    const [projects, allTasks, templatesPayload] = await Promise.all([
+      tasksApi.listProjects(),
+      tasksApi.listTasks(),
+      tasksApi.listTemplates().catch(() => ({ excursion_templates: [] as ExcursionTemplate[] }))
+    ]);
+    excursions = projects.filter((project) => project.type === 'excursion');
+    tasks = allTasks;
+    templates = templatesPayload.excursion_templates as ExcursionTemplate[];
+  } catch (err) {
+    renderLoadError(canvas, err, () => void renderExcursionsView(canvas), 'Could not load excursions');
+    return;
+  }
 
-  canvas.append(el('h2', 'section-title', 'Active'));
-  if (!excursions.length) {
-    listHost.append(el('p', 'empty-state', 'No excursions yet. Create one above.'));
-  } else {
-    const reload = async () => {
-      await renderExcursionsView(canvas);
-    };
-    for (const project of excursions) {
-      listHost.append(
-        renderExcursionCard(project, tasks, {
-          onOpen: openProjectPage,
-          onDelete: (current) => deleteProjectNow(current, reload, confirmHost)
-        })
-      );
+  const now = new Date();
+
+  function dropProject(projectId: string): void {
+    excursions = excursions.filter((project) => project.id !== projectId);
+    tasks = tasks.filter((task) => task.parent_project_id !== projectId);
+    paint();
+  }
+
+  function paint(): void {
+    const restoreSearch =
+      document.activeElement instanceof HTMLInputElement &&
+      document.activeElement.getAttribute('aria-label') === 'Filter excursions';
+    const searchPos = restoreSearch
+      ? (document.activeElement as HTMLInputElement).selectionStart
+      : null;
+    const scrollTop = canvas.scrollTop;
+
+    canvas.replaceChildren();
+    const confirmHost = el('div', 'excursion-confirm');
+
+    const toolbar = createHubToolbar('projects-toolbar', 'excursions-toolbar');
+    const search = createHubSearch({
+      placeholder: 'Filter excursions…',
+      ariaLabel: 'Filter excursions',
+      value: excursionQuery,
+      onInput: (value) => {
+        excursionQuery = value;
+        paint();
+      }
+    });
+    const filters = createCollapsibleFilters({
+      id: 'excursions',
+      ariaLabel: 'Filters',
+      className: 'hub-filters--inline',
+      active: Boolean(excursionQuery.trim())
+    });
+    filters.panel.append(search.el);
+    toolbar.append(
+      filters.root,
+      createHubPills({
+        label: 'Group by',
+        role: 'tablist',
+        items: [
+          { id: 'clearance', label: 'Clearance' },
+          { id: 'when', label: 'When' }
+        ],
+        value: excursionGroupBy,
+        onSelect: (id) => {
+          excursionGroupBy = id;
+          paint();
+        }
+      }),
+      createPlusButton('Add an excursion', () => {
+        location.hash = newExcursionHash(templates[0]?.id);
+      })
+    );
+    canvas.append(toolbar, confirmHost);
+    canvas.append(
+      renderExcursionBoard(excursions, tasks, now, {
+        onOpen: openProjectPage,
+        onDelete: (current) => deleteProjectNow(current, () => dropProject(current.id), confirmHost)
+      })
+    );
+
+    canvas.scrollTop = scrollTop;
+    if (restoreSearch) {
+      const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter excursions"]');
+      if (field) {
+        field.focus();
+        if (searchPos != null) field.setSelectionRange(searchPos, searchPos);
+      }
     }
   }
-  canvas.append(listHost);
+
+  paint();
+}
+
+export function resetExcursionsViewStateForTests(): void {
+  excursionQuery = '';
+  excursionGroupBy = 'clearance';
 }
 
 /** Confirm the (single) template, then write — event date is editable inline, no template picker. */
