@@ -96,12 +96,28 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   let error = "";
   let phase: ChatPhase | null = null;
   let month = new Date().getMonth();
+  let fullscreen = false;
   let canvasTeardown: (() => void) | null = null;
   let stopped = false;
 
   function teardownCanvas() {
     canvasTeardown?.();
     canvasTeardown = null;
+  }
+
+  function setFullscreen(next: boolean) {
+    fullscreen = next;
+    document.body.classList.toggle("is-stars-fullscreen", fullscreen);
+    const wrap = host.querySelector<HTMLElement>("[data-stars-sky-wrap]");
+    if (!wrap) return;
+    wrap.classList.toggle("is-fullscreen", fullscreen);
+    host.querySelectorAll<HTMLButtonElement>("[data-stars-fullscreen]").forEach(button => {
+      button.setAttribute("aria-pressed", String(fullscreen));
+      button.textContent = fullscreen ? "Exit" : "Full screen";
+      button.classList.toggle("is-active", fullscreen);
+    });
+    const exit = host.querySelector<HTMLButtonElement>("[data-stars-exit-fullscreen]");
+    if (exit) exit.hidden = !fullscreen;
   }
 
   function bindModeRow() {
@@ -165,6 +181,10 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
 
   function renderShell(body: string) {
     teardownCanvas();
+    if (screen !== "sky") {
+      fullscreen = false;
+      document.body.classList.remove("is-stars-fullscreen");
+    }
     host.innerHTML = `<section class="stars-root">${graphModesHtml()}${body}</section>`;
     bindModeRow();
   }
@@ -242,20 +262,24 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   function renderSky() {
     const year = new Date().getFullYear();
     const date = new Date(Date.UTC(year, month, 15, 12));
-    renderShell(`<div class="stars-sky-toolbar">
-      <div><p class="eyebrow">Stars</p><h2>Night sky</h2></div>
-      <form class="stars-search" data-stars-search>
-        <label class="sr-only" for="stars-query">Topic or question</label>
-        <input id="stars-query" type="search" value="${escapeHtml(query)}" placeholder="What should Clementine connect?" autocomplete="off" required />
-        <button type="submit" class="btn btn--primary">Find notes</button>
-      </form>
-    </div>
-    ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
-    <section class="stars-sky" data-stars-sky aria-label="Saved constellations and unconnected note stars"></section>
-    <div class="stars-year glass-panel">
-      <label for="stars-month">Sky position</label>
-      <input id="stars-month" type="range" min="0" max="11" step="1" value="${month}" />
-      <output for="stars-month">${MONTHS[month]} ${year}</output>
+    renderShell(`<div class="stars-sky-wrap" data-stars-sky-wrap>
+      <div class="stars-sky-toolbar glass-panel">
+        <div><p class="eyebrow">Stars</p><h2>Night sky</h2></div>
+        <form class="stars-search" data-stars-search>
+          <label class="sr-only" for="stars-query">Topic or question</label>
+          <input id="stars-query" type="search" value="${escapeHtml(query)}" placeholder="What should Clementine connect?" autocomplete="off" required />
+          <button type="submit" class="btn btn--primary">Find notes</button>
+        </form>
+        <button type="button" class="btn btn--ghost stars-fullscreen-btn" data-stars-fullscreen aria-pressed="false">Full screen</button>
+      </div>
+      ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
+      <section class="stars-sky" data-stars-sky aria-label="Saved constellations and unconnected note stars"></section>
+      <div class="stars-year glass-panel">
+        <label for="stars-month">Sky position</label>
+        <input id="stars-month" type="range" min="0" max="11" step="1" value="${month}" />
+        <output for="stars-month">${MONTHS[month]} ${year}</output>
+      </div>
+      <button type="button" class="stars-fullscreen-exit btn btn--ghost" data-stars-exit-fullscreen hidden>Exit full screen</button>
     </div>`);
     const sky = host.querySelector<HTMLElement>("[data-stars-sky]")!;
     canvasTeardown = mountStarsSky(sky, saved, date, item => {
@@ -278,6 +302,11 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       month = Number(slider.value);
       renderSky();
     };
+    host.querySelectorAll<HTMLButtonElement>("[data-stars-fullscreen]").forEach(button => {
+      button.onclick = () => setFullscreen(!fullscreen);
+    });
+    host.querySelector<HTMLButtonElement>("[data-stars-exit-fullscreen]")!.onclick = () => setFullscreen(false);
+    setFullscreen(fullscreen);
   }
 
   function render() {
@@ -286,6 +315,14 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
     else if (screen === "detail") renderDetail();
     else renderSky();
   }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if (event.key === "Escape" && fullscreen) {
+      event.preventDefault();
+      setFullscreen(false);
+    }
+  }
+  document.addEventListener("keydown", onKeyDown);
 
   render();
   void listSavedConstellations()
@@ -297,6 +334,8 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
 
   return () => {
     stopped = true;
+    document.removeEventListener("keydown", onKeyDown);
+    document.body.classList.remove("is-stars-fullscreen");
     teardownCanvas();
     host.innerHTML = "";
   };
