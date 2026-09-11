@@ -1,5 +1,6 @@
 import { isIndexKey, listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { hashEntityRef } from './entity-ref.mjs';
+import { isValidEventId, isValidOrganisationId, isValidPersonId } from './identity-schema.mjs';
 import { isValidLinkId, isValidOperationId } from './universal-link-schema.mjs';
 
 // Storage adapter for the shared Universal Links / Person / Organisation
@@ -43,12 +44,70 @@ export async function setJSON(store, key, value) {
   return store.setJSON(key, value);
 }
 
+function assertValidPersonId(id) {
+  if (!isValidPersonId(id)) {
+    throw Object.assign(new Error(`Invalid Person id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_person_id' });
+  }
+  return id;
+}
+
+function assertValidOrganisationId(id) {
+  if (!isValidOrganisationId(id)) {
+    throw Object.assign(new Error(`Invalid Organisation id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_organisation_id' });
+  }
+  return id;
+}
+
+function assertValidEventId(id) {
+  if (!isValidEventId(id)) {
+    throw Object.assign(new Error(`Invalid lifecycle event id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_event_id' });
+  }
+  return id;
+}
+
 export function personKey(id) {
-  return `entities/person/${id}`;
+  return `entities/person/${assertValidPersonId(id)}`;
 }
 
 export function organisationKey(id) {
-  return `entities/organisation/${id}`;
+  return `entities/organisation/${assertValidOrganisationId(id)}`;
+}
+
+export const PERSON_INDEX_PREFIX = 'entities/index/person/';
+export const ORGANISATION_INDEX_PREFIX = 'entities/index/organisation/';
+
+export function personIndexKey(id) {
+  return `${PERSON_INDEX_PREFIX}${assertValidPersonId(id)}`;
+}
+
+export function organisationIndexKey(id) {
+  return `${ORGANISATION_INDEX_PREFIX}${assertValidOrganisationId(id)}`;
+}
+
+// Lists only the lightweight per-entity index projection (never the
+// authoritative record) under one kind's index prefix — used by
+// entity-search.mjs. Bounded the same way listAuthoritativeLinkKeys is: an
+// administrative/search-only full-prefix listing, never called from an
+// ordinary Universal Link read path.
+export async function listPersonIndexKeys(store) {
+  return (await listBlobKeys(store, PERSON_INDEX_PREFIX)).filter(key => !isIndexKey(key));
+}
+
+export async function listOrganisationIndexKeys(store) {
+  return (await listBlobKeys(store, ORGANISATION_INDEX_PREFIX)).filter(key => !isIndexKey(key));
+}
+
+// One lifecycle event Blob per transition, keyed by the entity's own
+// canonical-ref hash (implementation programme, "Storage layout":
+// `entities/events/<entity_ref_hash>/<event_id>`) — the same hashing
+// convention Universal Link membership keys use, via entity-ref.mjs's
+// hashEntityRef.
+export function entityEventsPrefix(entityRef) {
+  return `entities/events/${hashEntityRef(entityRef)}/`;
+}
+
+export function entityEventKey(entityRef, eventId) {
+  return `${entityEventsPrefix(entityRef)}${assertValidEventId(eventId)}`;
 }
 
 function assertValidLinkId(id) {
