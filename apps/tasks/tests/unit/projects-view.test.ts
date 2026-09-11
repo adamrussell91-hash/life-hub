@@ -277,6 +277,17 @@ describe('projects view rebuild', () => {
     expect(location.hash).toBe('#/project/proj_go');
   });
 
+  it('takes Add next action to the project page instead of doing nothing', async () => {
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    const hint = canvas.querySelector<HTMLButtonElement>(
+      '[data-project-id="proj_idle"] .proj-health'
+    );
+    expect(hint?.textContent).toBe('Add next action');
+    hint?.click();
+    expect(location.hash).toBe('#/project/proj_idle');
+  });
+
   it('puts the same three-dot menu and delete on every project card', async () => {
     vi.mocked(tasksApi.deleteProject).mockResolvedValue({ deleted: true });
     const canvas = document.createElement('main');

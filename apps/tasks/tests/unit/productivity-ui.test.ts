@@ -147,7 +147,20 @@ describe('project health indicator', () => {
     expect(projectNextActionHealth(proj, healthy)).toBeNull();
     const missing = [task({ id: 't2', title: 'Done only', parent_project_id: 'p1', status: 'done' })];
     const hint = projectNextActionHealth(proj, missing);
+    expect(hint?.tagName).toBe('BUTTON');
     expect(hint?.textContent).toBe('Add next action');
+  });
+
+  it('opens add from Add next action instead of doing nothing', () => {
+    const onAdd = vi.fn();
+    const hint = projectNextActionHealth(
+      project({ id: 'p1', title: 'Alpha' }),
+      [task({ id: 't2', title: 'Done only', parent_project_id: 'p1', status: 'done' })],
+      onAdd
+    );
+    expect(hint).not.toBeNull();
+    hint!.click();
+    expect(onAdd).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -45,6 +45,16 @@ export async function deleteKey(store, key) {
 
 export async function listJSON(store, prefix) {
   const keys = (await listBlobKeys(store, prefix)).filter(key => !isIndexKey(key));
+  const have = new Set(keys);
+  // Netlify Blobs list() can lag a just-written key. Create always updates
+  // `{prefix}_index`; union those ids so a refresh still sees the new row.
+  for (const id of await readIndex(store, `${prefix}_index`)) {
+    const key = `${prefix}${id}`;
+    if (!have.has(key)) {
+      keys.push(key);
+      have.add(key);
+    }
+  }
   const entries = await Promise.all(keys.map(key => getJSON(store, key)));
   return dedupeRecords(entries);
 }
