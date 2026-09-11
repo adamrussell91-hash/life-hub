@@ -2,10 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { hashEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
+import { generateEventId, generateOrganisationId, generatePersonId } from '../../netlify/functions/_shared/identity-schema.mjs';
 import { generateOperationId } from '../../netlify/functions/_shared/universal-link-schema.mjs';
 import {
   LINKS_PREFIX,
   MEMBERSHIP_SCHEMA_VERSION,
+  ORGANISATION_INDEX_PREFIX,
+  PERSON_INDEX_PREFIX,
   UNIVERSAL_LINK_CONTENT_STORE,
   buildEndpointMembershipRecord,
   buildTypeMembershipRecord,
@@ -15,12 +18,18 @@ import {
   byTargetPrefix,
   byTypeKey,
   byTypePrefix,
+  entityEventKey,
+  entityEventsPrefix,
   getJSON,
   linkKey,
   listAuthoritativeLinkKeys,
   listMembership,
+  listOrganisationIndexKeys,
+  listPersonIndexKeys,
   operationKey,
+  organisationIndexKey,
   organisationKey,
+  personIndexKey,
   personKey,
   setJSON
 } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
@@ -62,8 +71,10 @@ test('store name is the shared universal-link-content store', () => {
 
 test('key builders use entity-ref.mjs hashEntityRef and produce the layout named in the implementation programme', () => {
   const linkId = ulId('abc');
-  assert.equal(personKey('person_seth'), 'entities/person/person_seth');
-  assert.equal(organisationKey('organisation_unsw'), 'entities/organisation/organisation_unsw');
+  const personId = generatePersonId();
+  const organisationId = generateOrganisationId();
+  assert.equal(personKey(personId), `entities/person/${personId}`);
+  assert.equal(organisationKey(organisationId), `entities/organisation/${organisationId}`);
   assert.equal(linkKey(linkId), `universal-links/links/${linkId}`);
 
   const sourceRef = 'tasks:task:task_email_seth';
@@ -110,9 +121,20 @@ test('this module now exports the Slice 2 write primitives', () => {
 
 test('getJSON reads through the store adapter', async () => {
   const store = createMemoryStore();
-  await store.setJSON(personKey('person_seth'), { id: 'person_seth', display_name: 'Seth' });
-  assert.deepEqual(await getJSON(store, personKey('person_seth')), { id: 'person_seth', display_name: 'Seth' });
-  assert.equal(await getJSON(store, personKey('person_missing')), null);
+  const personId = generatePersonId();
+  const missingId = generatePersonId();
+  await store.setJSON(personKey(personId), { id: personId, display_name: 'Seth' });
+  assert.deepEqual(await getJSON(store, personKey(personId)), { id: personId, display_name: 'Seth' });
+  assert.equal(await getJSON(store, personKey(missingId)), null);
+});
+
+test('personKey/organisationKey validate the id shape before building a key (Slice 3)', () => {
+  for (const bad of ['person_seth', 'not_a_person_id', '../../etc/passwd', '']) {
+    assert.throws(() => personKey(bad), error => error.status === 400 && error.code === 'invalid_person_id', `personKey(${JSON.stringify(bad)})`);
+  }
+  for (const bad of ['organisation_unsw', 'not_an_organisation_id', '../../etc/passwd', '']) {
+    assert.throws(() => organisationKey(bad), error => error.status === 400 && error.code === 'invalid_organisation_id', `organisationKey(${JSON.stringify(bad)})`);
+  }
 });
 
 test('listMembership reads every membership blob under a prefix and dedupes by link_id', async () => {
@@ -287,4 +309,39 @@ test('setJSON writes through the store adapter', async () => {
   const store = createMemoryStore();
   await setJSON(store, linkKey(ulId('write-check')), { hello: 'world' });
   assert.deepEqual(await getJSON(store, linkKey(ulId('write-check'))), { hello: 'world' });
+});
+
+// --- Slice 3: identity index and lifecycle event keys ---
+
+test('personIndexKey/organisationIndexKey build the documented index layout and validate the id first', () => {
+  const personId = generatePersonId();
+  const organisationId = generateOrganisationId();
+  assert.equal(personIndexKey(personId), `${PERSON_INDEX_PREFIX}${personId}`);
+  assert.equal(organisationIndexKey(organisationId), `${ORGANISATION_INDEX_PREFIX}${organisationId}`);
+  assert.equal(PERSON_INDEX_PREFIX, 'entities/index/person/');
+  assert.equal(ORGANISATION_INDEX_PREFIX, 'entities/index/organisation/');
+  assert.throws(() => personIndexKey('not_a_person_id'), error => error.code === 'invalid_person_id');
+  assert.throws(() => organisationIndexKey('not_an_organisation_id'), error => error.code === 'invalid_organisation_id');
+});
+
+test('listPersonIndexKeys/listOrganisationIndexKeys list only their own index prefix', async () => {
+  const store = createMemoryStore();
+  const personId = generatePersonId();
+  const organisationId = generateOrganisationId();
+  await store.setJSON(personIndexKey(personId), { id: personId });
+  await store.setJSON(organisationIndexKey(organisationId), { id: organisationId });
+  await store.setJSON(personKey(personId), { id: personId }); // the authoritative record, not an index entry
+
+  assert.deepEqual(await listPersonIndexKeys(store), [personIndexKey(personId)]);
+  assert.deepEqual(await listOrganisationIndexKeys(store), [organisationIndexKey(organisationId)]);
+});
+
+test('entityEventKey/entityEventsPrefix hash the entity ref and validate the event id first', () => {
+  const ref = 'shared:person:' + generatePersonId();
+  const eventId = generateEventId();
+  assert.equal(entityEventsPrefix(ref), `entities/events/${hashEntityRef(ref)}/`);
+  assert.equal(entityEventKey(ref, eventId), `${entityEventsPrefix(ref)}${eventId}`);
+  for (const bad of ['event_deadbeef', 'event_../../etc/passwd', '', 'not_an_event_id']) {
+    assert.throws(() => entityEventKey(ref, bad), error => error.status === 400 && error.code === 'invalid_event_id');
+  }
 });
