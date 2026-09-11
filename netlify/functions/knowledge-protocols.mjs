@@ -31,12 +31,14 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
   return { text, evidenceIds: [] };
 }
 
-function searchableTerms(session) {
+const STOP = new Set(['about','after','again','also','and','any','are','because','been','before','being','between','but','can','could','for','from','has','have','here','how','into','its','just','like','may','might','more','most','need','not','only','other','our','out','over','really','same','should','some','stay','such','than','that','the','their','them','then','there','they','this','through','too','under','very','want','was','were','what','when','where','whether','which','while','who','why','will','with','would','you','your']);
+
+export function searchableTerms(session) {
   return Object.values(session?.intake ?? {})
     .join(' ')
     .toLowerCase()
-    .match(/[a-z0-9]{3,}/g)
-    ?.filter((term, index, all) => all.indexOf(term) === index)
+    .match(/[a-z0-9]{4,}/g)
+    ?.filter((term, index, all) => !STOP.has(term) && all.indexOf(term) === index)
     .slice(0, 18) ?? [];
 }
 
@@ -46,18 +48,25 @@ function manifestRows(raw) {
 
 /** Read-only, bounded archive lookup. It deliberately avoids listKnowledgePages,
  * whose recovery path may write a repaired manifest. */
+function termHits(haystack, term) {
+  if (haystack.includes(term)) return true;
+  if (term.endsWith('s') && term.length > 4 && haystack.includes(term.slice(0, -1))) return true;
+  if (!term.endsWith('s') && haystack.includes(`${term}s`)) return true;
+  return false;
+}
+
 export async function defaultRetrieve(session, env, fetchImpl = fetch) {
   const terms = searchableTerms(session);
-  if (!terms.length) return { evidence: [], status: 'No specific archive terms were supplied. Claims remain self-report or uncertainty.' };
+  if (!terms.length) return { evidence: [], status: 'none' };
   try {
     const raw = await readKnowledgeFile('manifest.json', { env, fetchImpl });
     const ranked = manifestRows(raw).map(row => {
-      const title = typeof row?.title === 'string' ? row.title : '';
-      const excerpt = typeof row?.excerpt === 'string' ? row.excerpt : '';
-      const tags = Array.isArray(row?.tags) ? row.tags.filter(tag => typeof tag === 'string').join(' ') : '';
-      const haystack = `${title} ${excerpt} ${tags}`.toLowerCase();
-      return { row, score: terms.reduce((total, term) => total + (haystack.includes(term) ? 1 : 0), 0) };
-    }).filter(({ row, score }) => typeof row?.id === 'string' && score > 0)
+      const title = typeof row?.title === 'string' ? row.title.toLowerCase() : '';
+      const excerpt = typeof row?.excerpt === 'string' ? row.excerpt.toLowerCase() : '';
+      const tags = Array.isArray(row?.tags) ? row.tags.filter(tag => typeof tag === 'string').join(' ').toLowerCase() : '';
+      const score = terms.reduce((total, term) => total + (termHits(`${title} ${tags}`, term) ? 2 : termHits(excerpt, term) ? 1 : 0), 0);
+      return { row, score };
+    }).filter(({ row, score }) => typeof row?.id === 'string' && score >= 2)
       .sort((left, right) => right.score - left.score)
       .slice(0, 6);
     const evidence = ranked.map(({ row }) => ({
@@ -67,12 +76,28 @@ export async function defaultRetrieve(session, env, fetchImpl = fetch) {
       text: typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '',
       source: 'Knowledge Hub archive'
     }));
-    return evidence.length
-      ? { evidence, status: `Retrieved ${evidence.length} matching Knowledge Hub note${evidence.length === 1 ? '' : 's'} for grounding.` }
-      : { evidence: [], status: 'No matching Knowledge Hub notes were retrieved. Claims remain self-report or uncertainty.' };
+    return evidence.length ? { evidence, status: 'grounded' } : { evidence: [], status: 'none' };
   } catch {
-    return { evidence: [], status: 'Knowledge Hub archive is temporarily unavailable. Claims remain self-report or uncertainty.' };
+    return { evidence: [], status: 'none' };
   }
+}
+
+export function protocolRunUrl(request) {
+  return new URL('/api/knowledge/protocols/run', request.url);
+}
+
+export async function defaultInvokeProtocolRun(request, sessionId, env = {}, fetchImpl = fetch) {
+  const response = await fetchImpl(protocolRunUrl(request), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-cognitive-session-id': sessionId,
+      ...(request.headers.get('cookie') ? { cookie: request.headers.get('cookie') } : {}),
+      ...(request.headers.get('origin') ? { origin: request.headers.get('origin') } : {})
+    },
+    body: JSON.stringify({ sessionId })
+  });
+  return response.status === 202 || response.ok;
 }
 
 async function serviceFor(env, deps) {
@@ -111,6 +136,13 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       const session = body.sessionId
         ? await service.action(owner(env), body)
         : await service.create(owner(env), body);
+      if (!['queued', 'running'].includes(session.status)) {
+        return withCors(okResponse(200, { session }), request, env);
+      }
+      const invokeRun = deps.invokeRun ?? defaultInvokeProtocolRun;
+      let kicked = false;
+      try { kicked = await invokeRun(request, session.id, env, deps.fetchImpl ?? fetch); } catch { kicked = false; }
+      if (kicked) return withCors(okResponse(202, { session }), request, env);
       const advanced = await service.run(owner(env), session.id);
       return withCors(okResponse(200, { session: advanced }), request, env);
     } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message ?? 'Protocol request failed.', error.status >= 500), request, env); }
