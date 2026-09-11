@@ -2143,6 +2143,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
 }
 
 .block-tabs__tablist {
@@ -2600,26 +2602,41 @@
 /* Nested editor chrome */
 .block-editor__columns,
 .block-editor__section-children,
-.block-editor__column-pane,
-.block-editor__tabs-panel {
+.block-editor__column-pane {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   margin-top: var(--space-2);
 }
 
-.block-editor__column-panes,
-.block-editor__tabs-panels {
+.block-editor__column-panes {
   display: grid;
   gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
 }
 
-.block-editor__column-pane,
-.block-editor__tabs-panel {
+.block-editor__column-pane {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: var(--space-3);
   background: var(--glass);
+  width: 100%;
+  min-width: 0;
+}
+
+.block-editor__tabs,
+.block-editor__tabs-panel {
+  width: 100%;
+  min-width: 0;
+}
+
+.block-editor__tabs-panel {
+  padding: var(--space-3) 0 0;
+}
+
+.block-editor__tabs-add {
+  width: 100%;
 }
 
 .block-editor__column-pane--drop {
@@ -3385,6 +3402,18 @@
 .lesson-page {
   position: relative;
   max-width: 62.5rem;
+}
+
+.page-editor .lesson-page,
+.page-editor .lesson-page--blocks,
+.page-editor .lesson-page__blocks,
+.page-editor .lesson-page__block,
+.page-editor .lesson-page__block .block-editor,
+.page-editor .block-editor__tabs,
+.page-editor .block-tabs {
+  max-width: none;
+  width: 100%;
+  min-width: 0;
 }
 
 .lesson-page__title:focus-visible {
