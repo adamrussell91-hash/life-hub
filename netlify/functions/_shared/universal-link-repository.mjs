@@ -73,6 +73,20 @@ function invalidTransitionError(message) {
   return Object.assign(new Error(message), { status: 409, code: 'invalid_lifecycle_transition' });
 }
 
+// Thrown by `repairLifecycleJournal` (correction, Job 2) when the
+// authoritative link has moved on to a state this stale operation did not
+// observe — a later, permitted lifecycle mutation (or another repair)
+// changed it after this operation's precondition was recorded. Retrying
+// or re-repairing the same stale operation can never resolve this; only
+// the fact that a later state now exists is the answer, so this is a
+// stable, non-retryable conflict rather than a `link_write_incomplete`.
+function linkOperationSupersededError({ operationId, linkId }) {
+  return Object.assign(
+    new Error('This Universal Link operation has been superseded by a later change and cannot be safely replayed.'),
+    { status: 409, code: 'link_operation_superseded', operation_id: operationId, link_id: linkId }
+  );
+}
+
 function isNullableString(value) {
   return value === null || value === undefined || typeof value === 'string';
 }
@@ -592,10 +606,28 @@ export function createUniversalLinkRepository({
     return result;
   }
 
+  // Correction, Job 2: repair must never write the operation's recorded
+  // target state over a link that has since moved on. Before this fix,
+  // whenever the live record didn't already match the intended result
+  // (`alreadyDone` false), repair blindly wrote the old intended state
+  // over the *current* record with no check that the operation still
+  // owned the mutation — so repairing a stale `endLink` after the same
+  // link had since been genuinely `deleteLink`'d reverted the deletion
+  // back to `ended`. `from_status` is the link's status this operation
+  // itself observed as its precondition (recorded once, at the moment the
+  // journal was first prepared — see `endLink`/`suppressLink`/`deleteLink`
+  // below); repair may write only when the live record still matches that
+  // precondition (nothing has changed since) or already matches the
+  // intended result (a genuine retry after the mutation landed but before
+  // the commit write did). Anything else means a later operation — a
+  // different permitted lifecycle mutation, or another repair — has
+  // superseded this one, and repair must refuse rather than silently
+  // reverting that later state.
   async function repairLifecycleJournal(journal) {
     const linkId = journal.link_id;
     const payload = journal.link_payload && typeof journal.link_payload === 'object' ? journal.link_payload : {};
     const toStatus = payload.to_status;
+    const fromStatus = payload.from_status;
 
     let raw;
     let record;
@@ -610,6 +642,10 @@ export function createUniversalLinkRepository({
     const alreadyDone = journal.operation_type === 'end_link'
       ? (record.status === 'ended' && record.valid_to === payload.valid_to ? record : null)
       : (record.status === toStatus ? record : null);
+
+    if (!alreadyDone && record.status !== fromStatus) {
+      throw linkOperationSupersededError({ operationId: journal.operation_id, linkId });
+    }
 
     return applyLifecycleMutation({
       journal,
@@ -664,7 +700,11 @@ export function createUniversalLinkRepository({
       operationType: 'end_link',
       linkId: id,
       detail: validTo,
-      intendedPayload: { link_id: id, to_status: 'ended', valid_to: validTo }
+      // `from_status` is always 'current' — endLink permits no other
+      // precondition (see the check above) — but is recorded explicitly
+      // for `repairLifecycleJournal` to compare against, matching
+      // suppressLink/deleteLink's own recorded precondition.
+      intendedPayload: { link_id: id, to_status: 'ended', valid_to: validTo, from_status: 'current' }
     });
 
     // 6-7. Set valid_to, status ended, and updated_at, preserving the link
@@ -697,7 +737,10 @@ export function createUniversalLinkRepository({
       operationType: 'suppress_link',
       linkId: id,
       detail: reason,
-      intendedPayload: { link_id: id, to_status: 'suppressed', reason_code: reason }
+      // `from_status` records the exact precondition this attempt
+      // observed (current or ended) so repair can refuse to write over a
+      // record that has since moved on to some other state.
+      intendedPayload: { link_id: id, to_status: 'suppressed', reason_code: reason, from_status: record.status }
     });
 
     // 3-4. Set status suppressed, preserving the prior temporal fields. 5-6.
@@ -730,7 +773,10 @@ export function createUniversalLinkRepository({
       operationType: 'delete_link',
       linkId: id,
       detail: reason,
-      intendedPayload: { link_id: id, to_status: 'deleted', reason_code: reason }
+      // `from_status` records the exact precondition this attempt
+      // observed (current, ended, or suppressed) so repair can refuse to
+      // write over a record that has since moved on to some other state.
+      intendedPayload: { link_id: id, to_status: 'deleted', reason_code: reason, from_status: record.status }
     });
 
     // 3-5. Set status deleted (soft deletion only), preserving the

@@ -15,10 +15,12 @@ import {
   validatePersonFieldUpdate
 } from './identity-schema.mjs';
 import { deriveOperationId, isValidOperationId } from './universal-link-schema.mjs';
+import { mapBounded } from './blobs-list.mjs';
 import {
   defaultGetUniversalLinkStore,
   entityEventKey,
   getJSON,
+  listPersonIndexKeys,
   organisationIndexKey,
   organisationKey,
   personIndexKey,
@@ -76,6 +78,65 @@ import {
 // mutation itself succeeded must not re-reject just because the status
 // already changed); no match means an unrelated, independent request,
 // which goes through ordinary validation from the live state.
+//
+// --- Self-identity invariant (correction B1, hardened) ---
+//
+// A prior version of this module gated the active-self invariant with a
+// single check at the *start* of create/activate, then wrote the entity,
+// the index, and finally the self-pointer, in that order, with no further
+// check. That let a confirmed sequential defect through: if the pointer
+// write was the step that failed (or any step after the entity write
+// itself already landed), the entity was already durably `is_self: true,
+// lifecycle_status: 'active'` on disk — externally observable via an
+// ordinary GET — before the invariant was ever re-checked. A second,
+// unrelated self creation/activation that completed fully in between could
+// end up with its own equally-active entity, and a later blind repair of
+// the first attempt could then clobber the pointer the second attempt
+// legitimately holds.
+//
+// The fix is not merely reordering steps (Netlify Blobs has no
+// compare-and-set, so no ordering alone is airtight against a *genuinely
+// concurrent* pair of requests — see the PR body's concurrency boundary).
+// Instead, every write that would make a Person newly `is_self &&
+// lifecycle_status: 'active'` externally observable is gated by its own
+// fresh, live ownership check, immediately before that exact write:
+//
+// - `claimSelfPointer` re-runs `assertSelfAvailable` immediately before
+//   writing the pointer, and is the *first* step for any operation that
+//   would activate a self Person — so the pointer is claimed (or the
+//   operation stably rejected) before the entity write that would make it
+//   observable ever runs.
+// - The entity write for such an operation re-runs `assertSelfAvailable`
+//   immediately before writing, so even if the pointer was claimed by this
+//   operation but a later, fully-completed operation has since taken over
+//   (the sequential case the confirmed defect exercised), this step
+//   refuses rather than silently writing a second active self.
+// - `releaseSelfPointerIfOwned` (used when a self Person deactivates)
+//   clears the pointer only when it still names the Person being
+//   deactivated — a stale deactivation repaired after a different Person
+//   has since become self must never touch that later Person's claim.
+// - `reconcileSelfIdentity` scans every Person the identity index knows
+//   about and compares against the pointer: exactly one active self and a
+//   matching pointer is left alone; zero active selfs clears the pointer;
+// more than one active self (a state these fixes are designed to make
+//   unreachable going forward, but which could already exist from
+//   corrupted data) is reported as a stable conflict and never silently
+//   resolved by picking one.
+//
+// Every one of these checks is re-run identically on repair — repair never
+// blindly replays a stored pointer value, only ever the same live-checked
+// claim/release primitives the original attempt used.
+//
+// Honest concurrency boundary: none of this is a database transaction.
+// Two requests whose entire claim-check-then-write for the *same* step
+// interleave inside that single check-then-act window could still both
+// proceed — only Netlify Blobs gaining a compare-and-set primitive closes
+// that gap completely. What this design guarantees is that any two
+// attempts that are properly *sequenced* — one's operation (through
+// whichever step it reaches, including a repair much later) finishes
+// before the next's corresponding step runs — can never both end up
+// active, because the step that would make the *second* one active always
+// re-checks live state immediately before acting.
 
 export const IDENTITY_OPERATION_SCHEMA_VERSION = 1;
 
@@ -83,15 +144,18 @@ const IDENTITY_OPERATION_TYPES = new Set(['create_identity', 'update_identity', 
 const IDENTITY_OPERATION_STATUSES = new Set(['prepared', 'repair_needed', 'committed']);
 
 const STRONG = { consistency: 'strong' };
+const RECONCILE_BATCH_SIZE = 10;
 
 // One authoritative singleton pointer recording which Person currently
 // holds `is_self: true` and `lifecycle_status: 'active'` (correction B1).
 // Netlify Blobs offers no database transaction or compare-and-set
 // primitive, so this alone cannot make the uniqueness check atomic — see
-// `assertSelfAvailable` below and the PR body's "active self invariant and
-// concurrency boundary" section for the honest limits of what a strong
-// read plus a single authoritative key can guarantee without one.
+// `assertSelfAvailable`/`claimSelfPointer` below and the PR body's "active
+// self invariant and concurrency boundary" section for the honest limits
+// of what a strong read plus a single authoritative key can guarantee
+// without one.
 export const SELF_POINTER_KEY = 'entities/self-pointer';
+export const SELF_POINTER_SCHEMA_VERSION = 2;
 
 export function identityOperationKey(operationId) {
   if (!isValidOperationId(operationId)) {
@@ -135,6 +199,20 @@ function identityOperationSupersededError({ operationId, entityId }) {
   );
 }
 
+// Thrown by `assertSelfAvailable`/`claimSelfPointer` whenever an active
+// self identity already exists elsewhere. Marked `stableConflict: true` so
+// `runIdentitySteps` propagates it as-is (a stable 409) instead of masking
+// it behind a retryable `503 identity_write_incomplete` — retrying this
+// specific conflict can never succeed on its own; only an operator
+// resolving which Person is actually self can.
+function selfIdentityExistsError() {
+  return Object.assign(new Error('An active self identity already exists.'), {
+    status: 409,
+    code: 'self_identity_exists',
+    stableConflict: true
+  });
+}
+
 function identityNotFoundError() {
   return Object.assign(new Error('Entity not found.'), { status: 404, code: 'entity_not_found' });
 }
@@ -161,6 +239,13 @@ function buildIndexFor(record, kind) {
     isSelf: kind === 'person' ? record.is_self : false,
     updatedAt: record.updated_at
   });
+}
+
+function parseSelfPointer(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const personId = typeof raw.person_id === 'string' ? raw.person_id : null;
+  const operationId = typeof raw.operation_id === 'string' ? raw.operation_id : null;
+  return { person_id: personId, operation_id: operationId };
 }
 
 // Distinguishes "this call is the same attempt as the journal already on
@@ -202,7 +287,10 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
 
   // Runs an ordered list of `{ name, alreadyDone, write }` steps, skipping
   // any already satisfied, then commits the journal. On any failure,
-  // best-effort marks the journal `repair_needed` and throws
+  // best-effort marks the journal `repair_needed`. A step whose failure is
+  // a stable, non-retryable business conflict (marked `stableConflict` —
+  // currently only the self-identity ownership checks) is rethrown as-is;
+  // anything else (a genuine storage failure) is wrapped as a retryable
   // `identity_write_incomplete`.
   async function runIdentitySteps({ journal, entityId, steps }) {
     const completedSteps = [];
@@ -214,6 +302,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       } catch (cause) {
         // eslint-disable-next-line no-await-in-loop
         await bestEffortMarkRepairNeeded(journal, completedSteps, cause?.code ?? 'write_failed');
+        if (cause?.stableConflict) throw cause;
         throw identityWriteIncompleteError({ operationId: journal.operation_id, entityId });
       }
     }
@@ -241,7 +330,8 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   // The uniqueness check for the active self identity (correction B1),
   // shared by both creation and activation — the confirmed defect was
   // that only creation ran it. `excludingPersonId` lets a person's own
-  // (re)activation of itself as the current self not spuriously reject.
+  // (re)activation of itself as the current self not spuriously reject,
+  // and lets a claim in progress for `excludingPersonId` itself pass.
   //
   // Honest concurrency boundary: this reads the singleton pointer with
   // strong consistency and then reads the pointed-to person with strong
@@ -249,28 +339,165 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   // both pass this check before either writes could still both proceed.
   // This is the documented, accepted boundary for the current
   // single-operator system (see the PR body); it is not a claim of
-  // transactional uniqueness.
+  // transactional uniqueness. What closes the *sequential* version of this
+  // gap is that every write this check gates (`claimSelfPointer`, and the
+  // entity write itself) re-runs this exact check immediately beforehand,
+  // rather than relying on a single check made earlier in the request.
   async function assertSelfAvailable({ excludingPersonId }) {
-    const pointer = await getJSON(store, SELF_POINTER_KEY, STRONG);
-    const currentSelfId = pointer && typeof pointer === 'object' && typeof pointer.person_id === 'string'
-      ? pointer.person_id
-      : null;
+    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    const currentSelfId = pointer?.person_id ?? null;
     if (!currentSelfId || currentSelfId === excludingPersonId) return;
     const currentSelf = parsePersonRecord(await getJSON(store, personKey(currentSelfId), STRONG));
     if (currentSelf && currentSelf.is_self && currentSelf.lifecycle_status === 'active') {
-      throw Object.assign(new Error('An active self identity already exists.'), {
-        status: 409,
-        code: 'self_identity_exists'
+      throw selfIdentityExistsError();
+    }
+  }
+
+  // Claims the self pointer for `personId` — the first step of any
+  // operation that would make a Person newly the active self. Re-checks
+  // availability immediately before writing (not just once, earlier in the
+  // request), so a claim can never land after a later, fully-completed
+  // claim has already taken the slot.
+  async function claimSelfPointer({ personId, operationId }) {
+    await assertSelfAvailable({ excludingPersonId: personId });
+    await setJSON(store, SELF_POINTER_KEY, {
+      schema_version: SELF_POINTER_SCHEMA_VERSION,
+      person_id: personId,
+      operation_id: operationId,
+      updated_at: now()
+    });
+  }
+
+  // Clears the self pointer for a deactivating Person, but only when the
+  // live pointer still names that exact Person — required behaviour 2/3: a
+  // stale deactivation repaired after a later Person has already become
+  // self must never clear (or otherwise disturb) that later Person's
+  // claim. Never throws: this is always a safe no-op when the pointer has
+  // moved on, not a conflict.
+  async function releaseSelfPointerIfOwned({ personId }) {
+    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    if (!pointer || pointer.person_id !== personId) return;
+    await setJSON(store, SELF_POINTER_KEY, {
+      schema_version: SELF_POINTER_SCHEMA_VERSION,
+      person_id: null,
+      operation_id: null,
+      updated_at: now()
+    });
+  }
+
+  // Builds the ordered step list shared by every create/update/lifecycle
+  // operation and its repair. `selfPointerAction` is `'claim'` (pointer
+  // claimed first, entity write re-checks live availability immediately
+  // before writing), `'release'` (pointer cleared last, only if still
+  // owned), or `null` (no self-pointer involvement at all — every
+  // Organisation, and every non-self Person).
+  function buildIdentitySteps({
+    kind,
+    entityId,
+    operationId,
+    entityRecord,
+    indexRecord,
+    event,
+    selfPointerAction,
+    entityAlreadyDone = false
+  }) {
+    const steps = [];
+    if (selfPointerAction === 'claim') {
+      steps.push({
+        name: 'self_pointer',
+        alreadyDone: false,
+        write: () => claimSelfPointer({ personId: entityId, operationId })
       });
     }
+    steps.push({
+      name: 'entity',
+      alreadyDone: entityAlreadyDone,
+      write: () => (selfPointerAction === 'claim' ? assertSelfAvailable({ excludingPersonId: entityId }) : Promise.resolve())
+        .then(() => setJSON(store, entityKeyFor(kind, entityId), entityRecord))
+    });
+    steps.push({ name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(kind, entityId), indexRecord) });
+    if (event) {
+      steps.push({
+        name: 'event',
+        alreadyDone: false,
+        write: () => setJSON(store, entityEventKey(event.entity_ref, event.event_id), event)
+      });
+    }
+    if (selfPointerAction === 'release') {
+      steps.push({
+        name: 'self_pointer',
+        alreadyDone: false,
+        write: () => releaseSelfPointerIfOwned({ personId: entityId })
+      });
+    }
+    return steps;
+  }
+
+  // Scans every Person the identity index knows about and compares the
+  // live count of `is_self && lifecycle_status: 'active'` records against
+  // the pointer (required behaviour 6). The authoritative Person records
+  // are the ground truth here, not the pointer — the pointer is a cache of
+  // "who currently holds the slot" that this reconciles *toward* the
+  // records, never the other way around:
+  //
+  // - Exactly one active self: the pointer is corrected to name it if it
+  //   doesn't already (`reconciled`), or left alone if it does
+  //   (`consistent`).
+  // - Zero active selfs: the pointer is cleared if it names anyone
+  //   (`reconciled`), or left alone if already clear (`consistent`).
+  // - More than one active self — a state the claim/release checks above
+  //   are designed to make unreachable going forward, but which could
+  //   already exist from data corrupted before this correction — is
+  //   reported as a stable `conflict` and nothing is written. This never
+  //   silently picks one; it is exactly the "stable conflict requiring
+  //   operator action" required behaviour 6 asks for.
+  async function reconcileSelfIdentity() {
+    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    const pointerPersonId = pointer?.person_id ?? null;
+
+    const indexKeys = await listPersonIndexKeys(store);
+    const indexRecords = await mapBounded(indexKeys, RECONCILE_BATCH_SIZE, key => getJSON(store, key));
+    const personIds = [...new Set(
+      indexRecords
+        .filter(record => record && typeof record === 'object' && typeof record.id === 'string')
+        .map(record => record.id)
+    )];
+
+    const personRecords = await mapBounded(personIds, RECONCILE_BATCH_SIZE, id => getJSON(store, personKey(id), STRONG));
+    const activeSelfIds = personIds
+      .filter((_, index) => {
+        const record = parsePersonRecord(personRecords[index]);
+        return Boolean(record && record.is_self && record.lifecycle_status === 'active');
+      })
+      .sort();
+
+    if (activeSelfIds.length > 1) {
+      return { status: 'conflict', person_ids: activeSelfIds, pointer_person_id: pointerPersonId };
+    }
+
+    const truePersonId = activeSelfIds[0] ?? null;
+    if (pointerPersonId === truePersonId) {
+      return { status: 'consistent', person_id: truePersonId };
+    }
+
+    await setJSON(store, SELF_POINTER_KEY, {
+      schema_version: SELF_POINTER_SCHEMA_VERSION,
+      person_id: truePersonId,
+      operation_id: null,
+      updated_at: now()
+    });
+    return { status: 'reconciled', person_id: truePersonId, previous_pointer_person_id: pointerPersonId };
   }
 
   async function createIdentity({ kind, input }) {
     const validated = kind === 'person' ? validatePersonCreateInput(input) : validateOrganisationCreateInput(input);
+    const claimsSelf = kind === 'person' && validated.is_self;
 
-    // B1: the same uniqueness check creation always ran, now shared with
-    // activation via `assertSelfAvailable`.
-    if (kind === 'person' && validated.is_self) {
+    // B1: fast-fail check before generating an id or journal at all. The
+    // authoritative gate is `claimSelfPointer`'s own re-check immediately
+    // before the pointer write below — this is purely an early rejection
+    // for the ordinary case where availability hasn't changed since.
+    if (claimsSelf) {
       await assertSelfAvailable({ excludingPersonId: null });
     }
 
@@ -306,9 +533,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       });
 
     const indexRecord = buildIndexFor(record, kind);
-    const selfPointerPayload = kind === 'person' && validated.is_self
-      ? { schema_version: 1, person_id: entityId, updated_at: timestamp }
-      : null;
+    const selfPointerAction = claimsSelf ? 'claim' : null;
 
     const operationId = deriveOperationId(['create_identity', kind, entityId]);
     const journal = {
@@ -319,7 +544,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       entity_id: entityId,
       status: 'prepared',
       completed_steps: [],
-      payload: { entity: record, index: indexRecord, self_pointer: selfPointerPayload },
+      payload: { entity: record, index: indexRecord, self_pointer_action: selfPointerAction },
       created_at: timestamp,
       updated_at: timestamp,
       last_error_code: null
@@ -330,13 +555,15 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       throw identityWriteIncompleteError({ operationId, entityId });
     }
 
-    const steps = [
-      { name: 'entity', alreadyDone: false, write: () => setJSON(store, entityKeyFor(kind, entityId), record) },
-      { name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(kind, entityId), indexRecord) }
-    ];
-    if (selfPointerPayload) {
-      steps.push({ name: 'self_pointer', alreadyDone: false, write: () => setJSON(store, SELF_POINTER_KEY, selfPointerPayload) });
-    }
+    const steps = buildIdentitySteps({
+      kind,
+      entityId,
+      operationId,
+      entityRecord: record,
+      indexRecord,
+      event: null,
+      selfPointerAction
+    });
 
     await runIdentitySteps({ journal, entityId, steps });
     return { record, ref: formatEntityRef({ namespace: 'shared', kind, id: entityId }) };
@@ -373,11 +600,6 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       : Object.freeze({ ...record, ...validatedPatch, updated_at: timestamp });
     const indexRecord = resuming ? existingJournal.payload.index : buildIndexFor(updatedRecord, ref.kind);
 
-    const steps = [
-      { name: 'entity', alreadyDone: entityAlreadyWritten, write: () => setJSON(store, entityKeyFor(ref.kind, ref.id), updatedRecord) },
-      { name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(ref.kind, ref.id), indexRecord) }
-    ];
-
     const journal = resuming ? existingJournal : {
       schema_version: IDENTITY_OPERATION_SCHEMA_VERSION,
       operation_id: operationId,
@@ -399,6 +621,17 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       }
     }
 
+    const steps = buildIdentitySteps({
+      kind: ref.kind,
+      entityId: ref.id,
+      operationId,
+      entityRecord: updatedRecord,
+      indexRecord,
+      event: null,
+      selfPointerAction: null,
+      entityAlreadyDone: entityAlreadyWritten
+    });
+
     await runIdentitySteps({ journal, entityId: ref.id, steps });
     return updatedRecord;
   }
@@ -411,6 +644,12 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     const operationId = deriveOperationId(['lifecycle_identity', ref.kind, ref.id, toStatus]);
     const existingJournal = validateIdentityOperationRecord(await getJSON(store, identityOperationKey(operationId), STRONG));
     const { resuming, entityAlreadyWritten } = computeResumeState({ journal: existingJournal, preUpdatedAt });
+
+    // A self identity's transition graph only ever permits active<->inactive
+    // (every other target is rejected by `assertLifecycleTransitionAllowed`'s
+    // self-protection below), so which direction this operation's pointer
+    // involvement takes is fully determined by `toStatus` alone.
+    const selfPointerAction = !isSelf ? null : (toStatus === 'active' ? 'claim' : 'release');
 
     if (!resuming) {
       // The transition-graph check only runs for a fresh (or stale/
@@ -426,9 +665,11 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
         retentionReason,
         retentionReviewAt
       });
-      // B1: the same self-uniqueness check activation now runs, matching
-      // creation.
-      if (isSelf && toStatus === 'active') {
+      // B1: fast-fail check before generating an event/journal, mirroring
+      // createIdentity's early check — `claimSelfPointer`'s own re-check
+      // immediately before the pointer write is still the authoritative
+      // gate (also applied on a resumed retry via the step list below).
+      if (selfPointerAction === 'claim') {
         await assertSelfAvailable({ excludingPersonId: ref.id });
       }
     }
@@ -448,19 +689,6 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       to_status: toStatus,
       created_at: timestamp
     });
-    const needsSelfPointer = isSelf && (toStatus === 'active' || record.lifecycle_status === 'active');
-    const selfPointerPayload = resuming
-      ? existingJournal.payload.self_pointer ?? null
-      : (needsSelfPointer ? { schema_version: 1, person_id: toStatus === 'active' ? ref.id : null, updated_at: timestamp } : null);
-
-    const steps = [
-      { name: 'entity', alreadyDone: entityAlreadyWritten, write: () => setJSON(store, entityKeyFor(ref.kind, ref.id), updatedRecord) },
-      { name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(ref.kind, ref.id), indexRecord) },
-      { name: 'event', alreadyDone: false, write: () => setJSON(store, entityEventKey(entityRef, event.event_id), event) }
-    ];
-    if (selfPointerPayload) {
-      steps.push({ name: 'self_pointer', alreadyDone: false, write: () => setJSON(store, SELF_POINTER_KEY, selfPointerPayload) });
-    }
 
     const journal = resuming ? existingJournal : {
       schema_version: IDENTITY_OPERATION_SCHEMA_VERSION,
@@ -476,7 +704,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
         entity: updatedRecord,
         index: indexRecord,
         event,
-        self_pointer: selfPointerPayload
+        self_pointer_action: selfPointerAction
       },
       created_at: timestamp,
       updated_at: timestamp,
@@ -489,6 +717,17 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
         throw identityWriteIncompleteError({ operationId, entityId: ref.id });
       }
     }
+
+    const steps = buildIdentitySteps({
+      kind: ref.kind,
+      entityId: ref.id,
+      operationId,
+      entityRecord: updatedRecord,
+      indexRecord,
+      event,
+      selfPointerAction,
+      entityAlreadyDone: entityAlreadyWritten
+    });
 
     await runIdentitySteps({ journal, entityId: ref.id, steps });
     return updatedRecord;
@@ -504,13 +743,16 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     }
 
     if (journal.operation_type === 'create_identity') {
-      const steps = [
-        { name: 'entity', alreadyDone: false, write: () => setJSON(store, entityKeyFor(journal.kind, journal.entity_id), journal.payload.entity) },
-        { name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(journal.kind, journal.entity_id), journal.payload.index) }
-      ];
-      if (journal.payload.self_pointer) {
-        steps.push({ name: 'self_pointer', alreadyDone: false, write: () => setJSON(store, SELF_POINTER_KEY, journal.payload.self_pointer) });
-      }
+      const selfPointerAction = journal.payload.self_pointer_action === 'claim' ? 'claim' : null;
+      const steps = buildIdentitySteps({
+        kind: journal.kind,
+        entityId: journal.entity_id,
+        operationId,
+        entityRecord: journal.payload.entity,
+        indexRecord: journal.payload.index,
+        event: null,
+        selfPointerAction
+      });
       await runIdentitySteps({ journal, entityId: journal.entity_id, steps });
       return {
         operation_id: operationId,
@@ -532,20 +774,20 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       throw identityOperationSupersededError({ operationId, entityId: journal.entity_id });
     }
 
-    const steps = [
-      { name: 'entity', alreadyDone: entityAlreadyWritten, write: () => setJSON(store, entityKeyFor(journal.kind, journal.entity_id), journal.payload.entity) },
-      { name: 'index', alreadyDone: false, write: () => setJSON(store, indexKeyFor(journal.kind, journal.entity_id), journal.payload.index) }
-    ];
-    if (journal.operation_type === 'lifecycle_identity') {
-      steps.push({
-        name: 'event',
-        alreadyDone: false,
-        write: () => setJSON(store, entityEventKey(journal.payload.event.entity_ref, journal.payload.event.event_id), journal.payload.event)
-      });
-      if (journal.payload.self_pointer) {
-        steps.push({ name: 'self_pointer', alreadyDone: false, write: () => setJSON(store, SELF_POINTER_KEY, journal.payload.self_pointer) });
-      }
-    }
+    const selfPointerAction = journal.operation_type === 'lifecycle_identity'
+      ? (journal.payload.self_pointer_action ?? null)
+      : null;
+
+    const steps = buildIdentitySteps({
+      kind: journal.kind,
+      entityId: journal.entity_id,
+      operationId,
+      entityRecord: journal.payload.entity,
+      indexRecord: journal.payload.index,
+      event: journal.operation_type === 'lifecycle_identity' ? journal.payload.event : null,
+      selfPointerAction,
+      entityAlreadyDone: entityAlreadyWritten
+    });
 
     await runIdentitySteps({ journal, entityId: journal.entity_id, steps });
     return { operation_id: operationId, entity_id: journal.entity_id, status: 'committed', repaired: true };
@@ -556,7 +798,8 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     loadEntity,
     updateFields,
     transitionLifecycle,
-    repairIdentityOperation
+    repairIdentityOperation,
+    reconcileSelfIdentity
   };
 }
 
