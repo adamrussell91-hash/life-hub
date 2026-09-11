@@ -1642,8 +1642,6 @@
 
 /* ---------- excursion cards sit on the projects board ---------- */
 .excursion-card__row {
-  justify-content: space-between;
-  width: 100%;
   font-size: var(--text-xs);
 }
 
