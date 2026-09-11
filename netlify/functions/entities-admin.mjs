@@ -1,7 +1,7 @@
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { isValidOperationId } from './_shared/universal-link-schema.mjs';
+import { createAccessContext } from './_shared/entity-access.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createIdentityRepository } from './_shared/identity-repository.mjs';
 
@@ -23,8 +23,11 @@ export const config = { path: '/api/entities/admin' };
 //   POST /api/entities/admin
 //   Body: { "action": "repair_operation", "operation_id": "op_<32 hex>" }
 //     -> 200 { ok: true, data: { operation_id, entity_id, status: "committed", repaired, ref? } }
-//     -> 400 invalid_operation_id      (malformed operation_id, never reaches storage)
-//     -> 404 operation_not_found       (well-formed but unknown, or a corrupted journal record)
+//     -> 404 operation_not_found       (a malformed operation_id — never reaches a Blob key — a
+//                                       well-formed but unknown one, a corrupted or unsupported-
+//                                       schema-version stored journal, or a journal whose own
+//                                       stored operation_id doesn't match the one requested; every
+//                                       case returns this identical non-disclosing response)
 //     -> 409 identity_operation_superseded / self_identity_exists
 //                                      (a later, independent change has moved the entity or the
 //                                       active-self slot on since this operation was prepared;
@@ -37,14 +40,19 @@ export const config = { path: '/api/entities/admin' };
 //   before any repository call.
 //
 // Every response carries `cache-control: no-store` (via `_shared/http.mjs`'s
-// `jsonResponse`). Authentication (a valid operator session cookie),
-// allowed-origin enforcement, and the server-derived `workflow:
-// 'administration'` access context all come from the same
-// `createOperatorHandler` gate `universal-links-admin.mjs`/`entities.mjs`
-// use — a caller can never supply their own workflow or actor, and an
+// `jsonResponse`). Authentication (a valid operator session cookie) and
+// allowed-origin enforcement come from `createOperatorHandler`, the same
+// gate `universal-links-admin.mjs`/`entities.mjs` use. The administration
+// access context itself is built here, on the server, from nothing but
+// the literal workflow name — never from request JSON — and passed
+// explicitly into `repairIdentityOperation`/`reconcileSelfIdentity`, which
+// both require it and reject anything else (including no context at all)
+// with `403 administration_required`; the route name alone grants
+// nothing. A caller can never supply their own workflow or actor, and an
 // unauthenticated or wrong-origin request never reaches the repository at
 // all. This route adds no UI and is never called from an ordinary Life
-// workflow — only from this explicit administration action.
+// workflow — only from this explicit administration action; `entities.mjs`
+// exposes neither action.
 const ACTIONS = new Set(['repair_operation', 'reconcile_self_identity']);
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
 
@@ -100,22 +108,24 @@ export function createEntitiesAdminHandler(deps = {}) {
         );
       }
 
+      // Server-derived only — never accepted from request JSON
+      // (`assertNoAccessFields` above already rejects a body that tries).
+      // Job 3: both repository methods require this context and assert
+      // the administration workflow themselves; the route does not
+      // pre-empt that check, it only ever supplies the same context.
+      const accessContext = createAccessContext({ workflow: 'administration' });
+
       if (action === 'repair_operation') {
-        const operationId = parsed.value.operation_id;
-        // Validate operation IDs before storage access — a malformed id
-        // never reaches a Blob key.
-        if (!isValidOperationId(operationId)) {
-          return withCors(
-            errorResponse(400, 'invalid_operation_id', 'operation_id must be a valid operation id.', false),
-            request,
-            env
-          );
-        }
-        const result = await repo.repairIdentityOperation(operationId);
+        // `operation_id` validation, including path safety, happens
+        // inside `repairIdentityOperation` itself, before any Blob key is
+        // built — a malformed, unknown, or otherwise unusable id all
+        // collapse to the same non-disclosing 404 (correction Job 4); the
+        // route no longer pre-checks and returns a different status.
+        const result = await repo.repairIdentityOperation(parsed.value.operation_id, accessContext);
         return withCors(okResponse(200, result), request, env);
       }
 
-      const result = await repo.reconcileSelfIdentity();
+      const result = await repo.reconcileSelfIdentity(accessContext);
       return withCors(okResponse(200, result), request, env);
     } catch (error) {
       return withCors(toErrorResponse(error), request, env);
