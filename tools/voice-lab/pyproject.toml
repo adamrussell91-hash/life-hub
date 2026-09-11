@@ -1,0 +1,9 @@
+[project]
+name = "chadwick-voice-lab"
+version = "0.1.0"
+description = "Local-only Chadwick casting with MLX Qwen3-TTS VoiceDesign"
+requires-python = ">=3.13,<3.14"
+dependencies = ["mlx-audio==0.5.1"]
+
+[tool.uv]
+package = false

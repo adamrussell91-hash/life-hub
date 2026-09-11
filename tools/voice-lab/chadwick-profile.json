@@ -1,0 +1,28 @@
+{
+  "name": "Chadwick Flexington",
+  "status": "approved",
+  "approved_at": "2026-09-06",
+  "candidate": {
+    "number": 6,
+    "id": "1ec4ccc7fdbb42da9fc1b8c772f15916",
+    "seed": 45,
+    "local_wav": "approved/chadwick-approved-seed-45.wav",
+    "sha256": "a7f70712f1891ee81b38c09aeb9616f8aebabb1b578e586f1944bc655198b1ae"
+  },
+  "reference": {
+    "seconds": 9.944,
+    "text": "Bro. BRO. That chest press? Your pecs are about to file a restraining order against that shirt. Wider shoulders, thicker arms, the whole situation. Absolute unit behavior."
+  },
+  "clone": {
+    "model": "mlx-community/Qwen3-TTS-12Hz-0.6B-Base-4bit",
+    "revision": "0d6bb6fe33f92d47a507e23b9148940e8366ab5b",
+    "language": "English",
+    "settings": {
+      "temperature": 0.9,
+      "top_p": 1.0,
+      "top_k": 50,
+      "repetition_penalty": 1.5,
+      "max_tokens": 768
+    }
+  }
+}
