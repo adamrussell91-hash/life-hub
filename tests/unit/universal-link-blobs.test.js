@@ -2,8 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { hashEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
+import { generateOperationId } from '../../netlify/functions/_shared/universal-link-schema.mjs';
 import {
+  LINKS_PREFIX,
+  MEMBERSHIP_SCHEMA_VERSION,
   UNIVERSAL_LINK_CONTENT_STORE,
+  buildEndpointMembershipRecord,
+  buildTypeMembershipRecord,
   bySourceKey,
   bySourcePrefix,
   byTargetKey,
@@ -12,9 +17,12 @@ import {
   byTypePrefix,
   getJSON,
   linkKey,
+  listAuthoritativeLinkKeys,
   listMembership,
+  operationKey,
   organisationKey,
-  personKey
+  personKey,
+  setJSON
 } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
 
 // The canonical deterministic id form is `ul_` + 64 lowercase hex chars.
@@ -79,12 +87,25 @@ test('every key builder that concatenates a link id validates it first, rejectin
   }
 });
 
-test('this module exports no write capability', () => {
-  const exported = { bySourceKey, bySourcePrefix, byTargetKey, byTargetPrefix, byTypeKey, byTypePrefix, getJSON, linkKey, listMembership, organisationKey, personKey };
-  assert.equal('setJSON' in exported, false);
-  assert.equal('deleteKey' in exported, false);
-  assert.equal('operationKey' in exported, false);
-  assert.equal('buildMembershipRecord' in exported, false);
+// Slice 1 asserted this module exported no write capability at all. Slice 2
+// deliberately adds it here — the implementation programme: "Modify
+// universal-link-blobs.mjs only as required to add the write primitives,
+// operation keys, relationship type memberships, ... and strong
+// consistency options" — so that assertion is now stale and is replaced by
+// the inverse: these write primitives exist, and only
+// `universal-link-repository.mjs` is permitted to call them (see the
+// dedicated "no write outside the repository" search in
+// universal-link-repository.test.js and the Slice 2 PR body's verification
+// section).
+test('this module now exports the Slice 2 write primitives', () => {
+  const exported = { setJSON, operationKey, buildEndpointMembershipRecord, buildTypeMembershipRecord, listAuthoritativeLinkKeys };
+  for (const [name, value] of Object.entries(exported)) {
+    assert.equal(typeof value, 'function', `${name} must be exported as a function`);
+  }
+  // This module still does not export a hard-delete primitive — every
+  // lifecycle transition in this programme is a soft status update via
+  // setJSON, never a Blob delete.
+  assert.equal('deleteKey' in { setJSON, operationKey }, false);
 });
 
 test('getJSON reads through the store adapter', async () => {
@@ -178,4 +199,92 @@ test('listMembership bounds concurrent Blob GETs to 10 even with many membership
   assert.equal(results.length, 25);
   assert.ok(maxInFlight <= 10, `expected at most 10 concurrent GETs, saw ${maxInFlight}`);
   assert.ok(maxInFlight > 1, 'sanity check: batching still runs concurrently within a batch');
+});
+
+// --- Slice 2: write primitives, operation keys, membership builders ---
+
+test('operationKey builds the documented key and validates the operation id first', () => {
+  const opId = generateOperationId();
+  assert.equal(operationKey(opId), `universal-links/operations/${opId}`);
+  for (const bad of ['op_deadbeef', 'op_../../etc/passwd', '', 'not_an_op_id']) {
+    assert.throws(() => operationKey(bad), error => error.status === 400 && error.code === 'invalid_operation_id');
+  }
+});
+
+test('LINKS_PREFIX matches the prefix linkKey writes under', () => {
+  assert.equal(LINKS_PREFIX, 'universal-links/links/');
+  const linkId = ulId('prefix-check');
+  assert.equal(linkKey(linkId), `${LINKS_PREFIX}${linkId}`);
+});
+
+test('byTypeKey/byTypePrefix validate the relationship type before building a key', () => {
+  const linkId = ulId('type-check');
+  assert.equal(byTypeKey('collaborator', linkId), `universal-links/by-type/collaborator/${linkId}`);
+  for (const bad of ['Collaborator', 'collaborator/../../etc', '', 'has space', 'has-hyphen']) {
+    assert.throws(() => byTypePrefix(bad), error => error.status === 400 && error.code === 'invalid_relationship_type', `byTypePrefix(${JSON.stringify(bad)})`);
+    assert.throws(() => byTypeKey(bad, linkId), error => error.code === 'invalid_relationship_type', `byTypeKey(${JSON.stringify(bad)})`);
+  }
+});
+
+test('buildEndpointMembershipRecord contains exactly link_id, canonical_ref, created_at, schema_version', () => {
+  const linkId = ulId('endpoint-membership');
+  const record = buildEndpointMembershipRecord({
+    linkId,
+    canonicalRef: 'tasks:task:task_email_seth',
+    createdAt: '2026-09-11T00:00:00.000Z'
+  });
+  assert.deepEqual(Object.keys(record).sort(), ['canonical_ref', 'created_at', 'link_id', 'schema_version']);
+  assert.equal(record.schema_version, MEMBERSHIP_SCHEMA_VERSION);
+  assert.equal(record.link_id, linkId);
+  assert.equal(record.canonical_ref, 'tasks:task:task_email_seth');
+  assert.equal(record.created_at, '2026-09-11T00:00:00.000Z');
+});
+
+test('buildEndpointMembershipRecord validates the link id before building the record', () => {
+  assert.throws(
+    () => buildEndpointMembershipRecord({ linkId: 'ul_deadbeef', canonicalRef: 'tasks:task:task_x', createdAt: 'x' }),
+    error => error.code === 'invalid_link_id'
+  );
+});
+
+test('buildTypeMembershipRecord is a distinct, minimal shape with no canonical_ref, endpoint label, or copied domain data', () => {
+  const linkId = ulId('type-membership');
+  const record = buildTypeMembershipRecord({ linkId, relationshipType: 'collaborator', createdAt: '2026-09-11T00:00:00.000Z' });
+  assert.deepEqual(Object.keys(record).sort(), ['created_at', 'link_id', 'relationship_type', 'schema_version']);
+  assert.equal('canonical_ref' in record, false);
+  assert.equal('display_label' in record, false);
+  assert.equal(record.relationship_type, 'collaborator');
+});
+
+test('listAuthoritativeLinkKeys lists only the universal-links/links/ prefix and excludes _index keys', async () => {
+  const store = createMemoryStore();
+  const idOne = ulId('auth-one');
+  const idTwo = ulId('auth-two');
+  await store.setJSON(linkKey(idOne), { id: idOne });
+  await store.setJSON(linkKey(idTwo), { id: idTwo });
+  await store.setJSON(`${LINKS_PREFIX}_index`, [idOne, idTwo]);
+  // A membership key under a different prefix must never be returned by
+  // this administrative listing.
+  await store.setJSON(`${bySourcePrefix('tasks:task:task_email_seth')}${idOne}`, membershipRecord(idOne, 'tasks:task:task_email_seth'));
+
+  const keys = await listAuthoritativeLinkKeys(store);
+  assert.deepEqual(keys.sort(), [linkKey(idOne), linkKey(idTwo)].sort());
+});
+
+test('getJSON forwards a consistency option (e.g. strong) straight to the store', async () => {
+  const calls = [];
+  const store = {
+    async get(key, options) {
+      calls.push({ key, options });
+      return null;
+    }
+  };
+  await getJSON(store, 'some/key', { consistency: 'strong' });
+  assert.deepEqual(calls, [{ key: 'some/key', options: { type: 'json', consistency: 'strong' } }]);
+});
+
+test('setJSON writes through the store adapter', async () => {
+  const store = createMemoryStore();
+  await setJSON(store, linkKey(ulId('write-check')), { hello: 'world' });
+  assert.deepEqual(await getJSON(store, linkKey(ulId('write-check'))), { hello: 'world' });
 });

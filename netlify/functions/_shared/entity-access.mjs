@@ -56,6 +56,41 @@ export function strictestVisibility(...visibilities) {
   ));
 }
 
+// Requires the administration workflow specifically. `suppressLink`,
+// `deleteLink`, `repairOperation`, and `rebuildIndexes` (Slice 2) are
+// destructive or repository-wide operations gated to this workflow alone —
+// unlike ordinary reads/creates/ends, which any known workflow may perform.
+// Throws a 403, not the 404 non-disclosure shape: this is a scope check on
+// the caller's own session, not a statement about whether something else
+// exists.
+export function assertAdministrationWorkflow(accessContext) {
+  if (!accessContext || accessContext.workflow !== 'administration') {
+    throw Object.assign(new Error('This action requires the administration workflow.'), {
+      status: 403,
+      code: 'administration_required'
+    });
+  }
+}
+
+// The visibility a workflow itself contributes to a link's derived
+// visibility (Slice 2 `createLink` step 5), independent of either
+// endpoint's own visibility. Every current workflow contributes only
+// `operator` — no workflow can yet assert `teaching_protected` (see
+// `createAccessContext` above) — so this is `operator` today for all six
+// known workflows. Defined as its own function, rather than inlining
+// `'operator'` at each call site, so Slice 8's College approval gate has
+// one place to change when a teaching-scoped workflow starts contributing
+// `teaching_protected`.
+export function deriveWorkflowVisibility(accessContext) {
+  if (!accessContext || !KNOWN_WORKFLOWS.has(accessContext.workflow)) {
+    throw Object.assign(new Error('Cannot derive workflow visibility without a known workflow.'), {
+      status: 400,
+      code: 'invalid_workflow'
+    });
+  }
+  return 'operator';
+}
+
 // A hidden target must behave as absent (implementation programme,
 // "Authorisation and visibility"). Every resolver and read path throws
 // this exact shape — never a distinct "forbidden" error — so a caller

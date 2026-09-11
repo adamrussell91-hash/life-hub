@@ -1,19 +1,22 @@
 import { isIndexKey, listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { hashEntityRef } from './entity-ref.mjs';
-import { isValidLinkId } from './universal-link-schema.mjs';
+import { isValidLinkId, isValidOperationId } from './universal-link-schema.mjs';
 
-// Read-only storage adapter for the shared Universal Links / Person /
-// Organisation store. This is a brand new store with no pre-fold legacy
-// Netlify site — unlike `tasks-blobs.mjs` / `teaching-blobs.mjs`, it does
-// not need the `*_SITE_ID` env override / cross-site token fallback those
-// carry for historical reasons (see Slice 0 repository-map.md). It opens
-// directly on the umbrella site.
+// Storage adapter for the shared Universal Links / Person / Organisation
+// store. This is a brand new store with no pre-fold legacy Netlify site —
+// unlike `tasks-blobs.mjs` / `teaching-blobs.mjs`, it does not need the
+// `*_SITE_ID` env override / cross-site token fallback those carry for
+// historical reasons (see Slice 0 repository-map.md). It opens directly on
+// the umbrella site.
 //
-// This slice exports no write capability at all: no `setJSON`, no
-// `deleteKey`, no membership-record builder, no operation-journal key.
-// Slice 2 adds the canonical write service on top of these same key
-// builders.
+// Slice 1 exported read-only access. Slice 2 adds the write primitives,
+// operation-journal key, and membership-record builders the canonical
+// write service (`universal-link-repository.mjs`) needs — no handler or
+// domain service may call `setJSON` here directly; only
+// `universal-link-repository.mjs` writes Universal Link keys.
 export const UNIVERSAL_LINK_CONTENT_STORE = 'universal-link-content';
+
+export const LINKS_PREFIX = 'universal-links/links/';
 
 // Membership and link hydration are bounded to this many concurrent Blob
 // reads at a time.
@@ -24,8 +27,20 @@ export async function defaultGetUniversalLinkStore() {
   return getStore(UNIVERSAL_LINK_CONTENT_STORE);
 }
 
-export async function getJSON(store, key) {
-  return store.get(key, { type: 'json' });
+// `options` forwards straight to the Netlify Blobs `get` call — in
+// particular `{ consistency: 'strong' }`, which the installed
+// `@netlify/blobs` version (9.1.2) supports on `get`/`getMetadata`/
+// `getWithMetadata` but not on `list` (confirmed against
+// `node_modules/@netlify/blobs/dist/main.js`). The write path uses strong
+// consistency for every existence check it makes before deciding whether a
+// step is already done; ordinary reads (`universal-link-read-repository.mjs`)
+// do not need it and keep calling this with no options, same as Slice 1.
+export async function getJSON(store, key, options = {}) {
+  return store.get(key, { type: 'json', ...options });
+}
+
+export async function setJSON(store, key, value) {
+  return store.setJSON(key, value);
 }
 
 export function personKey(id) {
@@ -46,12 +61,40 @@ function assertValidLinkId(id) {
   return id;
 }
 
-// Every key builder that concatenates a link id validates it first — a
-// malformed or path-like id (e.g. `../../secrets`) must never reach a Blob
-// key, whether it came from a caller, a stored record, or a membership
-// record read back from storage.
+function assertValidOperationId(id) {
+  if (!isValidOperationId(id)) {
+    throw Object.assign(new Error(`Invalid Universal Link operation id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_operation_id'
+    });
+  }
+  return id;
+}
+
+// Relationship type keys are plain (not hashed) directory segments, so they
+// are validated by character shape alone rather than by a hash-collision
+// check. This module deliberately does not import `relationship-registry.mjs`
+// — the storage layer stays decoupled from relationship semantics — so this
+// is a key-safety pattern check only, matching every registered relationship
+// key's actual shape, not a registry lookup.
+const RELATIONSHIP_TYPE_KEY_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+function assertValidRelationshipTypeKey(relationshipType) {
+  if (typeof relationshipType !== 'string' || !RELATIONSHIP_TYPE_KEY_PATTERN.test(relationshipType)) {
+    throw Object.assign(new Error(`Invalid relationship type for storage key: ${JSON.stringify(relationshipType)}`), {
+      status: 400,
+      code: 'invalid_relationship_type'
+    });
+  }
+  return relationshipType;
+}
+
+// Every key builder that concatenates a link id, operation id, or
+// relationship type validates it first — a malformed or path-like value
+// (e.g. `../../secrets`) must never reach a Blob key, whether it came from
+// a caller, a stored record, or a membership record read back from storage.
 export function linkKey(id) {
-  return `universal-links/links/${assertValidLinkId(id)}`;
+  return `${LINKS_PREFIX}${assertValidLinkId(id)}`;
 }
 
 export function bySourcePrefix(sourceRef) {
@@ -63,7 +106,7 @@ export function byTargetPrefix(targetRef) {
 }
 
 export function byTypePrefix(relationshipType) {
-  return `universal-links/by-type/${relationshipType}/`;
+  return `universal-links/by-type/${assertValidRelationshipTypeKey(relationshipType)}/`;
 }
 
 export function bySourceKey(sourceRef, linkId) {
@@ -76,6 +119,46 @@ export function byTargetKey(targetRef, linkId) {
 
 export function byTypeKey(relationshipType, linkId) {
   return `${byTypePrefix(relationshipType)}${assertValidLinkId(linkId)}`;
+}
+
+export function operationKey(operationId) {
+  return `universal-links/operations/${assertValidOperationId(operationId)}`;
+}
+
+export const UNIVERSAL_LINK_SCHEMA_KEY = 'universal-links/schema';
+
+export const MEMBERSHIP_SCHEMA_VERSION = 1;
+
+// Source/target membership records: exactly `link_id`, `canonical_ref`,
+// `created_at`, `schema_version` — no endpoint label or other domain data
+// (implementation programme, "Storage layout").
+export function buildEndpointMembershipRecord({ linkId, canonicalRef, createdAt }) {
+  return Object.freeze({
+    schema_version: MEMBERSHIP_SCHEMA_VERSION,
+    link_id: assertValidLinkId(linkId),
+    canonical_ref: canonicalRef,
+    created_at: createdAt
+  });
+}
+
+// A distinct, even more minimal record for `by-type` membership: no
+// `canonical_ref` (there is no entity endpoint here, just the relationship
+// type grouping) and no endpoint label or copied domain data.
+export function buildTypeMembershipRecord({ linkId, relationshipType, createdAt }) {
+  return Object.freeze({
+    schema_version: MEMBERSHIP_SCHEMA_VERSION,
+    link_id: assertValidLinkId(linkId),
+    relationship_type: assertValidRelationshipTypeKey(relationshipType),
+    created_at: createdAt
+  });
+}
+
+// Authoritative link keys, for administrative rebuild only (implementation
+// programme: "Full link scans are permitted only for authenticated
+// administrative rebuild and migration operations"). Never call this from
+// an ordinary read path.
+export async function listAuthoritativeLinkKeys(store) {
+  return (await listBlobKeys(store, LINKS_PREFIX)).filter(key => !isIndexKey(key));
 }
 
 function isPlausibleMembershipRecord(record, canonicalRef) {

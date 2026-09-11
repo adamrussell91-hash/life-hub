@@ -5,11 +5,22 @@ import {
   LINK_ID_PATTERN,
   LINK_STATUSES,
   LINK_VISIBILITIES,
+  OPERATION_ID_PATTERN,
+  OPERATION_SCHEMA_VERSION,
+  OPERATION_STATUSES,
+  OPERATION_STEPS,
+  OPERATION_TYPES,
   ORDINARY_READ_STATUSES,
+  REASON_CODE_PATTERN,
   UNIVERSAL_LINK_SCHEMA_VERSION,
   equivalenceInput,
+  generateLinkId,
+  generateOperationId,
   isValidLinkId,
+  isValidOperationId,
+  isValidReasonCode,
   parseUniversalLink,
+  validateOperationRecord,
   validateUniversalLinkRecord
 } from '../../netlify/functions/_shared/universal-link-schema.mjs';
 
@@ -174,4 +185,170 @@ test('equivalenceInput produces identical output for identical relationship-defi
     relationshipType: 'collaborator'
   };
   assert.deepEqual(equivalenceInput(base), equivalenceInput({ ...base }));
+});
+
+// --- Slice 2: deterministic id generation and write validation ---
+
+test('generateLinkId is stable across equivalent inputs regardless of property order', () => {
+  const base = {
+    sourceRef: 'tasks:task:task_email_seth',
+    targetRef: 'shared:person:person_seth',
+    relationshipType: 'collaborator'
+  };
+  const idFromOrderA = generateLinkId(equivalenceInput(base));
+  const idFromOrderB = generateLinkId(equivalenceInput({
+    relationshipType: base.relationshipType,
+    targetRef: base.targetRef,
+    sourceRef: base.sourceRef
+  }));
+  assert.equal(idFromOrderA, idFromOrderB);
+  assert.match(idFromOrderA, LINK_ID_PATTERN);
+});
+
+test('generateLinkId is unaffected by valid_to, status, timestamps, display labels, or extraneous fields', () => {
+  // equivalenceInput destructures only its named duplicate-field
+  // parameters, so a caller building it straight from a wider client
+  // payload (which may carry valid_to, status, timestamps, or display
+  // labels alongside the real duplicate fields) still produces an
+  // equivalence object — and therefore a link id — with none of that noise
+  // in it.
+  const clean = {
+    sourceRef: 'tasks:task:task_email_seth',
+    targetRef: 'shared:person:person_seth',
+    relationshipType: 'collaborator'
+  };
+  const noisyClientPayload = {
+    ...clean,
+    valid_to: '2027-01-01T00:00:00.000Z',
+    status: 'ended',
+    created_at: '2020-01-01T00:00:00.000Z',
+    updated_at: '2020-01-01T00:00:00.000Z',
+    display_label: 'Seth Example',
+    source_title: 'Do not hash me'
+  };
+  const cleanId = generateLinkId(equivalenceInput(clean));
+  const noisyId = generateLinkId(equivalenceInput(noisyClientPayload));
+  assert.equal(cleanId, noisyId);
+  // Confirm equivalenceInput itself dropped the noise, not just that the
+  // two ids happen to match.
+  assert.equal('valid_to' in equivalenceInput(noisyClientPayload), false);
+  assert.equal('status' in equivalenceInput(noisyClientPayload), false);
+  assert.equal('display_label' in equivalenceInput(noisyClientPayload), false);
+});
+
+test('generateLinkId changes when any duplicate field changes', () => {
+  const base = {
+    sourceRef: 'tasks:task:task_email_seth',
+    targetRef: 'shared:person:person_seth',
+    relationshipType: 'collaborator'
+  };
+  const baseId = generateLinkId(equivalenceInput(base));
+  const variants = [
+    { ...base, sourceRef: 'tasks:task:task_other' },
+    { ...base, targetRef: 'shared:person:person_other' },
+    { ...base, relationshipType: 'contact' },
+    { ...base, contextKey: 'tasks' },
+    { ...base, contextRef: 'tasks:project:proj_1' },
+    { ...base, role: 'Reviewer' },
+    { ...base, validFrom: '2026-01-01T00:00:00.000Z' },
+    { ...base, occurredAt: '2026-01-01T00:00:00.000Z' }
+  ];
+  for (const variant of variants) {
+    const variantId = generateLinkId(equivalenceInput(variant));
+    assert.notEqual(variantId, baseId, `expected a distinct id for ${JSON.stringify(variant)}`);
+  }
+});
+
+test('isValidOperationId accepts only op_ followed by exactly 32 lowercase hex characters', () => {
+  const id = generateOperationId();
+  assert.equal(isValidOperationId(id), true);
+  assert.match(id, OPERATION_ID_PATTERN);
+  for (const bad of [
+    'op_deadbeef',
+    'op_' + 'a'.repeat(31),
+    'op_' + 'a'.repeat(33),
+    'op_' + 'A'.repeat(32),
+    'op_../../etc/passwd',
+    '',
+    null,
+    undefined,
+    123
+  ]) {
+    assert.equal(isValidOperationId(bad), false, `expected ${JSON.stringify(bad)} to be rejected`);
+  }
+});
+
+test('generateOperationId produces distinct, path-safe ids', () => {
+  const a = generateOperationId();
+  const b = generateOperationId();
+  assert.notEqual(a, b);
+  assert.equal(a.includes('/'), false);
+  assert.equal(a.includes('..'), false);
+});
+
+function validOperationRecord(overrides = {}) {
+  return {
+    schema_version: OPERATION_SCHEMA_VERSION,
+    operation_id: generateOperationId(),
+    operation_type: 'create_link',
+    link_id: 'ul_' + 'a'.repeat(64),
+    status: 'prepared',
+    completed_steps: [],
+    link_payload: { source_ref: 'tasks:task:task_email_seth' },
+    created_at: '2026-09-11T00:00:00.000Z',
+    updated_at: '2026-09-11T00:00:00.000Z',
+    last_error_code: null,
+    ...overrides
+  };
+}
+
+test('validateOperationRecord accepts a well formed journal record and returns a copy', () => {
+  const record = validOperationRecord();
+  const validated = validateOperationRecord(record);
+  assert.deepEqual(validated, record);
+  assert.notEqual(validated, record);
+});
+
+test('validateOperationRecord rejects structurally malformed journal records without throwing', () => {
+  assert.equal(validateOperationRecord(null), null);
+  assert.equal(validateOperationRecord([]), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ schema_version: 2 })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ operation_id: 'not-an-op-id' })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ operation_type: 'made_up' })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ link_id: 'not-a-link-id' })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ status: 'unknown' })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ completed_steps: ['not_a_step'] })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ completed_steps: 'link' })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ link_payload: [] })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ link_payload: null })), null);
+  assert.equal(validateOperationRecord(validOperationRecord({ last_error_code: 123 })), null);
+});
+
+test('OPERATION_STATUSES, OPERATION_TYPES, and OPERATION_STEPS are lower case and exactly the documented sets', () => {
+  assert.deepEqual([...OPERATION_STATUSES].sort(), ['committed', 'prepared', 'repair_needed']);
+  assert.deepEqual([...OPERATION_TYPES].sort(), ['create_link', 'delete_link', 'end_link', 'suppress_link']);
+  assert.deepEqual(
+    [...OPERATION_STEPS].sort(),
+    ['link', 'source_membership', 'target_membership', 'type_membership']
+  );
+  for (const value of [...OPERATION_STATUSES, ...OPERATION_TYPES, ...OPERATION_STEPS]) {
+    assert.equal(value, value.toLowerCase(), `${value} must be lower case`);
+  }
+});
+
+test('isValidReasonCode accepts only bounded, machine-safe lower_snake_case codes', () => {
+  assert.equal(isValidReasonCode('duplicate_contact'), true);
+  assert.match('duplicate_contact', REASON_CODE_PATTERN);
+  for (const bad of [
+    'Duplicate Contact', // free text with spaces/case
+    'Adam asked to remove Seth from the list', // free text sentence, could contain PII
+    '', // empty
+    '1_leading_digit',
+    'a'.repeat(65), // too long
+    null,
+    undefined,
+    123
+  ]) {
+    assert.equal(isValidReasonCode(bad), false, `expected ${JSON.stringify(bad)} to be rejected`);
+  }
 });
