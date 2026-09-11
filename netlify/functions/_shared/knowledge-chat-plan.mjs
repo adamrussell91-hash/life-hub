@@ -28,6 +28,13 @@ export const CHAT_HATS = [
     plan: 'Retrieve, read note bodies, write an evidence-mapped thematic synthesis. Always produce a central claim (relationship + mechanism + implication, at most two sentences, confidence-rated). Cluster into 3 to 7 themes with source counts and confidence. Map major claims to sources. Label direct findings versus inferences. Separate explanatory levels. End with a ranked limitations table and an explicit answer to the question. Every claim carries a markdown note link [Title](pageId). Never invent a page. Never write a raw page id.'
   },
   {
+    id: 'stars',
+    label: 'Stars',
+    defaultScope: 'standard',
+    defaultDepth: 'iterative',
+    plan: 'Retrieve and analyse the archive using the thematic synthesis standard, then return one small evidence-grounded constellation as strict JSON for the Stars renderer.'
+  },
+  {
     id: 'evidence',
     label: 'Evidence check',
     defaultScope: 'narrow',
@@ -106,7 +113,7 @@ export function resolveChatPlan(hatId, overrides = {}) {
 }
 
 export function writeMaxTokens(input) {
-  if (input.hat === 'synthesis') return 4000;
+  if (input.hat === 'synthesis' || input.hat === 'stars') return 4000;
   if (input.hat === 'fromBook' || input.hat === 'makeNote') return 3500;
   return resolveChatPlan(input.hat, input).kernel === 'deep' ? 2000 : 1200;
 }
