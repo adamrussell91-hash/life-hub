@@ -34,7 +34,7 @@ import {
   priorityFilterOptions
 } from '@/views/hub-kit';
 import { mountDailyDial, type DailyDialHandle } from '@/views/daily-dial';
-import { onTasksChanged } from '@/services/task-cache';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 
 export { renderProjectsView } from '@/views/projects';
 
@@ -90,23 +90,23 @@ function dropTask(list: Task[], id: string): Task[] {
   return list.filter((entry) => entry.id !== id);
 }
 
-export async function markTaskOpen(task: Task): Promise<void> {
-  await tasksApi.updateTask(task.id, { status: 'open' });
+export async function markTaskOpen(task: Task): Promise<Task> {
+  return tasksApi.updateTask(task.id, { status: 'open' });
 }
 
-export async function markTaskDone(task: Task, actualMinutes?: number): Promise<void> {
+export async function markTaskDone(task: Task, actualMinutes?: number): Promise<Task | undefined> {
   if (actualMinutes != null && !Number.isNaN(actualMinutes)) {
     await tasksApi.recordClareActual(task.id, actualMinutes);
-    return;
+    return undefined;
   }
-  await tasksApi.updateTask(task.id, { status: 'done' });
+  return tasksApi.updateTask(task.id, { status: 'done' });
 }
 
 /** Tick / Complete marks done immediately. Undo toast reverses it. */
 export function requestToggleDone(
   host: HTMLElement,
   task: Task,
-  onDone: () => Promise<void>
+  onDone: (updated?: Task) => void | Promise<void>
 ): void {
   if (task.status === 'done') {
     void markTaskOpen(task).then(onDone).catch((err) => {
@@ -116,8 +116,8 @@ export function requestToggleDone(
   }
 
   void markTaskDone(task)
-    .then(async () => {
-      await onDone();
+    .then(async (updated) => {
+      await onDone(updated);
       const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
       offerTimedUndo({
         message: `Completed “${task.title}”`,
@@ -298,10 +298,18 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
-  teardownDay = onTasksChanged((incoming) => {
+  const stopDayChanged = onTasksChanged((incoming) => {
     for (const task of incoming) upsertTask(tasks, task);
     paint();
   });
+  const stopDayDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownDay = () => {
+    stopDayChanged();
+    stopDayDeleted();
+  };
 }
 
 export async function renderListView(canvas: HTMLElement): Promise<void> {
@@ -420,10 +428,18 @@ export async function renderListView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
-  teardownBacklog = onTasksChanged((incoming) => {
+  const stopBacklogChanged = onTasksChanged((incoming) => {
     for (const task of incoming) upsertTask(tasks, task);
     paint();
   });
+  const stopBacklogDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownBacklog = () => {
+    stopBacklogChanged();
+    stopBacklogDeleted();
+  };
 }
 
 export async function renderSearchView(canvas: HTMLElement): Promise<void> {

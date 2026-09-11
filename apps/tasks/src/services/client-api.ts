@@ -5,9 +5,9 @@ import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/pr
 import {
   filterCachedTasks,
   mergeListedTasks,
-  rememberCreatedTask,
-  rememberDeletedTask,
-  rememberUpdatedTask,
+  notifyTasksChanged,
+  notifyTasksDeleted,
+  rememberFetchedTask,
   restoreDeletedTask
 } from '@/services/task-cache';
 import type { TransitMap } from '@/schemas/map';
@@ -92,29 +92,27 @@ async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerat
 export const tasksApi = {
   listTasks: () => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks)),
   getTask: (id: string) =>
-    apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => {
-      rememberUpdatedTask(task);
-      return task;
-    }),
+    apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => rememberFetchedTask(task)),
   createTask: (body: unknown) =>
     apiPost<Task>('/api/tasks', body).then((task) => {
-      rememberCreatedTask(task);
+      notifyTasksChanged([task]);
       return task;
     }),
   updateTask: (id: string, body: unknown) =>
     apiPatch<Task>(`/api/tasks?id=${encodeURIComponent(id)}`, body).then((task) => {
-      rememberUpdatedTask(task);
+      notifyTasksChanged([task]);
       return task;
     }),
   deleteTask: async (id: string, meta?: { agent?: string; reason?: string }) => {
-    rememberDeletedTask(id);
+    notifyTasksDeleted([id]);
     try {
       return await apiDelete<{ deleted: boolean }>(
         `/api/tasks?id=${encodeURIComponent(id)}`,
         meta
       );
     } catch (err) {
-      restoreDeletedTask(id);
+      const restored = restoreDeletedTask(id);
+      if (restored) notifyTasksChanged([restored]);
       throw err;
     }
   },

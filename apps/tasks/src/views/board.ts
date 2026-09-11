@@ -25,7 +25,7 @@ import { renderDashboardOverview } from '@/views/dashboard-overview';
 import { pageHeaderStatusSlot } from '@/shell/shell';
 import { requestToggleDone } from '@/views/dashboard';
 import { runningProjectIds } from '@/domain/dashboard-overview';
-import { onTasksChanged } from '@/services/task-cache';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 
 /** Session-scoped project / domain filters for Kanban. */
 let boardProjectFilter: string | 'all' = 'all';
@@ -209,9 +209,8 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
         reloadBoard();
       },
       onCompleteTask: (task) =>
-        requestToggleDone(confirmHost, task, async () => {
-          const fresh = await tasksApi.getTask(task.id);
-          applyTask(fresh);
+        requestToggleDone(confirmHost, task, async (updated) => {
+          applyTask(updated ?? { ...task, status: task.status === 'done' ? 'open' : 'done' });
         }),
       onStartTask: (task) => {
         void tasksApi.updateTask(task.id, { status: 'in_progress' }).then(
@@ -393,13 +392,11 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     }
 
     const alreadyThere = existing?.closest('.card-list') === list;
-    if (!alreadyThere) {
-      existing?.remove();
-      const card = remountBoardCard(task, column, list);
-      if (document.activeElement === card) card.blur();
-      // Completing jumps the mobile column tabs to Done and feels like a full-screen flash.
-      if (column !== 'done') showBoardColumn?.(column);
-    }
+    existing?.remove();
+    const card = remountBoardCard(task, column, list);
+    if (document.activeElement === card) card.blur();
+    // Completing jumps the mobile column tabs to Done and feels like a full-screen flash.
+    if (!alreadyThere && column !== 'done') showBoardColumn?.(column);
     syncChrome();
     paintOverview();
     restoreViewport(saved);
@@ -479,11 +476,20 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   const stopLiveIn = onTasksChanged((incoming) => {
     for (const task of incoming) upsertTask(task);
   });
+  const stopDeleted = onTasksDeleted((ids) => {
+    for (const id of ids) {
+      const current = byId.get(id);
+      if (current) dropBoardTask(current);
+      else board.querySelector(`[data-id="${id}"]`)?.remove();
+    }
+    paintOverview();
+  });
   const stopBoard = initBoard(board, {
     onCardMoved: (detail) => persistMove(detail, byId, confirmHost, upsertTask, () => void renderBoardView(canvas))
   });
   teardownBoard = () => {
     stopLiveIn();
+    stopDeleted();
     stopBoard();
   };
 }

@@ -282,6 +282,7 @@ describe('hub cards', () => {
       expect.objectContaining({ id: 'task_chip' }),
       { priority: 'urgent' }
     );
+    expect(chip?.textContent).toBe('urgent');
 
     const domain = slot.querySelector<HTMLButtonElement>('.hub-chip');
     domain!.click();
