@@ -4,7 +4,7 @@ import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
 import { tasksApi } from '@/services/client-api';
-import { formatRelativeUpdated, projectProgress, statusLabel, taskPageHash } from '@/domain/cards';
+import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel, taskPageHash } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
@@ -344,17 +344,12 @@ function paintTaskPage(
   canvas.replaceChildren(page);
 }
 
-function projectPageTasks(projectId: string, tasks: Task[]): Task[] {
-  return tasks.filter((task) => task.parent_project_id === projectId && task.status !== 'dead');
-}
-
 function renderProjectTaskRow(task: Task): HTMLElement {
   const row = el('article', 'task-row');
   row.dataset.taskId = task.id;
   const heading = el('h3', 'task-row__title');
-  const link = document.createElement('a');
+  const link = el('a', undefined, task.title);
   link.href = taskPageHash(task.id);
-  link.textContent = task.title;
   heading.append(link);
   row.append(heading);
   if (task.status === 'done') {
@@ -370,7 +365,7 @@ function paintProjectPage(
   header?: HTMLElement
 ): void {
   let current = project;
-  let liveTasks = [...tasks];
+  let liveTasks = tasks;
   let saveTimer: number | undefined;
   const errorHost = el('p', 'empty-state');
   errorHost.hidden = true;
@@ -416,7 +411,6 @@ function paintProjectPage(
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/projects', '← Projects'));
-  const healthHost = el('span', 'page-card__health');
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
@@ -473,9 +467,10 @@ function paintProjectPage(
   taskList.setAttribute('aria-label', 'Project tasks');
   const foot = el('footer', 'task-card__foot');
   foot.append(updated);
+  let healthNode: HTMLElement | null = null;
 
   const paintProjectTasks = () => {
-    const progress = projectProgress(project, liveTasks);
+    const progress = projectProgress(current, liveTasks);
     const metric = el('div');
     const pct = el('p', 'hub-hero-metric');
     pct.innerHTML = `${progress.pct}<span class="hub-hero-metric__unit">%</span>`;
@@ -485,32 +480,34 @@ function paintProjectPage(
     fill.style.width = `${progress.pct}%`;
     track.replaceChildren(fill);
 
-    healthHost.replaceChildren();
-    const health = projectNextActionHealth(current, liveTasks, () => {
-      openPlusAdd(card);
-    });
-    if (health) healthHost.append(health);
+    healthNode?.remove();
+    healthNode = projectNextActionHealth(current, liveTasks, () => openPlusAdd(card));
+    if (healthNode) head.append(healthNode);
 
-    const children = projectPageTasks(project.id, liveTasks);
-    taskList.replaceChildren();
+    const children = projectChildTasks(current, liveTasks);
     if (!children.length) {
-      taskList.append(el('p', 'empty-state', 'No tasks on this project yet.'));
+      taskList.replaceChildren(el('p', 'empty-state', 'No tasks on this project yet.'));
       return;
     }
-    for (const child of children) taskList.append(renderProjectTaskRow(child));
+    taskList.replaceChildren(...children.map(renderProjectTaskRow));
   };
 
-  head.append(healthHost);
   paintProjectTasks();
 
-  card.append(head, fields, labeledField('Quality bar', qualityHost), notes.el, metrics, track);
   card.append(
+    head,
+    fields,
+    labeledField('Quality bar', qualityHost),
+    notes.el,
+    metrics,
+    track,
     renderQuickAdd((created) => {
       liveTasks = [created, ...liveTasks.filter((task) => task.id !== created.id)];
       paintProjectTasks();
-    }, project.id)
+    }, project.id),
+    taskList,
+    foot
   );
-  card.append(taskList, foot);
   card.append(
     renderCardMenu(`${project.title} card menu`, [
       {

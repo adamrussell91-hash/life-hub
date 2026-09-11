@@ -50,13 +50,10 @@ export function projectNextActionHealth(
   onAdd?: () => void
 ): HTMLElement | null {
   if (project.status === 'archived_dead' || project.status === 'paused') return null;
-  const result = inspectProjectHealth(project, tasks);
-  if (result.health === 'healthy' || result.health === 'waiting_only') return null;
-  if (result.health !== 'missing_next_action') return null;
+  if (inspectProjectHealth(project, tasks).health !== 'missing_next_action') return null;
   const hint = el('button', 'proj-health proj-health--warn', 'Add next action');
   hint.type = 'button';
   hint.addEventListener('click', (event) => {
-    event.preventDefault();
     event.stopPropagation();
     if (onAdd) onAdd();
     else location.hash = projectPageHash(project.id);
