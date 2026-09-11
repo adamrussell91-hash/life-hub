@@ -4,6 +4,7 @@ import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import {
   getRelationshipDeclaration,
   listRelationshipDeclarations,
+  projectRelationshipRegistry,
   validateRelationshipInput
 } from '../../netlify/functions/_shared/relationship-registry.mjs';
 
@@ -12,11 +13,12 @@ const organisation = parseEntityRef('shared:organisation:organisation_unsw');
 const task = parseEntityRef('tasks:task:task_email_seth');
 const communication = parseEntityRef('professional:communication:communication_001');
 
-test('lists exactly the seven first-slice declarations with correct inverse labels', () => {
+test('lists exactly the eight first-slice declarations with correct inverse labels', () => {
   const keys = listRelationshipDeclarations().map(decl => decl.key).sort();
   assert.deepEqual(keys, [
     'about_person',
     'collaborator',
+    'contact',
     'employee_at',
     'follow_up',
     'follows_from',
@@ -25,7 +27,27 @@ test('lists exactly the seven first-slice declarations with correct inverse labe
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
   assert.equal(getRelationshipDeclaration('collaborator').inverse_label, 'collaborates_on');
+  assert.equal(getRelationshipDeclaration('contact').inverse_label, 'contacted_for_task');
   assert.equal(getRelationshipDeclaration('recipient').inverse_label, 'received_communication');
+});
+
+test('projectRelationshipRegistry exposes every declaration without duplicate_fields', () => {
+  const projected = projectRelationshipRegistry();
+  assert.equal(projected.length, 8);
+  const contact = projected.find(decl => decl.key === 'contact');
+  assert.ok(contact);
+  assert.deepEqual(Object.keys(contact).sort(), [
+    'allowed_visibility',
+    'cardinality',
+    'inverse_label',
+    'key',
+    'metadata_keys',
+    'role_mode',
+    'source_kinds',
+    'target_kinds',
+    'temporal_mode'
+  ]);
+  assert.equal('duplicate_fields' in contact, false);
 });
 
 test('accepts a well formed period relationship', () => {

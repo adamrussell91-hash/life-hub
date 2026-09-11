@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 // Canonical entity reference implementation for the Universal Links programme.
 // This is a new, separate implementation from `hub-ref.mjs`, which stays the
@@ -6,7 +6,6 @@ import { randomUUID } from 'node:crypto';
 // Do not extend `hub-ref.mjs` with these namespaces.
 
 const REF_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
-const ID_PREFIX = /^[a-z][a-z0-9_]*$/;
 
 export const ENTITY_REF_NAMESPACES = new Set([
   'shared',
@@ -60,16 +59,34 @@ export function isEntityRef(value) {
   return parseEntityRef(value) !== null;
 }
 
-// Generated identity ids use a non-semantic prefix plus a random UUID —
-// never a name, email, year group, class, or school identifier (programme
-// "Absolute exclusions" #4-5 apply to StudentReference; this rule is kept
-// general for every identity kind).
-export function newEntityId(prefix) {
-  if (typeof prefix !== 'string' || !ID_PREFIX.test(prefix)) {
-    throw Object.assign(new Error('newEntityId requires a lower_snake_case prefix'), {
+// Format validation, not existence or access. A malformed or unregistered
+// ref is a caller error (400) — distinct from `entity-access.mjs`'s
+// `endpointNotFoundError` (404), which is about existence/visibility of an
+// otherwise well-formed ref. Accepts either a string or an already-parsed
+// { namespace, kind, id } object and always returns the parsed object.
+export function assertRegisteredEntityRef(refInput) {
+  const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+  const valid = ref && isRegisteredEntityRefKind(ref.namespace, ref.kind) && formatEntityRef(ref);
+  if (!valid) {
+    throw Object.assign(new Error(`Invalid or unregistered entity ref: ${JSON.stringify(refInput)}`), {
       status: 400,
-      code: 'validation_error'
+      code: 'invalid_entity_ref'
     });
   }
-  return `${prefix}_${randomUUID()}`;
+  return ref;
+}
+
+// SHA-256 hash of the canonical ref string, used for Universal Link
+// membership key safety (implementation programme, "Storage layout": "Hash
+// canonical refs for key safety with SHA 256"). Accepts a string or a
+// parsed ref object.
+export function hashEntityRef(refInput) {
+  const canonical = typeof refInput === 'string' ? refInput : formatEntityRef(refInput);
+  if (!canonical) {
+    throw Object.assign(new Error(`Cannot hash an unformattable entity ref: ${JSON.stringify(refInput)}`), {
+      status: 400,
+      code: 'invalid_entity_ref'
+    });
+  }
+  return createHash('sha256').update(canonical).digest('hex');
 }

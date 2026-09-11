@@ -1,29 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  assertEntityKindAllowed,
   createAccessContext,
   endpointNotFoundError,
-  isEntityKindAllowed,
-  isVisibilityAllowed
+  isVisibilityAllowed,
+  strictestVisibility
 } from '../../netlify/functions/_shared/entity-access.mjs';
 
-test('createAccessContext derives allowed_visibility from workflow, not from caller input', () => {
+test('createAccessContext derives actor and allowed_visibility from workflow, not from caller input', () => {
   const tasksContext = createAccessContext({ workflow: 'tasks' });
   assert.equal(tasksContext.actor, 'operator');
   assert.deepEqual(tasksContext.allowed_visibility, ['operator']);
+});
 
-  const teachingContext = createAccessContext({ workflow: 'teaching' });
-  assert.deepEqual(teachingContext.allowed_visibility, ['operator', 'teaching_protected']);
-
-  const administrationContext = createAccessContext({ workflow: 'administration' });
-  assert.deepEqual(administrationContext.allowed_visibility, ['operator', 'teaching_protected']);
+test('no workflow grants teaching_protected in this slice, including teaching and administration', () => {
+  // The College approval gate (Slice 8) has not been recorded. Nothing may
+  // read or write teaching_protected data before then, so no workflow may
+  // even be granted the visibility label yet.
+  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
+    const context = createAccessContext({ workflow });
+    assert.deepEqual(context.allowed_visibility, ['operator'], `${workflow} must not grant teaching_protected`);
+  }
 });
 
 test('createAccessContext ignores unexpected input fields rather than trusting them', () => {
-  // A handler must never forward client-supplied `actor`, `workflow`, or
-  // `allowed_visibility` straight into the context (implementation
-  // programme, "Authorisation model" rule #2). Passing them here proves
-  // the function only reads `workflow` and `allowedEntityKinds`.
   const context = createAccessContext({
     workflow: 'tasks',
     actor: 'attacker',
@@ -52,13 +53,30 @@ test('isVisibilityAllowed checks membership in the derived allowed set', () => {
   assert.equal(isVisibilityAllowed(null, 'operator'), false);
 });
 
-test('isEntityKindAllowed treats an empty allow-list as unrestricted, a populated one as a filter', () => {
-  const open = createAccessContext({ workflow: 'tasks' });
-  assert.equal(isEntityKindAllowed(open, 'person'), true);
+test('strictestVisibility returns the most restrictive known label', () => {
+  assert.equal(strictestVisibility('operator'), 'operator');
+  assert.equal(strictestVisibility('operator', 'teaching_protected'), 'teaching_protected');
+  assert.equal(strictestVisibility('teaching_protected', 'operator'), 'teaching_protected');
+});
 
+test('strictestVisibility ignores unknown values and throws when nothing known was given', () => {
+  assert.equal(strictestVisibility('operator', 'made_up'), 'operator');
+  assert.throws(() => strictestVisibility('made_up'), error => error.code === 'invalid_visibility');
+  assert.throws(() => strictestVisibility(), error => error.code === 'invalid_visibility');
+});
+
+test('assertEntityKindAllowed treats an empty allow-list as unrestricted', () => {
+  const open = createAccessContext({ workflow: 'tasks' });
+  assert.doesNotThrow(() => assertEntityKindAllowed(open, 'person'));
+});
+
+test('assertEntityKindAllowed rejects a kind outside a populated allow-list with the non-disclosure shape', () => {
   const restricted = createAccessContext({ workflow: 'tasks', allowedEntityKinds: ['task'] });
-  assert.equal(isEntityKindAllowed(restricted, 'task'), true);
-  assert.equal(isEntityKindAllowed(restricted, 'person'), false);
+  assert.doesNotThrow(() => assertEntityKindAllowed(restricted, 'task'));
+  assert.throws(
+    () => assertEntityKindAllowed(restricted, 'person'),
+    error => error.status === 404 && error.code === 'endpoint_not_found'
+  );
 });
 
 test('endpointNotFoundError is a stable 404 shape with no protected detail', () => {

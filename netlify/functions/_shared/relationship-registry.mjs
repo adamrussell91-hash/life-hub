@@ -80,6 +80,18 @@ const REGISTRY = new Map([
     })
   ],
   [
+    'contact',
+    declaration({
+      key: 'contact',
+      sourceKinds: ['tasks:task'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'contacted_for_task',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
     'recipient',
     declaration({
       key: 'recipient',
@@ -135,6 +147,23 @@ export function getRelationshipDeclaration(key) {
 
 export function listRelationshipDeclarations() {
   return [...REGISTRY.values()];
+}
+
+// Read-only public projection for the future `GET /api/relationship-registry`
+// route (Slice 2). Excludes `duplicate_fields` — an internal detail of how
+// the write path computes link equivalence, not something a client needs.
+export function projectRelationshipRegistry() {
+  return listRelationshipDeclarations().map(decl => ({
+    key: decl.key,
+    source_kinds: [...decl.source_kinds],
+    target_kinds: [...decl.target_kinds],
+    inverse_label: decl.inverse_label,
+    cardinality: decl.cardinality,
+    temporal_mode: decl.temporal_mode,
+    role_mode: decl.role_mode,
+    metadata_keys: [...decl.metadata_keys],
+    allowed_visibility: [...decl.allowed_visibility]
+  }));
 }
 
 function validationError(code, message) {

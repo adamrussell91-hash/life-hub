@@ -2,10 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ENTITY_REF_KINDS,
+  assertRegisteredEntityRef,
   formatEntityRef,
+  hashEntityRef,
   isEntityRef,
   isRegisteredEntityRefKind,
-  newEntityId,
   parseEntityRef
 } from '../../netlify/functions/_shared/entity-ref.mjs';
 
@@ -53,21 +54,36 @@ test('format then parse round trips exactly for every registered kind', () => {
   }
 });
 
-test('newEntityId prefixes a random UUID and rejects a bad prefix', () => {
-  const id = newEntityId('person');
-  assert.match(id, /^person_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-  assert.notEqual(newEntityId('person'), id, 'two calls generate different ids');
-  assert.throws(() => newEntityId('Person'), error => error.code === 'validation_error');
-  assert.throws(() => newEntityId(''), error => error.code === 'validation_error');
-  assert.throws(() => newEntityId('person name'), error => error.code === 'validation_error');
+test('assertRegisteredEntityRef accepts a valid string or object ref and returns the parsed form', () => {
+  assert.deepEqual(assertRegisteredEntityRef('tasks:task:task_seth'), {
+    namespace: 'tasks',
+    kind: 'task',
+    id: 'task_seth'
+  });
+  const ref = { namespace: 'shared', kind: 'person', id: 'person_seth' };
+  assert.deepEqual(assertRegisteredEntityRef(ref), ref);
 });
 
-test('newEntityId never embeds the prefix content beyond a closed vocabulary word', () => {
-  // Guards the "never embed a name, email, or identifier" rule by construction:
-  // the id is always `<prefix>_<uuid>`, so no caller-supplied free text can
-  // reach the id even if a resolver mistakenly passed one as the prefix.
-  const id = newEntityId('organisation');
-  const [prefix, ...rest] = id.split('_');
-  assert.equal(prefix, 'organisation');
-  assert.equal(rest.join('_').length, 36);
+test('assertRegisteredEntityRef throws a 400 validation error, not a 404, for a malformed or unregistered ref', () => {
+  for (const bad of ['not a ref', 'unknown:kind:id', 'teaching:student_reference:x', '', null, { namespace: 'shared', kind: 'person', id: '' }]) {
+    assert.throws(
+      () => assertRegisteredEntityRef(bad),
+      error => error.status === 400 && error.code === 'invalid_entity_ref'
+    );
+  }
+});
+
+test('hashEntityRef is deterministic, differs per ref, and accepts a string or object', () => {
+  const a = hashEntityRef('shared:person:person_seth');
+  const b = hashEntityRef({ namespace: 'shared', kind: 'person', id: 'person_seth' });
+  assert.equal(a, b);
+  assert.match(a, /^[0-9a-f]{64}$/);
+  assert.notEqual(a, hashEntityRef('shared:person:person_other'));
+});
+
+test('hashEntityRef rejects an unformattable ref rather than hashing garbage', () => {
+  assert.throws(
+    () => hashEntityRef({ namespace: 'shared', kind: 'student_reference', id: 'x' }),
+    error => error.status === 400 && error.code === 'invalid_entity_ref'
+  );
 });
