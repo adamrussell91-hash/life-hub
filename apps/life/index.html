@@ -17,7 +17,6 @@
   <link rel="stylesheet" href="packages/design-kit/sign-in.css">
   <link rel="stylesheet" href="packages/design-kit/motion.css">
   <link rel="stylesheet" href="packages/design-kit/morphing-popover.css">
-  <link rel="stylesheet" href="packages/design-kit/hub-compose.css">
   <link rel="stylesheet" href="packages/design-kit/adaptive-slider.css">
   <link rel="stylesheet" href="packages/design-kit/view-on-map.css">
   <link rel="stylesheet" href="packages/design-kit/hub-places-map.css">
@@ -323,91 +322,74 @@
               </div>
             </div>
             <div class="hub-pulse-grid">
-              <a class="metric-card hub-pulse-card" data-hub-pulse="teaching" href="/teaching/">
-                <p class="metric-label">Teaching</p>
-                <p class="metric-context">Classes and lessons</p>
-                <p class="hub-pulse-card__count" data-hub-count>—</p>
+
+              <article class="metric-card hub-pulse-card" data-hub-pulse="teaching">
+                <header class="hub-pulse-card__header">
+                  <a class="hub-pulse-card__link" href="/teaching/">
+                    <p class="metric-label">Teaching</p>
+                  </a>
+                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-teaching" aria-label="Expand today's lessons">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </header>
+                <p class="metric-context">Today's lessons</p>
+                <p class="hub-pulse-card__glance" data-hub-glance>Checking…</p>
                 <p class="metric-caption" data-hub-status hidden></p>
-              </a>
-              <a class="metric-card hub-pulse-card" data-hub-pulse="knowledge" href="/knowledge/">
-                <p class="metric-label">Knowledge</p>
-                <p class="metric-context">Archive and research</p>
-                <p class="hub-pulse-card__count" data-hub-count>—</p>
-                <p class="metric-caption" data-hub-status hidden></p>
-              </a>
-              <a class="metric-card hub-pulse-card" data-hub-pulse="tasks" href="/tasks/">
-                <p class="metric-label">Tasks</p>
+                <div class="hub-pulse-card__body" id="hub-pulse-body-teaching" hidden>
+                  <div class="hub-agenda" data-teaching-agenda></div>
+                  <a class="hub-pulse-card__more" href="/teaching/">Open full timetable →</a>
+                </div>
+              </article>
+
+              <article class="metric-card hub-pulse-card" data-hub-pulse="knowledge">
+                <header class="hub-pulse-card__header">
+                  <a class="hub-pulse-card__link" href="/knowledge/">
+                    <p class="metric-label">Knowledge</p>
+                  </a>
+                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-knowledge" aria-label="Expand new note options">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </header>
+                <p class="metric-context">New note</p>
+                <form class="hub-knowledge-quick" data-knowledge-quick-form>
+                  <label class="sr-only" for="knowledge-quick-text">New note</label>
+                  <textarea id="knowledge-quick-text" class="hub-knowledge-quick__text" data-knowledge-quick-text rows="1" placeholder="What's on your mind?"></textarea>
+                  <p class="metric-caption" data-hub-status hidden></p>
+                  <div class="hub-pulse-card__body" id="hub-pulse-body-knowledge" hidden>
+                    <label class="hub-knowledge-quick__clementine">
+                      <input type="checkbox" data-knowledge-quick-clementine checked>
+                      <span>Ask Clementine to file this</span>
+                    </label>
+                  </div>
+                  <div class="hub-knowledge-quick__actions">
+                    <button class="btn btn--primary" type="submit" data-knowledge-quick-save disabled>Save note</button>
+                  </div>
+                  <p class="hub-knowledge-quick__result" data-knowledge-quick-result hidden></p>
+                </form>
+              </article>
+
+              <article class="metric-card hub-pulse-card" data-hub-pulse="tasks">
+                <header class="hub-pulse-card__header">
+                  <a class="hub-pulse-card__link" href="/tasks/">
+                    <p class="metric-label">Tasks</p>
+                  </a>
+                  <button class="hub-pulse-card__toggle" type="button" data-hub-pulse-toggle aria-expanded="false" aria-controls="hub-pulse-body-tasks" aria-label="Expand task list">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                  </button>
+                </header>
                 <p class="metric-context">Board</p>
                 <p class="hub-pulse-card__count" data-hub-count>—</p>
                 <p class="metric-caption" data-hub-status hidden></p>
-              </a>
+                <div class="hub-pulse-card__body" id="hub-pulse-body-tasks" hidden>
+                  <div class="hub-checklist" data-task-checklist></div>
+                  <form class="hub-task-add" data-task-add-form>
+                    <label class="sr-only" for="task-add-input">Add a task</label>
+                    <input type="text" id="task-add-input" class="hub-task-add__input" data-task-add-input placeholder="Add a task…" required>
+                  </form>
+                </div>
+              </article>
+
             </div>
-            <article class="metric-card hub-pulse-clare">
-              <p class="metric-label">Dump for Clare</p>
-              <p class="metric-caption">Stays on Life. Opens the same Tasks session the board uses.</p>
-              <form id="clare-dump-form" class="hub-compose" data-hub-compose>
-                <div class="hub-compose__card">
-                  <label class="sr-only" for="clare-dump-text">Dump for Clare</label>
-                  <textarea id="clare-dump-text" class="hub-compose__text" name="text" rows="3" data-hub-compose-text placeholder="What's up?" required></textarea>
-                  <div class="hub-compose__tray">
-                    <div class="hub-compose__when" data-hub-compose-when aria-hidden="true">
-                      <div class="hub-compose__when-bar">
-                        <label class="hub-compose__chip">
-                          <span class="hub-compose__chip-label" data-hub-compose-date-label></span>
-                          <input type="date" data-hub-compose-date>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M6 9l6 6 6-6"/>
-                          </svg>
-                        </label>
-                        <label class="hub-compose__chip">
-                          <span class="hub-compose__chip-label" data-hub-compose-time-label></span>
-                          <input type="time" data-hub-compose-time>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M6 9l6 6 6-6"/>
-                          </svg>
-                        </label>
-                      </div>
-                      <button class="hub-compose__close" type="button" data-hub-compose-close title="Close" aria-label="Close schedule">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
-                          <path d="M6 6l12 12M18 6 6 18"/>
-                        </svg>
-                      </button>
-                    </div>
-                    <div class="hub-compose__actions">
-                      <button class="hub-compose__cal" type="button" data-hub-compose-cal aria-label="Add due date" aria-expanded="false">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                          <rect x="3.5" y="5" width="17" height="15.5" rx="2"/>
-                          <path d="M8 3.5v3M16 3.5v3M3.5 10h17"/>
-                        </svg>
-                      </button>
-                      <button class="btn btn--primary hub-compose__dump" type="submit" data-hub-compose-dump>Dump</button>
-                      <button class="btn btn--primary hub-compose__schedule" type="button" data-hub-compose-schedule tabindex="-1">Schedule</button>
-                    </div>
-                  </div>
-                </div>
-                <div class="hub-pulse-clare__tools">
-                  <label class="metric-caption" for="clare-dump-protocol">Protocol</label>
-                  <select id="clare-dump-protocol">
-                    <option value="">None</option>
-                    <option value="morning-sweep">Morning sweep</option>
-                    <option value="tomorrow-setup">Tomorrow</option>
-                    <option value="weekly-reset">Weekly reset</option>
-                    <option value="high-stakes">High-stakes</option>
-                    <option value="shrink-first-step">Shrink first move</option>
-                    <option value="shatter-start">Shatter this</option>
-                    <option value="time-map">Time map</option>
-                    <option value="open-loops">Open loops</option>
-                  </select>
-                  <div class="hub-pulse-clare__actions">
-                    <button class="btn btn--secondary" type="button" id="clare-brief-button">Brief</button>
-                  </div>
-                </div>
-              </form>
-              <a class="btn btn--ghost" href="/tasks/">Open Tasks Hub</a>
-              <p class="metric-caption" id="clare-voice" hidden></p>
-              <ul id="clare-proposals" hidden></ul>
-              <p class="metric-caption" id="clare-briefing" hidden></p>
-            </article>
           </section>
         </section>
 

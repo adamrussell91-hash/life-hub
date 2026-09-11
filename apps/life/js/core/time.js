@@ -50,6 +50,12 @@ export function getSydneyDateKey(instant = new Date()) {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+/** Minutes since midnight, Sydney wall-clock time -- for ordering "is this lesson past yet?". */
+export function getSydneyMinutesOfDay(instant = new Date()) {
+  const p = parts(instant, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  return Number(p.hour) * 60 + Number(p.minute);
+}
+
 export function getSydneyTimestamp(instant = new Date()) {
   const p = parts(instant, {
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',

@@ -45,6 +45,30 @@ export function createKnowledgeApi(fetchImpl = fetch) {
         watches: Array.isArray(data.watches) ? data.watches : [],
         status: data.status === 'unavailable' ? 'unavailable' : 'ready'
       };
+    },
+    async createPage({ title, body } = {}) {
+      const response = await fetchImpl('/api/knowledge/pages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title, body })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Save note failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data;
+    },
+    async tidyPage(id) {
+      const response = await fetchImpl('/api/knowledge/tidy', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id, apply: true })
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || payload?.ok !== true) {
+        throw httpError('Tidy failed', response.status, payload?.error?.code ?? 'request_failed');
+      }
+      return payload.data;
     }
   };
 }

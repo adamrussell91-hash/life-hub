@@ -43,3 +43,45 @@ test('loadStressFlags throws on 404 so the controller can skip the source', asyn
     error => error.status === 404 && /Tasks request failed/.test(error.message)
   );
 });
+
+test('createTask POSTs title and domain to /api/tasks and returns the created task', async () => {
+  const created = { id: 't9', title: 'Pack for the trip', domain: 'life', status: 'open' };
+  const api = createTasksApi(async (url, init) => {
+    assert.equal(url, '/api/tasks');
+    assert.equal(init.method, 'POST');
+    assert.deepEqual(JSON.parse(init.body), { title: 'Pack for the trip', domain: 'life' });
+    return {
+      ok: true,
+      status: 201,
+      json: async () => ({ ok: true, data: created })
+    };
+  });
+  assert.deepEqual(await api.createTask({ title: 'Pack for the trip' }), created);
+});
+
+test('createTask surfaces validation errors', async () => {
+  const api = createTasksApi(async () => ({
+    ok: false,
+    status: 400,
+    json: async () => ({ ok: false, error: { code: 'validation_error' } })
+  }));
+  await assert.rejects(
+    () => api.createTask({ title: '' }),
+    error => error.status === 400 && error.code === 'validation_error'
+  );
+});
+
+test('setTaskStatus PATCHes the task id in the query string', async () => {
+  const updated = { id: 't9', status: 'done' };
+  const api = createTasksApi(async (url, init) => {
+    assert.equal(url, '/api/tasks?id=t9');
+    assert.equal(init.method, 'PATCH');
+    assert.deepEqual(JSON.parse(init.body), { status: 'done' });
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ ok: true, data: updated })
+    };
+  });
+  assert.deepEqual(await api.setTaskStatus('t9', 'done'), updated);
+});
