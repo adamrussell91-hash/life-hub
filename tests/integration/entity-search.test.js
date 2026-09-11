@@ -30,12 +30,28 @@ function memoryStore() {
   };
 }
 
+function tasksMemoryStore() {
+  const map = new Map();
+  return {
+    async get(key) {
+      return map.has(key) ? map.get(key) : null;
+    },
+    async setJSON(key, value) {
+      map.set(key, value);
+    },
+    async list({ prefix = '' } = {}) {
+      return { blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
+    }
+  };
+}
+
 function baseDeps(store, overrides = {}) {
   return {
     env,
     now: () => Date.parse('2026-08-01T01:00:00Z'),
     identityNow: () => '2026-08-01T01:00:00.000Z',
     getContentStore: async () => store,
+    getTasksStore: async () => tasksMemoryStore(),
     ...overrides
   };
 }
@@ -106,6 +122,36 @@ test('rejects a query shorter than 2 or longer than 100 characters', async () =>
   assert.equal(short.status, 400);
   const long = await handler(request({ url: `https://api.adam-russell.com/api/entities/search?q=${'a'.repeat(101)}` }));
   assert.equal(long.status, 400);
+});
+
+// --- Correction B2: normalise (trim) before validating query length ---
+
+test('B2: whitespace-only and padded-short queries are rejected after trimming, before any store read', async () => {
+  let storeAccessed = false;
+  const store = new Proxy(memoryStore(), {
+    get(target, prop) {
+      if (prop === 'get' || prop === 'list') storeAccessed = true;
+      return target[prop];
+    }
+  });
+  const handler = createEntitySearchHandler(baseDeps(store));
+
+  for (const q of ['  ', '\t\t', '\n', ' a ']) {
+    // eslint-disable-next-line no-await-in-loop
+    const response = await handler(request({ url: `https://api.adam-russell.com/api/entities/search?q=${encodeURIComponent(q)}` }));
+    assert.equal(response.status, 400, `expected 400 for query ${JSON.stringify(q)}`);
+    // eslint-disable-next-line no-await-in-loop
+    assert.equal((await response.json()).error.code, 'invalid_query_length');
+  }
+  assert.equal(storeAccessed, false, 'an invalid query must never list an index or read a Blob');
+});
+
+test('B2: a valid two-character query surrounded by spaces is accepted', async () => {
+  const store = memoryStore();
+  const { seth } = await seed(store);
+  const handler = createEntitySearchHandler(baseDeps(store));
+  const response = await (await handler(request({ url: `https://api.adam-russell.com/api/entities/search?q=${encodeURIComponent('  Se  ')}` }))).json();
+  assert.ok(response.data.groups.person.some(r => r.ref === seth.ref));
 });
 
 test('every response uses cache-control: no-store', async () => {
@@ -198,11 +244,69 @@ test('caps combined results at 20', async () => {
   assert.equal(response.data.groups.person.length, 20);
 });
 
-test('never returns a StudentReference kind (none registered, no such index exists)', async () => {
+// --- Correction B6: Task results in entity search ---
+
+function tasksStoreSeededWith(tasks) {
+  const store = tasksMemoryStore();
+  const ids = [];
+  for (const task of tasks) {
+    store.setJSON(`tasks/${task.id}`, task);
+    ids.push(task.id);
+  }
+  store.setJSON('tasks/_index', ids);
+  return store;
+}
+
+test('B6: task results are returned, grouped separately, and ranked alongside person/organisation results', async () => {
+  const store = memoryStore();
+  const { unsw } = await seed(store);
+  const tasksStore = tasksStoreSeededWith([
+    { id: 'task_1', title: 'Example task about the proposal', status: 'open' },
+    { id: 'task_2', title: 'Unrelated task', status: 'open' }
+  ]);
+  const handler = createEntitySearchHandler(baseDeps(store, { getTasksStore: async () => tasksStore }));
+
+  const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Example' }))).json();
+  assert.equal(response.data.groups.task.length, 1);
+  assert.equal(response.data.groups.task[0].ref, 'tasks:task:task_1');
+  assert.equal(response.data.groups.task[0].display_label, 'Example task about the proposal');
+  assert.ok(response.data.groups.organisation.some(r => r.ref === unsw.ref));
+});
+
+test('B6: task search respects the combined cap of 20 across all kinds', async () => {
+  const store = memoryStore();
+  const entities = createEntitiesHandler(baseDeps(store));
+  for (let i = 0; i < 15; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await entities(request({
+      url: 'https://api.adam-russell.com/api/entities',
+      method: 'POST',
+      body: { kind: 'person', display_name: `Search Target ${i}` }
+    }));
+  }
+  const tasksStore = tasksStoreSeededWith(
+    Array.from({ length: 15 }, (_, i) => ({ id: `task_${i}`, title: `Search Target Task ${i}`, status: 'open' }))
+  );
+  const handler = createEntitySearchHandler(baseDeps(store, { getTasksStore: async () => tasksStore }));
+
+  const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Search' }))).json();
+  const total = response.data.groups.person.length + response.data.groups.organisation.length + response.data.groups.task.length;
+  assert.equal(total, 20);
+});
+
+test('B6: an unsupported kind (including student_reference) is rejected with 400, not silently dropped', async () => {
   const store = memoryStore();
   await seed(store);
   const handler = createEntitySearchHandler(baseDeps(store));
-  const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex&kinds=student_reference' }))).json();
-  assert.equal(response.data.groups.person.length, 0);
-  assert.equal(response.data.groups.organisation.length, 0);
+  const response = await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex&kinds=student_reference' }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_kind');
+});
+
+test('never returns a StudentReference kind through an ordinary, fully-valid kinds list', async () => {
+  const store = memoryStore();
+  await seed(store);
+  const handler = createEntitySearchHandler(baseDeps(store));
+  const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex&kinds=person,organisation,task' }))).json();
+  assert.doesNotMatch(JSON.stringify(response), /student_reference/);
 });

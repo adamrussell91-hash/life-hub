@@ -229,6 +229,46 @@ function isPlausibleMembershipRecord(record, canonicalRef) {
   );
 }
 
+// Strict existence checks for a *specific* expected membership record at a
+// known key — used by the write path (`universal-link-repository.mjs`) to
+// decide whether a create/retry/repair/rebuild step may skip writing a
+// membership, or must treat it as missing and replace it.
+//
+// Before this check existed, the write path treated ANY non-null value at
+// a membership key as "already present" (`Boolean(record)`), while the
+// read path (`isPlausibleMembershipRecord` above, via `listMembership`)
+// already rejected a record whose fields didn't match. That mismatch let a
+// membership with the wrong schema version, link id, canonical ref, or
+// relationship type sit at the expected key forever: the write path never
+// repaired it (it looked "present"), and the read path always filtered it
+// out (it looked absent) — the link became permanently unreachable via
+// `listOutgoing`/`listIncoming`/`listForEntity` even though creating it
+// reported success. Every field must match exactly; a record failing any
+// check counts as missing so the caller replaces it at the same key.
+export function isValidEndpointMembershipRecord(record, { linkId, canonicalRef }) {
+  return Boolean(
+    record &&
+    typeof record === 'object' &&
+    record.schema_version === MEMBERSHIP_SCHEMA_VERSION &&
+    record.link_id === linkId &&
+    record.canonical_ref === canonicalRef &&
+    typeof record.created_at === 'string' &&
+    record.created_at.length > 0
+  );
+}
+
+export function isValidTypeMembershipRecord(record, { linkId, relationshipType }) {
+  return Boolean(
+    record &&
+    typeof record === 'object' &&
+    record.schema_version === MEMBERSHIP_SCHEMA_VERSION &&
+    record.link_id === linkId &&
+    record.relationship_type === relationshipType &&
+    typeof record.created_at === 'string' &&
+    record.created_at.length > 0
+  );
+}
+
 // Reads every membership record under a prefix, verifying the retained
 // canonical ref against the hash-derived prefix (protects against a hash
 // collision silently returning the wrong link), rejecting any record whose

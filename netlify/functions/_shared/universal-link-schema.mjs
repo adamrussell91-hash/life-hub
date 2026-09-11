@@ -161,6 +161,26 @@ export function generateOperationId() {
   return `op_${randomBytes(16).toString('hex')}`;
 }
 
+// A deterministic, path-safe operation id derived from a set of parts by
+// hashing their canonical JSON — same `op_` + 32 lowercase hex shape as
+// `generateOperationId`'s random ids (OPERATION_ID_PATTERN), so both are
+// valid anywhere an operation id is stored or looked up.
+//
+// Unlike `generateOperationId`, calling this twice with the *same* parts
+// always returns the *same* id. `createLink`'s create/repair protocol uses
+// it (keyed on the deterministic link id) so a retry after a partial
+// failure resolves to the same operation journal record instead of
+// spawning a new one each attempt — the write path can then find and
+// finish that exact operation, rather than leaving it stuck in
+// `repair_needed` forever while retries silently create fresh journals
+// nothing ever revisits. `universal-link-repository.mjs`'s lifecycle
+// methods and `identity-repository.mjs` reuse the same derivation for the
+// same reason.
+export function deriveOperationId(parts) {
+  const digest = createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 32);
+  return `op_${digest}`;
+}
+
 export const OPERATION_SCHEMA_VERSION = 1;
 
 // Lower-case only (implementation programme, "Use lower case status
