@@ -95,6 +95,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   let error = "";
   let phase: ChatPhase | null = null;
   let month = new Date().getMonth();
+  let year = new Date().getFullYear();
   let fullscreen = false;
   let canvasTeardown: (() => void) | null = null;
   let horizonArc: HorizonArc | null = null;
@@ -266,7 +267,6 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   }
 
   function renderSky() {
-    const year = new Date().getFullYear();
     const dateFor = (m: number) => new Date(Date.UTC(year, m, 15, 12));
     const totalNotes = options.entries.length;
     const meta = saved.length
@@ -284,7 +284,11 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       </div>
       ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
       <section class="stars-sky" data-stars-sky aria-label="Saved constellations and unconnected note stars"></section>
-      <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through the year"></div>
+      <div class="stars-horizon-row">
+        <button type="button" class="stars-horizon-year btn btn--ghost" data-stars-year="prev" aria-label="Previous year">‹ ${year - 1}</button>
+        <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through the year"></div>
+        <button type="button" class="stars-horizon-year btn btn--ghost" data-stars-year="next" aria-label="Next year">${year + 1} ›</button>
+      </div>
       <button type="button" class="stars-fullscreen-exit btn btn--ghost" data-stars-exit-fullscreen hidden>Exit full screen</button>
     </div>`);
     const sky = host.querySelector<HTMLElement>("[data-stars-sky]")!;
@@ -300,7 +304,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
         selectedRelation = item.relations.find(relation => relation.sourceId === selectedNote?.pageId || relation.targetId === selectedNote?.pageId);
         screen = "detail";
         render();
-      }, options.entries.length);
+      });
       if (!saved.length) {
         sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
       }
@@ -320,6 +324,13 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       year,
       onChange: mountSky,
       onCommit: next => { month = next; },
+    });
+
+    host.querySelectorAll<HTMLButtonElement>("[data-stars-year]").forEach(button => {
+      button.onclick = () => {
+        year += button.dataset.starsYear === "prev" ? -1 : 1;
+        render();
+      };
     });
 
     host.querySelectorAll<HTMLButtonElement>("[data-stars-fullscreen]").forEach(button => {

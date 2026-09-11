@@ -4162,6 +4162,54 @@ body.is-universe-fullscreen .local-banner {
   height: 100%;
 }
 
+.stars-sky__camera {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 50%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.stars-sky__camera.is-dragging {
+  cursor: grabbing;
+}
+
+.stars-sky-zoom {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--on-dark-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--depth) 72%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--elev-2);
+}
+
+.stars-sky-zoom .btn {
+  width: 2.5rem;
+  min-height: 2.5rem;
+  padding: 0;
+  border-radius: 0;
+  color: var(--on-dark);
+  background: transparent;
+  border-color: transparent;
+  touch-action: manipulation;
+}
+
+.stars-sky-zoom .btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--on-dark) 12%, transparent);
+}
+
+.stars-sky-zoom .btn + .btn {
+  border-top: 1px solid var(--on-dark-line);
+}
+
 .stars-node {
   position: absolute;
   z-index: 2;
@@ -4600,6 +4648,22 @@ body.is-universe-fullscreen .local-banner {
   animation-play-state: paused;
 }
 
+.stars-horizon-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stars-horizon-row .stars-horizon {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.stars-horizon-year {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .stars-horizon {
   position: relative;
   height: 5.5rem;
@@ -4781,14 +4845,29 @@ body.is-universe-fullscreen .local-banner {
   color: var(--on-dark-muted);
 }
 
-.stars-sky-wrap.is-fullscreen .stars-horizon {
+.stars-sky-wrap.is-fullscreen .stars-horizon-row {
   position: absolute;
   bottom: var(--space-4);
   left: var(--space-4);
   right: var(--space-4);
   z-index: 6;
+}
+
+.stars-sky-wrap.is-fullscreen .stars-horizon {
   background: color-mix(in srgb, var(--depth) 68%, transparent);
   backdrop-filter: blur(12px);
+}
+
+.stars-sky-wrap.is-fullscreen .stars-horizon-year {
+  color: var(--on-dark);
+  background: color-mix(in srgb, var(--depth) 68%, transparent);
+  border-color: var(--on-dark-line);
+  backdrop-filter: blur(12px);
+}
+
+.stars-sky-wrap.is-fullscreen .stars-sky-zoom {
+  top: calc(var(--space-4) + 3.2rem);
+  right: var(--space-4);
 }
 
 .stars-sky-wrap.is-fullscreen .stars-horizon__tick {
@@ -4882,6 +4961,21 @@ body.is-stars-fullscreen .local-banner {
 
   .stars-horizon__label {
     right: var(--space-4);
+  }
+
+  .stars-horizon-year {
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
+  }
+
+  .stars-sky-zoom {
+    top: var(--space-2);
+    right: var(--space-2);
+  }
+
+  .stars-sky-zoom .btn {
+    width: 2.25rem;
+    min-height: 2.25rem;
   }
 
   .stars-claims {
