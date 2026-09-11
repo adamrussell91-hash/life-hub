@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Chadwick Voice Lab</title>
+    <link rel="stylesheet" href="/style.css">
+  </head>
+  <body>
+    <header class="masthead">
+      <a class="wordmark" href="#main">Chadwick <span>Voice Lab</span></a>
+      <p>Local casting studio</p>
+    </header>
+
+    <main id="main">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Voice direction</p>
+        <h1 id="page-title">Find the voice that feels right.</h1>
+        <p class="lede">Describe the character, choose an audition, and generate a small set of local voice candidates.</p>
+      </section>
+
+      <div class="studio-grid">
+        <form id="casting-form" class="panel controls" novalidate>
+          <div class="panel-heading">
+            <div><span class="step">01</span><h2>Direction</h2></div>
+            <p id="model-name" class="model"></p>
+          </div>
+
+          <label for="preset">Starting point</label>
+          <select id="preset" name="preset">
+            <option value="">Custom direction</option>
+          </select>
+
+          <div class="label-row">
+            <label for="voice-description">Voice description</label>
+            <span id="description-count" aria-hidden="true"></span>
+          </div>
+          <textarea id="voice-description" name="description" rows="6" maxlength="3000" required></textarea>
+
+          <div class="divider"></div>
+          <div class="section-title"><span class="step">02</span><h2>Audition</h2></div>
+          <label for="script-select">Fixed script</label>
+          <select id="script-select" name="script_id"></select>
+          <label for="script-text" class="sr-only">Audition script text</label>
+          <textarea id="script-text" class="script" rows="7" readonly></textarea>
+
+          <div class="field-pair">
+            <div>
+              <label for="count">Candidates</label>
+              <input id="count" name="count" type="number" min="1" max="8" step="1" value="3" inputmode="numeric">
+            </div>
+            <div>
+              <label for="seed">Seed <span class="optional">optional</span></label>
+              <input id="seed" name="seed" type="number" min="0" max="4294967295" step="1" inputmode="numeric" placeholder="Random">
+            </div>
+          </div>
+          <p id="seed-note" class="field-note"></p>
+
+          <details class="settings">
+            <summary>Generation settings</summary>
+            <div class="settings-grid">
+              <label>Temperature<input id="temperature" name="temperature" type="number" min="0.1" max="1.5" step="0.05"></label>
+              <label>Top P<input id="top-p" name="top_p" type="number" min="0.05" max="1" step="0.05"></label>
+              <label>Top K<input id="top-k" name="top_k" type="number" min="1" max="100" step="1"></label>
+              <label>Repetition penalty<input id="repetition-penalty" name="repetition_penalty" type="number" min="1" max="2" step="0.01"></label>
+              <label>Max tokens<input id="max-tokens" name="max_tokens" type="number" min="128" max="4096" step="1"></label>
+            </div>
+            <p class="settings-help">Temperature controls variety. Max tokens sets the cutoff; increase it if a longer audition ends early.</p>
+          </details>
+
+          <div id="form-error" class="inline-error" role="alert" hidden></div>
+          <div class="actions">
+            <button id="generate" class="primary" type="submit" disabled>Generate candidates</button>
+            <button id="cancel" class="secondary" type="button" hidden>Cancel after current</button>
+          </div>
+        </form>
+
+        <section class="panel auditions" aria-labelledby="auditions-title">
+          <div class="panel-heading results-heading">
+            <div><span class="step">03</span><h2 id="auditions-title">Candidates</h2></div>
+            <span id="result-count" class="result-count"></span>
+          </div>
+
+          <div id="status-card" class="status-card" data-status="idle">
+            <div class="status-line">
+              <span class="status-dot" aria-hidden="true"></span>
+              <strong id="status-label">Ready to audition</strong>
+              <span id="elapsed" class="elapsed"></span>
+            </div>
+            <p id="status-message">Your completed candidates will stay here between sessions.</p>
+            <div class="progress-track" aria-hidden="true"><span id="progress-bar"></span></div>
+            <button id="retry" class="text-button" type="button" hidden>Try loading again</button>
+          </div>
+          <div id="live-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+          <ol id="results" class="candidate-list"></ol>
+          <div id="empty-state" class="empty-state">
+            <span aria-hidden="true">⌁</span>
+            <p>No auditions yet.</p>
+            <small>Generate a set to compare them here.</small>
+          </div>
+        </section>
+      </div>
+
+      <section id="voice-lock" class="panel lock-panel" aria-labelledby="voice-lock-title">
+        <div class="lock-heading">
+          <div>
+            <p class="eyebrow">Approved voice</p>
+            <div class="section-title"><span class="step">04</span><h2 id="voice-lock-title">Voice Lock</h2></div>
+            <p class="lock-lede">Use Candidate 6 as the reference, then check whether Chadwick stays recognisably Chadwick on brand-new lines.</p>
+          </div>
+          <p id="lock-model-name" class="model lock-model"></p>
+        </div>
+
+        <div class="lock-grid">
+          <div class="reference-card">
+            <span class="approved-badge">Approved</span>
+            <h3>Candidate 6</h3>
+            <p id="reference-meta">Seed 45 · approved casting reference</p>
+            <audio id="reference-audio" controls preload="metadata" aria-label="Play approved Candidate 6"></audio>
+            <details>
+              <summary>Cloning excerpt</summary>
+              <p id="reference-text" class="reference-text"></p>
+            </details>
+          </div>
+
+          <form id="lock-form" class="lock-controls" novalidate>
+            <fieldset>
+              <legend>Validation lines</legend>
+              <p>Each line tests a different part of the voice. Leave all six selected for the full pack.</p>
+              <div id="lock-tests" class="test-list"></div>
+            </fieldset>
+            <div class="field-pair compact-fields">
+              <div>
+                <label for="lock-seed">Starting seed</label>
+                <input id="lock-seed" type="number" min="0" max="4294967295" step="1" inputmode="numeric">
+              </div>
+              <div>
+                <label for="lock-max-tokens">Max tokens</label>
+                <input id="lock-max-tokens" type="number" min="128" max="2048" step="1">
+              </div>
+            </div>
+            <div id="lock-error" class="inline-error" role="alert" hidden></div>
+            <div class="actions">
+              <button id="lock-generate" class="primary" type="submit" disabled>Generate validation pack</button>
+              <button id="lock-cancel" class="secondary" type="button" hidden>Cancel after current</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="lock-results-head">
+          <div id="lock-status-card" class="status-card" data-status="idle">
+            <div class="status-line">
+              <span class="status-dot" aria-hidden="true"></span>
+              <strong id="lock-status-label">Ready to lock the voice</strong>
+              <span id="lock-elapsed" class="elapsed"></span>
+            </div>
+            <p id="lock-status-message">The first run downloads the smaller cloning model. Finished clips stay on this Mac.</p>
+            <div class="progress-track" aria-hidden="true"><span id="lock-progress-bar"></span></div>
+          </div>
+          <span id="lock-result-count" class="result-count"></span>
+        </div>
+        <ol id="lock-results" class="candidate-list lock-list"></ol>
+        <div id="lock-empty-state" class="empty-state lock-empty">
+          <span aria-hidden="true">⌁</span>
+          <p>No Voice Lock clips yet.</p>
+          <small>Generate the validation pack, then compare each line with Candidate 6.</small>
+        </div>
+        <div id="lock-live-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      </section>
+    </main>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

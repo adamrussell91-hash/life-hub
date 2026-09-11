@@ -435,6 +435,7 @@ function renderHero(root, session, { logger, libraryByName } = {}) {
   }
 
   if (planned && logger) {
+    void logger.prepareVoice?.(session);
     setHidden(preview, started);
     setHidden(startBtn, started);
     setHidden(loggerEl, !started);

@@ -2142,6 +2142,86 @@ main { max-width: 76rem; margin: 0 auto; }
   min-width: 0;
   max-width: 100%;
 }
+.chadwick-voice {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--fitness-accent) 28%, var(--line));
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--fitness-accent) 15%, transparent), transparent 58%),
+    color-mix(in srgb, var(--fitness-accent) 6%, var(--warm-white));
+}
+.chadwick-voice[hidden] { display: none; }
+.chadwick-voice__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.chadwick-voice__head > div {
+  display: grid;
+  gap: 0.05rem;
+}
+.chadwick-voice__eyebrow {
+  color: var(--fitness-accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+}
+.chadwick-voice__signal {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--muted);
+  box-shadow: 0 0 0 0.28rem color-mix(in srgb, var(--muted) 12%, transparent);
+}
+.chadwick-voice__signal[data-state="ready"],
+.chadwick-voice__signal[data-state="playing"] {
+  background: var(--fitness-accent);
+  box-shadow: 0 0 0 0.28rem color-mix(in srgb, var(--fitness-accent) 15%, transparent);
+}
+.chadwick-voice__signal[data-state="preparing"] { animation: chadwick-voice-pulse 1.2s ease-in-out infinite; }
+.chadwick-voice__status {
+  min-height: 1.25rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.chadwick-voice__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+.chadwick-voice__primary,
+.chadwick-voice__button {
+  min-height: 42px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.72rem;
+  background: var(--warm-white);
+  color: var(--depth);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 650;
+  cursor: pointer;
+}
+.chadwick-voice__primary {
+  border-color: color-mix(in srgb, var(--fitness-accent) 38%, var(--line));
+  background: color-mix(in srgb, var(--fitness-accent) 13%, var(--warm-white));
+}
+.chadwick-voice__primary:disabled,
+.chadwick-voice__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@keyframes chadwick-voice-pulse {
+  50% { opacity: 0.35; transform: scale(0.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chadwick-voice__signal { animation: none !important; }
+}
 .fitness-logger__header {
   display: flex;
   flex-wrap: wrap;

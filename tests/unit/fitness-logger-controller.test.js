@@ -99,6 +99,23 @@ function makeController(overrides = {}) {
   };
 }
 
+test('planned workouts prepare Candidate 6 and unmounting hides the voice player', () => {
+  const calls = [];
+  const voice = {
+    prepare(value) { calls.push(['prepare', value.path]); },
+    hide() { calls.push(['hide']); }
+  };
+  const { controller } = makeController({ voice });
+  controller.prepareVoice(session());
+  controller.mount(session());
+  assert.deepEqual(calls.filter(([name]) => name === 'prepare'), [
+    ['prepare', session().path],
+    ['prepare', session().path]
+  ]);
+  controller.unmount();
+  assert.deepEqual(calls.at(-1), ['hide']);
+});
+
 test('finish confirms completed overwrite and clears the draft', async () => {
   const store = new Map();
   const storage = {
