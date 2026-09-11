@@ -296,6 +296,7 @@ describe('page editor', () => {
     });
 
     const canvas = document.createElement('main');
+    document.body.append(canvas);
     await renderPageEditor(canvas, { kind: 'project', id: emptyProject.id });
 
     const hint = [...canvas.querySelectorAll('button')].find((btn) => btn.textContent === 'Add next action');
@@ -303,7 +304,8 @@ describe('page editor', () => {
     expect(canvas.querySelector<HTMLElement>('.plus-add__panel')?.hidden).toBe(true);
     hint!.click();
     expect(canvas.querySelector<HTMLElement>('.plus-add__panel')?.hidden).toBe(false);
-    expect(document.activeElement).toBe(canvas.querySelector('[aria-label="New task title"]'));
+    expect(canvas.querySelector('[aria-label="New task title"]')).toBe(document.activeElement);
+    canvas.remove();
   });
 
   it('opens an excursion as a task page with progress, date, tracker, and joined timeline', async () => {
