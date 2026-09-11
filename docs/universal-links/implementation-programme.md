@@ -29,7 +29,7 @@ This section is authoritative when any later sentence appears ambiguous. Claude 
 
 ### Source retrieval
 
-PR 304 planning head for this revision is `7fd44087e5d88d8e7dff1e224b7d7c278712fcef`.
+PR 304 architecture baseline is commit `7fd44087e5d88d8e7dff1e224b7d7c278712fcef`. Later commits on the same PR amend the execution instructions. Record the fetched PR head rather than trying to encode this document's own commit SHA inside the document.
 
 Claude Code must retrieve the planning documents without asking Adam to paste them:
 
@@ -1049,7 +1049,7 @@ This slice is documentation only. Do not include any foundation code.
 
 1. Fetch `origin/main` and PR 304.
 2. Record the current `origin/main` SHA as `BASE_SHA`.
-3. Record PR 304 planning SHA `7fd44087e5d88d8e7dff1e224b7d7c278712fcef` as `PLAN_SHA`.
+3. Record the fetched `origin/pr-304-plan` head as `PLAN_SHA` and verify it descends from architecture baseline `7fd44087e5d88d8e7dff1e224b7d7c278712fcef`.
 4. Create `claude/universal-links-slice-0-repository-map` from `BASE_SHA`, not from PR 304.
 5. Read both planning files with `git show origin/pr-304-plan:<path>`.
 6. Do not copy either planning file into the Slice 0 branch.
@@ -1543,7 +1543,7 @@ git fetch origin pull/304/head:refs/remotes/origin/pr-304-plan
 git rev-parse origin/main
 git rev-parse origin/pr-304-plan
 
-The expected planning SHA is 7fd44087e5d88d8e7dff1e224b7d7c278712fcef. Stop only if the fetched PR ref does not contain this commit. Read the planning files with git show. Do not expect them on main and do not copy them into the Slice 0 branch.
+The required architecture baseline is 7fd44087e5d88d8e7dff1e224b7d7c278712fcef. Run `git merge-base --is-ancestor 7fd44087e5d88d8e7dff1e224b7d7c278712fcef origin/pr-304-plan`. Stop only if this check fails. Record the current fetched PR head as PLAN_SHA. Read the planning files with git show. Do not expect them on main and do not copy them into the Slice 0 branch.
 
 Create claude/universal-links-slice-0-repository-map from the fetched origin/main SHA.
 
