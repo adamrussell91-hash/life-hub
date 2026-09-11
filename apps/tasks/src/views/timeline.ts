@@ -1,6 +1,7 @@
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { toDateKey } from '@/domain/queries';
 import {
@@ -151,7 +152,11 @@ function paintList(
   return list;
 }
 
+let teardownTimeline: (() => void) | null = null;
+
 export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
+  teardownTimeline?.();
+  teardownTimeline = null;
   showViewLoading(canvas, 'Loading timeline…', '.chronology');
   let tasks: Task[];
   let projects: Project[];
@@ -206,6 +211,23 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       );
     }
   });
+
+  const stopChanged = onTasksChanged((incoming) => {
+    for (const task of incoming) {
+      const index = tasks.findIndex((entry) => entry.id === task.id);
+      if (index >= 0) tasks[index] = task;
+      else tasks.push(task);
+    }
+    paint();
+  });
+  const stopDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownTimeline = () => {
+    stopChanged();
+    stopDeleted();
+  };
 
   paint();
 }
