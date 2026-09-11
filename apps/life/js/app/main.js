@@ -21,6 +21,7 @@ import { createChatPanelController } from './chat-panel.js';
 import { attachVisualViewportInset } from './visual-viewport.js';
 import { API_BASE_URL } from './config.js';
 import { createFitnessLoggerController } from './fitness-logger-controller.js';
+import { createChadwickVoiceController } from './chadwick-voice.js';
 import { createFitnessTemplateLibrary } from './fitness-template-library.js';
 import { createFitnessTemplatesApi } from './fitness-templates-api.js';
 import { createSurfaceWidgetLibrary } from './surface-widget-library.js';
@@ -109,9 +110,15 @@ const shortcutsApi = createShortcutsApi(fetchImpl);
 
 let controller;
 let chatController;
+const chadwickVoice = createChadwickVoiceController({
+  root: document,
+  fetchImpl,
+  storage: localStorage
+});
 const fitnessLogger = createFitnessLoggerController({
   root: document,
   chatApi,
+  voice: chadwickVoice,
   storage: localStorage,
   onSessionWritten: () => void controller.refresh({ manual: true })
 });

@@ -19,6 +19,7 @@ import { collapseExerciseEditor, hideFitnessLogger, renderFitnessLogger, updateL
 export function createFitnessLoggerController({
   root,
   chatApi,
+  voice,
   storage = globalThis.localStorage,
   documentTarget = globalThis.document,
   onSessionWritten,
@@ -352,7 +353,7 @@ export function createFitnessLoggerController({
     if (documentTarget?.visibilityState === 'hidden') void flushAutosave();
   }
 
-  function unmount() {
+  function unmount({ keepVoice = false } = {}) {
     clearIdle();
     resetTimer();
     documentTarget?.removeEventListener?.('visibilitychange', onVisibility);
@@ -365,6 +366,7 @@ export function createFitnessLoggerController({
     finishing = false;
     saveState = '';
     syncedFingerprint = null;
+    if (!keepVoice) voice?.hide?.();
   }
 
   function mount(session) {
@@ -381,7 +383,7 @@ export function createFitnessLoggerController({
       return;
     }
 
-    unmount();
+    unmount({ keepVoice: true });
     draft = nextDraft;
     mountedPath = draft.path;
     syncedFingerprint = draftFingerprint(cloneLoggerDraft(session));
@@ -389,6 +391,7 @@ export function createFitnessLoggerController({
     else setSaveState('');
     documentTarget?.addEventListener?.('visibilitychange', onVisibility);
     rerender();
+    void voice?.prepare?.(draft);
   }
 
   function destroy() {
@@ -411,6 +414,7 @@ export function createFitnessLoggerController({
     undoCompleteTimer,
     addExercise,
     reorderExercise,
-    removeExercise
+    removeExercise,
+    prepareVoice: session => voice?.prepare?.(session)
   };
 }
