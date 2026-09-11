@@ -432,3 +432,276 @@ test('B4: repairIdentityOperation returns a non-disclosing not-found for an unkn
 test('B4: unsafe operation ids never reach storage keys', () => {
   assert.throws(() => identityOperationKey('op_../../etc/passwd'), error => error.code === 'invalid_operation_id');
 });
+
+// --- Job 1 (PR #313 correction comment): harden the active-self invariant
+// against partial writes and repair. See identity-repository.mjs's
+// "Self-identity invariant (correction B1, hardened)" comment for the full
+// design: every write that would make a Person newly the observable
+// active self re-checks live ownership immediately before writing, both
+// on a fresh attempt and on repair, rather than trusting a single
+// check made earlier or a stored payload value.
+
+const SELF_CREATE_BOUNDARIES = ['self_pointer', 'entity', 'index'];
+
+for (const boundary of SELF_CREATE_BOUNDARIES) {
+  test(`Job1: create self A fails at "${boundary}"; self B may then be created; repairing A never produces two active selfs`, async () => {
+    const store = createMemoryStore();
+    const repo = createRepo(store);
+
+    let failed = false;
+    store._failNextMatching(key => {
+      if (failed) return false;
+      const matches = boundary === 'self_pointer'
+        ? key === SELF_POINTER_KEY
+        : boundary === 'entity'
+          ? key.startsWith('entities/person/')
+          : key.startsWith('entities/index/person/');
+      if (matches) {
+        failed = true;
+        return true;
+      }
+      return false;
+    });
+
+    let caughtOperationId;
+    let personAId;
+    await assert.rejects(
+      repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } }),
+      error => {
+        assert.equal(error.status, 503);
+        assert.equal(error.code, 'identity_write_incomplete');
+        caughtOperationId = error.operation_id;
+        personAId = error.entity_id;
+        return true;
+      }
+    );
+    store._clearFailure();
+
+    // B's creation may legitimately succeed (A's reservation never became
+    // observable) or be correctly rejected (A's entity is already active
+    // on disk) — either is safe; what must hold is the final state.
+    let personBId = null;
+    try {
+      const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+      personBId = personB.id;
+    } catch (error) {
+      assert.equal(error.code, 'self_identity_exists');
+    }
+
+    // A plain second createIdentity would make a *third* identity — the
+    // only recovery path for a specific failed create is
+    // repairIdentityOperation, with the operation id the 503 carried.
+    try {
+      const repaired = await repo.repairIdentityOperation(caughtOperationId);
+      assert.equal(repaired.status, 'committed');
+    } catch (error) {
+      assert.equal(error.status, 409);
+    }
+
+    const activeSelfs = [];
+    for (const id of [personAId, personBId].filter(Boolean)) {
+      let record;
+      try {
+        record = await repo.loadEntity({ kind: 'person', id });
+      } catch {
+        continue;
+      }
+      if (record.is_self && record.lifecycle_status === 'active') activeSelfs.push(id);
+    }
+    assert.ok(activeSelfs.length <= 1, `expected at most one active self, got ${JSON.stringify(activeSelfs)}`);
+
+    const reconciled = await repo.reconcileSelfIdentity();
+    assert.notEqual(reconciled.status, 'conflict');
+  });
+}
+
+const SELF_ACTIVATE_BOUNDARIES = ['self_pointer', 'entity', 'index', 'event'];
+
+for (const boundary of SELF_ACTIVATE_BOUNDARIES) {
+  test(`Job1: activating self A fails at "${boundary}"; self B may then become active; repairing A never produces two active selfs`, async () => {
+    const store = createMemoryStore();
+    const repo = createRepo(store);
+    const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+    await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+
+    let failed = false;
+    store._failNextMatching(key => {
+      if (failed) return false;
+      const matches = boundary === 'self_pointer'
+        ? key === SELF_POINTER_KEY
+        : boundary === 'entity'
+          ? key === personKey(personA.id)
+          : boundary === 'index'
+            ? key === personIndexKey(personA.id)
+            : key.startsWith('entities/events/');
+      if (matches) {
+        failed = true;
+        return true;
+      }
+      return false;
+    });
+
+    let caughtOperationId;
+    await assert.rejects(
+      repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+      error => {
+        assert.equal(error.status, 503);
+        caughtOperationId = error.operation_id;
+        return true;
+      }
+    );
+    store._clearFailure();
+
+    // B can only become active self if A's failed attempt never made A's
+    // own record observably active — otherwise B's own claim correctly
+    // rejects.
+    let personBId = null;
+    try {
+      const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+      personBId = personB.id;
+    } catch (error) {
+      assert.equal(error.code, 'self_identity_exists');
+    }
+
+    try {
+      const repaired = await repo.repairIdentityOperation(caughtOperationId);
+      assert.equal(repaired.status, 'committed');
+    } catch (error) {
+      assert.equal(error.status, 409);
+    }
+
+    const activeSelfs = [];
+    for (const id of [personA.id, personBId].filter(Boolean)) {
+      const record = await repo.loadEntity({ kind: 'person', id });
+      if (record.is_self && record.lifecycle_status === 'active') activeSelfs.push(id);
+    }
+    assert.ok(activeSelfs.length <= 1, `expected at most one active self, got ${JSON.stringify(activeSelfs)}`);
+
+    const reconciled = await repo.reconcileSelfIdentity();
+    assert.notEqual(reconciled.status, 'conflict');
+  });
+}
+
+test("Job1: repairing a stale deactivation of A never clears a pointer that now belongs to B", async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+
+  // Fail A's deactivation at the very last step (the pointer release):
+  // entity, index, and event all succeed first.
+  store._failNextMatching(key => key === SELF_POINTER_KEY);
+  let caughtOperationId;
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' }),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503 && error.code === 'identity_write_incomplete';
+    }
+  );
+  store._clearFailure();
+
+  const midway = await repo.loadEntity({ kind: 'person', id: personA.id });
+  assert.equal(midway.lifecycle_status, 'inactive');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id, 'the pointer is genuinely stale at this point');
+
+  // B claims the self slot — A's own record already shows inactive, so
+  // this is a legitimate claim, not a race.
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id);
+
+  // Repairing A's stale deactivation must not clear B's claim (required
+  // behaviour 2/3).
+  const repaired = await repo.repairIdentityOperation(caughtOperationId);
+  assert.equal(repaired.status, 'committed');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id, "B's claim must survive repairing A's stale deactivation");
+});
+
+test("Job1: activation of A fails before its pointer write; once B is active, retrying A's activation is a stable conflict, never a silently reconciled second self", async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+
+  store._failNextMatching(key => key === SELF_POINTER_KEY);
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+    error => error.status === 503
+  );
+  store._clearFailure();
+  assert.equal(store._raw(SELF_POINTER_KEY)?.person_id ?? null, null, 'the pointer was never claimed for A');
+
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+  assert.equal(personB.lifecycle_status, 'active');
+
+  // A plain retry resumes the same journal (the entity hasn't moved since
+  // the failed attempt) but must re-check live ownership at the
+  // pointer-claim step, not blindly replay it.
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+    error => error.status === 409 && error.code === 'self_identity_exists'
+  );
+
+  const finalA = await repo.loadEntity({ kind: 'person', id: personA.id });
+  const finalB = await repo.loadEntity({ kind: 'person', id: personB.id });
+  assert.equal(finalA.lifecycle_status, 'inactive');
+  assert.equal(finalB.lifecycle_status, 'active');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id);
+
+  const reconciled = await repo.reconcileSelfIdentity();
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id });
+});
+
+test('Job1: ordinary entity GET (loadEntity) and reconcileSelfIdentity agree on which Person is the active self', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+
+  const reconciled = await repo.reconcileSelfIdentity();
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id });
+
+  const loadedA = await repo.loadEntity({ kind: 'person', id: personA.id });
+  const loadedB = await repo.loadEntity({ kind: 'person', id: personB.id });
+  assert.equal(loadedA.is_self && loadedA.lifecycle_status === 'active', false);
+  assert.equal(loadedB.is_self && loadedB.lifecycle_status === 'active', true);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id);
+});
+
+test('Job1: reconcileSelfIdentity and repairIdentityOperation are both idempotent when repeated', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: person } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+
+  const first = await repo.reconcileSelfIdentity();
+  const second = await repo.reconcileSelfIdentity();
+  assert.deepEqual(first, { status: 'consistent', person_id: person.id });
+  assert.deepEqual(second, { status: 'consistent', person_id: person.id });
+
+  const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  const repairedOnce = await repo.repairIdentityOperation(operationId);
+  const repairedTwice = await repo.repairIdentityOperation(operationId);
+  assert.equal(repairedOnce.repaired, false);
+  assert.equal(repairedTwice.repaired, false);
+});
+
+test('Job1: reconcileSelfIdentity reports a stable conflict — and writes nothing — when two Persons are somehow both active selfs', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B' } });
+
+  // Simulate corruption predating this correction: B is independently
+  // written as an active self without ever going through the guarded
+  // claim path.
+  const rawB = store._raw(personKey(personB.id));
+  await store.setJSON(personKey(personB.id), { ...rawB, is_self: true });
+  const rawIndexB = store._raw(personIndexKey(personB.id));
+  await store.setJSON(personIndexKey(personB.id), { ...rawIndexB, is_self: true });
+
+  const before = store._raw(SELF_POINTER_KEY);
+  const result = await repo.reconcileSelfIdentity();
+  assert.equal(result.status, 'conflict');
+  assert.deepEqual(result.person_ids.sort(), [personA.id, personB.id].sort());
+  assert.deepEqual(store._raw(SELF_POINTER_KEY), before, 'a conflict must never be silently resolved by writing the pointer');
+});
