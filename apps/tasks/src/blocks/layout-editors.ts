@@ -17,6 +17,7 @@ import type { Block } from '@/schemas/block';
 import { createEditorFilter } from '@/views/hub-kit';
 
 type TabsBlock = Extract<Block, { block_type: 'tabs' }>;
+type TabPanel = TabsBlock['content']['tabs'][number];
 type ColumnsBlock = Extract<Block, { block_type: 'columns' }>;
 
 export function createSpacerEditor(
@@ -292,6 +293,19 @@ export function createColumnsEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+const preferredTabsPanel = new Map<string, number>();
+
+export function rememberTabsPanel(blockId: string, index: number): void {
+  preferredTabsPanel.set(blockId, index);
+}
+
+function preferredPanelIndex(blockId: string, tabCount: number): number {
+  const stored = preferredTabsPanel.get(blockId) ?? 0;
+  const next = Math.max(0, Math.min(stored, tabCount - 1));
+  preferredTabsPanel.set(blockId, next);
+  return next;
+}
+
 export function createTabsEditor(
   block: TabsBlock,
   onChange: BlockChangeHandler<TabsBlock>,
@@ -300,15 +314,24 @@ export function createTabsEditor(
   const fields = document.createElement('div');
   fields.className = 'block-editor__fields block-editor__tabs';
 
-  const panelsRoot = document.createElement('div');
-  panelsRoot.className = 'block-editor__tabs-panels';
+  const chrome = document.createElement('div');
+  chrome.className = 'block-tabs';
+
+  const tablist = document.createElement('div');
+  tablist.className = 'block-tabs__tablist';
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute('aria-label', 'Content tabs');
+
+  const pane = document.createElement('div');
+  pane.className = 'block-tabs__panel block-editor__tabs-panel';
+  pane.setAttribute('role', 'tabpanel');
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn btn--ghost block-editor__tabs-add';
   addBtn.textContent = 'Add tab';
 
-  function emitTabs(tabs: TabsBlock['content']['tabs']): void {
+  function emitTabs(tabs: TabPanel[]): void {
     onChange({
       ...getLatest(),
       content: { tabs }
@@ -316,106 +339,152 @@ export function createTabsEditor(
     rebuild();
   }
 
-  function rebuild(): void {
-    const current = getLatest();
-    panelsRoot.replaceChildren();
-    addBtn.disabled = current.content.tabs.length >= 8;
-
-    current.content.tabs.forEach((panel, panelIndex) => {
-      const pane = document.createElement('div');
-      pane.className = 'block-editor__tabs-panel';
-
-      const header = document.createElement('div');
-      header.className = 'block-editor__tabs-panel-header';
-
-      const label = document.createElement('input');
-      label.type = 'text';
-      label.className = 'block-editor__tab-label';
-      label.value = panel.label;
-      label.placeholder = `Tab ${panelIndex + 1} label`;
-      label.setAttribute('aria-label', `Tab ${panelIndex + 1} label`);
-      label.addEventListener('input', () => {
-        const latest = getLatest();
-        const tabs = latest.content.tabs.map((t, i) =>
-          i === panelIndex ? { ...t, label: label.value } : t
-        );
-        onChange({
-          ...latest,
-          content: { tabs }
-        });
-      });
-
-      const up = document.createElement('button');
-      up.type = 'button';
-      up.className = 'btn btn--ghost';
-      up.textContent = '↑';
-      up.disabled = panelIndex === 0;
-      up.addEventListener('click', () => {
-        if (panelIndex === 0) return;
-        const tabs = [...getLatest().content.tabs];
-        const tmp = tabs[panelIndex - 1]!;
-        tabs[panelIndex - 1] = tabs[panelIndex]!;
-        tabs[panelIndex] = tmp;
-        emitTabs(tabs);
-      });
-
-      const down = document.createElement('button');
-      down.type = 'button';
-      down.className = 'btn btn--ghost';
-      down.textContent = '↓';
-      down.disabled = panelIndex === current.content.tabs.length - 1;
-      down.addEventListener('click', () => {
-        const tabs = [...getLatest().content.tabs];
-        if (panelIndex >= tabs.length - 1) return;
-        const tmp = tabs[panelIndex + 1]!;
-        tabs[panelIndex + 1] = tabs[panelIndex]!;
-        tabs[panelIndex] = tmp;
-        emitTabs(tabs);
-      });
-
-      const remove = document.createElement('button');
-      remove.type = 'button';
-      remove.className = 'btn btn--ghost block-editor__tabs-remove';
-      remove.textContent = 'Remove tab';
-      remove.disabled = current.content.tabs.length <= 2;
-      remove.addEventListener('click', () => {
-        const latest = getLatest();
-        if (latest.content.tabs.length <= 2) return;
-        emitTabs(latest.content.tabs.filter((_, i) => i !== panelIndex));
-      });
-
-      header.append(label, up, down, remove);
-
-      const nested = createNestedBlocksEditor({
-        blocks: panel.blocks,
-        allowedTypes: TAB_CHILD_TYPES,
-        idFactory: () => `${getLatest().id}_t${panelIndex}`,
-        onChange: (nextBlocks) => {
-          const latest = getLatest();
-          const tabs = latest.content.tabs.map((t, i) =>
-            i === panelIndex
-              ? {
-                  ...t,
-                  blocks: nextBlocks as TabsBlock['content']['tabs'][number]['blocks']
-                }
-              : t
-          );
-          onChange({
-            ...latest,
-            content: { tabs }
-          });
-        }
-      });
-
-      pane.append(header, nested);
-      panelsRoot.append(pane);
+  function patchTab(index: number, patch: (tab: TabPanel) => TabPanel): void {
+    const latest = getLatest();
+    onChange({
+      ...latest,
+      content: {
+        tabs: latest.content.tabs.map((tab, i) => (i === index ? patch(tab) : tab))
+      }
     });
   }
+
+  function selectPanel(index: number): void {
+    rememberTabsPanel(getLatest().id, index);
+    rebuild();
+  }
+
+  function swapSelected(delta: number): void {
+    const latest = getLatest();
+    const selected = preferredPanelIndex(latest.id, latest.content.tabs.length);
+    const next = selected + delta;
+    if (next < 0 || next >= latest.content.tabs.length) return;
+    const tabs = [...latest.content.tabs];
+    const swap = tabs[next]!;
+    tabs[next] = tabs[selected]!;
+    tabs[selected] = swap;
+    rememberTabsPanel(latest.id, next);
+    emitTabs(tabs);
+  }
+
+  function rebuild(): void {
+    const current = getLatest();
+    const selected = preferredPanelIndex(current.id, current.content.tabs.length);
+    const panel = current.content.tabs[selected];
+    if (!panel) return;
+
+    addBtn.disabled = current.content.tabs.length >= 8;
+    tablist.replaceChildren();
+    pane.replaceChildren();
+    pane.id = `${current.id}-editor-panel-${panel.id}`;
+    pane.setAttribute('aria-labelledby', `${current.id}-editor-tab-${panel.id}`);
+
+    current.content.tabs.forEach((tab, index) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'block-tabs__tab';
+      btn.setAttribute('role', 'tab');
+      btn.id = `${current.id}-editor-tab-${tab.id}`;
+      btn.setAttribute('aria-controls', `${current.id}-editor-panel-${tab.id}`);
+      btn.setAttribute('aria-selected', index === selected ? 'true' : 'false');
+      btn.tabIndex = index === selected ? 0 : -1;
+      btn.classList.toggle('block-tabs__tab--active', index === selected);
+      btn.textContent = tab.label || `Tab ${index + 1}`;
+      btn.addEventListener('click', () => selectPanel(index));
+      tablist.append(btn);
+    });
+
+    const header = document.createElement('div');
+    header.className = 'block-editor__tabs-panel-header';
+
+    const label = document.createElement('input');
+    label.type = 'text';
+    label.className = 'block-editor__tab-label';
+    label.value = panel.label;
+    label.placeholder = `Tab ${selected + 1} label`;
+    label.setAttribute('aria-label', `Tab ${selected + 1} label`);
+    label.addEventListener('input', () => {
+      patchTab(selected, (tab) => ({ ...tab, label: label.value }));
+      const activeTab = tablist.querySelector<HTMLElement>('[aria-selected="true"]');
+      if (activeTab) activeTab.textContent = label.value || `Tab ${selected + 1}`;
+    });
+
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'btn btn--ghost';
+    up.textContent = '↑';
+    up.disabled = selected === 0;
+    up.addEventListener('click', () => swapSelected(-1));
+
+    const down = document.createElement('button');
+    down.type = 'button';
+    down.className = 'btn btn--ghost';
+    down.textContent = '↓';
+    down.disabled = selected === current.content.tabs.length - 1;
+    down.addEventListener('click', () => swapSelected(1));
+
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn--ghost block-editor__tabs-remove';
+    remove.textContent = 'Remove tab';
+    remove.disabled = current.content.tabs.length <= 2;
+    remove.addEventListener('click', () => {
+      const latest = getLatest();
+      if (latest.content.tabs.length <= 2) return;
+      rememberTabsPanel(latest.id, Math.max(0, selected - 1));
+      emitTabs(latest.content.tabs.filter((_, i) => i !== selected));
+    });
+
+    header.append(label, up, down, remove);
+
+    const nested = createNestedBlocksEditor({
+      blocks: panel.blocks,
+      allowedTypes: TAB_CHILD_TYPES,
+      idFactory: () => `${getLatest().id}_t${selected}`,
+      onChange: (nextBlocks) => {
+        patchTab(selected, (tab) => ({
+          ...tab,
+          blocks: nextBlocks as TabPanel['blocks']
+        }));
+      }
+    });
+
+    pane.append(header, nested);
+  }
+
+  tablist.addEventListener('keydown', (event) => {
+    const tabs = getLatest().content.tabs;
+    if (tabs.length === 0) return;
+    const selected = preferredPanelIndex(getLatest().id, tabs.length);
+    let next = selected;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = (selected + 1) % tabs.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = (selected - 1 + tabs.length) % tabs.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    selectPanel(next);
+    tablist.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
+  });
 
   addBtn.addEventListener('click', () => {
     const latest = getLatest();
     if (latest.content.tabs.length >= 8) return;
     const n = latest.content.tabs.length + 1;
+    rememberTabsPanel(latest.id, latest.content.tabs.length);
     emitTabs([
       ...latest.content.tabs,
       { id: `${latest.id}_t${n}_${Date.now()}`, label: '', blocks: [] }
@@ -423,6 +492,7 @@ export function createTabsEditor(
   });
 
   rebuild();
-  fields.append(panelsRoot, addBtn);
+  chrome.append(tablist, pane);
+  fields.append(chrome, addBtn);
   return editorShell(block, onChange, fields, getLatest);
 }

@@ -4,6 +4,7 @@ import {
   cloneBlockWithNewIds,
   type InsertMenuValue
 } from '@/blocks/create-block';
+import { rememberTabsPanel } from '@/blocks/layout-editors';
 import {
   createBlockEditor,
   createVisibilitySelect,
@@ -543,7 +544,13 @@ export function mountBlockCanvas(
   }
 
   function preview(block: Block): HTMLElement {
-    return options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
+    const el = options.renderPreview?.(block) ?? renderBlock(block, 'teacher');
+    if (block.block_type === 'tabs') {
+      el.querySelectorAll('[role="tab"]').forEach((btn, index) => {
+        btn.addEventListener('click', () => rememberTabsPanel(block.id, index));
+      });
+    }
+    return el;
   }
 
   function render(): void {
@@ -588,7 +595,7 @@ export function mountBlockCanvas(
           selectedId = block.id;
           options.onSelect?.(block.id);
         });
-      } else if (isTextLike(block.block_type)) {
+      } else if (isTextLike(block.block_type) || block.block_type === 'tabs') {
         if (selectedId === block.id) {
           const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
           editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
