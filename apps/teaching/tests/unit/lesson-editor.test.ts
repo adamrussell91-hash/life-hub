@@ -46,6 +46,7 @@ import { apiGet, apiPut, apiPost, apiPatch, ApiClientError } from '@/api/client'
 import { createBlock } from '@/blocks/create-block';
 import { mountLessonEditor, type LessonEditorHandle } from '@/teacher/lesson-editor';
 import { renderTeacherShell } from '@/teacher/shell';
+import { enterBlockEdit } from './helpers/block-edit';
 
 const startAiJobMock = vi.mocked(startAiJob);
 const pollAiJobMock = vi.mocked(pollAiJob);
@@ -316,7 +317,7 @@ describe('mountLessonEditor', () => {
     mount();
     await tick();
 
-    refs.canvas.querySelector<HTMLElement>('.lesson-page__block')!.click();
+    enterBlockEdit(refs.canvas);
     await tick();
 
     const editors = refs.canvas.querySelectorAll('.block-editor');
@@ -623,7 +624,7 @@ describe('mountLessonEditor', () => {
     mount();
     await tick();
 
-    refs.canvas.querySelector<HTMLElement>('.lesson-page__block[data-block-type="section"]')!.click();
+    enterBlockEdit(refs.canvas, '.lesson-page__block[data-block-type="section"]');
     expect(refs.canvas.querySelector('.lesson-editor__save-composition')).not.toBeNull();
 
     refs.canvas.querySelector<HTMLButtonElement>('.lesson-editor__save-composition')!.click();
@@ -898,7 +899,6 @@ describe('mountLessonEditor', () => {
     await tick();
     await tick();
 
-    refs.canvas.querySelector<HTMLElement>('.lesson-page__block[data-block-id="block_lesson_001_1"]')!.click();
     expect(refs.canvas.querySelector('.lesson-editor__save-composition')).toBeNull();
     expect(refs.canvas.querySelector('.lesson-editor__linked-badge')?.textContent).toBe('Linked');
     expect(refs.canvas.querySelector('.lesson-editor__edit-source')).not.toBeNull();

@@ -32,7 +32,6 @@ import {
   moveBlockTo,
   type DropRootMode
 } from '@/teacher/lesson-canvas/drop';
-import { isInlineEditor } from '@/teacher/lesson-canvas/kinds';
 import {
   draggable,
   dropTargetForElements
@@ -57,6 +56,8 @@ export type MountBlockCanvasOptions = {
   onDetachComposition?: (blockId: string) => void;
   onCompositionDrop?: (id: string) => void;
   renderLinkedPreview?: (compositionId: string) => HTMLElement;
+  /** Author canvases only. Student / published surfaces omit the ⋯ menu. */
+  editable?: boolean;
 };
 
 export type BlockCanvasHandle = {
@@ -183,15 +184,6 @@ function gripIcon(): SVGSVGElement {
   return svg;
 }
 
-function trashIcon(): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('aria-hidden', 'true');
-  svg.innerHTML =
-    '<path fill="currentColor" d="M9 3h6l1 2h4v2H4V5h4l1-2zm1 6h2v9h-2V9zm4 0h2v9h-2V9zM8 9h2v9H8V9z"/>';
-  return svg;
-}
-
 export function mountBlockCanvas(
   host: HTMLElement,
   options: MountBlockCanvasOptions
@@ -203,7 +195,9 @@ export function mountBlockCanvas(
   let pendingReveal: string | null = null;
   let publishErrorIds = new Set<string>();
   let dndCleanups: CleanupFn[] = [];
+  let menuDisposers: Array<() => void> = [];
   const rootMode: DropRootMode = options.allowCollectionAtRoot ? 'page' : 'lesson';
+  const canEdit = options.editable !== false;
 
   const root = document.createElement('div');
   root.className = 'lesson-page lesson-page--blocks';
@@ -212,6 +206,11 @@ export function mountBlockCanvas(
   function clearDnd(): void {
     for (const stop of dndCleanups) stop();
     dndCleanups = [];
+  }
+
+  function clearMenus(): void {
+    for (const stop of menuDisposers) stop();
+    menuDisposers = [];
   }
 
   root.addEventListener('dragleave', (event) => {
@@ -226,6 +225,7 @@ export function mountBlockCanvas(
   }
 
   function select(blockId: string | null): void {
+    if (!canEdit && blockId) return;
     // Re-selecting the open block would rebuild its editor mid-edit, so clicks
     // inside an already-selected block are left alone.
     if (selectedId === blockId) return;
@@ -440,22 +440,6 @@ export function mountBlockCanvas(
     return grip;
   }
 
-  function createBlockDelete(block: Block): HTMLElement {
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'lesson-page__block-delete';
-    remove.setAttribute('aria-label', 'Delete block');
-    remove.title = 'Delete block';
-    remove.append(trashIcon());
-    remove.addEventListener('click', (event) => {
-      event.stopPropagation();
-      selectedId = null;
-      options.onSelect?.(null);
-      emit(deleteBlocksById(blocks, [block.id]));
-    });
-    return remove;
-  }
-
   function moveBy(blockId: string, delta: number): void {
     const from = blocks.findIndex((row) => row.id === blockId);
     if (from < 0) return;
@@ -477,60 +461,66 @@ export function mountBlockCanvas(
     emit(result.blocks);
   }
 
-  function createToolbar(block: Block): HTMLElement {
+  function duplicateBlock(block: Block): void {
+    const clone = cloneBlockWithNewIds(block, options.idFactory);
+    const location = findBlockLocation(blocks, block.id);
+    const parent = location?.parent ?? { kind: 'root' };
+    const at = location ? location.index + 1 : blocks.length;
+    const result = insertAt(blocks, parent, at, clone, { rootMode });
+    if (result.ok) emit(result.blocks);
+  }
+
+  function deleteBlock(block: Block): void {
+    selectedId = null;
+    options.onSelect?.(null);
+    emit(deleteBlocksById(blocks, [block.id]));
+  }
+
+  function createBlockMenu(block: Block): HTMLElement {
+    const editing = selectedId === block.id;
+    const kind = block.block_type.replace(/_/g, ' ');
+    const menu = mountPageOptionsMenu(
+      [
+        {
+          label: editing ? 'Done' : 'Edit',
+          dataset: { blockAction: editing ? 'done' : 'edit' },
+          onSelect: () => select(editing ? null : block.id)
+        },
+        { label: 'Move up', dataset: { blockAction: 'up' }, onSelect: () => moveBy(block.id, -1) },
+        { label: 'Move down', dataset: { blockAction: 'down' }, onSelect: () => moveBy(block.id, 1) },
+        {
+          label: 'Duplicate',
+          dataset: { blockAction: 'duplicate' },
+          onSelect: () => duplicateBlock(block)
+        },
+        {
+          label: 'Delete',
+          danger: true,
+          dataset: { blockAction: 'delete' },
+          onSelect: () => deleteBlock(block)
+        }
+      ],
+      { label: `${kind} block menu`, className: 'lesson-page__block-menu' }
+    );
+    menuDisposers.push(menu.dispose);
+    return menu.el;
+  }
+
+  function createEditChrome(block: Block): HTMLElement {
     const bar = document.createElement('div');
     bar.className = 'lesson-page__toolbar';
 
+    const done = document.createElement('button');
+    done.type = 'button';
+    done.className = 'btn btn--secondary lesson-page__done';
+    done.textContent = 'Done';
+    done.addEventListener('click', (event) => {
+      event.stopPropagation();
+      select(null);
+    });
+
     const visibility = createVisibilitySelect(block, onBlockChange, latestBlock(block.id, block));
-
-    const index = blocks.findIndex((row) => row.id === block.id);
-
-    const up = document.createElement('button');
-    up.type = 'button';
-    up.className = 'btn btn--ghost lesson-page__move-up';
-    up.textContent = 'Move up';
-    up.disabled = index <= 0;
-    up.addEventListener('click', (event) => {
-      event.stopPropagation();
-      moveBy(block.id, -1);
-    });
-
-    const down = document.createElement('button');
-    down.type = 'button';
-    down.className = 'btn btn--ghost lesson-page__move-down';
-    down.textContent = 'Move down';
-    down.disabled = index < 0 || index >= blocks.length - 1;
-    down.addEventListener('click', (event) => {
-      event.stopPropagation();
-      moveBy(block.id, 1);
-    });
-
-    const duplicate = document.createElement('button');
-    duplicate.type = 'button';
-    duplicate.className = 'btn btn--ghost';
-    duplicate.textContent = 'Duplicate';
-    duplicate.addEventListener('click', (event) => {
-      event.stopPropagation();
-      const clone = cloneBlockWithNewIds(block, options.idFactory);
-      const location = findBlockLocation(blocks, block.id);
-      const parent = location?.parent ?? { kind: 'root' };
-      const at = location ? location.index + 1 : blocks.length;
-      const result = insertAt(blocks, parent, at, clone, { rootMode });
-      if (result.ok) emit(result.blocks);
-    });
-
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.className = 'btn btn--ghost';
-    remove.textContent = 'Delete';
-    remove.addEventListener('click', (event) => {
-      event.stopPropagation();
-      selectedId = null;
-      options.onSelect?.(null);
-      emit(deleteBlocksById(blocks, [block.id]));
-    });
-
-    bar.append(visibility, up, down, duplicate, remove);
+    bar.append(done, visibility);
 
     if (block.block_type === 'section' && !isLinkedSection(block) && options.onSaveComposition) {
       const saveComposition = document.createElement('button');
@@ -592,6 +582,7 @@ export function mountBlockCanvas(
 
   function render(): void {
     clearDnd();
+    clearMenus();
     root.replaceChildren();
 
     if (options.heading) {
@@ -621,53 +612,21 @@ export function mountBlockCanvas(
         row.classList.add('lesson-page__block--publish-error');
       }
       bindRowDropTarget(row, index);
-      row.append(createGrip(block, row), createBlockDelete(block));
+      if (canEdit) {
+        row.append(createGrip(block, row), createBlockMenu(block));
+      }
 
       if (isLinkedSection(block)) {
         row.append(createLinkedChrome(block));
         row.append(
           options.renderLinkedPreview?.(block.content.link.source_composition_id) ?? preview(block)
         );
-        row.addEventListener('click', (event) => {
-          if ((event.target as HTMLElement | null)?.closest('button')) return;
-          selectedId = block.id;
-          options.onSelect?.(block.id);
-        });
-      } else if (isInlineEditor(block.block_type)) {
-        if (selectedId === block.id) {
-          const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
-          editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
-          row.append(editor);
-          row.append(createToolbar(block));
-        } else {
-          row.append(preview(block));
-        }
-        row.addEventListener('click', () => select(block.id));
+      } else if (canEdit && selectedId === block.id) {
+        const editor = createBlockEditor(block, onBlockChange, latestBlock(block.id, block), editorCtx());
+        editor.querySelectorAll('.block-editor__move-up, .block-editor__move-down').forEach((el) => el.remove());
+        row.append(editor, createEditChrome(block));
       } else {
-        const previewHolder = document.createElement('div');
-        previewHolder.className = 'lesson-page__preview';
-        previewHolder.append(preview(block));
-        row.append(previewHolder);
-        row.addEventListener('click', (event) => {
-          if ((event.target as HTMLElement | null)?.closest('.lesson-page__inspector')) return;
-          if (selectedId === block.id) return;
-          selectAndReveal(block.id);
-        });
-        if (selectedId === block.id) {
-          const inspector = document.createElement('div');
-          inspector.className = 'lesson-page__inspector';
-          const editor = createBlockEditor(
-            block,
-            onBlockChange,
-            latestBlock(block.id, block),
-            editorCtx()
-          );
-          editor
-            .querySelectorAll('.block-editor__move-up, .block-editor__move-down')
-            .forEach((el) => el.remove());
-          inspector.append(editor);
-          row.append(inspector, createToolbar(block));
-        }
+        row.append(preview(block));
       }
 
       list.append(row);
@@ -695,6 +654,7 @@ export function mountBlockCanvas(
       render();
     },
     insertType(type: InsertMenuValue) {
+      if (!canEdit) return;
       const block = createFromInsertMenu(type, options.idFactory());
       const target = insertTargetForSelection(blocks, selectedId);
       const result = insertAt(blocks, target.parent, target.index, block, { rootMode });
@@ -722,6 +682,7 @@ export function mountBlockCanvas(
     },
     dispose() {
       clearDnd();
+      clearMenus();
       root.remove();
     }
   };

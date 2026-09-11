@@ -299,6 +299,12 @@ export function rememberTabsPanel(blockId: string, index: number): void {
   preferredTabsPanel.set(blockId, index);
 }
 
+export function applyRememberedTabsPanel(root: ParentNode, blockId: string): void {
+  const buttons = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+  if (buttons.length === 0) return;
+  buttons[preferredPanelIndex(blockId, buttons.length)]?.click();
+}
+
 function preferredPanelIndex(blockId: string, tabCount: number): number {
   const stored = preferredTabsPanel.get(blockId) ?? 0;
   const next = Math.max(0, Math.min(stored, tabCount - 1));
