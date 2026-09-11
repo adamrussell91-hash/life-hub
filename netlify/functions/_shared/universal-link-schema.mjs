@@ -1,24 +1,80 @@
-import { createHash } from 'node:crypto';
-import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
+import { parseEntityRef } from './entity-ref.mjs';
+import { validateRelationshipInput } from './relationship-registry.mjs';
 
 export const UNIVERSAL_LINK_SCHEMA_VERSION = 1;
 export const LINK_STATUSES = new Set(['current', 'ended', 'suppressed', 'deleted']);
 export const LINK_VISIBILITIES = new Set(['operator', 'teaching_protected']);
 
-function validationError(code, message) {
-  return Object.assign(new Error(message), { status: 400, code });
+// This slice validates existing records only. It does not generate ids or
+// timestamps — deterministic id generation is a Slice 2 write-path
+// concern (implementation programme, "Slice 1 exact file contract").
+
+function isNullableString(value) {
+  return value === null || typeof value === 'string';
 }
 
-function normalizeForHash(value) {
-  return value === undefined ? null : value;
+// Structural parse only — a type guard, not a business-rule check. Returns
+// a shallow-copied, normalized record or null when the shape is not a
+// plausible Universal Link at all (used to drop malformed/corrupted
+// records during reads without throwing).
+export function parseUniversalLink(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.schema_version !== UNIVERSAL_LINK_SCHEMA_VERSION) return null;
+  if (typeof raw.id !== 'string' || !raw.id.startsWith('ul_')) return null;
+  if (!parseEntityRef(raw.source_ref) || !parseEntityRef(raw.target_ref)) return null;
+  if (typeof raw.relationship_type !== 'string' || !raw.relationship_type) return null;
+  if (!isNullableString(raw.role)) return null;
+  if (!isNullableString(raw.context_key)) return null;
+  if (!isNullableString(raw.context_ref)) return null;
+  if (typeof raw.temporal_mode !== 'string' || !raw.temporal_mode) return null;
+  if (!isNullableString(raw.valid_from)) return null;
+  if (!isNullableString(raw.valid_to)) return null;
+  if (!isNullableString(raw.occurred_at)) return null;
+  if (!LINK_STATUSES.has(raw.status)) return null;
+  if (!LINK_VISIBILITIES.has(raw.visibility)) return null;
+  if (!raw.metadata || typeof raw.metadata !== 'object' || Array.isArray(raw.metadata)) return null;
+  if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
+  return { ...raw };
 }
 
-// Deterministic equivalence hash. Only the fields that define "the same
-// relationship" participate — never valid_to, status, display labels, or
-// audit timestamps (implementation programme, "Universal Link record").
-// Object keys are sorted and every null-ish value normalized to `null`
-// before hashing so an equivalent create always resolves to the same id.
-export function computeLinkEquivalenceHash({
+// Full validation: structural shape, then the relationship registry's
+// source/target/temporal/role/metadata/visibility rules (reusing
+// `validateRelationshipInput` so a stored record is checked against
+// exactly the same rules a write would be — implementation programme,
+// "Validate each loaded link against the complete schema and current
+// registry declaration"). Throws on any violation; never silently repairs.
+export function validateUniversalLinkRecord(raw) {
+  const parsed = parseUniversalLink(raw);
+  if (!parsed) {
+    throw Object.assign(new Error('Malformed Universal Link record.'), {
+      status: 400,
+      code: 'invalid_link_record'
+    });
+  }
+  const declaration = validateRelationshipInput({
+    sourceRef: parseEntityRef(parsed.source_ref),
+    targetRef: parseEntityRef(parsed.target_ref),
+    relationshipType: parsed.relationship_type,
+    role: parsed.role,
+    validFrom: parsed.valid_from,
+    validTo: parsed.valid_to,
+    occurredAt: parsed.occurred_at,
+    metadata: parsed.metadata,
+    visibility: parsed.visibility
+  });
+  if (parsed.temporal_mode !== declaration.temporal_mode) {
+    throw Object.assign(new Error(`temporal_mode ${parsed.temporal_mode} does not match the ${declaration.key} declaration.`), {
+      status: 400,
+      code: 'temporal_mode_mismatch'
+    });
+  }
+  return parsed;
+}
+
+// Returns the normalized, sorted-key object that Slice 2's write path will
+// hash to derive a link's deterministic id. Pure data shaping only — no
+// hashing, no id, no timestamp. Mirrors the registry's `duplicate_fields`.
+export function equivalenceInput({
   sourceRef,
   targetRef,
   relationshipType,
@@ -29,93 +85,18 @@ export function computeLinkEquivalenceHash({
   occurredAt = null
 }) {
   const payload = {
-    context_key: normalizeForHash(contextKey),
-    context_ref: normalizeForHash(contextRef),
-    occurred_at: normalizeForHash(occurredAt),
-    relationship_type: normalizeForHash(relationshipType),
-    role: normalizeForHash(role),
-    source_ref: normalizeForHash(sourceRef),
-    target_ref: normalizeForHash(targetRef),
-    valid_from: normalizeForHash(validFrom)
-  };
-  const normalized = {};
-  for (const key of Object.keys(payload).sort()) normalized[key] = payload[key];
-  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
-}
-
-export function linkIdFromEquivalenceHash(hash) {
-  return `ul_${hash}`;
-}
-
-// Builds a fresh, `status: 'current'` Universal Link record. Callers pass
-// the relationship declaration resolved by `relationship-registry.mjs` so
-// `temporal_mode` always matches the registry rather than being asserted
-// by the caller.
-export function buildUniversalLinkRecord({
-  sourceRef,
-  targetRef,
-  relationshipType,
-  declaration,
-  role = null,
-  contextKey = null,
-  contextRef = null,
-  validFrom = null,
-  validTo = null,
-  occurredAt = null,
-  visibility = 'operator',
-  metadata = {},
-  now = () => new Date().toISOString()
-}) {
-  const sourceRefString = typeof sourceRef === 'string' ? sourceRef : formatEntityRef(sourceRef);
-  const targetRefString = typeof targetRef === 'string' ? targetRef : formatEntityRef(targetRef);
-  if (!sourceRefString) throw validationError('invalid_source_ref', 'source_ref could not be formatted');
-  if (!targetRefString) throw validationError('invalid_target_ref', 'target_ref could not be formatted');
-  if (!LINK_VISIBILITIES.has(visibility)) throw validationError('invalid_visibility', `Unknown visibility ${visibility}`);
-
-  const hash = computeLinkEquivalenceHash({
-    sourceRef: sourceRefString,
-    targetRef: targetRefString,
-    relationshipType,
-    contextKey,
-    contextRef,
-    role,
-    validFrom,
-    occurredAt
-  });
-  const timestamp = now();
-
-  return {
-    schema_version: UNIVERSAL_LINK_SCHEMA_VERSION,
-    id: linkIdFromEquivalenceHash(hash),
-    source_ref: sourceRefString,
-    target_ref: targetRefString,
-    relationship_type: relationshipType,
-    role,
     context_key: contextKey,
     context_ref: contextRef,
-    temporal_mode: declaration?.temporal_mode ?? null,
-    valid_from: validFrom,
-    valid_to: validTo,
     occurred_at: occurredAt,
-    status: 'current',
-    visibility,
-    metadata: metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {},
-    created_at: timestamp,
-    updated_at: timestamp
+    relationship_type: relationshipType,
+    role,
+    source_ref: sourceRef,
+    target_ref: targetRef,
+    valid_from: validFrom
   };
-}
-
-// Structural shape check only — does not re-validate against the
-// relationship registry (that happens at write time, Slice 2).
-export function isValidLinkRecordShape(record) {
-  if (!record || typeof record !== 'object') return false;
-  if (record.schema_version !== UNIVERSAL_LINK_SCHEMA_VERSION) return false;
-  if (typeof record.id !== 'string' || !record.id.startsWith('ul_')) return false;
-  if (!parseEntityRef(record.source_ref)) return false;
-  if (!parseEntityRef(record.target_ref)) return false;
-  if (typeof record.relationship_type !== 'string' || !record.relationship_type) return false;
-  if (!LINK_STATUSES.has(record.status)) return false;
-  if (!LINK_VISIBILITIES.has(record.visibility)) return false;
-  if (!record.metadata || typeof record.metadata !== 'object' || Array.isArray(record.metadata)) return false;
-  return true;
+  const normalized = {};
+  for (const key of Object.keys(payload).sort()) {
+    normalized[key] = payload[key] === undefined ? null : payload[key];
+  }
+  return normalized;
 }
