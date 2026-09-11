@@ -1,12 +1,13 @@
 import {
   CENTRAL_NODE_SECTIONS,
   classifyCentralNodePatchRisk,
-  applyCentralNodePatch
+  applyCentralNodePatch,
+  centralNodePatchContentError
 } from '../../../apps/life/js/core/central-node-patch.js';
 import { GOVERNANCE_ENTRY_TYPES } from '../../../apps/life/js/core/governance-log.js';
 import { formatHubRef, parseHubRef } from './hub-ref.mjs';
 
-export { classifyCentralNodePatchRisk, applyCentralNodePatch };
+export { classifyCentralNodePatchRisk, applyCentralNodePatch, centralNodePatchContentError };
 
 const CENTRAL_NODE_OPS = [
   'upsert_field',

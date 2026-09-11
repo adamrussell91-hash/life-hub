@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch,
+  centralNodePatchContentError,
   CENTRAL_NODE_SECTIONS
 } from '../../apps/life/js/core/central-node-patch.js';
 
@@ -174,6 +175,54 @@ test('apply rejects unknown section', () => {
       section: 'nope',
       op: 'append_line',
       payload: { text: 'x' }
+    }),
+    null
+  );
+});
+
+test('content error: this_week append_line with two day-by-day rows is rejected', () => {
+  assert.equal(
+    centralNodePatchContentError({
+      section: 'this_week',
+      op: 'append_line',
+      payload: {
+        text: 'Mon 7 Sep: 1,578 kcal, 139.5g P. Tue 8 Sep: 1,240 kcal, 70g P.'
+      }
+    }),
+    'this_week_day_by_day_dump'
+  );
+});
+
+test('content error: this_week append_line with two ISO-dated rows is rejected', () => {
+  assert.equal(
+    centralNodePatchContentError({
+      section: 'this_week',
+      op: 'replace_section',
+      payload: { text: '2026-09-07: ran 5k. 2026-09-09: lifted.' }
+    }),
+    'this_week_day_by_day_dump'
+  );
+});
+
+test('content error: this_week append_line with a single date reference is allowed', () => {
+  assert.equal(
+    centralNodePatchContentError({
+      section: 'this_week',
+      op: 'append_line',
+      payload: { text: '- Protein averaged 95g/day, short of the 120g target.' }
+    }),
+    null
+  );
+});
+
+test('content error: this_month is not subject to the This Week rule', () => {
+  assert.equal(
+    centralNodePatchContentError({
+      section: 'this_month',
+      op: 'replace_section',
+      payload: {
+        text: 'Mon 7 Sep: session one. Tue 8 Sep: session two.'
+      }
     }),
     null
   );

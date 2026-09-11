@@ -170,7 +170,8 @@ import {
   validateGovernanceLogAppendInput,
   classifyCentralNodePatchRisk,
   applyCentralNodePatch,
-  assertAgentMayApplyCentralNodePatch
+  assertAgentMayApplyCentralNodePatch,
+  centralNodePatchContentError
 } from './_shared/hammond-tools.mjs';
 import { buildSecondOpinionChoice } from './_shared/second-opinion.mjs';
 import {
@@ -2231,6 +2232,14 @@ export function createChatHandler({
                 }
                 if (!assertAgentMayApplyCentralNodePatch(slug, patch)) {
                   return JSON.stringify({ ok: false, error: 'patch_not_allowed' });
+                }
+                const contentError = centralNodePatchContentError(patch);
+                if (contentError) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: contentError,
+                    detail: 'This Week is weekly averages and key events only -- no day-by-day logs or macro dumps (Writing Rule 5). Condense to one or two lines, or write a synthesised pattern into Long-Term Trends instead.'
+                  });
                 }
                 const risk = classifyCentralNodePatchRisk(patch);
                 if (risk === 'confirm') {

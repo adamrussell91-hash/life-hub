@@ -5947,15 +5947,68 @@ main { max-width: 76rem; margin: 0 auto; }
   color: var(--marine);
   font-weight: 700;
 }
+.governance-entry-heading--stale {
+  color: var(--danger);
+}
 .governance-entry-status,
 .governance-entry-decision,
 .governance-entry-chosen,
-.governance-entry-reasoning,
-.governance-entry-revisit,
-.governance-entry-body {
+.governance-entry-revisit {
   margin: 0.25rem 0 0;
   color: var(--muted);
   font-size: var(--text-base);
+}
+.governance-entry-longfield {
+  margin: 0.25rem 0 0;
+}
+.governance-entry-field-label {
+  margin: 0;
+  color: var(--marine);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+.governance-entry-reasoning-content,
+.governance-entry-body-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.governance-entry-reasoning,
+.governance-entry-body {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+  line-height: 1.45;
+}
+.governance-entry-reasoning-list,
+.governance-entry-body-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: var(--text-base);
+  line-height: 1.45;
+}
+.governance-entry-longfield code {
+  font-size: var(--text-sm);
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+}
+.governance-entry-toggle {
+  margin: 0.3rem 0 0;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--wave);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.governance-entry-toggle:hover,
+.governance-entry-toggle:focus-visible {
+  text-decoration: underline;
 }
 
 .governance-traces {
