@@ -12,6 +12,49 @@ Repository: `adamrussell91-hash/life-hub`
 
 This is an implementation programme, not permission to build every phase in one pull request. Execute one slice at a time. Stop after every slice for independent review.
 
+## Execution contract and resolved decisions
+
+This section is authoritative when any later sentence appears ambiguous. Claude Code must not turn the decisions below into questions for Adam.
+
+1. Slice 0 is documentation and repository verification only. It contains no schemas, storage code, read functions, API handlers or UI.
+2. Slice 1 contains all three foundation elements: type and shape contracts, pure indexed read and query functions, and read only Netlify Blobs store wiring. It contains no write path, HTTP endpoint or UI.
+3. The first user interface lives in a new `apps/professional` SPA mounted at `/professional/`. Do not place Person pages or relationship timelines inside `apps/tasks`.
+4. Tasks receives only its workflow integration in Slice 6: the shared picker, relationship chips and Task to Person links.
+5. PR 304 has two planning documents, not three: `docs/proposals/comms-hub-people-unification.md` and this file. There is no separate supplied implementation programme outside Git.
+6. Slice 0 compares current `origin/main` with those two files at PR 304's pinned planning commit. It does not require either planning file to exist on `main`.
+7. Repository reconciliation means verifying each asserted path and architectural assumption, recording `confirmed`, `moved`, `missing` or `contradicted`, and naming the exact replacement path or required decision. It does not mean rewriting consolidation documents.
+8. Do not land, merge or copy the proposal into `main` during Slice 0.
+9. Every implementation slice begins only after its predecessor has been reviewed and merged. Do not stack slices unless Adam explicitly directs a stacked branch.
+10. No slice is permission to merge. Open a draft pull request and stop.
+
+### Source retrieval
+
+PR 304 planning head for this revision is `7fd44087e5d88d8e7dff1e224b7d7c278712fcef`.
+
+Claude Code must retrieve the planning documents without asking Adam to paste them:
+
+```bash
+git fetch origin pull/304/head:refs/remotes/origin/pr-304-plan
+git show origin/pr-304-plan:docs/proposals/comms-hub-people-unification.md
+git show origin/pr-304-plan:docs/universal-links/implementation-programme.md
+```
+
+If PR 304 advances, use the head SHA Adam names. Do not silently substitute a later revision.
+
+### Question gate
+
+Proceed without asking Adam when the answer exists in this document, the proposal, current repository code or an applicable `AGENTS.md` file. Record ordinary repository drift in the Slice 0 map.
+
+Stop and ask only when one of these conditions applies:
+
+1. GitHub or repository access is unavailable.
+2. The requested base commit no longer exists.
+3. A required action would expose real student data or weaken authentication.
+4. A migration would delete or overwrite production data.
+5. Current code proves two explicit instructions mutually exclusive and no safe non runtime documentation result is possible.
+
+Do not ask Adam to choose slice boundaries, UI location, included foundation components, planning sources, file naming or whether to merge. Those decisions are fixed here.
+
 ## Agent responsibilities
 
 Claude Code owns repository reconnaissance, implementation, migrations, broad mechanical changes and complete local verification.
@@ -54,7 +97,7 @@ The implementation must respect the current repository rather than rebuilding th
 8. Authentication uses `LIFE_HUB_PASSPHRASE_HASH`, `SESSION_SECRET` and `life_hub_session`.
 9. Do not create a second passphrase, cookie or authentication flow.
 10. Tasks data stays in `tasks-hub-content`.
-11. Knowledge notes stay in `knowledge-hub-data` through `_shared/knowledge-data.mjs`.
+11. Knowledge notes stay in the separate private GitHub repository `adamrussell91-hash/knowledge-hub-data` through `netlify/functions/_shared/knowledge-data.mjs`. Do not move them into Netlify Blobs.
 12. Teaching records stay in `teaching-hub-content`.
 13. Root `netlify.toml` remains the only Functions deployment configuration.
 14. New hub interfaces must use `packages/design-kit` and `packages/hub-switcher.js`.
@@ -140,7 +183,7 @@ The architecture has six layers.
 | Job Application | Professional Hub | `professional-hub-content` |
 | Task and Project | Tasks Hub | existing `tasks-hub-content` |
 | Lesson, Unit, Class and StudentReference | Teaching Hub | existing `teaching-hub-content` |
-| Page and Publication | Knowledge Hub | existing `knowledge-hub-data` |
+| Page and Publication | Knowledge Hub | existing private GitHub repository `adamrussell91-hash/knowledge-hub-data` through `_shared/knowledge-data.mjs` |
 | Life records | Life Hub | existing Life stores |
 
 `universal-link-content` and `professional-hub-content` are named stores inside the existing umbrella Netlify deployment. They require no new site, hostname or authentication secret.
@@ -312,6 +355,7 @@ First slice declarations:
 | `employee_at` | Person | Organisation | `employs` | period |
 | `member_of` | Person | Organisation | `has_member` | period |
 | `collaborator` | Task | Person | `collaborates_on` | timeless |
+| `contact` | Task | Person | `contacted_for_task` | timeless |
 | `recipient` | Communication | Person | `received_communication` | point |
 | `about_person` | Communication | Person | `communication_about` | point |
 | `follows_from` | Communication | Task | `prompted_communication` | timeless |
@@ -997,30 +1041,242 @@ Technical requirements:
 
 ### Slice 0. Repository reconciliation and test harness
 
-Outcome: confirm every file path, current branch assumption, build command, auth boundary and store adapter before product code.
+Outcome: one evidence based repository map committed on a branch from current `origin/main`. This slice resolves repository facts before runtime design becomes code.
 
-Claude instructions:
+This slice is documentation only. Do not include any foundation code.
 
-1. Read `CLAUDE.md`.
-2. Read `docs/consolidation/plan.md` for current platform facts. Do not act as consolidation overseer.
-3. Read `packages/design-kit/AGENTS.md`.
-4. Read affected app `AGENTS.md` files.
-5. Inspect current `main` rather than trusting this document where code has moved.
-6. Produce `docs/universal-links/repository-map.md` containing confirmed files, functions, stores, routes, tests and deviations from this document.
-7. Add no runtime behaviour.
-8. Run root tests and build.
+#### Required branch and source state
 
-Stop after PR creation.
+1. Fetch `origin/main` and PR 304.
+2. Record the current `origin/main` SHA as `BASE_SHA`.
+3. Record PR 304 planning SHA `7fd44087e5d88d8e7dff1e224b7d7c278712fcef` as `PLAN_SHA`.
+4. Create `claude/universal-links-slice-0-repository-map` from `BASE_SHA`, not from PR 304.
+5. Read both planning files with `git show origin/pr-304-plan:<path>`.
+6. Do not copy either planning file into the Slice 0 branch.
+
+#### Files to inspect
+
+Read the complete contents of:
+
+```text
+CLAUDE.md
+docs/consolidation/plan.md
+package.json
+netlify.toml
+scripts/build-spa.mjs
+scripts/prepare-web.mjs
+packages/design-kit/AGENTS.md
+packages/hub-switcher.js
+packages/design-kit/js/hub-entity-search.js
+apps/tasks/AGENTS.md
+apps/tasks/package.json
+apps/tasks/src/schemas/task.ts
+apps/tasks/src/services/client-api.ts
+apps/tasks/src/views/task-editor.ts
+apps/tasks/src/app/main.ts
+apps/knowledge/AGENTS.md
+apps/knowledge/package.json
+apps/knowledge/src/domain/hub-ref.ts
+apps/knowledge/src/domain/page.ts
+apps/knowledge/src/wiki/connectedHtml.ts
+netlify/functions/_shared/operator-gate.mjs
+netlify/functions/_shared/tasks-blobs.mjs
+netlify/functions/_shared/teaching-blobs.mjs
+netlify/functions/_shared/knowledge-data.mjs
+netlify/functions/_shared/hub-ref.mjs
+netlify/functions/_shared/inverse-links.mjs
+netlify/functions/tasks.mjs
+tests/integration/tasks-list.test.js
+tests/integration/knowledge-pages.test.js
+tests/unit/hub-ref.test.js
+tests/unit/inverse-links.test.js
+```
+
+Also locate every nested `AGENTS.md` governing those paths and read it before writing.
+
+#### Only file to create
+
+Create:
+
+`docs/universal-links/repository-map.md`
+
+Use these exact headings:
+
+```text
+# Universal Links repository map
+## Source revisions
+## Build and deployment topology
+## Authentication and origin boundary
+## Runtime data ownership
+## Current entity and relationship mechanisms
+## Existing helpers to reuse
+## Confirmed implementation paths for Slices 1 to 6
+## Planning assertions which are false, stale or unverified
+## Baseline verification
+## Slice 1 exact file contract
+```
+
+#### Required evidence tables
+
+The map must include:
+
+1. A source revision table with `BASE_SHA`, `PLAN_SHA`, branch name and inspection date.
+2. A build table covering each root script, each app build command, output directory and umbrella mount.
+3. An API table covering handler factory, session cookie, origin validation helper, Function directory and route mapping source.
+4. A data ownership table for Tasks, Teaching, Knowledge, Life, proposed shared identities and proposed Professional records. State storage technology and existing adapter path. Mark proposed stores as `not implemented`.
+5. A relationship mechanism table covering Task contexts, Knowledge `connected`, `HubRef`, inverse links, Teaching student references and domain ownership fields. State whether each remains, migrates or is out of scope.
+6. A file status table for every path named in this implementation programme. Use only `confirmed`, `moved`, `missing` or `contradicted`. Every non confirmed row needs evidence and a replacement action.
+7. A Slice 1 file contract listing every file to create or edit and one sentence describing the required export or test responsibility.
+
+#### Fixed reconciliation answers
+
+1. Do not edit `docs/consolidation/plan.md`, `docs/consolidation/OVERSEER.md`, or any checkpoint.
+2. Do not write a separate slice roadmap. This document already defines the roadmap.
+3. Do not land the proposal document on `main`.
+4. Do not add cross references from consolidation documents.
+5. Do identify contradictions in the repository map.
+6. Do not resolve contradictions with runtime code in this slice.
+7. The expected Knowledge storage fact is a separate private GitHub repository accessed through `_shared/knowledge-data.mjs`, not a Netlify Blobs store. Verify and record this.
+8. The expected Professional UI location is a future `apps/professional` SPA at `/professional/`, not `apps/tasks`. Verify the umbrella build changes required and record them.
+
+#### Verification
+
+Run from the repository root:
+
+```bash
+npm test
+npm run build
+git diff --check
+```
+
+Do not repair unrelated baseline failures. Record the exact command, exit code and failing test or build stage.
+
+#### Slice 0 completion gate
+
+Slice 0 is complete only when:
+
+1. `git diff --name-only BASE_SHA...HEAD` contains only `docs/universal-links/repository-map.md`.
+2. Every required heading and table exists.
+3. Every planning path has a status.
+4. The map gives Slice 1 an exact file list.
+5. A draft PR is open against `main`.
+6. The PR remains unmerged.
+
+Stop after reporting the draft PR URL, base SHA, head SHA, changed file, command results and contradictions found.
 
 ### Slice 1. Shared contracts, registry and read only repository
 
-Outcome: EntityRef, relationship registry, Universal Link schema, store adapter, resolver interface and indexed read methods.
+Prerequisite: Slice 0 has been reviewed and merged. Begin from the resulting current `origin/main`.
 
-No Person UI. No write endpoint. No Professional SPA.
+Outcome: all shared contracts plus a read only repository backed by the proposed `universal-link-content` Netlify Blobs store. This slice includes contracts, pure indexed queries and read only store wiring. It excludes every write operation and every interface.
 
-Tests must cover parsing, registry rejection, visibility intersection, membership lookup and hidden endpoint non disclosure.
+#### Files to create
 
-Stop after PR creation.
+```text
+netlify/functions/_shared/entity-ref.mjs
+netlify/functions/_shared/entity-access.mjs
+netlify/functions/_shared/entity-resolvers.mjs
+netlify/functions/_shared/relationship-registry.mjs
+netlify/functions/_shared/universal-link-schema.mjs
+netlify/functions/_shared/universal-link-blobs.mjs
+netlify/functions/_shared/universal-link-read-repository.mjs
+tests/unit/entity-ref.test.js
+tests/unit/entity-access.test.js
+tests/unit/entity-resolvers.test.js
+tests/unit/relationship-registry.test.js
+tests/unit/universal-link-schema.test.js
+tests/unit/universal-link-blobs.test.js
+tests/unit/universal-link-read-repository.test.js
+```
+
+Change a path only if the merged Slice 0 map proves the path conflicts with repository conventions. In that case, follow the mapped replacement and cite the map in the PR body.
+
+#### Required exports
+
+`entity-ref.mjs` exports `parseEntityRef`, `formatEntityRef`, `assertRegisteredEntityRef`, `hashEntityRef` and the registered namespace and kind table.
+
+`entity-access.mjs` exports `createAccessContext`, `isVisibilityAllowed`, `strictestVisibility` and `assertEntityKindAllowed`. `createAccessContext` accepts server supplied actor and workflow values. No request body field sets access.
+
+`relationship-registry.mjs` exports the frozen declarations, `getRelationshipDeclaration`, `validateRelationshipInput` and `projectRelationshipRegistry`. Add only the eight declarations listed earlier in this document.
+
+`universal-link-schema.mjs` exports `parseUniversalLink`, `validateUniversalLinkRecord` and `equivalenceInput`. This slice validates existing records. It does not generate IDs or timestamps.
+
+`universal-link-blobs.mjs` exports the store name, key builders, membership parser and `defaultGetUniversalLinkStore`. Reuse `listBlobKeys` and the same `getJSON` conventions as `_shared/tasks-blobs.mjs`. Do not add `set`, `setJSON`, `delete` or index rebuild exports.
+
+`entity-resolvers.mjs` defines a resolver registry interface and injectable resolvers. In Slice 1, implement Task resolution only against the existing Tasks adapter. Define Person, Organisation and Communication resolver slots, but return a named unavailable result because those entity stores do not exist yet. Do not create empty identity stores.
+
+`universal-link-read-repository.mjs` exports `createUniversalLinkReadRepository({ store, resolveEntity })` with these methods only:
+
+```text
+getLink(id, accessContext)
+listOutgoing(sourceRef, accessContext)
+listIncoming(targetRef, accessContext)
+listForEntity(ref, accessContext)
+```
+
+#### Read algorithm
+
+For each list call:
+
+1. Parse and validate the requested EntityRef.
+2. Hash the canonical ref with SHA 256.
+3. List only the relevant membership prefix.
+4. Parse every membership record and reject hash collisions by comparing its stored canonical ref.
+5. Load the authoritative link for each surviving membership.
+6. Validate each link against the schema and registry.
+7. Resolve both endpoints.
+8. Apply link visibility and both endpoint visibility before adding a result.
+9. Return no label, count contribution or error detail for an inaccessible endpoint.
+10. Sort by `updated_at` descending, then `id` ascending for deterministic ties.
+11. Bound hydration to batches of ten.
+12. Return an empty array for a valid ref with no memberships.
+
+Do not scan `universal-links/links/` during an ordinary read.
+
+#### Test fixtures
+
+Use in memory fake stores. Include:
+
+1. one visible Task to Person link;
+2. one hidden endpoint;
+3. one missing authoritative link referenced by membership;
+4. one membership hash collision with a mismatched canonical ref;
+5. one malformed link record;
+6. one duplicate membership seen from both directions;
+7. eleven visible links to prove bounded hydration continues beyond one batch.
+
+Tests must prove:
+
+1. EntityRef round trips and rejects unknown pairs and unsafe IDs.
+2. Every registry source, target, role and temporal rule rejects invalid input.
+3. Store key builders produce the exact key layout in this document.
+4. Read methods use membership prefixes and never list the authoritative link root.
+5. `listForEntity` deduplicates the same link.
+6. Hidden and missing endpoints are indistinguishable in returned data.
+7. Hidden records do not affect returned counts.
+8. No read method writes to the fake store.
+
+#### Explicit exclusions
+
+Do not create:
+
+1. `netlify/functions/universal-links.mjs`;
+2. any POST, PATCH or DELETE handler;
+3. deterministic link ID generation;
+4. operation journals;
+5. index writes or rebuilds;
+6. Person or Organisation records;
+7. `apps/professional`;
+8. picker or timeline components;
+9. Task editor changes;
+10. Knowledge migration code;
+11. StudentReference code.
+
+#### Verification and completion gate
+
+Run root `npm test`, root `npm run build`, every new unit test file directly with `node --test`, and `git diff --check`.
+
+Open a draft PR against `main`. The PR must show all three Slice 1 foundation elements, no HTTP routes, no UI and no writes. Stop and do not merge.
 
 ### Slice 2. Canonical link writes and recovery
 
@@ -1090,7 +1346,7 @@ Complete vertical acceptance path:
 3. add two concurrent dated roles;
 4. render the roles on Seth's timeline;
 5. create Task `Email Seth about the proposal`;
-6. select Seth through `@` picker with inferred relationship `collaborator` or explicit `recipient_intent` only if the registry adds and defines it;
+6. select Seth through the `@` picker with relationship `contact`. Use `collaborator` only when the selected Person helps perform the Task;
 7. log the completed Communication;
 8. link Communication to Task and Seth;
 9. create a follow up Task linked to Seth and Communication;
@@ -1098,7 +1354,7 @@ Complete vertical acceptance path:
 11. end one relationship without deleting history;
 12. archive Seth and verify normal suggestions hide the record while deliberate archive search finds it.
 
-Do not invent a relationship key during implementation. If `recipient_intent` is needed, update the registry and tests in the same PR.
+Do not invent a relationship key during implementation. `contact` is the fixed relationship for a Task whose action is directed to a Person.
 
 Stop after PR creation.
 
@@ -1271,52 +1527,45 @@ Rollback path:
 Copy only this section to Claude Code for the next action.
 
 ```text
-You are working in the current adamrussell91-hash/life-hub repository. Your task is Slice 0 only for the PR 304 Universal Links implementation programme.
+Work in adamrussell91-hash/life-hub. Execute Slice 0 only. Slice 0 is repository verification and one documentation file. It contains no foundation code, schemas, storage adapters, query functions, API handlers or UI.
 
-Read these files before acting:
-1. CLAUDE.md
-2. docs/consolidation/plan.md
-3. docs/proposals/comms-hub-people-unification.md after PR 304 is merged or from PR 304's branch if Adam directs you to use it
-4. packages/design-kit/AGENTS.md
-5. apps/tasks/AGENTS.md
-6. apps/knowledge/AGENTS.md
-7. every applicable nested AGENTS.md
+Fixed decisions. Do not ask Adam to choose among them:
+1. Slice 0 is documentation only.
+2. Slice 1 later includes contracts, indexed read functions and read only Netlify Blobs wiring together.
+3. The future Person interface lives in new apps/professional at /professional/. It does not live in apps/tasks.
+4. PR 304 has exactly two planning sources: docs/proposals/comms-hub-people-unification.md and docs/universal-links/implementation-programme.md.
+5. There is no third supplied programme to request.
+6. Do not merge anything.
 
-Goal:
-Create an evidence based repository map for the Universal Links programme. Confirm the real current files, runtime stores, API handlers, auth gates, SPA build paths, routing, shared design kit, Task editor, Knowledge connected links and relevant tests. This is reconnaissance and documentation only.
+Retrieve the pinned planning source:
+git fetch origin main
+git fetch origin pull/304/head:refs/remotes/origin/pr-304-plan
+git rev-parse origin/main
+git rev-parse origin/pr-304-plan
 
-Write:
+The expected planning SHA is 7fd44087e5d88d8e7dff1e224b7d7c278712fcef. Stop only if the fetched PR ref does not contain this commit. Read the planning files with git show. Do not expect them on main and do not copy them into the Slice 0 branch.
+
+Create claude/universal-links-slice-0-repository-map from the fetched origin/main SHA.
+
+Read the complete Slice 0 section of docs/universal-links/implementation-programme.md from origin/pr-304-plan. Follow its exact file inspection list, evidence tables, fixed reconciliation answers, verification commands and completion gate.
+
+Repository reconciliation has one meaning here. For every asserted path and platform fact, record confirmed, moved, missing or contradicted. For every non confirmed item, name the evidence, correct location and required action. Do not rewrite consolidation documents and do not implement corrections.
+
+Create one file only:
 docs/universal-links/repository-map.md
 
-The map must include:
-1. current main SHA
-2. exact application mounts
-3. exact API deployment and auth path
-4. data store ownership by domain
-5. every current cross hub identity or link mechanism
-6. exact files which would be touched in Slices 1 to 6
-7. existing helpers to reuse
-8. conflicts between current code and the implementation programme
-9. baseline test and build results
-10. a proposed Slice 1 file list, with no code changes
+The file must use the exact headings and tables required by Slice 0. Its Slice 1 file contract must list each proposed file and its export or test responsibility. Mark proposed stores and apps as not implemented.
 
-Strict scope:
-1. Do not edit runtime code.
-2. Do not create schemas, handlers, stores, routes or UI.
-3. Do not modify consolidation checkpoints.
-4. Do not change dependencies.
-5. Do not change deployments or environment variables.
-6. Do not include real contacts or student data.
-7. Do not begin Slice 1.
+Important expected correction to verify: Knowledge production data uses a separate private GitHub repository through netlify/functions/_shared/knowledge-data.mjs. Do not describe it as a Netlify Blobs knowledge-hub-data store.
 
-Create branch:
-claude/universal-links-slice-0-repository-map
-
-Run:
+Run from the root:
 npm test
 npm run build
+git diff --check
 
-Commit the documentation, push the branch and open a draft PR. Do not merge. Report the PR URL, base SHA, head SHA, files changed, test results and any divergence from the architecture document.
+Do not fix unrelated failures. Record exact commands, exit codes and failures.
+
+Before committing, verify git diff --name-only contains only docs/universal-links/repository-map.md. Commit, push and open a draft PR against main. Do not merge. Report the PR URL, base SHA, head SHA, changed file, test and build results, plus every contradiction found. Do not start Slice 1.
 ```
 
 ## Completion definition
@@ -1336,4 +1585,3 @@ The programme is complete only when:
 11. all affected tests and builds pass;
 12. Codex has independently reviewed each slice;
 13. Adam has explicitly approved every merge.
-
