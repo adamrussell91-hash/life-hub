@@ -74,7 +74,9 @@ Professional Hub is therefore a view and workflow layer over shared identity plu
 
 ### 3.2 Universal Links
 
-Universal Links replaces Page.connected, people_links, free text student references, isolated foreign keys used for cross hub relationships, and any new hub specific link mechanism.
+Universal Links replaces Page.connected, people_links, free text student references, isolated foreign keys used only for cross hub discovery, and any new hub specific link mechanism.
+
+Universal Links does not replace a domain's authoritative ownership, containment, ordering, or integrity relationships. A Lesson still stores its owning Unit through Teaching's native model. A Task still stores its owning Project through Tasks' native model. Those domains may publish corresponding Universal Links for discovery and backlinks, but the Universal Link is not the authoritative ownership record.
 
 Every Universal Link records:
 
@@ -83,14 +85,14 @@ Every Universal Link records:
 | id | Stable link identity |
 | source_ref | The record where the relationship was created |
 | target_ref | The linked record |
-| relationship_type | The meaning of the connection |
-| role | The target's role in this context |
+| relationship_type | Canonical relationship key from the relationship registry |
+| role | Optional contextual role which refines, but does not duplicate, the relationship type |
 | context | The domain or workflow where the link applies |
 | valid_from | When an ongoing relationship began |
 | valid_to | When an ongoing relationship ended |
 | occurred_at | Date of a point in time interaction or event |
-| status | Active, inactive, archived, retained, or deleted |
-| visibility | Access scope, including protected student scope |
+| status | Relationship state, separate from either endpoint's entity lifecycle |
+| visibility | Additional link access scope, evaluated with access to both endpoints |
 | metadata | Small type specific details which do not justify a new entity |
 | created_at | Audit timestamp |
 | updated_at | Audit timestamp |
@@ -104,16 +106,55 @@ Examples:
 | Meeting | attendee | Person |
 | Note | author | Person |
 | Person | employee at | Organisation |
-| Student | participant in | Program |
+| StudentReference | participant in | Program |
 | Event | part of | Excursion |
 | Event | venue | Organisation |
 | Job application | target organisation | Organisation |
-| Lesson | belongs to | Unit |
-| Project | contains | Task |
+| Lesson | supporting material | Note |
+| Project | partner organisation | Organisation |
 
 There must be one canonical write path. A link is never copied into both records. Source and target pages read the same link through indexed lookup.
 
 Universal Links must support links between every registered entity type, not only links to people.
+
+#### Relationship registry
+
+Every relationship type must be declared in one shared registry before use. Each declaration defines:
+
+- canonical relationship key
+- permitted source entity types
+- permitted target entity types
+- canonical direction
+- inverse display label
+- cardinality
+- whether the relationship is point in time, dated, or timeless
+- allowed role values
+- allowed metadata shape
+- duplicate equivalence rules
+
+For example, Person employee_at Organisation has the inverse Organisation employs Person. Task collaborator Person has the inverse Person collaborates_on Task. The registry, not free text labels, controls validation, backlinks, inverse rendering, role inference, and duplicate prevention.
+
+A contextual role refines a relationship without restating it. For a Meeting attendee Person link, chair or minute_taker may be valid roles. Attendee is the relationship type, not both the relationship type and role.
+
+#### Authorisation and visibility
+
+A Universal Link is returned only when the requester may access the link and both endpoint records. Visibility is the intersection of source access, target access, link access, and the current workflow scope.
+
+Protected records must not leak through:
+
+- search results
+- @ suggestions
+- backlinks
+- unified pages
+- relationship timelines
+- counts or aggregates
+- notifications
+- analytics or telemetry
+- error messages
+- logs
+- AI retrieval or generated context
+
+A hidden target must behave as absent. The system must not reveal its label, identifier, entity type, relationship type, existence, or contribution to a count. Indexed lookups must apply authorisation before returning results rather than filtering protected records only in the interface.
 
 ### 3.3 Relationship history and timeline
 
@@ -300,6 +341,8 @@ Student references use initials or neutral codes rather than full names. They ap
 
 ### 6.1 Purpose and scope
 
+StudentReference is a protected, Teaching owned entity. It is not a Person subtype, does not participate in general identity search, and does not share the ordinary Person lifecycle or unified Person page. Universal Links may connect a StudentReference only inside explicitly authorised teaching workflows.
+
 The application does not become a student information system. Student references exist only to support narrow operational needs such as:
 
 - who is in a class
@@ -393,12 +436,14 @@ This is a smaller approval question than operating a full student identity datab
 
 ## 7. Lifecycle and retention
 
-Status terms must have defined behaviour.
+Entity lifecycle and relationship lifecycle are separate state machines. Ending a role does not archive either endpoint. Archiving a Person does not rewrite every historical relationship as archived.
+
+### 7.1 Entity lifecycle
 
 | Status | Behaviour |
 |---|---|
 | active | Appears in current search, suggestions, dashboards, and work |
-| inactive | Historical relationship remains available but is excluded from current defaults |
+| inactive | Historical identity remains available but is excluded from current defaults |
 | archived | Read only, hidden from ordinary suggestions, available through deliberate archive search |
 | retained | Hidden from normal use and held for a documented reason until a defined review or deletion date |
 | deidentified | Identity removed while approved anonymous activity history remains |
@@ -407,6 +452,17 @@ Status terms must have defined behaviour.
 Stored is not a status because it says nothing about access, purpose, or deletion.
 
 Archive must not mean forgotten permanent retention. Every retained identity requires a retention reason, review date, and final action.
+
+### 7.2 Relationship lifecycle
+
+| Status | Behaviour |
+|---|---|
+| current | The relationship applies now. A dated relationship has no valid_to value |
+| ended | The historical relationship remains queryable and has a valid_to value |
+| suppressed | Hidden from ordinary views for a documented access, moderation, or retention reason |
+| deleted | Removed where policy permits, with a non identifying tombstone only where required for integrity |
+
+Point in time links use occurred_at and do not need current or ended semantics. A relationship change closes the prior dated link by setting valid_to and status ended, then creates the new current link. Entity lifecycle changes never silently alter relationship history.
 
 ## 8. Link storage, integrity, and performance
 
@@ -422,8 +478,9 @@ The storage layer must support indexed lookup in both directions:
 
 Required integrity behaviour:
 
-- validate source and target entity types
-- prevent duplicate equivalent links
+- validate source and target entity types against the relationship registry
+- enforce source, target, link, and workflow authorisation during indexed lookup
+- prevent duplicate equivalent links using registry rules
 - preserve history when roles change
 - stop deletion when protected references require review
 - deidentify or tombstone deleted identities without silently breaking history
@@ -463,8 +520,11 @@ Acceptance criteria:
 - relationship role inference remains editable
 - unified Person page reads links rather than copied fields
 - relationship timeline shows concurrent roles and dated changes
-- lifecycle states behave as defined
-- tests cover link creation, backlinks, role history, archive filtering, and duplicate prevention
+- entity and relationship lifecycle states behave independently as defined
+- relationship registry controls direction, inverse labels, cardinality, temporal behaviour, role values, metadata, and duplicate equivalence
+- protected links and endpoints do not leak through search, suggestions, backlinks, timelines, counts, logs, analytics, or AI retrieval
+- StudentReference remains Teaching owned, protected, and separate from Person
+- tests cover link creation, backlinks, inverse rendering, role history, authorisation, non disclosure, archive filtering, relationship ending, and duplicate prevention
 - only synthetic data appears in repository fixtures and tests
 
 ## 10. Later slices
@@ -492,6 +552,8 @@ After the first slice proves the model:
 - Do not treat a planned communication and a completed communication as the same record.
 - Do not make Professional Hub the technical owner of shared identities.
 - Do not copy linked records into Person or Organisation pages.
+- Do not replace authoritative domain ownership or containment relationships with Universal Links.
+- Do not treat StudentReference as a Person subtype or expose it through general identity search.
 - Do not create a separate top level ProfessionalDevelopmentEvent entity before an Event subtype proves insufficient.
 - Do not turn the application into a student information system.
 - Do not store full student identities, official forms, sensitive student information, or unrestricted student notes.
