@@ -17,11 +17,17 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
   if (!apiKey) throw Object.assign(new Error('AI provider is not configured.'), { code: 'provider_unavailable' });
   const client = createAnthropicClient({ apiKey, fetchImpl });
   let text = '';
-  for await (const event of client.streamMessage({
-    system: prompt.system,
-    messages: [{ role: 'user', content: prompt.user }],
-    maxTokens: Math.min(1200, Math.max(160, prompt.wordBudget * 2))
-  })) if (event.type === 'text') text += event.delta ?? '';
+  try {
+    for await (const event of client.streamMessage({
+      system: prompt.system,
+      messages: [{ role: 'user', content: prompt.user }],
+      maxTokens: Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
+    })) if (event.type === 'text') text += event.delta ?? '';
+  } catch (error) {
+    // Sonnet 5 rejects the client's max_tokens assistant-prefill continuation.
+    // Keep a complete first-round voice if we already have one.
+    if (!text.trim()) throw error;
+  }
   return { text, evidenceIds: [] };
 }
 

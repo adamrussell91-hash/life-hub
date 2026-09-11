@@ -88,7 +88,47 @@ export function buildPrompt(s,currentStep){
  const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,gate?`This is a ${gate} checkpoint. Return one targeted question and STOP.`:'If a question is necessary, return it separately and STOP; do not continue analysis.',s.protocolId==='fates'?`Micro-turn ${(currentStep.micro||0)+1} of ${currentStep.quota||1} in this logical stop. A prior confirmed plan supplies fixed creative/critical roles.`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling.':'',s.protocolId==='mirror'&&speaker==='present'&&s.intake.timescale==='long-arc'?'Ask what the user is willing to sit with, tolerate or protect this week.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:''].filter(Boolean).join('\n');
  return {speaker,stage,gate,wordBudget:budget,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput:s.intake,mode:s.mode,evidence:s.evidence,evidenceStatus:s.evidenceStatus,...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
+// Voices are prompted for JSON; the provider adapter streams that payload as text.
+// Models often put literal newlines inside strings, which JSON.parse rejects.
+function repairJsonStrings(s){
+ let out='',inString=false,escape=false;
+ for(const ch of s){
+  if(inString){
+   if(escape){out+=ch;escape=false;continue;}
+   if(ch==='\\'){out+=ch;escape=true;continue;}
+   if(ch==='"'){out+=ch;inString=false;continue;}
+   const code=ch.charCodeAt(0);
+   if(code<32){out+=ch==='\n'?'\\n':ch==='\r'?'\\r':ch==='\t'?'\\t':`\\u${code.toString(16).padStart(4,'0')}`;continue;}
+   out+=ch;continue;
+  }
+  if(ch==='"')inString=true;
+  out+=ch;
+ }
+ return out;
+}
+function voiceText(parsed){
+ if(typeof parsed.text==='string')return parsed.text;
+ if(Array.isArray(parsed.text))return parsed.text.filter(part=>typeof part==='string').join('\n');
+ return '';
+}
+function parseVoice(raw){
+ if(!raw||typeof raw!=='object'||typeof raw.text!=='string')return raw;
+ const trimmed=raw.text.trim();
+ const fenced=trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
+ const candidate=fenced?.[1]?.trim()??trimmed;
+ const start=candidate.indexOf('{'),end=candidate.lastIndexOf('}');
+ if(start<0||end<=start)return raw;
+ const slice=candidate.slice(start,end+1);
+ let parsed;
+ try{parsed=JSON.parse(slice);}
+ catch{try{parsed=JSON.parse(repairJsonStrings(slice));}catch{return raw;}}
+ if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return raw;
+ const text=voiceText(parsed),question=typeof parsed.question==='string'?parsed.question:parsed.question??null;
+ if(!text&&typeof question!=='string')return raw;
+ return {...raw,...parsed,text:text||question,question:question??null,evidenceIds:Array.isArray(parsed.evidenceIds)?parsed.evidenceIds:(raw.evidenceIds??[])};
+}
 function validateOutput(raw,s,p){
+ raw=parseVoice(raw);
  if(!raw||typeof raw.text!=='string'||!raw.text.trim())throw fault(502,'invalid_model_output','The voice returned no usable text. Retry this stage.');
  if(raw.question!=null&&typeof raw.question!=='string')throw fault(502,'invalid_model_output','The question format was invalid.');
  let text=raw.text.trim(),question=raw.question?.trim()||null;

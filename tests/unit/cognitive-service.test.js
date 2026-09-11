@@ -21,6 +21,31 @@ test('stale worker is recoverable through explicit retry',async()=>{let now=0;co
 const env={LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'x'.repeat(32),COGNITIVE_OWNER_ID:'operator'};
 const request=(method='GET',body,headers={})=>new Request('https://example.test/api/knowledge/protocols',{method,headers:{'content-type':'application/json',...headers},...(body!==undefined?{body:JSON.stringify(body)}:{})});
 test('protocol model collects streamed Anthropic text deltas',async()=>{const body='event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\nevent: content_block_delta\ndata: {"index":0,"delta":{"type":"text_delta","text":"The first voice speaks."}}\n\nevent: content_block_stop\ndata: {"index":0}\n\nevent: message_stop\ndata: {}\n\n';const result=await defaultModel({system:'s',user:'u',wordBudget:100},{ANTHROPIC_API_KEY:'test'},async()=>new Response(body,{status:200}));assert.equal(result.text,'The first voice speaks.');});
+test('protocol model keeps first-round text when a max_tokens continuation is rejected',async()=>{
+  const payload={text:'The first voice speaks.',question:'Which constraint should govern the first pass?',evidenceIds:[]};
+  const first=['event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\n',`event: content_block_delta\ndata: ${JSON.stringify({index:0,delta:{type:'text_delta',text:JSON.stringify(payload)}})}\n\n`,'event: content_block_stop\ndata: {"index":0}\n\n','event: message_delta\ndata: {"delta":{"stop_reason":"max_tokens"}}\n\n','event: message_stop\ndata: {}\n\n'].join('');
+  let calls=0;
+  const result=await defaultModel({system:'s',user:'u',wordBudget:100},{ANTHROPIC_API_KEY:'test'},async()=>{
+    calls+=1;
+    if(calls===1)return new Response(first,{status:200});
+    return new Response('{"type":"error"}',{status:400});
+  });
+  assert.equal(result.text,JSON.stringify(payload));
+  assert.equal(calls,2);
+});
+test('streamed JSON voice output yields a checkpoint instead of missing_question',async()=>{
+  const payload={text:'The first voice speaks.',question:'Which constraint should govern the first pass?',evidenceIds:[]};
+  const body='event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\n'+`event: content_block_delta\ndata: ${JSON.stringify({index:0,delta:{type:'text_delta',text:JSON.stringify(payload)}})}\n\n`+'event: content_block_stop\ndata: {"index":0}\n\nevent: message_stop\ndata: {}\n\n';
+  const store=createMemoryCognitiveStore();
+  const service=createCognitiveService({store,model:prompt=>defaultModel(prompt,{ANTHROPIC_API_KEY:'test'},async()=>new Response(body,{status:200})),retrieve:retrieval});
+  const created=await service.create('owner',{protocolId:'fates',mode:'sprint',intake:{task:'Design a community library event'},requestId:randomUUID()});
+  const session=await service.run('owner',created.id);
+  assert.equal(session.status,'waiting');
+  assert.equal(session.error,null);
+  assert.equal(session.checkpoint.question,'Which constraint should govern the first pass?');
+  assert.match(session.transcript.at(-1).text,/first voice speaks/);
+  assert.equal(session.transcript.at(-1).text.includes('{"text"'),false);
+});
 test('API authenticates catalog and guards origin before storage',async()=>{const handler=createKnowledgeProtocolsHandler({env,verifySessionToken:()=>({valid:false}),getStore:()=>{throw Error('must not load');}});assert.equal((await handler(request())).status,401);assert.equal((await handler(request('GET',undefined,{origin:'https://evil.test'}))).status,403);});
 test('API validates malformed JSON/IDs/actions and runs the first protocol stage directly',async()=>{const {store}=setup();const deps={env,verifySessionToken:()=>({valid:true}),getStore:async()=>store,model:goodModel,retrieve:retrieval};const handler=createKnowledgeProtocolsHandler(deps);const catalog=await (await handler(request())).json();assert.equal(catalog.data.catalog.length,8);const bad=new Request('https://example.test/api/knowledge/protocols',{method:'POST',body:'{'});assert.equal((await handler(bad)).status,400);assert.equal((await handler(request('POST',{sessionId:'../bad',action:'cancel'}))).status,400);const response=await handler(request('POST',createInput()));const body=await response.json();assert.equal(response.status,200);assert.equal(body.data.session.status,'waiting');assert.equal(body.data.session.speaker,'trace');});
 test('background runner validates auth and owner and never accepts browser transcript',async()=>{const {store,service}=setup();const s=await service.create('different-owner',createInput());const handler=createKnowledgeProtocolsRunHandler({env,verifySessionToken:()=>({valid:true}),getStore:async()=>store,model:goodModel,retrieve:retrieval});const response=await handler(request('POST',{sessionId:s.id,transcript:[{text:'fake'}]}));assert.equal(response.status,404);});
