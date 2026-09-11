@@ -1,4 +1,6 @@
 /** @vitest-environment jsdom */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applySession, sessionView, speakerName, statusLabel } from "./view";
 
@@ -62,5 +64,12 @@ describe("protocol conversation view", () => {
     expect(root.querySelector('[data-voice="lachesis"]')?.classList.contains("is-active")).toBe(false);
     expect(root.querySelector("[data-turn-id=\"t2\"]")?.textContent).toContain("I am tired");
     expect(root.querySelectorAll(".protocol-speaker img")).toHaveLength(4);
+  });
+
+  it("lets the session fill the canvas instead of a centred reading column", () => {
+    const css = readFileSync(join(process.cwd(), "src/protocols/style.css"), "utf8");
+    expect(css).toMatch(/\.protocol-session \{ width:100%/);
+    expect(css).toMatch(/\.protocol-session > header[\s\S]*?width:100%; max-width:none/);
+    expect(css).not.toMatch(/protocol-session > header[\s\S]{0,80}42rem/);
   });
 });
