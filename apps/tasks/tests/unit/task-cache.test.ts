@@ -5,6 +5,7 @@ import {
   mergeListedTasks,
   rememberCreatedTask,
   rememberDeletedTask,
+  rememberFetchedTask,
   resetTaskCache,
   restoreDeletedTask
 } from '@/services/task-cache';
@@ -75,6 +76,24 @@ describe('task cache', () => {
     expect(normalized.depends_on).toEqual([]);
     expect(normalized.tags).toEqual([]);
     expect(normalized.attachments).toEqual([]);
+  });
+
+  it('keeps a newer write when a later GET is stale', () => {
+    const written = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      status: 'done',
+      updated_at: '2026-09-11T00:00:02.000Z'
+    });
+    const stale = task({
+      id: 'task_tick',
+      title: 'Tick me',
+      status: 'open',
+      updated_at: '2026-09-11T00:00:01.000Z'
+    });
+    rememberCreatedTask(written);
+    expect(rememberFetchedTask(stale).status).toBe('done');
+    expect(mergeListedTasks([])[0]?.status).toBe('done');
   });
 
   it('restores a deleted task if the write fails', () => {

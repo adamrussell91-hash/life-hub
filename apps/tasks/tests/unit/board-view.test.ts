@@ -234,8 +234,9 @@ describe('board view mutations', () => {
 
     await vi.waitFor(() => {
       expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_tick', { status: 'done' });
-      expect(vi.mocked(tasksApi.getTask)).toHaveBeenCalledWith('task_tick');
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_tick"]')).not.toBeNull();
     });
+    expect(vi.mocked(tasksApi.getTask)).not.toHaveBeenCalled();
     expect(canvas.querySelector('.canvas-status')).toBeNull();
     expect(canvas.querySelector('.board')).toBe(board);
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
@@ -246,6 +247,63 @@ describe('board view mutations', () => {
     // Completing must not jump the mobile column tabs to Done (that reads as a flash).
     const activeTab = canvas.querySelector('.board-col-nav [aria-selected="true"]');
     expect(activeTab?.textContent ?? '').not.toMatch(/Done/i);
+  });
+
+  it('moves every Today tick onto Done even when the follow-up getTask is stale', async () => {
+    const first = task({ id: 'task_a', title: 'First tick', status: 'open', due_date: '2026-08-27' });
+    const second = task({ id: 'task_b', title: 'Second tick', status: 'open', due_date: '2026-08-27' });
+    const firstDone = task({
+      id: 'task_a',
+      title: 'First tick',
+      status: 'done',
+      due_date: '2026-08-27',
+      updated_at: '2026-09-11T00:00:01.000Z'
+    });
+    const secondDone = task({
+      id: 'task_b',
+      title: 'Second tick',
+      status: 'done',
+      due_date: '2026-08-27',
+      updated_at: '2026-09-11T00:00:02.000Z'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([first, second]);
+    vi.mocked(tasksApi.updateTask).mockImplementation(async (id) => (id === 'task_a' ? firstDone : secondDone));
+    // Production follow-up GET can lose the race and return the pre-tick task.
+    vi.mocked(tasksApi.getTask).mockImplementation(async (id) => (id === 'task_a' ? first : second));
+    vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)' || query === '(max-width: 720px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }) as unknown as MediaQueryList);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    expect(canvas.querySelector('.column[data-col="todo"] [data-id="task_a"]')).not.toBeNull();
+    expect(canvas.querySelector('.column[data-col="todo"] [data-id="task_b"]')).not.toBeNull();
+
+    for (const box of canvas.querySelectorAll<HTMLInputElement>('#timeline-today .task-check input')) {
+      box.checked = true;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_a', { status: 'done' });
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_b', { status: 'done' });
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_a"]')).not.toBeNull();
+      expect(canvas.querySelector('.column[data-col="done"] [data-id="task_b"]')).not.toBeNull();
+    });
+    expect(canvas.querySelector('.column[data-col="todo"] [data-id="task_a"]')).toBeNull();
+    expect(canvas.querySelector('.column[data-col="todo"] [data-id="task_b"]')).toBeNull();
+    expect(canvas.querySelector('#timeline-today [data-source="task"]')?.textContent ?? '').not.toMatch(
+      /First tick|Second tick/
+    );
   });
 
   it('does not scroll the page to the board card when ticking Today', async () => {

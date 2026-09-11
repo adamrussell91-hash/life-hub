@@ -90,23 +90,23 @@ function dropTask(list: Task[], id: string): Task[] {
   return list.filter((entry) => entry.id !== id);
 }
 
-export async function markTaskOpen(task: Task): Promise<void> {
-  await tasksApi.updateTask(task.id, { status: 'open' });
+export async function markTaskOpen(task: Task): Promise<Task> {
+  return tasksApi.updateTask(task.id, { status: 'open' });
 }
 
-export async function markTaskDone(task: Task, actualMinutes?: number): Promise<void> {
+export async function markTaskDone(task: Task, actualMinutes?: number): Promise<Task | undefined> {
   if (actualMinutes != null && !Number.isNaN(actualMinutes)) {
     await tasksApi.recordClareActual(task.id, actualMinutes);
-    return;
+    return undefined;
   }
-  await tasksApi.updateTask(task.id, { status: 'done' });
+  return tasksApi.updateTask(task.id, { status: 'done' });
 }
 
 /** Tick / Complete marks done immediately. Undo toast reverses it. */
 export function requestToggleDone(
   host: HTMLElement,
   task: Task,
-  onDone: () => Promise<void>
+  onDone: (updated?: Task) => void | Promise<void>
 ): void {
   if (task.status === 'done') {
     void markTaskOpen(task).then(onDone).catch((err) => {
@@ -116,8 +116,8 @@ export function requestToggleDone(
   }
 
   void markTaskDone(task)
-    .then(async () => {
-      await onDone();
+    .then(async (updated) => {
+      await onDone(updated);
       const { offerTimedUndo } = await import('../../design-kit/js/hub-feedback.js');
       offerTimedUndo({
         message: `Completed “${task.title}”`,

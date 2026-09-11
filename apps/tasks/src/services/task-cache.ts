@@ -53,8 +53,13 @@ export function onTasksChanged(handler: (tasks: Task[]) => void): () => void {
   return () => window.removeEventListener(TASKS_CHANGED, listener);
 }
 
-export function rememberUpdatedTask(task: Task): void {
-  rememberCreatedTask(task);
+/** GET can lose a write race — keep the newer cached copy. */
+export function rememberFetchedTask(task: Task): Task {
+  const incoming = normalizeTask(task);
+  const current = listed.get(incoming.id);
+  const chosen = current ? pickNewer(current, incoming) : incoming;
+  rememberCreatedTask(chosen);
+  return chosen;
 }
 
 export function rememberDeletedTask(id: string, task?: Task): void {

@@ -5,9 +5,10 @@ import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/pr
 import {
   filterCachedTasks,
   mergeListedTasks,
+  notifyTasksChanged,
   rememberCreatedTask,
   rememberDeletedTask,
-  rememberUpdatedTask,
+  rememberFetchedTask,
   restoreDeletedTask
 } from '@/services/task-cache';
 import type { TransitMap } from '@/schemas/map';
@@ -92,10 +93,7 @@ async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerat
 export const tasksApi = {
   listTasks: () => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks)),
   getTask: (id: string) =>
-    apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => {
-      rememberUpdatedTask(task);
-      return task;
-    }),
+    apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => rememberFetchedTask(task)),
   createTask: (body: unknown) =>
     apiPost<Task>('/api/tasks', body).then((task) => {
       rememberCreatedTask(task);
@@ -103,7 +101,7 @@ export const tasksApi = {
     }),
   updateTask: (id: string, body: unknown) =>
     apiPatch<Task>(`/api/tasks?id=${encodeURIComponent(id)}`, body).then((task) => {
-      rememberUpdatedTask(task);
+      notifyTasksChanged([task]);
       return task;
     }),
   deleteTask: async (id: string, meta?: { agent?: string; reason?: string }) => {

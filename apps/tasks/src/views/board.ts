@@ -209,9 +209,8 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
         reloadBoard();
       },
       onCompleteTask: (task) =>
-        requestToggleDone(confirmHost, task, async () => {
-          const fresh = await tasksApi.getTask(task.id);
-          applyTask(fresh);
+        requestToggleDone(confirmHost, task, async (updated) => {
+          applyTask(updated ?? { ...task, status: task.status === 'done' ? 'open' : 'done' });
         }),
       onStartTask: (task) => {
         void tasksApi.updateTask(task.id, { status: 'in_progress' }).then(
