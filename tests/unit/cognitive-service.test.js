@@ -21,6 +21,18 @@ test('stale worker is recoverable through explicit retry',async()=>{let now=0;co
 const env={LIFE_HUB_PASSPHRASE_HASH:'configured',SESSION_SECRET:'x'.repeat(32),COGNITIVE_OWNER_ID:'operator'};
 const request=(method='GET',body,headers={})=>new Request('https://example.test/api/knowledge/protocols',{method,headers:{'content-type':'application/json',...headers},...(body!==undefined?{body:JSON.stringify(body)}:{})});
 test('protocol model collects streamed Anthropic text deltas',async()=>{const body='event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\nevent: content_block_delta\ndata: {"index":0,"delta":{"type":"text_delta","text":"The first voice speaks."}}\n\nevent: content_block_stop\ndata: {"index":0}\n\nevent: message_stop\ndata: {}\n\n';const result=await defaultModel({system:'s',user:'u',wordBudget:100},{ANTHROPIC_API_KEY:'test'},async()=>new Response(body,{status:200}));assert.equal(result.text,'The first voice speaks.');});
+test('protocol model keeps first-round text when a max_tokens continuation is rejected',async()=>{
+  const payload={text:'The first voice speaks.',question:'Which constraint should govern the first pass?',evidenceIds:[]};
+  const first=['event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\n',`event: content_block_delta\ndata: ${JSON.stringify({index:0,delta:{type:'text_delta',text:JSON.stringify(payload)}})}\n\n`,'event: content_block_stop\ndata: {"index":0}\n\n','event: message_delta\ndata: {"delta":{"stop_reason":"max_tokens"}}\n\n','event: message_stop\ndata: {}\n\n'].join('');
+  let calls=0;
+  const result=await defaultModel({system:'s',user:'u',wordBudget:100},{ANTHROPIC_API_KEY:'test'},async()=>{
+    calls+=1;
+    if(calls===1)return new Response(first,{status:200});
+    return new Response('{"type":"error"}',{status:400});
+  });
+  assert.equal(result.text,JSON.stringify(payload));
+  assert.equal(calls,2);
+});
 test('streamed JSON voice output yields a checkpoint instead of missing_question',async()=>{
   const payload={text:'The first voice speaks.',question:'Which constraint should govern the first pass?',evidenceIds:[]};
   const body='event: content_block_start\ndata: {"index":0,"content_block":{"type":"text"}}\n\n'+`event: content_block_delta\ndata: ${JSON.stringify({index:0,delta:{type:'text_delta',text:JSON.stringify(payload)}})}\n\n`+'event: content_block_stop\ndata: {"index":0}\n\nevent: message_stop\ndata: {}\n\n';
