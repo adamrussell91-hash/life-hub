@@ -4,6 +4,7 @@ import { escapeHtml, showToast } from "../lib/dom";
 import type { ChatPhase } from "../api/client";
 import { listSavedConstellations, researchStars, saveConstellation } from "./client";
 import { mountStarsSky, mountStarsSymbol } from "./canvas";
+import { mountHorizonArc, type HorizonArc } from "./horizon";
 import type { SavedConstellation, StarsNote, StarsProposal, StarsRelation } from "./schema";
 
 type GraphExitMode = "constellation" | "showAll" | "universe";
@@ -15,8 +16,6 @@ export type StarsViewOptions = {
 };
 
 type StarsScreen = "sky" | "working" | "proposal" | "detail";
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function graphModesHtml() {
   return `<div class="graph-modes stars-graph-modes" role="group" aria-label="Graph mode">
@@ -98,11 +97,17 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   let month = new Date().getMonth();
   let fullscreen = false;
   let canvasTeardown: (() => void) | null = null;
+  let horizonArc: HorizonArc | null = null;
   let stopped = false;
 
   function teardownCanvas() {
     canvasTeardown?.();
     canvasTeardown = null;
+  }
+
+  function teardownHorizon() {
+    horizonArc?.destroy();
+    horizonArc = null;
   }
 
   function setFullscreen(next: boolean) {
@@ -182,10 +187,11 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   function renderShell(body: string) {
     teardownCanvas();
     if (screen !== "sky") {
+      teardownHorizon();
       fullscreen = false;
       document.body.classList.remove("is-stars-fullscreen");
     }
-    host.innerHTML = `<section class="stars-root">${graphModesHtml()}${body}</section>`;
+    host.innerHTML = `<section class="stars-root stars-enter">${graphModesHtml()}${body}</section>`;
     bindModeRow();
   }
 
@@ -261,10 +267,14 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
 
   function renderSky() {
     const year = new Date().getFullYear();
-    const date = new Date(Date.UTC(year, month, 15, 12));
+    const dateFor = (m: number) => new Date(Date.UTC(year, m, 15, 12));
+    const totalNotes = options.entries.length;
+    const meta = saved.length
+      ? `${saved.length} constellation${saved.length === 1 ? "" : "s"} charted · ${totalNotes} note${totalNotes === 1 ? "" : "s"} in your archive`
+      : `${totalNotes} note${totalNotes === 1 ? "" : "s"} waiting to be connected`;
     renderShell(`<div class="stars-sky-wrap" data-stars-sky-wrap>
       <div class="stars-sky-toolbar glass-panel">
-        <div><p class="eyebrow">Stars</p><h2>Night sky</h2></div>
+        <div><p class="eyebrow">Stars</p><h2>Night sky</h2><p class="stars-sky-toolbar__meta" data-stars-meta>${escapeHtml(meta)}</p></div>
         <form class="stars-search" data-stars-search>
           <label class="sr-only" for="stars-query">Topic or question</label>
           <input id="stars-query" type="search" value="${escapeHtml(query)}" placeholder="What should Clementine connect?" autocomplete="off" required />
@@ -274,34 +284,44 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       </div>
       ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
       <section class="stars-sky" data-stars-sky aria-label="Saved constellations and unconnected note stars"></section>
-      <div class="stars-year glass-panel">
-        <label for="stars-month">Sky position</label>
-        <input id="stars-month" type="range" min="0" max="11" step="1" value="${month}" />
-        <output for="stars-month">${MONTHS[month]} ${year}</output>
-      </div>
+      <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through the year"></div>
       <button type="button" class="stars-fullscreen-exit btn btn--ghost" data-stars-exit-fullscreen hidden>Exit full screen</button>
     </div>`);
     const sky = host.querySelector<HTMLElement>("[data-stars-sky]")!;
-    canvasTeardown = mountStarsSky(sky, saved, date, item => {
-      selected = item;
-      selectedNote = item.notes[0] ?? null;
-      selectedRelation = item.relations.find(relation => relation.sourceId === selectedNote?.pageId || relation.targetId === selectedNote?.pageId);
-      screen = "detail";
-      render();
-    }, options.entries.length);
-    if (!saved.length) {
-      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
+
+    let mountedMonth = -1;
+    function mountSky(m: number) {
+      if (m === mountedMonth) return;
+      mountedMonth = m;
+      teardownCanvas();
+      canvasTeardown = mountStarsSky(sky, saved, dateFor(m), item => {
+        selected = item;
+        selectedNote = item.notes[0] ?? null;
+        selectedRelation = item.relations.find(relation => relation.sourceId === selectedNote?.pageId || relation.targetId === selectedNote?.pageId);
+        screen = "detail";
+        render();
+      }, options.entries.length);
+      if (!saved.length) {
+        sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
+      }
     }
+    mountSky(month);
+
     host.querySelector<HTMLFormElement>("[data-stars-search]")!.onsubmit = event => {
       event.preventDefault();
       const input = host.querySelector<HTMLInputElement>("#stars-query");
       void create(input?.value ?? "");
     };
-    const slider = host.querySelector<HTMLInputElement>("#stars-month")!;
-    slider.onchange = () => {
-      month = Number(slider.value);
-      renderSky();
-    };
+
+    teardownHorizon();
+    const horizonHost = host.querySelector<HTMLElement>("[data-stars-horizon]")!;
+    horizonArc = mountHorizonArc(horizonHost, {
+      month,
+      year,
+      onChange: mountSky,
+      onCommit: next => { month = next; },
+    });
+
     host.querySelectorAll<HTMLButtonElement>("[data-stars-fullscreen]").forEach(button => {
       button.onclick = () => setFullscreen(!fullscreen);
     });
@@ -316,10 +336,20 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
     else renderSky();
   }
 
+  function isTypingTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    return target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable;
+  }
+
   function onKeyDown(event: KeyboardEvent) {
     if (event.key === "Escape" && fullscreen) {
       event.preventDefault();
       setFullscreen(false);
+      return;
+    }
+    if ((event.key === "f" || event.key === "F") && screen === "sky" && !isTypingTarget(event.target)) {
+      event.preventDefault();
+      setFullscreen(!fullscreen);
     }
   }
   document.addEventListener("keydown", onKeyDown);
@@ -337,6 +367,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
     document.removeEventListener("keydown", onKeyDown);
     document.body.classList.remove("is-stars-fullscreen");
     teardownCanvas();
+    teardownHorizon();
     host.innerHTML = "";
   };
 }

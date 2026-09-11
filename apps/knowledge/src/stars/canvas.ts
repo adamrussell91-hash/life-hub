@@ -1,4 +1,5 @@
 import { buildStarsLayout } from "./templates";
+import { createStarPopover } from "./popover";
 import type { SavedConstellation, StarsNote, StarsProposal, StarsRelation } from "./schema";
 
 type SymbolHandlers = {
@@ -44,14 +45,24 @@ function configureCanvas(canvas: HTMLCanvasElement) {
   return { context, width: rect.width, height: rect.height };
 }
 
-type DustStar = { x: number; y: number; r: number; phase: number; speed: number; layer: number; baseAlpha: number };
+const STAR_TINTS = ["#ffffff", "#dbe6ff", "#fff2d6", "#ffe1e6"];
+
+function pickTint(next: () => number) {
+  const roll = next();
+  if (roll < 0.5) return STAR_TINTS[0]!;
+  if (roll < 0.8) return STAR_TINTS[1]!;
+  if (roll < 0.93) return STAR_TINTS[2]!;
+  return STAR_TINTS[3]!;
+}
+
+type DustStar = { x: number; y: number; r: number; phase: number; speed: number; layer: number; baseAlpha: number; color: string };
 
 function buildDust(seed: number, width: number, height: number, count: number): DustStar[] {
   const next = random(seed);
   const stars: DustStar[] = [];
   for (let index = 0; index < count; index += 1) {
     const roll = next();
-    const layer = roll < 0.62 ? 0 : roll < 0.88 ? 1 : 2;
+    const layer = roll < 0.6 ? 0 : roll < 0.86 ? 1 : 2;
     const r = layer === 0 ? 0.3 + next() * 0.5 : layer === 1 ? 0.55 + next() * 0.65 : 0.85 + next() * 1;
     stars.push({
       x: next() * width,
@@ -61,20 +72,35 @@ function buildDust(seed: number, width: number, height: number, count: number): 
       speed: 0.35 + next() * 1.05,
       layer,
       baseAlpha: 0.14 + next() * 0.56,
+      color: pickTint(next),
     });
   }
   return stars;
 }
 
-function drawDust(context: CanvasRenderingContext2D, stars: DustStar[], color: string, t: number, parallax: { x: number; y: number }) {
+function drawDust(context: CanvasRenderingContext2D, stars: DustStar[], t: number, parallax: { x: number; y: number }) {
   context.save();
-  context.fillStyle = color;
   for (const star of stars) {
     const depth = star.layer === 0 ? 5 : star.layer === 1 ? 12 : 22;
     const twinkle = 0.5 + 0.5 * Math.sin(t * 0.0011 * star.speed + star.phase);
-    context.globalAlpha = Math.max(0, Math.min(1, star.baseAlpha * (0.45 + twinkle * 0.65)));
+    const alpha = Math.max(0, Math.min(1, star.baseAlpha * (0.45 + twinkle * 0.65)));
+    const x = star.x + parallax.x * depth;
+    const y = star.y + parallax.y * depth;
+    if (star.layer === 2) {
+      const glowR = star.r * 6.5;
+      const glow = context.createRadialGradient(x, y, 0, x, y, glowR);
+      glow.addColorStop(0, star.color);
+      glow.addColorStop(1, "transparent");
+      context.globalAlpha = alpha * 0.32;
+      context.fillStyle = glow;
+      context.beginPath();
+      context.arc(x, y, glowR, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = alpha;
+    context.fillStyle = star.color;
     context.beginPath();
-    context.arc(star.x + parallax.x * depth, star.y + parallax.y * depth, star.r, 0, Math.PI * 2);
+    context.arc(x, y, star.r, 0, Math.PI * 2);
     context.fill();
   }
   context.restore();
@@ -98,6 +124,40 @@ function drawNebula(context: CanvasRenderingContext2D, width: number, height: nu
     context.fillStyle = gradient;
     context.fillRect(0, 0, width, height);
   });
+  context.restore();
+}
+
+function drawMilkyWay(context: CanvasRenderingContext2D, width: number, height: number, t: number, seed: number, color: string) {
+  const next = random(seed);
+  const angle = (-16 + next() * 32) * (Math.PI / 180);
+  const cx = width / 2;
+  const cy = height / 2;
+  context.save();
+  context.translate(cx, cy);
+  context.rotate(angle + Math.sin(t * 0.00003) * 0.015);
+  context.translate(-cx, -cy);
+  const bandWidth = Math.max(width, height) * 0.5;
+  const gradient = context.createLinearGradient(0, cy - bandWidth / 2, 0, cy + bandWidth / 2);
+  gradient.addColorStop(0, "transparent");
+  gradient.addColorStop(0.5, color);
+  gradient.addColorStop(1, "transparent");
+  context.globalCompositeOperation = "lighter";
+  context.globalAlpha = 0.055;
+  context.fillStyle = gradient;
+  context.fillRect(-width * 0.6, cy - bandWidth / 2, width * 2.2, bandWidth);
+  context.restore();
+}
+
+function drawVignette(context: CanvasRenderingContext2D, width: number, height: number) {
+  const gradient = context.createRadialGradient(
+    width / 2, height / 2, Math.min(width, height) * 0.22,
+    width / 2, height / 2, Math.max(width, height) * 0.75,
+  );
+  gradient.addColorStop(0, "transparent");
+  gradient.addColorStop(1, "rgba(3, 8, 18, 0.42)");
+  context.save();
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
   context.restore();
 }
 
@@ -147,41 +207,39 @@ function stepShootingStars(stars: ShootingStar[], width: number, height: number,
   return alive;
 }
 
-function createTooltip(host: HTMLElement) {
-  const tip = document.createElement("div");
-  tip.className = "graph-tip stars-tip";
-  tip.hidden = true;
-  host.appendChild(tip);
-  const hostRect = () => host.getBoundingClientRect();
-  return {
-    el: tip,
-    show(text: string, clientX: number, clientY: number) {
-      const rect = hostRect();
-      tip.textContent = text;
-      tip.hidden = false;
-      const left = Math.min(Math.max(clientX - rect.left + 14, 8), rect.width - 8);
-      const top = Math.min(Math.max(clientY - rect.top + 14, 8), rect.height - 8);
-      tip.style.left = `${left}px`;
-      tip.style.top = `${top}px`;
-    },
-    hide() {
-      tip.hidden = true;
-    },
-  };
+type Ripple = { x: number; y: number; age: number; life: number };
+
+function stepRipples(ripples: Ripple[]) {
+  for (const ripple of ripples) ripple.age += 1;
+  return ripples.filter(ripple => ripple.age < ripple.life);
 }
 
-function bindTooltip(button: HTMLElement, tooltip: ReturnType<typeof createTooltip>, text: string) {
-  button.setAttribute("title", text);
-  const reveal = (event: { clientX: number; clientY: number }) => tooltip.show(text, event.clientX, event.clientY);
-  button.addEventListener("pointerenter", reveal);
-  button.addEventListener("pointermove", reveal);
-  button.addEventListener("pointerdown", reveal);
-  button.addEventListener("focus", () => {
-    const rect = button.getBoundingClientRect();
-    tooltip.show(text, rect.left + rect.width / 2, rect.top);
-  });
-  button.addEventListener("pointerleave", () => tooltip.hide());
-  button.addEventListener("blur", () => tooltip.hide());
+function drawRipples(context: CanvasRenderingContext2D, ripples: Ripple[], color: string) {
+  context.save();
+  context.lineCap = "round";
+  for (const ripple of ripples) {
+    const progress = ripple.age / ripple.life;
+    context.globalAlpha = Math.max(0, (1 - progress) * 0.55);
+    context.strokeStyle = color;
+    context.lineWidth = 1.4;
+    context.beginPath();
+    context.arc(ripple.x, ripple.y, 4 + progress * 36, 0, Math.PI * 2);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function revealDelay(index: number) {
+  return `${Math.min(index, 22) * 42}ms`;
+}
+
+function relationForSegment(proposal: StarsProposal, source: number, target: number) {
+  const sourceId = proposal.notes[source]?.pageId;
+  const targetId = proposal.notes[target]?.pageId;
+  return proposal.relations.find(relation =>
+    (relation.sourceId === sourceId && relation.targetId === targetId) ||
+    (relation.sourceId === targetId && relation.targetId === sourceId),
+  );
 }
 
 function bindParallax(host: HTMLElement, reduced: boolean) {
@@ -211,29 +269,22 @@ function bindParallax(host: HTMLElement, reduced: boolean) {
   };
 }
 
-function relationForSegment(proposal: StarsProposal, source: number, target: number) {
-  const sourceId = proposal.notes[source]?.pageId;
-  const targetId = proposal.notes[target]?.pageId;
-  return proposal.relations.find(relation =>
-    (relation.sourceId === sourceId && relation.targetId === targetId) ||
-    (relation.sourceId === targetId && relation.targetId === sourceId),
-  );
-}
-
 export function mountStarsSymbol(host: HTMLElement, proposal: StarsProposal, handlers: SymbolHandlers = {}) {
   host.innerHTML = `<canvas class="stars-symbol__canvas" aria-hidden="true"></canvas><div class="stars-symbol__nodes"></div>`;
   const canvas = host.querySelector<HTMLCanvasElement>("canvas")!;
   const layer = host.querySelector<HTMLElement>(".stars-symbol__nodes")!;
   const layout = buildStarsLayout(proposal.symbol.templateId, proposal.notes.length);
   const reduced = prefersReducedMotion();
-  const tooltip = createTooltip(host);
+  const popover = createStarPopover(host);
   const parallax = bindParallax(host, reduced);
   let stopped = false;
   let raf = 0;
   let size = { width: 0, height: 0 };
   let dust: DustStar[] = [];
   let colors = { onDark: "white", gold: "white" };
+  let ripples: Ripple[] = [];
   const nebulaSeed = seedOf(proposal.title);
+  const mountedAt = performance.now();
 
   const point = (index: number) => {
     const padX = Math.min(86, size.width * 0.12);
@@ -244,15 +295,18 @@ export function mountStarsSymbol(host: HTMLElement, proposal: StarsProposal, han
     };
   };
 
-  const drawForeground = (context: CanvasRenderingContext2D) => {
+  const drawForeground = (context: CanvasRenderingContext2D, t: number) => {
+    const revealed = reduced ? 1 : Math.min(1, (t - mountedAt) / 700);
     context.save();
     context.strokeStyle = colors.gold;
     context.lineWidth = 1.35;
-    context.globalAlpha = 0.82;
-    layout.segments.forEach(segment => {
+    layout.segments.forEach((segment, index) => {
       if (!proposal.notes[segment.source] || !proposal.notes[segment.target]) return;
       const relation = relationForSegment(proposal, segment.source, segment.target);
       if (!relation) return;
+      const segProgress = Math.max(0, Math.min(1, revealed * layout.segments.length - index));
+      if (segProgress <= 0) return;
+      context.globalAlpha = 0.82 * segProgress;
       context.setLineDash(["complicates", "contrasts"].includes(relation.type) ? [6, 5] : []);
       const start = point(segment.source);
       const end = point(segment.target);
@@ -270,9 +324,13 @@ export function mountStarsSymbol(host: HTMLElement, proposal: StarsProposal, han
     const { width, height } = size;
     context.clearRect(0, 0, width, height);
     drawNebula(context, width, height, t, nebulaSeed, [colors.gold, colors.onDark]);
+    drawMilkyWay(context, width, height, t, nebulaSeed + 7, colors.onDark);
     parallax.settle();
-    drawDust(context, dust, colors.onDark, t, parallax.current);
-    drawForeground(context);
+    drawDust(context, dust, t, parallax.current);
+    drawForeground(context, t);
+    ripples = stepRipples(ripples);
+    drawRipples(context, ripples, colors.gold);
+    drawVignette(context, width, height);
     if (!reduced) raf = requestAnimationFrame(frame);
   };
 
@@ -293,11 +351,21 @@ export function mountStarsSymbol(host: HTMLElement, proposal: StarsProposal, han
       button.style.left = `${location.x}px`;
       button.style.top = `${location.y}px`;
       button.style.setProperty("--twinkle-delay", `${(seedOf(note.pageId) % 4000) / 1000}s`);
+      button.style.setProperty("--reveal-delay", revealDelay(index));
       button.setAttribute("aria-label", `${note.title}. ${note.role}`);
       button.innerHTML = `<span class="stars-node__light" aria-hidden="true"></span>`;
-      bindTooltip(button, tooltip, note.title);
       const relation = proposal.relations.find(item => item.sourceId === note.pageId || item.targetId === note.pageId);
-      button.onclick = () => handlers.onSelectNote?.(note, relation);
+      const reveal = () => popover.showNote(note, button);
+      button.addEventListener("pointerenter", event => {
+        if (event.pointerType === "mouse") reveal();
+      });
+      button.addEventListener("focus", reveal);
+      button.addEventListener("pointerleave", () => popover.hideSoon());
+      button.addEventListener("blur", () => popover.hideSoon());
+      button.onclick = () => {
+        if (!reduced) ripples.push({ x: location.x, y: location.y, age: 0, life: 26 });
+        handlers.onSelectNote?.(note, relation);
+      };
       button.ondblclick = () => handlers.onOpenNote?.(note.pageId, note.title);
       layer.append(button);
     });
@@ -356,7 +424,7 @@ export function mountStarsSky(
   const canvas = host.querySelector<HTMLCanvasElement>("canvas")!;
   const layer = host.querySelector<HTMLElement>(".stars-sky__objects")!;
   const reduced = prefersReducedMotion();
-  const tooltip = createTooltip(host);
+  const popover = createStarPopover(host);
   const parallax = bindParallax(host, reduced);
   let stopped = false;
   let raf = 0;
@@ -364,8 +432,24 @@ export function mountStarsSky(
   let dust: DustStar[] = [];
   let colors = { onDark: "white", gold: "white" };
   let shootingStars: ShootingStar[] = [];
+  let ripples: Ripple[] = [];
+  let openPopoverId: string | null = null;
   const angle = annualSkyRotation(date);
   const shootSeed = random(seedOf(`${date.toISOString()}-shoot`));
+
+  function closeCard() {
+    openPopoverId = null;
+    popover.hideSoon();
+  }
+
+  function onDocumentPointerDown(event: PointerEvent) {
+    const target = event.target as Node | null;
+    if (target && popover.el.contains(target)) return;
+    if (target instanceof Element && target.closest(".stars-sky-object")) return;
+    openPopoverId = null;
+    popover.hideNow();
+  }
+  document.addEventListener("pointerdown", onDocumentPointerDown);
 
   const frame = (t: number) => {
     if (stopped) return;
@@ -373,15 +457,19 @@ export function mountStarsSky(
     const { width, height } = size;
     context.clearRect(0, 0, width, height);
     drawNebula(context, width, height, t, 51023, [colors.gold, colors.onDark]);
+    drawMilkyWay(context, width, height, t, 61031, colors.onDark);
     parallax.settle();
     context.save();
     context.translate(width / 2, height * 0.48);
     context.rotate(angle);
     context.translate(-width / 2, -height * 0.48);
-    drawDust(context, dust, colors.onDark, t, parallax.current);
+    drawDust(context, dust, t, parallax.current);
     context.restore();
     shootingStars = stepShootingStars(shootingStars, width, height, shootSeed, reduced);
     drawShootingStars(context, shootingStars, colors.onDark);
+    ripples = stepRipples(ripples);
+    drawRipples(context, ripples, colors.gold);
+    drawVignette(context, width, height);
     if (!reduced) raf = requestAnimationFrame(frame);
   };
 
@@ -395,21 +483,42 @@ export function mountStarsSky(
     dust = buildDust(934857, width, height, visibleNoteCount);
 
     layer.innerHTML = "";
-    constellations.forEach(item => {
+    constellations.forEach((item, index) => {
       const position = rotatePoint(item.sky.x, item.sky.y, angle);
       const button = document.createElement("button");
       button.type = "button";
       button.className = "stars-sky-object";
       button.style.left = `${position.x * width}px`;
       button.style.top = `${position.y * height}px`;
-      button.style.transform = `translate(-50%, -50%) scale(${item.sky.scale})`;
+      button.style.setProperty("--sky-scale", String(item.sky.scale));
       button.style.setProperty("--twinkle-delay", `${(seedOf(item.id) % 4000) / 1000}s`);
+      button.style.setProperty("--reveal-delay", revealDelay(index));
       button.setAttribute("aria-label", `Open ${item.title}, ${item.notes.length} notes`);
       button.innerHTML = miniSymbol(item);
       const symbol = button.querySelector<SVGElement>("svg");
       if (symbol) symbol.style.transform = `rotate(${angle + item.sky.rotation}rad)`;
-      bindTooltip(button, tooltip, `${item.title} · ${item.notes.length} notes`);
-      button.onclick = () => onSelect(item);
+
+      const commit = () => {
+        if (!reduced) ripples.push({ x: position.x * width, y: position.y * height, age: 0, life: 26 });
+        onSelect(item);
+      };
+      const showCard = () => {
+        openPopoverId = item.id;
+        popover.showConstellation(item, button, commit);
+      };
+      button.addEventListener("pointerenter", event => {
+        if (event.pointerType === "mouse") showCard();
+      });
+      button.addEventListener("focus", showCard);
+      button.addEventListener("pointerleave", () => closeCard());
+      button.addEventListener("blur", () => closeCard());
+      button.onclick = () => {
+        if (openPopoverId === item.id && !popover.el.hidden) {
+          commit();
+          return;
+        }
+        showCard();
+      };
       layer.append(button);
     });
 
@@ -424,6 +533,7 @@ export function mountStarsSky(
   return () => {
     stopped = true;
     if (raf) cancelAnimationFrame(raf);
+    document.removeEventListener("pointerdown", onDocumentPointerDown);
     observer.disconnect();
     layer.innerHTML = "";
   };
