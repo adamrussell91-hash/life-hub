@@ -5,6 +5,7 @@ import type { Lesson } from '@/schemas/lesson';
 import type { Media } from '@/schemas/media';
 import { isCanvasLike, isInlineEditor, isTextLike } from '@/teacher/lesson-canvas/kinds';
 import { mountBlockCanvas, mountLessonPage } from '@/teacher/lesson-canvas/mount-page';
+import { clickBlockMenuAction, deleteBlockFromMenu, enterBlockEdit } from './helpers/block-edit';
 
 const MIME = 'application/x-teaching-hub-block';
 const ISO = '2026-01-01T00:00:00.000Z';
@@ -168,7 +169,7 @@ describe('mountLessonPage', () => {
     title.value = 'Renamed lesson';
     title.dispatchEvent(new Event('input', { bubbles: true }));
 
-    host.querySelector<HTMLElement>('[data-block-id="h1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="h1"]');
     const editor = host.querySelector<HTMLElement>('.block-editor[data-block-type="heading"]')!;
 
     host.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
@@ -242,15 +243,22 @@ describe('mountLessonPage', () => {
     const heading = host.querySelector<HTMLElement>('[data-block-id="h1"]');
     expect(heading).not.toBeNull();
     heading!.click();
+    expect(host.querySelector('.block-editor[data-block-type="heading"]')).toBeNull();
+
+    enterBlockEdit(host, '[data-block-id="h1"]');
     const headingEditor = host.querySelector('.block-editor[data-block-type="heading"]');
     expect(headingEditor).not.toBeNull();
     expect(host.querySelector('.block-editor__move-up')).toBeNull();
     expect(host.querySelector('.lesson-editor__reorder')).toBeNull();
+
+    host.querySelector<HTMLButtonElement>('.lesson-page__done')!.click();
+    expect(host.querySelector('.block-editor[data-block-type="heading"]')).toBeNull();
+    expect(host.querySelector('[data-block-id="h1"] .lesson-page__block-menu')).not.toBeNull();
   });
 
   it('survives typing: the field being edited keeps focus and its caret', () => {
     const { onChange } = mount();
-    host.querySelector<HTMLElement>('[data-block-id="h1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="h1"]');
 
     const field = host.querySelector<HTMLInputElement>('.block-editor__heading-text')!;
     // Clicking into the field is how editing starts, and it must not rebuild the row.
@@ -279,9 +287,9 @@ describe('mountLessonPage', () => {
 
   it('refreshes a heavy block preview while its editor stays put', () => {
     mount(makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] }));
-    host.querySelector<HTMLElement>('[data-block-id="ch1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="ch1"]');
 
-    const editor = host.querySelector<HTMLElement>('.lesson-page__inspector .block-editor')!;
+    const editor = host.querySelector<HTMLElement>('[data-block-id="ch1"] .block-editor')!;
     const captionField = editor.querySelector<HTMLInputElement>('input, textarea');
     expect(captionField).not.toBeNull();
 
@@ -295,32 +303,27 @@ describe('mountLessonPage', () => {
 
   it('keeps a heavy block editor inside the block it belongs to', () => {
     mount(makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] }));
-    host.querySelector<HTMLElement>('[data-block-id="ch1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="ch1"]');
 
-    const inspector = host.querySelector('.lesson-page__inspector');
-    expect(inspector).not.toBeNull();
-    expect(inspector!.closest('[data-block-id]')?.getAttribute('data-block-id')).toBe('ch1');
-    expect(inspector!.querySelector('.block-editor')).not.toBeNull();
+    const editor = host.querySelector('[data-block-id="ch1"] .block-editor');
+    expect(editor).not.toBeNull();
+    expect(editor!.closest('[data-block-id]')?.getAttribute('data-block-id')).toBe('ch1');
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
   });
 
-  it('reorders blocks with the toolbar move controls', () => {
+  it('reorders blocks from the block menu', () => {
     const { onChange } = mount();
-    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
-
-    const up = host.querySelector<HTMLButtonElement>('.lesson-page__move-up');
-    expect(up).not.toBeNull();
-    expect(up!.disabled).toBe(false);
-    up!.click();
+    clickBlockMenuAction(host, '[data-block-id="cm1"]', 'up');
 
     const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
     expect(next.blocks.map((b) => b.id)).toEqual(['cm1', 'h1']);
   });
 
-  it('disables move up on the first block and move down on the last', () => {
-    mount();
-    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
-    expect(host.querySelector<HTMLButtonElement>('.lesson-page__move-down')!.disabled).toBe(true);
-    expect(host.querySelector<HTMLButtonElement>('.lesson-page__move-up')!.disabled).toBe(false);
+  it('does not move the first block up or the last block down', () => {
+    const { onChange } = mount();
+    clickBlockMenuAction(host, '[data-block-id="h1"]', 'up');
+    clickBlockMenuAction(host, '[data-block-id="cm1"]', 'down');
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('accepts a palette drop on a block body, not just the gap between blocks', () => {
@@ -364,7 +367,7 @@ describe('mountLessonPage', () => {
     expect(next.blocks.map((b) => b.id)).toEqual(['cm1', 'h1', 'h2']);
   });
 
-  it('renders heavy blocks and shows inspector plus toolbar on select', () => {
+  it('renders heavy blocks as published until Edit is chosen from the menu', () => {
     const { onSelect } = mount(
       makeLesson({ blocks: [createBlock('heading', 'h1'), createBlock('chart', 'ch1')] })
     );
@@ -373,9 +376,13 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('.block-chart, .block[data-block-type="chart"]')).not.toBeNull();
 
     chart!.click();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(host.querySelector('[data-block-id="ch1"] .block-editor')).toBeNull();
+
+    enterBlockEdit(host, '[data-block-id="ch1"]');
     expect(onSelect).toHaveBeenCalledWith('ch1');
-    expect(host.querySelector('.lesson-page__inspector')).not.toBeNull();
-    expect(host.querySelector('.lesson-page__inspector .block-editor')).not.toBeNull();
+    expect(host.querySelector('[data-block-id="ch1"] .block-editor')).not.toBeNull();
+    expect(host.querySelector('.lesson-page__inspector')).toBeNull();
 
     const toolbarText = host.textContent ?? '';
     expect(toolbarText).toContain('Duplicate');
@@ -396,6 +403,10 @@ describe('mountLessonPage', () => {
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
 
     row!.click();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(host.querySelector('.block-mind-map')).not.toBeNull();
+
+    enterBlockEdit(host, '[data-block-id="mm1"]');
     expect(onSelect).toHaveBeenCalledWith('mm1');
     expect(host.querySelector('.lesson-page__preview')).toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
@@ -406,7 +417,7 @@ describe('mountLessonPage', () => {
 
   it('edits concept maps on one canvas instead of stacking preview and inspector', () => {
     mount();
-    host.querySelector<HTMLElement>('[data-block-id="cm1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="cm1"]');
 
     expect(host.querySelector('.lesson-page__preview')).toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
@@ -414,7 +425,7 @@ describe('mountLessonPage', () => {
     expect(host.querySelectorAll('.block-graph-maker')).toHaveLength(1);
   });
 
-  it('deletes a video block from the gutter without selecting it first', () => {
+  it('deletes a video block from the menu without entering edit first', () => {
     const video = createBlock('video', 'v1');
     if (video.block_type !== 'video') throw new Error('expected video');
     video.content = { provider: 'youtube', external_id: 'dQw4w9WgXcQ' };
@@ -424,7 +435,7 @@ describe('mountLessonPage', () => {
     expect(frame).not.toBeNull();
     expect(host.querySelector('.lesson-page__inspector')).toBeNull();
 
-    host.querySelector<HTMLButtonElement>('[data-block-id="v1"] [aria-label="Delete block"]')!.click();
+    deleteBlockFromMenu(host, '[data-block-id="v1"]');
 
     const next = onChange.mock.calls.at(-1)?.[0] as Lesson;
     expect(next.blocks.map((block) => block.id)).toEqual(['h1']);
@@ -633,7 +644,7 @@ describe('mountBlockCanvas', () => {
       idFactory: () => ids.shift() ?? 'new_x'
     });
 
-    host.querySelector<HTMLElement>('[data-block-id="sec1"]')!.click();
+    enterBlockEdit(host, '[data-block-id="sec1"]');
     handle.insertType('heading');
 
     const next = onChange.mock.calls.at(-1)?.[0] as Block[];
@@ -641,5 +652,17 @@ describe('mountBlockCanvas', () => {
     expect(next[0]?.block_type).toBe('section');
     if (next[0]?.block_type !== 'section') return;
     expect(next[0].content.blocks.map((block) => block.block_type)).toEqual(['heading']);
+  });
+
+  it('omits the edit menu on a published student canvas', () => {
+    mountBlockCanvas(host, {
+      blocks: [createBlock('heading', 'h1')],
+      onChange: vi.fn(),
+      idFactory: () => ids.shift() ?? 'new_x',
+      editable: false
+    });
+    expect(host.querySelector('.lesson-page__block-menu')).toBeNull();
+    expect(host.querySelector('.lesson-page__grip')).toBeNull();
+    expect(host.querySelector('.block-editor')).toBeNull();
   });
 });
