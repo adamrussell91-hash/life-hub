@@ -76,11 +76,102 @@ function compactIntake(definition: Definition, prompt: string) {
   return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]));
 }
 
-function sessionView(session: Session, definition: Definition) {
-  const turns = session.transcript.map(turn => `<article class="protocol-turn protocol-turn--${escapeHtml(turn.role)} ${turn.speaker === session.speaker ? "is-speaking" : ""}"><p>${escapeHtml(turn.speaker)}</p><div>${escapeHtml(turn.text)}</div></article>`).join("");
-  const waiting = session.checkpoint ? `<form class="protocol-reply" data-protocol-reply><label>${escapeHtml(session.checkpoint.question)}<textarea name="reply" required></textarea></label><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</form>` : "";
-  const failure = session.error ? `<div class="confirm-card"><p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry">Retry this voice</button>` : ""}</div>` : "";
-  return `<section class="protocol-session" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p><h1>${escapeHtml(session.speaker ?? "Session")}</h1><p class="protocol-session__status">${escapeHtml(session.status)} · ${escapeHtml(session.stage)}</p></header><div class="protocol-stage" aria-live="polite">${definition.voices.map(voice => `<div class="protocol-speaker ${voice.id === session.speaker ? "is-active" : ""}"><img src="${ASSET_ROOT}/voices/${voiceAsset[`${definition.id}:${voice.id}`]}.png" alt=""><span>${escapeHtml(voice.name)}</span><small>${escapeHtml(voice.role)}</small></div>`).join("")}</div><div class="protocol-transcript">${turns || "<p>Preparing the first voice…</p>"}</div>${waiting}${failure}</section>`;
+export const PROTOCOL_POLL_MS = 400;
+const VOICE_ROLES: Record<string, string> = {
+  lachesis: "Strategist and measurer", clotho: "Generative spinner", atropos: "Critical cutter", weave: "Witness and mapper",
+  ketill: "Near horizon", alvar: "Far horizon", sigrid: "The Reckoning",
+  builder: "Affirmative structure", breaker: "Structural critique", reforger: "Rebuild with limits",
+  surveyor: "Map the terrain", miner: "Extract claims", cartographer: "Map relationships",
+  retrospective: "Revealed preferences", prospective: "Stated aspirations", present: "Present tension",
+  principle: "Duty and rights", consequence: "Outcomes", virtue: "Character",
+  trace: "Process reconstruction", patterns: "Pattern match", recalibration: "Confidence",
+  inverter: "Hidden relationship", scaler: "Downscale and upscale", "context-shifter": "Context dissolution"
+};
+
+function voiceOf(definition: Definition, id: string | null) {
+  return definition.voices.find(voice => voice.id === id) ?? null;
+}
+export function speakerName(session: Session, definition: Definition) {
+  return voiceOf(definition, session.speaker)?.name ?? (session.speaker === "you" ? "You" : session.speaker ?? "Session");
+}
+export function statusLabel(session: Session) {
+  if (["queued", "running"].includes(session.status)) return "thinking";
+  if (session.status === "waiting") return "listening";
+  if (session.status === "failed") return "needs a retry";
+  if (session.status === "completed") return "closed";
+  return session.status;
+}
+function voiceSrc(definition: Definition, id: string) {
+  return `${ASSET_ROOT}/voices/${voiceAsset[`${definition.id}:${id}`]}.png`;
+}
+function turnHtml(turn: Session["transcript"][number], speaker: string | null) {
+  const who = turn.speaker === "you" ? "You" : turn.speaker;
+  return `<article class="protocol-turn protocol-turn--${escapeHtml(turn.role)} ${turn.speaker === speaker ? "is-speaking" : ""}" data-turn-id="${escapeHtml(turn.id)}"><p>${escapeHtml(who)}</p><div>${escapeHtml(turn.text)}</div></article>`;
+}
+function composerHtml(session: Session, definition: Definition) {
+  if (session.error) {
+    return `<div class="confirm-card" data-protocol-composer><p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
+  }
+  if (["queued", "running"].includes(session.status)) {
+    return `<div class="protocol-session__listening" data-protocol-composer><p aria-live="polite">${escapeHtml(speakerName(session, definition))} is thinking</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
+  }
+  if (!session.checkpoint) return `<div data-protocol-composer></div>`;
+  const who = speakerName(session, definition);
+  return `<form class="protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}"><label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="Reply to ${escapeHtml(who)}"></textarea></label><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</form>`;
+}
+function stageHtml(session: Session, definition: Definition) {
+  return definition.voices.map(voice => `<div class="protocol-speaker ${voice.id === session.speaker ? "is-active" : ""}" data-voice="${escapeHtml(voice.id)}"><img src="${voiceSrc(definition, voice.id)}" alt="${escapeHtml(voice.name)}" width="160" height="160"><span>${escapeHtml(voice.name)}</span><small>${escapeHtml(voice.role || VOICE_ROLES[voice.id] || "")}</small></div>`).join("");
+}
+export function sessionView(session: Session, definition: Definition) {
+  const listening = ["queued", "running"].includes(session.status);
+  const turns = session.transcript.map(turn => turnHtml(turn, session.speaker)).join("");
+  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p><h1>${escapeHtml(speakerName(session, definition))}</h1><p class="protocol-session__status">${escapeHtml(statusLabel(session))}</p></header><div class="protocol-stage" aria-live="polite">${stageHtml(session, definition)}</div><div class="protocol-transcript">${turns || `<p class="protocol-transcript__empty">${escapeHtml(speakerName(session, definition))} is joining the conversation…</p>`}</div>${composerHtml(session, definition)}</section>`;
+}
+export function applySession(root: HTMLElement, session: Session, definition: Definition) {
+  const shell = root.querySelector<HTMLElement>(".protocol-session");
+  if (!shell) {
+    root.innerHTML = sessionView(session, definition);
+    return;
+  }
+  const listening = ["queued", "running"].includes(session.status);
+  shell.classList.toggle("is-listening", listening);
+  shell.dataset.speaker = session.speaker ?? "";
+  const title = shell.querySelector("h1");
+  if (title) title.textContent = speakerName(session, definition);
+  const status = shell.querySelector(".protocol-session__status");
+  if (status) status.textContent = statusLabel(session);
+  shell.querySelectorAll<HTMLElement>(".protocol-speaker").forEach(node => {
+    node.classList.toggle("is-active", node.dataset.voice === session.speaker);
+  });
+  const transcript = shell.querySelector(".protocol-transcript");
+  if (transcript) {
+    const ids = new Set(session.transcript.map(turn => turn.id));
+    const seen = new Set<string>();
+    transcript.querySelectorAll("[data-turn-id]").forEach(node => {
+      const id = node.getAttribute("data-turn-id") ?? "";
+      if (!ids.has(id)) node.remove();
+      else seen.add(id);
+    });
+    const empty = transcript.querySelector(".protocol-transcript__empty");
+    if (session.transcript.length && empty) empty.remove();
+    if (!session.transcript.length && !empty) transcript.innerHTML = `<p class="protocol-transcript__empty">${escapeHtml(speakerName(session, definition))} is joining the conversation…</p>`;
+    for (const turn of session.transcript) {
+      if (!seen.has(turn.id)) transcript.insertAdjacentHTML("beforeend", turnHtml(turn, session.speaker));
+    }
+    transcript.querySelectorAll<HTMLElement>(".protocol-turn").forEach(node => {
+      const id = node.getAttribute("data-turn-id");
+      const turn = session.transcript.find(item => item.id === id);
+      node.classList.toggle("is-speaking", Boolean(turn && turn.speaker === session.speaker));
+    });
+    const last = transcript.querySelector<HTMLElement>("[data-turn-id]:last-of-type");
+    last?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+  }
+  const composer = shell.querySelector("[data-protocol-composer]");
+  const next = composerHtml(session, definition);
+  const nextCheckpoint = session.checkpoint?.question ?? "";
+  const sameForm = composer?.matches("[data-protocol-reply]") && composer.getAttribute("data-checkpoint") === nextCheckpoint && !listening && !session.error;
+  if (!sameForm) composer?.insertAdjacentHTML("afterend", next), composer?.remove();
+  if (!composer) shell.insertAdjacentHTML("beforeend", next);
 }
 
 export function renderProtocols({ host }: { host: HTMLElement }) {
@@ -89,18 +180,87 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let currentSession: Session | null = null;
   let pollTimer: number | null = null;
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
-  const poll = async () => {
-    if (!currentSession || USE_LOCAL_DATA) return;
-    try { const response = await fetch(`${API_BASE}/protocols?sessionId=${encodeURIComponent(currentSession.id)}`, { credentials: "include" }); if (!response.ok) throw new Error(); const body = await response.json(); currentSession = body.data.session; paint(); if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, 1500); } catch { if (currentSession) { currentSession = { ...currentSession, error: { message: "Could not refresh this session. Retry keeps completed turns intact.", retryable: true } }; paint(); } }
-  };
   const paint = () => {
-    host.innerHTML = currentSession && selected ? sessionView(currentSession, selected) : selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1>Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
-    host.querySelectorAll<HTMLButtonElement>("[data-protocol-flip]").forEach(button => button.onclick = () => { const card = button.closest<HTMLElement>("[data-protocol-card]")!; const open = !card.classList.contains("is-open"); card.classList.toggle("is-open", open); card.querySelector<HTMLButtonElement>(".protocol-card__front")?.setAttribute("aria-expanded", String(open)); });
-    host.querySelectorAll<HTMLButtonElement>("[data-protocol-begin]").forEach(button => button.onclick = () => { selected = definitions.find(d => d.id === button.dataset.protocolBegin) ?? null; paint(); });
-    host.querySelector<HTMLButtonElement>("[data-protocol-close]")?.addEventListener("click", () => { stopPolling(); selected = null; currentSession = null; paint(); });
-    host.querySelector<HTMLFormElement>("[data-protocol-form]")?.addEventListener("submit", async event => { event.preventDefault(); if (USE_LOCAL_DATA || !selected) return; const form = new FormData(event.currentTarget); const error = host.querySelector<HTMLElement>("[data-protocol-error]"); const prompt = String(form.get("prompt") ?? "").trim(); try { const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ protocolId: selected.id, mode: form.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() }) }); const body = await response.json(); if (!response.ok) throw new Error(body?.error?.message ?? "The protocol could not start."); currentSession = body.data.session; paint(); void poll(); } catch (reason) { if (error) { error.textContent = reason instanceof Error ? reason.message : "The protocol could not start."; error.hidden = false; } } });
-    host.querySelector<HTMLFormElement>("[data-protocol-reply]")?.addEventListener("submit", async event => { event.preventDefault(); if (!currentSession) return; const form = new FormData(event.currentTarget); const kind = currentSession.checkpoint?.kind; const action = String(form.get("action") ?? (["verify", "confirm"].includes(kind ?? "") ? "confirm" : kind === "reflection" ? "reflect" : "answer")); const text = String(form.get("reply") ?? ""); const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action, text }) }); if (response.ok) { currentSession = (await response.json()).data.session; paint(); void poll(); } });
-    host.querySelector<HTMLButtonElement>("[data-protocol-action]")?.addEventListener("click", async event => { if (!currentSession) return; const action = (event.currentTarget as HTMLButtonElement).dataset.protocolAction; const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action }) }); if (response.ok) { currentSession = (await response.json()).data.session; paint(); void poll(); } });
+    if (currentSession && selected) applySession(host, currentSession, selected);
+    else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1>Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
+  };
+  const poll = async () => {
+    if (!currentSession?.id || USE_LOCAL_DATA) return;
+    try {
+      const response = await fetch(`${API_BASE}/protocols?sessionId=${encodeURIComponent(currentSession.id)}`, { credentials: "include" });
+      if (!response.ok) throw new Error();
+      const body = await response.json();
+      currentSession = body.data.session;
+      paint();
+      if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, PROTOCOL_POLL_MS);
+    } catch {
+      if (currentSession) {
+        currentSession = { ...currentSession, error: { message: "Could not refresh this session. Retry keeps completed turns intact.", retryable: true } };
+        paint();
+      }
+    }
+  };
+  const postAction = async (payload: Record<string, unknown>) => {
+    const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body?.error?.message ?? "The protocol could not continue.");
+    currentSession = body.data.session;
+    paint();
+    void poll();
+  };
+  host.onclick = event => {
+    const target = event.target as HTMLElement;
+    const flip = target.closest<HTMLButtonElement>("[data-protocol-flip]");
+    if (flip) {
+      const card = flip.closest<HTMLElement>("[data-protocol-card]");
+      if (!card) return;
+      const open = !card.classList.contains("is-open");
+      card.classList.toggle("is-open", open);
+      card.querySelector<HTMLButtonElement>(".protocol-card__front")?.setAttribute("aria-expanded", String(open));
+      return;
+    }
+    const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
+    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; paint(); return; }
+    const action = target.closest<HTMLButtonElement>("[data-protocol-action]")?.dataset.protocolAction;
+    if (action && currentSession) void postAction({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action });
+  };
+  host.onsubmit = async event => {
+    const form = event.target as HTMLFormElement;
+    event.preventDefault();
+    if (form.matches("[data-protocol-form]")) {
+      if (USE_LOCAL_DATA || !selected) return;
+      const data = new FormData(form);
+      const prompt = String(data.get("prompt") ?? "").trim();
+      currentSession = { id: "", status: "queued", stage: "briefing", speaker: selected.voices[0]?.id ?? null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
+      paint();
+      try {
+        await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() });
+      } catch (reason) {
+        currentSession = null;
+        paint();
+        const error = host.querySelector<HTMLElement>("[data-protocol-error]");
+        if (error) { error.textContent = reason instanceof Error ? reason.message : "The protocol could not start."; error.hidden = false; }
+      }
+      return;
+    }
+    if (!form.matches("[data-protocol-reply]") || !currentSession) return;
+    const data = new FormData(form);
+    const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
+    const kind = currentSession.checkpoint?.kind;
+    const action = submitter?.name === "action" ? String(submitter.value) : (["verify", "confirm"].includes(kind ?? "") ? "confirm" : kind === "reflection" ? "reflect" : "answer");
+    const text = String(data.get("reply") ?? "");
+    if (["answer", "correct", "reflect"].includes(action) && !text.trim()) return;
+    const prior = currentSession;
+    currentSession = {
+      ...prior,
+      status: action === "cancel" ? "cancelled" : "queued",
+      checkpoint: null,
+      transcript: text.trim() ? [...prior.transcript, { id: `local-${prior.revision}`, role: "user", speaker: "you", stage: prior.stage, text: text.trim() }] : prior.transcript
+    };
+    paint();
+    try { await postAction({ sessionId: prior.id, revision: prior.revision, requestId: crypto.randomUUID(), action, text }); }
+    catch { currentSession = { ...prior, error: { message: "The reply could not be sent.", retryable: true } }; paint(); }
   };
   paint();
   void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);

@@ -39,4 +39,18 @@ test('Tribunal voices receive identical original context and cannot see outputs'
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});
 test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer']);for(const [mode,expected] of [['break',['breaker']],['build-break',['builder','breaker']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
 test('Mirror deep waits for framing, long arc asks what to protect; Horizon fallback explicit',async()=>{const {calls}=await run('mirror','deep');assert.equal(calls[0].stage,'framing');const s=start('mirror');s.intake.timescale='long-arc';assert.match(buildPrompt(s,{speaker:'present',stage:'present'}).system,/sit with, tolerate|protect/);const h=start('horizon');assert.match(buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system,/extrapolated from current trajectory/);});
+test('voices are told to use relevant notes organically and never narrate an empty archive',()=>{
+  const s=start('fates','sprint');
+  s.evidence=[{id:'knowledge:note-1',kind:'knowledge_hub_note',title:'Workload and rest',text:'You wrote that afternoon marking leaves no recovery.'}];
+  s.evidenceStatus='No matching Knowledge Hub notes were retrieved. Claims remain self-report or uncertainty.';
+  const grounded=buildPrompt(s,{speaker:'lachesis',stage:'briefing',gate:'answer'});
+  assert.match(grounded.system,/already know/);
+  assert.match(grounded.system,/Never mention Knowledge Hub notes/);
+  assert.match(grounded.user,/Workload and rest/);
+  assert.equal(grounded.user.includes('No matching Knowledge Hub notes'),false);
+  assert.equal(grounded.user.includes('evidenceStatus'),false);
+  const empty=buildPrompt(start('fates','sprint'),{speaker:'lachesis',stage:'briefing',gate:'answer'});
+  assert.equal(empty.user.includes('knownContext'),false);
+  assert.equal(empty.user.includes('self-report'),false);
+});
 test('unverified quotes are rejected, and terminal state cannot be model-commanded',async()=>{let s=start('tribunal');await assert.rejects(()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Claim',quotes:[{evidenceId:'fake',text:'made up'}],evidenceIds:['fake']})}),/evidence|quotation/);});
