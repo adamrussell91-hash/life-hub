@@ -122,6 +122,7 @@ import { applyRating } from "./quiz/review";
 import { duePageReviews, seedPageReview, upsertPageReview } from "./quiz/pageReview";
 import { duePagesHtml, pageReviewActionsHtml } from "./quiz/pageReviewView";
 import { type PageReview, type QuizRating, type QuizStore } from "./quiz/schema";
+import { mountStarsView } from "./stars/view";
 
 type View =
   | "list"
@@ -134,7 +135,7 @@ type View =
   | "podcast"
   | "quiz"
   | "protocols";
-type GraphMode = "constellation" | "showAll" | "universe";
+type GraphMode = "constellation" | "showAll" | "universe" | "stars";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const DESKTOP_ROW_HEIGHT = 68;
@@ -1067,6 +1068,35 @@ function renderTimeline() {
 }
 
 function renderGraph() {
+  if (graphMode === "stars") {
+    shell(`
+      ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Stars saves on this device</p>` : ""}
+      ${pageHeader(
+        "Private archive",
+        "Stars",
+        `<div class="viewbar">
+          <button class="viewbar__btn" data-jump-list type="button">List</button>
+          <button class="viewbar__btn is-active" type="button">Graph</button>
+        </div>`,
+      )}
+      <div data-stars-root></div>
+    `);
+    app.querySelector<HTMLButtonElement>("[data-jump-list]")!.onclick = () => {
+      view = "list";
+      render();
+    };
+    const host = app.querySelector<HTMLElement>("[data-stars-root]")!;
+    const mounted = mountStarsView(host, {
+      entries,
+      onOpenPage: openPageInNewTab,
+      onModeChange: mode => {
+        graphMode = mode;
+        render();
+      },
+    });
+    graphTeardown = mounted;
+    return;
+  }
   const constellation = buildArchiveGraph(entries);
   const excerptFor = (pageId: string) => entries.find(entry => entry.id === pageId)?.excerpt ?? "";
 
@@ -1087,6 +1117,7 @@ function renderGraph() {
             <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Constellation</button>
             <button type="button" data-graph-mode="showAll" class="${graphMode === "showAll" ? "is-active" : ""}">Show All</button>
             <button type="button" data-graph-mode="universe" class="${graphMode === "universe" ? "is-active" : ""}">Universe</button>
+            <button type="button" data-graph-mode="stars">Stars</button>
           </div>
           ${
             graphMode === "showAll"

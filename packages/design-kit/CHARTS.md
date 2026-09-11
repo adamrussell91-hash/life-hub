@@ -149,6 +149,7 @@ Do **not** copy these onto Tasks or Teaching unless you add them to the library 
 
 - Show-all: `showAllGraph.ts`, `showAllDraw.ts`, `showAllEdges.ts`, `showAllSimulation.ts`, `showAllCommunities.ts`, `showAllScope.ts`, `showAllTransition.ts`
 - Universe / solar: `solarModel.ts`, `solarView.ts`, `universeChrome.ts`, `universeKey.ts`
+- Stars / saved meaning constellations: `stars/templates.ts`, `stars/canvas.ts`, `stars/view.ts`. Deterministic symbol geometry, note-star selection, and date-driven annual sky rotation. This engine is isolated from Universe.
 - Layout notes (Knowledge): `apps/knowledge/docs/GRAPH_LAYOUT_BRIEF.md`, `GRAPH_LAYOUT_METRICS.md`
 
 ---
@@ -201,6 +202,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-11 | Stars | Added the Knowledge-only saved constellation engine: controlled symbol templates, grounded note relationships, source-mapped synthesis, and annual night-sky placement. No Universe renderer changes. |
 | 2026-09-06 | `mood-mix` | Tasks project portfolio / home Projects tile consumes Life `mood-mix` donut for lifecycle share (“What’s the mix?”). Drops the board area-line spark. Typed consumer in `apps/tasks/src/chart-kit/mood-mix.ts`. |
 | 2026-09-06 | `area-line` | Tasks dashboard completion trend consumes Life `area-line` (typed consumer + `animateAreaReveal`). No new catalog types. |
 | 2026-09-06 | Fitness | e1RM vs recent form is one `area-line` overlay (each lift as % of its own peak) with a legend. Who is improving keeps `bump` but uses kit label size, fewer week ticks, and a legend instead of cramped right-side names. |
