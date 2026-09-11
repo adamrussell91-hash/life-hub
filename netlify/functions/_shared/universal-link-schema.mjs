@@ -5,6 +5,24 @@ export const UNIVERSAL_LINK_SCHEMA_VERSION = 1;
 export const LINK_STATUSES = new Set(['current', 'ended', 'suppressed', 'deleted']);
 export const LINK_VISIBILITIES = new Set(['operator', 'teaching_protected']);
 
+// A stored link's status a caller may see in an ordinary read, without an
+// explicit administrative method. `suppressed` and `deleted` are real,
+// valid statuses (see LINK_STATUSES) — they are simply not disclosed
+// through ordinary reads. `ended` stays visible: it is queryable history,
+// not a hidden state.
+export const ORDINARY_READ_STATUSES = new Set(['current', 'ended']);
+
+// The canonical deterministic id form Slice 2 will generate:
+// `ul_` followed by exactly 64 lowercase hex characters (a SHA-256 digest).
+// Enforced everywhere an id reaches a Blob key — stored records, membership
+// records, and getLink input — so a malformed or path-like id can never be
+// concatenated into a storage key.
+export const LINK_ID_PATTERN = /^ul_[0-9a-f]{64}$/;
+
+export function isValidLinkId(id) {
+  return typeof id === 'string' && LINK_ID_PATTERN.test(id);
+}
+
 // This slice validates existing records only. It does not generate ids or
 // timestamps — deterministic id generation is a Slice 2 write-path
 // concern (implementation programme, "Slice 1 exact file contract").
@@ -20,7 +38,7 @@ function isNullableString(value) {
 export function parseUniversalLink(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   if (raw.schema_version !== UNIVERSAL_LINK_SCHEMA_VERSION) return null;
-  if (typeof raw.id !== 'string' || !raw.id.startsWith('ul_')) return null;
+  if (!isValidLinkId(raw.id)) return null;
   if (!parseEntityRef(raw.source_ref) || !parseEntityRef(raw.target_ref)) return null;
   if (typeof raw.relationship_type !== 'string' || !raw.relationship_type) return null;
   if (!isNullableString(raw.role)) return null;

@@ -1,6 +1,7 @@
+import { mapBounded } from './blobs-list.mjs';
 import { assertRegisteredEntityRef, formatEntityRef } from './entity-ref.mjs';
 import { endpointNotFoundError, isVisibilityAllowed } from './entity-access.mjs';
-import { validateUniversalLinkRecord } from './universal-link-schema.mjs';
+import { ORDINARY_READ_STATUSES, isValidLinkId, validateUniversalLinkRecord } from './universal-link-schema.mjs';
 import { bySourcePrefix, byTargetPrefix, getJSON, linkKey, listMembership } from './universal-link-blobs.mjs';
 
 // Read-only half of the canonical Universal Link repository (Slice 1).
@@ -20,14 +21,8 @@ import { bySourcePrefix, byTargetPrefix, getJSON, linkKey, listMembership } from
 
 const BATCH_SIZE = 10;
 
-async function mapBounded(items, size, fn) {
-  const out = [];
-  for (let start = 0; start < items.length; start += size) {
-    const batch = items.slice(start, start + size);
-    const results = await Promise.all(batch.map(fn));
-    out.push(...results);
-  }
-  return out;
+function isEndpointNotFound(error) {
+  return Boolean(error) && error.code === 'endpoint_not_found';
 }
 
 function sortLinks(entries) {
@@ -36,6 +31,15 @@ function sortLinks(entries) {
     if (byUpdatedAt !== 0) return byUpdatedAt;
     return String(a.link.id ?? '').localeCompare(String(b.link.id ?? ''));
   });
+}
+
+function assertValidGetLinkId(id) {
+  if (!isValidLinkId(id)) {
+    throw Object.assign(new Error(`Invalid Universal Link id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_link_id'
+    });
+  }
 }
 
 export function createUniversalLinkReadRepository({ store, resolveEntity }) {
@@ -50,8 +54,10 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
   // schema and its current registry declaration (implementation
   // programme, "Validate each link against the schema and registry").
   // Returns null for anything malformed or invalid rather than throwing —
-  // a corrupted record must not break reads of everything else.
+  // a corrupted record must not break reads of everything else. Does NOT
+  // filter by status — callers decide what statuses are disclosable.
   async function loadValidLink(linkId) {
+    assertValidGetLinkId(linkId);
     const raw = await getJSON(store, linkKey(linkId));
     try {
       return validateUniversalLinkRecord(raw);
@@ -61,16 +67,20 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
   }
 
   // Applies link visibility, then resolves and authorises the *other*
-  // endpoint. Returns null — never a labeled placeholder — when either
-  // check fails, so a hidden or missing endpoint is indistinguishable from
-  // one that never existed.
+  // endpoint. Returns null — never a labeled placeholder — only when the
+  // endpoint is genuinely absent to this caller (endpoint_not_found).
+  // Every other error (an unimplemented resolver, a storage failure, an
+  // unexpected exception) propagates: those are infrastructure faults, not
+  // "this entity is hidden," and must stay visible and retryable rather
+  // than being silently swallowed into a misleadingly-empty result.
   async function toAccessibleEntry(record, otherRef, accessContext) {
     if (!isVisibilityAllowed(accessContext, record.visibility)) return null;
     try {
       const endpoint = await resolveEntity(otherRef, accessContext);
       return { link: record, endpoint };
-    } catch {
-      return null;
+    } catch (error) {
+      if (isEndpointNotFound(error)) return null;
+      throw error;
     }
   }
 
@@ -80,15 +90,17 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
     const requestedRef = assertRegisteredEntityRef(requestedRefInput);
     const canonicalRef = formatEntityRef(requestedRef);
 
-    // Authorise the requested endpoint itself before membership lookup.
-    // A requested ref that cannot be resolved (missing, hidden, or an
-    // unavailable resolver slot) yields an empty list — identical to a
-    // valid, visible ref with zero memberships — rather than a 404 that
-    // would confirm something about its existence.
+    // Authorise the requested endpoint itself before membership lookup. A
+    // requested ref this caller cannot see (endpoint_not_found) yields an
+    // empty list — identical to a valid, visible ref with zero
+    // memberships — rather than a 404 that would confirm something about
+    // its existence. Any other failure (resolver_unavailable, a storage
+    // fault) propagates rather than being reinterpreted as "no results."
     try {
       await resolveEntity(canonicalRef, accessContext);
-    } catch {
-      return [];
+    } catch (error) {
+      if (isEndpointNotFound(error)) return [];
+      throw error;
     }
 
     const prefix = prefixFor(canonicalRef);
@@ -100,6 +112,7 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
       seen.add(entry.link_id);
       const record = await loadValidLink(entry.link_id);
       if (!record || record[matchField] !== canonicalRef) return null;
+      if (!ORDINARY_READ_STATUSES.has(record.status)) return null;
       return toAccessibleEntry(record, record[otherField], accessContext);
     });
 
@@ -110,14 +123,20 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
     async getLink(id, accessContext) {
       const record = await loadValidLink(id);
       if (!record) throw endpointNotFoundError();
+      // A suppressed or deleted link is not disclosed through this
+      // ordinary read method — the same non-disclosure rule as list reads
+      // — until an explicit administrative method exists.
+      if (!ORDINARY_READ_STATUSES.has(record.status)) throw endpointNotFoundError();
       if (!isVisibilityAllowed(accessContext, record.visibility)) throw endpointNotFoundError();
       // getLink must resolve and authorise both endpoints, not just
-      // return their refs.
+      // return their refs. Only endpoint_not_found is non-disclosure;
+      // anything else propagates.
       try {
         await resolveEntity(record.source_ref, accessContext);
         await resolveEntity(record.target_ref, accessContext);
-      } catch {
-        throw endpointNotFoundError();
+      } catch (error) {
+        if (isEndpointNotFound(error)) throw endpointNotFoundError();
+        throw error;
       }
       return record;
     },

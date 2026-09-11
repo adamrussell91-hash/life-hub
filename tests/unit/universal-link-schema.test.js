@@ -1,18 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import {
+  LINK_ID_PATTERN,
   LINK_STATUSES,
   LINK_VISIBILITIES,
+  ORDINARY_READ_STATUSES,
   UNIVERSAL_LINK_SCHEMA_VERSION,
   equivalenceInput,
+  isValidLinkId,
   parseUniversalLink,
   validateUniversalLinkRecord
 } from '../../netlify/functions/_shared/universal-link-schema.mjs';
 
+// The canonical deterministic id form is `ul_` + 64 lowercase hex chars
+// (a SHA-256 digest). Tests use a hash of a readable label so ids stay
+// both realistic and distinguishable.
+function ulId(label) {
+  return `ul_${createHash('sha256').update(label).digest('hex')}`;
+}
+
 function validRecord(overrides = {}) {
   return {
     schema_version: UNIVERSAL_LINK_SCHEMA_VERSION,
-    id: 'ul_deadbeef',
+    id: ulId('default'),
     source_ref: 'tasks:task:task_email_seth',
     target_ref: 'shared:person:person_seth',
     relationship_type: 'collaborator',
@@ -122,6 +133,38 @@ test('equivalenceInput sorts keys, normalizes undefined to null, and excludes va
   assert.equal('valid_to' in input, false);
   assert.equal('status' in input, false);
   assert.equal('created_at' in input, false);
+});
+
+test('isValidLinkId accepts only ul_ followed by exactly 64 lowercase hex characters', () => {
+  assert.equal(isValidLinkId(ulId('valid')), true);
+  assert.match(ulId('valid'), LINK_ID_PATTERN);
+  for (const bad of [
+    'ul_deadbeef', // too short
+    'ul_' + 'a'.repeat(63), // one char short
+    'ul_' + 'a'.repeat(65), // one char long
+    'ul_' + 'A'.repeat(64), // uppercase not permitted
+    'ul_' + 'g'.repeat(64), // non-hex character
+    `not_${'a'.repeat(64)}`, // wrong prefix
+    'ul_../../etc/passwd', // path traversal
+    'ul_' + 'a'.repeat(60) + '/../', // path traversal with correct-length prefix
+    '',
+    null,
+    undefined,
+    123
+  ]) {
+    assert.equal(isValidLinkId(bad), false, `expected ${JSON.stringify(bad)} to be rejected`);
+  }
+});
+
+test('parseUniversalLink rejects a record whose id is not the canonical deterministic form', () => {
+  assert.equal(parseUniversalLink(validRecord({ id: 'ul_deadbeef' })), null);
+  assert.equal(parseUniversalLink(validRecord({ id: 'ul_../../etc/passwd' })), null);
+});
+
+test('ORDINARY_READ_STATUSES contains exactly current and ended', () => {
+  assert.deepEqual([...ORDINARY_READ_STATUSES].sort(), ['current', 'ended']);
+  assert.equal(ORDINARY_READ_STATUSES.has('suppressed'), false);
+  assert.equal(ORDINARY_READ_STATUSES.has('deleted'), false);
 });
 
 test('equivalenceInput produces identical output for identical relationship-defining fields', () => {
