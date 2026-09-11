@@ -228,6 +228,91 @@ describe('page editor', () => {
     expect(labels).toEqual(['Basic', 'Media', 'Teaching', 'Learning', 'Visualisation', 'Layout']);
   });
 
+  it('lists project tasks and keeps a newly added task on the page', async () => {
+    const existing: Task = {
+      ...task(),
+      id: 'task_existing',
+      title: 'Draft accreditation brief',
+      parent_project_id: project.id
+    };
+    const created: Task = {
+      ...task(),
+      id: 'task_new',
+      title: 'Book mentoring session',
+      parent_project_id: project.id
+    };
+    vi.mocked(tasksApi.getProject).mockResolvedValue(project);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([existing]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [],
+      task_templates: [],
+      project_templates: []
+    });
+    vi.mocked(tasksApi.createTask).mockResolvedValue(created);
+
+    const canvas = document.createElement('main');
+    const header = pageHeader(project.title);
+    await renderPageEditor(canvas, { kind: 'project', id: project.id }, { header });
+
+    const existingCard = canvas.querySelector(
+      '.page-card__tasks .hub-card-slot [data-task-id="task_existing"]'
+    );
+    expect(existingCard?.querySelector('.hub-row__title')?.textContent).toBe('Draft accreditation brief');
+    expect(existingCard?.classList.contains('hub-row')).toBe(true);
+    expect(canvas.querySelector('.page-card__tasks .task-row')).toBeNull();
+    expect(canvas.textContent).not.toContain('Loading page…');
+    const listsBefore = vi.mocked(tasksApi.listTasks).mock.calls.length;
+    const getsBefore = vi.mocked(tasksApi.getProject).mock.calls.length;
+
+    const form = canvas.querySelector('form.quick-add') as HTMLFormElement;
+    const title = form.querySelector<HTMLInputElement>('[aria-label="New task title"]')!;
+    title.value = 'Book mentoring session';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await vi.waitFor(() => {
+      expect(
+        canvas.querySelector(
+          '.page-card__tasks .hub-card-slot [data-task-id="task_new"] .hub-row__title'
+        )?.textContent
+      ).toBe('Book mentoring session');
+    });
+    expect(tasksApi.createTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Book mentoring session',
+        parent_project_id: project.id
+      })
+    );
+    expect(canvas.textContent).not.toContain('Loading page…');
+    expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(listsBefore);
+    expect(vi.mocked(tasksApi.getProject)).toHaveBeenCalledTimes(getsBefore);
+    expect(canvas.querySelector('[data-task-id="task_existing"]')).not.toBeNull();
+  });
+
+  it('opens the add form from Add next action on a project page', async () => {
+    const emptyProject: Project = { ...project, id: 'proj_empty', title: 'Accreditation Mentoring' };
+    vi.mocked(tasksApi.getProject).mockResolvedValue(emptyProject);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [],
+      task_templates: [],
+      project_templates: []
+    });
+
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderPageEditor(canvas, { kind: 'project', id: emptyProject.id });
+
+    const hint = [...canvas.querySelectorAll('button')].find((btn) => btn.textContent === 'Add next action');
+    expect(hint).not.toBeNull();
+    expect(canvas.querySelector<HTMLElement>('.plus-add__panel')?.hidden).toBe(true);
+    hint!.click();
+    expect(canvas.querySelector<HTMLElement>('.plus-add__panel')?.hidden).toBe(false);
+    expect(canvas.querySelector('[aria-label="New task title"]')).toBe(document.activeElement);
+    canvas.remove();
+  });
+
   it('opens an excursion as a task page with progress, date, tracker, and joined timeline', async () => {
     const excursion: Project = {
       ...project,

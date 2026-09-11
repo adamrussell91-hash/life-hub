@@ -4,12 +4,15 @@ import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
 import { tasksApi } from '@/services/client-api';
-import { formatRelativeUpdated, projectProgress, statusLabel } from '@/domain/cards';
+import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
-import { renderQuickAdd } from '@/views/task-editor';
+import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
+import { openPlusAdd } from '@/views/plus-add';
+import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
+import { requestToggleDone } from '@/views/dashboard';
 import { mountBlockInsert } from '@/views/block-insert';
 import { paintExcursionPage } from '@/views/excursion-timeline';
 import { bindEditablePageTitle } from '@/shell/shell';
@@ -350,6 +353,7 @@ function paintProjectPage(
   header?: HTMLElement
 ): void {
   let current = project;
+  let liveTasks = tasks;
   let saveTimer: number | undefined;
   const errorHost = el('p', 'empty-state');
   errorHost.hidden = true;
@@ -391,13 +395,10 @@ function paintProjectPage(
     current: () => current.title
   });
 
-  const progress = projectProgress(project, tasks);
   const page = el('div', 'page-editor');
   const card = el('article', 'hub-card page-card');
   const head = el('header', 'task-card__head');
   head.append(backLink('#/projects', '← Projects'));
-  const health = projectNextActionHealth(project, tasks);
-  if (health) head.append(health);
 
   const fields = el('div', 'page-card__fields hub-toolbar');
   const status = pageFilter(
@@ -449,26 +450,86 @@ function paintProjectPage(
   );
 
   const metrics = el('div', 'task-card__progress');
-  const metric = el('div');
-  const pct = el('p', 'hub-hero-metric');
-  pct.innerHTML = `${progress.pct}<span class="hub-hero-metric__unit">%</span>`;
-  metric.append(pct, el('p', 'hub-hero-metric__lab', `${progress.done} of ${progress.total} tasks complete`));
-  metrics.append(metric);
   const track = el('div', 'hub-track');
-  const fill = el('div', 'hub-track__fill');
-  fill.style.width = `${progress.pct}%`;
-  track.append(fill);
+  const confirmHost = el('div', 'task-confirm');
+  const taskList = el('div', 'task-stack page-card__tasks');
+  taskList.setAttribute('aria-label', 'Project tasks');
   const foot = el('footer', 'task-card__foot');
   foot.append(updated);
+  let healthNode: HTMLElement | null = null;
 
-  card.append(head, fields, labeledField('Quality bar', qualityHost), notes.el, metrics, track);
+  const acceptTask = (updated: Task) => {
+    const index = liveTasks.findIndex((item) => item.id === updated.id);
+    if (index < 0) liveTasks = [updated, ...liveTasks];
+    else liveTasks[index] = updated;
+    paintProjectTasks();
+  };
+
+  const childHandlers: TaskCardHandlers = {
+    onToggle: (item) =>
+      requestToggleDone(confirmHost, item, async () => {
+        acceptTask({ ...item, status: item.status === 'done' ? 'open' : 'done' });
+      }),
+    onDelete: (item) =>
+      deleteTaskNow(
+        item,
+        () => {
+          liveTasks = liveTasks.filter((entry) => entry.id !== item.id);
+          paintProjectTasks();
+        },
+        confirmHost
+      ),
+    onEdit: (item) =>
+      void renderTaskEditor(confirmHost, item, [current], (saved) => {
+        if (saved) acceptTask(saved);
+      }),
+    onPatch: (item, patch) => {
+      void tasksApi.updateTask(item.id, patch).then(acceptTask, (err) => {
+        confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err)));
+      });
+    }
+  };
+
+  const paintProjectTasks = () => {
+    const progress = projectProgress(current, liveTasks);
+    const metric = el('div');
+    const pct = el('p', 'hub-hero-metric');
+    pct.innerHTML = `${progress.pct}<span class="hub-hero-metric__unit">%</span>`;
+    metric.append(pct, el('p', 'hub-hero-metric__lab', `${progress.done} of ${progress.total} tasks complete`));
+    metrics.replaceChildren(metric);
+    const fill = el('div', 'hub-track__fill');
+    fill.style.width = `${progress.pct}%`;
+    track.replaceChildren(fill);
+
+    healthNode?.remove();
+    healthNode = projectNextActionHealth(current, liveTasks, () => openPlusAdd(card));
+    if (healthNode) head.append(healthNode);
+
+    const children = projectChildTasks(current, liveTasks);
+    if (!children.length) {
+      taskList.replaceChildren(el('p', 'empty-state', 'No tasks on this project yet.'));
+      return;
+    }
+    taskList.replaceChildren();
+    for (const child of children) mountTaskCard(taskList, child, childHandlers);
+  };
+
+  paintProjectTasks();
+
   card.append(
-    renderQuickAdd(
-      () => void renderPageEditor(canvas, { kind: 'project', id: project.id }, { header }),
-      project.id
-    )
+    head,
+    fields,
+    labeledField('Quality bar', qualityHost),
+    notes.el,
+    metrics,
+    track,
+    renderQuickAdd((created) => {
+      acceptTask(created);
+    }, project.id),
+    confirmHost,
+    taskList,
+    foot
   );
-  card.append(foot);
   card.append(
     renderCardMenu(`${project.title} card menu`, [
       {

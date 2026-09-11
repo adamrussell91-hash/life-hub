@@ -14,8 +14,9 @@ const session = createSessionToken({
   randomBytes: () => Buffer.alloc(16, 4)
 }, SECRET).token;
 
-function memoryStore(entries = {}) {
+function memoryStore(entries = {}, { staleList = false } = {}) {
   const map = new Map(Object.entries(entries));
+  const listed = new Set(Object.keys(entries));
   return {
     async get(key, options = {}) {
       const value = map.get(key);
@@ -24,13 +25,15 @@ function memoryStore(entries = {}) {
     },
     async setJSON(key, value) {
       map.set(key, value);
+      if (!staleList) listed.add(key);
     },
     async delete(key) {
       map.delete(key);
+      listed.delete(key);
     },
     async list({ prefix }) {
       return {
-        blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key }))
+        blobs: [...listed].filter(key => key.startsWith(prefix)).map(key => ({ key }))
       };
     }
   };
@@ -181,6 +184,40 @@ test('Tasks POST/PATCH/DELETE use the Life session and keep the index', async ()
     request({ cookie: false, method: 'POST', body: { title: 'Nope', domain: 'life' } })
   );
   assert.equal(anon.status, 401);
+});
+
+test('Tasks list includes a just-created project task when Blobs list() is stale', async () => {
+  const store = memoryStore({
+    'tasks/_index': ['task-1'],
+    'tasks/task-1': { id: 'task-1', title: 'Mark 12 English', status: 'open' }
+  }, { staleList: true });
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+
+  const created = await handler(
+    request({
+      method: 'POST',
+      origin: 'https://tasks-hub.adam-russell.com',
+      body: {
+        title: 'Book mentoring session',
+        domain: 'teaching',
+        parent_project_id: 'proj_accreditation'
+      }
+    })
+  );
+  assert.equal(created.status, 201);
+  const createdBody = await created.json();
+  assert.equal(createdBody.data.parent_project_id, 'proj_accreditation');
+
+  const listed = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
+  assert.equal(listed.status, 200);
+  const tasks = (await listed.json()).data.tasks;
+  const found = tasks.find((task) => task.id === createdBody.data.id);
+  assert.equal(found?.title, 'Book mentoring session');
+  assert.equal(found?.parent_project_id, 'proj_accreditation');
 });
 
 test('Tasks POST rejects a missing domain', async () => {
