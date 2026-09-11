@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  assertAdministrationWorkflow,
   assertEntityKindAllowed,
   createAccessContext,
+  deriveWorkflowVisibility,
   endpointNotFoundError,
   isVisibilityAllowed,
   strictestVisibility
@@ -84,4 +86,36 @@ test('endpointNotFoundError is a stable 404 shape with no protected detail', () 
   assert.equal(error.status, 404);
   assert.equal(error.code, 'endpoint_not_found');
   assert.doesNotMatch(error.message, /person|organisation|student/i);
+});
+
+// --- Slice 2: assertAdministrationWorkflow, deriveWorkflowVisibility ---
+
+test('assertAdministrationWorkflow permits only the administration workflow', () => {
+  const admin = createAccessContext({ workflow: 'administration' });
+  assert.doesNotThrow(() => assertAdministrationWorkflow(admin));
+
+  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life']) {
+    const context = createAccessContext({ workflow });
+    assert.throws(
+      () => assertAdministrationWorkflow(context),
+      error => error.status === 403 && error.code === 'administration_required',
+      `expected ${workflow} to be rejected`
+    );
+  }
+  assert.throws(
+    () => assertAdministrationWorkflow(null),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+});
+
+test('deriveWorkflowVisibility returns operator for every known workflow (no teaching_protected grant yet)', () => {
+  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
+    const context = createAccessContext({ workflow });
+    assert.equal(deriveWorkflowVisibility(context), 'operator');
+  }
+});
+
+test('deriveWorkflowVisibility rejects a missing or unknown workflow', () => {
+  assert.throws(() => deriveWorkflowVisibility(null), error => error.code === 'invalid_workflow');
+  assert.throws(() => deriveWorkflowVisibility({ workflow: 'made_up' }), error => error.code === 'invalid_workflow');
 });
