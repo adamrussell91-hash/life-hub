@@ -410,4 +410,148 @@ describe('board view mutations', () => {
       'Mark Year 11 papers'
     );
   });
+
+  it('live-paints board card properties when the task changes without moving column', async () => {
+    const open = task({
+      id: 'task_props',
+      title: 'Old title',
+      status: 'open',
+      due_date: '2026-08-27',
+      priority: 'medium',
+      domain: 'teaching'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    const card = canvas.querySelector('[data-id="task_props"]');
+    expect(card?.textContent).toContain('Old title');
+    expect(card?.querySelector('.priority-chip')?.textContent).toBe('medium');
+    expect(card?.querySelector('.date-badge')?.textContent).toContain('27/08/26');
+
+    notifyTasksChanged([
+      task({
+        id: 'task_props',
+        title: 'Renamed brief',
+        status: 'open',
+        due_date: '2026-09-15',
+        priority: 'urgent',
+        domain: 'life',
+        updated_at: '2026-09-11T01:00:00.000Z'
+      })
+    ]);
+
+    const updated = canvas.querySelector('[data-id="task_props"]');
+    expect(updated?.closest('.column')?.getAttribute('data-col')).toBe('todo');
+    expect(updated?.textContent).toContain('Renamed brief');
+    expect(updated?.querySelector('.priority-chip')?.textContent).toBe('urgent');
+    expect(updated?.querySelector('.date-badge')?.textContent).toContain('15/09/26');
+    expect(updated?.querySelector('.hub-chip')?.textContent).toBe('Life');
+  });
+
+  it('patches a board chip and live-updates the Today row from the same task', async () => {
+    const open = task({
+      id: 'task_chip',
+      title: 'Chip sync',
+      status: 'open',
+      due_date: '2026-08-27',
+      domain: 'teaching',
+      priority: 'high'
+    });
+    const patched = task({
+      id: 'task_chip',
+      title: 'Chip sync',
+      status: 'open',
+      due_date: '2026-08-27',
+      domain: 'wedding',
+      priority: 'urgent'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(patched);
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    expect(canvas.querySelector('#timeline-today .dashboard-row__date')?.textContent).toBe('teaching');
+
+    const chip = canvas.querySelector<HTMLButtonElement>('[data-id="task_chip"] .priority-chip');
+    chip!.click();
+    const panel = document.querySelector<HTMLElement>('.morphing-popover__panel:not([hidden])');
+    [...panel!.querySelectorAll('.hub-pills__btn')].find((btn) => btn.textContent === 'urgent')?.dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    );
+    [...panel!.querySelectorAll('button')].find((btn) => btn.textContent === 'Save')?.click();
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_chip', { priority: 'urgent' });
+    });
+
+    const domain = canvas.querySelector<HTMLButtonElement>('[data-id="task_chip"] .hub-chip');
+    domain!.click();
+    const domainPanel = document.querySelector<HTMLElement>('.morphing-popover__panel:not([hidden])');
+    [...domainPanel!.querySelectorAll('.hub-pills__btn')]
+      .find((btn) => btn.textContent === 'Wedding')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    [...domainPanel!.querySelectorAll('button')].find((btn) => btn.textContent === 'Save')?.click();
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith('task_chip', { domain: 'wedding' });
+      expect(canvas.querySelector('#timeline-today .dashboard-row__date')?.textContent).toBe('wedding');
+      expect(canvas.querySelector('[data-id="task_chip"] .priority-chip')?.textContent).toBe('urgent');
+      expect(canvas.querySelector('[data-id="task_chip"] .hub-chip')?.textContent).toBe('Wedding');
+    });
+  });
+
+  it('reschedules from Today and live-updates the board card due date', async () => {
+    const open = task({
+      id: 'task_move_day',
+      title: 'Move day',
+      status: 'open',
+      due_date: '2026-08-27'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([open]);
+    vi.mocked(tasksApi.updateTask).mockImplementation(async (_id, patch) =>
+      task({
+        id: 'task_move_day',
+        title: 'Move day',
+        status: 'open',
+        due_date: (patch as { due_date: string }).due_date
+      })
+    );
+
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderBoardView(canvas);
+
+    expect(canvas.querySelector('[data-id="task_move_day"] .date-badge')?.textContent).toContain('27/08/26');
+
+    const later = [...canvas.querySelectorAll<HTMLButtonElement>('.dashboard-heat__cell')].find(
+      (cell) => cell.dataset.today !== 'true'
+    );
+    expect(later).toBeTruthy();
+    const transfer = {
+      data: { 'application/x-tasks-hub-task': open.id, 'text/plain': open.id } as Record<string, string>,
+      getData(type: string) {
+        return this.data[type] ?? '';
+      }
+    };
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: transfer });
+    later!.dispatchEvent(drop);
+
+    await vi.waitFor(() => {
+      expect(vi.mocked(tasksApi.updateTask)).toHaveBeenCalledWith(
+        'task_move_day',
+        expect.objectContaining({ due_date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })
+      );
+    });
+    const due = (vi.mocked(tasksApi.updateTask).mock.calls[0]?.[1] as { due_date: string }).due_date;
+    const [year, month, day] = due.split('-');
+    expect(canvas.querySelector('[data-id="task_move_day"] .date-badge')?.textContent).toContain(
+      `${day}/${month}/${year.slice(-2)}`
+    );
+  });
 });

@@ -4,6 +4,7 @@ import type { Area } from '@/schemas/area';
 import type { Goal } from '@/schemas/goal';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
 import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { hashQuery } from '@/shell/shell';
 import { backlogTasks, openTasks, parseDue, toDateKey } from '@/domain/queries';
 import { somedayTasks } from '@/domain/hierarchy';
@@ -322,6 +323,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
   const today = new Date();
   let anchor = parseCalendarAnchor(hashQuery().get('date'), today);
   const keys = new AbortController();
+  let stopLive = (): void => undefined;
   const session: LiveCalendar = {
     canvas,
     mode: mode === 'week' ? parseCalendarMode() : mode,
@@ -334,7 +336,10 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       anchor = fromHash;
       paint();
     },
-    dispose: () => keys.abort()
+    dispose: () => {
+      keys.abort();
+      stopLive();
+    }
   };
   if (liveCalendar) liveCalendar.dispose();
   liveCalendar = session;
@@ -883,6 +888,23 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
     onShortcuts: () => openCalendarCommand(canvas, 'help', goDate),
     onSwitch: switchMode
   });
+
+  const stopChanged = onTasksChanged((incoming) => {
+    for (const task of incoming) {
+      const index = tasks.findIndex((entry) => entry.id === task.id);
+      if (index >= 0) tasks[index] = task;
+      else tasks.push(task);
+    }
+    paint();
+  });
+  const stopDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  stopLive = () => {
+    stopChanged();
+    stopDeleted();
+  };
 
   paint();
 }

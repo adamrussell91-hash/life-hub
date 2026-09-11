@@ -6,8 +6,7 @@ import {
   filterCachedTasks,
   mergeListedTasks,
   notifyTasksChanged,
-  rememberCreatedTask,
-  rememberDeletedTask,
+  notifyTasksDeleted,
   rememberFetchedTask,
   restoreDeletedTask
 } from '@/services/task-cache';
@@ -96,7 +95,7 @@ export const tasksApi = {
     apiGet<Task>(`/api/tasks?id=${encodeURIComponent(id)}`).then((task) => rememberFetchedTask(task)),
   createTask: (body: unknown) =>
     apiPost<Task>('/api/tasks', body).then((task) => {
-      rememberCreatedTask(task);
+      notifyTasksChanged([task]);
       return task;
     }),
   updateTask: (id: string, body: unknown) =>
@@ -105,14 +104,15 @@ export const tasksApi = {
       return task;
     }),
   deleteTask: async (id: string, meta?: { agent?: string; reason?: string }) => {
-    rememberDeletedTask(id);
+    notifyTasksDeleted([id]);
     try {
       return await apiDelete<{ deleted: boolean }>(
         `/api/tasks?id=${encodeURIComponent(id)}`,
         meta
       );
     } catch (err) {
-      restoreDeletedTask(id);
+      const restored = restoreDeletedTask(id);
+      if (restored) notifyTasksChanged([restored]);
       throw err;
     }
   },

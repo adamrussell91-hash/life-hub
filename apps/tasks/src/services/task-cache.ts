@@ -34,13 +34,21 @@ export function rememberCreatedTask(task: Task): void {
 }
 
 export const TASKS_CHANGED = 'tasks-hub:tasks-changed';
+export const TASKS_DELETED = 'tasks-hub:tasks-deleted';
 
-/** Cache + tell open Today/Board/Backlog views to live-insert. */
+/** Cache + tell open views to live-apply the canonical task. */
 export function notifyTasksChanged(tasks: Task[]): void {
   const incoming = tasks.filter((task) => task && typeof task.id === 'string' && task.id);
   if (!incoming.length) return;
   for (const task of incoming) rememberCreatedTask(task);
   window.dispatchEvent(new CustomEvent<Task[]>(TASKS_CHANGED, { detail: incoming }));
+}
+
+export function notifyTasksDeleted(ids: string[]): void {
+  const incoming = ids.filter((id) => typeof id === 'string' && id);
+  if (!incoming.length) return;
+  for (const id of incoming) rememberDeletedTask(id);
+  window.dispatchEvent(new CustomEvent<string[]>(TASKS_DELETED, { detail: incoming }));
 }
 
 export function onTasksChanged(handler: (tasks: Task[]) => void): () => void {
@@ -51,6 +59,16 @@ export function onTasksChanged(handler: (tasks: Task[]) => void): () => void {
   };
   window.addEventListener(TASKS_CHANGED, listener);
   return () => window.removeEventListener(TASKS_CHANGED, listener);
+}
+
+export function onTasksDeleted(handler: (ids: string[]) => void): () => void {
+  const listener = (event: Event) => {
+    const detail = (event as CustomEvent<string[]>).detail;
+    if (!Array.isArray(detail) || !detail.length) return;
+    handler(detail);
+  };
+  window.addEventListener(TASKS_DELETED, listener);
+  return () => window.removeEventListener(TASKS_DELETED, listener);
 }
 
 /** GET can lose a write race — keep the newer cached copy. */

@@ -34,7 +34,7 @@ import {
   priorityFilterOptions
 } from '@/views/hub-kit';
 import { mountDailyDial, type DailyDialHandle } from '@/views/daily-dial';
-import { onTasksChanged } from '@/services/task-cache';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 
 export { renderProjectsView } from '@/views/projects';
 
@@ -298,10 +298,18 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
-  teardownDay = onTasksChanged((incoming) => {
+  const stopDayChanged = onTasksChanged((incoming) => {
     for (const task of incoming) upsertTask(tasks, task);
     paint();
   });
+  const stopDayDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownDay = () => {
+    stopDayChanged();
+    stopDayDeleted();
+  };
 }
 
 export async function renderListView(canvas: HTMLElement): Promise<void> {
@@ -420,10 +428,18 @@ export async function renderListView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
-  teardownBacklog = onTasksChanged((incoming) => {
+  const stopBacklogChanged = onTasksChanged((incoming) => {
     for (const task of incoming) upsertTask(tasks, task);
     paint();
   });
+  const stopBacklogDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownBacklog = () => {
+    stopBacklogChanged();
+    stopBacklogDeleted();
+  };
 }
 
 export async function renderSearchView(canvas: HTMLElement): Promise<void> {

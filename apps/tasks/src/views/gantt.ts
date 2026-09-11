@@ -1,6 +1,7 @@
 import type { Task, TaskDomain } from '@/schemas/task';
 import type { Project, Milestone } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { hashQuery } from '@/shell/shell';
 import { projectMilestones } from '@/domain/project-milestones';
 import {
@@ -159,7 +160,11 @@ function pill(
   return btn;
 }
 
+let teardownGantt: (() => void) | null = null;
+
 export async function renderGanttView(canvas: HTMLElement): Promise<void> {
+  teardownGantt?.();
+  teardownGantt = null;
   showViewLoading(canvas, 'Loading Gantt…', '.gantt-toolbar');
   let tasks: Task[];
   let projects: Project[];
@@ -1097,6 +1102,23 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       if (!(event.target instanceof Element) || !event.target.closest('.gantt-edge-hit')) closePopover();
     }
   });
+
+  const stopChanged = onTasksChanged((incoming) => {
+    for (const task of incoming) {
+      const index = tasks.findIndex((entry) => entry.id === task.id);
+      if (index >= 0) tasks[index] = task;
+      else tasks.push(task);
+    }
+    paint();
+  });
+  const stopDeleted = onTasksDeleted((ids) => {
+    tasks = tasks.filter((task) => !ids.includes(task.id));
+    paint();
+  });
+  teardownGantt = () => {
+    stopChanged();
+    stopDeleted();
+  };
 
   paint();
 }

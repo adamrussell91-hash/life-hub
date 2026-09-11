@@ -96,6 +96,7 @@ function closedFieldChip(spec: {
     value: spec.value,
     onSave(value) {
       trigger.className = `${spec.faceClass(value)} morphing-popover__trigger`;
+      trigger.textContent = spec.choices.find((choice) => choice.value === value)?.label ?? value;
       if (spec.dataset) {
         for (const key of Object.keys(spec.dataset)) {
           if (key === 'priority' || key === 'area') trigger.dataset[key] = value;

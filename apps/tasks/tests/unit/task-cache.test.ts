@@ -3,6 +3,8 @@ import type { Task } from '@/schemas/task';
 import {
   filterCachedTasks,
   mergeListedTasks,
+  notifyTasksDeleted,
+  onTasksDeleted,
   rememberCreatedTask,
   rememberDeletedTask,
   rememberFetchedTask,
@@ -76,6 +78,17 @@ describe('task cache', () => {
     expect(normalized.depends_on).toEqual([]);
     expect(normalized.tags).toEqual([]);
     expect(normalized.attachments).toEqual([]);
+  });
+
+  it('broadcasts deletes so open views can drop the card', () => {
+    const doomed = task({ id: 'task_gone', title: 'Gone' });
+    rememberCreatedTask(doomed);
+    const seen: string[][] = [];
+    const stop = onTasksDeleted((ids) => seen.push(ids));
+    notifyTasksDeleted([doomed.id]);
+    stop();
+    expect(seen).toEqual([['task_gone']]);
+    expect(mergeListedTasks([])).toEqual([]);
   });
 
   it('keeps a newer write when a later GET is stale', () => {
