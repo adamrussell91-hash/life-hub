@@ -43,14 +43,21 @@ import { activeProjectMeter } from '@/domain/hammond-portfolio';
 import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
-/** Quiet when healthy; prompt when next action missing. */
-export function projectNextActionHealth(project: Project, tasks: Task[]): HTMLElement | null {
+/** Quiet when healthy; a real control when the project has no next action. */
+export function projectNextActionHealth(
+  project: Project,
+  tasks: Task[],
+  onAdd?: () => void
+): HTMLElement | null {
   if (project.status === 'archived_dead' || project.status === 'paused') return null;
-  const result = inspectProjectHealth(project, tasks);
-  if (result.health === 'healthy' || result.health === 'waiting_only') return null;
-  if (result.health !== 'missing_next_action') return null;
-  const hint = el('span', 'proj-health proj-health--warn', 'Add next action');
-  hint.setAttribute('role', 'status');
+  if (inspectProjectHealth(project, tasks).health !== 'missing_next_action') return null;
+  const hint = el('button', 'proj-health proj-health--warn', 'Add next action');
+  hint.type = 'button';
+  hint.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (onAdd) onAdd();
+    else location.hash = projectPageHash(project.id);
+  });
   return hint;
 }
 
