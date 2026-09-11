@@ -35,8 +35,11 @@ function prefersReducedMotion() {
   }
 }
 
-function configureCanvas(canvas: HTMLCanvasElement) {
-  const rect = canvas.getBoundingClientRect();
+function configureCanvas(canvas: HTMLCanvasElement, hostRect?: { width: number; height: number }) {
+  // Measuring from a rect supplied by an un-transformed ancestor (rather than the
+  // canvas's own getBoundingClientRect) keeps drawing/layout math stable even when
+  // the canvas sits inside a CSS-scaled pan/zoom camera layer.
+  const rect = hostRect ?? canvas.getBoundingClientRect();
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(rect.width * ratio));
   canvas.height = Math.max(1, Math.round(rect.height * ratio));
@@ -413,16 +416,35 @@ function miniSymbol(item: SavedConstellation) {
   return `<svg viewBox="0 0 100 70" aria-hidden="true">${lines}${stars}</svg>`;
 }
 
+const SKY_MIN_SCALE = 1;
+const SKY_MAX_SCALE = 2.6;
+const SKY_ZOOM_STEP = 1.35;
+
+type SkyCamera = { scale: number; x: number; y: number };
+
 export function mountStarsSky(
   host: HTMLElement,
   constellations: SavedConstellation[],
   date: Date,
   onSelect: (item: SavedConstellation) => void,
-  noteCount = 0,
 ) {
-  host.innerHTML = `<canvas class="stars-sky__canvas" aria-hidden="true"></canvas><div class="stars-sky__objects"></div>`;
+  host.innerHTML = `
+    <div class="stars-sky__camera" data-stars-camera>
+      <canvas class="stars-sky__canvas" aria-hidden="true"></canvas>
+      <div class="stars-sky__objects"></div>
+    </div>
+    <div class="stars-sky-zoom" role="group" aria-label="Sky zoom">
+      <button type="button" class="btn btn--ghost" data-stars-zoom="in" aria-label="Zoom in">+</button>
+      <button type="button" class="btn btn--ghost" data-stars-zoom="out" aria-label="Zoom out">−</button>
+      <button type="button" class="btn btn--ghost" data-stars-zoom="reset" aria-label="Reset zoom">⤾</button>
+    </div>
+  `;
+  const cameraEl = host.querySelector<HTMLElement>("[data-stars-camera]")!;
   const canvas = host.querySelector<HTMLCanvasElement>("canvas")!;
   const layer = host.querySelector<HTMLElement>(".stars-sky__objects")!;
+  const zoomInBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="in"]')!;
+  const zoomOutBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="out"]')!;
+  const zoomResetBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="reset"]')!;
   const reduced = prefersReducedMotion();
   const popover = createStarPopover(host);
   const parallax = bindParallax(host, reduced);
@@ -434,8 +456,76 @@ export function mountStarsSky(
   let shootingStars: ShootingStar[] = [];
   let ripples: Ripple[] = [];
   let openPopoverId: string | null = null;
+  let view: SkyCamera = { scale: SKY_MIN_SCALE, x: 0, y: 0 };
   const angle = annualSkyRotation(date);
   const shootSeed = random(seedOf(`${date.toISOString()}-shoot`));
+
+  function clampView(next: SkyCamera): SkyCamera {
+    const scale = Math.max(SKY_MIN_SCALE, Math.min(SKY_MAX_SCALE, next.scale));
+    const maxX = (size.width * (scale - 1)) / 2;
+    const maxY = (size.height * (scale - 1)) / 2;
+    return {
+      scale,
+      x: Math.max(-maxX, Math.min(maxX, next.x)),
+      y: Math.max(-maxY, Math.min(maxY, next.y)),
+    };
+  }
+
+  function applyView() {
+    cameraEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+    zoomOutBtn.disabled = view.scale <= SKY_MIN_SCALE;
+    zoomInBtn.disabled = view.scale >= SKY_MAX_SCALE;
+  }
+
+  function setScale(nextScale: number) {
+    view = clampView({ ...view, scale: nextScale });
+    applyView();
+  }
+
+  zoomInBtn.onclick = () => setScale(view.scale * SKY_ZOOM_STEP);
+  zoomOutBtn.onclick = () => setScale(view.scale / SKY_ZOOM_STEP);
+  zoomResetBtn.onclick = () => {
+    view = { scale: SKY_MIN_SCALE, x: 0, y: 0 };
+    applyView();
+  };
+
+  function onWheel(event: WheelEvent) {
+    event.preventDefault();
+    setScale(view.scale * (event.deltaY < 0 ? SKY_ZOOM_STEP : 1 / SKY_ZOOM_STEP));
+  }
+  cameraEl.addEventListener("wheel", onWheel, { passive: false });
+
+  let dragging = false;
+  let dragLast = { x: 0, y: 0 };
+  function isDragBlocked(target: EventTarget | null) {
+    return target instanceof Element && !!target.closest(".stars-sky-object");
+  }
+  function onPointerDown(event: PointerEvent) {
+    if (event.button !== undefined && event.button !== 0) return;
+    if (isDragBlocked(event.target)) return;
+    dragging = true;
+    dragLast = { x: event.clientX, y: event.clientY };
+    cameraEl.setPointerCapture(event.pointerId);
+    cameraEl.classList.add("is-dragging");
+  }
+  function onPointerMoveDrag(event: PointerEvent) {
+    if (!dragging) return;
+    const dx = event.clientX - dragLast.x;
+    const dy = event.clientY - dragLast.y;
+    dragLast = { x: event.clientX, y: event.clientY };
+    view = clampView({ ...view, x: view.x + dx, y: view.y + dy });
+    applyView();
+  }
+  function onPointerUpDrag(event: PointerEvent) {
+    if (!dragging) return;
+    dragging = false;
+    cameraEl.classList.remove("is-dragging");
+    try { cameraEl.releasePointerCapture(event.pointerId); } catch { /* already released */ }
+  }
+  cameraEl.addEventListener("pointerdown", onPointerDown);
+  cameraEl.addEventListener("pointermove", onPointerMoveDrag);
+  cameraEl.addEventListener("pointerup", onPointerUpDrag);
+  cameraEl.addEventListener("pointercancel", onPointerUpDrag);
 
   function closeCard() {
     openPopoverId = null;
@@ -475,12 +565,17 @@ export function mountStarsSky(
 
   const layoutAll = () => {
     if (stopped) return;
-    const { context, width, height } = configureCanvas(canvas);
+    const { context, width, height } = configureCanvas(canvas, host.getBoundingClientRect());
     context.clearRect(0, 0, width, height);
     size = { width, height };
     colors = { onDark: css("--on-dark", "white"), gold: css("--pastel-gold", "white") };
-    const visibleNoteCount = Math.max(0, Math.round(noteCount));
-    dust = buildDust(934857, width, height, visibleNoteCount);
+    // Density scales with the visible area (with a floor) so the sky always reads as
+    // full — it must never depend on how many notes/constellations exist, or a small
+    // archive renders a sparse, patchy field instead of a real starfield.
+    const density = Math.max(220, Math.round((width * height) / 4200));
+    dust = buildDust(934857, width, height, density);
+    view = clampView(view);
+    applyView();
 
     layer.innerHTML = "";
     constellations.forEach((item, index) => {
