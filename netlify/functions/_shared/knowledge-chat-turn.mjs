@@ -28,7 +28,7 @@ function lastUserQuery(messages) {
 
 function withArchiveLookupPlan(input) {
   if (input.researchSessionId || input.writeSessionId || input.compose) return input;
-  if (input.hat === 'fromBook' || input.hat === 'makeNote') return input;
+  if (input.hat === 'fromBook' || input.hat === 'makeNote' || input.hat === 'stars') return input;
   if (!isArchiveLookupQuery(lastUserQuery(input.messages))) return input;
   return { ...input, hat: 'scoping', depth: 'single', scope: 'wide' };
 }
@@ -163,6 +163,8 @@ function assembledSystem(input, archive) {
   const coverage = archive.research ? coverageFromResearch(archive.research) : undefined;
   const synthesis = input.hat === 'synthesis'
     ? `\n${loadKnowledgePrompt('clementine-thematic-synthesis.md', input.cwd)}`
+    : input.hat === 'stars'
+      ? `\n${loadKnowledgePrompt('clementine-stars.md', input.cwd)}`
     : input.hat === 'fromBook'
       ? `\n${loadKnowledgePrompt('clementine-book-note.md', input.cwd)}`
       : input.hat === 'makeNote'
