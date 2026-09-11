@@ -17,7 +17,8 @@
     "test:integration": "node --test tests/integration/*.test.js",
     "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/hub-count.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/mind.spec.mjs tests/browser/fitness.spec.mjs tests/browser/morphing-popover.spec.mjs tests/browser/hub-compose.spec.mjs tests/browser/view-on-map.spec.mjs tests/browser/card-swipe.spec.mjs tests/browser/shortcuts.spec.mjs",
     "validate:fixtures": "node scripts/validate-fixtures.mjs",
-    "import:mind": "node scripts/import-mind-notion.mjs"
+    "import:mind": "node scripts/import-mind-notion.mjs",
+    "chadwick-voice": "bash tools/voice-lab/launch.sh --no-open"
   },
   "dependencies": {
     "@annotorious/annotorious": "^3.8.10",

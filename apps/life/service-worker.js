@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v166';
+const CACHE_NAME = 'life-hub-shell-v167';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -108,6 +108,7 @@ const SHELL_FILES = [
   'js/app/chat-controller.js',
   'js/app/chat-panel.js',
   'js/app/chat-turn-anchor.js',
+  'js/app/chadwick-voice.js',
   'js/app/confirm-card-receipt.js',
   'js/app/visual-viewport.js',
   'js/app/config.js',
