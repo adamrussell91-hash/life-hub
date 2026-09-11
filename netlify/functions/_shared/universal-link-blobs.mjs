@@ -65,12 +65,29 @@ function assertValidEventId(id) {
   return id;
 }
 
+export const PERSON_PREFIX = 'entities/person/';
+export const ORGANISATION_PREFIX = 'entities/organisation/';
+
 export function personKey(id) {
-  return `entities/person/${assertValidPersonId(id)}`;
+  return `${PERSON_PREFIX}${assertValidPersonId(id)}`;
 }
 
 export function organisationKey(id) {
-  return `entities/organisation/${assertValidOrganisationId(id)}`;
+  return `${ORGANISATION_PREFIX}${assertValidOrganisationId(id)}`;
+}
+
+// Lists authoritative Person keys directly — never the derived search
+// index (correction: reconciliation Job 2). A Person whose index write
+// failed is invisible to `listPersonIndexKeys` below, but must still be
+// visible to anything deciding which Person records actually exist (most
+// importantly `reconcileSelfIdentity`). Bounded the same way
+// `listAuthoritativeLinkKeys` is: an administrative/reconciliation-only
+// full-prefix listing under `entities/person/` specifically — distinct
+// from, and never overlapping with, `entities/index/person/`,
+// `entities/organisation/`, `entities/events/`, or `entities/self-pointer` —
+// never called from an ordinary read path.
+export async function listAuthoritativePersonKeys(store) {
+  return (await listBlobKeys(store, PERSON_PREFIX)).filter(key => !isIndexKey(key));
 }
 
 export const PERSON_INDEX_PREFIX = 'entities/index/person/';
@@ -88,7 +105,11 @@ export function organisationIndexKey(id) {
 // authoritative record) under one kind's index prefix — used by
 // entity-search.mjs. Bounded the same way listAuthoritativeLinkKeys is: an
 // administrative/search-only full-prefix listing, never called from an
-// ordinary Universal Link read path.
+// ordinary Universal Link read path. This is *derived* data: correction
+// Job 2 established that anything deciding which Person records
+// authoritatively exist (`reconcileSelfIdentity`) must use
+// `listAuthoritativePersonKeys` above instead — this index listing stays
+// eligible for search and for repair, never for existence decisions.
 export async function listPersonIndexKeys(store) {
   return (await listBlobKeys(store, PERSON_INDEX_PREFIX)).filter(key => !isIndexKey(key));
 }

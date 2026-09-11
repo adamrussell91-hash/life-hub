@@ -5,7 +5,14 @@ import {
   createIdentityRepository,
   identityOperationKey
 } from '../../netlify/functions/_shared/identity-repository.mjs';
+import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
 import { personKey, personIndexKey } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
+
+// The administration access context every repair/reconcile call requires
+// (correction Job 3) — server-derived exactly the way `entities-admin.mjs`
+// builds it, never accepted from a request body.
+const admin = createAccessContext({ workflow: 'administration' });
+const life = createAccessContext({ workflow: 'life' });
 
 // Mirrors universal-link-repository.test.js's synthetic store: failure
 // injection on both reads and writes, plus a durable write log, so every
@@ -55,6 +62,48 @@ function createMemoryStore() {
       const value = map.get(key);
       return value ? JSON.parse(value) : null;
     }
+  };
+}
+
+// A deterministic store barrier (Job 1's required controlled-interleaving
+// test): wraps a memory store so a specific write can pause the calling
+// operation immediately after that write lands, until the test releases
+// it. This lets a test suspend operation A right between "A's pointer
+// write landed" and "A's Person record write starts" — the exact window
+// the confirmed interleaving exploited — then run a second, fully
+// synchronous operation B to completion before resuming A, with no timing
+// assumptions beyond the JS event loop's own microtask/macrotask ordering.
+function createBarrierStore(baseStore) {
+  let barrier = null;
+  return {
+    async get(key, options) {
+      return baseStore.get(key, options);
+    },
+    async setJSON(key, value) {
+      await baseStore.setJSON(key, value);
+      if (barrier && barrier.predicate(key, value)) {
+        const current = barrier;
+        barrier = null; // one-shot
+        await current.promise;
+      }
+    },
+    async list(options) {
+      return baseStore.list(options);
+    },
+    // Arms a one-shot pause: the *next* setJSON call whose key/value match
+    // `predicate` will complete its write, then block until the returned
+    // `release` function is called.
+    _pauseAfterNextWriteMatching(predicate) {
+      let release;
+      const promise = new Promise(resolve => { release = resolve; });
+      barrier = { predicate, promise };
+      return release;
+    },
+    _failNextMatching: predicate => baseStore._failNextMatching(predicate),
+    _clearFailure: () => baseStore._clearFailure(),
+    _writeLog: baseStore._writeLog,
+    _has: key => baseStore._has(key),
+    _raw: key => baseStore._raw(key)
   };
 }
 
@@ -252,7 +301,7 @@ for (const boundary of CREATE_BOUNDARIES) {
     // with the operation id the 503 carried (correction B4, design note:
     // identity ids are random, so there is no content-based equivalence to
     // dedupe an ordinary retry against, unlike Universal Links).
-    const repaired = await repo.repairIdentityOperation(caughtOperationId);
+    const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
     assert.equal(repaired.status, 'committed');
     assert.equal(repaired.entity_id, caughtEntityId);
 
@@ -281,7 +330,7 @@ test('B4: confirmed reproduction 1 — create fails the index write; repair comp
   );
   store._clearFailure();
 
-  const repaired = await repo.repairIdentityOperation(caughtOperationId);
+  const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
   assert.equal(repaired.repaired, true);
 
   const personEntityKeys = [...store._writeLog].filter(key => /^entities\/person\/person_/.test(key));
@@ -359,7 +408,7 @@ test('B4: confirmed reproduction 3 — a lifecycle transition survives a failed 
   const eventKeys = [...store._writeLog].filter(key => key.startsWith('entities/events/'));
   assert.equal(new Set(eventKeys).size, 1, 'exactly one lifecycle event key was ever written');
 
-  const repaired = await repo.repairIdentityOperation(caughtOperationId);
+  const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
   assert.equal(repaired.status, 'committed');
   assert.equal(repaired.repaired, false, 'the retry above already finished it');
 });
@@ -405,7 +454,7 @@ test('B4: repairIdentityOperation refuses to replay a lifecycle operation supers
   await repo.transitionLifecycle({ ref: { kind: 'person', id: person.id }, toStatus: 'active' });
 
   await assert.rejects(
-    repo.repairIdentityOperation(caughtOperationId),
+    repo.repairIdentityOperation(caughtOperationId, admin),
     error => error.status === 409 && error.code === 'identity_operation_superseded'
   );
 });
@@ -415,7 +464,7 @@ test('B4: repairIdentityOperation is idempotent on an already-committed operatio
   const repo = createRepo(store);
   const { record: person } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
   const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
-  const result = await repo.repairIdentityOperation(operationId);
+  const result = await repo.repairIdentityOperation(operationId, admin);
   assert.equal(result.status, 'committed');
   assert.equal(result.repaired, false);
 });
@@ -424,7 +473,7 @@ test('B4: repairIdentityOperation returns a non-disclosing not-found for an unkn
   const store = createMemoryStore();
   const repo = createRepo(store);
   await assert.rejects(
-    repo.repairIdentityOperation('op_' + '0'.repeat(32)),
+    repo.repairIdentityOperation('op_' + '0'.repeat(32), admin),
     error => error.status === 404 && error.code === 'operation_not_found'
   );
 });
@@ -492,7 +541,7 @@ for (const boundary of SELF_CREATE_BOUNDARIES) {
     // only recovery path for a specific failed create is
     // repairIdentityOperation, with the operation id the 503 carried.
     try {
-      const repaired = await repo.repairIdentityOperation(caughtOperationId);
+      const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
       assert.equal(repaired.status, 'committed');
     } catch (error) {
       assert.equal(error.status, 409);
@@ -510,7 +559,7 @@ for (const boundary of SELF_CREATE_BOUNDARIES) {
     }
     assert.ok(activeSelfs.length <= 1, `expected at most one active self, got ${JSON.stringify(activeSelfs)}`);
 
-    const reconciled = await repo.reconcileSelfIdentity();
+    const reconciled = await repo.reconcileSelfIdentity(admin);
     assert.notEqual(reconciled.status, 'conflict');
   });
 }
@@ -564,7 +613,7 @@ for (const boundary of SELF_ACTIVATE_BOUNDARIES) {
     }
 
     try {
-      const repaired = await repo.repairIdentityOperation(caughtOperationId);
+      const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
       assert.equal(repaired.status, 'committed');
     } catch (error) {
       assert.equal(error.status, 409);
@@ -577,18 +626,24 @@ for (const boundary of SELF_ACTIVATE_BOUNDARIES) {
     }
     assert.ok(activeSelfs.length <= 1, `expected at most one active self, got ${JSON.stringify(activeSelfs)}`);
 
-    const reconciled = await repo.reconcileSelfIdentity();
+    const reconciled = await repo.reconcileSelfIdentity(admin);
     assert.notEqual(reconciled.status, 'conflict');
   });
 }
 
-test("Job1: repairing a stale deactivation of A never clears a pointer that now belongs to B", async () => {
+test('Job1: a stale deactivation of A blocks an ordinary create until explicitly repaired, then B can claim the slot', async () => {
   const store = createMemoryStore();
   const repo = createRepo(store);
   const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
 
   // Fail A's deactivation at the very last step (the pointer release):
-  // entity, index, and event all succeed first.
+  // entity, index, and event all succeed first, so A's own record already
+  // shows inactive — but the pointer itself is never cleared, and still
+  // carries the operation id of A's original (long since committed)
+  // *create*, not the deactivation. `inspectSelfPointer` classifies this
+  // as `'stale'`: the Person isn't active, and the only journal the
+  // pointer's own operation id resolves to is already `committed` — a
+  // claim that finished, not one still in flight.
   store._failNextMatching(key => key === SELF_POINTER_KEY);
   let caughtOperationId;
   await assert.rejects(
@@ -604,16 +659,120 @@ test("Job1: repairing a stale deactivation of A never clears a pointer that now 
   assert.equal(midway.lifecycle_status, 'inactive');
   assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id, 'the pointer is genuinely stale at this point');
 
-  // B claims the self slot — A's own record already shows inactive, so
-  // this is a legitimate claim, not a race.
+  // Required behaviour 7: a stale reservation must never be silently
+  // overwritten by an ordinary create — B's attempt is rejected even
+  // though A's own record already shows inactive.
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } }),
+    error => error.status === 409 && error.code === 'self_identity_exists'
+  );
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id, 'the stale pointer was not silently claimed over');
+
+  // Explicit repair of A's stale deactivation clears the pointer, since it
+  // still names A — required behaviour 2/3, 8.
+  const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
+  assert.equal(repaired.status, 'committed');
+  assert.equal(store._raw(SELF_POINTER_KEY)?.person_id ?? null, null, 'repair released the stale reservation');
+
+  // Only now can B legitimately claim the slot.
   const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
   assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id);
+});
 
-  // Repairing A's stale deactivation must not clear B's claim (required
-  // behaviour 2/3).
-  const repaired = await repo.repairIdentityOperation(caughtOperationId);
+test('Job1: reconcileSelfIdentity clears a stale reservation whose claiming operation is missing, malformed, or committed without an active Person', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+
+  // Case 1: the pointer's operation id resolves to nothing at all (the
+  // journal key was never written, or was deleted).
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: personA.id,
+    operation_id: 'op_' + '9'.repeat(32),
+    updated_at: '2026-01-01T00:00:00.000Z'
+  });
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } }),
+    error => error.code === 'self_identity_exists'
+  );
+  let reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'reconciled', person_id: null, previous_pointer_person_id: personA.id });
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+
+  // Case 2: the pointer's operation id resolves to a malformed journal
+  // (fails schema validation).
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: personA.id,
+    operation_id: 'op_' + '8'.repeat(32),
+    updated_at: '2026-01-01T00:00:00.000Z'
+  });
+  await store.setJSON(identityOperationKey('op_' + '8'.repeat(32)), { not: 'a valid journal' });
+  reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+
+  // Case 3: the pointer names a *committed* journal (a claim that
+  // genuinely finished) whose Person is nonetheless not active — e.g. A
+  // was independently deactivated afterward without the pointer moving.
+  const createOperationId = [...store._writeLog]
+    .filter(key => key.startsWith('identities/operations/'))
+    .map(key => key.split('/').pop())
+    .find(id => store._raw(`identities/operations/${id}`)?.entity_id === personA.id
+      && store._raw(`identities/operations/${id}`)?.operation_type === 'create_identity');
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: personA.id,
+    operation_id: createOperationId,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  });
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person C', is_self: true } }),
+    error => error.code === 'self_identity_exists'
+  );
+  reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+
+  // Once reconciled, an ordinary create finally succeeds.
+  const { record: personD } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person D', is_self: true } });
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personD.id);
+});
+
+test('Job1: a genuinely pending reservation is left alone by reconcileSelfIdentity — it may still legitimately finish', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  // Fail the entity write so the claim is genuinely still "in flight"
+  // (its journal is `repair_needed`, not `committed`).
+  store._failNextMatching(key => key.startsWith('entities/person/'));
+  let caughtOperationId;
+  let caughtEntityId;
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } }),
+    error => {
+      caughtOperationId = error.operation_id;
+      caughtEntityId = error.entity_id;
+      return true;
+    }
+  );
+  store._clearFailure();
+
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId, 'the pending claim reserved the slot');
+
+  // Reconciliation must not cancel a pending reservation — required
+  // behaviour 13's principle applied to the zero-active-self case.
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'consistent');
+  assert.equal(reconciled.pending_reservation_person_id, caughtEntityId);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId, 'the pending reservation was left untouched');
+
+  // The pending operation can still legitimately finish via repair.
+  const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
   assert.equal(repaired.status, 'committed');
-  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id, "B's claim must survive repairing A's stale deactivation");
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId);
 });
 
 test("Job1: activation of A fails before its pointer write; once B is active, retrying A's activation is a stable conflict, never a silently reconciled second self", async () => {
@@ -647,8 +806,8 @@ test("Job1: activation of A fails before its pointer write; once B is active, re
   assert.equal(finalB.lifecycle_status, 'active');
   assert.equal(store._raw(SELF_POINTER_KEY).person_id, personB.id);
 
-  const reconciled = await repo.reconcileSelfIdentity();
-  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id });
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id, index_repaired: false });
 });
 
 test('Job1: ordinary entity GET (loadEntity) and reconcileSelfIdentity agree on which Person is the active self', async () => {
@@ -658,8 +817,8 @@ test('Job1: ordinary entity GET (loadEntity) and reconcileSelfIdentity agree on 
   await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
   const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
 
-  const reconciled = await repo.reconcileSelfIdentity();
-  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id });
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personB.id, index_repaired: false });
 
   const loadedA = await repo.loadEntity({ kind: 'person', id: personA.id });
   const loadedB = await repo.loadEntity({ kind: 'person', id: personB.id });
@@ -673,14 +832,14 @@ test('Job1: reconcileSelfIdentity and repairIdentityOperation are both idempoten
   const repo = createRepo(store);
   const { record: person } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
 
-  const first = await repo.reconcileSelfIdentity();
-  const second = await repo.reconcileSelfIdentity();
-  assert.deepEqual(first, { status: 'consistent', person_id: person.id });
-  assert.deepEqual(second, { status: 'consistent', person_id: person.id });
+  const first = await repo.reconcileSelfIdentity(admin);
+  const second = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(first, { status: 'consistent', person_id: person.id, index_repaired: false });
+  assert.deepEqual(second, { status: 'consistent', person_id: person.id, index_repaired: false });
 
   const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
-  const repairedOnce = await repo.repairIdentityOperation(operationId);
-  const repairedTwice = await repo.repairIdentityOperation(operationId);
+  const repairedOnce = await repo.repairIdentityOperation(operationId, admin);
+  const repairedTwice = await repo.repairIdentityOperation(operationId, admin);
   assert.equal(repairedOnce.repaired, false);
   assert.equal(repairedTwice.repaired, false);
 });
@@ -700,8 +859,291 @@ test('Job1: reconcileSelfIdentity reports a stable conflict — and writes nothi
   await store.setJSON(personIndexKey(personB.id), { ...rawIndexB, is_self: true });
 
   const before = store._raw(SELF_POINTER_KEY);
-  const result = await repo.reconcileSelfIdentity();
+  const result = await repo.reconcileSelfIdentity(admin);
   assert.equal(result.status, 'conflict');
   assert.deepEqual(result.person_ids.sort(), [personA.id, personB.id].sort());
   assert.deepEqual(store._raw(SELF_POINTER_KEY), before, 'a conflict must never be silently resolved by writing the pointer');
+});
+
+// --- Job 1 required controlled-interleaving test (round 3 correction) ---
+//
+// The confirmed defect: `claimSelfPointer` wrote a pointer before writing
+// the Person record, but `assertSelfAvailable` treated the pointer as
+// occupied only when its referenced Person already existed and was
+// active — so the pointer never actually reserved anything while its
+// Person was still absent. These tests pause operation A with a
+// deterministic store barrier immediately after A's pointer write lands
+// (before A's Person record is written), run operation B to completion in
+// that window, and assert B is rejected *before* it writes anything.
+
+test("Job1: controlled interleaving — A's pending create claim reserves the slot against a concurrent create that reads it before A's Person record exists", async () => {
+  const base = createMemoryStore();
+  const store = createBarrierStore(base);
+  const repo = createRepo(store);
+
+  const releaseA = store._pauseAfterNextWriteMatching(key => key === SELF_POINTER_KEY);
+  const aPromise = repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+
+  // Let A's synchronous-plus-microtask work run until it genuinely blocks
+  // on the barrier — a macrotask always runs after the microtask queue
+  // fully drains, so this is deterministic, not a timing guess.
+  await new Promise(resolve => setImmediate(resolve));
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } }),
+    error => error.status === 409 && error.code === 'self_identity_exists'
+  );
+  assert.equal(store._writeLog.filter(key => key.startsWith('entities/person/')).length, 0, "B never wrote a Person record");
+
+  releaseA();
+  const { record: personA } = await aPromise;
+
+  assert.equal(personA.is_self, true);
+  assert.equal(personA.lifecycle_status, 'active');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id);
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personA.id, index_repaired: false });
+});
+
+test("Job1: controlled interleaving — A's pending activation claim reserves the slot against a concurrent activation that reads it before A becomes active", async () => {
+  const base = createMemoryStore();
+  const store = createBarrierStore(base);
+  const repo = createRepo(store);
+
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personB.id }, toStatus: 'inactive' });
+
+  const releaseA = store._pauseAfterNextWriteMatching(key => key === SELF_POINTER_KEY);
+  const aPromise = repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' });
+  await new Promise(resolve => setImmediate(resolve));
+
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personB.id }, toStatus: 'active' }),
+    error => error.status === 409 && error.code === 'self_identity_exists'
+  );
+
+  releaseA();
+  const activatedA = await aPromise;
+
+  assert.equal(activatedA.lifecycle_status, 'active');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id);
+  const finalB = await repo.loadEntity({ kind: 'person', id: personB.id });
+  assert.equal(finalB.lifecycle_status, 'inactive');
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personA.id, index_repaired: false });
+});
+
+// --- Job 2 (round 3 correction): reconciliation must use authoritative
+// Person records, not the derived search index ---
+
+test('Job2: reconcileSelfIdentity finds an active self through authoritative storage even when its index write failed, and repairs the index', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  store._failNextMatching(key => key.startsWith('entities/index/person/'));
+  let caughtOperationId;
+  let caughtEntityId;
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } }),
+    error => {
+      caughtOperationId = error.operation_id;
+      caughtEntityId = error.entity_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+
+  // A's pointer and authoritative Person record both succeeded; only the
+  // index is missing. An index-based reconciliation would find no active
+  // self at all here — the confirmed defect.
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId);
+  assert.equal(store._has(personIndexKey(caughtEntityId)), false, 'the index is genuinely missing at this point');
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'consistent');
+  assert.equal(reconciled.person_id, caughtEntityId);
+  assert.equal(reconciled.index_repaired, true);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId, 'the pointer was never touched — it was already correct');
+  assert.ok(store._has(personIndexKey(caughtEntityId)), "reconciliation repaired A's missing index");
+  assert.equal(store._raw(personIndexKey(caughtEntityId)).lifecycle_status, 'active', 'the repaired index reflects the authoritative record — what search would now see');
+
+  // An ordinary attempt to create a second self is still rejected — A is
+  // genuinely active, index or no index.
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } }),
+    error => error.code === 'self_identity_exists'
+  );
+
+  // Repairing A's original operation still finishes cleanly afterward.
+  const repaired = await repo.repairIdentityOperation(caughtOperationId, admin);
+  assert.equal(repaired.status, 'committed');
+
+  const finalRecord = await repo.loadEntity({ kind: 'person', id: caughtEntityId });
+  assert.equal(finalRecord.is_self && finalRecord.lifecycle_status === 'active', true);
+  const finalReconcile = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(finalReconcile, { status: 'consistent', person_id: caughtEntityId, index_repaired: false });
+});
+
+test('Job2: reconcileSelfIdentity finds an activated self through authoritative storage even when the activation\'s index write failed', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+
+  store._failNextMatching(key => key === personIndexKey(personA.id));
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+    error => error.status === 503
+  );
+  store._clearFailure();
+
+  const midway = await repo.loadEntity({ kind: 'person', id: personA.id });
+  assert.equal(midway.lifecycle_status, 'active');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id);
+  assert.notEqual(store._raw(personIndexKey(personA.id)).lifecycle_status, 'active', 'the index is genuinely stale at this point');
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'consistent', person_id: personA.id, index_repaired: true });
+  assert.equal(store._raw(personIndexKey(personA.id)).lifecycle_status, 'active');
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person B', is_self: true } }),
+    error => error.code === 'self_identity_exists'
+  );
+});
+
+// --- Job 3 (round 3 correction): both repair capabilities must require and
+// enforce a server-derived administration AccessContext ---
+
+test('Job3: repairIdentityOperation rejects a call with no access context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
+  const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  await assert.rejects(
+    repo.repairIdentityOperation(operationId),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+});
+
+test('Job3: repairIdentityOperation rejects a life workflow context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
+  const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  await assert.rejects(
+    repo.repairIdentityOperation(operationId, life),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+});
+
+test('Job3: repairIdentityOperation accepts a server-derived administration context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: person } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
+  const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  const result = await repo.repairIdentityOperation(operationId, admin);
+  assert.equal(result.status, 'committed');
+  assert.equal(result.entity_id, person.id);
+});
+
+test('Job3: reconcileSelfIdentity rejects a call with no access context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await assert.rejects(
+    repo.reconcileSelfIdentity(),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+});
+
+test('Job3: reconcileSelfIdentity rejects a life workflow context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await assert.rejects(
+    repo.reconcileSelfIdentity(life),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+});
+
+test('Job3: reconcileSelfIdentity accepts a server-derived administration context', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const result = await repo.reconcileSelfIdentity(admin);
+  assert.equal(result.status, 'consistent');
+  assert.equal(result.person_id, null);
+});
+
+// --- Job 4 (round 3 correction): non-disclosing 404 for identity operation
+// lookup — a malformed, unknown, corrupted, unsupported-schema-version, or
+// mismatched-operation_id journal must all collapse to the same response ---
+
+test('Job4: repairIdentityOperation returns a non-disclosing 404 for a path-unsafe operation id and performs no storage access', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await assert.rejects(
+    repo.repairIdentityOperation('../../etc/passwd', admin),
+    error => error.status === 404 && error.code === 'operation_not_found'
+  );
+  assert.equal(store._writeLog.length, 0, 'no write of any kind happened for a path-unsafe id');
+});
+
+test('Job4: repairIdentityOperation returns the same 404 for a corrupted stored journal', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const operationId = 'op_' + '7'.repeat(32);
+  await store.setJSON(identityOperationKey(operationId), { garbage: true });
+  await assert.rejects(
+    repo.repairIdentityOperation(operationId, admin),
+    error => error.status === 404 && error.code === 'operation_not_found'
+  );
+});
+
+test('Job4: repairIdentityOperation returns the same 404 for a journal with an unsupported schema version', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
+  const operationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  const journal = store._raw(identityOperationKey(operationId));
+  await store.setJSON(identityOperationKey(operationId), { ...journal, schema_version: 999 });
+  await assert.rejects(
+    repo.repairIdentityOperation(operationId, admin),
+    error => error.status === 404 && error.code === 'operation_not_found'
+  );
+});
+
+test("Job4: repairIdentityOperation returns the same 404 when the stored journal's own operation_id does not match the requested id", async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await repo.createIdentity({ kind: 'person', input: { display_name: 'Seth Example' } });
+  const realOperationId = [...store._writeLog].find(key => key.startsWith('identities/operations/')).split('/').pop();
+  const journal = store._raw(identityOperationKey(realOperationId));
+  const otherOperationId = 'op_' + '6'.repeat(32);
+  // Simulate a corrupted or overwritten record: the journal stored at
+  // this key claims to be a *different* operation than the one it was
+  // looked up by.
+  await store.setJSON(identityOperationKey(otherOperationId), { ...journal, operation_id: realOperationId });
+  await assert.rejects(
+    repo.repairIdentityOperation(otherOperationId, admin),
+    error => error.status === 404 && error.code === 'operation_not_found'
+  );
+});
+
+test('Job4: every malformed/unknown/corrupted operation id produces the identical response, revealing nothing about which check failed', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const outcomes = await Promise.all([
+    repo.repairIdentityOperation('../../etc/passwd', admin).catch(error => error),
+    repo.repairIdentityOperation('op_' + '0'.repeat(32), admin).catch(error => error),
+    repo.repairIdentityOperation('', admin).catch(error => error),
+    repo.repairIdentityOperation(null, admin).catch(error => error)
+  ]);
+  for (const error of outcomes) {
+    assert.equal(error.status, 404);
+    assert.equal(error.code, 'operation_not_found');
+    assert.equal(error.message, 'Identity operation not found.');
+  }
 });

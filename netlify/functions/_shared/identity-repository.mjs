@@ -1,4 +1,5 @@
 import { assertLifecycleTransitionAllowed, applyLifecycleTransition } from './entity-lifecycle.mjs';
+import { assertAdministrationWorkflow } from './entity-access.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import {
   IDENTITY_SCHEMA_VERSION,
@@ -20,7 +21,7 @@ import {
   defaultGetUniversalLinkStore,
   entityEventKey,
   getJSON,
-  listPersonIndexKeys,
+  listAuthoritativePersonKeys,
   organisationIndexKey,
   organisationKey,
   personIndexKey,
@@ -115,17 +116,36 @@ import {
 //   clears the pointer only when it still names the Person being
 //   deactivated — a stale deactivation repaired after a different Person
 //   has since become self must never touch that later Person's claim.
-// - `reconcileSelfIdentity` scans every Person the identity index knows
-//   about and compares against the pointer: exactly one active self and a
-//   matching pointer is left alone; zero active selfs clears the pointer;
-// more than one active self (a state these fixes are designed to make
-//   unreachable going forward, but which could already exist from
-//   corrupted data) is reported as a stable conflict and never silently
-//   resolved by picking one.
+// - `reconcileSelfIdentity` scans every *authoritative* Person record
+//   (never the derived search index — see `loadAuthoritativePersons`) and
+//   compares against the pointer: exactly one active self and a matching
+//   pointer is left alone; zero active selfs and no valid pending
+//   reservation clears the pointer; more than one active self (a state
+//   these fixes are designed to make unreachable going forward, but which
+//   could already exist from corrupted data) is reported as a stable
+//   conflict and never silently resolved by picking one.
 //
 // Every one of these checks is re-run identically on repair — repair never
 // blindly replays a stored pointer value, only ever the same live-checked
 // claim/release primitives the original attempt used.
+//
+// Hardened further after a second confirmed reproduction: a pointer
+// written before its Person record exists did not actually reserve
+// anything, because the original `assertSelfAvailable` treated "the
+// pointed-to Person is absent or inactive" as proof the slot was free —
+// so a second, unrelated operation could freely steal a genuinely
+// in-flight claim, and each half of that race could go on to write its
+// own active Person independently. `inspectSelfPointer` now classifies
+// the pointer into `'empty'`, `'active_owner'`, `'pending'` (a claim
+// that is provably still in flight — its journal exists, matches, and is
+// not yet `committed`), or `'stale'` (anything else non-active — a
+// missing, malformed, mismatched, or already-`committed`-without-
+// becoming-active journal). `assertSelfAvailable` blocks a *different*
+// operation on every non-empty state alike, including `'stale'`: an
+// ordinary create or activation is never allowed to silently claim a
+// reservation just because it looks abandoned — only
+// `reconcileSelfIdentity`, an explicit administration action working
+// from the authoritative Person records, may clear a genuinely stale one.
 //
 // Honest concurrency boundary: none of this is a database transaction.
 // Two requests whose entire claim-check-then-write for the *same* step
@@ -327,30 +347,100 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     return record;
   }
 
+  // Classifies the live self pointer into exactly one of four states
+  // (required behaviour 4 of the "pending reservation" correction):
+  //
+  // - `'empty'`: no pointer, or a pointer naming nobody. The slot is free.
+  // - `'active_owner'`: the pointer names a Person whose *authoritative*
+  //   record is currently `is_self && lifecycle_status: 'active'`. A
+  //   fully committed, currently-active self.
+  // - `'pending'`: the pointer names a Person who is not (yet) active,
+  //   but the operation that claimed the pointer is still genuinely in
+  //   flight — its journal exists, its `entity_id` and `operation_id`
+  //   match the pointer exactly, and its status is `prepared` or
+  //   `repair_needed` (never `committed`). This is a *valid* reservation:
+  //   the claiming operation has not finished, but it also has not been
+  //   abandoned or superseded.
+  // - `'stale'`: the pointer names a Person who is not active, and the
+  //   claim behind it cannot be trusted to still be in flight — its
+  //   journal is missing, malformed, mismatched (a corrupted or
+  //   overwritten record whose `entity_id`/`operation_id` don't match the
+  //   pointer), or already `committed` (the claiming operation finished,
+  //   yet the Person is still not the active self — e.g. it was
+  //   independently deactivated or deleted afterward, or the pointer
+  //   simply predates this correction and carries no operation id at
+  //   all). A `'stale'` classification is never proof the slot is safe to
+  //   reuse — see `assertSelfAvailable` below.
+  //
+  // Before writing anything, `assertSelfAvailable` treats `'pending'` and
+  // `'stale'` identically to `'active_owner'`: all three block a
+  // *different* operation (required behaviour 1, 2, 5, 7). The
+  // distinction matters for repair and reconciliation, which — unlike an
+  // ordinary create/activate — are explicitly allowed to resolve a
+  // `'pending'` operation (by finishing it) or clear a `'stale'` one (by
+  // reconciling toward the authoritative Person records), never by an
+  // ordinary request silently overwriting either.
+  async function inspectSelfPointer() {
+    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    if (!pointer || !pointer.person_id) return { state: 'empty', pointer: null };
+
+    const personRecord = parsePersonRecord(await getJSON(store, personKey(pointer.person_id), STRONG));
+    if (personRecord && personRecord.is_self && personRecord.lifecycle_status === 'active') {
+      return { state: 'active_owner', pointer, personRecord };
+    }
+
+    if (!pointer.operation_id) {
+      return { state: 'stale', pointer };
+    }
+    const journal = validateIdentityOperationRecord(await getJSON(store, identityOperationKey(pointer.operation_id), STRONG));
+    if (!journal || journal.operation_id !== pointer.operation_id || journal.entity_id !== pointer.person_id) {
+      return { state: 'stale', pointer };
+    }
+    if (journal.status === 'committed') {
+      // The claiming operation finished. A committed journal is never
+      // "still in flight" again, regardless of the Person's current
+      // status — that Person's own later, independent change (or a
+      // pointer that simply never got updated) is what left this stale.
+      return { state: 'stale', pointer, journal };
+    }
+    return { state: 'pending', pointer, journal };
+  }
+
   // The uniqueness check for the active self identity (correction B1),
   // shared by both creation and activation — the confirmed defect was
   // that only creation ran it. `excludingPersonId` lets a person's own
   // (re)activation of itself as the current self not spuriously reject,
-  // and lets a claim in progress for `excludingPersonId` itself pass.
+  // and lets the same operation resuming its own claim (whatever state
+  // that claim is currently in) pass — required behaviour 4d/6.
+  //
+  // A *different* operation is blocked by every non-empty state —
+  // `'active_owner'`, `'pending'`, and `'stale'` alike (required
+  // behaviour 1, 2, 5, 7). Treating `'stale'` as available here is
+  // exactly the confirmed defect: a valid pending reservation (or even an
+  // ambiguous one this check cannot prove is abandoned) must never be
+  // silently claimed over by an ordinary create or activation. Clearing a
+  // genuinely stale reservation is `reconcileSelfIdentity`'s job, an
+  // explicit administration action — never a side effect of an unrelated
+  // request.
   //
   // Honest concurrency boundary: this reads the singleton pointer with
-  // strong consistency and then reads the pointed-to person with strong
-  // consistency, but Netlify Blobs has no compare-and-set — two calls that
-  // both pass this check before either writes could still both proceed.
+  // strong consistency and then reads the pointed-to person (and, where
+  // relevant, its claiming operation's journal) with strong consistency,
+  // but Netlify Blobs has no compare-and-set — two calls whose read and
+  // write for the *same* step genuinely overlap could still both proceed.
   // This is the documented, accepted boundary for the current
   // single-operator system (see the PR body); it is not a claim of
-  // transactional uniqueness. What closes the *sequential* version of this
-  // gap is that every write this check gates (`claimSelfPointer`, and the
-  // entity write itself) re-runs this exact check immediately beforehand,
-  // rather than relying on a single check made earlier in the request.
+  // transactional uniqueness. What this check closes is the *sequential*
+  // gap: every write it gates (`claimSelfPointer`, and the entity write
+  // itself) re-runs this exact check immediately beforehand, rather than
+  // relying on a single check made earlier in the request, so a
+  // reservation can never be silently bypassed just because the Person it
+  // names happens to not exist yet or not be active yet.
   async function assertSelfAvailable({ excludingPersonId }) {
-    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
-    const currentSelfId = pointer?.person_id ?? null;
-    if (!currentSelfId || currentSelfId === excludingPersonId) return;
-    const currentSelf = parsePersonRecord(await getJSON(store, personKey(currentSelfId), STRONG));
-    if (currentSelf && currentSelf.is_self && currentSelf.lifecycle_status === 'active') {
-      throw selfIdentityExistsError();
-    }
+    const { state, pointer } = await inspectSelfPointer();
+    if (state === 'empty') return;
+    if (pointer.person_id === excludingPersonId) return;
+    throw selfIdentityExistsError();
   }
 
   // Claims the self pointer for `personId` — the first step of any
@@ -433,51 +523,127 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     return steps;
   }
 
-  // Scans every Person the identity index knows about and compares the
-  // live count of `is_self && lifecycle_status: 'active'` records against
-  // the pointer (required behaviour 6). The authoritative Person records
-  // are the ground truth here, not the pointer — the pointer is a cache of
-  // "who currently holds the slot" that this reconciles *toward* the
-  // records, never the other way around:
+  // Best-effort: rewrites a Person's identity index entry when it is
+  // missing or stale (required behaviour 15 of the reconciliation
+  // correction, Job 2). Never throws — index repair is a courtesy this
+  // performs *in addition to* the pointer reconciliation below, and a
+  // failure here must never mask reconciliation's own, more important
+  // result. Returns whether a repair was written.
+  async function repairPersonIndexIfNeeded(personRecord) {
+    const expected = buildIndexFor(personRecord, 'person');
+    try {
+      const current = await getJSON(store, personIndexKey(personRecord.id));
+      if (current && JSON.stringify(current) === JSON.stringify(expected)) return false;
+      await setJSON(store, personIndexKey(personRecord.id), expected);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Enumerates *authoritative* Person records directly from
+  // `entities/person/<id>` (correction Job 2) — never the derived search
+  // index. The identity index is written as a separate step after the
+  // authoritative record; a Person whose index write failed (or was never
+  // repaired) is invisible to `listPersonIndexKeys`, but must never be
+  // invisible to reconciliation, which exists precisely to catch this
+  // class of drift (required behaviour 1-3, 14). The index stays eligible
+  // only as *derived* data this function may repair (behaviour 9, 15),
+  // never as the source of which Persons exist (behaviour 2, 8).
+  async function loadAuthoritativePersons() {
+    const personKeys = await listAuthoritativePersonKeys(store);
+    const rawRecords = await mapBounded(personKeys, RECONCILE_BATCH_SIZE, key => getJSON(store, key, STRONG));
+    return rawRecords.map(raw => parsePersonRecord(raw)).filter(Boolean);
+  }
+
+  // Scans every *authoritative* Person record (never the search index —
+  // see `loadAuthoritativePersons`) and compares the live count of
+  // `is_self && lifecycle_status: 'active'` records against the pointer
+  // (required behaviour 10-14). The authoritative Person records are the
+  // ground truth here, not the pointer — the pointer is a cache of "who
+  // currently holds the slot" that this reconciles *toward* the records,
+  // never the other way around:
   //
   // - Exactly one active self: the pointer is corrected to name it if it
   //   doesn't already (`reconciled`), or left alone if it does
-  //   (`consistent`).
-  // - Zero active selfs: the pointer is cleared if it names anyone
-  //   (`reconciled`), or left alone if already clear (`consistent`).
+  //   (`consistent`) — either way, its identity index is repaired if
+  //   stale (behaviour 15).
+  // - Zero active selfs: a genuinely `'stale'` or `'empty'` pointer state
+  //   (per `inspectSelfPointer`) is cleared (`reconciled`) or left alone
+  //   if already clear (`consistent`). A `'pending'` state is left
+  //   strictly alone — its claiming operation may still legitimately
+  //   finish; reconciliation must not cancel work that has not been
+  //   proven abandoned (behaviour 13's principle, applied to the
+  //   zero-active-self case).
+  // - Exactly one active self, but the pointer currently names a
+  //   *different*, still-`'pending'` reservation: reported as a stable
+  //   `conflict` rather than silently cancelling that other operation's
+  //   in-flight claim (required behaviour 13 — this correction's chosen
+  //   rule is "report a conflict," documented here and in the PR body,
+  //   never "safely cancel," since reconciliation cannot know whether the
+  //   pending operation is about to legitimately finish).
   // - More than one active self — a state the claim/release checks above
   //   are designed to make unreachable going forward, but which could
   //   already exist from data corrupted before this correction — is
   //   reported as a stable `conflict` and nothing is written. This never
   //   silently picks one; it is exactly the "stable conflict requiring
-  //   operator action" required behaviour 6 asks for.
-  async function reconcileSelfIdentity() {
+  //   operator action" required behaviour 12 asks for.
+  async function reconcileSelfIdentity(accessContext) {
+    assertAdministrationWorkflow(accessContext);
+
     const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
     const pointerPersonId = pointer?.person_id ?? null;
 
-    const indexKeys = await listPersonIndexKeys(store);
-    const indexRecords = await mapBounded(indexKeys, RECONCILE_BATCH_SIZE, key => getJSON(store, key));
-    const personIds = [...new Set(
-      indexRecords
-        .filter(record => record && typeof record === 'object' && typeof record.id === 'string')
-        .map(record => record.id)
-    )];
-
-    const personRecords = await mapBounded(personIds, RECONCILE_BATCH_SIZE, id => getJSON(store, personKey(id), STRONG));
-    const activeSelfIds = personIds
-      .filter((_, index) => {
-        const record = parsePersonRecord(personRecords[index]);
-        return Boolean(record && record.is_self && record.lifecycle_status === 'active');
-      })
-      .sort();
+    const persons = await loadAuthoritativePersons();
+    const activeSelfPersons = persons.filter(record => record.is_self && record.lifecycle_status === 'active');
+    const activeSelfIds = activeSelfPersons.map(record => record.id).sort();
 
     if (activeSelfIds.length > 1) {
       return { status: 'conflict', person_ids: activeSelfIds, pointer_person_id: pointerPersonId };
     }
 
     const truePersonId = activeSelfIds[0] ?? null;
+
+    if (!truePersonId) {
+      // No authoritative active self exists at all.
+      const inspection = pointerPersonId ? await inspectSelfPointer() : null;
+      if (inspection && inspection.state === 'pending') {
+        // A claim may still legitimately finish — never cancel it here.
+        return { status: 'consistent', person_id: null, pending_reservation_person_id: pointerPersonId };
+      }
+      if (!pointerPersonId) {
+        return { status: 'consistent', person_id: null };
+      }
+      await setJSON(store, SELF_POINTER_KEY, {
+        schema_version: SELF_POINTER_SCHEMA_VERSION,
+        person_id: null,
+        operation_id: null,
+        updated_at: now()
+      });
+      return { status: 'reconciled', person_id: null, previous_pointer_person_id: pointerPersonId };
+    }
+
+    const truePerson = activeSelfPersons.find(record => record.id === truePersonId);
+
     if (pointerPersonId === truePersonId) {
-      return { status: 'consistent', person_id: truePersonId };
+      const indexRepaired = await repairPersonIndexIfNeeded(truePerson);
+      return { status: 'consistent', person_id: truePersonId, index_repaired: indexRepaired };
+    }
+
+    // Exactly one true active self exists, but the pointer disagrees. If
+    // the pointer's disagreement is itself a still-`'pending'` claim for a
+    // *different* Person, this is a genuine conflict between an
+    // in-progress reservation and an already-active self — report it
+    // rather than silently cancelling the pending operation (behaviour 13).
+    if (pointerPersonId) {
+      const inspection = await inspectSelfPointer();
+      if (inspection.state === 'pending') {
+        return {
+          status: 'conflict',
+          person_ids: [truePersonId],
+          pending_reservation_person_id: pointerPersonId
+        };
+      }
     }
 
     await setJSON(store, SELF_POINTER_KEY, {
@@ -486,7 +652,8 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       operation_id: null,
       updated_at: now()
     });
-    return { status: 'reconciled', person_id: truePersonId, previous_pointer_person_id: pointerPersonId };
+    const indexRepaired = await repairPersonIndexIfNeeded(truePerson);
+    return { status: 'reconciled', person_id: truePersonId, previous_pointer_person_id: pointerPersonId, index_repaired: indexRepaired };
   }
 
   async function createIdentity({ kind, input }) {
@@ -733,10 +900,22 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     return updatedRecord;
   }
 
-  async function repairIdentityOperation(operationId) {
+  async function repairIdentityOperation(operationId, accessContext) {
+    // 1. Require an administration workflow context — before any
+    // validation or storage access (correction Job 3).
+    assertAdministrationWorkflow(accessContext);
+
+    // 2. Return a non-disclosing not-found response for anything that
+    // isn't a genuinely usable journal record: a malformed operation id
+    // (checked before any Blob key is ever built), a well-formed but
+    // unknown id, a malformed or unsupported-schema-version stored
+    // journal, or a journal whose own stored `operation_id` doesn't match
+    // the id it was looked up by (correction Job 4) — every case
+    // collapses to the identical response, revealing nothing about which
+    // check failed.
     if (!isValidOperationId(operationId)) throw identityOperationNotFoundError();
     const journal = validateIdentityOperationRecord(await getJSON(store, identityOperationKey(operationId), STRONG));
-    if (!journal) throw identityOperationNotFoundError();
+    if (!journal || journal.operation_id !== operationId) throw identityOperationNotFoundError();
 
     if (journal.status === 'committed') {
       return { operation_id: operationId, entity_id: journal.entity_id, status: 'committed', repaired: false };

@@ -148,11 +148,13 @@ test('every response uses cache-control: no-store', async () => {
   assert.equal(response.headers.get('cache-control'), 'no-store');
 });
 
-test('repair_operation validates the operation id before storage access', async () => {
-  const handler = createEntitiesAdminHandler(baseDeps(memoryStore()));
+test('repair_operation returns a non-disclosing 404, not 400, for a path-unsafe operation id (correction Job 4)', async () => {
+  const store = memoryStore();
+  const handler = createEntitiesAdminHandler(baseDeps(store));
   const response = await handler(request({ body: { action: 'repair_operation', operation_id: '../../etc/passwd' } }));
-  assert.equal(response.status, 400);
-  assert.equal((await response.json()).error.code, 'invalid_operation_id');
+  assert.equal(response.status, 404);
+  assert.equal((await response.json()).error.code, 'operation_not_found');
+  assert.equal(store._keys('').length, 0, 'no storage access happened for a path-unsafe id');
 });
 
 test('repair_operation on an unknown (but valid-shaped) operation id returns a non-disclosing not found response', async () => {
@@ -300,7 +302,8 @@ test('Job3 #5: unauthenticated, wrong origin, malformed id, unknown operation, a
   assert.equal(wrongOrigin.status, 403);
 
   const malformed = await adminHandler(request({ body: { action: 'repair_operation', operation_id: 'not-an-operation-id' } }));
-  assert.equal(malformed.status, 400);
+  assert.equal(malformed.status, 404);
+  assert.equal((await malformed.json()).error.code, 'operation_not_found');
 
   const unknown = await adminHandler(request({ body: { action: 'repair_operation', operation_id: `op_${'2'.repeat(32)}` } }));
   assert.equal(unknown.status, 404);
@@ -356,4 +359,72 @@ test('reconcile_self_identity is reachable through the administration route and 
   const body = (await response.json()).data;
   assert.equal(body.status, 'consistent');
   assert.equal(body.person_id, created.id);
+});
+
+// --- Job 3 (round 3 correction): the route must build and pass a
+// server-derived administration AccessContext into both repository calls,
+// and the repository must itself require and enforce it ---
+
+test('Job3 #7: the HTTP handler passes a server-derived administration access context into both repository calls', async () => {
+  const store = memoryStore();
+  const calls = [];
+  const fakeRepo = {
+    async repairIdentityOperation(operationId, accessContext) {
+      calls.push({ method: 'repairIdentityOperation', operationId, accessContext });
+      return { operation_id: operationId, entity_id: 'person_x', status: 'committed', repaired: false };
+    },
+    async reconcileSelfIdentity(accessContext) {
+      calls.push({ method: 'reconcileSelfIdentity', accessContext });
+      return { status: 'consistent', person_id: null };
+    }
+  };
+  const deps = baseDeps(store, { createIdentityRepository: () => fakeRepo });
+  const adminHandler = createEntitiesAdminHandler(deps);
+
+  const operationId = `op_${'3'.repeat(32)}`;
+  await adminHandler(request({ body: { action: 'repair_operation', operation_id: operationId } }));
+  await adminHandler(request({ body: { action: 'reconcile_self_identity' } }));
+
+  const expectedContext = { actor: 'operator', workflow: 'administration', allowed_visibility: ['operator'], allowed_entity_kinds: [] };
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].method, 'repairIdentityOperation');
+  assert.equal(calls[0].operationId, operationId);
+  assert.deepEqual(calls[0].accessContext, expectedContext);
+  assert.equal(calls[1].method, 'reconcileSelfIdentity');
+  assert.deepEqual(calls[1].accessContext, expectedContext);
+});
+
+test('Job3 #8: the ordinary entities.mjs route rejects reconcile_self_identity too, not only repair_operation', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entitiesHandler = createEntitiesHandler(deps);
+  const created = (await (await entitiesHandler(entitiesRequest({ body: { kind: 'person', display_name: 'Normal Workflow Person' } }))).json()).data;
+
+  const response = await entitiesHandler(entitiesRequest({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/entities?ref=${encodeURIComponent(created.ref)}&action=reconcile_self_identity`,
+    body: {}
+  }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_action');
+});
+
+test('Job3: a repository call that somehow reached without an administration context (e.g. a future caller bug) is rejected with 403, never treated as authorised by the route name alone', async () => {
+  // This exercises the real (non-fake) repository directly through the
+  // route's own dependency-injection seam, confirming the enforcement
+  // lives in identity-repository.mjs itself — not something the route
+  // could accidentally bypass by, say, forgetting to build the context.
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const repo = deps.createIdentityRepository
+    ? deps.createIdentityRepository({ store })
+    : (await import('../../netlify/functions/_shared/identity-repository.mjs')).createIdentityRepository({ store });
+  await assert.rejects(
+    repo.reconcileSelfIdentity(),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
+  await assert.rejects(
+    repo.repairIdentityOperation(`op_${'4'.repeat(32)}`, { workflow: 'life' }),
+    error => error.status === 403 && error.code === 'administration_required'
+  );
 });
