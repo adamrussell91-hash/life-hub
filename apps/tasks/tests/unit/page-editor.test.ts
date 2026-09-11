@@ -255,9 +255,12 @@ describe('page editor', () => {
     const header = pageHeader(project.title);
     await renderPageEditor(canvas, { kind: 'project', id: project.id }, { header });
 
-    expect(canvas.querySelector('[data-task-id="task_existing"]')?.textContent).toContain(
-      'Draft accreditation brief'
+    const existingCard = canvas.querySelector(
+      '.page-card__tasks .hub-card-slot [data-task-id="task_existing"]'
     );
+    expect(existingCard?.querySelector('.hub-row__title')?.textContent).toBe('Draft accreditation brief');
+    expect(existingCard?.classList.contains('hub-row')).toBe(true);
+    expect(canvas.querySelector('.page-card__tasks .task-row')).toBeNull();
     expect(canvas.textContent).not.toContain('Loading page…');
     const listsBefore = vi.mocked(tasksApi.listTasks).mock.calls.length;
     const getsBefore = vi.mocked(tasksApi.getProject).mock.calls.length;
@@ -268,9 +271,11 @@ describe('page editor', () => {
     form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     await vi.waitFor(() => {
-      expect(canvas.querySelector('[data-task-id="task_new"]')?.textContent).toContain(
-        'Book mentoring session'
-      );
+      expect(
+        canvas.querySelector(
+          '.page-card__tasks .hub-card-slot [data-task-id="task_new"] .hub-row__title'
+        )?.textContent
+      ).toBe('Book mentoring session');
     });
     expect(tasksApi.createTask).toHaveBeenCalledWith(
       expect.objectContaining({

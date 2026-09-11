@@ -4,13 +4,15 @@ import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
 import { tasksApi } from '@/services/client-api';
-import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel, taskPageHash } from '@/domain/cards';
+import { formatRelativeUpdated, projectChildTasks, projectProgress, statusLabel } from '@/domain/cards';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
-import { renderQuickAdd } from '@/views/task-editor';
+import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
 import { openPlusAdd } from '@/views/plus-add';
+import { mountTaskCard } from '@/views/hub-cards';
+import { requestToggleDone } from '@/views/dashboard';
 import { mountBlockInsert } from '@/views/block-insert';
 import { paintExcursionPage } from '@/views/excursion-timeline';
 import { bindEditablePageTitle } from '@/shell/shell';
@@ -344,20 +346,6 @@ function paintTaskPage(
   canvas.replaceChildren(page);
 }
 
-function renderProjectTaskRow(task: Task): HTMLElement {
-  const row = el('article', 'task-row');
-  row.dataset.taskId = task.id;
-  const heading = el('h3', 'task-row__title');
-  const link = el('a', undefined, task.title);
-  link.href = taskPageHash(task.id);
-  heading.append(link);
-  row.append(heading);
-  if (task.status === 'done') {
-    row.append(el('span', 'status-badge status-badge--done', statusLabel(task.status)));
-  }
-  return row;
-}
-
 function paintProjectPage(
   canvas: HTMLElement,
   project: Project,
@@ -463,11 +451,21 @@ function paintProjectPage(
 
   const metrics = el('div', 'task-card__progress');
   const track = el('div', 'hub-track');
+  const confirmHost = el('div', 'task-confirm');
   const taskList = el('div', 'task-stack page-card__tasks');
   taskList.setAttribute('aria-label', 'Project tasks');
   const foot = el('footer', 'task-card__foot');
   foot.append(updated);
   let healthNode: HTMLElement | null = null;
+
+  const acceptTask = (updated: Task) => {
+    const index = liveTasks.findIndex((item) => item.id === updated.id);
+    liveTasks =
+      index >= 0
+        ? liveTasks.map((item) => (item.id === updated.id ? updated : item))
+        : [updated, ...liveTasks];
+    paintProjectTasks();
+  };
 
   const paintProjectTasks = () => {
     const progress = projectProgress(current, liveTasks);
@@ -489,7 +487,30 @@ function paintProjectPage(
       taskList.replaceChildren(el('p', 'empty-state', 'No tasks on this project yet.'));
       return;
     }
-    taskList.replaceChildren(...children.map(renderProjectTaskRow));
+    taskList.replaceChildren();
+    for (const child of children) {
+      mountTaskCard(taskList, child, {
+        onToggle: (item) =>
+          requestToggleDone(confirmHost, item, async () => {
+            const nextStatus = item.status === 'done' ? 'open' : 'done';
+            acceptTask({ ...item, status: nextStatus });
+          }),
+        onDelete: (item) =>
+          deleteTaskNow(item, () => {
+            liveTasks = liveTasks.filter((entry) => entry.id !== item.id);
+            paintProjectTasks();
+          }, confirmHost),
+        onEdit: (item) =>
+          void renderTaskEditor(confirmHost, item, [current], (saved) => {
+            if (saved) acceptTask(saved);
+          }),
+        onPatch: (item, patch) => {
+          void tasksApi.updateTask(item.id, patch).then(acceptTask, (err) => {
+            confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err)));
+          });
+        }
+      });
+    }
   };
 
   paintProjectTasks();
@@ -502,9 +523,9 @@ function paintProjectPage(
     metrics,
     track,
     renderQuickAdd((created) => {
-      liveTasks = [created, ...liveTasks.filter((task) => task.id !== created.id)];
-      paintProjectTasks();
+      acceptTask(created);
     }, project.id),
+    confirmHost,
     taskList,
     foot
   );
