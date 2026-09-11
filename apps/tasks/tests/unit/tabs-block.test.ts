@@ -153,8 +153,15 @@ describe('createTabsEditor', () => {
   });
 });
 
+function enterBlockEdit(root: ParentNode, selector = '[data-block-type="tabs"]'): HTMLElement {
+  const row = root.querySelector<HTMLElement>(selector)!;
+  row.querySelector<HTMLButtonElement>('.lesson-page__block-menu')!.click();
+  document.querySelector<HTMLButtonElement>('[data-card-menu-item="edit"]')!.click();
+  return root.querySelector<HTMLElement>(selector)!;
+}
+
 describe('project page tabs canvas', () => {
-  it('edits the selected tabs block inline instead of a stacked inspector', () => {
+  it('stays in published view when switching tabs', () => {
     const host = document.createElement('div');
     document.body.append(host);
     const block = tabsBlock();
@@ -168,13 +175,51 @@ describe('project page tabs canvas', () => {
       onChange: () => undefined
     });
 
-    const preview = host.querySelector<HTMLElement>('[data-block-type="tabs"]')!;
-    tabButton(preview, 'Henry')?.click();
-
     const row = host.querySelector<HTMLElement>('[data-block-type="tabs"]')!;
-    expect(row.querySelector('.lesson-page__inspector')).toBeNull();
-    expect(row.querySelectorAll('.block-editor__tabs-panel')).toHaveLength(1);
-    expect(row.querySelector('.block-editor__tab-label')).toHaveProperty('value', 'Henry');
-    expect(row.querySelector('button.block-editor__nested-add')).toBeTruthy();
+    tabButton(row, 'Henry')?.click();
+    expect(row.querySelector('.block-editor__tab-label')).toBeNull();
+    expect(row.querySelector('button.block-editor__nested-add')).toBeNull();
+    expect(tabButton(row, 'Henry')?.getAttribute('aria-selected')).toBe('true');
+    expect(row.querySelector('.lesson-page__block-menu')).toBeTruthy();
+  });
+
+  it('opens the editor from the block menu and Done returns to published', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const block = tabsBlock();
+    block.content.tabs[0]!.label = 'Noelle';
+    block.content.tabs[1]!.label = 'Henry';
+    rememberTabsPanel(block.id, 0);
+
+    mountBlockCanvas(host, {
+      blocks: [block],
+      idFactory: () => 'n',
+      onChange: () => undefined
+    });
+
+    tabButton(host, 'Henry')?.click();
+    const editing = enterBlockEdit(host);
+    expect(editing.querySelector('.lesson-page__inspector')).toBeNull();
+    expect(editing.querySelectorAll('.block-editor__tabs-panel')).toHaveLength(1);
+    expect(editing.querySelector('.block-editor__tab-label')).toHaveProperty('value', 'Henry');
+    expect(editing.querySelector('button.block-editor__nested-add')).toBeTruthy();
+
+    editing.querySelector<HTMLButtonElement>('.lesson-page__done')!.click();
+    const published = host.querySelector<HTMLElement>('[data-block-type="tabs"]')!;
+    expect(published.querySelector('.block-editor__tab-label')).toBeNull();
+    expect(tabButton(published, 'Henry')?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('omits the edit menu on a published student canvas', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountBlockCanvas(host, {
+      blocks: [tabsBlock()],
+      idFactory: () => 'n',
+      onChange: () => undefined,
+      editable: false
+    });
+    expect(host.querySelector('.lesson-page__block-menu')).toBeNull();
+    expect(host.querySelector('.block-editor__tab-label')).toBeNull();
   });
 });

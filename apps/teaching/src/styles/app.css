@@ -8948,11 +8948,18 @@ body.is-lesson-builder-full-page .hub-utilities {
 
 .lesson-page__block {
   position: relative;
-  padding: 18px 20px;
+  padding: 18px 2.75rem 18px 20px;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   box-shadow: var(--elev-1);
+}
+
+.lesson-page__block-menu {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: 2;
 }
 
 .lesson-page__block[data-block-type='spacer'],
