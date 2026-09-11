@@ -1,96 +1,480 @@
-# Comms Hub + unified People model — proposal
+# Comms Hub, unified identity, and Universal Links proposal
 
-> Status: **draft for discussion**, not adopted. This is not a consolidation checkpoint (see `docs/consolidation/`) — it's new content-architecture work, written up so it can be pasted into `docs/consolidation/plan.md` as a new slice if Adam wants Cursor to build it.
+> Status: draft for discussion, not adopted.
 >
-> Origin: Adam asked Claude Code to look at the Notion Comms Hub, the People/professional-relationship setup, and the Career/Professional Development Hub, and say what a from-scratch, non-Notion version should look like in `life-hub`.
+> This proposal records the agreed product and architecture direction. It does not amend the consolidation checkpoints and contains no application code.
+>
+> Core decision: Person and Organisation are shared identities. Universal Links is the single relationship architecture across all hubs. The @ picker is the standard interface for creating those links.
 
-## 1. What's actually in Notion today
+## 1. Problem observed in Notion
 
-- **People lives under "Professional Relationship Management"** (`People` database, reached from the Career/Professional Development Hub) — colleagues, mentors, providers. Each person page carries an `AI summary`, `Communications` relation, `Current Workplace` relation, `LinkedIn`, etc.
-- **Students are a completely separate, disconnected thing** — a `Student Database` last touched in 2023 (archived under "Gradebook 2023"). There is no relation between it and `People`.
-- **The `Communications` database already shows the exact fragmentation Adam described**, inside a single table:
-  - `Attendees` — a real relation to the `People` data source. This is the *only* field that correctly links to a person record.
-  - `Person` — a Notion **user-mention** field (an account, not a page in `People`). Structurally different from `Attendees` despite meaning the same thing.
-  - `Student Name` — plain text. Because students aren't in `People`, there's no way to relate a communication to a student — so it degrades to a string that can typo, can't be queried, and can't roll up.
-  - `Meeting Type` includes both `Professional Development` and `Student Meeting` as *values of the same select field* — Notion is already trying to tell you these are the same kind of object (a logged interaction) with different subjects, but the schema doesn't reinforce it.
-- **The Professional Development Events database has the identical bug**: its `Person` field is also a Notion user-mention, not a relation to `People`. So PD events, meetings, and communications each invented their own ad hoc way of pointing at a person, and none of the three agree with each other.
-- **Professional Development Hub embeds the People database via a Notion synced block** — a UI trick (mirror the same block on two pages) that looks like integration but isn't: there's no query, no rollup across hub boundaries, just a copy-visible-here hack. This is Notion's ceiling, not a design choice Adam made on purpose.
-- **The same fragmentation exists one level up, for organizations, not just people.** Career Overview (job history) relates to a `Companies` database. The Professional Network section has a separate `Workplaces` database. `People`'s own `Current Workplace` field relates to yet another workplace page. `Dream Universities`, `Education Institutions`, `Australian University Opportunities`, and `Potential Uni Options` are four more flat lists that are all, structurally, the same shape (name / city / country / website). At least 6–7 places independently model "an institution," none aware of the others — this needs solving alongside Person, not after it.
-- **The rest of the Career/PD Hub decomposes cleanly once Person + Organization exist**, rather than needing its own database per concept:
+The current Notion setup fragments the same people, organisations, activities, and career material across unrelated databases.
 
-  | Notion piece | What it actually is | Where it goes |
-  |---|---|---|
-  | Career Overview | Adam's own job history: role, status, dates, org, linked PD events | Not a new entity — Adam is a `Person` too; this becomes that Person's own position-history sub-record against `Organization`. |
-  | PD Events & Opportunities | Provider, date, notes, tasks | `ProfessionalDevelopmentEvent` (§4) |
-  | Jobs to Apply For | Status + multi-stage result (interview/rejected/successful/rounds) | A pipeline, not career history — folds into **Tasks Hub** as a `Project` type (`type: 'job_application'`), same bolt-on pattern excursions already use |
-  | Presentations and Publications | Title, category, date, venue, topics — content Adam produced | **Knowledge Hub** content type (new `origins` kind alongside the existing `degree`/`unit`/`notebook`/`book`/`pd`) |
-  | Book Ideas | Small backlog list | Knowledge Hub tagged notes — doesn't need its own table |
-  | Dream Universities / Education Institutions / Australian University Opportunities / Potential Uni Options | Four overlapping "institutions I'm interested in" lists | Collapse into `Organization` with a `relationship_type`/`interest_level` tag (aspirational employer / PD provider / current employer / study option) |
-  | Future Intel (Weekly Opportunities Scout agent output) | Freeform toggle text: recurring conferences + predicted announcement windows | Worth structuring (`predicted_window`, `priority`, `review_at`) so it can surface as a calendar reminder instead of living in a toggle nobody re-reads |
-  | Dormant Resources (Education Networks, Content Opportunities) | Notion's own label says it — inactive | Don't migrate structure; data-dump into Organization/Knowledge if anything's worth keeping, no UI |
+- People contains professional contacts but excludes students.
+- Student Database is separate, stale, and disconnected from People.
+- Communications uses three incompatible identity fields: an Attendees relation, a Person user mention, and a free text Student Name.
+- Professional Development Events uses another Person user mention rather than a relation to People.
+- Companies, Workplaces, Dream Universities, Education Institutions, Australian University Opportunities, and Potential Uni Options repeatedly model the same underlying concept: an organisation.
+- Career history, job applications, professional development, presentations, publications, opportunities, and contacts sit beside one another without a common identity or relationship model.
+- Synced blocks make records visible in several locations but do not create reliable cross system relationships.
 
-  **Net effect: the Career Hub doesn't become its own app.** Once Person + Organization exist, it's a dashboard/view over Professional Hub + Tasks Hub + Knowledge Hub, not a sixth data silo.
+The replacement should not reproduce these databases under new names. It should create one shared identity and relationship foundation, then let each hub present the records relevant to its work.
 
-## 2. What's actually in the codebase today
+## 2. Existing repository position
 
-Checked every app under `apps/` (`life`, `teaching`, `knowledge`, `tasks`) and `docs/consolidation/plan.md`.
+The current repository has useful precedents but no shared identity layer.
 
-- **There is no Person/Contact entity anywhere.** Not duplicated — simply absent. `Task.contexts` has a `kind: 'person'` option, but it's a free-text label for GTD context-matching ("call @Sarah"), not a foreign key to anything. Teaching's `ClassSchema` models a class as a group; there's no student roster as individual records. Real people (Adam's dietician, psychologist, PD contacts) exist only as prose inside `central-node.md`.
-- **Everything really is a `Task`.** `apps/tasks/src/schemas/task.ts` is one shape used for admin follow-ups, excursion sub-items, and anything else that needs a checkbox. `kind` and `domain` are free strings (`z.string().min(1)`), not enums — Adam's "everything counts as a task" complaint is architecturally exact. Excursions hang off `Project.type === 'excursion'` with bolt-on optional fields (`compliance_modules`, `permission_notes`, `student_group_reference: string | null` — again, a free-text reference, not a link).
-- **One good precedent already exists, and it's worth naming**: Teaching lessons are *not* crammed into `Task`. `ScheduledLessonSchema` (`apps/teaching/src/schemas/scheduled-lesson.ts`) is its own entity with `delivery_status: 'planned' | 'current' | 'delivered' | 'skipped' | 'rescheduled'` instead of a `completed` boolean — because a lesson isn't ticked off, it's *delivered or not*. This is exactly the immovable/non-completable pattern the rest of the system needs for Events and PD sessions. Adam already built the right shape once; the job is to generalize it, not invent it.
-- **A real cross-hub linking primitive already exists, and it's the piece to extend**: `apps/knowledge/src/domain/hub-ref.ts` defines a typed `HubRef` union (`{hub: 'knowledge'|'teaching'|'tasks'|'life', kind, id}`), stored as `"hub:kind:id"` strings in `Page.connected: string[]`, with `netlify/functions/_shared/inverse-links.mjs` computing backlinks ("what points at this ref"). That inverse-index is exactly the query a Person page needs ("everything that points at Mr Smith"). Two caveats to fix, not reasons to avoid it: (a) it's currently Knowledge-only — `connected` doesn't exist on `Task`/`Project`/`Class`; (b) `inverse-links.mjs` scans all pages at request time with a hardcoded `SMALL_ARCHIVE = 24` fallback — fine for Knowledge's current size, not fine as the backbone of a People graph that every hub writes into.
-- **Calendar is a client-side merge, not a schema.** `apps/life/js/shell/calendar-sources.js` just tags four heterogeneous per-hub feeds (`logged-days`, `scheduled-lessons`, `archive`, `board`) and merges them for display. There's no shared `CalendarEvent` type. `OVERSEER.md` already names "consolidated calendar" as a **shell-level capability** — i.e. something no single hub owns — which is the same architectural category this new work falls into.
-- `docs/consolidation/plan.md` is exclusively infra (one repo, one Netlify site, one auth) — the hub-API fold is done (checkpoint-10, PASS WITH NITS). It says nothing about People or Comms. That's good news: the repo is in a quiet, stable state, which is the right moment to start this as a new slice rather than fighting an in-flight migration.
+- There is no first class Person or Organisation entity.
+- Task contexts with kind person are free text labels, not identity references.
+- Student group references are free text rather than links.
+- Knowledge has HubRef, Page.connected, and inverse link behaviour, but these are local to Knowledge and rely on scanning records.
+- Teaching correctly keeps ScheduledLesson separate from Task and gives it delivery states rather than a completed boolean.
+- The Life calendar merges several domain feeds for display. It is a projection, not a shared source of truth.
+- Tasks, projects, lessons, notes, events, meetings, communications, applications, programs, excursions, people, and organisations do not yet share one linking mechanism.
 
-## 3. Patterns worth stealing (external research)
+The existing Knowledge link implementation is a useful prototype. It should be migrated into the shared model, not preserved as a second relationship system.
 
-- **Unified Person via a relation/join table, not embedded fields.** HubSpot's "engagements" (its umbrella term for email/call/meeting/note/task) each carry an `associations` object linking to any number of contacts — the activity doesn't belong to a person, it's joined to one or more. Monica (open-source personal CRM) does the plain version: one `contacts` table, everything else (`activities`, `reminders`, `life_events`) foreign-keys to `contact_id`, with a pivot table when more than one person is involved. Notion's own relation+rollup mechanic proves the same idea works with zero custom code. Attio/Folk generalize this further — Person and Company are first-class *objects* that any other object can point at.
-  - **Concrete recommendation:** extend the `HubRef` pattern that already exists, and add a `people_links` table (`entity_ref`, `person_id`, `role`) for multi-person cases (meeting attendees, cc'd comms). Single-person cases (a PD event's provider) can use a plain `HubRef` field.
-- **Immovable-fact vs completable-item is Google Calendar's own split.** Calendar Events have a time slot and no completion concept; Tasks have a due date and a `completed` boolean and no fixed slot. Sunsama/Akiflow layer scheduling on top of that same split rather than merging it. The generalizable primitive is two independent fields on any schedulable entity: `occurs_at` (nullable start/end) and `completable` (boolean).
-- **A polymorphic Activity/Interaction log is the Comms log, verbatim.** HubSpot's engagement types (call/email/meeting/note) and Monica's `activities` table are one log table with a `type` enum and generic person-links, rather than a separate table per channel. Communications-as-tasks ("email this person") should be a `Communication` row that can *optionally* spawn or link to a `Task`, not a `Task` that happens to be about a person.
+## 3. Agreed architecture
 
-## 4. Recommended shape
+### 3.1 Shared identity, domain owned records
 
-Two new shared entities, and five schedulable/loggable entity types replacing the single `Task` shape for anything that isn't genuinely GTD work:
+Person and Organisation are shared entities. No product hub owns their meaning.
 
-| Entity | `occurs_at` | `completable` | `movable` | Notes |
-|---|---|---|---|---|
-| **Person** | — | — | — | `id, name, category (student \| colleague \| provider \| family \| external), tags, workplace_ref, contact info`. One row whether Mr Smith is an excursion chaperone, a meeting attendee, or a PD provider. Adam himself is a `Person` row too — his own career history is just his position-history sub-record. |
-| **Organization** | — | — | — | `id, name, type, relationship_type (employer \| PD provider \| study option \| aspirational), city/country, website`. Collapses the Companies/Workplaces/Dream-Universities/Institutions sprawl (§1) into one table. |
-| **Event** | fixed | no | no | "Tournament of Minds State Final." Calendar fact. Can hang off an Excursion/Project as its anchor date without itself being a task. |
-| **Lesson** | fixed (timetable) | no (`delivery_status`) | no | Generalizes `ScheduledLessonSchema` — already correct, stays owned by Teaching. |
-| **Meeting** | fixed, reschedulable | yes | yes | Notes (→ Knowledge), people (→ Person, multi), calendar presence. Most of what's in Notion's `Communications` database today under `Meeting Type`. |
-| **Task / Project / Excursion / Program / sub-task** | optional (due date only) | yes | yes | Keep the existing Tasks Hub system as-is — it already works. |
-| **Communication** | timestamp of contact | yes (done/follow-up) | n/a | "Called Mr Smith," "need to email the excursion coordinator." Logged fact first, task-like behaviour second. May link to a `Task` rather than being one. |
-| **ProfessionalDevelopmentEvent** | fixed | usually no (attended or not) | sometimes | Provider `Person`/`Organization`, optional other attendees, Knowledge notes taken during/about it. |
+Shared packages and services own:
 
-Every entity links to `Person`/`Organization` via the extended `HubRef`/`people_links` mechanism, and to Knowledge notes via the existing `connected[]` mechanism, generalized past Knowledge-only.
+- Person identity
+- Organisation identity
+- Universal Links
+- relationship history
+- link indexing
+- identity lifecycle
+- privacy and access rules
+- common entity references
+- common scheduling projections
 
-## 5. Where this lives in the repo
+Professional Hub owns the interface and workflows for:
 
-**Naming decision:** the section holding Person, Organization, Communications, and PD is called **Professional Hub** — matching the existing Teaching Hub / Knowledge Hub / Tasks Hub convention, and staying plain/work-vocabulary rather than a metaphor (Relationships/Network/Orbit/Ecosystem were all considered and rejected — either too CRM-generic, too poetic, or not concrete enough). `Person`/`Organization`/`Communication` stay as the underlying entity names regardless of the hub label.
+- professional contacts
+- communications
+- meetings
+- professional development
+- career history
+- job applications
+- professional relationship views
 
-**Career Hub does not become its own app** (§1) — it's a view inside Professional Hub (your own Person's career tab, Organization filtered by `relationship_type`) plus links out to Tasks Hub (job applications) and Knowledge Hub (presentations/publications, book ideas).
+Other hubs continue to own their domain records:
 
-| Piece | Placement | Why |
+- Teaching owns classes, lessons, units, programs, and teaching records.
+- Tasks owns tasks and projects.
+- Knowledge owns notes, pages, publications, and reference material.
+- Life owns personal domain records.
+- The shell calendar assembles projections from domain owned records.
+
+Professional Hub is therefore a view and workflow layer over shared identity plus linked domain records. It is not the technical owner of every Person or Organisation.
+
+### 3.2 Universal Links
+
+Universal Links replaces Page.connected, people_links, free text student references, isolated foreign keys used for cross hub relationships, and any new hub specific link mechanism.
+
+Every Universal Link records:
+
+| Field | Purpose |
+|---|---|
+| id | Stable link identity |
+| source_ref | The record where the relationship was created |
+| target_ref | The linked record |
+| relationship_type | The meaning of the connection |
+| role | The target's role in this context |
+| context | The domain or workflow where the link applies |
+| valid_from | When an ongoing relationship began |
+| valid_to | When an ongoing relationship ended |
+| occurred_at | Date of a point in time interaction or event |
+| status | Active, inactive, archived, retained, or deleted |
+| visibility | Access scope, including protected student scope |
+| metadata | Small type specific details which do not justify a new entity |
+| created_at | Audit timestamp |
+| updated_at | Audit timestamp |
+
+Examples:
+
+| Source | Relationship | Target |
 |---|---|---|
-| `Person`, `Organization`, `Communication`, `ProfessionalDevelopmentEvent` | **New `apps/professional/`**, mounted at `/professional/` in the Life rail, same fold-in pattern as Teaching/Knowledge/Tasks | New first-class hub; these are the entities nothing else should own |
-| `Event`, `Meeting` | **New entity types inside Tasks Hub**, siblings to `Task`/`Project` (same pattern as `ScheduledLesson` sitting beside `Task` in Teaching) | Tasks Hub already owns all the schedulable/calendar-fact machinery (`domain/calendar.ts`, due-date/status pattern, the excursion bolt-on precedent) — don't build a second calendar system inside Professional Hub. They link *out* to `Person`/`Organization` via `HubRef`; Professional Hub doesn't need to own them to be what they point at. |
-| `Lesson` / `ScheduledLesson` | Stays in Teaching, unchanged | Already correctly separated from `Task` |
-| Presentations/Publications, Book Ideas | Fold into Knowledge Hub's existing `Page` schema (`origins` gains `presentation`/`publication` kinds) | Content Adam produced belongs with the rest of his notes/content, not a Career-only list |
-| Jobs to Apply For | Fold into Tasks Hub as `Project.type === 'job_application'` | Pipeline-shaped, same bolt-on-fields pattern excursions use |
-| Shared schema/link code | **New `packages/professional-core`**, sibling to `packages/design-kit` — the one existing precedent for "code every app imports" | Contains the `Person`/`Organization` zod schemas, the extended `HubRef` union (adding `professional:person` / `professional:organization` to the existing `knowledge`/`teaching`/`tasks`/`life` kinds in `apps/knowledge/src/domain/hub-ref.ts`), and the generalized relations/backlink helper (the uncapped version of `inverse-links.mjs`). `apps/tasks` (Meeting/Event → Person), `apps/knowledge` (Page → Person/Organization), and `apps/professional` itself all import from here. |
-| API + storage | New handlers on the **existing `life-hub2` Netlify site** — `/api/people`, `/api/organizations`, `/api/communications`, `/api/pd-events`, plus `/api/events` and `/api/meetings` added to the Tasks handlers. New Blobs store (e.g. `professional-hub-content`), following the exact `tasks-hub-content`/`teaching-hub-content` precedent | `plan.md`'s standing rule: prefer one Netlify site absorbing folded sections, no new passphrase. `life-hub-data`'s schema stays frozen/untouched per the consolidation non-goals. |
-| Shell | Life rail gets a "Professional" mount alongside Teaching/Knowledge/Tasks. `calendar-sources.js` gains Meeting/Event (from Tasks' feed) and PD events (from Professional Hub's feed) | Same additive pattern used when Teaching's scheduled lessons were wired in |
+| Task | collaborator | Person |
+| Communication | recipient | Person |
+| Meeting | attendee | Person |
+| Note | author | Person |
+| Person | employee at | Organisation |
+| Student | participant in | Program |
+| Event | part of | Excursion |
+| Event | venue | Organisation |
+| Job application | target organisation | Organisation |
+| Lesson | belongs to | Unit |
+| Project | contains | Task |
 
-## 6. Suggested build order (small slices, matching how the rest of this repo has been built)
+There must be one canonical write path. A link is never copied into both records. Source and target pages read the same link through indexed lookup.
 
-1. **`Person` + `Organization` schemas and minimal CRUD** in `packages/professional-core` + `apps/professional/`, no UI polish — the thing everything else needs to exist first.
-2. **Widen `HubRef`** to include `professional:person` / `professional:organization`, and give `Task`/`Project`/`Meeting`/`Event` their own `connected`/`people_links` fields the way `Page` already has one. Fix the `inverse-links.mjs` `SMALL_ARCHIVE = 24` scan cap in the same slice — it will be load-bearing for the People graph, not a Knowledge-only nicety anymore.
-3. **`Communication` entity + basic log UI** in Professional Hub — the actual comms log — linked to Person (multi) and optionally a Task.
-4. **`Event` and `Meeting` entities** in Tasks Hub with the `occurs_at`/`completable`/`movable` fields, feeding the existing calendar merge as new sources.
-5. **`ProfessionalDevelopmentEvent`** linking Person (provider) + Organization + Knowledge notes — turns the Career/PD hub from a Notion synced-block hack into a real cross-hub view.
-6. **Fold Jobs to Apply For into Tasks**, and Presentations/Publications + Book Ideas into Knowledge, per the §1 table.
-7. Backfill: pull real people out of Notion's `People` database (colleagues) and `Student Database` (students, however stale) into the new `Person` table, and organizations out of `Companies`/`Workplaces`/`Dream Universities`/etc. into `Organization`, so day one isn't empty.
+Universal Links must support links between every registered entity type, not only links to people.
 
-This is intentionally not a rewrite — Tasks Hub's GTD system stays, Teaching's lesson content model stays, Knowledge stays the notes system. The new work is the Person/Organization spine and the entity types that were missing.
+### 3.3 Relationship history and timeline
+
+A Person or Organisation does not have one permanent category. Roles are multiple, contextual, and dated.
+
+Examples for one Person:
+
+- colleague at St Aloysius' College from February 2025 to present
+- NORTH+ participant from June 2025 to present
+- Tournament of Minds collaborator from July 2025 to August 2025
+- Everyday Magis coach from March 2026 to present
+
+When a relationship changes, the system closes the previous dated relationship and creates the next one. It does not overwrite the past.
+
+The unified page renders:
+
+- dots for point in time interactions and changes
+- dated periods for ongoing roles
+- filters for professional, teaching, personal, program, and organisation contexts
+- all concurrent roles rather than one category
+- source links back to the task, meeting, event, note, program, or project which established the relationship
+
+The timeline is functional history. It supports search, filtering, reporting, and AI context. It is not a decorative activity feed.
+
+### 3.4 Unified Organisation view
+
+Organisation also has multiple contextual and dated relationships.
+
+UNSW might simultaneously or historically be:
+
+- a study institution
+- a professional development provider
+- an event venue
+- an employer
+- an aspirational employer
+- a research source
+- the organisation connected to several people
+
+Opening UNSW should assemble one cohesive view containing all of these relationships, grouped by context and ordered through a unified timeline. Organisation type and relationship type must not be a single permanent field.
+
+### 3.5 Self identity
+
+Adam is represented by a protected self identity, not an ordinary external contact.
+
+The self identity supports:
+
+- position history linked to organisations
+- qualifications
+- presentations and publications
+- professional development
+- job applications
+- authored notes
+- roles and relationship periods
+
+The self record has an explicit protected identity flag and separate mutation rules so it cannot be merged, archived, or treated as an external contact accidentally.
+
+## 4. Correct entity boundaries
+
+### 4.1 Tasks remain actions
+
+A Task represents work which needs to be done.
+
+Examples:
+
+- email Seth
+- draft selection criteria
+- return permission forms
+- prepare meeting agenda
+
+Tasks may link to any Person, Organisation, Project, Event, Meeting, Program, Excursion, Note, or Application through Universal Links.
+
+### 4.2 Communications remain interaction records
+
+A Communication records contact which occurred or was sent.
+
+Examples:
+
+- emailed Seth
+- called the excursion coordinator
+- received advice from a provider
+- sent a follow up message
+
+Planned contact is a Task. Completed or received contact is a Communication. A Communication may create or link to a follow up Task, but it does not carry task completion behaviour itself.
+
+### 4.3 Meetings use occurrence states
+
+A Meeting is a scheduled interaction. It uses states such as:
+
+- scheduled
+- completed
+- cancelled
+- rescheduled
+- no show
+
+Preparation and follow up are linked Tasks. The Meeting itself is not treated as a completable task.
+
+### 4.4 Professional development is an Event subtype
+
+Professional development does not require a separate top level entity.
+
+It is an Event with event_type professional_development and optional extension fields for:
+
+- provider
+- accreditation category
+- hours
+- attendance state
+- certificate
+- linked notes
+- linked learning actions
+
+The same Event foundation supports excursions, conferences, ceremonies, deadlines, performances, and other calendar facts without making Tasks Hub their owner.
+
+### 4.5 Scheduling is shared infrastructure
+
+Events and Meetings do not belong to Tasks Hub merely because Tasks already has date handling.
+
+Each domain owns its source records. A shared scheduling package defines common time, recurrence, status, and calendar projection contracts. The Life shell calendar merges these projections.
+
+Examples:
+
+- Teaching owns a lesson and publishes its schedule projection.
+- Professional owns a professional meeting and publishes its schedule projection.
+- A professional development Event belongs to Professional and publishes its schedule projection.
+- An excursion event remains linked to its owning excursion or project and publishes its schedule projection.
+- Tasks owns due work and publishes task due date projections.
+
+### 4.6 Job applications have a dedicated workflow
+
+A job application is not one Task. Professional Hub provides a dedicated application record containing:
+
+- organisation
+- position
+- advertisement
+- closing date
+- pipeline status
+- application documents
+- selection criteria
+- contacts and referees
+- interview rounds
+- outcome
+- reflection
+
+Tasks represent the actions required to progress the application. The career view assembles applications, employment history, professional development, publications, presentations, people, and organisations without copying their records.
+
+## 5. The @ linking experience
+
+The @ picker is the standard interface for creating a Universal Link.
+
+Examples:
+
+- Email @Seth about the proposal.
+- Complete this task with @Seth.
+- Add @UNSW as the venue.
+- Link this lesson to @Year 10 English.
+- Attach this task to @Tournament of Minds.
+- Professional development notes on reading by @Seth.
+
+Search results are grouped by entity type and show enough context to prevent mistakes:
+
+- Seth Dunn, Person, colleague, St Aloysius' College
+- UNSW, Organisation, study institution and event venue
+- Tournament of Minds, Program
+- State Final, Event
+- Year 10 English, Class
+
+Selecting a result creates a visible, clickable chip backed by the target's stable identifier. The visible label is not the stored relationship.
+
+The editor infers a sensible relationship from the record type and language:
+
+- Email @Seth defaults to recipient.
+- Meeting with @Seth defaults to attendee.
+- Notes by @Seth defaults to author.
+- Complete this with @Seth defaults to collaborator.
+- Event at @UNSW defaults to venue.
+- Task for @Tournament of Minds defaults to related program.
+
+The user may change the inferred role, remove the link, add more links, or create a new permitted entity when no match exists.
+
+Clicking a chip opens the target's unified page. The same behaviour appears in Tasks, Projects, Events, Meetings, Communications, Programs, Excursions, Lessons, Notes, Publications, and Applications.
+
+Student results appear only inside authorised student contexts. General search, Life search, Knowledge search, URLs, analytics, notifications, and logs must not reveal student identity by default.
+
+## 6. Student identity and privacy boundary
+
+### 6.1 Non negotiable repository rule
+
+No real student personal information enters GitHub.
+
+The repository may contain:
+
+- schemas
+- access control code
+- migration code
+- synthetic fixtures
+- fake names and records clearly marked as synthetic
+
+The repository must not contain:
+
+- student names
+- student email addresses
+- school identifiers
+- class lists
+- parent information
+- medical or disability information
+- behaviour information
+- reports
+- private notes
+- uploaded student documents
+- production exports
+- production logs
+- encryption keys or access secrets
+
+A GitHub breach should expose source code and synthetic data only. It should not identify a real student or reveal credentials used to reach student data.
+
+### 6.2 Policy gate before student import
+
+No identifiable student data should be imported into the personal system until there is documented authority to store it with the selected providers.
+
+Before enabling student identity, record:
+
+- the approved purpose
+- the approved fields
+- the approved storage provider and region
+- who has access
+- retention periods
+- deletion requirements
+- incident response responsibility
+- school approval or policy basis
+
+Encryption does not make an unapproved system approved.
+
+### 6.3 Protected student identity design
+
+If the policy gate is satisfied, student identity uses three layers.
+
+1. Shared records use an opaque generated identifier with no initials, year, class, school number, or embedded meaning.
+2. A separate protected identity store maps the opaque identifier to the minimum approved display information.
+3. Activity records for classes, programs, excursions, coaching, meetings, achievements, and tasks reference only the opaque identifier.
+
+Required controls include:
+
+- multifactor authentication
+- deny by default authorisation
+- recent reauthentication before identity reveal
+- encryption in transit and at rest
+- separate field encryption for identity data
+- keys stored outside GitHub and outside the data store
+- no identity in URLs, telemetry, analytics, error messages, or logs
+- access logs for identity reads and mutations
+- short sessions
+- rate limits
+- encrypted backups
+- tested deletion across primary data, indexes, archives, and backups
+- dependency, code, and secret scanning
+- a documented breach response process
+
+Free text on student records should be restricted. Structured, purpose bound fields reduce the chance of sensitive information accumulating without a clear need.
+
+## 7. Lifecycle and retention
+
+Status terms must have defined behaviour.
+
+| Status | Behaviour |
+|---|---|
+| active | Appears in current search, suggestions, dashboards, and work |
+| inactive | Historical relationship remains available but is excluded from current defaults |
+| archived | Read only, hidden from ordinary suggestions, available through deliberate archive search |
+| retained | Hidden from normal use and held for a documented reason until a defined review or deletion date |
+| deidentified | Identity removed while approved anonymous activity history remains |
+| deleted | Personal information irretrievably removed; only a non identifying tombstone remains where needed for link integrity |
+
+Stored is not a status because it says nothing about access, purpose, or deletion.
+
+Archive must not mean forgotten permanent retention. Every retained identity requires a retention reason, review date, and final action.
+
+## 8. Link storage, integrity, and performance
+
+Universal Links must not depend on scanning every Page, Task, Person, or Project at request time.
+
+The storage layer must support indexed lookup in both directions:
+
+- all outgoing links for source_ref
+- all incoming links for target_ref
+- links by relationship_type
+- links active on a given date
+- links within a visibility scope
+
+Required integrity behaviour:
+
+- validate source and target entity types
+- prevent duplicate equivalent links
+- preserve history when roles change
+- stop deletion when protected references require review
+- deidentify or tombstone deleted identities without silently breaking history
+- update both lookup indexes atomically or recover safely
+- record audit history for protected changes
+- rebuild indexes through a tested administrative operation
+- migrate existing Knowledge connected links into Universal Links
+- retire old write paths after migration
+
+The implementation plan must define storage shape, index keys, consistency rules, migration, backup, and recovery before Universal Links becomes load bearing.
+
+## 9. First vertical slice
+
+Do not begin with several disconnected schema and CRUD slices.
+
+The first slice should deliver one complete workflow:
+
+1. Create Seth as a Person.
+2. Link Seth to an Organisation.
+3. Add two concurrent dated roles in different contexts.
+4. Render the roles and changes on Seth's relationship timeline.
+5. Write Email @Seth in a Task.
+6. Resolve the @ mention into a Universal Link with role recipient.
+7. Log the completed Communication.
+8. Link the Communication to the Task and Seth.
+9. Create a follow up Task linked to Seth.
+10. Open Seth and see the Organisation, roles, Task, Communication, and timeline together.
+11. Mark one relationship inactive without deleting its history.
+12. Archive Seth and verify normal suggestions hide the record while deliberate archive search finds it.
+
+Acceptance criteria:
+
+- one canonical Universal Link write path
+- indexed lookup from source and target
+- no duplicate relationship storage
+- shared @ picker used by at least Task and Communication
+- relationship role inference remains editable
+- unified Person page reads links rather than copied fields
+- relationship timeline shows concurrent roles and dated changes
+- lifecycle states behave as defined
+- tests cover link creation, backlinks, role history, archive filtering, and duplicate prevention
+- only synthetic data appears in repository fixtures and tests
+
+## 10. Later slices
+
+After the first slice proves the model:
+
+1. Extend the @ picker and Universal Links to Projects, Events, Meetings, Programs, Excursions, Lessons, Notes, Publications, and Applications.
+2. Add the unified Organisation page and timeline.
+3. Add shared scheduling projections without transferring domain ownership to Tasks.
+4. Add Meeting workflows and linked preparation or follow up Tasks.
+5. Add Event subtypes, including professional development.
+6. Add the dedicated job application pipeline and career dashboard.
+7. Migrate existing Knowledge connected links.
+8. Add identity duplicate detection and merge tooling.
+9. Complete privacy review and provider approval before any student migration.
+10. Import approved professional contacts and organisations with deduplication and provenance.
+11. Import only approved, current, purpose bound student identity data. Do not backfill stale student records merely to populate the interface.
+
+## 11. Explicit non goals
+
+- Do not turn every scheduled record into a Task.
+- Do not place all Events and Meetings inside Tasks Hub.
+- Do not maintain both connected fields and a second people_links system.
+- Do not give Person or Organisation one permanent category.
+- Do not treat a planned communication and a completed communication as the same record.
+- Do not make Professional Hub the technical owner of shared identities.
+- Do not copy linked records into Person or Organisation pages.
+- Do not create a separate top level ProfessionalDevelopmentEvent entity before an Event subtype proves insufficient.
+- Do not migrate real student data before the privacy and policy gate passes.
+- Do not place secrets, production data, or identifiable student fixtures in GitHub.
+
+The intended result is one identity and relationship spine across the umbrella application. Each hub keeps its domain responsibilities. Universal Links connects their records. The @ picker makes those connections simple to create. Unified Person and Organisation pages make the complete history coherent to use.
