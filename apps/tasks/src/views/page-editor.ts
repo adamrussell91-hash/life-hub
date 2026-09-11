@@ -11,7 +11,7 @@ import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
 import { openPlusAdd } from '@/views/plus-add';
-import { mountTaskCard } from '@/views/hub-cards';
+import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
 import { requestToggleDone } from '@/views/dashboard';
 import { mountBlockInsert } from '@/views/block-insert';
 import { paintExcursionPage } from '@/views/excursion-timeline';
@@ -460,11 +460,34 @@ function paintProjectPage(
 
   const acceptTask = (updated: Task) => {
     const index = liveTasks.findIndex((item) => item.id === updated.id);
-    liveTasks =
-      index >= 0
-        ? liveTasks.map((item) => (item.id === updated.id ? updated : item))
-        : [updated, ...liveTasks];
+    if (index < 0) liveTasks = [updated, ...liveTasks];
+    else liveTasks[index] = updated;
     paintProjectTasks();
+  };
+
+  const childHandlers: TaskCardHandlers = {
+    onToggle: (item) =>
+      requestToggleDone(confirmHost, item, async () => {
+        acceptTask({ ...item, status: item.status === 'done' ? 'open' : 'done' });
+      }),
+    onDelete: (item) =>
+      deleteTaskNow(
+        item,
+        () => {
+          liveTasks = liveTasks.filter((entry) => entry.id !== item.id);
+          paintProjectTasks();
+        },
+        confirmHost
+      ),
+    onEdit: (item) =>
+      void renderTaskEditor(confirmHost, item, [current], (saved) => {
+        if (saved) acceptTask(saved);
+      }),
+    onPatch: (item, patch) => {
+      void tasksApi.updateTask(item.id, patch).then(acceptTask, (err) => {
+        confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err)));
+      });
+    }
   };
 
   const paintProjectTasks = () => {
@@ -488,29 +511,7 @@ function paintProjectPage(
       return;
     }
     taskList.replaceChildren();
-    for (const child of children) {
-      mountTaskCard(taskList, child, {
-        onToggle: (item) =>
-          requestToggleDone(confirmHost, item, async () => {
-            const nextStatus = item.status === 'done' ? 'open' : 'done';
-            acceptTask({ ...item, status: nextStatus });
-          }),
-        onDelete: (item) =>
-          deleteTaskNow(item, () => {
-            liveTasks = liveTasks.filter((entry) => entry.id !== item.id);
-            paintProjectTasks();
-          }, confirmHost),
-        onEdit: (item) =>
-          void renderTaskEditor(confirmHost, item, [current], (saved) => {
-            if (saved) acceptTask(saved);
-          }),
-        onPatch: (item, patch) => {
-          void tasksApi.updateTask(item.id, patch).then(acceptTask, (err) => {
-            confirmHost.replaceChildren(el('p', 'empty-state', errorMessage(err)));
-          });
-        }
-      });
-    }
+    for (const child of children) mountTaskCard(taskList, child, childHandlers);
   };
 
   paintProjectTasks();
