@@ -46,27 +46,27 @@ export function createTasksApi(fetchImpl = fetch) {
       const payload = await readJson(fetchImpl, '/api/stress-flags');
       return payload.data?.flags ?? [];
     },
-    async dumpWithClare({ text, domain = 'teaching', protocol_id } = {}) {
-      const response = await fetchImpl('/api/clare', {
+    async createTask({ title, domain = 'life' } = {}) {
+      const response = await fetchImpl('/api/tasks', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'dump', text, domain, protocol_id })
+        body: JSON.stringify({ title, domain })
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
-        throw httpError('Clare dump failed', response.status, payload?.error?.code ?? 'request_failed');
+        throw httpError('Create task failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data;
     },
-    async briefWithClare(protocol_id = 'morning-sweep') {
-      const response = await fetchImpl('/api/clare', {
-        method: 'POST',
+    async setTaskStatus(id, status) {
+      const response = await fetchImpl(`/api/tasks?id=${encodeURIComponent(id)}`, {
+        method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'brief', protocol_id })
+        body: JSON.stringify({ status })
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
-        throw httpError('Clare brief failed', response.status, payload?.error?.code ?? 'request_failed');
+        throw httpError('Update task failed', response.status, payload?.error?.code ?? 'request_failed');
       }
       return payload.data;
     }

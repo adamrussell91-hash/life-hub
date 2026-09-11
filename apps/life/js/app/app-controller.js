@@ -1,7 +1,8 @@
-import { addCalendarDays, getSydneyDateKey } from '../core/time.js';
+import { addCalendarDays, getSydneyDateKey, getSydneyMinutesOfDay } from '../core/time.js';
 import { bindHubAccordion, openHubAccordion, renderHubPreview } from '../shell/hub-accordion.js';
-import { renderHubPulse } from '../shell/render-hub-pulse.js';
-import { renderClareResult } from '../shell/render-tasks.js';
+import { formatHubPulseCount, renderHubPulse } from '../shell/render-hub-pulse.js';
+import { renderTaskChecklist, renderTeachingAgenda } from '../shell/render-hub-widgets.js';
+import { nextLessonFromCurriculum, todaysLessonsFromCurriculum } from '../shell/teaching-today.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
@@ -10,7 +11,6 @@ import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
-import { readHubCompose } from '../../../../packages/design-kit/js/hub-compose.js';
 import { packCnBoard } from './render-central-node.js';
 import { settleMetricRings } from './chart-kit/animate.js';
 
@@ -168,6 +168,7 @@ export function createAppController(dependencies) {
   let tasksEvents = [];
   let tasksCalendarInFlight = null;
   let hubPulseInFlight = null;
+  let latestOpenTasks = [];
   let bodyRange = 'six_month';
   let bloodsRange = 'five_year';
   let mindRange = 'monthly';
@@ -262,11 +263,20 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#central-node-audit-button'), 'click', () => {
     openCentralNodeAudit();
   });
-  bind(root.querySelector('#clare-dump-form'), 'submit', event => {
-    event.preventDefault?.();
-    void submitClareDump();
+  bind(root.querySelector('.hub-pulse-grid'), 'click', event => {
+    const toggle = event.target.closest?.('[data-hub-pulse-toggle]');
+    if (toggle) {
+      toggleHubPulseCard(toggle);
+      return;
+    }
+    const checkbox = event.target.closest?.('[data-task-checkbox]');
+    if (checkbox) void toggleTaskDone(checkbox);
   });
-  bind(root.querySelector('#clare-brief-button'), 'click', () => void submitClareBrief());
+  bind(root.querySelector('[data-knowledge-quick-text]'), 'input', event => {
+    root.querySelector('[data-knowledge-quick-save]')?.toggleAttribute('disabled', !event.target.value.trim());
+  });
+  bind(root.querySelector('[data-knowledge-quick-form]'), 'submit', event => void submitKnowledgeQuickNote(event));
+  bind(root.querySelector('[data-task-add-form]'), 'submit', event => void submitTaskAdd(event));
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
   bind(windowTarget, 'hashchange', () => {
@@ -988,10 +998,13 @@ export function createAppController(dependencies) {
         .then(data => {
           const classes = data?.classes ?? [];
           renderHubPreview(root, 'teaching', classes.map(item => item.code || item.title));
-          return { status: 'ready', count: classes.length };
+          const agendaOptions = { date: getSydneyDateKey(), nowMinutes: getSydneyMinutesOfDay() };
+          renderTeachingAgenda(root, todaysLessonsFromCurriculum(data, agendaOptions));
+          return { status: 'ready', nextLesson: nextLessonFromCurriculum(data, agendaOptions) };
         })
         .catch(error => {
           renderHubPreview(root, 'teaching', ['Classes are not bound yet']);
+          renderTeachingAgenda(root, []);
           return { status: error?.code === 'blobs_unbound' ? 'unbound' : 'error' };
         })
       : Promise.resolve({ status: 'error' });
@@ -1012,10 +1025,14 @@ export function createAppController(dependencies) {
         .then(list => {
           const open = (Array.isArray(list) ? list : []).filter(item => item?.status !== 'done');
           renderHubPreview(root, 'tasks', open.map(item => item.title));
+          latestOpenTasks = open;
+          renderTaskChecklist(root, latestOpenTasks, { today: getSydneyDateKey() });
           return { status: 'ready', count: open.length };
         })
         .catch(error => {
           renderHubPreview(root, 'tasks', ['Board is not bound yet']);
+          latestOpenTasks = [];
+          renderTaskChecklist(root, latestOpenTasks);
           return { status: error?.code === 'tasks_blobs_unbound' ? 'unbound' : 'error' };
         })
       : Promise.resolve({ status: 'error' });
@@ -1032,33 +1049,89 @@ export function createAppController(dependencies) {
     });
   }
 
-  function clareProtocol() {
-    const value = root.querySelector('#clare-dump-protocol')?.value;
-    return value || undefined;
+  function toggleHubPulseCard(button) {
+    const card = button.closest('[data-hub-pulse]');
+    const body = card?.querySelector('.hub-pulse-card__body');
+    if (!body) return;
+    const expanded = button.getAttribute('aria-expanded') === 'true';
+    button.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;
   }
 
-  async function submitClareDump() {
-    if (!tasksApi?.dumpWithClare) return;
-    const form = root.querySelector('#clare-dump-form');
-    const compose = readHubCompose(form);
-    const text = compose?.composed ?? root.querySelector('#clare-dump-text')?.value ?? '';
-    renderClareResult(root, { status: 'loading' });
+  function setKnowledgeQuickResult(message, tone = 'neutral') {
+    const node = root.querySelector('[data-knowledge-quick-result]');
+    if (!node) return;
+    node.textContent = message ?? '';
+    node.hidden = !message;
+    node.dataset.tone = tone;
+  }
+
+  async function submitKnowledgeQuickNote(event) {
+    event.preventDefault?.();
+    if (!knowledgeApi?.createPage) return;
+    const textarea = root.querySelector('[data-knowledge-quick-text]');
+    const saveButton = root.querySelector('[data-knowledge-quick-save]');
+    const useClementine = root.querySelector('[data-knowledge-quick-clementine]')?.checked;
+    const body = (textarea?.value ?? '').trim();
+    if (!body) return;
+    const title = body.split('\n')[0].slice(0, 80).trim() || 'Quick note';
+    saveButton?.setAttribute('disabled', 'true');
+    setKnowledgeQuickResult(useClementine ? 'Saving and asking Clementine to file it…' : 'Saving…');
     try {
-      const dump = await tasksApi.dumpWithClare({ text, protocol_id: clareProtocol() });
-      renderClareResult(root, { status: 'ready', dump });
+      const saved = await knowledgeApi.createPage({ title, body });
+      if (useClementine && saved?.id) {
+        try {
+          await knowledgeApi.tidyPage(saved.id);
+          setKnowledgeQuickResult('Saved and filed with Clementine.', 'success');
+        } catch {
+          setKnowledgeQuickResult('Saved. Clementine could not file it right now.', 'success');
+        }
+      } else {
+        setKnowledgeQuickResult('Saved.', 'success');
+      }
+      if (textarea) textarea.value = '';
     } catch {
-      renderClareResult(root, { status: 'error' });
+      setKnowledgeQuickResult('Could not save that note.', 'error');
+      saveButton?.removeAttribute('disabled');
     }
   }
 
-  async function submitClareBrief() {
-    if (!tasksApi?.briefWithClare) return;
-    renderClareResult(root, { status: 'loading' });
+  function renderTaskCount(count) {
+    const node = root.querySelector('[data-hub-pulse="tasks"] [data-hub-count]');
+    if (node) node.textContent = formatHubPulseCount('tasks', count);
+  }
+
+  async function submitTaskAdd(event) {
+    event.preventDefault?.();
+    if (!tasksApi?.createTask) return;
+    const input = root.querySelector('[data-task-add-input]');
+    const title = (input?.value ?? '').trim();
+    if (!title) return;
+    input.setAttribute('disabled', 'true');
     try {
-      const briefing = await tasksApi.briefWithClare(clareProtocol() ?? 'morning-sweep');
-      renderClareResult(root, { status: 'ready', briefing });
+      const created = await tasksApi.createTask({ title, domain: 'life' });
+      latestOpenTasks = [created, ...latestOpenTasks];
+      renderTaskChecklist(root, latestOpenTasks, { today: getSydneyDateKey() });
+      renderTaskCount(latestOpenTasks.length);
+      if (input) input.value = '';
+    } finally {
+      input?.removeAttribute('disabled');
+    }
+  }
+
+  async function toggleTaskDone(checkbox) {
+    const row = checkbox.closest('[data-task-id]');
+    const id = row?.dataset.taskId;
+    if (!id || !tasksApi?.setTaskStatus) return;
+    checkbox.disabled = true;
+    try {
+      await tasksApi.setTaskStatus(id, 'done');
+      latestOpenTasks = latestOpenTasks.filter(task => task.id !== id);
+      renderTaskChecklist(root, latestOpenTasks, { today: getSydneyDateKey() });
+      renderTaskCount(latestOpenTasks.length);
     } catch {
-      renderClareResult(root, { status: 'error' });
+      checkbox.checked = false;
+      checkbox.disabled = false;
     }
   }
 
