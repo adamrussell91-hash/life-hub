@@ -294,13 +294,55 @@ The user may change the inferred role, remove the link, add more links, or creat
 
 Clicking a chip opens the target's unified page. The same behaviour appears in Tasks, Projects, Events, Meetings, Communications, Programs, Excursions, Lessons, Notes, Publications, and Applications.
 
-Student results appear only inside authorised student contexts. General search, Life search, Knowledge search, URLs, analytics, notifications, and logs must not reveal student identity by default.
+Student references use initials or neutral codes rather than full names. They appear only inside authorised teaching contexts. General search, Life search, Knowledge search, URLs, analytics, notifications, and logs must not expose student references by default.
 
-## 6. Student identity and privacy boundary
+## 6. Student references and privacy boundary
 
-### 6.1 Non negotiable repository rule
+### 6.1 Purpose and scope
 
-No real student personal information enters GitHub.
+The application does not become a student information system. Student references exist only to support narrow operational needs such as:
+
+- who is in a class
+- who participates in a program
+- who attends an excursion
+- who receives coaching
+- whether a permission note is pending, submitted, approved, or declined
+- when participation began or ended
+
+A student reference uses:
+
+- a stable random internal ID
+- initials or a neutral code as the display label
+- class, program, excursion, or coaching membership
+- permission status
+- relevant participation dates
+- lifecycle status
+
+Duplicate initials use a neutral suffix such as AR1 and AR2. Codes must not contain a student number, date of birth, year group, initials plus class, or another embedded identifier.
+
+The system does not need a separate full identity database because full student names are outside scope.
+
+### 6.2 Information excluded
+
+Do not store:
+
+- full student names
+- student email addresses
+- school identifiers
+- parent or family information
+- permission forms or uploaded permission documents
+- medical, disability, counselling, wellbeing, or behaviour information
+- personal contact information
+- school reports
+- free text profiles or private notes
+- dates of birth
+- production exports or production logs containing student references
+
+Permission tracking records status only. The approved school system remains the source for submitted forms, contacts, medical requirements, consent details, and other official student information.
+
+### 6.3 Repository rule
+
+No real student reference data enters GitHub.
 
 The repository may contain:
 
@@ -308,69 +350,46 @@ The repository may contain:
 - access control code
 - migration code
 - synthetic fixtures
-- fake names and records clearly marked as synthetic
+- fake initials and codes clearly marked as synthetic
 
-The repository must not contain:
+The repository must not contain real class lists, real initials paired with classes or activities, production exports, production logs, access secrets, or encryption keys.
 
-- student names
-- student email addresses
-- school identifiers
-- class lists
-- parent information
-- medical or disability information
-- behaviour information
-- reports
-- private notes
-- uploaded student documents
-- production exports
-- production logs
-- encryption keys or access secrets
+A GitHub breach should expose source code and synthetic data only. It should not reveal a real student reference or credentials used to reach runtime data.
 
-A GitHub breach should expose source code and synthetic data only. It should not identify a real student or reveal credentials used to reach student data.
+### 6.4 Runtime protection
 
-### 6.2 Policy gate before student import
+Initials are not treated as anonymous. A class, school, program, or excursion context might make a student identifiable.
 
-No identifiable student data should be imported into the personal system until there is documented authority to store it with the selected providers.
+Runtime student references therefore require:
 
-Before enabling student identity, record:
-
-- the approved purpose
-- the approved fields
-- the approved storage provider and region
-- who has access
-- retention periods
-- deletion requirements
-- incident response responsibility
-- school approval or policy basis
-
-Encryption does not make an unapproved system approved.
-
-### 6.3 Protected student identity design
-
-If the policy gate is satisfied, student identity uses three layers.
-
-1. Shared records use an opaque generated identifier with no initials, year, class, school number, or embedded meaning.
-2. A separate protected identity store maps the opaque identifier to the minimum approved display information.
-3. Activity records for classes, programs, excursions, coaching, meetings, achievements, and tasks reference only the opaque identifier.
-
-Required controls include:
-
-- multifactor authentication
-- deny by default authorisation
-- recent reauthentication before identity reveal
-- encryption in transit and at rest
-- separate field encryption for identity data
-- keys stored outside GitHub and outside the data store
-- no identity in URLs, telemetry, analytics, error messages, or logs
-- access logs for identity reads and mutations
-- short sessions
-- rate limits
-- encrypted backups
-- tested deletion across primary data, indexes, archives, and backups
+- the existing authenticated server path
+- deny by default access
+- storage outside GitHub
+- no student references in URLs, telemetry, analytics, error messages, or logs
+- short sessions and rate limits
+- encrypted transport
+- protected backups
+- tested archive, deidentification, and deletion
 - dependency, code, and secret scanning
-- a documented breach response process
+- a documented purpose and retention period
 
-Free text on student records should be restricted. Structured, purpose bound fields reduce the chance of sensitive information accumulating without a clear need.
+The @ picker shows student codes only inside authorised teaching workflows. Other hubs do not return student results unless the current workflow explicitly permits them.
+
+### 6.5 Review before live use
+
+Before real initials or codes are entered, confirm the College permits this limited use with the selected hosting provider.
+
+The review should record:
+
+- the operational purpose
+- the exact permitted fields
+- the hosting provider
+- who has access
+- retention and deletion periods
+- incident response responsibility
+- the approved school system which remains the source of truth
+
+This is a smaller approval question than operating a full student identity database, but initials linked to classes or activities still require deliberate handling.
 
 ## 7. Lifecycle and retention
 
@@ -460,9 +479,9 @@ After the first slice proves the model:
 6. Add the dedicated job application pipeline and career dashboard.
 7. Migrate existing Knowledge connected links.
 8. Add identity duplicate detection and merge tooling.
-9. Complete privacy review and provider approval before any student migration.
+9. Complete the limited student reference review before entering real initials or codes.
 10. Import approved professional contacts and organisations with deduplication and provenance.
-11. Import only approved, current, purpose bound student identity data. Do not backfill stale student records merely to populate the interface.
+11. Add only current, purpose bound student references needed for classes, programs, excursions, coaching, or permission status. Do not import the stale Student Database and do not import full student identities.
 
 ## 11. Explicit non goals
 
@@ -474,7 +493,8 @@ After the first slice proves the model:
 - Do not make Professional Hub the technical owner of shared identities.
 - Do not copy linked records into Person or Organisation pages.
 - Do not create a separate top level ProfessionalDevelopmentEvent entity before an Event subtype proves insufficient.
-- Do not migrate real student data before the privacy and policy gate passes.
-- Do not place secrets, production data, or identifiable student fixtures in GitHub.
+- Do not turn the application into a student information system.
+- Do not store full student identities, official forms, sensitive student information, or unrestricted student notes.
+- Do not place secrets, production data, real initials, class lists, or identifiable student fixtures in GitHub.
 
 The intended result is one identity and relationship spine across the umbrella application. Each hub keeps its domain responsibilities. Universal Links connects their records. The @ picker makes those connections simple to create. Unified Person and Organisation pages make the complete history coherent to use.
