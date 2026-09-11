@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
   formatDisplayDate, formatShortMonth, formatWeekday,
-  getSydneyDateKey, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
+  getSydneyDateKey, getSydneyMinutesOfDay, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
 } from '../../apps/life/js/core/time.js';
 
 test('Sydney date key crosses the spring DST boundary by calendar date', () => {
   assert.equal(getSydneyDateKey(new Date('2026-10-03T15:30:00Z')), '2026-10-04');
   assert.equal(getSydneyTimestamp(new Date('2026-10-03T16:30:00Z')).endsWith('+11:00'), true);
+});
+
+test('Sydney minutes of day reads the wall-clock time, not UTC', () => {
+  assert.equal(getSydneyMinutesOfDay(new Date('2026-07-30T02:15:00Z')), 12 * 60 + 15);
+  assert.equal(getSydneyMinutesOfDay(new Date('2026-10-03T23:40:00Z')), 10 * 60 + 40);
 });
 
 test('Sydney timestamp uses standard time in July', () => {

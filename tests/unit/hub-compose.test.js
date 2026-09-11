@@ -58,12 +58,11 @@ test('readHubCompose is null on a plain form', () => {
   assert.equal(readHubCompose({ matches() { return false; } }), null);
 });
 
-test('kit, chrome, Life, Teaching, and Knowledge all load hub-compose', async () => {
+test('kit, chrome, Teaching, and Knowledge all load hub-compose; Life no longer does', async () => {
   const css = await readFile(new URL('../../packages/design-kit/hub-compose.css', import.meta.url), 'utf8');
   const chrome = await readFile(new URL('../../packages/design-kit/chrome.css', import.meta.url), 'utf8');
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   const main = await readFile(new URL('../../apps/life/js/app/main.js', import.meta.url), 'utf8');
-  const controller = await readFile(new URL('../../apps/life/js/app/app-controller.js', import.meta.url), 'utf8');
   const sw = await readFile(new URL('../../apps/life/service-worker.js', import.meta.url), 'utf8');
   const teaching = await readFile(new URL('../../apps/teaching/src/design/tokens.css', import.meta.url), 'utf8');
   const knowledge = await readFile(new URL('../../apps/knowledge/src/tokens.css', import.meta.url), 'utf8');
@@ -74,18 +73,13 @@ test('kit, chrome, Life, Teaching, and Knowledge all load hub-compose', async ()
   assert.match(css, /prefers-reduced-motion/);
   assert.doesNotMatch(css, /\.hub-compose__posted|\.hub-compose__footer/);
   assert.match(chrome, /hub-compose\.css/);
-  assert.match(html, /packages\/design-kit\/hub-compose\.css/);
-  assert.match(html, /id="clare-dump-form"/);
-  assert.match(html, /data-hub-compose/);
-  assert.match(html, /id="clare-dump-text"/);
-  assert.match(html, /id="clare-dump-protocol"/);
-  assert.match(html, /id="clare-brief-button"/);
-  assert.doesNotMatch(html, /Write a dump/);
-  assert.doesNotMatch(html, /Will be posted/);
+  // Life's home page replaced Dump-for-Clare with real per-hub quick-add widgets
+  // (Teaching agenda, Knowledge capture, Tasks checklist) that don't use hub-compose.
+  assert.doesNotMatch(html, /packages\/design-kit\/hub-compose\.css/);
+  assert.doesNotMatch(html, /id="clare-dump-form"/);
+  assert.doesNotMatch(html, /data-hub-compose\b/);
   assert.match(main, /startHubMotion/);
-  assert.match(controller, /readHubCompose/);
-  assert.match(controller, /compose/);
-  assert.match(sw, /hub-compose\.css/);
+  assert.doesNotMatch(sw, /hub-compose\.css/);
   assert.match(sw, /hub-compose\.js/);
   assert.match(teaching, /hub-compose\.css/);
   assert.match(knowledge, /hub-compose\.css/);
