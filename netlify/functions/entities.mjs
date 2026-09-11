@@ -2,35 +2,9 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { assertRegisteredEntityRef, formatEntityRef } from './_shared/entity-ref.mjs';
-import {
-  assertLifecycleTransitionAllowed,
-  applyLifecycleTransition,
-  writeLifecycleEvent
-} from './_shared/entity-lifecycle.mjs';
-import {
-  generateOrganisationId,
-  generatePersonId,
-  IDENTITY_SCHEMA_VERSION,
-  buildIdentityIndexRecord,
-  displayLabelFor,
-  parseOrganisationRecord,
-  parsePersonRecord,
-  redactIdentityRecord,
-  validateOrganisationCreateInput,
-  validateOrganisationFieldUpdate,
-  validatePersonCreateInput,
-  validatePersonFieldUpdate
-} from './_shared/identity-schema.mjs';
-import {
-  defaultGetUniversalLinkStore,
-  getJSON,
-  organisationIndexKey,
-  organisationKey,
-  personIndexKey,
-  personKey,
-  setJSON,
-  listPersonIndexKeys
-} from './_shared/universal-link-blobs.mjs';
+import { redactIdentityRecord } from './_shared/identity-schema.mjs';
+import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { createIdentityRepository } from './_shared/identity-repository.mjs';
 
 export const config = { path: '/api/entities' };
 
@@ -42,6 +16,11 @@ export const config = { path: '/api/entities' };
 // default (implementation programme, resolver rule 4: archived entities
 // resolve "for deliberate overview and archive workflows" — this handler
 // is exactly that).
+//
+// This handler validates the request shape and dispatches to
+// `identity-repository.mjs`, the canonical identity write service —
+// it does not coordinate the entity/index/event/self-pointer writes
+// itself (correction B4).
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
 // Lifecycle actions map to the target `lifecycle_status`; `update` is the
@@ -73,38 +52,10 @@ function toErrorResponse(error) {
   const code = typeof error?.code === 'string' ? error.code : 'internal_error';
   const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
   const retryable = Boolean(error?.retryable) || status === 503;
-  return errorResponse(status, code, message, retryable);
-}
-
-function notFound() {
-  return Object.assign(new Error('Entity not found.'), { status: 404, code: 'entity_not_found' });
-}
-
-async function loadEntity(store, ref) {
-  if (ref.kind === 'person') {
-    const record = parsePersonRecord(await getJSON(store, personKey(ref.id)));
-    if (!record) throw notFound();
-    return record;
-  }
-  const record = parseOrganisationRecord(await getJSON(store, organisationKey(ref.id)));
-  if (!record) throw notFound();
-  return record;
-}
-
-async function writeEntity(store, kind, record) {
-  const key = kind === 'person' ? personKey(record.id) : organisationKey(record.id);
-  const indexKey = kind === 'person' ? personIndexKey(record.id) : organisationIndexKey(record.id);
-  await setJSON(store, key, record);
-  await setJSON(store, indexKey, buildIdentityIndexRecord({
-    id: record.id,
-    kind,
-    displayLabel: displayLabelFor(record),
-    sortName: kind === 'person' ? record.sort_name : null,
-    lifecycleStatus: record.lifecycle_status,
-    isSelf: kind === 'person' ? record.is_self : false,
-    updatedAt: record.updated_at
-  }));
-  return record;
+  const data = (error?.operation_id || error?.entity_id)
+    ? { operation_id: error.operation_id ?? null, entity_id: error.entity_id ?? null }
+    : undefined;
+  return errorResponse(status, code, message, retryable, {}, data);
 }
 
 // The safe projection this API returns — the redacted record plus its
@@ -112,20 +63,6 @@ async function writeEntity(store, kind, record) {
 // sort_name/legal_name/aliases for a deleted or deidentified record.
 function projectEntity(kind, record) {
   return { ref: formatEntityRef({ namespace: 'shared', kind, id: record.id }), ...redactIdentityRecord(record) };
-}
-
-async function assertNoActiveSelfPerson(store) {
-  const keys = await listPersonIndexKeys(store);
-  for (const key of keys) {
-    // eslint-disable-next-line no-await-in-loop
-    const entry = await getJSON(store, key);
-    if (entry?.is_self && entry?.lifecycle_status === 'active') {
-      throw Object.assign(new Error('An active self identity already exists.'), {
-        status: 409,
-        code: 'self_identity_exists'
-      });
-    }
-  }
 }
 
 function readRef(url) {
@@ -149,15 +86,17 @@ export function createEntitiesHandler(deps = {}) {
   // and lifecycle event timestamps, and needs to be independently
   // deterministic for tests.
   const identityNow = deps.identityNow ?? (() => new Date().toISOString());
+  const createRepository = deps.createIdentityRepository ?? createIdentityRepository;
 
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
     const url = new URL(request.url);
+    const repo = createRepository({ store, now: identityNow });
 
     try {
       if (request.method === 'GET') {
         const ref = readRef(url);
-        const record = await loadEntity(store, ref);
+        const record = await repo.loadEntity(ref);
         return withCors(okResponse(200, projectEntity(ref.kind, record)), request, env);
       }
 
@@ -170,44 +109,8 @@ export function createEntitiesHandler(deps = {}) {
           return withCors(errorResponse(400, 'unsupported_entity_kind', 'kind must be "person" or "organisation".', false), request, env);
         }
 
-        const now = identityNow();
-        if (kind === 'person') {
-          const input = validatePersonCreateInput(parsed.value);
-          if (input.is_self) await assertNoActiveSelfPerson(store);
-          const record = {
-            schema_version: IDENTITY_SCHEMA_VERSION,
-            id: generatePersonId(),
-            kind: 'person',
-            display_name: input.display_name,
-            sort_name: input.sort_name,
-            aliases: input.aliases,
-            lifecycle_status: 'active',
-            is_self: input.is_self,
-            retention_reason: null,
-            retention_review_at: null,
-            created_at: now,
-            updated_at: now
-          };
-          await writeEntity(store, 'person', record);
-          return withCors(okResponse(201, projectEntity('person', record)), request, env);
-        }
-
-        const input = validateOrganisationCreateInput(parsed.value);
-        const record = {
-          schema_version: IDENTITY_SCHEMA_VERSION,
-          id: generateOrganisationId(),
-          kind: 'organisation',
-          display_name: input.display_name,
-          legal_name: input.legal_name,
-          aliases: input.aliases,
-          lifecycle_status: 'active',
-          retention_reason: null,
-          retention_review_at: null,
-          created_at: now,
-          updated_at: now
-        };
-        await writeEntity(store, 'organisation', record);
-        return withCors(okResponse(201, projectEntity('organisation', record)), request, env);
+        const { record } = await repo.createIdentity({ kind, input: parsed.value });
+        return withCors(okResponse(201, projectEntity(kind, record)), request, env);
       }
 
       if (request.method === 'PATCH') {
@@ -217,15 +120,8 @@ export function createEntitiesHandler(deps = {}) {
         if (parsed.error) return withCors(parsed.error, request, env);
         assertNoAccessFields(parsed.value);
 
-        const record = await loadEntity(store, ref);
-        const now = identityNow();
-
         if (action === 'update') {
-          const patch = ref.kind === 'person'
-            ? validatePersonFieldUpdate(parsed.value)
-            : validateOrganisationFieldUpdate(parsed.value);
-          const updated = { ...record, ...patch, updated_at: now };
-          await writeEntity(store, ref.kind, updated);
+          const updated = await repo.updateFields({ ref, patch: parsed.value });
           return withCors(okResponse(200, projectEntity(ref.kind, updated)), request, env);
         }
 
@@ -234,27 +130,11 @@ export function createEntitiesHandler(deps = {}) {
           return withCors(errorResponse(400, 'invalid_action', 'Unsupported action.', false), request, env);
         }
 
-        assertLifecycleTransitionAllowed({
-          kind: ref.kind,
-          fromStatus: record.lifecycle_status,
+        const updated = await repo.transitionLifecycle({
+          ref,
           toStatus,
-          isSelf: ref.kind === 'person' ? record.is_self : false,
           retentionReason: parsed.value.retention_reason,
           retentionReviewAt: parsed.value.retention_review_at
-        });
-        const updated = applyLifecycleTransition({
-          record,
-          toStatus,
-          retentionReason: parsed.value.retention_reason ?? null,
-          retentionReviewAt: parsed.value.retention_review_at ?? null,
-          now
-        });
-        await writeEntity(store, ref.kind, updated);
-        await writeLifecycleEvent(store, {
-          entityRef: formatEntityRef({ namespace: 'shared', kind: ref.kind, id: ref.id }),
-          fromStatus: record.lifecycle_status,
-          toStatus,
-          now
         });
         return withCors(okResponse(200, projectEntity(ref.kind, updated)), request, env);
       }
