@@ -16,6 +16,22 @@ A **bold** and *italic* line.
     expect(html).toContain("<li>one</li>");
   });
 
+  it("renders level four to six Markdown headings instead of exposing their hashes", () => {
+    const html = renderMarkdown(`### What it means
+
+#### 1. What cerebrosides are
+
+##### Supporting detail
+
+###### Final detail
+`);
+    expect(html).toContain("<h5>What it means</h5>");
+    expect(html).toContain("<h6>1. What cerebrosides are</h6>");
+    expect(html).toContain("<h6>Supporting detail</h6>");
+    expect(html).toContain("<h6>Final detail</h6>");
+    expect(html).not.toContain("####");
+  });
+
   it("renders pipe tables", () => {
     const html = renderMarkdown(`## What the archive holds
 
