@@ -180,6 +180,101 @@ function shareRowsFromColumns(items, copyFor) {
   }));
 }
 
+function formatGoalWeeks(goal) {
+  if (goal.kind === 'frequency') {
+    const met = (goal.weeks ?? []).filter(week => week.met).length;
+    return `${goal.current ?? '—'} / week · ${met} of 4 weeks at 3`;
+  }
+  const met = (goal.weeks ?? []).filter(week => week.met).length;
+  return `${met} / 3 safe weeks`;
+}
+
+function renderFitnessGoals(root, goals) {
+  const card = showCard(root, '#fitness-goals-card', goals?.length >= 1);
+  const host = root.querySelector('#fitness-goals');
+  if (!card || !host) return;
+  host.replaceChildren();
+  for (const goal of goals) {
+    const item = root.createElement('article');
+    item.className = 'fitness-goal';
+    const label = root.createElement('strong');
+    label.textContent = goal.label;
+    const value = root.createElement('span');
+    value.className = 'fitness-goal__value';
+    const detail = root.createElement('span');
+    detail.className = 'metric-caption';
+    if (goal.kind === 'e1rm') {
+      value.textContent = goal.current == null ? 'No logged e1RM' : formatKg(goal.current);
+      detail.textContent = goal.current == null
+        ? `${formatKg(goal.target)} by ${formatDisplayDate(goal.deadline)}`
+        : `${formatKg(goal.remaining)} to go · ${formatKg(goal.target)} by ${formatDisplayDate(goal.deadline)}`;
+      const track = root.createElement('span');
+      track.className = 'fitness-goal__track';
+      const fill = root.createElement('i');
+      setWidth(fill, goal.progress ?? 0);
+      track.append(fill);
+      item.append(label, value, detail, track);
+    } else {
+      value.textContent = formatGoalWeeks(goal);
+      detail.textContent = goal.kind === 'frequency'
+        ? '26-week average toward 3 sessions/week, sustained for 4 weeks.'
+        : 'Weekly tonnage must stay out of the high ACWR band for 3 straight weeks.';
+      const weeks = root.createElement('div');
+      weeks.className = 'fitness-goal__weeks';
+      for (const week of goal.weeks ?? []) {
+        const mark = root.createElement('i');
+        mark.className = 'fitness-goal__week';
+        mark.dataset.met = String(Boolean(week.met));
+        if (week.band) mark.dataset.band = week.band;
+        mark.setAttribute('title', `${formatDisplayDate(week.date)} · ${week.value ?? week.band ?? 'no baseline'}`);
+        weeks.append(mark);
+      }
+      item.append(label, value, detail, weeks);
+    }
+    host.append(item);
+  }
+}
+
+function appendRadialLabel(root, svg, x, y, text) {
+  const label = createSvg(root, 'text');
+  if (!label) return;
+  label.setAttribute('x', String(x));
+  label.setAttribute('y', String(y));
+  label.setAttribute('text-anchor', 'middle');
+  label.setAttribute('class', 'fitness-viz__label');
+  label.textContent = text;
+  svg.append(label);
+}
+
+function renderTrainingRhythm(root, when, rhythm) {
+  const ready = Number(when?.count) >= 2 || Number(rhythm?.count) >= 2;
+  const card = showCard(root, '#fitness-training-radial-card', ready);
+  const svg = root.querySelector('#fitness-training-radial');
+  const reads = [when?.read, rhythm?.read].filter(Boolean);
+  setText(root, '[data-fitness="training-rhythm-read"]', reads.join(' · '));
+  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  clearSvg(svg);
+  svg.setAttribute('viewBox', '0 0 160 160');
+  const tip = ensureTip(root, card);
+  const timeItems = (when?.buckets ?? []).map((bucket, index) => ({
+    ...bucket,
+    colour: CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]
+  }));
+  const rhythmItems = (rhythm?.weeks ?? []).map((week, index) => ({
+    key: week.key,
+    label: formatDisplayDate(week.key).slice(0, 5),
+    value: week.value,
+    colour: week.value > 0 ? 'var(--wave)' : 'var(--shore)',
+    index
+  }));
+  paintDonut(root, svg, rhythmItems, { radius: 62, tip, prefix: 'Monthly rhythm · ' });
+  paintDonut(root, svg, timeItems, { radius: 40, tip, prefix: 'Time of day · ' });
+  appendRadialLabel(root, svg, 80, 75, when?.typicalTime ?? `${rhythm?.count ?? 0} sessions`);
+  appendRadialLabel(root, svg, 80, 89, 'typical start');
+  timeItems.forEach((item, index) => appendRadialLabel(root, svg, 18 + index * 41, 150, `${item.label} ${item.value}`));
+  rhythmItems.forEach((item, index) => appendRadialLabel(root, svg, 20 + index * 30, 12, `${item.label} ${item.value}`));
+}
+
 function renderWhen(root, when) {
   const ready = Number(when?.count) >= 2 && when?.buckets?.length;
   const card = showCard(root, '#fitness-clock-card', ready);
@@ -427,9 +522,9 @@ function renderTwoRing(root, current, prior) {
   })));
 }
 
-function renderGauge(root, cardSelector, svgSelector, value, target, label) {
+function renderGauge(root, cardSelector, svgSelector, value, target, label, { manageCard = true } = {}) {
   const ready = Number.isFinite(value);
-  const card = showCard(root, cardSelector, ready);
+  const card = manageCard ? showCard(root, cardSelector, ready) : root.querySelector(cardSelector);
   if (label) setText(root, label.selector, ready ? label.text : '');
   const svg = root.querySelector(svgSelector);
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
@@ -588,10 +683,10 @@ function renderE1rmBands(root, lifts) {
   animateAreaReveal(svg);
 }
 
-function renderPill(root, gauge) {
-  const card = showCard(root, '#fitness-pill-card', Boolean(gauge));
+function renderPill(root, gauge, { cardSelector = '#fitness-pill-card', manageCard = true } = {}) {
+  const card = manageCard ? showCard(root, cardSelector, Boolean(gauge)) : root.querySelector(cardSelector);
   const svg = root.querySelector('#fitness-pill-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  if (!gauge || !card || !svg || typeof root.createElementNS !== 'function') return;
   const pct = Math.min(1.6, Math.max(0, gauge.pct / 100));
   clearSvg(svg);
   svg.setAttribute('viewBox', '0 0 48 120');
@@ -633,8 +728,8 @@ function renderYear(root, yearMonths) {
   )), ensureTip(root, card));
 }
 
-function renderRepMix(root, items, read) {
-  const card = showCard(root, '#fitness-rep-card', items?.length >= 1);
+function renderRepMix(root, items, read, { cardSelector = '#fitness-rep-card', manageCard = true } = {}) {
+  const card = manageCard ? showCard(root, cardSelector, items?.length >= 1) : root.querySelector(cardSelector);
   const svg = root.querySelector('#fitness-rep-mix');
   if (!card) return;
   setText(root, '[data-fitness="rep-read"]', read ?? '');
@@ -735,9 +830,8 @@ function renderEfficiency(root, weeks) {
 export function renderFitnessCharts(root, charts = {}) {
   setText(root, '[data-fitness="longest-streak"]', String(charts.longestStreak ?? 0));
 
-  renderWhen(root, charts.trainWhen);
-  renderRhythm(root, charts.monthRhythm);
-  renderE1rmBest(root, charts.e1rmVsBest);
+  renderFitnessGoals(root, charts.fitnessGoals);
+  renderTrainingRhythm(root, charts.trainWhen, charts.monthRhythm);
   renderBump(root, charts.bumpRanks);
   renderStream(root, charts.regionStream);
   renderPainHeat(root, charts.painHeat);
@@ -746,21 +840,24 @@ export function renderFitnessCharts(root, charts = {}) {
   const push = charts.pushPull?.find(item => item.key === 'push')?.value ?? 0;
   const pull = charts.pushPull?.find(item => item.key === 'pull')?.value ?? 0;
   const pushTotal = push + pull;
-  renderGauge(root, '#fitness-push-pull-card', '#fitness-push-gauge', pushTotal ? push / pushTotal : null, 0.5, {
-    selector: '[data-fitness="push-read"]',
-    text: pushTotal ? `${formatKg(push)} push · ${formatKg(pull)} pull` : ''
-  });
   const trained = charts.restCounts?.trained;
   const days = charts.restCounts?.days || 30;
   const weekTarget = charts.weekTarget ?? 4;
-  renderGauge(root, '#fitness-rest-card', '#fitness-rest-gauge', Number.isFinite(trained) && trained > 0 ? trained / days : null, weekTarget / 7, {
+  showCard(root, '#fitness-balance-card', pushTotal > 0 || (Number.isFinite(trained) && trained > 0));
+  renderGauge(root, '#fitness-balance-card', '#fitness-push-gauge', pushTotal ? push / pushTotal : null, 0.5, {
+    selector: '[data-fitness="push-read"]',
+    text: pushTotal ? `${formatKg(push)} push · ${formatKg(pull)} pull` : ''
+  }, { manageCard: false });
+  renderGauge(root, '#fitness-balance-card', '#fitness-rest-gauge', Number.isFinite(trained) && trained > 0 ? trained / days : null, weekTarget / 7, {
     selector: '[data-fitness="rest-read"]',
     text: Number.isFinite(trained) ? `${trained} trained / ${days} days` : ''
-  });
-  renderE1rmBands(root, charts.e1rmBands);
-  renderPill(root, charts.sessionGauge);
+  }, { manageCard: false });
+  // The full-width rank view carries strength progress; the two near-duplicate
+  // e1RM comparison cards intentionally stay out of the dashboard.
+  showCard(root, '#fitness-session-shape-card', Boolean(charts.sessionGauge) || charts.repRanges?.length >= 1);
+  renderPill(root, charts.sessionGauge, { cardSelector: '#fitness-session-shape-card', manageCard: false });
   renderYear(root, charts.yearMonths);
-  renderRepMix(root, charts.repRanges, charts.repRead);
+  renderRepMix(root, charts.repRanges, charts.repRead, { cardSelector: '#fitness-session-shape-card', manageCard: false });
   renderSparks(root, charts.sessionReadings, {
     duration: charts.durationSeries,
     distance: charts.distanceSeries,
