@@ -46,6 +46,11 @@ const TRAIN_BANDS = [
 ];
 const PUSH_NAME = /press|dip|push|fly|pec|bench/i;
 const PULL_NAME = /row|pull|curl|lat|chin/i;
+const E1RM_GOALS = [
+  { id: 'chest-e1rm', label: 'Chest e1RM', exercise: 'Bar Press', target: 65 },
+  { id: 'arms-e1rm', label: 'Arms e1RM', exercise: 'Cable Bar Wide Grip Curl', target: 60 },
+  { id: 'back-e1rm', label: 'Back e1RM', exercise: 'Reverse Wide Grip Bent Over Row', target: 47 }
+];
 
 function completedRecords(events, from, to) {
   return (events ?? [])
@@ -300,6 +305,102 @@ export function acwrBand(ratio) {
   if (ratio > ACWR_HIGH) return 'high';
   if (ratio < ACWR_LOW) return 'low';
   return 'medium';
+}
+
+function roundOne(value) {
+  return Number.isFinite(value) ? Math.round(value * 10) / 10 : null;
+}
+
+function currentExerciseE1rm(records, exerciseName) {
+  const key = normalizeExerciseName(exerciseName);
+  let latest = null;
+  for (const record of records ?? []) {
+    for (const exercise of record.exercises ?? []) {
+      if (normalizeExerciseName(exercise.name) !== key) continue;
+      const set = bestSet(exercise);
+      if (!set) continue;
+      if (!latest || record.date > latest.date || (record.date === latest.date && set.e1rm > latest.value)) {
+        latest = { date: record.date, value: set.e1rm };
+      }
+    }
+  }
+  return latest;
+}
+
+function goalDeadline(date) {
+  return `${String(date).slice(0, 4)}-10-31`;
+}
+
+function buildFrequencyGoal(records, date, average) {
+  const endWeek = getSydneyWeekStart(date);
+  const weeks = [];
+  for (let offset = 3; offset >= 0; offset -= 1) {
+    const week = addCalendarDays(endWeek, -7 * offset);
+    const value = new Set(
+      (records ?? [])
+        .filter(record => record.date >= week && record.date <= addCalendarDays(week, 6) && record.date <= date)
+        .map(record => record.date)
+    ).size;
+    weeks.push({ date: week, value, met: value >= 3 });
+  }
+  return {
+    id: 'frequency',
+    label: 'Training frequency',
+    kind: 'frequency',
+    current: roundOne(average),
+    average: roundOne(average),
+    target: 3,
+    weeks,
+    complete: weeks.every(week => week.met)
+  };
+}
+
+function buildLoadConsistencyGoal(records, date) {
+  const points = buildLoadHorizon(records, date)[0]?.points ?? [];
+  const weeks = points.slice(-3).map(point => ({
+    date: point.date,
+    value: point.value,
+    ratio: point.ratio,
+    band: point.band,
+    met: Number.isFinite(point.ratio) && point.band !== 'high'
+  }));
+  return {
+    id: 'load-consistency',
+    label: 'Load consistency',
+    kind: 'load',
+    target: 3,
+    weeks,
+    complete: weeks.length === 3 && weeks.every(week => week.met)
+  };
+}
+
+export function buildFitnessGoals({ events, date, workoutsPerWeek = null } = {}) {
+  const records = (events ?? [])
+    .map(event => event?.record ?? event)
+    .filter(record => record?.status === 'completed' && record.date && record.date <= date);
+  const deadline = goalDeadline(date);
+  const e1rmGoals = E1RM_GOALS.map(goal => {
+    const latest = currentExerciseE1rm(records, goal.exercise);
+    const current = roundOne(latest?.value);
+    const remaining = current == null ? goal.target : Math.max(0, roundOne(goal.target - current));
+    return {
+      ...goal,
+      kind: 'e1rm',
+      current,
+      remaining,
+      progress: current == null ? 0 : Math.min(100, Math.round((current / goal.target) * 100)),
+      date: latest?.date ?? null,
+      deadline,
+      complete: current != null && current >= goal.target
+    };
+  });
+  return [
+    e1rmGoals[0],
+    e1rmGoals[1],
+    buildFrequencyGoal(records, date, workoutsPerWeek),
+    e1rmGoals[2],
+    buildLoadConsistencyGoal(records, date)
+  ];
 }
 
 function trainBandForMinutes(minutes) {
@@ -661,7 +762,8 @@ export function buildFitnessCharts({
   date,
   weekCompletedCount = 0,
   weekTarget = 4,
-  monthDates = []
+  monthDates = [],
+  workoutsPerWeek = null
 } = {}) {
   const from = monthDates[0] ?? addCalendarDays(date, -(MONTH_DAYS - 1));
   const windowDates = monthDates.length ? monthDates : enumerateDateKeys(from, date);
@@ -749,6 +851,7 @@ export function buildFitnessCharts({
     yearMonths: buildYearMonths(events, date),
     year: Number(String(date).slice(0, 4)),
     repRead: buildRepRead(buildRepRanges(records)),
-    weekTarget
+    weekTarget,
+    fitnessGoals: buildFitnessGoals({ events, date, workoutsPerWeek })
   };
 }
