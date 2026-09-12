@@ -21,7 +21,7 @@ export const ENTITY_REF_NAMESPACES = new Set([
 // a real workflow (implementation programme, "Absolute exclusions" #11).
 export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
-  professional: new Set(['communication']),
+  professional: new Set(['communication', 'meeting', 'event']),
   tasks: new Set(['task', 'project']),
   teaching: new Set(['unit']),
   knowledge: new Set(['page']),

@@ -13,29 +13,37 @@ const organisation = parseEntityRef('shared:organisation:organisation_unsw');
 const task = parseEntityRef('tasks:task:task_email_seth');
 const communication = parseEntityRef('professional:communication:communication_001');
 
-test('lists the Slice 1–7 relationship declarations with correct inverse labels', () => {
+test('lists the Slice 1–9 relationship declarations with correct inverse labels', () => {
   const keys = listRelationshipDeclarations().map(decl => decl.key).sort();
   assert.deepEqual(keys, [
     'about_person',
+    'attendee',
     'collaborator',
     'contact',
     'employee_at',
     'follow_up',
     'follows_from',
+    'learning_for',
     'member_of',
+    'preparation',
+    'provider',
     'recipient',
-    'related_to'
+    'related_to',
+    'venue'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
   assert.equal(getRelationshipDeclaration('collaborator').inverse_label, 'collaborates_on');
   assert.equal(getRelationshipDeclaration('contact').inverse_label, 'contacted_for_task');
   assert.equal(getRelationshipDeclaration('recipient').inverse_label, 'received_communication');
   assert.equal(getRelationshipDeclaration('related_to').inverse_label, 'related_to');
+  assert.equal(getRelationshipDeclaration('attendee').inverse_label, 'attends');
+  assert.equal(getRelationshipDeclaration('preparation').inverse_label, 'has_preparation');
+  assert.equal(getRelationshipDeclaration('learning_for').inverse_label, 'has_learning_task');
 });
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 9);
+  assert.equal(projected.length, 14);
   const contact = projected.find(decl => decl.key === 'contact');
   assert.ok(contact);
   assert.deepEqual(Object.keys(contact).sort(), [
@@ -50,6 +58,8 @@ test('projectRelationshipRegistry exposes every declaration without duplicate_fi
     'temporal_mode'
   ]);
   assert.equal('duplicate_fields' in contact, false);
+  const attendee = projected.find(decl => decl.key === 'attendee');
+  assert.deepEqual(attendee.allowed_roles, ['chair', 'minute_taker']);
 });
 
 test('accepts a well formed period relationship', () => {
@@ -197,5 +207,94 @@ test('rejects role text for a relationship whose role_mode is none', () => {
       role: 'lead'
     }),
     error => error.code === 'role_not_permitted'
+  );
+});
+
+const meeting = parseEntityRef('professional:meeting:meeting_001');
+const event = parseEntityRef('professional:event:event_001');
+
+test('attendee accepts null, chair, and minute_taker roles only', () => {
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: meeting,
+      targetRef: person,
+      relationshipType: 'attendee',
+      role: null,
+      occurredAt: '2026-09-12T10:00:00.000Z'
+    }).key,
+    'attendee'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: meeting,
+      targetRef: person,
+      relationshipType: 'attendee',
+      role: 'chair',
+      occurredAt: '2026-09-12T10:00:00.000Z'
+    }).key,
+    'attendee'
+  );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: meeting,
+        targetRef: person,
+        relationshipType: 'attendee',
+        role: 'observer',
+        occurredAt: '2026-09-12T10:00:00.000Z'
+      }),
+    (error) => error.code === 'invalid_role'
+  );
+});
+
+test('preparation, venue, provider, learning_for, and extended follow_up/related_to accept Slice 9 kinds', () => {
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: task,
+      targetRef: meeting,
+      relationshipType: 'preparation'
+    }).key,
+    'preparation'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: task,
+      targetRef: meeting,
+      relationshipType: 'follow_up'
+    }).key,
+    'follow_up'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: event,
+      targetRef: organisation,
+      relationshipType: 'venue'
+    }).key,
+    'venue'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: event,
+      targetRef: organisation,
+      relationshipType: 'provider'
+    }).key,
+    'provider'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: task,
+      targetRef: event,
+      relationshipType: 'learning_for'
+    }).key,
+    'learning_for'
+  );
+  const page = parseEntityRef('knowledge:page:page_seed01');
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: event,
+      targetRef: page,
+      relationshipType: 'related_to'
+    }).key,
+    'related_to'
   );
 });

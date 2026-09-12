@@ -28,6 +28,12 @@ export const CALENDAR_SOURCES = [
     label: 'Tasks',
     kind: 'board',
     status: 'live'
+  },
+  {
+    id: 'professional',
+    label: 'Professional',
+    kind: 'schedule-projections',
+    status: 'live'
   }
 ];
 

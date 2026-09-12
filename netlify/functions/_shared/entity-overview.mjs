@@ -62,6 +62,8 @@ function toTimelineEntry({ link, endpoint, direction }) {
 function bucketFor(linkedRecords, kind) {
   if (kind === 'task') return linkedRecords.tasks;
   if (kind === 'communication') return linkedRecords.communications;
+  if (kind === 'meeting') return linkedRecords.meetings;
+  if (kind === 'event') return linkedRecords.events;
   if (kind === 'organisation') return linkedRecords.organisations;
   if (kind === 'person') return linkedRecords.people;
   return null;
@@ -111,7 +113,14 @@ export async function assembleEntityOverview(refInput, deps = {}) {
       return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-  const linked_records = { tasks: [], communications: [], organisations: [], people: [] };
+  const linked_records = {
+    tasks: [],
+    communications: [],
+    meetings: [],
+    events: [],
+    organisations: [],
+    people: []
+  };
   const seen = new Set();
   for (const entry of entries) {
     const bucket = bucketFor(linked_records, entry.endpoint.kind);
