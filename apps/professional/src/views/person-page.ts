@@ -5,13 +5,14 @@ import type { EntityOverview, PersonRecord } from '@/domain/types';
 export async function renderPersonPage(
   canvas: HTMLElement,
   personId: string,
-  options: { onTitleReady?: (title: string) => void } = {}
+  options: { onTitleReady?: (title: string) => void; isCurrent?: () => boolean } = {}
 ): Promise<void> {
   await renderEntityDetail(canvas, {
     ref: personRef(personId),
     backHref: '#/people',
     backLabel: 'Back to People',
     onTitleReady: options.onTitleReady,
+    isCurrent: options.isCurrent,
     renderExtraFields: (overview: EntityOverview, host: HTMLElement) => {
       const person = overview.entity as PersonRecord;
       if (person.sort_name) {

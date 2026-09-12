@@ -1,4 +1,4 @@
-import { isValidOrganisationId, isValidPersonId } from '@/domain/ids';
+import { isValidCommunicationId, isValidOrganisationId, isValidPersonId } from '@/domain/ids';
 
 export type RailViewId = 'people' | 'organisations' | 'relationships' | 'communications';
 
@@ -9,15 +9,15 @@ export type Route =
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
   | { name: 'communications' }
+  | { name: 'communication-new' }
+  | { name: 'communication'; id: string }
   | { name: 'not-found'; path: string };
 
 /**
  * Parses the hash into a route, validating any decoded identifier against
  * the same shape the server contracts require *before* it is ever used to
  * build a request URL. A route segment containing a path separator or an
- * encoded traversal sequence never produces a valid `person`/`organisation`
- * route — it falls through to `not-found` instead, exactly like any other
- * unrecognised path.
+ * encoded traversal sequence never produces a valid detail route.
  */
 export function parseRoute(hash: string = location.hash): Route {
   const raw = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
@@ -31,6 +31,10 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
 
+  if (segments.length === 2 && segments[0] === 'communication' && segments[1] === 'new') {
+    return { name: 'communication-new' };
+  }
+
   if (segments.length === 2 && segments[0] === 'person') {
     const id = safeDecode(segments[1]!);
     if (id && isValidPersonId(id)) return { name: 'person', id };
@@ -43,13 +47,16 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
 
+  if (segments.length === 2 && segments[0] === 'communication') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidCommunicationId(id)) return { name: 'communication', id };
+    return { name: 'not-found', path };
+  }
+
   return { name: 'not-found', path };
 }
 
 function safeDecode(segment: string): string | null {
-  // A raw, un-decoded path separator (encoded or not) never survives to
-  // look like a valid id — reject before decoding, and again after, since
-  // decoding itself can introduce one (`%2F` -> `/`, `%2E%2E` -> `..`).
   if (segment.includes('/') || segment.includes('\\')) return null;
   let decoded: string;
   try {
@@ -65,7 +72,13 @@ export function railHighlightFor(route: Route): RailViewId | null {
   if (route.name === 'people' || route.name === 'person') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
-  if (route.name === 'communications') return 'communications';
+  if (
+    route.name === 'communications' ||
+    route.name === 'communication' ||
+    route.name === 'communication-new'
+  ) {
+    return 'communications';
+  }
   return null;
 }
 
@@ -75,4 +88,8 @@ export function personRoute(id: string): string {
 
 export function organisationRoute(id: string): string {
   return `#/organisation/${encodeURIComponent(id)}`;
+}
+
+export function communicationRoute(id: string): string {
+  return `#/communication/${encodeURIComponent(id)}`;
 }
