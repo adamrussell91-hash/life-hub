@@ -143,6 +143,30 @@ test('serves remounted hub directory indexes and SPA fallbacks', async t => {
   assert.match(await deep.text(), /Teaching Hub/);
 });
 
+test('serves the remounted Professional Hub directory index and a deep path', async t => {
+  const root = await mkdtemp(join(tmpdir(), 'life-hub-spa-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(join(root, 'professional'));
+  await writeFile(join(root, 'professional', 'index.html'), '<title>Professional Hub</title>');
+  const server = createStaticServer({ root, apiRoot: projectRoot });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  const index = await fetch(`${baseUrl}/professional/`);
+  assert.equal(index.status, 200);
+  assert.match(await index.text(), /Professional Hub/);
+
+  const noTrailingSlash = await fetch(`${baseUrl}/professional`);
+  assert.equal(noTrailingSlash.status, 200);
+  assert.match(await noTrailingSlash.text(), /Professional Hub/);
+
+  const deep = await fetch(`${baseUrl}/professional/person/person_00000000-0000-4000-8000-000000000001`);
+  assert.equal(deep.status, 200);
+  assert.match(await deep.text(), /Professional Hub/);
+});
+
 function readConfigurationValue(configuration, section, key) {
   let inSection = false;
   for (const line of configuration.split(/\r?\n/)) {

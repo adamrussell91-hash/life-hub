@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:apps && node scripts/prepare-web.mjs",
-    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks",
+    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks && npm run build:professional",
     "build:teaching": "node scripts/build-spa.mjs teaching",
     "build:knowledge": "node scripts/build-spa.mjs knowledge",
     "build:tasks": "node scripts/build-spa.mjs tasks",
+    "build:professional": "node scripts/build-spa.mjs professional",
     "generate:auth": "node scripts/generate-auth-secrets.mjs",
     "prepare:web": "node scripts/prepare-web.mjs",
     "dev": "node scripts/prepare-web.mjs && node scripts/serve.mjs",

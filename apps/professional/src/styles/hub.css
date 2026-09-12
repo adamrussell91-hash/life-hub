@@ -1,0 +1,274 @@
+/* Professional Hub domain styles — chrome comes from packages/design-kit. */
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  z-index: 200;
+  padding: 0.4rem 0.7rem;
+  transform: translateY(-150%);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
+.hub-canvas:focus {
+  outline: none;
+}
+
+.hub-canvas:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.hub-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+}
+
+.hub-canvas,
+.hub-canvas__body {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.canvas-status,
+.empty-state {
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+@media (max-width: 720px) {
+  .hub-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    min-height: 100dvh;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  /* Locked mobile chrome hides the rail — do not restyle it into a top strip. */
+  .hub-rail {
+    display: none !important;
+  }
+
+  .hub-canvas {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+    padding: var(--space-4);
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hub-canvas__body {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+/* Entity search (People / Organisations / Relationships landing) */
+
+.entity-search-page {
+  max-width: 34rem;
+}
+
+.entity-search__field {
+  margin-bottom: var(--space-3);
+}
+
+.entity-search__input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+}
+
+.entity-search__input::placeholder {
+  color: var(--shallow);
+}
+
+.entity-search__status {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.entity-search__results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-px);
+}
+
+.entity-search__result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-ui);
+}
+
+.entity-search__result:hover,
+.entity-search__result:focus-visible {
+  background: rgba(23, 55, 94, 0.06);
+}
+
+.entity-search__result-label {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.entity-search__result-supporting {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* Entity detail (Person / Organisation pages) */
+
+.entity-detail__back {
+  display: inline-flex;
+  margin-bottom: var(--space-4);
+}
+
+.entity-detail__summary {
+  margin-bottom: var(--space-5);
+}
+
+.entity-detail__kind {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-2);
+}
+
+.entity-detail__sort-name,
+.entity-detail__legal-name {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-2);
+}
+
+.entity-detail__self-indicator {
+  display: inline-block;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  margin: 0;
+}
+
+.entity-detail__section {
+  margin-bottom: var(--space-6);
+}
+
+.entity-detail__heading {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+}
+
+.entity-detail__relationship-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.entity-detail__relationship-label {
+  font-weight: var(--weight-medium);
+}
+
+.entity-detail__relationship-endpoint {
+  color: var(--muted);
+}
+
+/* Relationship timeline */
+
+.relationship-timeline__year {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.relationship-timeline__list {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.relationship-timeline__entry {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.relationship-timeline__marker {
+  flex: 0 0 auto;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.relationship-timeline__entry--open .relationship-timeline__marker {
+  color: var(--ink);
+}
+
+.relationship-timeline__body {
+  min-width: 0;
+}
+
+.relationship-timeline__label {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.relationship-timeline__entry--open .relationship-timeline__label {
+  font-weight: var(--weight-medium);
+}
+
+.relationship-timeline__meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.relationship-timeline__empty {
+  color: var(--muted);
+  font-size: var(--text-base);
+}

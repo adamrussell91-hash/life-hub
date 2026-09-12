@@ -17,7 +17,7 @@ const MIME_TYPES = {
   '.yml': 'application/yaml; charset=utf-8'
 };
 
-const SPA_MOUNTS = new Set(['teaching', 'knowledge', 'tasks']);
+const SPA_MOUNTS = new Set(['teaching', 'knowledge', 'tasks', 'professional']);
 
 const send = (response, status, body, contentType = 'text/plain; charset=utf-8') => {
   response.writeHead(status, {
