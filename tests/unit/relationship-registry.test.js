@@ -13,7 +13,7 @@ const organisation = parseEntityRef('shared:organisation:organisation_unsw');
 const task = parseEntityRef('tasks:task:task_email_seth');
 const communication = parseEntityRef('professional:communication:communication_001');
 
-test('lists exactly the eight first-slice declarations with correct inverse labels', () => {
+test('lists the Slice 1–7 relationship declarations with correct inverse labels', () => {
   const keys = listRelationshipDeclarations().map(decl => decl.key).sort();
   assert.deepEqual(keys, [
     'about_person',
@@ -23,17 +23,19 @@ test('lists exactly the eight first-slice declarations with correct inverse labe
     'follow_up',
     'follows_from',
     'member_of',
-    'recipient'
+    'recipient',
+    'related_to'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
   assert.equal(getRelationshipDeclaration('collaborator').inverse_label, 'collaborates_on');
   assert.equal(getRelationshipDeclaration('contact').inverse_label, 'contacted_for_task');
   assert.equal(getRelationshipDeclaration('recipient').inverse_label, 'received_communication');
+  assert.equal(getRelationshipDeclaration('related_to').inverse_label, 'related_to');
 });
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 8);
+  assert.equal(projected.length, 9);
   const contact = projected.find(decl => decl.key === 'contact');
   assert.ok(contact);
   assert.deepEqual(Object.keys(contact).sort(), [
