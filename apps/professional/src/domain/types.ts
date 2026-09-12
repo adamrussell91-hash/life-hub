@@ -124,6 +124,23 @@ export interface IncompleteLinksProjection {
   pending_intent_ids: string[];
 }
 
+export interface FollowUpOperationProjection {
+  operation_id: string;
+  status: 'in_progress' | 'incomplete' | 'committed' | string;
+  task_id: string | null;
+  title: string;
+  completed_intent_ids: string[];
+  completed_link_ids: string[];
+  failed_intent_ids: string[];
+  failed_relationships: Array<{
+    intent_id: string;
+    relationship_type: string;
+    target_ref: string;
+    error_code?: string;
+  }>;
+  pending_intent_ids: string[];
+}
+
 export interface CommunicationRecord {
   schema_version: number;
   id: string;
@@ -136,4 +153,5 @@ export interface CommunicationRecord {
   created_at: string;
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
+  follow_up_operation?: FollowUpOperationProjection | null;
 }

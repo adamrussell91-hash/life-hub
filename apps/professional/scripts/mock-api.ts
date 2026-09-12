@@ -61,6 +61,22 @@ interface CommunicationRecord {
     failed_intent_ids: string[];
     pending_intent_ids: string[];
   } | null;
+  follow_up_operation?: {
+    operation_id: string;
+    status: string;
+    task_id: string | null;
+    title: string;
+    completed_intent_ids: string[];
+    completed_link_ids: string[];
+    failed_intent_ids: string[];
+    failed_relationships: Array<{
+      intent_id: string;
+      relationship_type: string;
+      target_ref: string;
+      error_code?: string;
+    }>;
+    pending_intent_ids: string[];
+  } | null;
 }
 
 function refFor(record: PersonRecord | OrganisationRecord): string {
@@ -144,6 +160,7 @@ export function createMockApi() {
   );
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
   const communications = new Map<string, CommunicationRecord>();
+  const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
 
   let authenticated = false;
 
@@ -331,7 +348,13 @@ export function createMockApi() {
             error: { code: 'communication_not_found', message: 'Communication not found.' }
           });
         }
-        return json(200, { ok: true, data: { communication } });
+        const followUp = followUpOperations.get(communication.id);
+        return json(200, {
+          ok: true,
+          data: {
+            communication: followUp ? { ...communication, follow_up_operation: followUp } : communication
+          }
+        });
       }
       const list = [...communications.values()].sort((a, b) => {
         const delta = Date.parse(b.occurred_at) - Date.parse(a.occurred_at);
@@ -354,6 +377,91 @@ export function createMockApi() {
         communication.incomplete_links = null;
         communications.set(communication.id, communication);
         return json(200, { ok: true, data: { communication, links: [], retried: true } });
+      }
+
+      if (action === 'create-follow-up' || action === 'retry-follow-up') {
+        const id = url.searchParams.get('id');
+        const communication = id ? communications.get(id) : null;
+        if (!communication) {
+          return json(404, {
+            ok: false,
+            error: { code: 'communication_not_found', message: 'Communication not found.' }
+          });
+        }
+        const input = (body ?? {}) as { title?: string; force_incomplete?: boolean };
+        let operation = followUpOperations.get(communication.id) ?? null;
+        const createdTask = !operation?.task_id;
+        if (!operation) {
+          operation = {
+            operation_id: `cop_follow_${communication.id.slice(-12)}`,
+            status: 'in_progress',
+            task_id: `task_follow_${communication.id.slice(-8)}`,
+            title: typeof input.title === 'string' && input.title.trim()
+              ? input.title.trim()
+              : `Follow up: ${communication.subject || communication.channel}`,
+            completed_intent_ids: [],
+            completed_link_ids: [],
+            failed_intent_ids: [],
+            failed_relationships: [],
+            pending_intent_ids: [`follow_up:professional:communication:${communication.id}`]
+          };
+        }
+        if (input.force_incomplete || (body as { simulate_incomplete?: boolean })?.simulate_incomplete) {
+          operation = {
+            ...operation,
+            status: 'incomplete',
+            failed_intent_ids: ['contact:shared:person:mock'],
+            failed_relationships: [
+              {
+                intent_id: 'contact:shared:person:mock',
+                relationship_type: 'contact',
+                target_ref: 'shared:person:mock'
+              }
+            ],
+            pending_intent_ids: ['contact:shared:person:mock'],
+            completed_intent_ids: [`follow_up:professional:communication:${communication.id}`],
+            completed_link_ids: ['ul_follow_mock']
+          };
+          followUpOperations.set(communication.id, operation);
+          return json(
+            503,
+            {
+              ok: false,
+              error: {
+                code: 'follow_up_operation_incomplete',
+                message: 'Follow-up Task relationships could not be completed.',
+                retryable: true
+              },
+              data: {
+                communication_id: communication.id,
+                operation_id: operation.operation_id,
+                task_id: operation.task_id,
+                completed_link_ids: operation.completed_link_ids,
+                failed_intent_ids: operation.failed_intent_ids
+              }
+            });
+        }
+        operation = {
+          ...operation,
+          status: 'committed',
+          failed_intent_ids: [],
+          failed_relationships: [],
+          pending_intent_ids: [],
+          completed_intent_ids: [
+            `follow_up:professional:communication:${communication.id}`,
+            'contact:shared:person:mock'
+          ],
+          completed_link_ids: ['ul_follow_mock', 'ul_contact_mock']
+        };
+        followUpOperations.set(communication.id, operation);
+        const payload = {
+          communication: { ...communication, follow_up_operation: operation },
+          follow_up_operation: operation,
+          task_id: operation.task_id,
+          created_task: createdTask,
+          incomplete: false
+        };
+        return json(action === 'create-follow-up' ? 201 : 200, { ok: true, data: payload });
       }
 
       const input = body as {

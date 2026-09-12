@@ -22,6 +22,7 @@ import {
   listCommunicationIndexKeys,
   setJSON
 } from './professional-blobs.mjs';
+import { createFollowUpOperationRepository } from './follow-up-operation-repository.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { equivalenceInput, generateLinkId } from './universal-link-schema.mjs';
@@ -194,6 +195,25 @@ export function createCommunicationRepository(deps = {}) {
   const resolveEntity = deps.resolveEntity ?? defaultResolveEntity;
   const getUniversalLinkStore = deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
   const createLinkRepository = deps.createUniversalLinkRepository ?? createUniversalLinkRepository;
+  const followUpRepo =
+    deps.followUpOperationRepository ??
+    createFollowUpOperationRepository({
+      store: professionalStore,
+      now,
+      resolveEntity,
+      getUniversalLinkStore,
+      createUniversalLinkRepository: createLinkRepository,
+      getTasksStore: deps.getTasksStore,
+      createTaskId: deps.createTaskId,
+      env: deps.env
+    });
+
+  async function attachFollowUp(record, incompleteJournal) {
+    const projection = projectCommunication(record, simplifyIncomplete(incompleteJournal));
+    const followUp = await followUpRepo.getProjection(record.id);
+    if (followUp) projection.follow_up_operation = followUp;
+    return projection;
+  }
 
   async function loadJournal(operationId) {
     return getJSON(professionalStore, communicationOperationKey(operationId));
@@ -240,7 +260,7 @@ export function createCommunicationRepository(deps = {}) {
       });
     }
     const journal = await loadOpenJournalForCommunication(id);
-    return projectCommunication(record, simplifyIncomplete(journal));
+    return attachFollowUp(record, journal);
   }
 
   async function listCommunications() {
@@ -263,9 +283,20 @@ export function createCommunicationRepository(deps = {}) {
     const projections = [];
     for (const record of records) {
       const journal = await loadOpenJournalForCommunication(record.id);
-      projections.push(projectCommunication(record, simplifyIncomplete(journal)));
+      projections.push(await attachFollowUp(record, journal));
     }
     return projections;
+  }
+
+  async function createFollowUp(id, input = {}) {
+    return followUpRepo.createOrRetry({
+      communicationId: id,
+      title: input.title
+    });
+  }
+
+  async function retryFollowUp(id) {
+    return followUpRepo.createOrRetry({ communicationId: id });
   }
 
   async function prepareValidatedIntents({ communicationRef, occurredAt, links }) {
@@ -545,7 +576,9 @@ export function createCommunicationRepository(deps = {}) {
     listCommunications,
     createCommunication,
     updateCommunication,
-    retryLinks
+    retryLinks,
+    createFollowUp,
+    retryFollowUp
   };
 }
 
