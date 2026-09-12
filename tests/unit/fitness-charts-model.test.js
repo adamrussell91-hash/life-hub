@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
 import {
   acwrBand,
+  buildFitnessGoals,
   buildE1rmBands,
   buildE1rmVsBest,
   buildFitnessCharts,
@@ -231,6 +232,52 @@ test('acwrBand follows the 0.8–1.3 sweet spot', () => {
   assert.equal(acwrBand(1.3), 'medium');
   assert.equal(acwrBand(1.4), 'high');
   assert.equal(acwrBand(null), 'medium');
+});
+
+test('fitness goals track the three named lifts, four-week frequency, and a safe-load streak', () => {
+  const charts = buildFitnessGoals({
+    events: events([
+      volumeSession('2026-08-10', 200, {
+        exercises: [
+          { name: 'Bar Press', sets: [{ reps: 9, weight_kg: 45.15 }] },
+          { name: 'Cable Bar Wide Grip Curl', sets: [{ reps: 8, weight_kg: 42 }] },
+          { name: 'Reverse Wide Grip Bent Over Row', sets: [{ reps: 10, weight_kg: 30 }] }
+        ]
+      }),
+      volumeSession('2026-08-18', 200),
+      volumeSession('2026-08-20', 200),
+      volumeSession('2026-08-25', 200),
+      volumeSession('2026-09-01', 200),
+      volumeSession('2026-09-03', 200),
+      volumeSession('2026-09-08', 200),
+      volumeSession('2026-09-10', 200)
+    ]),
+    date: '2026-09-12',
+    workoutsPerWeek: 1.5
+  });
+
+  assert.equal(charts.length, 5);
+  assert.deepEqual(charts.map(goal => goal.id), [
+    'chest-e1rm', 'arms-e1rm', 'frequency', 'back-e1rm', 'load-consistency'
+  ]);
+  assert.deepEqual(charts.filter(goal => goal.kind === 'e1rm').map(goal => goal.target), [65, 60, 47]);
+  assert.equal(charts[0].exercise, 'Bar Press');
+  assert.equal(charts[0].current, 58.7);
+  assert.equal(charts[0].remaining, 6.3);
+  assert.equal(charts[0].deadline, '2026-10-31');
+  assert.equal(charts[1].current, 53.2);
+  assert.equal(charts.find(goal => goal.id === 'back-e1rm').current, 40);
+
+  const frequency = charts.find(goal => goal.id === 'frequency');
+  assert.equal(frequency.average, 1.5);
+  assert.equal(frequency.target, 3);
+  assert.equal(frequency.weeks.length, 4);
+  assert.equal(frequency.weeks.at(-1).value, 2);
+
+  const load = charts.find(goal => goal.id === 'load-consistency');
+  assert.equal(load.target, 3);
+  assert.equal(load.weeks.length, 3);
+  assert.ok(load.weeks.every(week => week.band !== 'high'));
 });
 
 test('training load is weekly tonnage banded by ACWR against the prior 4 weeks', () => {
