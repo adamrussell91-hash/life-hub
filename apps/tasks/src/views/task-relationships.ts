@@ -2,9 +2,9 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
 import {
   createUniversalLink,
-  endUniversalLink,
   listUniversalLinksForEntity,
   searchEntities,
+  suppressUniversalLink,
   taskEntityRef,
   type UniversalLinkEntry
 } from '@/api/universal-links';
@@ -22,6 +22,9 @@ export interface TaskRelationshipsHandle {
  * Relationships section for the full Task editor only.
  * Task JSON never receives Person or Universal Link IDs — every relationship
  * is stored through the canonical Universal Link API.
+ *
+ * contact and collaborator are timeless: saved chips use Remove → suppress,
+ * never endLink.
  */
 export function renderTaskRelationshipsSection(taskId: string): TaskRelationshipsHandle {
   const section = el('section', 'task-editor__relationships');
@@ -64,15 +67,15 @@ export function renderTaskRelationshipsSection(taskId: string): TaskRelationship
     onRemovePending: () => undefined,
     onEndSaved: async (chip: { id: string; label: string }) => {
       try {
-        const today = new Date().toISOString().slice(0, 10);
-        await endUniversalLink(chip.id, today);
+        await suppressUniversalLink(chip.id, 'operator_requested');
         await refresh();
       } catch (err) {
         status.hidden = false;
-        status.textContent = err instanceof ApiClientError ? err.message : 'Could not end relationship.';
+        status.textContent =
+          err instanceof ApiClientError ? err.message : 'Could not remove relationship.';
       }
     },
-    endLabel: 'End'
+    endLabel: 'Remove'
   });
 
   const picker = createEntityPicker({

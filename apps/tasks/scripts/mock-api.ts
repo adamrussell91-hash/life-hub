@@ -796,13 +796,13 @@ export function createMockApi({ seed }: MockApiOptions) {
         }
         if (entityRef) {
           const outgoing = [...syntheticLinks.values()]
-            .filter((link) => link.source_ref === entityRef)
+            .filter((link) => link.source_ref === entityRef && link.status === 'current')
             .map((link) => ({
               link,
               endpoint: endpointForRef(link.target_ref)
             }));
           const incoming = [...syntheticLinks.values()]
-            .filter((link) => link.target_ref === entityRef)
+            .filter((link) => link.target_ref === entityRef && link.status === 'current')
             .map((link) => ({
               link,
               endpoint: endpointForRef(link.source_ref)
@@ -863,6 +863,18 @@ export function createMockApi({ seed }: MockApiOptions) {
             (body as { valid_to?: string })?.valid_to ?? new Date().toISOString().slice(0, 10);
           link.status = 'ended';
           link.valid_to = validTo;
+          syntheticLinks.set(id, link);
+          return json(200, { ok: true, data: { link } });
+        }
+        if (action === 'suppress') {
+          const reason = (body as { reason?: string })?.reason;
+          if (typeof reason !== 'string' || !/^[a-z][a-z0-9_]{0,63}$/.test(reason)) {
+            return json(400, {
+              ok: false,
+              error: { code: 'invalid_reason_code', message: 'Invalid reason code.' }
+            });
+          }
+          link.status = 'suppressed';
           syntheticLinks.set(id, link);
           return json(200, { ok: true, data: { link } });
         }

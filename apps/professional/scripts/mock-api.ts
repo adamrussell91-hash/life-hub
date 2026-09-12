@@ -482,7 +482,31 @@ export function createMockApi() {
       if (!input?.source_ref || !input?.target_ref || !input?.relationship_type) {
         return json(400, { ok: false, error: { code: 'invalid_input', message: 'Invalid link.' } });
       }
-      const id = `ul_${randomUUID().slice(0, 12)}`;
+      const existing = relationships.find(
+        (link) =>
+          link.source_ref === input.source_ref &&
+          link.target_ref === input.target_ref &&
+          link.relationship_type === input.relationship_type &&
+          link.status === 'current'
+      );
+      if (existing) {
+        return json(200, {
+          ok: true,
+          data: {
+            link: {
+              id: existing.id,
+              source_ref: existing.source_ref,
+              target_ref: existing.target_ref,
+              relationship_type: existing.relationship_type,
+              status: existing.status
+            },
+            created: false
+          }
+        });
+      }
+      const id = `ul_${Buffer.from(`${input.source_ref}|${input.target_ref}|${input.relationship_type}`)
+        .toString('hex')
+        .slice(0, 24)}`;
       relationships.push({
         id,
         source_ref: input.source_ref,
@@ -517,7 +541,7 @@ export function createMockApi() {
         return json(400, { ok: false, error: { code: 'missing_selector', message: 'selector required' } });
       }
       const outgoing = relationships
-        .filter((link) => link.source_ref === entityRef)
+        .filter((link) => link.source_ref === entityRef && link.status === 'current')
         .map((link) => ({
           link,
           endpoint: findByRef(link.target_ref)
@@ -533,7 +557,7 @@ export function createMockApi() {
               }
         }));
       const incoming = relationships
-        .filter((link) => link.target_ref === entityRef)
+        .filter((link) => link.target_ref === entityRef && link.status === 'current')
         .map((link) => ({
           link,
           endpoint: findByRef(link.source_ref)
