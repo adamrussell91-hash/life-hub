@@ -12,7 +12,8 @@ function declaration({
   temporalMode,
   roleMode,
   metadataKeys = [],
-  allowedVisibility = ['operator']
+  allowedVisibility = ['operator'],
+  allowedRoles = null
 }) {
   return Object.freeze({
     key,
@@ -24,6 +25,7 @@ function declaration({
     role_mode: roleMode,
     metadata_keys: Object.freeze([...metadataKeys]),
     allowed_visibility: Object.freeze([...allowedVisibility]),
+    allowed_roles: allowedRoles == null ? null : Object.freeze([...allowedRoles]),
     // Fields whose combination defines "the same relationship" for
     // deterministic equivalence hashing (universal-link-schema.mjs).
     duplicate_fields: Object.freeze([
@@ -132,8 +134,70 @@ const REGISTRY = new Map([
     declaration({
       key: 'follow_up',
       sourceKinds: ['tasks:task'],
-      targetKinds: ['professional:communication'],
+      targetKinds: ['professional:communication', 'professional:meeting'],
       inverseLabel: 'has_follow_up',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    // Meeting attendee. Allowed optional roles: chair, minute_taker (null ok).
+    'attendee',
+    declaration({
+      key: 'attendee',
+      sourceKinds: ['professional:meeting'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'attends',
+      cardinality: 'many_to_many',
+      temporalMode: 'point',
+      roleMode: 'optional_text',
+      allowedRoles: ['chair', 'minute_taker']
+    })
+  ],
+  [
+    'preparation',
+    declaration({
+      key: 'preparation',
+      sourceKinds: ['tasks:task'],
+      targetKinds: ['professional:meeting'],
+      inverseLabel: 'has_preparation',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'venue',
+    declaration({
+      key: 'venue',
+      sourceKinds: ['professional:event'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'hosts_event',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'provider',
+    declaration({
+      key: 'provider',
+      sourceKinds: ['professional:event'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'provides_event',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'learning_for',
+    declaration({
+      key: 'learning_for',
+      sourceKinds: ['tasks:task'],
+      targetKinds: ['professional:event'],
+      inverseLabel: 'has_learning_task',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
       roleMode: 'none'
@@ -146,8 +210,22 @@ const REGISTRY = new Map([
     'related_to',
     declaration({
       key: 'related_to',
-      sourceKinds: ['knowledge:page', 'teaching:unit', 'tasks:project', 'life:decision'],
-      targetKinds: ['knowledge:page', 'teaching:unit', 'tasks:project', 'life:decision'],
+      sourceKinds: [
+        'knowledge:page',
+        'teaching:unit',
+        'tasks:project',
+        'life:decision',
+        'professional:meeting',
+        'professional:event'
+      ],
+      targetKinds: [
+        'knowledge:page',
+        'teaching:unit',
+        'tasks:project',
+        'life:decision',
+        'professional:meeting',
+        'professional:event'
+      ],
       inverseLabel: 'related_to',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
@@ -178,7 +256,8 @@ export function projectRelationshipRegistry() {
     temporal_mode: decl.temporal_mode,
     role_mode: decl.role_mode,
     metadata_keys: [...decl.metadata_keys],
-    allowed_visibility: [...decl.allowed_visibility]
+    allowed_visibility: [...decl.allowed_visibility],
+    ...(decl.allowed_roles ? { allowed_roles: [...decl.allowed_roles] } : {})
   }));
 }
 
@@ -268,6 +347,12 @@ export function validateRelationshipInput({
   }
   if (role !== null && typeof role !== 'string') {
     throw validationError('invalid_role', `${decl.key} role must be a string or null`);
+  }
+  if (decl.allowed_roles && role !== null && !decl.allowed_roles.includes(role)) {
+    throw validationError(
+      'invalid_role',
+      `${decl.key} role must be one of: ${decl.allowed_roles.join(', ')}`
+    );
   }
 
   const metadataObject = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : null;

@@ -129,6 +129,14 @@ test('resolveEntity registers professional:communication to the live resolver sl
   assert.equal(RESOLVER_SLOTS['professional:communication'], resolveCommunication);
 });
 
+test('resolveEntity registers professional:meeting and professional:event resolver slots', async () => {
+  const { RESOLVER_SLOTS, resolveMeeting, resolveEvent } = await import(
+    '../../netlify/functions/_shared/entity-resolvers.mjs'
+  );
+  assert.equal(RESOLVER_SLOTS['professional:meeting'], resolveMeeting);
+  assert.equal(RESOLVER_SLOTS['professional:event'], resolveEvent);
+});
+
 // --- Slice 3: real Person and Organisation resolution ---
 
 test('resolvePerson projects display_name as display_label, is_self as supporting_label', async () => {

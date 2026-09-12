@@ -1,6 +1,18 @@
-import { isValidCommunicationId, isValidOrganisationId, isValidPersonId } from '@/domain/ids';
+import {
+  isValidCommunicationId,
+  isValidEventId,
+  isValidMeetingId,
+  isValidOrganisationId,
+  isValidPersonId
+} from '@/domain/ids';
 
-export type RailViewId = 'people' | 'organisations' | 'relationships' | 'communications';
+export type RailViewId =
+  | 'people'
+  | 'organisations'
+  | 'relationships'
+  | 'communications'
+  | 'meetings'
+  | 'events';
 
 export type Route =
   | { name: 'people' }
@@ -11,6 +23,12 @@ export type Route =
   | { name: 'communications' }
   | { name: 'communication-new' }
   | { name: 'communication'; id: string }
+  | { name: 'meetings' }
+  | { name: 'meeting-new' }
+  | { name: 'meeting'; id: string }
+  | { name: 'events' }
+  | { name: 'event-new' }
+  | { name: 'event'; id: string }
   | { name: 'not-found'; path: string };
 
 /**
@@ -30,9 +48,17 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
+  if (segments.length === 1 && segments[0] === 'meetings') return { name: 'meetings' };
+  if (segments.length === 1 && segments[0] === 'events') return { name: 'events' };
 
   if (segments.length === 2 && segments[0] === 'communication' && segments[1] === 'new') {
     return { name: 'communication-new' };
+  }
+  if (segments.length === 2 && segments[0] === 'meeting' && segments[1] === 'new') {
+    return { name: 'meeting-new' };
+  }
+  if (segments.length === 2 && segments[0] === 'event' && segments[1] === 'new') {
+    return { name: 'event-new' };
   }
 
   if (segments.length === 2 && segments[0] === 'person') {
@@ -50,6 +76,18 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 2 && segments[0] === 'communication') {
     const id = safeDecode(segments[1]!);
     if (id && isValidCommunicationId(id)) return { name: 'communication', id };
+    return { name: 'not-found', path };
+  }
+
+  if (segments.length === 2 && segments[0] === 'meeting') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidMeetingId(id)) return { name: 'meeting', id };
+    return { name: 'not-found', path };
+  }
+
+  if (segments.length === 2 && segments[0] === 'event') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidEventId(id)) return { name: 'event', id };
     return { name: 'not-found', path };
   }
 
@@ -79,6 +117,12 @@ export function railHighlightFor(route: Route): RailViewId | null {
   ) {
     return 'communications';
   }
+  if (route.name === 'meetings' || route.name === 'meeting' || route.name === 'meeting-new') {
+    return 'meetings';
+  }
+  if (route.name === 'events' || route.name === 'event' || route.name === 'event-new') {
+    return 'events';
+  }
   return null;
 }
 
@@ -92,4 +136,12 @@ export function organisationRoute(id: string): string {
 
 export function communicationRoute(id: string): string {
   return `#/communication/${encodeURIComponent(id)}`;
+}
+
+export function meetingRoute(id: string): string {
+  return `#/meeting/${encodeURIComponent(id)}`;
+}
+
+export function eventRoute(id: string): string {
+  return `#/event/${encodeURIComponent(id)}`;
 }

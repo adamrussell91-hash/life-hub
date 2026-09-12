@@ -2,7 +2,7 @@
  * Shapes mirroring the server contracts this hub consumes.
  */
 
-export type EntityKind = 'person' | 'organisation' | 'task' | 'communication';
+export type EntityKind = 'person' | 'organisation' | 'task' | 'communication' | 'meeting' | 'event';
 
 export interface SearchResult {
   ref: string;
@@ -95,6 +95,8 @@ export interface TimelineEntry {
 export interface LinkedRecords {
   tasks: RelationshipEndpoint[];
   communications: RelationshipEndpoint[];
+  meetings?: RelationshipEndpoint[];
+  events?: RelationshipEndpoint[];
   organisations: RelationshipEndpoint[];
   people: RelationshipEndpoint[];
 }
@@ -154,4 +156,65 @@ export interface CommunicationRecord {
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
   follow_up_operation?: FollowUpOperationProjection | null;
+}
+
+export type MeetingState =
+  | 'scheduled'
+  | 'completed'
+  | 'cancelled'
+  | 'rescheduled'
+  | 'no_show';
+
+export interface MeetingOccurrenceHistoryEntry {
+  scheduled_start: string;
+  scheduled_end: string;
+  time_zone: string;
+  changed_at: string;
+  reason?: string;
+}
+
+export interface MeetingRecord {
+  schema_version: number;
+  id: string;
+  title: string;
+  scheduled_start: string;
+  scheduled_end: string;
+  time_zone: string;
+  location_text: string | null;
+  agenda: string | null;
+  notes: string | null;
+  state: MeetingState;
+  occurrence_history: MeetingOccurrenceHistoryEntry[];
+  created_at: string;
+  updated_at: string;
+  incomplete_links?: IncompleteLinksProjection | null;
+}
+
+export type EventOccurrenceState = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+export type AttendanceState = 'registered' | 'attended' | 'partial' | 'absent';
+
+export interface EventCertificate {
+  name?: string;
+  issued_at?: string | null;
+  reference?: string;
+}
+
+export interface EventRecord {
+  schema_version: number;
+  id: string;
+  title: string;
+  event_type: 'professional_development' | string;
+  start: string;
+  end: string;
+  time_zone: string;
+  all_day: boolean;
+  occurrence_state: EventOccurrenceState;
+  location_text: string | null;
+  accreditation_category: string | null;
+  hours: number | null;
+  attendance_state: AttendanceState | null;
+  certificate: EventCertificate | null;
+  created_at: string;
+  updated_at: string;
+  incomplete_links?: IncompleteLinksProjection | null;
 }

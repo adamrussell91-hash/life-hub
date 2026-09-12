@@ -13,7 +13,10 @@ const CATEGORY = {
   sleep: 'sleep',
   scheduled_lesson: 'teaching',
   task: 'tasks',
-  knowledge_page: 'knowledge'
+  work_block: 'tasks',
+  knowledge_page: 'knowledge',
+  professional_meeting: 'professional',
+  professional_event: 'professional'
 };
 
 function searchText(event) {

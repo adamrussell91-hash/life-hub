@@ -1,8 +1,8 @@
 /**
  * Shared umbrella calendar sources.
  * Life logged days are live via loadLiveEvents — this registry only names them.
- * Other hub API hosts stay out of this file. Teaching, Knowledge, and Tasks
- * events load from same-origin umbrella handlers.
+ * Other hub API hosts stay out of this file. Teaching, Knowledge, Tasks, and
+ * Professional events load from same-origin umbrella handlers.
  */
 export const CALENDAR_SOURCES = [
   {
@@ -27,6 +27,12 @@ export const CALENDAR_SOURCES = [
     id: 'tasks',
     label: 'Tasks',
     kind: 'board',
+    status: 'live'
+  },
+  {
+    id: 'professional',
+    label: 'Professional',
+    kind: 'schedule-projections',
     status: 'live'
   }
 ];
