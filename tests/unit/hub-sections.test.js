@@ -89,18 +89,36 @@ test('formatLessonGlance names an honest empty state and includes the lesson top
   );
 });
 
-test('umbrella hub switcher lists Life plus the three remounted hubs', () => {
+test('umbrella hub switcher lists Life plus the four remounted hubs, Professional exactly once', () => {
   const ids = listUmbrellaHubs().map(hub => hub.id);
-  assert.deepEqual(ids, ['life', 'teaching', 'knowledge', 'tasks']);
+  assert.deepEqual(ids, ['life', 'teaching', 'knowledge', 'tasks', 'professional']);
+  assert.equal(ids.filter(id => id === 'professional').length, 1);
   const html = hubSwitcherHtml('knowledge');
   assert.match(html, /data-hub-switcher/);
   assert.match(html, /href="\/"/);
   assert.match(html, /href="\/teaching\/"/);
   assert.match(html, /href="\/knowledge\/"/);
   assert.match(html, /href="\/tasks\/"/);
+  assert.match(html, /href="\/professional\/"/);
   assert.match(html, /aria-current="page"/);
   assert.match(html, /data-hub-toggle="knowledge"/);
   assert.match(html, /class="hub-row is-active"/);
+});
+
+test('every hub switcher rendering includes Professional exactly once, for every current hub', () => {
+  for (const currentId of ['life', 'teaching', 'knowledge', 'tasks', 'professional']) {
+    const html = hubSwitcherHtml(currentId);
+    const matches = html.match(/data-hub="professional"/g) ?? [];
+    assert.equal(matches.length, 1, `expected exactly one Professional row when current hub is "${currentId}"`);
+  }
+});
+
+test('Life desktop hub switcher and mobile More sheet include Professional', async () => {
+  const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
+  assert.match(html, /href="\/professional\/"/);
+  assert.match(html, /data-hub="professional"/);
+  assert.match(html, /data-hub-toggle="professional"/);
+  assert.match(html, /data-hub-panel="professional"/);
 });
 
 test('hub switcher host prefers the rail so it stays out of the scrolling nav', () => {

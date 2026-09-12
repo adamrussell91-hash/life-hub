@@ -29,6 +29,18 @@ export const UMBRELLA_HUBS = [
     eyebrow: 'Board',
     origin: '/tasks/',
     paths: ['M8 7h11', 'M8 12h11', 'M8 17h11', 'm4.5 7 .8.8L7 6', 'M4.5 12l.8.8L7 11']
+  },
+  {
+    id: 'professional',
+    title: 'Professional',
+    eyebrow: 'People and organisations',
+    origin: '/professional/',
+    paths: [
+      'M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
+      'M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5',
+      'M16 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z',
+      'M14.8 14.3c.5-.13 1-.2 1.5-.2 2.4 0 4.2 1.7 4.2 4.4'
+    ]
   }
 ];
 

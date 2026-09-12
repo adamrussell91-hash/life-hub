@@ -1,0 +1,75 @@
+{
+  "_comment": "Synthetic fixture data for the local Vite mock only. No real contacts, students, employers, or organisations.",
+  "people": [
+    {
+      "schema_version": 1,
+      "id": "person_00000000-0000-4000-8000-000000000001",
+      "kind": "person",
+      "display_name": "Seth Example",
+      "sort_name": "Example, Seth",
+      "aliases": [],
+      "lifecycle_status": "active",
+      "is_self": false,
+      "retention_reason": null,
+      "retention_review_at": null,
+      "created_at": "2023-01-01T00:00:00.000Z",
+      "updated_at": "2023-01-01T00:00:00.000Z"
+    }
+  ],
+  "organisations": [
+    {
+      "schema_version": 1,
+      "id": "organisation_00000000-0000-4000-8000-000000000002",
+      "kind": "organisation",
+      "display_name": "Example University",
+      "legal_name": "Example University Ltd",
+      "aliases": [],
+      "lifecycle_status": "active",
+      "retention_reason": null,
+      "retention_review_at": null,
+      "created_at": "2020-01-01T00:00:00.000Z",
+      "updated_at": "2020-01-01T00:00:00.000Z"
+    }
+  ],
+  "relationships": [
+    {
+      "id": "link_current_teaching",
+      "source_ref": "shared:person:person_00000000-0000-4000-8000-000000000001",
+      "target_ref": "shared:organisation:organisation_00000000-0000-4000-8000-000000000002",
+      "relationship_type": "works_at",
+      "inverse_label": "employs",
+      "context_key": "Teaching Faculty",
+      "status": "current",
+      "temporal_mode": "period",
+      "valid_from": "2023-01-15",
+      "valid_to": null,
+      "occurred_at": null
+    },
+    {
+      "id": "link_current_research",
+      "source_ref": "shared:person:person_00000000-0000-4000-8000-000000000001",
+      "target_ref": "shared:organisation:organisation_00000000-0000-4000-8000-000000000002",
+      "relationship_type": "works_at",
+      "inverse_label": "employs",
+      "context_key": "Research Lab",
+      "status": "current",
+      "temporal_mode": "period",
+      "valid_from": "2023-06-01",
+      "valid_to": null,
+      "occurred_at": null
+    },
+    {
+      "id": "link_ended_studies",
+      "source_ref": "shared:person:person_00000000-0000-4000-8000-000000000001",
+      "target_ref": "shared:organisation:organisation_00000000-0000-4000-8000-000000000002",
+      "relationship_type": "studied_at",
+      "inverse_label": "graduated",
+      "context_key": "Undergraduate",
+      "status": "ended",
+      "temporal_mode": "period",
+      "valid_from": "2018-02-01",
+      "valid_to": "2021-12-15",
+      "occurred_at": null
+    }
+  ]
+}
