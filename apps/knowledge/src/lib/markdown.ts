@@ -63,11 +63,11 @@ export function renderMarkdown(markdown: string): string {
       continue;
     }
 
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
     if (heading) {
       closeLists();
-      const level = heading[1].length;
-      html.push(`<h${level + 2}>${inline(heading[2])}</h${level + 2}>`);
+      const level = Math.min(heading[1].length + 2, 6);
+      html.push(`<h${level}>${inline(heading[2])}</h${level}>`);
       i++;
       continue;
     }
@@ -140,7 +140,7 @@ export function renderMarkdown(markdown: string): string {
     while (
       i < lines.length &&
       lines[i].trim() &&
-      !/^(#{1,3}\s|[-*]\s|\d+\.\s|>|---+\s*$)/.test(lines[i]) &&
+      !/^(#{1,6}\s|[-*]\s|\d+\.\s|>|---+\s*$)/.test(lines[i]) &&
       !isTableRow(lines[i])
     ) {
       para.push(lines[i]);
