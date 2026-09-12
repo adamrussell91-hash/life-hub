@@ -219,20 +219,13 @@ test('completed Fitness hero keeps set details and hides Start workout', () => {
   assert.equal(root.ensure('#fitness-start-workout').attributes.hidden, '');
 });
 
-test('empty focus and first-logged comparisons stay hidden', () => {
+test('empty focus stays hidden when the session has no focus tags', () => {
   const root = fitnessRoot();
   renderFitness(root, baseModel({
     heroSession: null,
-    comparisons: [{
-      name: 'Bar Press set 1',
-      firstLogged: true,
-      currentBest: { weight_kg: 30, reps: 10 },
-      previousBest: null
-    }]
+    comparisons: []
   }));
   assert.equal(root.ensure('#fitness-focus-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-comparisons').children.length, 0);
 });
 
 test('status, working weights, and the visual week board replace empty charts', () => {
@@ -270,14 +263,7 @@ test('status, working weights, and the visual week board replace empty charts', 
       exerciseCount: 2
     }],
     focusHits: [{ key: 'chest', label: 'chest', count: 2 }],
-    comparisons: [{
-      name: 'Bar Press',
-      firstLogged: false,
-      isPr: true,
-      weightDeltaKg: 4,
-      currentBest: { weight_kg: 34, reps: 10 },
-      previousBest: { weight_kg: 30, reps: 10 }
-    }]
+    comparisons: []
   }));
 
   assert.equal(root.ensure('[data-fitness="week-done"]').textContent, '1');
@@ -297,8 +283,6 @@ test('status, working weights, and the visual week board replace empty charts', 
   assert.equal(root.ensure('#fitness-loads-card').attributes.hidden, undefined);
   assert.match(root.ensure('#fitness-loads').children[0].children[1].textContent, /34 kg × 8/);
   assert.equal(root.ensure('#fitness-recent-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-comparisons-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-comparisons').children[0].children[2].textContent, 'PR');
 });
 
 test('last-week volume bar fills track height and scales width against this week', () => {
@@ -352,15 +336,13 @@ test('kit charts unhide when their own data is ready and stay hidden otherwise',
     }
   }));
   assert.equal(root.ensure('[data-fitness="longest-streak"]').textContent, '1');
-  assert.equal(root.ensure('#fitness-rep-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-session-shape-card').attributes.hidden, undefined);
   assert.equal(root.ensure('[data-fitness="rep-read"]').textContent, 'Mostly Hypertrophy');
   assert.equal(root.ensure('#fitness-region-vol-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-push-pull-card').attributes.hidden, undefined);
+  assert.equal(root.ensure('#fitness-balance-card').attributes.hidden, undefined);
   assert.match(root.ensure('[data-fitness="push-read"]').textContent, /push/);
-  assert.equal(root.ensure('#fitness-rest-card').attributes.hidden, undefined);
-  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, '');
   assert.equal(root.ensure('#fitness-readings-card').attributes.hidden, '');
-  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, '');
+  assert.equal(root.ensure('#fitness-training-radial-card').attributes.hidden, '');
 });
 
 function widgetText(el) {
