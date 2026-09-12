@@ -113,22 +113,38 @@ export async function defaultLoadInverseLinks({
   writeCutover = isKnowledgeWriteCutoverEnabled(env)
 } = {}) {
   try {
-    let indexed = { links: [], status: 'ready' };
-    if (page?.id && typeof listIncoming === 'function') {
-      indexed = await listIndexedKnowledgeBacklinks({
-        pageId: page.id,
-        listIncoming
-      });
+    // After cutover, ordinary requests must never scan the archive. If the
+    // indexed read is not bound, fail visibly instead of falling back.
+    if (writeCutover && typeof listIncoming !== 'function') {
+      return {
+        links: [],
+        groups: [],
+        status: 'unavailable',
+        source: 'universal_links_unavailable'
+      };
     }
 
-    // After parity + cutover, ordinary requests use indexed Universal Link
-    // reads only — no scan of every Knowledge page.
-    if (writeCutover && typeof listIncoming === 'function') {
+    let indexed = { links: [], status: 'ready' };
+    if (page?.id && typeof listIncoming === 'function') {
+      try {
+        indexed = await listIndexedKnowledgeBacklinks({
+          pageId: page.id,
+          listIncoming
+        });
+      } catch {
+        indexed = { links: [], status: 'unavailable' };
+      }
+    }
+
+    if (writeCutover) {
       return {
         links: indexed.links,
         groups: [],
-        status: indexed.status,
-        source: 'universal_links_indexed'
+        status: indexed.status === 'unavailable' ? 'unavailable' : 'ready',
+        source:
+          indexed.status === 'unavailable'
+            ? 'universal_links_unavailable'
+            : 'universal_links_indexed'
       };
     }
 

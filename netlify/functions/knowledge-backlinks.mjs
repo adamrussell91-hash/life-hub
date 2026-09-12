@@ -1,5 +1,6 @@
 import { methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { defaultLoadInverseLinks, normalizeInverseLinks } from './_shared/inverse-links.mjs';
+import { bindKnowledgeUniversalLinks } from './_shared/knowledge-ul-runtime.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 
 export const config = { path: '/api/knowledge/backlinks' };
@@ -11,10 +12,20 @@ export function createKnowledgeBacklinksHandler(deps = {}) {
       return withCors(methodNotAllowed('GET, OPTIONS'), request, env);
     }
     try {
+      const binding = deps.bindKnowledgeUniversalLinks
+        ? await deps.bindKnowledgeUniversalLinks({ env })
+        : await bindKnowledgeUniversalLinks({
+            env,
+            getUniversalLinkStore: deps.getUniversalLinkStore,
+            createUniversalLinkRepository: deps.createUniversalLinkRepository,
+            resolveEntity: deps.resolveEntity,
+            now: deps.now
+          });
       const loadInverse = deps.loadInverseLinks ?? defaultLoadInverseLinks;
       const loaded = normalizeInverseLinks(await loadInverse({
         env,
-        fetchImpl: deps.fetchImpl
+        fetchImpl: deps.fetchImpl,
+        listIncoming: binding.listIncoming
       }));
       return withCors(okResponse(200, {
         groups: loaded.groups,

@@ -50,7 +50,9 @@ export function enrichKnowledgePage(page, {
   inverseLinks = [],
   inverseStatus = 'ready',
   urlWatches = [],
-  urlWatchStatus = 'ready'
+  urlWatchStatus = 'ready',
+  relationships = null,
+  relationshipsStatus = 'ready'
 } = {}) {
   if (!page || typeof page !== 'object') return page;
   const next = { ...page };
@@ -66,9 +68,10 @@ export function enrichKnowledgePage(page, {
   const watches = Array.isArray(urlWatches) ? urlWatches : [];
   if (watches.length) next.url_watches = watches;
   if (urlWatchStatus === 'unavailable') next.url_watches_status = 'unavailable';
+  if (Array.isArray(relationships)) next.relationships = relationships;
+  if (relationshipsStatus === 'unavailable') next.relationships_status = 'unavailable';
   return next;
 }
-
 export async function loadLifeRepo({ env, fetchImpl, client } = {}) {
   const github = client ?? createGitHubClient({ env, fetchImpl });
   const resolved = await github.resolveTree();
