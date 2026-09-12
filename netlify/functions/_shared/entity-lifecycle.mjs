@@ -1,5 +1,4 @@
-import { generateEventId, redactIdentityRecord } from './identity-schema.mjs';
-import { entityEventKey, setJSON } from './universal-link-blobs.mjs';
+import { redactIdentityRecord } from './identity-schema.mjs';
 
 // Entity lifecycle transitions (implementation programme, "Lifecycle
 // services"). Independent of Universal Link relationship lifecycle
@@ -100,22 +99,4 @@ export function applyLifecycleTransition({ record, toStatus, retentionReason = n
     next = redactIdentityRecord(next);
   }
   return next;
-}
-
-// Writes one lifecycle event Blob at `entities/events/<entity_ref_hash>/<event_id>`
-// (implementation programme, lifecycle rule 3). Never carries a display
-// label — only the canonical ref and the two status values.
-export async function writeLifecycleEvent(store, { entityRef, fromStatus, toStatus, now }) {
-  const eventId = generateEventId();
-  const event = Object.freeze({
-    schema_version: 1,
-    event_id: eventId,
-    entity_ref: entityRef,
-    event_type: 'lifecycle_transition',
-    from_status: fromStatus,
-    to_status: toStatus,
-    created_at: now
-  });
-  await setJSON(store, entityEventKey(entityRef, eventId), event);
-  return event;
 }
