@@ -5,6 +5,8 @@ export const TIME_GRID_END_HOUR = 22;
 export const TIME_GRID_HOUR_PX = 52;
 export const TIME_GRID_SNAP_MINUTES = 15;
 export const TIME_GRID_DEFAULT_MINUTES = 60;
+/** Shortest painted span (meals / point-in-time chips). Height still floors in blockStyle. */
+export const TIME_GRID_MIN_MINUTES = 5;
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -57,7 +59,7 @@ export function hourCaption(hour) {
   return hour < 12 ? `${h} AM` : `${h} PM`;
 }
 
-export function clampSpan(start, minutes, minHours = 0.25) {
+export function clampSpan(start, minutes, minHours = TIME_GRID_MIN_MINUTES / 60) {
   const duration = Math.max((Number(minutes) || TIME_GRID_DEFAULT_MINUTES) / 60, minHours);
   return { start, end: Math.min(start + duration, 24) };
 }

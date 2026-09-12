@@ -35,6 +35,14 @@ test('layoutTimedBlocks assigns overlap lanes', () => {
   assert.notEqual(blocks[0].lane, blocks[1].lane);
 });
 
+test('layoutTimedBlocks keeps five-minute meals as a five-minute span', () => {
+  const [block] = layoutTimedBlocks([
+    { title: 'Lunch', time: '12:30', durationMin: 5 }
+  ]);
+  assert.equal(block.start, 12.5);
+  assert.equal(block.end, 12.5 + 5 / 60);
+});
+
 test('parseGoToDate accepts ISO, AU, and today', () => {
   const today = new Date(2026, 8, 5);
   assert.equal(parseGoToDate('2026-09-05', today)?.getDate(), 5);
