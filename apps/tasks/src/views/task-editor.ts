@@ -29,6 +29,7 @@ import {
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
+import { renderTaskRelationshipsSection } from '@/views/task-relationships';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
 const WEEKDAYS = [
@@ -392,6 +393,8 @@ export async function renderTaskEditor(
     value: task.description
   });
 
+  const relationships = renderTaskRelationshipsSection(task.id);
+
   const actions = el('div', 'confirm-card__actions');
   const discard = el('button', 'btn btn--ghost', 'Discard');
   discard.type = 'button';
@@ -420,6 +423,8 @@ export async function renderTaskEditor(
         estimated_duration = null;
       }
       const reminder = remind.read(dueValue, dueTimeValue);
+      // Save the Task through the existing Tasks API first — never put
+      // Person or Universal Link IDs into Task JSON.
       const updated = await tasksApi.updateTask(task.id, {
         title: nextTitle,
         due_date: dueValue,
@@ -436,6 +441,13 @@ export async function renderTaskEditor(
         remind_at: reminder.remind_at,
         remind_dismissed_at: reminder.remind_dismissed_at
       });
+      const linkResult = await relationships.savePendingLinks(updated.id);
+      if (linkResult.incomplete) {
+        save.disabled = false;
+        discard.disabled = false;
+        host.append(el('p', 'empty-state', linkResult.message ?? 'Some relationships are incomplete.'));
+        return;
+      }
       await onSaved(updated);
     } catch (err) {
       save.disabled = false;
@@ -458,7 +470,7 @@ export async function renderTaskEditor(
   if (task.kind !== 'step' && !task.parent_task_id) {
     card.append(recurrence.section, remind.section);
   }
-  card.append(actions);
+  card.append(relationships.section, actions);
   host.append(card);
 
   if (task.kind !== 'step' && !task.parent_task_id) {

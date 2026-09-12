@@ -71,6 +71,31 @@ export function retryCommunicationLinks(
   return apiPost(`/api/communications?${params.toString()}`, {}, { signal: options.signal });
 }
 
+export interface FollowUpOperationResult {
+  communication: CommunicationRecord;
+  follow_up_operation: NonNullable<CommunicationRecord['follow_up_operation']>;
+  task_id: string;
+  created_task: boolean;
+  incomplete: boolean;
+}
+
+export function createFollowUpTask(
+  id: string,
+  body: { title?: string } = {},
+  options: { signal?: AbortSignal } = {}
+): Promise<FollowUpOperationResult> {
+  const params = new URLSearchParams({ id, action: 'create-follow-up' });
+  return apiPost(`/api/communications?${params.toString()}`, body, { signal: options.signal });
+}
+
+export function retryFollowUpTask(
+  id: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<FollowUpOperationResult> {
+  const params = new URLSearchParams({ id, action: 'retry-follow-up' });
+  return apiPost(`/api/communications?${params.toString()}`, {}, { signal: options.signal });
+}
+
 export function isIncompleteLinksError(err: unknown): err is ApiClientError & {
   data: {
     communication_id: string;
@@ -82,6 +107,22 @@ export function isIncompleteLinksError(err: unknown): err is ApiClientError & {
   return (
     err instanceof ApiClientError &&
     err.code === 'communication_links_incomplete' &&
+    typeof (err as ApiClientError & { data?: unknown }).data === 'object'
+  );
+}
+
+export function isFollowUpIncompleteError(err: unknown): err is ApiClientError & {
+  data: {
+    communication_id: string;
+    operation_id: string;
+    task_id: string;
+    completed_link_ids: string[];
+    failed_intent_ids: string[];
+  };
+} {
+  return (
+    err instanceof ApiClientError &&
+    err.code === 'follow_up_operation_incomplete' &&
     typeof (err as ApiClientError & { data?: unknown }).data === 'object'
   );
 }

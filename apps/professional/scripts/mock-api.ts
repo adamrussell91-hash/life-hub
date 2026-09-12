@@ -61,6 +61,22 @@ interface CommunicationRecord {
     failed_intent_ids: string[];
     pending_intent_ids: string[];
   } | null;
+  follow_up_operation?: {
+    operation_id: string;
+    status: string;
+    task_id: string | null;
+    title: string;
+    completed_intent_ids: string[];
+    completed_link_ids: string[];
+    failed_intent_ids: string[];
+    failed_relationships: Array<{
+      intent_id: string;
+      relationship_type: string;
+      target_ref: string;
+      error_code?: string;
+    }>;
+    pending_intent_ids: string[];
+  } | null;
 }
 
 function refFor(record: PersonRecord | OrganisationRecord): string {
@@ -144,6 +160,7 @@ export function createMockApi() {
   );
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
   const communications = new Map<string, CommunicationRecord>();
+  const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
 
   let authenticated = false;
 
@@ -331,7 +348,13 @@ export function createMockApi() {
             error: { code: 'communication_not_found', message: 'Communication not found.' }
           });
         }
-        return json(200, { ok: true, data: { communication } });
+        const followUp = followUpOperations.get(communication.id);
+        return json(200, {
+          ok: true,
+          data: {
+            communication: followUp ? { ...communication, follow_up_operation: followUp } : communication
+          }
+        });
       }
       const list = [...communications.values()].sort((a, b) => {
         const delta = Date.parse(b.occurred_at) - Date.parse(a.occurred_at);
@@ -354,6 +377,91 @@ export function createMockApi() {
         communication.incomplete_links = null;
         communications.set(communication.id, communication);
         return json(200, { ok: true, data: { communication, links: [], retried: true } });
+      }
+
+      if (action === 'create-follow-up' || action === 'retry-follow-up') {
+        const id = url.searchParams.get('id');
+        const communication = id ? communications.get(id) : null;
+        if (!communication) {
+          return json(404, {
+            ok: false,
+            error: { code: 'communication_not_found', message: 'Communication not found.' }
+          });
+        }
+        const input = (body ?? {}) as { title?: string; force_incomplete?: boolean };
+        let operation = followUpOperations.get(communication.id) ?? null;
+        const createdTask = !operation?.task_id;
+        if (!operation) {
+          operation = {
+            operation_id: `cop_follow_${communication.id.slice(-12)}`,
+            status: 'in_progress',
+            task_id: `task_follow_${communication.id.slice(-8)}`,
+            title: typeof input.title === 'string' && input.title.trim()
+              ? input.title.trim()
+              : `Follow up: ${communication.subject || communication.channel}`,
+            completed_intent_ids: [],
+            completed_link_ids: [],
+            failed_intent_ids: [],
+            failed_relationships: [],
+            pending_intent_ids: [`follow_up:professional:communication:${communication.id}`]
+          };
+        }
+        if (input.force_incomplete || (body as { simulate_incomplete?: boolean })?.simulate_incomplete) {
+          operation = {
+            ...operation,
+            status: 'incomplete',
+            failed_intent_ids: ['contact:shared:person:mock'],
+            failed_relationships: [
+              {
+                intent_id: 'contact:shared:person:mock',
+                relationship_type: 'contact',
+                target_ref: 'shared:person:mock'
+              }
+            ],
+            pending_intent_ids: ['contact:shared:person:mock'],
+            completed_intent_ids: [`follow_up:professional:communication:${communication.id}`],
+            completed_link_ids: ['ul_follow_mock']
+          };
+          followUpOperations.set(communication.id, operation);
+          return json(
+            503,
+            {
+              ok: false,
+              error: {
+                code: 'follow_up_operation_incomplete',
+                message: 'Follow-up Task relationships could not be completed.',
+                retryable: true
+              },
+              data: {
+                communication_id: communication.id,
+                operation_id: operation.operation_id,
+                task_id: operation.task_id,
+                completed_link_ids: operation.completed_link_ids,
+                failed_intent_ids: operation.failed_intent_ids
+              }
+            });
+        }
+        operation = {
+          ...operation,
+          status: 'committed',
+          failed_intent_ids: [],
+          failed_relationships: [],
+          pending_intent_ids: [],
+          completed_intent_ids: [
+            `follow_up:professional:communication:${communication.id}`,
+            'contact:shared:person:mock'
+          ],
+          completed_link_ids: ['ul_follow_mock', 'ul_contact_mock']
+        };
+        followUpOperations.set(communication.id, operation);
+        const payload = {
+          communication: { ...communication, follow_up_operation: operation },
+          follow_up_operation: operation,
+          task_id: operation.task_id,
+          created_task: createdTask,
+          incomplete: false
+        };
+        return json(action === 'create-follow-up' ? 201 : 200, { ok: true, data: payload });
       }
 
       const input = body as {
@@ -448,6 +556,131 @@ export function createMockApi() {
       communication.updated_at = new Date().toISOString();
       communications.set(communication.id, communication);
       return json(200, { ok: true, data: { communication } });
+    }
+
+    if (path === '/api/tasks' && method === 'POST') {
+      const input = body as { title?: string };
+      const id = `task_${randomUUID().slice(0, 8)}`;
+      const task = {
+        id,
+        title: typeof input.title === 'string' ? input.title : 'Untitled',
+        status: 'open',
+        domain: 'work',
+        priority: 'normal',
+        kind: 'task'
+      };
+      // Task JSON never stores Communication or Person IDs.
+      return json(201, { ok: true, data: task });
+    }
+
+    if (path === '/api/universal-links' && method === 'POST') {
+      const input = body as {
+        source_ref?: string;
+        target_ref?: string;
+        relationship_type?: string;
+      };
+      for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
+        if (input && Object.prototype.hasOwnProperty.call(input, key)) {
+          return json(400, {
+            ok: false,
+            error: { code: 'access_field_not_accepted', message: `Field "${key}" is not accepted.` }
+          });
+        }
+      }
+      if (!input?.source_ref || !input?.target_ref || !input?.relationship_type) {
+        return json(400, { ok: false, error: { code: 'invalid_input', message: 'Invalid link.' } });
+      }
+      const existing = relationships.find(
+        (link) =>
+          link.source_ref === input.source_ref &&
+          link.target_ref === input.target_ref &&
+          link.relationship_type === input.relationship_type &&
+          link.status === 'current'
+      );
+      if (existing) {
+        return json(200, {
+          ok: true,
+          data: {
+            link: {
+              id: existing.id,
+              source_ref: existing.source_ref,
+              target_ref: existing.target_ref,
+              relationship_type: existing.relationship_type,
+              status: existing.status
+            },
+            created: false
+          }
+        });
+      }
+      const id = `ul_${Buffer.from(`${input.source_ref}|${input.target_ref}|${input.relationship_type}`)
+        .toString('hex')
+        .slice(0, 24)}`;
+      relationships.push({
+        id,
+        source_ref: input.source_ref,
+        target_ref: input.target_ref,
+        relationship_type: input.relationship_type,
+        inverse_label: input.relationship_type,
+        context_key: null,
+        status: 'current',
+        temporal_mode: 'timeless',
+        valid_from: null,
+        valid_to: null,
+        occurred_at: null
+      });
+      return json(201, {
+        ok: true,
+        data: {
+          link: {
+            id,
+            source_ref: input.source_ref,
+            target_ref: input.target_ref,
+            relationship_type: input.relationship_type,
+            status: 'current'
+          },
+          created: true
+        }
+      });
+    }
+
+    if (path === '/api/universal-links' && method === 'GET') {
+      const entityRef = url.searchParams.get('entity_ref');
+      if (!entityRef) {
+        return json(400, { ok: false, error: { code: 'missing_selector', message: 'selector required' } });
+      }
+      const outgoing = relationships
+        .filter((link) => link.source_ref === entityRef && link.status === 'current')
+        .map((link) => ({
+          link,
+          endpoint: findByRef(link.target_ref)
+            ? endpointFor(findByRef(link.target_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
+            : {
+                ref: link.target_ref,
+                kind: 'unknown',
+                display_label: link.target_ref,
+                supporting_label: null,
+                href: null,
+                lifecycle_status: null,
+                visibility: 'operator'
+              }
+        }));
+      const incoming = relationships
+        .filter((link) => link.target_ref === entityRef && link.status === 'current')
+        .map((link) => ({
+          link,
+          endpoint: findByRef(link.source_ref)
+            ? endpointFor(findByRef(link.source_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
+            : {
+                ref: link.source_ref,
+                kind: 'unknown',
+                display_label: link.source_ref,
+                supporting_label: null,
+                href: null,
+                lifecycle_status: null,
+                visibility: 'operator'
+              }
+        }));
+      return json(200, { ok: true, data: { outgoing, incoming } });
     }
 
     return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown route.' } });
