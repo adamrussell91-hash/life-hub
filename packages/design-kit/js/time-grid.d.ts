@@ -3,6 +3,7 @@ export const TIME_GRID_END_HOUR: number;
 export const TIME_GRID_HOUR_PX: number;
 export const TIME_GRID_SNAP_MINUTES: number;
 export const TIME_GRID_DEFAULT_MINUTES: number;
+export const TIME_GRID_MIN_MINUTES: number;
 
 export function parseTimeHours(time: string | null | undefined): number | null;
 export function hoursToDueTime(hours: number): string;
