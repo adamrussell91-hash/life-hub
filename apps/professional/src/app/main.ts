@@ -19,6 +19,16 @@ import {
   renderCommunicationNewView,
   renderCommunicationsView
 } from '@/views/communications';
+import {
+  renderMeetingDetailView,
+  renderMeetingNewView,
+  renderMeetingsView
+} from '@/views/meetings';
+import {
+  renderEventDetailView,
+  renderEventNewView,
+  renderEventsView
+} from '@/views/events';
 import { renderPersonPage } from '@/views/person-page';
 import { renderOrganisationPage } from '@/views/organisation-page';
 
@@ -91,6 +101,48 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Communications', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'meetings') {
+      renderPageHeader(shell, viewChrome('meetings'));
+      await renderMeetingsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'meeting-new') {
+      renderPageHeader(shell, { eyebrow: 'Meetings', title: 'Schedule' });
+      await renderMeetingNewView(shell.canvas);
+      return;
+    }
+    if (route.name === 'meeting') {
+      renderPageHeader(shell, { eyebrow: 'Meetings', title: 'Loading…' });
+      await renderMeetingDetailView(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Meetings', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'events') {
+      renderPageHeader(shell, viewChrome('events'));
+      await renderEventsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'event-new') {
+      renderPageHeader(shell, { eyebrow: 'Events', title: 'Add event' });
+      await renderEventNewView(shell.canvas);
+      return;
+    }
+    if (route.name === 'event') {
+      renderPageHeader(shell, { eyebrow: 'Events', title: 'Loading…' });
+      await renderEventDetailView(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Events', title });
         },
         isCurrent: () => generation === routeGeneration
       });

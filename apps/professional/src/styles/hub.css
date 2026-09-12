@@ -218,7 +218,22 @@
   margin-bottom: var(--space-4);
 }
 
+.meetings__actions,
+.events__actions {
+  margin-bottom: var(--space-4);
+}
+
 .communications__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.meetings__list,
+.events__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -233,19 +248,43 @@
   text-decoration: none;
 }
 
+.meetings__link,
+.events__link {
+  font-weight: var(--weight-medium);
+  color: inherit;
+  text-decoration: none;
+}
+
 .communications__link:hover,
 .communications__link:focus-visible {
   text-decoration: underline;
 }
 
+.meetings__link:hover,
+.meetings__link:focus-visible,
+.events__link:hover,
+.events__link:focus-visible {
+  text-decoration: underline;
+}
+
 .communications__meta,
-.communication-form__status {
+.communication-form__status,
+.meetings__meta,
+.meeting-form__status,
+.events__meta,
+.event-form__status {
   color: var(--muted);
   font-size: var(--text-sm);
 }
 
 .communication-form,
-.communication-detail__edit {
+.communication-detail__edit,
+.meeting-form,
+.meeting-detail__edit,
+.meeting-detail__reschedule,
+.event-form,
+.event-detail__edit,
+.event-detail__reschedule {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -256,7 +295,20 @@
 .communication-form select,
 .communication-form textarea,
 .communication-detail__edit input,
-.communication-detail__edit textarea {
+.communication-detail__edit textarea,
+.meeting-form input,
+.meeting-form select,
+.meeting-form textarea,
+.meeting-detail__edit input,
+.meeting-detail__edit textarea,
+.meeting-detail__reschedule input,
+.event-form input,
+.event-form select,
+.event-form textarea,
+.event-detail__edit input,
+.event-detail__edit select,
+.event-detail__edit textarea,
+.event-detail__reschedule input {
   width: 100%;
   box-sizing: border-box;
   min-height: 2.5rem;
@@ -269,9 +321,19 @@
   font-size: var(--text-base);
 }
 
-.communication-detail__incomplete {
+.communication-detail__incomplete,
+.meeting-detail__incomplete,
+.event-detail__incomplete {
   margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+
+.meeting-detail__actions,
+.event-detail__actions {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }

@@ -161,6 +161,8 @@ export function createMockApi() {
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
   const communications = new Map<string, CommunicationRecord>();
   const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
+  const meetings = new Map<string, Record<string, unknown>>();
+  const events = new Map<string, Record<string, unknown>>();
 
   let authenticated = false;
 
@@ -226,6 +228,8 @@ export function createMockApi() {
     const linked_records = {
       tasks: [] as unknown[],
       communications: [] as unknown[],
+      meetings: [] as unknown[],
+      events: [] as unknown[],
       organisations: [] as unknown[],
       people: [] as unknown[]
     };
@@ -556,6 +560,299 @@ export function createMockApi() {
       communication.updated_at = new Date().toISOString();
       communications.set(communication.id, communication);
       return json(200, { ok: true, data: { communication } });
+    }
+
+    if (path === '/api/meetings' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const meeting = meetings.get(id);
+        if (!meeting) {
+          return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
+        }
+        return json(200, { ok: true, data: { meeting } });
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          meetings: [...meetings.values()].sort(
+            (a, b) => Date.parse(String(a.scheduled_start)) - Date.parse(String(b.scheduled_start))
+          )
+        }
+      });
+    }
+
+    if (path === '/api/meetings' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      const id = url.searchParams.get('id');
+      if (action === 'retry-links' && id) {
+        const meeting = meetings.get(id);
+        if (!meeting) {
+          return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
+        }
+        meeting.incomplete_links = null;
+        return json(200, { ok: true, data: { meeting, links: [], retried: true } });
+      }
+      if (action && id && meetings.has(id)) {
+        const meeting = meetings.get(id)!;
+        if (action === 'reschedule') {
+          const input = body as {
+            scheduled_start: string;
+            scheduled_end: string;
+            time_zone: string;
+            reason?: string | null;
+          };
+          const history = Array.isArray(meeting.occurrence_history)
+            ? [...(meeting.occurrence_history as unknown[])]
+            : [];
+          history.push({
+            scheduled_start: meeting.scheduled_start,
+            scheduled_end: meeting.scheduled_end,
+            time_zone: meeting.time_zone,
+            changed_at: new Date().toISOString(),
+            ...(input.reason ? { reason: input.reason } : {})
+          });
+          Object.assign(meeting, {
+            scheduled_start: input.scheduled_start,
+            scheduled_end: input.scheduled_end,
+            time_zone: input.time_zone,
+            state: 'rescheduled',
+            occurrence_history: history,
+            updated_at: new Date().toISOString()
+          });
+          return json(200, { ok: true, data: { meeting } });
+        }
+        const stateMap: Record<string, string> = {
+          complete: 'completed',
+          cancel: 'cancelled',
+          'no-show': 'no_show'
+        };
+        if (stateMap[action]) {
+          meeting.state = stateMap[action];
+          meeting.updated_at = new Date().toISOString();
+          return json(200, { ok: true, data: { meeting } });
+        }
+      }
+      const input = body as {
+        title?: string;
+        scheduled_start?: string;
+        scheduled_end?: string;
+        time_zone?: string;
+        location_text?: string | null;
+        agenda?: string | null;
+        notes?: string | null;
+        links?: Array<{ target_ref: string; relationship_type: string; role?: string | null; occurred_at?: string }>;
+      };
+      const now = new Date().toISOString();
+      const meetingId = `meeting_${randomUUID()}`;
+      const meeting = {
+        schema_version: 1,
+        id: meetingId,
+        title: (input.title ?? '').trim() || 'Untitled',
+        scheduled_start: input.scheduled_start ?? now,
+        scheduled_end: input.scheduled_end ?? now,
+        time_zone: input.time_zone ?? 'Australia/Sydney',
+        location_text: input.location_text ?? null,
+        agenda: input.agenda ?? null,
+        notes: input.notes ?? null,
+        state: 'scheduled',
+        occurrence_history: [],
+        created_at: now,
+        updated_at: now,
+        incomplete_links: null as null
+      };
+      meetings.set(meetingId, meeting);
+      const sourceRef = `professional:meeting:${meetingId}`;
+      for (const link of input.links ?? []) {
+        relationships.push({
+          id: `link_${randomUUID()}`,
+          source_ref: sourceRef,
+          target_ref: link.target_ref,
+          relationship_type: link.relationship_type,
+          inverse_label: link.relationship_type === 'attendee' ? 'attends' : link.relationship_type,
+          context_key: null,
+          status: 'current',
+          temporal_mode: link.relationship_type === 'attendee' ? 'point' : 'timeless',
+          valid_from: null,
+          valid_to: null,
+          occurred_at: link.occurred_at ?? meeting.scheduled_start
+        });
+      }
+      return json(201, { ok: true, data: { meeting, links: [], created: true } });
+    }
+
+    if (path === '/api/meetings' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const meeting = id ? meetings.get(id) : null;
+      if (!meeting) {
+        return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
+      }
+      const patch = body as Record<string, unknown>;
+      for (const key of ['title', 'location_text', 'agenda', 'notes']) {
+        if (patch[key] !== undefined) meeting[key] = patch[key];
+      }
+      meeting.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { meeting } });
+    }
+
+    if (path === '/api/events' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const event = events.get(id);
+        if (!event) {
+          return json(404, { ok: false, error: { code: 'event_not_found', message: 'Event not found.' } });
+        }
+        return json(200, { ok: true, data: { event } });
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          events: [...events.values()].sort(
+            (a, b) => Date.parse(String(a.start)) - Date.parse(String(b.start))
+          )
+        }
+      });
+    }
+
+    if (path === '/api/events' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      const id = url.searchParams.get('id');
+      if (action === 'retry-links' && id) {
+        const event = events.get(id);
+        if (!event) {
+          return json(404, { ok: false, error: { code: 'event_not_found', message: 'Event not found.' } });
+        }
+        event.incomplete_links = null;
+        return json(200, { ok: true, data: { event, links: [], retried: true } });
+      }
+      if (action && id && events.has(id)) {
+        const event = events.get(id)!;
+        if (action === 'reschedule') {
+          const input = body as { start: string; end: string; time_zone: string; all_day?: boolean };
+          Object.assign(event, {
+            start: input.start,
+            end: input.end,
+            time_zone: input.time_zone,
+            all_day: input.all_day ?? false,
+            occurrence_state: 'rescheduled',
+            updated_at: new Date().toISOString()
+          });
+          return json(200, { ok: true, data: { event } });
+        }
+        if (action === 'complete' || action === 'cancel') {
+          event.occurrence_state = action === 'complete' ? 'completed' : 'cancelled';
+          event.updated_at = new Date().toISOString();
+          return json(200, { ok: true, data: { event } });
+        }
+      }
+      const input = body as {
+        title?: string;
+        event_type?: string;
+        start?: string;
+        end?: string;
+        time_zone?: string;
+        all_day?: boolean;
+        location_text?: string | null;
+        accreditation_category?: string | null;
+        hours?: number | null;
+        attendance_state?: string | null;
+        certificate?: unknown;
+        links?: Array<{ target_ref: string; relationship_type: string }>;
+      };
+      const now = new Date().toISOString();
+      const eventId = `event_${randomUUID()}`;
+      const event = {
+        schema_version: 1,
+        id: eventId,
+        title: (input.title ?? '').trim() || 'Untitled',
+        event_type: input.event_type ?? 'professional_development',
+        start: input.start ?? now,
+        end: input.end ?? now,
+        time_zone: input.time_zone ?? 'Australia/Sydney',
+        all_day: Boolean(input.all_day),
+        occurrence_state: 'scheduled',
+        location_text: input.location_text ?? null,
+        accreditation_category: input.accreditation_category ?? null,
+        hours: input.hours ?? null,
+        attendance_state: input.attendance_state ?? null,
+        certificate: input.certificate ?? null,
+        created_at: now,
+        updated_at: now,
+        incomplete_links: null as null
+      };
+      events.set(eventId, event);
+      const sourceRef = `professional:event:${eventId}`;
+      for (const link of input.links ?? []) {
+        relationships.push({
+          id: `link_${randomUUID()}`,
+          source_ref: sourceRef,
+          target_ref: link.target_ref,
+          relationship_type: link.relationship_type,
+          inverse_label: link.relationship_type,
+          context_key: null,
+          status: 'current',
+          temporal_mode: 'timeless',
+          valid_from: null,
+          valid_to: null,
+          occurred_at: null
+        });
+      }
+      return json(201, { ok: true, data: { event, links: [], created: true } });
+    }
+
+    if (path === '/api/events' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const event = id ? events.get(id) : null;
+      if (!event) {
+        return json(404, { ok: false, error: { code: 'event_not_found', message: 'Event not found.' } });
+      }
+      const patch = body as Record<string, unknown>;
+      for (const key of Object.keys(patch)) {
+        if (
+          [
+            'title',
+            'location_text',
+            'accreditation_category',
+            'hours',
+            'attendance_state',
+            'certificate',
+            'all_day'
+          ].includes(key)
+        ) {
+          event[key] = patch[key];
+        }
+      }
+      event.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { event } });
+    }
+
+    if (path === '/api/schedule-projections' && method === 'GET') {
+      const projections = [
+        ...[...meetings.values()].map((meeting) => ({
+          projection_id: `proj_meeting_${String(meeting.id).slice(-12)}`,
+          source_ref: `professional:meeting:${meeting.id}`,
+          kind: 'meeting',
+          title: meeting.title,
+          start: meeting.scheduled_start,
+          end: meeting.scheduled_end,
+          time_zone: meeting.time_zone,
+          all_day: false,
+          status: meeting.state,
+          href: `/professional/#/meeting/${meeting.id}`
+        })),
+        ...[...events.values()].map((event) => ({
+          projection_id: `proj_event_${String(event.id).slice(-12)}`,
+          source_ref: `professional:event:${event.id}`,
+          kind: 'event',
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          time_zone: event.time_zone,
+          all_day: Boolean(event.all_day),
+          status: event.occurrence_state,
+          href: `/professional/#/event/${event.id}`
+        }))
+      ];
+      return json(200, { ok: true, data: { projections } });
     }
 
     if (path === '/api/tasks' && method === 'POST') {

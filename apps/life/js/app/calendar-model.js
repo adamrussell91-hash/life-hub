@@ -61,6 +61,10 @@ export function eventDetailTitle(record, body = '') {
       return 'Sleep';
     case 'scheduled_lesson':
       return record.title || 'Lesson';
+    case 'professional_meeting':
+      return record.title || 'Meeting';
+    case 'professional_event':
+      return record.title || 'Event';
     case 'task':
       return record.title || 'Task';
     case 'work_block':
@@ -126,6 +130,10 @@ export function eventBrief(event) {
       return record.duration_h != null ? `${record.duration_h} h sleep` : '';
     case 'scheduled_lesson':
       return record.delivery_status ? `Teaching · ${record.delivery_status}` : 'Teaching';
+    case 'professional_meeting':
+      return record.status ? `Meeting · ${record.status}` : 'Meeting';
+    case 'professional_event':
+      return record.status ? `Event · ${record.status}` : 'Event';
     case 'task':
       return record.status ? `Tasks · ${record.status}` : 'Tasks';
     case 'work_block': {

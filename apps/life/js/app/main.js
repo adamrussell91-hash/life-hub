@@ -45,6 +45,7 @@ import { createRepositoryCache } from './repository-cache.js';
 import { createSkincareApi } from './skincare-api.js';
 import { createKnowledgeApi } from './knowledge-api.js';
 import { createTasksApi } from './tasks-api.js';
+import { createScheduleApi } from './schedule-api.js';
 import { createShortcutsApi } from './shortcuts-api.js';
 import { renderShortcuts } from './render-shortcuts.js';
 import { createTeachingApi } from './teaching-api.js';
@@ -106,6 +107,7 @@ const skincareApi = createSkincareApi(fetchImpl);
 const teachingApi = createTeachingApi(fetchImpl);
 const knowledgeApi = createKnowledgeApi(fetchImpl);
 const tasksApi = createTasksApi(fetchImpl);
+const scheduleApi = createScheduleApi(fetchImpl);
 const shortcutsApi = createShortcutsApi(fetchImpl);
 
 let controller;
@@ -179,6 +181,7 @@ controller = createAppController({
   teachingApi,
   knowledgeApi,
   tasksApi,
+  scheduleApi,
   shortcutsApi,
   renderShortcuts,
   skincareController,
