@@ -84,6 +84,26 @@ test('comparisons collapse set-suffixed names and expose a kg delta', () => {
   assert.ok(model.weekVolumeKg > 0);
 });
 
+test('working weights show only the ten most recently trained exercises', () => {
+  const exercises = Array.from({ length: 11 }, (_, index) => ({
+    name: `Lift ${index + 1}`,
+    sets: [{ reps: 10, weight_kg: index + 1 }]
+  }));
+  const model = buildFitnessModel({
+    events: events(exercises.map((exercise, index) => workout({
+      date: `2026-07-${String(index + 10).padStart(2, '0')}`,
+      exercises: [exercise]
+    }))),
+    date: '2026-07-30'
+  });
+
+  assert.equal(model.workingWeights.length, 10);
+  assert.deepEqual(model.workingWeights.map(row => row.name), [
+    'Lift 11', 'Lift 10', 'Lift 9', 'Lift 8', 'Lift 7',
+    'Lift 6', 'Lift 5', 'Lift 4', 'Lift 3', 'Lift 2'
+  ]);
+});
+
 test('hero prefers today planned over older completed', () => {
   const model = buildFitnessModel({
     events: events([

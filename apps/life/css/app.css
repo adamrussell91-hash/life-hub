@@ -1644,6 +1644,10 @@ main { max-width: 76rem; margin: 0 auto; }
   grid-column: span 2;
   height: 100%;
 }
+.fitness-bento > .fitness-panel--wide,
+.fitness-bento > .fitness-viz > .fitness-panel--wide {
+  grid-column: 1 / -1;
+}
 .fitness-bento > .fitness-tile--slim,
 .fitness-bento > .fitness-viz > .fitness-tile--slim {
   grid-column: span 1;
@@ -1651,6 +1655,30 @@ main { max-width: 76rem; margin: 0 auto; }
 .fitness-viz {
   display: contents;
 }
+.fitness-goals {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.fitness-goal {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--canvas);
+}
+.fitness-goal__value { font-size: var(--text-lg); color: var(--depth); }
+.fitness-goal__track { display: block; height: var(--space-2); background: var(--shore); border-radius: var(--radius-full); overflow: hidden; }
+.fitness-goal__track i { display: block; height: 100%; width: var(--bar, 0%); background: var(--wave); border-radius: inherit; }
+.fitness-goal__weeks { display: flex; gap: var(--space-1); }
+.fitness-goal__week { width: var(--space-3); height: var(--space-3); border-radius: 50%; background: var(--shore); }
+.fitness-goal__week[data-met="true"] { background: var(--success); }
+.fitness-goal__week[data-band="high"] { background: var(--danger); }
+.fitness-split-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.fitness-split-card > section + section { border-left: 1px solid var(--line); padding-left: var(--space-4); }
 .fitness-board,
 .fitness-recent-list {
   display: grid;
@@ -6336,6 +6364,7 @@ main { max-width: 76rem; margin: 0 auto; }
     grid-column: span 1;
   }
   .fitness-region-grid { grid-template-columns: 1fr; }
+  .fitness-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 48rem) {
   .fitness-bento { grid-template-columns: 1fr; }
@@ -6360,6 +6389,9 @@ main { max-width: 76rem; margin: 0 auto; }
   .fitness-kv-row { grid-template-columns: 1fr; }
   .fitness-kv-row span { text-align: left; white-space: normal; }
   .fitness-share-row { grid-template-columns: 1fr; }
+  .fitness-goals,
+  .fitness-split-card { grid-template-columns: 1fr; }
+  .fitness-split-card > section + section { border-left: 0; border-top: 1px solid var(--line); padding-left: 0; padding-top: var(--space-4); }
   .fitness-compare-row { grid-template-columns: 1fr; }
   .pr-badge,
   .fitness-compare-delta { justify-self: start; }
