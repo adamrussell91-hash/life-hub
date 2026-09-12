@@ -5,7 +5,7 @@ const COMMON_FIELDS = [
   'schema_version', 'id', 'type', 'date', 'time', 'created_at', 'updated_at', 'source'
 ];
 
-const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const MOODS = ['great', 'good', 'neutral', 'low', 'bad'];
 const ENERGY_LEVELS = ['high', 'medium', 'low'];
 const DAY_TYPES = ['movement', 'workout_30', 'workout_45_60'];

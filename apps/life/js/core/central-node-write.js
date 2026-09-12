@@ -160,7 +160,7 @@ export function recentActionFingerprint(line) {
   const body = match[3].replace(/\s+/g, ' ').trim();
   if (!dateKey || !agentKey || !body) return null;
 
-  const mealSlot = /\bfor (breakfast|lunch|dinner|snack)\b/i.exec(body);
+  const mealSlot = /\bfor (breakfast|lunch|dinner|snack|dessert)\b/i.exec(body);
   if (mealSlot) {
     return `${dateKey}|${agentKey}|meal:${mealSlot[1].toLowerCase()}`;
   }
