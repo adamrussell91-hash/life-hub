@@ -152,7 +152,7 @@ export function resolveCalendarDayClick(expandedDate, clickedDate) {
 }
 
 function eventDurationMin(record) {
-  // Meals are a timestamp, not a sitting — keep a short timed chip so the grid can place them.
+  // Meals are a timestamp, not a sitting — short chip for grid placement.
   if (record?.type === 'meal') return 5;
   if (record?.type === 'workout' && record.duration_min != null) return Number(record.duration_min);
   if (record?.type === 'work_block' && record.duration_min != null) return Number(record.duration_min);

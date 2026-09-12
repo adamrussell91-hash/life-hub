@@ -140,18 +140,14 @@ test('eventsForDate includes brief and category affordance', () => {
 });
 
 test('meals use a five-minute calendar span, not the one-hour default', () => {
-  const [meal] = eventsForDate([
-    { record: { type: 'meal', date: '2026-08-05', meal: 'breakfast', time: '08:00' }, body: '', path: 'a' }
-  ], '2026-08-05');
-  const [workout] = eventsForDate([
-    { record: { type: 'workout', date: '2026-08-05', title: 'Pump', time: '09:00', duration_min: 45 }, body: '', path: 'b' }
-  ], '2026-08-05');
-  const [untimed] = eventsForDate([
+  const rows = eventsForDate([
+    { record: { type: 'meal', date: '2026-08-05', meal: 'breakfast', time: '08:00' }, body: '', path: 'a' },
+    { record: { type: 'workout', date: '2026-08-05', title: 'Pump', time: '09:00', duration_min: 45 }, body: '', path: 'b' },
     { record: { type: 'diary', date: '2026-08-05', time: '10:00' }, body: 'note', path: 'c' }
   ], '2026-08-05');
-  assert.equal(meal.durationMin, 5);
-  assert.equal(workout.durationMin, 45);
-  assert.equal(untimed.durationMin, 60);
+  assert.equal(rows[0].durationMin, 5);
+  assert.equal(rows[1].durationMin, 45);
+  assert.equal(rows[2].durationMin, 60);
 });
 
 test('resolveCalendarDayClick toggles same day and expands other days', () => {

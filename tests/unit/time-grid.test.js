@@ -35,10 +35,8 @@ test('layoutTimedBlocks assigns overlap lanes', () => {
   assert.notEqual(blocks[0].lane, blocks[1].lane);
 });
 
-test('layoutTimedBlocks keeps five-minute meals as a five-minute span', () => {
-  const [block] = layoutTimedBlocks([
-    { title: 'Lunch', time: '12:30', durationMin: 5 }
-  ]);
+test('layoutTimedBlocks keeps a five-minute duration as a five-minute span', () => {
+  const [block] = layoutTimedBlocks([{ title: 'Lunch', time: '12:30', durationMin: 5 }]);
   assert.equal(block.start, 12.5);
   assert.equal(block.end, 12.5 + 5 / 60);
 });

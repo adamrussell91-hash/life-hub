@@ -5,7 +5,6 @@ export const TIME_GRID_END_HOUR = 22;
 export const TIME_GRID_HOUR_PX = 52;
 export const TIME_GRID_SNAP_MINUTES = 15;
 export const TIME_GRID_DEFAULT_MINUTES = 60;
-/** Shortest painted span (meals / point-in-time chips). Height still floors in blockStyle. */
 export const TIME_GRID_MIN_MINUTES = 5;
 
 const TIME_RE = /^(?:[01]\d|2[0-3]):([0-5]\d)$/;
