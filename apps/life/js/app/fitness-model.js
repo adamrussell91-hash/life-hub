@@ -445,7 +445,7 @@ function buildLongTerm(events, date, libraryByName = null) {
 
 function buildWorkingWeights(events, date) {
   const from = addCalendarDays(date, -(MONTH_DAYS - 1));
-  const best = new Map();
+  const latest = new Map();
   for (const { record } of events) {
     if (record.status !== 'completed' || record.date < from || record.date > date) continue;
     for (const exercise of record.exercises ?? []) {
@@ -453,9 +453,9 @@ function buildWorkingWeights(events, date) {
       const key = normalizeExerciseName(display);
       const set = bestSet(exercise);
       if (!key || !set) continue;
-      const existing = best.get(key);
-      if (!existing || set.e1rm > existing.e1rm) {
-        best.set(key, {
+      const existing = latest.get(key);
+      if (!existing || record.date > existing.date || (record.date === existing.date && set.e1rm > existing.e1rm)) {
+        latest.set(key, {
           name: display,
           weight_kg: set.weight_kg,
           reps: set.reps,
@@ -465,7 +465,9 @@ function buildWorkingWeights(events, date) {
       }
     }
   }
-  return [...best.values()].sort((a, b) => b.e1rm - a.e1rm || a.name.localeCompare(b.name));
+  return [...latest.values()]
+    .sort((a, b) => b.date.localeCompare(a.date) || b.e1rm - a.e1rm || a.name.localeCompare(b.name))
+    .slice(0, 10);
 }
 
 function buildRecentSessions(events, date, limit = 4) {
@@ -604,7 +606,8 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
       date,
       weekCompletedCount,
       weekTarget: WORKOUT_TARGET_PER_WEEK,
-      monthDates
+      monthDates,
+      workoutsPerWeek: longTerm.workoutsPerWeek
     })
   };
 }
