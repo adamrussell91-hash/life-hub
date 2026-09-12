@@ -5,14 +5,15 @@
   "agents": ["brisket"],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Propose deleting a confirmed meal slot (Confirm). Clears the nutrition file and refreshes day totals — use for remove/undo/duplicate, not macro corrections.",
+  "prompt_one_liner": "Propose deleting a confirmed meal (Confirm). Clears the nutrition file(s) and refreshes day totals — use for remove/undo, not macro corrections. Pass slug when several of one type exist.",
   "inputs": {
     "date": "YYYY-MM-DD",
-    "meal": "breakfast|lunch|dinner|snack"
+    "meal": "breakfast|lunch|dinner|snack|dessert",
+    "slug": "optional file slug e.g. snack-1530"
   },
   "side_effects": [
     "Renders a Confirm card listing the meal file(s) to remove",
-    "On Confirm, deletes data/nutrition/… meal markdown (including snack-2 style variants)",
+    "On Confirm, deletes data/nutrition/… meal markdown (timed, slot-only, or snack-2 style variants)",
     "Rebuilds Central Node Status Nutrition from remaining meals that day"
   ],
   "surfaces": ["confirm_card", "central_node", "nutrition_tab", "governance_log"],

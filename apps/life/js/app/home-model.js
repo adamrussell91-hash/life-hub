@@ -24,7 +24,7 @@ const EMPTY_TARGETS = {
   sodium_ceiling_mg: 0,
   calcium_target_mg: 0,
   polyphenol_daily_aim: 0,
-  meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, minimum: 0 }
+  meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, dessert: 0, minimum: 0 }
 };
 
 const weekdayLetter = date => new Intl.DateTimeFormat('en-AU', {

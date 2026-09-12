@@ -45,7 +45,8 @@ function formatOmega3Tally(tally) {
 }
 
 function formatMealSplit(meals, guides) {
-  return ['breakfast', 'lunch', 'dinner', 'snack']
+  return ['breakfast', 'lunch', 'dinner', 'snack', 'dessert']
+    .filter(slot => (meals?.[slot]?.protein_g ?? 0) > 0 || (guides?.[slot] ?? 0) > 0)
     .map(slot => {
       const logged = meals?.[slot]?.protein_g ?? 0;
       const guide = guides?.[slot] ?? 0;

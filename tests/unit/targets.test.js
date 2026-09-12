@@ -33,7 +33,7 @@ test('applies recovery to the following day targets without changing day type', 
     sodium_ceiling_mg: 2000,
     calcium_target_mg: 1000,
     polyphenol_daily_aim: 10,
-    meal_protein_g: { breakfast: 30, lunch: 30, dinner: 40, snack: 20, minimum: 25 }
+    meal_protein_g: { breakfast: 30, lunch: 30, dinner: 40, snack: 20, dessert: 0, minimum: 25 }
   });
 });
 

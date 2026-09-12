@@ -62,13 +62,13 @@ test('validates, writes, and returns the canonical path for a new record', async
   const payload = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-breakfast.md');
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-breakfast-1600.md');
   assert.equal(calls[0].options.method, 'PUT');
   assert.equal(JSON.parse(calls[0].options.body).sha, undefined);
 });
 
-test('meal confirm derives path from meal slot even when request slug is the agent id', async () => {
-  // Photo Confirm often sends slug=brisket (agent id). Path must still be …-lunch.md.
+test('meal confirm derives path from meal+time even when request slug is the agent id', async () => {
+  // Photo Confirm often sends slug=brisket (agent id). Path must still be …-lunch-1600.md.
   const { calls, fetchImpl } = githubFetchStub();
   const handler = createChatConfirmHandler({
     env: validEnv,
@@ -88,10 +88,10 @@ test('meal confirm derives path from meal slot even when request slug is the age
   const payload = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-lunch.md');
+  assert.equal(payload.data.path, 'data/nutrition/2026/08/2026-08-01-lunch-1600.md');
   assert.ok(!String(payload.data.path).includes('brisket'));
   assert.equal(calls[0].options.method, 'PUT');
-  assert.match(String(calls[0].url), /2026-08-01-lunch\.md/);
+  assert.match(String(calls[0].url), /2026-08-01-lunch-1600\.md/);
 });
 
 test('reports a validation failure without contacting GitHub', async () => {

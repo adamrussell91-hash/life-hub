@@ -11,7 +11,7 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
   meal: {
-    meal: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+    meal: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'] },
     calories: { type: 'number' },
     protein_g: { type: 'number' },
     fat_g: { type: 'number' },
@@ -274,7 +274,8 @@ export function buildPlannedWorkoutSlug(title) {
 
 /**
  * Stable path slug for a validated record.
- * Meals use slot-only slugs so same-day corrections overwrite the same file.
+ * Meals use slot + clock (`snack-1530`) so more than one of the same type can
+ * land on one day; same meal + same time still overwrites on correction.
  * Planned workouts key off title so multiple sessions can share a calendar day.
  */
 export function buildRecordSlug(record) {
@@ -283,7 +284,10 @@ export function buildRecordSlug(record) {
     if (typeof record.meal !== 'string' || !SLUG.test(record.meal)) {
       throw new TypeError(`Invalid meal slot: ${record.meal}`);
     }
-    return record.meal;
+    const time = typeof record.time === 'string' && /^\d{2}:\d{2}$/.test(record.time)
+      ? record.time.replace(':', '')
+      : '0000';
+    return `${record.meal}-${time}`;
   }
   if (record.type === 'workout' && record.status === 'planned') {
     return buildPlannedWorkoutSlug(record.title);

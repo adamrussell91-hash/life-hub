@@ -224,7 +224,7 @@ function parseDateFromParent(raw) {
 }
 
 function defaultTimeForMeal(meal) {
-  return ({ breakfast: '08:00', lunch: '12:30', dinner: '19:00', snack: '15:30' })[meal] ?? '12:00';
+  return ({ breakfast: '08:00', lunch: '12:30', dinner: '19:00', snack: '15:30', dessert: '21:00' })[meal] ?? '12:00';
 }
 
 function parseTimeEaten(notes) {

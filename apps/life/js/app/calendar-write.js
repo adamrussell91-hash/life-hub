@@ -1,4 +1,4 @@
-const MEALS = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEALS = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const WRITABLE = new Set(['diary', 'workout', 'meal']);
 
 export function isWritableCalendarType(type) {
@@ -7,7 +7,9 @@ export function isWritableCalendarType(type) {
 
 export function slugForLog(type, { meal, time } = {}) {
   if (type === 'meal') {
-    return MEALS.includes(meal) ? meal : 'snack';
+    const slot = MEALS.includes(meal) ? meal : 'snack';
+    const hhmm = String(time ?? '00:00').replace(':', '');
+    return `${slot}-${hhmm}`;
   }
   const hhmm = String(time ?? '00:00').replace(':', '');
   return `${type}-${hhmm}`;
@@ -16,10 +18,13 @@ export function slugForLog(type, { meal, time } = {}) {
 export function inferMealSlot(title, time) {
   const lower = String(title ?? '').trim().toLowerCase();
   if (MEALS.includes(lower)) return lower;
+  if (/\bdessert\b/.test(lower)) return 'dessert';
   const hours = typeof time === 'string' ? Number(time.slice(0, 2)) : NaN;
   if (hours < 11) return 'breakfast';
   if (hours < 15) return 'lunch';
+  if (hours < 17) return 'snack';
   if (hours < 21) return 'dinner';
+  if (Number.isFinite(hours)) return 'dessert';
   return 'snack';
 }
 

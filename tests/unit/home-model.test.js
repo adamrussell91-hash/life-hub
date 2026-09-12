@@ -47,7 +47,8 @@ test('builds the approved Home fixture model through core modules', async () => 
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },
       dinner: { protein_g: 0 },
-      snack: { protein_g: 0 }
+      snack: { protein_g: 0 },
+      dessert: { protein_g: 0 }
     }
   });
   assert.equal(model.targets.calories, 1900);
@@ -82,7 +83,7 @@ test('a repository with no config/targets.yml yet renders zeroed targets instead
     sodium_ceiling_mg: 0,
     calcium_target_mg: 0,
     polyphenol_daily_aim: 0,
-    meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, minimum: 0 }
+    meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, dessert: 0, minimum: 0 }
   });
   assert.deepEqual(model.progress, { calories: 0, protein: 0, fat: 0, logging: 0 });
   assert.equal(model.overFatCeiling, false);

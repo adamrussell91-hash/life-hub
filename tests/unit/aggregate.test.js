@@ -33,7 +33,8 @@ test('matches the approved sample Home totals for parsed events', () => {
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },
       dinner: { protein_g: 0 },
-      snack: { protein_g: 0 }
+      snack: { protein_g: 0 },
+      dessert: { protein_g: 0 }
     }
   });
   assert.equal(resolveDayType(events, '2026-07-30'), 'workout_30');
@@ -57,6 +58,18 @@ test('fat and protein sums round off IEEE754 noise to one decimal', () => {
   assert.equal(nutrition.protein_g, 139.7);
 });
 
+test('multiple snacks and dessert sum into meal distribution buckets', () => {
+  const meals = [
+    { type: 'meal', date: '2026-09-12', meal: 'snack', protein_g: 10, calories: 100 },
+    { type: 'meal', date: '2026-09-12', meal: 'snack', protein_g: 12, calories: 150 },
+    { type: 'meal', date: '2026-09-12', meal: 'dessert', protein_g: 4, calories: 220 }
+  ];
+  const nutrition = aggregateNutrition(meals, '2026-09-12');
+  assert.equal(nutrition.protein_g, 26);
+  assert.equal(nutrition.meals.snack.protein_g, 22);
+  assert.equal(nutrition.meals.dessert.protein_g, 4);
+});
+
 test('empty and missing additive nutrition values contribute zero', () => {
   const sparse = [{ type: 'meal', date: '2026-07-31', meal: 'snack', protein_g: null }];
 
@@ -73,7 +86,8 @@ test('empty and missing additive nutrition values contribute zero', () => {
       breakfast: { protein_g: 0 },
       lunch: { protein_g: 0 },
       dinner: { protein_g: 0 },
-      snack: { protein_g: 0 }
+      snack: { protein_g: 0 },
+      dessert: { protein_g: 0 }
     }
   });
 });

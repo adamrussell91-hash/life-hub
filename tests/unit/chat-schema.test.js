@@ -7,17 +7,34 @@ test('builds the canonical path for each writable record type', () => {
   assert.equal(buildCanonicalPath({ type: 'weight', date: '2026-08-01', slug: 'weight' }), 'data/body/2026/08/2026-08-01-weight.md');
 });
 
-test('meal slugs are slot-only so same-day corrections overwrite', () => {
-  assert.equal(buildRecordSlug({ type: 'meal', meal: 'lunch', time: '13:45' }), 'lunch');
-  assert.equal(buildRecordSlug({ type: 'meal', meal: 'snack', time: '16:00' }), 'snack');
+test('meal slugs include clock time so same-day multiples do not collide', () => {
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'lunch', time: '13:45' }), 'lunch-1345');
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'snack', time: '16:00' }), 'snack-1600');
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'dessert', time: '21:30' }), 'dessert-2130');
+  assert.equal(buildRecordSlug({ type: 'meal', meal: 'snack', time: '10:15' }), 'snack-1015');
   assert.equal(
     buildCanonicalPath({
       type: 'meal',
       date: '2026-08-07',
       slug: buildRecordSlug({ type: 'meal', meal: 'lunch', time: '13:45' })
     }),
-    'data/nutrition/2026/08/2026-08-07-lunch.md'
+    'data/nutrition/2026/08/2026-08-07-lunch-1345.md'
   );
+});
+
+test('dessert is a valid meal type', () => {
+  const result = validateLogEntry({
+    type: 'meal',
+    date: '2026-08-01',
+    time: '21:15',
+    fields: {
+      meal: 'dessert', calories: 220, protein_g: 4, fat_g: 8, sodium_mg: 40,
+      calcium_mg: 60, polyphenol_score: 1, omega3: 'none'
+    }
+  }, { id: 'meal-dessert', now: '2026-08-01T21:15:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.meal, 'dessert');
+  assert.equal(buildRecordSlug(result.record), 'dessert-2115');
 });
 
 test('non-meal slugs still include time when present', () => {

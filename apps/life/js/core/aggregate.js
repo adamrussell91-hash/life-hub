@@ -1,6 +1,6 @@
 import { addCalendarDays } from './time.js';
 
-const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 const DAY_TYPE_RANK = { movement: 0, workout_30: 1, workout_45_60: 2 };
 const BODY_TYPES = new Set(['weight', 'composition']);

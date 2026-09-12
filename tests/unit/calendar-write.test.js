@@ -7,8 +7,9 @@ import {
   slugForLog
 } from '../../apps/life/js/app/calendar-write.js';
 
-test('slugForLog uses meal slot or type plus time', () => {
-  assert.equal(slugForLog('meal', { meal: 'lunch' }), 'lunch');
+test('slugForLog uses meal slot plus time', () => {
+  assert.equal(slugForLog('meal', { meal: 'lunch', time: '12:30' }), 'lunch-1230');
+  assert.equal(slugForLog('meal', { meal: 'dessert', time: '21:00' }), 'dessert-2100');
   assert.equal(slugForLog('diary', { time: '09:15' }), 'diary-0915');
   assert.equal(slugForLog('workout', { time: '18:00' }), 'workout-1800');
 });
@@ -17,7 +18,10 @@ test('inferMealSlot reads title or clock', () => {
   assert.equal(inferMealSlot('Breakfast', '21:00'), 'breakfast');
   assert.equal(inferMealSlot('Eggs', '08:00'), 'breakfast');
   assert.equal(inferMealSlot('Eggs', '13:00'), 'lunch');
+  assert.equal(inferMealSlot('Yoghurt', '15:30'), 'snack');
   assert.equal(inferMealSlot('Eggs', '19:00'), 'dinner');
+  assert.equal(inferMealSlot('Ice cream', '21:30'), 'dessert');
+  assert.equal(inferMealSlot('Dessert', '19:00'), 'dessert');
 });
 
 test('candidateForLog builds diary, workout, and meal payloads', () => {

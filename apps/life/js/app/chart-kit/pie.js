@@ -1,15 +1,17 @@
-const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_ORDER = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
 const MEAL_COLOURS = {
   breakfast: 'color-mix(in srgb, var(--wave) 35%, white)',
   lunch: 'color-mix(in srgb, var(--wave) 55%, white)',
   dinner: 'var(--wave)',
-  snack: 'var(--high-sea)'
+  snack: 'var(--high-sea)',
+  dessert: 'color-mix(in srgb, var(--high-sea) 55%, var(--wave))'
 };
 const MEAL_LABELS = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
-  snack: 'Snack'
+  snack: 'Snack',
+  dessert: 'Dessert'
 };
 
 function polar(cx, cy, r, angleRad) {
