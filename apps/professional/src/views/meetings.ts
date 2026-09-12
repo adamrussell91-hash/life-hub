@@ -119,10 +119,10 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
   timeZone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
   timeZone.setAttribute('aria-label', 'Time zone');
 
-  const location = document.createElement('input');
-  location.type = 'text';
-  location.placeholder = 'Location';
-  location.setAttribute('aria-label', 'Location');
+  const locationField = document.createElement('input');
+  locationField.type = 'text';
+  locationField.placeholder = 'Location';
+  locationField.setAttribute('aria-label', 'Location');
 
   const agenda = document.createElement('textarea');
   agenda.rows = 3;
@@ -198,7 +198,7 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
     el('label', undefined, 'Time zone'),
     timeZone,
     el('label', undefined, 'Location'),
-    location,
+    locationField,
     el('label', undefined, 'Agenda'),
     agenda,
     el('label', undefined, 'Attendee role for next pick'),
@@ -230,14 +230,14 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
         scheduled_start: scheduledStart,
         scheduled_end: new Date(end.value).toISOString(),
         time_zone: timeZone.value,
-        location_text: location.value || null,
+        location_text: locationField.value || null,
         agenda: agenda.value || null,
         links
       });
-      location.hash = meetingRoute(result.meeting.id);
+      window.location.hash = meetingRoute(result.meeting.id);
     } catch (err) {
       if (isMeetingIncompleteLinksError(err)) {
-        location.hash = meetingRoute(err.data.meeting_id);
+        window.location.hash = meetingRoute(err.data.meeting_id);
         return;
       }
       status.hidden = false;
