@@ -204,7 +204,8 @@ export function createCommunicationRepository(deps = {}) {
       getUniversalLinkStore,
       createUniversalLinkRepository: createLinkRepository,
       getTasksStore: deps.getTasksStore,
-      createTaskId: deps.createTaskId,
+      beforeTaskEnsure: deps.beforeTaskEnsure,
+      afterTaskEnsure: deps.afterTaskEnsure,
       env: deps.env
     });
 

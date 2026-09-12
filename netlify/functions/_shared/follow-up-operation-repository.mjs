@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   deriveCommunicationOperationId,
   isValidCommunicationId,
@@ -5,7 +6,6 @@ import {
   projectCommunication
 } from './communication-schema.mjs';
 import { createAccessContext } from './entity-access.mjs';
-import { formatEntityRef } from './entity-ref.mjs';
 import {
   buildFollowUpIntents,
   recipientPersonRefsFromLinks
@@ -18,7 +18,6 @@ import {
 import {
   defaultGetTasksStore,
   getJSON as getTasksJSON,
-  newTaskId,
   readTaskIndex,
   setJSON as setTasksJSON,
   taskKey,
@@ -42,6 +41,25 @@ function followUpPointerKey(communicationId) {
     });
   }
   return `${FOLLOW_UP_OPERATION_PREFIX}by-communication/${communicationId}`;
+}
+
+/** One Task id per follow-up operation — concurrent creates and retries share it. */
+export function deriveFollowUpTaskId(operationId) {
+  const digest = createHash('sha256')
+    .update(`follow_up_task_id:${operationId}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `task_fu_${digest}`;
+}
+
+function unionIds(...lists) {
+  const out = new Set();
+  for (const list of lists) {
+    for (const id of list ?? []) {
+      if (typeof id === 'string' && id) out.add(id);
+    }
+  }
+  return [...out];
 }
 
 function followUpIncompleteError(journal) {
@@ -129,7 +147,8 @@ export function createFollowUpOperationRepository(deps = {}) {
   const getUniversalLinkStore = deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
   const createLinkRepository = deps.createUniversalLinkRepository ?? createUniversalLinkRepository;
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
-  const createTaskId = deps.createTaskId ?? newTaskId;
+  const beforeTaskEnsure = deps.beforeTaskEnsure;
+  const afterTaskEnsure = deps.afterTaskEnsure;
 
   async function loadJournal(operationId) {
     return getJSON(professionalStore, followUpOperationKey(operationId));
@@ -145,13 +164,49 @@ export function createFollowUpOperationRepository(deps = {}) {
     return loadJournal(pointer.operation_id);
   }
 
+  /**
+   * Merge completed link work so a competing write cannot erase intent/link ids
+   * another request already recorded. Prefer committed over incomplete when either
+   * side finished; otherwise keep the newer status while unioning completions.
+   */
   async function saveJournal(journal) {
-    await setJSON(professionalStore, followUpOperationKey(journal.operation_id), journal);
-    await setJSON(professionalStore, followUpPointerKey(journal.communication_id), {
-      operation_id: journal.operation_id,
-      communication_id: journal.communication_id
+    const existing = await loadJournal(journal.operation_id);
+    let merged = journal;
+    if (existing && existing.operation_id === journal.operation_id) {
+      const completedIntentIds = unionIds(existing.completed_intent_ids, journal.completed_intent_ids);
+      const completedLinkIds = unionIds(existing.completed_link_ids, journal.completed_link_ids);
+      const completedIntentSet = new Set(completedIntentIds);
+      const failedRelationships = (journal.failed_relationships ?? []).filter(
+        (item) => !completedIntentSet.has(item.intent_id)
+      );
+      const failedIntentIds = (journal.failed_intent_ids ?? []).filter(
+        (id) => !completedIntentSet.has(id)
+      );
+      const status =
+        existing.status === 'committed' || journal.status === 'committed'
+          ? 'committed'
+          : journal.status || existing.status;
+      merged = {
+        ...existing,
+        ...journal,
+        task_id: journal.task_id || existing.task_id,
+        title: journal.title || existing.title,
+        intents: journal.intents ?? existing.intents,
+        completed_intent_ids: completedIntentIds,
+        completed_link_ids: completedLinkIds,
+        failed_intent_ids: status === 'committed' ? [] : failedIntentIds,
+        failed_relationships: status === 'committed' ? [] : failedRelationships,
+        status,
+        created_at: existing.created_at || journal.created_at,
+        updated_at: journal.updated_at || existing.updated_at
+      };
+    }
+    await setJSON(professionalStore, followUpOperationKey(merged.operation_id), merged);
+    await setJSON(professionalStore, followUpPointerKey(merged.communication_id), {
+      operation_id: merged.operation_id,
+      communication_id: merged.communication_id
     });
-    return journal;
+    return merged;
   }
 
   async function loadCommunicationRecord(communicationId) {
@@ -173,13 +228,23 @@ export function createFollowUpOperationRepository(deps = {}) {
     return record;
   }
 
-  async function createTaskRecord(title) {
+  /** Idempotent create for the journal's deterministic Task id. */
+  async function ensureTaskRecord(taskId, title) {
     const tasksStore = await getTasksStore(deps.env);
+    if (typeof beforeTaskEnsure === 'function') {
+      await beforeTaskEnsure({ taskId, tasksStore });
+    }
+    const existing = await getTasksJSON(tasksStore, taskKey(taskId));
+    if (existing?.id === taskId) {
+      if (typeof afterTaskEnsure === 'function') {
+        await afterTaskEnsure({ taskId, tasksStore, created: false, task: existing });
+      }
+      return { task: existing, created: false };
+    }
     const timestamp = now();
-    const id = createTaskId();
     const task = {
       schema_version: 1,
-      id,
+      id: taskId,
       title,
       description: '',
       kind: 'task',
@@ -197,11 +262,12 @@ export function createFollowUpOperationRepository(deps = {}) {
       source: 'manual'
     };
     // Never store Communication, Person, or Universal Link ids on Task JSON.
-    await setTasksJSON(tasksStore, taskKey(id), task);
+    await setTasksJSON(tasksStore, taskKey(taskId), task);
     const ids = await readTaskIndex(tasksStore);
-    await writeTaskIndex(tasksStore, [...ids, id]);
-    // Confirm the write landed before returning the id to the journal.
-    const stored = await getTasksJSON(tasksStore, taskKey(id));
+    if (!ids.includes(taskId)) {
+      await writeTaskIndex(tasksStore, [...ids, taskId]);
+    }
+    const stored = await getTasksJSON(tasksStore, taskKey(taskId));
     if (!stored?.id) {
       throw Object.assign(new Error('Follow-up Task could not be stored.'), {
         status: 503,
@@ -209,7 +275,10 @@ export function createFollowUpOperationRepository(deps = {}) {
         retryable: true
       });
     }
-    return stored;
+    if (typeof afterTaskEnsure === 'function') {
+      await afterTaskEnsure({ taskId, tasksStore, created: true, task: stored });
+    }
+    return { task: stored, created: true };
   }
 
   async function ensureIntents(journal, linkRepo, accessContext) {
@@ -347,6 +416,7 @@ export function createFollowUpOperationRepository(deps = {}) {
   async function createOrRetry({ communicationId, title }) {
     const record = await loadCommunicationRecord(communicationId);
     const operationId = deriveCommunicationOperationId(['follow_up_task', communicationId]);
+    const deterministicTaskId = deriveFollowUpTaskId(operationId);
     let journal = await loadJournal(operationId);
     const timestamp = now();
     const resolvedTitle =
@@ -355,6 +425,8 @@ export function createFollowUpOperationRepository(deps = {}) {
         : `Follow up: ${record.subject || record.channel}`;
 
     if (!journal) {
+      // Claim the Task id in the journal before any Task record write so a
+      // crash or concurrent first request cannot mint a second Task.
       journal = {
         schema_version: 1,
         kind: 'follow_up_task',
@@ -362,7 +434,7 @@ export function createFollowUpOperationRepository(deps = {}) {
         communication_id: communicationId,
         status: 'in_progress',
         title: resolvedTitle,
-        task_id: null,
+        task_id: deterministicTaskId,
         intents: null,
         completed_intent_ids: [],
         completed_link_ids: [],
@@ -371,7 +443,16 @@ export function createFollowUpOperationRepository(deps = {}) {
         created_at: timestamp,
         updated_at: timestamp
       };
-      await saveJournal(journal);
+      journal = await saveJournal(journal);
+    } else if (!journal.task_id) {
+      journal = {
+        ...journal,
+        task_id: deterministicTaskId,
+        title: journal.title || resolvedTitle,
+        status: journal.status === 'committed' ? journal.status : 'in_progress',
+        updated_at: now()
+      };
+      journal = await saveJournal(journal);
     }
 
     if (journal.status === 'committed' && journal.task_id) {
@@ -384,21 +465,10 @@ export function createFollowUpOperationRepository(deps = {}) {
       };
     }
 
-    let createdTask = false;
-    if (!journal.task_id) {
-      // Persist the Task id in the journal before recipient lookup or link writes
-      // so every retry resumes the same Task.
-      const task = await createTaskRecord(journal.title || resolvedTitle);
-      journal = {
-        ...journal,
-        task_id: task.id,
-        title: journal.title || resolvedTitle,
-        status: 'in_progress',
-        updated_at: now()
-      };
-      await saveJournal(journal);
-      createdTask = true;
-    }
+    const { created: createdTask } = await ensureTaskRecord(
+      journal.task_id,
+      journal.title || resolvedTitle
+    );
 
     const accessContext = createAccessContext({ workflow: 'life' });
     const ulStore = await getUniversalLinkStore(deps.env);
@@ -425,7 +495,8 @@ export function createFollowUpOperationRepository(deps = {}) {
     getProjection,
     createOrRetry,
     projectFollowUpOperation,
-    enrichCommunication
+    enrichCommunication,
+    deriveFollowUpTaskId
   };
 }
 

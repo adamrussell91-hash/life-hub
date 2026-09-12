@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { deriveCommunicationOperationId } from '../../netlify/functions/_shared/communication-schema.mjs';
 import { createCommunicationsHandler } from '../../netlify/functions/communications.mjs';
+import {
+  deriveFollowUpTaskId,
+  followUpOperationKey
+} from '../../netlify/functions/_shared/follow-up-operation-repository.mjs';
 import { createIdentityRepository } from '../../netlify/functions/_shared/identity-repository.mjs';
 import {
   resolveCommunication,
@@ -75,13 +80,19 @@ async function seedPerson(store, displayName = 'Seth Example') {
   return { record, ref };
 }
 
+function expectedTaskIdFor(communicationId) {
+  const operationId = deriveCommunicationOperationId(['follow_up_task', communicationId]);
+  return deriveFollowUpTaskId(operationId);
+}
+
 function makeHandler({
   professionalStore,
   universalStore,
   tasksStore,
   linkCreateImpl,
   listForEntityImpl,
-  createTaskId
+  beforeTaskEnsure,
+  afterTaskEnsure
 }) {
   const resolveEntity = async (refInput, accessContext) => {
     const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
@@ -106,7 +117,8 @@ function makeHandler({
     getContentStore: async () => professionalStore,
     getUniversalLinkStore: async () => universalStore,
     getTasksStore: async () => tasksStore,
-    createTaskId,
+    beforeTaskEnsure,
+    afterTaskEnsure,
     resolveEntity,
     createUniversalLinkRepository: () => ({
       createLink: linkCreateImpl,
@@ -141,23 +153,22 @@ async function createCommunicationWithRecipient(handler, personRef) {
   return body.data.communication;
 }
 
+function taskKeysInStore(tasksStore) {
+  return [...tasksStore.map.keys()].filter((key) => key.startsWith('tasks/') && key !== 'tasks/_index');
+}
+
 test('follow-up: recipient lookup failure after Task create survives reload and retries the same Task', async () => {
   const professionalStore = memoryStore();
   const universalStore = memoryStore();
   const tasksStore = memoryStore();
   const { ref: personRef } = await seedPerson(universalStore);
   let listCalls = 0;
-  let taskIdCounter = 0;
   const createdLinks = [];
 
   const handler = makeHandler({
     professionalStore,
     universalStore,
     tasksStore,
-    createTaskId: () => {
-      taskIdCounter += 1;
-      return `task_follow_${taskIdCounter}`;
-    },
     listForEntityImpl: async () => {
       listCalls += 1;
       if (listCalls === 1) {
@@ -190,6 +201,7 @@ test('follow-up: recipient lookup failure after Task create survives reload and 
   });
 
   const communication = await createCommunicationWithRecipient(handler, personRef);
+  const expectedTaskId = expectedTaskIdFor(communication.id);
 
   const first = await handler(
     request({
@@ -202,8 +214,8 @@ test('follow-up: recipient lookup failure after Task create survives reload and 
   const firstBody = await first.json();
   assert.equal(firstBody.error.code, 'follow_up_operation_incomplete');
   assert.equal(firstBody.error.retryable, true);
-  assert.equal(firstBody.data.task_id, 'task_follow_1');
-  assert.equal(taskIdCounter, 1);
+  assert.equal(firstBody.data.task_id, expectedTaskId);
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
 
   const reload = await handler(
     request({ url: `https://api.adam-russell.com/api/communications?id=${communication.id}` })
@@ -211,7 +223,7 @@ test('follow-up: recipient lookup failure after Task create survives reload and 
   assert.equal(reload.status, 200);
   const reloadBody = await reload.json();
   assert.equal(reloadBody.data.communication.follow_up_operation.status, 'incomplete');
-  assert.equal(reloadBody.data.communication.follow_up_operation.task_id, 'task_follow_1');
+  assert.equal(reloadBody.data.communication.follow_up_operation.task_id, expectedTaskId);
 
   const retry = await handler(
     request({
@@ -222,12 +234,12 @@ test('follow-up: recipient lookup failure after Task create survives reload and 
   );
   assert.equal(retry.status, 200);
   const retryBody = await retry.json();
-  assert.equal(retryBody.data.task_id, 'task_follow_1');
+  assert.equal(retryBody.data.task_id, expectedTaskId);
   assert.equal(retryBody.data.created_task, false);
   assert.equal(retryBody.data.follow_up_operation.status, 'committed');
-  assert.equal(taskIdCounter, 1);
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
 
-  const storedTask = await tasksStore.get(taskKey('task_follow_1'), { type: 'json' });
+  const storedTask = await tasksStore.get(taskKey(expectedTaskId), { type: 'json' });
   assert.equal(storedTask.title, 'Follow up: Proposal');
   assert.equal(Object.prototype.hasOwnProperty.call(storedTask, 'communication_id'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(storedTask, 'person_id'), false);
@@ -239,7 +251,6 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   const universalStore = memoryStore();
   const tasksStore = memoryStore();
   const { ref: personRef } = await seedPerson(universalStore);
-  let taskIdCounter = 0;
   let failContactOnce = true;
   const createdLinks = [];
 
@@ -247,10 +258,6 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
     professionalStore,
     universalStore,
     tasksStore,
-    createTaskId: () => {
-      taskIdCounter += 1;
-      return `task_follow_${taskIdCounter}`;
-    },
     listForEntityImpl: async (ref) => {
       if (String(ref).startsWith('professional:communication:')) {
         return {
@@ -294,6 +301,7 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   });
 
   const communication = await createCommunicationWithRecipient(handler, personRef);
+  const expectedTaskId = expectedTaskIdFor(communication.id);
 
   const first = await handler(
     request({
@@ -304,7 +312,7 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   );
   assert.equal(first.status, 503);
   const firstBody = await first.json();
-  assert.equal(firstBody.data.task_id, 'task_follow_1');
+  assert.equal(firstBody.data.task_id, expectedTaskId);
   assert.ok(firstBody.data.completed_link_ids.length >= 1);
   assert.ok(firstBody.data.failed_intent_ids.some((id) => String(id).startsWith('contact:')));
 
@@ -317,7 +325,7 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   );
   assert.equal(second.status, 200);
   const secondBody = await second.json();
-  assert.equal(secondBody.data.task_id, 'task_follow_1');
+  assert.equal(secondBody.data.task_id, expectedTaskId);
   assert.equal(secondBody.data.follow_up_operation.status, 'committed');
 
   const completedReload = await handler(
@@ -325,7 +333,7 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   );
   const completedBody = await completedReload.json();
   assert.equal(completedBody.data.communication.follow_up_operation.status, 'committed');
-  assert.equal(completedBody.data.communication.follow_up_operation.task_id, 'task_follow_1');
+  assert.equal(completedBody.data.communication.follow_up_operation.task_id, expectedTaskId);
 
   const [clickA, clickB] = await Promise.all([
     handler(
@@ -347,9 +355,9 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
   assert.equal(clickB.status, 201);
   const bodyA = await clickA.json();
   const bodyB = await clickB.json();
-  assert.equal(bodyA.data.task_id, 'task_follow_1');
-  assert.equal(bodyB.data.task_id, 'task_follow_1');
-  assert.equal(taskIdCounter, 1);
+  assert.equal(bodyA.data.task_id, expectedTaskId);
+  assert.equal(bodyB.data.task_id, expectedTaskId);
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
 
   assert.equal(createdLinks.filter((link) => link.relationship_type === 'follow_up').length, 1);
   assert.equal(createdLinks.filter((link) => link.relationship_type === 'contact').length, 1);
@@ -358,4 +366,188 @@ test('follow-up: partial link failure, repeated retry, completed reload, concurr
       key.startsWith('communications/follow-up-operations/')
     )
   );
+});
+
+test('follow-up: concurrent initial create reaches Task ensure before either finishes', async () => {
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const { ref: personRef } = await seedPerson(universalStore);
+  const createdLinks = [];
+  let arrived = 0;
+  let releaseBarrier;
+  const barrier = new Promise((resolve) => {
+    releaseBarrier = resolve;
+  });
+
+  const handler = makeHandler({
+    professionalStore,
+    universalStore,
+    tasksStore,
+    beforeTaskEnsure: async () => {
+      arrived += 1;
+      if (arrived === 2) releaseBarrier();
+      await barrier;
+    },
+    listForEntityImpl: async (ref) => {
+      if (String(ref).startsWith('professional:communication:')) {
+        return {
+          outgoing: [
+            {
+              link: {
+                id: 'ul_recipient',
+                status: 'current',
+                relationship_type: 'recipient',
+                source_ref: String(ref),
+                target_ref: personRef
+              }
+            }
+          ],
+          incoming: []
+        };
+      }
+      return { outgoing: [], incoming: [] };
+    },
+    linkCreateImpl: async (input) => {
+      const existing = createdLinks.find(
+        (item) =>
+          item.source_ref === input.source_ref &&
+          item.target_ref === input.target_ref &&
+          item.relationship_type === input.relationship_type
+      );
+      if (existing) {
+        return { link: { id: existing.id, ...existing }, created: false };
+      }
+      const link = { id: `ul_${createdLinks.length + 1}`, ...input, status: 'current' };
+      createdLinks.push(link);
+      return { link, created: true };
+    }
+  });
+
+  const communication = await createCommunicationWithRecipient(handler, personRef);
+  const expectedTaskId = expectedTaskIdFor(communication.id);
+
+  const [first, second] = await Promise.all([
+    handler(
+      request({
+        method: 'POST',
+        url: `https://api.adam-russell.com/api/communications?id=${communication.id}&action=create-follow-up`,
+        body: { title: 'Follow up: Proposal' }
+      })
+    ),
+    handler(
+      request({
+        method: 'POST',
+        url: `https://api.adam-russell.com/api/communications?id=${communication.id}&action=create-follow-up`,
+        body: { title: 'Follow up: Proposal' }
+      })
+    )
+  ]);
+
+  assert.equal(arrived, 2);
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+  const bodyA = await first.json();
+  const bodyB = await second.json();
+  assert.equal(bodyA.data.task_id, expectedTaskId);
+  assert.equal(bodyB.data.task_id, expectedTaskId);
+  assert.equal(bodyA.data.follow_up_operation.status, 'committed');
+  assert.equal(bodyB.data.follow_up_operation.status, 'committed');
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
+  assert.equal(createdLinks.filter((link) => link.relationship_type === 'follow_up').length, 1);
+  assert.equal(createdLinks.filter((link) => link.relationship_type === 'contact').length, 1);
+
+  const operationId = deriveCommunicationOperationId(['follow_up_task', communication.id]);
+  const journal = await professionalStore.get(followUpOperationKey(operationId), { type: 'json' });
+  assert.equal(journal.status, 'committed');
+  assert.equal(journal.task_id, expectedTaskId);
+  assert.equal(journal.completed_intent_ids.length, 2);
+  assert.equal(journal.completed_link_ids.length, 2);
+});
+
+test('follow-up: interruption after Task storage before journal continuation reuses stored Task', async () => {
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const { ref: personRef } = await seedPerson(universalStore);
+  const createdLinks = [];
+  let failAfterTaskOnce = true;
+
+  const handler = makeHandler({
+    professionalStore,
+    universalStore,
+    tasksStore,
+    afterTaskEnsure: async ({ created }) => {
+      if (created && failAfterTaskOnce) {
+        failAfterTaskOnce = false;
+        throw Object.assign(new Error('interrupted after task storage'), {
+          status: 503,
+          code: 'follow_up_interrupted_after_task',
+          retryable: true
+        });
+      }
+    },
+    listForEntityImpl: async (ref) => {
+      if (String(ref).startsWith('professional:communication:')) {
+        return {
+          outgoing: [
+            {
+              link: {
+                id: 'ul_recipient',
+                status: 'current',
+                relationship_type: 'recipient',
+                source_ref: String(ref),
+                target_ref: personRef
+              }
+            }
+          ],
+          incoming: []
+        };
+      }
+      return { outgoing: [], incoming: [] };
+    },
+    linkCreateImpl: async (input) => {
+      const link = { id: `ul_${createdLinks.length + 1}`, ...input, status: 'current' };
+      createdLinks.push(link);
+      return { link, created: true };
+    }
+  });
+
+  const communication = await createCommunicationWithRecipient(handler, personRef);
+  const expectedTaskId = expectedTaskIdFor(communication.id);
+  const operationId = deriveCommunicationOperationId(['follow_up_task', communication.id]);
+
+  const first = await handler(
+    request({
+      method: 'POST',
+      url: `https://api.adam-russell.com/api/communications?id=${communication.id}&action=create-follow-up`,
+      body: { title: 'Follow up: Proposal' }
+    })
+  );
+  assert.equal(first.status, 503);
+  const firstBody = await first.json();
+  assert.equal(firstBody.error.code, 'follow_up_interrupted_after_task');
+
+  const journalAfterInterrupt = await professionalStore.get(followUpOperationKey(operationId), {
+    type: 'json'
+  });
+  assert.equal(journalAfterInterrupt.task_id, expectedTaskId);
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
+  assert.ok(await tasksStore.get(taskKey(expectedTaskId), { type: 'json' }));
+
+  const retry = await handler(
+    request({
+      method: 'POST',
+      url: `https://api.adam-russell.com/api/communications?id=${communication.id}&action=retry-follow-up`,
+      body: {}
+    })
+  );
+  assert.equal(retry.status, 200);
+  const retryBody = await retry.json();
+  assert.equal(retryBody.data.task_id, expectedTaskId);
+  assert.equal(retryBody.data.created_task, false);
+  assert.equal(retryBody.data.follow_up_operation.status, 'committed');
+  assert.equal(taskKeysInStore(tasksStore).length, 1);
+  assert.equal(createdLinks.filter((link) => link.relationship_type === 'follow_up').length, 1);
+  assert.equal(createdLinks.filter((link) => link.relationship_type === 'contact').length, 1);
 });

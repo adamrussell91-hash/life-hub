@@ -94,7 +94,8 @@ export function createCommunicationsHandler(deps = {}) {
         generateId: deps.generateId,
         createUniversalLinkRepository: deps.createUniversalLinkRepository,
         getTasksStore: deps.getTasksStore ?? defaultGetTasksStore,
-        createTaskId: deps.createTaskId,
+        beforeTaskEnsure: deps.beforeTaskEnsure,
+        afterTaskEnsure: deps.afterTaskEnsure,
         env
       });
 
