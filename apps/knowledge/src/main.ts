@@ -1853,6 +1853,7 @@ async function saveCompose() {
       tags: applyTopicTags(snapshot.tags, snapshot.tags),
       origins: snapshot.origins,
       body: snapshot.body,
+      // Kept for local Page typing only — savePage omits connected on the wire.
       connected: activePage?.connected ?? [],
       attachments: [...snapshot.existing, ...uploaded],
       source: hub ? "hub" : activePage?.source,

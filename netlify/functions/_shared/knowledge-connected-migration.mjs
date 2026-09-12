@@ -29,6 +29,7 @@ function emptyReport() {
     malformed: [],
     unsupported: [],
     unresolved: [],
+    unavailable_resolvers: [],
     duplicates: [],
     converted: [],
     sampled_comparisons: [],
@@ -192,7 +193,23 @@ export function createKnowledgeConnectedMigration(deps = {}) {
 
         try {
           await resolveEntity(classified.target_ref, accessContext);
-        } catch {
+        } catch (error) {
+          if (error?.code === 'resolver_unavailable') {
+            report.unavailable_resolvers = report.unavailable_resolvers || [];
+            report.unavailable_resolvers.push({
+              source_page_id: entry.id,
+              value,
+              target_ref: classified.target_ref,
+              kind: error?.kind || null
+            });
+            report.missing_mappings.push({
+              source_page_id: entry.id,
+              value,
+              reason: 'unavailable_resolver',
+              target_ref: classified.target_ref
+            });
+            continue;
+          }
           report.unresolved.push({
             source_page_id: entry.id,
             value,
@@ -303,13 +320,22 @@ export function createKnowledgeConnectedMigration(deps = {}) {
     return {
       legacy_counts: { values: legacyCount, convertible_pairs: legacyPairs.size },
       canonical_counts: { links: canonicalCount, pairs: canonicalPairs.size },
+      legacy_pairs: [...legacyPairs].sort(),
+      canonical_pairs: [...canonicalPairs].sort(),
+      equivalent_pairs: equivalent,
       equivalent_counts: equivalent,
+      missing_pairs: missing,
       missing_mappings: missing,
       unresolved_values: previousMigrationReport?.unresolved ?? [],
+      unresolved_endpoints: previousMigrationReport?.unresolved ?? [],
+      malformed_values: previousMigrationReport?.malformed ?? [],
+      unavailable_resolvers: previousMigrationReport?.unavailable_resolvers ?? [],
       duplicate_mappings: previousMigrationReport?.duplicates ?? [],
+      duplicates: previousMigrationReport?.duplicates ?? [],
       extra_canonical_pairs: extras,
       deterministic_sampled_comparisons: previousMigrationReport?.sampled_comparisons ?? [],
-      rollback_connected_fields_preserved: true
+      rollback_connected_fields_preserved: true,
+      parity_source: 'related_to_type_index'
     };
   }
 

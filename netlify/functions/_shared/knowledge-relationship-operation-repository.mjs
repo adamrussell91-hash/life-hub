@@ -41,10 +41,10 @@ function pageSourceRef(pageId) {
   return formatEntityRef({ namespace: 'knowledge', kind: 'page', id: pageId });
 }
 
-function linkTargetRef(link, sourceRef) {
+/** Outgoing target only — never treat an incoming link as owned by this page. */
+function ownedOutgoingTargetRef(link, sourceRef) {
   if (!link) return '';
-  if (link.source_ref === sourceRef) return String(link.target_ref || '').trim();
-  if (link.target_ref === sourceRef) return String(link.source_ref || '').trim();
+  if (link.source_ref !== sourceRef) return '';
   return String(link.target_ref || '').trim();
 }
 
@@ -110,7 +110,9 @@ export function createKnowledgeRelationshipOperationRepository(deps) {
       if (!link) continue;
       if (String(link.relationship_type || '') !== 'related_to') continue;
       if (link.status && link.status !== 'current') continue;
-      const target = linkTargetRef(link, sourceRef);
+      // Ownership: only suppress/replace links this page authored.
+      if (link.source_ref !== sourceRef) continue;
+      const target = ownedOutgoingTargetRef(link, sourceRef);
       if (!target || target === sourceRef) continue;
       existingByTarget.set(target, { id: String(link.id || ''), target_ref: target });
     }
@@ -198,7 +200,8 @@ export function createKnowledgeRelationshipOperationRepository(deps) {
       const link = entry?.link ?? entry;
       if (!link || String(link.relationship_type || '') !== 'related_to') continue;
       if (link.status && link.status !== 'current') continue;
-      const target = linkTargetRef(link, sourceRef);
+      if (link.source_ref !== sourceRef) continue;
+      const target = ownedOutgoingTargetRef(link, sourceRef);
       if (target) existingCurrentTargets.add(target);
     }
 

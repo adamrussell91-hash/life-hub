@@ -1,6 +1,8 @@
 /**
  * Adapter-facing helpers for Knowledge connected / related_to display.
- * Prefer dual-read relationship rows; fall back to legacy connected strings.
+ * Prefer dual-read relationship rows when the server supplied an array
+ * (including empty after cutover). Fall back to legacy connected only when
+ * relationships were not loaded (null/undefined).
  */
 
 export function connectedDisplayRefs({
@@ -10,7 +12,7 @@ export function connectedDisplayRefs({
   legacyConnected?: string[];
   relationships?: Array<{ legacy_hub_ref?: string | null; target_ref?: string }> | null;
 }): string[] {
-  if (Array.isArray(relationships) && relationships.length) {
+  if (Array.isArray(relationships)) {
     const out: string[] = [];
     const seen = new Set<string>();
     for (const row of relationships) {

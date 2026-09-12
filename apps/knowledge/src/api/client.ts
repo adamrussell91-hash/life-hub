@@ -279,11 +279,36 @@ export async function savePage(page: Page): Promise<Page> {
   if (USE_LOCAL_DATA) {
     throw new Error("Saving needs the live API (netlify dev or production).");
   }
+  // Ordinary content saves must not drive Universal Link mutation. Omit
+  // connected so title/body/tag/attachment saves leave relationships alone.
+  const { connected: _omitConnected, relationships: _omitRel, relationships_status: _omitStatus, ...content } =
+    page as Page & {
+      relationships?: unknown;
+      relationships_status?: unknown;
+    };
   return apiFetch<Page>("/pages-save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(page),
+    body: JSON.stringify(content),
   });
+}
+
+/** Explicit relationship mutation — only intentional related_to submissions. */
+export async function replacePageRelationships(
+  pageId: string,
+  relatedTo: string[],
+): Promise<{ page: Page; relationships_replaced: boolean }> {
+  if (USE_LOCAL_DATA) {
+    throw new Error("Relationship updates need the live API (netlify dev or production).");
+  }
+  return apiFetch<{ page: Page; relationships_replaced: boolean }>(
+    "/pages-save?action=replace-relationships",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: pageId, related_to: relatedTo }),
+    },
+  );
 }
 
 export type KnowledgeIntakeJob = {
