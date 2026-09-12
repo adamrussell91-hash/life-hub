@@ -80,7 +80,6 @@ export function renderFitness(root, model, { logger, templates, libraryByName, o
 
   renderTemplateRail(root, templates, { libraryByName, onSelectTemplate });
   renderFocusStrip(root, model.focusHits);
-  renderComparisons(root, model.comparisons);
   renderRunWidget(root, model);
 
   root.querySelector('#fitness-dashboard')?.removeAttribute('hidden');

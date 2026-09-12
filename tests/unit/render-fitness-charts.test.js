@@ -65,7 +65,7 @@ function chartRoot() {
   };
 }
 
-test('when-you-train paints day-part counts and a typical-time caption', () => {
+test('training rhythm combines time-of-day and monthly cadence in one radial card', () => {
   const root = chartRoot();
   renderFitnessCharts(root, {
     trainWhen: {
@@ -110,63 +110,34 @@ test('when-you-train paints day-part counts and a typical-time caption', () => {
     }
   });
 
-  assert.equal(root.ensure('[data-fitness="when-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue');
-  const clock = texts(root.ensure('#fitness-clock-chart'));
-  assert.ok(clock.includes('Morning'));
-  assert.ok(clock.includes('Evening'));
-  assert.ok(clock.includes('3'));
-  assert.equal(root.ensure('#fitness-clock-card').attributes.hidden, undefined);
-  assert.ok(root.ensure('#fitness-clock-card').children.some(node => node.dataset?.role === 'fitness-tip'));
-
-  assert.equal(root.ensure('[data-fitness="orbit-read"]').textContent, '4 sessions in the last 30 days · longest gap 8 days');
-  const rhythm = texts(root.ensure('#fitness-orbit-chart'));
-  assert.ok(rhythm.includes('11/08'));
-  assert.ok(rhythm.includes('2'));
-  assert.equal(root.ensure('[data-fitness="e1rm-best-read"]').textContent, 'Closest to best: Squat · 98% · furthest Press · 72%');
-  const best = texts(root.ensure('#fitness-e1rm-radial-chart'));
-  assert.ok(best.includes('Squat'));
-  assert.ok(best.includes('98%'));
+  assert.equal(root.ensure('[data-fitness="training-rhythm-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue · 4 sessions in the last 30 days · longest gap 8 days');
+  const radial = texts(root.ensure('#fitness-training-radial'));
+  assert.ok(radial.includes('Morning 1'));
+  assert.ok(radial.includes('Evening 3'));
+  assert.ok(radial.includes('11/08 1'));
+  assert.ok(radial.includes('18/08 2'));
+  assert.equal(root.ensure('#fitness-training-radial-card').attributes.hidden, undefined);
+  assert.ok(root.ensure('#fitness-training-radial-card').children.some(node => node.dataset?.role === 'fitness-tip'));
   assert.equal(root.ensure('[data-fitness="year-read"]').textContent, '4 sessions in 2026');
   assert.ok(texts(root.ensure('#fitness-year-chart')).includes('Aug'));
 });
 
-test('e1RM form paints one overlay with a legend, not a stack of lift charts', () => {
+test('goal cards show lift progress, four-week frequency, and safe-load streaks', () => {
   const root = chartRoot();
   renderFitnessCharts(root, {
-    e1rmBands: [
-      {
-        name: 'Squat',
-        series: [{ date: '2026-07-01', value: 80 }, { date: '2026-07-30', value: 100 }],
-        pctSeries: [
-          { date: '2026-07-01', value: 80, kg: 80 },
-          { date: '2026-07-30', value: 100, kg: 100 }
-        ]
-      },
-      {
-        name: 'Press',
-        series: [{ date: '2026-07-08', value: 40 }, { date: '2026-07-22', value: 36 }],
-        pctSeries: [
-          { date: '2026-07-08', value: 100, kg: 40 },
-          { date: '2026-07-22', value: 90, kg: 36 }
-        ]
-      }
+    fitnessGoals: [
+      { id: 'chest-e1rm', label: 'Chest e1RM', kind: 'e1rm', exercise: 'Bar Press', current: 58.7, target: 65, remaining: 6.3, progress: 90, deadline: '2026-10-31' },
+      { id: 'frequency', label: 'Training frequency', kind: 'frequency', current: 1.5, target: 3, weeks: [{ date: '2026-08-17', value: 2, met: false }, { date: '2026-08-24', value: 3, met: true }, { date: '2026-08-31', value: 3, met: true }, { date: '2026-09-07', value: 2, met: false }] },
+      { id: 'load-consistency', label: 'Load consistency', kind: 'load', target: 3, weeks: [{ date: '2026-08-24', band: 'medium', met: true }, { date: '2026-08-31', band: 'medium', met: true }, { date: '2026-09-07', band: 'high', met: false }] }
     ]
   });
 
-  const svg = root.ensure('#fitness-e1rm-chart');
-  const paths = [];
-  const labels = [];
-  walk(svg, node => {
-    if (node.name === 'path') paths.push(node);
-    if (node.name === 'text' && node.textContent) labels.push(node.textContent);
-  });
-  assert.equal(paths.length, 2);
-  assert.ok(labels.includes('100%'));
-  assert.ok(labels.includes('80%'));
-  assert.equal(root.ensure('#fitness-e1rm-card').attributes.hidden, undefined);
-  const legend = texts(root.ensure('#fitness-e1rm-card'));
-  assert.ok(legend.includes('Squat'));
-  assert.ok(legend.includes('Press'));
+  assert.equal(root.ensure('#fitness-goals-card').attributes.hidden, undefined);
+  const goals = texts(root.ensure('#fitness-goals'));
+  assert.ok(goals.includes('Chest e1RM'));
+  assert.ok(goals.includes('58.7 kg'));
+  assert.ok(goals.some(text => text.startsWith('1.5 / week')));
+  assert.ok(goals.includes('2 / 3 safe weeks'));
 });
 
 test('who-is-improving uses a legend and short week labels', () => {
