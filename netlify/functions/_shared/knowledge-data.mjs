@@ -1,4 +1,5 @@
 import { normalizeConnected } from './hub-ref.mjs';
+import { isKnowledgeWriteCutoverEnabled } from './knowledge-ul-config.mjs';
 
 const GITHUB_ORIGIN = 'https://api.github.com';
 const REPOSITORY = /^(?<owner>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,38}))\/(?<repo>[A-Za-z0-9_.-]{1,100})$/;
@@ -345,9 +346,14 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   if (!title) {
     throw knowledgeWriteError(400, 'validation_error', 'title is required');
   }
-  const connected = Array.isArray(input.connected)
-    ? normalizeConnected(input.connected)
-    : null;
+  const writeCutover = isKnowledgeWriteCutoverEnabled(env);
+  // After write cutover, relationship edits go through Universal Links only.
+  // Existing connected values stay stored for rollback and comparison.
+  const connected = writeCutover
+    ? null
+    : Array.isArray(input.connected)
+      ? normalizeConnected(input.connected)
+      : null;
   const id = isSafeKnowledgePageId(input.id) ? input.id : newKnowledgePageId();
   const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
   let previous = null;

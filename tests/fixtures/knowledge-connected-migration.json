@@ -1,0 +1,39 @@
+{
+  "pages": [
+    {
+      "id": "page_alpha",
+      "title": "Alpha Note",
+      "area": "notes",
+      "connected": [
+        "page_beta",
+        "teaching:unit:unit_alpha",
+        "tasks:project:project_alpha",
+        "life:decision:decision_alpha",
+        "not a ref",
+        "weird:kind:id_one",
+        "teaching:unit:unit_missing"
+      ]
+    },
+    {
+      "id": "page_beta",
+      "title": "Beta Note",
+      "area": "notes",
+      "connected": ["page_alpha", "page_alpha"]
+    },
+    {
+      "id": "page_gamma",
+      "title": "Gamma Note",
+      "area": "university",
+      "connected": []
+    }
+  ],
+  "units": [
+    { "id": "unit_alpha", "title": "Unit Alpha", "code": "UA1", "status": "active" }
+  ],
+  "projects": [
+    { "id": "project_alpha", "title": "Project Alpha", "status": "active" }
+  ],
+  "decisions": [
+    { "id": "decision_alpha", "title": "Decision Alpha", "status": "active" }
+  ]
+}
