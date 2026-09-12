@@ -9,6 +9,7 @@
 
 const PERSON_ID_PATTERN = /^person_[0-9a-f-]{36}$/;
 const ORGANISATION_ID_PATTERN = /^organisation_[0-9a-f-]{36}$/;
+const COMMUNICATION_ID_PATTERN = /^communication_[0-9a-f-]{36}$/;
 
 export function isValidPersonId(id: string): boolean {
   return PERSON_ID_PATTERN.test(id);
@@ -18,12 +19,20 @@ export function isValidOrganisationId(id: string): boolean {
   return ORGANISATION_ID_PATTERN.test(id);
 }
 
+export function isValidCommunicationId(id: string): boolean {
+  return COMMUNICATION_ID_PATTERN.test(id);
+}
+
 export function personRef(id: string): string {
   return `shared:person:${id}`;
 }
 
 export function organisationRef(id: string): string {
   return `shared:organisation:${id}`;
+}
+
+export function communicationRef(id: string): string {
+  return `professional:communication:${id}`;
 }
 
 export function parseSharedRef(ref: string): { kind: 'person' | 'organisation'; id: string } | null {

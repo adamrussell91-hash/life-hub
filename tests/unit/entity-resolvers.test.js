@@ -98,11 +98,35 @@ test('resolverUnavailableError names the kind and uses a distinct code from endp
   assert.notEqual(error.code, 'endpoint_not_found');
 });
 
-test('resolveEntity still dispatches professional:communication to an unavailable slot (Slice 5 not landed)', async () => {
-  await assert.rejects(
-    resolveEntity('professional:communication:communication_001', tasksContext),
-    error => error.status === 501 && error.code === 'resolver_unavailable'
+test('resolveCommunication projects subject (or channel/date) and never exposes summary', async () => {
+  const { resolveCommunication } = await import('../../netlify/functions/_shared/entity-resolvers.mjs');
+  const { communicationKey } = await import('../../netlify/functions/_shared/professional-blobs.mjs');
+  const { COMMUNICATION_SCHEMA_VERSION } = await import('../../netlify/functions/_shared/communication-schema.mjs');
+  const store = createMemoryStore();
+  const id = 'communication_00000000-0000-4000-8000-000000000099';
+  await store.setJSON(communicationKey(id), {
+    schema_version: COMMUNICATION_SCHEMA_VERSION,
+    id,
+    direction: 'outbound',
+    channel: 'email',
+    occurred_at: '2026-09-01T10:00:00.000Z',
+    subject: 'Proposal follow-up',
+    summary: 'SECRET SUMMARY MUST NOT LEAK',
+    status: 'completed',
+    created_at: '2026-09-01T10:00:00.000Z',
+    updated_at: '2026-09-01T10:00:00.000Z'
+  });
+  const projection = await resolveCommunication(id, tasksContext, { getStore: async () => store });
+  assert.equal(projection.display_label, 'Proposal follow-up');
+  assert.equal(projection.href, `/professional/#/communication/${id}`);
+  assert.equal(JSON.stringify(projection).includes('SECRET'), false);
+});
+
+test('resolveEntity registers professional:communication to the live resolver slot', async () => {
+  const { RESOLVER_SLOTS, resolveCommunication } = await import(
+    '../../netlify/functions/_shared/entity-resolvers.mjs'
   );
+  assert.equal(RESOLVER_SLOTS['professional:communication'], resolveCommunication);
 });
 
 // --- Slice 3: real Person and Organisation resolution ---
