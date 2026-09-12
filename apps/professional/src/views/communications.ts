@@ -10,7 +10,7 @@ import {
   updateCommunication
 } from '@/api/communications';
 import { searchEntities } from '@/api/entities';
-import { ApiClientError } from '@/api/client';
+import { apiPost, ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
 import type { CommunicationRecord } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
@@ -339,6 +339,52 @@ export async function renderCommunicationDetailView(
       incomplete.append(retry);
       canvas.append(incomplete);
     }
+
+    const followUp = el('section', 'communication-detail__follow-up');
+    followUp.append(el('h2', undefined, 'Follow up'));
+    const followUpStatus = el('p', 'communication-form__status');
+    followUpStatus.hidden = true;
+    const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
+    followUpBtn.type = 'button';
+    followUpBtn.addEventListener('click', async () => {
+      followUpBtn.disabled = true;
+      followUpStatus.hidden = true;
+      try {
+        // Create the Task first through the Tasks API — Task JSON never
+        // receives Communication or Person IDs.
+        const task = await apiPost<{ id: string; title: string }>('/api/tasks', {
+          title: `Follow up: ${labelFor(record)}`,
+          status: 'open',
+          domain: 'work',
+          priority: 'normal',
+          kind: 'task'
+        });
+        const linkErrors: string[] = [];
+        try {
+          await apiPost('/api/universal-links', {
+            source_ref: `tasks:task:${task.id}`,
+            target_ref: `professional:communication:${record.id}`,
+            relationship_type: 'follow_up'
+          });
+        } catch (err) {
+          linkErrors.push(err instanceof ApiClientError ? err.message : 'follow_up failed');
+        }
+        if (linkErrors.length) {
+          followUpStatus.hidden = false;
+          followUpStatus.textContent = `Task ${task.id} saved. Incomplete links: ${linkErrors.join('; ')}.`;
+          followUpBtn.disabled = false;
+          return;
+        }
+        followUpStatus.hidden = false;
+        followUpStatus.textContent = `Follow up Task created (${task.id}).`;
+      } catch (err) {
+        followUpStatus.hidden = false;
+        followUpStatus.textContent = err instanceof ApiClientError ? err.message : 'Follow up failed.';
+        followUpBtn.disabled = false;
+      }
+    });
+    followUp.append(followUpBtn, followUpStatus);
+    canvas.append(followUp);
   }
 
   await load();
