@@ -8,6 +8,7 @@ export interface EntityDetailConfig {
   backHref: string;
   backLabel: string;
   onTitleReady?: (title: string) => void;
+  isCurrent?: () => boolean;
   /** Person-only: sort name + a quiet "Self" indicator. Organisation-only: legal name. */
   renderExtraFields?: (overview: EntityOverview, host: HTMLElement) => void;
 }
@@ -48,8 +49,10 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     showViewLoading(canvas, 'Loading…');
     try {
       const overview = await fetchEntityOverview(config.ref);
+      if (config.isCurrent && !config.isCurrent()) return;
       renderLoaded(overview);
     } catch (err) {
+      if (config.isCurrent && !config.isCurrent()) return;
       renderLoadError(canvas, err, () => void load());
     }
   }
@@ -76,6 +79,44 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     currentSection.append(currentHost);
     renderRelationshipList(currentHost, overview.current_relationships, 'No current relationships.');
 
+    const activitySection = el('section', 'entity-detail__section');
+    activitySection.append(el('h2', 'entity-detail__heading', 'Linked activity'));
+    const activityHost = el('div');
+    activitySection.append(activityHost);
+    const activityBits: string[] = [];
+    for (const item of overview.linked_records.communications) {
+      activityBits.push(`Communication · ${item.display_label}`);
+    }
+    for (const item of overview.linked_records.tasks) {
+      activityBits.push(`Task · ${item.display_label}`);
+    }
+    if (!activityBits.length) {
+      activityHost.append(el('p', 'empty-state', 'No linked communications or tasks.'));
+    } else {
+      const list = document.createElement('ul');
+      list.className = 'entity-detail__relationship-list';
+      for (const bit of activityBits) {
+        const item = document.createElement('li');
+        if (bit.startsWith('Communication')) {
+          const match = overview.linked_records.communications.find((c) =>
+            bit.endsWith(c.display_label)
+          );
+          if (match?.href) {
+            const link = document.createElement('a');
+            link.href = match.href;
+            link.textContent = bit;
+            item.append(link);
+          } else {
+            item.textContent = bit;
+          }
+        } else {
+          item.textContent = bit;
+        }
+        list.append(item);
+      }
+      activityHost.append(list);
+    }
+
     const timelineSection = el('section', 'entity-detail__section');
     timelineSection.append(el('h2', 'entity-detail__heading', 'Relationship timeline'));
     const timelineHost = el('div');
@@ -88,7 +129,7 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     historicalSection.append(historicalHost);
     renderRelationshipList(historicalHost, overview.historical_relationships, 'No historical relationships.');
 
-    canvas.append(back, summary, currentSection, timelineSection, historicalSection);
+    canvas.append(back, summary, currentSection, activitySection, timelineSection, historicalSection);
   }
 
   await load();

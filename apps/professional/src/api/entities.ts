@@ -5,7 +5,7 @@ export interface SearchOptions {
   signal?: AbortSignal;
 }
 
-/** `GET /api/entities/search?q=<encoded>&kinds=<kind>` — one kind per call. */
+/** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */
 export function searchEntities(
   query: string,
   kinds: 'person' | 'organisation' | 'person,organisation',

@@ -1,5 +1,11 @@
 import { parseEntityRef, formatEntityRef } from './entity-ref.mjs';
 import { assertEntityKindAllowed, endpointNotFoundError, isVisibilityAllowed } from './entity-access.mjs';
+import { communicationDisplayLabel, isValidCommunicationId, parseCommunicationRecord } from './communication-schema.mjs';
+import {
+  communicationKey,
+  defaultGetProfessionalStore,
+  getJSON as getProfessionalJSON
+} from './professional-blobs.mjs';
 import { taskKey, getJSON as getTasksJSON, defaultGetTasksStore } from './tasks-blobs.mjs';
 import { displayLabelFor, isValidOrganisationId, isValidPersonId, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
 import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationKey, personKey } from './universal-link-blobs.mjs';
@@ -9,13 +15,8 @@ import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationK
 // href, lifecycle_status, visibility }. This is the only shape a resolver
 // may return — never the raw stored record.
 //
-// In Slice 1, only Task resolved for real, against the existing
-// `tasks-hub-content` adapter; Person, Organisation, and Communication had
-// no store yet and threw a distinctly named `resolver_unavailable` error.
-// Slice 3 supplies the Person and Organisation stores (`identity-schema.mjs`
-// + `universal-link-blobs.mjs`'s `personKey`/`organisationKey`), so those two
-// slots now resolve for real. Communication remains unavailable until its
-// owning slice (5) creates `professional-hub-content`.
+// Slice 5 supplies Communication resolution against `professional-hub-content`.
+// Resolver output never exposes the Communication summary.
 
 export function resolverUnavailableError(kind) {
   return Object.assign(new Error(`Resolution for kind "${kind}" is not available until its owning slice.`), {
@@ -96,17 +97,35 @@ export async function resolveOrganisation(id, accessContext, { getStore = defaul
   };
 }
 
-async function resolveCommunicationSlot() {
-  throw resolverUnavailableError('communication');
+export async function resolveCommunication(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidCommunicationId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'communication', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseCommunicationRecord(await getProfessionalJSON(store, communicationKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'communication',
+    display_label: communicationDisplayLabel(record),
+    supporting_label: `${record.direction} ${record.channel}`,
+    href: `/professional/#/communication/${encodeURIComponent(id)}`,
+    lifecycle_status: record.status,
+    visibility: 'operator'
+  };
 }
 
-// Exported so a future slice's tests (and this slice's own) can assert
-// each slot's kind without depending on dispatch internals.
+// Exported so tests can assert each slot's kind without depending on
+// dispatch internals.
 export const RESOLVER_SLOTS = Object.freeze({
   'shared:person': resolvePerson,
   'shared:organisation': resolveOrganisation,
   'tasks:task': resolveTask,
-  'professional:communication': resolveCommunicationSlot
+  'professional:communication': resolveCommunication
 });
 
 // Single entry point used by the read-only Universal Link repository.
