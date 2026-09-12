@@ -418,12 +418,38 @@ export function createCommunicationRepository(deps = {}) {
     await setJSON(professionalStore, communicationOperationKey(operationId), journal);
     await writeOperationPointer(id, operationId);
 
-    const ulStore = await getUniversalLinkStore();
-    const linkRepo = createLinkRepository({
-      store: ulStore,
-      resolveEntity,
-      now
-    });
+    // Once the Communication and recovery journal exist, every subsequent
+    // failure — including Universal Link store binding — must surface as a
+    // retryable communication_links_incomplete response, not a generic 500.
+    const incompleteFromJournal = (currentJournal) =>
+      linksIncompleteError({
+        communicationId: id,
+        operationId,
+        completedLinkIds: currentJournal.completed_link_ids ?? [],
+        failedIntentIds: draftIntents
+          .filter((intent) => !(currentJournal.completed_link_ids ?? []).includes(intent.link_id))
+          .map((intent) => intent.intent_id)
+      });
+
+    let linkRepo;
+    try {
+      const ulStore = await getUniversalLinkStore();
+      linkRepo = createLinkRepository({
+        store: ulStore,
+        resolveEntity,
+        now
+      });
+    } catch {
+      journal = {
+        ...journal,
+        status: 'repair_needed',
+        failed_intent_ids: draftIntents.map((intent) => intent.intent_id),
+        last_error_code: 'universal_link_store_unavailable',
+        updated_at: now()
+      };
+      await setJSON(professionalStore, communicationOperationKey(operationId), journal);
+      throw incompleteFromJournal(journal);
+    }
 
     try {
       journal = await runLinkIntents({ journal, linkRepo, accessContext });
@@ -431,14 +457,7 @@ export function createCommunicationRepository(deps = {}) {
       if (error?.code === 'communication_links_incomplete') {
         throw error;
       }
-      throw linksIncompleteError({
-        communicationId: id,
-        operationId,
-        completedLinkIds: journal.completed_link_ids ?? [],
-        failedIntentIds: draftIntents
-          .filter((intent) => !(journal.completed_link_ids ?? []).includes(intent.link_id))
-          .map((intent) => intent.intent_id)
-      });
+      throw incompleteFromJournal(journal);
     }
 
     const links = [];

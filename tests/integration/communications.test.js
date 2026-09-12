@@ -270,6 +270,113 @@ test('POST with a failing link write returns communication_links_incomplete and 
   assert.ok(getBody.data.communication.incomplete_links);
 });
 
+test('getUniversalLinkStore failure after Communication and journal writes returns retryable incomplete contract', async () => {
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const { ref: personRef } = await seedPerson(universalStore);
+  let storeLookups = 0;
+  const createdLinks = [];
+
+  const resolveEntity = async (refInput, accessContext, options = {}) => {
+    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+    if (ref.namespace === 'professional' && ref.kind === 'communication') {
+      return resolveCommunication(ref.id, accessContext, {
+        getStore: async () => professionalStore
+      });
+    }
+    if (ref.namespace === 'shared' && ref.kind === 'person') {
+      return resolvePerson(ref.id, accessContext, { getStore: async () => universalStore });
+    }
+    throw Object.assign(new Error('not found'), { status: 404, code: 'endpoint_not_found' });
+  };
+
+  const handler = createCommunicationsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    communicationNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => professionalStore,
+    getUniversalLinkStore: async () => {
+      storeLookups += 1;
+      if (storeLookups === 1) {
+        throw Object.assign(new Error('Universal Link store unbound'), {
+          status: 503,
+          code: 'universal_link_blobs_unbound'
+        });
+      }
+      return universalStore;
+    },
+    resolveEntity,
+    createUniversalLinkRepository: () => ({
+      createLink: async (input) => {
+        createdLinks.push(input);
+        return { link: { id: `ul_${createdLinks.length}`, ...input }, created: true };
+      },
+      getLink: async (id) => ({ link: { id } })
+    })
+  });
+
+  const createResponse = await handler(
+    request({
+      method: 'POST',
+      body: {
+        direction: 'outbound',
+        channel: 'email',
+        occurred_at: '2026-09-01T10:00:00.000Z',
+        subject: 'Store unavailable',
+        links: [
+          {
+            target_ref: personRef,
+            relationship_type: 'recipient',
+            occurred_at: '2026-09-01T10:00:00.000Z'
+          }
+        ]
+      }
+    })
+  );
+  assert.equal(createResponse.status, 503);
+  const created = await createResponse.json();
+  assert.equal(created.error.code, 'communication_links_incomplete');
+  assert.equal(created.error.retryable, true);
+  assert.ok(created.data.communication_id);
+  assert.ok(created.data.operation_id);
+  assert.deepEqual(created.data.completed_link_ids, []);
+  assert.ok(Array.isArray(created.data.failed_intent_ids));
+  assert.equal(created.data.failed_intent_ids.length, 1);
+  assert.equal(createdLinks.length, 0);
+
+  const communicationId = created.data.communication_id;
+  const getResponse = await handler(
+    request({
+      url: `https://api.adam-russell.com/api/communications?id=${communicationId}`
+    })
+  );
+  assert.equal(getResponse.status, 200);
+  const getBody = await getResponse.json();
+  assert.equal(getBody.data.communication.id, communicationId);
+  assert.equal(getBody.data.communication.subject, 'Store unavailable');
+  assert.ok(getBody.data.communication.incomplete_links);
+  assert.equal(getBody.data.communication.incomplete_links.operation_id, created.data.operation_id);
+
+  const retryResponse = await handler(
+    request({
+      method: 'POST',
+      url: `https://api.adam-russell.com/api/communications?id=${communicationId}&action=retry-links`,
+      body: {}
+    })
+  );
+  assert.equal(retryResponse.status, 200);
+  const retryBody = await retryResponse.json();
+  assert.equal(retryBody.data.communication.id, communicationId);
+  assert.equal(retryBody.data.communication.incomplete_links == null, true);
+  assert.equal(retryBody.data.retried, true);
+  assert.equal(createdLinks.length, 1);
+  assert.equal(createdLinks[0].relationship_type, 'recipient');
+  assert.equal(storeLookups, 2);
+
+  const listAfter = await professionalStore.list({ prefix: 'communications/records/' });
+  assert.equal(listAfter.blobs.length, 1);
+});
+
 test('retry-links resumes missing work without duplicating completed links', async () => {
   const professionalStore = memoryStore();
   const universalStore = memoryStore();
