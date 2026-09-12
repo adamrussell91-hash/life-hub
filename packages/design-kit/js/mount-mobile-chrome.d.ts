@@ -9,7 +9,7 @@ export type MobileChromeItem = {
 };
 
 export type MountMobileChromeOptions = {
-  currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks';
+  currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks' | 'professional';
   primary: MobileChromeItem[];
   more?: MobileChromeItem[];
 };
