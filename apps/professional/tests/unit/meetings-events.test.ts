@@ -18,7 +18,8 @@ describe('meeting and event routes', () => {
     expect(parseRoute(`#/event/${VALID_EVENT_ID}`)).toEqual({ name: 'event', id: VALID_EVENT_ID });
     expect(parseRoute('#/meeting/not-valid').name).toBe('not-found');
     expect(railHighlightFor({ name: 'meeting-new' })).toBe('meetings');
-    expect(railHighlightFor({ name: 'event' })).toBe('events');
+    expect(railHighlightFor({ name: 'events' })).toBe('events');
+    expect(railHighlightFor({ name: 'event', id: VALID_EVENT_ID })).toBe('events');
     expect(meetingRoute(VALID_MEETING_ID)).toBe(`#/meeting/${VALID_MEETING_ID}`);
     expect(eventRoute(VALID_EVENT_ID)).toBe(`#/event/${VALID_EVENT_ID}`);
   });
