@@ -1147,3 +1147,340 @@ test('Job4: every malformed/unknown/corrupted operation id produces the identica
     assert.equal(error.message, 'Identity operation not found.');
   }
 });
+
+// --- Job1 (round 4 correction): malformed self-pointer reconciliation ---
+//
+// The confirmed defect: `inspectSelfPointer` passed a stored pointer's
+// `person_id`/`operation_id` straight to `personKey`/`identityOperationKey`
+// before proving either was safe, so a malformed stored pointer made every
+// caller — including `reconcileSelfIdentity`, the one operation that exists
+// to repair exactly this kind of corruption — throw a raw `400
+// invalid_person_id`/`invalid_operation_id` instead of returning a normal
+// classification. These tests reproduce the confirmed reproductions
+// verbatim and cover the additional genuineness checks the correction adds
+// to what counts as a pending reservation.
+
+const SAMPLE_PERSON_ID = 'person_00000000-0000-4000-8000-000000000000';
+const SAMPLE_OPERATION_ID = 'op_22222222222222222222222222222222';
+
+test('Job1/R4 #1: a path-unsafe pointer person_id never reaches personKey — blocks as stale, not a 400', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: '../../escape',
+    operation_id: 'op_11111111111111111111111111111111'
+  });
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+    error => {
+      // Requirement 17: the confirmed defect threw `invalid_person_id`
+      // (400) sourced from stored pointer content — it must now be an
+      // ordinary, safe self-identity conflict instead.
+      assert.notEqual(error.code, 'invalid_person_id');
+      assert.notEqual(error.status, 400);
+      return error.status === 409 && error.code === 'self_identity_exists';
+    }
+  );
+});
+
+test('Job1/R4 #2: a valid pointer person_id with a path-unsafe operation_id never reaches identityOperationKey', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: SAMPLE_PERSON_ID,
+    operation_id: '../../escape'
+  });
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+    error => {
+      assert.notEqual(error.code, 'invalid_operation_id');
+      assert.notEqual(error.status, 400);
+      return error.status === 409 && error.code === 'self_identity_exists';
+    }
+  );
+});
+
+test('Job1/R4 #3: an unsupported pointer schema version is malformed, not a valid candidate', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, { schema_version: 1, person_id: SAMPLE_PERSON_ID, operation_id: null });
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+    error => error.status === 409 && error.code === 'self_identity_exists'
+  );
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #4: primitive and array stored pointer values are malformed, never crash, and reconcile clears them', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  for (const garbage of ['just a string', 42, true, ['array', 'pointer'], []]) {
+    await store.setJSON(SELF_POINTER_KEY, garbage);
+    await assert.rejects(
+      repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+      error => error.status === 409 && error.code === 'self_identity_exists'
+    );
+    const reconciled = await repo.reconcileSelfIdentity(admin);
+    assert.equal(reconciled.status, 'reconciled');
+    assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+  }
+});
+
+test('Job1/R4 #5: partial empty pointer shapes are malformed — the canonical empty pointer clears both fields together', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  const partialShapes = [
+    { schema_version: 2, person_id: null, operation_id: SAMPLE_OPERATION_ID },
+    { schema_version: 2, person_id: SAMPLE_PERSON_ID },
+    { schema_version: 2, operation_id: null },
+    { schema_version: 2 }
+  ];
+  for (const shape of partialShapes) {
+    await store.setJSON(SELF_POINTER_KEY, shape);
+    await assert.rejects(
+      repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+      error => error.status === 409 && error.code === 'self_identity_exists'
+    );
+  }
+});
+
+// Builds a synthetic, directly-injected journal + pointer pair so each
+// "almost genuine" reservation shape can be tested in isolation, without
+// needing to force a specific write to fail mid-operation.
+async function writeSyntheticPointerAndJournal(store, { journalOverrides = {}, entityOverrides = {} } = {}) {
+  const journal = {
+    schema_version: 1,
+    operation_id: SAMPLE_OPERATION_ID,
+    operation_type: 'create_identity',
+    kind: 'person',
+    entity_id: SAMPLE_PERSON_ID,
+    status: 'prepared',
+    completed_steps: [],
+    payload: {
+      entity: {
+        id: SAMPLE_PERSON_ID,
+        kind: 'person',
+        is_self: true,
+        lifecycle_status: 'active',
+        ...entityOverrides
+      },
+      index: {},
+      self_pointer_action: 'claim'
+    },
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    last_error_code: null,
+    ...journalOverrides
+  };
+  await store.setJSON(identityOperationKey(SAMPLE_OPERATION_ID), journal);
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: SAMPLE_PERSON_ID,
+    operation_id: SAMPLE_OPERATION_ID,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  });
+}
+
+test('Job1/R4 #6: a prepared journal for a nonself entity is never a genuine self reservation', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await writeSyntheticPointerAndJournal(store, { entityOverrides: { is_self: false } });
+
+  // Not pending: reconciliation (no active self exists) clears it outright
+  // rather than reporting a pending reservation to leave alone.
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #7: a prepared journal with no claim action is never a genuine self reservation', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  // A journal whose self_pointer_action is null (as a release-direction or
+  // pointerless journal would carry) rather than 'claim'.
+  await store.setJSON(identityOperationKey(SAMPLE_OPERATION_ID), {
+    schema_version: 1,
+    operation_id: SAMPLE_OPERATION_ID,
+    operation_type: 'lifecycle_identity',
+    kind: 'person',
+    entity_id: SAMPLE_PERSON_ID,
+    status: 'prepared',
+    completed_steps: [],
+    payload: {
+      entity: { id: SAMPLE_PERSON_ID, kind: 'person', is_self: true, lifecycle_status: 'active' },
+      index: {},
+      self_pointer_action: null
+    },
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    last_error_code: null
+  });
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: SAMPLE_PERSON_ID,
+    operation_id: SAMPLE_OPERATION_ID,
+    updated_at: '2026-01-01T00:00:00.000Z'
+  });
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #8: a lifecycle journal whose intended Person is not active is never a genuine self reservation', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await writeSyntheticPointerAndJournal(store, {
+    journalOverrides: { operation_type: 'lifecycle_identity' },
+    entityOverrides: { lifecycle_status: 'inactive' }
+  });
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #9: a journal whose entity_id disagrees with the pointer is never a genuine self reservation', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const otherPersonId = 'person_11111111-1111-4111-8111-111111111111';
+  await writeSyntheticPointerAndJournal(store, {
+    journalOverrides: { entity_id: otherPersonId },
+    entityOverrides: { id: otherPersonId }
+  });
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #10: a genuine pending create reservation is preserved, not treated as stale', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  store._failNextMatching(key => key.startsWith('entities/person/'));
+  let caughtEntityId;
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } }),
+    error => {
+      caughtEntityId = error.entity_id;
+      return true;
+    }
+  );
+  store._clearFailure();
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'consistent');
+  assert.equal(reconciled.pending_reservation_person_id, caughtEntityId);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, caughtEntityId, 'a genuine pending create reservation must not be cleared');
+});
+
+test('Job1/R4 #11: a genuine pending activation reservation is preserved, not treated as stale', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  await repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'inactive' });
+
+  store._failNextMatching(key => key === SELF_POINTER_KEY);
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+    error => error.status === 503
+  );
+  store._clearFailure();
+
+  // The pointer write itself failed here, so nothing was reserved — this
+  // proves the *absence* case is safe. Now exercise the genuinely-pending
+  // case: the pointer write lands but the entity write fails.
+  store._failNextMatching(key => key.startsWith('entities/person/'));
+  await assert.rejects(
+    repo.transitionLifecycle({ ref: { kind: 'person', id: personA.id }, toStatus: 'active' }),
+    error => error.status === 503
+  );
+  store._clearFailure();
+
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id, 'the pending activation reserved the slot');
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'consistent');
+  assert.equal(reconciled.pending_reservation_person_id, personA.id);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id, 'a genuine pending activation reservation must not be cleared');
+});
+
+test('Job1/R4 #12: a stale malformed pointer is cleared when no active self exists', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, ['not', 'a', 'pointer']);
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.deepEqual(reconciled, { status: 'reconciled', person_id: null, previous_pointer_person_id: null });
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('Job1/R4 #13: a stale malformed pointer is replaced when exactly one authoritative active self exists', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+
+  await store.setJSON(SELF_POINTER_KEY, { schema_version: 1, garbage: true });
+
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+  assert.equal(reconciled.person_id, personA.id);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, personA.id);
+});
+
+test('Job1/R4 #14: no write happens when multiple authoritative active selfs exist, even with a malformed pointer', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { record: personA } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person A', is_self: true } });
+  const { record: personB } = await repo.createIdentity({ kind: 'person', input: { display_name: 'Person B' } });
+
+  const rawB = store._raw(personKey(personB.id));
+  await store.setJSON(personKey(personB.id), { ...rawB, is_self: true });
+  const rawIndexB = store._raw(personIndexKey(personB.id));
+  await store.setJSON(personIndexKey(personB.id), { ...rawIndexB, is_self: true });
+
+  await store.setJSON(SELF_POINTER_KEY, 'totally malformed');
+  const before = store._raw(SELF_POINTER_KEY);
+
+  const result = await repo.reconcileSelfIdentity(admin);
+  assert.equal(result.status, 'conflict');
+  assert.deepEqual(result.person_ids.sort(), [personA.id, personB.id].sort());
+  assert.deepEqual(store._raw(SELF_POINTER_KEY), before, 'a conflict must never be silently resolved by writing the pointer');
+});
+
+test('Job1/R4 #15: reconciliation after clearing a malformed pointer is idempotent on repeat', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, 12345);
+
+  const first = await repo.reconcileSelfIdentity(admin);
+  const second = await repo.reconcileSelfIdentity(admin);
+  assert.equal(first.status, 'reconciled');
+  assert.deepEqual(second, { status: 'consistent', person_id: null });
+});
+
+test('Job1/R4 #17: unsafe stored identifiers never reach a Blob key lookup (no invalid_person_id/invalid_operation_id thrown)', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: '../../../etc/passwd',
+    operation_id: '../../../etc/shadow'
+  });
+
+  await assert.rejects(
+    repo.createIdentity({ kind: 'person', input: { display_name: 'Someone', is_self: true } }),
+    error => !['invalid_person_id', 'invalid_operation_id'].includes(error.code)
+  );
+  const reconciled = await repo.reconcileSelfIdentity(admin);
+  assert.equal(reconciled.status, 'reconciled');
+});

@@ -8,6 +8,7 @@ import {
   generateEventId,
   generateOrganisationId,
   generatePersonId,
+  isValidPersonId,
   parseOrganisationRecord,
   parsePersonRecord,
   validateOrganisationCreateInput,
@@ -261,11 +262,73 @@ function buildIndexFor(record, kind) {
   });
 }
 
-function parseSelfPointer(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const personId = typeof raw.person_id === 'string' ? raw.person_id : null;
-  const operationId = typeof raw.operation_id === 'string' ? raw.operation_id : null;
-  return { person_id: personId, operation_id: operationId };
+// The one internal pointer parser (correction Job 1, round 4): classifies
+// the *raw* stored value into exactly one of three outcomes, and is the
+// only place allowed to read `person_id`/`operation_id` off untrusted
+// storage content. Every other function in this module that needs the
+// pointer's identifiers goes through this classifier first — never through
+// a looser, ad hoc read — so a malformed stored value can never reach
+// `personKey`/`identityOperationKey` (both of which throw a validation
+// error for an unsafe id, which is exactly the confirmed defect: a
+// reconciliation call that cannot even inspect the pointer it exists to
+// repair).
+//
+// - `'empty'`: no stored value at all, or the canonical empty pointer
+//   (`person_id: null, operation_id: null` together). The slot is free.
+// - `'candidate'`: a supported, well-shaped, nonempty pointer — a
+//   path-safe, correctly formatted `person_id`, and an `operation_id` that
+//   is either also valid or `null` (a legacy stale pointer predating the
+//   operation id being recorded at all).
+// - `'malformed'`: everything else — a non-object, an array, a primitive,
+//   an unsupported schema version, a missing field, a partial-empty shape
+//   (one identifier `null` while the other is not — the canonical empty
+//   pointer always clears both together), or either identifier present but
+//   unsafe/invalid. A malformed pointer is never proof the slot is free —
+//   callers treat it as `'stale'`, exactly like a well-formed pointer whose
+//   claim has been abandoned.
+function classifyStoredSelfPointer(raw) {
+  if (raw === null || raw === undefined) return { kind: 'empty' };
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { kind: 'malformed' };
+  if (raw.schema_version !== SELF_POINTER_SCHEMA_VERSION) return { kind: 'malformed' };
+  if (!Object.prototype.hasOwnProperty.call(raw, 'person_id') || !Object.prototype.hasOwnProperty.call(raw, 'operation_id')) {
+    return { kind: 'malformed' };
+  }
+
+  const { person_id: personId, operation_id: operationId } = raw;
+  if (personId === null && operationId === null) return { kind: 'empty' };
+
+  // A pointer naming an operation but no Person (or any other partial
+  // empty shape) is never a valid reservation.
+  if (personId === null) return { kind: 'malformed' };
+  if (typeof personId !== 'string' || !isValidPersonId(personId)) return { kind: 'malformed' };
+
+  if (operationId === null) return { kind: 'candidate', person_id: personId, operation_id: null };
+  if (typeof operationId !== 'string' || !isValidOperationId(operationId)) return { kind: 'malformed' };
+
+  return { kind: 'candidate', person_id: personId, operation_id: operationId };
+}
+
+// A stored journal is a genuine pending self reservation only when every
+// one of these holds (correction Job 1, round 4) — anything less is
+// `'stale'`, including a journal for an entirely unrelated operation that
+// merely happens to share the pointer's operation id after storage
+// corruption. `pointer` here is always a `'candidate'` classification's
+// `{ person_id, operation_id }`, never a raw stored shape.
+function isGenuinePendingSelfReservation(journal, pointer) {
+  if (!journal) return false;
+  if (journal.operation_id !== pointer.operation_id) return false;
+  if (journal.entity_id !== pointer.person_id) return false;
+  if (journal.kind !== 'person') return false;
+  if (journal.status !== 'prepared' && journal.status !== 'repair_needed') return false;
+  if (journal.operation_type !== 'create_identity' && journal.operation_type !== 'lifecycle_identity') return false;
+  if (journal.payload.self_pointer_action !== 'claim') return false;
+  const entity = journal.payload.entity;
+  if (!entity || typeof entity !== 'object') return false;
+  if (entity.id !== pointer.person_id) return false;
+  if (entity.kind !== 'person') return false;
+  if (entity.is_self !== true) return false;
+  if (entity.lifecycle_status !== 'active') return false;
+  return true;
 }
 
 // Distinguishes "this call is the same attempt as the journal already on
@@ -381,8 +444,15 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   // reconciling toward the authoritative Person records), never by an
   // ordinary request silently overwriting either.
   async function inspectSelfPointer() {
-    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
-    if (!pointer || !pointer.person_id) return { state: 'empty', pointer: null };
+    const classification = classifyStoredSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    if (classification.kind === 'empty') return { state: 'empty', pointer: null };
+    // A malformed stored value is classified `'stale'` — the same
+    // treatment as a well-formed pointer whose claim has been abandoned —
+    // without ever passing its unsafe content to `personKey` or
+    // `identityOperationKey` (the confirmed defect this correction fixes).
+    if (classification.kind === 'malformed') return { state: 'stale', pointer: null };
+
+    const pointer = { person_id: classification.person_id, operation_id: classification.operation_id };
 
     const personRecord = parsePersonRecord(await getJSON(store, personKey(pointer.person_id), STRONG));
     if (personRecord && personRecord.is_self && personRecord.lifecycle_status === 'active') {
@@ -393,15 +463,13 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       return { state: 'stale', pointer };
     }
     const journal = validateIdentityOperationRecord(await getJSON(store, identityOperationKey(pointer.operation_id), STRONG));
-    if (!journal || journal.operation_id !== pointer.operation_id || journal.entity_id !== pointer.person_id) {
+    if (!isGenuinePendingSelfReservation(journal, pointer)) {
+      // Covers a missing journal, one that fails schema validation, one for
+      // an unrelated entity/operation/kind, one already `committed` (the
+      // claiming operation finished, but its Person is no longer the
+      // active self), and one that never actually names a claim on this
+      // exact Person becoming active self.
       return { state: 'stale', pointer };
-    }
-    if (journal.status === 'committed') {
-      // The claiming operation finished. A committed journal is never
-      // "still in flight" again, regardless of the Person's current
-      // status — that Person's own later, independent change (or a
-      // pointer that simply never got updated) is what left this stale.
-      return { state: 'stale', pointer, journal };
     }
     return { state: 'pending', pointer, journal };
   }
@@ -439,7 +507,11 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   async function assertSelfAvailable({ excludingPersonId }) {
     const { state, pointer } = await inspectSelfPointer();
     if (state === 'empty') return;
-    if (pointer.person_id === excludingPersonId) return;
+    // `pointer` is `null` for a malformed stored value (state `'stale'`
+    // with nothing safe to compare) — it can never be "this operation's
+    // own claim" in that case, so it always falls through to the conflict
+    // below, exactly like any other non-empty state.
+    if (pointer && pointer.person_id === excludingPersonId) return;
     throw selfIdentityExistsError();
   }
 
@@ -465,8 +537,8 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   // claim. Never throws: this is always a safe no-op when the pointer has
   // moved on, not a conflict.
   async function releaseSelfPointerIfOwned({ personId }) {
-    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
-    if (!pointer || pointer.person_id !== personId) return;
+    const classification = classifyStoredSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    if (classification.kind !== 'candidate' || classification.person_id !== personId) return;
     await setJSON(store, SELF_POINTER_KEY, {
       schema_version: SELF_POINTER_SCHEMA_VERSION,
       person_id: null,
@@ -591,8 +663,12 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
   async function reconcileSelfIdentity(accessContext) {
     assertAdministrationWorkflow(accessContext);
 
-    const pointer = parseSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
-    const pointerPersonId = pointer?.person_id ?? null;
+    const classification = classifyStoredSelfPointer(await getJSON(store, SELF_POINTER_KEY, STRONG));
+    // A malformed stored value never contributes a Person id to reconcile
+    // against or to report — it is treated as `'stale'`, the same as any
+    // other non-empty classification below, but nothing unsafe from it is
+    // ever echoed back or used to build a Blob key.
+    const pointerPersonId = classification.kind === 'candidate' ? classification.person_id : null;
 
     const persons = await loadAuthoritativePersons();
     const activeSelfPersons = persons.filter(record => record.is_self && record.lifecycle_status === 'active');
@@ -606,14 +682,17 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
 
     if (!truePersonId) {
       // No authoritative active self exists at all.
-      const inspection = pointerPersonId ? await inspectSelfPointer() : null;
+      const inspection = classification.kind === 'candidate' ? await inspectSelfPointer() : null;
       if (inspection && inspection.state === 'pending') {
         // A claim may still legitimately finish — never cancel it here.
         return { status: 'consistent', person_id: null, pending_reservation_person_id: pointerPersonId };
       }
-      if (!pointerPersonId) {
+      if (classification.kind === 'empty') {
         return { status: 'consistent', person_id: null };
       }
+      // Non-empty (a stale candidate, or a malformed stored value) with no
+      // authoritative active self anywhere: write the canonical empty
+      // pointer.
       await setJSON(store, SELF_POINTER_KEY, {
         schema_version: SELF_POINTER_SCHEMA_VERSION,
         person_id: null,
