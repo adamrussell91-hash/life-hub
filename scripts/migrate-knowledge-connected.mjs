@@ -4,7 +4,8 @@
  *
  * Dry-run is the default. Writes require --execute. Live Knowledge reads
  * require an explicit --source=live. Production execution requires BOTH
- * --source=live and --confirm-execute. Fixture mode is for local verification.
+ * --source=live and --confirm-execute. Fixture mode is for local verification
+ * and keeps memory stores.
  *
  * Usage:
  *   node scripts/migrate-knowledge-connected.mjs --fixture tests/fixtures/knowledge-connected-migration.json
@@ -15,16 +16,29 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createAccessContext } from '../netlify/functions/_shared/entity-access.mjs';
 import { createKnowledgeConnectedMigration } from '../netlify/functions/_shared/knowledge-connected-migration.mjs';
 import { resolveEntity as defaultResolveEntity } from '../netlify/functions/_shared/entity-resolvers.mjs';
-import { resolveKnowledgePage, resolveLifeDecision, resolveTasksProject, resolveTeachingUnit } from '../netlify/functions/_shared/knowledge-universal-links.mjs';
+import {
+  resolveKnowledgePage,
+  resolveLifeDecision,
+  resolveTasksProject,
+  resolveTeachingUnit
+} from '../netlify/functions/_shared/knowledge-universal-links.mjs';
 import { parseEntityRef } from '../netlify/functions/_shared/entity-ref.mjs';
 import { createUniversalLinkRepository } from '../netlify/functions/_shared/universal-link-repository.mjs';
 import {
   getKnowledgePage as defaultGetKnowledgePage,
   listKnowledgePages as defaultListKnowledgePages
 } from '../netlify/functions/_shared/knowledge-data.mjs';
+import {
+  byTypePrefix,
+  defaultGetUniversalLinkStore,
+  getJSON,
+  linkKey
+} from '../netlify/functions/_shared/universal-link-blobs.mjs';
+import { listBlobKeys, isIndexKey } from '../netlify/functions/_shared/blobs-list.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore } from '../netlify/functions/_shared/teaching-blobs.mjs';
+import { defaultGetTasksStore } from '../netlify/functions/_shared/tasks-blobs.mjs';
 
 function parseArgs(argv) {
   const fixtureIndex = argv.indexOf('--fixture');
@@ -73,6 +87,33 @@ async function loadFixture(fixturePath) {
   return raw;
 }
 
+/**
+ * Build parity from the related_to type index — never scan universal-links/links/.
+ */
+export async function loadCanonicalRelatedToFromIndexes(store, { getJSONImpl = getJSON } = {}) {
+  if (!store) return [];
+  const prefix = byTypePrefix('related_to');
+  let keys = [];
+  try {
+    keys = (await listBlobKeys(store, prefix)).filter((key) => !isIndexKey(key));
+  } catch {
+    return [];
+  }
+  const links = [];
+  const seen = new Set();
+  for (const key of keys) {
+    const membership = await getJSONImpl(store, key);
+    const linkId =
+      (membership && typeof membership.link_id === 'string' && membership.link_id) ||
+      String(key.split('/').pop() || '');
+    if (!linkId || seen.has(linkId)) continue;
+    seen.add(linkId);
+    const link = await getJSONImpl(store, linkKey(linkId));
+    if (link && typeof link === 'object') links.push(link);
+  }
+  return links;
+}
+
 async function main(argv = process.argv.slice(2), inject = {}) {
   const args = parseArgs(argv);
   if (args.help) {
@@ -108,9 +149,14 @@ Dry-run is the default. Live production writes require --source=live --execute -
   let units = new Map();
   let projects = new Map();
   let decisions = new Map();
-  let ulStore = inject.universalLinkStore ?? memoryStore();
   let listPages;
   let getPage;
+  let ulStore = null;
+  let getTeachingStore = inject.getTeachingStore ?? null;
+  let getTasksStore = inject.getTasksStore ?? null;
+  let getDecision = inject.getDecision ?? null;
+  const loadCanonicalLinks =
+    inject.loadCanonicalRelatedToFromIndexes ?? loadCanonicalRelatedToFromIndexes;
 
   if (source === 'fixture') {
     if (!args.fixture) {
@@ -124,6 +170,25 @@ Dry-run is the default. Live production writes require --source=live --execute -
     for (const decision of fixture.decisions ?? []) decisions.set(decision.id, decision);
     listPages = async () => pages;
     getPage = async (id) => pages.find((page) => page.id === id) ?? null;
+    // Fixture mode always keeps memory stores (or an injected isolated store).
+    ulStore = inject.universalLinkStore ?? memoryStore();
+    getTeachingStore = async () => ({
+      async get(key, { type } = {}) {
+        const id = key.replace(/^units\//, '');
+        const record = units.get(id);
+        if (!record) return null;
+        return type === 'json' ? record : JSON.stringify(record);
+      }
+    });
+    getTasksStore = async () => ({
+      async get(key, { type } = {}) {
+        const id = key.replace(/^projects\//, '');
+        const record = projects.get(id);
+        if (!record) return null;
+        return type === 'json' ? record : JSON.stringify(record);
+      }
+    });
+    getDecision = async (id) => decisions.get(id) ?? null;
   } else {
     // Live source reads through knowledge-data.mjs (injectable for tests).
     const listKnowledgePages = inject.listKnowledgePages ?? defaultListKnowledgePages;
@@ -133,6 +198,35 @@ Dry-run is the default. Live production writes require --source=live --execute -
     listPages = async () => listKnowledgePages({ env, fetchImpl });
     getPage = async (id) => getKnowledgePage(id, { env, fetchImpl });
     pages = await listPages();
+
+    // Live dry-run and execute both bind a real Universal Link store adapter.
+    // Memory fallback is fixture-only — never used for live execute.
+    if (Object.prototype.hasOwnProperty.call(inject, 'universalLinkStore')) {
+      ulStore = inject.universalLinkStore;
+    } else {
+      const getUl = inject.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
+      try {
+        ulStore = await getUl(env);
+      } catch (error) {
+        console.error(
+          `Universal Link store unavailable for live migration: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return 2;
+      }
+    }
+    if (!ulStore) {
+      console.error('Universal Link store unbound for live migration. Refusing to continue.');
+      return 2;
+    }
+    if (args.execute && ulStore && typeof ulStore._map !== 'undefined' && !inject.universalLinkStore) {
+      // Guard: default live execute must not silently use an in-process memory map.
+      console.error('Live execute refused an in-memory Universal Link store.');
+      return 2;
+    }
+
+    getTeachingStore = inject.getTeachingStore ?? defaultGetTeachingStore;
+    getTasksStore = inject.getTasksStore ?? defaultGetTasksStore;
+    getDecision = inject.getDecision ?? null;
   }
 
   const resolveEntity = async (refInput, accessContext, options = {}) => {
@@ -144,31 +238,19 @@ Dry-run is the default. Live production writes require --source=live --execute -
     }
     if (ref?.namespace === 'teaching' && ref.kind === 'unit') {
       return resolveTeachingUnit(ref.id, accessContext, {
-        getStore: async () => ({
-          async get(key, { type } = {}) {
-            const id = key.replace(/^units\//, '');
-            const record = units.get(id);
-            if (!record) return null;
-            return type === 'json' ? record : JSON.stringify(record);
-          }
-        })
+        getStore: getTeachingStore
       });
     }
     if (ref?.namespace === 'tasks' && ref.kind === 'project') {
       return resolveTasksProject(ref.id, accessContext, {
-        getStore: async () => ({
-          async get(key, { type } = {}) {
-            const id = key.replace(/^projects\//, '');
-            const record = projects.get(id);
-            if (!record) return null;
-            return type === 'json' ? record : JSON.stringify(record);
-          }
-        })
+        getStore: getTasksStore
       });
     }
     if (ref?.namespace === 'life' && ref.kind === 'decision') {
       return resolveLifeDecision(ref.id, accessContext, {
-        getDecision: async (id) => decisions.get(id) ?? null
+        getDecision:
+          getDecision ||
+          (async () => null)
       });
     }
     return defaultResolveEntity(refInput, accessContext, options);
@@ -179,23 +261,17 @@ Dry-run is the default. Live production writes require --source=live --execute -
     getPage,
     resolveEntity,
     getUniversalLinkStore: async () => ulStore,
-    createLinkRepository: createUniversalLinkRepository
+    createLinkRepository: inject.createLinkRepository ?? createUniversalLinkRepository
   });
 
   const report = await migration.run({ dryRun });
-  const writtenLinks = [];
-  if (!dryRun) {
-    // Collect written links for parity from the in-memory store.
-    for (const [key, value] of ulStore._map.entries()) {
-      if (key.startsWith('universal-links/links/')) {
-        writtenLinks.push(typeof value === 'string' ? JSON.parse(value) : value);
-      }
-    }
-  }
+
+  // Parity reads pre-existing (and newly written) canonical related_to via indexes.
+  const indexedLinks = await loadCanonicalLinks(ulStore);
   const parityPages = source === 'live' ? await listPages() : pages;
   const parity = migration.buildParityReport({
     pages: parityPages,
-    links: writtenLinks,
+    links: indexedLinks,
     previousMigrationReport: report
   });
 
@@ -207,6 +283,8 @@ Dry-run is the default. Live production writes require --source=live --execute -
     confirm_execute: args.confirmExecute,
     write_cutover_default: false,
     dual_write: false,
+    store_mode: source === 'fixture' ? 'memory' : 'live_adapter',
+    parity_source: 'related_to_type_index',
     note: dryRun
       ? `Dry run (${source}) — zero Universal Link writes.`
       : `Execute mode (${source}) — writes went through createUniversalLinkRepository only.`
@@ -219,4 +297,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   main().then((code) => process.exit(code));
 }
 
-export { main, parseArgs };
+export { main, parseArgs, memoryStore };

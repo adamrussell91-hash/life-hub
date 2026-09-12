@@ -11,6 +11,44 @@ import { createKnowledgeRelationshipOperationRepository } from './knowledge-rela
 import { bindKnowledgeUniversalLinks } from './knowledge-ul-runtime.mjs';
 
 /**
+ * Normalize listForEntity results: production returns `{ outgoing, incoming }`;
+ * some tests inject a flat array of `{ link }` entries.
+ */
+export function flattenListForEntityResult(result) {
+  if (Array.isArray(result)) return result;
+  if (result && typeof result === 'object') {
+    const outgoing = Array.isArray(result.outgoing) ? result.outgoing : [];
+    const incoming = Array.isArray(result.incoming) ? result.incoming : [];
+    return [...outgoing, ...incoming];
+  }
+  return [];
+}
+
+/** Links this page owns (source_ref matches) — used for replace/suppress. */
+export function ownedOutgoingRelatedLinks(result, sourceRef) {
+  if (result && typeof result === 'object' && !Array.isArray(result) && Array.isArray(result.outgoing)) {
+    return result.outgoing.filter((entry) => {
+      const link = entry?.link ?? entry;
+      return (
+        link &&
+        link.relationship_type === 'related_to' &&
+        (!link.status || link.status === 'current') &&
+        link.source_ref === sourceRef
+      );
+    });
+  }
+  return flattenListForEntityResult(result).filter((entry) => {
+    const link = entry?.link ?? entry;
+    return (
+      link &&
+      link.relationship_type === 'related_to' &&
+      (!link.status || link.status === 'current') &&
+      link.source_ref === sourceRef
+    );
+  });
+}
+
+/**
  * Load dual-read relationship rows for a Knowledge page via indexed listForEntity.
  * @returns {Promise<{ relationships: object[], status: 'ready'|'unavailable', report?: object }>}
  */
@@ -52,24 +90,25 @@ export async function loadKnowledgePageRelationships({
   const sourceRef = formatEntityRef({ namespace: 'knowledge', kind: 'page', id: page.id });
   let universalLinks = [];
   try {
-    universalLinks = await listFn(sourceRef, access);
+    universalLinks = flattenListForEntityResult(await listFn(sourceRef, access));
   } catch {
     if (writeCutover) {
       return { relationships: [], status: 'unavailable', report: null };
     }
     const legacyOnly = combineConnectedRelationships({
       sourcePageId: page.id,
-      legacyConnected: dualRead ? page.connected || [] : page.connected || [],
+      legacyConnected: page.connected || [],
       universalLinks: []
     });
     return {
-      relationships: dualRead ? legacyOnly.relationships : legacyOnly.relationships,
+      relationships: legacyOnly.relationships,
       status: dualRead ? 'unavailable' : 'ready',
       report: legacyOnly.report
     };
   }
 
   if (writeCutover) {
+    // Canonical only — stale legacy connected stays stored but must not reappear.
     const canonicalOnly = combineConnectedRelationships({
       sourcePageId: page.id,
       legacyConnected: [],
@@ -154,10 +193,8 @@ export async function applyKnowledgeRelationshipCutover({
 
   const sourceRef = formatEntityRef({ namespace: 'knowledge', kind: 'page', id: pageId });
   const existing = await bound.listForEntity(sourceRef, bound.accessContext);
-  const existingRelated = (Array.isArray(existing) ? existing : []).filter((entry) => {
-    const link = entry?.link ?? entry;
-    return link && link.relationship_type === 'related_to';
-  });
+  // Replace only relationships this page owns — never incoming links.
+  const existingRelated = ownedOutgoingRelatedLinks(existing, sourceRef);
 
   const journal = createRelationshipRepository({ store: bound.store });
   return journal.applyRelatedToCutover({

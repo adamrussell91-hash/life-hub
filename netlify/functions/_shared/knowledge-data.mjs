@@ -342,15 +342,16 @@ async function putWithRetry(file, text, deps, message, knownSha) {
   }
 }
 
-export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso = () => new Date().toISOString() , applyRelationshipCutover = applyKnowledgeRelationshipCutover } = {}) {
+export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso = () => new Date().toISOString() } = {}) {
   const title = typeof input?.title === 'string' ? input.title.trim() : '';
   if (!title) {
     throw knowledgeWriteError(400, 'validation_error', 'title is required');
   }
   const writeCutover = isKnowledgeWriteCutoverEnabled(env);
-  // After write cutover, relationship edits go through Universal Links only.
-  // Existing connected values stay stored for rollback and comparison.
-  // Submitted connected is still interpreted as the intended relationship set.
+  // After write cutover, ordinary content saves never mutate Universal Links.
+  // Relationship changes require POST ?action=replace-relationships.
+  // Submitted connected is ignored for UL and for overwriting stored legacy
+  // connected (rollback field stays as previously stored).
   const submittedConnected = Array.isArray(input.connected)
     ? normalizeConnected(input.connected)
     : undefined;
@@ -423,30 +424,64 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   };
   const merged = [...rows.filter(row => row?.id !== id), entry];
   await putWithRetry('manifest.json', JSON.stringify(merged), { env, fetchImpl }, `Upsert ${id}`, manifestFile?.sha);
-  if (writeCutover && submittedConnected !== undefined) {
-    try {
-      await applyRelationshipCutover({
-        pageId: id,
-        submittedConnected,
-        env
-      });
-    } catch (error) {
-      // Page JSON already stored with legacy connected preserved. Surface a
-      // retryable partial failure so the client can resume the journaled UL ops.
-      const status = Number.isInteger(error?.status) ? error.status : 409;
-      const err = new Error(error?.message || 'Knowledge relationship cutover incomplete');
-      err.status = status;
-      err.code = error?.code || 'knowledge_relationship_operation_incomplete';
-      err.data = {
-        ...(error?.data && typeof error.data === 'object' ? error.data : {}),
-        page: stored,
-        page_saved: true,
-        retryable: error?.data?.retryable !== false
-      };
-      throw err;
-    }
-  }
   return stored;
+}
+
+/**
+ * Explicit relationship mutation for one Knowledge page.
+ * Only intentional submissions create/suppress related_to links.
+ */
+export async function replaceKnowledgePageRelationships(
+  input,
+  { env, fetchImpl = fetch, applyRelationshipCutover = applyKnowledgeRelationshipCutover } = {}
+) {
+  const id = isSafeKnowledgePageId(input?.id) ? input.id : null;
+  if (!id) {
+    throw knowledgeWriteError(400, 'validation_error', 'id is required');
+  }
+  if (!isKnowledgeWriteCutoverEnabled(env)) {
+    throw knowledgeWriteError(
+      409,
+      'knowledge_relationship_cutover_disabled',
+      'Universal Link relationship writes require write cutover.'
+    );
+  }
+  const relatedTo = Array.isArray(input?.related_to)
+    ? input.related_to
+    : Array.isArray(input?.connected)
+      ? input.connected
+      : null;
+  if (!Array.isArray(relatedTo)) {
+    throw knowledgeWriteError(400, 'validation_error', 'related_to array is required');
+  }
+  const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
+  let page = null;
+  if (existing?.text) {
+    try { page = JSON.parse(existing.text); } catch { page = null; }
+  }
+  if (!page) {
+    throw knowledgeWriteError(404, 'page_not_found', 'Knowledge page not found');
+  }
+  try {
+    await applyRelationshipCutover({
+      pageId: id,
+      submittedConnected: relatedTo,
+      env
+    });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 409;
+    const err = new Error(error?.message || 'Knowledge relationship cutover incomplete');
+    err.status = status;
+    err.code = error?.code || 'knowledge_relationship_operation_incomplete';
+    err.data = {
+      ...(error?.data && typeof error.data === 'object' ? error.data : {}),
+      page,
+      page_saved: false,
+      retryable: error?.data?.retryable !== false
+    };
+    throw err;
+  }
+  return page;
 }
 
 export async function getQuizStore({ env, fetchImpl = fetch } = {}) {

@@ -4,7 +4,11 @@ import {
   okResponse,
   withCors
 } from './_shared/http.mjs';
-import { listKnowledgePages, saveKnowledgePage } from './_shared/knowledge-data.mjs';
+import {
+  listKnowledgePages,
+  replaceKnowledgePageRelationships,
+  saveKnowledgePage
+} from './_shared/knowledge-data.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
@@ -41,13 +45,29 @@ export function createKnowledgePagesHandler(deps = {}) {
     if (request.method !== 'POST') {
       return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
     }
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
     const parsed = await readJsonObject(request);
     if (parsed.error) return withCors(parsed.error, request, env);
     try {
+      if (action === 'replace-relationships') {
+        const page = await replaceKnowledgePageRelationships(parsed.value, {
+          env,
+          fetchImpl: deps.fetchImpl,
+          applyRelationshipCutover: deps.applyRelationshipCutover
+        });
+        return withCors(okResponse(200, { page, relationships_replaced: true }), request, env);
+      }
+      if (action) {
+        return withCors(
+          errorResponse(400, 'invalid_action', 'Unsupported action.', false),
+          request,
+          env
+        );
+      }
       const saved = await saveKnowledgePage(parsed.value, {
         env,
-        fetchImpl: deps.fetchImpl,
-        applyRelationshipCutover: deps.applyRelationshipCutover
+        fetchImpl: deps.fetchImpl
       });
       return withCors(okResponse(200, saved), request, env);
     } catch (error) {
