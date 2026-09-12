@@ -1384,7 +1384,7 @@ function renderPage(page: LivePage) {
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.live_body ?? livePageBody(page.body))}</div>
       ${decisionTraceHtml(page.decision_traces, page.decision_traces_status)}
-      ${connectedLinksHtml(page, entries)}
+      ${connectedLinksHtml(page, entries, { relationships: page.relationships ?? null })}
       ${inverseLinksHtml(page.inverse_links, page.inverse_links_status)}
       ${urlWatchHtml(page.url_watches, page.url_watches_status)}
       ${renderAttachments(page)}

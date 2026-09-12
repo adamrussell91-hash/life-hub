@@ -16,6 +16,8 @@ import {
 } from './_shared/knowledge-live.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { defaultLoadUrlWatches, extractWatchUrls, normalizeUrlWatchStatus } from './_shared/url-watch.mjs';
+import { bindKnowledgeUniversalLinks } from './_shared/knowledge-ul-runtime.mjs';
+import { loadKnowledgePageRelationships } from './_shared/knowledge-page-relationships.mjs';
 
 export const config = { path: '/api/knowledge/pages/:id' };
 
@@ -30,7 +32,7 @@ export function createKnowledgePageHandler(deps = {}) {
       return withCors(errorResponse(404, 'not_found', 'Page not found', false), request, env);
     }
     try {
-      const page = await getKnowledgePage(id, { env, fetchImpl: deps.fetchImpl });
+      const page = await (deps.getKnowledgePage ?? getKnowledgePage)(id, { env, fetchImpl: deps.fetchImpl });
       if (!page) {
         return withCors(errorResponse(404, 'not_found', 'Page not found', false), request, env);
       }
@@ -46,6 +48,8 @@ export function createKnowledgePageHandler(deps = {}) {
       let inverseStatus = 'ready';
       let urlWatches = [];
       let urlWatchStatus = 'ready';
+      let relationships = null;
+      let relationshipsStatus = 'ready';
       let lifeRepo;
       const usingDefaultLife = !deps.loadWorkoutCompare && !deps.loadDecisionTraces && !deps.loadUrlWatches;
       if (usingDefaultLife && (needsCompare || needsTraces || needsWatches)) {
@@ -110,18 +114,41 @@ export function createKnowledgePageHandler(deps = {}) {
         })());
       }
       jobs.push((async () => {
+        const binding = deps.bindKnowledgeUniversalLinks
+          ? await deps.bindKnowledgeUniversalLinks({ env })
+          : await bindKnowledgeUniversalLinks({
+              env,
+              getUniversalLinkStore: deps.getUniversalLinkStore,
+              createUniversalLinkRepository: deps.createUniversalLinkRepository,
+              resolveEntity: deps.resolveEntity,
+              now: deps.now
+            });
         const loadInverse = deps.loadInverseLinks ?? defaultLoadInverseLinks;
         try {
           const loaded = normalizeInverseLinks(await loadInverse({
             env,
             fetchImpl: deps.fetchImpl,
-            page
+            page,
+            listIncoming: binding.listIncoming
           }));
           inverseLinks = loaded.links;
           inverseStatus = loaded.status;
         } catch {
           inverseLinks = [];
           inverseStatus = 'unavailable';
+        }
+        try {
+          const rel = await (deps.loadKnowledgePageRelationships ?? loadKnowledgePageRelationships)({
+            page,
+            env,
+            listForEntity: binding.listForEntity,
+            accessContext: binding.accessContext
+          });
+          relationships = rel.relationships;
+          relationshipsStatus = rel.status === 'unavailable' ? 'unavailable' : 'ready';
+        } catch {
+          relationships = [];
+          relationshipsStatus = 'unavailable';
         }
       })());
       await Promise.all(jobs);
@@ -132,7 +159,9 @@ export function createKnowledgePageHandler(deps = {}) {
         inverseLinks,
         inverseStatus,
         urlWatches,
-        urlWatchStatus
+        urlWatchStatus,
+        relationships,
+        relationshipsStatus
       })), request, env);
     } catch (error) {
       const status = Number.isInteger(error?.status) ? error.status : 502;

@@ -1,5 +1,6 @@
 import { normalizeConnected } from './hub-ref.mjs';
 import { isKnowledgeWriteCutoverEnabled } from './knowledge-ul-config.mjs';
+import { applyKnowledgeRelationshipCutover } from './knowledge-page-relationships.mjs';
 
 const GITHUB_ORIGIN = 'https://api.github.com';
 const REPOSITORY = /^(?<owner>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,38}))\/(?<repo>[A-Za-z0-9_.-]{1,100})$/;
@@ -341,7 +342,7 @@ async function putWithRetry(file, text, deps, message, knownSha) {
   }
 }
 
-export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso = () => new Date().toISOString() } = {}) {
+export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso = () => new Date().toISOString() , applyRelationshipCutover = applyKnowledgeRelationshipCutover } = {}) {
   const title = typeof input?.title === 'string' ? input.title.trim() : '';
   if (!title) {
     throw knowledgeWriteError(400, 'validation_error', 'title is required');
@@ -349,10 +350,14 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   const writeCutover = isKnowledgeWriteCutoverEnabled(env);
   // After write cutover, relationship edits go through Universal Links only.
   // Existing connected values stay stored for rollback and comparison.
+  // Submitted connected is still interpreted as the intended relationship set.
+  const submittedConnected = Array.isArray(input.connected)
+    ? normalizeConnected(input.connected)
+    : undefined;
   const connected = writeCutover
     ? null
-    : Array.isArray(input.connected)
-      ? normalizeConnected(input.connected)
+    : submittedConnected !== undefined
+      ? submittedConnected
       : null;
   const id = isSafeKnowledgePageId(input.id) ? input.id : newKnowledgePageId();
   const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
@@ -418,6 +423,29 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   };
   const merged = [...rows.filter(row => row?.id !== id), entry];
   await putWithRetry('manifest.json', JSON.stringify(merged), { env, fetchImpl }, `Upsert ${id}`, manifestFile?.sha);
+  if (writeCutover && submittedConnected !== undefined) {
+    try {
+      await applyRelationshipCutover({
+        pageId: id,
+        submittedConnected,
+        env
+      });
+    } catch (error) {
+      // Page JSON already stored with legacy connected preserved. Surface a
+      // retryable partial failure so the client can resume the journaled UL ops.
+      const status = Number.isInteger(error?.status) ? error.status : 409;
+      const err = new Error(error?.message || 'Knowledge relationship cutover incomplete');
+      err.status = status;
+      err.code = error?.code || 'knowledge_relationship_operation_incomplete';
+      err.data = {
+        ...(error?.data && typeof error.data === 'object' ? error.data : {}),
+        page: stored,
+        page_saved: true,
+        retryable: error?.data?.retryable !== false
+      };
+      throw err;
+    }
+  }
   return stored;
 }
 
