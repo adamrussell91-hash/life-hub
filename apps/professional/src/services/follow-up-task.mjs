@@ -1,54 +1,20 @@
 /**
- * Follow-up Task orchestration for Communication detail.
+ * Follow-up Task orchestration helpers.
  *
- * Creates the Task once, then writes Universal Links for:
- * - follow_up → Communication
- * - contact → every current recipient Person (read from Universal Links)
- *
- * Task JSON never receives Person, Communication, or Universal Link IDs.
- * Retry resumes the saved Task and only missing link intents.
+ * Intent builders live in the shared Netlify module used by durable server
+ * journals. The client helper remains for unit tests; the Communication
+ * screen uses server create-follow-up / retry-follow-up actions.
  */
 
-/**
- * @param {Array<{ link: { status: string, relationship_type: string, target_ref: string } }>} outgoing
- * @returns {string[]}
- */
-export function recipientPersonRefsFromLinks(outgoing) {
-  const refs = [];
-  const seen = new Set();
-  for (const entry of outgoing) {
-    const link = entry.link;
-    if (link.status !== 'current') continue;
-    if (link.relationship_type !== 'recipient') continue;
-    if (!link.target_ref.startsWith('shared:person:')) continue;
-    if (seen.has(link.target_ref)) continue;
-    seen.add(link.target_ref);
-    refs.push(link.target_ref);
-  }
-  return refs;
-}
+export {
+  buildFollowUpIntents,
+  recipientPersonRefsFromLinks
+} from '../../../../netlify/functions/_shared/follow-up-intents.mjs';
 
-/**
- * @param {{ communicationRef: string, recipientPersonRefs: string[] }} input
- */
-export function buildFollowUpIntents(input) {
-  /** @type {Array<{ intent_id: string, relationship_type: 'follow_up' | 'contact', target_ref: string }>} */
-  const intents = [
-    {
-      intent_id: `follow_up:${input.communicationRef}`,
-      relationship_type: 'follow_up',
-      target_ref: input.communicationRef
-    }
-  ];
-  for (const personRef of input.recipientPersonRefs) {
-    intents.push({
-      intent_id: `contact:${personRef}`,
-      relationship_type: 'contact',
-      target_ref: personRef
-    });
-  }
-  return intents;
-}
+import {
+  buildFollowUpIntents,
+  recipientPersonRefsFromLinks
+} from '../../../../netlify/functions/_shared/follow-up-intents.mjs';
 
 /**
  * Create or retry a follow-up Task for a Communication.

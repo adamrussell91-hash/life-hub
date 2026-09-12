@@ -4,6 +4,7 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
 import { isValidCommunicationId } from './_shared/communication-schema.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import {
   resolveCommunication,
@@ -32,10 +33,11 @@ function toErrorResponse(error) {
   const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
   const retryable = Boolean(error?.retryable) || status === 503;
   const data =
-    error?.communication_id || error?.operation_id
+    error?.communication_id || error?.operation_id || error?.task_id
       ? {
           communication_id: error.communication_id ?? null,
           operation_id: error.operation_id ?? null,
+          task_id: error.task_id ?? null,
           completed_link_ids: error.completed_link_ids ?? [],
           failed_intent_ids: error.failed_intent_ids ?? []
         }
@@ -90,7 +92,10 @@ export function createCommunicationsHandler(deps = {}) {
         resolveEntity,
         getUniversalLinkStore,
         generateId: deps.generateId,
-        createUniversalLinkRepository: deps.createUniversalLinkRepository
+        createUniversalLinkRepository: deps.createUniversalLinkRepository,
+        getTasksStore: deps.getTasksStore ?? defaultGetTasksStore,
+        createTaskId: deps.createTaskId,
+        env
       });
 
       try {
@@ -109,6 +114,19 @@ export function createCommunicationsHandler(deps = {}) {
           if (action === 'retry-links') {
             const id = readId(url);
             const result = await repo.retryLinks(id);
+            return withCors(okResponse(200, result), request, env);
+          }
+          if (action === 'create-follow-up') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            const result = await repo.createFollowUp(id, parsed.value ?? {});
+            return withCors(okResponse(201, result), request, env);
+          }
+          if (action === 'retry-follow-up') {
+            const id = readId(url);
+            const result = await repo.retryFollowUp(id);
             return withCors(okResponse(200, result), request, env);
           }
           if (action) {
