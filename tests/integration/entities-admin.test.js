@@ -4,6 +4,7 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
 import { createEntitiesAdminHandler } from '../../netlify/functions/entities-admin.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
+import { SELF_POINTER_KEY } from '../../netlify/functions/_shared/identity-repository.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -359,6 +360,51 @@ test('reconcile_self_identity is reachable through the administration route and 
   const body = (await response.json()).data;
   assert.equal(body.status, 'consistent');
   assert.equal(body.person_id, created.id);
+});
+
+// --- Job 1 (round 4 correction): the confirmed defect — a malformed
+// stored self-pointer made `inspectSelfPointer` pass unsafe content
+// straight to `personKey`/`identityOperationKey`, which threw a 400
+// before `reconcileSelfIdentity` could ever return a normal response,
+// leaving the administration reconciliation route unable to repair the
+// exact state it exists to repair ---
+
+test('reconcile_self_identity returns 200 (not 400) for a stored pointer with a path-unsafe person_id, and clears it', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const adminHandler = createEntitiesAdminHandler(deps);
+
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: '../../escape',
+    operation_id: 'op_11111111111111111111111111111111'
+  });
+
+  const response = await adminHandler(request({ body: { action: 'reconcile_self_identity' } }));
+  assert.equal(response.status, 200);
+  const body = (await response.json()).data;
+  assert.equal(body.status, 'reconciled');
+  assert.equal(body.person_id, null);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
+});
+
+test('reconcile_self_identity returns 200 (not 400) for a stored pointer with a valid person_id and a path-unsafe operation_id', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const adminHandler = createEntitiesAdminHandler(deps);
+
+  await store.setJSON(SELF_POINTER_KEY, {
+    schema_version: 2,
+    person_id: 'person_00000000-0000-4000-8000-000000000000',
+    operation_id: '../../escape'
+  });
+
+  const response = await adminHandler(request({ body: { action: 'reconcile_self_identity' } }));
+  assert.equal(response.status, 200);
+  const body = (await response.json()).data;
+  assert.equal(body.status, 'reconciled');
+  assert.equal(body.person_id, null);
+  assert.equal(store._raw(SELF_POINTER_KEY).person_id, null);
 });
 
 // --- Job 3 (round 3 correction): the route must build and pass a
