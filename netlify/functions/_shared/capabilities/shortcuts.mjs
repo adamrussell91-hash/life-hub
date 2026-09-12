@@ -296,15 +296,19 @@ export function shortcutSchemas() {
     delete_meal: {
       name: 'delete_meal',
       description:
-        'Propose deleting a confirmed meal slot for a date (Confirm). Removes the nutrition file(s) for that breakfast/lunch/dinner/snack — including numbered duplicates like snack-2 — and refreshes day Nutrition totals. Use when Adam asks to delete, remove, undo, or clear a meal/duplicate. Not for macro corrections (use log_entry overwrite for those).',
+        'Propose deleting a confirmed meal for a date (Confirm). Without slug, removes every file for that meal type (breakfast/lunch/dinner/snack/dessert), including timed (snack-1530) and numbered (snack-2) variants. Pass slug to remove one instance when several exist. Not for macro corrections (use log_entry overwrite for those).',
       input_schema: {
         type: 'object',
         properties: {
           date: { type: 'string', description: 'YYYY-MM-DD' },
           meal: {
             type: 'string',
-            enum: ['breakfast', 'lunch', 'dinner', 'snack'],
-            description: 'Meal slot to remove for that date'
+            enum: ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'],
+            description: 'Meal type to remove for that date'
+          },
+          slug: {
+            type: 'string',
+            description: 'Optional file slug only (e.g. snack-1530). When set, deletes that one file.'
           }
         },
         required: ['date', 'meal'],
@@ -953,18 +957,22 @@ async function handleDeleteMeal(ctx, input) {
   }
   const date = String(input.date || '').trim();
   const meal = String(input.meal || '').trim();
+  const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
   if (!isCalendarDate(date)) return deny('date must be YYYY-MM-DD');
-  if (!isMealSlot(meal)) return deny('meal must be breakfast, lunch, dinner, or snack');
+  if (!isMealSlot(meal)) return deny('meal must be breakfast, lunch, dinner, snack, or dessert');
 
-  const paths = findMealDeletePaths(repoTreeOf(ctx), date, meal);
+  const paths = findMealDeletePaths(repoTreeOf(ctx), date, meal, slug ? { slug } : {});
   if (paths.length === 0) {
-    return deny(`No ${meal} record found for ${date}`);
+    return deny(slug
+      ? `No ${meal} record with slug ${slug} found for ${date}`
+      : `No ${meal} record found for ${date}`);
   }
 
+  const label = slug || meal;
   return propose(
     buildProposal({
       agentSlug: ctx.agentSlug,
-      intent: `Delete ${meal} for ${date}`,
+      intent: `Delete ${label} for ${date}`,
       surfaces: ['confirm_card', 'nutrition_tab', 'central_node', 'governance_log'],
       reads: paths,
       writes: paths.map(path => ({

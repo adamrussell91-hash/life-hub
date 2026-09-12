@@ -23,7 +23,7 @@ import {
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
 import { persistLogEntry, renderMarkdown, syncCentralNodeAfterMealDeletes } from './_shared/persist-log.mjs';
-import { mealDeletesFromWrites } from './_shared/delete-meal.mjs';
+import { mealDeletesFromWrites, resolveMealWritePath } from './_shared/delete-meal.mjs';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { sendDiaryToDayOne } from './_shared/dayone-send.mjs';
 import {
@@ -175,12 +175,13 @@ export function createChatConfirmHandler({
     }
 
     let path;
+    let pathSlug;
     try {
-      // Meals always use the meal-slot slug from the record (breakfast/lunch/…).
+      // Meals always derive the path from the record (meal + time → snack-1530).
       // Never trust the request `slug` here — that field is overloaded as the
       // agent id on other confirm kinds, and a photo Confirm with slug=brisket
-      // would write data/nutrition/…/…-brisket.md instead of …-lunch.md.
-      const pathSlug = validation.record.type === 'meal'
+      // would write data/nutrition/…/…-brisket.md instead of …-lunch-1600.md.
+      pathSlug = validation.record.type === 'meal'
         ? buildRecordSlug(validation.record)
         : parsed.slug;
       path = buildCanonicalPath({
@@ -210,6 +211,18 @@ export function createChatConfirmHandler({
         });
         path = target.path;
         existingSha = target.existingSha;
+      } else if (validation.record.type === 'meal' && parsed.overwrite) {
+        const current = await client.resolveTree();
+        const target = resolveMealWritePath(current.tree, {
+          date: validation.record.date,
+          meal: validation.record.meal,
+          slug: pathSlug,
+          overwrite: true
+        });
+        if (target) {
+          path = target.path;
+          existingSha = target.existingSha;
+        }
       } else if (parsed.overwrite) {
         const current = await client.resolveTree();
         existingSha = current.tree.find(entry => entry.path === path && entry.type === 'blob')?.sha;

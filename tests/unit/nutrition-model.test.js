@@ -44,7 +44,8 @@ test('builds today\'s macros, day type, and full target profile from the existin
       breakfast: { protein_g: 38 },
       lunch: { protein_g: 42 },
       dinner: { protein_g: 0 },
-      snack: { protein_g: 0 }
+      snack: { protein_g: 0 },
+      dessert: { protein_g: 0 }
     }
   });
   assert.equal(model.dayType, 'movement');
@@ -55,7 +56,7 @@ test('builds today\'s macros, day type, and full target profile from the existin
     sodium_ceiling_mg: 2000,
     calcium_target_mg: 1000,
     polyphenol_daily_aim: 10,
-    meal_protein_g: { breakfast: 30, lunch: 30, dinner: 40, snack: 20, minimum: 25 }
+    meal_protein_g: { breakfast: 30, lunch: 30, dinner: 40, snack: 20, dessert: 0, minimum: 25 }
   });
 });
 
@@ -195,7 +196,7 @@ test('a repository with no config/targets.yml yet renders zeroed targets and unt
     sodium_ceiling_mg: 0,
     calcium_target_mg: 0,
     polyphenol_daily_aim: 0,
-    meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, minimum: 0 }
+    meal_protein_g: { breakfast: 0, lunch: 0, dinner: 0, snack: 0, dessert: 0, minimum: 0 }
   });
   assert.equal(model.week.every(day => day.proteinTarget === 0 && day.hitProtein === false), true);
   assert.equal(model.month.every(day => day.proteinTarget === 0 && day.hitProtein === false), true);

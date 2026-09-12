@@ -22,6 +22,7 @@ export function getDayTargets(config, dateKey, dayType = 'movement', recovery = 
       lunch: set.protein.lunch,
       dinner: set.protein.dinner,
       snack: set.protein.snack,
+      dessert: set.protein.dessert ?? 0,
       minimum: set.protein.min_per_meal
     }
   };

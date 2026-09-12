@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   findMealDeletePaths,
   mealDeletesFromWrites,
-  parseNutritionMealPath
+  parseNutritionMealPath,
+  resolveMealWritePath
 } from '../../netlify/functions/_shared/delete-meal.mjs';
 import {
   executeShortcut,
@@ -23,7 +24,7 @@ import { recentActionFingerprint } from '../../apps/life/js/core/central-node-wr
 const SHA = 'a'.repeat(40);
 const COMMIT = 'b'.repeat(40);
 
-test('parseNutritionMealPath accepts canonical and numbered meal slots', () => {
+test('parseNutritionMealPath accepts timed, numbered, and dessert slots', () => {
   assert.deepEqual(parseNutritionMealPath('data/nutrition/2026/09/2026-09-08-snack.md'), {
     date: '2026-09-08',
     meal: 'snack',
@@ -31,24 +32,45 @@ test('parseNutritionMealPath accepts canonical and numbered meal slots', () => {
     path: 'data/nutrition/2026/09/2026-09-08-snack.md'
   });
   assert.equal(parseNutritionMealPath('data/nutrition/2026/09/2026-09-08-snack-2.md')?.meal, 'snack');
+  assert.equal(parseNutritionMealPath('data/nutrition/2026/09/2026-09-08-snack-1530.md')?.meal, 'snack');
+  assert.equal(parseNutritionMealPath('data/nutrition/2026/09/2026-09-08-dessert-2115.md')?.meal, 'dessert');
   assert.equal(parseNutritionMealPath('data/nutrition/2026/09/2026-09-08-notes.md'), null);
 });
 
-test('findMealDeletePaths returns canonical slot plus numbered variants', () => {
+test('findMealDeletePaths returns canonical slot plus numbered and timed variants', () => {
   const tree = [
     { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-snack.md', sha: SHA },
     { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-snack-2.md', sha: SHA },
+    { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-snack-1530.md', sha: SHA },
     { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-lunch.md', sha: SHA },
     { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-snack-notes.md', sha: SHA }
   ];
   assert.deepEqual(findMealDeletePaths(tree, '2026-09-08', 'snack'), [
+    'data/nutrition/2026/09/2026-09-08-snack-1530.md',
     'data/nutrition/2026/09/2026-09-08-snack-2.md',
     'data/nutrition/2026/09/2026-09-08-snack.md'
+  ]);
+  assert.deepEqual(findMealDeletePaths(tree, '2026-09-08', 'snack', { slug: 'snack-1530' }), [
+    'data/nutrition/2026/09/2026-09-08-snack-1530.md'
   ]);
   assert.deepEqual(findMealDeletePaths(tree, '2026-09-08', 'lunch'), [
     'data/nutrition/2026/09/2026-09-08-lunch.md'
   ]);
   assert.deepEqual(findMealDeletePaths(tree, '2026-09-08', 'breakfast'), []);
+});
+
+test('resolveMealWritePath prefers timed slug and falls back to legacy on overwrite', () => {
+  const tree = [
+    { type: 'blob', path: 'data/nutrition/2026/09/2026-09-08-snack.md', sha: SHA }
+  ];
+  assert.deepEqual(
+    resolveMealWritePath(tree, { date: '2026-09-08', meal: 'snack', slug: 'snack-1530', overwrite: true }),
+    { path: 'data/nutrition/2026/09/2026-09-08-snack.md', existingSha: SHA }
+  );
+  assert.deepEqual(
+    resolveMealWritePath(tree, { date: '2026-09-08', meal: 'snack', slug: 'snack-1600', overwrite: false }),
+    { path: 'data/nutrition/2026/09/2026-09-08-snack-1600.md', existingSha: undefined }
+  );
 });
 
 test('delete_meal shortcut proposes delete writes for existing files', async () => {
