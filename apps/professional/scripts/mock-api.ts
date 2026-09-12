@@ -450,6 +450,107 @@ export function createMockApi() {
       return json(200, { ok: true, data: { communication } });
     }
 
+    if (path === '/api/tasks' && method === 'POST') {
+      const input = body as { title?: string };
+      const id = `task_${randomUUID().slice(0, 8)}`;
+      const task = {
+        id,
+        title: typeof input.title === 'string' ? input.title : 'Untitled',
+        status: 'open',
+        domain: 'work',
+        priority: 'normal',
+        kind: 'task'
+      };
+      // Task JSON never stores Communication or Person IDs.
+      return json(201, { ok: true, data: task });
+    }
+
+    if (path === '/api/universal-links' && method === 'POST') {
+      const input = body as {
+        source_ref?: string;
+        target_ref?: string;
+        relationship_type?: string;
+      };
+      for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
+        if (input && Object.prototype.hasOwnProperty.call(input, key)) {
+          return json(400, {
+            ok: false,
+            error: { code: 'access_field_not_accepted', message: `Field "${key}" is not accepted.` }
+          });
+        }
+      }
+      if (!input?.source_ref || !input?.target_ref || !input?.relationship_type) {
+        return json(400, { ok: false, error: { code: 'invalid_input', message: 'Invalid link.' } });
+      }
+      const id = `ul_${randomUUID().slice(0, 12)}`;
+      relationships.push({
+        id,
+        source_ref: input.source_ref,
+        target_ref: input.target_ref,
+        relationship_type: input.relationship_type,
+        inverse_label: input.relationship_type,
+        context_key: null,
+        status: 'current',
+        temporal_mode: 'timeless',
+        valid_from: null,
+        valid_to: null,
+        occurred_at: null
+      });
+      return json(201, {
+        ok: true,
+        data: {
+          link: {
+            id,
+            source_ref: input.source_ref,
+            target_ref: input.target_ref,
+            relationship_type: input.relationship_type,
+            status: 'current'
+          },
+          created: true
+        }
+      });
+    }
+
+    if (path === '/api/universal-links' && method === 'GET') {
+      const entityRef = url.searchParams.get('entity_ref');
+      if (!entityRef) {
+        return json(400, { ok: false, error: { code: 'missing_selector', message: 'selector required' } });
+      }
+      const outgoing = relationships
+        .filter((link) => link.source_ref === entityRef)
+        .map((link) => ({
+          link,
+          endpoint: findByRef(link.target_ref)
+            ? endpointFor(findByRef(link.target_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
+            : {
+                ref: link.target_ref,
+                kind: 'unknown',
+                display_label: link.target_ref,
+                supporting_label: null,
+                href: null,
+                lifecycle_status: null,
+                visibility: 'operator'
+              }
+        }));
+      const incoming = relationships
+        .filter((link) => link.target_ref === entityRef)
+        .map((link) => ({
+          link,
+          endpoint: findByRef(link.source_ref)
+            ? endpointFor(findByRef(link.source_ref) as PersonRecord | OrganisationRecord | CommunicationRecord)
+            : {
+                ref: link.source_ref,
+                kind: 'unknown',
+                display_label: link.source_ref,
+                supporting_label: null,
+                href: null,
+                lifecycle_status: null,
+                visibility: 'operator'
+              }
+        }));
+      return json(200, { ok: true, data: { outgoing, incoming } });
+    }
+
     return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown route.' } });
   }
 

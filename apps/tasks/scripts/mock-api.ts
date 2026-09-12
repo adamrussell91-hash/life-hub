@@ -40,6 +40,84 @@ export function createMockApi({ seed }: MockApiOptions) {
   const LOCAL_PASSPHRASE = 'tasks-hub-local';
   let authenticated = false;
 
+  const SETH_ID = 'person_00000000-0000-4000-8000-000000000001';
+  const syntheticPeople = new Map<
+    string,
+    { id: string; display_name: string; sort_name: string | null; lifecycle_status: string }
+  >([
+    [
+      SETH_ID,
+      {
+        id: SETH_ID,
+        display_name: 'Seth Example',
+        sort_name: 'Example, Seth',
+        lifecycle_status: 'active'
+      }
+    ]
+  ]);
+  const syntheticLinks = new Map<
+    string,
+    {
+      id: string;
+      source_ref: string;
+      target_ref: string;
+      relationship_type: string;
+      status: string;
+      temporal_mode: string;
+      context_key: string | null;
+      occurred_at: string | null;
+      valid_from: string | null;
+      valid_to: string | null;
+    }
+  >();
+
+  function endpointForRef(ref: string) {
+    const parts = ref.split(':');
+    if (parts[0] === 'shared' && parts[1] === 'person') {
+      const person = syntheticPeople.get(parts[2]!);
+      return {
+        ref,
+        kind: 'person',
+        display_label: person?.display_name ?? 'Person',
+        supporting_label: null,
+        href: null,
+        lifecycle_status: person?.lifecycle_status ?? null,
+        visibility: 'operator'
+      };
+    }
+    if (parts[0] === 'professional' && parts[1] === 'communication') {
+      return {
+        ref,
+        kind: 'communication',
+        display_label: 'Communication',
+        supporting_label: null,
+        href: `/professional/#/communication/${parts[2]}`,
+        lifecycle_status: 'completed',
+        visibility: 'operator'
+      };
+    }
+    if (parts[0] === 'tasks' && parts[1] === 'task') {
+      return {
+        ref,
+        kind: 'task',
+        display_label: 'Task',
+        supporting_label: null,
+        href: null,
+        lifecycle_status: 'open',
+        visibility: 'operator'
+      };
+    }
+    return {
+      ref,
+      kind: 'unknown',
+      display_label: ref,
+      supporting_label: null,
+      href: null,
+      lifecycle_status: null,
+      visibility: 'operator'
+    };
+  }
+
   async function ensure() {
     if (!seeded) {
       await seedIfEmpty(kv, keys, seed);
@@ -673,6 +751,122 @@ export function createMockApi({ seed }: MockApiOptions) {
       if (method === 'PATCH' || method === 'PUT') {
         const parsed = PlanningDirectionUpdateSchema.parse(body ?? {});
         return json(200, { ok: true, data: await s.updatePlanningDirection(parsed) });
+      }
+    }
+
+    if (path === '/api/entities/search' && method === 'GET') {
+      const query = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+      const includeArchived = url.searchParams.get('include_archived') === 'true';
+      const kinds = new Set((url.searchParams.get('kinds') ?? 'person').split(','));
+      const groups: Record<string, unknown[]> = { person: [], organisation: [], task: [] };
+      if (kinds.has('person')) {
+        for (const person of syntheticPeople.values()) {
+          if (!includeArchived && person.lifecycle_status === 'archived') continue;
+          if (['deleted', 'deidentified'].includes(person.lifecycle_status)) continue;
+          if (
+            !query ||
+            person.display_name.toLowerCase().includes(query) ||
+            (person.sort_name ?? '').toLowerCase().includes(query)
+          ) {
+            groups.person.push({
+              ref: `shared:person:${person.id}`,
+              kind: 'person',
+              display_label: person.display_name,
+              supporting_label: null,
+              href: null,
+              lifecycle_status: person.lifecycle_status,
+              visibility: 'operator'
+            });
+          }
+        }
+      }
+      return json(200, { ok: true, data: { groups } });
+    }
+
+    if (path === '/api/universal-links') {
+      if (method === 'GET') {
+        const entityRef = url.searchParams.get('entity_ref');
+        const linkId = url.searchParams.get('id');
+        if (linkId) {
+          const link = syntheticLinks.get(linkId);
+          if (!link) {
+            return json(404, { ok: false, error: { code: 'not_found', message: 'Link not found' } });
+          }
+          return json(200, { ok: true, data: { link } });
+        }
+        if (entityRef) {
+          const outgoing = [...syntheticLinks.values()]
+            .filter((link) => link.source_ref === entityRef)
+            .map((link) => ({
+              link,
+              endpoint: endpointForRef(link.target_ref)
+            }));
+          const incoming = [...syntheticLinks.values()]
+            .filter((link) => link.target_ref === entityRef)
+            .map((link) => ({
+              link,
+              endpoint: endpointForRef(link.source_ref)
+            }));
+          return json(200, { ok: true, data: { outgoing, incoming } });
+        }
+        return json(400, {
+          ok: false,
+          error: { code: 'missing_selector', message: 'selector required' }
+        });
+      }
+      if (method === 'POST') {
+        const input = body as {
+          source_ref?: string;
+          target_ref?: string;
+          relationship_type?: string;
+        };
+        if (!input?.source_ref || !input?.target_ref || !input?.relationship_type) {
+          return json(400, { ok: false, error: { code: 'invalid_input', message: 'Invalid link' } });
+        }
+        for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
+          if (Object.prototype.hasOwnProperty.call(input as object, key)) {
+            return json(400, {
+              ok: false,
+              error: { code: 'access_field_not_accepted', message: `Field "${key}" is not accepted.` }
+            });
+          }
+        }
+        const id = `ul_${Buffer.from(`${input.source_ref}|${input.target_ref}|${input.relationship_type}`)
+          .toString('hex')
+          .slice(0, 32)}`;
+        if (syntheticLinks.has(id)) {
+          return json(200, { ok: true, data: { link: syntheticLinks.get(id), created: false } });
+        }
+        const link = {
+          id,
+          source_ref: input.source_ref,
+          target_ref: input.target_ref,
+          relationship_type: input.relationship_type,
+          status: 'current',
+          temporal_mode: 'timeless',
+          context_key: null,
+          occurred_at: null,
+          valid_from: null,
+          valid_to: null
+        };
+        syntheticLinks.set(id, link);
+        return json(201, { ok: true, data: { link, created: true } });
+      }
+      if (method === 'PATCH' && id) {
+        const action = url.searchParams.get('action');
+        const link = syntheticLinks.get(id);
+        if (!link) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Link not found' } });
+        }
+        if (action === 'end') {
+          const validTo =
+            (body as { valid_to?: string })?.valid_to ?? new Date().toISOString().slice(0, 10);
+          link.status = 'ended';
+          link.valid_to = validTo;
+          syntheticLinks.set(id, link);
+          return json(200, { ok: true, data: { link } });
+        }
+        return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action' } });
       }
     }
 
