@@ -10,9 +10,14 @@ import {
   updateCommunication
 } from '@/api/communications';
 import { searchEntities } from '@/api/entities';
-import { apiPost, ApiClientError } from '@/api/client';
+import { createTask, createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import { ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
 import type { CommunicationRecord } from '@/domain/types';
+import {
+  createOrRetryFollowUpTask,
+  type FollowUpState
+} from '@/services/follow-up-task';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -344,39 +349,51 @@ export async function renderCommunicationDetailView(
     followUp.append(el('h2', undefined, 'Follow up'));
     const followUpStatus = el('p', 'communication-form__status');
     followUpStatus.hidden = true;
+    let pendingFollowUp: FollowUpState | null = null;
     const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
     followUpBtn.type = 'button';
+
+    function paintFollowUpStatus(state: FollowUpState, incomplete: boolean): void {
+      followUpStatus.hidden = false;
+      if (incomplete) {
+        const failed = state.failed_relationships
+          .map((item) => `${item.relationship_type} → ${item.target_ref}`)
+          .join('; ');
+        followUpStatus.textContent = `Task ${state.task_id} saved. Incomplete links: ${failed}. Use Retry.`;
+        followUpBtn.textContent = 'Retry incomplete follow up links';
+        followUpBtn.disabled = false;
+        return;
+      }
+      followUpStatus.textContent = `Follow up Task created (${state.task_id}).`;
+      followUpBtn.textContent = 'Create follow up Task';
+      followUpBtn.disabled = true;
+    }
+
     followUpBtn.addEventListener('click', async () => {
       followUpBtn.disabled = true;
       followUpStatus.hidden = true;
       try {
-        // Create the Task first through the Tasks API — Task JSON never
-        // receives Communication or Person IDs.
-        const task = await apiPost<{ id: string; title: string }>('/api/tasks', {
-          title: `Follow up: ${labelFor(record)}`,
-          status: 'open',
-          domain: 'work',
-          priority: 'normal',
-          kind: 'task'
-        });
-        const linkErrors: string[] = [];
-        try {
-          await apiPost('/api/universal-links', {
-            source_ref: `tasks:task:${task.id}`,
-            target_ref: `professional:communication:${record.id}`,
-            relationship_type: 'follow_up'
-          });
-        } catch (err) {
-          linkErrors.push(err instanceof ApiClientError ? err.message : 'follow_up failed');
-        }
-        if (linkErrors.length) {
-          followUpStatus.hidden = false;
-          followUpStatus.textContent = `Task ${task.id} saved. Incomplete links: ${linkErrors.join('; ')}.`;
-          followUpBtn.disabled = false;
-          return;
-        }
-        followUpStatus.hidden = false;
-        followUpStatus.textContent = `Follow up Task created (${task.id}).`;
+        const result = await createOrRetryFollowUpTask(
+          {
+            createTask: (input) =>
+              createTask({
+                title: input.title,
+                status: 'open',
+                domain: 'work',
+                priority: 'normal',
+                kind: 'task'
+              }),
+            listLinksForEntity: listUniversalLinksForEntity,
+            createLink: createUniversalLink
+          },
+          {
+            communicationId: record.id,
+            title: `Follow up: ${labelFor(record)}`,
+            prior: pendingFollowUp
+          }
+        );
+        pendingFollowUp = result.incomplete ? result.state : null;
+        paintFollowUpStatus(result.state, result.incomplete);
       } catch (err) {
         followUpStatus.hidden = false;
         followUpStatus.textContent = err instanceof ApiClientError ? err.message : 'Follow up failed.';

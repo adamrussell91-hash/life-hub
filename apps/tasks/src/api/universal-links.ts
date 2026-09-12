@@ -78,6 +78,22 @@ export function endUniversalLink(
   });
 }
 
+/**
+ * Timeless Task relationships (contact, collaborator) are removed from ordinary
+ * views via suppress, not end. The HTTP route derives the administration
+ * workflow server-side — the client never supplies workflow fields.
+ */
+export function suppressUniversalLink(
+  linkId: string,
+  reason = 'operator_requested',
+  options: { signal?: AbortSignal } = {}
+): Promise<{ link: UniversalLinkRecord }> {
+  const params = new URLSearchParams({ id: linkId, action: 'suppress' });
+  return apiPatch(`/api/universal-links?${params.toString()}`, { reason }, {
+    signal: options.signal
+  });
+}
+
 export function searchEntities(
   query: string,
   kinds: string,

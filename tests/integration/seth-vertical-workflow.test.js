@@ -6,11 +6,11 @@ import { createEntitySearchHandler } from '../../netlify/functions/entity-search
 import { createEntityOverviewHandler } from '../../netlify/functions/entity-overview.mjs';
 import { createUniversalLinksHandler } from '../../netlify/functions/universal-links.mjs';
 import { createCommunicationsHandler } from '../../netlify/functions/communications.mjs';
-import { createIdentityRepository } from '../../netlify/functions/_shared/identity-repository.mjs';
 import { resolveCommunication, resolvePerson, resolveOrganisation, resolveTask } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { communicationKey } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import { taskKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
+import { createOrRetryFollowUpTask } from '../../apps/professional/src/services/follow-up-task.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -201,32 +201,81 @@ test('synthetic Seth vertical workflow: roles, task contact, communication, foll
   assert.equal(Object.prototype.hasOwnProperty.call(storedComm, 'task_id'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(storedComm, 'links'), false);
 
-  // 9. Follow-up Task linked to Seth + Communication
-  const followUpId = 'task_follow_up_seth';
-  await tasksStore.setJSON(taskKey(followUpId), {
-    id: followUpId,
-    title: 'Follow up: Proposal',
-    status: 'open'
+  // 9. Follow-up Task via the same orchestration the Communication screen uses.
+  // Recipients are read from Universal Links; Task JSON stays free of ids.
+  let taskCreateCount = 0;
+  const followUpDeps = {
+    createTask: async ({ title }) => {
+      taskCreateCount += 1;
+      const id = 'task_follow_up_seth';
+      await tasksStore.setJSON(taskKey(id), { id, title, status: 'open' });
+      return { id, title };
+    },
+    listLinksForEntity: async (entityRef) => {
+      const response = await links(request(
+        `https://api.adam-russell.com/api/universal-links?entity_ref=${encodeURIComponent(entityRef)}`
+      ));
+      assert.equal(response.status, 200);
+      return (await response.json()).data;
+    },
+    createLink: async (body) => {
+      const response = await links(request('https://api.adam-russell.com/api/universal-links', {
+        method: 'POST',
+        body
+      }));
+      assert.ok(response.status === 201 || response.status === 200, `link create failed: ${response.status}`);
+      return (await response.json()).data;
+    }
+  };
+
+  const followUp = await createOrRetryFollowUpTask(followUpDeps, {
+    communicationId: communication.id,
+    title: 'Follow up: Proposal'
   });
-  await links(request('https://api.adam-russell.com/api/universal-links', {
-    method: 'POST',
-    body: {
-      source_ref: `tasks:task:${followUpId}`,
-      target_ref: `professional:communication:${communication.id}`,
-      relationship_type: 'follow_up'
-    }
-  }));
-  await links(request('https://api.adam-russell.com/api/universal-links', {
-    method: 'POST',
-    body: {
-      source_ref: `tasks:task:${followUpId}`,
-      target_ref: sethRef,
-      relationship_type: 'contact'
-    }
-  }));
-  const followUpStored = await tasksStore.get(taskKey(followUpId), { type: 'json' });
+  assert.equal(followUp.incomplete, false);
+  assert.equal(followUp.created_task, true);
+  assert.equal(taskCreateCount, 1);
+  assert.equal(followUp.state.task_id, 'task_follow_up_seth');
+  assert.ok(
+    followUp.state.completed_intent_ids.includes(
+      `follow_up:professional:communication:${communication.id}`
+    )
+  );
+  assert.ok(followUp.state.completed_intent_ids.includes(`contact:${sethRef}`));
+
+  const followUpStored = await tasksStore.get(taskKey(followUp.state.task_id), { type: 'json' });
   assert.equal(Object.prototype.hasOwnProperty.call(followUpStored, 'communication_id'), false);
   assert.equal(Object.prototype.hasOwnProperty.call(followUpStored, 'person_id'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(followUpStored, 'universal_link_id'), false);
+
+  // Equivalent re-run via prior state creates no second Task and no duplicate links.
+  const followUpRetry = await createOrRetryFollowUpTask(followUpDeps, {
+    communicationId: communication.id,
+    title: 'Follow up: Proposal',
+    prior: followUp.state
+  });
+  assert.equal(followUpRetry.created_task, false);
+  assert.equal(taskCreateCount, 1);
+  assert.equal(followUpRetry.state.task_id, followUp.state.task_id);
+
+  const taskLinks = await (
+    await links(request(
+      `https://api.adam-russell.com/api/universal-links?entity_ref=${encodeURIComponent(`tasks:task:${followUp.state.task_id}`)}`
+    ))
+  ).json();
+  const followUpLinks = taskLinks.data.outgoing.filter((entry) => entry.link.relationship_type === 'follow_up');
+  const contactLinks = taskLinks.data.outgoing.filter((entry) => entry.link.relationship_type === 'contact');
+  assert.equal(followUpLinks.length, 1);
+  assert.equal(contactLinks.length, 1);
+  assert.equal(contactLinks[0].link.target_ref, sethRef);
+
+  // Removing a saved contact uses suppress (timeless), not end.
+  const suppressRes = await links(request(
+    `https://api.adam-russell.com/api/universal-links?id=${encodeURIComponent(contactLinks[0].link.id)}&action=suppress`,
+    { method: 'PATCH', body: { reason: 'operator_requested' } }
+  ));
+  assert.equal(suppressRes.status, 200);
+  assert.equal((await suppressRes.json()).data.link.status, 'suppressed');
 
   // 10. Seth overview shows org, roles, tasks, communication
   const finalOverview = await (
@@ -261,6 +310,59 @@ test('synthetic Seth vertical workflow: roles, task contact, communication, foll
     await search(request('https://api.adam-russell.com/api/entities/search?q=Seth&kinds=person&include_archived=true'))
   ).json();
   assert.equal(archived.data.groups.person.some((item) => item.ref === sethRef), true);
+});
+
+test('follow-up orchestration retains Task when a contact write fails and retry completes missing links only', async () => {
+  let taskCreates = 0;
+  let failContact = true;
+  const linkCalls = [];
+  const deps = {
+    createTask: async ({ title }) => {
+      taskCreates += 1;
+      return { id: 'task_follow_partial', title };
+    },
+    listLinksForEntity: async () => ({
+      outgoing: [
+        {
+          link: {
+            id: 'ul_recipient',
+            status: 'current',
+            relationship_type: 'recipient',
+            source_ref: 'professional:communication:communication_partial',
+            target_ref: 'shared:person:person_seth'
+          }
+        }
+      ]
+    }),
+    createLink: async (input) => {
+      linkCalls.push(input.relationship_type);
+      if (input.relationship_type === 'contact' && failContact) {
+        throw new Error('contact failed');
+      }
+      return { link: { id: `ul_${input.relationship_type}` }, created: true };
+    }
+  };
+
+  const first = await createOrRetryFollowUpTask(deps, {
+    communicationId: 'communication_partial',
+    title: 'Follow up: Partial'
+  });
+  assert.equal(first.incomplete, true);
+  assert.equal(first.state.task_id, 'task_follow_partial');
+  assert.equal(taskCreates, 1);
+  assert.deepEqual(first.state.failed_relationships.map((item) => item.relationship_type), ['contact']);
+
+  failContact = false;
+  const second = await createOrRetryFollowUpTask(deps, {
+    communicationId: 'communication_partial',
+    title: 'Follow up: Partial',
+    prior: first.state
+  });
+  assert.equal(second.incomplete, false);
+  assert.equal(second.created_task, false);
+  assert.equal(taskCreates, 1);
+  assert.equal(linkCalls.filter((type) => type === 'follow_up').length, 1);
+  assert.equal(linkCalls.filter((type) => type === 'contact').length, 2);
 });
 
 test('APIs reject unauthenticated requests and disallowed origins', async () => {

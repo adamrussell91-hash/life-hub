@@ -46,6 +46,7 @@ vi.mock('@/api/universal-links', () => ({
     created: true
   })),
   endUniversalLink: vi.fn(async () => ({ link: { id: 'ul_x', status: 'ended' } })),
+  suppressUniversalLink: vi.fn(async () => ({ link: { id: 'ul_x', status: 'suppressed' } })),
   searchEntities: vi.fn(async () => ({
     groups: {
       person: [
@@ -66,7 +67,11 @@ vi.mock('@/api/universal-links', () => ({
 
 import { renderTaskEditor } from '@/views/task-editor';
 import { tasksApi } from '@/services/client-api';
-import { createUniversalLink, listUniversalLinksForEntity } from '@/api/universal-links';
+import {
+  createUniversalLink,
+  listUniversalLinksForEntity,
+  suppressUniversalLink
+} from '@/api/universal-links';
 
 const baseTask = {
   id: 'task_1',
@@ -169,5 +174,42 @@ describe('Task editor Relationships section', () => {
         source_ref: 'tasks:task:task_1'
       });
     }
+  });
+
+  it('labels saved contact/collaborator actions Remove and suppresses rather than ending', async () => {
+    vi.mocked(listUniversalLinksForEntity).mockResolvedValueOnce({
+      outgoing: [
+        {
+          link: {
+            id: 'ul_saved_contact',
+            source_ref: 'tasks:task:task_1',
+            target_ref: 'shared:person:person_00000000-0000-4000-8000-000000000001',
+            relationship_type: 'contact',
+            status: 'current'
+          },
+          endpoint: {
+            ref: 'shared:person:person_00000000-0000-4000-8000-000000000001',
+            kind: 'person',
+            display_label: 'Seth Example'
+          }
+        }
+      ],
+      incoming: []
+    } as never);
+
+    const host = document.createElement('div');
+    document.body.append(host);
+    await renderTaskEditor(host, baseTask, [], async () => undefined);
+    await vi.waitFor(() => expect(host.textContent).toMatch(/Seth Example/));
+
+    const remove = [...host.querySelectorAll('button')].find((btn) => btn.textContent === 'Remove');
+    expect(remove).toBeTruthy();
+    expect([...host.querySelectorAll('button')].some((btn) => btn.textContent === 'End')).toBe(
+      false
+    );
+    remove!.click();
+    await vi.waitFor(() => expect(suppressUniversalLink).toHaveBeenCalled());
+    expect(vi.mocked(suppressUniversalLink).mock.calls[0]![0]).toBe('ul_saved_contact');
+    expect(vi.mocked(suppressUniversalLink).mock.calls[0]![1]).toBe('operator_requested');
   });
 });
