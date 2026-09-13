@@ -5,13 +5,17 @@ export class ApiClientError extends Error {
   readonly code: string;
   readonly details?: unknown;
   readonly status?: number;
+  readonly data?: unknown;
+  readonly retryable?: boolean;
 
-  constructor(error: ApiErrorBody, status?: number) {
+  constructor(error: ApiErrorBody, status?: number, data?: unknown) {
     super(error.message);
     this.name = 'ApiClientError';
     this.code = error.code;
     this.details = error.details;
     this.status = status;
+    this.data = data;
+    this.retryable = error.retryable;
   }
 }
 
@@ -147,7 +151,7 @@ async function apiRequestOnce<T>(
 
   const result = await parseApiResponse<T>(response);
   if (!result.ok) {
-    throw new ApiClientError(result.error, response.status);
+    throw new ApiClientError(result.error, response.status, result.data);
   }
   return result.data;
 }
@@ -182,4 +186,12 @@ export function apiPost<T>(
   options?: ApiRequestOptions
 ): Promise<T> {
   return apiRequest<T>('POST', path, { ...options, body });
+}
+
+export function apiPatch<T>(
+  path: string,
+  body?: unknown,
+  options?: ApiRequestOptions
+): Promise<T> {
+  return apiRequest<T>('PATCH', path, { ...options, body });
 }

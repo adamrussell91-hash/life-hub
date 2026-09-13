@@ -1,9 +1,9 @@
 /**
- * Small in-memory mock of the umbrella endpoints Professional needs, so the
- * Vite dev server works without production secrets or real data:
- * session check, sign in/out, entity search, entity overview. Nothing else
- * — no Communication storage or API, per Slice 4 scope.
+ * In-memory mock of umbrella endpoints Professional needs for local Vite
+ * development: session, entities search/overview, and Communications.
+ * Synthetic fixtures only — no production data, no AI providers.
  */
+import { randomUUID } from 'node:crypto';
 import seedData from '../fixtures/seed.json' with { type: 'json' };
 
 const LOCAL_PASSPHRASE = 'professional-hub-local';
@@ -43,6 +43,26 @@ interface RelationshipSeed {
   occurred_at: string | null;
 }
 
+interface CommunicationRecord {
+  schema_version: number;
+  id: string;
+  direction: 'outbound' | 'inbound';
+  channel: string;
+  occurred_at: string;
+  subject: string;
+  summary: string;
+  status: 'completed' | 'received';
+  created_at: string;
+  updated_at: string;
+  incomplete_links?: {
+    operation_id: string;
+    status: string;
+    completed_link_ids: string[];
+    failed_intent_ids: string[];
+    pending_intent_ids: string[];
+  } | null;
+}
+
 function refFor(record: PersonRecord | OrganisationRecord): string {
   return `shared:${record.kind}:${record.id}`;
 }
@@ -72,7 +92,19 @@ function toSearchResult(record: PersonRecord | OrganisationRecord, rank: number)
   };
 }
 
-function endpointFor(record: PersonRecord | OrganisationRecord) {
+function endpointFor(record: PersonRecord | OrganisationRecord | CommunicationRecord) {
+  if ('direction' in record) {
+    const subject = typeof record.subject === 'string' ? record.subject.trim() : '';
+    return {
+      ref: `professional:communication:${record.id}`,
+      kind: 'communication',
+      display_label: subject || `${record.direction} ${record.channel}`,
+      supporting_label: `${record.direction} ${record.channel}`,
+      href: `/professional/#/communication/${encodeURIComponent(record.id)}`,
+      lifecycle_status: record.status,
+      visibility: 'operator'
+    };
+  }
   return {
     ref: refFor(record),
     kind: record.kind,
@@ -94,7 +126,11 @@ function timelineKind(link: RelationshipSeed): 'point' | 'period' | 'change' {
   return 'change';
 }
 
-function timelineLabel(link: RelationshipSeed, endpoint: { display_label: string }, direction: 'outgoing' | 'incoming'): string {
+function timelineLabel(
+  link: RelationshipSeed,
+  endpoint: { display_label: string },
+  direction: 'outgoing' | 'incoming'
+): string {
   if (direction === 'outgoing') return `${link.relationship_type} ${endpoint.display_label}`.trim();
   return `${link.inverse_label} ${endpoint.display_label}`.trim();
 }
@@ -106,7 +142,8 @@ export function createMockApi() {
   const organisations = new Map<string, OrganisationRecord>(
     (seedData.organisations as OrganisationRecord[]).map((o) => [o.id, { ...o }])
   );
-  const relationships = seedData.relationships as RelationshipSeed[];
+  const relationships = [...(seedData.relationships as RelationshipSeed[])];
+  const communications = new Map<string, CommunicationRecord>();
 
   let authenticated = false;
 
@@ -114,18 +151,19 @@ export function createMockApi() {
     return { status, body };
   }
 
-  function findByRef(ref: string): PersonRecord | OrganisationRecord | null {
+  function findByRef(ref: string): PersonRecord | OrganisationRecord | CommunicationRecord | null {
     const parts = ref.split(':');
-    if (parts.length !== 3 || parts[0] !== 'shared') return null;
-    const [, kind, id] = parts;
-    if (kind === 'person') return people.get(id!) ?? null;
-    if (kind === 'organisation') return organisations.get(id!) ?? null;
+    if (parts.length !== 3) return null;
+    const [ns, kind, id] = parts;
+    if (ns === 'shared' && kind === 'person') return people.get(id!) ?? null;
+    if (ns === 'shared' && kind === 'organisation') return organisations.get(id!) ?? null;
+    if (ns === 'professional' && kind === 'communication') return communications.get(id!) ?? null;
     return null;
   }
 
   function buildOverview(ref: string) {
     const entity = findByRef(ref);
-    if (!entity) return null;
+    if (!entity || !('kind' in entity)) return null;
 
     const entries = relationships
       .filter((link) => link.source_ref === ref || link.target_ref === ref)
@@ -133,7 +171,17 @@ export function createMockApi() {
         const direction: 'outgoing' | 'incoming' = link.source_ref === ref ? 'outgoing' : 'incoming';
         const otherRef = direction === 'outgoing' ? link.target_ref : link.source_ref;
         const other = findByRef(otherRef);
-        const endpoint = other ? endpointFor(other) : { ref: otherRef, kind: 'person', display_label: 'Unknown', supporting_label: null, href: null, lifecycle_status: null, visibility: 'operator' };
+        const endpoint = other
+          ? endpointFor(other as PersonRecord | OrganisationRecord | CommunicationRecord)
+          : {
+              ref: otherRef,
+              kind: 'person',
+              display_label: 'Unknown',
+              supporting_label: null,
+              href: null,
+              lifecycle_status: null,
+              visibility: 'operator'
+            };
         return { link, endpoint, direction };
       });
 
@@ -149,7 +197,7 @@ export function createMockApi() {
         label: timelineLabel(entry.link, entry.endpoint, entry.direction),
         context_key: entry.link.context_key,
         source_ref: entry.link.source_ref,
-        href: null
+        href: entry.endpoint.href ?? null
       }))
       .sort((a, b) => {
         if (!a.date && !b.date) return 0;
@@ -158,10 +206,20 @@ export function createMockApi() {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
 
-    const linked_records = { tasks: [] as unknown[], communications: [] as unknown[], organisations: [] as unknown[], people: [] as unknown[] };
+    const linked_records = {
+      tasks: [] as unknown[],
+      communications: [] as unknown[],
+      organisations: [] as unknown[],
+      people: [] as unknown[]
+    };
+    const seen = new Set<string>();
     for (const entry of entries) {
+      if (seen.has(entry.endpoint.ref)) continue;
+      seen.add(entry.endpoint.ref);
       if (entry.endpoint.kind === 'organisation') linked_records.organisations.push(entry.endpoint);
       else if (entry.endpoint.kind === 'person') linked_records.people.push(entry.endpoint);
+      else if (entry.endpoint.kind === 'communication') linked_records.communications.push(entry.endpoint);
+      else if (entry.endpoint.kind === 'task') linked_records.tasks.push(entry.endpoint);
     }
 
     return {
@@ -179,17 +237,29 @@ export function createMockApi() {
 
     if (path === '/api/session' && method === 'GET') {
       if (!authenticated) {
-        return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
+        return json(401, {
+          ok: false,
+          error: { code: 'unauthenticated', message: 'Please sign in to continue.' }
+        });
       }
-      return json(200, { ok: true, data: { authenticated: true, expiresAt: Date.now() + 12 * 3600_000 } });
+      return json(200, {
+        ok: true,
+        data: { authenticated: true, expiresAt: Date.now() + 12 * 3600_000 }
+      });
     }
     if (path === '/api/auth' && method === 'POST') {
       const passphrase = (body as { passphrase?: string })?.passphrase;
       if (typeof passphrase === 'string' && passphrase.trim() === LOCAL_PASSPHRASE) {
         authenticated = true;
-        return json(200, { ok: true, data: { authenticated: true, expiresAt: Date.now() + 12 * 3600_000 } });
+        return json(200, {
+          ok: true,
+          data: { authenticated: true, expiresAt: Date.now() + 12 * 3600_000 }
+        });
       }
-      return json(401, { ok: false, error: { code: 'invalid_credentials', message: 'That passphrase was not accepted.' } });
+      return json(401, {
+        ok: false,
+        error: { code: 'invalid_credentials', message: 'That passphrase was not accepted.' }
+      });
     }
     if (path === '/api/logout' && method === 'POST') {
       authenticated = false;
@@ -197,31 +267,43 @@ export function createMockApi() {
     }
 
     if (!authenticated) {
-      return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Please sign in to continue.' } });
+      return json(401, {
+        ok: false,
+        error: { code: 'unauthenticated', message: 'Please sign in to continue.' }
+      });
     }
 
     if (path === '/api/entities/search' && method === 'GET') {
       const query = (url.searchParams.get('q') ?? '').trim();
       if (query.length < 2) {
-        return json(400, { ok: false, error: { code: 'invalid_query_length', message: 'q must be at least 2 characters.' } });
+        return json(400, {
+          ok: false,
+          error: { code: 'invalid_query_length', message: 'q must be at least 2 characters.' }
+        });
       }
+      const includeArchived = url.searchParams.get('include_archived') === 'true';
       const kinds = new Set((url.searchParams.get('kinds') ?? 'person,organisation,task').split(','));
       const results: Array<ReturnType<typeof toSearchResult>> = [];
       if (kinds.has('person')) {
         for (const person of people.values()) {
+          if (!includeArchived && person.lifecycle_status === 'archived') continue;
+          if (['deleted', 'deidentified'].includes(person.lifecycle_status)) continue;
           const rank = matchRank(query, person.display_name, person.sort_name);
           if (rank !== null) results.push(toSearchResult(person, rank));
         }
       }
       if (kinds.has('organisation')) {
         for (const organisation of organisations.values()) {
+          if (!includeArchived && organisation.lifecycle_status === 'archived') continue;
+          if (organisation.lifecycle_status === 'deleted') continue;
           const rank = matchRank(query, organisation.display_name, null);
           if (rank !== null) results.push(toSearchResult(organisation, rank));
         }
       }
       results.sort((a, b) => a.rank - b.rank || a.display_label.localeCompare(b.display_label));
+      const capped = results.slice(0, 20);
       const groups = { person: [] as unknown[], organisation: [] as unknown[], task: [] as unknown[] };
-      for (const { rank: _rank, ...result } of results) {
+      for (const { rank: _rank, ...result } of capped) {
         (groups as Record<string, unknown[]>)[result.kind]!.push(result);
       }
       return json(200, { ok: true, data: { groups } });
@@ -237,6 +319,135 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } });
       }
       return json(200, { ok: true, data: overview });
+    }
+
+    if (path === '/api/communications' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const communication = communications.get(id);
+        if (!communication) {
+          return json(404, {
+            ok: false,
+            error: { code: 'communication_not_found', message: 'Communication not found.' }
+          });
+        }
+        return json(200, { ok: true, data: { communication } });
+      }
+      const list = [...communications.values()].sort((a, b) => {
+        const delta = Date.parse(b.occurred_at) - Date.parse(a.occurred_at);
+        return delta !== 0 ? delta : a.id < b.id ? 1 : -1;
+      });
+      return json(200, { ok: true, data: { communications: list } });
+    }
+
+    if (path === '/api/communications' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      if (action === 'retry-links') {
+        const id = url.searchParams.get('id');
+        const communication = id ? communications.get(id) : null;
+        if (!communication) {
+          return json(404, {
+            ok: false,
+            error: { code: 'communication_not_found', message: 'Communication not found.' }
+          });
+        }
+        communication.incomplete_links = null;
+        communications.set(communication.id, communication);
+        return json(200, { ok: true, data: { communication, links: [], retried: true } });
+      }
+
+      const input = body as {
+        direction?: string;
+        channel?: string;
+        occurred_at?: string;
+        subject?: string;
+        summary?: string;
+        links?: Array<{ target_ref: string; relationship_type: string; occurred_at?: string }>;
+        force_incomplete?: boolean;
+      };
+      if (input?.direction !== 'outbound' && input?.direction !== 'inbound') {
+        return json(400, { ok: false, error: { code: 'invalid_direction', message: 'Invalid direction.' } });
+      }
+      const now = new Date().toISOString();
+      const id = `communication_${randomUUID()}`;
+      const communication: CommunicationRecord = {
+        schema_version: 1,
+        id,
+        direction: input.direction,
+        channel: input.channel ?? 'email',
+        occurred_at: input.occurred_at ?? now,
+        subject: (input.subject ?? '').trim(),
+        summary: (input.summary ?? '').trim(),
+        status: input.direction === 'outbound' ? 'completed' : 'received',
+        created_at: now,
+        updated_at: now
+      };
+
+      // Stored record never copies orchestration links / target IDs.
+      const stored = { ...communication };
+      communications.set(id, stored);
+
+      const sourceRef = `professional:communication:${id}`;
+      for (const link of input.links ?? []) {
+        relationships.push({
+          id: `link_${randomUUID()}`,
+          source_ref: sourceRef,
+          target_ref: link.target_ref,
+          relationship_type: link.relationship_type,
+          inverse_label:
+            link.relationship_type === 'recipient' ? 'received_communication' : link.relationship_type,
+          context_key: null,
+          status: 'current',
+          temporal_mode: link.relationship_type === 'follows_from' ? 'timeless' : 'point',
+          valid_from: null,
+          valid_to: null,
+          occurred_at: link.occurred_at ?? communication.occurred_at
+        });
+      }
+
+      if (input.force_incomplete) {
+        const operationId = `cop_${'a'.repeat(32)}`;
+        stored.incomplete_links = {
+          operation_id: operationId,
+          status: 'repair_needed',
+          completed_link_ids: [],
+          failed_intent_ids: ['intent_000_mock'],
+          pending_intent_ids: ['intent_000_mock']
+        };
+        return json(503, {
+          ok: false,
+          error: {
+            code: 'communication_links_incomplete',
+            message: 'One or more Communication links could not be completed.',
+            retryable: true
+          },
+          data: {
+            communication_id: id,
+            operation_id: operationId,
+            completed_link_ids: [],
+            failed_intent_ids: ['intent_000_mock']
+          }
+        });
+      }
+
+      return json(201, { ok: true, data: { communication: stored, links: [], created: true } });
+    }
+
+    if (path === '/api/communications' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const communication = id ? communications.get(id) : null;
+      if (!communication) {
+        return json(404, {
+          ok: false,
+          error: { code: 'communication_not_found', message: 'Communication not found.' }
+        });
+      }
+      const patch = body as { subject?: string; summary?: string };
+      if (typeof patch.subject === 'string') communication.subject = patch.subject.trim();
+      if (typeof patch.summary === 'string') communication.summary = patch.summary.trim();
+      communication.updated_at = new Date().toISOString();
+      communications.set(communication.id, communication);
+      return json(200, { ok: true, data: { communication } });
     }
 
     return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown route.' } });

@@ -3,6 +3,8 @@ import '../../design-kit/overlays.css';
 import '../../design-kit/chrome.css';
 import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
+import '../../design-kit/entity-links.css';
+import '../../design-kit/relationship-timeline.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -12,7 +14,11 @@ import { parseRoute, railHighlightFor } from '@/app/router';
 import { renderPeopleView } from '@/views/people';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
-import { renderCommunicationsView } from '@/views/communications';
+import {
+  renderCommunicationDetailView,
+  renderCommunicationNewView,
+  renderCommunicationsView
+} from '@/views/communications';
 import { renderPersonPage } from '@/views/person-page';
 import { renderOrganisationPage } from '@/views/organisation-page';
 
@@ -40,7 +46,10 @@ async function bootApp(root: HTMLElement): Promise<void> {
     onRefresh: () => void paint()
   });
 
+  let routeGeneration = 0;
+
   async function paint(): Promise<void> {
+    const generation = ++routeGeneration;
     const route = parseRoute();
     const highlight = railHighlightFor(route);
     renderPrimaryNav(shell.railNav, highlight);
@@ -68,20 +77,44 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
     if (route.name === 'communications') {
       renderPageHeader(shell, viewChrome('communications'));
-      renderCommunicationsView(shell.canvas);
+      await renderCommunicationsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'communication-new') {
+      renderPageHeader(shell, { eyebrow: 'Communications', title: 'Compose' });
+      await renderCommunicationNewView(shell.canvas);
+      return;
+    }
+    if (route.name === 'communication') {
+      renderPageHeader(shell, { eyebrow: 'Communications', title: 'Loading…' });
+      await renderCommunicationDetailView(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Communications', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'person') {
       renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
       await renderPersonPage(shell.canvas, route.id, {
-        onTitleReady: (title) => renderPageHeader(shell, { eyebrow: 'People', title })
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'People', title });
+        },
+        isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'organisation') {
       renderPageHeader(shell, { eyebrow: 'Organisations', title: 'Loading…' });
       await renderOrganisationPage(shell.canvas, route.id, {
-        onTitleReady: (title) => renderPageHeader(shell, { eyebrow: 'Organisations', title })
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Organisations', title });
+        },
+        isCurrent: () => generation === routeGeneration
       });
     }
   }

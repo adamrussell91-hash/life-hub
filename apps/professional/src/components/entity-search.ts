@@ -118,14 +118,9 @@ export function mountEntitySearch(container: HTMLElement, options: EntitySearchO
     results.replaceChildren();
 
     try {
-      const groupsResponses = await Promise.all(
-        options.kinds === 'person,organisation'
-          ? [
-              searchEntities(query, 'person', { signal: ownController.signal }),
-              searchEntities(query, 'organisation', { signal: ownController.signal })
-            ]
-          : [searchEntities(query, options.kinds, { signal: ownController.signal })]
-      );
+      // One bounded request even for mixed person+organisation search —
+      // the server already caps the combined result set at 20.
+      const response = await searchEntities(query, options.kinds, { signal: ownController.signal });
 
       // Ignore a response that raced back after a newer query already
       // superseded it — the caller may have kept typing while this was in
@@ -133,13 +128,10 @@ export function mountEntitySearch(container: HTMLElement, options: EntitySearchO
       // cancelled in time.
       if (destroyed || query !== currentQuery) return;
 
-      const merged = groupsResponses.reduce<{ person: SearchResult[]; organisation: SearchResult[] }>(
-        (acc, response) => ({
-          person: [...acc.person, ...(response.groups.person ?? [])],
-          organisation: [...acc.organisation, ...(response.groups.organisation ?? [])]
-        }),
-        { person: [], organisation: [] }
-      );
+      const merged = {
+        person: response.groups.person ?? [],
+        organisation: response.groups.organisation ?? []
+      };
       const list = mergeGroups(merged, options.kinds);
 
       if (!list.length) {

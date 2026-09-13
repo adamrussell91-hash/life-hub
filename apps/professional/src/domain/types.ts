@@ -1,11 +1,8 @@
 /**
- * Shapes mirroring the read-only server contracts this slice consumes:
- * `entity-search.mjs` (`/api/entities/search`) and `entity-overview.mjs`
- * (`/api/entities/overview`). Nothing here is authored client-side — the
- * server assembles and authorises every field.
+ * Shapes mirroring the server contracts this hub consumes.
  */
 
-export type EntityKind = 'person' | 'organisation' | 'task';
+export type EntityKind = 'person' | 'organisation' | 'task' | 'communication';
 
 export interface SearchResult {
   ref: string;
@@ -21,6 +18,7 @@ export interface SearchGroups {
   person: SearchResult[];
   organisation: SearchResult[];
   task: SearchResult[];
+  communication?: SearchResult[];
 }
 
 export interface PersonRecord {
@@ -107,4 +105,35 @@ export interface EntityOverview {
   historical_relationships: RelationshipEntry[];
   timeline: TimelineEntry[];
   linked_records: LinkedRecords;
+}
+
+export type CommunicationDirection = 'outbound' | 'inbound';
+export type CommunicationChannel =
+  | 'email'
+  | 'phone'
+  | 'message'
+  | 'in_person'
+  | 'video'
+  | 'other';
+
+export interface IncompleteLinksProjection {
+  operation_id: string;
+  status: string;
+  completed_link_ids: string[];
+  failed_intent_ids: string[];
+  pending_intent_ids: string[];
+}
+
+export interface CommunicationRecord {
+  schema_version: number;
+  id: string;
+  direction: CommunicationDirection;
+  channel: CommunicationChannel;
+  occurred_at: string;
+  subject: string;
+  summary: string;
+  status: 'completed' | 'received';
+  created_at: string;
+  updated_at: string;
+  incomplete_links?: IncompleteLinksProjection | null;
 }
