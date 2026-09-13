@@ -127,9 +127,9 @@ export function createUniversalLinksHandler(deps = {}) {
         if (!id) {
           return withCors(errorResponse(400, 'missing_id', 'id query param required.', false), request, env);
         }
-        if (action !== 'end' && action !== 'suppress') {
+        if (action !== 'end' && action !== 'suppress' && action !== 'change_role') {
           return withCors(
-            errorResponse(400, 'invalid_action', 'action must be "end" or "suppress".', false),
+            errorResponse(400, 'invalid_action', 'action must be "end", "suppress", or "change_role".', false),
             request,
             env
           );
@@ -142,6 +142,20 @@ export function createUniversalLinksHandler(deps = {}) {
           const accessContext = createAccessContext({ workflow: 'life' });
           const link = await repo.endLink(id, parsed.value.valid_to, accessContext);
           return withCors(okResponse(200, { link }), request, env);
+        }
+
+        if (action === 'change_role') {
+          // Registry-controlled role editing: ordinary shared-infrastructure
+          // operation, not scoped to a hub-specific workflow (same
+          // reasoning as GET/POST/end above).
+          const accessContext = createAccessContext({ workflow: 'life' });
+          const { ended, created } = await repo.changeRole(
+            id,
+            parsed.value.role,
+            parsed.value.changed_at,
+            accessContext
+          );
+          return withCors(okResponse(200, { ended, created }), request, env);
         }
 
         // `suppress` requires the administration workflow — the server

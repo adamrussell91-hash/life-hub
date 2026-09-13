@@ -200,6 +200,65 @@ test('shows two concurrent current relationships and one ended historical relati
   assert.equal(body.linked_records.communications.length, 0);
 });
 
+test('timeline_limit and timeline_next_cursor paginate the timeline stably, without truncating current/historical relationships', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  const orgA = await createOrganisation(entities, 'Org A');
+  const orgB = await createOrganisation(entities, 'Org B');
+  const orgC = await createOrganisation(entities, 'Org C');
+
+  for (const [org, validFrom] of [
+    [orgA, '2025-01-01T00:00:00.000Z'],
+    [orgB, '2025-06-01T00:00:00.000Z'],
+    [orgC, '2025-09-01T00:00:00.000Z']
+  ]) {
+    // eslint-disable-next-line no-await-in-loop
+    await links(request({
+      url: 'https://api.adam-russell.com/api/universal-links',
+      method: 'POST',
+      body: { source_ref: seth.ref, target_ref: org.ref, relationship_type: 'member_of', valid_from: validFrom }
+    }));
+  }
+
+  const firstPageResponse = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=2`
+  }));
+  const firstPage = (await firstPageResponse.json()).data;
+  assert.equal(firstPage.timeline.length, 2);
+  assert.equal(firstPage.timeline[0].date, '2025-09-01T00:00:00.000Z');
+  assert.equal(firstPage.timeline[1].date, '2025-06-01T00:00:00.000Z');
+  assert.ok(firstPage.timeline_next_cursor, 'a third entry remains, so a cursor must be returned');
+  // Pagination never truncates the deliberately-complete relationship views.
+  assert.equal(firstPage.current_relationships.length, 3);
+
+  const secondPageResponse = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=2&timeline_cursor=${encodeURIComponent(firstPage.timeline_next_cursor)}`
+  }));
+  const secondPage = (await secondPageResponse.json()).data;
+  assert.equal(secondPage.timeline.length, 1);
+  assert.equal(secondPage.timeline[0].date, '2025-01-01T00:00:00.000Z');
+  assert.equal(secondPage.timeline_next_cursor, null, 'no further page remains');
+});
+
+test('an invalid timeline_cursor is rejected as a caller error, not silently ignored', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+  const seth = await createPerson(entities);
+
+  const response = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_cursor=not-a-real-cursor`
+  }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_cursor');
+});
+
 test('the entity field never discloses a deleted person\'s former name', async () => {
   const store = memoryStore();
   const deps = baseDeps(store);

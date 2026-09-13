@@ -12,6 +12,7 @@ function entry(overrides: Partial<TimelineEntry>): TimelineEntry {
     context_key: null,
     source_ref: 'shared:person:person_x',
     href: null,
+    context_href: null,
     ...overrides
   };
 }

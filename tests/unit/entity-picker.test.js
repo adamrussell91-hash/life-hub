@@ -160,6 +160,73 @@ test('relationship timeline preserves server order within a year', () => {
   assert.deepEqual(labels, ['First', 'Second']);
 });
 
+test('a chip with a resolved href renders a clickable link; a chip without one renders plain text', () => {
+  setupDom();
+  const container = document.createElement('div');
+  renderEntityChips({
+    container,
+    chips: [
+      {
+        id: '1',
+        ref: 'shared:person:1',
+        label: 'Seth',
+        state: 'saved',
+        relationshipType: 'recipient',
+        href: '/professional/#/person/person_1'
+      },
+      {
+        id: '2',
+        ref: 'teaching:student_reference:student_ref_1',
+        label: 'AR',
+        state: 'saved',
+        relationshipType: 'participates_in',
+        href: null
+      }
+    ]
+  });
+  const items = [...container.querySelectorAll('.entity-chip')];
+  const linked = items[0].querySelector('.entity-chip__label');
+  assert.equal(linked.tagName, 'A');
+  assert.equal(linked.getAttribute('href'), '/professional/#/person/person_1');
+
+  const unlinked = items[1].querySelector('.entity-chip__label');
+  assert.equal(unlinked.tagName, 'SPAN');
+});
+
+test('relationship timeline renders a "View source" link only when context_href is resolved', () => {
+  setupDom();
+  const container = document.createElement('div');
+  document.body.append(container);
+  renderRelationshipTimeline(container, [
+    {
+      id: '1',
+      kind: 'point',
+      date: '2026-06-01T00:00:00.000Z',
+      end_date: null,
+      label: 'recipient Seth',
+      context_key: null,
+      source_ref: 'professional:communication:communication_1',
+      href: null,
+      context_href: '/professional/#/communication/communication_1'
+    },
+    {
+      id: '2',
+      kind: 'point',
+      date: '2026-05-01T00:00:00.000Z',
+      end_date: null,
+      label: 'collaborator Seth',
+      context_key: null,
+      source_ref: 'tasks:task:task_1',
+      href: null,
+      context_href: null
+    }
+  ]);
+  const entries = [...container.querySelectorAll('.relationship-timeline__entry')];
+  const sourceLink = entries[0].querySelector('.relationship-timeline__source a');
+  assert.equal(sourceLink.getAttribute('href'), '/professional/#/communication/communication_1');
+  assert.equal(entries[1].querySelector('.relationship-timeline__source'), null);
+});
+
 test('renderEntityChips never invents StudentReference offerings', () => {
   setupDom();
   const container = document.createElement('div');

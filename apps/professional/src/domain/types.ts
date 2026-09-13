@@ -108,6 +108,7 @@ export interface TimelineEntry {
   context_key: string | null;
   source_ref: string;
   href: string | null;
+  context_href: string | null;
 }
 
 export interface LinkedRecords {

@@ -16,11 +16,12 @@ test('createAccessContext derives actor and allowed_visibility from workflow, no
   assert.deepEqual(tasksContext.allowed_visibility, ['operator']);
 });
 
-test('no workflow grants teaching_protected in this slice, including teaching and administration', () => {
-  // The College approval gate (Slice 8) has not been recorded. Nothing may
-  // read or write teaching_protected data before then, so no workflow may
-  // even be granted the visibility label yet.
-  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
+test('only the server-derived teaching workflow grants teaching_protected', () => {
+  // The Slice 8 College approval gate (docs/universal-links/student-reference-approval.md)
+  // grants teaching_protected to the teaching workflow only.
+  const teaching = createAccessContext({ workflow: 'teaching' });
+  assert.deepEqual(teaching.allowed_visibility, ['operator', 'teaching_protected']);
+  for (const workflow of ['professional', 'tasks', 'knowledge', 'life', 'administration']) {
     const context = createAccessContext({ workflow });
     assert.deepEqual(context.allowed_visibility, ['operator'], `${workflow} must not grant teaching_protected`);
   }
@@ -108,8 +109,9 @@ test('assertAdministrationWorkflow permits only the administration workflow', ()
   );
 });
 
-test('deriveWorkflowVisibility returns operator for every known workflow (no teaching_protected grant yet)', () => {
-  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
+test('deriveWorkflowVisibility grants teaching_protected only to teaching', () => {
+  assert.equal(deriveWorkflowVisibility(createAccessContext({ workflow: 'teaching' })), 'teaching_protected');
+  for (const workflow of ['professional', 'tasks', 'knowledge', 'life', 'administration']) {
     const context = createAccessContext({ workflow });
     assert.equal(deriveWorkflowVisibility(context), 'operator');
   }

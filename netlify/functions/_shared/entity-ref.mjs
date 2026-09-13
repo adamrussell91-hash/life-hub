@@ -23,7 +23,18 @@ export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
   professional: new Set(['communication', 'meeting', 'event', 'application']),
   tasks: new Set(['task', 'project', 'program']),
-  teaching: new Set(['unit', 'lesson']),
+  // `class` and `student_reference` are Slice 8's own additions — Slice 11
+  // deliberately deferred both pending this privacy-scoped work (see
+  // tests/unit/slice11-entity-adapters.test.js). `class` gets an ordinary
+  // operator-visible resolver (a class name like "Year 10 English" is not
+  // itself sensitive); `student_reference` is registered here only so
+  // `formatEntityRef`/`parseEntityRef` can build valid refs for the
+  // Universal Link store — it is never added to `RESOLVER_SLOTS`
+  // (entity-resolvers.mjs), so the generic `resolveEntity` dispatch still
+  // 404s it exactly like an unregistered kind. Only
+  // `student-reference-repository.mjs`'s own Teaching-scoped resolver can
+  // resolve it, and only under the `teaching` workflow.
+  teaching: new Set(['unit', 'lesson', 'class', 'student_reference']),
   knowledge: new Set(['page']),
   life: new Set(['decision'])
 };

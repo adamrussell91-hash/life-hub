@@ -791,6 +791,67 @@ export function createUniversalLinkRepository({
     });
   }
 
+  // Registry-controlled role editing (implementation priority: "Add
+  // registry controlled role editing"). Per the proposal's relationship
+  // history model ("When a relationship changes, the system closes the
+  // previous dated relationship and creates the next one. It does not
+  // overwrite the past." — comms-hub-people-unification.md ยง3.3), a role
+  // change is never an in-place metadata mutation: it ends the current
+  // period link and opens the next one with the new role, so the prior
+  // role stays queryable history. Composes the existing endLink/createLink
+  // methods rather than adding a new write primitive — both already carry
+  // their own journal/retry protection, so this needs none of its own.
+  async function changeRole(id, newRole, changedAt, accessContext) {
+    if (!isIsoTimestamp(changedAt)) {
+      throw validationError('invalid_changed_at', 'changedAt must be an ISO timestamp.');
+    }
+    const record = await readRepository.getLink(id, accessContext);
+    if (record.temporal_mode !== 'period') {
+      throw validationError('not_a_period_relationship', 'changeRole only applies to period relationships.');
+    }
+    // A retry that lands after endLink already committed (but before
+    // createLink did) must not re-call endLink — that would throw
+    // invalid_lifecycle_transition against an already-ended link. Treat an
+    // already-ended link at this exact changedAt as this same attempt's
+    // completed first half; anything else not `current` is a real conflict.
+    const alreadyEnded = record.status === 'ended' && record.valid_to === changedAt;
+    if (record.status !== 'current' && !alreadyEnded) {
+      throw invalidTransitionError('changeRole requires a link with status current.');
+    }
+
+    const nextInput = {
+      source_ref: record.source_ref,
+      target_ref: record.target_ref,
+      relationship_type: record.relationship_type,
+      role: newRole,
+      context_key: record.context_key,
+      context_ref: record.context_ref,
+      valid_from: changedAt,
+      metadata: record.metadata,
+      visibility: record.visibility
+    };
+
+    // Registry-controlled: validate the new role against this relationship's
+    // own declaration *before* ending the current period, so an invalid
+    // role is rejected while the relationship still has a current period —
+    // never left with no current successor.
+    validateRelationshipInput({
+      sourceRef: assertRegisteredEntityRef(record.source_ref),
+      targetRef: assertRegisteredEntityRef(record.target_ref),
+      relationshipType: record.relationship_type,
+      role: newRole,
+      validFrom: changedAt,
+      validTo: null,
+      occurredAt: null,
+      metadata: record.metadata,
+      visibility: record.visibility
+    });
+
+    const ended = alreadyEnded ? record : await endLink(id, changedAt, accessContext);
+    const { link: created } = await createLink(nextInput, accessContext);
+    return { ended, created };
+  }
+
   // --- Index rebuild ---
 
   async function rebuildIndexes(accessContext, options = {}) {
@@ -937,6 +998,7 @@ export function createUniversalLinkRepository({
     endLink,
     suppressLink,
     deleteLink,
+    changeRole,
     repairOperation,
     rebuildIndexes
   };
