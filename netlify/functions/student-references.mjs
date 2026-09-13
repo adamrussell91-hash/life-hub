@@ -49,6 +49,7 @@ export function createStudentReferencesHandler(deps = {}) {
       validateBody(parsed.value);
       const repo = createStudentReferenceRepository({
         store,
+        accessContext: access,
         ...(deps.repositoryNow ? { now: deps.repositoryNow } : {}),
         ...(deps.generateStudentReferenceId ? { generateId: deps.generateStudentReferenceId } : {})
       });
