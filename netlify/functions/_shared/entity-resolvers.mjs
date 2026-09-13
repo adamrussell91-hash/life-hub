@@ -25,7 +25,6 @@ import {
   resolveTasksProject,
   resolveTasksProgram,
   resolveTeachingLesson,
-  resolveTeachingClass,
   resolveLifeDecision
 } from './knowledge-universal-links.mjs';
 
@@ -35,7 +34,6 @@ export {
   resolveTasksProject,
   resolveTasksProgram,
   resolveTeachingLesson,
-  resolveTeachingClass,
   resolveLifeDecision
 };
 // Entity resolvers verify a record exists and is accessible, then return a
@@ -228,7 +226,6 @@ export const RESOLVER_SLOTS = Object.freeze({
   'knowledge:page': resolveKnowledgePage,
   'teaching:unit': resolveTeachingUnit,
   'teaching:lesson': resolveTeachingLesson,
-  'teaching:class': resolveTeachingClass,
   'life:decision': resolveLifeDecision
 });
 

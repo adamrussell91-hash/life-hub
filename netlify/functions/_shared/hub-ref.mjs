@@ -66,9 +66,6 @@ export function hrefForHubRef(ref) {
   if (ref?.hub === 'teaching' && ref.kind === 'lesson') {
     return `${HUB_SITES.teaching}/lessons/${encodeURIComponent(ref.id)}`;
   }
-  if (ref?.hub === 'teaching' && ref.kind === 'class') {
-    return `${HUB_SITES.teaching}/classes/${encodeURIComponent(ref.id)}`;
-  }
   if (ref?.hub === 'tasks' && ref.kind === 'project') {
     return `${HUB_SITES.tasks}/#/project/${encodeURIComponent(ref.id)}`;
   }

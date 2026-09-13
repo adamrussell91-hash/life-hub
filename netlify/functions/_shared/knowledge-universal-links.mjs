@@ -22,8 +22,7 @@ import {
   defaultGetContentStore as defaultGetTeachingStore,
   getJSON as getTeachingJSON,
   unitKey,
-  draftLessonKey,
-  classKey
+  draftLessonKey
 } from './teaching-blobs.mjs';
 import { createAccessContext } from './entity-access.mjs';
 
@@ -180,38 +179,6 @@ export async function resolveTeachingLesson(
     id,
     displayLabel: typeof record.title === 'string' && record.title ? record.title : id,
     supportingLabel: typeof record.unit_id === 'string' ? record.unit_id : null,
-    href: hrefForHubRef(hubRef),
-    lifecycleStatus: status
-  });
-}
-
-export async function resolveTeachingClass(
-  id,
-  accessContext,
-  { getStore = defaultGetTeachingStore } = {}
-) {
-  if (typeof id !== 'string' || !REF_ID.test(id)) throw endpointNotFoundError();
-  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
-  const store = await getStore();
-  const record = await getTeachingJSON(store, classKey(id));
-  if (!record || typeof record !== 'object') throw endpointNotFoundError();
-  const status = typeof record.status === 'string' ? record.status : 'active';
-  if (status === 'trashed' || status === 'deleted') throw endpointNotFoundError();
-  const hubRef = { hub: 'teaching', kind: 'class', id };
-  const label =
-    typeof record.display_name === 'string' && record.display_name
-      ? record.display_name
-      : typeof record.title === 'string' && record.title
-        ? record.title
-        : typeof record.code === 'string' && record.code
-          ? record.code
-          : id;
-  return projection({
-    namespace: 'teaching',
-    kind: 'class',
-    id,
-    displayLabel: label,
-    supportingLabel: typeof record.code === 'string' ? record.code : null,
     href: hrefForHubRef(hubRef),
     lifecycleStatus: status
   });
