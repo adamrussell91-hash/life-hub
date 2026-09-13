@@ -2,6 +2,7 @@ const ID_PATTERN = /^student_ref_[0-9a-f-]{36}$/;
 const DISPLAY_CODE_PATTERN = /^[A-Z]{1,3}(?:[1-9][0-9]*)?$/;
 const INITIALS_PATTERN = /^[A-Z]{1,3}$/;
 const CONTEXT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/;
+const STUDENT_REFERENCE_KEYS = new Set(['schema_version', 'id', 'kind', 'display_code', 'lifecycle_status', 'created_at', 'updated_at']);
 
 export const STUDENT_REFERENCE_LIFECYCLE = Object.freeze(['active', 'inactive', 'archived', 'deleted']);
 export const STUDENT_CONTEXT_TYPES = Object.freeze(['class', 'program', 'excursion', 'coaching']);
@@ -31,6 +32,7 @@ function isoOrNull(value) {
 
 export function parseStudentReference(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (Object.keys(value).some(key => !STUDENT_REFERENCE_KEYS.has(key))) return null;
   if (
     value.schema_version !== 1 ||
     value.kind !== 'student_reference' ||
