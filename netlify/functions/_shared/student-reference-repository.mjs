@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { deleteKey, getJSON, setJSON } from './teaching-blobs.mjs';
+import { assertEntityKindAllowed, endpointNotFoundError, isVisibilityAllowed } from './entity-access.mjs';
 import {
   isStudentReferenceId,
   normalizeInitials,
@@ -55,10 +56,15 @@ function publicProjection(record) {
 
 export function createStudentReferenceRepository({
   store,
+  accessContext,
   now = () => new Date().toISOString(),
   generateId = () => `student_ref_${randomUUID()}`
 }) {
   if (!store) throw studentReferenceError('student_reference_store_unbound', 503);
+  if (accessContext?.workflow !== 'teaching' || !isVisibilityAllowed(accessContext, 'teaching_protected')) {
+    throw endpointNotFoundError();
+  }
+  assertEntityKindAllowed(accessContext, 'student_reference');
 
   async function getRequired(id) {
     if (!isStudentReferenceId(id)) throw studentReferenceError();
