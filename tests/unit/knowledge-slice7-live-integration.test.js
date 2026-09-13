@@ -702,6 +702,187 @@ test('replace-relationships action is the only authenticated UL mutation path', 
   assert.deepEqual(lastSubmitted.submittedConnected, ['page_beta']);
 });
 
+
+test('replace relationships on A with only B→A does not create A→B', async () => {
+  const store = memoryJsonStore();
+  const created = [];
+  const suppressed = [];
+  const bind = async () => ({
+    ok: true,
+    store,
+    accessContext: { workflow: 'knowledge' },
+    administrationAccessContext: { workflow: 'administration' },
+    listForEntity: async () => ({
+      outgoing: [],
+      incoming: [
+        {
+          link: {
+            id: 'ul_ba',
+            source_ref: 'knowledge:page:page_beta',
+            target_ref: 'knowledge:page:page_alpha',
+            relationship_type: 'related_to',
+            status: 'current'
+          }
+        }
+      ]
+    }),
+    createLink: async (input) => {
+      const link = { id: `ul_new_${created.length + 1}`, ...input, status: 'current' };
+      created.push(link);
+      return { link, created: true };
+    },
+    suppressLink: async (id) => {
+      suppressed.push(id);
+      return { link: { id, status: 'suppressed' } };
+    }
+  });
+
+  const result = await applyKnowledgeRelationshipCutover({
+    pageId: 'page_alpha',
+    submittedConnected: [], // editor desired refs exclude incoming
+    bindUniversalLinks: bind
+  });
+  assert.equal(result.ok, true);
+  assert.equal(created.length, 0);
+  assert.deepEqual(suppressed, []);
+});
+
+test('B cannot suppress incoming A→B through B replace payload', async () => {
+  const created = [];
+  const suppressed = [];
+  const bind = async () => ({
+    ok: true,
+    store: memoryJsonStore(),
+    accessContext: { workflow: 'knowledge' },
+    administrationAccessContext: { workflow: 'administration' },
+    listForEntity: async () => ({
+      outgoing: [],
+      incoming: [
+        {
+          link: {
+            id: 'ul_ab',
+            source_ref: 'knowledge:page:page_alpha',
+            target_ref: 'knowledge:page:page_beta',
+            relationship_type: 'related_to',
+            status: 'current'
+          }
+        }
+      ]
+    }),
+    createLink: async (input) => {
+      created.push(input);
+      return { link: { id: 'ul_x', ...input, status: 'current' }, created: true };
+    },
+    suppressLink: async (id) => {
+      suppressed.push(id);
+      return { link: { id, status: 'suppressed' } };
+    }
+  });
+
+  const result = await applyKnowledgeRelationshipCutover({
+    pageId: 'page_beta',
+    submittedConnected: [], // user cannot remove incoming via desired refs
+    bindUniversalLinks: bind
+  });
+  assert.equal(result.ok, true);
+  assert.equal(created.length, 0);
+  assert.ok(!suppressed.includes('ul_ab'));
+});
+
+test('mixed incoming+outgoing save on A preserves directions and creates no duplicates', async () => {
+  const created = [];
+  const suppressed = [];
+  const bind = async () => ({
+    ok: true,
+    store: memoryJsonStore(),
+    accessContext: { workflow: 'knowledge' },
+    administrationAccessContext: { workflow: 'administration' },
+    listForEntity: async () => ({
+      outgoing: [
+        {
+          link: {
+            id: 'ul_ag',
+            source_ref: 'knowledge:page:page_alpha',
+            target_ref: 'knowledge:page:page_gamma',
+            relationship_type: 'related_to',
+            status: 'current'
+          }
+        }
+      ],
+      incoming: [
+        {
+          link: {
+            id: 'ul_ba',
+            source_ref: 'knowledge:page:page_beta',
+            target_ref: 'knowledge:page:page_alpha',
+            relationship_type: 'related_to',
+            status: 'current'
+          }
+        }
+      ]
+    }),
+    createLink: async (input) => {
+      created.push(input);
+      return { link: { id: `ul_${created.length}`, ...input, status: 'current' }, created: true };
+    },
+    suppressLink: async (id) => {
+      suppressed.push(id);
+      return { link: { id, status: 'suppressed' } };
+    }
+  });
+
+  const result = await applyKnowledgeRelationshipCutover({
+    pageId: 'page_alpha',
+    submittedConnected: ['page_gamma'], // only owned outgoing
+    bindUniversalLinks: bind
+  });
+  assert.equal(result.ok, true);
+  assert.equal(created.length, 0);
+  assert.deepEqual(suppressed, []);
+});
+
+test('removing owned outgoing A→B suppresses only the original link', async () => {
+  const suppressed = [];
+  const created = [];
+  const bind = async () => ({
+    ok: true,
+    store: memoryJsonStore(),
+    accessContext: { workflow: 'knowledge' },
+    administrationAccessContext: { workflow: 'administration' },
+    listForEntity: async () => ({
+      outgoing: [
+        {
+          link: {
+            id: 'ul_ab',
+            source_ref: 'knowledge:page:page_alpha',
+            target_ref: 'knowledge:page:page_beta',
+            relationship_type: 'related_to',
+            status: 'current'
+          }
+        }
+      ],
+      incoming: []
+    }),
+    createLink: async (input) => {
+      created.push(input);
+      return { link: { id: 'ul_new', ...input, status: 'current' }, created: true };
+    },
+    suppressLink: async (id) => {
+      suppressed.push(id);
+      return { link: { id, status: 'suppressed' } };
+    }
+  });
+
+  const result = await applyKnowledgeRelationshipCutover({
+    pageId: 'page_alpha',
+    submittedConnected: [],
+    bindUniversalLinks: bind
+  });
+  assert.equal(result.ok, true);
+  assert.deepEqual(suppressed, ['ul_ab']);
+  assert.equal(created.length, 0);
+});
+
 test('saveKnowledgePage after cutover ignores connected and never applies cutover', async () => {
   const { saveKnowledgePage } = await import('../../netlify/functions/_shared/knowledge-data.mjs');
   let cutover = 0;

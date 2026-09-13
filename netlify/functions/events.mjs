@@ -35,11 +35,13 @@ function toErrorResponse(error) {
   const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
   const retryable = Boolean(error?.retryable) || status === 503;
   const data =
-    error?.event_id || error?.operation_id || error?.task_id
+    error?.event_id || error?.operation_id || error?.task_id || error?.target_ref
       ? {
           event_id: error.event_id ?? null,
           operation_id: error.operation_id ?? null,
           task_id: error.task_id ?? null,
+          target_ref: error.target_ref ?? null,
+          relationship_type: error.relationship_type ?? null,
           completed_link_ids: error.completed_link_ids ?? [],
           failed_intent_ids: error.failed_intent_ids ?? []
         }
