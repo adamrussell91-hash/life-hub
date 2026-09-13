@@ -4,9 +4,15 @@ import { communicationDisplayLabel, isValidCommunicationId, parseCommunicationRe
 import { meetingDisplayLabel, isValidMeetingId, parseMeetingRecord } from './meeting-schema.mjs';
 import { eventDisplayLabel, isValidEventId, parseEventRecord } from './event-schema.mjs';
 import {
+  applicationDisplayLabel,
+  isValidApplicationId,
+  parseApplicationRecord
+} from './application-schema.mjs';
+import {
   communicationKey,
   meetingKey,
   eventKey,
+  applicationKey,
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
@@ -179,6 +185,28 @@ export async function resolveEvent(
   };
 }
 
+export async function resolveApplication(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidApplicationId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'application', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseApplicationRecord(await getProfessionalJSON(store, applicationKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'application',
+    display_label: applicationDisplayLabel(record),
+    supporting_label: record.pipeline_status,
+    href: `/professional/#/application/${encodeURIComponent(id)}`,
+    lifecycle_status: record.pipeline_status,
+    visibility: 'operator'
+  };
+}
+
 // Exported so tests can assert each slot's kind without depending on
 // dispatch internals.
 export const RESOLVER_SLOTS = Object.freeze({
@@ -189,6 +217,7 @@ export const RESOLVER_SLOTS = Object.freeze({
   'professional:communication': resolveCommunication,
   'professional:meeting': resolveMeeting,
   'professional:event': resolveEvent,
+  'professional:application': resolveApplication,
   'knowledge:page': resolveKnowledgePage,
   'teaching:unit': resolveTeachingUnit,
   'life:decision': resolveLifeDecision
