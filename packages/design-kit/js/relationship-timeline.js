@@ -65,6 +65,21 @@ function renderEntry(entry) {
 
   body.append(label);
   if (parts.length) body.append(meta);
+
+  // Links to the authoritative record that established the relationship
+  // (a Task, Communication, Meeting, or Event) — distinct from `entry.href`,
+  // which links to the *other side* of the relationship. Only rendered when
+  // the server resolved a safe href; never invented client-side.
+  if (entry.context_href) {
+    const source = document.createElement('p');
+    source.className = 'relationship-timeline__source';
+    const sourceLink = document.createElement('a');
+    sourceLink.href = entry.context_href;
+    sourceLink.textContent = 'View source';
+    source.append(sourceLink);
+    body.append(source);
+  }
+
   item.append(marker, body);
   return item;
 }
@@ -79,7 +94,8 @@ function renderEntry(entry) {
  *   label: string,
  *   context_key?: string | null,
  *   source_ref?: string,
- *   href?: string | null
+ *   href?: string | null,
+ *   context_href?: string | null
  * }>} timeline
  */
 export function renderRelationshipTimeline(container, timeline) {

@@ -26,11 +26,16 @@ export function createEntityOverviewHandler(deps = {}) {
         return withCors(errorResponse(400, 'missing_ref', 'ref query param required.', false), request, env);
       }
 
+      const limitParam = url.searchParams.get('timeline_limit');
+      const parsedLimit = limitParam !== null ? Number.parseInt(limitParam, 10) : undefined;
+
       try {
         const overview = await assembleEntityOverview(raw, {
           store,
           resolveEntity,
-          createRepository
+          createRepository,
+          timelineLimit: Number.isInteger(parsedLimit) ? parsedLimit : undefined,
+          timelineCursor: url.searchParams.get('timeline_cursor') ?? undefined
         });
         return withCors(okResponse(200, overview), request, env);
       } catch (error) {

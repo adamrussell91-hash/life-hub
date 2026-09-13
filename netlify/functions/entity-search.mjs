@@ -3,6 +3,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { displayLabelFor, parseIdentityIndexRecord, parseOrganisationRecord, parsePersonRecord } from './_shared/identity-schema.mjs';
 import { formatEntityRef } from './_shared/entity-ref.mjs';
 import { mapBounded } from './_shared/blobs-list.mjs';
+import { personHref, organisationHref, taskHref } from './_shared/entity-resolvers.mjs';
 import {
   defaultGetUniversalLinkStore,
   getJSON,
@@ -27,6 +28,16 @@ const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 100;
 const MAX_RESULTS = 20;
 const READ_BATCH_SIZE = 10;
+// Hard cap on how many candidate records any one kind will hydrate per
+// search request, independent of how many index/candidate ids exist.
+// `matchRank` still runs against every hydrated candidate, but this bounds
+// the worst case (a store with thousands of records) to a fixed number of
+// Blob reads rather than growing unboundedly with store size.
+const MAX_CANDIDATES_PER_KIND = 200;
+
+function boundedCandidates(ids) {
+  return ids.length > MAX_CANDIDATES_PER_KIND ? ids.slice(0, MAX_CANDIDATES_PER_KIND) : ids;
+}
 
 // Task search (correction B6) uses the existing Tasks storage
 // (`tasks-hub-content`, via `_shared/tasks-blobs.mjs`) and a safe
@@ -77,7 +88,7 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
     candidateIds.push(entry.id);
   }
 
-  const hydrated = await mapBounded(candidateIds, READ_BATCH_SIZE, async id => {
+  const hydrated = await mapBounded(boundedCandidates(candidateIds), READ_BATCH_SIZE, async id => {
     const record = parseAuthoritative(await getJSON(store, loadKey(id)));
     if (!record) return null;
     const visible = record.lifecycle_status === 'active' || (includeArchived && record.lifecycle_status === 'archived');
@@ -91,7 +102,7 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
       kind,
       display_label: label,
       supporting_label: kind === 'person' && record.is_self ? 'self' : null,
-      href: null,
+      href: kind === 'person' ? personHref(record.id) : organisationHref(record.id),
       lifecycle_status: record.lifecycle_status,
       visibility: 'operator'
     };
@@ -103,7 +114,7 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
 async function searchTaskKind(getTasksStore, query) {
   const store = await getTasksStore();
   const ids = await readTaskIndex(store);
-  const records = await mapBounded(ids, READ_BATCH_SIZE, id => getTasksJSON(store, taskKey(id)));
+  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, id => getTasksJSON(store, taskKey(id)));
 
   const out = [];
   for (const record of records) {
@@ -117,7 +128,7 @@ async function searchTaskKind(getTasksStore, query) {
       kind: 'task',
       display_label: title,
       supporting_label: typeof record.status === 'string' ? record.status : null,
-      href: null,
+      href: taskHref(record.id),
       lifecycle_status: typeof record.status === 'string' ? record.status : null,
       visibility: 'operator'
     });
@@ -135,7 +146,7 @@ async function searchApplicationKind(getProfessionalStore, query) {
         .filter(Boolean)
     )
   ];
-  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
+  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, async (id) =>
     parseApplicationRecord(await getProfessionalJSON(store, applicationKey(id)))
   );
 
@@ -163,7 +174,7 @@ async function searchApplicationKind(getProfessionalStore, query) {
 async function searchProgramKind(getTasksStore, query) {
   const store = await getTasksStore();
   const ids = await readIndex(store, 'programs/_index');
-  const records = await mapBounded(ids, READ_BATCH_SIZE, id =>
+  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, id =>
     getTasksJSON(store, programKey(id))
   );
   const out = [];

@@ -62,17 +62,32 @@ function authenticatedRequest(path) {
 const tasksContext = createAccessContext({ workflow: 'tasks' });
 const teachingContext = createAccessContext({ workflow: 'teaching' });
 
-test('Slice 11 registers Program and Lesson while deferring protected Class search and references', () => {
+test('Slice 11 registers Program and Lesson; Slice 8 later registers Class and the protected StudentReference kind', () => {
   assert.equal(ENTITY_REF_KINDS.tasks.has('program'), true);
   assert.equal(ENTITY_REF_KINDS.teaching.has('lesson'), true);
-  assert.equal(ENTITY_REF_KINDS.teaching.has('class'), false);
+  // Slice 11 deferred Class pending the privacy-scoped work StudentReference
+  // needed it for; Slice 8 supplies it (a class name is not itself
+  // sensitive — only membership is), plus the protected student_reference
+  // kind, which stays out of the generic resolver dispatch table below.
+  assert.equal(ENTITY_REF_KINDS.teaching.has('class'), true);
+  assert.equal(ENTITY_REF_KINDS.teaching.has('student_reference'), true);
   assert.deepEqual(parseEntityRef('tasks:program:prog_demo'), {
     namespace: 'tasks',
     kind: 'program',
     id: 'prog_demo'
   });
-  assert.equal(parseEntityRef('teaching:class:class_12eng'), null);
-  assert.equal(parseEntityRef('teaching:student_reference:student_1'), null);
+  assert.deepEqual(parseEntityRef('teaching:class:class_12eng'), {
+    namespace: 'teaching',
+    kind: 'class',
+    id: 'class_12eng'
+  });
+  // Registered for storage-key validity only — resolveEntity still 404s it
+  // (no RESOLVER_SLOTS entry), so this remains "unavailable to generic APIs".
+  assert.deepEqual(parseEntityRef('teaching:student_reference:student_ref_1'), {
+    namespace: 'teaching',
+    kind: 'student_reference',
+    id: 'student_ref_1'
+  });
 });
 
 test('Program resolver returns a safe canonical projection and hides raw fields', async () => {
@@ -262,9 +277,10 @@ test('related_to permits Program and Lesson but rejects invalid shape', () => {
   );
 });
 
-test('malformed and deferred Slice 11 refs stay absent', () => {
+test('malformed refs and the still-unregistered excursion kind stay absent', () => {
   assert.equal(parseEntityRef('tasks:program:'), null);
   assert.equal(parseEntityRef('teaching:lesson:'), null);
+  // Excursions are modelled as tasks:project (see tasks-stress.mjs's
+  // `project.type === 'excursion'`), not a separate registered kind.
   assert.equal(formatEntityRef({ namespace: 'tasks', kind: 'excursion', id: 'x' }), '');
-  assert.equal(formatEntityRef({ namespace: 'teaching', kind: 'class', id: 'x' }), '');
 });
