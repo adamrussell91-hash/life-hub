@@ -592,3 +592,314 @@ test('hidden endpoint resolution for unknown application id matches missing shap
     (error) => error.status === 404 && error.code === 'endpoint_not_found'
   );
 });
+
+
+test('dual-organisation career regression: employment org and application-only org both appear for correct reasons', async () => {
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const tasksStore = memoryStore();
+  const identity = createIdentityRepository({
+    store: universalStore,
+    now: () => '2026-08-01T01:00:00.000Z'
+  });
+  const { ref: employmentOrgRef } = await identity.createIdentity({
+    kind: 'organisation',
+    input: { display_name: 'Current Employer College' }
+  });
+  const { ref: applicationOrgRef } = await identity.createIdentity({
+    kind: 'organisation',
+    input: { display_name: 'Application Only Academy' }
+  });
+  const { ref: selfRef } = await identity.createIdentity({
+    kind: 'person',
+    input: { display_name: 'Adam Self', is_self: true }
+  });
+
+  const resolveEntity = makeResolveEntity({
+    professionalStore,
+    universalStore,
+    tasksStore
+  });
+  const access = createAccessContext({ workflow: 'life' });
+  const linkRepo = createUniversalLinkRepository({
+    store: universalStore,
+    resolveEntity,
+    now: () => '2026-08-01T01:00:00.000Z'
+  });
+
+  await linkRepo.createLink(
+    {
+      source_ref: selfRef,
+      target_ref: employmentOrgRef,
+      relationship_type: 'employee_at',
+      role: 'teacher',
+      valid_from: '2020-01-01T00:00:00.000Z',
+      valid_to: null,
+      metadata: {}
+    },
+    access
+  );
+
+  const applicationsHandler = createApplicationsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    applicationNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => professionalStore,
+    getUniversalLinkStore: async () => universalStore,
+    getTasksStore: async () => tasksStore,
+    resolveEntity,
+    createUniversalLinkRepository: () => linkRepo,
+    generateId: () => 'application_00000000-0000-4000-8000-0000000000d1'
+  });
+  const careerHandler = createCareerHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    careerNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => professionalStore,
+    getUniversalLinkStore: async () => universalStore,
+    resolveEntity,
+    createUniversalLinkRepository: () => linkRepo
+  });
+
+  const created = await applicationsHandler(
+    request({
+      url: 'https://api.adam-russell.com/api/applications',
+      method: 'POST',
+      body: {
+        position_title: 'Specialist Role',
+        links: [{ target_ref: applicationOrgRef, relationship_type: 'applies_to' }]
+      }
+    })
+  );
+  assert.equal(created.status, 201);
+
+  const list = await applicationsHandler(
+    request({ url: 'https://api.adam-russell.com/api/applications' })
+  );
+  assert.equal(list.status, 200);
+  const listed = (await list.json()).data.applications;
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].organisation.ref, applicationOrgRef);
+  assert.equal(listed[0].organisation.display_label, 'Application Only Academy');
+  assert.equal('organisation_id' in listed[0], false);
+
+  const careerResponse = await careerHandler(
+    request({ url: 'https://api.adam-russell.com/api/career' })
+  );
+  assert.equal(careerResponse.status, 200);
+  const career = (await careerResponse.json()).data;
+  assert.equal(career.employment.status, 'ok');
+  assert.ok(career.employment.items.some((item) => item.ref === employmentOrgRef));
+  assert.equal(
+    career.employment.items.some((item) => item.ref === applicationOrgRef),
+    false,
+    'application-only org must not appear as employment'
+  );
+  assert.equal(career.organisations.status, 'ok');
+  assert.ok(career.organisations.items.some((item) => item.ref === employmentOrgRef));
+  assert.ok(career.organisations.items.some((item) => item.ref === applicationOrgRef));
+});
+
+test('application create write-boundary failures are incomplete and retryable without duplicate applications', async () => {
+  const stepIds = {
+    journal: 'application_00000000-0000-4000-8000-0000000000a1',
+    pointer: 'application_00000000-0000-4000-8000-0000000000a2',
+    record: 'application_00000000-0000-4000-8000-0000000000a3',
+    index: 'application_00000000-0000-4000-8000-0000000000a4',
+    store_bind: 'application_00000000-0000-4000-8000-0000000000a5',
+    link: 'application_00000000-0000-4000-8000-0000000000a6',
+    commit: 'application_00000000-0000-4000-8000-0000000000a7'
+  };
+
+  for (const step of Object.keys(stepIds)) {
+    const professionalStore = memoryStore();
+    const universalStore = memoryStore();
+    const identity = createIdentityRepository({
+      store: universalStore,
+      now: () => '2026-08-01T01:00:00.000Z'
+    });
+    const { ref: orgRef } = await identity.createIdentity({
+      kind: 'organisation',
+      input: { display_name: `Org ${step}` }
+    });
+    const resolveEntity = makeResolveEntity({
+      professionalStore,
+      universalStore,
+      tasksStore: memoryStore()
+    });
+    const applicationId = stepIds[step];
+
+    let failLinkOnce = step === 'link';
+    const handler = createApplicationsHandler({
+      env,
+      now: () => Date.parse('2026-08-01T01:00:00Z'),
+      applicationNow: () => '2026-08-01T01:00:00.000Z',
+      getContentStore: async () => professionalStore,
+      getUniversalLinkStore: async () => {
+        if (step === 'store_bind') {
+          throw Object.assign(new Error('store unavailable'), {
+            code: 'universal_link_store_unavailable'
+          });
+        }
+        return universalStore;
+      },
+      resolveEntity,
+      generateId: () => applicationId,
+      failAtStep: step === 'link' || step === 'store_bind' ? null : step,
+      createUniversalLinkRepository: () => ({
+        createLink: async (input) => {
+          if (failLinkOnce) {
+            failLinkOnce = false;
+            throw Object.assign(new Error('link boom'), { code: 'link_write_failed' });
+          }
+          return {
+            link: {
+              id: `ul_${step}`,
+              source_ref: input.source_ref,
+              target_ref: input.target_ref,
+              relationship_type: input.relationship_type,
+              status: 'current'
+            },
+            created: true
+          };
+        },
+        getLink: async (id) => ({ link: { id, status: 'current' } }),
+        listForEntity: async () => ({ outgoing: [], incoming: [] })
+      })
+    });
+
+    const createResponse = await handler(
+      request({
+        url: 'https://api.adam-russell.com/api/applications',
+        method: 'POST',
+        body: {
+          position_title: `Boundary ${step}`,
+          links: [{ target_ref: orgRef, relationship_type: 'applies_to' }]
+        }
+      })
+    );
+    assert.equal(createResponse.status, 503, `step ${step} should be incomplete`);
+    const errorBody = await createResponse.json();
+    assert.equal(errorBody.error.retryable, true, `step ${step} retryable`);
+    assert.equal(errorBody.error.code, 'application_links_incomplete', `step ${step} code`);
+    const errorApplicationId =
+      errorBody.data?.application_id ?? errorBody.error.application_id ?? null;
+    assert.equal(errorApplicationId, applicationId, `step ${step} application_id`);
+
+    const healthyLinkRepo = createUniversalLinkRepository({
+      store: universalStore,
+      resolveEntity,
+      now: () => '2026-08-01T01:00:00.000Z'
+    });
+    const retryHandler = createApplicationsHandler({
+      env,
+      now: () => Date.parse('2026-08-01T01:00:00Z'),
+      applicationNow: () => '2026-08-01T01:00:00.000Z',
+      getContentStore: async () => professionalStore,
+      getUniversalLinkStore: async () => universalStore,
+      resolveEntity,
+      generateId: () => applicationId,
+      createUniversalLinkRepository: () => healthyLinkRepo
+    });
+
+    let recovered;
+    if (step === 'journal' || step === 'pointer') {
+      // Deterministic create retry reuses the same Application id.
+      recovered = await retryHandler(
+        request({
+          url: 'https://api.adam-russell.com/api/applications',
+          method: 'POST',
+          body: {
+            position_title: `Boundary ${step}`,
+            links: [{ target_ref: orgRef, relationship_type: 'applies_to' }]
+          }
+        })
+      );
+    } else {
+      recovered = await retryHandler(
+        request({
+          url: `https://api.adam-russell.com/api/applications?id=${applicationId}&action=retry-links`,
+          method: 'POST'
+        })
+      );
+    }
+    assert.ok([200, 201].includes(recovered.status), `step ${step} recovery should succeed`);
+    const recoveredBody = await recovered.json();
+    const recoveredId =
+      recoveredBody.data.application?.id ?? recoveredBody.data.application_id ?? null;
+    assert.equal(recoveredId, applicationId);
+
+    const list = await retryHandler(
+      request({ url: 'https://api.adam-russell.com/api/applications' })
+    );
+    const applications = (await list.json()).data.applications;
+    assert.equal(
+      applications.filter((item) => item.id === applicationId).length,
+      1,
+      `step ${step} must not duplicate applications`
+    );
+  }
+});
+
+test('GET application returns incomplete projection when create journal exists without record', async () => {
+  const professionalStore = memoryStore();
+  const applicationId = 'application_00000000-0000-4000-8000-0000000000e5';
+  const operationId = 'aop_' + 'ab'.repeat(16);
+  const record = {
+    schema_version: 1,
+    id: applicationId,
+    position_title: 'Ghost Draft',
+    advertisement: { title: null, url: null, source: null, summary: null, captured_at: null },
+    closing_date: null,
+    pipeline_status: 'drafting',
+    documents: [],
+    selection_criteria: [],
+    interview_rounds: [],
+    outcome: { status: 'none', date: null, offer_details: null, reason: null },
+    reflection: null,
+    created_at: '2026-08-01T01:00:00.000Z',
+    updated_at: '2026-08-01T01:00:00.000Z'
+  };
+  await professionalStore.setJSON(`applications/operations/${operationId}`, {
+    schema_version: 1,
+    operation_id: operationId,
+    operation_type: 'create_application',
+    application_id: applicationId,
+    status: 'repair_needed',
+    payload: { record },
+    intents: [],
+    completed_steps: [],
+    completed_link_ids: [],
+    failed_intent_ids: [],
+    created_at: '2026-08-01T01:00:00.000Z',
+    updated_at: '2026-08-01T01:00:00.000Z'
+  });
+  await professionalStore.setJSON(`applications/operations/by-application/${applicationId}`, {
+    operation_id: operationId,
+    application_id: applicationId
+  });
+
+  const handler = createApplicationsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    applicationNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => professionalStore,
+    getUniversalLinkStore: async () => memoryStore(),
+    resolveEntity: makeResolveEntity({
+      professionalStore,
+      universalStore: memoryStore(),
+      tasksStore: memoryStore()
+    })
+  });
+
+  const response = await handler(
+    request({
+      url: `https://api.adam-russell.com/api/applications?id=${applicationId}`
+    })
+  );
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.application.id, applicationId);
+  assert.equal(body.data.application.position_title, 'Ghost Draft');
+  assert.ok(body.data.application.incomplete_links);
+});

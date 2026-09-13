@@ -64,6 +64,17 @@ export function createApplicationRepository(deps = {}) {
     resolveEntity: deps.resolveEntity ?? defaultResolveEntity
   });
   const generateId = deps.generateId ?? generateApplicationId;
+  // Test-only write-boundary injection: fail once when the named step runs.
+  let failAtStep = deps.failAtStep ?? null;
+  function maybeFail(step) {
+    if (failAtStep === step) {
+      failAtStep = null;
+      throw Object.assign(new Error(`Injected failure at ${step}`), {
+        code: 'injected_write_failure',
+        step
+      });
+    }
+  }
 
   async function loadJournal(operationId) {
     return getJSON(professionalStore, applicationOperationKey(operationId));
@@ -90,9 +101,20 @@ export function createApplicationRepository(deps = {}) {
 
   async function getApplication(id) {
     if (!isValidApplicationId(id)) throw notFound();
-    const record = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
-    if (!record) throw notFound();
     const journal = await loadOpenJournalForApplication(id);
+    const record = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
+    if (!record) {
+      // Create journal may exist before the record write succeeds.
+      if (
+        journal &&
+        journal.operation_type === 'create_application' &&
+        journal.status !== 'committed' &&
+        journal.payload?.record
+      ) {
+        return projectApplication(journal.payload.record, simplifyIncomplete(journal));
+      }
+      throw notFound();
+    }
     return projectApplication(record, simplifyIncomplete(journal));
   }
 
@@ -112,11 +134,53 @@ export function createApplicationRepository(deps = {}) {
     }
     records.sort(compareApplicationsNewestFirst);
     const projections = [];
+    let linkRepo = null;
+    try {
+      const ulStore = await getUniversalLinkStore();
+      linkRepo = createUniversalLinkRepository({
+        store: ulStore,
+        resolveEntity,
+        now
+      });
+    } catch {
+      linkRepo = null;
+    }
+    const accessContext = createAccessContext({ workflow: 'life' });
     for (const record of records) {
       const journal = await loadOpenJournalForApplication(record.id);
-      projections.push(projectApplication(record, simplifyIncomplete(journal)));
+      const projection = projectApplication(record, simplifyIncomplete(journal));
+      if (linkRepo) {
+        try {
+          const applicationRef = formatEntityRef({
+            namespace: 'professional',
+            kind: 'application',
+            id: record.id
+          });
+          const { outgoing } = await linkRepo.listForEntity(applicationRef, accessContext);
+          const org = outgoing.find(
+            (entry) =>
+              entry.link.relationship_type === 'applies_to' &&
+              entry.endpoint?.kind === 'organisation'
+          );
+          if (org) {
+            projection.organisation = {
+              ref: org.endpoint.ref,
+              display_label: org.endpoint.display_label ?? org.endpoint.ref
+            };
+          }
+        } catch {
+          // List remains available even when relationship projection fails.
+        }
+      }
+      projections.push(projection);
     }
     return projections;
+  }
+
+
+  async function persistJournal(journal) {
+    await setJSON(professionalStore, applicationOperationKey(journal.operation_id), journal);
+    return journal;
   }
 
   async function createApplication(input) {
@@ -157,63 +221,140 @@ export function createApplicationRepository(deps = {}) {
       updated_at: timestamp
     };
 
-    await setJSON(professionalStore, applicationKey(id), record);
-    await setJSON(professionalStore, applicationIndexKey(id), applicationIndexRecord(record));
-
-    if (!draftIntents.length) {
-      return { application: projectApplication(record), links: [], created: true };
-    }
-
-    await resolveEntity(applicationRef, accessContext);
-
+    // Deterministic operation identity before any externally observable write.
     const operationId = deriveApplicationOperationId([
-      'create_application_links',
+      'create_application',
       id,
       draftIntents.map((intent) => intent.link_id)
     ]);
     let journal = {
       schema_version: 1,
       operation_id: operationId,
-      operation_type: 'create_application_links',
+      operation_type: 'create_application',
       application_id: id,
       status: 'prepared',
+      payload: { record },
       intents: draftIntents,
+      completed_steps: [],
       completed_link_ids: [],
       failed_intent_ids: [],
       created_at: timestamp,
       updated_at: timestamp
     };
-    await setJSON(professionalStore, applicationOperationKey(operationId), journal);
-    await writeOperationPointer(id, operationId);
+    try {
+      maybeFail('journal');
+      journal = await persistJournal(journal);
+      maybeFail('pointer');
+      await writeOperationPointer(id, operationId);
+    } catch (error) {
+      // Identity is known; expose a repairable incomplete contract even when
+      // the journal or pointer write failed mid-create.
+      try {
+        journal = await persistJournal({
+          ...journal,
+          status: 'repair_needed',
+          last_error_code: error?.code ?? 'application_write_failed',
+          updated_at: now()
+        });
+        await writeOperationPointer(id, operationId);
+      } catch {
+        // Best-effort only: still return identifiers for a deterministic retry.
+      }
+      throw incompleteFromJournal(journal, draftIntents);
+    }
 
-    const incompleteFromJournal = (currentJournal) =>
-      applicationIncomplete({
-        applicationId: id,
-        operationId,
-        completedLinkIds: currentJournal.completed_link_ids ?? [],
-        failedIntentIds: draftIntents
-          .filter((intent) => !(currentJournal.completed_link_ids ?? []).includes(intent.link_id))
-          .map((intent) => intent.intent_id)
+    return resumeCreateApplication({
+      journal,
+      applicationRef,
+      accessContext,
+      draftIntents
+    });
+  }
+
+  function incompleteFromJournal(journal, draftIntents) {
+    return applicationIncomplete({
+      applicationId: journal.application_id,
+      operationId: journal.operation_id,
+      completedLinkIds: journal.completed_link_ids ?? [],
+      failedIntentIds: (draftIntents ?? journal.intents ?? [])
+        .filter((intent) => !(journal.completed_link_ids ?? []).includes(intent.link_id))
+        .map((intent) => intent.intent_id)
+    });
+  }
+
+  async function markStep(journal, step) {
+    const completed = new Set(journal.completed_steps ?? []);
+    completed.add(step);
+    return persistJournal({
+      ...journal,
+      completed_steps: [...completed],
+      updated_at: now()
+    });
+  }
+
+  async function resumeCreateApplication({ journal, applicationRef, accessContext, draftIntents }) {
+    const id = journal.application_id;
+    const record = journal.payload?.record;
+    if (!record) {
+      throw validationError('invalid_application_operation', 'Create journal is missing its Application payload.');
+    }
+    const intents = draftIntents ?? journal.intents ?? [];
+    const done = new Set(journal.completed_steps ?? []);
+
+    try {
+      if (!done.has('record')) {
+        maybeFail('record');
+        await setJSON(professionalStore, applicationKey(id), record);
+        journal = await markStep(journal, 'record');
+      }
+      if (!done.has('index')) {
+        maybeFail('index');
+        await setJSON(professionalStore, applicationIndexKey(id), applicationIndexRecord(record));
+        journal = await markStep(journal, 'index');
+      }
+    } catch (error) {
+      journal = await persistJournal({
+        ...journal,
+        status: 'repair_needed',
+        last_error_code: error?.code ?? 'application_write_failed',
+        updated_at: now()
       });
+      throw incompleteFromJournal(journal, intents);
+    }
+
+    if (!intents.length) {
+      journal = await persistJournal({
+        ...journal,
+        status: 'committed',
+        failed_intent_ids: [],
+        updated_at: now()
+      });
+      return { application: projectApplication(record), links: [], created: true };
+    }
+
+    await resolveEntity(applicationRef, accessContext);
 
     let linkRepo;
     try {
+      maybeFail('store_bind');
       const ulStore = await getUniversalLinkStore();
       linkRepo = createUniversalLinkRepository({
         store: ulStore,
         resolveEntity,
         now
       });
+      if (!done.has('store_bound')) {
+        journal = await markStep(journal, 'store_bound');
+      }
     } catch {
-      journal = {
+      journal = await persistJournal({
         ...journal,
         status: 'repair_needed',
-        failed_intent_ids: draftIntents.map((intent) => intent.intent_id),
+        failed_intent_ids: intents.map((intent) => intent.intent_id),
         last_error_code: 'universal_link_store_unavailable',
         updated_at: now()
-      };
-      await setJSON(professionalStore, applicationOperationKey(operationId), journal);
-      throw incompleteFromJournal(journal);
+      });
+      throw incompleteFromJournal(journal, intents);
     }
 
     try {
@@ -234,16 +375,35 @@ export function createApplicationRepository(deps = {}) {
       });
     } catch (error) {
       if (error?.code === 'application_links_incomplete') throw error;
-      throw incompleteFromJournal(journal);
+      throw incompleteFromJournal(journal, intents);
+    }
+
+    try {
+      maybeFail('commit');
+      journal = await persistJournal({
+        ...journal,
+        status: 'committed',
+        failed_intent_ids: [],
+        updated_at: now()
+      });
+    } catch (error) {
+      journal = await persistJournal({
+        ...journal,
+        status: 'repair_needed',
+        last_error_code: error?.code ?? 'application_commit_failed',
+        updated_at: now()
+      });
+      throw incompleteFromJournal(journal, intents);
     }
 
     const links = [];
-    for (const intent of draftIntents) {
+    for (const intent of intents) {
       const listed = await linkRepo.getLink(intent.link_id, accessContext);
       links.push(listed.link);
     }
     return { application: projectApplication(record), links, created: true };
   }
+
 
   async function updateApplication(id, patchInput) {
     assertNoAccessFields(patchInput);
@@ -269,14 +429,29 @@ export function createApplicationRepository(deps = {}) {
 
   async function retryLinks(id) {
     if (!isValidApplicationId(id)) throw notFound();
-    const record = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
-    if (!record) throw notFound();
     const journal = await loadOpenJournalForApplication(id);
     if (!journal || journal.status === 'committed') {
+      const record = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
+      if (!record) throw notFound();
       return { application: projectApplication(record), links: [], retried: false };
     }
 
+    const applicationRef = formatEntityRef({ namespace: 'professional', kind: 'application', id });
     const accessContext = createAccessContext({ workflow: 'life' });
+
+    if (journal.operation_type === 'create_application') {
+      const result = await resumeCreateApplication({
+        journal,
+        applicationRef,
+        accessContext,
+        draftIntents: journal.intents ?? []
+      });
+      return { application: result.application, links: result.links, retried: true };
+    }
+
+    const record = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
+    if (!record) throw notFound();
+
     const ulStore = await getUniversalLinkStore();
     const linkRepo = createUniversalLinkRepository({
       store: ulStore,

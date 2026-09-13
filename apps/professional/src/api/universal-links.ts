@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/api/client';
+import { apiGet, apiPatch, apiPost } from '@/api/client';
 
 export interface UniversalLinkRecord {
   id: string;
@@ -6,6 +6,7 @@ export interface UniversalLinkRecord {
   target_ref: string;
   relationship_type: string;
   status: string;
+  role?: string | null;
 }
 
 export interface UniversalLinkEntry {
@@ -15,6 +16,7 @@ export interface UniversalLinkEntry {
     kind: string;
     display_label: string;
   };
+  direction?: 'outgoing' | 'incoming';
 }
 
 export function listUniversalLinksForEntity(
@@ -30,10 +32,20 @@ export function createUniversalLink(
     source_ref: string;
     target_ref: string;
     relationship_type: string;
+    role?: string | null;
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ link: UniversalLinkRecord; created: boolean }> {
   return apiPost('/api/universal-links', body, { signal: options.signal });
+}
+
+export function endUniversalLink(
+  id: string,
+  body: { valid_to?: string | null } = {},
+  options: { signal?: AbortSignal } = {}
+): Promise<{ link: UniversalLinkRecord }> {
+  const params = new URLSearchParams({ id, action: 'end' });
+  return apiPatch(`/api/universal-links?${params.toString()}`, body, { signal: options.signal });
 }
 
 export function createTask(

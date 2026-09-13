@@ -176,7 +176,7 @@ export async function assembleCareerOverview(deps = {}) {
       const { outgoing } = await linkRepo.listForEntity(appRef, accessContext);
       for (const entry of outgoing) {
         const type = entry.link.relationship_type;
-        if (type === 'applicant_to' && entry.endpoint.kind === 'organisation') {
+        if (type === 'applies_to' && entry.endpoint.kind === 'organisation') {
           if (!orgSeen.has(entry.endpoint.ref)) {
             orgSeen.add(entry.endpoint.ref);
             orgItems.push(endpointSummary(entry.endpoint));

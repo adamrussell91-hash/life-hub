@@ -326,6 +326,8 @@ export interface ApplicationRecord {
   reflection: string | null;
   created_at: string;
   updated_at: string;
+  /** Resolved from Universal Links (`applies_to`); never copied into Application JSON. */
+  organisation?: { ref: string; display_label: string } | null;
   incomplete_links?: IncompleteLinksProjection | null;
   application_action_operation?: FollowUpOperationProjection | null;
 }
