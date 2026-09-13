@@ -244,6 +244,61 @@ test('caps combined results at 20', async () => {
   assert.equal(response.data.groups.person.length, 20);
 });
 
+test('a valid match is never hidden by candidate count: 250 non-matching records plus one match still finds the match', async () => {
+  const store = memoryStore();
+  const entities = createEntitiesHandler(baseDeps(store));
+  for (let i = 0; i < 250; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await entities(request({
+      url: 'https://api.adam-russell.com/api/entities',
+      method: 'POST',
+      body: { kind: 'person', display_name: `Unrelated Person ${i}` }
+    }));
+  }
+  await entities(request({
+    url: 'https://api.adam-russell.com/api/entities',
+    method: 'POST',
+    body: { kind: 'person', display_name: 'Zzyzx Match' }
+  }));
+  const search = createEntitySearchHandler(baseDeps(store));
+  const response = await (await search(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Zzyzx' }))).json();
+  assert.equal(response.data.groups.person.length, 1);
+  assert.equal(response.data.groups.person[0].display_label, 'Zzyzx Match');
+});
+
+test('bounded indexed candidate selection: only index-matching candidates are hydrated against the authoritative store', async () => {
+  const store = memoryStore();
+  const entities = createEntitiesHandler(baseDeps(store));
+  for (let i = 0; i < 30; i += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await entities(request({
+      url: 'https://api.adam-russell.com/api/entities',
+      method: 'POST',
+      body: { kind: 'person', display_name: `Unrelated Person ${i}` }
+    }));
+  }
+  await entities(request({
+    url: 'https://api.adam-russell.com/api/entities',
+    method: 'POST',
+    body: { kind: 'person', display_name: 'Unique Match Zzyzx' }
+  }));
+
+  let authoritativeReads = 0;
+  const countingStore = {
+    ...store,
+    async get(key, options) {
+      if (key.startsWith('entities/person/')) authoritativeReads += 1;
+      return store.get(key, options);
+    }
+  };
+  const search = createEntitySearchHandler(baseDeps(countingStore));
+  const response = await (await search(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Zzyzx' }))).json();
+  assert.equal(response.data.groups.person.length, 1);
+  // Only the one plausibly-matching candidate (per the cheap index) is
+  // hydrated against the authoritative store — not all 31 records.
+  assert.equal(authoritativeReads, 1);
+});
+
 // --- Correction B6: Task results in entity search ---
 
 function tasksStoreSeededWith(tasks) {

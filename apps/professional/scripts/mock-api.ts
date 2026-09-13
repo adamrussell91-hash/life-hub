@@ -217,7 +217,8 @@ export function createMockApi() {
         label: timelineLabel(entry.link, entry.endpoint, entry.direction),
         context_key: entry.link.context_key,
         source_ref: entry.link.source_ref,
-        href: entry.endpoint.href ?? null
+        href: entry.endpoint.href ?? null,
+        context_href: null
       }))
       .sort((a, b) => {
         if (!a.date && !b.date) return 0;

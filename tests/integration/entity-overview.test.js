@@ -5,9 +5,10 @@ import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
 import { createEntityOverviewHandler } from '../../netlify/functions/entity-overview.mjs';
 import { createUniversalLinksHandler } from '../../netlify/functions/universal-links.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
-import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import { resolveOrganisation, resolvePerson, resolveTask } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
+import { taskKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -40,7 +41,7 @@ function memoryStore() {
 // letting the production resolvers connect to a real Netlify Blobs
 // binding (which does not exist in this unit test process). Mirrors the
 // pattern Slice 1/2's own suites use with a synthetic resolveEntity.
-function makeResolveEntity(store) {
+function makeResolveEntity(store, tasksStore = null) {
   return async function resolveEntity(refInput, accessContext, options = {}) {
     const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
     if (!ref) throw endpointNotFoundError();
@@ -49,6 +50,9 @@ function makeResolveEntity(store) {
     }
     if (ref.namespace === 'shared' && ref.kind === 'organisation') {
       return resolveOrganisation(ref.id, accessContext, { ...options, getStore: async () => store });
+    }
+    if (ref.namespace === 'tasks' && ref.kind === 'task' && tasksStore) {
+      return resolveTask(ref.id, accessContext, { ...options, getStore: async () => tasksStore });
     }
     throw endpointNotFoundError();
   };
@@ -198,6 +202,200 @@ test('shows two concurrent current relationships and one ended historical relati
   assert.equal(body.linked_records.organisations.length, 2);
   assert.equal(body.linked_records.tasks.length, 0);
   assert.equal(body.linked_records.communications.length, 0);
+});
+
+test('timeline_limit and timeline_next_cursor paginate the timeline stably, without truncating current/historical relationships', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  const orgA = await createOrganisation(entities, 'Org A');
+  const orgB = await createOrganisation(entities, 'Org B');
+  const orgC = await createOrganisation(entities, 'Org C');
+
+  for (const [org, validFrom] of [
+    [orgA, '2025-01-01T00:00:00.000Z'],
+    [orgB, '2025-06-01T00:00:00.000Z'],
+    [orgC, '2025-09-01T00:00:00.000Z']
+  ]) {
+    // eslint-disable-next-line no-await-in-loop
+    await links(request({
+      url: 'https://api.adam-russell.com/api/universal-links',
+      method: 'POST',
+      body: { source_ref: seth.ref, target_ref: org.ref, relationship_type: 'member_of', valid_from: validFrom }
+    }));
+  }
+
+  const firstPageResponse = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=2`
+  }));
+  const firstPage = (await firstPageResponse.json()).data;
+  assert.equal(firstPage.timeline.length, 2);
+  assert.equal(firstPage.timeline[0].date, '2025-09-01T00:00:00.000Z');
+  assert.equal(firstPage.timeline[1].date, '2025-06-01T00:00:00.000Z');
+  assert.ok(firstPage.timeline_next_cursor, 'a third entry remains, so a cursor must be returned');
+  // Pagination never truncates the deliberately-complete relationship views.
+  assert.equal(firstPage.current_relationships.length, 3);
+
+  const secondPageResponse = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=2&timeline_cursor=${encodeURIComponent(firstPage.timeline_next_cursor)}`
+  }));
+  const secondPage = (await secondPageResponse.json()).data;
+  assert.equal(secondPage.timeline.length, 1);
+  assert.equal(secondPage.timeline[0].date, '2025-01-01T00:00:00.000Z');
+  assert.equal(secondPage.timeline_next_cursor, null, 'no further page remains');
+});
+
+test('an invalid timeline_cursor is rejected as a caller error, not silently ignored', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+  const seth = await createPerson(entities);
+
+  const response = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_cursor=not-a-real-cursor`
+  }));
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_cursor');
+});
+
+test('a timeline entry from a Task shows a source link even though context_ref was never set', async () => {
+  const store = memoryStore();
+  const tasksStore = tasksMemoryStore();
+  await tasksStore.setJSON(taskKey('task_email_seth'), {
+    id: 'task_email_seth',
+    title: 'Email Seth about the proposal',
+    status: 'open'
+  });
+  const deps = baseDeps(store, { resolveEntity: makeResolveEntity(store, tasksStore) });
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: 'tasks:task:task_email_seth', target_ref: seth.ref, relationship_type: 'contact' }
+  }));
+
+  const response = await overview(request({ url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}` }));
+  const body = (await response.json()).data;
+  assert.equal(body.timeline.length, 1);
+  assert.equal(body.timeline[0].context_href, '/tasks/#/task/task_email_seth');
+  assert.equal(body.timeline[0].href, '/tasks/#/task/task_email_seth');
+});
+
+test('timeline cursor stays stable when the entry it pointed at is suppressed between page requests', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  const orgA = await createOrganisation(entities, 'Org A');
+  const orgB = await createOrganisation(entities, 'Org B');
+  const orgC = await createOrganisation(entities, 'Org C');
+
+  const linkB = await (await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: seth.ref, target_ref: orgB.ref, relationship_type: 'member_of', valid_from: '2025-06-01T00:00:00.000Z' }
+  }))).json();
+  await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: seth.ref, target_ref: orgA.ref, relationship_type: 'member_of', valid_from: '2025-01-01T00:00:00.000Z' }
+  }));
+  await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: seth.ref, target_ref: orgC.ref, relationship_type: 'member_of', valid_from: '2025-09-01T00:00:00.000Z' }
+  }));
+
+  const firstPage = (await (await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=1`
+  }))).json()).data;
+  assert.equal(firstPage.timeline[0].date, '2025-09-01T00:00:00.000Z');
+  const cursor = firstPage.timeline_next_cursor;
+  assert.ok(cursor);
+
+  // The entry the first page's cursor points past (Org C, 2025-09) is now
+  // suppressed — an administrative action, but the same "no longer in
+  // ordinary reads" effect a deletion has.
+  await links(request({
+    url: `https://api.adam-russell.com/api/universal-links?id=${linkB.data.link.id}&action=suppress`,
+    method: 'PATCH',
+    body: { reason: 'operator_requested' }
+  }));
+
+  const secondPage = (await (await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=1&timeline_cursor=${encodeURIComponent(cursor)}`
+  }))).json()).data;
+  // Org B (2025-06) is now hidden, but Org A (2025-01) must still be
+  // reachable through the OLD cursor rather than the page coming back
+  // empty just because the entry the cursor named is gone.
+  assert.equal(secondPage.timeline.length, 1);
+  assert.equal(secondPage.timeline[0].date, '2025-01-01T00:00:00.000Z');
+});
+
+test('only the requested page resolves context_href — entries beyond it are never touched', async () => {
+  const store = memoryStore();
+  const tasksStore = tasksMemoryStore();
+  for (const id of ['task_a', 'task_b', 'task_c']) {
+    // eslint-disable-next-line no-await-in-loop
+    await tasksStore.setJSON(taskKey(id), { id, title: `Task ${id}`, status: 'open' });
+  }
+  let taskResolveCalls = 0;
+  const countingResolveEntity = async (refInput, accessContext, options) => {
+    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+    if (ref?.namespace === 'tasks' && ref?.kind === 'task') taskResolveCalls += 1;
+    return makeResolveEntity(store, tasksStore)(refInput, accessContext, options);
+  };
+  const deps = baseDeps(store, { resolveEntity: countingResolveEntity });
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  const orgA = await createOrganisation(entities, 'Org A');
+  // Three period relationships, each recording a different Task as the
+  // context that established it — context_href must resolve one of these
+  // per timeline entry.
+  for (const [validFrom, taskId] of [
+    ['2025-01-01T00:00:00.000Z', 'task_a'],
+    ['2025-06-01T00:00:00.000Z', 'task_b'],
+    ['2025-09-01T00:00:00.000Z', 'task_c']
+  ]) {
+    // eslint-disable-next-line no-await-in-loop
+    await links(request({
+      url: 'https://api.adam-russell.com/api/universal-links',
+      method: 'POST',
+      body: {
+        source_ref: seth.ref,
+        target_ref: orgA.ref,
+        relationship_type: 'member_of',
+        valid_from: validFrom,
+        context_ref: `tasks:task:${taskId}`
+      }
+    }));
+  }
+  taskResolveCalls = 0; // reset: only count resolves made by the overview call below
+
+  const response = await overview(request({
+    url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}&timeline_limit=1`
+  }));
+  const body = (await response.json()).data;
+  assert.equal(body.timeline.length, 1);
+  assert.equal(body.timeline[0].context_href, '/tasks/#/task/task_c');
+  // Only the one page entry's context_ref was resolved — task_a and task_b
+  // (entries 2 and 3, not on this page) were never touched.
+  assert.equal(taskResolveCalls, 1);
 });
 
 test('the entity field never discloses a deleted person\'s former name', async () => {

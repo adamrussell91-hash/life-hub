@@ -288,6 +288,40 @@ const REGISTRY = new Map([
       temporalMode: 'timeless',
       roleMode: 'none'
     })
+  ],
+  [
+    // StudentReference class/program/excursion/coaching membership (Slice
+    // 8). Teaching owns StudentReference records, but this relationship —
+    // like every other cross-record relationship in this programme — lives
+    // in the canonical Universal Link repository, not a second Teaching-
+    // owned membership table. `context_key` carries which of the four
+    // membership kinds this is ('class' | 'program' | 'excursion' |
+    // 'coaching'); excursions and coaching groups are modelled as
+    // `tasks:project`/`tasks:program` respectively (no dedicated entity
+    // exists for either), so `context_key` — not `target_kinds` — is what
+    // actually distinguishes an excursion membership from an ordinary
+    // program membership. `student-reference-repository.mjs` enforces the
+    // context_key -> target-kind pairing; the registry only constrains the
+    // union of permitted target kinds. `metadata.permission_status` tracks
+    // status only (never a stored form) and changes by closing the current
+    // link and opening the next one (docs/proposals/comms-hub-people-
+    // unification.md ยง3.3 "closes the previous ... creates the next"),
+    // never by mutating a link in place. `allowed_visibility` is
+    // deliberately `teaching_protected` only — this relationship can never
+    // be created, read, or listed outside the server-derived Teaching
+    // workflow.
+    'participates_in',
+    declaration({
+      key: 'participates_in',
+      sourceKinds: ['teaching:student_reference'],
+      targetKinds: ['teaching:class', 'tasks:program', 'tasks:project'],
+      inverseLabel: 'has_participant',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'none',
+      metadataKeys: ['permission_status'],
+      allowedVisibility: ['teaching_protected']
+    })
   ]
 ]);
 
@@ -302,8 +336,20 @@ export function listRelationshipDeclarations() {
 // Read-only public projection for the future `GET /api/relationship-registry`
 // route (Slice 2). Excludes `duplicate_fields` — an internal detail of how
 // the write path computes link equivalence, not something a client needs.
+// Excludes any relationship whose `allowed_visibility` never includes
+// `operator` — today, only `participates_in` (Slice 8's StudentReference
+// membership). `/api/relationship-registry` is a generic, non-workflow-
+// scoped route (any authenticated caller, not just `teaching`), so a
+// relationship reachable only under `teaching_protected` must not appear
+// in it — the same "generic browser routes... must not expose
+// StudentReference" boundary every other generic surface already
+// enforces. `getRelationshipDeclaration`/`validateRelationshipInput` still
+// see every declaration regardless of visibility; only this public
+// projection filters.
 export function projectRelationshipRegistry() {
-  return listRelationshipDeclarations().map(decl => ({
+  return listRelationshipDeclarations()
+    .filter(decl => decl.allowed_visibility.includes('operator'))
+    .map(decl => ({
     key: decl.key,
     source_kinds: [...decl.source_kinds],
     target_kinds: [...decl.target_kinds],
