@@ -219,7 +219,8 @@
 }
 
 .meetings__actions,
-.events__actions {
+.events__actions,
+.applications__actions {
   margin-bottom: var(--space-4);
 }
 
@@ -233,7 +234,9 @@
 }
 
 .meetings__list,
-.events__list {
+.events__list,
+.applications__list,
+.career__list {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -249,7 +252,9 @@
 }
 
 .meetings__link,
-.events__link {
+.events__link,
+.applications__link,
+.career__link {
   font-weight: var(--weight-medium);
   color: inherit;
   text-decoration: none;
@@ -263,7 +268,11 @@
 .meetings__link:hover,
 .meetings__link:focus-visible,
 .events__link:hover,
-.events__link:focus-visible {
+.events__link:focus-visible,
+.applications__link:hover,
+.applications__link:focus-visible,
+.career__link:hover,
+.career__link:focus-visible {
   text-decoration: underline;
 }
 
@@ -272,7 +281,10 @@
 .meetings__meta,
 .meeting-form__status,
 .events__meta,
-.event-form__status {
+.event-form__status,
+.applications__meta,
+.application-form__status,
+.career__meta {
   color: var(--muted);
   font-size: var(--text-sm);
 }
@@ -284,7 +296,9 @@
 .meeting-detail__reschedule,
 .event-form,
 .event-detail__edit,
-.event-detail__reschedule {
+.event-detail__reschedule,
+.application-form,
+.application-detail__edit {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -308,7 +322,13 @@
 .event-detail__edit input,
 .event-detail__edit select,
 .event-detail__edit textarea,
-.event-detail__reschedule input {
+.event-detail__reschedule input,
+.application-form input,
+.application-form select,
+.application-form textarea,
+.application-detail__edit input,
+.application-detail__edit select,
+.application-detail__edit textarea {
   width: 100%;
   box-sizing: border-box;
   min-height: 2.5rem;
@@ -323,7 +343,8 @@
 
 .communication-detail__incomplete,
 .meeting-detail__incomplete,
-.event-detail__incomplete {
+.event-detail__incomplete,
+.application-detail__incomplete {
   margin-top: var(--space-4);
   display: flex;
   flex-direction: column;
@@ -331,9 +352,48 @@
 }
 
 .meeting-detail__actions,
-.event-detail__actions {
+.event-detail__actions,
+.application-detail__actions {
   margin-top: var(--space-4);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.applications__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.applications__toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.applications__pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.applications__pipeline-heading,
+.career__heading {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-3);
+}
+
+.career__section {
+  margin-bottom: var(--space-6);
+}
+
+.application-detail__facts,
+.application-detail__section {
+  margin-bottom: var(--space-4);
+}
+
+.application-detail__edit {
+  margin-bottom: var(--space-4);
 }

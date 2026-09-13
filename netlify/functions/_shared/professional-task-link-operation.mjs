@@ -1,7 +1,8 @@
 /**
- * Cross-store Task → Meeting/Event Universal Link journal.
- * Covers preparation, follow_up, learning_for, and application_action. Deterministic Task ids
- * when creating; existing Task ids when selecting. Retry never duplicates.
+ * Cross-store Task → Meeting/Event/Application Universal Link journal.
+ * Covers preparation, follow_up, learning_for, and application_action.
+ * Deterministic Task ids when creating; existing Task ids when selecting.
+ * Retry never duplicates.
  */
 import { createHash } from 'node:crypto';
 import { createAccessContext } from './entity-access.mjs';
@@ -25,7 +26,6 @@ const ALLOWED = Object.freeze({
   preparation: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
   follow_up: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
   learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] },
-  // Shared with Application workflows (Slice 10); same bind/retry contract.
   application_action: { targetKind: 'application', sourceKinds: ['tasks:task'] }
 });
 

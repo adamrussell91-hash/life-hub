@@ -163,6 +163,7 @@ export function createMockApi() {
   const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
   const meetings = new Map<string, Record<string, unknown>>();
   const events = new Map<string, Record<string, unknown>>();
+  const applications = new Map<string, Record<string, unknown>>();
 
   let authenticated = false;
 
@@ -230,6 +231,7 @@ export function createMockApi() {
       communications: [] as unknown[],
       meetings: [] as unknown[],
       events: [] as unknown[],
+      applications: [] as unknown[],
       organisations: [] as unknown[],
       people: [] as unknown[]
     };
@@ -241,6 +243,9 @@ export function createMockApi() {
       else if (entry.endpoint.kind === 'person') linked_records.people.push(entry.endpoint);
       else if (entry.endpoint.kind === 'communication') linked_records.communications.push(entry.endpoint);
       else if (entry.endpoint.kind === 'task') linked_records.tasks.push(entry.endpoint);
+      else if (entry.endpoint.kind === 'meeting') linked_records.meetings.push(entry.endpoint);
+      else if (entry.endpoint.kind === 'event') linked_records.events.push(entry.endpoint);
+      else if (entry.endpoint.kind === 'application') linked_records.applications.push(entry.endpoint);
     }
 
     return {
@@ -853,6 +858,234 @@ export function createMockApi() {
         }))
       ];
       return json(200, { ok: true, data: { projections } });
+    }
+
+    if (path === '/api/applications' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const application = applications.get(id);
+        if (!application) {
+          return json(404, {
+            ok: false,
+            error: { code: 'application_not_found', message: 'Application not found.' }
+          });
+        }
+        return json(200, { ok: true, data: { application } });
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          applications: [...applications.values()].sort(
+            (a, b) => Date.parse(String(b.updated_at)) - Date.parse(String(a.updated_at))
+          )
+        }
+      });
+    }
+
+    if (path === '/api/applications' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      const id = url.searchParams.get('id');
+      if (action === 'retry-links' && id) {
+        const application = applications.get(id);
+        if (!application) {
+          return json(404, {
+            ok: false,
+            error: { code: 'application_not_found', message: 'Application not found.' }
+          });
+        }
+        application.incomplete_links = null;
+        return json(200, { ok: true, data: { application, links: [], retried: true } });
+      }
+      if (action === 'transition' && id && applications.has(id)) {
+        const application = applications.get(id)!;
+        const next = (body as { pipeline_status?: string })?.pipeline_status;
+        if (!next) {
+          return json(400, {
+            ok: false,
+            error: { code: 'invalid_pipeline_status', message: 'pipeline_status is not permitted.' }
+          });
+        }
+        application.pipeline_status = next;
+        application.updated_at = new Date().toISOString();
+        return json(200, { ok: true, data: { application } });
+      }
+      if (action === 'link-task' && id && applications.has(id)) {
+        const application = applications.get(id)!;
+        const input = body as { title?: string; task_id?: string; relationship_type?: string };
+        const operation = {
+          operation_id: `ptl_${randomUUID().slice(0, 8)}`,
+          status: 'committed',
+          task_id: input.task_id ?? `task_${randomUUID().slice(0, 8)}`,
+          title: input.title ?? 'Application action',
+          relationship_type: 'application_action',
+          completed_intent_ids: [] as string[],
+          completed_link_ids: [] as string[],
+          failed_intent_ids: [] as string[],
+          pending_intent_ids: [] as string[]
+        };
+        application.application_action_operation = operation;
+        application.updated_at = new Date().toISOString();
+        return json(200, { ok: true, data: { application, operation } });
+      }
+      if (action === 'retry-task-link' && id && applications.has(id)) {
+        const application = applications.get(id)!;
+        const operation = application.application_action_operation as
+          | Record<string, unknown>
+          | undefined;
+        if (operation) {
+          operation.status = 'committed';
+          application.application_action_operation = operation;
+        }
+        return json(200, {
+          ok: true,
+          data: { application, operation: application.application_action_operation }
+        });
+      }
+      const input = body as {
+        position_title?: string;
+        advertisement?: Record<string, unknown>;
+        closing_date?: string | null;
+        documents?: unknown[];
+        selection_criteria?: unknown[];
+        interview_rounds?: unknown[];
+        links?: Array<{ target_ref: string; relationship_type: string; role?: string | null }>;
+      };
+      const now = new Date().toISOString();
+      const applicationId = `application_${randomUUID()}`;
+      const application = {
+        schema_version: 1,
+        id: applicationId,
+        position_title: (input.position_title ?? '').trim() || 'Untitled',
+        advertisement: {
+          title: (input.advertisement?.title as string | null | undefined) ?? null,
+          url: (input.advertisement?.url as string | null | undefined) ?? null,
+          source: (input.advertisement?.source as string | null | undefined) ?? null,
+          summary: (input.advertisement?.summary as string | null | undefined) ?? null,
+          captured_at: (input.advertisement?.captured_at as string | null | undefined) ?? null
+        },
+        closing_date: input.closing_date ?? null,
+        pipeline_status: 'drafting',
+        documents: Array.isArray(input.documents) ? input.documents : [],
+        selection_criteria: Array.isArray(input.selection_criteria) ? input.selection_criteria : [],
+        interview_rounds: Array.isArray(input.interview_rounds) ? input.interview_rounds : [],
+        outcome: { status: 'none', date: null, offer_details: null, reason: null },
+        reflection: null,
+        created_at: now,
+        updated_at: now,
+        incomplete_links: null as null
+      };
+      applications.set(applicationId, application);
+      const sourceRef = `professional:application:${applicationId}`;
+      for (const link of input.links ?? []) {
+        relationships.push({
+          id: `link_${randomUUID()}`,
+          source_ref: sourceRef,
+          target_ref: link.target_ref,
+          relationship_type: link.relationship_type,
+          inverse_label: link.relationship_type,
+          context_key: null,
+          status: 'current',
+          temporal_mode: 'timeless',
+          valid_from: null,
+          valid_to: null,
+          occurred_at: null
+        });
+      }
+      return json(201, { ok: true, data: { application, links: [], created: true } });
+    }
+
+    if (path === '/api/applications' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const application = id ? applications.get(id) : null;
+      if (!application) {
+        return json(404, {
+          ok: false,
+          error: { code: 'application_not_found', message: 'Application not found.' }
+        });
+      }
+      const patch = body as Record<string, unknown>;
+      for (const key of [
+        'position_title',
+        'advertisement',
+        'closing_date',
+        'documents',
+        'selection_criteria',
+        'interview_rounds',
+        'outcome',
+        'reflection'
+      ]) {
+        if (patch[key] !== undefined) {
+          if (key === 'documents' && Array.isArray(patch.documents)) {
+            application.documents = (patch.documents as Array<Record<string, unknown>>).map((doc) => ({
+              ...doc,
+              id: typeof doc.id === 'string' ? doc.id : `adoc_${randomUUID()}`
+            }));
+          } else if (key === 'selection_criteria' && Array.isArray(patch.selection_criteria)) {
+            application.selection_criteria = (
+              patch.selection_criteria as Array<Record<string, unknown>>
+            ).map((entry) => ({
+              ...entry,
+              id: typeof entry.id === 'string' ? entry.id : `acrit_${randomUUID()}`
+            }));
+          } else if (key === 'interview_rounds' && Array.isArray(patch.interview_rounds)) {
+            application.interview_rounds = (
+              patch.interview_rounds as Array<Record<string, unknown>>
+            ).map((entry) => ({
+              ...entry,
+              id: typeof entry.id === 'string' ? entry.id : `aint_${randomUUID()}`
+            }));
+          } else if (key === 'advertisement' && patch.advertisement && typeof patch.advertisement === 'object') {
+            application.advertisement = {
+              ...(application.advertisement as Record<string, unknown>),
+              ...(patch.advertisement as Record<string, unknown>)
+            };
+          } else if (key === 'outcome' && patch.outcome && typeof patch.outcome === 'object') {
+            application.outcome = {
+              ...(application.outcome as Record<string, unknown>),
+              ...(patch.outcome as Record<string, unknown>)
+            };
+          } else {
+            application[key] = patch[key];
+          }
+        }
+      }
+      application.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { application } });
+    }
+
+    if (path === '/api/career' && method === 'GET') {
+      const appItems = [...applications.values()].map((record) => ({
+        ref: `professional:application:${record.id}`,
+        id: record.id,
+        position_title: record.position_title,
+        pipeline_status: record.pipeline_status,
+        closing_date: record.closing_date ?? null,
+        updated_at: record.updated_at,
+        href: `/professional/#/application/${record.id}`
+      }));
+      const pdItems = [...events.values()]
+        .filter((event) => event.event_type === 'professional_development')
+        .map((event) => ({
+          ref: `professional:event:${event.id}`,
+          id: event.id,
+          title: event.title,
+          event_type: event.event_type,
+          start: event.start,
+          end: event.end,
+          occurrence_state: event.occurrence_state,
+          href: `/professional/#/event/${event.id}`
+        }));
+      return json(200, {
+        ok: true,
+        data: {
+          applications: { status: 'ok', items: appItems },
+          employment: { status: 'ok', items: [] },
+          professional_development: { status: 'ok', items: pdItems },
+          people: { status: 'ok', items: [] },
+          organisations: { status: 'ok', items: [] },
+          deferred: ['publication', 'presentation']
+        }
+      });
     }
 
     if (path === '/api/tasks' && method === 'POST') {

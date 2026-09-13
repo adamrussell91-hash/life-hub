@@ -64,6 +64,7 @@ function bucketFor(linkedRecords, kind) {
   if (kind === 'communication') return linkedRecords.communications;
   if (kind === 'meeting') return linkedRecords.meetings;
   if (kind === 'event') return linkedRecords.events;
+  if (kind === 'application') return linkedRecords.applications;
   if (kind === 'organisation') return linkedRecords.organisations;
   if (kind === 'person') return linkedRecords.people;
   return null;
@@ -118,6 +119,7 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     communications: [],
     meetings: [],
     events: [],
+    applications: [],
     organisations: [],
     people: []
   };

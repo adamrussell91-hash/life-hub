@@ -5,6 +5,10 @@ import {
 } from './communication-schema.mjs';
 import { isValidMeetingId, isValidMeetingOperationId } from './meeting-schema.mjs';
 import { isValidEventId, isValidEventOperationId } from './event-schema.mjs';
+import {
+  isValidApplicationId,
+  isValidApplicationOperationId
+} from './application-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -23,6 +27,10 @@ export const MEETING_OPERATION_PREFIX = 'meetings/operations/';
 export const EVENT_PREFIX = 'events/records/';
 export const EVENT_INDEX_PREFIX = 'events/index/';
 export const EVENT_OPERATION_PREFIX = 'events/operations/';
+
+export const APPLICATION_PREFIX = 'applications/records/';
+export const APPLICATION_INDEX_PREFIX = 'applications/index/';
+export const APPLICATION_OPERATION_PREFIX = 'applications/operations/';
 
 function assertValidCommunicationId(id) {
   if (!isValidCommunicationId(id)) {
@@ -79,6 +87,26 @@ function assertValidEventOperationId(id) {
     throw Object.assign(new Error(`Invalid Event operation id: ${JSON.stringify(id)}`), {
       status: 400,
       code: 'invalid_event_operation_id'
+    });
+  }
+  return id;
+}
+
+function assertValidApplicationId(id) {
+  if (!isValidApplicationId(id)) {
+    throw Object.assign(new Error(`Invalid Application id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_application_id'
+    });
+  }
+  return id;
+}
+
+function assertValidApplicationOperationId(id) {
+  if (!isValidApplicationOperationId(id)) {
+    throw Object.assign(new Error(`Invalid Application operation id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_application_operation_id'
     });
   }
   return id;
@@ -149,4 +177,20 @@ export function eventOperationKey(id) {
 
 export async function listEventIndexKeys(store) {
   return (await listBlobKeys(store, EVENT_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function applicationKey(id) {
+  return `${APPLICATION_PREFIX}${assertValidApplicationId(id)}`;
+}
+
+export function applicationIndexKey(id) {
+  return `${APPLICATION_INDEX_PREFIX}${assertValidApplicationId(id)}`;
+}
+
+export function applicationOperationKey(id) {
+  return `${APPLICATION_OPERATION_PREFIX}${assertValidApplicationOperationId(id)}`;
+}
+
+export async function listApplicationIndexKeys(store) {
+  return (await listBlobKeys(store, APPLICATION_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
 }
