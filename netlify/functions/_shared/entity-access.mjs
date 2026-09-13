@@ -17,11 +17,9 @@ const VISIBILITY_STRICTNESS = ['operator', 'teaching_protected'];
 // from request JSON — a caller-supplied workflow would let a client widen
 // its own access.
 //
-// No workflow grants `teaching_protected` yet. The implementation
-// programme requires a recorded College approval gate (Slice 8) before
-// any teaching_protected data exists or is reachable — granting the
-// visibility label pre-emptively, even with nothing behind it yet, is out
-// of scope here and stays out until that gate lands.
+// `teaching_protected` is granted only to the server-derived `teaching`
+// workflow, for the narrow, synthetic-fixture-only StudentReference
+// implementation. Every other workflow stays operator-only.
 export function createAccessContext({ workflow, allowedEntityKinds = [] } = {}) {
   if (!KNOWN_WORKFLOWS.has(workflow)) {
     throw Object.assign(new Error(`Unknown workflow: ${workflow}`), { status: 400, code: 'invalid_workflow' });
@@ -29,7 +27,7 @@ export function createAccessContext({ workflow, allowedEntityKinds = [] } = {}) 
   return Object.freeze({
     actor: 'operator',
     workflow,
-    allowed_visibility: Object.freeze(['operator']),
+    allowed_visibility: Object.freeze(workflow === 'teaching' ? ['operator', 'teaching_protected'] : ['operator']),
     allowed_entity_kinds: Object.freeze([...allowedEntityKinds])
   });
 }
@@ -74,13 +72,9 @@ export function assertAdministrationWorkflow(accessContext) {
 
 // The visibility a workflow itself contributes to a link's derived
 // visibility (Slice 2 `createLink` step 5), independent of either
-// endpoint's own visibility. Every current workflow contributes only
-// `operator` — no workflow can yet assert `teaching_protected` (see
-// `createAccessContext` above) — so this is `operator` today for all six
-// known workflows. Defined as its own function, rather than inlining
-// `'operator'` at each call site, so Slice 8's College approval gate has
-// one place to change when a teaching-scoped workflow starts contributing
-// `teaching_protected`.
+// endpoint's own visibility. The `teaching` workflow contributes
+// `teaching_protected` (Slice 8); every other workflow still contributes
+// `operator`.
 export function deriveWorkflowVisibility(accessContext) {
   if (!accessContext || !KNOWN_WORKFLOWS.has(accessContext.workflow)) {
     throw Object.assign(new Error('Cannot derive workflow visibility without a known workflow.'), {
@@ -88,7 +82,7 @@ export function deriveWorkflowVisibility(accessContext) {
       code: 'invalid_workflow'
     });
   }
-  return 'operator';
+  return accessContext.workflow === 'teaching' ? 'teaching_protected' : 'operator';
 }
 
 // A hidden target must behave as absent (implementation programme,

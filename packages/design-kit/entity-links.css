@@ -102,6 +102,17 @@
   font-weight: var(--weight-medium);
 }
 
+.entity-chip__label--link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.entity-chip__label--link:hover,
+.entity-chip__label--link:focus-visible {
+  text-decoration-thickness: 2px;
+}
+
 .entity-chip__meta {
   color: var(--muted);
   font-size: var(--text-sm);

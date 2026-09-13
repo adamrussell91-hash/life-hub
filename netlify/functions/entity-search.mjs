@@ -3,6 +3,7 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { displayLabelFor, parseIdentityIndexRecord, parseOrganisationRecord, parsePersonRecord } from './_shared/identity-schema.mjs';
 import { formatEntityRef } from './_shared/entity-ref.mjs';
 import { mapBounded } from './_shared/blobs-list.mjs';
+import { personHref, organisationHref, taskHref } from './_shared/entity-resolvers.mjs';
 import {
   defaultGetUniversalLinkStore,
   getJSON,
@@ -55,15 +56,24 @@ function matchRank(query, label, sortName) {
 }
 
 // Search must never trust an index display label as authority (correction
-// B4). The identity index (`entities/index/<kind>/<id>`) is used only to
-// find candidate ids cheaply — every candidate that matches is then
-// hydrated and re-validated against its authoritative Person/Organisation
-// record, and the *authoritative* record's own current lifecycle status
-// and label decide visibility and ranking. This protects privacy if a
-// stale index survives a partial identity-write failure: a former active
-// name can never resurface through search just because an old index entry
-// was never repaired, and a record already redacted (deidentified/deleted)
-// can never appear even if its index entry is stale.
+// B4). The identity index (`entities/index/<kind>/<id>`) already carries a
+// `display_label`/`sort_name` cheaply, without loading the full
+// authoritative record — so ranking runs against the index FIRST, and only
+// candidates that already pass `matchRank` there go on to the expensive
+// authoritative hydration. This is the bounded, indexed candidate
+// selection: hydration work scales with how many candidates plausibly
+// match the query, not with how many records the store holds overall, and
+// — unlike a fixed hydration cap — it can never hide a valid match, since
+// every candidate whose CURRENT index entry matches is still considered
+// regardless of store size.
+//
+// The authoritative record is still the sole source of truth for
+// disclosure: every candidate that passes the index-level rank is
+// re-validated (and re-ranked) against its authoritative record below, so
+// a stale index entry can only ever cause an extra hydration, never a
+// privacy leak — a former active name can't resurface just because an old
+// index entry was never repaired, and a redacted (deidentified/deleted)
+// record can't appear even if its index entry is stale.
 async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived) {
   const indexKeys = await listKeys(store);
   const indexRecords = await mapBounded(indexKeys, READ_BATCH_SIZE, key => getJSON(store, key));
@@ -74,6 +84,8 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
     const entry = parseIdentityIndexRecord(raw);
     if (!entry || seen.has(entry.id)) continue;
     seen.add(entry.id);
+    const indexRank = matchRank(query, entry.display_label, kind === 'person' ? entry.sort_name : null);
+    if (indexRank === null) continue;
     candidateIds.push(entry.id);
   }
 
@@ -91,7 +103,7 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
       kind,
       display_label: label,
       supporting_label: kind === 'person' && record.is_self ? 'self' : null,
-      href: null,
+      href: kind === 'person' ? personHref(record.id) : organisationHref(record.id),
       lifecycle_status: record.lifecycle_status,
       visibility: 'operator'
     };
@@ -117,7 +129,7 @@ async function searchTaskKind(getTasksStore, query) {
       kind: 'task',
       display_label: title,
       supporting_label: typeof record.status === 'string' ? record.status : null,
-      href: null,
+      href: taskHref(record.id),
       lifecycle_status: typeof record.status === 'string' ? record.status : null,
       visibility: 'operator'
     });

@@ -15,6 +15,7 @@ export interface UniversalLinkEntry {
     ref: string;
     kind: string;
     display_label: string;
+    href?: string | null;
   };
   direction?: 'outgoing' | 'incoming';
 }
@@ -45,6 +46,20 @@ export function endUniversalLink(
   options: { signal?: AbortSignal } = {}
 ): Promise<{ link: UniversalLinkRecord }> {
   const params = new URLSearchParams({ id, action: 'end' });
+  return apiPatch(`/api/universal-links?${params.toString()}`, body, { signal: options.signal });
+}
+
+/**
+ * Registry-controlled role editing: ends the current period and opens the
+ * next one with the new role (server-side `changeRole`), so the prior role
+ * stays queryable history rather than being overwritten in place.
+ */
+export function changeUniversalLinkRole(
+  id: string,
+  body: { role: string | null; changed_at: string },
+  options: { signal?: AbortSignal } = {}
+): Promise<{ ended: UniversalLinkRecord; created: UniversalLinkRecord }> {
+  const params = new URLSearchParams({ id, action: 'change_role' });
   return apiPatch(`/api/universal-links?${params.toString()}`, body, { signal: options.signal });
 }
 

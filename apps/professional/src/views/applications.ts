@@ -259,7 +259,8 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
         ref: item.ref,
         label: `${item.display_label} (applies to)`,
         relationshipType: 'applies_to',
-        state: 'pending'
+        state: 'pending',
+        href: item.href ?? null
       });
     }
   });
@@ -284,7 +285,8 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
         ref: item.ref,
         label: `${item.display_label} (contact)`,
         relationshipType: 'application_contact',
-        state: 'pending'
+        state: 'pending',
+        href: item.href ?? null
       });
     }
   });
@@ -311,7 +313,8 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
         label: `${item.display_label} (referee · ${role})`,
         relationshipType: 'referee',
         state: 'pending',
-        supportingLabel: role
+        supportingLabel: role,
+        href: item.href ?? null
       });
     }
   });
@@ -324,7 +327,8 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
         ref: item.ref,
         label: item.display_label,
         relationshipType: 'related_to',
-        state: 'pending'
+        state: 'pending',
+        href: item.href
       });
     }
   });

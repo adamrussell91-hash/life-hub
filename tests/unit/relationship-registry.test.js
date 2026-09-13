@@ -28,6 +28,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'follows_from',
     'learning_for',
     'member_of',
+    'participates_in',
     'preparation',
     'provider',
     'recipient',
@@ -47,11 +48,18 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.equal(getRelationshipDeclaration('application_contact').inverse_label, 'contact_for_application');
   assert.equal(getRelationshipDeclaration('referee').inverse_label, 'referee_for');
   assert.equal(getRelationshipDeclaration('application_action').inverse_label, 'has_application_action');
+  assert.equal(getRelationshipDeclaration('participates_in').inverse_label, 'has_participant');
 });
 
-test('projectRelationshipRegistry exposes every declaration without duplicate_fields', () => {
+test('projectRelationshipRegistry exposes every declaration without duplicate_fields, but excludes teaching_protected-only relationships', () => {
   const projected = projectRelationshipRegistry();
   assert.equal(projected.length, 18);
+  // participates_in (StudentReference membership) is allowed_visibility:
+  // ['teaching_protected'] only — the generic, non-workflow-scoped
+  // /api/relationship-registry route must never disclose it, even as
+  // schema metadata with no actual student data.
+  assert.equal(projected.some((decl) => decl.key === 'participates_in'), false);
+  assert.ok(getRelationshipDeclaration('participates_in'), 'the raw declaration must still exist for internal validation');
   const contact = projected.find(decl => decl.key === 'contact');
   assert.ok(contact);
   assert.deepEqual(Object.keys(contact).sort(), [

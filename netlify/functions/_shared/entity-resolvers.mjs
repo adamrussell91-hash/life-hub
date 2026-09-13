@@ -19,6 +19,7 @@ import {
 import { taskKey, getJSON as getTasksJSON, defaultGetTasksStore } from './tasks-blobs.mjs';
 import { displayLabelFor, isValidOrganisationId, isValidPersonId, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
 import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationKey, personKey } from './universal-link-blobs.mjs';
+import { classKey, defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON } from './teaching-blobs.mjs';
 import {
   resolveKnowledgePage,
   resolveTeachingUnit,
@@ -44,6 +45,29 @@ export {
 // Slice 5 supplies Communication resolution against `professional-hub-content`.
 // Resolver output never exposes the Communication summary.
 
+// Canonical browser hrefs for the umbrella-mounted apps (implementation
+// programme, "Repository facts": Professional at `/professional/`, Tasks
+// at `/tasks/`). Relative paths only — resolvers never invent an absolute
+// hostname for a hub the umbrella already serves. Exported so
+// entity-search.mjs's projections (a different codepath that hydrates the
+// same authoritative records) can render the identical href rather than
+// duplicating the URL shape.
+export function personHref(id) {
+  return `/professional/#/person/${encodeURIComponent(id)}`;
+}
+
+export function organisationHref(id) {
+  return `/professional/#/organisation/${encodeURIComponent(id)}`;
+}
+
+export function taskHref(id) {
+  return `/tasks/#/task/${encodeURIComponent(id)}`;
+}
+
+export function classHref(id) {
+  return `/teaching/classes/${encodeURIComponent(id)}`;
+}
+
 export function resolverUnavailableError(kind) {
   return Object.assign(new Error(`Resolution for kind "${kind}" is not available until its owning slice.`), {
     status: 501,
@@ -64,7 +88,7 @@ export async function resolveTask(id, accessContext, { getStore = defaultGetTask
     kind: 'task',
     display_label: typeof record.title === 'string' ? record.title : '',
     supporting_label: typeof record.status === 'string' ? record.status : null,
-    href: null,
+    href: taskHref(id),
     lifecycle_status: typeof record.status === 'string' ? record.status : null,
     visibility: 'operator'
   };
@@ -98,7 +122,7 @@ export async function resolvePerson(id, accessContext, { getStore = defaultGetUn
     kind: 'person',
     display_label: displayLabelFor(record),
     supporting_label: record.is_self ? 'self' : null,
-    href: null,
+    href: personHref(id),
     lifecycle_status: record.lifecycle_status,
     visibility: 'operator'
   };
@@ -117,8 +141,37 @@ export async function resolveOrganisation(id, accessContext, { getStore = defaul
     kind: 'organisation',
     display_label: displayLabelFor(record),
     supporting_label: null,
-    href: null,
+    href: organisationHref(id),
     lifecycle_status: record.lifecycle_status,
+    visibility: 'operator'
+  };
+}
+
+// Class metadata (title/code) is not itself sensitive — only membership is
+// (docs/proposals/comms-hub-people-unification.md ยง6). This is an ordinary
+// operator-visible resolver, deferred from Slice 11 only because nothing
+// needed it yet; Slice 8's StudentReference `participates_in` relationship
+// is the first real caller.
+export async function resolveTeachingClass(
+  id,
+  accessContext,
+  { getStore = defaultGetTeachingStore } = {}
+) {
+  const ref = formatEntityRef({ namespace: 'teaching', kind: 'class', id });
+  if (!ref) throw endpointNotFoundError();
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = await getTeachingJSON(store, classKey(id));
+  if (!record || typeof record !== 'object') throw endpointNotFoundError();
+  const status = typeof record.status === 'string' ? record.status : 'active';
+  if (status === 'trashed' || status === 'deleted') throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'class',
+    display_label: typeof record.title === 'string' && record.title ? record.title : id,
+    supporting_label: typeof record.code === 'string' ? record.code : null,
+    href: classHref(id),
+    lifecycle_status: status,
     visibility: 'operator'
   };
 }
@@ -226,7 +279,9 @@ export const RESOLVER_SLOTS = Object.freeze({
   'knowledge:page': resolveKnowledgePage,
   'teaching:unit': resolveTeachingUnit,
   'teaching:lesson': resolveTeachingLesson,
+  'teaching:class': resolveTeachingClass,
   'life:decision': resolveLifeDecision
+  // 'teaching:student_reference' is deliberately absent — see entity-ref.mjs.
 });
 
 // Single entry point used by the read-only Universal Link repository.

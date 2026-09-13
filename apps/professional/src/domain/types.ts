@@ -85,6 +85,7 @@ export interface RelationshipLink {
   relationship_type: string;
   status: 'current' | 'ended' | string;
   temporal_mode: 'point' | 'period' | string;
+  role: string | null;
   context_key: string | null;
   occurred_at: string | null;
   valid_from: string | null;
@@ -108,6 +109,7 @@ export interface TimelineEntry {
   context_key: string | null;
   source_ref: string;
   href: string | null;
+  context_href: string | null;
 }
 
 export interface LinkedRecords {

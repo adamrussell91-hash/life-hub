@@ -1153,6 +1153,105 @@ test('Job2: a superseded repair never touches memberships or the link\'s tempora
   assert.equal(final.created_at, link.created_at);
 });
 
+// --- Registry-controlled role editing: changeRole ---
+
+test('changeRole ends the current period and opens the next one with the new role, preserving history', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link: original } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    role: 'Gifted Education Teacher',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  const { ended, created } = await repo.changeRole(original.id, 'Head of Department', '2026-06-01T00:00:00.000Z', life);
+
+  assert.equal(ended.id, original.id);
+  assert.equal(ended.status, 'ended');
+  assert.equal(ended.valid_to, '2026-06-01T00:00:00.000Z');
+  assert.equal(ended.role, 'Gifted Education Teacher', 'the prior role stays queryable history, never overwritten');
+
+  assert.notEqual(created.id, original.id);
+  assert.equal(created.role, 'Head of Department');
+  assert.equal(created.status, 'current');
+  assert.equal(created.valid_from, '2026-06-01T00:00:00.000Z');
+
+  // Both periods remain readable via the same source.
+  const outgoing = await repo.listOutgoing(PERSON_REF, life);
+  const roles = outgoing.map((entry) => entry.link.role).sort();
+  assert.deepEqual(roles, ['Gifted Education Teacher', 'Head of Department']);
+});
+
+test('changeRole only applies to period relationships', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link: collaboratorLink } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+  await assert.rejects(
+    repo.changeRole(collaboratorLink.id, 'not allowed', '2026-06-01T00:00:00.000Z', life),
+    (e) => e.code === 'not_a_period_relationship'
+  );
+});
+
+test('changeRole is registry-controlled: an invalid role is rejected and the current period is left untouched', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link: original } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    role: 'Gifted Education Teacher',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  const beforeCount = (await repo.listOutgoing(PERSON_REF, life)).length;
+  await assert.rejects(repo.changeRole(original.id, 123, '2026-06-01T00:00:00.000Z', life), (e) => e.code === 'invalid_role');
+  const afterCount = (await repo.listOutgoing(PERSON_REF, life)).length;
+  assert.equal(afterCount, beforeCount, 'a rejected role change must not end the current period');
+  const stillCurrent = await repo.getLink(original.id, life);
+  assert.equal(stillCurrent.status, 'current');
+});
+
+test('changeRole recovers when the ending half already committed but the create half failed', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link: original } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    role: 'Gifted Education Teacher',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  let failed = false;
+  store._failNextMatching((key) => {
+    if (failed) return false;
+    if (key.startsWith('universal-links/links/') && !key.includes(original.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+
+  await assert.rejects(
+    repo.changeRole(original.id, 'Head of Department', '2026-06-01T00:00:00.000Z', life),
+    (e) => e.status === 503
+  );
+  store._clearFailure();
+
+  const endedNow = await repo.getLink(original.id, life);
+  assert.equal(endedNow.status, 'ended', 'the end half must have committed even though the create half failed');
+
+  // Retrying changeRole with the SAME arguments must not re-attempt endLink
+  // (which would otherwise reject an already-ended link) and must complete
+  // the create half.
+  const { ended, created } = await repo.changeRole(original.id, 'Head of Department', '2026-06-01T00:00:00.000Z', life);
+  assert.equal(ended.id, original.id);
+  assert.equal(created.role, 'Head of Department');
+  assert.equal(created.status, 'current');
+});
+
 // --- No module outside universal-link-repository.mjs writes Universal Link keys ---
 
 test('createUniversalLinkRepository is the only place these tests call setJSON/operationKey together to perform a write', () => {

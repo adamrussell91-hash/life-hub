@@ -166,6 +166,94 @@ describe('renderPersonPage', () => {
     expect(canvas.textContent).toMatch(/No historical relationships/);
   });
 
+  it('offers accessible role editing only for a current, period relationship', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          current_relationships: [
+            {
+              link: { id: 'l1', relationship_type: 'employee_at', status: 'current', temporal_mode: 'period', role: 'Gifted Education Teacher' },
+              endpoint: { ref: `shared:organisation:${ORG_ID}`, kind: 'organisation', display_label: 'Example University', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' },
+              direction: 'outgoing'
+            },
+            {
+              link: { id: 'l2', relationship_type: 'collaborator', status: 'current', temporal_mode: 'timeless', role: null },
+              endpoint: { ref: `shared:organisation:${ORG_ID}`, kind: 'organisation', display_label: 'Example University', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' },
+              direction: 'outgoing'
+            }
+          ]
+        })
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    const editButtons = [...canvas.querySelectorAll('button.entity-detail__role-edit')];
+    // Exactly one: the period relationship gets an edit control, the
+    // timeless one does not.
+    expect(editButtons.length).toBe(1);
+    expect(editButtons[0].getAttribute('aria-label')).toBe('Edit role for Example University');
+    expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Gifted Education Teacher');
+  });
+
+  it('saving a role edit calls change_role and reloads the overview', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ok: true,
+          data: personOverview({
+            current_relationships: [
+              {
+                link: { id: 'l1', relationship_type: 'employee_at', status: 'current', temporal_mode: 'period', role: 'Gifted Education Teacher' },
+                endpoint: { ref: `shared:organisation:${ORG_ID}`, kind: 'organisation', display_label: 'Example University', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' },
+                direction: 'outgoing'
+              }
+            ]
+          })
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ok: true,
+          data: { ended: { id: 'l1' }, created: { id: 'l4', role: 'Head of Department' } }
+        })
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          ok: true,
+          data: personOverview({
+            current_relationships: [
+              {
+                link: { id: 'l4', relationship_type: 'employee_at', status: 'current', temporal_mode: 'period', role: 'Head of Department' },
+                endpoint: { ref: `shared:organisation:${ORG_ID}`, kind: 'organisation', display_label: 'Example University', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' },
+                direction: 'outgoing'
+              }
+            ]
+          })
+        })
+      );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    canvas.querySelector<HTMLButtonElement>('button.entity-detail__role-edit')!.click();
+    const form = canvas.querySelector<HTMLFormElement>('.entity-detail__role-form')!;
+    expect(form.hidden).toBe(false);
+    const input = form.querySelector<HTMLInputElement>('input')!;
+    input.value = 'Head of Department';
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const patchCall = vi.mocked(fetch).mock.calls[1];
+    expect(String(patchCall[0])).toMatch(/action=change_role/);
+    expect(patchCall[1]?.method).toBe('PATCH');
+    expect(JSON.parse(String(patchCall[1]?.body)).role).toBe('Head of Department');
+
+    expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Head of Department');
+  });
+
   it('retries on a recoverable load failure', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(jsonResponse(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } }))

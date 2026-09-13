@@ -76,7 +76,7 @@ test('resolveTask projects title as display_label and status as lifecycle_status
     kind: 'task',
     display_label: 'Email Seth about the proposal',
     supporting_label: 'open',
-    href: null,
+    href: '/tasks/#/task/task_email_seth',
     lifecycle_status: 'open',
     visibility: 'operator'
   });
@@ -150,7 +150,7 @@ test('resolvePerson projects display_name as display_label, is_self as supportin
     kind: 'person',
     display_label: 'Seth Example',
     supporting_label: 'self',
-    href: null,
+    href: `/professional/#/person/${record.id}`,
     lifecycle_status: 'active',
     visibility: 'operator'
   });
@@ -219,7 +219,7 @@ test('resolveEntity dispatches tasks:task to real resolution', async () => {
   assert.equal(projection.kind, 'task');
 });
 
-test('resolveEntity 404s an unregistered kind (e.g. StudentReference) exactly like a missing record', async () => {
+test('resolveEntity keeps the protected StudentReference kind unavailable to the generic resolver', async () => {
   await assert.rejects(
     resolveEntity('teaching:student_reference:student_ref_ar1', tasksContext),
     error => error.status === 404 && error.code === 'endpoint_not_found'

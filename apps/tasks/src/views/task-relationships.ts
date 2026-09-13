@@ -131,7 +131,8 @@ export function renderTaskRelationshipsSection(taskId: string): TaskRelationship
           label: entry.endpoint.display_label,
           relationshipType: entry.link.relationship_type,
           state: 'saved' as const,
-          supportingLabel: entry.link.relationship_type
+          supportingLabel: entry.link.relationship_type,
+          href: entry.endpoint.href ?? null
         }));
       chipList.setChips([...saved, ...pending]);
     } catch (err) {

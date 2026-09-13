@@ -11,7 +11,8 @@
  *   relationshipType?: string | null,
  *   state: 'pending' | 'saved',
  *   supportingLabel?: string | null,
- *   readonly?: boolean
+ *   readonly?: boolean,
+ *   href?: string | null
  * }} EntityChipModel
  */
 
@@ -52,9 +53,17 @@ export function renderEntityChips(options) {
     if (chip.relationshipType) item.dataset.relationshipType = chip.relationshipType;
     if (chip.readonly) item.dataset.readonly = 'true';
 
-    const label = document.createElement('span');
+    // A chip backed by a resolved href opens the target's unified page —
+    // the same "clicking a chip opens the target's unified page" behaviour
+    // named for Tasks, Communications, Programs, etc. Only a server-
+    // resolved href is ever used; nothing here invents one.
+    const label = chip.href ? document.createElement('a') : document.createElement('span');
     label.className = 'entity-chip__label';
     label.textContent = chip.label;
+    if (chip.href) {
+      label.href = chip.href;
+      label.classList.add('entity-chip__label--link');
+    }
 
     const meta = document.createElement('span');
     meta.className = 'entity-chip__meta';
