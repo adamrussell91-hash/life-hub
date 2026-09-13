@@ -17,11 +17,9 @@ const VISIBILITY_STRICTNESS = ['operator', 'teaching_protected'];
 // from request JSON — a caller-supplied workflow would let a client widen
 // its own access.
 //
-// Slice 8 records the College approval gate (docs/universal-links/
-// student-reference-approval.md) for a narrow, synthetic-fixture-only
-// StudentReference implementation. That approval grants
-// `teaching_protected` only to the server-derived `teaching` workflow —
-// every other workflow stays operator-only, exactly as before.
+// `teaching_protected` is granted only to the server-derived `teaching`
+// workflow, for the narrow, synthetic-fixture-only StudentReference
+// implementation. Every other workflow stays operator-only.
 export function createAccessContext({ workflow, allowedEntityKinds = [] } = {}) {
   if (!KNOWN_WORKFLOWS.has(workflow)) {
     throw Object.assign(new Error(`Unknown workflow: ${workflow}`), { status: 400, code: 'invalid_workflow' });

@@ -230,7 +230,8 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         label: `${item.display_label} (${relationshipType})`,
         relationshipType,
         state: 'pending',
-        supportingLabel: relationshipType
+        supportingLabel: relationshipType,
+        href: item.href ?? null
       });
     }
   });
@@ -244,7 +245,8 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         label: item.display_label,
         relationshipType: 'related_to',
         state: 'pending',
-        supportingLabel: 'related_to'
+        supportingLabel: 'related_to',
+        href: item.href
       });
     }
   });

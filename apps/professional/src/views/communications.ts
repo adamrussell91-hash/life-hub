@@ -171,7 +171,8 @@ export async function renderCommunicationNewView(canvas: HTMLElement): Promise<v
         label: item.display_label,
         relationshipType: 'recipient',
         state: 'pending',
-        supportingLabel: item.supporting_label ?? null
+        supportingLabel: item.supporting_label ?? null,
+        href: item.href ?? null
       });
     }
   });

@@ -17,8 +17,7 @@ test('createAccessContext derives actor and allowed_visibility from workflow, no
 });
 
 test('only the server-derived teaching workflow grants teaching_protected', () => {
-  // The Slice 8 College approval gate (docs/universal-links/student-reference-approval.md)
-  // grants teaching_protected to the teaching workflow only.
+  // teaching_protected is granted to the teaching workflow only.
   const teaching = createAccessContext({ workflow: 'teaching' });
   assert.deepEqual(teaching.allowed_visibility, ['operator', 'teaching_protected']);
   for (const workflow of ['professional', 'tasks', 'knowledge', 'life', 'administration']) {

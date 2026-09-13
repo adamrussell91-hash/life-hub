@@ -262,3 +262,112 @@ test('student-references never surfaces via /api/entities/search or the generic 
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, 'invalid_kind');
 });
+
+// --- Basic rate limits, no-store on every response, strict field validation ---
+
+test('student-references and student-reference-search declare a basic Netlify platform rate limit, not a custom system', async () => {
+  const { config: referencesConfig } = await import('../../netlify/functions/student-references.mjs');
+  const { config: searchConfig } = await import('../../netlify/functions/student-reference-search.mjs');
+  assert.ok(referencesConfig.rateLimit);
+  assert.equal(referencesConfig.rateLimit.action, 'rate_limit');
+  assert.deepEqual(referencesConfig.rateLimit.aggregateBy, ['ip', 'domain']);
+  assert.ok(searchConfig.rateLimit);
+  assert.equal(searchConfig.rateLimit.action, 'rate_limit');
+});
+
+test('every student-references response carries cache-control: no-store, including errors and auth rejections', async () => {
+  const handler = createStudentReferencesHandler(baseDeps());
+  const unauthenticated = await handler(request({ cookie: false, url: 'https://api.adam-russell.com/api/student-references?id=x' }));
+  assert.equal(unauthenticated.headers.get('cache-control'), 'no-store');
+
+  const methodError = await handler(request({ method: 'PUT' }));
+  assert.equal(methodError.headers.get('cache-control'), 'no-store');
+
+  const actionError = await handler(request({ method: 'POST', body: { action: 'made_up' } }));
+  assert.equal(actionError.headers.get('cache-control'), 'no-store');
+
+  const created = await handler(request({ method: 'POST', body: { action: 'create', initials: 'wx' } }));
+  assert.equal(created.headers.get('cache-control'), 'no-store');
+});
+
+test('every student-reference-search response carries cache-control: no-store, including a rejected method', async () => {
+  const handler = createStudentReferenceSearchHandler(baseDeps());
+  const methodError = await handler(request({ method: 'GET', url: 'https://api.adam-russell.com/api/student-references/search' }));
+  assert.equal(methodError.headers.get('cache-control'), 'no-store');
+});
+
+test('strict field validation: an unexpected field on a known action is rejected before the repository is called', async () => {
+  const handler = createStudentReferencesHandler(baseDeps());
+  const response = await handler(
+    request({ method: 'POST', body: { action: 'create', initials: 'yz', unexpected_field: 'nope' } })
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_field');
+});
+
+test('strict field validation: a wrong-typed field is rejected', async () => {
+  const handler = createStudentReferencesHandler(baseDeps());
+  const response = await handler(
+    request({ method: 'POST', body: { action: 'create', initials: 123 } })
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_field');
+});
+
+test('strict field validation: an unexpected field on the search route is rejected', async () => {
+  const handler = createStudentReferenceSearchHandler(baseDeps());
+  const response = await handler(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/student-references/search',
+      body: { context_type: 'class', context_ref: 'teaching:class:class_synth_10e', unexpected: true }
+    })
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_field');
+});
+
+test('set_permission_status is one journalled retry-safe operation reachable over the route, and repair_set_permission_status resumes it', async () => {
+  const teachingStore = memoryStore();
+  const ulStore = memoryStore();
+  const handler = createStudentReferencesHandler(baseDeps({ teachingStore, ulStore, baseResolveEntity: fakeBaseResolveEntity }));
+
+  const created = (await (await handler(request({ method: 'POST', body: { action: 'create', initials: 'hi' } }))).json()).data;
+  const studentId = created.student.ref.split(':').pop();
+  await handler(
+    request({
+      method: 'POST',
+      body: {
+        action: 'assign',
+        student_id: studentId,
+        context_type: 'class',
+        context_ref: 'teaching:class:class_synth_10e',
+        valid_from: '2025-01-01T00:00:00.000Z'
+      }
+    })
+  );
+
+  const statusResponse = await handler(
+    request({
+      method: 'POST',
+      body: {
+        action: 'set_permission_status',
+        student_id: studentId,
+        context_type: 'class',
+        context_ref: 'teaching:class:class_synth_10e',
+        status: 'approved'
+      }
+    })
+  );
+  assert.equal(statusResponse.status, 200);
+  const body = (await statusResponse.json()).data;
+  assert.equal(body.ended.status, 'ended');
+  assert.equal(body.created.status, 'current');
+  assert.equal(body.created.metadata.permission_status, 'approved');
+
+  const repairResponse = await handler(
+    request({ method: 'POST', body: { action: 'repair_set_permission_status', operation_id: body.operation_id } })
+  );
+  assert.equal(repairResponse.status, 200);
+  assert.equal((await repairResponse.json()).data.repaired, false);
+});

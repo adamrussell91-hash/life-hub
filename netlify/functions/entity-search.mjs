@@ -28,16 +28,6 @@ const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 100;
 const MAX_RESULTS = 20;
 const READ_BATCH_SIZE = 10;
-// Hard cap on how many candidate records any one kind will hydrate per
-// search request, independent of how many index/candidate ids exist.
-// `matchRank` still runs against every hydrated candidate, but this bounds
-// the worst case (a store with thousands of records) to a fixed number of
-// Blob reads rather than growing unboundedly with store size.
-const MAX_CANDIDATES_PER_KIND = 200;
-
-function boundedCandidates(ids) {
-  return ids.length > MAX_CANDIDATES_PER_KIND ? ids.slice(0, MAX_CANDIDATES_PER_KIND) : ids;
-}
 
 // Task search (correction B6) uses the existing Tasks storage
 // (`tasks-hub-content`, via `_shared/tasks-blobs.mjs`) and a safe
@@ -66,15 +56,24 @@ function matchRank(query, label, sortName) {
 }
 
 // Search must never trust an index display label as authority (correction
-// B4). The identity index (`entities/index/<kind>/<id>`) is used only to
-// find candidate ids cheaply — every candidate that matches is then
-// hydrated and re-validated against its authoritative Person/Organisation
-// record, and the *authoritative* record's own current lifecycle status
-// and label decide visibility and ranking. This protects privacy if a
-// stale index survives a partial identity-write failure: a former active
-// name can never resurface through search just because an old index entry
-// was never repaired, and a record already redacted (deidentified/deleted)
-// can never appear even if its index entry is stale.
+// B4). The identity index (`entities/index/<kind>/<id>`) already carries a
+// `display_label`/`sort_name` cheaply, without loading the full
+// authoritative record — so ranking runs against the index FIRST, and only
+// candidates that already pass `matchRank` there go on to the expensive
+// authoritative hydration. This is the bounded, indexed candidate
+// selection: hydration work scales with how many candidates plausibly
+// match the query, not with how many records the store holds overall, and
+// — unlike a fixed hydration cap — it can never hide a valid match, since
+// every candidate whose CURRENT index entry matches is still considered
+// regardless of store size.
+//
+// The authoritative record is still the sole source of truth for
+// disclosure: every candidate that passes the index-level rank is
+// re-validated (and re-ranked) against its authoritative record below, so
+// a stale index entry can only ever cause an extra hydration, never a
+// privacy leak — a former active name can't resurface just because an old
+// index entry was never repaired, and a redacted (deidentified/deleted)
+// record can't appear even if its index entry is stale.
 async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived) {
   const indexKeys = await listKeys(store);
   const indexRecords = await mapBounded(indexKeys, READ_BATCH_SIZE, key => getJSON(store, key));
@@ -85,10 +84,12 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
     const entry = parseIdentityIndexRecord(raw);
     if (!entry || seen.has(entry.id)) continue;
     seen.add(entry.id);
+    const indexRank = matchRank(query, entry.display_label, kind === 'person' ? entry.sort_name : null);
+    if (indexRank === null) continue;
     candidateIds.push(entry.id);
   }
 
-  const hydrated = await mapBounded(boundedCandidates(candidateIds), READ_BATCH_SIZE, async id => {
+  const hydrated = await mapBounded(candidateIds, READ_BATCH_SIZE, async id => {
     const record = parseAuthoritative(await getJSON(store, loadKey(id)));
     if (!record) return null;
     const visible = record.lifecycle_status === 'active' || (includeArchived && record.lifecycle_status === 'archived');
@@ -114,7 +115,7 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
 async function searchTaskKind(getTasksStore, query) {
   const store = await getTasksStore();
   const ids = await readTaskIndex(store);
-  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, id => getTasksJSON(store, taskKey(id)));
+  const records = await mapBounded(ids, READ_BATCH_SIZE, id => getTasksJSON(store, taskKey(id)));
 
   const out = [];
   for (const record of records) {
@@ -146,7 +147,7 @@ async function searchApplicationKind(getProfessionalStore, query) {
         .filter(Boolean)
     )
   ];
-  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, async (id) =>
+  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
     parseApplicationRecord(await getProfessionalJSON(store, applicationKey(id)))
   );
 
@@ -174,7 +175,7 @@ async function searchApplicationKind(getProfessionalStore, query) {
 async function searchProgramKind(getTasksStore, query) {
   const store = await getTasksStore();
   const ids = await readIndex(store, 'programs/_index');
-  const records = await mapBounded(boundedCandidates(ids), READ_BATCH_SIZE, id =>
+  const records = await mapBounded(ids, READ_BATCH_SIZE, id =>
     getTasksJSON(store, programKey(id))
   );
   const out = [];
