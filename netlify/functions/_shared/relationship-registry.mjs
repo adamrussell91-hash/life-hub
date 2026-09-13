@@ -216,7 +216,8 @@ const REGISTRY = new Map([
         'tasks:project',
         'life:decision',
         'professional:meeting',
-        'professional:event'
+        'professional:event',
+        'professional:application'
       ],
       targetKinds: [
         'knowledge:page',
@@ -224,13 +225,63 @@ const REGISTRY = new Map([
         'tasks:project',
         'life:decision',
         'professional:meeting',
-        'professional:event'
+        'professional:event',
+        'professional:application'
       ],
       inverseLabel: 'related_to',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
       roleMode: 'none',
       metadataKeys: ['migration_source']
+    })
+  ],
+  [
+    'applicant_to',
+    declaration({
+      key: 'applicant_to',
+      sourceKinds: ['professional:application'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'receives_application',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    // Application hiring contact (distinct from task `contact`).
+    'application_contact',
+    declaration({
+      key: 'application_contact',
+      sourceKinds: ['professional:application'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'contact_for_application',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'optional_text'
+    })
+  ],
+  [
+    'referee',
+    declaration({
+      key: 'referee',
+      sourceKinds: ['professional:application'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'referees_for',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'application_action',
+    declaration({
+      key: 'application_action',
+      sourceKinds: ['tasks:task'],
+      targetKinds: ['professional:application'],
+      inverseLabel: 'has_application_action',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
     })
   ]
 ]);

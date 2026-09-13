@@ -1,7 +1,8 @@
 /**
- * Cross-store Task → Meeting/Event Universal Link journal.
- * Covers preparation, follow_up, and learning_for. Deterministic Task ids
- * when creating; existing Task ids when selecting. Retry never duplicates.
+ * Cross-store Task → Meeting/Event/Application Universal Link journal.
+ * Covers preparation, follow_up, learning_for, and application_action.
+ * Deterministic Task ids when creating; existing Task ids when selecting.
+ * Retry never duplicates.
  */
 import { createHash } from 'node:crypto';
 import { createAccessContext } from './entity-access.mjs';
@@ -24,7 +25,8 @@ const PREFIX = 'professional/task-link-operations/';
 const ALLOWED = Object.freeze({
   preparation: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
   follow_up: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
-  learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] }
+  learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] },
+  application_action: { targetKind: 'application', sourceKinds: ['tasks:task'] }
 });
 
 export function deriveProfessionalTaskLinkOperationId(parts) {
@@ -219,7 +221,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   /**
    * @param {{
    *   targetRef: string,
-   *   relationshipType: 'preparation'|'follow_up'|'learning_for',
+   *   relationshipType: 'preparation'|'follow_up'|'learning_for'|'application_action',
    *   title?: string,
    *   taskId?: string,
    *   operationSeed?: string
