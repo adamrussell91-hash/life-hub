@@ -11,7 +11,8 @@ import {
   organisationKey,
   personKey
 } from './_shared/universal-link-blobs.mjs';
-import { defaultGetTasksStore, getJSON as getTasksJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { defaultGetTasksStore, getJSON as getTasksJSON, programKey, readIndex, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { hrefForHubRef } from './_shared/hub-ref.mjs';
 import {
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON,
@@ -34,7 +35,7 @@ const READ_BATCH_SIZE = 10;
 // `universal-link-content`, and no new Task index is created: the
 // existing `tasks/_index` (`readTaskIndex`) is reused as-is.
 // Application search is opt-in via kinds=application (not in DEFAULT_KINDS).
-const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application']);
+const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application', 'program']);
 const DEFAULT_KINDS = ['person', 'organisation', 'task'];
 
 function normalize(value) {
@@ -158,6 +159,34 @@ async function searchApplicationKind(getProfessionalStore, query) {
   return out;
 }
 
+
+async function searchProgramKind(getTasksStore, query) {
+  const store = await getTasksStore();
+  const ids = await readIndex(store, 'programs/_index');
+  const records = await mapBounded(ids, READ_BATCH_SIZE, id =>
+    getTasksJSON(store, programKey(id))
+  );
+  const out = [];
+  for (const record of records) {
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    const label = typeof record.name === 'string' ? record.name : '';
+    const rank = matchRank(query, label, null);
+    if (rank === null) continue;
+    const href = hrefForHubRef({ hub: 'tasks', kind: 'program', id: record.id });
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'tasks', kind: 'program', id: record.id }),
+      kind: 'program',
+      display_label: label || record.id,
+      supporting_label: typeof record.organiser === 'string' ? record.organiser : null,
+      href,
+      lifecycle_status: 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
 export function createEntitySearchHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
   const getProfessionalStore = deps.getProfessionalStore ?? defaultGetProfessionalStore;
@@ -222,7 +251,8 @@ export function createEntitySearchHandler(deps = {}) {
         ? searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived)
         : [],
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
-      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : []
+      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
+      requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : []
     ]);
 
     // Exact prefix matches rank before token matches across every group
@@ -234,7 +264,7 @@ export function createEntitySearchHandler(deps = {}) {
       .slice(0, MAX_RESULTS)
       .map(({ rank, ...result }) => result); // eslint-disable-line no-unused-vars
 
-    const groups = { person: [], organisation: [], task: [], application: [] };
+    const groups = { person: [], organisation: [], task: [], application: [], program: [] };
     for (const result of ranked) groups[result.kind].push(result);
 
     return withCors(okResponse(200, { groups }), request, env);

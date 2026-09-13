@@ -15,12 +15,14 @@ import { isKnowledgeDualReadEnabled, isKnowledgeWriteCutoverEnabled } from './kn
 import {
   defaultGetTasksStore,
   getJSON as getTasksJSON,
-  projectKey
+  projectKey,
+  programKey
 } from './tasks-blobs.mjs';
 import {
   defaultGetContentStore as defaultGetTeachingStore,
   getJSON as getTeachingJSON,
-  unitKey
+  unitKey,
+  draftLessonKey
 } from './teaching-blobs.mjs';
 import { createAccessContext } from './entity-access.mjs';
 
@@ -131,6 +133,54 @@ export async function resolveLifeDecision(
     supportingLabel: null,
     href: hrefForHubRef(hubRef),
     lifecycleStatus: typeof record.status === 'string' ? record.status : 'active'
+  });
+}
+
+
+export async function resolveTasksProgram(
+  id,
+  accessContext,
+  { getStore = defaultGetTasksStore } = {}
+) {
+  if (typeof id !== 'string' || !REF_ID.test(id)) throw endpointNotFoundError();
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = await getTasksJSON(store, programKey(id));
+  if (!record || typeof record !== 'object') throw endpointNotFoundError();
+  const hubRef = { hub: 'tasks', kind: 'program', id };
+  return projection({
+    namespace: 'tasks',
+    kind: 'program',
+    id,
+    displayLabel: typeof record.name === 'string' && record.name ? record.name : id,
+    supportingLabel: typeof record.organiser === 'string' && record.organiser ? record.organiser : null,
+    href: hrefForHubRef(hubRef),
+    lifecycleStatus: 'active'
+  });
+}
+
+export async function resolveTeachingLesson(
+  id,
+  accessContext,
+  { getStore = defaultGetTeachingStore } = {}
+) {
+  if (typeof id !== 'string' || !REF_ID.test(id)) throw endpointNotFoundError();
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = await getTeachingJSON(store, draftLessonKey(id));
+  if (!record || typeof record !== 'object') throw endpointNotFoundError();
+  // Operator-safe projection only: never return blocks, student material, or homepage content.
+  const status = typeof record.status === 'string' ? record.status : 'active';
+  if (status === 'trashed' || status === 'deleted') throw endpointNotFoundError();
+  const hubRef = { hub: 'teaching', kind: 'lesson', id };
+  return projection({
+    namespace: 'teaching',
+    kind: 'lesson',
+    id,
+    displayLabel: typeof record.title === 'string' && record.title ? record.title : id,
+    supportingLabel: typeof record.unit_id === 'string' ? record.unit_id : null,
+    href: hrefForHubRef(hubRef),
+    lifecycleStatus: status
   });
 }
 

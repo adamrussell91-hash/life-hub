@@ -134,8 +134,8 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
         'p',
         'empty-state',
         labels.length
-          ? `Publication and Presentation are deferred (${labels.join(', ')}).`
-          : 'Publication and Presentation are deferred.'
+          ? `Publication and Presentation stay deferred — no authoritative store or active workflow yet (${labels.join(', ')}).`
+          : 'Publication and Presentation stay deferred — no authoritative store or active workflow yet.'
       )
     );
     canvas.append(deferred);
