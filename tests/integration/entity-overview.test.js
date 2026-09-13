@@ -4,6 +4,7 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
 import { createEntityOverviewHandler } from '../../netlify/functions/entity-overview.mjs';
 import { createUniversalLinksHandler } from '../../netlify/functions/universal-links.mjs';
+import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
 import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
@@ -53,6 +54,21 @@ function makeResolveEntity(store) {
   };
 }
 
+function tasksMemoryStore() {
+  const map = new Map();
+  return {
+    async get(key) {
+      return map.has(key) ? map.get(key) : null;
+    },
+    async setJSON(key, value) {
+      map.set(key, value);
+    },
+    async list({ prefix = '' } = {}) {
+      return { blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
+    }
+  };
+}
+
 function baseDeps(store, overrides = {}) {
   return {
     env,
@@ -60,6 +76,7 @@ function baseDeps(store, overrides = {}) {
     identityNow: () => '2026-08-01T01:00:00.000Z',
     repositoryNow: () => '2026-08-01T01:00:00.000Z',
     getContentStore: async () => store,
+    getTasksStore: async () => tasksMemoryStore(),
     resolveEntity: makeResolveEntity(store),
     ...overrides
   };
@@ -212,6 +229,69 @@ test('an archived entity still resolves through overview (a deliberate workflow)
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.data.entity.lifecycle_status, 'archived');
+});
+
+test('B5: overview preserves current and historical relationships for an archived Person, while ordinary reads still hide it', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+  const search = createEntitySearchHandler(deps);
+
+  const seth = await createPerson(entities);
+  const unsw = await createOrganisation(entities, 'Example University');
+  const second = await createOrganisation(entities, 'Second Org');
+
+  const link1 = await (await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: seth.ref, target_ref: unsw.ref, relationship_type: 'employee_at', valid_from: '2025-01-01T00:00:00.000Z' }
+  }))).json();
+  await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: { source_ref: seth.ref, target_ref: second.ref, relationship_type: 'member_of', valid_from: '2025-06-01T00:00:00.000Z' }
+  }));
+  await links(request({
+    url: `https://api.adam-russell.com/api/universal-links?id=${link1.data.link.id}&action=end`,
+    method: 'PATCH',
+    body: { valid_to: '2026-01-01T00:00:00.000Z' }
+  }));
+
+  await entities(request({
+    url: `https://api.adam-russell.com/api/entities?ref=${encodeURIComponent(seth.ref)}&action=archive`,
+    method: 'PATCH',
+    body: {}
+  }));
+
+  // Before the fix: entity-overview.mjs loaded the archived Person directly
+  // (bypassing the resolver's ordinary archived-hiding), but then called
+  // listForEntity with the *ordinary* resolver, which 404s the requested
+  // archived ref during its own initial authorisation check — so both
+  // outgoing and incoming came back empty even though the relationships
+  // were still there.
+  const response = await overview(request({ url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}` }));
+  const body = (await response.json()).data;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.entity.lifecycle_status, 'archived');
+  assert.equal(body.current_relationships.length, 1, 'the current member_of relationship must remain visible in the archived Person\'s own overview');
+  assert.equal(body.historical_relationships.length, 1, 'the ended employee_at relationship must remain visible');
+  assert.equal(body.timeline.length, 2, 'both timeline entries must remain visible');
+  assert.equal(body.linked_records.organisations.length, 2, 'the linked Organisation must remain visible');
+
+  // Ordinary Universal Link reads must still hide the archived Person: from
+  // UNSW's own (non-archived) perspective, its relationship to the now
+  // archived Seth must not appear.
+  const unswLinks = await (await links(request({
+    url: `https://api.adam-russell.com/api/universal-links?entity_ref=${encodeURIComponent(unsw.ref)}`
+  }))).json();
+  assert.equal(unswLinks.data.incoming.length, 0, 'ordinary Universal Link reads must not disclose a relationship to an archived Person');
+
+  // Ordinary entity search must still hide the archived Person by default.
+  const ordinarySearch = await (await search(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Seth' }))).json();
+  assert.equal(ordinarySearch.data.groups.person.length, 0, 'ordinary suggestions must not surface an archived Person');
 });
 
 test('rejects a ref for an unsupported kind', async () => {

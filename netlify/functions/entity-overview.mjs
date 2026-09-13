@@ -110,7 +110,21 @@ export function createEntityOverviewHandler(deps = {}) {
 
       const accessContext = createAccessContext({ workflow: 'life' });
       const repo = createRepository({ store, resolveEntity });
-      const { outgoing, incoming } = await repo.listForEntity(canonicalRef, accessContext);
+      // Overview is a deliberate archive-aware workflow (implementation
+      // programme, resolver rule 4) — `loadEntity` above already loads the
+      // requested Person/Organisation directly regardless of lifecycle
+      // status. `listForEntity` must be told the same thing explicitly:
+      // without `includeArchived`, its internal authorisation check on the
+      // *requested* ref would 404 an archived entity exactly like an
+      // ordinary suggestion does, and both directions would silently come
+      // back empty even though the record itself loaded fine (correction
+      // B5). This option reaches only the resolution of `canonicalRef`
+      // itself — every *other* endpoint a returned link resolves to (the
+      // Organisations, Tasks, People, etc. this entity is linked to) still
+      // goes through ordinary, non-archived resolution, so an archived
+      // entity's relationships stay invisible everywhere except its own
+      // overview.
+      const { outgoing, incoming } = await repo.listForEntity(canonicalRef, accessContext, { includeArchived: true });
 
       const entries = [
         ...outgoing.map(entry => ({ ...entry, direction: 'outgoing' })),
