@@ -143,6 +143,7 @@ test('deletion removes the record and memberships and leaves a non-identifying t
   const handler = createStudentReferencesHandler(deps(store, [id]));
   await post(handler, { action: 'create', initials: 'DE' });
   await post(handler, { action: 'assign', student_ref_id: id, context_type: 'coaching', context_id: 'COACHING_SYNTHETIC_1' });
+  await post(handler, { action: 'archive', student_ref_id: id });
   const response = await post(handler, { action: 'delete', student_ref_id: id });
   assert.equal(response.status, 200);
   const serialised = JSON.stringify([...store.map.values()]);
