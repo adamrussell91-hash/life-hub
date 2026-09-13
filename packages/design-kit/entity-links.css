@@ -1,0 +1,132 @@
+/* Shared entity picker + chips — tokens only. */
+
+.entity-picker {
+  position: relative;
+  z-index: 5;
+  margin-top: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-2);
+  max-width: 28rem;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.entity-picker__listbox {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-1);
+  gap: var(--space-1);
+}
+
+.entity-picker__group {
+  margin: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+}
+
+.entity-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.entity-picker__option:hover,
+.entity-picker__option--active {
+  background: var(--wash);
+}
+
+.entity-picker__option:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.entity-picker__option-label {
+  font-weight: var(--weight-medium);
+}
+
+.entity-picker__option-meta {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.entity-picker__empty {
+  margin: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.entity-picker__create {
+  margin: var(--space-2);
+}
+
+.entity-chips__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.entity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.entity-chip--pending {
+  border-style: dashed;
+}
+
+.entity-chip__label {
+  overflow-wrap: anywhere;
+  font-weight: var(--weight-medium);
+}
+
+.entity-chip__meta {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.entity-chip__action {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 var(--space-1);
+  line-height: 1;
+}
+
+.entity-chip__action:hover,
+.entity-chip__action:focus-visible {
+  color: var(--ink);
+}
+
+.entity-chip__action:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.entity-chips--empty {
+  display: none;
+}

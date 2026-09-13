@@ -164,6 +164,57 @@ test('saveKnowledgePage keeps Teaching and Tasks refs on connected', async () =>
   assert.deepEqual(manifest[0].connected, saved.connected);
 });
 
+test('after cutover a body edit preserves legacy connected and does not require UL cutover', async () => {
+  const previous = {
+    id: 'page_alpha',
+    title: 'Alpha',
+    body: 'old',
+    connected: ['page_beta', 'teaching:unit:unit_x'],
+    tags: [],
+    attachments: [],
+    area: 'notes',
+    source: 'hub',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1
+  };
+  const { files, fetchImpl } = memoryGithub({
+    'pages/page_alpha.json': { sha: 'p1', text: JSON.stringify(previous) },
+    'manifest.json': {
+      sha: 'man1',
+      text: JSON.stringify([
+        {
+          id: 'page_alpha',
+          title: 'Alpha',
+          area: 'notes',
+          tags: [],
+          excerpt: 'old',
+          created_at: previous.created_at,
+          path: 'pages/page_alpha.json',
+          connected: previous.connected
+        }
+      ])
+    }
+  });
+  const saved = await saveKnowledgePage(
+    {
+      id: 'page_alpha',
+      title: 'Alpha',
+      body: 'new body',
+      connected: []
+    },
+    {
+      env: { GITHUB_TOKEN: 'token', KNOWLEDGE_UNIVERSAL_LINKS_WRITE_CUTOVER: '1' },
+      fetchImpl,
+      nowIso: () => '2026-09-12T00:00:00.000Z'
+    }
+  );
+  assert.equal(saved.body, 'new body');
+  assert.deepEqual(saved.connected, ['page_beta', 'teaching:unit:unit_x']);
+  const stored = JSON.parse(files.get('pages/page_alpha.json').text);
+  assert.deepEqual(stored.connected, ['page_beta', 'teaching:unit:unit_x']);
+});
+
 test('saveKnowledgePage rejects an invalid connected ref', async () => {
   await assert.rejects(
     () => saveKnowledgePage(

@@ -21,11 +21,11 @@ export const ENTITY_REF_NAMESPACES = new Set([
 // a real workflow (implementation programme, "Absolute exclusions" #11).
 export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
-  professional: new Set(['communication']),
-  tasks: new Set(['task', 'project']),
-  teaching: new Set(),
-  knowledge: new Set(),
-  life: new Set()
+  professional: new Set(['communication', 'meeting', 'event', 'application']),
+  tasks: new Set(['task', 'project', 'program']),
+  teaching: new Set(['unit', 'lesson']),
+  knowledge: new Set(['page']),
+  life: new Set(['decision'])
 };
 
 export function isRegisteredEntityRefKind(namespace, kind) {

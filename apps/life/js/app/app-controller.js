@@ -5,6 +5,7 @@ import { renderTaskChecklist, renderTeachingAgenda } from '../shell/render-hub-w
 import { nextLessonFromCurriculum, todaysLessonsFromCurriculum } from '../shell/teaching-today.js';
 import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
+import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -96,6 +97,7 @@ export function createAppController(dependencies) {
     teachingApi,
     knowledgeApi,
     tasksApi,
+    scheduleApi,
     shortcutsApi,
     renderShortcuts,
     skincareController,
@@ -167,6 +169,8 @@ export function createAppController(dependencies) {
   let cnPanelsInFlight = null;
   let tasksEvents = [];
   let tasksCalendarInFlight = null;
+  let professionalEvents = [];
+  let professionalCalendarInFlight = null;
   let hubPulseInFlight = null;
   let latestOpenTasks = [];
   let bodyRange = 'six_month';
@@ -768,7 +772,8 @@ export function createAppController(dependencies) {
     return Promise.all([
       loadTeachingCalendar(),
       loadKnowledgeCalendar(),
-      loadTasksCalendar()
+      loadTasksCalendar(),
+      loadProfessionalCalendar()
     ]);
   }
 
@@ -852,6 +857,24 @@ export function createAppController(dependencies) {
         if (currentSection === 'calendar') renderCalendarSection();
       });
     return tasksCalendarInFlight;
+  }
+
+  function loadProfessionalCalendar() {
+    if (!scheduleApi?.listScheduleProjections) return Promise.resolve();
+    if (professionalCalendarInFlight) return professionalCalendarInFlight;
+    professionalCalendarInFlight = scheduleApi
+      .listScheduleProjections()
+      .then((result) => {
+        professionalEvents = professionalEventsFromProjections(result?.projections ?? []);
+      })
+      .catch(() => {
+        professionalEvents = [];
+      })
+      .finally(() => {
+        professionalCalendarInFlight = null;
+        if (currentSection === 'calendar') renderCalendarSection();
+      });
+    return professionalCalendarInFlight;
   }
 
   function protectedWindowsForCalendar(selectedDate) {
@@ -1262,7 +1285,13 @@ export function createAppController(dependencies) {
       calendarView = 'day';
     }
     const model = buildCalendarModel({
-      events: [...(latestResult.events ?? []), ...teachingEvents, ...knowledgeEvents, ...tasksEvents],
+      events: [
+        ...(latestResult.events ?? []),
+        ...teachingEvents,
+        ...knowledgeEvents,
+        ...tasksEvents,
+        ...professionalEvents
+      ],
       date,
       selectedDate: calendarSelectedDate,
       viewMonth: calendarViewMonth,
@@ -1642,6 +1671,8 @@ export function createAppController(dependencies) {
     cnPanelsInFlight = null;
     tasksEvents = [];
     tasksCalendarInFlight = null;
+    professionalEvents = [];
+    professionalCalendarInFlight = null;
     hubPulseInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();

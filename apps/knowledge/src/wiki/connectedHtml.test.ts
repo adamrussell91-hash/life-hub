@@ -39,4 +39,29 @@ describe("connectedLinksHtml", () => {
     expect(html).toContain("Decision aotfw-sources");
     expect(html).not.toContain("data-open-page=\"life:decision:aotfw-sources\"");
   });
+
+  it("shows an unavailable state when dual-read relationships failed", () => {
+    const html = connectedLinksHtml(
+      { connected: ["page_stale"] },
+      [{ id: "page_stale", title: "Stale" }],
+      { relationshipsStatus: "unavailable" },
+    );
+    expect(html).toContain("Related pages are unavailable.");
+    expect(html).not.toContain("Stale");
+  });
+
+  it("prefers dual-read relationship rows over legacy connected", () => {
+    const html = connectedLinksHtml(
+      { connected: ["page_legacy"] },
+      [
+        { id: "page_legacy", title: "Legacy" },
+        { id: "page_canonical", title: "Canonical" },
+      ],
+      {
+        relationships: [{ legacy_hub_ref: "page_canonical", target_ref: "knowledge:page:page_canonical" }],
+      },
+    );
+    expect(html).toContain("Canonical");
+    expect(html).not.toContain("Legacy");
+  });
 });
