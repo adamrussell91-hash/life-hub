@@ -137,7 +137,7 @@ const FOOD = new Set([
   'eat', 'ate', 'eaten', 'meal', 'meals', 'nutrition', 'calorie', 'calories',
   'macro', 'macros', 'adherence', 'logged', 'protein', 'diet', 'food',
   'eating', 'intake', 'targets', 'target', 'remaining', 'left', 'miss',
-  'hitting', 'lately', 'breakfast', 'lunch', 'dinner', 'snack', 'week'
+  'hitting', 'lately', 'breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'week'
 ]);
 const SKIN = new Set([
   'skin', 'routine', 'helping', 'product', 'flare', 'breakout', 'skincare',

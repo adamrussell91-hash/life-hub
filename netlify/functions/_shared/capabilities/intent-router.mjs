@@ -47,16 +47,23 @@ const KEYWORD_HINTS = [
   },
   {
     ids: ['lookup.food-brand-au', 'lookup.save-food-library', 'log.entry'],
-    patterns: [/log (?:my |a )?meal/i, /calories/i, /macros/i, /\bate\b/i, /food library/i]
+    patterns: [
+      /log (?:my |a )?(?:meal|snack|dessert|breakfast|lunch|dinner)/i,
+      /calories/i,
+      /macros/i,
+      /\bate\b/i,
+      /\bdessert\b/i,
+      /food library/i
+    ]
   },
   {
     ids: ['log.delete-meal'],
     patterns: [
-      /delete (?:the |my |this |that )?(?:meal|snack|breakfast|lunch|dinner|log|entry|duplicate)/i,
-      /remove (?:the |my |this |that )?(?:meal|snack|breakfast|lunch|dinner|log|entry|duplicate)/i,
-      /undo (?:the |my |this |that )?(?:meal|snack|log)/i,
-      /clear (?:the |my |this |that )?(?:meal|snack|duplicate)/i,
-      /duplicate (?:meal|snack|entry|log)/i
+      /delete (?:the |my |this |that )?(?:meal|snack|dessert|breakfast|lunch|dinner|log|entry|duplicate)/i,
+      /remove (?:the |my |this |that )?(?:meal|snack|dessert|breakfast|lunch|dinner|log|entry|duplicate)/i,
+      /undo (?:the |my |this |that )?(?:meal|snack|dessert|log)/i,
+      /clear (?:the |my |this |that )?(?:meal|snack|dessert|duplicate)/i,
+      /duplicate (?:meal|snack|dessert|entry|log)/i
     ]
   },
   {

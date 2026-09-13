@@ -215,7 +215,7 @@ export function searchNutritionRecords(records, { query, limit = DEFAULT_LIMIT }
 function focusNutritionQuery(query = '') {
   const text = String(query ?? '');
   const food = (text.match(
-    /\b(protein|meal|meals|calorie|calories|macro|macros|egg|eggs|bowl|lunch|dinner|breakfast|snack|fat|carb|carbs)\b/gi
+    /\b(protein|meal|meals|calorie|calories|macro|macros|egg|eggs|bowl|lunch|dinner|breakfast|snack|dessert|fat|carb|carbs)\b/gi
   ) || []).map(w => w.toLowerCase());
   if (!food.length) {
     const stop = new Set([
