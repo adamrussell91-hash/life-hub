@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { assertValidTimeZone } from './wall-time.mjs';
 
 // Meeting records for Professional Hub (`professional-hub-content`).
 // Relationships live only as Universal Links — never store Person, Task,
@@ -197,7 +198,9 @@ export function validateMeetingCreateInput(input) {
     throw validationError('invalid_scheduled_end', 'scheduled_end must be a valid ISO timestamp.');
   }
   assertTimeOrder(input.scheduled_start, input.scheduled_end);
-  const time_zone = trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false });
+  const time_zone = assertValidTimeZone(
+    trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
+  );
   const links = input.links === undefined ? [] : input.links;
   if (!Array.isArray(links)) {
     throw validationError('invalid_links', 'links must be an array.');
@@ -262,7 +265,9 @@ export function validateMeetingRescheduleInput(input) {
     throw validationError('invalid_scheduled_end', 'scheduled_end must be a valid ISO timestamp.');
   }
   assertTimeOrder(input.scheduled_start, input.scheduled_end);
-  const time_zone = trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false });
+  const time_zone = assertValidTimeZone(
+    trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
+  );
   return {
     scheduled_start: input.scheduled_start,
     scheduled_end: input.scheduled_end,

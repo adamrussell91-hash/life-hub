@@ -123,6 +123,130 @@ describe('renderMeetingNewView', () => {
   });
 });
 
+describe('renderMeetingDetailView task flows', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({
+          ok: true,
+          data: {
+            outgoing: [
+              {
+                link: {
+                  id: 'ul_attendee',
+                  relationship_type: 'attendee',
+                  status: 'current',
+                  source_ref: `professional:meeting:${VALID_MEETING_ID}`,
+                  target_ref: 'shared:person:person_1'
+                },
+                endpoint: { ref: 'shared:person:person_1', kind: 'person', display_label: 'Seth' }
+              }
+            ],
+            incoming: []
+          }
+        });
+      }
+      if (href.includes('action=link-task')) {
+        return Response.json({
+          ok: true,
+          data: {
+            meeting: {
+              schema_version: 1,
+              id: VALID_MEETING_ID,
+              title: 'Seth planning',
+              scheduled_start: '2026-09-15T01:00:00.000Z',
+              scheduled_end: '2026-09-15T02:00:00.000Z',
+              time_zone: 'Australia/Sydney',
+              location_text: null,
+              agenda: null,
+              notes: null,
+              state: 'scheduled',
+              occurrence_history: [],
+              created_at: '2026-09-01T10:00:00.000Z',
+              updated_at: '2026-09-01T10:00:00.000Z',
+              preparation_operation: {
+                operation_id: 'ptl_prep',
+                status: 'committed',
+                task_id: 'task_ptl_1',
+                relationship_type: 'preparation',
+                completed_intent_ids: [],
+                completed_link_ids: [],
+                failed_intent_ids: [],
+                pending_intent_ids: []
+              }
+            },
+            operation: {
+              operation_id: 'ptl_prep',
+              status: 'committed',
+              task_id: 'task_ptl_1',
+              relationship_type: 'preparation',
+              completed_intent_ids: [],
+              completed_link_ids: [],
+              failed_intent_ids: [],
+              pending_intent_ids: []
+            }
+          }
+        });
+      }
+      return Response.json({
+        ok: true,
+        data: {
+          meeting: {
+            schema_version: 1,
+            id: VALID_MEETING_ID,
+            title: 'Seth planning',
+            scheduled_start: '2026-09-15T01:00:00.000Z',
+            scheduled_end: '2026-09-15T02:00:00.000Z',
+            time_zone: 'Australia/Sydney',
+            location_text: null,
+            agenda: null,
+            notes: null,
+            state: 'scheduled',
+            occurrence_history: [],
+            created_at: '2026-09-01T10:00:00.000Z',
+            updated_at: '2026-09-01T10:00:00.000Z'
+          }
+        }
+      });
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('shows preparation and follow-up Task controls and posts link-task', async () => {
+    const { renderMeetingDetailView } = await import('@/views/meetings');
+    const canvas = document.createElement('div');
+    await renderMeetingDetailView(canvas, VALID_MEETING_ID);
+    expect(canvas.textContent).toMatch(/Preparation Task/);
+    expect(canvas.textContent).toMatch(/Follow-up Task/);
+    const prepSubmit = canvas.querySelector(
+      '[data-task-link-submit="preparation"]'
+    ) as HTMLButtonElement;
+    expect(prepSubmit).toBeTruthy();
+    const title = [...canvas.querySelectorAll('input')].find(
+      (input) => input.getAttribute('aria-label') === 'Preparation Task title'
+    ) as HTMLInputElement;
+    title.value = 'Prep notes';
+    prepSubmit.click();
+    await vi.waitFor(() => {
+      expect(String(vi.mocked(fetch).mock.calls.map((c) => String(c[0])).join('\n'))).toMatch(
+        /action=link-task/
+      );
+    });
+    const linkCall = vi.mocked(fetch).mock.calls.find((call) => String(call[0]).includes('link-task'));
+    expect(JSON.parse(String(linkCall?.[1]?.body))).toMatchObject({
+      relationship_type: 'preparation',
+      title: 'Prep notes'
+    });
+  });
+});
+
 describe('renderEventsView', () => {
   const originalFetch = globalThis.fetch;
 

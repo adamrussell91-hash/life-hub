@@ -97,3 +97,41 @@ export function isMeetingIncompleteLinksError(err: unknown): err is ApiClientErr
     typeof (err as ApiClientError & { data?: unknown }).data === 'object'
   );
 }
+
+export interface TaskLinkOperation {
+  operation_id: string;
+  status: string;
+  task_id: string | null;
+  title?: string | null;
+  relationship_type: string;
+  completed_intent_ids: string[];
+  completed_link_ids: string[];
+  failed_intent_ids: string[];
+  pending_intent_ids: string[];
+}
+
+export function linkMeetingTask(
+  id: string,
+  body: { relationship_type: 'preparation' | 'follow_up'; title?: string; task_id?: string },
+  options: { signal?: AbortSignal } = {}
+): Promise<{ meeting: MeetingRecord; operation: TaskLinkOperation }> {
+  const params = new URLSearchParams({ id, action: 'link-task' });
+  return apiPost(`/api/meetings?${params.toString()}`, body, { signal: options.signal });
+}
+
+export function retryMeetingTaskLink(
+  id: string,
+  operationId: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ meeting: MeetingRecord; operation: TaskLinkOperation }> {
+  const params = new URLSearchParams({ id, action: 'retry-task-link' });
+  return apiPost(`/api/meetings?${params.toString()}`, { operation_id: operationId }, {
+    signal: options.signal
+  });
+}
+
+export function isMeetingTaskLinkIncompleteError(err: unknown): err is ApiClientError & {
+  data: { operation_id: string; task_id?: string | null };
+} {
+  return err instanceof ApiClientError && err.code === 'professional_task_link_incomplete';
+}

@@ -188,6 +188,8 @@ export interface MeetingRecord {
   created_at: string;
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
+  preparation_operation?: FollowUpOperationProjection | null;
+  follow_up_operation?: FollowUpOperationProjection | null;
 }
 
 export type EventOccurrenceState = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
@@ -217,4 +219,5 @@ export interface EventRecord {
   created_at: string;
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
+  learning_operation?: FollowUpOperationProjection | null;
 }

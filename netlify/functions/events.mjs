@@ -10,6 +10,8 @@ import {
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
+import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
+import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 
 export const config = { path: '/api/events' };
 
@@ -33,10 +35,11 @@ function toErrorResponse(error) {
   const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
   const retryable = Boolean(error?.retryable) || status === 503;
   const data =
-    error?.event_id || error?.operation_id
+    error?.event_id || error?.operation_id || error?.task_id
       ? {
           event_id: error.event_id ?? null,
           operation_id: error.operation_id ?? null,
+          task_id: error.task_id ?? null,
           completed_link_ids: error.completed_link_ids ?? [],
           failed_intent_ids: error.failed_intent_ids ?? []
         }
@@ -72,6 +75,9 @@ export function createEventsHandler(deps = {}) {
   const createRepository = deps.createEventRepository ?? createEventRepository;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
   const getUniversalLinkStore = deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
+  const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
+  const createTaskLinkRepository =
+    deps.createProfessionalTaskLinkOperationRepository ?? createProfessionalTaskLinkOperationRepository;
 
   return createOperatorHandler(
     async (request, context) => {
@@ -98,12 +104,35 @@ export function createEventsHandler(deps = {}) {
         createUniversalLinkRepository: deps.createUniversalLinkRepository
       });
 
+      const taskLinks = createTaskLinkRepository({
+        store,
+        now: eventNow,
+        resolveEntity,
+        getUniversalLinkStore,
+        getTasksStore,
+        createUniversalLinkRepository: deps.createUniversalLinkRepository,
+        env
+      });
+
       try {
         if (request.method === 'GET') {
           if (url.searchParams.has('id')) {
             const id = readId(url);
             const event = await repo.getEvent(id);
-            return withCors(okResponse(200, { event }), request, env);
+            const learning_operation = await taskLinks.loadForTarget(
+              `professional:event:${id}`,
+              'learning_for'
+            );
+            return withCors(
+              okResponse(200, {
+                event: {
+                  ...event,
+                  ...(learning_operation ? { learning_operation } : {})
+                }
+              }),
+              request,
+              env
+            );
           }
           const events = await repo.listEvents();
           return withCors(okResponse(200, { events }), request, env);
@@ -115,6 +144,45 @@ export function createEventsHandler(deps = {}) {
             const id = readId(url);
             const result = await repo.retryLinks(id);
             return withCors(okResponse(200, result), request, env);
+          }
+          if (action === 'link-task') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            if (parsed.value?.relationship_type !== 'learning_for') {
+              return withCors(
+                errorResponse(400, 'invalid_relationship_type', 'relationship_type must be learning_for.', false),
+                request,
+                env
+              );
+            }
+            await repo.getEvent(id);
+            const result = await taskLinks.linkTask({
+              targetRef: `professional:event:${id}`,
+              relationshipType: 'learning_for',
+              title: parsed.value?.title,
+              taskId: parsed.value?.task_id
+            });
+            const event = await repo.getEvent(id);
+            return withCors(okResponse(200, { event, operation: result.operation }), request, env);
+          }
+          if (action === 'retry-task-link') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            const operationId = parsed.value?.operation_id;
+            if (typeof operationId !== 'string' || !operationId) {
+              return withCors(
+                errorResponse(400, 'missing_operation_id', 'operation_id is required.', false),
+                request,
+                env
+              );
+            }
+            const result = await taskLinks.retry(operationId);
+            const event = await repo.getEvent(id);
+            return withCors(okResponse(200, { event, operation: result.operation }), request, env);
           }
           if (action === 'reschedule') {
             const id = readId(url);

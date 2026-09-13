@@ -5,10 +5,13 @@ import {
   createMeeting,
   getMeeting,
   isMeetingIncompleteLinksError,
+  isMeetingTaskLinkIncompleteError,
+  linkMeetingTask,
   listMeetings,
   meetingStateAction,
   rescheduleMeeting,
   retryMeetingLinks,
+  retryMeetingTaskLink,
   updateMeeting
 } from '@/api/meetings';
 import { searchEntities } from '@/api/entities';
@@ -16,6 +19,12 @@ import { ApiClientError } from '@/api/client';
 import { meetingRoute } from '@/app/router';
 import type { MeetingRecord } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
+import {
+  loadEntityRelationships,
+  mountTaskLinkPanel,
+  renderRelationshipSection
+} from '@/components/schedule-relationships';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -28,9 +37,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function toLocalInput(iso: string): string {
-  const date = new Date(iso);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+function defaultZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
 }
 
 export async function renderMeetingsView(canvas: HTMLElement): Promise<void> {
@@ -110,13 +118,14 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
   end.required = true;
   end.setAttribute('aria-label', 'Ends');
   const now = new Date();
-  start.value = toLocalInput(now.toISOString());
-  end.value = toLocalInput(new Date(now.getTime() + 60 * 60_000).toISOString());
+  const zone = defaultZone();
+  start.value = utcIsoToWallLocal(now.toISOString(), zone);
+  end.value = utcIsoToWallLocal(new Date(now.getTime() + 60 * 60_000).toISOString(), zone);
 
   const timeZone = document.createElement('input');
   timeZone.type = 'text';
   timeZone.name = 'time_zone';
-  timeZone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
+  timeZone.value = zone;
   timeZone.setAttribute('aria-label', 'Time zone');
 
   const locationField = document.createElement('input');
@@ -216,7 +225,23 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
     event.preventDefault();
     status.hidden = true;
     save.disabled = true;
-    const scheduledStart = new Date(start.value).toISOString();
+    if (!isValidTimeZone(timeZone.value)) {
+      status.hidden = false;
+      status.textContent = 'Enter a valid IANA time zone.';
+      save.disabled = false;
+      return;
+    }
+    let scheduledStart: string;
+    let scheduledEnd: string;
+    try {
+      scheduledStart = wallLocalToUtcIso(start.value, timeZone.value);
+      scheduledEnd = wallLocalToUtcIso(end.value, timeZone.value);
+    } catch (err) {
+      status.hidden = false;
+      status.textContent = err instanceof Error ? err.message : 'Invalid date.';
+      save.disabled = false;
+      return;
+    }
     const pending = chipList.getChips().filter((chip) => chip.state === 'pending');
     const links = pending.map((chip) => ({
       target_ref: chip.ref,
@@ -228,7 +253,7 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
       const result = await createMeeting({
         title: title.value,
         scheduled_start: scheduledStart,
-        scheduled_end: new Date(end.value).toISOString(),
+        scheduled_end: scheduledEnd,
         time_zone: timeZone.value,
         location_text: locationField.value || null,
         agenda: agenda.value || null,
@@ -339,11 +364,11 @@ export async function renderMeetingDetailView(
     rescheduleForm.className = 'meeting-detail__reschedule';
     const newStart = document.createElement('input');
     newStart.type = 'datetime-local';
-    newStart.value = toLocalInput(record.scheduled_start);
+    newStart.value = utcIsoToWallLocal(record.scheduled_start, record.time_zone);
     newStart.setAttribute('aria-label', 'New start');
     const newEnd = document.createElement('input');
     newEnd.type = 'datetime-local';
-    newEnd.value = toLocalInput(record.scheduled_end);
+    newEnd.value = utcIsoToWallLocal(record.scheduled_end, record.time_zone);
     newEnd.setAttribute('aria-label', 'New end');
     const reason = document.createElement('input');
     reason.type = 'text';
@@ -356,8 +381,8 @@ export async function renderMeetingDetailView(
       event.preventDefault();
       void runAction('Reschedule', () =>
         rescheduleMeeting(record.id, {
-          scheduled_start: new Date(newStart.value).toISOString(),
-          scheduled_end: new Date(newEnd.value).toISOString(),
+          scheduled_start: wallLocalToUtcIso(newStart.value, record.time_zone),
+          scheduled_end: wallLocalToUtcIso(newEnd.value, record.time_zone),
           time_zone: record.time_zone,
           reason: reason.value || null
         })
@@ -384,7 +409,99 @@ export async function renderMeetingDetailView(
       );
     });
 
-    canvas.append(back, facts, actions, actionStatus, rescheduleForm, edit);
+    const relationships = el('section', 'meeting-detail__relationships');
+    relationships.append(el('p', undefined, 'Loading relationships…'));
+
+    const taskPanels = el('div', 'meeting-detail__task-panels');
+    mountTaskLinkPanel({
+      host: taskPanels,
+      heading: 'Preparation Task',
+      relationshipType: 'preparation',
+      incompleteOperationId:
+        record.preparation_operation?.status === 'incomplete'
+          ? record.preparation_operation.operation_id
+          : null,
+      statusMessage:
+        record.preparation_operation?.status === 'committed'
+          ? `Preparation Task ${record.preparation_operation.task_id}`
+          : record.preparation_operation?.status === 'incomplete'
+            ? 'Preparation link incomplete.'
+            : null,
+      onSubmit: async (input) => {
+        try {
+          const result = await linkMeetingTask(record.id, {
+            relationship_type: 'preparation',
+            ...input
+          });
+          paint(result.meeting);
+        } catch (err) {
+          if (isMeetingTaskLinkIncompleteError(err)) {
+            await load();
+            return;
+          }
+          throw err;
+        }
+      },
+      onRetry: async (operationId) => {
+        const result = await retryMeetingTaskLink(record.id, operationId);
+        paint(result.meeting);
+      }
+    });
+    mountTaskLinkPanel({
+      host: taskPanels,
+      heading: 'Follow-up Task',
+      relationshipType: 'follow_up',
+      incompleteOperationId:
+        record.follow_up_operation?.status === 'incomplete'
+          ? record.follow_up_operation.operation_id
+          : null,
+      statusMessage:
+        record.follow_up_operation?.status === 'committed'
+          ? `Follow-up Task ${record.follow_up_operation.task_id}`
+          : record.follow_up_operation?.status === 'incomplete'
+            ? 'Follow-up link incomplete.'
+            : null,
+      onSubmit: async (input) => {
+        try {
+          const result = await linkMeetingTask(record.id, {
+            relationship_type: 'follow_up',
+            ...input
+          });
+          paint(result.meeting);
+        } catch (err) {
+          if (isMeetingTaskLinkIncompleteError(err)) {
+            await load();
+            return;
+          }
+          throw err;
+        }
+      },
+      onRetry: async (operationId) => {
+        const result = await retryMeetingTaskLink(record.id, operationId);
+        paint(result.meeting);
+      }
+    });
+
+    canvas.append(back, facts, actions, actionStatus, rescheduleForm, edit, relationships, taskPanels);
+
+    void loadEntityRelationships(`professional:meeting:${record.id}`)
+      .then((entries) => {
+        renderRelationshipSection(
+          relationships,
+          entries,
+          'No attendees, preparation, or follow-up links yet.'
+        );
+      })
+      .catch((err) => {
+        relationships.replaceChildren(
+          el('h2', undefined, 'Relationships'),
+          el(
+            'p',
+            'empty-state',
+            err instanceof ApiClientError ? err.message : 'Relationships unavailable.'
+          )
+        );
+      });
 
     if (record.incomplete_links) {
       const incomplete = el('section', 'meeting-detail__incomplete');
