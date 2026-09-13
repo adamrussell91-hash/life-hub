@@ -31,7 +31,9 @@ const NAV: NavItem[] = [
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
   { id: 'communications', label: 'Communications', href: '#/communications' },
   { id: 'meetings', label: 'Meetings', href: '#/meetings' },
-  { id: 'events', label: 'Events', href: '#/events' }
+  { id: 'events', label: 'Events', href: '#/events' },
+  { id: 'applications', label: 'Applications', href: '#/applications' },
+  { id: 'career', label: 'Career', href: '#/career' }
 ];
 
 export function viewChrome(view: RailViewId): { eyebrow: string; title: string } {

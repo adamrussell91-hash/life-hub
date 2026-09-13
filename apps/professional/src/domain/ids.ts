@@ -12,6 +12,7 @@ const ORGANISATION_ID_PATTERN = /^organisation_[0-9a-f-]{36}$/;
 const COMMUNICATION_ID_PATTERN = /^communication_[0-9a-f-]{36}$/;
 const MEETING_ID_PATTERN = /^meeting_[0-9a-f-]{36}$/;
 const EVENT_ID_PATTERN = /^event_[0-9a-f-]{36}$/;
+const APPLICATION_ID_PATTERN = /^application_[0-9a-f-]{36}$/;
 
 export function isValidPersonId(id: string): boolean {
   return PERSON_ID_PATTERN.test(id);
@@ -33,6 +34,10 @@ export function isValidEventId(id: string): boolean {
   return EVENT_ID_PATTERN.test(id);
 }
 
+export function isValidApplicationId(id: string): boolean {
+  return APPLICATION_ID_PATTERN.test(id);
+}
+
 export function personRef(id: string): string {
   return `shared:person:${id}`;
 }
@@ -51,6 +56,10 @@ export function meetingRef(id: string): string {
 
 export function eventRef(id: string): string {
   return `professional:event:${id}`;
+}
+
+export function applicationRef(id: string): string {
+  return `professional:application:${id}`;
 }
 
 export function parseSharedRef(ref: string): { kind: 'person' | 'organisation'; id: string } | null {
