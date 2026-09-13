@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMeetingsView, renderMeetingNewView } from '@/views/meetings';
-import { renderEventsView } from '@/views/events';
+import { renderEventNewView, renderEventsView } from '@/views/events';
 import { parseRoute, railHighlightFor, meetingRoute, eventRoute } from '@/app/router';
 
 const VALID_MEETING_ID = 'meeting_00000000-0000-4000-8000-000000000010';
@@ -167,5 +167,37 @@ describe('renderEventsView', () => {
     await renderEventsView(canvas);
     expect(canvas.textContent).toMatch(/Gifted education PD/);
     expect(canvas.textContent).toMatch(/professional development/i);
+  });
+});
+
+describe('renderEventNewView', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        data: { groups: { person: [], organisation: [], task: [] } }
+      })
+    );
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('renders location, all-day, certificate, and knowledge picker controls', async () => {
+    const canvas = document.createElement('div');
+    await renderEventNewView(canvas);
+    expect(canvas.querySelector('form.event-form')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Location"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="All day"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Certificate name"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Certificate reference"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Certificate issued at"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Related knowledge page"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Hours"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Organisation link"]')).toBeTruthy();
   });
 });
