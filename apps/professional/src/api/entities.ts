@@ -1,5 +1,5 @@
 import { apiGet } from './client';
-import type { EntityOverview, SearchGroups } from '@/domain/types';
+import type { EntityOverview, SearchableEntityKind, SearchGroups } from '@/domain/types';
 
 export interface SearchOptions {
   signal?: AbortSignal;
@@ -8,7 +8,7 @@ export interface SearchOptions {
 /** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */
 export function searchEntities(
   query: string,
-  kinds: string,
+  kinds: SearchableEntityKind,
   options: SearchOptions = {}
 ): Promise<{ groups: SearchGroups }> {
   const params = new URLSearchParams({ q: query, kinds });

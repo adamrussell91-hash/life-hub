@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
 import {
   ENTITY_REF_KINDS,
@@ -7,169 +8,263 @@ import {
   parseEntityRef
 } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { resolveEntity } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import {
+  validateRelationshipInput
+} from '../../netlify/functions/_shared/relationship-registry.mjs';
 import { programKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
-import { draftLessonKey, classKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
+import { draftLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
 
+const SECRET = 's'.repeat(32);
+const NOW = Date.parse('2026-08-01T01:00:00Z');
+const env = {
+  LIFE_HUB_PASSPHRASE_HASH: 'configured',
+  SESSION_SECRET: SECRET,
+  SITE_ORIGIN: 'https://life-hub.adam-russell.com'
+};
+const session = createSessionToken(
+  { now: Date.parse('2026-08-01T00:00:00Z'), randomBytes: () => Buffer.alloc(16, 7) },
+  SECRET
+).token;
+
 function memoryStore(seed = {}) {
-  const map = new Map(Object.entries(seed).map(([k, v]) => [k, structuredClone(v)]));
+  const map = new Map(Object.entries(seed).map(([key, value]) => [key, structuredClone(value)]));
+  const listPrefixes = [];
   return {
     async get(key, { type } = {}) {
       if (!map.has(key)) return null;
-      const raw = map.get(key);
-      return type === 'json' ? structuredClone(raw) : raw;
+      const value = map.get(key);
+      return type === 'json' ? structuredClone(value) : value;
     },
     async setJSON(key, value) {
       map.set(key, structuredClone(value));
     },
     async list({ prefix = '' } = {}) {
+      listPrefixes.push(prefix);
       return {
-        blobs: [...map.keys()].filter((key) => key.startsWith(prefix)).map((key) => ({ key }))
+        blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key }))
       };
     },
-    _map: map
+    _map: map,
+    _listPrefixes: listPrefixes
   };
 }
 
-const teachingCtx = createAccessContext({ workflow: 'teaching' });
-const tasksCtx = createAccessContext({ workflow: 'tasks' });
-const lifeCtx = createAccessContext({ workflow: 'life' });
+function authenticatedRequest(path) {
+  return new Request(`https://api.adam-russell.com${path}`, {
+    headers: {
+      cookie: `life_hub_session=${session}`,
+      origin: 'https://life-hub.adam-russell.com'
+    }
+  });
+}
 
-test('Slice 11 registers program, lesson, and class entity kinds only', () => {
+const tasksContext = createAccessContext({ workflow: 'tasks' });
+const teachingContext = createAccessContext({ workflow: 'teaching' });
+
+test('Slice 11 registers Program and Lesson while deferring protected Class search and references', () => {
   assert.equal(ENTITY_REF_KINDS.tasks.has('program'), true);
   assert.equal(ENTITY_REF_KINDS.teaching.has('lesson'), true);
-  assert.equal(ENTITY_REF_KINDS.teaching.has('class'), true);
-  assert.equal(ENTITY_REF_KINDS.teaching.has('student'), false);
+  assert.equal(ENTITY_REF_KINDS.teaching.has('class'), false);
   assert.deepEqual(parseEntityRef('tasks:program:prog_demo'), {
     namespace: 'tasks',
     kind: 'program',
     id: 'prog_demo'
   });
-  assert.equal(formatEntityRef({ namespace: 'tasks', kind: 'program', id: 'prog_demo' }), 'tasks:program:prog_demo');
-  assert.equal(parseEntityRef('shared:student_reference:stu_1'), null);
+  assert.equal(parseEntityRef('teaching:class:class_12eng'), null);
+  assert.equal(parseEntityRef('teaching:student_reference:student_1'), null);
 });
 
-test('resolveTasksProgram projects safe labels and href without raw record leakage', async () => {
+test('Program resolver returns a safe canonical projection and hides raw fields', async () => {
   const store = memoryStore({
     [programKey('prog_tom')]: {
       id: 'prog_tom',
       name: 'Tournament of Minds',
       organiser: 'NSW DoE',
-      secret_internal: 'should-not-leak'
+      secret_internal: 'never return'
     }
   });
-  const projection = await resolveEntity('tasks:program:prog_tom', tasksCtx, {
+  const projection = await resolveEntity('tasks:program:prog_tom', tasksContext, {
     getStore: async () => store
   });
-  assert.equal(projection.kind, 'program');
   assert.equal(projection.display_label, 'Tournament of Minds');
   assert.equal(projection.supporting_label, 'NSW DoE');
-  assert.equal(projection.lifecycle_status, 'active');
-  assert.match(projection.href ?? '', /programs/);
-  assert.equal('secret_internal' in projection, false);
+  assert.equal(
+    projection.href,
+    'https://tasks-hub.adam-russell.com/#/programs?id=prog_tom'
+  );
+  assert.equal(JSON.stringify(projection).includes('never return'), false);
   await assert.rejects(
-    () => resolveEntity('tasks:program:missing', tasksCtx, { getStore: async () => store }),
-    (error) => error.status === 404 && error.code === 'endpoint_not_found'
+    () => resolveEntity('tasks:program:missing', tasksContext, { getStore: async () => store }),
+    error => error.status === 404 && error.code === 'endpoint_not_found'
   );
 });
 
-test('resolveTeachingLesson and resolveTeachingClass stay operator-safe and hide trashed records', async () => {
+test('Lesson resolver projects safe fields and applies lifecycle treatment', async () => {
   const store = memoryStore({
-    [draftLessonKey('lesson_alpha')]: {
-      id: 'lesson_alpha',
+    [draftLessonKey('lesson_active')]: {
+      id: 'lesson_active',
       title: 'Poetry workshop',
       unit_id: 'unit_1',
       status: 'active',
-      blocks: [{ type: 'text', text: 'student-facing body' }],
-      homepage: { announcements: ['secret'] }
+      blocks: [{ text: 'student-facing body' }],
+      homepage: { announcements: ['private'] }
     },
-    [draftLessonKey('lesson_gone')]: {
-      id: 'lesson_gone',
-      title: 'Trashed',
-      status: 'trashed',
-      blocks: []
+    [draftLessonKey('lesson_archived')]: {
+      id: 'lesson_archived',
+      title: 'Archived workshop',
+      status: 'archived'
     },
-    [classKey('class_12eng')]: {
-      id: 'class_12eng',
-      code: '12ENG',
-      display_name: 'Year 12 English',
-      status: 'active',
-      homepage: { announcements: [{ text: 'do-not-leak' }], resources: [], custom: [] }
+    [draftLessonKey('lesson_trashed')]: {
+      id: 'lesson_trashed',
+      title: 'Trashed workshop',
+      status: 'trashed'
+    },
+    [draftLessonKey('lesson_deleted')]: {
+      id: 'lesson_deleted',
+      title: 'Deleted workshop',
+      status: 'deleted'
     }
   });
-
-  const lesson = await resolveEntity('teaching:lesson:lesson_alpha', teachingCtx, {
+  const active = await resolveEntity('teaching:lesson:lesson_active', teachingContext, {
     getStore: async () => store
   });
-  assert.equal(lesson.display_label, 'Poetry workshop');
-  assert.equal(lesson.supporting_label, 'unit_1');
-  assert.equal('blocks' in lesson, false);
-  assert.equal(JSON.stringify(lesson).includes('student-facing'), false);
+  assert.equal(active.display_label, 'Poetry workshop');
+  assert.equal(active.href, 'https://teaching-hub.adam-russell.com/lessons/lesson_active');
+  assert.equal(JSON.stringify(active).includes('student-facing body'), false);
+  assert.equal(JSON.stringify(active).includes('private'), false);
 
+  const archived = await resolveEntity('teaching:lesson:lesson_archived', teachingContext, {
+    getStore: async () => store
+  });
+  assert.equal(archived.lifecycle_status, 'archived');
+
+  for (const id of ['lesson_trashed', 'lesson_deleted', 'missing']) {
+    await assert.rejects(
+      () => resolveEntity(`teaching:lesson:${id}`, teachingContext, { getStore: async () => store }),
+      error => error.status === 404 && error.code === 'endpoint_not_found'
+    );
+  }
+
+  const restricted = createAccessContext({
+    workflow: 'teaching',
+    allowedEntityKinds: ['unit']
+  });
   await assert.rejects(
-    () => resolveEntity('teaching:lesson:lesson_gone', teachingCtx, { getStore: async () => store }),
-    (error) => error.status === 404
+    () => resolveEntity('teaching:lesson:lesson_active', restricted, { getStore: async () => store }),
+    error => error.status === 404 && error.code === 'endpoint_not_found'
   );
-
-  const cls = await resolveEntity('teaching:class:class_12eng', teachingCtx, {
-    getStore: async () => store
-  });
-  assert.equal(cls.display_label, 'Year 12 English');
-  assert.equal(cls.supporting_label, '12ENG');
-  assert.equal(JSON.stringify(cls).includes('do-not-leak'), false);
-  assert.match(cls.href ?? '', /classes/);
 });
 
-test('entity search includes program/lesson/class opt-in and rejects student_reference', async () => {
+test('authenticated Program search uses programs/_index and returns its canonical href', async () => {
+  const sharedStore = memoryStore();
   const tasksStore = memoryStore({
-    [programKey('prog_tom')]: { id: 'prog_tom', name: 'Tournament of Minds', organiser: 'NSW' }
-  });
-  const teachingStore = memoryStore({
-    [draftLessonKey('lesson_alpha')]: {
-      id: 'lesson_alpha',
-      title: 'Poetry workshop',
-      unit_id: 'unit_1',
-      status: 'active'
+    'programs/_index': ['prog_tom', 'prog_other'],
+    [programKey('prog_tom')]: {
+      id: 'prog_tom',
+      name: 'Tournament of Minds',
+      organiser: 'NSW',
+      secret_internal: 'never return'
     },
-    [classKey('class_12eng')]: {
-      id: 'class_12eng',
-      code: '12ENG',
-      display_name: 'Year 12 English',
-      status: 'active'
+    [programKey('prog_other')]: {
+      id: 'prog_other',
+      name: 'Unrelated activity',
+      organiser: 'Example'
     }
   });
   const handler = createEntitySearchHandler({
-    env: {
-      LIFE_HUB_PASSPHRASE_HASH: 'configured',
-      SESSION_SECRET: 's'.repeat(32),
-      SITE_ORIGIN: 'https://life-hub.adam-russell.com'
-    },
-    now: () => Date.parse('2026-08-01T01:00:00Z'),
-    // Bypass auth for unit focus by injecting operator context path if supported;
-    // fall back to exercising search helpers through handler deps stores.
-    getContentStore: async () => memoryStore(),
+    env,
+    now: () => NOW,
+    getContentStore: async () => sharedStore,
     getTasksStore: async () => tasksStore,
-    getTeachingStore: async () => teachingStore,
-    getProfessionalStore: async () => memoryStore(),
-    getUniversalLinkStore: async () => memoryStore()
+    getProfessionalStore: async () => memoryStore()
   });
-
-  // Unsupported student kind rejected
-  const denied = await handler(
-    new Request('https://api.adam-russell.com/api/entities/search?q=stu&kinds=student_reference', {
-      headers: { origin: 'https://life-hub.adam-russell.com' }
-    })
+  const response = await handler(
+    authenticatedRequest('/api/entities/search?q=Tour&kinds=program')
   );
-  // Unauthenticated may be 401 first; either way student_reference must never succeed.
-  assert.notEqual(denied.status, 200);
-
-  // Direct helper coverage via resolve path already done; search path needs session.
-  // Assert parse rejects student refs regardless of search.
-  assert.equal(parseEntityRef('teaching:student_reference:abc'), null);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.groups.program.length, 1);
+  assert.deepEqual(body.data.groups.program[0], {
+    ref: 'tasks:program:prog_tom',
+    kind: 'program',
+    display_label: 'Tournament of Minds',
+    supporting_label: 'NSW',
+    href: 'https://tasks-hub.adam-russell.com/#/programs?id=prog_tom',
+    lifecycle_status: 'active',
+    visibility: 'operator'
+  });
+  assert.deepEqual(tasksStore._listPrefixes, []);
+  assert.equal(JSON.stringify(body).includes('never return'), false);
 });
 
-test('malformed Slice 11 refs are absent', async () => {
+test('generic search rejects Lesson, Class, and StudentReference before Teaching storage access', async () => {
+  const sharedStore = memoryStore();
+  let teachingStoreAccessed = false;
+  const handler = createEntitySearchHandler({
+    env,
+    now: () => NOW,
+    getContentStore: async () => sharedStore,
+    getTasksStore: async () => memoryStore(),
+    getProfessionalStore: async () => memoryStore(),
+    getTeachingStore: async () => {
+      teachingStoreAccessed = true;
+      return memoryStore();
+    }
+  });
+  for (const kind of ['lesson', 'class', 'student_reference']) {
+    const response = await handler(
+      authenticatedRequest(`/api/entities/search?q=Poetry&kinds=${kind}`)
+    );
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).error.code, 'invalid_kind');
+  }
+  assert.equal(teachingStoreAccessed, false);
+});
+
+test('related_to permits Program and Lesson but rejects invalid shape', () => {
+  const program = parseEntityRef('tasks:program:prog_tom');
+  const lesson = parseEntityRef('teaching:lesson:lesson_active');
+  assert.ok(program);
+  assert.ok(lesson);
+  const declaration = validateRelationshipInput({
+    sourceRef: program,
+    targetRef: lesson,
+    relationshipType: 'related_to'
+  });
+  assert.equal(declaration.key, 'related_to');
+
+  assert.throws(
+    () => validateRelationshipInput({
+      sourceRef: parseEntityRef('tasks:task:task_1'),
+      targetRef: program,
+      relationshipType: 'related_to'
+    }),
+    error => error.code === 'invalid_source_kind'
+  );
+  assert.throws(
+    () => validateRelationshipInput({
+      sourceRef: program,
+      targetRef: lesson,
+      relationshipType: 'related_to',
+      role: 'owner'
+    }),
+    error => error.code === 'role_not_permitted'
+  );
+  assert.throws(
+    () => validateRelationshipInput({
+      sourceRef: program,
+      targetRef: lesson,
+      relationshipType: 'related_to',
+      occurredAt: '2026-08-01T00:00:00.000Z'
+    }),
+    error => error.code === 'dates_on_timeless_relationship'
+  );
+});
+
+test('malformed and deferred Slice 11 refs stay absent', () => {
   assert.equal(parseEntityRef('tasks:program:'), null);
   assert.equal(parseEntityRef('teaching:lesson:'), null);
   assert.equal(formatEntityRef({ namespace: 'tasks', kind: 'excursion', id: 'x' }), '');
+  assert.equal(formatEntityRef({ namespace: 'teaching', kind: 'class', id: 'x' }), '');
 });
