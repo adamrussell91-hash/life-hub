@@ -23,7 +23,7 @@ export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
   professional: new Set(['communication', 'meeting', 'event', 'application']),
   tasks: new Set(['task', 'project', 'program']),
-  teaching: new Set(['unit', 'lesson']),
+  teaching: new Set(['unit', 'lesson', 'student_reference']),
   knowledge: new Set(['page']),
   life: new Set(['decision'])
 };

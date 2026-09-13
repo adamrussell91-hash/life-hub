@@ -17,11 +17,8 @@ const VISIBILITY_STRICTNESS = ['operator', 'teaching_protected'];
 // from request JSON — a caller-supplied workflow would let a client widen
 // its own access.
 //
-// No workflow grants `teaching_protected` yet. The implementation
-// programme requires a recorded College approval gate (Slice 8) before
-// any teaching_protected data exists or is reachable — granting the
-// visibility label pre-emptively, even with nothing behind it yet, is out
-// of scope here and stays out until that gate lands.
+// The recorded Slice 8 approval grants teaching_protected only to the
+// server-derived Teaching workflow. Every other workflow remains operator-only.
 export function createAccessContext({ workflow, allowedEntityKinds = [] } = {}) {
   if (!KNOWN_WORKFLOWS.has(workflow)) {
     throw Object.assign(new Error(`Unknown workflow: ${workflow}`), { status: 400, code: 'invalid_workflow' });
@@ -29,7 +26,7 @@ export function createAccessContext({ workflow, allowedEntityKinds = [] } = {}) 
   return Object.freeze({
     actor: 'operator',
     workflow,
-    allowed_visibility: Object.freeze(['operator']),
+    allowed_visibility: Object.freeze(workflow === 'teaching' ? ['operator', 'teaching_protected'] : ['operator']),
     allowed_entity_kinds: Object.freeze([...allowedEntityKinds])
   });
 }
@@ -88,7 +85,7 @@ export function deriveWorkflowVisibility(accessContext) {
       code: 'invalid_workflow'
     });
   }
-  return 'operator';
+  return accessContext.workflow === 'teaching' ? 'teaching_protected' : 'operator';
 }
 
 // A hidden target must behave as absent (implementation programme,

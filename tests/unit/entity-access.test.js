@@ -16,13 +16,11 @@ test('createAccessContext derives actor and allowed_visibility from workflow, no
   assert.deepEqual(tasksContext.allowed_visibility, ['operator']);
 });
 
-test('no workflow grants teaching_protected in this slice, including teaching and administration', () => {
-  // The College approval gate (Slice 8) has not been recorded. Nothing may
-  // read or write teaching_protected data before then, so no workflow may
-  // even be granted the visibility label yet.
-  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
-    const context = createAccessContext({ workflow });
-    assert.deepEqual(context.allowed_visibility, ['operator'], `${workflow} must not grant teaching_protected`);
+test('only the server-derived Teaching workflow grants teaching_protected', () => {
+  const teaching = createAccessContext({ workflow: 'teaching' });
+  assert.deepEqual(teaching.allowed_visibility, ['operator', 'teaching_protected']);
+  for (const workflow of ['professional', 'tasks', 'knowledge', 'life', 'administration']) {
+    assert.deepEqual(createAccessContext({ workflow }).allowed_visibility, ['operator']);
   }
 });
 
@@ -108,10 +106,10 @@ test('assertAdministrationWorkflow permits only the administration workflow', ()
   );
 });
 
-test('deriveWorkflowVisibility returns operator for every known workflow (no teaching_protected grant yet)', () => {
-  for (const workflow of ['professional', 'tasks', 'teaching', 'knowledge', 'life', 'administration']) {
-    const context = createAccessContext({ workflow });
-    assert.equal(deriveWorkflowVisibility(context), 'operator');
+test('deriveWorkflowVisibility protects Teaching and leaves other workflows operator-only', () => {
+  assert.equal(deriveWorkflowVisibility(createAccessContext({ workflow: 'teaching' })), 'teaching_protected');
+  for (const workflow of ['professional', 'tasks', 'knowledge', 'life', 'administration']) {
+    assert.equal(deriveWorkflowVisibility(createAccessContext({ workflow })), 'operator');
   }
 });
 

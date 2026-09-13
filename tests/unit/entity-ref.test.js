@@ -16,7 +16,8 @@ test('parses every registered namespace:kind pair and round-trips through format
     ['shared:organisation:organisation_abc123', { namespace: 'shared', kind: 'organisation', id: 'organisation_abc123' }],
     ['professional:communication:communication_abc123', { namespace: 'professional', kind: 'communication', id: 'communication_abc123' }],
     ['tasks:task:task_abc123', { namespace: 'tasks', kind: 'task', id: 'task_abc123' }],
-    ['tasks:project:proj_abc123', { namespace: 'tasks', kind: 'project', id: 'proj_abc123' }]
+    ['tasks:project:proj_abc123', { namespace: 'tasks', kind: 'project', id: 'proj_abc123' }],
+    ['teaching:student_reference:student_ref_00000000-0000-4000-8000-000000000001', { namespace: 'teaching', kind: 'student_reference', id: 'student_ref_00000000-0000-4000-8000-000000000001' }]
   ];
   for (const [raw, expected] of cases) {
     assert.deepEqual(parseEntityRef(raw), expected);
@@ -26,7 +27,7 @@ test('parses every registered namespace:kind pair and round-trips through format
 });
 
 test('rejects unknown namespace, unknown kind, and malformed ids', () => {
-  assert.equal(parseEntityRef('teaching:student_reference:student_ref_abc'), null, 'unregistered kind for a known namespace');
+  assert.equal(parseEntityRef('teaching:unknown_kind:student_ref_abc'), null, 'unregistered kind for a known namespace');
   assert.equal(parseEntityRef('unknown_namespace:person:person_abc'), null, 'unregistered namespace');
   assert.equal(parseEntityRef('shared:person:'), null, 'empty id');
   assert.equal(parseEntityRef('shared:person'), null, 'wrong segment count');
@@ -65,7 +66,7 @@ test('assertRegisteredEntityRef accepts a valid string or object ref and returns
 });
 
 test('assertRegisteredEntityRef throws a 400 validation error, not a 404, for a malformed or unregistered ref', () => {
-  for (const bad of ['not a ref', 'unknown:kind:id', 'teaching:student_reference:x', '', null, { namespace: 'shared', kind: 'person', id: '' }]) {
+  for (const bad of ['not a ref', 'unknown:kind:id', 'teaching:unknown_kind:x', '', null, { namespace: 'shared', kind: 'person', id: '' }]) {
     assert.throws(
       () => assertRegisteredEntityRef(bad),
       error => error.status === 400 && error.code === 'invalid_entity_ref'
