@@ -236,12 +236,12 @@ const REGISTRY = new Map([
     })
   ],
   [
-    'applicant_to',
+    'applies_to',
     declaration({
-      key: 'applicant_to',
+      key: 'applies_to',
       sourceKinds: ['professional:application'],
       targetKinds: ['shared:organisation'],
-      inverseLabel: 'receives_application',
+      inverseLabel: 'has_application',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
       roleMode: 'none'
@@ -257,7 +257,7 @@ const REGISTRY = new Map([
       inverseLabel: 'contact_for_application',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
-      roleMode: 'optional_text'
+      roleMode: 'none'
     })
   ],
   [
@@ -266,10 +266,11 @@ const REGISTRY = new Map([
       key: 'referee',
       sourceKinds: ['professional:application'],
       targetKinds: ['shared:person'],
-      inverseLabel: 'referees_for',
+      inverseLabel: 'referee_for',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
-      roleMode: 'none'
+      roleMode: 'optional_text',
+      allowedRoles: ['professional', 'character', 'academic']
     })
   ],
   [

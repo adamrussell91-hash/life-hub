@@ -8,11 +8,12 @@ import { assertValidTimeZone } from './wall-time.mjs';
 export const APPLICATION_SCHEMA_VERSION = 1;
 
 export const APPLICATION_PIPELINE_STATUSES = new Set([
-  'researching',
-  'preparing',
+  'drafting',
+  'ready',
   'submitted',
-  'interview',
-  'offered',
+  'under_review',
+  'interviewing',
+  'offer',
   'accepted',
   'declined',
   'withdrawn',
@@ -28,11 +29,12 @@ export const APPLICATION_TERMINAL_STATUSES = new Set([
 
 /** Allowed pipeline transitions — Meeting-style explicit map. */
 export const APPLICATION_PIPELINE_TRANSITIONS = Object.freeze({
-  researching: Object.freeze(['preparing', 'withdrawn']),
-  preparing: Object.freeze(['submitted', 'researching', 'withdrawn']),
-  submitted: Object.freeze(['interview', 'unsuccessful', 'withdrawn']),
-  interview: Object.freeze(['offered', 'unsuccessful', 'withdrawn']),
-  offered: Object.freeze(['accepted', 'declined', 'withdrawn']),
+  drafting: Object.freeze(['ready', 'withdrawn']),
+  ready: Object.freeze(['submitted', 'drafting', 'withdrawn']),
+  submitted: Object.freeze(['under_review', 'interviewing', 'offer', 'unsuccessful', 'withdrawn']),
+  under_review: Object.freeze(['interviewing', 'offer', 'unsuccessful', 'withdrawn']),
+  interviewing: Object.freeze(['offer', 'unsuccessful', 'withdrawn', 'interviewing']),
+  offer: Object.freeze(['accepted', 'declined', 'withdrawn']),
   accepted: Object.freeze([]),
   declined: Object.freeze([]),
   withdrawn: Object.freeze([]),
@@ -40,39 +42,21 @@ export const APPLICATION_PIPELINE_TRANSITIONS = Object.freeze({
 });
 
 export const DOCUMENT_TYPES = new Set([
-  'cover_letter',
   'resume',
+  'cover_letter',
   'selection_criteria',
-  'portfolio',
   'other'
 ]);
 
-export const DOCUMENT_STATUSES = new Set(['draft', 'ready', 'submitted']);
+export const DOCUMENT_STATUSES = new Set(['draft', 'final', 'submitted']);
 
 export const INTERVIEW_FORMATS = new Set(['in_person', 'video', 'phone', 'other']);
 
-export const INTERVIEW_RESULTS = new Set([
-  'pending',
-  'progressed',
-  'unsuccessful',
-  'offer',
-  'withdrawn'
-]);
+export const INTERVIEW_RESULTS = new Set(['pending', 'advanced', 'unsuccessful', 'withdrawn']);
 
-export const INTERVIEW_LIFECYCLE_STATES = new Set([
-  'scheduled',
-  'completed',
-  'cancelled',
-  'no_show'
-]);
+export const INTERVIEW_LIFECYCLE_STATES = new Set(['planned', 'completed', 'cancelled']);
 
-export const OUTCOME_STATUSES = new Set([
-  'offered',
-  'accepted',
-  'declined',
-  'unsuccessful',
-  'withdrawn'
-]);
+export const OUTCOME_STATUSES = new Set(['none', 'offer', 'accepted', 'declined', 'unsuccessful']);
 
 export const POSITION_TITLE_MAX = 500;
 export const AD_TITLE_MAX = 500;
@@ -80,6 +64,7 @@ export const AD_URL_MAX = 2000;
 export const AD_SOURCE_MAX = 200;
 export const AD_SUMMARY_MAX = 4000;
 export const DOC_LABEL_MAX = 300;
+export const DOC_URL_MAX = 2000;
 export const DOC_REF_MAX = 500;
 export const DOC_VERSION_MAX = 80;
 export const CRITERION_MAX = 2000;
@@ -94,10 +79,13 @@ export const MAX_CRITERIA = 60;
 export const MAX_INTERVIEW_ROUNDS = 30;
 
 const APPLICATION_ID_PATTERN = /^application_[0-9a-f-]{36}$/;
+const DOCUMENT_ID_PATTERN = /^adoc_[0-9a-f-]{36}$/;
+const CRITERION_ID_PATTERN = /^acrit_[0-9a-f-]{36}$/;
+const INTERVIEW_ID_PATTERN = /^aint_[0-9a-f-]{36}$/;
 export const APPLICATION_OPERATION_ID_PATTERN = /^aop_[0-9a-f]{32}$/;
 
 export const PERMITTED_CREATE_LINK_TYPES = new Set([
-  'applicant_to',
+  'applies_to',
   'application_contact',
   'referee',
   'related_to'
@@ -109,12 +97,36 @@ export function generateApplicationId() {
   return `application_${randomUUID()}`;
 }
 
+export function generateDocumentId() {
+  return `adoc_${randomUUID()}`;
+}
+
+export function generateCriterionId() {
+  return `acrit_${randomUUID()}`;
+}
+
+export function generateInterviewId() {
+  return `aint_${randomUUID()}`;
+}
+
 export function isValidApplicationId(id) {
   return typeof id === 'string' && APPLICATION_ID_PATTERN.test(id);
 }
 
 export function isValidApplicationOperationId(id) {
   return typeof id === 'string' && APPLICATION_OPERATION_ID_PATTERN.test(id);
+}
+
+export function isValidDocumentId(id) {
+  return typeof id === 'string' && DOCUMENT_ID_PATTERN.test(id);
+}
+
+export function isValidCriterionId(id) {
+  return typeof id === 'string' && CRITERION_ID_PATTERN.test(id);
+}
+
+export function isValidInterviewId(id) {
+  return typeof id === 'string' && INTERVIEW_ID_PATTERN.test(id);
 }
 
 export function deriveApplicationOperationId(parts) {
@@ -131,10 +143,12 @@ function isIsoTimestamp(value) {
   return Number.isFinite(Date.parse(value));
 }
 
-function isDateString(value) {
-  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
-  const parsed = Date.parse(`${value}T00:00:00.000Z`);
-  return Number.isFinite(parsed);
+function isClosingDate(value) {
+  if (typeof value !== 'string' || !value) return false;
+  if (DATE_PATTERN.test(value)) {
+    return Number.isFinite(Date.parse(`${value}T00:00:00.000Z`));
+  }
+  return Number.isFinite(Date.parse(value));
 }
 
 function trimBounded(value, field, max, { allowEmpty = true } = {}) {
@@ -159,7 +173,6 @@ function emptyAdvertisement() {
 }
 
 function parseAdvertisement(raw) {
-  if (raw === null || raw === undefined) return emptyAdvertisement();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   for (const key of Object.keys(raw)) {
     if (!ADVERTISEMENT_KEYS.has(key)) return null;
@@ -179,12 +192,14 @@ function parseAdvertisement(raw) {
 }
 
 function validateAdvertisementInput(raw, { mergeWith = null } = {}) {
-  if (raw === null) return emptyAdvertisement();
+  if (raw === null) {
+    throw validationError('invalid_advertisement', 'advertisement object is required.');
+  }
   if (raw === undefined) {
     return mergeWith ? { ...mergeWith } : emptyAdvertisement();
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw validationError('invalid_advertisement', 'advertisement must be an object or null.');
+    throw validationError('invalid_advertisement', 'advertisement must be an object.');
   }
   for (const key of Object.keys(raw)) {
     if (!ADVERTISEMENT_KEYS.has(key)) {
@@ -213,7 +228,15 @@ function validateAdvertisementInput(raw, { mergeWith = null } = {}) {
   return base;
 }
 
-const DOCUMENT_KEYS = new Set(['document_type', 'label', 'url_or_storage_ref', 'version', 'status']);
+const DOCUMENT_KEYS = new Set([
+  'id',
+  'document_type',
+  'label',
+  'url',
+  'storage_ref',
+  'version',
+  'status'
+]);
 
 function parseDocuments(raw) {
   if (!Array.isArray(raw)) return null;
@@ -224,16 +247,20 @@ function parseDocuments(raw) {
     for (const key of Object.keys(entry)) {
       if (!DOCUMENT_KEYS.has(key)) return null;
     }
+    if (!isValidDocumentId(entry.id)) return null;
     if (!DOCUMENT_TYPES.has(entry.document_type)) return null;
     if (typeof entry.label !== 'string') return null;
-    if (typeof entry.url_or_storage_ref !== 'string') return null;
-    if (entry.version != null && typeof entry.version !== 'string') return null;
+    if (entry.url != null && typeof entry.url !== 'string') return null;
+    if (entry.storage_ref != null && typeof entry.storage_ref !== 'string') return null;
+    if (typeof entry.version !== 'string') return null;
     if (!DOCUMENT_STATUSES.has(entry.status)) return null;
     out.push({
+      id: entry.id,
       document_type: entry.document_type,
       label: entry.label,
-      url_or_storage_ref: entry.url_or_storage_ref,
-      version: entry.version ?? null,
+      url: entry.url ?? null,
+      storage_ref: entry.storage_ref ?? null,
+      version: entry.version,
       status: entry.status
     });
   }
@@ -263,22 +290,26 @@ function validateDocumentsInput(raw) {
     if (!DOCUMENT_STATUSES.has(entry.status)) {
       throw validationError('invalid_document_status', `documents[${index}].status is not permitted.`);
     }
+    let id = entry.id;
+    if (id === undefined || id === null) id = generateDocumentId();
+    if (!isValidDocumentId(id)) {
+      throw validationError('invalid_document_id', `documents[${index}].id must be adoc_<uuid>.`);
+    }
     return {
+      id,
       document_type: entry.document_type,
       label: trimBounded(entry.label, `documents[${index}].label`, DOC_LABEL_MAX, { allowEmpty: false }),
-      url_or_storage_ref: trimBounded(
-        entry.url_or_storage_ref,
-        `documents[${index}].url_or_storage_ref`,
-        DOC_REF_MAX,
-        { allowEmpty: false }
-      ),
-      version: trimBounded(entry.version, `documents[${index}].version`, DOC_VERSION_MAX),
+      url: trimBounded(entry.url, `documents[${index}].url`, DOC_URL_MAX),
+      storage_ref: trimBounded(entry.storage_ref, `documents[${index}].storage_ref`, DOC_REF_MAX),
+      version: trimBounded(entry.version, `documents[${index}].version`, DOC_VERSION_MAX, {
+        allowEmpty: false
+      }),
       status: entry.status
     };
   });
 }
 
-const CRITERION_KEYS = new Set(['criterion', 'response', 'order', 'completed']);
+const CRITERION_KEYS = new Set(['id', 'criterion', 'response', 'order', 'completed']);
 
 function parseSelectionCriteria(raw) {
   if (!Array.isArray(raw)) return null;
@@ -289,11 +320,13 @@ function parseSelectionCriteria(raw) {
     for (const key of Object.keys(entry)) {
       if (!CRITERION_KEYS.has(key)) return null;
     }
+    if (!isValidCriterionId(entry.id)) return null;
     if (typeof entry.criterion !== 'string') return null;
     if (entry.response != null && typeof entry.response !== 'string') return null;
-    if (typeof entry.order !== 'number' || !Number.isInteger(entry.order) || entry.order < 0) return null;
+    if (typeof entry.order !== 'number' || !Number.isFinite(entry.order)) return null;
     if (typeof entry.completed !== 'boolean') return null;
     out.push({
+      id: entry.id,
       criterion: entry.criterion,
       response: entry.response ?? null,
       order: entry.order,
@@ -323,13 +356,19 @@ function validateSelectionCriteriaInput(raw) {
         throw validationError('unknown_field', `Unknown selection_criteria field "${key}".`);
       }
     }
-    if (typeof entry.order !== 'number' || !Number.isInteger(entry.order) || entry.order < 0) {
-      throw validationError('invalid_order', `selection_criteria[${index}].order must be a non-negative integer.`);
+    if (typeof entry.order !== 'number' || !Number.isFinite(entry.order)) {
+      throw validationError('invalid_order', `selection_criteria[${index}].order must be a number.`);
     }
     if (typeof entry.completed !== 'boolean') {
       throw validationError('invalid_completed', `selection_criteria[${index}].completed must be a boolean.`);
     }
+    let id = entry.id;
+    if (id === undefined || id === null) id = generateCriterionId();
+    if (!isValidCriterionId(id)) {
+      throw validationError('invalid_criterion_id', `selection_criteria[${index}].id must be acrit_<uuid>.`);
+    }
     return {
+      id,
       criterion: trimBounded(entry.criterion, `selection_criteria[${index}].criterion`, CRITERION_MAX, {
         allowEmpty: false
       }),
@@ -341,10 +380,11 @@ function validateSelectionCriteriaInput(raw) {
 }
 
 const INTERVIEW_KEYS = new Set([
-  'date',
+  'id',
+  'scheduled_at',
   'time_zone',
   'format',
-  'location',
+  'location_text',
   'preparation_notes',
   'panel_notes',
   'result',
@@ -360,22 +400,26 @@ function parseInterviewRounds(raw) {
     for (const key of Object.keys(entry)) {
       if (!INTERVIEW_KEYS.has(key)) return null;
     }
-    if (!isIsoTimestamp(entry.date)) return null;
-    if (typeof entry.time_zone !== 'string' || !entry.time_zone.trim()) return null;
+    if (!isValidInterviewId(entry.id)) return null;
+    if (entry.scheduled_at != null && !isIsoTimestamp(entry.scheduled_at)) return null;
+    if (entry.time_zone != null && (typeof entry.time_zone !== 'string' || !entry.time_zone.trim())) {
+      return null;
+    }
     if (!INTERVIEW_FORMATS.has(entry.format)) return null;
-    if (entry.location != null && typeof entry.location !== 'string') return null;
+    if (entry.location_text != null && typeof entry.location_text !== 'string') return null;
     if (entry.preparation_notes != null && typeof entry.preparation_notes !== 'string') return null;
     if (entry.panel_notes != null && typeof entry.panel_notes !== 'string') return null;
-    if (!INTERVIEW_RESULTS.has(entry.result)) return null;
+    if (entry.result != null && !INTERVIEW_RESULTS.has(entry.result)) return null;
     if (!INTERVIEW_LIFECYCLE_STATES.has(entry.lifecycle_state)) return null;
     out.push({
-      date: entry.date,
-      time_zone: entry.time_zone,
+      id: entry.id,
+      scheduled_at: entry.scheduled_at ?? null,
+      time_zone: entry.time_zone ?? null,
       format: entry.format,
-      location: entry.location ?? null,
+      location_text: entry.location_text ?? null,
       preparation_notes: entry.preparation_notes ?? null,
       panel_notes: entry.panel_notes ?? null,
-      result: entry.result,
+      result: entry.result ?? null,
       lifecycle_state: entry.lifecycle_state
     });
   }
@@ -402,16 +446,26 @@ function validateInterviewRoundsInput(raw) {
         throw validationError('unknown_field', `Unknown interview_rounds field "${key}".`);
       }
     }
-    if (!isIsoTimestamp(entry.date)) {
-      throw validationError('invalid_interview_date', `interview_rounds[${index}].date must be ISO.`);
+    let scheduled_at = null;
+    if (entry.scheduled_at !== undefined && entry.scheduled_at !== null) {
+      if (!isIsoTimestamp(entry.scheduled_at)) {
+        throw validationError(
+          'invalid_interview_scheduled_at',
+          `interview_rounds[${index}].scheduled_at must be ISO or null.`
+        );
+      }
+      scheduled_at = entry.scheduled_at;
     }
-    const time_zone = assertValidTimeZone(
-      trimBounded(entry.time_zone, `interview_rounds[${index}].time_zone`, 120, { allowEmpty: false })
-    );
+    let time_zone = null;
+    if (entry.time_zone !== undefined && entry.time_zone !== null) {
+      time_zone = assertValidTimeZone(
+        trimBounded(entry.time_zone, `interview_rounds[${index}].time_zone`, 120, { allowEmpty: false })
+      );
+    }
     if (!INTERVIEW_FORMATS.has(entry.format)) {
       throw validationError('invalid_interview_format', `interview_rounds[${index}].format is not permitted.`);
     }
-    if (!INTERVIEW_RESULTS.has(entry.result)) {
+    if (entry.result != null && !INTERVIEW_RESULTS.has(entry.result)) {
       throw validationError('invalid_interview_result', `interview_rounds[${index}].result is not permitted.`);
     }
     if (!INTERVIEW_LIFECYCLE_STATES.has(entry.lifecycle_state)) {
@@ -420,11 +474,21 @@ function validateInterviewRoundsInput(raw) {
         `interview_rounds[${index}].lifecycle_state is not permitted.`
       );
     }
+    let id = entry.id;
+    if (id === undefined || id === null) id = generateInterviewId();
+    if (!isValidInterviewId(id)) {
+      throw validationError('invalid_interview_id', `interview_rounds[${index}].id must be aint_<uuid>.`);
+    }
     return {
-      date: entry.date,
+      id,
+      scheduled_at,
       time_zone,
       format: entry.format,
-      location: trimBounded(entry.location, `interview_rounds[${index}].location`, INTERVIEW_LOCATION_MAX),
+      location_text: trimBounded(
+        entry.location_text,
+        `interview_rounds[${index}].location_text`,
+        INTERVIEW_LOCATION_MAX
+      ),
       preparation_notes: trimBounded(
         entry.preparation_notes,
         `interview_rounds[${index}].preparation_notes`,
@@ -435,7 +499,7 @@ function validateInterviewRoundsInput(raw) {
         `interview_rounds[${index}].panel_notes`,
         INTERVIEW_NOTES_MAX
       ),
-      result: entry.result,
+      result: entry.result ?? null,
       lifecycle_state: entry.lifecycle_state
     };
   });
@@ -443,14 +507,17 @@ function validateInterviewRoundsInput(raw) {
 
 const OUTCOME_KEYS = new Set(['status', 'date', 'offer_details', 'reason']);
 
+function emptyOutcome() {
+  return { status: 'none', date: null, offer_details: null, reason: null };
+}
+
 function parseOutcome(raw) {
-  if (raw === null || raw === undefined) return null;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   for (const key of Object.keys(raw)) {
     if (!OUTCOME_KEYS.has(key)) return null;
   }
   if (!OUTCOME_STATUSES.has(raw.status)) return null;
-  if (raw.date != null && !isDateString(raw.date)) return null;
+  if (raw.date != null && !isClosingDate(raw.date)) return null;
   if (raw.offer_details != null && typeof raw.offer_details !== 'string') return null;
   if (raw.reason != null && typeof raw.reason !== 'string') return null;
   return {
@@ -462,17 +529,17 @@ function parseOutcome(raw) {
 }
 
 function validateOutcomeInput(raw, { mergeWith = null } = {}) {
-  if (raw === null) return null;
-  if (raw === undefined) return mergeWith ?? null;
+  if (raw === null) return emptyOutcome();
+  if (raw === undefined) return mergeWith ? { ...mergeWith } : emptyOutcome();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw validationError('invalid_outcome', 'outcome must be an object or null.');
+    throw validationError('invalid_outcome', 'outcome must be an object.');
   }
   for (const key of Object.keys(raw)) {
     if (!OUTCOME_KEYS.has(key)) {
       throw validationError('unknown_field', `Unknown outcome field "${key}".`);
     }
   }
-  const base = mergeWith ? { ...mergeWith } : { status: null, date: null, offer_details: null, reason: null };
+  const base = mergeWith ? { ...mergeWith } : emptyOutcome();
   if (raw.status !== undefined) {
     if (!OUTCOME_STATUSES.has(raw.status)) {
       throw validationError('invalid_outcome_status', 'outcome.status is not permitted.');
@@ -481,8 +548,8 @@ function validateOutcomeInput(raw, { mergeWith = null } = {}) {
   }
   if (raw.date !== undefined) {
     if (raw.date === null) base.date = null;
-    else if (!isDateString(raw.date)) {
-      throw validationError('invalid_outcome_date', 'outcome.date must be YYYY-MM-DD or null.');
+    else if (!isClosingDate(raw.date)) {
+      throw validationError('invalid_outcome_date', 'outcome.date must be ISO date or null.');
     } else base.date = raw.date;
   }
   if (raw.offer_details !== undefined) {
@@ -491,11 +558,8 @@ function validateOutcomeInput(raw, { mergeWith = null } = {}) {
   if (raw.reason !== undefined) {
     base.reason = trimBounded(raw.reason, 'outcome.reason', OUTCOME_REASON_MAX);
   }
-  if (!base.status) {
-    throw validationError('invalid_outcome_status', 'outcome.status is required when setting outcome.');
-  }
   return {
-    status: base.status,
+    status: base.status ?? 'none',
     date: base.date ?? null,
     offer_details: base.offer_details ?? null,
     reason: base.reason ?? null
@@ -528,7 +592,7 @@ export function parseApplicationRecord(raw) {
   if (typeof raw.position_title !== 'string') return null;
   const advertisement = parseAdvertisement(raw.advertisement);
   if (!advertisement) return null;
-  if (raw.closing_date != null && !isDateString(raw.closing_date)) return null;
+  if (raw.closing_date != null && !isClosingDate(raw.closing_date)) return null;
   if (!APPLICATION_PIPELINE_STATUSES.has(raw.pipeline_status)) return null;
   const documents = parseDocuments(raw.documents);
   if (!documents) return null;
@@ -537,7 +601,7 @@ export function parseApplicationRecord(raw) {
   const interview_rounds = parseInterviewRounds(raw.interview_rounds);
   if (!interview_rounds) return null;
   const outcome = parseOutcome(raw.outcome);
-  if (raw.outcome !== null && raw.outcome !== undefined && outcome === null) return null;
+  if (!outcome) return null;
   if (raw.reflection != null && typeof raw.reflection !== 'string') return null;
   if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
   return {
@@ -550,7 +614,7 @@ export function parseApplicationRecord(raw) {
     documents,
     selection_criteria,
     interview_rounds,
-    outcome: outcome ?? null,
+    outcome,
     reflection: raw.reflection ?? null,
     created_at: raw.created_at,
     updated_at: raw.updated_at
@@ -581,8 +645,8 @@ export function validateApplicationCreateInput(input) {
   });
   let closing_date = null;
   if (input.closing_date !== undefined && input.closing_date !== null) {
-    if (!isDateString(input.closing_date)) {
-      throw validationError('invalid_closing_date', 'closing_date must be YYYY-MM-DD or null.');
+    if (!isClosingDate(input.closing_date)) {
+      throw validationError('invalid_closing_date', 'closing_date must be ISO date or null.');
     }
     closing_date = input.closing_date;
   }
@@ -639,8 +703,8 @@ export function validateApplicationFieldUpdate(input, existing = null) {
   }
   if (input.closing_date !== undefined) {
     if (input.closing_date === null) patch.closing_date = null;
-    else if (!isDateString(input.closing_date)) {
-      throw validationError('invalid_closing_date', 'closing_date must be YYYY-MM-DD or null.');
+    else if (!isClosingDate(input.closing_date)) {
+      throw validationError('invalid_closing_date', 'closing_date must be ISO date or null.');
     } else patch.closing_date = input.closing_date;
   }
   if (input.documents !== undefined) {
@@ -664,7 +728,7 @@ export function validateApplicationFieldUpdate(input, existing = null) {
   return patch;
 }
 
-export function assertApplicationPipelineTransition(from, to) {
+export function assertApplicationStateTransition(from, to) {
   const allowed = APPLICATION_PIPELINE_TRANSITIONS[from];
   if (!allowed || !allowed.includes(to)) {
     throw validationError(
@@ -691,7 +755,7 @@ export function projectApplication(record, incompleteLinks = null) {
     documents: record.documents ?? [],
     selection_criteria: record.selection_criteria ?? [],
     interview_rounds: record.interview_rounds ?? [],
-    outcome: record.outcome ?? null,
+    outcome: record.outcome ?? emptyOutcome(),
     reflection: record.reflection ?? null,
     created_at: record.created_at,
     updated_at: record.updated_at

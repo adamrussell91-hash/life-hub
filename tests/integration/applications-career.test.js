@@ -275,9 +275,9 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
         },
         closing_date: '2026-09-30',
         links: [
-          { target_ref: orgRef, relationship_type: 'applicant_to' },
-          { target_ref: contactRef, relationship_type: 'application_contact', role: 'recruiter' },
-          { target_ref: refereeRef, relationship_type: 'referee' },
+          { target_ref: orgRef, relationship_type: 'applies_to' },
+          { target_ref: contactRef, relationship_type: 'application_contact' },
+          { target_ref: refereeRef, relationship_type: 'referee', role: 'professional' },
           { target_ref: 'knowledge:page:page_app_notes', relationship_type: 'related_to' }
         ]
       }
@@ -287,7 +287,7 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   const created = await createResponse.json();
   const application = created.data.application;
   assert.equal(application.id, APPLICATION_ID);
-  assert.equal(application.pipeline_status, 'researching');
+  assert.equal(application.pipeline_status, 'drafting');
   assert.equal('organisation_id' in application, false);
   assert.equal('person_id' in application, false);
   assert.equal('task_id' in application, false);
@@ -304,22 +304,27 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
         advertisement: { summary: 'Updated summary only' },
         documents: [
           {
+            id: 'adoc_00000000-0000-4000-8000-000000000011',
             document_type: 'resume',
             label: 'Resume v1',
-            url_or_storage_ref: 'blob:resume-v1',
-            version: '1',
-            status: 'ready'
-          },
-          {
-            document_type: 'cover_letter',
-            label: 'Cover',
-            url_or_storage_ref: 'https://example.com/cover.pdf',
+            url: null,
+            storage_ref: 'blob:resume-v1',
             version: '1',
             status: 'draft'
+          },
+          {
+            id: 'adoc_00000000-0000-4000-8000-0000000000a2',
+            document_type: 'cover_letter',
+            label: 'Cover',
+            url: 'https://example.com/cover.pdf',
+            storage_ref: null,
+            version: '1',
+            status: 'final'
           }
         ],
         selection_criteria: [
           {
+            id: 'acrit_00000000-0000-4000-8000-0000000000b1',
             criterion: 'Demonstrated teaching excellence',
             response: 'Draft response',
             order: 0,
@@ -346,19 +351,16 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   assert.equal(linkTask.status, 200);
   assert.equal((await linkTask.json()).data.operation.status, 'committed');
 
-  for (const [action, expected] of [
-    ['prepare', 'preparing'],
-    ['submit', 'submitted'],
-    ['interview', 'interview']
-  ]) {
+  for (const status of ['ready', 'submitted', 'under_review', 'interviewing']) {
     const transition = await applicationsHandler(
       request({
-        url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=${action}`,
-        method: 'POST'
+        url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=transition`,
+        method: 'POST',
+        body: { pipeline_status: status }
       })
     );
-    assert.equal(transition.status, 200, `action ${action}`);
-    assert.equal((await transition.json()).data.application.pipeline_status, expected);
+    assert.equal(transition.status, 200, `transition to ${status}`);
+    assert.equal((await transition.json()).data.application.pipeline_status, status);
   }
 
   const patchInterview = await applicationsHandler(
@@ -368,13 +370,14 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
       body: {
         interview_rounds: [
           {
-            date: '2026-10-10T01:00:00.000Z',
+            id: 'aint_00000000-0000-4000-8000-0000000000c1',
+            scheduled_at: '2026-10-10T01:00:00.000Z',
             time_zone: 'Australia/Sydney',
             format: 'video',
-            location: null,
+            location_text: null,
             preparation_notes: 'Prep panel pack',
             panel_notes: 'Strong pedagogy answers',
-            result: 'progressed',
+            result: 'advanced',
             lifecycle_state: 'completed'
           }
         ]
@@ -389,8 +392,9 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
 
   const offer = await applicationsHandler(
     request({
-      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=offer`,
-      method: 'POST'
+      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=transition`,
+      method: 'POST',
+      body: { pipeline_status: 'offer' }
     })
   );
   assert.equal(offer.status, 200);
@@ -401,7 +405,7 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
       method: 'PATCH',
       body: {
         outcome: {
-          status: 'accepted',
+          status: 'offer',
           date: '2026-10-20',
           offer_details: '1.0 FTE ongoing',
           reason: null
@@ -412,13 +416,14 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   );
   assert.equal(outcomePatch.status, 200);
   const finalApp = (await outcomePatch.json()).data.application;
-  assert.equal(finalApp.outcome.status, 'accepted');
+  assert.equal(finalApp.outcome.status, 'offer');
   assert.ok(finalApp.reflection.includes('Strong panel'));
 
   const accept = await applicationsHandler(
     request({
-      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=accept`,
-      method: 'POST'
+      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=transition`,
+      method: 'POST',
+      body: { pipeline_status: 'accepted' }
     })
   );
   assert.equal(accept.status, 200);
@@ -481,14 +486,15 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   assert.equal(career.organisations.status, 'ok');
   assert.ok(career.organisations.items.some((item) => item.ref === orgRef));
   assert.equal(career.people.status, 'ok');
+  assert.deepEqual(career.deferred, ['publication', 'presentation']);
 
   const appLinks = await linkRepo.listForEntity(applicationRef, access);
   assert.ok(
-    [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'applicant_to')
+    [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'applies_to')
   );
   assert.ok(
     [...appLinks.outgoing, ...appLinks.incoming].some(
-      (e) => e.link.relationship_type === 'application_contact' && e.link.role === 'recruiter'
+      (e) => e.link.relationship_type === 'application_contact'
     )
   );
   assert.ok(
@@ -544,7 +550,7 @@ test('application partial link write is fail-visible and retryable without dupli
       method: 'POST',
       body: {
         position_title: 'Partial',
-        links: [{ target_ref: orgRef, relationship_type: 'applicant_to' }]
+        links: [{ target_ref: orgRef, relationship_type: 'applies_to' }]
       }
     })
   );
