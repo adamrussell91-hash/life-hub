@@ -10,7 +10,8 @@
  *   label: string,
  *   relationshipType?: string | null,
  *   state: 'pending' | 'saved',
- *   supportingLabel?: string | null
+ *   supportingLabel?: string | null,
+ *   readonly?: boolean
  * }} EntityChipModel
  */
 
@@ -45,9 +46,11 @@ export function renderEntityChips(options) {
   for (const chip of chips) {
     const item = document.createElement('li');
     item.className = `entity-chip entity-chip--${chip.state}`;
+    if (chip.readonly) item.classList.add('entity-chip--readonly');
     item.dataset.ref = chip.ref;
     item.dataset.chipId = chip.id;
     if (chip.relationshipType) item.dataset.relationshipType = chip.relationshipType;
+    if (chip.readonly) item.dataset.readonly = 'true';
 
     const label = document.createElement('span');
     label.className = 'entity-chip__label';
@@ -61,7 +64,9 @@ export function renderEntityChips(options) {
     item.append(label);
     if (metaParts.length) item.append(meta);
 
-    if (chip.state === 'pending' && onRemovePending) {
+    if (chip.readonly) {
+      // Incoming / read-only relationships have no remove or end action.
+    } else if (chip.state === 'pending' && onRemovePending) {
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.className = 'entity-chip__action';

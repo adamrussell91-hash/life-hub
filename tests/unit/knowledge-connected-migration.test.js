@@ -252,6 +252,90 @@ test('migration execute is deterministic, writes through repository, and does no
   assert.equal(parity.rollback_connected_fields_preserved, true);
 });
 
+
+test('dual read preserves incoming B→A ownership and never rewrites as A→B', () => {
+  const combined = combineConnectedRelationships({
+    sourcePageId: 'page_alpha',
+    legacyConnected: [],
+    universalLinks: [
+      {
+        link: {
+          id: 'ul_ba',
+          source_ref: 'knowledge:page:page_beta',
+          target_ref: 'knowledge:page:page_alpha',
+          relationship_type: 'related_to',
+          status: 'current'
+        }
+      }
+    ]
+  });
+  assert.equal(combined.relationships.length, 1);
+  const row = combined.relationships[0];
+  assert.equal(row.direction, 'incoming');
+  assert.equal(row.ownership, 'incoming_readonly');
+  assert.equal(row.source_ref, 'knowledge:page:page_beta');
+  assert.equal(row.target_ref, 'knowledge:page:page_alpha');
+  assert.equal(row.other_ref, 'knowledge:page:page_beta');
+  assert.equal(row.legacy_hub_ref, 'page_beta');
+});
+
+test('dual read marks outgoing A→B as outgoing_owned with canonical endpoints', () => {
+  const combined = combineConnectedRelationships({
+    sourcePageId: 'page_alpha',
+    legacyConnected: [],
+    universalLinks: [
+      {
+        link: {
+          id: 'ul_ab',
+          source_ref: 'knowledge:page:page_alpha',
+          target_ref: 'knowledge:page:page_beta',
+          relationship_type: 'related_to',
+          status: 'current'
+        }
+      }
+    ]
+  });
+  const row = combined.relationships[0];
+  assert.equal(row.direction, 'outgoing');
+  assert.equal(row.ownership, 'outgoing_owned');
+  assert.equal(row.source_ref, 'knowledge:page:page_alpha');
+  assert.equal(row.target_ref, 'knowledge:page:page_beta');
+});
+
+test('dual read keeps mixed incoming and outgoing distinct without reciprocal rewrite', () => {
+  const combined = combineConnectedRelationships({
+    sourcePageId: 'page_alpha',
+    legacyConnected: [],
+    universalLinks: [
+      {
+        link: {
+          id: 'ul_ag',
+          source_ref: 'knowledge:page:page_alpha',
+          target_ref: 'knowledge:page:page_gamma',
+          relationship_type: 'related_to',
+          status: 'current'
+        }
+      },
+      {
+        link: {
+          id: 'ul_ba',
+          source_ref: 'knowledge:page:page_beta',
+          target_ref: 'knowledge:page:page_alpha',
+          relationship_type: 'related_to',
+          status: 'current'
+        }
+      }
+    ]
+  });
+  assert.equal(combined.relationships.length, 2);
+  const byOther = Object.fromEntries(
+    combined.relationships.map((row) => [row.other_ref, row])
+  );
+  assert.equal(byOther['knowledge:page:page_gamma'].ownership, 'outgoing_owned');
+  assert.equal(byOther['knowledge:page:page_beta'].ownership, 'incoming_readonly');
+  assert.equal(byOther['knowledge:page:page_beta'].source_ref, 'knowledge:page:page_beta');
+});
+
 test('dual read deduplicates equivalent legacy and canonical relationships', () => {
   const combined = combineConnectedRelationships({
     sourcePageId: 'page_alpha',
