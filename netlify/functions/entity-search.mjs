@@ -11,7 +11,9 @@ import {
   organisationKey,
   personKey
 } from './_shared/universal-link-blobs.mjs';
-import { defaultGetTasksStore, getJSON as getTasksJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { defaultGetTasksStore, getJSON as getTasksJSON, listJSON as listTasksJSON, programKey, PROGRAM_PREFIX, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON, draftLessonKey, classKey, DRAFT_LESSON_PREFIX, CLASS_PREFIX } from './_shared/teaching-blobs.mjs';
+import { listBlobKeys } from './_shared/blobs-list.mjs';
 import {
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON,
@@ -34,7 +36,7 @@ const READ_BATCH_SIZE = 10;
 // `universal-link-content`, and no new Task index is created: the
 // existing `tasks/_index` (`readTaskIndex`) is reused as-is.
 // Application search is opt-in via kinds=application (not in DEFAULT_KINDS).
-const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application']);
+const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application', 'program', 'lesson', 'class']);
 const DEFAULT_KINDS = ['person', 'organisation', 'task'];
 
 function normalize(value) {
@@ -158,8 +160,87 @@ async function searchApplicationKind(getProfessionalStore, query) {
   return out;
 }
 
+
+async function searchProgramKind(getTasksStore, query) {
+  const store = await getTasksStore();
+  const records = await listTasksJSON(store, PROGRAM_PREFIX);
+  const out = [];
+  for (const record of records) {
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    const label = typeof record.name === 'string' ? record.name : '';
+    const rank = matchRank(query, label, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'tasks', kind: 'program', id: record.id }),
+      kind: 'program',
+      display_label: label || record.id,
+      supporting_label: typeof record.organiser === 'string' ? record.organiser : null,
+      href: null,
+      lifecycle_status: 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
+async function searchLessonKind(getTeachingStore, query) {
+  const store = await getTeachingStore();
+  const keys = (await listBlobKeys(store, DRAFT_LESSON_PREFIX)).filter((key) => !key.endsWith('/_index'));
+  const out = [];
+  for (const key of keys) {
+    const record = await getTeachingJSON(store, key);
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    if (record.status === 'trashed' || record.status === 'deleted') continue;
+    const label = typeof record.title === 'string' ? record.title : '';
+    const rank = matchRank(query, label, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'teaching', kind: 'lesson', id: record.id }),
+      kind: 'lesson',
+      display_label: label || record.id,
+      supporting_label: typeof record.unit_id === 'string' ? record.unit_id : null,
+      href: null,
+      lifecycle_status: typeof record.status === 'string' ? record.status : 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
+async function searchClassKind(getTeachingStore, query) {
+  const store = await getTeachingStore();
+  const keys = (await listBlobKeys(store, CLASS_PREFIX)).filter((key) => !key.endsWith('/_index'));
+  const out = [];
+  for (const key of keys) {
+    const record = await getTeachingJSON(store, key);
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    if (record.status === 'trashed' || record.status === 'deleted') continue;
+    const label =
+      (typeof record.display_name === 'string' && record.display_name) ||
+      (typeof record.title === 'string' && record.title) ||
+      (typeof record.code === 'string' && record.code) ||
+      record.id;
+    const rank = matchRank(query, label, typeof record.code === 'string' ? record.code : null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'teaching', kind: 'class', id: record.id }),
+      kind: 'class',
+      display_label: label,
+      supporting_label: typeof record.code === 'string' ? record.code : null,
+      href: null,
+      lifecycle_status: typeof record.status === 'string' ? record.status : 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
 export function createEntitySearchHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
+  const getTeachingStore = deps.getTeachingStore ?? defaultGetTeachingStore;
   const getProfessionalStore = deps.getProfessionalStore ?? defaultGetProfessionalStore;
 
   return createOperatorHandler(async (request, context) => {
@@ -222,7 +303,10 @@ export function createEntitySearchHandler(deps = {}) {
         ? searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived)
         : [],
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
-      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : []
+      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
+      requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : [],
+      requestedKinds.has('lesson') ? searchLessonKind(getTeachingStore, query) : [],
+      requestedKinds.has('class') ? searchClassKind(getTeachingStore, query) : []
     ]);
 
     // Exact prefix matches rank before token matches across every group
@@ -234,7 +318,7 @@ export function createEntitySearchHandler(deps = {}) {
       .slice(0, MAX_RESULTS)
       .map(({ rank, ...result }) => result); // eslint-disable-line no-unused-vars
 
-    const groups = { person: [], organisation: [], task: [], application: [] };
+    const groups = { person: [], organisation: [], task: [], application: [], program: [], lesson: [], class: [] };
     for (const result of ranked) groups[result.kind].push(result);
 
     return withCors(okResponse(200, { groups }), request, env);

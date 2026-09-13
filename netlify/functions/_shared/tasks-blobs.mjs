@@ -63,6 +63,12 @@ export function projectKey(id) {
   return `${PROJECT_PREFIX}${id}`;
 }
 
+export const PROGRAM_PREFIX = 'programs/';
+
+export function programKey(id) {
+  return `${PROGRAM_PREFIX}${id}`;
+}
+
 export function newTaskId() {
   return `task_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
