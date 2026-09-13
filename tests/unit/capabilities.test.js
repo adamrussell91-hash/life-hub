@@ -770,6 +770,24 @@ test('intent router surfaces track.close-challenge on dispute asks', () => {
   assert.ok(ids.includes('track.close-challenge'));
 });
 
+test('intent router surfaces log.delete-meal for dessert deletes', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'brisket',
+    message: 'Delete the dessert from tonight'
+  });
+  assert.ok(ids.includes('log.delete-meal'));
+});
+
+test('intent router surfaces log.entry when Adam mentions dessert', () => {
+  resetCapabilityCaches();
+  const ids = selectCapabilityIdsForTurn({
+    slug: 'brisket',
+    message: 'Log dessert — dark chocolate'
+  });
+  assert.ok(ids.includes('log.entry'));
+});
+
 test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => {
   assert.deepEqual(classifyWriteTarget('data/challenges/no-sugar.json'), {
     store: 'github',

@@ -40,6 +40,25 @@ test('parses a canonical meal and body', () => {
   assert.equal(event.legacy, false);
 });
 
+test('parses timed dessert meals without invalid_event', () => {
+  const dessert = valid
+    .replace('meal-1', 'meal-dessert-1')
+    .replaceAll('2026-07-30', '2026-09-12')
+    .replace('meal: breakfast', 'meal: dessert')
+    .replace('time: "07:45"', 'time: "21:15"')
+    .replaceAll('07:45:00', '21:15:00')
+    .replace('Protein smoothie.', 'Dark chocolate.');
+  const event = parseEventDocument(
+    dessert,
+    'data/nutrition/2026/09/2026-09-12-dessert-2115.md',
+    load
+  );
+  assert.equal(event.record.meal, 'dessert');
+  assert.equal(event.record.time, '21:15');
+  assert.equal(event.body, 'Dark chocolate.');
+  assert.deepEqual(validateRecord(event.record), []);
+});
+
 test('marks missing historical common metadata as legacy without inventing values', () => {
   const event = parseEventDocument(
     '---\ntype: weight\ndate: 2020-01-02\nweight_kg: 90\n---',

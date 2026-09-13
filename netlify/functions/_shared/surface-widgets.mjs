@@ -92,7 +92,7 @@ export function normalizeChallengeProgressWidget(widget) {
 function mealPlanDayText(value) {
   if (typeof value === 'string') return value.trim();
   if (!value || typeof value !== 'object' || Array.isArray(value)) return '';
-  const parts = ['breakfast', 'lunch', 'dinner']
+  const parts = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert']
     .map(slot => {
       const text = typeof value[slot] === 'string' ? value[slot].trim() : '';
       return text ? `${slot[0].toUpperCase()}${slot.slice(1)}: ${text}` : '';
