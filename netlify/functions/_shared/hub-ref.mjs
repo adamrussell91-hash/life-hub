@@ -63,8 +63,14 @@ export function hrefForHubRef(ref) {
   if (ref?.hub === 'teaching' && ref.kind === 'unit') {
     return `${HUB_SITES.teaching}/units/${encodeURIComponent(ref.id)}`;
   }
+  if (ref?.hub === 'teaching' && ref.kind === 'lesson') {
+    return `${HUB_SITES.teaching}/lessons/${encodeURIComponent(ref.id)}`;
+  }
   if (ref?.hub === 'tasks' && ref.kind === 'project') {
     return `${HUB_SITES.tasks}/#/project/${encodeURIComponent(ref.id)}`;
+  }
+  if (ref?.hub === 'tasks' && ref.kind === 'program') {
+    return `${HUB_SITES.tasks}/#/programs?id=${encodeURIComponent(ref.id)}`;
   }
   if (ref?.hub === 'life' && ref.kind === 'decision') {
     return `${HUB_SITES.life}/#central-node`;

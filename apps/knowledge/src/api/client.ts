@@ -8,6 +8,54 @@ export const USE_LOCAL_DATA =
   import.meta.env.VITE_USE_LOCAL_DATA === "true" ||
   (Boolean(import.meta.env.DEV) && import.meta.env.MODE !== "test");
 
+export class KnowledgeApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly retryable: boolean;
+  readonly data?: unknown;
+
+  constructor(input: {
+    message: string;
+    code: string;
+    status: number;
+    retryable?: boolean;
+    data?: unknown;
+  }) {
+    super(input.message);
+    this.name = "KnowledgeApiError";
+    this.code = input.code;
+    this.status = input.status;
+    this.retryable = Boolean(input.retryable);
+    this.data = input.data;
+  }
+}
+
+function throwApiFailure(payload: unknown, status: number, path: string): never {
+  if (payload && typeof payload === "object") {
+    const error = (payload as { error?: unknown; data?: unknown }).error;
+    const data = (payload as { data?: unknown }).data;
+    if (error && typeof error === "object") {
+      const code =
+        typeof (error as { code?: unknown }).code === "string"
+          ? (error as { code: string }).code
+          : "api_error";
+      const message =
+        typeof (error as { message?: unknown }).message === "string" &&
+        (error as { message: string }).message.trim()
+          ? (error as { message: string }).message
+          : readApiError(payload, status, path);
+      const retryable = (error as { retryable?: unknown }).retryable === true;
+      throw new KnowledgeApiError({ message, code, status, retryable, data });
+    }
+  }
+  throw new KnowledgeApiError({
+    message: readApiError(payload, status, path),
+    code: "api_error",
+    status,
+    retryable: status >= 500,
+  });
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit, base: string = API_BASE): Promise<T> {
   const response = await fetch(`${base}${path}`, {
     credentials: "include",
@@ -20,7 +68,7 @@ async function apiFetch<T>(path: string, init?: RequestInit, base: string = API_
     payload = null;
   }
   if (!response.ok) {
-    throw new Error(readApiError(payload, response.status, path));
+    throwApiFailure(payload, response.status, path);
   }
   return unwrapApiPayload<T>(payload);
 }
@@ -279,11 +327,36 @@ export async function savePage(page: Page): Promise<Page> {
   if (USE_LOCAL_DATA) {
     throw new Error("Saving needs the live API (netlify dev or production).");
   }
+  // Ordinary content saves must not drive Universal Link mutation. Omit
+  // connected so title/body/tag/attachment saves leave relationships alone.
+  const { connected: _omitConnected, relationships: _omitRel, relationships_status: _omitStatus, ...content } =
+    page as Page & {
+      relationships?: unknown;
+      relationships_status?: unknown;
+    };
   return apiFetch<Page>("/pages-save", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(page),
+    body: JSON.stringify(content),
   });
+}
+
+/** Explicit relationship mutation — only intentional related_to submissions. */
+export async function replacePageRelationships(
+  pageId: string,
+  relatedTo: string[],
+): Promise<{ page: Page; relationships_replaced: boolean }> {
+  if (USE_LOCAL_DATA) {
+    throw new Error("Relationship updates need the live API (netlify dev or production).");
+  }
+  return apiFetch<{ page: Page; relationships_replaced: boolean }>(
+    "/pages-save?action=replace-relationships",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: pageId, related_to: relatedTo }),
+    },
+  );
 }
 
 export type KnowledgeIntakeJob = {

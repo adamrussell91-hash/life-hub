@@ -59,6 +59,8 @@ export const PageSchema = z
     decision_traces_status: z.enum(["ready", "unavailable"]).optional(),
     inverse_links: z.array(z.unknown()).optional(),
     inverse_links_status: z.enum(["ready", "unavailable"]).optional(),
+    relationships: z.array(z.unknown()).optional(),
+    relationships_status: z.enum(["ready", "unavailable"]).optional(),
     url_watches: z.array(z.unknown()).optional(),
     url_watches_status: z.enum(["ready", "unavailable"]).optional(),
   })

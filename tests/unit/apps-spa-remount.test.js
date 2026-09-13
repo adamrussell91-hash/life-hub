@@ -5,7 +5,7 @@ import { constants } from 'node:fs';
 
 const root = new URL('../../', import.meta.url);
 
-test('Teaching, Knowledge, and Tasks SPAs live under apps/', async () => {
+test('Teaching, Knowledge, Tasks, and Professional SPAs live under apps/', async () => {
   for (const path of [
     'apps/teaching/index.html',
     'apps/teaching/src/app/main.ts',
@@ -13,7 +13,10 @@ test('Teaching, Knowledge, and Tasks SPAs live under apps/', async () => {
     'apps/knowledge/index.html',
     'apps/knowledge/src/main.ts',
     'apps/tasks/index.html',
-    'apps/tasks/src/app/main.ts'
+    'apps/tasks/src/app/main.ts',
+    'apps/professional/index.html',
+    'apps/professional/src/app/main.ts',
+    'apps/professional/src/app/router.ts'
   ]) {
     await access(new URL(path, root), constants.F_OK);
   }
@@ -24,18 +27,20 @@ test('Knowledge SPA restore keeps a trailing slash on /knowledge', async () => {
   assert.match(html, /redirect === '\/knowledge' \? '\/knowledge\/' : redirect/);
 });
 
-test('umbrella Pages build uses subpath bases for the three SPAs', async () => {
+test('umbrella Pages build uses subpath bases for the four SPAs', async () => {
   const teaching = await readFile(new URL('apps/teaching/vite.config.ts', root), 'utf8');
   const knowledge = await readFile(new URL('apps/knowledge/vite.config.ts', root), 'utf8');
   const tasks = await readFile(new URL('apps/tasks/vite.config.ts', root), 'utf8');
+  const professional = await readFile(new URL('apps/professional/vite.config.ts', root), 'utf8');
   assert.match(teaching, /UMBRELLA_SPA === ['"]1['"] \? ['"]\/teaching\/['"]/);
   assert.match(knowledge, /UMBRELLA_SPA === ['"]1['"] \? ['"]\/knowledge\/['"]/);
   assert.match(tasks, /UMBRELLA_SPA === ['"]1['"] \? ['"]\/tasks\/['"]/);
+  assert.match(professional, /UMBRELLA_SPA === ['"]1['"] \? ['"]\/professional\/['"]/);
 });
 
 test('prepare-web publishes built SPAs and a Pages 404 dispatcher', async () => {
   const source = await readFile(new URL('scripts/prepare-web.mjs', root), 'utf8');
-  assert.match(source, /spaApps = \['teaching', 'knowledge', 'tasks'\]/);
+  assert.match(source, /spaApps = \['teaching', 'knowledge', 'tasks', 'professional'\]/);
   assert.match(source, /copyBuiltSpa/);
   assert.match(source, /pages-spa-fallback\.html/);
   const fallback = await readFile(new URL('scripts/pages-spa-fallback.html', root), 'utf8');
@@ -43,6 +48,17 @@ test('prepare-web publishes built SPAs and a Pages 404 dispatcher', async () => 
   assert.match(fallback, /\/teaching/);
   assert.match(fallback, /\/knowledge/);
   assert.match(fallback, /\/tasks/);
+  assert.match(fallback, /\/professional/);
+});
+
+test('build-spa runs Professional\'s own typecheck before its Vite build', async () => {
+  const source = await readFile(new URL('scripts/build-spa.mjs', root), 'utf8');
+  assert.match(source, /'teaching', 'knowledge', 'tasks', 'professional'/);
+  assert.match(source, /hasTypecheckScript/);
+  const professionalPackageJson = JSON.parse(
+    await readFile(new URL('apps/professional/package.json', root), 'utf8')
+  );
+  assert.equal(professionalPackageJson.scripts.typecheck, 'tsc --noEmit');
 });
 
 test('Teaching router strips the umbrella /teaching base', async () => {
@@ -60,4 +76,11 @@ test('Functions stay at repo-root netlify/functions, not under apps', async () =
   assert.doesNotMatch(toml, /apps\/teaching\/netlify/);
   assert.doesNotMatch(toml, /apps\/knowledge\/netlify/);
   assert.doesNotMatch(toml, /apps\/tasks\/netlify/);
+  assert.doesNotMatch(toml, /apps\/professional\/netlify/);
+});
+
+test('no separate deployment configuration exists under apps/professional', async () => {
+  for (const path of ['apps/professional/netlify.toml', 'apps/professional/netlify', 'apps/professional/wrangler.jsonc', 'apps/professional/wrangler.toml']) {
+    await assert.rejects(access(new URL(path, root), constants.F_OK));
+  }
 });

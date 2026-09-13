@@ -1,5 +1,10 @@
 import { formatHubRef, parseHubRef } from './hub-ref.mjs';
 import { getKnowledgePage, listKnowledgePages } from './knowledge-data.mjs';
+import {
+  combineBacklinks,
+  listIndexedKnowledgeBacklinks
+} from './knowledge-universal-links.mjs';
+import { isKnowledgeDualReadEnabled, isKnowledgeWriteCutoverEnabled } from './knowledge-ul-config.mjs';
 
 const SMALL_ARCHIVE = 24;
 
@@ -102,15 +107,66 @@ export async function defaultLoadInverseLinks({
   env,
   fetchImpl = fetch,
   page,
-  listPages = listKnowledgePages
+  listPages = listKnowledgePages,
+  listIncoming = null,
+  dualRead = isKnowledgeDualReadEnabled(env),
+  writeCutover = isKnowledgeWriteCutoverEnabled(env)
 } = {}) {
   try {
+    // After cutover, ordinary requests must never scan the archive. If the
+    // indexed read is not bound, fail visibly instead of falling back.
+    if (writeCutover && typeof listIncoming !== 'function') {
+      return {
+        links: [],
+        groups: [],
+        status: 'unavailable',
+        source: 'universal_links_unavailable'
+      };
+    }
+
+    let indexed = { links: [], status: 'ready' };
+    if (page?.id && typeof listIncoming === 'function') {
+      try {
+        indexed = await listIndexedKnowledgeBacklinks({
+          pageId: page.id,
+          listIncoming
+        });
+      } catch {
+        indexed = { links: [], status: 'unavailable' };
+      }
+    }
+
+    if (writeCutover) {
+      return {
+        links: indexed.links,
+        groups: [],
+        status: indexed.status === 'unavailable' ? 'unavailable' : 'ready',
+        source:
+          indexed.status === 'unavailable'
+            ? 'universal_links_unavailable'
+            : 'universal_links_indexed'
+      };
+    }
+
     const listed = await listPages({ env, fetchImpl });
     const entries = await hydrateConnected(listed, { env, fetchImpl });
-    const links = page?.id ? collectInverseLinks(entries, page.id) : [];
+    const legacyLinks = page?.id ? collectInverseLinks(entries, page.id) : [];
     const groups = collectDecisionBacklinks(entries);
-    return { links, groups, status: 'ready' };
+
+    if (dualRead && typeof listIncoming === 'function') {
+      return {
+        links: combineBacklinks({
+          indexedLinks: indexed.links,
+          legacyLinks
+        }),
+        groups,
+        status: indexed.status === 'unavailable' ? 'unavailable' : 'ready',
+        source: 'dual_read'
+      };
+    }
+
+    return { links: legacyLinks, groups, status: 'ready', source: 'legacy_scan' };
   } catch {
-    return { links: [], groups: [], status: 'unavailable' };
+    return { links: [], groups: [], status: 'unavailable', source: 'error' };
   }
 }
