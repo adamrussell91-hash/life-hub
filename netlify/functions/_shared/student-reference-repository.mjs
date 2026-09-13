@@ -152,7 +152,10 @@ export function createStudentReferenceRepository({
     },
 
     async delete(studentId) {
-      await getRequired(studentId);
+      const record = await getRequired(studentId);
+      if (record.lifecycle_status !== 'archived') {
+        throw studentReferenceError('student_reference_must_be_archived', 409);
+      }
       const keys = await listBlobKeys(store, STUDENT_CONTEXT_PREFIX);
       const matching = await mapBounded(keys, 10, async key => {
         const row = await getJSON(store, key);
