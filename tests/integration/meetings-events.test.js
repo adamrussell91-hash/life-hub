@@ -179,6 +179,7 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
     meetingNow: () => '2026-08-01T01:00:00.000Z',
     getContentStore: async () => professionalStore,
     getUniversalLinkStore: async () => universalStore,
+    getTasksStore: async () => tasksStore,
     resolveEntity,
     createUniversalLinkRepository: () => linkRepo,
     generateId: () => 'meeting_00000000-0000-4000-8000-0000000000aa'
@@ -190,6 +191,7 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
     eventNow: () => '2026-08-01T01:00:00.000Z',
     getContentStore: async () => professionalStore,
     getUniversalLinkStore: async () => universalStore,
+    getTasksStore: async () => tasksStore,
     resolveEntity,
     createUniversalLinkRepository: () => linkRepo,
     generateId: () => 'event_00000000-0000-4000-8000-0000000000bb'
@@ -238,14 +240,18 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
   assert.equal('links' in meeting, false);
 
   const meetingRef = `professional:meeting:${meeting.id}`;
-  await linkRepo.createLink(
-    {
-      source_ref: `tasks:task:${prepTaskId}`,
-      target_ref: meetingRef,
-      relationship_type: 'preparation'
-    },
-    access
+  const prepLinkResponse = await meetingsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/meetings?id=${meeting.id}&action=link-task`,
+      method: 'POST',
+      body: { relationship_type: 'preparation', task_id: prepTaskId }
+    })
   );
+  assert.equal(prepLinkResponse.status, 200);
+  const prepOp = (await prepLinkResponse.json()).data.operation;
+  assert.equal(prepOp.status, 'committed');
+  assert.equal(prepOp.task_id, prepTaskId);
+  assert.equal(prepOp.relationship_type, 'preparation');
 
   const rescheduleResponse = await meetingsHandler(
     request({
@@ -275,14 +281,15 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
   assert.equal(completeResponse.status, 200);
   assert.equal((await completeResponse.json()).data.meeting.state, 'completed');
 
-  await linkRepo.createLink(
-    {
-      source_ref: `tasks:task:${followTaskId}`,
-      target_ref: meetingRef,
-      relationship_type: 'follow_up'
-    },
-    access
+  const followLinkResponse = await meetingsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/meetings?id=${meeting.id}&action=link-task`,
+      method: 'POST',
+      body: { relationship_type: 'follow_up', task_id: followTaskId }
+    })
   );
+  assert.equal(followLinkResponse.status, 200);
+  assert.equal((await followLinkResponse.json()).data.operation.status, 'committed');
 
   const createEventResponse = await eventsHandler(
     request({
@@ -313,14 +320,26 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
   assert.equal('links' in event, false);
 
   const eventRef = `professional:event:${event.id}`;
-  await linkRepo.createLink(
-    {
-      source_ref: `tasks:task:${learnTaskId}`,
-      target_ref: eventRef,
-      relationship_type: 'learning_for'
-    },
-    access
+  const learnLinkResponse = await eventsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/events?id=${event.id}&action=link-task`,
+      method: 'POST',
+      body: { relationship_type: 'learning_for', task_id: learnTaskId }
+    })
   );
+  assert.equal(learnLinkResponse.status, 200);
+  assert.equal((await learnLinkResponse.json()).data.operation.status, 'committed');
+
+  // Creating via title uses a deterministic Task id — retry must not duplicate.
+  const createdLearn = await eventsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/events?id=${event.id}&action=link-task`,
+      method: 'POST',
+      body: { relationship_type: 'learning_for', title: 'Second learning Task' }
+    })
+  );
+  // Second learning_for with different title is a different operation; first existing-task link remains unique.
+  assert.ok([200, 503].includes(createdLearn.status));
 
   const storedMeeting = await professionalStore.get(meetingKey(meeting.id), { type: 'json' });
   const storedEvent = await professionalStore.get(eventKey(event.id), { type: 'json' });

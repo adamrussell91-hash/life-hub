@@ -79,6 +79,52 @@ describe('renderPersonPage', () => {
     expect(historical.querySelectorAll('li').length).toBe(1);
   });
 
+  it('lists Meetings and Events in Linked activity with Professional hrefs', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          linked_records: {
+            tasks: [],
+            communications: [],
+            organisations: [],
+            people: [],
+            meetings: [
+              {
+                ref: 'professional:meeting:meeting_1',
+                kind: 'meeting',
+                display_label: 'Seth planning',
+                supporting_label: null,
+                href: '/professional/#/meeting/meeting_00000000-0000-4000-8000-000000000010',
+                lifecycle_status: 'active',
+                visibility: 'operator'
+              }
+            ],
+            events: [
+              {
+                ref: 'professional:event:event_1',
+                kind: 'event',
+                display_label: 'PD day',
+                supporting_label: null,
+                href: '/professional/#/event/event_00000000-0000-4000-8000-000000000010',
+                lifecycle_status: 'active',
+                visibility: 'operator'
+              }
+            ]
+          }
+        })
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+    expect(canvas.textContent).toMatch(/Meeting · Seth planning/);
+    expect(canvas.textContent).toMatch(/Event · PD day/);
+    const meetingLink = [...canvas.querySelectorAll('a')].find((a) =>
+      a.textContent?.includes('Seth planning')
+    );
+    expect(meetingLink?.getAttribute('href')).toMatch(/#\/meeting\//);
+  });
+
   it('exposes a back link to People and no edit/archive/delete/create-link controls', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');

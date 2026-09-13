@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { assertValidTimeZone } from './wall-time.mjs';
 
 // Event records for Professional Hub (`professional-hub-content`).
 // Relationships (venue, provider, related Knowledge, learning Tasks) live only
@@ -226,7 +227,9 @@ export function validateEventCreateInput(input) {
     throw validationError('invalid_end', 'end must be a valid ISO timestamp.');
   }
   assertTimeOrder(input.start, input.end);
-  const time_zone = trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false });
+  const time_zone = assertValidTimeZone(
+    trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
+  );
   const all_day = input.all_day === undefined ? false : input.all_day;
   if (typeof all_day !== 'boolean') {
     throw validationError('invalid_all_day', 'all_day must be a boolean.');
@@ -347,7 +350,9 @@ export function validateEventRescheduleInput(input) {
     throw validationError('invalid_end', 'end must be a valid ISO timestamp.');
   }
   assertTimeOrder(input.start, input.end);
-  const time_zone = trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false });
+  const time_zone = assertValidTimeZone(
+    trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
+  );
   const all_day = input.all_day === undefined ? false : input.all_day;
   if (typeof all_day !== 'boolean') {
     throw validationError('invalid_all_day', 'all_day must be a boolean.');

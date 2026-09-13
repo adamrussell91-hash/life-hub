@@ -100,3 +100,41 @@ export function isEventIncompleteLinksError(err: unknown): err is ApiClientError
     typeof (err as ApiClientError & { data?: unknown }).data === 'object'
   );
 }
+
+export interface EventTaskLinkOperation {
+  operation_id: string;
+  status: string;
+  task_id: string | null;
+  title?: string | null;
+  relationship_type: string;
+  completed_intent_ids: string[];
+  completed_link_ids: string[];
+  failed_intent_ids: string[];
+  pending_intent_ids: string[];
+}
+
+export function linkEventTask(
+  id: string,
+  body: { relationship_type: 'learning_for'; title?: string; task_id?: string },
+  options: { signal?: AbortSignal } = {}
+): Promise<{ event: EventRecord; operation: EventTaskLinkOperation }> {
+  const params = new URLSearchParams({ id, action: 'link-task' });
+  return apiPost(`/api/events?${params.toString()}`, body, { signal: options.signal });
+}
+
+export function retryEventTaskLink(
+  id: string,
+  operationId: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ event: EventRecord; operation: EventTaskLinkOperation }> {
+  const params = new URLSearchParams({ id, action: 'retry-task-link' });
+  return apiPost(`/api/events?${params.toString()}`, { operation_id: operationId }, {
+    signal: options.signal
+  });
+}
+
+export function isEventTaskLinkIncompleteError(err: unknown): err is ApiClientError & {
+  data: { operation_id: string; task_id?: string | null };
+} {
+  return err instanceof ApiClientError && err.code === 'professional_task_link_incomplete';
+}

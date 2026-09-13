@@ -10,11 +10,14 @@ import {
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
+import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
+import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 
 export const config = { path: '/api/meetings' };
 
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
 const STATE_ACTIONS = new Set(['complete', 'cancel', 'no-show']);
+const TASK_LINK_TYPES = new Set(['preparation', 'follow_up']);
 
 function assertNoAccessFields(value) {
   for (const key of FORBIDDEN_ACCESS_FIELDS) {
@@ -33,10 +36,11 @@ function toErrorResponse(error) {
   const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
   const retryable = Boolean(error?.retryable) || status === 503;
   const data =
-    error?.meeting_id || error?.operation_id
+    error?.meeting_id || error?.operation_id || error?.task_id
       ? {
           meeting_id: error.meeting_id ?? null,
           operation_id: error.operation_id ?? null,
+          task_id: error.task_id ?? null,
           completed_link_ids: error.completed_link_ids ?? [],
           failed_intent_ids: error.failed_intent_ids ?? []
         }
@@ -73,6 +77,9 @@ export function createMeetingsHandler(deps = {}) {
   const createRepository = deps.createMeetingRepository ?? createMeetingRepository;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
   const getUniversalLinkStore = deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
+  const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
+  const createTaskLinkRepository =
+    deps.createProfessionalTaskLinkOperationRepository ?? createProfessionalTaskLinkOperationRepository;
 
   return createOperatorHandler(
     async (request, context) => {
@@ -99,12 +106,35 @@ export function createMeetingsHandler(deps = {}) {
         createUniversalLinkRepository: deps.createUniversalLinkRepository
       });
 
+      const taskLinks = createTaskLinkRepository({
+        store,
+        now: meetingNow,
+        resolveEntity,
+        getUniversalLinkStore,
+        getTasksStore,
+        createUniversalLinkRepository: deps.createUniversalLinkRepository,
+        env
+      });
+
       try {
         if (request.method === 'GET') {
           if (url.searchParams.has('id')) {
             const id = readId(url);
             const meeting = await repo.getMeeting(id);
-            return withCors(okResponse(200, { meeting }), request, env);
+            const meetingRef = `professional:meeting:${id}`;
+            const preparation_operation = await taskLinks.loadForTarget(meetingRef, 'preparation');
+            const follow_up_operation = await taskLinks.loadForTarget(meetingRef, 'follow_up');
+            return withCors(
+              okResponse(200, {
+                meeting: {
+                  ...meeting,
+                  ...(preparation_operation ? { preparation_operation } : {}),
+                  ...(follow_up_operation ? { follow_up_operation } : {})
+                }
+              }),
+              request,
+              env
+            );
           }
           const meetings = await repo.listMeetings();
           return withCors(okResponse(200, { meetings }), request, env);
@@ -116,6 +146,46 @@ export function createMeetingsHandler(deps = {}) {
             const id = readId(url);
             const result = await repo.retryLinks(id);
             return withCors(okResponse(200, result), request, env);
+          }
+          if (action === 'link-task') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            const relationshipType = parsed.value?.relationship_type;
+            if (!TASK_LINK_TYPES.has(relationshipType)) {
+              return withCors(
+                errorResponse(400, 'invalid_relationship_type', 'relationship_type must be preparation or follow_up.', false),
+                request,
+                env
+              );
+            }
+            await repo.getMeeting(id);
+            const result = await taskLinks.linkTask({
+              targetRef: `professional:meeting:${id}`,
+              relationshipType,
+              title: parsed.value?.title,
+              taskId: parsed.value?.task_id
+            });
+            const meeting = await repo.getMeeting(id);
+            return withCors(okResponse(200, { meeting, operation: result.operation }), request, env);
+          }
+          if (action === 'retry-task-link') {
+            const id = readId(url);
+            const parsed = await readJsonObject(request);
+            if (parsed.error) return withCors(parsed.error, request, env);
+            assertNoAccessFields(parsed.value ?? {});
+            const operationId = parsed.value?.operation_id;
+            if (typeof operationId !== 'string' || !operationId) {
+              return withCors(
+                errorResponse(400, 'missing_operation_id', 'operation_id is required.', false),
+                request,
+                env
+              );
+            }
+            const result = await taskLinks.retry(operationId);
+            const meeting = await repo.getMeeting(id);
+            return withCors(okResponse(200, { meeting, operation: result.operation }), request, env);
           }
           if (action === 'reschedule') {
             const id = readId(url);
