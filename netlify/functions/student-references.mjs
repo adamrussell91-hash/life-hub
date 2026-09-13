@@ -4,7 +4,10 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createAccessContext, isVisibilityAllowed } from './_shared/entity-access.mjs';
 import { createStudentReferenceRepository } from './_shared/student-reference-repository.mjs';
 
-export const config = { path: '/api/teaching/student-references' };
+export const config = {
+  path: '/api/teaching/student-references',
+  rateLimit: { action: 'rate_limit', aggregateBy: ['ip', 'domain'], windowLimit: 30, windowSize: 60 }
+};
 
 const ACTION_KEYS = Object.freeze({
   create: new Set(['action', 'initials']),
