@@ -2,12 +2,26 @@
  * Explicit related_to editor for Knowledge compose.
  * Ordinary page Save never touches these chips — only Save relationships
  * calls replacePageRelationships.
+ *
+ * Ownership kinds on dual-read chips:
+ * - outgoing_owned — this page is source_ref (editable; included in replace)
+ * - incoming_readonly — this page is target_ref (read-only; never in replace)
+ * - legacy_pending — legacy connected only (editable; owned by this page)
  */
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
 import { KnowledgeApiError, searchPages } from '../api/client';
-import { connectedDisplayRefs } from './connectedRelationships';
+import {
+  connectedDisplayRefs,
+  peerHubRefForRelationship,
+  type DualReadRelationshipRow
+} from './connectedRelationships';
 import { labelForHubRef, parseHubRef } from '../domain/hub-ref';
+
+export type RelationshipOwnership =
+  | 'outgoing_owned'
+  | 'incoming_readonly'
+  | 'legacy_pending';
 
 export type RelatedChip = {
   id: string;
@@ -17,6 +31,9 @@ export type RelatedChip = {
   label: string;
   linkId?: string | null;
   state: 'saved' | 'pending';
+  ownership: RelationshipOwnership;
+  sourceRef?: string | null;
+  targetRef?: string | null;
 };
 
 export type RelatedStatus =
@@ -28,11 +45,7 @@ export type RelatedStatus =
   | 'incomplete'
   | 'failure';
 
-export type PageRelationshipRow = {
-  legacy_hub_ref?: string | null;
-  target_ref?: string;
-  link_id?: string | null;
-};
+export type PageRelationshipRow = DualReadRelationshipRow;
 
 export function hubRefFromEntityRef(entityRef: string): string | null {
   const parts = entityRef.split(':');
@@ -56,6 +69,60 @@ export function entityRefFromHubRef(hubRef: string): string | null {
   return `${parsed.hub}:${parsed.kind}:${parsed.id}`;
 }
 
+function ownershipForRow(
+  row: PageRelationshipRow | undefined,
+  viewingPageId: string
+): RelationshipOwnership {
+  if (!row) return 'legacy_pending';
+  if (
+    row.ownership === 'outgoing_owned' ||
+    row.ownership === 'incoming_readonly' ||
+    row.ownership === 'legacy_pending'
+  ) {
+    return row.ownership;
+  }
+  const viewingRef = `knowledge:page:${viewingPageId}`;
+  if (row.direction === 'incoming' || (row.source_ref && row.source_ref !== viewingRef)) {
+    return 'incoming_readonly';
+  }
+  const sources = Array.isArray(row.sources) ? row.sources : [];
+  if (sources.includes('legacy') && !sources.includes('canonical') && !row.link_id) {
+    return 'legacy_pending';
+  }
+  return 'outgoing_owned';
+}
+
+function ownerLabel(
+  sourceRef: string | null | undefined,
+  entries: { id: string; title: string }[]
+): string {
+  if (!sourceRef) return 'another page';
+  const parts = sourceRef.split(':');
+  if (parts.length === 3 && parts[0] === 'knowledge' && parts[1] === 'page') {
+    return entries.find(entry => entry.id === parts[2])?.title || parts[2] || 'another page';
+  }
+  return sourceRef;
+}
+
+function supportingLabelFor(
+  chip: RelatedChip,
+  entries: { id: string; title: string }[]
+): string {
+  if (chip.state === 'pending') return 'pending';
+  if (chip.ownership === 'incoming_readonly') {
+    return `Incoming · owned by ${ownerLabel(chip.sourceRef, entries)}`;
+  }
+  if (chip.ownership === 'legacy_pending') return 'legacy · pending migration';
+  return 'related_to';
+}
+
+/** HubRefs this page may write through replace — never incoming. */
+export function desiredHubRefsFromChips(chips: RelatedChip[]): string[] {
+  return chips
+    .filter(chip => chip.ownership !== 'incoming_readonly')
+    .map(chip => chip.hubRef);
+}
+
 export function chipsFromDualRead(input: {
   pageId: string;
   legacyConnected?: string[];
@@ -70,33 +137,65 @@ export function chipsFromDualRead(input: {
       message: 'Related pages are unavailable. Retry to reload.',
     };
   }
-  const refs = connectedDisplayRefs({
-    legacyConnected: input.legacyConnected ?? [],
-    relationships: input.relationships ?? null,
-  });
-  const byHub = new Map<string, PageRelationshipRow>();
-  for (const row of Array.isArray(input.relationships) ? input.relationships : []) {
-    const hub = typeof row.legacy_hub_ref === 'string' ? row.legacy_hub_ref : null;
-    if (hub) byHub.set(hub, row);
+
+  const entries = input.entries ?? [];
+  const rows = Array.isArray(input.relationships) ? input.relationships : null;
+
+  if (rows) {
+    const chips: RelatedChip[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      const hubRef = peerHubRefForRelationship(row, input.pageId);
+      if (!hubRef || hubRef === input.pageId || seen.has(hubRef)) continue;
+      const entityRef = entityRefFromHubRef(hubRef);
+      if (!entityRef) continue;
+      seen.add(hubRef);
+      const ownership = ownershipForRow(row, input.pageId);
+      const parsed = parseHubRef(hubRef);
+      const pageTitle =
+        parsed?.hub === 'knowledge'
+          ? entries.find(entry => entry.id === parsed.id)?.title
+          : null;
+      chips.push({
+        id: `saved:${ownership}:${hubRef}`,
+        hubRef,
+        entityRef,
+        label: pageTitle || (parsed ? labelForHubRef(parsed) : hubRef),
+        linkId: row.link_id ?? null,
+        state: 'saved',
+        ownership,
+        sourceRef: row.source_ref ?? null,
+        targetRef: row.target_ref ?? null,
+      });
+    }
+    return { chips, status: 'ready', message: '' };
   }
+
+  const refs = connectedDisplayRefs({
+    pageId: input.pageId,
+    legacyConnected: input.legacyConnected ?? [],
+    relationships: null,
+  });
   const chips: RelatedChip[] = [];
   for (const hubRef of refs) {
     if (hubRef === input.pageId) continue;
     const entityRef = entityRefFromHubRef(hubRef);
     if (!entityRef) continue;
-    const row = byHub.get(hubRef);
     const parsed = parseHubRef(hubRef);
     const pageTitle =
       parsed?.hub === 'knowledge'
-        ? input.entries?.find(entry => entry.id === parsed.id)?.title
+        ? entries.find(entry => entry.id === parsed.id)?.title
         : null;
     chips.push({
-      id: `saved:${hubRef}`,
+      id: `saved:legacy_pending:${hubRef}`,
       hubRef,
       entityRef,
       label: pageTitle || (parsed ? labelForHubRef(parsed) : hubRef),
-      linkId: row?.link_id ?? null,
+      linkId: null,
       state: 'saved',
+      ownership: 'legacy_pending',
+      sourceRef: `knowledge:page:${input.pageId}`,
+      targetRef: entityRef,
     });
   }
   return { chips, status: 'ready', message: '' };
@@ -110,9 +209,6 @@ export type PageRelationshipsEditorHandle = {
   destroy: () => void;
 };
 
-/**
- * Mount picker + chips into a host. Mutates `chips` in place via callbacks.
- */
 export function mountPageRelationshipsEditor(options: {
   host: HTMLElement;
   pageId: string;
@@ -136,7 +232,7 @@ export function mountPageRelationshipsEditor(options: {
   const copy = document.createElement('p');
   copy.className = 'compose__hint';
   copy.textContent =
-    'Link other archive pages with the shared picker. Title, body, tags, and attachments keep their own Save — relationships only change when you use Save relationships.';
+    'Link other archive pages with the shared picker. Incoming links owned by another page are read-only. Title, body, tags, and attachments keep their own Save — relationships only change when you use Save relationships.';
 
   const pickerInput = document.createElement('input');
   pickerInput.type = 'text';
@@ -173,20 +269,24 @@ export function mountPageRelationshipsEditor(options: {
   root.append(heading, copy, pickerInput, chipsHost, statusEl, actions);
   options.host.replaceChildren(root);
 
-  let chips = [...options.chips];
+  let chips = options.chips.map(chip => ({
+    ...chip,
+    ownership: chip.ownership ?? ('outgoing_owned' as RelationshipOwnership),
+  }));
 
   const chipList = createEntityChipList({
     container: chipsHost,
-    chips: chips.map(toPickerChip),
+    chips: chips.map(chip => toPickerChip(chip)),
     endLabel: 'Remove',
     onRemovePending: (chip: { id: string }) => {
       chips = chips.filter(item => item.id !== chip.id);
       options.onChange(chips);
     },
     onEndSaved: (chip: { id: string }) => {
-      // Pending removal — lifecycle runs only on Save relationships.
+      const current = chips.find(item => item.id === chip.id);
+      if (!current || current.ownership === 'incoming_readonly') return;
       chips = chips.filter(item => item.id !== chip.id);
-      chipList.setChips(chips.map(toPickerChip));
+      chipList.setChips(chips.map(item => toPickerChip(item)));
       options.onChange(chips);
       setStatus(
         'ready',
@@ -244,9 +344,12 @@ export function mountPageRelationshipsEditor(options: {
         entityRef: item.ref,
         label: item.display_label,
         state: 'pending',
+        ownership: 'outgoing_owned',
+        sourceRef: `knowledge:page:${options.pageId}`,
+        targetRef: item.ref,
       };
       chips = [...chips, next];
-      chipList.setChips(chips.map(toPickerChip));
+      chipList.setChips(chips.map(chip => toPickerChip(chip)));
       options.onChange(chips);
     },
   });
@@ -259,7 +362,8 @@ export function mountPageRelationshipsEditor(options: {
       label: chip.label,
       relationshipType: 'related_to',
       state: chip.state,
-      supportingLabel: chip.state === 'pending' ? 'pending' : 'related_to',
+      supportingLabel: supportingLabelFor(chip, options.entries),
+      readonly: chip.ownership === 'incoming_readonly',
     };
   }
 
@@ -277,7 +381,7 @@ export function mountPageRelationshipsEditor(options: {
   }
 
   function setBusy(busy: boolean) {
-    setStatus(busy ? 'saving' : 'ready', busy ? 'Saving relationships…' : statusEl.textContent);
+    setStatus(busy ? 'saving' : 'ready', busy ? 'Saving relationships…' : statusEl.textContent || '');
   }
 
   saveBtn.addEventListener('click', () => options.onSave());
@@ -290,7 +394,7 @@ export function mountPageRelationshipsEditor(options: {
 
   return {
     root,
-    getDesiredHubRefs: () => chips.map(chip => chip.hubRef),
+    getDesiredHubRefs: () => desiredHubRefsFromChips(chips),
     setStatus,
     setBusy,
     destroy: () => {
@@ -306,7 +410,10 @@ export function relationshipErrorMessage(error: unknown): {
   retryable: boolean;
 } {
   if (error instanceof KnowledgeApiError) {
-    if (error.code === 'knowledge_ul_unavailable' || error.code === 'universal_link_blobs_unbound') {
+    if (
+      error.code === 'knowledge_ul_unavailable' ||
+      error.code === 'universal_link_blobs_unbound'
+    ) {
       return {
         status: 'unavailable',
         message: error.message || 'Universal Link store is unavailable.',
@@ -316,7 +423,9 @@ export function relationshipErrorMessage(error: unknown): {
     if (error.code === 'knowledge_relationship_operation_incomplete') {
       return {
         status: 'incomplete',
-        message: error.message || 'Relationship update incomplete. Retry to finish without duplicates.',
+        message:
+          error.message ||
+          'Relationship update incomplete. Retry to finish without duplicates.',
         retryable: true,
       };
     }

@@ -330,9 +330,23 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
       });
     }
 
-    const linkRepo = await bindLinkRepo();
     const completedIntents = new Set(journal.completed_intent_ids ?? []);
     const completedLinks = new Set(journal.completed_link_ids ?? []);
+    let linkRepo;
+    try {
+      linkRepo = await bindLinkRepo();
+    } catch (error) {
+      const pending = (journal.intents ?? [])
+        .map((intent) => intent.intent_id)
+        .filter((id) => !completedIntents.has(id));
+      journal = await saveJournal({
+        ...journal,
+        status: 'incomplete',
+        failed_intent_ids: pending,
+        updated_at: now()
+      });
+      throw incompleteError(journal);
+    }
     for (const intent of journal.intents) {
       if (completedIntents.has(intent.intent_id)) continue;
       try {
