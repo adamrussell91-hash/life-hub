@@ -14,6 +14,10 @@ export type EntityKind =
   | 'lesson';
 
 export type SearchableEntityKind = 'person' | 'organisation' | 'task' | 'application' | 'program';
+export type SearchableEntityKinds =
+  | SearchableEntityKind
+  | 'person,organisation'
+  | 'person,organisation,task';
 
 export interface SearchResult {
   ref: string;
@@ -30,7 +34,9 @@ export interface SearchGroups {
   organisation: SearchResult[];
   task: SearchResult[];
   communication?: SearchResult[];
+  application?: SearchResult[];
   program?: SearchResult[];
+
 }
 
 export interface PersonRecord {
