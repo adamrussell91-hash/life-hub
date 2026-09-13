@@ -10,9 +10,9 @@ import { validateRelationshipInput } from './relationship-registry.mjs';
 import {
   OPERATION_SCHEMA_VERSION,
   UNIVERSAL_LINK_SCHEMA_VERSION,
+  deriveOperationId,
   equivalenceInput,
   generateLinkId,
-  generateOperationId as defaultGenerateOperationId,
   isValidLinkId,
   isValidOperationId,
   isValidReasonCode,
@@ -27,6 +27,8 @@ import {
   byTypeKey,
   defaultGetUniversalLinkStore,
   getJSON,
+  isValidEndpointMembershipRecord,
+  isValidTypeMembershipRecord,
   linkKey,
   listAuthoritativeLinkKeys,
   operationKey,
@@ -71,6 +73,20 @@ function invalidTransitionError(message) {
   return Object.assign(new Error(message), { status: 409, code: 'invalid_lifecycle_transition' });
 }
 
+// Thrown by `repairLifecycleJournal` (correction, Job 2) when the
+// authoritative link has moved on to a state this stale operation did not
+// observe — a later, permitted lifecycle mutation (or another repair)
+// changed it after this operation's precondition was recorded. Retrying
+// or re-repairing the same stale operation can never resolve this; only
+// the fact that a later state now exists is the answer, so this is a
+// stable, non-retryable conflict rather than a `link_write_incomplete`.
+function linkOperationSupersededError({ operationId, linkId }) {
+  return Object.assign(
+    new Error('This Universal Link operation has been superseded by a later change and cannot be safely replayed.'),
+    { status: 409, code: 'link_operation_superseded', operation_id: operationId, link_id: linkId }
+  );
+}
+
 function isNullableString(value) {
   return value === null || value === undefined || typeof value === 'string';
 }
@@ -90,8 +106,7 @@ function assertReasonCode(reason) {
 export function createUniversalLinkRepository({
   store,
   resolveEntity,
-  now = () => new Date().toISOString(),
-  generateOperationId = defaultGenerateOperationId
+  now = () => new Date().toISOString()
 } = {}) {
   if (!store) {
     throw new Error('createUniversalLinkRepository requires a store.');
@@ -141,12 +156,20 @@ export function createUniversalLinkRepository({
         validLink = null;
       }
     }
+    // A membership key holding *some* value is not enough to call it
+    // present — its content must actually be the expected membership for
+    // *this* link at *this* key (matching schema version, link id, and
+    // canonical ref/relationship type). A record that merely exists but
+    // doesn't match counts as missing, the same way the read path already
+    // treats it (universal-link-blobs.mjs's `isPlausibleMembershipRecord`),
+    // so create/retry/repair replace it instead of leaving a permanently
+    // unreachable link behind it.
     return {
       linkRaw,
       validLink,
-      hasSource: Boolean(sourceMembership),
-      hasTarget: Boolean(targetMembership),
-      hasType: Boolean(typeMembership)
+      hasSource: isValidEndpointMembershipRecord(sourceMembership, { linkId, canonicalRef: sourceCanonical }),
+      hasTarget: isValidEndpointMembershipRecord(targetMembership, { linkId, canonicalRef: targetCanonical }),
+      hasType: isValidTypeMembershipRecord(typeMembership, { linkId, relationshipType })
     };
   }
 
@@ -203,7 +226,13 @@ export function createUniversalLinkRepository({
         ...journal,
         status: 'committed',
         completed_steps: ['link', 'source_membership', 'target_membership', 'type_membership'],
-        updated_at: now()
+        updated_at: now(),
+        // Reset explicitly — a resumed operation's loaded `journal` object
+        // can carry `last_error_code` from an earlier failed attempt (set
+        // by `bestEffortMarkRepairNeeded` below), and spreading `...journal`
+        // would otherwise leave that stale code on an operation that just
+        // reached `committed`.
+        last_error_code: null
       });
     } catch (cause) {
       await bestEffortMarkRepairNeeded(journal, completedSteps, cause?.code ?? 'commit_write_failed');
@@ -294,16 +323,32 @@ export function createUniversalLinkRepository({
     const existingValidLink = state.validLink;
     const created = !existingValidLink;
 
-    // 9. If a valid equivalent record already exists and all memberships
-    // exist, return the record with created false.
-    if (existingValidLink && state.hasSource && state.hasTarget && state.hasType) {
+    // The operation id is derived from the deterministic link id itself,
+    // not generated randomly per call — every create/retry attempt for
+    // this exact equivalent link resolves to the same operation record.
+    // This is what lets step 9's early return below still guarantee the
+    // *original* operation reaches `committed`: previously, a repeat call
+    // that found the link and every membership already durable returned
+    // immediately without ever touching the operation journal, so an
+    // original attempt whose *only* failure was the final commit-journal
+    // write stayed stuck in `repair_needed` forever — a later "successful"
+    // retry never even looked at it (implementation-programme correction
+    // A3). Loading any existing journal for this id lets that be detected.
+    const operationId = deriveOperationId(['create_link', linkId]);
+    let journal = validateOperationRecord(await getJSON(store, operationKey(operationId), STRONG));
+
+    // 9. If a valid equivalent record already exists, all memberships
+    // exist, and the deterministic operation for this link is already
+    // committed, there is nothing left to do.
+    if (existingValidLink && state.hasSource && state.hasTarget && state.hasType && journal?.status === 'committed') {
       return { link: existingValidLink, created: false };
     }
 
     // 10. Otherwise repair the same deterministic link (or create it for
-    // the first time) rather than creating a second link — steps 11-16.
+    // the first time), and ensure the deterministic operation reaches
+    // `committed` — steps 11-16.
     const timestamp = now();
-    const linkPayload = Object.freeze({
+    const linkPayload = existingValidLink ?? Object.freeze({
       schema_version: UNIVERSAL_LINK_SCHEMA_VERSION,
       id: linkId,
       source_ref: sourceCanonical,
@@ -323,29 +368,35 @@ export function createUniversalLinkRepository({
       updated_at: timestamp
     });
 
-    const operationId = generateOperationId();
-    const journal = {
-      schema_version: OPERATION_SCHEMA_VERSION,
-      operation_id: operationId,
-      operation_type: 'create_link',
-      link_id: linkId,
-      status: 'prepared',
-      completed_steps: [],
-      link_payload: linkPayload,
-      created_at: timestamp,
-      updated_at: timestamp,
-      last_error_code: null
-    };
-
     // 11. Write an operation journal record with status prepared before
-    // writing the link or memberships.
-    try {
-      await setJSON(store, operationKey(operationId), journal);
-    } catch {
-      throw linkWriteIncompleteError({ operationId, linkId });
+    // writing the link or memberships — unless a journal for this
+    // deterministic id already exists from a previous attempt, in which
+    // case reuse it rather than starting a second one.
+    if (!journal) {
+      journal = {
+        schema_version: OPERATION_SCHEMA_VERSION,
+        operation_id: operationId,
+        operation_type: 'create_link',
+        link_id: linkId,
+        status: 'prepared',
+        completed_steps: [],
+        link_payload: linkPayload,
+        created_at: timestamp,
+        updated_at: timestamp,
+        last_error_code: null
+      };
+      try {
+        await setJSON(store, operationKey(operationId), journal);
+      } catch {
+        throw linkWriteIncompleteError({ operationId, linkId });
+      }
     }
 
     // 12-16. Write the link and any missing memberships; mark committed.
+    // Every step is skipped when its target key already validly exists
+    // (see `readAuthoritativeState`/`runSteps`), so replaying this for an
+    // already-complete link performs no redundant writes beyond the final
+    // idempotent commit of the journal itself.
     await runSteps({
       journal,
       linkId,
@@ -377,6 +428,10 @@ export function createUniversalLinkRepository({
 
     if (journal.status === 'committed') {
       return { operation_id: operationId, link_id: journal.link_id, status: 'committed', repaired: false };
+    }
+
+    if (journal.operation_type !== 'create_link') {
+      return repairLifecycleJournal(journal);
     }
 
     // 5. Validate the link against the current schema and registry before
@@ -414,15 +469,204 @@ export function createUniversalLinkRepository({
   }
 
   // --- Lifecycle methods ---
+  //
+  // `endLink`/`suppressLink`/`deleteLink` used to mutate the authoritative
+  // link and then write a single best-effort "audit" journal entry that
+  // was explicitly documented as *not* a recovery mechanism — a failed
+  // journal write after a successful mutation was silently swallowed, and
+  // there was no way to tell a caller their request had actually completed
+  // when the response looked like a hard failure (implementation-programme
+  // correction A4). These three methods now follow the same
+  // prepare-before-mutate, mutate, commit protocol `createLink` uses:
+  //
+  // 1. Derive a deterministic operation id from the mutation's own inputs
+  //    (link id + the intended target state) — not from wall-clock time —
+  //    so a genuine retry of the *same* request (before or after the
+  //    mutation itself lands) resolves to the *same* journal record
+  //    instead of a fresh one, while a *different* later request (e.g. a
+  //    link ended, reopened by a repair, then ended again with a different
+  //    date) still gets its own.
+  // 2. Write (or reuse) that operation's `prepared` journal, recording the
+  //    validated intended transition — never endpoint display data.
+  // 3. Write the authoritative link idempotently — skipped when the link
+  //    already reflects the intended target state (so a retry that lands
+  //    after the mutation already succeeded does not re-reject the
+  //    transition just because the link's status already changed).
+  // 4. Mark the operation committed.
+  // 5. On any post-preparation failure, best-effort mark the operation
+  //    `repair_needed` and return `503 link_write_incomplete` with the
+  //    safe `operation_id`/`link_id`.
+  // 6. `repairOperation` (above) replays any of these three operation
+  //    types the same way, via `repairLifecycleJournal`.
+
+  function deriveLifecycleOperationId(operationType, linkId, detail) {
+    return deriveOperationId(['lifecycle_link', operationType, linkId, detail ?? null]);
+  }
+
+  // Reads (without creating) any existing journal for this deterministic
+  // lifecycle operation. A caller uses this to distinguish two different
+  // situations that both present as "the link is already at the target
+  // status":
+  //
+  // - An *incomplete* prior attempt at this exact mutation (journal exists,
+  //   not yet `committed`) — the link write may have already landed while
+  //   the commit write failed. A retry here must resume and finish, not
+  //   re-reject the transition just because the status already changed
+  //   (implementation-programme correction A4).
+  // - A *fully completed* prior attempt at this exact mutation (journal
+  //   exists and is `committed`), or no attempt at all — an ordinary
+  //   repeat of an already-finished request. The link's own transition
+  //   graph decides whether repeating it is valid (e.g. suppressing an
+  //   already-suppressed link has no `suppressed -> suppressed` edge and
+  //   stays a normal rejection); this case must not silently succeed just
+  //   because the *last* attempt happened to reach the same status.
+  async function peekLifecycleJournal(operationType, linkId, detail) {
+    const operationId = deriveLifecycleOperationId(operationType, linkId, detail);
+    const journal = validateOperationRecord(await getJSON(store, operationKey(operationId), STRONG));
+    return { operationId, journal, resumable: Boolean(journal) && journal.status !== 'committed' };
+  }
+
+  async function loadAuthoritativeLinkForAdministration(id) {
+    if (!isValidLinkId(id)) throw endpointNotFoundError();
+    const raw = await getJSON(store, linkKey(id), STRONG);
+    let record;
+    try {
+      record = validateUniversalLinkRecord(raw);
+    } catch {
+      throw endpointNotFoundError();
+    }
+    if (!record) throw endpointNotFoundError();
+    return record;
+  }
+
+  // Loads (or starts) the deterministic operation journal for one
+  // lifecycle mutation attempt. `intendedPayload` never carries endpoint
+  // display data — only the link id and the target status/fields being
+  // written.
+  async function ensureLifecycleJournal({ operationType, linkId, detail, intendedPayload }) {
+    const operationId = deriveLifecycleOperationId(operationType, linkId, detail);
+    const existing = validateOperationRecord(await getJSON(store, operationKey(operationId), STRONG));
+    if (existing) return { operationId, journal: existing };
+
+    const timestamp = now();
+    const journal = {
+      schema_version: OPERATION_SCHEMA_VERSION,
+      operation_id: operationId,
+      operation_type: operationType,
+      link_id: linkId,
+      status: 'prepared',
+      completed_steps: [],
+      link_payload: intendedPayload,
+      created_at: timestamp,
+      updated_at: timestamp,
+      last_error_code: null
+    };
+    try {
+      await setJSON(store, operationKey(operationId), journal);
+    } catch {
+      throw linkWriteIncompleteError({ operationId, linkId });
+    }
+    return { operationId, journal };
+  }
+
+  async function commitLifecycleJournal(journal) {
+    try {
+      await setJSON(store, operationKey(journal.operation_id), {
+        ...journal,
+        status: 'committed',
+        completed_steps: ['link'],
+        updated_at: now(),
+        last_error_code: null
+      });
+    } catch (cause) {
+      await bestEffortMarkRepairNeeded(journal, journal.completed_steps ?? [], cause?.code ?? 'commit_write_failed');
+      throw linkWriteIncompleteError({ operationId: journal.operation_id, linkId: journal.link_id });
+    }
+  }
+
+  // Shared core for endLink/suppressLink/deleteLink: writes the mutated
+  // link only when it doesn't already reflect the intended state, then
+  // commits the journal. `alreadyDone` is computed by the caller from the
+  // authoritative record it already validated is allowed to transition (or
+  // has already transitioned).
+  async function applyLifecycleMutation({ journal, operationId, linkId, alreadyDone, buildUpdatedRecord }) {
+    let result;
+    if (alreadyDone) {
+      result = alreadyDone;
+    } else {
+      result = buildUpdatedRecord();
+      try {
+        await setJSON(store, linkKey(linkId), result);
+      } catch (cause) {
+        await bestEffortMarkRepairNeeded(journal, [], cause?.code ?? 'write_failed');
+        throw linkWriteIncompleteError({ operationId, linkId });
+      }
+    }
+    await commitLifecycleJournal(journal);
+    return result;
+  }
+
+  // Correction, Job 2: repair must never write the operation's recorded
+  // target state over a link that has since moved on. Before this fix,
+  // whenever the live record didn't already match the intended result
+  // (`alreadyDone` false), repair blindly wrote the old intended state
+  // over the *current* record with no check that the operation still
+  // owned the mutation — so repairing a stale `endLink` after the same
+  // link had since been genuinely `deleteLink`'d reverted the deletion
+  // back to `ended`. `from_status` is the link's status this operation
+  // itself observed as its precondition (recorded once, at the moment the
+  // journal was first prepared — see `endLink`/`suppressLink`/`deleteLink`
+  // below); repair may write only when the live record still matches that
+  // precondition (nothing has changed since) or already matches the
+  // intended result (a genuine retry after the mutation landed but before
+  // the commit write did). Anything else means a later operation — a
+  // different permitted lifecycle mutation, or another repair — has
+  // superseded this one, and repair must refuse rather than silently
+  // reverting that later state.
+  async function repairLifecycleJournal(journal) {
+    const linkId = journal.link_id;
+    const payload = journal.link_payload && typeof journal.link_payload === 'object' ? journal.link_payload : {};
+    const toStatus = payload.to_status;
+    const fromStatus = payload.from_status;
+
+    let raw;
+    let record;
+    try {
+      raw = await getJSON(store, linkKey(linkId), STRONG);
+      record = validateUniversalLinkRecord(raw);
+    } catch {
+      record = null;
+    }
+    if (!record) throw linkWriteIncompleteError({ operationId: journal.operation_id, linkId });
+
+    const alreadyDone = journal.operation_type === 'end_link'
+      ? (record.status === 'ended' && record.valid_to === payload.valid_to ? record : null)
+      : (record.status === toStatus ? record : null);
+
+    if (!alreadyDone && record.status !== fromStatus) {
+      throw linkOperationSupersededError({ operationId: journal.operation_id, linkId });
+    }
+
+    return applyLifecycleMutation({
+      journal,
+      operationId: journal.operation_id,
+      linkId,
+      alreadyDone,
+      buildUpdatedRecord: () => ({
+        ...record,
+        status: toStatus,
+        updated_at: now(),
+        ...(journal.operation_type === 'end_link' ? { valid_to: payload.valid_to } : {})
+      })
+    }).then(link => ({ operation_id: journal.operation_id, link_id: linkId, status: 'committed', repaired: true, link }));
+  }
 
   async function endLink(id, validTo, accessContext) {
-    // 1. Load the visible authoritative link.
+    // 1. Load the visible authoritative link. `ended` stays visible
+    // through the ordinary read, so a retry that lands after the mutation
+    // already succeeded (but before the commit journal write did) can
+    // still see it here rather than 404ing.
     const record = await readRepository.getLink(id, accessContext);
-
-    // 2. Permit only valid lifecycle transitions.
-    if (record.status !== 'current') {
-      throw invalidTransitionError('endLink requires a link with status current.');
-    }
 
     // 3. Apply only to period relationships.
     if (record.temporal_mode !== 'period') {
@@ -439,56 +683,39 @@ export function createUniversalLinkRepository({
       throw validationError('valid_to_before_valid_from', 'valid_to cannot precede valid_from.');
     }
 
-    // 6. Set valid_to, status ended, and updated_at. 7. Preserve the link
-    // id and memberships (untouched).
-    const updated = {
-      ...record,
-      valid_to: validTo,
-      status: 'ended',
-      updated_at: now()
-    };
-    await setJSON(store, linkKey(id), updated);
+    // Only a resumed *incomplete* attempt at this exact mutation may bypass
+    // the transition-graph check below — an ordinary repeat of an
+    // already-fully-committed end (or a fresh call with no prior attempt)
+    // still goes through it normally (see `peekLifecycleJournal`).
+    const { resumable } = await peekLifecycleJournal('end_link', id, validTo);
+    const alreadyDone = resumable && record.status === 'ended' && record.valid_to === validTo ? record : null;
 
-    // 8. Journal the mutation.
-    await journalMutation({ operationType: 'end_link', linkId: id });
-
-    return updated;
-  }
-
-  async function loadAuthoritativeLinkForAdministration(id) {
-    if (!isValidLinkId(id)) throw endpointNotFoundError();
-    const raw = await getJSON(store, linkKey(id), STRONG);
-    let record;
-    try {
-      record = validateUniversalLinkRecord(raw);
-    } catch {
-      throw endpointNotFoundError();
+    // 2. Permit only valid lifecycle transitions (unless resuming an
+    // already-applied incomplete attempt).
+    if (!alreadyDone && record.status !== 'current') {
+      throw invalidTransitionError('endLink requires a link with status current.');
     }
-    if (!record) throw endpointNotFoundError();
-    return record;
-  }
 
-  async function journalMutation({ operationType, linkId, reasonCode = null }) {
-    const operationId = generateOperationId();
-    const timestamp = now();
-    try {
-      await setJSON(store, operationKey(operationId), {
-        schema_version: OPERATION_SCHEMA_VERSION,
-        operation_id: operationId,
-        operation_type: operationType,
-        link_id: linkId,
-        status: 'committed',
-        completed_steps: [],
-        link_payload: { link_id: linkId, reason_code: reasonCode },
-        created_at: timestamp,
-        updated_at: timestamp,
-        last_error_code: null
-      });
-    } catch {
-      // The mutation itself already succeeded; the journal entry for a
-      // single-write lifecycle mutation is a best-effort audit record, not
-      // a recovery mechanism (unlike create's multi-step journal).
-    }
+    const { operationId, journal } = await ensureLifecycleJournal({
+      operationType: 'end_link',
+      linkId: id,
+      detail: validTo,
+      // `from_status` is always 'current' — endLink permits no other
+      // precondition (see the check above) — but is recorded explicitly
+      // for `repairLifecycleJournal` to compare against, matching
+      // suppressLink/deleteLink's own recorded precondition.
+      intendedPayload: { link_id: id, to_status: 'ended', valid_to: validTo, from_status: 'current' }
+    });
+
+    // 6-7. Set valid_to, status ended, and updated_at, preserving the link
+    // id and memberships (untouched). 8. Journal the mutation.
+    return applyLifecycleMutation({
+      journal,
+      operationId,
+      linkId: id,
+      alreadyDone,
+      buildUpdatedRecord: () => ({ ...record, valid_to: validTo, status: 'ended', updated_at: now() })
+    });
   }
 
   async function suppressLink(id, reason, accessContext) {
@@ -497,21 +724,34 @@ export function createUniversalLinkRepository({
     assertReasonCode(reason);
 
     const record = await loadAuthoritativeLinkForAdministration(id);
+    const { resumable } = await peekLifecycleJournal('suppress_link', id, reason);
+    const alreadyDone = resumable && record.status === 'suppressed' ? record : null;
 
-    // 2. Permit transitions from current or ended.
-    if (record.status !== 'current' && record.status !== 'ended') {
+    // 2. Permit transitions from current or ended (unless resuming an
+    // already-applied incomplete attempt).
+    if (!alreadyDone && record.status !== 'current' && record.status !== 'ended') {
       throw invalidTransitionError('suppressLink requires a link with status current or ended.');
     }
 
-    // 3. Set status suppressed and updated_at. 4. Preserve the prior
-    // temporal fields.
-    const updated = { ...record, status: 'suppressed', updated_at: now() };
-    await setJSON(store, linkKey(id), updated);
+    const { operationId, journal } = await ensureLifecycleJournal({
+      operationType: 'suppress_link',
+      linkId: id,
+      detail: reason,
+      // `from_status` records the exact precondition this attempt
+      // observed (current or ended) so repair can refuse to write over a
+      // record that has since moved on to some other state.
+      intendedPayload: { link_id: id, to_status: 'suppressed', reason_code: reason, from_status: record.status }
+    });
 
-    // 5. Journal the mutation. 6. Store a bounded machine safe reason code.
-    await journalMutation({ operationType: 'suppress_link', linkId: id, reasonCode: reason });
-
-    return updated;
+    // 3-4. Set status suppressed, preserving the prior temporal fields. 5-6.
+    // Journal the mutation with a bounded machine safe reason code.
+    return applyLifecycleMutation({
+      journal,
+      operationId,
+      linkId: id,
+      alreadyDone,
+      buildUpdatedRecord: () => ({ ...record, status: 'suppressed', updated_at: now() })
+    });
   }
 
   async function deleteLink(id, reason, accessContext) {
@@ -520,21 +760,35 @@ export function createUniversalLinkRepository({
     assertReasonCode(reason);
 
     const record = await loadAuthoritativeLinkForAdministration(id);
+    const { resumable } = await peekLifecycleJournal('delete_link', id, reason);
+    const alreadyDone = resumable && record.status === 'deleted' ? record : null;
 
-    // 2. Permit transitions from current, ended, or suppressed.
-    if (!['current', 'ended', 'suppressed'].includes(record.status)) {
+    // 2. Permit transitions from current, ended, or suppressed (unless
+    // resuming an already-applied incomplete attempt).
+    if (!alreadyDone && !['current', 'ended', 'suppressed'].includes(record.status)) {
       throw invalidTransitionError('deleteLink requires a link with status current, ended, or suppressed.');
     }
 
-    // 3. Set status deleted and updated_at. 4. Soft deletion only. 5.
-    // Preserve the authoritative record and memberships.
-    const updated = { ...record, status: 'deleted', updated_at: now() };
-    await setJSON(store, linkKey(id), updated);
+    const { operationId, journal } = await ensureLifecycleJournal({
+      operationType: 'delete_link',
+      linkId: id,
+      detail: reason,
+      // `from_status` records the exact precondition this attempt
+      // observed (current, ended, or suppressed) so repair can refuse to
+      // write over a record that has since moved on to some other state.
+      intendedPayload: { link_id: id, to_status: 'deleted', reason_code: reason, from_status: record.status }
+    });
 
-    // 6. Journal the mutation. 7. Store a bounded machine safe reason code.
-    await journalMutation({ operationType: 'delete_link', linkId: id, reasonCode: reason });
-
-    return updated;
+    // 3-5. Set status deleted (soft deletion only), preserving the
+    // authoritative record and memberships. 6-7. Journal the mutation with
+    // a bounded machine safe reason code.
+    return applyLifecycleMutation({
+      journal,
+      operationId,
+      linkId: id,
+      alreadyDone,
+      buildUpdatedRecord: () => ({ ...record, status: 'deleted', updated_at: now() })
+    });
   }
 
   // --- Index rebuild ---
@@ -581,14 +835,52 @@ export function createUniversalLinkRepository({
       counts.valid += 1;
 
       // 4. Derive the expected source, target, and relationship type
-      // memberships. 5. Check whether each membership exists.
+      // memberships. 5. Check whether each membership exists — and is
+      // actually valid for *this* link, not merely present (the same
+      // strict check `readAuthoritativeState` uses; see correction A1).
       const sourceKey = bySourceKey(record.source_ref, record.id);
       const targetKey = byTargetKey(record.target_ref, record.id);
       const typeKey = byTypeKey(record.relationship_type, record.id);
 
-      const hasSource = Boolean(await getJSON(store, sourceKey, STRONG));
-      const hasTarget = Boolean(await getJSON(store, targetKey, STRONG));
-      const hasType = Boolean(await getJSON(store, typeKey, STRONG));
+      // Each membership read is wrapped separately so one failed read
+      // never aborts the whole rebuild (correction A2): before this, an
+      // unhandled rejection from any of these three reads propagated
+      // through `mapBounded`'s `Promise.all`, which killed the entire
+      // batch — including every other link already in flight alongside
+      // it — and the rebuild never inspected any link queued after it.
+      // A failed read here instead counts this one link as failed and
+      // moves on; nothing is written for a link whose membership state
+      // could not be fully established.
+      let hasSource;
+      let hasTarget;
+      let hasType;
+      try {
+        hasSource = isValidEndpointMembershipRecord(await getJSON(store, sourceKey, STRONG), {
+          linkId: record.id,
+          canonicalRef: record.source_ref
+        });
+      } catch {
+        counts.failed += 1;
+        return;
+      }
+      try {
+        hasTarget = isValidEndpointMembershipRecord(await getJSON(store, targetKey, STRONG), {
+          linkId: record.id,
+          canonicalRef: record.target_ref
+        });
+      } catch {
+        counts.failed += 1;
+        return;
+      }
+      try {
+        hasType = isValidTypeMembershipRecord(await getJSON(store, typeKey, STRONG), {
+          linkId: record.id,
+          relationshipType: record.relationship_type
+        });
+      } catch {
+        counts.failed += 1;
+        return;
+      }
 
       const missingWrites = [];
       if (!hasSource) {
@@ -639,9 +931,9 @@ export function createUniversalLinkRepository({
   return {
     createLink,
     getLink: (id, accessContext) => readRepository.getLink(id, accessContext),
-    listOutgoing: (sourceRef, accessContext) => readRepository.listOutgoing(sourceRef, accessContext),
-    listIncoming: (targetRef, accessContext) => readRepository.listIncoming(targetRef, accessContext),
-    listForEntity: (ref, accessContext) => readRepository.listForEntity(ref, accessContext),
+    listOutgoing: (sourceRef, accessContext, resolveOptions) => readRepository.listOutgoing(sourceRef, accessContext, resolveOptions),
+    listIncoming: (targetRef, accessContext, resolveOptions) => readRepository.listIncoming(targetRef, accessContext, resolveOptions),
+    listForEntity: (ref, accessContext, resolveOptions) => readRepository.listForEntity(ref, accessContext, resolveOptions),
     endLink,
     suppressLink,
     deleteLink,

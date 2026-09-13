@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createAccessContext, endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { formatEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { bySourceKey, byTargetKey, byTypeKey, linkKey, operationKey } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
+import { deriveOperationId } from '../../netlify/functions/_shared/universal-link-schema.mjs';
 import { createUniversalLinkRepository } from '../../netlify/functions/_shared/universal-link-repository.mjs';
 
 // This suite exercises the canonical write service against a synthetic,
@@ -14,9 +15,13 @@ function createMemoryStore() {
   const map = new Map();
   const writeLog = [];
   let failWhen = null; // (key, value) => boolean
+  let failGetWhen = null; // (key) => boolean
 
   return {
     async get(key, { type } = {}) {
+      if (failGetWhen && failGetWhen(key)) {
+        throw Object.assign(new Error('simulated read failure'), { code: 'simulated_read_failure' });
+      }
       if (!map.has(key)) return null;
       const raw = map.get(key);
       return type === 'json' ? JSON.parse(raw) : raw;
@@ -38,6 +43,12 @@ function createMemoryStore() {
     _clearFailure() {
       failWhen = null;
     },
+    _failGetMatching(predicate) {
+      failGetWhen = predicate;
+    },
+    _clearGetFailure() {
+      failGetWhen = null;
+    },
     _writeLog: writeLog,
     _has(key) {
       return map.has(key);
@@ -45,6 +56,12 @@ function createMemoryStore() {
     _raw(key) {
       const value = map.get(key);
       return value ? JSON.parse(value) : null;
+    },
+    _put(key, value) {
+      map.set(key, JSON.stringify(value));
+    },
+    _delete(key) {
+      map.delete(key);
     }
   };
 }
@@ -278,18 +295,15 @@ for (const boundary of WRITE_BOUNDARIES) {
     const outgoing = await repo.listOutgoing(TASK_REF, life);
     assert.equal(outgoing.length, 1, 'no duplicate link or membership after retry');
 
-    // When the failure happened at the prepared-journal write itself, that
-    // attempt's operation id was never durably written — there is nothing
-    // for repairOperation to find under it, by definition, and the retry
-    // above (not this operation id) is what completed the link. For every
-    // later boundary, the journal *was* persisted, so a second
-    // repairOperation call on it is a safe no-op that reports committed.
-    if (boundary.name !== 'prepared journal write') {
-      const repaired = await repo.repairOperation(caughtOperationId, admin);
-      assert.equal(repaired.status, 'committed');
-    } else {
-      await assert.rejects(repo.repairOperation(caughtOperationId, admin), error => error.code === 'operation_not_found');
-    }
+    // The operation id is deterministic (derived from the link id itself,
+    // correction A3) rather than randomly generated per attempt, so the
+    // retry above resumed and committed this *exact* operation id — even
+    // when the very first write attempted under it (the prepared-journal
+    // write) is what failed. A second repairOperation call on it is a safe
+    // no-op that reports the already-committed status.
+    const repaired = await repo.repairOperation(caughtOperationId, admin);
+    assert.equal(repaired.status, 'committed');
+    assert.equal(repaired.repaired, false);
   });
 }
 
@@ -625,6 +639,518 @@ test('rebuild hydration never exceeds ten simultaneous reads or writes', async (
   const report = await repo.rebuildIndexes(admin, { dryRun: false });
   assert.equal(report.inspected, 25);
   assert.ok(maxInFlight <= 10, `expected at most 10 concurrent Blob operations, saw ${maxInFlight}`);
+});
+
+// --- Correction A1: strict membership content validation ---
+
+test('A1: a membership record with wrong content at the expected key is treated as missing and repaired on retry', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  // Corrupt the source membership: right key, wrong canonical_ref content
+  // (as if a hash-prefix collision or a bad write once landed here). A
+  // naive existence check (`Boolean(value)`) would treat this as "already
+  // present" and never repair it, even though the read path already
+  // filters it out as invalid — leaving the link permanently unreachable
+  // via an ordinary read despite `createLink` having reported success.
+  store._put(bySourceKey(TASK_REF, link.id), {
+    schema_version: 1,
+    link_id: link.id,
+    canonical_ref: 'shared:person:person_someone_else',
+    created_at: '2020-01-01T00:00:00.000Z'
+  });
+
+  const beforeRepair = await repo.listOutgoing(TASK_REF, life);
+  assert.equal(beforeRepair.length, 0, 'the read path already rejects the corrupted membership');
+
+  const retry = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+  assert.equal(retry.link.id, link.id);
+  assert.equal(retry.created, false);
+
+  assert.equal(store._raw(bySourceKey(TASK_REF, link.id)).canonical_ref, TASK_REF);
+  const afterRepair = await repo.listOutgoing(TASK_REF, life);
+  assert.equal(afterRepair.length, 1, 'the link is reachable again once the corrupted membership is replaced');
+});
+
+test('A1: rebuildIndexes counts a membership with wrong content as missing, reports it in dry run, and repairs it live', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  store._put(byTypeKey('collaborator', link.id), {
+    schema_version: 1,
+    link_id: link.id,
+    relationship_type: 'contact',
+    created_at: '2020-01-01T00:00:00.000Z'
+  });
+
+  const dry = await repo.rebuildIndexes(admin, { dryRun: true });
+  assert.equal(dry.missing, 1);
+  assert.equal(dry.repaired, 0);
+  assert.equal(store._raw(byTypeKey('collaborator', link.id)).relationship_type, 'contact', 'dry run must not write');
+
+  const live = await repo.rebuildIndexes(admin, { dryRun: false });
+  assert.equal(live.missing, 1);
+  assert.equal(live.repaired, 1);
+  assert.equal(store._raw(byTypeKey('collaborator', link.id)).relationship_type, 'collaborator');
+});
+
+// --- Correction A2: rebuild survives a failed membership read ---
+
+test('A2: a failed membership read during rebuild counts as failed for that link without aborting the whole rebuild', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  const { link: linkA } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+  const entities = defaultEntities();
+  entities.set('shared:person:person_other', { kind: 'person' });
+  const repoB = createRepo(store, { resolveEntity: createFakeResolver(entities) });
+  const { link: linkB } = await repoB.createLink(
+    { source_ref: TASK_REF, target_ref: 'shared:person:person_other', relationship_type: 'collaborator' },
+    life
+  );
+
+  // Give link B real repair work to do, so a report of "still inspected
+  // and repaired" is meaningful rather than vacuously true.
+  store._delete(byTargetKey('shared:person:person_other', linkB.id));
+
+  let failedOnce = false;
+  store._failGetMatching(key => {
+    if (failedOnce) return false;
+    if (key === byTargetKey(PERSON_REF, linkA.id)) {
+      failedOnce = true;
+      return true;
+    }
+    return false;
+  });
+
+  const report = await repo.rebuildIndexes(admin, { dryRun: false });
+  assert.equal(report.inspected, 2, 'both links were inspected despite link A\'s read failure');
+  assert.equal(report.failed, 1, 'link A\'s failed membership read counts as failed, not a crash');
+  assert.equal(report.repaired, 1, 'link B\'s missing membership was still repaired');
+  assert.ok(
+    store._has(byTargetKey('shared:person:person_other', linkB.id)),
+    'a later link still gets inspected and repaired after an earlier link\'s read failure'
+  );
+});
+
+test('A2: failure injection covers each of the three membership reads independently', async () => {
+  for (const targetKeyName of ['source', 'target', 'type']) {
+    // eslint-disable-next-line no-await-in-loop
+    const store = createMemoryStore();
+    // eslint-disable-next-line no-await-in-loop
+    const repo = createRepo(store);
+    // eslint-disable-next-line no-await-in-loop
+    const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+    const failingKey = targetKeyName === 'source'
+      ? bySourceKey(TASK_REF, link.id)
+      : targetKeyName === 'target'
+        ? byTargetKey(PERSON_REF, link.id)
+        : byTypeKey('collaborator', link.id);
+
+    store._failGetMatching(key => key === failingKey);
+
+    // eslint-disable-next-line no-await-in-loop
+    const report = await repo.rebuildIndexes(admin, { dryRun: false });
+    assert.equal(report.inspected, 1);
+    assert.equal(report.failed, 1, `a failed ${targetKeyName} membership read must not crash rebuildIndexes`);
+  }
+});
+
+// --- Correction A3: retry commits the ORIGINAL create operation ---
+
+test('A3: retry after a commit-journal failure brings the ORIGINAL operation to committed with all four steps and no error code', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+
+  let seenOperationWrites = 0;
+  store._failNextMatching(key => {
+    if (!key.startsWith('universal-links/operations/')) return false;
+    seenOperationWrites += 1;
+    return seenOperationWrites === 2; // the final commit write
+  });
+
+  let originalOperationId;
+  let originalLinkId;
+  await assert.rejects(repo.createLink({ ...COLLABORATOR_INPUT }, life), error => {
+    assert.equal(error.status, 503);
+    assert.equal(error.code, 'link_write_incomplete');
+    originalOperationId = error.operation_id;
+    originalLinkId = error.link_id;
+    return true;
+  });
+
+  store._clearFailure();
+  const retry = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+  assert.equal(retry.link.id, originalLinkId);
+  assert.equal(retry.created, false, 'the link and memberships were already durable before the commit write failed');
+
+  const originalOperation = store._raw(operationKey(originalOperationId));
+  assert.equal(originalOperation.operation_id, originalOperationId);
+  assert.equal(originalOperation.status, 'committed');
+  assert.deepEqual(
+    [...originalOperation.completed_steps].sort(),
+    ['link', 'source_membership', 'target_membership', 'type_membership'].sort()
+  );
+  assert.equal(originalOperation.last_error_code, null);
+
+  assert.equal(store._writeLog.filter(key => key === linkKey(originalLinkId)).length, 1, 'the link was written exactly once');
+  assert.equal(store._writeLog.filter(key => key === bySourceKey(TASK_REF, originalLinkId)).length, 1);
+  assert.equal(store._writeLog.filter(key => key === byTargetKey(PERSON_REF, originalLinkId)).length, 1);
+  assert.equal(store._writeLog.filter(key => key === byTypeKey('collaborator', originalLinkId)).length, 1);
+});
+
+// --- Correction A4: recoverable lifecycle journalling ---
+
+const LIFECYCLE_CASES = [
+  {
+    name: 'endLink',
+    setup: repo => repo.createLink({
+      source_ref: PERSON_REF,
+      target_ref: ORG_REF,
+      relationship_type: 'employee_at',
+      valid_from: '2025-01-01T00:00:00.000Z'
+    }, life).then(({ link }) => link),
+    call: (repo, link) => repo.endLink(link.id, '2026-06-01T00:00:00.000Z', life),
+    expectedStatus: 'ended'
+  },
+  {
+    name: 'suppressLink',
+    setup: repo => repo.createLink({ ...COLLABORATOR_INPUT }, life).then(({ link }) => link),
+    call: (repo, link) => repo.suppressLink(link.id, 'operator_requested', admin),
+    expectedStatus: 'suppressed'
+  },
+  {
+    name: 'deleteLink',
+    setup: repo => repo.createLink({ ...COLLABORATOR_INPUT }, life).then(({ link }) => link),
+    call: (repo, link) => repo.deleteLink(link.id, 'operator_requested', admin),
+    expectedStatus: 'deleted'
+  }
+];
+
+const LIFECYCLE_WRITE_BOUNDARIES = ['prepared journal write', 'authoritative link write', 'committed journal update'];
+
+for (const lifecycleCase of LIFECYCLE_CASES) {
+  for (const boundary of LIFECYCLE_WRITE_BOUNDARIES) {
+    test(`A4: ${lifecycleCase.name} survives a failed "${boundary}" and a retry completes the same operation without rejecting`, async () => {
+      const store = createMemoryStore();
+      const repo = createRepo(store);
+      const link = await lifecycleCase.setup(repo);
+
+      let failed = false;
+      let operationWriteCount = 0;
+      store._failNextMatching(key => {
+        if (failed) return false;
+        if (boundary === 'authoritative link write') {
+          if (key === linkKey(link.id)) {
+            failed = true;
+            return true;
+          }
+          return false;
+        }
+        if (!key.startsWith('universal-links/operations/')) return false;
+        operationWriteCount += 1;
+        const shouldFail = (boundary === 'prepared journal write' && operationWriteCount === 1) ||
+          (boundary === 'committed journal update' && operationWriteCount === 2);
+        if (shouldFail) failed = true;
+        return shouldFail;
+      });
+
+      let caughtOperationId;
+      await assert.rejects(lifecycleCase.call(repo, link), error => {
+        assert.equal(error.status, 503);
+        assert.equal(error.code, 'link_write_incomplete');
+        assert.equal(typeof error.operation_id, 'string');
+        caughtOperationId = error.operation_id;
+        return true;
+      });
+
+      store._clearFailure();
+
+      // The retry must not reject merely because the first attempt already
+      // changed the link's status (implementation-programme correction A4).
+      const retried = await lifecycleCase.call(repo, link);
+      assert.equal(retried.status, lifecycleCase.expectedStatus);
+
+      const operation = store._raw(operationKey(caughtOperationId));
+      assert.equal(operation.status, 'committed');
+      assert.equal(operation.last_error_code, null);
+
+      // repairOperation reaches the same committed result without
+      // duplicating operations.
+      const repaired = await repo.repairOperation(caughtOperationId, admin);
+      assert.equal(repaired.status, 'committed');
+      assert.equal(repaired.repaired, false);
+    });
+  }
+}
+
+test('A4: repeating a fully-completed suppressLink/deleteLink with no prior failure is still rejected by the ordinary transition graph', async () => {
+  // A resumed *incomplete* attempt bypasses the transition check; an
+  // ordinary repeat of a request that already fully succeeded must not.
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  await repo.suppressLink(link.id, 'operator_requested', admin);
+  await assert.rejects(
+    repo.suppressLink(link.id, 'operator_requested', admin),
+    error => error.code === 'invalid_lifecycle_transition'
+  );
+
+  await repo.deleteLink(link.id, 'operator_requested', admin);
+  await assert.rejects(
+    repo.deleteLink(link.id, 'operator_requested', admin),
+    error => error.code === 'invalid_lifecycle_transition'
+  );
+});
+
+// --- Job 2 (PR #313 correction comment): stale lifecycle repair must never
+// supersede a later change ---
+
+test('Job2: repairing a stale endLink after the same link was later deleted returns 409 and the link stays deleted', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  // 1-3: start endLink, fail the authoritative link write.
+  let failed = false;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (key === linkKey(link.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.endLink(link.id, '2026-06-01T00:00:00.000Z', life),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503 && error.code === 'link_write_incomplete';
+    }
+  );
+  store._clearFailure();
+
+  // 4: complete deleteLink for the same link.
+  const deleted = await repo.deleteLink(link.id, 'operator_requested', admin);
+  assert.equal(deleted.status, 'deleted');
+
+  // 5-6: repairing the earlier endLink operation must refuse, and the
+  // link must stay deleted.
+  await assert.rejects(
+    repo.repairOperation(caughtOperationId, admin),
+    error => error.status === 409 && error.code === 'link_operation_superseded'
+  );
+  const final = store._raw(linkKey(link.id));
+  assert.equal(final.status, 'deleted');
+  assert.equal(final.valid_to, null, 'endLink\'s valid_to must never have been written over the deletion');
+});
+
+test('Job2: repairing a stale suppressLink after the same link was later deleted leaves the link deleted', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  let failed = false;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (key === linkKey(link.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.suppressLink(link.id, 'operator_requested', admin),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+
+  await repo.deleteLink(link.id, 'operator_requested', admin);
+
+  const repairResult = await repo.repairOperation(caughtOperationId, admin).catch(error => error);
+  assert.equal(repairResult.status, 409);
+  const final = store._raw(linkKey(link.id));
+  assert.equal(final.status, 'deleted');
+});
+
+test('Job2: repairing a stale endLink after a different later permitted mutation preserves that later state', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  let failed = false;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (key === linkKey(link.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.endLink(link.id, '2026-06-01T00:00:00.000Z', life),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+
+  // A different, independently permitted later lifecycle operation lands
+  // instead of a retry of the failed endLink.
+  const suppressed = await repo.suppressLink(link.id, 'operator_requested', admin);
+  assert.equal(suppressed.status, 'suppressed');
+
+  await assert.rejects(
+    repo.repairOperation(caughtOperationId, admin),
+    error => error.status === 409 && error.code === 'link_operation_superseded'
+  );
+  const final = store._raw(linkKey(link.id));
+  assert.equal(final.status, 'suppressed', 'the later state must survive the stale repair attempt');
+});
+
+test('Job2: a genuine retry after the authoritative mutation landed but before the journal committed still finishes the original journal', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  let failed = false;
+  let operationWriteCount = 0;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (!key.startsWith('universal-links/operations/')) return false;
+    operationWriteCount += 1;
+    // Fail the *second* operation write for this id — the commit update
+    // that follows a successful authoritative link write.
+    if (operationWriteCount === 2) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.deleteLink(link.id, 'operator_requested', admin),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+
+  // The link mutation already landed; repair must simply finish
+  // committing the same journal, not reject it as superseded.
+  const repaired = await repo.repairOperation(caughtOperationId, admin);
+  assert.equal(repaired.status, 'committed');
+  assert.equal(repaired.repaired, true);
+  const final = store._raw(linkKey(link.id));
+  assert.equal(final.status, 'deleted');
+});
+
+test('Job2: repeated repair of a committed operation, and repeated repair of a superseded operation, are both idempotent', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({ ...COLLABORATOR_INPUT }, life);
+
+  let failed = false;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (key === linkKey(link.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.suppressLink(link.id, 'operator_requested', admin),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+  await repo.deleteLink(link.id, 'operator_requested', admin);
+
+  const firstAttempt = await repo.repairOperation(caughtOperationId, admin).catch(error => error);
+  const secondAttempt = await repo.repairOperation(caughtOperationId, admin).catch(error => error);
+  assert.equal(firstAttempt.status, 409);
+  assert.equal(secondAttempt.status, 409);
+  assert.equal(firstAttempt.code, 'link_operation_superseded');
+  assert.equal(secondAttempt.code, 'link_operation_superseded');
+
+  // A committed operation's repair is separately, already-proven
+  // idempotent by the A4 suite above; this test's own committed
+  // deleteLink operation is exercised the same way for completeness.
+  const deleteOperationId = deriveOperationId(['lifecycle_link', 'delete_link', link.id, 'operator_requested']);
+  const repairedOnce = await repo.repairOperation(deleteOperationId, admin);
+  const repairedTwice = await repo.repairOperation(deleteOperationId, admin);
+  assert.equal(repairedOnce.repaired, false);
+  assert.equal(repairedTwice.repaired, false);
+});
+
+test('Job2: a superseded repair never touches memberships or the link\'s temporal history', async () => {
+  const store = createMemoryStore();
+  const repo = createRepo(store);
+  const { link } = await repo.createLink({
+    source_ref: PERSON_REF,
+    target_ref: ORG_REF,
+    relationship_type: 'employee_at',
+    valid_from: '2025-01-01T00:00:00.000Z'
+  }, life);
+
+  let failed = false;
+  store._failNextMatching(key => {
+    if (failed) return false;
+    if (key === linkKey(link.id)) {
+      failed = true;
+      return true;
+    }
+    return false;
+  });
+  let caughtOperationId;
+  await assert.rejects(
+    repo.endLink(link.id, '2026-06-01T00:00:00.000Z', life),
+    error => {
+      caughtOperationId = error.operation_id;
+      return error.status === 503;
+    }
+  );
+  store._clearFailure();
+  await repo.deleteLink(link.id, 'operator_requested', admin);
+
+  const membershipKeysBefore = [bySourceKey(PERSON_REF, link.id), byTargetKey(ORG_REF, link.id), byTypeKey('employee_at', link.id)]
+    .map(key => store._raw(key));
+
+  await assert.rejects(repo.repairOperation(caughtOperationId, admin), error => error.status === 409);
+
+  const membershipKeysAfter = [bySourceKey(PERSON_REF, link.id), byTargetKey(ORG_REF, link.id), byTypeKey('employee_at', link.id)]
+    .map(key => store._raw(key));
+  assert.deepEqual(membershipKeysAfter, membershipKeysBefore);
+
+  const final = store._raw(linkKey(link.id));
+  assert.equal(final.valid_from, '2025-01-01T00:00:00.000Z');
+  assert.equal(final.created_at, link.created_at);
 });
 
 // --- No module outside universal-link-repository.mjs writes Universal Link keys ---

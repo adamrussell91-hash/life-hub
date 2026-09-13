@@ -84,7 +84,7 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
     }
   }
 
-  async function listByPrefix({ requestedRefInput, prefixFor, matchField, otherField, accessContext }) {
+  async function listByPrefix({ requestedRefInput, prefixFor, matchField, otherField, accessContext, requestedRefResolveOptions }) {
     // 1. Parse and validate the requested EntityRef before any hashing or
     // lookup — a malformed query is a caller error (400), not a 404.
     const requestedRef = assertRegisteredEntityRef(requestedRefInput);
@@ -96,8 +96,18 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
     // memberships — rather than a 404 that would confirm something about
     // its existence. Any other failure (resolver_unavailable, a storage
     // fault) propagates rather than being reinterpreted as "no results."
+    //
+    // `requestedRefResolveOptions` (e.g. `{ includeArchived: true }`) is
+    // forwarded *only* to this one resolution of the caller's own
+    // requested ref — never to resolving the *other* endpoint of each
+    // link below (`toAccessibleEntry` always calls `resolveEntity` with no
+    // options). This is the deliberate "overview resolver mode" a caller
+    // like entity-overview.mjs opts into explicitly (correction B5): it
+    // lets a deliberately-requested archived Person/Organisation see its
+    // own relationship history, without making archived identities
+    // visible anywhere else a link's *other* endpoint gets resolved.
     try {
-      await resolveEntity(canonicalRef, accessContext);
+      await resolveEntity(canonicalRef, accessContext, requestedRefResolveOptions);
     } catch (error) {
       if (isEndpointNotFound(error)) return [];
       throw error;
@@ -141,30 +151,39 @@ export function createUniversalLinkReadRepository({ store, resolveEntity }) {
       return record;
     },
 
-    async listOutgoing(sourceRefInput, accessContext) {
+    async listOutgoing(sourceRefInput, accessContext, resolveOptions) {
       return listByPrefix({
         requestedRefInput: sourceRefInput,
         prefixFor: bySourcePrefix,
         matchField: 'source_ref',
         otherField: 'target_ref',
-        accessContext
+        accessContext,
+        requestedRefResolveOptions: resolveOptions
       });
     },
 
-    async listIncoming(targetRefInput, accessContext) {
+    async listIncoming(targetRefInput, accessContext, resolveOptions) {
       return listByPrefix({
         requestedRefInput: targetRefInput,
         prefixFor: byTargetPrefix,
         matchField: 'target_ref',
         otherField: 'source_ref',
-        accessContext
+        accessContext,
+        requestedRefResolveOptions: resolveOptions
       });
     },
 
-    async listForEntity(refInput, accessContext) {
+    // `resolveOptions` is opt-in and forwarded to `listOutgoing`/
+    // `listIncoming` unchanged — omitted entirely, ordinary calls keep
+    // today's behaviour (an archived/hidden requested ref yields an empty
+    // result, same as absent). Only a caller that deliberately asks for
+    // e.g. `{ includeArchived: true }` (entity-overview.mjs's dedicated
+    // overview mode) sees a deliberately-requested archived entity's own
+    // relationship history.
+    async listForEntity(refInput, accessContext, resolveOptions) {
       const [outgoing, incoming] = await Promise.all([
-        this.listOutgoing(refInput, accessContext),
-        this.listIncoming(refInput, accessContext)
+        this.listOutgoing(refInput, accessContext, resolveOptions),
+        this.listIncoming(refInput, accessContext, resolveOptions)
       ]);
       return { outgoing, incoming };
     }

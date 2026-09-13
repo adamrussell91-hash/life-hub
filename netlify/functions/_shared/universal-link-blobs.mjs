@@ -65,12 +65,29 @@ function assertValidEventId(id) {
   return id;
 }
 
+export const PERSON_PREFIX = 'entities/person/';
+export const ORGANISATION_PREFIX = 'entities/organisation/';
+
 export function personKey(id) {
-  return `entities/person/${assertValidPersonId(id)}`;
+  return `${PERSON_PREFIX}${assertValidPersonId(id)}`;
 }
 
 export function organisationKey(id) {
-  return `entities/organisation/${assertValidOrganisationId(id)}`;
+  return `${ORGANISATION_PREFIX}${assertValidOrganisationId(id)}`;
+}
+
+// Lists authoritative Person keys directly — never the derived search
+// index (correction: reconciliation Job 2). A Person whose index write
+// failed is invisible to `listPersonIndexKeys` below, but must still be
+// visible to anything deciding which Person records actually exist (most
+// importantly `reconcileSelfIdentity`). Bounded the same way
+// `listAuthoritativeLinkKeys` is: an administrative/reconciliation-only
+// full-prefix listing under `entities/person/` specifically — distinct
+// from, and never overlapping with, `entities/index/person/`,
+// `entities/organisation/`, `entities/events/`, or `entities/self-pointer` —
+// never called from an ordinary read path.
+export async function listAuthoritativePersonKeys(store) {
+  return (await listBlobKeys(store, PERSON_PREFIX)).filter(key => !isIndexKey(key));
 }
 
 export const PERSON_INDEX_PREFIX = 'entities/index/person/';
@@ -88,7 +105,11 @@ export function organisationIndexKey(id) {
 // authoritative record) under one kind's index prefix — used by
 // entity-search.mjs. Bounded the same way listAuthoritativeLinkKeys is: an
 // administrative/search-only full-prefix listing, never called from an
-// ordinary Universal Link read path.
+// ordinary Universal Link read path. This is *derived* data: correction
+// Job 2 established that anything deciding which Person records
+// authoritatively exist (`reconcileSelfIdentity`) must use
+// `listAuthoritativePersonKeys` above instead — this index listing stays
+// eligible for search and for repair, never for existence decisions.
 export async function listPersonIndexKeys(store) {
   return (await listBlobKeys(store, PERSON_INDEX_PREFIX)).filter(key => !isIndexKey(key));
 }
@@ -226,6 +247,46 @@ function isPlausibleMembershipRecord(record, canonicalRef) {
     typeof record === 'object' &&
     isValidLinkId(record.link_id) &&
     record.canonical_ref === canonicalRef
+  );
+}
+
+// Strict existence checks for a *specific* expected membership record at a
+// known key — used by the write path (`universal-link-repository.mjs`) to
+// decide whether a create/retry/repair/rebuild step may skip writing a
+// membership, or must treat it as missing and replace it.
+//
+// Before this check existed, the write path treated ANY non-null value at
+// a membership key as "already present" (`Boolean(record)`), while the
+// read path (`isPlausibleMembershipRecord` above, via `listMembership`)
+// already rejected a record whose fields didn't match. That mismatch let a
+// membership with the wrong schema version, link id, canonical ref, or
+// relationship type sit at the expected key forever: the write path never
+// repaired it (it looked "present"), and the read path always filtered it
+// out (it looked absent) — the link became permanently unreachable via
+// `listOutgoing`/`listIncoming`/`listForEntity` even though creating it
+// reported success. Every field must match exactly; a record failing any
+// check counts as missing so the caller replaces it at the same key.
+export function isValidEndpointMembershipRecord(record, { linkId, canonicalRef }) {
+  return Boolean(
+    record &&
+    typeof record === 'object' &&
+    record.schema_version === MEMBERSHIP_SCHEMA_VERSION &&
+    record.link_id === linkId &&
+    record.canonical_ref === canonicalRef &&
+    typeof record.created_at === 'string' &&
+    record.created_at.length > 0
+  );
+}
+
+export function isValidTypeMembershipRecord(record, { linkId, relationshipType }) {
+  return Boolean(
+    record &&
+    typeof record === 'object' &&
+    record.schema_version === MEMBERSHIP_SCHEMA_VERSION &&
+    record.link_id === linkId &&
+    record.relationship_type === relationshipType &&
+    typeof record.created_at === 'string' &&
+    record.created_at.length > 0
   );
 }
 

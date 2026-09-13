@@ -4,22 +4,9 @@ import {
   ORGANISATION_TRANSITIONS,
   PERSON_TRANSITIONS,
   applyLifecycleTransition,
-  assertLifecycleTransitionAllowed,
-  writeLifecycleEvent
+  assertLifecycleTransitionAllowed
 } from '../../netlify/functions/_shared/entity-lifecycle.mjs';
 import { TOMBSTONE_LABEL, generatePersonId } from '../../netlify/functions/_shared/identity-schema.mjs';
-import { entityEventsPrefix } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
-
-function createMemoryStore() {
-  const map = new Map();
-  return {
-    async setJSON(key, value) { map.set(key, value); },
-    async list({ prefix = '' } = {}) {
-      return { blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
-    },
-    _dump() { return [...map.entries()]; }
-  };
-}
 
 test('PERSON_TRANSITIONS matches the documented graph exactly', () => {
   assert.deepEqual([...PERSON_TRANSITIONS.active].sort(), ['archived', 'deidentified', 'inactive', 'retained']);
@@ -122,17 +109,4 @@ test('applyLifecycleTransition sets retention_reason/retention_review_at when tr
   });
   assert.equal(retained.retention_reason, 'legal_hold');
   assert.equal(retained.retention_review_at, '2027-01-01T00:00:00.000Z');
-});
-
-test('writeLifecycleEvent writes one event Blob under entities/events/<hash>/ with no display label', async () => {
-  const store = createMemoryStore();
-  const ref = `shared:person:${generatePersonId()}`;
-  const event = await writeLifecycleEvent(store, { entityRef: ref, fromStatus: 'active', toStatus: 'archived', now: '2026-09-11T00:00:00.000Z' });
-  assert.equal(event.entity_ref, ref);
-  assert.equal(event.from_status, 'active');
-  assert.equal(event.to_status, 'archived');
-  const [[key, value]] = store._dump();
-  assert.ok(key.startsWith(entityEventsPrefix(ref)));
-  assert.deepEqual(value, event);
-  assert.doesNotMatch(JSON.stringify(event), /Seth|display_label|display_name/i);
 });
