@@ -7,8 +7,15 @@ export function connectedLinksHtml(
   entries: { id: string; title: string }[],
   options: {
     relationships?: Array<{ legacy_hub_ref?: string | null; target_ref?: string }> | null;
+    relationshipsStatus?: "ready" | "unavailable" | null;
   } = {},
 ): string {
+  if (options.relationshipsStatus === "unavailable") {
+    return `<section class="wiki-links" aria-label="Connected">
+              <h3>Connected</h3>
+              <p class="wiki-links__unavailable">Related pages are unavailable.</p>
+            </section>`;
+  }
   const ids = connectedDisplayRefs({
     legacyConnected: page.connected ?? [],
     relationships: options.relationships ?? null
