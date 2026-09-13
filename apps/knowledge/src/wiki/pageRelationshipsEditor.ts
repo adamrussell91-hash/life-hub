@@ -16,7 +16,7 @@ import {
   peerHubRefForRelationship,
   type DualReadRelationshipRow
 } from './connectedRelationships';
-import { labelForHubRef, parseHubRef } from '../domain/hub-ref';
+import { hrefForHubRef, labelForHubRef, parseHubRef } from '../domain/hub-ref';
 
 export type RelationshipOwnership =
   | 'outgoing_owned'
@@ -34,6 +34,7 @@ export type RelatedChip = {
   ownership: RelationshipOwnership;
   sourceRef?: string | null;
   targetRef?: string | null;
+  href?: string | null;
 };
 
 export type RelatedStatus =
@@ -166,6 +167,7 @@ export function chipsFromDualRead(input: {
         ownership,
         sourceRef: row.source_ref ?? null,
         targetRef: row.target_ref ?? null,
+        href: parsed ? hrefForHubRef(parsed) : null,
       });
     }
     return { chips, status: 'ready', message: '' };
@@ -196,6 +198,7 @@ export function chipsFromDualRead(input: {
       ownership: 'legacy_pending',
       sourceRef: `knowledge:page:${input.pageId}`,
       targetRef: entityRef,
+      href: parsed ? hrefForHubRef(parsed) : null,
     });
   }
   return { chips, status: 'ready', message: '' };
@@ -329,12 +332,12 @@ export function mountPageRelationshipsEditor(options: {
               kind: 'page',
               display_label: entry.title,
               supporting_label: entry.id,
-              href: null,
+              href: hrefForHubRef({ hub: 'knowledge', kind: 'page', id: entry.id }),
             })),
         },
       };
     },
-    onSelect: (item: { ref: string; display_label: string }) => {
+    onSelect: (item: { ref: string; display_label: string; href?: string | null }) => {
       const hubRef = hubRefFromEntityRef(item.ref);
       if (!hubRef || hubRef === options.pageId) return;
       if (chips.some(chip => chip.hubRef === hubRef)) return;
@@ -347,6 +350,7 @@ export function mountPageRelationshipsEditor(options: {
         ownership: 'outgoing_owned',
         sourceRef: `knowledge:page:${options.pageId}`,
         targetRef: item.ref,
+        href: item.href ?? null,
       };
       chips = [...chips, next];
       chipList.setChips(chips.map(chip => toPickerChip(chip)));
@@ -364,6 +368,7 @@ export function mountPageRelationshipsEditor(options: {
       state: chip.state,
       supportingLabel: supportingLabelFor(chip, options.entries),
       readonly: chip.ownership === 'incoming_readonly',
+      href: chip.href ?? null,
     };
   }
 

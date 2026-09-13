@@ -185,7 +185,8 @@ export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {
         label: role ? `${item.display_label} (${role})` : item.display_label,
         relationshipType: 'attendee',
         state: 'pending',
-        supportingLabel: role
+        supportingLabel: role,
+        href: item.href ?? null
       });
     }
   });

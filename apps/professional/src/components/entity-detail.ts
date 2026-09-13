@@ -1,4 +1,6 @@
 import { fetchEntityOverview } from '@/api/entities';
+import { changeUniversalLinkRole } from '@/api/universal-links';
+import { ApiClientError } from '@/api/client';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
 import type { EntityOverview, RelationshipEntry } from '@/domain/types';
@@ -24,7 +26,91 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function renderRelationshipList(host: HTMLElement, entries: RelationshipEntry[], emptyMessage: string): void {
+/**
+ * Accessible role editing for a current, period relationship: a real
+ * `<button>` (keyboard operable, labelled) reveals an inline `<label>` +
+ * `<input>` + Save/Cancel pair — never a `window.prompt`. Saving calls the
+ * registry-controlled `change_role` action, which ends the current period
+ * and opens the next one with the new role (server-side `changeRole`), so
+ * the prior role stays queryable history rather than being overwritten.
+ */
+function renderRoleEditor(item: HTMLElement, entry: RelationshipEntry, onChanged: () => void): void {
+  const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? 'No role set');
+
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'btn btn--ghost entity-detail__role-edit';
+  editButton.textContent = 'Edit role';
+  editButton.setAttribute('aria-label', `Edit role for ${entry.endpoint.display_label}`);
+
+  const form = document.createElement('form');
+  form.className = 'entity-detail__role-form';
+  form.hidden = true;
+
+  const labelId = `role-input-${entry.link.id}`;
+  const label = document.createElement('label');
+  label.className = 'entity-detail__role-form-label';
+  label.htmlFor = labelId;
+  label.textContent = `Role for ${entry.endpoint.display_label}`;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = labelId;
+  input.value = entry.link.role ?? '';
+
+  const save = document.createElement('button');
+  save.type = 'submit';
+  save.className = 'btn btn--primary';
+  save.textContent = 'Save';
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.className = 'btn btn--ghost';
+  cancel.textContent = 'Cancel';
+
+  const status = el('p', 'entity-detail__role-form-status');
+  status.hidden = true;
+
+  function openForm(): void {
+    editButton.hidden = true;
+    form.hidden = false;
+    input.focus();
+  }
+
+  function closeForm(): void {
+    form.hidden = true;
+    editButton.hidden = false;
+    status.hidden = true;
+  }
+
+  editButton.addEventListener('click', openForm);
+  cancel.addEventListener('click', closeForm);
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const nextRole = input.value.trim() || null;
+    save.disabled = true;
+    changeUniversalLinkRole(entry.link.id, { role: nextRole, changed_at: new Date().toISOString() })
+      .then(() => {
+        onChanged();
+      })
+      .catch((err: unknown) => {
+        save.disabled = false;
+        status.hidden = false;
+        status.textContent = err instanceof ApiClientError ? err.message : 'Could not update role.';
+      });
+  });
+
+  form.append(label, input, save, cancel, status);
+  item.append(roleLine, editButton, form);
+}
+
+function renderRelationshipList(
+  host: HTMLElement,
+  entries: RelationshipEntry[],
+  emptyMessage: string,
+  options: { editableRoles?: boolean; onRoleChanged?: () => void } = {}
+): void {
   host.replaceChildren();
   if (!entries.length) {
     host.append(el('p', 'empty-state', emptyMessage));
@@ -37,6 +123,12 @@ function renderRelationshipList(host: HTMLElement, entries: RelationshipEntry[],
     const label = el('span', 'entity-detail__relationship-label', entry.link.relationship_type);
     const endpoint = el('span', 'entity-detail__relationship-endpoint', entry.endpoint.display_label);
     item.append(label, document.createTextNode(' · '), endpoint);
+    // Role editing only makes sense for a period relationship that is
+    // still current — a point-in-time or timeless link, or an already-
+    // ended period, has no "current role" to change.
+    if (options.editableRoles && entry.link.temporal_mode === 'period' && entry.link.status === 'current') {
+      renderRoleEditor(item, entry, () => options.onRoleChanged?.());
+    }
     list.append(item);
   }
   host.append(list);
@@ -77,7 +169,10 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     currentSection.append(el('h2', 'entity-detail__heading', 'Current relationships'));
     const currentHost = el('div');
     currentSection.append(currentHost);
-    renderRelationshipList(currentHost, overview.current_relationships, 'No current relationships.');
+    renderRelationshipList(currentHost, overview.current_relationships, 'No current relationships.', {
+      editableRoles: true,
+      onRoleChanged: () => void load()
+    });
 
     const activitySection = el('section', 'entity-detail__section');
     activitySection.append(el('h2', 'entity-detail__heading', 'Linked activity'));

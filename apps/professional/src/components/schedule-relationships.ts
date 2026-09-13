@@ -39,7 +39,18 @@ export function renderRelationshipSection(
       typeof (entry.link as { role?: string }).role === 'string'
         ? (entry.link as { role?: string }).role
         : null;
-    item.textContent = role ? `${type} · ${label} (${role})` : `${type} · ${label}`;
+    const text = role ? `${type} · ${label} (${role})` : `${type} · ${label}`;
+    // Render the resolved endpoint as a clickable link when the server
+    // supplied one — never invent a href client-side.
+    const href = entry.endpoint?.href;
+    if (href) {
+      const link = document.createElement('a');
+      link.href = href;
+      link.textContent = text;
+      item.append(link);
+    } else {
+      item.textContent = text;
+    }
     list.append(item);
   }
   host.append(list);
@@ -119,7 +130,8 @@ export function mountTaskLinkPanel(options: {
           ref: item.ref,
           label: item.display_label,
           relationshipType: options.relationshipType,
-          state: 'pending'
+          state: 'pending',
+          href: item.href ?? null
         }
       ]);
     }
@@ -181,7 +193,7 @@ export function mountTaskLinkPanel(options: {
 /** Knowledge page picker using local Knowledge API when available, else free-text avoided. */
 export function mountKnowledgePagePicker(options: {
   input: HTMLInputElement;
-  onSelect: (item: { ref: string; display_label: string }) => void;
+  onSelect: (item: { ref: string; display_label: string; href?: string | null }) => void;
 }): { root: HTMLElement } {
   const picker = createEntityPicker({
     input: options.input,
@@ -209,7 +221,7 @@ export function mountKnowledgePagePicker(options: {
             kind: 'page',
             display_label: hit.title || hit.id || 'Page',
             supporting_label: hit.id ?? null,
-            href: null
+            href: hit.id ? `/knowledge/#page/${encodeURIComponent(hit.id)}` : null
           }))
         }
       };

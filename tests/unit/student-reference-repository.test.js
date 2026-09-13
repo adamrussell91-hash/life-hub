@@ -199,9 +199,11 @@ test('create recovers when the code-claim write itself fails: the retry claims t
 test('create recovers when the write fails after the code claim is journalled but before the record is written', async () => {
   const teachingStore = memoryStore();
   const ulStore = memoryStore();
-  // 1) operation journal (prepared), 2) code-claim write, 3) journal update
-  // recording claimed_code — fail the authoritative record write (4th).
-  const flaky = failingSetStore(teachingStore, { failOn: [4] });
+  // 1) operation journal (prepared), 2) code-claim write — fail the
+  // authoritative record write (3rd). `claimDisplayCode` needs no journal
+  // bookkeeping of its own: it is idempotent by re-deriving the same
+  // already-claimed code on repair (see claimDisplayCode's own comment).
+  const flaky = failingSetStore(teachingStore, { failOn: [3] });
   const repo = createStudentReferenceRepository({
     teachingStore: flaky,
     accessContext: teachingContext,
@@ -238,9 +240,9 @@ test('create recovers when the write fails after the code claim is journalled bu
 test('create recovers when the write fails after the record is written but before the journal commits', async () => {
   const teachingStore = memoryStore();
   const ulStore = memoryStore();
-  // 1) journal prepared, 2) code claim, 3) journal claimed_code update,
-  // 4) record write, 5) journal commit — fail the commit write.
-  const flaky = failingSetStore(teachingStore, { failOn: [5] });
+  // 1) journal prepared, 2) code claim, 3) record write, 4) journal commit
+  // — fail the commit write.
+  const flaky = failingSetStore(teachingStore, { failOn: [4] });
   const repo = createStudentReferenceRepository({
     teachingStore: flaky,
     accessContext: teachingContext,
@@ -261,6 +263,33 @@ test('create recovers when the write fails after the record is written but befor
 
   const recordKeys = [...teachingStore._map.keys()].filter((k) => k.startsWith('protected/student-references/'));
   assert.equal(recordKeys.length, 1, 'must not duplicate the authoritative record on repair');
+});
+
+test('a failed-then-repaired create never wastes a code or changes the suffix a later sibling would get', async () => {
+  const teachingStore = memoryStore();
+  const ulStore = memoryStore();
+  // Fail the commit write for the first "gg" create.
+  const flaky = failingSetStore(teachingStore, { failOn: [4] });
+  const flakyRepo = createStudentReferenceRepository({
+    teachingStore: flaky,
+    accessContext: teachingContext,
+    getUniversalLinkStore: async () => ulStore,
+    baseResolveEntity,
+    now: () => new Date('2026-08-01T00:00:00.000Z').toISOString()
+  });
+  await assert.rejects(flakyRepo.create('gg'), (e) => e.status === 503);
+
+  const repo = makeRepo({ teachingStore, ulStore });
+  const journalEntry = [...teachingStore._map.entries()].find(([key]) => key.startsWith('protected/student-reference-operations/'));
+  const [, journal] = journalEntry;
+  const repaired = await repo.repairCreate(journal.operation_id);
+  assert.equal(repaired.student.display_code, 'GG', 'repair must land the first student on the bare initials, not a suffix');
+
+  // A second, entirely new "gg" student created afterward must get the
+  // very next free suffix (GG2) — proving the earlier failure-then-repair
+  // cycle did not waste GG2 or leave a gap.
+  const second = await repo.create('gg');
+  assert.equal(second.student.display_code, 'GG2');
 });
 
 test('repairCreate on an already-committed operation is a safe no-op', async () => {
@@ -462,20 +491,112 @@ test('setPermissionStatus closes the current link and opens a new one rather tha
   const studentId = student.ref.split(':').pop();
   const contextRef = formatEntityRef({ namespace: 'tasks', kind: 'program', id: programId });
 
-  const { link: original } = await repo.assign({ studentId, contextType: 'coaching', contextRef });
+  // assign's own valid_from must differ from the fixed clock's `now()` (used
+  // below by setPermissionStatus) so the closed and reopened periods get
+  // distinct deterministic link ids.
+  const { link: original } = await repo.assign({
+    studentId,
+    contextType: 'coaching',
+    contextRef,
+    validFrom: '2025-01-01T00:00:00.000Z'
+  });
   const { ended, created } = await repo.setPermissionStatus({
     studentId,
     contextType: 'coaching',
     contextRef,
-    status: 'approved',
-    changedAt: '2026-08-02T00:00:00.000Z'
+    status: 'approved'
   });
 
   assert.equal(ended.id, original.id);
   assert.equal(ended.status, 'ended');
+  assert.equal(ended.valid_to, '2026-08-01T00:00:00.000Z');
   assert.notEqual(created.id, original.id);
+  assert.equal(created.valid_from, '2026-08-01T00:00:00.000Z');
   assert.equal(created.metadata.permission_status, 'approved');
   assert.equal(created.status, 'current');
+});
+
+test('setPermissionStatus is one journalled, retry-safe operation: the create half can be repaired without re-ending or losing the timestamp', async () => {
+  const teachingStore = memoryStore();
+  const ulStore = memoryStore();
+  const programId = 'prog_coaching_retry';
+  seedProgram(programId);
+  const repo = makeRepo({ teachingStore, ulStore });
+  const { student } = await repo.create('qr');
+  const studentId = student.ref.split(':').pop();
+  const contextRef = formatEntityRef({ namespace: 'tasks', kind: 'program', id: programId });
+  const { link: original } = await repo.assign({
+    studentId,
+    contextType: 'coaching',
+    contextRef,
+    validFrom: '2025-01-01T00:00:00.000Z'
+  });
+
+  // Let the end half commit, then fail exactly the new link's own write so
+  // the create half fails after the end half already landed.
+  let failedOnce = false;
+  const flakyUlStore = {
+    ...ulStore,
+    async setJSON(key, value) {
+      if (!failedOnce && key.startsWith('universal-links/links/') && !key.includes(original.id)) {
+        failedOnce = true;
+        throw Object.assign(new Error('simulated'), { code: 'simulated_failure' });
+      }
+      return ulStore.setJSON(key, value);
+    }
+  };
+  const flakyRepo = createStudentReferenceRepository({
+    teachingStore,
+    accessContext: teachingContext,
+    getUniversalLinkStore: async () => flakyUlStore,
+    baseResolveEntity,
+    now: () => new Date('2026-08-01T00:00:00.000Z').toISOString()
+  });
+
+  await assert.rejects(
+    flakyRepo.setPermissionStatus({ studentId, contextType: 'coaching', contextRef, status: 'approved' }),
+    (e) => e.status === 503 && e.code === 'student_reference_write_incomplete' && typeof e.operation_id === 'string'
+  );
+
+  // The end half is durable: the original link is already ended at the
+  // server-persisted timestamp, even though the operation as a whole
+  // hasn't committed.
+  const endedNow = await (await ulStore.get(`universal-links/links/${original.id}`, { type: 'json' }));
+  assert.equal(endedNow.status, 'ended');
+  assert.equal(endedNow.valid_to, '2026-08-01T00:00:00.000Z');
+
+  const operationJournal = [...teachingStore._map.values()].find((v) => v?.operation_type === 'set_permission_status');
+  assert.ok(operationJournal, 'expected a set_permission_status journal to exist');
+  assert.equal(operationJournal.payload.at, '2026-08-01T00:00:00.000Z', 'the server timestamp must be persisted in the journal');
+
+  // Repair must not attempt to re-end the already-ended link (which would
+  // otherwise reject with invalid_lifecycle_transition) and must reuse the
+  // exact same persisted timestamp for the create half.
+  const repaired = await repo.repairSetPermissionStatus(operationJournal.operation_id);
+  assert.equal(repaired.repaired, true);
+  assert.equal(repaired.created.valid_from, '2026-08-01T00:00:00.000Z');
+  assert.equal(repaired.created.metadata.permission_status, 'approved');
+  assert.equal(repaired.created.status, 'current');
+});
+
+test('assign rejects an archived StudentReference', async () => {
+  const teachingStore = memoryStore();
+  const ulStore = memoryStore();
+  const classId = 'class_archived_assign_synth';
+  seedClass(classId);
+  const repo = makeRepo({ teachingStore, ulStore });
+  const { student } = await repo.create('st');
+  const studentId = student.ref.split(':').pop();
+  await repo.archive(studentId);
+
+  await assert.rejects(
+    repo.assign({
+      studentId,
+      contextType: 'class',
+      contextRef: formatEntityRef({ namespace: 'teaching', kind: 'class', id: classId })
+    }),
+    (e) => e.status === 409 && e.code === 'student_reference_not_active'
+  );
 });
 
 test('search finds current members of a context by code prefix and excludes ended/other-context memberships', async () => {
@@ -493,6 +614,23 @@ test('search finds current members of a context by code prefix and excludes ende
 
   const results = await repo.search({ contextType: 'class', contextRef, query: 'pp' });
   assert.deepEqual(results.map((r) => r.display_code).sort(), ['PP', 'PP2']);
+});
+
+test('search excludes an archived StudentReference even while its membership link is still current', async () => {
+  const teachingStore = memoryStore();
+  const ulStore = memoryStore();
+  const classId = 'class_search_archived_synth';
+  seedClass(classId);
+  const repo = makeRepo({ teachingStore, ulStore });
+  const contextRef = formatEntityRef({ namespace: 'teaching', kind: 'class', id: classId });
+
+  const { student } = await repo.create('tv');
+  const studentId = student.ref.split(':').pop();
+  await repo.assign({ studentId, contextType: 'class', contextRef });
+  await repo.archive(studentId);
+
+  const results = await repo.search({ contextType: 'class', contextRef, query: 'tv' });
+  assert.deepEqual(results, []);
 });
 
 // --- Privacy non-disclosure ---

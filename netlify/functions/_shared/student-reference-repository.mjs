@@ -4,7 +4,12 @@ import { assertEntityKindAllowed, endpointNotFoundError, isVisibilityAllowed } f
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
-import { deriveOperationId, isValidOperationId, isValidReasonCode } from './universal-link-schema.mjs';
+import {
+  deriveOperationId,
+  generateOperationId as defaultGenerateOperationId,
+  isValidOperationId,
+  isValidReasonCode
+} from './universal-link-schema.mjs';
 import { getJSON, setJSON, deleteKey } from './teaching-blobs.mjs';
 import {
   STUDENT_CONTEXT_TARGET_KIND,
@@ -82,7 +87,12 @@ function studentReferenceNotFoundError() {
 // universal-link-schema.mjs's validateOperationRecord shape checks, scoped
 // to this module's own operation types. Returns null (never throws) so a
 // corrupted journal cannot crash a repair attempt.
-const OPERATION_TYPES = new Set(['create_student_reference', 'lifecycle_student_reference', 'delete_student_reference']);
+const OPERATION_TYPES = new Set([
+  'create_student_reference',
+  'lifecycle_student_reference',
+  'delete_student_reference',
+  'set_permission_status'
+]);
 const OPERATION_STATUSES = new Set(['prepared', 'repair_needed', 'committed']);
 
 function validateOperationRecord(raw) {
@@ -156,7 +166,8 @@ export function createStudentReferenceRepository({
   getUniversalLinkStore = defaultGetUniversalLinkStore,
   baseResolveEntity = defaultResolveEntity,
   now = () => new Date().toISOString(),
-  generateId = () => `student_ref_${randomUUID()}`
+  generateId = () => `student_ref_${randomUUID()}`,
+  generateOperationId = defaultGenerateOperationId
 }) {
   if (!teachingStore) throw studentReferenceError('student_reference_store_unbound', 503);
   if (accessContext?.workflow !== 'teaching' || !isVisibilityAllowed(accessContext, 'teaching_protected')) {
@@ -192,57 +203,56 @@ export function createStudentReferenceRepository({
     return record;
   }
 
-  // Allocates a unique display code for `initials`, concurrency-safe: two
-  // callers racing for the same initials can never both claim the same
-  // code, because `trySetIfNew` writes the claim key only if it does not
-  // already exist. The first allocation for a given initials keeps the
+  // Allocates a unique display code for `initials`, concurrency-safe and
+  // idempotent under retry: two callers racing for the same initials can
+  // never both claim the same code, because `trySetIfNew` writes the claim
+  // key only if it does not already exist. Critically, this function is
+  // ALSO safe to call again for the SAME `studentId` after a prior partial
+  // failure — before attempting a fresh claim at each candidate, it first
+  // checks whether that candidate is already claimed BY THIS student
+  // (a prior attempt's claim that succeeded but whose caller never learned
+  // the outcome). When it is, that candidate is returned directly: no new
+  // claim is attempted, no code is wasted, and the suffix never changes
+  // between attempts. The first allocation for a given initials keeps the
   // bare initials; the second and later ones append a neutral numeric
   // suffix (AR, AR2, AR3, ...) — never a student number, DOB, year group,
   // or class (ยง6.1).
   async function claimDisplayCode(initials, studentId) {
     for (let n = 0; n < MAX_SUFFIX_ATTEMPTS; n += 1) {
       const candidate = n === 0 ? initials : `${initials}${n + 1}`;
+      const key = studentCodeKey(candidate);
       // eslint-disable-next-line no-await-in-loop
-      const claimed = await trySetIfNew(teachingStore, studentCodeKey(candidate), {
+      const existing = await getJSON(teachingStore, key);
+      if (existing?.student_ref_id === studentId) return candidate;
+      if (existing) continue; // claimed by a different student; try the next candidate
+      // eslint-disable-next-line no-await-in-loop
+      const claimed = await trySetIfNew(teachingStore, key, {
         schema_version: 1,
         student_ref_id: studentId,
         created_at: now()
       });
       if (claimed) return candidate;
+      // Lost a race for this exact candidate between the check above and
+      // this claim attempt — move on to the next one rather than retrying
+      // the same candidate forever.
     }
     throw studentReferenceError('display_code_exhausted', 409);
   }
 
   // Runs (or resumes) the two idempotent create steps — claim a code, then
-  // write the authoritative record — recorded in `journal.payload`, so a
-  // repair after failure at either step never re-claims a second code for
-  // the same operation and never overwrites an already-written record.
+  // write the authoritative record. `claimDisplayCode` is itself safe to
+  // call again after a prior partial failure (see above), so no
+  // claimed-code bookkeeping needs to live in the journal at all: every
+  // repair simply re-derives the same code and continues.
   async function runCreateSteps(journal) {
     const id = journal.student_id;
-    let claimedCode = journal.payload.claimed_code ?? null;
-
-    if (!claimedCode) {
-      try {
-        claimedCode = await claimDisplayCode(journal.payload.initials, id);
-      } catch (cause) {
-        if (cause?.code === 'display_code_exhausted') throw cause;
-        await bestEffortMarkRepairNeeded(journal, [], cause?.code ?? 'claim_failed');
-        throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId: id });
-      }
-      journal = { ...journal, payload: { ...journal.payload, claimed_code: claimedCode }, updated_at: now() };
-      try {
-        await setJSON(teachingStore, studentOperationKey(journal.operation_id), journal);
-      } catch {
-        // The code is durably claimed even though this journal update
-        // failed; a retry finds the claim already exists for THIS student
-        // only via the record it eventually writes below, but with the
-        // journal not reflecting `claimed_code`, a naive retry would
-        // attempt to claim again from n=0 and immediately fail on the
-        // already-claimed bare initials, then correctly fall through to
-        // the next free suffix — safe, if slightly wasteful. Surface as
-        // incomplete either way so the caller retries.
-        throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId: id });
-      }
+    let claimedCode;
+    try {
+      claimedCode = await claimDisplayCode(journal.payload.initials, id);
+    } catch (cause) {
+      if (cause?.code === 'display_code_exhausted') throw cause;
+      await bestEffortMarkRepairNeeded(journal, [], cause?.code ?? 'claim_failed');
+      throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId: id });
     }
 
     const existing = parseStudentReference(await getJSON(teachingStore, studentReferenceKey(id)));
@@ -297,7 +307,7 @@ export function createStudentReferenceRepository({
       student_id: id,
       status: 'prepared',
       completed_steps: [],
-      payload: { initials, claimed_code: null },
+      payload: { initials },
       created_at: timestamp,
       updated_at: timestamp,
       last_error_code: null
@@ -499,7 +509,10 @@ export function createStudentReferenceRepository({
   // Every step this touches — journal, link, membership writes — is the
   // canonical repository's own, so this needs no write-path of its own.
   async function assign({ studentId, contextType, contextRef, validFrom, permissionStatus }) {
-    await getAuthoritative(studentId);
+    const student = await getAuthoritative(studentId);
+    if (student.lifecycle_status !== 'active') {
+      throw studentReferenceError('student_reference_not_active', 409);
+    }
     const targetCanonical = assertContextTarget(contextType, contextRef);
     const linkRepo = await getLinkRepo();
     return linkRepo.createLink({
@@ -541,36 +554,121 @@ export function createStudentReferenceRepository({
   // opening the next one with the updated metadata (comms-hub-people-
   // unification.md ยง3.3: "closes the previous dated relationship and
   // creates the next one" — never an in-place metadata mutation, so the
-  // prior status stays queryable history). Retry-safe: if a previous
-  // attempt already ended the link at this exact `at`, that half is
-  // skipped and only the create half is retried.
-  async function setPermissionStatus({ studentId, contextType, contextRef, status, changedAt }) {
-    validatePermissionStatus(status);
+  // prior status stays queryable history). This is one journalled,
+  // retryable operation: the server timestamp (`at`) is generated and
+  // persisted to the journal BEFORE either the end or the create half
+  // runs, so a retry (via `repairSetPermissionStatus`) always resumes with
+  // the exact same `at` — never a freshly generated one, which would
+  // otherwise make the retry unable to find the link it already ended.
+  async function runSetPermissionStatusSteps(journal) {
+    const { student_id: studentId } = journal;
+    const { context_type: contextType, context_ref: contextRef, new_status: status, at } = journal.payload;
     const linkRepo = await getLinkRepo();
-    const { targetCanonical, candidates } = await findMembership({ linkRepo, studentId, contextType, contextRef });
-    const at = changedAt ?? now();
+
+    let candidates;
+    try {
+      ({ candidates } = await findMembership({ linkRepo, studentId, contextType, contextRef }));
+    } catch (cause) {
+      if (Number.isInteger(cause?.status) && cause.status < 500) throw cause;
+      await bestEffortMarkRepairNeeded(journal, [], cause?.code ?? 'read_failed');
+      throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId });
+    }
     const currentLink = candidates.find((entry) => entry.link.status === 'current');
 
     let ended;
     if (currentLink) {
-      ended = await linkRepo.endLink(currentLink.link.id, at, accessContext);
+      try {
+        ended = await linkRepo.endLink(currentLink.link.id, at, accessContext);
+      } catch (cause) {
+        await bestEffortMarkRepairNeeded(journal, [], cause?.code ?? 'end_link_failed');
+        throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId });
+      }
     } else {
+      // No current link: either a prior attempt already ended it at this
+      // exact `at` (safe to resume the create half), or there was never a
+      // matching membership at all.
       const recentlyEnded = candidates.find((entry) => entry.link.status === 'ended' && entry.link.valid_to === at);
       if (!recentlyEnded) throw studentReferenceError('participation_not_found', 404);
       ended = recentlyEnded.link;
     }
 
-    const { link: created } = await linkRepo.createLink({
-      source_ref: studentSourceRef(studentId),
-      target_ref: targetCanonical,
-      relationship_type: 'participates_in',
-      context_key: contextType,
-      valid_from: at,
-      metadata: { permission_status: status },
-      visibility: 'teaching_protected'
-    }, accessContext);
+    let created;
+    try {
+      const result = await linkRepo.createLink({
+        source_ref: studentSourceRef(studentId),
+        target_ref: contextRef,
+        relationship_type: 'participates_in',
+        context_key: contextType,
+        valid_from: at,
+        metadata: { permission_status: status },
+        visibility: 'teaching_protected'
+      }, accessContext);
+      created = result.link;
+    } catch (cause) {
+      await bestEffortMarkRepairNeeded(journal, ['end'], cause?.code ?? 'create_link_failed');
+      throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId });
+    }
 
-    return { ended, created };
+    try {
+      await setJSON(teachingStore, studentOperationKey(journal.operation_id), {
+        ...journal,
+        status: 'committed',
+        completed_steps: ['end', 'create'],
+        updated_at: now(),
+        last_error_code: null
+      });
+    } catch (cause) {
+      await bestEffortMarkRepairNeeded(journal, ['end', 'create'], cause?.code ?? 'commit_write_failed');
+      throw studentWriteIncompleteError({ operationId: journal.operation_id, studentId });
+    }
+
+    return { ended, created, operation_id: journal.operation_id };
+  }
+
+  async function setPermissionStatus({ studentId, contextType, contextRef, status }) {
+    validatePermissionStatus(status);
+    await getAuthoritative(studentId);
+    const targetCanonical = assertContextTarget(contextType, contextRef);
+
+    const operationId = generateOperationId();
+    const timestamp = now();
+    const journal = {
+      schema_version: OPERATION_SCHEMA_VERSION,
+      operation_id: operationId,
+      operation_type: 'set_permission_status',
+      student_id: studentId,
+      status: 'prepared',
+      completed_steps: [],
+      // The server timestamp is captured and persisted here — before either
+      // the end or the create half has run — so a repair reuses it exactly
+      // rather than computing a new one.
+      payload: { context_type: contextType, context_ref: targetCanonical, new_status: status, at: timestamp },
+      created_at: timestamp,
+      updated_at: timestamp,
+      last_error_code: null
+    };
+    try {
+      await setJSON(teachingStore, studentOperationKey(operationId), journal);
+    } catch {
+      throw studentWriteIncompleteError({ operationId, studentId });
+    }
+    return runSetPermissionStatusSteps(journal);
+  }
+
+  // Repairs an incomplete `setPermissionStatus` operation by its
+  // operation_id — mirrors `repairCreate`: the persisted `at` in the
+  // journal is what makes this resumable, since `setPermissionStatus`
+  // itself has no stable natural key to retry against (the same student/
+  // context pair may have its permission changed more than once).
+  async function repairSetPermissionStatus(operationId) {
+    if (!isValidOperationId(operationId)) throw studentOperationNotFoundError();
+    const journal = validateOperationRecord(await getJSON(teachingStore, studentOperationKey(operationId)));
+    if (!journal || journal.operation_type !== 'set_permission_status') throw studentOperationNotFoundError();
+    if (journal.status === 'committed') {
+      return { operation_id: operationId, repaired: false };
+    }
+    const result = await runSetPermissionStatusSteps(journal);
+    return { ...result, repaired: true };
   }
 
   // Teaching-scoped search: "who is in this class/program/excursion/
@@ -593,6 +691,10 @@ export function createStudentReferenceRepository({
       if (entry.link.context_key !== contextType) continue;
       if (entry.link.status !== 'current') continue;
       if (entry.endpoint.kind !== 'student_reference') continue;
+      // Ordinary search excludes archived StudentReferences — matches the
+      // same "archived hides from ordinary suggestions" rule Person/
+      // Organisation search already follows.
+      if (entry.endpoint.lifecycle_status !== 'active') continue;
       if (seen.has(entry.endpoint.ref)) continue;
       seen.add(entry.endpoint.ref);
       const code = entry.endpoint.display_label;
@@ -613,6 +715,7 @@ export function createStudentReferenceRepository({
     assign,
     endMembership,
     setPermissionStatus,
+    repairSetPermissionStatus,
     search
   };
 }

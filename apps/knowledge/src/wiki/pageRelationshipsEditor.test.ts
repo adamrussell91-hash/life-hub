@@ -122,6 +122,46 @@ describe("pageRelationshipsEditor ownership", () => {
     expect(desiredHubRefsFromChips(ready.chips)).toEqual(["page_gamma"]);
   });
 
+  it("resolves a Knowledge page href for chips built from dual-read rows", () => {
+    const ready = chipsFromDualRead({
+      pageId: "page_alpha",
+      relationships: [
+        {
+          source_ref: "knowledge:page:page_alpha",
+          target_ref: "knowledge:page:page_gamma",
+          other_ref: "knowledge:page:page_gamma",
+          legacy_hub_ref: "page_gamma",
+          direction: "outgoing",
+          ownership: "outgoing_owned",
+          link_id: "ul_ag",
+          sources: ["canonical"],
+        },
+      ],
+      entries: [{ id: "page_gamma", title: "Gamma" }],
+    });
+    expect(ready.chips[0]?.href).toBe("https://knowledge-hub.adam-russell.com/#page/page_gamma");
+  });
+
+  it("passes the resolved href through to the rendered chip as a clickable link", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    mountPageRelationshipsEditor({
+      host,
+      pageId: "page_alpha",
+      chips: [ownedOutgoing("page_gamma", "Gamma")].map((chip) => ({
+        ...chip,
+        href: "https://knowledge-hub.adam-russell.com/#page/page_gamma",
+      })),
+      status: "ready",
+      message: "",
+      entries: [{ id: "page_gamma", title: "Gamma" }],
+      onChange: () => undefined,
+    });
+    const link = host.querySelector<HTMLAnchorElement>(".entity-chip__label--link");
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute("href")).toBe("https://knowledge-hub.adam-russell.com/#page/page_gamma");
+  });
+
   it("renders incoming chips as read-only without a remove action", () => {
     const host = document.createElement("div");
     document.body.append(host);

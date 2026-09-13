@@ -43,6 +43,19 @@ function decodeTimelineCursor(cursor) {
   }
 }
 
+// The single ordering rule the timeline is sorted by: date descending,
+// undated entries last, id ascending as a deterministic tiebreak. Used for
+// BOTH the sort itself and cursor resumption below, so the two can never
+// disagree with each other.
+function compareTimelineOrder(a, b) {
+  if (!a.date && !b.date) return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  if (!a.date) return 1;
+  if (!b.date) return -1;
+  const byDate = new Date(b.date).getTime() - new Date(a.date).getTime();
+  if (byDate !== 0) return byDate;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
 function paginateTimeline(timeline, { limit, cursor } = {}) {
   const boundedLimit = Number.isInteger(limit) && limit > 0
     ? Math.min(limit, MAX_TIMELINE_LIMIT)
@@ -54,11 +67,12 @@ function paginateTimeline(timeline, { limit, cursor } = {}) {
     if (!decoded) {
       throw Object.assign(new Error('Invalid timeline cursor.'), { status: 400, code: 'invalid_cursor' });
     }
-    const foundIndex = timeline.findIndex((entry) => (entry.date ?? '') === decoded.date && entry.id === decoded.id);
-    // A cursor naming an entry no longer present (deleted, or moved outside
-    // ordinary visibility since the previous page) yields no further
-    // results rather than silently restarting from the top.
-    startIndex = foundIndex === -1 ? timeline.length : foundIndex + 1;
+    // Resume by ORDER, not by exact id match: if the cursor's own entry has
+    // since been deleted or hidden, this still finds the first entry that
+    // would have sorted after it, rather than treating "not found" as "end
+    // of list" and silently truncating every later, still-valid page.
+    const foundIndex = timeline.findIndex((entry) => compareTimelineOrder(entry, decoded) > 0);
+    startIndex = foundIndex === -1 ? timeline.length : foundIndex;
   }
 
   const page = timeline.slice(startIndex, startIndex + boundedLimit);
@@ -101,27 +115,44 @@ function timelineLabel({ link, endpoint, direction }) {
   return `${inverse} ${endpoint.display_label}`.trim();
 }
 
-// `context_ref` (when present) is the authoritative source record which
-// established the relationship — a Task, Communication, Meeting, or Event
-// the @ picker was used from (proposal ยง3.3: "source links back to the
-// task, meeting, event, note, program, or project which established the
-// relationship"). This is distinct from `endpoint.href`, which links to the
-// *other side* of the relationship (the Person/Organisation). Resolution
-// reuses the same non-disclosure rule as every other endpoint lookup: a
-// hidden or missing context record yields `context_href: null`, never a
-// distinct error, and never invents a browser href of its own.
-async function resolveContextHref(link, accessContext, resolveEntity) {
-  if (typeof link.context_ref !== 'string' || !link.context_ref) return null;
-  try {
-    const context = await resolveEntity(link.context_ref, accessContext);
-    return context.href ?? null;
-  } catch (error) {
-    if (error?.code === 'endpoint_not_found') return null;
-    throw error;
+// The authoritative source record that established this relationship — a
+// Task, Communication, Meeting, Event, or similar. This is distinct from
+// `endpoint.href`, which links to the *other side* of the relationship
+// (the Person/Organisation this overview belongs to is never that side).
+//
+// Two sources, in priority order:
+//  1. `link.context_ref`, when a caller explicitly recorded one.
+//  2. Otherwise, for an INCOMING entry (this overview's entity is the
+//     link's target), `link.source_ref` — the record that created the
+//     link in the first place, e.g. the Task behind a `contact` link or
+//     the Communication behind a `recipient` link — IS the endpoint
+//     already resolved above, so its href is reused directly rather than
+//     resolved a second time. An OUTGOING entry's source_ref is this
+//     overview's own entity, which is never a meaningful "source link", so
+//     it yields no fallback.
+// Resolution reuses the same non-disclosure rule as every other endpoint
+// lookup: a hidden or missing context record yields `context_href: null`,
+// never a distinct error, and never invents a browser href of its own.
+async function resolveContextHref({ link, endpoint, direction }, accessContext, resolveEntity) {
+  if (typeof link.context_ref === 'string' && link.context_ref) {
+    try {
+      const context = await resolveEntity(link.context_ref, accessContext);
+      return context.href ?? null;
+    } catch (error) {
+      if (error?.code === 'endpoint_not_found') return null;
+      throw error;
+    }
   }
+  if (direction === 'incoming') return endpoint.href ?? null;
+  return null;
 }
 
-async function toTimelineEntry({ link, endpoint, direction }, accessContext, resolveEntity) {
+// Cheap, synchronous half of a timeline entry — no I/O, safe to build for
+// every entry so timeline ordering/pagination never needs to touch the
+// network. `context_href` is added separately, only for the page actually
+// being returned (see `assembleEntityOverview`), since it is the one field
+// here that can require an extra resolve call.
+function baseTimelineEntry({ link, endpoint, direction }) {
   return {
     id: link.id,
     kind: timelineKind(link),
@@ -131,8 +162,7 @@ async function toTimelineEntry({ link, endpoint, direction }, accessContext, res
     context_key: link.context_key,
     source_ref: link.source_ref,
     // Never invent a browser href — only surface one the resolver provided.
-    href: endpoint.href ?? null,
-    context_href: await resolveContextHref(link, accessContext, resolveEntity)
+    href: endpoint.href ?? null
   };
 }
 
@@ -182,23 +212,24 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   const current_relationships = entries.filter((entry) => entry.link.status === 'current');
   const historical_relationships = entries.filter((entry) => entry.link.status === 'ended');
 
-  const fullTimeline = (await mapBounded(entries, 10, (entry) => toTimelineEntry(entry, accessContext, resolveEntity)))
-    .sort((a, b) => {
-      if (!a.date && !b.date) return a.id.localeCompare(b.id);
-      if (!a.date) return 1;
-      if (!b.date) return -1;
-      const byDate = new Date(b.date).getTime() - new Date(a.date).getTime();
-      // Deterministic tiebreak for a stable cursor: two entries with the
-      // exact same date must always sort the same way relative to each
-      // other, or a page boundary landing between them could skip or repeat
-      // one depending on incidental array order.
-      return byDate !== 0 ? byDate : a.id.localeCompare(b.id);
-    });
+  // Building the base timeline entries and sorting them is synchronous —
+  // no I/O — so it costs nothing extra to do for every entry. Only the
+  // PAGE actually being returned goes on to the (potentially I/O-bound)
+  // `context_href` resolution below: a request for page one of a long
+  // timeline never resolves anything for the entries on page two onward.
+  const sortedBaseEntries = entries
+    .map((entry) => ({ ...baseTimelineEntry(entry), _entry: entry }))
+    .sort(compareTimelineOrder);
 
-  const { items: timeline, next_cursor: timeline_next_cursor } = paginateTimeline(fullTimeline, {
+  const { items: pageEntries, next_cursor: timeline_next_cursor } = paginateTimeline(sortedBaseEntries, {
     limit: deps.timelineLimit,
     cursor: deps.timelineCursor
   });
+
+  const timeline = await mapBounded(pageEntries, 10, async ({ _entry, ...base }) => ({
+    ...base,
+    context_href: await resolveContextHref(_entry, accessContext, resolveEntity)
+  }));
 
   const linked_records = {
     tasks: [],
