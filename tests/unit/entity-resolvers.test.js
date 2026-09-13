@@ -219,7 +219,7 @@ test('resolveEntity dispatches tasks:task to real resolution', async () => {
   assert.equal(projection.kind, 'task');
 });
 
-test('resolveEntity 404s an unregistered kind (e.g. StudentReference) exactly like a missing record', async () => {
+test('resolveEntity keeps the protected StudentReference kind unavailable to the generic resolver', async () => {
   await assert.rejects(
     resolveEntity('teaching:student_reference:student_ref_ar1', tasksContext),
     error => error.status === 404 && error.code === 'endpoint_not_found'
