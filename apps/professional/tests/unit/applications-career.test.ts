@@ -190,13 +190,18 @@ describe('renderApplicationNewView', () => {
     adSource.value = 'Seek';
 
     async function pickFrom(input: HTMLInputElement, query: string): Promise<void> {
+      input.focus();
       input.value = `@${query}`;
       input.selectionStart = input.value.length;
       input.selectionEnd = input.value.length;
       input.dispatchEvent(new Event('input', { bubbles: true }));
       await vi.advanceTimersByTimeAsync(250);
       await Promise.resolve();
-      const option = canvas.querySelector('.entity-picker__option') as HTMLButtonElement | null;
+      const openPicker = [...canvas.querySelectorAll('.entity-picker')].find(
+        (node) => !(node as HTMLElement).hidden
+      ) as HTMLElement | undefined;
+      expect(openPicker).toBeTruthy();
+      const option = openPicker!.querySelector('.entity-picker__option') as HTMLButtonElement | null;
       expect(option).toBeTruthy();
       option!.click();
     }
