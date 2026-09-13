@@ -21,7 +21,9 @@ export const ENTITY_REF_NAMESPACES = new Set([
 // a real workflow (implementation programme, "Absolute exclusions" #11).
 export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
-  professional: new Set(['communication', 'meeting', 'event']),
+  // `application` is registered for shared Task-link operations
+  // (application_action). Slice 10 supplies the Application resolver.
+  professional: new Set(['communication', 'meeting', 'event', 'application']),
   tasks: new Set(['task', 'project']),
   teaching: new Set(['unit']),
   knowledge: new Set(['page']),
