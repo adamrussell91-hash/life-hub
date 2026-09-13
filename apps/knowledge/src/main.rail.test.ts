@@ -104,6 +104,9 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("function openCompose");
     expect(main).toContain('hat: "makeNote"');
     expect(main).toContain("compose__savebar");
+    expect(main).toContain("compose-relationships-host");
+    expect(main).toContain("replacePageRelationships");
+    expect(main).toContain("mountPageRelationshipsEditor");
     expect(main).toContain("positionHubFloating");
     expect(main).toContain("autoUpdateHubFloating");
     expect(css).toContain(".new-note");
