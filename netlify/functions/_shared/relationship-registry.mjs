@@ -138,6 +138,22 @@ const REGISTRY = new Map([
       temporalMode: 'timeless',
       roleMode: 'none'
     })
+  ],
+  [
+    // Symmetric Knowledge / hub relationship. Display uses the same label in
+    // both directions (`related_to`). migration_source metadata preserves
+    // provenance from legacy Knowledge `connected` values.
+    'related_to',
+    declaration({
+      key: 'related_to',
+      sourceKinds: ['knowledge:page', 'teaching:unit', 'tasks:project', 'life:decision'],
+      targetKinds: ['knowledge:page', 'teaching:unit', 'tasks:project', 'life:decision'],
+      inverseLabel: 'related_to',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none',
+      metadataKeys: ['migration_source']
+    })
   ]
 ]);
 

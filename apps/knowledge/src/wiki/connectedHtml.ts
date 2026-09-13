@@ -1,11 +1,25 @@
 import { hrefForHubRef, labelForHubRef, parseHubRef } from "../domain/hub-ref";
 import { escapeHtml } from "../lib/dom";
+import { connectedDisplayRefs } from "./connectedRelationships";
 
 export function connectedLinksHtml(
   page: { connected?: string[] },
   entries: { id: string; title: string }[],
+  options: {
+    relationships?: Array<{ legacy_hub_ref?: string | null; target_ref?: string }> | null;
+    relationshipsStatus?: "ready" | "unavailable" | null;
+  } = {},
 ): string {
-  const ids = page.connected ?? [];
+  if (options.relationshipsStatus === "unavailable") {
+    return `<section class="wiki-links" aria-label="Connected">
+              <h3>Connected</h3>
+              <p class="wiki-links__unavailable">Related pages are unavailable.</p>
+            </section>`;
+  }
+  const ids = connectedDisplayRefs({
+    legacyConnected: page.connected ?? [],
+    relationships: options.relationships ?? null
+  });
   if (!ids.length) return "";
   return `<section class="wiki-links" aria-label="Connected">
               <h3>Connected</h3>

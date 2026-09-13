@@ -1,4 +1,6 @@
 import { normalizeConnected } from './hub-ref.mjs';
+import { isKnowledgeWriteCutoverEnabled } from './knowledge-ul-config.mjs';
+import { applyKnowledgeRelationshipCutover } from './knowledge-page-relationships.mjs';
 
 const GITHUB_ORIGIN = 'https://api.github.com';
 const REPOSITORY = /^(?<owner>[A-Za-z0-9](?:[A-Za-z0-9.-]{0,38}))\/(?<repo>[A-Za-z0-9_.-]{1,100})$/;
@@ -345,9 +347,19 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   if (!title) {
     throw knowledgeWriteError(400, 'validation_error', 'title is required');
   }
-  const connected = Array.isArray(input.connected)
+  const writeCutover = isKnowledgeWriteCutoverEnabled(env);
+  // After write cutover, ordinary content saves never mutate Universal Links.
+  // Relationship changes require POST ?action=replace-relationships.
+  // Submitted connected is ignored for UL and for overwriting stored legacy
+  // connected (rollback field stays as previously stored).
+  const submittedConnected = Array.isArray(input.connected)
     ? normalizeConnected(input.connected)
-    : null;
+    : undefined;
+  const connected = writeCutover
+    ? null
+    : submittedConnected !== undefined
+      ? submittedConnected
+      : null;
   const id = isSafeKnowledgePageId(input.id) ? input.id : newKnowledgePageId();
   const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
   let previous = null;
@@ -413,6 +425,63 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
   const merged = [...rows.filter(row => row?.id !== id), entry];
   await putWithRetry('manifest.json', JSON.stringify(merged), { env, fetchImpl }, `Upsert ${id}`, manifestFile?.sha);
   return stored;
+}
+
+/**
+ * Explicit relationship mutation for one Knowledge page.
+ * Only intentional submissions create/suppress related_to links.
+ */
+export async function replaceKnowledgePageRelationships(
+  input,
+  { env, fetchImpl = fetch, applyRelationshipCutover = applyKnowledgeRelationshipCutover } = {}
+) {
+  const id = isSafeKnowledgePageId(input?.id) ? input.id : null;
+  if (!id) {
+    throw knowledgeWriteError(400, 'validation_error', 'id is required');
+  }
+  if (!isKnowledgeWriteCutoverEnabled(env)) {
+    throw knowledgeWriteError(
+      409,
+      'knowledge_relationship_cutover_disabled',
+      'Universal Link relationship writes require write cutover.'
+    );
+  }
+  const relatedTo = Array.isArray(input?.related_to)
+    ? input.related_to
+    : Array.isArray(input?.connected)
+      ? input.connected
+      : null;
+  if (!Array.isArray(relatedTo)) {
+    throw knowledgeWriteError(400, 'validation_error', 'related_to array is required');
+  }
+  const existing = await getKnowledgeContent(`pages/${id}.json`, { env, fetchImpl });
+  let page = null;
+  if (existing?.text) {
+    try { page = JSON.parse(existing.text); } catch { page = null; }
+  }
+  if (!page) {
+    throw knowledgeWriteError(404, 'page_not_found', 'Knowledge page not found');
+  }
+  try {
+    await applyRelationshipCutover({
+      pageId: id,
+      submittedConnected: relatedTo,
+      env
+    });
+  } catch (error) {
+    const status = Number.isInteger(error?.status) ? error.status : 409;
+    const err = new Error(error?.message || 'Knowledge relationship cutover incomplete');
+    err.status = status;
+    err.code = error?.code || 'knowledge_relationship_operation_incomplete';
+    err.data = {
+      ...(error?.data && typeof error.data === 'object' ? error.data : {}),
+      page,
+      page_saved: false,
+      retryable: error?.data?.retryable !== false
+    };
+    throw err;
+  }
+  return page;
 }
 
 export async function getQuizStore({ env, fetchImpl = fetch } = {}) {

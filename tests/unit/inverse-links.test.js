@@ -138,5 +138,7 @@ test('defaultLoadInverseLinks is unavailable when the list fails', async () => {
       throw new Error('manifest down');
     }
   });
-  assert.deepEqual(loaded, { links: [], groups: [], status: 'unavailable' });
+  assert.equal(loaded.status, 'unavailable');
+  assert.deepEqual(loaded.links, []);
+  assert.deepEqual(loaded.groups, []);
 });
