@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
-import { createStudentReferencesHandler } from '../../netlify/functions/student-references.mjs';
-import { createStudentReferenceSearchHandler } from '../../netlify/functions/student-reference-search.mjs';
+import { config as writeConfig, createStudentReferencesHandler } from '../../netlify/functions/student-references.mjs';
+import { config as searchConfig, createStudentReferenceSearchHandler } from '../../netlify/functions/student-reference-search.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
 import { resolveEntity } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
@@ -57,6 +57,13 @@ function deps(store, ids = []) {
 async function post(handler, body) {
   return handler(request('/api/teaching/student-references', { body }));
 }
+
+test('declares platform rate limits for protected writes and search', () => {
+  assert.equal(writeConfig.rateLimit.action, 'rate_limit');
+  assert.equal(searchConfig.rateLimit.action, 'rate_limit');
+  assert.deepEqual(writeConfig.rateLimit.aggregateBy, ['ip', 'domain']);
+  assert.deepEqual(searchConfig.rateLimit.aggregateBy, ['ip', 'domain']);
+});
 
 test('requires an authenticated allowed-origin Teaching session and never permits GET', async () => {
   const store = memoryStore();
@@ -143,6 +150,8 @@ test('deletion removes the record and memberships and leaves a non-identifying t
   const handler = createStudentReferencesHandler(deps(store, [id]));
   await post(handler, { action: 'create', initials: 'DE' });
   await post(handler, { action: 'assign', student_ref_id: id, context_type: 'coaching', context_id: 'COACHING_SYNTHETIC_1' });
+  const premature = await post(handler, { action: 'delete', student_ref_id: id });
+  assert.equal(premature.status, 409);
   await post(handler, { action: 'archive', student_ref_id: id });
   const response = await post(handler, { action: 'delete', student_ref_id: id });
   assert.equal(response.status, 200);
