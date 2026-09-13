@@ -614,14 +614,47 @@ test('migration live execute without store adapter fails closed', async () => {
 
 test('replace-relationships action is the only authenticated UL mutation path', async () => {
   let cutoverCalls = 0;
+  let lastSubmitted = null;
+  const pageText = JSON.stringify({
+    id: 'page_alpha',
+    title: 'Alpha',
+    area: 'notes',
+    tags: [],
+    body: 'body',
+    connected: ['page_keep'],
+    attachments: [],
+    source: 'hub',
+    created_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    schema_version: 1
+  });
   const handler = createKnowledgePagesHandler({
     env: {
       ...testEnv,
-      KNOWLEDGE_UNIVERSAL_LINKS_WRITE_CUTOVER: '1'
+      KNOWLEDGE_UNIVERSAL_LINKS_WRITE_CUTOVER: '1',
+      GITHUB_TOKEN: 'token',
+      KNOWLEDGE_GITHUB_REPOSITORY: 'adamrussell91-hash/knowledge-hub-data'
     },
-    fetchImpl: async () => new Response('{}', { status: 404 }),
-    applyRelationshipCutover: async () => {
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    fetchImpl: async (url, init = {}) => {
+      const href = String(url);
+      if ((init.method ?? 'GET') === 'GET' && href.includes('/contents/pages/page_alpha.json')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            sha: 'sha_page_alpha',
+            encoding: 'base64',
+            content: Buffer.from(pageText).toString('base64'),
+            size: Buffer.byteLength(pageText)
+          })
+        };
+      }
+      return new Response('{}', { status: 404 });
+    },
+    applyRelationshipCutover: async (input) => {
       cutoverCalls += 1;
+      lastSubmitted = input;
       return { ok: true };
     }
   });
@@ -645,6 +678,28 @@ test('replace-relationships action is the only authenticated UL mutation path', 
   );
   assert.notEqual(ordinary.status, 200);
   assert.equal(cutoverCalls, 0);
+
+  const explicit = await handler(
+    new Request(
+      'https://api.adam-russell.com/api/knowledge/pages?action=replace-relationships',
+      {
+        method: 'POST',
+        headers: {
+          cookie: `life_hub_session=${session}`,
+          origin: 'https://knowledge-hub.adam-russell.com',
+          'content-type': 'application/json'
+        },
+        body: JSON.stringify({ id: 'page_alpha', related_to: ['page_beta'] })
+      }
+    )
+  );
+  assert.equal(explicit.status, 200);
+  const body = await explicit.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.data.relationships_replaced, true);
+  assert.equal(cutoverCalls, 1);
+  assert.equal(lastSubmitted.pageId, 'page_alpha');
+  assert.deepEqual(lastSubmitted.submittedConnected, ['page_beta']);
 });
 
 test('saveKnowledgePage after cutover ignores connected and never applies cutover', async () => {

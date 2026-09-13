@@ -1813,6 +1813,39 @@ body.is-universe-fullscreen .local-banner {
   padding: 0;
 }
 
+.wiki-links__unavailable {
+  margin: 0;
+  color: var(--muted);
+}
+
+.compose__relationships-heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+
+.compose__relationship-picker {
+  width: min(100%, 28rem);
+  margin-top: var(--space-2);
+}
+
+.compose__relationship-chips {
+  margin-top: var(--space-3);
+}
+
+.compose__relationship-status {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.compose__relationship-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
 .decision-traces,
 .inverse-links,
 .url-watches {

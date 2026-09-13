@@ -22,6 +22,7 @@ import {
   login,
   logout,
   savePage,
+  replacePageRelationships,
   searchPages,
   signAttachment,
   resolveTidyIntake,
@@ -103,6 +104,14 @@ import { enterChatRail, leaveChatRail, renderChatRail } from "./chat/rail";
 import { ensureChatOverlay, hideChatOverlay, openChatOverlay, pinChatOverlayNote } from "./chat/overlay";
 import type { GraphPreviewNote } from "./archive/graphPreview";
 import { connectedLinksHtml } from "./wiki/connectedHtml";
+import {
+  chipsFromDualRead,
+  mountPageRelationshipsEditor,
+  relationshipErrorMessage,
+  type PageRelationshipsEditorHandle,
+  type RelatedChip,
+  type RelatedStatus,
+} from "./wiki/pageRelationshipsEditor";
 import { LIVE_UNAVAILABLE, LIVE_WORKOUT_TOKEN } from "./wiki/liveTokens";
 import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
 import { inverseLinksHtml } from "./wiki/inverseLinksHtml";
@@ -274,9 +283,15 @@ type ComposeState = {
   busy: boolean;
   captureBusy: boolean;
   recording: boolean;
+  related: RelatedChip[];
+  relatedStatus: RelatedStatus;
+  relatedMessage: string;
+  /** True once the page JSON exists on the server (edit, or after first content save). */
+  pagePersisted: boolean;
 };
 
 let composeBodyEditor: MarkdownTiptapHandle | null = null;
+let composeRelationships: PageRelationshipsEditorHandle | null = null;
 let compose: ComposeState | null = null;
 const composeVoiceWave = createComposeVoiceWave();
 const composeVoice = createVoiceCapture({
@@ -299,10 +314,21 @@ function blankCompose(origins: Origin[] = []): ComposeState {
     busy: false,
     captureBusy: false,
     recording: false,
+    related: [],
+    relatedStatus: "idle",
+    relatedMessage: "Save the note first, then add relationships.",
+    pagePersisted: false,
   };
 }
 
 function composeFromPage(page: Page): ComposeState {
+  const seeded = chipsFromDualRead({
+    pageId: page.id,
+    legacyConnected: page.connected ?? [],
+    relationships: (page.relationships as never) ?? null,
+    relationshipsStatus: page.relationships_status ?? null,
+    entries,
+  });
   return {
     id: page.id,
     title: page.title,
@@ -316,6 +342,10 @@ function composeFromPage(page: Page): ComposeState {
     busy: false,
     captureBusy: false,
     recording: false,
+    related: seeded.chips,
+    relatedStatus: seeded.status,
+    relatedMessage: seeded.message,
+    pagePersisted: true,
   };
 }
 
@@ -1384,7 +1414,10 @@ function renderPage(page: LivePage) {
       ${readerTopicPillsHtml(topics.slice(0, 6))}
       <div class="reader__body">${renderMarkdown(page.live_body ?? livePageBody(page.body))}</div>
       ${decisionTraceHtml(page.decision_traces, page.decision_traces_status)}
-      ${connectedLinksHtml(page, entries, { relationships: page.relationships ?? null })}
+      ${connectedLinksHtml(page, entries, {
+        relationships: page.relationships ?? null,
+        relationshipsStatus: page.relationships_status ?? null,
+      })}
       ${inverseLinksHtml(page.inverse_links, page.inverse_links_status)}
       ${urlWatchHtml(page.url_watches, page.url_watches_status)}
       ${renderAttachments(page)}
@@ -1605,6 +1638,7 @@ function renderCompose(state: ComposeState) {
         <ul class="compose__files">${files || "<li>None</li>"}</ul>
         <input id="compose-files" type="file" multiple />
       </div>
+      <div id="compose-relationships-host"></div>
       <div class="compose__savebar">
         <button class="btn btn--primary compose__save" data-compose-save type="button" ${
           USE_LOCAL_DATA || state.busy || captureBusy ? "disabled" : ""
@@ -1615,6 +1649,8 @@ function renderCompose(state: ComposeState) {
 
   composeBodyEditor?.destroy();
   composeBodyEditor = null;
+  composeRelationships?.destroy();
+  composeRelationships = null;
   const bodyHost = app.querySelector<HTMLElement>("#compose-body-host");
   if (bodyHost && compose) {
     composeBodyEditor = mountMarkdownTiptap({
@@ -1625,6 +1661,25 @@ function renderCompose(state: ComposeState) {
       },
     });
     bodyHost.replaceChildren(composeBodyEditor.host);
+  }
+
+  const relationshipsHost = app.querySelector<HTMLElement>("#compose-relationships-host");
+  if (relationshipsHost && compose) {
+    const draft = compose;
+    composeRelationships = mountPageRelationshipsEditor({
+      host: relationshipsHost,
+      pageId: draft.id,
+      chips: draft.related,
+      status: draft.relatedStatus,
+      message: draft.relatedMessage,
+      entries,
+      disabled: USE_LOCAL_DATA || !draft.pagePersisted,
+      onChange: chips => {
+        draft.related = chips;
+      },
+      onSave: () => void saveComposeRelationships(),
+      onRetryLoad: () => void reloadComposeRelationships(),
+    });
   }
 
   adoptComposeVoiceWave(app, composeVoiceWave);
@@ -1639,6 +1694,8 @@ function renderCompose(state: ComposeState) {
   app.querySelector<HTMLButtonElement>("[data-compose-cancel]")!.onclick = () => {
     composeBodyEditor?.destroy();
     composeBodyEditor = null;
+    composeRelationships?.destroy();
+    composeRelationships = null;
     compose = null;
     resetComposeTagChrome();
     view = activePage ? "page" : "list";
@@ -1814,6 +1871,77 @@ function renderCompose(state: ComposeState) {
   });
 }
 
+async function saveComposeRelationships() {
+  if (!compose || !compose.pagePersisted || USE_LOCAL_DATA) return;
+  if (compose.relatedStatus === "saving") return;
+  const snapshot = compose;
+  const relatedTo = composeRelationships?.getDesiredHubRefs() ?? snapshot.related.map(chip => chip.hubRef);
+  snapshot.relatedStatus = "saving";
+  snapshot.relatedMessage = "Saving relationships…";
+  composeRelationships?.setStatus("saving", "Saving relationships…");
+  try {
+    const result = await replacePageRelationships(snapshot.id, relatedTo);
+    const page = result.page as Page;
+    // Reload dual-read rows when the server returns them; otherwise re-seed from desired set.
+    let nextPage = page;
+    try {
+      nextPage = await getPage(snapshot.id);
+    } catch {
+      nextPage = page;
+    }
+    if (activePage?.id === snapshot.id) activePage = nextPage;
+    const seeded = chipsFromDualRead({
+      pageId: snapshot.id,
+      legacyConnected: nextPage.connected ?? [],
+      relationships: (nextPage.relationships as never) ?? null,
+      relationshipsStatus: nextPage.relationships_status ?? null,
+      entries,
+    });
+    snapshot.related = seeded.chips;
+    snapshot.relatedStatus = seeded.status === "unavailable" ? "unavailable" : "ready";
+    snapshot.relatedMessage =
+      seeded.status === "unavailable" ? seeded.message : "Relationships saved.";
+    composeRelationships?.setStatus(snapshot.relatedStatus, snapshot.relatedMessage);
+    // Remount chips from saved state without wiping the whole compose form.
+    render();
+    showToast("Relationships saved");
+  } catch (error) {
+    const mapped = relationshipErrorMessage(error);
+    snapshot.relatedStatus = mapped.status;
+    snapshot.relatedMessage = mapped.message;
+    composeRelationships?.setStatus(mapped.status, mapped.message);
+    showToast(mapped.message);
+  }
+}
+
+async function reloadComposeRelationships() {
+  if (!compose || !compose.pagePersisted || USE_LOCAL_DATA) return;
+  const snapshot = compose;
+  snapshot.relatedStatus = "loading";
+  snapshot.relatedMessage = "Loading relationships…";
+  composeRelationships?.setStatus("loading", "Loading relationships…");
+  try {
+    const page = await getPage(snapshot.id);
+    if (activePage?.id === snapshot.id) activePage = page;
+    const seeded = chipsFromDualRead({
+      pageId: snapshot.id,
+      legacyConnected: page.connected ?? [],
+      relationships: (page.relationships as never) ?? null,
+      relationshipsStatus: page.relationships_status ?? null,
+      entries,
+    });
+    snapshot.related = seeded.chips;
+    snapshot.relatedStatus = seeded.status;
+    snapshot.relatedMessage = seeded.message;
+    render();
+  } catch (error) {
+    snapshot.relatedStatus = "unavailable";
+    snapshot.relatedMessage =
+      error instanceof Error ? error.message : "Related pages are unavailable.";
+    composeRelationships?.setStatus("unavailable", snapshot.relatedMessage);
+  }
+}
+
 async function saveCompose() {
   if (!compose || compose.busy) return;
   compose.title = app.querySelector<HTMLInputElement>("#compose-title")!.value;
@@ -1868,6 +1996,8 @@ async function saveCompose() {
     activePage = saved;
     composeBodyEditor?.destroy();
     composeBodyEditor = null;
+    composeRelationships?.destroy();
+    composeRelationships = null;
     compose = null;
     resetComposeTagChrome();
     view = "page";

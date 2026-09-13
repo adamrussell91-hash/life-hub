@@ -1,5 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatWriteDroppedError, fetchSession, getPage, listPages, login, runChat, runCoach, savePage, signAttachment, startTidyIntake, tidyEndpoint, tidyPage } from "./client";
+import {
+  ChatWriteDroppedError,
+  fetchSession,
+  getPage,
+  KnowledgeApiError,
+  listPages,
+  login,
+  replacePageRelationships,
+  runChat,
+  runCoach,
+  savePage,
+  signAttachment,
+  startTidyIntake,
+  tidyEndpoint,
+  tidyPage,
+} from "./client";
 import { API_BASE } from "./config";
 
 describe("api client", () => {
@@ -277,6 +292,76 @@ describe("api client", () => {
       expect.stringContaining("/pages-save"),
       expect.objectContaining({ credentials: "include", method: "POST" }),
     );
+  });
+
+  it("omits connected and relationship fields on ordinary page saves", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ ok: true, data: { id: "page_alpha", title: "Alpha" } }),
+    });
+    vi.stubGlobal("fetch", fetchImpl);
+    await savePage({
+      id: "page_alpha",
+      title: "Alpha",
+      area: "notes",
+      tags: [],
+      body: "body",
+      connected: ["page_should_stay"],
+      relationships: [{ legacy_hub_ref: "page_should_stay" }],
+      relationships_status: "ready",
+      attachments: [],
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+      schema_version: 1,
+    } as never);
+    const body = JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body ?? "{}"));
+    expect(body).toMatchObject({ id: "page_alpha", title: "Alpha", body: "body" });
+    expect(Object.prototype.hasOwnProperty.call(body, "connected")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(body, "relationships")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(body, "relationships_status")).toBe(false);
+    expect(String(fetchImpl.mock.calls[0]?.[0])).not.toContain("replace-relationships");
+  });
+
+  it("posts explicit relationship replaces and surfaces retryable failures", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          ok: true,
+          data: { page: { id: "page_alpha" }, relationships_replaced: true },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          ok: false,
+          error: {
+            code: "knowledge_relationship_operation_incomplete",
+            message: "incomplete",
+            retryable: true,
+          },
+          data: { page_saved: false, retryable: true },
+        }),
+      });
+    vi.stubGlobal("fetch", fetchImpl);
+
+    await expect(replacePageRelationships("page_alpha", ["page_beta"])).resolves.toMatchObject({
+      relationships_replaced: true,
+    });
+    expect(String(fetchImpl.mock.calls[0]?.[0])).toContain("replace-relationships");
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body))).toEqual({
+      id: "page_alpha",
+      related_to: ["page_beta"],
+    });
+
+    await expect(replacePageRelationships("page_alpha", ["page_beta"])).rejects.toMatchObject({
+      name: "KnowledgeApiError",
+      code: "knowledge_relationship_operation_incomplete",
+      retryable: true,
+    });
+    expect(KnowledgeApiError).toBeTruthy();
   });
 
   it("posts attachment sign requests", async () => {
