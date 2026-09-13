@@ -2,7 +2,14 @@
  * Shapes mirroring the server contracts this hub consumes.
  */
 
-export type EntityKind = 'person' | 'organisation' | 'task' | 'communication' | 'meeting' | 'event';
+export type EntityKind =
+  | 'person'
+  | 'organisation'
+  | 'task'
+  | 'communication'
+  | 'meeting'
+  | 'event'
+  | 'application';
 
 export interface SearchResult {
   ref: string;
@@ -97,6 +104,7 @@ export interface LinkedRecords {
   communications: RelationshipEndpoint[];
   meetings?: RelationshipEndpoint[];
   events?: RelationshipEndpoint[];
+  applications?: RelationshipEndpoint[];
   organisations: RelationshipEndpoint[];
   people: RelationshipEndpoint[];
 }
@@ -220,4 +228,141 @@ export interface EventRecord {
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
   learning_operation?: FollowUpOperationProjection | null;
+}
+
+export type ApplicationPipelineStatus =
+  | 'drafting'
+  | 'ready'
+  | 'submitted'
+  | 'under_review'
+  | 'interviewing'
+  | 'offer'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn'
+  | 'unsuccessful';
+
+export type ApplicationDocumentType = 'resume' | 'cover_letter' | 'selection_criteria' | 'other';
+export type ApplicationDocumentStatus = 'draft' | 'final' | 'submitted';
+export type InterviewFormat = 'in_person' | 'video' | 'phone' | 'other';
+export type InterviewResult = 'pending' | 'advanced' | 'unsuccessful' | 'withdrawn';
+export type InterviewLifecycleState = 'planned' | 'completed' | 'cancelled';
+export type OutcomeStatus = 'none' | 'offer' | 'accepted' | 'declined' | 'unsuccessful';
+export type RefereeRole = 'professional' | 'character' | 'academic';
+
+/** Allowed next pipeline states — mirrors APPLICATION_PIPELINE_TRANSITIONS. */
+export const APPLICATION_PIPELINE_TRANSITIONS: Record<
+  ApplicationPipelineStatus,
+  readonly ApplicationPipelineStatus[]
+> = {
+  drafting: ['ready', 'withdrawn'],
+  ready: ['submitted', 'drafting', 'withdrawn'],
+  submitted: ['under_review', 'interviewing', 'offer', 'unsuccessful', 'withdrawn'],
+  under_review: ['interviewing', 'offer', 'unsuccessful', 'withdrawn'],
+  interviewing: ['offer', 'unsuccessful', 'withdrawn', 'interviewing'],
+  offer: ['accepted', 'declined', 'withdrawn'],
+  accepted: [],
+  declined: [],
+  withdrawn: [],
+  unsuccessful: []
+};
+
+export interface ApplicationAdvertisement {
+  title: string | null;
+  url: string | null;
+  source: string | null;
+  summary: string | null;
+  captured_at: string | null;
+}
+
+export interface ApplicationDocument {
+  id: string;
+  document_type: ApplicationDocumentType;
+  label: string;
+  url: string | null;
+  storage_ref: string | null;
+  version: string;
+  status: ApplicationDocumentStatus;
+}
+
+export interface SelectionCriterion {
+  id: string;
+  criterion: string;
+  response: string | null;
+  order: number;
+  completed: boolean;
+}
+
+export interface InterviewRound {
+  id: string;
+  scheduled_at: string | null;
+  time_zone: string | null;
+  format: InterviewFormat;
+  location_text: string | null;
+  preparation_notes: string | null;
+  panel_notes: string | null;
+  result: InterviewResult | null;
+  lifecycle_state: InterviewLifecycleState;
+}
+
+export interface ApplicationOutcome {
+  status: OutcomeStatus;
+  date: string | null;
+  offer_details: string | null;
+  reason: string | null;
+}
+
+export interface ApplicationRecord {
+  schema_version: number;
+  id: string;
+  position_title: string;
+  advertisement: ApplicationAdvertisement;
+  closing_date: string | null;
+  pipeline_status: ApplicationPipelineStatus;
+  documents: ApplicationDocument[];
+  selection_criteria: SelectionCriterion[];
+  interview_rounds: InterviewRound[];
+  outcome: ApplicationOutcome;
+  reflection: string | null;
+  created_at: string;
+  updated_at: string;
+  incomplete_links?: IncompleteLinksProjection | null;
+  application_action_operation?: FollowUpOperationProjection | null;
+}
+
+export interface CareerSectionItem {
+  ref?: string;
+  id?: string;
+  kind?: string;
+  display_label?: string;
+  supporting_label?: string | null;
+  href?: string | null;
+  lifecycle_status?: string | null;
+  position_title?: string;
+  pipeline_status?: string;
+  closing_date?: string | null;
+  updated_at?: string;
+  title?: string;
+  event_type?: string;
+  start?: string;
+  end?: string;
+  occurrence_state?: string;
+  role?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+}
+
+export interface CareerSection {
+  status: 'ok' | 'unavailable';
+  items: CareerSectionItem[];
+  reason?: string;
+}
+
+export interface CareerOverview {
+  applications: CareerSection;
+  employment: CareerSection;
+  professional_development: CareerSection;
+  people: CareerSection;
+  organisations: CareerSection;
+  deferred: string[];
 }

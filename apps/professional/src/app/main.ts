@@ -29,6 +29,12 @@ import {
   renderEventNewView,
   renderEventsView
 } from '@/views/events';
+import {
+  renderApplicationDetailView,
+  renderApplicationNewView,
+  renderApplicationsView
+} from '@/views/applications';
+import { renderCareerView } from '@/views/career';
 import { renderPersonPage } from '@/views/person-page';
 import { renderOrganisationPage } from '@/views/organisation-page';
 
@@ -146,6 +152,32 @@ async function bootApp(root: HTMLElement): Promise<void> {
         },
         isCurrent: () => generation === routeGeneration
       });
+      return;
+    }
+    if (route.name === 'applications') {
+      renderPageHeader(shell, viewChrome('applications'));
+      await renderApplicationsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'application-new') {
+      renderPageHeader(shell, { eyebrow: 'Applications', title: 'New application' });
+      await renderApplicationNewView(shell.canvas);
+      return;
+    }
+    if (route.name === 'application') {
+      renderPageHeader(shell, { eyebrow: 'Applications', title: 'Loading…' });
+      await renderApplicationDetailView(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Applications', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'career') {
+      renderPageHeader(shell, viewChrome('career'));
+      await renderCareerView(shell.canvas);
       return;
     }
     if (route.name === 'person') {

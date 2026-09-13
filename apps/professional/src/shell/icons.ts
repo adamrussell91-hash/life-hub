@@ -28,6 +28,17 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M8 8.5 12 12l4-3.5',
     'M6.5 18.5h11',
     'M8 14.5h8'
+  ],
+  applications: [
+    'M7 4.5h7l3 3V19.5H7V4.5Z',
+    'M14 4.5v3h3',
+    'M10 12h4',
+    'M10 15h4'
+  ],
+  career: [
+    'M4.5 9.5h15v9h-15v-9Z',
+    'M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2',
+    'M12 13v2'
   ]
 };
 

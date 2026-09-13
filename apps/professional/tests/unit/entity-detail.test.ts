@@ -79,7 +79,7 @@ describe('renderPersonPage', () => {
     expect(historical.querySelectorAll('li').length).toBe(1);
   });
 
-  it('lists Meetings and Events in Linked activity with Professional hrefs', async () => {
+  it('lists Meetings, Events, and Applications in Linked activity with Professional hrefs', async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(200, {
         ok: true,
@@ -110,6 +110,17 @@ describe('renderPersonPage', () => {
                 lifecycle_status: 'active',
                 visibility: 'operator'
               }
+            ],
+            applications: [
+              {
+                ref: 'professional:application:application_1',
+                kind: 'application',
+                display_label: 'Classroom Teacher',
+                supporting_label: null,
+                href: '/professional/#/application/application_00000000-0000-4000-8000-000000000010',
+                lifecycle_status: 'active',
+                visibility: 'operator'
+              }
             ]
           }
         })
@@ -119,10 +130,15 @@ describe('renderPersonPage', () => {
     await renderPersonPage(canvas, PERSON_ID);
     expect(canvas.textContent).toMatch(/Meeting · Seth planning/);
     expect(canvas.textContent).toMatch(/Event · PD day/);
+    expect(canvas.textContent).toMatch(/Application · Classroom Teacher/);
     const meetingLink = [...canvas.querySelectorAll('a')].find((a) =>
       a.textContent?.includes('Seth planning')
     );
     expect(meetingLink?.getAttribute('href')).toMatch(/#\/meeting\//);
+    const applicationLink = [...canvas.querySelectorAll('a')].find((a) =>
+      a.textContent?.includes('Classroom Teacher')
+    );
+    expect(applicationLink?.getAttribute('href')).toMatch(/#\/application\//);
   });
 
   it('exposes a back link to People and no edit/archive/delete/create-link controls', async () => {

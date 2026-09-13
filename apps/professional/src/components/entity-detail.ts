@@ -96,9 +96,16 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     for (const item of overview.linked_records.events ?? []) {
       activityBits.push({ label: `Event · ${item.display_label}`, href: item.href });
     }
+    for (const item of overview.linked_records.applications ?? []) {
+      activityBits.push({ label: `Application · ${item.display_label}`, href: item.href });
+    }
     if (!activityBits.length) {
       activityHost.append(
-        el('p', 'empty-state', 'No linked communications, tasks, meetings, or events.')
+        el(
+          'p',
+          'empty-state',
+          'No linked communications, tasks, meetings, events, or applications.'
+        )
       );
     } else {
       const list = document.createElement('ul');
