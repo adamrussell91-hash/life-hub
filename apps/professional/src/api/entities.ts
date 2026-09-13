@@ -8,7 +8,7 @@ export interface SearchOptions {
 /** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */
 export function searchEntities(
   query: string,
-  kinds: 'person' | 'organisation' | 'person,organisation' | 'task' | 'person,organisation,task',
+  kinds: string,
   options: SearchOptions = {}
 ): Promise<{ groups: SearchGroups }> {
   const params = new URLSearchParams({ q: query, kinds });

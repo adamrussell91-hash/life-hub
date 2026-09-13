@@ -9,7 +9,7 @@ export type EntityKind =
   | 'communication'
   | 'meeting'
   | 'event'
-  | 'application';
+  | 'application' | 'program' | 'lesson' | 'class';
 
 export interface SearchResult {
   ref: string;
@@ -26,6 +26,9 @@ export interface SearchGroups {
   organisation: SearchResult[];
   task: SearchResult[];
   communication?: SearchResult[];
+  program?: SearchResult[];
+  lesson?: SearchResult[];
+  class?: SearchResult[];
 }
 
 export interface PersonRecord {
