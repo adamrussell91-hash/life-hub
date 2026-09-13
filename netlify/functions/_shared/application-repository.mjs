@@ -1,7 +1,7 @@
 import {
   APPLICATION_SCHEMA_VERSION,
   PERMITTED_CREATE_LINK_TYPES,
-  assertApplicationPipelineTransition,
+  assertApplicationStateTransition,
   compareApplicationsNewestFirst,
   deriveApplicationOperationId,
   generateApplicationId,
@@ -147,11 +147,11 @@ export function createApplicationRepository(deps = {}) {
       position_title: validated.position_title,
       advertisement: validated.advertisement,
       closing_date: validated.closing_date,
-      pipeline_status: 'researching',
+      pipeline_status: 'drafting',
       documents: validated.documents,
       selection_criteria: validated.selection_criteria,
       interview_rounds: validated.interview_rounds,
-      outcome: null,
+      outcome: { status: 'none', date: null, offer_details: null, reason: null },
       reflection: null,
       created_at: timestamp,
       updated_at: timestamp
@@ -260,7 +260,7 @@ export function createApplicationRepository(deps = {}) {
   async function transitionPipeline(id, nextStatus) {
     const existing = parseApplicationRecord(await getJSON(professionalStore, applicationKey(id)));
     if (!existing) throw notFound();
-    assertApplicationPipelineTransition(existing.pipeline_status, nextStatus);
+    assertApplicationStateTransition(existing.pipeline_status, nextStatus);
     const updated = { ...existing, pipeline_status: nextStatus, updated_at: now() };
     await setJSON(professionalStore, applicationKey(id), updated);
     await setJSON(professionalStore, applicationIndexKey(id), applicationIndexRecord(updated));

@@ -16,17 +16,6 @@ import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 export const config = { path: '/api/applications' };
 
 const FORBIDDEN_ACCESS_FIELDS = ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds'];
-const PIPELINE_ACTIONS = new Set([
-  'prepare',
-  'submit',
-  'interview',
-  'offer',
-  'accept',
-  'decline',
-  'withdraw',
-  'unsuccessful',
-  'research'
-]);
 const TASK_LINK_TYPES = new Set(['application_action']);
 
 function assertNoAccessFields(value) {
@@ -73,19 +62,6 @@ function readId(url) {
     });
   }
   return id;
-}
-
-function statusForAction(action) {
-  if (action === 'prepare') return 'preparing';
-  if (action === 'submit') return 'submitted';
-  if (action === 'interview') return 'interview';
-  if (action === 'offer') return 'offered';
-  if (action === 'accept') return 'accepted';
-  if (action === 'decline') return 'declined';
-  if (action === 'withdraw') return 'withdrawn';
-  if (action === 'unsuccessful') return 'unsuccessful';
-  if (action === 'research') return 'researching';
-  return null;
 }
 
 export function createApplicationsHandler(deps = {}) {
@@ -223,11 +199,6 @@ export function createApplicationsHandler(deps = {}) {
               );
             }
             const application = await repo.transitionPipeline(id, next);
-            return withCors(okResponse(200, { application }), request, env);
-          }
-          if (PIPELINE_ACTIONS.has(action)) {
-            const id = readId(url);
-            const application = await repo.transitionPipeline(id, statusForAction(action));
             return withCors(okResponse(200, { application }), request, env);
           }
           if (action) {

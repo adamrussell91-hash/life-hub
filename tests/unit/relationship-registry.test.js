@@ -17,9 +17,9 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   const keys = listRelationshipDeclarations().map(decl => decl.key).sort();
   assert.deepEqual(keys, [
     'about_person',
-    'applicant_to',
     'application_action',
     'application_contact',
+    'applies_to',
     'attendee',
     'collaborator',
     'contact',
@@ -43,9 +43,9 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.equal(getRelationshipDeclaration('attendee').inverse_label, 'attends');
   assert.equal(getRelationshipDeclaration('preparation').inverse_label, 'has_preparation');
   assert.equal(getRelationshipDeclaration('learning_for').inverse_label, 'has_learning_task');
-  assert.equal(getRelationshipDeclaration('applicant_to').inverse_label, 'receives_application');
+  assert.equal(getRelationshipDeclaration('applies_to').inverse_label, 'has_application');
   assert.equal(getRelationshipDeclaration('application_contact').inverse_label, 'contact_for_application');
-  assert.equal(getRelationshipDeclaration('referee').inverse_label, 'referees_for');
+  assert.equal(getRelationshipDeclaration('referee').inverse_label, 'referee_for');
   assert.equal(getRelationshipDeclaration('application_action').inverse_label, 'has_application_action');
 });
 
@@ -314,26 +314,46 @@ test('Slice 10 application relationship keys accept application kinds', () => {
     validateRelationshipInput({
       sourceRef: application,
       targetRef: organisation,
-      relationshipType: 'applicant_to'
+      relationshipType: 'applies_to'
     }).key,
-    'applicant_to'
+    'applies_to'
   );
   assert.equal(
     validateRelationshipInput({
       sourceRef: application,
       targetRef: person,
-      relationshipType: 'application_contact',
-      role: 'recruiter'
+      relationshipType: 'application_contact'
     }).key,
     'application_contact'
   );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: application,
+        targetRef: person,
+        relationshipType: 'application_contact',
+        role: 'recruiter'
+      }),
+    (error) => error.code === 'role_not_permitted'
+  );
   assert.equal(
     validateRelationshipInput({
       sourceRef: application,
       targetRef: person,
-      relationshipType: 'referee'
+      relationshipType: 'referee',
+      role: 'professional'
     }).key,
     'referee'
+  );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: application,
+        targetRef: person,
+        relationshipType: 'referee',
+        role: 'friend'
+      }),
+    (error) => error.code === 'invalid_role'
   );
   assert.equal(
     validateRelationshipInput({
