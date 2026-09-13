@@ -47,7 +47,7 @@ function wireSelect(el, item, closeSheet) {
  *
  * @param {ParentNode & { querySelector: Function, append: Function }} host
  * @param {{
- *   currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks',
+ *   currentHub: 'life' | 'teaching' | 'knowledge' | 'tasks' | 'professional',
  *   primary: Array<{ id: string, label: string, paths?: string[], iconHtml?: string, href?: string, onSelect?: Function, current?: boolean }>,
  *   more?: Array<{ id: string, label: string, paths?: string[], iconHtml?: string, href?: string, onSelect?: Function }>
  * }} options
