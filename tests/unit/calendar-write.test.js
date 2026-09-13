@@ -22,6 +22,8 @@ test('inferMealSlot reads title or clock', () => {
   assert.equal(inferMealSlot('Eggs', '19:00'), 'dinner');
   assert.equal(inferMealSlot('Ice cream', '21:30'), 'dessert');
   assert.equal(inferMealSlot('Dessert', '19:00'), 'dessert');
+  assert.equal(inferMealSlot('Chocolate brownie', '15:00'), 'dessert');
+  assert.equal(inferMealSlot('Sweet potato mash', '19:00'), 'dinner');
 });
 
 test('candidateForLog builds diary, workout, and meal payloads', () => {

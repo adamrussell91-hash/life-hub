@@ -18,7 +18,9 @@ export function slugForLog(type, { meal, time } = {}) {
 export function inferMealSlot(title, time) {
   const lower = String(title ?? '').trim().toLowerCase();
   if (MEALS.includes(lower)) return lower;
-  if (/\bdessert\b/.test(lower)) return 'dessert';
+  if (/\b(dessert|pudding|ice\s*cream|cake|brownie)\b/.test(lower)) {
+    return 'dessert';
+  }
   const hours = typeof time === 'string' ? Number(time.slice(0, 2)) : NaN;
   if (hours < 11) return 'breakfast';
   if (hours < 15) return 'lunch';

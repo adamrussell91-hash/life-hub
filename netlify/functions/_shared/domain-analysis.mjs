@@ -347,7 +347,7 @@ export function analyseSkincareEvidence(records, today, { message = '', lookback
 
 export function statedNutritionConstraints(message = '') {
   const text = String(message || '');
-  const ate = /\b(just ate|i ate|i've eaten|had breakfast|had lunch|had dinner)\b/i.test(text);
+  const ate = /\b(just ate|i ate|i've eaten|had breakfast|had lunch|had dinner|had (?:a )?snack|had (?:a )?dessert)\b/i.test(text);
   const hungry = /\b(hungry|starving|skipped|forgot to log)\b/i.test(text);
   return {
     current_intake_note: ate ? 'ate_this_turn' : hungry ? 'intake_gap_this_turn' : null
