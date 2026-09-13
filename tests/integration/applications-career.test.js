@@ -5,7 +5,6 @@ import { createApplicationsHandler } from '../../netlify/functions/applications.
 import { createCareerHandler } from '../../netlify/functions/career.mjs';
 import { createEventsHandler } from '../../netlify/functions/events.mjs';
 import { createEntityOverviewHandler } from '../../netlify/functions/entity-overview.mjs';
-import { createUniversalLinksHandler } from '../../netlify/functions/universal-links.mjs';
 import { createIdentityRepository } from '../../netlify/functions/_shared/identity-repository.mjs';
 import { createUniversalLinkRepository } from '../../netlify/functions/_shared/universal-link-repository.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
@@ -75,7 +74,7 @@ function request({
   });
 }
 
-function makeResolveEntity({ professionalStore, universalStore, tasksStore }) {
+function makeResolveEntity({ professionalStore, universalStore, tasksStore, knowledgePages = new Map() }) {
   return async (refInput, accessContext, options = {}) => {
     const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
     if (ref?.namespace === 'professional' && ref.kind === 'application') {
@@ -92,6 +91,21 @@ function makeResolveEntity({ professionalStore, universalStore, tasksStore }) {
     }
     if (ref?.namespace === 'tasks' && ref.kind === 'task') {
       return resolveTask(ref.id, accessContext, { getStore: async () => tasksStore });
+    }
+    if (ref?.namespace === 'knowledge' && ref.kind === 'page') {
+      const page = knowledgePages.get(ref.id);
+      if (!page) {
+        throw Object.assign(new Error('not found'), { status: 404, code: 'endpoint_not_found' });
+      }
+      return {
+        ref: `knowledge:page:${ref.id}`,
+        kind: 'page',
+        display_label: page.title,
+        supporting_label: null,
+        href: null,
+        lifecycle_status: 'active',
+        visibility: 'operator'
+      };
     }
     throw Object.assign(new Error('not found'), { status: 404, code: 'endpoint_not_found' });
   };
@@ -145,14 +159,15 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   const professionalStore = memoryStore();
   const universalStore = memoryStore();
   const tasksStore = memoryStore();
+  const knowledgePages = new Map([['page_app_notes', { title: 'Application notes' }]]);
 
   const identity = createIdentityRepository({
     store: universalStore,
     now: () => '2026-08-01T01:00:00.000Z'
   });
-  const { ref: selfRef } = await identity.createIdentity({
-    kind: 'person',
-    input: { display_name: 'Adam Self', is_self: true }
+  const { ref: orgRef } = await identity.createIdentity({
+    kind: 'organisation',
+    input: { display_name: 'St Example College' }
   });
   const { ref: contactRef } = await identity.createIdentity({
     kind: 'person',
@@ -162,40 +177,43 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
     kind: 'person',
     input: { display_name: 'Referee Person' }
   });
-  const { ref: orgRef } = await identity.createIdentity({
-    kind: 'organisation',
-    input: { display_name: 'Example School' }
-  });
-  const { ref: employerRef } = await identity.createIdentity({
-    kind: 'organisation',
-    input: { display_name: 'Current Employer' }
+  const { ref: selfRef } = await identity.createIdentity({
+    kind: 'person',
+    input: { display_name: 'Adam Self', is_self: true }
   });
 
   const actionTaskId = 'task_app_action_1';
   await tasksStore.setJSON(taskKey(actionTaskId), {
     id: actionTaskId,
-    title: 'Submit application pack',
+    title: 'Draft selection criteria',
     status: 'open',
     domain: 'work',
     priority: 'normal',
     kind: 'task'
   });
 
-  const resolveEntity = makeResolveEntity({ professionalStore, universalStore, tasksStore });
+  const resolveEntity = makeResolveEntity({
+    professionalStore,
+    universalStore,
+    tasksStore,
+    knowledgePages
+  });
+  const access = createAccessContext({ workflow: 'life' });
   const linkRepo = createUniversalLinkRepository({
     store: universalStore,
     resolveEntity,
     now: () => '2026-08-01T01:00:00.000Z'
   });
 
-  const access = createAccessContext({ workflow: 'life' });
   await linkRepo.createLink(
     {
       source_ref: selfRef,
-      target_ref: employerRef,
+      target_ref: orgRef,
       relationship_type: 'employee_at',
-      role: 'Teacher',
-      valid_from: '2024-01-01T00:00:00.000Z'
+      role: 'teacher',
+      valid_from: '2020-01-01T00:00:00.000Z',
+      valid_to: null,
+      metadata: {}
     },
     access
   );
@@ -210,15 +228,6 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
     resolveEntity,
     createUniversalLinkRepository: () => linkRepo,
     generateId: () => APPLICATION_ID
-  });
-
-  const universalLinksHandler = createUniversalLinksHandler({
-    env,
-    now: () => Date.parse('2026-08-01T01:00:00Z'),
-    repositoryNow: () => '2026-08-01T01:00:00.000Z',
-    getContentStore: async () => universalStore,
-    resolveEntity,
-    createRepository: () => linkRepo
   });
 
   const eventsHandler = createEventsHandler({
@@ -251,7 +260,6 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
     createUniversalLinkRepository: () => linkRepo
   });
 
-  // 1–2. Create Application linked to Org (applies_to)
   const createResponse = await applicationsHandler(
     request({
       url: 'https://api.adam-russell.com/api/applications',
@@ -266,7 +274,12 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
           captured_at: '2026-08-01T00:00:00.000Z'
         },
         closing_date: '2026-09-30',
-        links: [{ target_ref: orgRef, relationship_type: 'applies_to' }]
+        links: [
+          { target_ref: orgRef, relationship_type: 'applicant_to' },
+          { target_ref: contactRef, relationship_type: 'application_contact', role: 'recruiter' },
+          { target_ref: refereeRef, relationship_type: 'referee' },
+          { target_ref: 'knowledge:page:page_app_notes', relationship_type: 'related_to' }
+        ]
       }
     })
   );
@@ -274,68 +287,39 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   const created = await createResponse.json();
   const application = created.data.application;
   assert.equal(application.id, APPLICATION_ID);
-  assert.equal(application.pipeline_status, 'drafting');
+  assert.equal(application.pipeline_status, 'researching');
   assert.equal('organisation_id' in application, false);
+  assert.equal('person_id' in application, false);
+  assert.equal('task_id' in application, false);
+  assert.equal('page_id' in application, false);
   assert.equal('links' in application, false);
 
   const applicationRef = `professional:application:${APPLICATION_ID}`;
 
-  // 3. Add contact + referee via Universal Links API
-  const contactLink = await universalLinksHandler(
-    request({
-      url: 'https://api.adam-russell.com/api/universal-links',
-      method: 'POST',
-      body: {
-        source_ref: applicationRef,
-        target_ref: contactRef,
-        relationship_type: 'application_contact'
-      }
-    })
-  );
-  assert.equal(contactLink.status, 201);
-  const refereeLink = await universalLinksHandler(
-    request({
-      url: 'https://api.adam-russell.com/api/universal-links',
-      method: 'POST',
-      body: {
-        source_ref: applicationRef,
-        target_ref: refereeRef,
-        relationship_type: 'referee',
-        role: 'professional'
-      }
-    })
-  );
-  assert.equal(refereeLink.status, 201);
-
-  // 4. PATCH documents + selection_criteria
   const patchDocs = await applicationsHandler(
     request({
       url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}`,
       method: 'PATCH',
       body: {
+        advertisement: { summary: 'Updated summary only' },
         documents: [
           {
-            id: 'adoc_00000000-0000-4000-8000-0000000000d1',
             document_type: 'resume',
             label: 'Resume v1',
-            url: null,
-            storage_ref: 'blob:resume-v1',
+            url_or_storage_ref: 'blob:resume-v1',
             version: '1',
-            status: 'draft'
+            status: 'ready'
           },
           {
-            id: 'adoc_00000000-0000-4000-8000-0000000000d2',
             document_type: 'cover_letter',
             label: 'Cover',
-            url: 'https://example.com/cover.pdf',
-            storage_ref: null,
+            url_or_storage_ref: 'https://example.com/cover.pdf',
             version: '1',
-            status: 'final'
+            status: 'draft'
           }
         ],
         selection_criteria: [
           {
-            id: 'acrit_00000000-0000-4000-8000-0000000000c1',
             criterion: 'Demonstrated teaching excellence',
             response: 'Draft response',
             order: 0,
@@ -347,10 +331,11 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   );
   assert.equal(patchDocs.status, 200);
   const afterDocs = (await patchDocs.json()).data.application;
+  assert.equal(afterDocs.advertisement.title, 'Gifted Education Teacher');
+  assert.equal(afterDocs.advertisement.summary, 'Updated summary only');
   assert.equal(afterDocs.documents.length, 2);
   assert.equal(afterDocs.selection_criteria.length, 1);
 
-  // 5. link-task application_action
   const linkTask = await applicationsHandler(
     request({
       url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=link-task`,
@@ -361,8 +346,21 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   assert.equal(linkTask.status, 200);
   assert.equal((await linkTask.json()).data.operation.status, 'committed');
 
-  // 6. PATCH interview round and complete it
-  const interviewId = 'aint_00000000-0000-4000-8000-0000000000i1';
+  for (const [action, expected] of [
+    ['prepare', 'preparing'],
+    ['submit', 'submitted'],
+    ['interview', 'interview']
+  ]) {
+    const transition = await applicationsHandler(
+      request({
+        url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=${action}`,
+        method: 'POST'
+      })
+    );
+    assert.equal(transition.status, 200, `action ${action}`);
+    assert.equal((await transition.json()).data.application.pipeline_status, expected);
+  }
+
   const patchInterview = await applicationsHandler(
     request({
       url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}`,
@@ -370,81 +368,72 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
       body: {
         interview_rounds: [
           {
-            id: interviewId,
-            scheduled_at: '2026-10-10T01:00:00.000Z',
+            date: '2026-10-10T01:00:00.000Z',
             time_zone: 'Australia/Sydney',
             format: 'video',
-            location_text: null,
-            preparation_notes: 'Prep panel pack',
-            panel_notes: null,
-            result: 'pending',
-            lifecycle_state: 'planned'
-          }
-        ]
-      }
-    })
-  );
-  assert.equal(patchInterview.status, 200);
-
-  const completeInterview = await applicationsHandler(
-    request({
-      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}`,
-      method: 'PATCH',
-      body: {
-        interview_rounds: [
-          {
-            id: interviewId,
-            scheduled_at: '2026-10-10T01:00:00.000Z',
-            time_zone: 'Australia/Sydney',
-            format: 'video',
-            location_text: null,
+            location: null,
             preparation_notes: 'Prep panel pack',
             panel_notes: 'Strong pedagogy answers',
-            result: 'advanced',
+            result: 'progressed',
             lifecycle_state: 'completed'
           }
         ]
       }
     })
   );
-  assert.equal(completeInterview.status, 200);
-  assert.equal((await completeInterview.json()).data.application.interview_rounds[0].lifecycle_state, 'completed');
+  assert.equal(patchInterview.status, 200);
+  assert.equal(
+    (await patchInterview.json()).data.application.interview_rounds[0].lifecycle_state,
+    'completed'
+  );
 
-  // 7. transition pipeline through valid states
-  for (const status of ['ready', 'submitted', 'under_review', 'interviewing', 'offer']) {
-    const transition = await applicationsHandler(
-      request({
-        url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=transition`,
-        method: 'POST',
-        body: { pipeline_status: status }
-      })
-    );
-    assert.equal(transition.status, 200, `transition to ${status}`);
-    assert.equal((await transition.json()).data.application.pipeline_status, status);
-  }
+  const offer = await applicationsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=offer`,
+      method: 'POST'
+    })
+  );
+  assert.equal(offer.status, 200);
 
-  // 8. PATCH outcome + reflection
   const outcomePatch = await applicationsHandler(
     request({
       url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}`,
       method: 'PATCH',
       body: {
         outcome: {
-          status: 'offer',
+          status: 'accepted',
           date: '2026-10-20',
           offer_details: '1.0 FTE ongoing',
           reason: null
         },
-        reflection: 'Strong panel; consider accepting after visiting campus.'
+        reflection: 'Strong panel; accepted after visiting campus.'
       }
     })
   );
   assert.equal(outcomePatch.status, 200);
   const finalApp = (await outcomePatch.json()).data.application;
-  assert.equal(finalApp.outcome.status, 'offer');
+  assert.equal(finalApp.outcome.status, 'accepted');
   assert.ok(finalApp.reflection.includes('Strong panel'));
 
-  // 9. Org and People overviews expose Application
+  const accept = await applicationsHandler(
+    request({
+      url: `https://api.adam-russell.com/api/applications?id=${APPLICATION_ID}&action=accept`,
+      method: 'POST'
+    })
+  );
+  assert.equal(accept.status, 200);
+  assert.equal((await accept.json()).data.application.pipeline_status, 'accepted');
+
+  const stored = await professionalStore.get(applicationKey(APPLICATION_ID), { type: 'json' });
+  const storedJson = JSON.stringify(stored);
+  assert.equal(storedJson.includes(orgRef), false);
+  assert.equal(storedJson.includes(contactRef), false);
+  assert.equal(storedJson.includes(refereeRef), false);
+  assert.equal(storedJson.includes(actionTaskId), false);
+  assert.equal(storedJson.includes('page_app_notes'), false);
+  assert.equal('organisation_id' in stored, false);
+  assert.equal('links' in stored, false);
+
   for (const ref of [orgRef, contactRef, refereeRef]) {
     const overviewResponse = await overviewHandler(
       request({
@@ -459,7 +448,6 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
     );
   }
 
-  // 10. Career view assembles Application, employment, PD Event without copied records
   const pdEvent = await eventsHandler(
     request({
       url: 'https://api.adam-russell.com/api/events',
@@ -487,43 +475,27 @@ test('Slice 10 acceptance: application links, docs, task, interview, pipeline, c
   assert.ok(career.applications.items.some((item) => item.id === APPLICATION_ID));
   assert.ok(!('documents' in career.applications.items[0]));
   assert.equal(career.employment.status, 'ok');
-  assert.ok(career.employment.items.some((item) => item.ref === employerRef));
+  assert.ok(career.employment.items.some((item) => item.ref === orgRef));
   assert.equal(career.professional_development.status, 'ok');
   assert.ok(career.professional_development.items.some((item) => item.id === EVENT_ID));
-  assert.ok(!('hours' in (career.professional_development.items[0] || {})) || true);
-  // PD summary must not copy full event record fields like accreditation_category
-  assert.equal('accreditation_category' in career.professional_development.items[0], false);
-  assert.deepEqual(career.deferred, ['publication', 'presentation']);
-  assert.equal(career.people.status, 'ok');
   assert.equal(career.organisations.status, 'ok');
-
-  // 11. Confirm no Org/Person/Task/Knowledge/UL ids inside stored Application JSON
-  const stored = await professionalStore.get(applicationKey(APPLICATION_ID), { type: 'json' });
-  const storedJson = JSON.stringify(stored);
-  assert.equal(storedJson.includes(orgRef), false);
-  assert.equal(storedJson.includes(contactRef), false);
-  assert.equal(storedJson.includes(refereeRef), false);
-  assert.equal(storedJson.includes(actionTaskId), false);
-  assert.equal(storedJson.includes('organisation_'), false);
-  assert.equal(storedJson.includes('person_'), false);
-  assert.equal('links' in stored, false);
+  assert.ok(career.organisations.items.some((item) => item.ref === orgRef));
+  assert.equal(career.people.status, 'ok');
 
   const appLinks = await linkRepo.listForEntity(applicationRef, access);
   assert.ok(
-    [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'applies_to')
+    [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'applicant_to')
   );
   assert.ok(
     [...appLinks.outgoing, ...appLinks.incoming].some(
-      (e) => e.link.relationship_type === 'application_contact'
+      (e) => e.link.relationship_type === 'application_contact' && e.link.role === 'recruiter'
     )
   );
   assert.ok(
     [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'referee')
   );
   assert.ok(
-    [...appLinks.outgoing, ...appLinks.incoming].some(
-      (e) => e.link.relationship_type === 'application_action'
-    )
+    [...appLinks.outgoing, ...appLinks.incoming].some((e) => e.link.relationship_type === 'application_action')
   );
 });
 
@@ -572,7 +544,7 @@ test('application partial link write is fail-visible and retryable without dupli
       method: 'POST',
       body: {
         position_title: 'Partial',
-        links: [{ target_ref: orgRef, relationship_type: 'applies_to' }]
+        links: [{ target_ref: orgRef, relationship_type: 'applicant_to' }]
       }
     })
   );

@@ -12,6 +12,13 @@ import {
   personKey
 } from './_shared/universal-link-blobs.mjs';
 import { defaultGetTasksStore, getJSON as getTasksJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import {
+  defaultGetProfessionalStore,
+  getJSON as getProfessionalJSON,
+  listApplicationIndexKeys,
+  applicationKey
+} from './_shared/professional-blobs.mjs';
+import { parseApplicationRecord } from './_shared/application-schema.mjs';
 
 export const config = { path: '/api/entities/search' };
 
@@ -26,7 +33,8 @@ const READ_BATCH_SIZE = 10;
 // `resolveTask` already exposes. Nothing here copies Task data into
 // `universal-link-content`, and no new Task index is created: the
 // existing `tasks/_index` (`readTaskIndex`) is reused as-is.
-const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task']);
+// Application search is opt-in via kinds=application (not in DEFAULT_KINDS).
+const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application']);
 const DEFAULT_KINDS = ['person', 'organisation', 'task'];
 
 function normalize(value) {
@@ -116,8 +124,43 @@ async function searchTaskKind(getTasksStore, query) {
   return out;
 }
 
+async function searchApplicationKind(getProfessionalStore, query) {
+  const store = await getProfessionalStore();
+  const indexKeys = await listApplicationIndexKeys(store);
+  const ids = [
+    ...new Set(
+      indexKeys
+        .map((key) => key.slice('applications/index/'.length))
+        .filter(Boolean)
+    )
+  ];
+  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
+    parseApplicationRecord(await getProfessionalJSON(store, applicationKey(id)))
+  );
+
+  const out = [];
+  for (const record of records) {
+    if (!record) continue;
+    const title = typeof record.position_title === 'string' ? record.position_title : '';
+    const rank = matchRank(query, title, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'professional', kind: 'application', id: record.id }),
+      kind: 'application',
+      display_label: title,
+      supporting_label: record.pipeline_status,
+      href: `/professional/#/application/${encodeURIComponent(record.id)}`,
+      lifecycle_status: record.pipeline_status,
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
 export function createEntitySearchHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
+  const getProfessionalStore = deps.getProfessionalStore ?? defaultGetProfessionalStore;
 
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -178,7 +221,8 @@ export function createEntitySearchHandler(deps = {}) {
       requestedKinds.has('organisation')
         ? searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived)
         : [],
-      requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : []
+      requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
+      requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : []
     ]);
 
     // Exact prefix matches rank before token matches across every group
@@ -190,7 +234,7 @@ export function createEntitySearchHandler(deps = {}) {
       .slice(0, MAX_RESULTS)
       .map(({ rank, ...result }) => result); // eslint-disable-line no-unused-vars
 
-    const groups = { person: [], organisation: [], task: [] };
+    const groups = { person: [], organisation: [], task: [], application: [] };
     for (const result of ranked) groups[result.kind].push(result);
 
     return withCors(okResponse(200, { groups }), request, env);
