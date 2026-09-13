@@ -95,7 +95,8 @@ export function createApplicationsHandler(deps = {}) {
         resolveEntity,
         getUniversalLinkStore,
         generateId: deps.generateId,
-        createUniversalLinkRepository: deps.createUniversalLinkRepository
+        createUniversalLinkRepository: deps.createUniversalLinkRepository,
+        failAtStep: deps.failAtStep
       });
 
       const taskLinks = createTaskLinkRepository({

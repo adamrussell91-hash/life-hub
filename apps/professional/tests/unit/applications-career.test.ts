@@ -62,12 +62,21 @@ describe('renderApplicationsView', () => {
         ok: true,
         data: {
           applications: [
-            sampleApplication(),
+            sampleApplication({
+              organisation: {
+                ref: ORG_REF,
+                display_label: 'Example University'
+              }
+            }),
             sampleApplication({
               id: 'application_00000000-0000-4000-8000-000000000011',
               position_title: 'Head of Stage',
               pipeline_status: 'submitted',
-              closing_date: null
+              closing_date: null,
+              organisation: {
+                ref: ORG_REF,
+                display_label: 'Example University'
+              }
             })
           ]
         }
@@ -86,6 +95,7 @@ describe('renderApplicationsView', () => {
     await renderApplicationsView(canvas);
     expect(canvas.textContent).toMatch(/Classroom Teacher/);
     expect(canvas.textContent).toMatch(/Head of Stage/);
+    expect(canvas.textContent).toMatch(/Example University/);
     expect(canvas.querySelector('.applications__pipeline')).toBeTruthy();
     expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/application/new');
 
@@ -377,5 +387,79 @@ describe('renderCareerView', () => {
       a.textContent?.includes('Classroom Teacher')
     );
     expect(link?.getAttribute('href')).toBe(`#/application/${VALID_APPLICATION_ID}`);
+  });
+});
+
+
+
+describe('application detail editing controls', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('edits documents criteria and interviews through detail controls', async () => {
+    const application = sampleApplication({
+      documents: [
+        {
+          id: 'adoc_00000000-0000-4000-8000-000000000001',
+          document_type: 'resume',
+          label: 'CV',
+          url: 'https://example.com/cv.pdf',
+          storage_ref: null,
+          version: '1',
+          status: 'draft'
+        }
+      ],
+      selection_criteria: [
+        {
+          id: 'acrit_00000000-0000-4000-8000-000000000001',
+          criterion: 'Teaching excellence',
+          response: 'Draft',
+          order: 1,
+          completed: false
+        }
+      ],
+      interview_rounds: []
+    });
+
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        if (init?.method === 'POST' || init?.method === 'PATCH') {
+          return Response.json({ ok: true, data: { link: { id: 'ul_1', status: 'current' }, created: true } });
+        }
+        return Response.json({ ok: true, data: { outgoing: [], incoming: [] } });
+      }
+      if (href.includes('/api/applications') && init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body ?? '{}'));
+        return Response.json({
+          ok: true,
+          data: { application: { ...application, ...body, updated_at: '2026-09-02T10:00:00.000Z' } }
+        });
+      }
+      if (href.includes('/api/applications')) {
+        return Response.json({ ok: true, data: { application } });
+      }
+      return Response.json({ ok: true, data: {} });
+    });
+
+    const canvas = document.createElement('div');
+    await renderApplicationDetailView(canvas, VALID_APPLICATION_ID);
+    // Relationship editor loads after paint.
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[aria-label="Outgoing relationships"]')).toBeTruthy();
+    });
+
+    expect(canvas.textContent).toMatch(/Documents/);
+    expect(canvas.querySelector('[aria-label="Document URL"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Selection criterion"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Interview date and time"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Interview time zone"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Organisation"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Application contact"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Referee"]')).toBeTruthy();
   });
 });

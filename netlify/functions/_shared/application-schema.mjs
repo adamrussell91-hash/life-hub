@@ -295,12 +295,24 @@ function validateDocumentsInput(raw) {
     if (!isValidDocumentId(id)) {
       throw validationError('invalid_document_id', `documents[${index}].id must be adoc_<uuid>.`);
     }
+    const url = trimBounded(entry.url, `documents[${index}].url`, DOC_URL_MAX);
+    const storage_ref = trimBounded(
+      entry.storage_ref,
+      `documents[${index}].storage_ref`,
+      DOC_REF_MAX
+    );
+    if (!url && !storage_ref) {
+      throw validationError(
+        'document_location_required',
+        `documents[${index}] requires url or storage_ref.`
+      );
+    }
     return {
       id,
       document_type: entry.document_type,
       label: trimBounded(entry.label, `documents[${index}].label`, DOC_LABEL_MAX, { allowEmpty: false }),
-      url: trimBounded(entry.url, `documents[${index}].url`, DOC_URL_MAX),
-      storage_ref: trimBounded(entry.storage_ref, `documents[${index}].storage_ref`, DOC_REF_MAX),
+      url,
+      storage_ref,
       version: trimBounded(entry.version, `documents[${index}].version`, DOC_VERSION_MAX, {
         allowEmpty: false
       }),

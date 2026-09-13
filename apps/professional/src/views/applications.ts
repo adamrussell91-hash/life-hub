@@ -29,11 +29,16 @@ import {
 } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import {
-  loadEntityRelationships,
   mountKnowledgePagePicker,
-  mountTaskLinkPanel,
-  renderRelationshipSection
+  mountTaskLinkPanel
 } from '@/components/schedule-relationships';
+import {
+  createUniversalLink,
+  endUniversalLink,
+  listUniversalLinksForEntity,
+  type UniversalLinkEntry
+} from '@/api/universal-links';
+import { wallLocalToUtcIso, utcIsoToWallLocal } from '@/lib/wall-time';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -148,6 +153,7 @@ function renderApplicationListItem(record: ApplicationRecord): HTMLLIElement {
     'p',
     'applications__meta',
     [
+      record.organisation?.display_label ?? null,
       statusLabel(record.pipeline_status),
       record.closing_date
         ? `closes ${formatDisplayDate(record.closing_date) ?? record.closing_date}`
@@ -624,24 +630,11 @@ export async function renderApplicationDetailView(
       taskPanels
     );
 
-    void loadEntityRelationships(applicationRef(record.id))
-      .then((entries) => {
-        renderRelationshipSection(
-          relationships,
-          entries,
-          'No organisation, contact, referee, or knowledge links yet.'
-        );
-      })
-      .catch((err) => {
-        relationships.replaceChildren(
-          el('h2', undefined, 'Relationships'),
-          el(
-            'p',
-            'empty-state',
-            err instanceof ApiClientError ? err.message : 'Relationships unavailable.'
-          )
-        );
-      });
+    void mountApplicationRelationshipEditor({
+      host: relationships,
+      applicationId: record.id,
+      onChanged: () => void load()
+    });
 
     if (record.incomplete_links) {
       const incomplete = el('section', 'application-detail__incomplete');
@@ -678,6 +671,13 @@ export async function renderApplicationDetailView(
   await load();
 }
 
+function newId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return `${prefix}_${crypto.randomUUID()}`;
+  }
+  return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+}
+
 function mountDocumentsForm(
   record: ApplicationRecord,
   onSave: (patch: {
@@ -688,18 +688,67 @@ function mountDocumentsForm(
       status: string;
     }>;
   }) => Promise<void>
-): HTMLFormElement {
+): HTMLElement {
+  const section = el('section', 'application-detail__edit');
+  section.append(el('h2', undefined, 'Documents'));
+  const list = el('ul', 'application-detail__editable-list');
+  section.append(list);
+
+  function paintList(): void {
+    list.replaceChildren();
+    for (const doc of record.documents) {
+      const item = document.createElement('li');
+      item.dataset.documentId = doc.id;
+      item.append(
+        el(
+          'p',
+          undefined,
+          `${doc.document_type} · ${doc.label} · v${doc.version} · ${doc.status}`
+        )
+      );
+      const url = document.createElement('input');
+      url.type = 'url';
+      url.value = doc.url ?? '';
+      url.placeholder = 'URL';
+      url.setAttribute('aria-label', `Document URL ${doc.label}`);
+      const storage = document.createElement('input');
+      storage.type = 'text';
+      storage.value = doc.storage_ref ?? '';
+      storage.placeholder = 'Storage reference';
+      storage.setAttribute('aria-label', `Document storage reference ${doc.label}`);
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.value = doc.label;
+      label.setAttribute('aria-label', `Document label ${doc.id}`);
+      const save = el('button', 'btn btn--secondary', 'Save document') as HTMLButtonElement;
+      save.type = 'button';
+      save.addEventListener('click', () => {
+        const next = record.documents.map((entry) =>
+          entry.id === doc.id
+            ? {
+                ...entry,
+                label: label.value.trim() || entry.label,
+                url: url.value.trim() || null,
+                storage_ref: storage.value.trim() || null
+              }
+            : entry
+        );
+        void onSave({ documents: next });
+      });
+      const remove = el('button', 'btn btn--ghost', 'Remove') as HTMLButtonElement;
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove document ${doc.label}`);
+      remove.addEventListener('click', () => {
+        void onSave({ documents: record.documents.filter((entry) => entry.id !== doc.id) });
+      });
+      item.append(label, url, storage, save, remove);
+      list.append(item);
+    }
+  }
+  paintList();
+
   const form = document.createElement('form');
-  form.className = 'application-detail__edit';
-  form.append(el('h2', undefined, 'Edit documents'));
-  const label = document.createElement('input');
-  label.type = 'text';
-  label.placeholder = 'Document label';
-  label.setAttribute('aria-label', 'Document label');
-  const version = document.createElement('input');
-  version.type = 'text';
-  version.value = '1';
-  version.setAttribute('aria-label', 'Document version');
+  form.className = 'application-detail__add';
   const type = document.createElement('select');
   type.setAttribute('aria-label', 'Document type');
   for (const value of ['resume', 'cover_letter', 'selection_criteria', 'other'] as const) {
@@ -708,6 +757,22 @@ function mountDocumentsForm(
     option.textContent = value;
     type.append(option);
   }
+  const label = document.createElement('input');
+  label.type = 'text';
+  label.placeholder = 'Document label';
+  label.setAttribute('aria-label', 'Document label');
+  const version = document.createElement('input');
+  version.type = 'text';
+  version.value = '1';
+  version.setAttribute('aria-label', 'Document version');
+  const url = document.createElement('input');
+  url.type = 'url';
+  url.placeholder = 'URL';
+  url.setAttribute('aria-label', 'Document URL');
+  const storage = document.createElement('input');
+  storage.type = 'text';
+  storage.placeholder = 'Storage reference';
+  storage.setAttribute('aria-label', 'Document storage reference');
   const docStatus = document.createElement('select');
   docStatus.setAttribute('aria-label', 'Document status');
   for (const value of ['draft', 'final', 'submitted'] as const) {
@@ -718,24 +783,28 @@ function mountDocumentsForm(
   }
   const save = el('button', 'btn btn--secondary', 'Add document') as HTMLButtonElement;
   save.type = 'submit';
-  form.append(type, label, version, docStatus, save);
+  form.append(type, label, version, url, storage, docStatus, save);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!label.value.trim()) return;
-    const next = [
-      ...record.documents,
-      {
-        document_type: type.value as ApplicationDocument['document_type'],
-        label: label.value.trim(),
-        url: null,
-        storage_ref: null,
-        version: version.value.trim() || '1',
-        status: docStatus.value as ApplicationDocument['status']
-      }
-    ];
-    await onSave({ documents: next });
+    if (!url.value.trim() && !storage.value.trim()) return;
+    await onSave({
+      documents: [
+        ...record.documents,
+        {
+          id: newId('adoc'),
+          document_type: type.value as ApplicationDocument['document_type'],
+          label: label.value.trim(),
+          url: url.value.trim() || null,
+          storage_ref: storage.value.trim() || null,
+          version: version.value.trim() || '1',
+          status: docStatus.value as ApplicationDocument['status']
+        }
+      ]
+    });
   });
-  return form;
+  section.append(form);
+  return section;
 }
 
 function mountCriteriaForm(
@@ -747,10 +816,83 @@ function mountCriteriaForm(
       completed: boolean;
     }>;
   }) => Promise<void>
-): HTMLFormElement {
+): HTMLElement {
+  const section = el('section', 'application-detail__edit');
+  section.append(el('h2', undefined, 'Selection criteria'));
+  const list = el('ul', 'application-detail__editable-list');
+  section.append(list);
+  const sorted = [...record.selection_criteria].sort((a, b) => a.order - b.order);
+  for (const criterion of sorted) {
+    const item = document.createElement('li');
+    item.dataset.criterionId = criterion.id;
+    const text = document.createElement('input');
+    text.type = 'text';
+    text.value = criterion.criterion;
+    text.setAttribute('aria-label', `Criterion ${criterion.id}`);
+    const response = document.createElement('textarea');
+    response.rows = 2;
+    response.value = criterion.response ?? '';
+    response.setAttribute('aria-label', `Criterion response ${criterion.id}`);
+    const completed = document.createElement('input');
+    completed.type = 'checkbox';
+    completed.checked = criterion.completed;
+    completed.setAttribute('aria-label', `Complete criterion ${criterion.id}`);
+    const up = el('button', 'btn btn--ghost', 'Up') as HTMLButtonElement;
+    up.type = 'button';
+    up.setAttribute('aria-label', `Move criterion ${criterion.id} up`);
+    up.addEventListener('click', () => {
+      const next = [...sorted];
+      const index = next.findIndex((entry) => entry.id === criterion.id);
+      if (index <= 0) return;
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      void onSave({
+        selection_criteria: next.map((entry, order) => ({ ...entry, order: order + 1 }))
+      });
+    });
+    const down = el('button', 'btn btn--ghost', 'Down') as HTMLButtonElement;
+    down.type = 'button';
+    down.setAttribute('aria-label', `Move criterion ${criterion.id} down`);
+    down.addEventListener('click', () => {
+      const next = [...sorted];
+      const index = next.findIndex((entry) => entry.id === criterion.id);
+      if (index < 0 || index >= next.length - 1) return;
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      void onSave({
+        selection_criteria: next.map((entry, order) => ({ ...entry, order: order + 1 }))
+      });
+    });
+    const save = el('button', 'btn btn--secondary', 'Save') as HTMLButtonElement;
+    save.type = 'button';
+    save.addEventListener('click', () => {
+      void onSave({
+        selection_criteria: record.selection_criteria.map((entry) =>
+          entry.id === criterion.id
+            ? {
+                ...entry,
+                criterion: text.value.trim() || entry.criterion,
+                response: response.value.trim() || null,
+                completed: completed.checked
+              }
+            : entry
+        )
+      });
+    });
+    const remove = el('button', 'btn btn--ghost', 'Remove') as HTMLButtonElement;
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove criterion ${criterion.id}`);
+    remove.addEventListener('click', () => {
+      const next = record.selection_criteria
+        .filter((entry) => entry.id !== criterion.id)
+        .sort((a, b) => a.order - b.order)
+        .map((entry, order) => ({ ...entry, order: order + 1 }));
+      void onSave({ selection_criteria: next });
+    });
+    item.append(text, response, completed, up, down, save, remove);
+    list.append(item);
+  }
+
   const form = document.createElement('form');
-  form.className = 'application-detail__edit';
-  form.append(el('h2', undefined, 'Edit selection criteria'));
+  form.className = 'application-detail__add';
   const criterion = document.createElement('input');
   criterion.type = 'text';
   criterion.placeholder = 'Criterion';
@@ -765,18 +907,21 @@ function mountCriteriaForm(
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!criterion.value.trim()) return;
-    const next = [
-      ...record.selection_criteria,
-      {
-        criterion: criterion.value.trim(),
-        response: response.value.trim() || null,
-        order: record.selection_criteria.length + 1,
-        completed: false
-      }
-    ];
-    await onSave({ selection_criteria: next });
+    await onSave({
+      selection_criteria: [
+        ...record.selection_criteria,
+        {
+          id: newId('acrit'),
+          criterion: criterion.value.trim(),
+          response: response.value.trim() || null,
+          order: record.selection_criteria.length + 1,
+          completed: false
+        }
+      ]
+    });
   });
-  return form;
+  section.append(form);
+  return section;
 }
 
 function mountInterviewsForm(
@@ -787,10 +932,123 @@ function mountInterviewsForm(
       lifecycle_state: string;
     }>;
   }) => Promise<void>
-): HTMLFormElement {
+): HTMLElement {
+  const section = el('section', 'application-detail__edit');
+  section.append(el('h2', undefined, 'Interview rounds'));
+  const list = el('ul', 'application-detail__editable-list');
+  section.append(list);
+
+  for (const round of record.interview_rounds) {
+    const item = document.createElement('li');
+    item.dataset.interviewId = round.id;
+    const zone = document.createElement('input');
+    zone.type = 'text';
+    zone.value = round.time_zone ?? 'Australia/Sydney';
+    zone.setAttribute('aria-label', `Interview time zone ${round.id}`);
+    const when = document.createElement('input');
+    when.type = 'datetime-local';
+    when.value =
+      round.scheduled_at && round.time_zone
+        ? utcIsoToWallLocal(round.scheduled_at, round.time_zone)
+        : '';
+    when.setAttribute('aria-label', `Interview date and time ${round.id}`);
+    const format = document.createElement('select');
+    format.setAttribute('aria-label', `Interview format ${round.id}`);
+    for (const value of ['in_person', 'video', 'phone', 'other'] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      if (value === round.format) option.selected = true;
+      format.append(option);
+    }
+    const location = document.createElement('input');
+    location.type = 'text';
+    location.value = round.location_text ?? '';
+    location.setAttribute('aria-label', `Interview location ${round.id}`);
+    const prep = document.createElement('textarea');
+    prep.rows = 2;
+    prep.value = round.preparation_notes ?? '';
+    prep.setAttribute('aria-label', `Interview preparation notes ${round.id}`);
+    const panel = document.createElement('textarea');
+    panel.rows = 2;
+    panel.value = round.panel_notes ?? '';
+    panel.setAttribute('aria-label', `Interview panel notes ${round.id}`);
+    const result = document.createElement('select');
+    result.setAttribute('aria-label', `Interview result ${round.id}`);
+    for (const value of ['pending', 'advanced', 'unsuccessful', 'withdrawn'] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      if ((round.result ?? 'pending') === value) option.selected = true;
+      result.append(option);
+    }
+    const lifecycle = document.createElement('select');
+    lifecycle.setAttribute('aria-label', `Interview lifecycle ${round.id}`);
+    for (const value of ['planned', 'completed', 'cancelled'] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      if (value === round.lifecycle_state) option.selected = true;
+      lifecycle.append(option);
+    }
+    const save = el('button', 'btn btn--secondary', 'Save interview') as HTMLButtonElement;
+    save.type = 'button';
+    save.addEventListener('click', () => {
+      const timeZone = zone.value.trim() || null;
+      let scheduledAt: string | null = null;
+      if (when.value && timeZone) {
+        scheduledAt = wallLocalToUtcIso(when.value, timeZone);
+      }
+      void onSave({
+        interview_rounds: record.interview_rounds.map((entry) =>
+          entry.id === round.id
+            ? {
+                ...entry,
+                scheduled_at: scheduledAt,
+                time_zone: timeZone,
+                format: format.value as InterviewRound['format'],
+                location_text: location.value.trim() || null,
+                preparation_notes: prep.value.trim() || null,
+                panel_notes: panel.value.trim() || null,
+                result: result.value as InterviewRound['result'],
+                lifecycle_state: lifecycle.value as InterviewRound['lifecycle_state']
+              }
+            : entry
+        )
+      });
+    });
+    const complete = el('button', 'btn btn--ghost', 'Complete') as HTMLButtonElement;
+    complete.type = 'button';
+    complete.addEventListener('click', () => {
+      void onSave({
+        interview_rounds: record.interview_rounds.map((entry) =>
+          entry.id === round.id ? { ...entry, lifecycle_state: 'completed' } : entry
+        )
+      });
+    });
+    const cancel = el('button', 'btn btn--ghost', 'Cancel round') as HTMLButtonElement;
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => {
+      void onSave({
+        interview_rounds: record.interview_rounds.map((entry) =>
+          entry.id === round.id ? { ...entry, lifecycle_state: 'cancelled' } : entry
+        )
+      });
+    });
+    const remove = el('button', 'btn btn--ghost', 'Remove') as HTMLButtonElement;
+    remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove interview ${round.id}`);
+    remove.addEventListener('click', () => {
+      void onSave({
+        interview_rounds: record.interview_rounds.filter((entry) => entry.id !== round.id)
+      });
+    });
+    item.append(when, zone, format, location, prep, panel, result, lifecycle, save, complete, cancel, remove);
+    list.append(item);
+  }
+
   const form = document.createElement('form');
-  form.className = 'application-detail__edit';
-  form.append(el('h2', undefined, 'Edit interview rounds'));
+  form.className = 'application-detail__add';
   const format = document.createElement('select');
   format.setAttribute('aria-label', 'Interview format');
   for (const value of ['in_person', 'video', 'phone', 'other'] as const) {
@@ -799,31 +1057,230 @@ function mountInterviewsForm(
     option.textContent = value;
     format.append(option);
   }
+  const zone = document.createElement('input');
+  zone.type = 'text';
+  zone.value = 'Australia/Sydney';
+  zone.setAttribute('aria-label', 'Interview time zone');
+  const when = document.createElement('input');
+  when.type = 'datetime-local';
+  when.setAttribute('aria-label', 'Interview date and time');
   const location = document.createElement('input');
   location.type = 'text';
   location.placeholder = 'Location';
   location.setAttribute('aria-label', 'Interview location');
+  const prep = document.createElement('textarea');
+  prep.rows = 2;
+  prep.placeholder = 'Preparation notes';
+  prep.setAttribute('aria-label', 'Interview preparation notes');
   const save = el('button', 'btn btn--secondary', 'Add interview') as HTMLButtonElement;
   save.type = 'submit';
-  form.append(format, location, save);
+  form.append(format, zone, when, location, prep, save);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const next = [
-      ...record.interview_rounds,
-      {
-        scheduled_at: null,
-        time_zone: null,
-        format: format.value as InterviewRound['format'],
-        location_text: location.value.trim() || null,
-        preparation_notes: null,
-        panel_notes: null,
-        result: 'pending' as const,
-        lifecycle_state: 'planned' as const
-      }
-    ];
-    await onSave({ interview_rounds: next });
+    const timeZone = zone.value.trim() || null;
+    let scheduledAt: string | null = null;
+    if (when.value && timeZone) {
+      scheduledAt = wallLocalToUtcIso(when.value, timeZone);
+    }
+    await onSave({
+      interview_rounds: [
+        ...record.interview_rounds,
+        {
+          id: newId('aint'),
+          scheduled_at: scheduledAt,
+          time_zone: timeZone,
+          format: format.value as InterviewRound['format'],
+          location_text: location.value.trim() || null,
+          preparation_notes: prep.value.trim() || null,
+          panel_notes: null,
+          result: 'pending',
+          lifecycle_state: 'planned'
+        }
+      ]
+    });
   });
-  return form;
+  section.append(form);
+  return section;
+}
+
+async function mountApplicationRelationshipEditor(options: {
+  host: HTMLElement;
+  applicationId: string;
+  onChanged: () => void | Promise<void>;
+}): Promise<void> {
+  const { host, applicationId, onChanged } = options;
+  const sourceRef = applicationRef(applicationId);
+  host.replaceChildren(el('h2', undefined, 'Relationships'), el('p', undefined, 'Loading relationships…'));
+
+  try {
+    const { outgoing, incoming } = await listUniversalLinksForEntity(sourceRef);
+    const currentOutgoing = outgoing.filter((entry) => entry.link.status === 'current');
+    const currentIncoming = incoming.filter((entry) => entry.link.status === 'current');
+    host.replaceChildren();
+    host.append(el('h2', undefined, 'Relationships'));
+
+    const outList = el('ul', 'application-detail__relationship-list');
+    outList.setAttribute('aria-label', 'Outgoing relationships');
+    if (!currentOutgoing.length) {
+      outList.append(el('li', 'empty-state', 'No outgoing organisation, contact, referee, or knowledge links yet.'));
+    }
+    for (const entry of currentOutgoing) {
+      const item = document.createElement('li');
+      const label =
+        entry.endpoint?.display_label ?? entry.link.target_ref ?? entry.link.source_ref;
+      const role =
+        typeof entry.link.role === 'string' && entry.link.role ? ` (${entry.link.role})` : '';
+      item.append(
+        el('span', undefined, `${entry.link.relationship_type} · ${label}${role} · owned`)
+      );
+      const remove = el('button', 'btn btn--ghost', 'Remove') as HTMLButtonElement;
+      remove.type = 'button';
+      remove.setAttribute(
+        'aria-label',
+        `Remove ${entry.link.relationship_type} link to ${label}`
+      );
+      remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        try {
+          await endUniversalLink(entry.link.id, {});
+          await onChanged();
+        } catch (err) {
+          host.append(
+            el(
+              'p',
+              undefined,
+              err instanceof ApiClientError ? err.message : 'Could not remove relationship.'
+            )
+          );
+          remove.disabled = false;
+        }
+      });
+      item.append(remove);
+      outList.append(item);
+    }
+    host.append(outList);
+
+    const inList = el('ul', 'application-detail__relationship-list');
+    inList.setAttribute('aria-label', 'Incoming relationships');
+    for (const entry of currentIncoming) {
+      const item = document.createElement('li');
+      const label =
+        entry.endpoint?.display_label ?? entry.link.source_ref ?? entry.link.target_ref;
+      item.append(
+        el(
+          'span',
+          undefined,
+          `${entry.link.relationship_type} · ${label} · incoming (owned by ${entry.link.source_ref})`
+        )
+      );
+      item.dataset.readonly = 'true';
+      inList.append(item);
+    }
+    if (currentIncoming.length) host.append(inList);
+
+    function addPicker(
+      ariaLabel: string,
+      placeholder: string,
+      kinds: Array<'organisation' | 'person' | 'task'>,
+      relationshipType: 'applies_to' | 'application_contact' | 'referee' | 'related_to',
+      roleSelect?: HTMLSelectElement
+    ): void {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.placeholder = placeholder;
+      input.setAttribute('aria-label', ariaLabel);
+      const chipsHost = el('div', 'application-detail__picker-chips');
+      host.append(input, chipsHost);
+      if (roleSelect) host.append(roleSelect);
+      createEntityPicker({
+        input,
+        allowedKinds: kinds,
+        emptyText: 'No matches.',
+        search: async (query, signal) => {
+          const kind = kinds[0];
+          const result = await searchEntities(query, kind, { signal });
+          return {
+            groups: {
+              person: result.groups.person,
+              organisation: result.groups.organisation,
+              task: result.groups.task
+            }
+          };
+        },
+        onSelect: (item) => {
+          void (async () => {
+            try {
+              await createUniversalLink({
+                source_ref: sourceRef,
+                target_ref: item.ref,
+                relationship_type: relationshipType,
+                role: roleSelect ? roleSelect.value : null
+              });
+              await onChanged();
+            } catch (err) {
+              host.append(
+                el(
+                  'p',
+                  undefined,
+                  err instanceof ApiClientError ? err.message : 'Could not add relationship.'
+                )
+              );
+            }
+          })();
+        }
+      });
+    }
+
+    addPicker('Organisation', 'Type @ to set organisation (applies to)', ['organisation'], 'applies_to');
+    addPicker('Application contact', 'Type @ to add application contact', ['person'], 'application_contact');
+    const refereeRole = document.createElement('select');
+    refereeRole.setAttribute('aria-label', 'Referee role');
+    for (const value of ['professional', 'character', 'academic'] as const) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      refereeRole.append(option);
+    }
+    addPicker('Referee', 'Type @ to add referee', ['person'], 'referee', refereeRole);
+
+    const knowledgeInput = document.createElement('input');
+    knowledgeInput.type = 'text';
+    knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+    knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
+    host.append(knowledgeInput);
+    mountKnowledgePagePicker({
+      input: knowledgeInput,
+      onSelect: (item) => {
+        void (async () => {
+          try {
+            await createUniversalLink({
+              source_ref: sourceRef,
+              target_ref: item.ref,
+              relationship_type: 'related_to'
+            });
+            await onChanged();
+          } catch (err) {
+            host.append(
+              el(
+                'p',
+                undefined,
+                err instanceof ApiClientError ? err.message : 'Could not add knowledge link.'
+              )
+            );
+          }
+        })();
+      }
+    });
+  } catch (err) {
+    host.replaceChildren(
+      el('h2', undefined, 'Relationships'),
+      el(
+        'p',
+        'empty-state',
+        err instanceof ApiClientError ? err.message : 'Relationships unavailable.'
+      )
+    );
+  }
 }
 
 function mountOutcomeForm(
