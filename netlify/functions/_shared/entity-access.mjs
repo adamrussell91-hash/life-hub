@@ -71,13 +71,8 @@ export function assertAdministrationWorkflow(accessContext) {
 
 // The visibility a workflow itself contributes to a link's derived
 // visibility (Slice 2 `createLink` step 5), independent of either
-// endpoint's own visibility. Every current workflow contributes only
-// `operator` — no workflow can yet assert `teaching_protected` (see
-// `createAccessContext` above) — so this is `operator` today for all six
-// known workflows. Defined as its own function, rather than inlining
-// `'operator'` at each call site, so Slice 8's College approval gate has
-// one place to change when a teaching-scoped workflow starts contributing
-// `teaching_protected`.
+// endpoint's own visibility. Teaching contributes `teaching_protected`;
+// every other workflow contributes `operator`.
 export function deriveWorkflowVisibility(accessContext) {
   if (!accessContext || !KNOWN_WORKFLOWS.has(accessContext.workflow)) {
     throw Object.assign(new Error('Cannot derive workflow visibility without a known workflow.'), {
