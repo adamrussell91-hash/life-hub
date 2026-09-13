@@ -160,13 +160,24 @@ export function legacyConnectedToRelationshipRow(sourcePageId, connectedValue) {
  * Dual-read: combine legacy connected values with canonical related_to links.
  * Deduplicates by target EntityRef (and equivalent HubRef storage form).
  */
+/**
+ * Dual-read projection that preserves canonical link direction and ownership.
+ *
+ * Chip kinds:
+ * - outgoing_owned — this page is source_ref (editable / replace payload)
+ * - incoming_readonly — this page is target_ref (display only; never in replace)
+ * - legacy_pending — legacy connected only; owned by this page per migration rule
+ *
+ * Never rewrite an incoming B→A link as if A owned A→B.
+ */
 export function combineConnectedRelationships({
   sourcePageId,
   legacyConnected = [],
   universalLinks = []
 }) {
   const sourceRef = formatEntityRef({ namespace: 'knowledge', kind: 'page', id: sourcePageId });
-  const byTarget = new Map();
+  /** @type {Map<string, any>} */
+  const byOther = new Map();
   const report = {
     legacy_count: 0,
     canonical_count: 0,
@@ -174,6 +185,22 @@ export function combineConnectedRelationships({
     malformed: [],
     unsupported: []
   };
+
+  function projectRow(row) {
+    const sources = [...row.sources].sort();
+    const otherRef = row.direction === 'incoming' ? row.source_ref : row.target_ref;
+    return {
+      source_ref: row.source_ref,
+      target_ref: row.target_ref,
+      relationship_type: 'related_to',
+      legacy_hub_ref: row.legacy_hub_ref ?? formatHubRefFromEntityRef(otherRef),
+      other_ref: otherRef,
+      direction: row.direction,
+      ownership: row.ownership,
+      sources,
+      link_id: row.link_id
+    };
+  }
 
   for (const value of Array.isArray(legacyConnected) ? legacyConnected : []) {
     report.legacy_count += 1;
@@ -186,19 +213,21 @@ export function combineConnectedRelationships({
       report.unsupported.push(value);
       continue;
     }
-    const existing = byTarget.get(row.target_ref);
+    const existing = byOther.get(row.target_ref);
     if (existing) {
       report.equivalent_count += 1;
       existing.sources.add('legacy');
       continue;
     }
-    byTarget.set(row.target_ref, {
+    byOther.set(row.target_ref, {
       source_ref: sourceRef,
       target_ref: row.target_ref,
       relationship_type: 'related_to',
       legacy_hub_ref: row.legacy_hub_ref,
       sources: new Set(['legacy']),
-      link_id: null
+      link_id: null,
+      direction: 'outgoing',
+      ownership: 'legacy_pending'
     });
   }
 
@@ -207,39 +236,46 @@ export function combineConnectedRelationships({
     if (!link || link.relationship_type !== 'related_to') continue;
     if (link.status && link.status !== 'current') continue;
     report.canonical_count += 1;
-    const targetRef =
-      link.source_ref === sourceRef
-        ? link.target_ref
-        : link.target_ref === sourceRef
-          ? link.source_ref
-          : null;
-    if (!targetRef) continue;
-    const existing = byTarget.get(targetRef);
+
+    let direction = null;
+    let otherRef = null;
+    if (link.source_ref === sourceRef) {
+      direction = 'outgoing';
+      otherRef = link.target_ref;
+    } else if (link.target_ref === sourceRef) {
+      direction = 'incoming';
+      otherRef = link.source_ref;
+    }
+    if (!direction || !otherRef) continue;
+
+    const ownership = direction === 'outgoing' ? 'outgoing_owned' : 'incoming_readonly';
+    const existing = byOther.get(otherRef);
     if (existing) {
       report.equivalent_count += 1;
       existing.sources.add('canonical');
       existing.link_id = link.id ?? existing.link_id;
+      // Canonical direction wins over a legacy-only placeholder for the same peer.
+      existing.source_ref = link.source_ref;
+      existing.target_ref = link.target_ref;
+      existing.direction = direction;
+      existing.ownership = ownership;
+      existing.legacy_hub_ref =
+        existing.legacy_hub_ref ?? formatHubRefFromEntityRef(otherRef);
       continue;
     }
-    byTarget.set(targetRef, {
-      source_ref: sourceRef,
-      target_ref: targetRef,
+    byOther.set(otherRef, {
+      source_ref: link.source_ref,
+      target_ref: link.target_ref,
       relationship_type: 'related_to',
-      legacy_hub_ref: formatHubRefFromEntityRef(targetRef),
+      legacy_hub_ref: formatHubRefFromEntityRef(otherRef),
       sources: new Set(['canonical']),
-      link_id: link.id ?? null
+      link_id: link.id ?? null,
+      direction,
+      ownership
     });
   }
 
-  const relationships = [...byTarget.values()].map((row) => ({
-    source_ref: row.source_ref,
-    target_ref: row.target_ref,
-    relationship_type: row.relationship_type,
-    legacy_hub_ref: row.legacy_hub_ref,
-    sources: [...row.sources].sort(),
-    link_id: row.link_id
-  }));
-
+  const relationships = [...byOther.values()].map(projectRow);
   return { relationships, report };
 }
 
