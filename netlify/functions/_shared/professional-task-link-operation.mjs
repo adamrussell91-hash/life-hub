@@ -1,6 +1,6 @@
 /**
  * Cross-store Task → Meeting/Event Universal Link journal.
- * Covers preparation, follow_up, and learning_for. Deterministic Task ids
+ * Covers preparation, follow_up, learning_for, and application_action. Deterministic Task ids
  * when creating; existing Task ids when selecting. Retry never duplicates.
  */
 import { createHash } from 'node:crypto';
@@ -24,7 +24,9 @@ const PREFIX = 'professional/task-link-operations/';
 const ALLOWED = Object.freeze({
   preparation: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
   follow_up: { targetKind: 'meeting', sourceKinds: ['tasks:task'] },
-  learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] }
+  learning_for: { targetKind: 'event', sourceKinds: ['tasks:task'] },
+  // Shared with Application workflows (Slice 10); same bind/retry contract.
+  application_action: { targetKind: 'application', sourceKinds: ['tasks:task'] }
 });
 
 export function deriveProfessionalTaskLinkOperationId(parts) {
@@ -219,7 +221,7 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
   /**
    * @param {{
    *   targetRef: string,
-   *   relationshipType: 'preparation'|'follow_up'|'learning_for',
+   *   relationshipType: 'preparation'|'follow_up'|'learning_for'|'application_action',
    *   title?: string,
    *   taskId?: string,
    *   operationSeed?: string
@@ -328,9 +330,23 @@ export function createProfessionalTaskLinkOperationRepository(deps = {}) {
       });
     }
 
-    const linkRepo = await bindLinkRepo();
     const completedIntents = new Set(journal.completed_intent_ids ?? []);
     const completedLinks = new Set(journal.completed_link_ids ?? []);
+    let linkRepo;
+    try {
+      linkRepo = await bindLinkRepo();
+    } catch (error) {
+      const pending = (journal.intents ?? [])
+        .map((intent) => intent.intent_id)
+        .filter((id) => !completedIntents.has(id));
+      journal = await saveJournal({
+        ...journal,
+        status: 'incomplete',
+        failed_intent_ids: pending,
+        updated_at: now()
+      });
+      throw incompleteError(journal);
+    }
     for (const intent of journal.intents) {
       if (completedIntents.has(intent.intent_id)) continue;
       try {
