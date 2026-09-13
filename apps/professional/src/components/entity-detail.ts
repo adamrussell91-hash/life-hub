@@ -83,34 +83,35 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     activitySection.append(el('h2', 'entity-detail__heading', 'Linked activity'));
     const activityHost = el('div');
     activitySection.append(activityHost);
-    const activityBits: string[] = [];
+    const activityBits: Array<{ label: string; href: string | null }> = [];
     for (const item of overview.linked_records.communications) {
-      activityBits.push(`Communication · ${item.display_label}`);
+      activityBits.push({ label: `Communication · ${item.display_label}`, href: item.href });
     }
     for (const item of overview.linked_records.tasks) {
-      activityBits.push(`Task · ${item.display_label}`);
+      activityBits.push({ label: `Task · ${item.display_label}`, href: item.href });
+    }
+    for (const item of overview.linked_records.meetings ?? []) {
+      activityBits.push({ label: `Meeting · ${item.display_label}`, href: item.href });
+    }
+    for (const item of overview.linked_records.events ?? []) {
+      activityBits.push({ label: `Event · ${item.display_label}`, href: item.href });
     }
     if (!activityBits.length) {
-      activityHost.append(el('p', 'empty-state', 'No linked communications or tasks.'));
+      activityHost.append(
+        el('p', 'empty-state', 'No linked communications, tasks, meetings, or events.')
+      );
     } else {
       const list = document.createElement('ul');
       list.className = 'entity-detail__relationship-list';
       for (const bit of activityBits) {
         const item = document.createElement('li');
-        if (bit.startsWith('Communication')) {
-          const match = overview.linked_records.communications.find((c) =>
-            bit.endsWith(c.display_label)
-          );
-          if (match?.href) {
-            const link = document.createElement('a');
-            link.href = match.href;
-            link.textContent = bit;
-            item.append(link);
-          } else {
-            item.textContent = bit;
-          }
+        if (bit.href) {
+          const link = document.createElement('a');
+          link.href = bit.href;
+          link.textContent = bit.label;
+          item.append(link);
         } else {
-          item.textContent = bit;
+          item.textContent = bit.label;
         }
         list.append(item);
       }

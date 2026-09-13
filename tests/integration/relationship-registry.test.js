@@ -58,7 +58,7 @@ test('returns projectRelationshipRegistry output and omits duplicate_fields and 
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const body = await response.json();
   assert.ok(Array.isArray(body.data.relationships));
-  assert.equal(body.data.relationships.length, 9);
+  assert.equal(body.data.relationships.length, 14);
   const collaborator = body.data.relationships.find(r => r.key === 'collaborator');
   assert.ok(collaborator);
   const relatedTo = body.data.relationships.find(r => r.key === 'related_to');

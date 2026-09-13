@@ -13,7 +13,22 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M16 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
     'M10.4 10.4 13.6 15.6'
   ],
-  communications: ['M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z']
+  communications: ['M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z'],
+  meetings: [
+    'M7 4v2',
+    'M17 4v2',
+    'M5 9h14',
+    'M6 7.5h12A1.5 1.5 0 0 1 19.5 9v10A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V9A1.5 1.5 0 0 1 6 7.5Z',
+    'M9 13h2',
+    'M13 13h2',
+    'M9 16h6'
+  ],
+  events: [
+    'M12 4v3',
+    'M8 8.5 12 12l4-3.5',
+    'M6.5 18.5h11',
+    'M8 14.5h8'
+  ]
 };
 
 export function createOutlineIcon(paths: string[]): SVGSVGElement {

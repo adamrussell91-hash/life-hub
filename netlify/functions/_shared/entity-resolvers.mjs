@@ -1,8 +1,12 @@
 import { parseEntityRef, formatEntityRef } from './entity-ref.mjs';
 import { assertEntityKindAllowed, endpointNotFoundError, isVisibilityAllowed } from './entity-access.mjs';
 import { communicationDisplayLabel, isValidCommunicationId, parseCommunicationRecord } from './communication-schema.mjs';
+import { meetingDisplayLabel, isValidMeetingId, parseMeetingRecord } from './meeting-schema.mjs';
+import { eventDisplayLabel, isValidEventId, parseEventRecord } from './event-schema.mjs';
 import {
   communicationKey,
+  meetingKey,
+  eventKey,
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
@@ -131,6 +135,50 @@ export async function resolveCommunication(
   };
 }
 
+export async function resolveMeeting(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidMeetingId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'meeting', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseMeetingRecord(await getProfessionalJSON(store, meetingKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'meeting',
+    display_label: meetingDisplayLabel(record),
+    supporting_label: record.state,
+    href: `/professional/#/meeting/${encodeURIComponent(id)}`,
+    lifecycle_status: record.state,
+    visibility: 'operator'
+  };
+}
+
+export async function resolveEvent(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidEventId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'event', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseEventRecord(await getProfessionalJSON(store, eventKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'event',
+    display_label: eventDisplayLabel(record),
+    supporting_label: record.event_type,
+    href: `/professional/#/event/${encodeURIComponent(id)}`,
+    lifecycle_status: record.occurrence_state,
+    visibility: 'operator'
+  };
+}
+
 // Exported so tests can assert each slot's kind without depending on
 // dispatch internals.
 export const RESOLVER_SLOTS = Object.freeze({
@@ -139,6 +187,8 @@ export const RESOLVER_SLOTS = Object.freeze({
   'tasks:task': resolveTask,
   'tasks:project': resolveTasksProject,
   'professional:communication': resolveCommunication,
+  'professional:meeting': resolveMeeting,
+  'professional:event': resolveEvent,
   'knowledge:page': resolveKnowledgePage,
   'teaching:unit': resolveTeachingUnit,
   'life:decision': resolveLifeDecision
