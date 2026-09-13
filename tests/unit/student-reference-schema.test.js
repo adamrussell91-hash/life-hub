@@ -19,6 +19,7 @@ const record = {
 test('accepts the reserved StudentReference shape and rejects extra identity shapes', () => {
   assert.deepEqual(parseStudentReference(record), record);
   assert.equal(parseStudentReference({ ...record, display_code: 'Student Name' }), null);
+  assert.equal(parseStudentReference({ ...record, full_name: 'Synthetic Student' }), null);
   assert.equal(parseStudentReference({ ...record, lifecycle_status: 'retained' }), null);
 });
 
