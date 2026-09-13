@@ -3,16 +3,19 @@ import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
 import {
   createCommunication,
+  createFollowUpTask,
   getCommunication,
+  isFollowUpIncompleteError,
   isIncompleteLinksError,
   listCommunications,
   retryCommunicationLinks,
+  retryFollowUpTask,
   updateCommunication
 } from '@/api/communications';
 import { searchEntities } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
-import type { CommunicationRecord } from '@/domain/types';
+import type { CommunicationRecord, FollowUpOperationProjection } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -339,6 +342,64 @@ export async function renderCommunicationDetailView(
       incomplete.append(retry);
       canvas.append(incomplete);
     }
+
+    const followUp = el('section', 'communication-detail__follow-up');
+    followUp.append(el('h2', undefined, 'Follow up'));
+    const followUpStatus = el('p', 'communication-form__status');
+    followUpStatus.hidden = true;
+    const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
+    followUpBtn.type = 'button';
+
+    function paintFollowUpFromOperation(operation: FollowUpOperationProjection): void {
+      followUpStatus.hidden = false;
+      if (operation.status === 'committed') {
+        followUpStatus.textContent = `Follow up Task ${operation.task_id}.`;
+        followUpBtn.textContent = 'Create follow up Task';
+        followUpBtn.disabled = true;
+        followUpBtn.hidden = true;
+        return;
+      }
+      const failed = (operation.failed_relationships ?? [])
+        .map((item) => `${item.relationship_type} → ${item.target_ref}`)
+        .join('; ');
+      followUpStatus.textContent = operation.task_id
+        ? `Task ${operation.task_id} saved. Incomplete follow up (operation ${operation.operation_id})${
+            failed ? `: ${failed}` : '.'
+          } Use Retry.`
+        : `Incomplete follow up (operation ${operation.operation_id}). Use Retry.`;
+      followUpBtn.textContent = 'Retry incomplete follow up';
+      followUpBtn.disabled = false;
+      followUpBtn.hidden = false;
+    }
+
+    if (record.follow_up_operation) {
+      paintFollowUpFromOperation(record.follow_up_operation);
+    }
+
+    followUpBtn.addEventListener('click', async () => {
+      followUpBtn.disabled = true;
+      followUpStatus.hidden = true;
+      try {
+        const existing = record.follow_up_operation;
+        const result =
+          existing && existing.status !== 'committed'
+            ? await retryFollowUpTask(record.id)
+            : await createFollowUpTask(record.id, {
+                title: `Follow up: ${labelFor(record)}`
+              });
+        paint(result.communication);
+      } catch (err) {
+        if (isFollowUpIncompleteError(err)) {
+          await load();
+          return;
+        }
+        followUpStatus.hidden = false;
+        followUpStatus.textContent = err instanceof ApiClientError ? err.message : 'Follow up failed.';
+        followUpBtn.disabled = false;
+      }
+    });
+    followUp.append(followUpBtn, followUpStatus);
+    canvas.append(followUp);
   }
 
   await load();
