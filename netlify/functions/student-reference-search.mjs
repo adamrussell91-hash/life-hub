@@ -25,7 +25,7 @@ export function createStudentReferenceSearchHandler(deps = {}) {
       if (Object.keys(parsed.value).some(key => !ALLOWED_KEYS.has(key))) {
         return withCors(errorResponse(400, 'field_not_permitted', 'Student reference request failed.', false), request, env);
       }
-      const repo = createStudentReferenceRepository({ store });
+      const repo = createStudentReferenceRepository({ store, accessContext: access });
       const results = await repo.search(parsed.value);
       return withCors(okResponse(200, { results }), request, env);
     } catch (error) {
