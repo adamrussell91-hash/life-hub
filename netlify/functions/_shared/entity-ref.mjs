@@ -23,9 +23,9 @@ export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
   professional: new Set(['communication']),
   tasks: new Set(['task', 'project']),
-  teaching: new Set(),
-  knowledge: new Set(),
-  life: new Set()
+  teaching: new Set(['unit']),
+  knowledge: new Set(['page']),
+  life: new Set(['decision'])
 };
 
 export function isRegisteredEntityRefKind(namespace, kind) {

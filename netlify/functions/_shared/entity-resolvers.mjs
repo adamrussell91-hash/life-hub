@@ -9,7 +9,19 @@ import {
 import { taskKey, getJSON as getTasksJSON, defaultGetTasksStore } from './tasks-blobs.mjs';
 import { displayLabelFor, isValidOrganisationId, isValidPersonId, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
 import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationKey, personKey } from './universal-link-blobs.mjs';
+import {
+  resolveKnowledgePage,
+  resolveTeachingUnit,
+  resolveTasksProject,
+  resolveLifeDecision
+} from './knowledge-universal-links.mjs';
 
+export {
+  resolveKnowledgePage,
+  resolveTeachingUnit,
+  resolveTasksProject,
+  resolveLifeDecision
+};
 // Entity resolvers verify a record exists and is accessible, then return a
 // safe display projection: { ref, kind, display_label, supporting_label,
 // href, lifecycle_status, visibility }. This is the only shape a resolver
@@ -125,7 +137,11 @@ export const RESOLVER_SLOTS = Object.freeze({
   'shared:person': resolvePerson,
   'shared:organisation': resolveOrganisation,
   'tasks:task': resolveTask,
-  'professional:communication': resolveCommunication
+  'tasks:project': resolveTasksProject,
+  'professional:communication': resolveCommunication,
+  'knowledge:page': resolveKnowledgePage,
+  'teaching:unit': resolveTeachingUnit,
+  'life:decision': resolveLifeDecision
 });
 
 // Single entry point used by the read-only Universal Link repository.
