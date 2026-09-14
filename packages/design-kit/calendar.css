@@ -263,18 +263,24 @@
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--wave) 55%, transparent);
 }
 
+/* One line, real ellipsis, no mid-word clipping — a 2-line webkit clamp
+ * with no non-webkit fallback let one long title balloon its whole grid
+ * row past its neighbours. Full text lives in the bloom drawer instead. */
 .hub-calendar__day .event-chip {
+  display: block;
   min-width: 0;
   width: 100%;
   padding: var(--space-1) var(--space-2);
   font-size: var(--text-2xs);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-snug);
-  white-space: normal;
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  text-overflow: ellipsis;
+}
+
+.hub-calendar__day .event-chip__meta {
+  display: none;
 }
 
 .event-chip {
@@ -829,18 +835,9 @@
     padding: var(--space-1);
   }
 
-  /* Compact bars, not clamped paragraphs: one line, real ellipsis, no
-   * mid-word clipping. Full text lives in the bloom drawer instead. */
+  /* Tighter chip padding at phone width — single-line ellipsis is now the
+   * base-rule default for all widths, not just mobile. */
   .hub-calendar__day .event-chip {
-    display: block;
-    font-size: var(--text-2xs);
     padding: 0.15rem 0.35rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .hub-calendar__day .event-chip__meta {
-    display: none;
   }
 }

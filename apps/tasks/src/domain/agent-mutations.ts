@@ -132,6 +132,27 @@ export function mutationLabel(mutation: AgentMutation): string {
   }
 }
 
+/**
+ * Fields an agent tool-call is known to send as a nullable date/time string.
+ * Models occasionally emit the literal string "null" (or "undefined")
+ * instead of omitting the key or sending real JSON null — left unguarded,
+ * that string is stored verbatim and rendered verbatim in a task's chips.
+ */
+const NULLABLE_DATE_LIKE_KEYS = new Set([
+  'due_date',
+  'due_time',
+  'target_date',
+  'review_at',
+  'follow_up_at',
+  'waiting_since'
+]);
+
+function sanitizeDateLikeValue(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  const text = value.trim();
+  return text === '' || text === 'null' || text === 'undefined' ? null : value;
+}
+
 /** Fields agents may patch on a task (no silent id/schema hijacks). */
 export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task> {
   const out: Record<string, unknown> = {};
@@ -160,7 +181,9 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'depth'
   ] as const;
   for (const key of allow) {
-    if (key in patch) out[key] = patch[key];
+    if (key in patch) {
+      out[key] = NULLABLE_DATE_LIKE_KEYS.has(key) ? sanitizeDateLikeValue(patch[key]) : patch[key];
+    }
   }
   return out as Partial<Task>;
 }
