@@ -68,7 +68,7 @@ export const ReviewLogSchema = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
   project_id: z.string(),
-  outcome: z.enum(['revived', 'frankensteined', 'buried', 'closed']),
+  outcome: z.enum(['revived', 'frankensteined', 'buried', 'closed', 'completed']),
   reason: z.string(),
   merge_into_project_id: z.string().nullable().default(null),
   /** Planned-vs-actual snapshot at closure (nullable for stall outcomes). */

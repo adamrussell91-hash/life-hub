@@ -1,5 +1,5 @@
 import type { Goal } from '@/schemas/goal';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { computeProjectVariance } from '@/domain/closure';
 import { projectChildTasks, projectProgress } from '@/domain/cards';
@@ -154,7 +154,7 @@ export function classifyProjectLifecycle(
   stallIds: ReadonlySet<string>,
   now: Date = new Date()
 ): ProjectLifecycle {
-  if (project.status === 'archived_dead') return 'completed';
+  if (isProjectArchived(project.status)) return 'completed';
   if (project.status === 'stalled' || stallIds.has(project.id)) return 'stalled';
 
   const variance = computeProjectVariance(project, tasks, now);
@@ -377,7 +377,7 @@ export function projectActivityHeatmap(
 ): { rows: HeatmapRow[]; axis: string[] } {
   const start = weekStart(now);
   const first = addDays(start, -7 * (weeks - 1));
-  const live = projects.filter((project) => project.status !== 'archived_dead');
+  const live = projects.filter((project) => !isProjectArchived(project.status));
   const rows = live.map((project) => ({
     projectId: project.id,
     title: project.title,
@@ -449,7 +449,7 @@ export function projectRoadmap(
   const { start, end, axis } = windowForZoom(zoom, now);
   const windowStart = start.getTime();
   const windowEnd = end.getTime();
-  const live = projects.filter((project) => project.status !== 'archived_dead');
+  const live = projects.filter((project) => !isProjectArchived(project.status));
   const rows = live.map((project, index) => {
     const created = parseDue(project.created_at);
     const current = parseDue(project.current_end_date) ?? parseDue(project.baseline_end_date);

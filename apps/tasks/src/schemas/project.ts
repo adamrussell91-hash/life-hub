@@ -71,8 +71,24 @@ export const FolderItemSchema = z.object({
 });
 
 export const ProjectTypeSchema = z.enum(['standard', 'excursion', 'academic_program']);
-export const ProjectStatusSchema = z.enum(['active', 'stalled', 'revived', 'archived_dead', 'paused']);
+export const ProjectStatusSchema = z.enum([
+  'active',
+  'stalled',
+  'revived',
+  'archived_dead',
+  'paused',
+  'completed'
+]);
 export const QualityBarSchema = z.enum(['good_enough', 'high_quality', 'exceptional']);
+
+/**
+ * "archived_dead" (buried / merged away) and "completed" (finished on purpose)
+ * are both terminal — neither belongs on an active board. Kept distinct so a
+ * finished project isn't mislabeled as one that was abandoned.
+ */
+export function isProjectArchived(status: ProjectStatus): boolean {
+  return status === 'archived_dead' || status === 'completed';
+}
 
 export const ProjectSchema = z.object({
   schema_version: schemaVersion,
@@ -133,6 +149,7 @@ export const ProjectSchema = z.object({
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectStatus = z.infer<typeof ProjectStatusSchema>;
+export type ProjectType = z.infer<typeof ProjectTypeSchema>;
 export type QualityBar = z.infer<typeof QualityBarSchema>;
 export type Milestone = z.infer<typeof MilestoneSchema>;
 export type PermissionNote = z.infer<typeof PermissionNoteSchema>;

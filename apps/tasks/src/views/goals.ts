@@ -1,6 +1,6 @@
 import type { Area } from '@/schemas/area';
 import type { Goal } from '@/schemas/goal';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { PlanningDirection } from '@/schemas/planning-direction';
 import type { PlanningProfile } from '@/schemas/planning-profile';
@@ -140,7 +140,7 @@ function renderGoalSection(
   section.append(head);
 
   const grid = el('div', 'hierarchy-grid');
-  const goalProjects = projects.filter((p) => p.parent_goal_id === goal.id && p.status !== 'archived_dead');
+  const goalProjects = projects.filter((p) => p.parent_goal_id === goal.id && !isProjectArchived(p.status));
   if (goalProjects.length === 0) {
     grid.append(el('p', 'empty-state', 'No projects under this goal yet.'));
   } else {

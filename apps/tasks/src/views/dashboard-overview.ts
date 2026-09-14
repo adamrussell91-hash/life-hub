@@ -1,4 +1,4 @@
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import {
   chipUrgencyClass,
@@ -595,7 +595,7 @@ export function renderDashboardOverview(host: HTMLElement, options: DashboardOve
 
   const stallIds = new Set(findStallCandidates(projects, tasks, now).map((c) => c.project.id));
   const pulseCards = projects
-    .filter((p) => p.status !== 'archived_dead')
+    .filter((p) => !isProjectArchived(p.status))
     .map((p) => buildProjectPulseCard(p, tasks, stallIds, now));
   const tension = tensionDismissed ? null : findPortfolioTension(pulseCards, tasks, now);
   if (tension) {
