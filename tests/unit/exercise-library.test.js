@@ -12,7 +12,9 @@ import {
   searchExerciseLibrarySchema,
   saveExerciseLibraryEntrySchema,
   applyCompletedWorkoutToLibrary,
-  daysSinceLastSession
+  daysSinceLastSession,
+  isExerciseShelved,
+  shelvedExerciseWarnings
 } from '../../netlify/functions/_shared/exercise-library.mjs';
 
 test('EXERCISE_LIBRARY_PATH is the canonical chat-direct blob', () => {
@@ -50,6 +52,35 @@ test('validateExerciseLibraryEntry requires name and target_area', () => {
   }), null);
 });
 
+test('validateExerciseLibraryEntry accepts shelving and rejects a bad date', () => {
+  const shelved = validateExerciseLibraryEntry({
+    name: 'Skull Crusher',
+    target_area: 'Arms',
+    shelved_until: '2026-10-05',
+    shelved_reason: 'Adam said he is over it'
+  });
+  assert.equal(shelved.shelved_until, '2026-10-05');
+  assert.equal(shelved.shelved_reason, 'Adam said he is over it');
+  assert.equal(validateExerciseLibraryEntry({
+    name: 'X', target_area: 'Chest', shelved_until: 'not-a-date'
+  }), null);
+});
+
+test('validateExerciseLibraryEntry clear_shelved nulls out shelving', () => {
+  const cleared = validateExerciseLibraryEntry({
+    name: 'Skull Crusher', target_area: 'Arms', clear_shelved: true
+  });
+  assert.equal(cleared.shelved_until, null);
+  assert.equal(cleared.shelved_reason, null);
+});
+
+test('isExerciseShelved is true only while shelved_until has not passed and today is known', () => {
+  assert.equal(isExerciseShelved({ shelved_until: '2026-10-05' }, '2026-09-14'), true);
+  assert.equal(isExerciseShelved({ shelved_until: '2026-09-01' }, '2026-09-14'), false);
+  assert.equal(isExerciseShelved({ shelved_until: '2026-10-05' }, null), false);
+  assert.equal(isExerciseShelved({}, '2026-09-14'), false);
+});
+
 test('upsertExerciseLibraryEntry replaces by case-insensitive name', () => {
   const first = upsertExerciseLibraryEntry([], {
     name: 'Bar Press', target_area: 'Chest'
@@ -62,15 +93,51 @@ test('upsertExerciseLibraryEntry replaces by case-insensitive name', () => {
   assert.equal(second[0].working_weight_kg, 44);
 });
 
-test('selectExerciseHighlights prefers in_rotation then last_performed', () => {
+test('upsertExerciseLibraryEntry merges instead of clobbering fields the call did not mention', () => {
+  const first = upsertExerciseLibraryEntry([], {
+    name: 'Bar Press', target_area: 'Chest', best_weight_kg: 42, times_performed: 6, in_rotation: true
+  }, '2026-08-05T00:00:00+10:00');
+  // A shelving call only mentions name/target_area/shelved_until -- it must not wipe
+  // best_weight_kg/times_performed/in_rotation that were already on the entry.
+  const shelved = upsertExerciseLibraryEntry(first, {
+    name: 'Bar Press', target_area: 'Chest', shelved_until: '2026-10-05'
+  }, '2026-09-14T00:00:00+10:00');
+  assert.equal(shelved.length, 1);
+  assert.equal(shelved[0].best_weight_kg, 42);
+  assert.equal(shelved[0].times_performed, 6);
+  assert.equal(shelved[0].in_rotation, true);
+  assert.equal(shelved[0].shelved_until, '2026-10-05');
+});
+
+test('selectExerciseHighlights surfaces never-performed and stalest moves first, and excludes shelved entries', () => {
   const entries = [
     { name: 'A', target_area: 'Chest', in_rotation: false, last_performed: '2026-07-01' },
     { name: 'B', target_area: 'Legs', in_rotation: true, last_performed: '2026-06-01' },
     { name: 'C', target_area: 'Back', in_rotation: false, last_performed: '2026-07-20' },
-    { name: 'D', target_area: 'Arms', in_rotation: false }
+    { name: 'D', target_area: 'Arms', in_rotation: false },
+    { name: 'E', target_area: 'Core', in_rotation: true, shelved_until: '2026-10-05' }
   ];
-  const highlights = selectExerciseHighlights(entries, 3);
-  assert.deepEqual(highlights.map(e => e.name), ['B', 'C', 'A']);
+  const highlights = selectExerciseHighlights(entries, 3, '2026-09-14');
+  // D was never performed, B is the stalest last_performed -- both surface ahead of
+  // A's more recent date. E is shelved and must not appear at all.
+  assert.deepEqual(highlights.map(e => e.name), ['D', 'B', 'A']);
+});
+
+test('shelvedExerciseWarnings flags a shelved exercise that slipped into a proposal', () => {
+  const entries = [
+    { name: 'Skull Crusher', target_area: 'Arms', shelved_until: '2026-10-05', shelved_reason: 'Adam is over it' }
+  ];
+  const record = { type: 'workout', exercises: [{ name: 'Skull Crusher' }, { name: 'Bar Press' }] };
+  const warnings = shelvedExerciseWarnings(record, entries, '2026-09-14');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /Skull Crusher/);
+  assert.match(warnings[0], /Adam is over it/);
+});
+
+test('shelvedExerciseWarnings is a no-op once the shelved date has passed', () => {
+  const entries = [{ name: 'Skull Crusher', target_area: 'Arms', shelved_until: '2026-09-01' }];
+  const record = { type: 'workout', exercises: [{ name: 'Skull Crusher' }] };
+  assert.deepEqual(shelvedExerciseWarnings(record, entries, '2026-09-14'), []);
 });
 
 test('searchExerciseLibrary ANDs query tokens across fields', () => {
@@ -119,6 +186,19 @@ test('formatExerciseLibraryForPrompt omits progress bits an entry has never had'
   assert.doesNotMatch(text, /last /);
   assert.doesNotMatch(text, /PB/);
   assert.doesNotMatch(text, /logged/);
+});
+
+test('formatExerciseLibraryForPrompt lists shelved moves separately and keeps them out of highlights', () => {
+  const entries = [
+    { name: 'Bar Press', target_area: 'Chest', working_weight_kg: 42 },
+    { name: 'Skull Crusher', target_area: 'Arms', shelved_until: '2026-10-05', shelved_reason: 'Adam is over it' }
+  ];
+  const text = formatExerciseLibraryForPrompt(entries, '2026-09-14');
+  assert.match(text, /Bar Press/);
+  assert.match(text, /Shelved/);
+  assert.match(text, /Skull Crusher \(until 2026-10-05, Adam is over it\)/);
+  const highlightLines = text.split('\n').filter(line => line.startsWith('- '));
+  assert.equal(highlightLines.some(line => line.includes('Skull Crusher')), false);
 });
 
 test('exerciseLibraryEntryFromCsvRow maps Notion columns', () => {

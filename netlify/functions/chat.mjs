@@ -135,6 +135,7 @@ import {
   formatExerciseLibraryForPrompt,
   parseExerciseLibrary,
   searchExerciseLibrary,
+  shelvedExerciseWarnings,
   upsertExerciseLibraryEntry,
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
@@ -500,7 +501,7 @@ export function createChatHandler({
           });
           if (validation.valid) {
             await persistOrProposeLogEntry({
-              client, slug, today, validation, send, userMessage: parsed.message
+              client, slug, today, validation, send, userMessage: parsed.message, exerciseLibraryEntries: []
             });
           } else {
             send({ type: 'record_rejected', errors: validation.errors });
@@ -965,7 +966,7 @@ export function createChatHandler({
           const decodedExerciseLibrary = exerciseLibraryBlob ? decodeBlob(exerciseLibraryBlob) : null;
           if (decodedExerciseLibrary !== null) {
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
-            exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries);
+            exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries, today);
             sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
           }
 
@@ -2180,7 +2181,7 @@ export function createChatHandler({
                 }
                 try {
                   const outcome = await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                    client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
                   });
                   if (outcome.status === 'written') {
                     return JSON.stringify({ ok: true, status: 'written', path: outcome.path });
@@ -2518,7 +2519,7 @@ export function createChatHandler({
               if (validation.valid) {
                 try {
                   await persistOrProposeLogEntry({
-                    client, slug, today, validation, send: emit, userMessage: parsed.message
+                    client, slug, today, validation, send: emit, userMessage: parsed.message, exerciseLibraryEntries
                   });
                 } catch {
                   pendingLogRejection = {
@@ -2615,7 +2616,7 @@ export function createChatHandler({
   };
 }
 
-async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage }) {
+async function persistOrProposeLogEntry({ client, slug, today, validation, send, userMessage, exerciseLibraryEntries = [] }) {
   let proposal = validation;
   if (slug === 'chadwick' && proposal.record?.type === 'workout') {
     proposal = coerceChatWorkoutProposal(proposal, { userMessage });
@@ -2713,7 +2714,12 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send,
     path,
     // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
     // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-    warnings: lintWorkoutProposal(proposal.record)
+    // shelvedExerciseWarnings catches a shelved move slipping into the plan even
+    // if Chadwick's own read of the Exercise Library missed it.
+    warnings: [
+      ...lintWorkoutProposal(proposal.record),
+      ...shelvedExerciseWarnings(proposal.record, exerciseLibraryEntries, today)
+    ]
   });
   return { ok: true, status: 'awaiting_confirm' };
 }
