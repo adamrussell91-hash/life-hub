@@ -60,14 +60,69 @@ export function validateExerciseLibraryEntry(input) {
     entry.last_performed = input.last_performed;
   }
 
+  // Shelving is how "Adam said he's over this move" becomes a durable fact instead
+  // of something only the current chat turn remembers -- see isExerciseShelved and
+  // selectExerciseHighlights below, which keep a shelved move out of what Chadwick
+  // is shown until the date passes.
+  if (input.clear_shelved === true) {
+    entry.shelved_until = null;
+    entry.shelved_reason = null;
+  } else if (input.shelved_until != null) {
+    if (typeof input.shelved_until !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.shelved_until)) return null;
+    entry.shelved_until = input.shelved_until;
+    if (typeof input.shelved_reason === 'string' && input.shelved_reason.trim()) {
+      entry.shelved_reason = input.shelved_reason.trim().slice(0, 200);
+    }
+  }
+
   return entry;
 }
 
+/**
+ * True while an entry's shelved_until date hasn't passed yet. Without `today`
+ * (a caller that hasn't got a date on hand) nothing is treated as shelved --
+ * callers that care about shelving must pass today's date explicitly.
+ */
+export function isExerciseShelved(entry, today) {
+  if (!entry || typeof entry.shelved_until !== 'string' || !today) return false;
+  return entry.shelved_until >= today;
+}
+
+/**
+ * Non-blocking guardrail alongside workout-lint.mjs: flags any exercise in a proposed
+ * workout that Adam has explicitly shelved and hasn't asked back yet, so a shelved move
+ * slipping into a proposal shows up on the Confirm card even if the model missed it.
+ */
+export function shelvedExerciseWarnings(record, entries, today) {
+  if (!record || record.type !== 'workout' || !Array.isArray(record.exercises)) return [];
+  if (!Array.isArray(entries) || !today) return [];
+  const shelvedByKey = new Map();
+  for (const entry of entries) {
+    if (isExerciseShelved(entry, today)) shelvedByKey.set(libraryKey(entry), entry);
+  }
+  if (shelvedByKey.size === 0) return [];
+  const warnings = [];
+  for (const exercise of record.exercises) {
+    const shelved = shelvedByKey.get(libraryKey({ name: exercise?.name }));
+    if (!shelved) continue;
+    const reason = shelved.shelved_reason ? ` (${shelved.shelved_reason})` : '';
+    warnings.push(`"${shelved.name}" is shelved until ${shelved.shelved_until}${reason} — Adam asked to skip it.`);
+  }
+  return warnings;
+}
+
 export function upsertExerciseLibraryEntry(entries, entry, updatedAt) {
-  const list = Array.isArray(entries)
-    ? entries.filter(existing => libraryKey(existing) !== libraryKey(entry))
-    : [];
-  list.push({ ...entry, updated_at: updatedAt });
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  const key = libraryKey(entry);
+  const index = list.findIndex(existing => libraryKey(existing) === key);
+  // Merge rather than replace -- a partial update (e.g. shelving a move, or
+  // flipping in_rotation) must not silently wipe last_performed/best_weight_kg/
+  // times_performed that this same call didn't mention.
+  if (index === -1) {
+    list.push({ ...entry, updated_at: updatedAt });
+  } else {
+    list[index] = { ...list[index], ...entry, updated_at: updatedAt };
+  }
   return list;
 }
 
@@ -175,23 +230,13 @@ export function daysSinceLastSession(entries, today) {
   return daysBetween(mostRecent, today);
 }
 
-export function selectExerciseHighlights(entries, limit = MAX_HIGHLIGHTS) {
+export function selectExerciseHighlights(entries, limit = MAX_HIGHLIGHTS, today = null) {
   if (!Array.isArray(entries) || entries.length === 0) return [];
-  const rotating = entries.filter(e => e.in_rotation === true);
-  const rest = entries
-    .filter(e => e.in_rotation !== true)
+  const eligible = entries.filter(e => !isExerciseShelved(e, today));
+  return eligible
     .slice()
-    .sort((a, b) => compareLastPerformedDesc(a, b));
-  const seen = new Set(rotating.map(libraryKey));
-  const out = [...rotating];
-  for (const entry of rest) {
-    if (out.length >= limit) break;
-    const key = libraryKey(entry);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(entry);
-  }
-  return out.slice(0, limit);
+    .sort((a, b) => compareVarietyFirst(a, b))
+    .slice(0, limit);
 }
 
 export function searchExerciseLibrary(entries, {
@@ -220,10 +265,11 @@ export function searchExerciseLibrary(entries, {
   }).slice(0, capped);
 }
 
-export function formatExerciseLibraryForPrompt(entries) {
-  const highlights = selectExerciseHighlights(entries);
-  if (highlights.length === 0) return '';
-  return highlights.map(entry => {
+export function formatExerciseLibraryForPrompt(entries, today = null) {
+  const highlights = selectExerciseHighlights(entries, MAX_HIGHLIGHTS, today);
+  const shelved = Array.isArray(entries) ? entries.filter(e => isExerciseShelved(e, today)) : [];
+  if (highlights.length === 0 && shelved.length === 0) return '';
+  const lines = highlights.map(entry => {
     const equipment = Array.isArray(entry.equipment) ? entry.equipment.join(', ') : '';
     const weight = typeof entry.working_weight_kg === 'number' ? `${entry.working_weight_kg} kg` : '';
     const rotation = entry.in_rotation ? 'in rotation' : '';
@@ -238,7 +284,15 @@ export function formatExerciseLibraryForPrompt(entries) {
     const bits = [entry.target_area, equipment, weight, lastPerformed, best, frequency, rotation, pain]
       .filter(Boolean).join(' · ');
     return `- ${entry.name} — ${bits}`;
-  }).join('\n');
+  });
+  if (shelved.length) {
+    const list = shelved.map(entry => {
+      const reason = entry.shelved_reason ? `, ${entry.shelved_reason}` : '';
+      return `${entry.name} (until ${entry.shelved_until}${reason})`;
+    }).join('; ');
+    lines.push(`Shelved — do not program these until the date listed unless Adam explicitly asks for one back: ${list}`);
+  }
+  return lines.join('\n');
 }
 
 export function exerciseLibraryEntryFromCsvRow(row) {
@@ -302,7 +356,7 @@ export function searchExerciseLibrarySchema() {
 export function saveExerciseLibraryEntrySchema() {
   return {
     name: 'save_exercise_library_entry',
-    description: 'Create or update an Exercise Library entry (cues, defaults, rotation, weights). Call after refining a move or adding a new one.',
+    description: 'Create or update an Exercise Library entry (cues, defaults, rotation, weights). Call after refining a move or adding a new one. Also the durable way to shelve a move Adam is over: set shelved_until (and shelved_reason) the same turn he says it, whether that comes up in chat or in a workout note -- do not just acknowledge it and move on. It stays out of the highlight list and off proposals until that date. Pass clear_shelved: true to bring a shelved move back early if Adam explicitly asks for it.',
     input_schema: {
       type: 'object',
       properties: {
@@ -321,7 +375,10 @@ export function saveExerciseLibraryEntrySchema() {
         default_bench_angle_deg: { type: 'number' },
         movement_pattern: { type: 'string' },
         demo_link: { type: 'string' },
-        last_performed: { type: 'string', description: 'YYYY-MM-DD' }
+        last_performed: { type: 'string', description: 'YYYY-MM-DD' },
+        shelved_until: { type: 'string', description: 'YYYY-MM-DD. Set when Adam says he is over this move / wants a break from it -- excludes it from highlights and proposals until this date.' },
+        shelved_reason: { type: 'string', description: 'Short reason, e.g. "Adam said he is bored of it" or "front shoulder was cranky on this".' },
+        clear_shelved: { type: 'boolean', description: 'Set true to lift a shelve early, e.g. Adam explicitly asks for the move back.' }
       },
       required: ['name', 'target_area']
     }
@@ -343,13 +400,25 @@ function libraryKey(entry) {
   return String(entry?.name ?? '').trim().toLowerCase();
 }
 
-function compareLastPerformedDesc(a, b) {
+/**
+ * Never-performed and long-stale moves sort first so Chadwick's highlight list
+ * leads with fresh options instead of the handful of things he's already been
+ * proposing every day. in_rotation only breaks a tie between two equally-stale
+ * moves now -- it used to pin every in_rotation entry to the top unconditionally,
+ * which is exactly what made the same small set of "current" lifts crowd out
+ * everything else, session after session.
+ */
+function compareVarietyFirst(a, b) {
   const left = a.last_performed || '';
   const right = b.last_performed || '';
-  if (left === right) return libraryKey(a).localeCompare(libraryKey(b));
-  if (!left) return 1;
-  if (!right) return -1;
-  return right.localeCompare(left);
+  if (left !== right) {
+    if (!left) return -1;
+    if (!right) return 1;
+    return left.localeCompare(right);
+  }
+  const rotationDiff = Number(b.in_rotation === true) - Number(a.in_rotation === true);
+  if (rotationDiff !== 0) return rotationDiff;
+  return libraryKey(a).localeCompare(libraryKey(b));
 }
 
 function parseNotionDate(value) {
