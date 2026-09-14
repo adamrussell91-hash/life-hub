@@ -123,6 +123,14 @@
   max-width: 100%;
 }
 
+/* .floating-chat-button is fixed over this corner on every page — reserve
+   room so it never sits on top of the last visible row of real content
+   (a card's menu button, a column's last card). Mirrors the mobile
+   reservation below, sized for the desktop button (3.2rem + space-6 offset). */
+.hub-canvas {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+}
+
 @media (max-width: 720px) {
   .hub-layout {
     grid-template-columns: minmax(0, 1fr);

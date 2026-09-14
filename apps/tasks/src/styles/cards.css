@@ -59,10 +59,14 @@
   color: var(--pastel-blue-ink);
 }
 
+/* Peach, not --warning: --warning's ink (#a85a0c) sits too close to
+ * --pastel-gold-ink (#6c581f) below, so "stuck" and "actively moving"
+ * read as the same brown at a glance. */
 .status-badge--deferred,
-.status-badge--stalled {
-  background: var(--warning-surface);
-  color: var(--warning);
+.status-badge--stalled,
+.status-badge--paused {
+  background: var(--pastel-peach);
+  color: var(--pastel-peach-ink);
 }
 
 .status-badge--dead,
@@ -163,6 +167,17 @@
   gap: var(--space-3);
 }
 
+/* Catch-all for any domain string without a rule below (task.domain is a
+ * free-text field — see TaskDomainSchema) — kept ahead of the specific
+ * selectors below so a known domain still wins on source order. Without
+ * this, an unmapped domain fell through to design-kit's generic .hub-chip
+ * default, which is the same lilac already used for "health" below —
+ * making a brand-new domain look identical to an existing one. */
+.hub-chip[data-area] {
+  background: var(--shore);
+  color: var(--muted);
+}
+
 .hub-chip[data-area='design'],
 .hub-chip[data-area='health'] {
   background: var(--pastel-lilac);
@@ -181,8 +196,8 @@
 }
 
 .hub-chip[data-area='wedding'] {
-  background: var(--pastel-lilac);
-  color: var(--pastel-lilac-ink);
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
 }
 
 .hub-chip[data-area='dev'],

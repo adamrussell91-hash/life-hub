@@ -302,3 +302,42 @@ Orbit, Branch, and Sky are genuinely stretch — don't delete them, but they don
 ## [UX-AUDIT] leftovers
 
 None. All test records created during this audit (`[UX-AUDIT] test task`, `[UX-AUDIT] Plan lesson observation feedback`, `[UX-AUDIT] backlog test`, and the un-prefixed "Marking batch" created via the Templates test) were deleted before finishing. Verified via `/api/tasks`: 22 tasks remain, zero matches for `UX-AUDIT` or `Marking batch`. The Excursions confirm-card test ("[UX-AUDIT] test excursion") was Cancelled, not created — nothing to delete there.
+
+---
+
+## 2026-09-15 pass — cross-cutting fixes from a screenshot review
+
+Filled 2026-09-15, working from screenshots of the deployed Dashboard/Board/Timeline/Month/Gantt views rather than a fresh live pass. Source read directly from `apps/tasks` on `main` (this app, not the standalone `Tasks-Hub` GitHub repo, which has drifted from what's deployed — worth retiring or clearly labelling if it's kept around). Four defects found this way turned out to be real, reproducible in source, and are fixed in this pass; two more were confirmed to already be in the codebase working as intended.
+
+**D1–D4 re-verified against current `main` — no longer reproducible.** The 2026-08-22 pass above found quick-add stamping `due_date` to today on Board/Backlog (D1), no Refresh control (D2), an empty Sign Out button (D3), and Cancel-still-completes on the actual-duration prompt (D4). Reading the current source: `renderQuickAdd`'s date field only renders/sends when a caller explicitly passes `dueDate` (Board and Backlog's call sites don't); `.hub-utilities`' Refresh and Sign Out buttons both build a real `<svg>` via `iconButton()` (`src/shell/shell.ts`); and the actual-duration flow is a custom confirm-card whose Discard handler (`src/views/dashboard.ts`) clears the card without calling `markTaskDone`. All four appear to have been fixed in the three weeks since — leaving this note so nobody re-fixes them, and closing them out.
+
+### D27 — Task cards can render a literal `"null"` chip when an AI mutation supplies one
+- Severity: S1
+- Surface: shell-wide — any task chip fed by an agent (Clare) tool-call patch, first seen on Board
+- Seen: A Clare-created task with no time set showed a date/time chip reading the literal word `null`. `formatDisplayDate` (`packages/design-kit/js/format-display-date.js:38-50`) is null-safe against JS `null`/`undefined`, but its fallback branch returns an unrecognised string verbatim — and `sanitizeTaskPatch` (`src/domain/agent-mutations.ts`) copied `due_date`/`due_time` straight from the model's tool-call JSON with no check for the literal string `"null"`, a known LLM quirk. `src/ai/clare-proposal-judge.ts:107-112` already guards exactly this case (`readDueDate`), but the guard never made it into the shared mutation sanitizer, so every other write path (`store.ts` `applyAgentMutations`, `schedule-diff.ts`) stayed exposed.
+- Fix (done): `sanitizeTaskPatch` now runs `due_date`, `due_time`, `target_date`, `review_at`, `follow_up_at`, and `waiting_since` through a guard that treats `""`, `"null"`, and `"undefined"` as real `null` before they're persisted. `schedule-diff.ts`'s `patch.due_date == null` checks inherit the fix for free, since they read `sanitizeTaskPatch`'s output.
+
+### D28 — Month grid's day chips wrap instead of truncating, ballooning one week row past its neighbours
+- Severity: S2
+- Surface: `#/month`
+- Seen: `.hub-calendar__day .event-chip` (`packages/design-kit/calendar.css:266-278`) clamped to 2 lines via `-webkit-line-clamp` with `white-space: normal` and no `text-overflow` fallback for non-WebKit engines. A day with one long task title could grow to 3-4x a neighbouring day's height, and since calendar grid rows auto-stretch to their tallest cell, that one day dragged its entire week row taller. The correct single-line-ellipsis treatment already existed, but only inside the `@media (max-width: 720px)` block — desktop never got it.
+- Fix (done): moved the mobile block's `white-space: nowrap; overflow: hidden; text-overflow: ellipsis;` (plus hiding `.event-chip__meta`, which can't fit on one line) up to the base rule, so every width gets single-line chips. The `.event-chip-more` "+N more" affordance was already there and needed no change. Mobile keeps only its tighter padding override now.
+
+### D29 — Gantt lane labels are unclipped SVG text, painted over by the first bar
+- Severity: S2
+- Surface: `#/gantt`
+- Seen: `layoutGanttGroups` (`src/domain/gantt.ts`) accepts a `labelWidth` option specifically to reserve a label column and already offsets every bar/tick/today-line by it — but the view's only call site (`src/views/gantt.ts`, `currentLayout()`) never passed one, so `labelWidth` defaulted to 0 and bars started at `x:0`, directly under the label text drawn at `x:12`. Bars paint after labels in SVG order, so a lane title past ~2-3 characters was visually occluded by the first bar despite the canvas having unused width to its right. CSS `text-overflow` doesn't apply to SVG `<text>`, so there was also no fallback truncation.
+- Fix (done): `currentLayout()` now passes `labelWidth: 160`. Since SVG text can't use CSS ellipsis, added `truncateSvgText()` — measures with `getComputedTextLength()` once the chart is attached to the DOM, binary-searches down to a length that fits, appends `…`, and adds a `<title>` child so the full label is still reachable on hover.
+
+### D30 — Status and domain color tokens have two collisions and one gap
+- Severity: S3
+- Surface: shell-wide — status badges (`src/styles/cards.css`) and domain chips (same file, plus the design-kit default in `packages/design-kit/filters.css`)
+- Seen, three separate issues:
+  1. `ProjectStatusSchema` includes `paused`, but no `.status-badge--paused` rule existed — it silently fell through to the generic gray default.
+  2. `.status-badge--deferred`/`--stalled` used `--warning` (ink `#a85a0c`), which sits close enough to `--pastel-gold-ink` (`#6c581f`, used for `in_progress`/`active`/`revived`/`planning`) that "stuck" and "actively moving" read as the same brown at a glance.
+  3. `.hub-chip[data-area='wedding']` and `[data-area='health']` used the identical `--pastel-lilac`/`--pastel-lilac-ink` pair — two different domains, one color. Separately, `task.domain` is free text (`TaskDomainSchema = z.string().min(1)`), and any value not in the explicit list (e.g. a custom domain someone types into Properties) fell through to design-kit's shared `.hub-chip` default — which is, coincidentally, that same lilac, so a brand-new domain looked identical to two existing ones.
+- Fix (done): added `.status-badge--paused` alongside deferred/stalled, both now on `--pastel-peach` (unused by any other status, clearly separate from the gold family). `wedding` moved to `--pastel-sage` (also previously unused here). Added a local `.hub-chip[data-area]` catch-all in `cards.css`, positioned ahead of the specific selectors so known domains still win on source order — any unmapped domain now gets the same neutral `--shore`/`--muted` already used for `other`, instead of borrowing the shared kit's lilac default.
+
+### Out of scope / later (this pass)
+- A full re-verification of D5–D26 against current `main` wasn't done this pass — only D1–D4 were checked, because they were the ones a fresh screenshot review would have re-surfaced if still broken. D5–D26 should get the same re-audit before anyone assumes they're still open.
+- The standalone `Tasks-Hub` GitHub repo (`adamrussell91-hash/Tasks-Hub`) is a separate, older codebase that has drifted from `apps/tasks` in this monorepo — it still has the pre-D1–D4 defects among others. Worth deciding whether it's an intentional fork, an abandoned migration artifact, or something to archive, since a future audit could easily target it by mistake.
