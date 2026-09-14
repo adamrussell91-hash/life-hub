@@ -94,6 +94,34 @@ function svgEl<K extends keyof SVGElementTagNameMap>(
   return node;
 }
 
+/** Reserved lane-label column, in the same px units as dayWidth (must be
+ * on the SVG at the time this runs so getComputedTextLength() resolves). */
+const GANTT_LABEL_WIDTH = 160;
+
+/**
+ * SVG <text> ignores CSS text-overflow, so a long lane title otherwise
+ * runs uninterrupted straight under the bars that get painted over it.
+ * Trim to fit maxWidth and add a <title> so the full text is still
+ * reachable on hover.
+ */
+function truncateSvgText(node: SVGTextElement, fullText: string, maxWidth: number): void {
+  node.textContent = fullText;
+  if (!fullText || node.getComputedTextLength() <= maxWidth) return;
+  const ellipsis = '…';
+  let lo = 0;
+  let hi = fullText.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    node.textContent = fullText.slice(0, mid) + ellipsis;
+    if (node.getComputedTextLength() <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  node.textContent = lo > 0 ? fullText.slice(0, lo) + ellipsis : ellipsis;
+  const title = svgEl('title');
+  title.textContent = fullText;
+  node.append(title);
+}
+
 function edgePathD(x1: number, y1: number, x2: number, y2: number): string {
   const midX = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
@@ -460,7 +488,8 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     return (
       layoutGanttGroups(groups, {
         zoom: session.zoom,
-        collapsedGroups: session.collapsedGroups
+        collapsedGroups: session.collapsedGroups,
+        labelWidth: GANTT_LABEL_WIDTH
       }) ?? placeholderGanttLayout(session.zoom)
     );
   }
@@ -921,6 +950,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       );
     }
 
+    const laneLabels: Array<{ node: SVGTextElement; text: string }> = [];
     for (const group of layout.groupBounds) {
       svg.append(
         svgEl('rect', {
@@ -938,6 +968,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
       });
       lane.textContent = group.title;
       svg.append(lane);
+      laneLabels.push({ node: lane, text: group.title });
     }
 
     for (const edge of layout.edges) {
@@ -1079,6 +1110,11 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     }
 
     scroll.replaceChildren(svg);
+    // getComputedTextLength() needs the node connected to a rendered
+    // document to measure correctly — truncate only now that it's live.
+    for (const { node, text } of laneLabels) {
+      truncateSvgText(node, text, layout.labelWidth - 20);
+    }
     if (!layout.bars.length) {
       const empty = el('p', 'empty-state', 'No dated tasks yet. Use + to add one to this timeline.');
       empty.style.pointerEvents = 'none';
