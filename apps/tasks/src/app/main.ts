@@ -46,6 +46,7 @@ import { renderClareView } from '@/views/clare';
 import { installClareSession } from '@/chat/clare-session';
 import { attachVisualViewportInset } from '@/chat/visual-viewport';
 import { renderExcursionsView, renderNewExcursionPage } from '@/views/excursions';
+import { renderArchiveView } from '@/views/archive';
 import { renderProgramsView } from '@/views/programs';
 import { renderStressView } from '@/views/stress';
 import { renderCoreyView, renderPublicCapacityView } from '@/views/corey';
@@ -123,6 +124,8 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderProjectsView(canvas);
     case 'excursions':
       return renderExcursionsView(canvas);
+    case 'archive':
+      return renderArchiveView(canvas);
     case 'programs':
       return renderProgramsView(canvas);
     case 'stress':

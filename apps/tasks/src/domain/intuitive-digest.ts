@@ -1,4 +1,4 @@
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { projectChildTasks } from '@/domain/cards';
 import { isBoardTask } from '@/domain/hierarchy';
@@ -136,7 +136,7 @@ export function buildIntuitiveDigest(
     });
 
   const liveProjects = projects
-    .filter((project) => project.status !== 'archived_dead')
+    .filter((project) => !isProjectArchived(project.status))
     .map((project): DigestProject & { score: number } => {
       const children = projectChildTasks(project, tasks).filter(
         (task) => task.status !== 'done' && task.status !== 'dead'

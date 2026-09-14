@@ -1,4 +1,4 @@
-import type { ComplianceModule, Project } from '@/schemas/project';
+import { isProjectArchived, type ComplianceModule, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate, LeadTimeOverrides } from '@/schemas/templates';
 import { tasksApi } from '@/services/client-api';
@@ -14,13 +14,14 @@ import { cloneDefaultComplianceModules } from '@/domain/excursion-modules';
 import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash, projectProgress } from '@/domain/cards';
 import { matchesProjectQuery } from '@/domain/projects-pulse';
+import { computeProjectVariance } from '@/domain/closure';
 import { parseDue, startOfDay } from '@/domain/queries';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { hashQuery } from '@/shell/shell';
-import { deleteProjectNow } from '@/views/card-actions';
+import { deleteProjectNow, showCompleteConfirm } from '@/views/card-actions';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import { renderComplianceBundle } from '@/views/excursion-compliance';
-import { renderCardMenu } from '@/views/card-menu';
+import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import {
   createHubField,
@@ -286,12 +287,18 @@ function complianceSummary(project: Project): { on: number; total: number } | nu
 function renderExcursionCard(
   project: Project,
   tasks: Task[],
-  actions: { onOpen: (project: Project) => void; onDelete: (project: Project) => void }
+  confirmHost: HTMLElement,
+  actions: {
+    onOpen: (project: Project) => void;
+    onDelete: (project: Project) => void;
+    onCompleted: (project: Project) => void;
+  }
 ): HTMLElement {
   const clearance = excursionClearance(project, tasks);
   const progress = projectProgress(project, tasks);
   const compliance = complianceSummary(project);
   const next = nextExcursionAction(project, tasks);
+  const variance = computeProjectVariance(project, tasks);
 
   const card = el('article', 'hub-card pcard excursion-card');
   card.dataset.projectId = project.id;
@@ -305,12 +312,17 @@ function renderExcursionCard(
       clearance.cleared ? 'Cleared' : 'Not cleared'
     )
   );
-  top.append(
-    renderCardMenu(`${project.title} card menu`, [
-      { id: 'page', label: 'Full page', onSelect: () => actions.onOpen(project) },
-      { id: 'delete', label: 'Delete', danger: true, onSelect: () => actions.onDelete(project) }
-    ])
-  );
+  const menuItems: CardMenuItem[] = [{ id: 'page', label: 'Full page', onSelect: () => actions.onOpen(project) }];
+  if (variance.ready_to_close) {
+    menuItems.push({
+      id: 'complete',
+      label: 'Mark complete',
+      onSelect: () =>
+        showCompleteConfirm(confirmHost, project, variance.slip_days, () => actions.onCompleted(project))
+    });
+  }
+  menuItems.push({ id: 'delete', label: 'Delete', danger: true, onSelect: () => actions.onDelete(project) });
+  top.append(renderCardMenu(`${project.title} card menu`, menuItems));
   card.append(top);
 
   const desc = project.arc_summary || project.description;
@@ -365,6 +377,14 @@ function renderExcursionCard(
   open.type = 'button';
   open.addEventListener('click', () => actions.onOpen(project));
   actionsRow.append(open);
+  if (variance.ready_to_close) {
+    const complete = el('button', 'btn btn--primary', 'Complete');
+    complete.type = 'button';
+    complete.addEventListener('click', () => {
+      showCompleteConfirm(confirmHost, project, variance.slip_days, () => actions.onCompleted(project));
+    });
+    actionsRow.append(complete);
+  }
   card.append(actionsRow);
 
   return card;
@@ -374,7 +394,12 @@ function renderExcursionBoard(
   excursions: Project[],
   tasks: Task[],
   now: Date,
-  actions: { onOpen: (project: Project) => void; onDelete: (project: Project) => void }
+  confirmHost: HTMLElement,
+  actions: {
+    onOpen: (project: Project) => void;
+    onDelete: (project: Project) => void;
+    onCompleted: (project: Project) => void;
+  }
 ): HTMLElement {
   const visible = excursions.filter((project) => matchesProjectQuery(project, excursionQuery));
   const lanes = excursionGroupBy === 'when' ? WHEN_LANES : CLEARANCE_LANES;
@@ -409,7 +434,7 @@ function renderExcursionBoard(
     head.append(el('span', 'lane__title', group.title), el('span', 'lane__count', String(group.cards.length)));
     lane.append(head);
     for (const project of group.cards) {
-      lane.append(renderExcursionCard(project, tasks, actions));
+      lane.append(renderExcursionCard(project, tasks, confirmHost, actions));
     }
     grid.append(lane);
   }
@@ -435,7 +460,9 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
       tasksApi.listTasks(),
       tasksApi.listTemplates().catch(() => ({ excursion_templates: [] as ExcursionTemplate[] }))
     ]);
-    excursions = projects.filter((project) => project.type === 'excursion');
+    excursions = projects.filter(
+      (project) => project.type === 'excursion' && !isProjectArchived(project.status)
+    );
     tasks = allTasks;
     templates = templatesPayload.excursion_templates as ExcursionTemplate[];
   } catch (err) {
@@ -501,9 +528,10 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
     );
     canvas.append(toolbar, confirmHost);
     canvas.append(
-      renderExcursionBoard(excursions, tasks, now, {
+      renderExcursionBoard(excursions, tasks, now, confirmHost, {
         onOpen: openProjectPage,
-        onDelete: (current) => deleteProjectNow(current, () => dropProject(current.id), confirmHost)
+        onDelete: (current) => deleteProjectNow(current, () => dropProject(current.id), confirmHost),
+        onCompleted: (current) => dropProject(current.id)
       })
     );
 

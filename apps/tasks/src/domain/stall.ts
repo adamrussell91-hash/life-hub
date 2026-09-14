@@ -1,4 +1,4 @@
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { addDays, parseDue, startOfDay } from '@/domain/queries';
 
@@ -46,7 +46,7 @@ export function findStallCandidates(
   const out: StallCandidate[] = [];
 
   for (const project of projects) {
-    if (project.status === 'archived_dead') continue;
+    if (isProjectArchived(project.status)) continue;
     if (!isStallEligible(project) && project.status !== 'stalled') continue;
 
     const last = lastProjectActivityAt(project, tasks);

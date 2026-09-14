@@ -1,5 +1,5 @@
 import type { Task } from '@/schemas/task';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { RecurrenceFrequency } from '@/schemas/recurrence';
 import { tasksApi } from '@/services/client-api';
 import { errorMessage } from '@/views/feedback';
@@ -375,7 +375,7 @@ export async function renderTaskEditor(
     options: [
       { value: '', label: 'No project' },
       ...projects
-        .filter((p) => p.status !== 'archived_dead')
+        .filter((p) => !isProjectArchived(p.status))
         .map((item) => ({ value: item.id, label: item.title }))
     ],
     value: task.parent_project_id ?? ''
