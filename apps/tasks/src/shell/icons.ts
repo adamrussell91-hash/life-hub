@@ -27,6 +27,7 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   list: ['M8 7h12', 'M8 12h12', 'M8 17h12', 'M5 7h.01', 'M5 12h.01', 'M5 17h.01'],
   projects: ['M4 8h6l2 2h8v10H4z'],
   excursions: ['M7 4v16', 'M7 5h10l-2.5 3L17 11H7'],
+  archive: ['M4 5h16v4H4z', 'M5 9v10h14V9', 'M10 13h4'],
   programs: [
     'M8 20h8',
     'M12 16v4',

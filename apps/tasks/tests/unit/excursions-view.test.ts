@@ -13,7 +13,8 @@ vi.mock('@/services/client-api', () => ({
     listTasks: vi.fn(),
     listTemplates: vi.fn(),
     createExcursionFromTemplate: vi.fn(),
-    deleteProject: vi.fn()
+    deleteProject: vi.fn(),
+    closeProject: vi.fn()
   }
 }));
 
@@ -186,6 +187,71 @@ describe('excursions dashboard', () => {
         'proj_ex_ethics_seed',
         expect.objectContaining({ reason: expect.any(String) })
       );
+    });
+  });
+
+  it('offers Mark complete once the event date has passed, and archives it via closeProject', async () => {
+    const pastExcursion: Project = {
+      ...excursion,
+      id: 'proj_ex_past',
+      title: 'Regional heat (done)',
+      current_end_date: '2020-01-01',
+      baseline_end_date: '2020-01-01'
+    };
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([pastExcursion]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [template],
+      task_templates: [],
+      project_templates: []
+    });
+    vi.mocked(tasksApi.closeProject).mockResolvedValue({
+      project: { ...pastExcursion, status: 'completed' },
+      review: {
+        schema_version: 1,
+        id: 'rev_1',
+        project_id: pastExcursion.id,
+        outcome: 'completed',
+        reason: 'Ran well.',
+        merge_into_project_id: null,
+        baseline_end_date: pastExcursion.baseline_end_date,
+        current_end_date: pastExcursion.current_end_date,
+        slip_days: 0,
+        created_at: '2020-01-02T00:00:00.000Z'
+      },
+      variance: {
+        project_id: pastExcursion.id,
+        baseline_end_date: pastExcursion.baseline_end_date,
+        current_end_date: pastExcursion.current_end_date,
+        derived_end_date: pastExcursion.current_end_date,
+        slip_days: 0,
+        open_task_count: 0,
+        done_task_count: 0,
+        all_tasks_done: false,
+        ready_to_close: true
+      }
+    });
+
+    location.hash = '#/excursions';
+    const canvas = document.createElement('main');
+    await renderExcursionsView(canvas);
+
+    const complete = canvas.querySelector<HTMLButtonElement>('.excursion-card .pcard__actions .btn--primary');
+    expect(complete?.textContent).toBe('Complete');
+    complete!.click();
+
+    const confirm = canvas.querySelector<HTMLButtonElement>('.excursion-confirm .btn--primary');
+    expect(confirm?.textContent).toBe('Confirm');
+    const reasonField = canvas.querySelector<HTMLInputElement>('.excursion-confirm [aria-label="Retrospective"]');
+    reasonField!.value = 'Ran well.';
+    confirm!.click();
+
+    await vi.waitFor(() => {
+      expect(tasksApi.closeProject).toHaveBeenCalledWith(pastExcursion.id, 'Ran well.');
+    });
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.excursion-card')).toBeNull();
     });
   });
 

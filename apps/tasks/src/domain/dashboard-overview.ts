@@ -1,4 +1,4 @@
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { isBoardTask } from '@/domain/hierarchy';
 import {
@@ -105,7 +105,7 @@ export function upcomingExcursionDates(
 
   for (const project of projects) {
     if (project.type !== 'excursion') continue;
-    if (project.status === 'archived_dead') continue;
+    if (isProjectArchived(project.status)) continue;
     for (const [label, read] of EXCURSION_DATE_LABELS) {
       const due_date = read(project);
       if (!due_date) continue;
@@ -165,7 +165,7 @@ export function loadToneFor(running: number, sustainable = 3): LoadTone {
 }
 
 function liveProjects(projects: Project[]): Project[] {
-  return projects.filter((project) => project.status !== 'archived_dead');
+  return projects.filter((project) => !isProjectArchived(project.status));
 }
 
 export function dashboardFocusStats(

@@ -7,7 +7,7 @@ import {
 } from '@/schemas/task-properties';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults';
 import { alignStockStatusLabelsWithBoard } from '@/domain/cards';
-import { ProjectSchema } from '@/schemas/project';
+import { ProjectSchema, isProjectArchived } from '@/schemas/project';
 import { projectMilestones } from '@/domain/project-milestones';
 import {
   FrameworkEntrySchema,
@@ -1262,7 +1262,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           flagged.push(candidate.project);
           continue;
         }
-        if (candidate.project.status === 'archived_dead') continue;
+        if (isProjectArchived(candidate.project.status)) continue;
         const updated = await this.updateProject(candidate.project.id, {
           status: 'stalled',
           stall_flagged_at: stamp
@@ -1286,7 +1286,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         if (!targetId) throw new Error('Frankenstein needs a merge target project');
         if (targetId === input.project_id) throw new Error('Cannot merge a project into itself');
         const target = await this.getProject(targetId);
-        if (!target || target.status === 'archived_dead') {
+        if (!target || isProjectArchived(target.status)) {
           throw new Error('Merge target project not found or archived');
         }
         const tasks = await this.listTasks();
@@ -1561,14 +1561,14 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
       if (!reason) throw new Error('A short retrospective is required');
       const existing = await this.getProject(input.project_id);
       if (!existing) throw new Error(`Project not found: ${input.project_id}`);
-      if (existing.status === 'archived_dead') throw new Error('Project already closed');
+      if (isProjectArchived(existing.status)) throw new Error('Project already archived');
 
       const tasks = await this.listTasks();
       const derived = deriveProjectEndDate(existing, tasks);
       const variance = computeProjectVariance({ ...existing, current_end_date: derived }, tasks);
 
       const project = await this.updateProject(existing.id, {
-        status: 'archived_dead',
+        status: 'completed',
         current_end_date: derived,
         review_summary: reason
       });
@@ -1577,7 +1577,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         schema_version: 1,
         id: newId('rev'),
         project_id: project.id,
-        outcome: 'closed',
+        outcome: 'completed',
         reason,
         baseline_end_date: project.baseline_end_date,
         current_end_date: project.current_end_date,
@@ -1596,7 +1596,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         action: 'update',
         entity_type: 'project',
         entity_id: project.id,
-        reason: `Closed: ${reason}`,
+        reason: `Completed: ${reason}`,
         created_at: nowIso()
       });
       await kv.setJSON(keys.agentActionLogKey(log.id), log);
