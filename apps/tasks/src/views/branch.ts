@@ -1,5 +1,5 @@
 import type { Task } from '@/schemas/task';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { hashQuery } from '@/shell/shell';
 import { layoutProjectBranch, type BranchNode } from '@/domain/branch';
@@ -188,7 +188,7 @@ function mountBranch(
 export async function renderBranchView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren(el('p', 'canvas-status', 'Loading branch…'));
   const [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
-  const active = projects.filter((p) => p.status !== 'archived_dead');
+  const active = projects.filter((p) => !isProjectArchived(p.status));
 
   canvas.replaceChildren();
   const toolbar = createHubToolbar('graph-toolbar');

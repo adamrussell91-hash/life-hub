@@ -1,5 +1,5 @@
 import type { Task, DependencyType, DependencyLink } from '@/schemas/task';
-import type { Project, Milestone } from '@/schemas/project';
+import { isProjectArchived, type Project, type Milestone } from '@/schemas/project';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { projectMilestones } from '@/domain/project-milestones';
 import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
@@ -274,7 +274,7 @@ export function buildScopedGanttRows(
   scope: GanttScope,
   projectId: string | null
 ): Array<{ project: Project; rows: GanttRow[] }> {
-  const active = projects.filter((project) => project.status !== 'archived_dead');
+  const active = projects.filter((project) => !isProjectArchived(project.status));
   const selected =
     scope === 'project' && projectId ? active.filter((project) => project.id === projectId) : active;
   const groups: Array<{ project: Project; rows: GanttRow[] }> = [];

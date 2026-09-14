@@ -72,10 +72,20 @@ describe('closure loop', () => {
       project_id: 'proj_close_demo',
       reason: 'Marks landed; wrap the arc.'
     });
-    expect(project.status).toBe('archived_dead');
+    expect(project.status).toBe('completed');
     expect(project.review_summary).toContain('Marks landed');
-    expect(review.outcome).toBe('closed');
+    expect(review.outcome).toBe('completed');
     expect(review.slip_days).toBe(variance.slip_days);
     expect(review.baseline_end_date).toBe('2026-07-15');
+  });
+
+  it('refuses to close an already-archived project', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    await store.closeProject({ project_id: 'proj_close_demo', reason: 'Done.' });
+    await expect(
+      store.closeProject({ project_id: 'proj_close_demo', reason: 'Again?' })
+    ).rejects.toThrow(/already archived/);
   });
 });

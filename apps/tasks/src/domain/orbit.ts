@@ -1,5 +1,5 @@
 import type { Task } from '@/schemas/task';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import { parseDue, startOfDay } from '@/domain/queries';
 
 export type OrbitBodyKind = 'task' | 'project';
@@ -74,7 +74,7 @@ export function layoutOrbit(
   const minR = options.minRadius ?? 56;
   const maxR = options.maxRadius ?? 220;
   const openTasks = tasks.filter((t) => t.status !== 'done' && t.status !== 'dead');
-  const activeProjects = projects.filter((p) => p.status !== 'archived_dead');
+  const activeProjects = projects.filter((p) => !isProjectArchived(p.status));
 
   const bodies: OrbitBody[] = [
     ...activeProjects.map((p) => {

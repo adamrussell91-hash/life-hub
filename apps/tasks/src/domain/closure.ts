@@ -1,4 +1,4 @@
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { parseDue, toDateKey } from '@/domain/queries';
 
@@ -50,8 +50,7 @@ export function computeProjectVariance(
   const endPassed =
     Boolean(current) && current!.getTime() <= from.getTime() + 24 * 60 * 60 * 1000;
   const all_tasks_done = child.length > 0 && open_task_count === 0;
-  const ready_to_close =
-    project.status !== 'archived_dead' && (all_tasks_done || endPassed);
+  const ready_to_close = !isProjectArchived(project.status) && (all_tasks_done || endPassed);
 
   return {
     project_id: project.id,

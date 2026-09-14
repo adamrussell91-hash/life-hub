@@ -1,5 +1,5 @@
 import type { Goal } from '@/schemas/goal';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { projectPageHash } from '@/domain/cards';
 import { findStallCandidates } from '@/domain/stall';
@@ -22,7 +22,7 @@ import {
 } from '@/domain/projects-pulse';
 import { tasksApi } from '@/services/client-api';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { deleteProjectNow } from '@/views/card-actions';
+import { deleteProjectNow, showCompleteConfirm } from '@/views/card-actions';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
@@ -49,7 +49,7 @@ export function projectNextActionHealth(
   tasks: Task[],
   onAdd?: () => void
 ): HTMLElement | null {
-  if (project.status === 'archived_dead' || project.status === 'paused') return null;
+  if (isProjectArchived(project.status) || project.status === 'paused') return null;
   if (inspectProjectHealth(project, tasks).health !== 'missing_next_action') return null;
   const hint = el('button', 'proj-health proj-health--warn', 'Add next action');
   hint.type = 'button';
@@ -235,9 +235,9 @@ function projectBoardMenuItems(
   ];
   if (card.readyToClose) {
     items.push({
-      id: 'close',
-      label: 'Close project',
-      onSelect: () => showCloseConfirm(confirmHost, card.project, card.slipDays, actions.onReload)
+      id: 'complete',
+      label: 'Mark complete',
+      onSelect: () => showCompleteConfirm(confirmHost, card.project, card.slipDays, actions.onReload)
     });
   }
   items.push({
@@ -351,12 +351,12 @@ function renderProjectBoardCard(
   });
   actions.append(open);
   if (card.readyToClose) {
-    const close = el('button', 'btn btn--primary', 'Close');
-    close.type = 'button';
-    close.addEventListener('click', () => {
-      showCloseConfirm(confirmHost, card.project, card.slipDays, boardActions.onReload);
+    const complete = el('button', 'btn btn--primary', 'Complete');
+    complete.type = 'button';
+    complete.addEventListener('click', () => {
+      showCompleteConfirm(confirmHost, card.project, card.slipDays, boardActions.onReload);
     });
-    actions.append(close);
+    actions.append(complete);
   }
   article.append(actions);
   attachProjectBoardMenu(top, card, confirmHost, boardActions);
@@ -634,13 +634,15 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     return;
   }
 
+  projects = projects.filter((project) => !isProjectArchived(project.status));
+
   const now = new Date();
   const stallIds = new Set(findStallCandidates(projects, tasks, now).map((item) => item.project.id));
   const cards = projects.map((project) => buildProjectPulseCard(project, tasks, stallIds, now));
   const ctx: PulseContext = { projects, tasks, goals, cards, stallIds, now };
   const retro = findRetroCandidate(cards, now);
   const stalled = cards.filter((card) => card.lifecycle === 'stalled');
-  const mergeTargets = projects.filter((project) => project.status !== 'archived_dead' && project.status !== 'stalled');
+  const mergeTargets = projects.filter((project) => !isProjectArchived(project.status) && project.status !== 'stalled');
 
   const reload = () => void renderProjectsView(canvas);
 
@@ -811,59 +813,6 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   }
 
   paint();
-}
-
-function showCloseConfirm(
-  host: HTMLElement,
-  project: Project,
-  slipDays: number | null,
-  onDone: () => void
-): void {
-  host.replaceChildren();
-  const card = el('section', 'confirm-card');
-  card.setAttribute('role', 'region');
-  card.setAttribute('aria-label', 'Confirm closure');
-  card.append(el('p', 'page-header__eyebrow', 'Proposed write'));
-  card.append(el('h2', 'closure-confirm__title', `Close ${project.title}`));
-  const reason = createHubField({
-    ariaLabel: 'Retrospective',
-    placeholder: 'Short retrospective (required)'
-  });
-  const slipText =
-    slipDays === null
-      ? 'No baseline comparison.'
-      : slipDays === 0
-        ? 'Landed on baseline.'
-        : slipDays > 0
-          ? `${slipDays} days past baseline.`
-          : `${Math.abs(slipDays)} days ahead of baseline.`;
-  card.append(el('p', 'page-header__supporting', `${slipText} Do not apply until Confirm.`), reason.el);
-  const actions = el('div', 'confirm-card__actions');
-  const discard = el('button', 'btn btn--ghost', 'Discard');
-  discard.type = 'button';
-  const confirm = el('button', 'btn btn--primary', 'Confirm');
-  confirm.type = 'button';
-  discard.addEventListener('click', () => host.replaceChildren());
-  confirm.addEventListener('click', async () => {
-    const text = reason.input.value.trim();
-    if (!text) {
-      host.append(el('p', 'empty-state', 'Add a retrospective first.'));
-      return;
-    }
-    confirm.disabled = true;
-    discard.disabled = true;
-    try {
-      await tasksApi.closeProject(project.id, text);
-      host.replaceChildren(el('p', 'canvas-status', 'Project closed.'));
-      onDone();
-    } catch (err) {
-      host.replaceChildren(el('p', 'empty-state', err instanceof Error ? err.message : 'Close failed'));
-    }
-  });
-  actions.append(discard, confirm);
-  card.append(actions);
-  host.append(card);
-  card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function renderStalledCard(

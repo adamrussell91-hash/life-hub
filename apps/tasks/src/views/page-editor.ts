@@ -1,5 +1,5 @@
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
-import type { Project, ProjectStatus, QualityBar } from '@/schemas/project';
+import { isProjectArchived, type Project, type ProjectStatus, type QualityBar } from '@/schemas/project';
 import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
@@ -41,7 +41,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-const PROJECT_STATUSES: ProjectStatus[] = ['active', 'stalled', 'revived', 'archived_dead'];
+const PROJECT_STATUSES: ProjectStatus[] = ['active', 'stalled', 'revived', 'completed', 'archived_dead'];
 
 export type EntityPageRef = { kind: 'task' | 'project'; id: string };
 
@@ -278,7 +278,7 @@ function paintTaskPage(
     [
       { value: '', label: 'No project' },
       ...projects
-        .filter((item) => item.status !== 'archived_dead')
+        .filter((item) => !isProjectArchived(item.status))
         .map((item) => ({ value: item.id, label: item.title }))
     ],
     task.parent_project_id ?? '',

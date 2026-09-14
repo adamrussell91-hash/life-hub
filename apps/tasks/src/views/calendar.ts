@@ -1,5 +1,5 @@
 import type { Task, TaskDomain } from '@/schemas/task';
-import type { Project } from '@/schemas/project';
+import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Area } from '@/schemas/area';
 import type { Goal } from '@/schemas/goal';
 import type { ClareDumpResult, ClareProposal } from '@/domain/clare';
@@ -657,7 +657,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
         options: [
           { value: 'all', label: 'All projects' },
           ...projects
-            .filter((project) => project.status !== 'archived_dead')
+            .filter((project) => !isProjectArchived(project.status))
             .map((project) => ({ value: project.id, label: project.title }))
         ],
         value: sessionFilters.projectId,
@@ -1752,7 +1752,7 @@ function renderQuickLinksWidget(tasks: Task[]): HTMLElement {
  *  Projects view renders, so the numbers always match. Omitted entirely when there are
  *  no active projects, rather than showing an empty strip. */
 function renderProjectPulseStrip(projects: Project[], tasks: Task[]): HTMLElement | null {
-  const active = projects.filter((p) => p.status !== 'archived_dead');
+  const active = projects.filter((p) => !isProjectArchived(p.status));
   if (!active.length) return null;
   const stallIds = new Set(findStallCandidates(projects, tasks).map((c) => c.project.id));
   const strip = el('div', 'calendar-pulse-strip');
@@ -1823,7 +1823,7 @@ function renderHorizonBreadcrumb(areas: Area[], goals: Goal[], projects: Project
   const segments: Array<{ label: string; count: number; href: string }> = [
     { label: 'Areas', count: areas.length, href: '#/goals' },
     { label: 'Goals', count: goals.filter((g) => g.status === 'active').length, href: '#/goals' },
-    { label: 'Projects', count: projects.filter((p) => p.status !== 'archived_dead').length, href: '#/projects' },
+    { label: 'Projects', count: projects.filter((p) => !isProjectArchived(p.status)).length, href: '#/projects' },
     { label: 'Actions', count: openTasks(tasks).length, href: '#/board' }
   ];
   const bar = el('nav', 'calendar-horizon-bar');

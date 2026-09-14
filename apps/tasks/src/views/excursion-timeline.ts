@@ -37,7 +37,7 @@ import {
   type HubFilterOption
 } from '@/views/hub-kit';
 
-const PROJECT_STATUSES: ProjectStatus[] = ['active', 'stalled', 'revived', 'archived_dead'];
+const PROJECT_STATUSES: ProjectStatus[] = ['active', 'stalled', 'revived', 'completed', 'archived_dead'];
 
 function pageBlocksOf(entity: Project): Block[] {
   return Array.isArray(entity.page_blocks) ? entity.page_blocks : [];

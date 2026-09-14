@@ -112,9 +112,10 @@ describe('project lifecycle mix', () => {
     expect(runningProjectCount(mix)).toBe(2);
   });
 
-  it('treats in-progress work as on the go and closed work as completed', () => {
+  it('treats in-progress work as on the go, and both completed and abandoned work as the completed lifecycle', () => {
     const live = project({ id: 'proj_go', title: 'On the go' });
-    const done = project({ id: 'proj_done', title: 'Done', status: 'archived_dead' });
+    const finished = project({ id: 'proj_done', title: 'Done', status: 'completed' });
+    const buried = project({ id: 'proj_dead', title: 'Buried', status: 'archived_dead' });
     const tasks = [
       task({
         id: 't1',
@@ -124,7 +125,10 @@ describe('project lifecycle mix', () => {
       })
     ];
     expect(classifyProjectLifecycle(live, tasks, new Set(), now)).toBe('on_the_go');
-    expect(classifyProjectLifecycle(done, [], new Set(), now)).toBe('completed');
+    expect(classifyProjectLifecycle(finished, [], new Set(), now)).toBe('completed');
+    expect(classifyProjectLifecycle(buried, [], new Set(), now)).toBe('completed');
+    // Distinct statuses under the hood — "completed" is not "archived_dead".
+    expect(finished.status).not.toBe(buried.status);
   });
 
   it('marks excursion work admin-heavy and goal-backed work high impact', () => {

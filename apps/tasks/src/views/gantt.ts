@@ -1,5 +1,5 @@
 import type { Task, TaskDomain } from '@/schemas/task';
-import type { Project, Milestone } from '@/schemas/project';
+import { isProjectArchived, type Project, type Milestone } from '@/schemas/project';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { hashQuery } from '@/shell/shell';
@@ -175,7 +175,7 @@ export async function renderGanttView(canvas: HTMLElement): Promise<void> {
     return;
   }
 
-  const liveProjects = projects.filter((project) => project.status !== 'archived_dead');
+  const liveProjects = projects.filter((project) => !isProjectArchived(project.status));
   const queryProject = hashQuery().get('project');
   if (queryProject && liveProjects.some((project) => project.id === queryProject)) {
     session.scope = 'project';
