@@ -4169,8 +4169,7 @@ body.is-universe-fullscreen .local-banner {
   align-items: stretch;
 }
 
-.stars-symbol,
-.stars-sky {
+.stars-symbol {
   position: relative;
   min-width: 0;
   overflow: hidden;
@@ -4557,10 +4556,6 @@ body.is-universe-fullscreen .local-banner {
   font: inherit;
 }
 
-.stars-sky {
-  min-height: 38rem;
-}
-
 .stars-empty {
   position: absolute;
   z-index: 3;
@@ -4676,12 +4671,6 @@ body.is-universe-fullscreen .local-banner {
   gap: 0;
   padding: 0;
   background: var(--depth);
-}
-
-.stars-sky-wrap.is-fullscreen .stars-sky {
-  flex: 1;
-  min-height: 0;
-  border-radius: 0;
 }
 
 .stars-sky-wrap.is-fullscreen .stars-sky-toolbar {
