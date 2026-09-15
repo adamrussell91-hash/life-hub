@@ -19,6 +19,7 @@ import {
 import { taskKey, getJSON as getTasksJSON, defaultGetTasksStore } from './tasks-blobs.mjs';
 import { displayLabelFor, isValidOrganisationId, isValidPersonId, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
 import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationKey, personKey } from './universal-link-blobs.mjs';
+import { getGithubOrganisation, getGithubPerson } from './github-professional-data.mjs';
 import { classKey, defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON } from './teaching-blobs.mjs';
 import {
   resolveKnowledgePage,
@@ -109,12 +110,23 @@ export async function resolveTask(id, accessContext, { getStore = defaultGetTask
 // An id that does not even match the expected `person_<uuid>` /
 // `organisation_<uuid>` shape is treated as "missing," not as a 400 —
 // resolution never discloses whether a malformed id would otherwise exist.
-export async function resolvePerson(id, accessContext, { getStore = defaultGetUniversalLinkStore, includeArchived = false } = {}) {
+// A Person not found in `universal-link-content` Blobs falls back to the
+// read-only, GitHub-canonical Professional import (github-professional-data.mjs)
+// before giving up. That import's records are already normalized to this
+// exact schema (identity-schema.mjs's `parsePersonRecord` shape) with
+// permanent derived ids, so no further branching is needed once the
+// fallback returns a record — the rest of this function treats it exactly
+// like a native one. A misconfigured or unreachable GitHub data repo
+// degrades to "not found" here, the same as any other absent record; it
+// never turns into a distinct error, since this fallback is best-effort by
+// design (see github-professional-data.mjs).
+export async function resolvePerson(id, accessContext, { getStore = defaultGetUniversalLinkStore, includeArchived = false, env, fetchImpl } = {}) {
   if (!isValidPersonId(id)) throw endpointNotFoundError();
   const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
-  const record = parsePersonRecord(await getIdentityJSON(store, personKey(id)));
+  let record = parsePersonRecord(await getIdentityJSON(store, personKey(id)));
+  if (!record) record = await getGithubPerson(id, { env, fetchImpl });
   if (!record) throw endpointNotFoundError();
   if (record.lifecycle_status === 'archived' && !includeArchived) throw endpointNotFoundError();
   return {
@@ -128,12 +140,13 @@ export async function resolvePerson(id, accessContext, { getStore = defaultGetUn
   };
 }
 
-export async function resolveOrganisation(id, accessContext, { getStore = defaultGetUniversalLinkStore, includeArchived = false } = {}) {
+export async function resolveOrganisation(id, accessContext, { getStore = defaultGetUniversalLinkStore, includeArchived = false, env, fetchImpl } = {}) {
   if (!isValidOrganisationId(id)) throw endpointNotFoundError();
   const ref = formatEntityRef({ namespace: 'shared', kind: 'organisation', id });
   if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
   const store = await getStore();
-  const record = parseOrganisationRecord(await getIdentityJSON(store, organisationKey(id)));
+  let record = parseOrganisationRecord(await getIdentityJSON(store, organisationKey(id)));
+  if (!record) record = await getGithubOrganisation(id, { env, fetchImpl });
   if (!record) throw endpointNotFoundError();
   if (record.lifecycle_status === 'archived' && !includeArchived) throw endpointNotFoundError();
   return {
