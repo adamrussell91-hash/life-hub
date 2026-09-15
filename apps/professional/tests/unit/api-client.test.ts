@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiGet, apiPost, ApiClientError, parseApiResponse } from '@/api/client';
+import { getApiBaseUrl } from '@/api/config';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -64,5 +65,16 @@ describe('apiGet/apiPost request encoding', () => {
     );
     await expect(apiGet('/api/session')).rejects.toBeInstanceOf(ApiClientError);
     await expect(apiGet('/api/session')).rejects.toMatchObject({ code: 'unauthenticated', status: 401 });
+  });
+});
+
+describe('production API routing', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('uses the Life Hub API from the GitHub Pages host', () => {
+    vi.stubGlobal('location', { hostname: 'life-hub.adam-russell.com' });
+    expect(getApiBaseUrl()).toBe('https://api.adam-russell.com');
   });
 });
