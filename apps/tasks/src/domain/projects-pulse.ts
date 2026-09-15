@@ -43,13 +43,19 @@ export const LIFECYCLE_LABEL: Record<ProjectLifecycle, string> = {
   stalled: 'Stalled'
 };
 
-/** Kit tokens only — fills for the portfolio mix ring. */
+/**
+ * Kit tokens only — fills for the portfolio mix ring.
+ * needs_attention uses --danger (not --pastel-peach-ink) to match every
+ * status badge elsewhere in the app for the same status (cards.css
+ * .status-badge--needs_attention) — the old peach-ink was also close
+ * enough to planning's gold-ink that the two read as the same brown.
+ */
 export const LIFECYCLE_COLOR: Record<ProjectLifecycle, string> = {
   completed: 'var(--success)',
   on_the_go: 'var(--wave)',
   planning: 'var(--pastel-gold-ink)',
   not_started: 'var(--shallow)',
-  needs_attention: 'var(--pastel-peach-ink)',
+  needs_attention: 'var(--danger)',
   stalled: 'var(--high-sea)'
 };
 
