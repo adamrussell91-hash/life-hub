@@ -24,7 +24,7 @@ import {
   type ShootingStar,
 } from "./canvas";
 import { buildSkyIndex, skyIndexRange, type MonthBucket } from "./skyIndex";
-import { MONTH_WIDTH_PX, clampMonthIndex, monthDeltaForPixels, screenXForMonth, stepInertia } from "./timeline";
+import { MONTH_WIDTH_PX, clampMonthIndex, currentMonthIndex, monthDeltaForPixels, screenXForMonth, stepInertia } from "./timeline";
 
 const RESOLVED_BUFFER_MONTHS = 1.5;
 const FRICTION = 0.94;
@@ -140,7 +140,7 @@ export function mountStarsPanorama(
   let dragLast = 0;
 
   function bounds() {
-    return skyIndexRange(skyIndex, initialMonthIndex);
+    return skyIndexRange(skyIndex, currentMonthIndex());
   }
 
   function setCenter(next: number) {
