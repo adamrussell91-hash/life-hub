@@ -243,3 +243,75 @@ test('resolveEntity enforces allowed_entity_kinds before dispatching to any reso
   const allowed = await resolveEntity('tasks:task:task_email_seth', restricted, { getStore: async () => store });
   assert.equal(allowed.kind, 'task');
 });
+
+// --- GitHub-canonical Professional import fallback ---
+
+test('resolvePerson/resolveOrganisation fall back to the GitHub-canonical import when the id is absent from Blobs', async () => {
+  const { derivePersonId, deriveOrganisationId, resetProfessionalDataCache } = await import(
+    '../../netlify/functions/_shared/github-professional-data.mjs'
+  );
+  resetProfessionalDataCache();
+  const store = createMemoryStore();
+  const personId = derivePersonId('leg-person-1');
+  const organisationId = deriveOrganisationId('leg-org-1');
+  const fetchImpl = async (url) => {
+    const href = String(url);
+    const body = (data) => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') }) });
+    if (href.endsWith('/data/professional/people.json')) {
+      return body([{ legacy_id: 'leg-person-1', display_name: 'Lauren Stuart', sort_name: null, aliases: [] }]);
+    }
+    if (href.endsWith('/data/professional/organisations.json')) {
+      return body([{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College', legal_name: null, aliases: [] }]);
+    }
+    if (href.endsWith('/data/professional/relationships.json')) {
+      return body([]);
+    }
+    return { ok: false, status: 404 };
+  };
+
+  const personProjection = await resolvePerson(personId, tasksContext, {
+    getStore: async () => store,
+    env: { GITHUB_TOKEN: 'token' },
+    fetchImpl
+  });
+  assert.equal(personProjection.display_label, 'Lauren Stuart');
+  assert.equal(personProjection.href, `/professional/#/person/${personId}`);
+
+  const organisationProjection = await resolveOrganisation(organisationId, tasksContext, {
+    getStore: async () => store,
+    env: { GITHUB_TOKEN: 'token' },
+    fetchImpl
+  });
+  assert.equal(organisationProjection.display_label, 'St. Aloysius College');
+});
+
+test('resolvePerson prefers a native Blob record over a GitHub-canonical one sharing the same derived id', async () => {
+  const { derivePersonId, resetProfessionalDataCache } = await import(
+    '../../netlify/functions/_shared/github-professional-data.mjs'
+  );
+  resetProfessionalDataCache();
+  const personId = derivePersonId('leg-person-native');
+  const store = createMemoryStore();
+  await store.setJSON(personKey(personId), personRecord({ id: personId, display_name: 'Native Wins' }));
+  const fetchImpl = async () => {
+    throw new Error('GitHub must not be consulted when the Blob record already exists');
+  };
+  const projection = await resolvePerson(personId, tasksContext, {
+    getStore: async () => store,
+    env: { GITHUB_TOKEN: 'token' },
+    fetchImpl
+  });
+  assert.equal(projection.display_label, 'Native Wins');
+});
+
+test('resolvePerson still 404s when neither Blobs nor the GitHub import has the id', async () => {
+  const { resetProfessionalDataCache } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
+  resetProfessionalDataCache();
+  const store = createMemoryStore();
+  const missingId = 'person_00000000-0000-0000-0000-000000000000';
+  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from('[]').toString('base64') }) });
+  await assert.rejects(
+    resolvePerson(missingId, tasksContext, { getStore: async () => store, env: { GITHUB_TOKEN: 'token' }, fetchImpl }),
+    error => error.status === 404 && error.code === 'endpoint_not_found'
+  );
+});

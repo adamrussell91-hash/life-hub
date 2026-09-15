@@ -365,3 +365,62 @@ test('never returns a StudentReference kind through an ordinary, fully-valid kin
   const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex&kinds=person,organisation,task' }))).json();
   assert.doesNotMatch(JSON.stringify(response), /student_reference/);
 });
+
+// --- GitHub-canonical Professional import merge (github-professional-data.mjs) ---
+
+test('search results interleave native Blob-backed people/organisations with the GitHub-canonical import', async () => {
+  const { resetProfessionalDataCache } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  await seed(store); // seeds "Seth Example", "Sarah Example", "Example University"
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const href = String(url);
+    const body = (data) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
+    });
+    if (href.endsWith('/data/professional/people.json')) {
+      return body([{ legacy_id: 'leg-person-1', display_name: 'Example Import Person', sort_name: null, aliases: [] }]);
+    }
+    if (href.endsWith('/data/professional/organisations.json')) {
+      return body([{ legacy_id: 'leg-org-1', display_name: 'Example Import College', legal_name: null, aliases: [] }]);
+    }
+    if (href.endsWith('/data/professional/relationships.json')) return body([]);
+    return { ok: false, status: 404 };
+  };
+
+  try {
+    const handler = createEntitySearchHandler(baseDeps(store, { env: { ...env, GITHUB_TOKEN: 'token' } }));
+    const response = await (await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex' }))).json();
+    const personLabels = response.data.groups.person.map(r => r.display_label);
+    const organisationLabels = response.data.groups.organisation.map(r => r.display_label);
+    assert.ok(personLabels.includes('Seth Example'), 'native person still matches');
+    assert.ok(personLabels.includes('Example Import Person'), 'GitHub-imported person is merged in');
+    assert.ok(organisationLabels.includes('Example University'), 'native organisation still matches');
+    assert.ok(organisationLabels.includes('Example Import College'), 'GitHub-imported organisation is merged in');
+  } finally {
+    globalThis.fetch = originalFetch;
+    resetProfessionalDataCache();
+  }
+});
+
+test('without GITHUB_TOKEN configured, search behaves exactly as before — no GitHub call is made', async () => {
+  const store = memoryStore();
+  await seed(store);
+  let githubCalled = false;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    githubCalled = true;
+    return originalFetch(url);
+  };
+  try {
+    const handler = createEntitySearchHandler(baseDeps(store));
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=Ex' }));
+    assert.equal(githubCalled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
