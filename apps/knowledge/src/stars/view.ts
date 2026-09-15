@@ -367,7 +367,14 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
 
   render();
   void listSavedConstellations()
-    .then(items => { saved = items; if (!stopped && screen === "sky") render(); })
+    .then(items => {
+      // A save can complete (and land in `saved`) before this initial fetch
+      // resolves; that fetch reflects a snapshot from before the save, so
+      // merge rather than overwrite or the just-saved item disappears.
+      const savedOnly = saved.filter(existing => !items.some(item => item.id === existing.id));
+      saved = [...items, ...savedOnly].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+      if (!stopped && screen === "sky") render();
+    })
     .catch(caught => {
       error = caught instanceof Error ? caught.message : "Night sky could not load.";
       if (!stopped && screen === "sky") render();
