@@ -63,7 +63,7 @@ export function mountHorizonArc(
   function onMove(event: PointerEvent) {
     if (!dragging) return;
     const value = valueFromClientX(event.clientX);
-    place(value);
+    place(Math.round(value));
     options.onChange(value);
   }
   function onUp(event: PointerEvent) {
@@ -95,10 +95,10 @@ export function mountHorizonArc(
   function onKey(event: KeyboardEvent) {
     if (event.key === "ArrowRight" || event.key === "ArrowUp") {
       event.preventDefault();
-      commitStep(1);
+      commitStep(event.shiftKey ? 12 : 1);
     } else if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       event.preventDefault();
-      commitStep(-1);
+      commitStep(event.shiftKey ? -12 : -1);
     }
   }
   marker.addEventListener("keydown", onKey);
