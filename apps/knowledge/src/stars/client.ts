@@ -42,7 +42,6 @@ function localPlacement(index: number) {
   const angle = index * 2.399963229728653;
   const ring = 0.16 + (index % 5) * 0.055;
   return {
-    x: Math.max(0.08, Math.min(0.92, 0.5 + Math.cos(angle) * ring * 1.25)),
     y: Math.max(0.12, Math.min(0.84, 0.48 + Math.sin(angle) * ring)),
     rotation: ((index * 37) % 360) * Math.PI / 180,
     scale: 0.82 + (index % 4) * 0.1,
