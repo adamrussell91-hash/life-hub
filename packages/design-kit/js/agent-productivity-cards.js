@@ -1265,24 +1265,24 @@ export function createActiveProjectsMeter(root, options = {}) {
     hint: meter.message,
     ariaLabel: meter.message
   });
-  const meterEl = create('div');
-  meterEl.className = 'prod-card__meter';
-  meterEl.dataset.status = meter.status;
-  const fill = create('div');
-  fill.className = 'prod-card__meter-fill';
-  const pct =
-    meter.limit != null && meter.limit > 0
-      ? Math.min(100, Math.round((meter.active_count / meter.limit) * 100))
-      : 0;
-  fill.style.width = meter.limit == null ? '0%' : `${pct}%`;
-  meterEl.append(fill);
-  const label = create('p');
-  label.className = 'prod-card__meta';
-  label.textContent =
-    meter.limit == null
-      ? `${meter.active_count} active · Limit not set`
-      : `${meter.active_count} of ${meter.limit}`;
-  card.append(meterEl, label);
+  // No limit means nothing to fill the bar against — a bar permanently
+  // stuck at 0% is dead chrome, not a chart. Only render it once there's
+  // a real ceiling to show progress toward, and don't repeat the hint
+  // above (which already states the count) in a second line below.
+  if (meter.limit != null && meter.limit > 0) {
+    const meterEl = create('div');
+    meterEl.className = 'prod-card__meter';
+    meterEl.dataset.status = meter.status;
+    const fill = create('div');
+    fill.className = 'prod-card__meter-fill';
+    const pct = Math.min(100, Math.round((meter.active_count / meter.limit) * 100));
+    fill.style.width = `${pct}%`;
+    meterEl.append(fill);
+    const label = create('p');
+    label.className = 'prod-card__meta';
+    label.textContent = `${meter.active_count} of ${meter.limit}`;
+    card.append(meterEl, label);
+  }
   return card;
 }
 
