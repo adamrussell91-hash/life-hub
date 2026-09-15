@@ -1,6 +1,6 @@
 # Life Hub Design
 
-Date: 31 July 2026 (Charts section updated 16 August 2026)  
+Date: 31 July 2026 (Charts updated 16 August; Clinical Thread updated 15 September 2026)  
 Status: Approved  
 Source of truth: [Life Hub App](https://www.notion.so/3adf794f847680eda2bbf184ce894090)
 
@@ -10,7 +10,7 @@ Life Hub is a private, responsive personal dashboard and conversational logging 
 
 The product is designed for equal use on desktop and iPhone. The GitHub repository is the only durable application data store. Historical data will be added later as hand-written Markdown events, so records remain simple, discoverable, portable, and human-readable.
 
-The first release excludes medical records, tasks, communications, teaching, detailed finance, nudges, notifications, scheduled jobs, goals, a Daily Score, an in-app editor for old logs, automated wearable ingestion, and an offline write queue.
+The original first-release scope excluded medical records, tasks, communications, teaching, detailed finance, nudges, notifications, scheduled jobs, goals, a Daily Score, an in-app editor for old logs, automated wearable ingestion, and an offline write queue. Later approved slices may extend that baseline; the Medical Overview and its Clinical Thread treatment are one such extension.
 
 ## Delivery approach
 
