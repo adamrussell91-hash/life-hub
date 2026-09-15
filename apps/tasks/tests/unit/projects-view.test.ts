@@ -129,6 +129,13 @@ const tasks: Task[] = [
 
 describe('projects view rebuild', () => {
   beforeEach(() => {
+    // Fixtures use created_at: '2026-08-01' with no other activity, and the
+    // stall threshold is 6 weeks — without pinning "now", every fixture
+    // project quietly starts qualifying as stalled once real time passes
+    // that window (it already has). Fake only Date, not timers, so
+    // vi.waitFor-based tests elsewhere in this file keep working.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-15T12:00:00.000Z'));
     resetProjectsViewStateForTests();
     vi.clearAllMocks();
     vi.mocked(tasksApi.flagStalledProjects).mockResolvedValue({ flagged: [], candidates: 0 });
@@ -155,9 +162,10 @@ describe('projects view rebuild', () => {
   afterEach(() => {
     closeCardMenu();
     document.body.replaceChildren();
+    vi.useRealTimers();
   });
 
-  it('renders a status mix chart with every lifecycle count', async () => {
+  it('renders a status mix chart with every live lifecycle count', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
 
@@ -170,8 +178,13 @@ describe('projects view rebuild', () => {
     expect(legend.some((text) => text?.includes('On the go') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Planning') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Not started') && text.includes('1'))).toBe(true);
-    expect(legend.some((text) => text?.includes('Completed') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Stalled') && text.includes('1'))).toBe(true);
+    // The full (non-compact) chart lists every lifecycle bucket even at
+    // zero, so "Completed" still appears here — just never with a real
+    // count, since renderProjectsView filters archived/completed projects
+    // out before lifecycle classification runs (see the board-lanes test,
+    // where an empty bucket gets no lane at all).
+    expect(legend.some((text) => text?.includes('Completed') && text.includes('0'))).toBe(true);
   });
 
   it('still paints when a stored project omitted milestones', async () => {
@@ -268,8 +281,10 @@ describe('projects view rebuild', () => {
     expect(lanes).toContain('On the go');
     expect(lanes).toContain('Planning');
     expect(lanes).toContain('Not started');
-    expect(lanes).toContain('Completed');
     expect(lanes).toContain('Stalled');
+    // No Completed lane — archived/completed projects are filtered out
+    // before this view classifies anything (see the mix-chart test above).
+    expect(lanes).not.toContain('Completed');
 
     const open = canvas.querySelector<HTMLButtonElement>('[data-project-id="proj_go"] .btn');
     expect(open?.textContent).toBe('Open page');
@@ -300,7 +315,10 @@ describe('projects view rebuild', () => {
       expect(card.querySelector('.card-menu')).not.toBeNull();
     }
 
-    const mind = canvas.querySelector<HTMLElement>('[data-project-id="proj_plan"]');
+    // Scoped to .pcard, not just [data-project-id] — a project can also
+    // appear as a forecast row/stall-card, which carries the same id but
+    // has no .card-menu.
+    const mind = canvas.querySelector<HTMLElement>('.pcard[data-project-id="proj_plan"]');
     expect(mind).not.toBeNull();
     mind?.querySelector<HTMLButtonElement>('.card-menu')?.click();
     const menu = document.querySelector<HTMLElement>('.card-menu__panel');
@@ -368,21 +386,23 @@ describe('projects view rebuild', () => {
     });
   });
 
-  it('puts the kanban first, status mix beside the timeline, and the heatmap last', async () => {
+  it('puts the forecast first, kanban next, and status mix beside the timeline', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
 
+    const forecast = canvas.querySelector('#project-forecast');
     const board = canvas.querySelector('.projects-board');
     const pulse = canvas.querySelector('.projects-pulse');
-    const heat = canvas.querySelector('.projects-heatmap');
     const chart = canvas.querySelector('.projects-chart');
+    expect(forecast).not.toBeNull();
     expect(board).not.toBeNull();
     expect(pulse).not.toBeNull();
-    expect(heat).not.toBeNull();
     expect(chart).not.toBeNull();
     expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
+    // No heatmap — confirmed unused and cut.
+    expect(canvas.querySelector('.projects-heatmap')).toBeNull();
+    expect(forecast!.compareDocumentPosition(board!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(board!.compareDocumentPosition(pulse!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pulse!.compareDocumentPosition(heat!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(canvas.textContent).not.toContain('Portfolio health');
     expect(canvas.querySelector('.roadmap-lede')?.textContent).toMatch(/calendar time/);
     expect(canvas.querySelector('.roadmap-axis__kind')?.textContent).toBe('Time');
@@ -408,14 +428,12 @@ describe('projects view rebuild', () => {
     expect(pressed?.textContent).toBe('Week');
   });
 
-  it('keeps the stalled outcome queue and confirm write', async () => {
+  it('keeps stalled-project outcomes and confirm write in the forecast', async () => {
     const canvas = document.createElement('main');
     await renderProjectsView(canvas);
 
-    const queue = canvas.querySelector('#stalled-queue');
-    expect(queue?.textContent).toMatch(/Masters notes/);
-    const expand = canvas.querySelector<HTMLButtonElement>('#stalled-queue .hub-icon-btn');
-    expand?.click();
+    const forecast = canvas.querySelector('#project-forecast');
+    expect(forecast?.textContent).toMatch(/Masters notes/);
     const reason = canvas.querySelector<HTMLInputElement>('[aria-label="Reason for Masters notes"]');
     expect(reason).not.toBeNull();
     reason!.value = 'Park it for next year';
