@@ -131,6 +131,10 @@ export function projectPageHash(id: string): string {
   return `#/project/${encodeURIComponent(id)}`;
 }
 
+export function programHash(id: string): string {
+  return `#/programs?id=${encodeURIComponent(id)}`;
+}
+
 /** Dedicated create page for an excursion — not the list. */
 export function newExcursionHash(templateId?: string | null): string {
   if (!templateId) return '#/excursions/new';

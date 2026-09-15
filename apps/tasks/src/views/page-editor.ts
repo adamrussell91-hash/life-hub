@@ -1,5 +1,6 @@
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
 import { isProjectArchived, type Project, type ProjectStatus, type QualityBar } from '@/schemas/project';
+import type { Program } from '@/schemas/program';
 import type { Block } from '@/schemas/block';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas, type BlockCanvasHandle } from '@/teacher/lesson-canvas/mount-page';
@@ -120,11 +121,15 @@ export async function renderPageEditor(
     ]);
     if (!project) throw new Error('Project not found');
     if (project.type === 'excursion') {
-      const template =
-        templates?.excursion_templates.find(
-          (item: ExcursionTemplate) => item.id === project.competition_or_event_type
-        ) ?? templates?.excursion_templates[0];
-      paintExcursionPage(canvas, project, tasks, template, reload, options.header);
+      const [template, programs] = await Promise.all([
+        Promise.resolve(
+          templates?.excursion_templates.find(
+            (item: ExcursionTemplate) => item.id === project.competition_or_event_type
+          ) ?? templates?.excursion_templates[0]
+        ),
+        tasksApi.listPrograms().catch(() => [] as Program[])
+      ]);
+      paintExcursionPage(canvas, project, tasks, template, reload, options.header, programs);
       return;
     }
     paintProjectPage(canvas, project, tasks, options.header);

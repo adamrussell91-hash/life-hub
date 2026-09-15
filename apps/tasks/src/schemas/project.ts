@@ -144,7 +144,9 @@ export const ProjectSchema = z.object({
   active_escalation: ActiveEscalationSchema.nullable().default(null),
   muster_log: z.array(MusterLogEntrySchema).optional(),
   /** Post — the excursion folder checklist (excursion only). */
-  folder_items: z.array(FolderItemSchema).optional()
+  folder_items: z.array(FolderItemSchema).optional(),
+  // Catalogue link — which Program (competition/program catalogue entry) this excursion is for.
+  linked_program_id: z.string().nullable().default(null)
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -196,7 +198,8 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   day_of_muster: true,
   active_escalation: true,
   muster_log: true,
-  folder_items: true
+  folder_items: true,
+  linked_program_id: true
 }).extend({
   title: z.string().min(1)
 });

@@ -2,12 +2,14 @@ import type { Project, ProjectStatus, PermissionNote } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate } from '@/schemas/templates';
 import type { Block } from '@/schemas/block';
+import type { Program } from '@/schemas/program';
 import { nextBlockIdFactory } from '@/teacher/lesson-canvas/drop';
 import { mountBlockCanvas } from '@/teacher/lesson-canvas/mount-page';
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import { tasksApi } from '@/services/client-api';
 import {
   formatRelativeUpdated,
+  programHash,
   projectProgress,
   statusBadgeClass,
   statusLabel,
@@ -399,7 +401,8 @@ export function paintExcursionPage(
   tasks: Task[],
   _template: ExcursionTemplate | undefined,
   onReload: () => Promise<void>,
-  header?: HTMLElement
+  header?: HTMLElement,
+  programs: Program[] = []
 ): void {
   let current = project;
   let saveTimer: number | undefined;
@@ -426,7 +429,8 @@ export function paintExcursionPage(
           day_of_muster: current.day_of_muster,
           active_escalation: current.active_escalation,
           muster_log: current.muster_log,
-          folder_items: current.folder_items
+          folder_items: current.folder_items,
+          linked_program_id: current.linked_program_id
         })
         .then(
           (next) => {
@@ -496,7 +500,30 @@ export function paintExcursionPage(
     project.status,
     (value) => persist({ status: value as ProjectStatus })
   );
-  fields.append(status.el);
+  const programLink = el('a', 'page-card__program-link') as HTMLAnchorElement;
+  const paintProgramLink = () => {
+    const linked = programs.find((item) => item.id === current.linked_program_id);
+    programLink.hidden = !linked;
+    if (linked) {
+      programLink.href = programHash(linked.id);
+      programLink.textContent = `View ${linked.name} in the catalogue →`;
+    }
+  };
+  const program = pageFilter(
+    'page-card__program',
+    'Program',
+    [
+      { value: '', label: 'No linked program' },
+      ...programs.map((item) => ({ value: item.id, label: item.name }))
+    ],
+    project.linked_program_id ?? '',
+    (value) => {
+      persist({ linked_program_id: value || null });
+      paintProgramLink();
+    }
+  );
+  paintProgramLink();
+  fields.append(status.el, program.el);
 
   const confirmHost = el('div', 'excursion-confirm');
   const reload = () => onReload();
@@ -526,6 +553,7 @@ export function paintExcursionPage(
   card.append(
     head,
     fields,
+    programLink,
     gateHost,
     renderProgress(project, tasks),
     renderComplianceSection(project, persist, refreshGate),
