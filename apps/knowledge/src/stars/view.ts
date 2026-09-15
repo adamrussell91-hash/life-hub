@@ -3,8 +3,11 @@ import type { PageManifestEntry } from "../domain/page";
 import { escapeHtml, showToast } from "../lib/dom";
 import type { ChatPhase } from "../api/client";
 import { listSavedConstellations, researchStars, saveConstellation } from "./client";
-import { mountStarsSky, mountStarsSymbol } from "./canvas";
+import { mountStarsSymbol } from "./canvas";
+import { mountStarsPanorama, type PanoramaController } from "./panorama";
 import { mountHorizonArc, type HorizonArc } from "./horizon";
+import { buildSkyIndex, skyIndexRange } from "./skyIndex";
+import { currentMonthIndex } from "./timeline";
 import type { SavedConstellation, StarsNote, StarsProposal, StarsRelation } from "./schema";
 
 type GraphExitMode = "constellation" | "showAll" | "universe";
@@ -94,10 +97,10 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   let query = "";
   let error = "";
   let phase: ChatPhase | null = null;
-  let month = new Date().getMonth();
-  let year = new Date().getFullYear();
+  let centerMonthIndex = currentMonthIndex();
   let fullscreen = false;
   let canvasTeardown: (() => void) | null = null;
+  let panoramaController: PanoramaController | null = null;
   let horizonArc: HorizonArc | null = null;
   let stopped = false;
 
@@ -267,7 +270,6 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
   }
 
   function renderSky() {
-    const dateFor = (m: number) => new Date(Date.UTC(year, m, 15, 12));
     const totalNotes = options.entries.length;
     const meta = saved.length
       ? `${saved.length} constellation${saved.length === 1 ? "" : "s"} charted · ${totalNotes} note${totalNotes === 1 ? "" : "s"} in your archive`
@@ -283,33 +285,32 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
         <button type="button" class="btn btn--ghost stars-fullscreen-btn" data-stars-fullscreen aria-pressed="false">Full screen</button>
       </div>
       ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
-      <section class="stars-sky" data-stars-sky aria-label="Saved constellations and unconnected note stars"></section>
+      <section class="stars-sky" data-stars-sky aria-label="Night sky: saved constellations and notes"></section>
       <div class="stars-horizon-row">
-        <button type="button" class="stars-horizon-year btn btn--ghost" data-stars-year="prev" aria-label="Previous year">‹ ${year - 1}</button>
-        <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through the year"></div>
-        <button type="button" class="stars-horizon-year btn btn--ghost" data-stars-year="next" aria-label="Next year">${year + 1} ›</button>
+        <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through time"></div>
       </div>
       <button type="button" class="stars-fullscreen-exit btn btn--ghost" data-stars-exit-fullscreen hidden>Exit full screen</button>
     </div>`);
     const sky = host.querySelector<HTMLElement>("[data-stars-sky]")!;
 
-    let mountedMonth = -1;
-    function mountSky(m: number) {
-      if (m === mountedMonth) return;
-      mountedMonth = m;
-      teardownCanvas();
-      canvasTeardown = mountStarsSky(sky, saved, dateFor(m), item => {
+    panoramaController = mountStarsPanorama(sky, saved, options.entries, centerMonthIndex, {
+      onSelectConstellation: item => {
         selected = item;
         selectedNote = item.notes[0] ?? null;
         selectedRelation = item.relations.find(relation => relation.sourceId === selectedNote?.pageId || relation.targetId === selectedNote?.pageId);
         screen = "detail";
         render();
-      });
-      if (!saved.length) {
-        sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
-      }
+      },
+      onCenterChange: next => {
+        centerMonthIndex = next;
+        horizonArc?.setMonthIndex(next);
+      },
+    });
+    canvasTeardown = () => panoramaController?.destroy();
+
+    if (!saved.length && !options.entries.length) {
+      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
     }
-    mountSky(month);
 
     host.querySelector<HTMLFormElement>("[data-stars-search]")!.onsubmit = event => {
       event.preventDefault();
@@ -317,20 +318,19 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       void create(input?.value ?? "");
     };
 
+    const skyIndex = buildSkyIndex(options.entries, saved);
+    const range = skyIndexRange(skyIndex, currentMonthIndex());
     teardownHorizon();
     const horizonHost = host.querySelector<HTMLElement>("[data-stars-horizon]")!;
     horizonArc = mountHorizonArc(horizonHost, {
-      month,
-      year,
-      onChange: mountSky,
-      onCommit: next => { month = next; },
-    });
-
-    host.querySelectorAll<HTMLButtonElement>("[data-stars-year]").forEach(button => {
-      button.onclick = () => {
-        year += button.dataset.starsYear === "prev" ? -1 : 1;
-        render();
-      };
+      monthIndex: centerMonthIndex,
+      minMonthIndex: range.min - 2,
+      maxMonthIndex: range.max + 2,
+      onChange: next => {
+        centerMonthIndex = next;
+        panoramaController?.setCenterMonthIndex(next);
+      },
+      onCommit: next => { centerMonthIndex = next; },
     });
 
     host.querySelectorAll<HTMLButtonElement>("[data-stars-fullscreen]").forEach(button => {
