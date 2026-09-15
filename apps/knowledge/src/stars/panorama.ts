@@ -165,34 +165,60 @@ export function mountStarsPanorama(
   }
 
   function hazeBuckets(): MonthBucket[] {
-    return [...skyIndex.values()].filter(bucket => Math.abs(bucket.monthIndex - center) > RESOLVED_BUFFER_MONTHS);
+    const result: MonthBucket[] = [];
+    for (const bucket of skyIndex.values()) {
+      if (Math.abs(bucket.monthIndex - center) > RESOLVED_BUFFER_MONTHS) result.push(bucket);
+    }
+    return result;
   }
 
-  function layoutHits() {
-    hitLayer.innerHTML = "";
-    for (const item of resolvedItems()) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = item.kind === "constellation" ? "stars-panorama__hit is-constellation" : "stars-panorama__hit is-note";
+  const hitPool = new Map<string, HTMLButtonElement>();
+
+  function keyFor(item: ResolvedItem): string {
+    return `${item.kind}:${item.id}`;
+  }
+
+  function createHitButton(item: ResolvedItem): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = item.kind === "constellation" ? "stars-panorama__hit is-constellation" : "stars-panorama__hit is-note";
+    button.setAttribute("aria-label", item.kind === "constellation" ? `Open ${item.title}` : item.title);
+    const reveal = () => {
+      if (item.kind === "note") popover.showNote({ pageId: item.id, title: item.title, excerpt: "", role: "" }, button);
+      else if (item.constellation) popover.showConstellation(item.constellation, button, () => handlers.onSelectConstellation(item.constellation!));
+    };
+    button.addEventListener("pointerenter", event => { if (event.pointerType === "mouse") reveal(); });
+    button.addEventListener("focus", reveal);
+    button.addEventListener("pointerleave", () => popover.hideSoon());
+    button.addEventListener("blur", () => popover.hideSoon());
+    if (item.kind === "constellation") button.onclick = () => handlers.onSelectConstellation(item.constellation!);
+    return button;
+  }
+
+  function syncHits(items: ResolvedItem[]) {
+    const seen = new Set<string>();
+    for (const item of items) {
+      const key = keyFor(item);
+      seen.add(key);
+      let button = hitPool.get(key);
+      if (!button) {
+        button = createHitButton(item);
+        hitPool.set(key, button);
+        hitLayer.append(button);
+      }
       button.style.left = `${item.screenX}px`;
       button.style.top = `${item.screenY}px`;
-      button.setAttribute("aria-label", item.kind === "constellation" ? `Open ${item.title}` : item.title);
-      const reveal = () => {
-        if (item.kind === "note") popover.showNote({ pageId: item.id, title: item.title, excerpt: "", role: "" }, button);
-        else if (item.constellation) popover.showConstellation(item.constellation, button, () => handlers.onSelectConstellation(item.constellation!));
-      };
-      button.addEventListener("pointerenter", event => { if (event.pointerType === "mouse") reveal(); });
-      button.addEventListener("focus", reveal);
-      button.addEventListener("pointerleave", () => popover.hideSoon());
-      button.addEventListener("blur", () => popover.hideSoon());
-      if (item.kind === "constellation") button.onclick = () => handlers.onSelectConstellation(item.constellation!);
-      hitLayer.append(button);
+    }
+    for (const [key, button] of hitPool) {
+      if (!seen.has(key)) {
+        button.remove();
+        hitPool.delete(key);
+      }
     }
   }
 
   function onPointerDown(event: PointerEvent) {
     if (event.button !== undefined && event.button !== 0) return;
-    if (event.target instanceof Element && event.target.closest(".stars-panorama__hit")) return;
     dragging = true;
     velocity = 0;
     dragLast = event.clientX;
@@ -205,11 +231,13 @@ export function mountStarsPanorama(
     const delta = -monthDeltaForPixels(dx, MONTH_WIDTH_PX);
     setCenter(center + delta);
     velocity = delta;
+    syncHits(resolvedItems());
   }
   function onPointerUp(event: PointerEvent) {
     if (!dragging) return;
     dragging = false;
     try { canvas.releasePointerCapture(event.pointerId); } catch { /* already released */ }
+    syncHits(resolvedItems());
   }
   canvas.addEventListener("pointerdown", onPointerDown);
   canvas.addEventListener("pointermove", onPointerMove);
@@ -221,8 +249,9 @@ export function mountStarsPanorama(
     if (!dragging && Math.abs(velocity) > 0) {
       setCenter(center + velocity);
       velocity = stepInertia(velocity, FRICTION, MIN_VELOCITY);
-      layoutHits();
     }
+    const items = resolvedItems();
+    syncHits(items);
     const context = canvas.getContext("2d")!;
     const { width, height } = size;
     context.clearRect(0, 0, width, height);
@@ -235,7 +264,7 @@ export function mountStarsPanorama(
       if (x < -80 || x > width + 80) continue;
       drawHaze(context, x, height * 0.5, bucket.notes.length + bucket.constellations.length, colors.gold);
     }
-    for (const item of resolvedItems()) {
+    for (const item of items) {
       if (item.kind === "constellation" && item.constellation) {
         drawGlyph(context, item.constellation, item.screenX, item.screenY, colors.gold);
       } else {
@@ -263,7 +292,7 @@ export function mountStarsPanorama(
     size = { width, height };
     colors = { onDark: css("--on-dark", "white"), gold: css("--pastel-gold", "white") };
     dust = buildDust(934857, width, height, Math.max(220, Math.round((width * height) / 4200)));
-    layoutHits();
+    syncHits(resolvedItems());
     if (reduced) frame(0);
   };
 
@@ -276,7 +305,7 @@ export function mountStarsPanorama(
     setCenterMonthIndex(monthIndex) {
       velocity = 0;
       setCenter(monthIndex);
-      layoutHits();
+      syncHits(resolvedItems());
     },
     getCenterMonthIndex() {
       return center;
@@ -290,6 +319,7 @@ export function mountStarsPanorama(
       canvas.removeEventListener("pointerup", onPointerUp);
       canvas.removeEventListener("pointercancel", onPointerUp);
       hitLayer.innerHTML = "";
+      hitPool.clear();
     },
   };
 }
