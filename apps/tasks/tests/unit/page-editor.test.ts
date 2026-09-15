@@ -16,7 +16,8 @@ vi.mock('@/services/client-api', () => ({
     createTask: vi.fn(),
     updateProject: vi.fn(),
     deleteProject: vi.fn(),
-    listTemplates: vi.fn()
+    listTemplates: vi.fn(),
+    listPrograms: vi.fn()
   }
 }));
 
@@ -374,6 +375,7 @@ describe('page editor', () => {
       }
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.updateProject).mockResolvedValue({
       ...excursion,
       updated_at: '2026-08-28T00:00:00.000Z'
@@ -475,6 +477,7 @@ describe('page editor', () => {
       source: 'auto_generated_from_excursion'
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
     vi.mocked(tasksApi.listTemplates).mockResolvedValue({
       frameworks: [],
@@ -527,6 +530,7 @@ describe('page editor', () => {
       source: 'auto_generated_from_excursion'
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([existing]);
     vi.mocked(tasksApi.listTemplates).mockResolvedValue({
       frameworks: [],
@@ -581,6 +585,7 @@ describe('page editor', () => {
       source: 'auto_generated_from_excursion'
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([existing, permission]);
     vi.mocked(tasksApi.listTemplates).mockResolvedValue({
       frameworks: [],
@@ -634,6 +639,7 @@ describe('page editor', () => {
       permission_notes: []
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
     vi.mocked(tasksApi.listTemplates).mockResolvedValue({
       frameworks: [],
@@ -680,6 +686,7 @@ describe('page editor', () => {
       competition_or_event_type: 'ext_excursion'
     };
     vi.mocked(tasksApi.getProject).mockResolvedValue(excursion);
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
     vi.mocked(tasksApi.listTemplates).mockResolvedValue({
       frameworks: [],

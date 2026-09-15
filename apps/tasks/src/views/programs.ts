@@ -1,4 +1,5 @@
 import type { Program } from '@/schemas/program';
+import type { Project } from '@/schemas/project';
 import {
   PROGRAM_AGE_GROUPS,
   PROGRAM_COST_BASES,
@@ -16,6 +17,7 @@ import {
   type ProgramSort
 } from '@/domain/programs';
 import { hashQuery } from '@/shell/shell';
+import { projectPageHash } from '@/domain/cards';
 import { showConfirmWrite } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
@@ -167,8 +169,7 @@ function renderToolbar(
     id: 'programs',
     ariaLabel: 'Filters',
     active: Boolean(
-      state.filters.query?.trim() ||
-        state.filters.type ||
+      state.filters.type ||
         state.filters.subject ||
         state.filters.month ||
         state.filters.age_group ||
@@ -178,10 +179,12 @@ function renderToolbar(
         state.filters.nsw
     )
   });
-  collapsed.panel.append(search.el, filters);
+  collapsed.panel.append(filters);
+  const searchRow = el('div', 'catalog-toolbar__row');
+  searchRow.append(search.el, collapsed.root);
   const controls = el('div', 'catalog-toolbar__row');
   controls.append(sortPills, viewPills, add);
-  wrap.append(collapsed.root, controls);
+  wrap.append(searchRow, controls);
   return wrap;
 }
 
@@ -263,11 +266,67 @@ function propertyRow(label: string, value: string | HTMLElement | null | undefin
   return row;
 }
 
+function renderLinkedExcursions(
+  program: Program,
+  excursions: Project[],
+  onChange: (patch: { excursionId: string; linked: boolean }) => void
+): HTMLElement {
+  const host = el('section', 'catalog-links');
+  host.append(el('p', 'page-header__eyebrow', 'Linked excursions'));
+
+  const linked = excursions.filter((item) => item.linked_program_id === program.id);
+  const unlinked = excursions.filter(
+    (item) => item.type === 'excursion' && item.linked_program_id !== program.id
+  );
+
+  const list = el('ul', 'catalog-links__list');
+  if (!linked.length) {
+    list.append(el('li', 'empty-state empty-state--compact', 'No excursions linked yet.'));
+  } else {
+    for (const excursion of linked) {
+      const item = el('li', 'catalog-links__item');
+      const link = document.createElement('a');
+      link.href = projectPageHash(excursion.id);
+      link.textContent = excursion.title;
+      const unlink = el('button', 'btn btn--ghost', 'Unlink');
+      unlink.type = 'button';
+      unlink.addEventListener('click', () => onChange({ excursionId: excursion.id, linked: false }));
+      item.append(link, unlink);
+      list.append(item);
+    }
+  }
+  host.append(list);
+
+  if (unlinked.length) {
+    const picker = createHubFilter({
+      key: 'Link excursion',
+      label: 'Link excursion',
+      defaultValue: '',
+      options: [
+        { value: '', label: 'Choose an excursion…' },
+        ...unlinked.map((item) => ({ value: item.id, label: item.title }))
+      ],
+      value: '',
+      onChange: (value) => {
+        if (!value) return;
+        onChange({ excursionId: value, linked: true });
+      }
+    });
+    const pickerRow = el('div', 'catalog-links__picker');
+    pickerRow.append(picker.el);
+    host.append(pickerRow);
+  }
+
+  return host;
+}
+
 function renderDetail(
   program: Program,
+  excursions: Project[],
   overlay: HTMLElement,
   onClose: () => void,
-  onDelete: () => void
+  onDelete: () => void,
+  onLinkChange: (patch: { excursionId: string; linked: boolean }) => void
 ): HTMLElement {
   const card = el('section', 'catalog-overlay__card task-row');
   card.setAttribute('role', 'dialog');
@@ -299,6 +358,7 @@ function renderDetail(
   ].filter((row): row is HTMLElement => Boolean(row));
   for (const row of rows) dl.append(row);
   card.append(dl);
+  card.append(renderLinkedExcursions(program, excursions, onLinkChange));
 
   if (isMappablePlace(program.location)) {
     const map = createViewOnMap({
@@ -497,9 +557,21 @@ function renderAddForm(
   });
 }
 
+async function applyLinkChange(
+  program: Program,
+  patch: { excursionId: string; linked: boolean },
+  reload: () => void
+): Promise<void> {
+  await tasksApi.updateProject(patch.excursionId, {
+    linked_program_id: patch.linked ? program.id : null
+  });
+  reload();
+}
+
 function paintList(
   host: HTMLElement,
   state: CatalogState,
+  excursions: Project[],
   overlay: HTMLElement,
   confirmHost: HTMLElement,
   reload: () => void
@@ -513,6 +585,7 @@ function paintList(
   const open = (program: Program) => {
     const card = renderDetail(
       program,
+      excursions,
       overlay,
       () => session.close(),
       () => {
@@ -527,7 +600,8 @@ function paintList(
           },
           'Delete'
         );
-      }
+      },
+      (patch) => void applyLinkChange(program, patch, reload)
     );
     const session = openOverlay(overlay, card);
   };
@@ -542,7 +616,11 @@ function paintList(
 
 export async function renderProgramsView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren();
-  const programs = await tasksApi.listPrograms();
+  const [programs, projects] = await Promise.all([
+    tasksApi.listPrograms(),
+    tasksApi.listProjects().catch(() => [] as Project[])
+  ]);
+  const excursions = projects.filter((item) => item.type === 'excursion');
   const state: CatalogState = {
     programs,
     filters: {},
@@ -558,7 +636,7 @@ export async function renderProgramsView(canvas: HTMLElement): Promise<void> {
   const paint = () => {
     const items = visiblePrograms(state);
     status.textContent = `${items.length} of ${state.programs.length} in the catalogue.`;
-    paintList(list, state, overlay, confirmHost, () => void renderProgramsView(canvas));
+    paintList(list, state, excursions, overlay, confirmHost, () => void renderProgramsView(canvas));
   };
 
   const toolbar = renderToolbar(
@@ -575,6 +653,7 @@ export async function renderProgramsView(canvas: HTMLElement): Promise<void> {
     if (match) {
       const card = renderDetail(
         match,
+        excursions,
         overlay,
         () => session.close(),
         () => {
@@ -589,7 +668,8 @@ export async function renderProgramsView(canvas: HTMLElement): Promise<void> {
             },
             'Delete'
           );
-        }
+        },
+        (patch) => void applyLinkChange(match, patch, () => void renderProgramsView(canvas))
       );
       const session = openOverlay(overlay, card);
     }

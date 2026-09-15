@@ -479,7 +479,8 @@ export function layoutGantt(rows: GanttRow[], options: LayoutGanttOptions = {}):
     key_dates: null,
     student_group_reference: null,
     generated_admin_tasks: [],
-    drafted_documents: null
+    drafted_documents: null,
+    linked_program_id: null
   };
   return layoutGanttGroups([{ project, rows }], { ...options, collapsedGroups: [] });
 }
