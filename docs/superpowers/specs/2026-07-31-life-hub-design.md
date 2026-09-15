@@ -188,3 +188,16 @@ Tests use fixtures or a separate test repository. They never write production da
 The first release is complete when all specified domain views render correct fixture-derived values; missing and empty data follow their distinct rules; chat creates one valid, idempotent event and refreshes affected views; every supported trigger selects the correct voice and colour; ambiguous routing asks; all error states are recoverable; no secret appears in browser requests, source maps, bundles, repository files, or logs; accessibility checks have no critical findings; and the Netlify preview passes the complete automated and desktop/iPhone acceptance suite.
 
 Production secrets are then supplied, the health and write pipelines are verified against the private repository, and the known-good preview is promoted. Rollback redeploys the prior app commit without rolling back data files.
+
+
+## Chronological views (Clinical Thread)
+
+Chronological narrative surfaces use the **Clinical Thread** pattern: a restrained vertical `--wave` spine, small nodes, readable date labels, compact existing-style cards, and a group heading that remains visually anchored on desktop. The pattern borrows the progression of a scroll-following timeline, not its gallery-scale imagery or a new component library.
+
+- **Content first:** every event exposes date, title, and key metadata as text. Nodes, colour, and motion are supplementary only.
+- **Existing tokens:** use the Clinical Glass type, glass, shadow, and state tokens. Do not create a timeline palette.
+- **Motion:** a single entry/filter-change reveal is allowed; `prefers-reduced-motion: reduce` shows the final state immediately. No looping or ornamental animation.
+- **Responsive:** desktop can retain a sticky group label; at 390 px, labels flow above events and all controls and dates remain visible without horizontal overflow.
+- **Semantics:** retain the host’s list, heading, button, link, selection, and expanded-state semantics. Relationship states and medical flags must never be colour-only.
+
+Use Clinical Thread for Medical Overview history, Professional relationship history, Teaching timeline blocks, and the card/group treatment around Knowledge University milestones. It does **not** replace Tasks Hub’s horizontal date-bar Timeline or Gantt, Teaching Scope & Sequence’s draggable week grid, or Knowledge Hub’s zoomable study canvas. Those are spatial planning tools and retain their specialised geometry and controls.
