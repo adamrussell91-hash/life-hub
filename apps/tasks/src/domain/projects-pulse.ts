@@ -4,7 +4,7 @@ import type { Task } from '@/schemas/task';
 import { computeProjectVariance } from '@/domain/closure';
 import { projectChildTasks, projectProgress } from '@/domain/cards';
 import { projectMilestones } from '@/domain/project-milestones';
-import { lastProjectActivityAt } from '@/domain/stall';
+import { lastProjectActivityAt, type StallCandidate } from '@/domain/stall';
 import { addDays, parseDue, startOfDay } from '@/domain/queries';
 
 export const SUSTAINABLE_RUNNING_LOAD = 3;
@@ -553,6 +553,64 @@ export function findRetroCandidate(
     }
   }
   return nearest;
+}
+
+export type ForecastKind = 'overdue_milestone' | 'upcoming_milestone' | 'stalled';
+
+export type ForecastItem = {
+  kind: ForecastKind;
+  project: Project;
+  label: string;
+  /** Negative = overdue / days idle, 0 = today, positive = days ahead. Sort key. */
+  daysOut: number;
+  stall?: StallCandidate;
+};
+
+export const FORECAST_HORIZON_DAYS = 21;
+
+/**
+ * "Is anything about to slip" in one sorted list — every open milestone due
+ * within FORECAST_HORIZON_DAYS (overdue ones included with no lower bound,
+ * so nothing silently drops off), plus every stalled project, most urgent
+ * first. Distinct from findRetroCandidate, which surfaces one project to
+ * prompt a close-out write-up rather than a full scan.
+ */
+export function buildProjectForecast(
+  cards: ProjectPulseCard[],
+  stalled: StallCandidate[],
+  now: Date = new Date()
+): ForecastItem[] {
+  const today = startOfDay(now);
+  const items: ForecastItem[] = [];
+
+  for (const card of cards) {
+    if (card.lifecycle === 'completed' || card.lifecycle === 'stalled') continue;
+    for (const milestone of projectMilestones(card.project)) {
+      if (milestone.status !== 'open') continue;
+      const due = parseDue(milestone.due_date);
+      if (!due) continue;
+      const daysOut = Math.round((startOfDay(due).getTime() - today.getTime()) / 86_400_000);
+      if (daysOut > FORECAST_HORIZON_DAYS) continue;
+      items.push({
+        kind: daysOut < 0 ? 'overdue_milestone' : 'upcoming_milestone',
+        project: card.project,
+        label: milestone.title,
+        daysOut
+      });
+    }
+  }
+
+  for (const candidate of stalled) {
+    items.push({
+      kind: 'stalled',
+      project: candidate.project,
+      label: `${candidate.open_task_count} open task${candidate.open_task_count === 1 ? '' : 's'} · no activity in ${candidate.idle_days}d`,
+      daysOut: -candidate.idle_days,
+      stall: candidate
+    });
+  }
+
+  return items.sort((a, b) => a.daysOut - b.daysOut);
 }
 
 export function matchesProjectQuery(project: Project, query: string): boolean {
