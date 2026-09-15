@@ -289,6 +289,46 @@ describe('page editor', () => {
     expect(canvas.querySelector('[data-task-id="task_existing"]')).not.toBeNull();
   });
 
+  it('shows completion and the saved updated time immediately on a project task card', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-15T12:00:00.000Z'));
+    const existing: Task = {
+      ...task(),
+      id: 'task_existing',
+      title: 'Draft accreditation brief',
+      parent_project_id: project.id
+    };
+    const completed: Task = {
+      ...existing,
+      status: 'done',
+      completed_at: '2026-09-15T12:00:00.000Z',
+      updated_at: '2026-09-15T12:00:00.000Z'
+    };
+    vi.mocked(tasksApi.getProject).mockResolvedValue(project);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([existing]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [],
+      task_templates: [],
+      project_templates: []
+    });
+    vi.mocked(tasksApi.updateTask).mockResolvedValue(completed);
+
+    const canvas = document.createElement('main');
+    await renderPageEditor(canvas, { kind: 'project', id: project.id });
+
+    const card = canvas.querySelector<HTMLElement>('[data-task-id="task_existing"]')!;
+    card.querySelector<HTMLButtonElement>('.card-menu')!.click();
+    document.querySelector<HTMLButtonElement>('[data-card-menu-item="toggle"]')!.click();
+
+    await vi.waitFor(() => {
+      const refreshed = canvas.querySelector<HTMLElement>('[data-task-id="task_existing"]')!;
+      expect(refreshed.querySelector('.status-badge--done')?.textContent).toBe('Done');
+      expect(refreshed.querySelector('.hub-row__updated')?.textContent).toBe('Updated just now');
+    });
+    expect(tasksApi.updateTask).toHaveBeenCalledWith('task_existing', { status: 'done' });
+  });
+
   it('opens the add form from Add next action on a project page', async () => {
     const emptyProject: Project = { ...project, id: 'proj_empty', title: 'Accreditation Mentoring' };
     vi.mocked(tasksApi.getProject).mockResolvedValue(emptyProject);
