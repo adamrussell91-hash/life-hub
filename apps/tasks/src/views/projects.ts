@@ -39,8 +39,6 @@ import {
 import { createPlusAdd } from '@/views/plus-add';
 import { inspectProjectHealth } from '@/domain/project-health';
 import { projectMilestones } from '@/domain/project-milestones';
-import { activeProjectMeter } from '@/domain/hammond-portfolio';
-import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
 /** Quiet when healthy; a real control when the project has no next action. */
@@ -74,6 +72,8 @@ const DRIFT_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h10"/><path d="m10 7 5 5-5 5"/><path d="M20 5v14"/></svg>';
 const LINK_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h9v9"/><path d="M18 4 9 13"/><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>';
+const ENERGY_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>';
 
 type PulseContext = {
   projects: Project[];
@@ -206,14 +206,6 @@ function renderTensionBanner(message: string, onDismiss: () => void): HTMLElemen
   return banner;
 }
 
-function milestoneTint(index: number): string {
-  return ['tint-blue', 'tint-peach', 'tint-gold', 'tint-lilac', 'tint-sage'][index % 5]!;
-}
-
-function energyTint(energy: ProjectPulseCard['energy']): string {
-  return energy === 'deep_focus' ? 'tint-blue' : 'tint-gold';
-}
-
 type ProjectBoardActions = {
   onReload: () => void;
   onDeleted: (projectId: string) => void;
@@ -274,12 +266,7 @@ function renderProjectBoardCard(
   top.append(title);
   const healthHint = projectNextActionHealth(card.project, tasks);
   if (healthHint) top.append(healthHint);
-  if (card.lifecycle === 'stalled') {
-    top.append(el('span', 'status-badge tint-peach', 'Stalled'));
-  } else {
-    const energy = el('span', `hub-chip ${energyTint(card.energy)}`, card.energyLabel);
-    top.append(energy);
-  }
+  top.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
   article.append(top);
 
   const desc = card.project.arc_summary || card.project.description;
@@ -323,6 +310,10 @@ function renderProjectBoardCard(
   linked.append(svgIcon(LINK_ICON), el('span', undefined, card.linkedLabel));
   article.append(linked);
 
+  const energy = el('div', 'meta-line');
+  energy.append(svgIcon(ENERGY_ICON), el('span', undefined, card.energyLabel));
+  article.append(energy);
+
   if (card.project.current_end_date || card.project.baseline_end_date) {
     const due = el('div', 'meta-line');
     due.append(
@@ -336,12 +327,14 @@ function renderProjectBoardCard(
     article.append(due);
   }
 
-  const chips = el('div', 'pcard__row');
-  chips.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
-  projectMilestones(card.project).slice(0, 3).forEach((milestone, index) => {
-    chips.append(el('span', `hub-chip ${milestoneTint(index)}`, milestone.title));
-  });
-  article.append(chips);
+  const milestones = projectMilestones(card.project).slice(0, 3);
+  if (milestones.length) {
+    const chips = el('div', 'pcard__row pcard__milestones');
+    milestones.forEach((milestone) => {
+      chips.append(el('span', 'pcard__milestone', milestone.title));
+    });
+    article.append(chips);
+  }
 
   const actions = el('div', 'pcard__row pcard__actions');
   const open = el('button', 'btn btn--ghost', 'Open page');
@@ -736,13 +729,20 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       active: Boolean(projectQuery.trim())
     });
     filters.panel.append(search.el);
-    toolbar.append(
-      filters.root,
-      createHubPills({
-        label: 'Group by',
+    const groupByRow = el('div', 'projects-groupby');
+    const statusToggle = el('button', `btn ${groupBy === 'status' ? 'btn--primary' : 'btn--ghost'}`, 'Status');
+    statusToggle.type = 'button';
+    statusToggle.setAttribute('aria-pressed', groupBy === 'status' ? 'true' : 'false');
+    statusToggle.addEventListener('click', () => {
+      groupBy = 'status';
+      paint();
+    });
+    groupByRow.append(
+      statusToggle,
+      createHubPills<ProjectsGroupBy>({
+        label: 'Group by (more)',
         role: 'tablist',
         items: [
-          { id: 'status', label: 'Status' },
           { id: 'energy', label: 'Energy' },
           { id: 'goal', label: 'Goal area' },
           { id: 'deadline', label: 'Deadline' }
@@ -752,14 +752,15 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
           groupBy = id;
           paint();
         }
-      }),
-      renderQuickAddProject(ctx.goals, acceptProject)
+      })
     );
+    toolbar.append(filters.root, groupByRow, renderQuickAddProject(ctx.goals, acceptProject));
     canvas.append(toolbar);
-    const meter = activeProjectMeter(ctx.projects, planningProfile);
-    const meterHost = el('div', 'projects-meter-host');
-    meterHost.append(createActiveProjectsMeter(document, { meter }));
-    canvas.append(meterHost);
+    // No separate "active projects, limit not set" meter here — the mix
+    // chart below already covers "how many running, is that sustainable"
+    // with an actual per-status breakdown, which made this card pure
+    // duplicate chrome on this page specifically (still used as-is on
+    // Goals, which has no equivalent chart).
     canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
 
     const pulse = el('div', 'projects-pulse');
