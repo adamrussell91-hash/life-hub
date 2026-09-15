@@ -32,6 +32,7 @@ export function createEntityOverviewHandler(deps = {}) {
       try {
         const overview = await assembleEntityOverview(raw, {
           store,
+          env,
           resolveEntity,
           createRepository,
           timelineLimit: Number.isInteger(parsedLimit) ? parsedLimit : undefined,

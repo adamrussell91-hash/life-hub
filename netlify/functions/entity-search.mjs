@@ -21,6 +21,7 @@ import {
   applicationKey
 } from './_shared/professional-blobs.mjs';
 import { parseApplicationRecord } from './_shared/application-schema.mjs';
+import { listGithubOrganisationCandidates, listGithubPersonCandidates } from './_shared/github-professional-data.mjs';
 
 export const config = { path: '/api/entities/search' };
 
@@ -110,6 +111,39 @@ async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthorita
   });
 
   return hydrated.filter(Boolean);
+}
+
+// Read-only supplement drawing candidates from the GitHub-canonical
+// Professional import (github-professional-data.mjs) instead of Blobs —
+// the same index-then-hydrate split isn't needed here since the whole
+// import is small enough (351 people, 18 organisations) to rank directly,
+// but the output shape and ranking rule are identical to
+// `searchIdentityKind`'s, so results interleave with native ones exactly
+// as if they were one list.
+async function searchGithubIdentityKind(kind, query, includeArchived, github) {
+  const candidates = kind === 'person'
+    ? await listGithubPersonCandidates(github)
+    : await listGithubOrganisationCandidates(github);
+
+  const out = [];
+  for (const record of candidates) {
+    const visible = record.lifecycle_status === 'active' || (includeArchived && record.lifecycle_status === 'archived');
+    if (!visible) continue;
+    const label = displayLabelFor(record);
+    const rank = matchRank(query, label, kind === 'person' ? record.sort_name : null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'shared', kind, id: record.id }),
+      kind,
+      display_label: label,
+      supporting_label: kind === 'person' && record.is_self ? 'self' : null,
+      href: kind === 'person' ? personHref(record.id) : organisationHref(record.id),
+      lifecycle_status: record.lifecycle_status,
+      visibility: 'operator'
+    });
+  }
+  return out;
 }
 
 async function searchTaskKind(getTasksStore, query) {
@@ -254,13 +288,20 @@ export function createEntitySearchHandler(deps = {}) {
 
     const requestedKinds = new Set(requestedKindsRaw);
     const includeArchived = url.searchParams.get('include_archived') === 'true';
+    const github = { env };
 
     const perKind = await Promise.all([
       requestedKinds.has('person')
-        ? searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived)
+        ? Promise.all([
+          searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived),
+          searchGithubIdentityKind('person', query, includeArchived, github)
+        ]).then(([native, githubMatches]) => [...native, ...githubMatches])
         : [],
       requestedKinds.has('organisation')
-        ? searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived)
+        ? Promise.all([
+          searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived),
+          searchGithubIdentityKind('organisation', query, includeArchived, github)
+        ]).then(([native, githubMatches]) => [...native, ...githubMatches])
         : [],
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
       requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
