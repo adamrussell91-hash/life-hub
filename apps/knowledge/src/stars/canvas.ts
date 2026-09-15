@@ -1,19 +1,19 @@
 import { buildStarsLayout } from "./templates";
 import { createStarPopover } from "./popover";
-import type { SavedConstellation, StarsNote, StarsProposal, StarsRelation } from "./schema";
+import type { StarsNote, StarsProposal, StarsRelation } from "./schema";
 
 type SymbolHandlers = {
   onSelectNote?: (note: StarsNote, relation?: StarsRelation) => void;
   onOpenNote?: (pageId: string, title: string) => void;
 };
 
-function seedOf(value: string) {
+export function seedOf(value: string) {
   let seed = 2166136261;
   for (const char of value) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
   return seed >>> 0;
 }
 
-function random(seed: number) {
+export function random(seed: number) {
   let state = seed || 1;
   return () => {
     state ^= state << 13;
@@ -23,11 +23,11 @@ function random(seed: number) {
   };
 }
 
-function css(name: string, fallback: string) {
+export function css(name: string, fallback: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-function prefersReducedMotion() {
+export function prefersReducedMotion() {
   try {
     return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
   } catch {
@@ -35,7 +35,7 @@ function prefersReducedMotion() {
   }
 }
 
-function configureCanvas(canvas: HTMLCanvasElement, hostRect?: { width: number; height: number }) {
+export function configureCanvas(canvas: HTMLCanvasElement, hostRect?: { width: number; height: number }) {
   // Measuring from a rect supplied by an un-transformed ancestor (rather than the
   // canvas's own getBoundingClientRect) keeps drawing/layout math stable even when
   // the canvas sits inside a CSS-scaled pan/zoom camera layer.
@@ -58,9 +58,9 @@ function pickTint(next: () => number) {
   return STAR_TINTS[3]!;
 }
 
-type DustStar = { x: number; y: number; r: number; phase: number; speed: number; layer: number; baseAlpha: number; color: string };
+export type DustStar = { x: number; y: number; r: number; phase: number; speed: number; layer: number; baseAlpha: number; color: string };
 
-function buildDust(seed: number, width: number, height: number, count: number): DustStar[] {
+export function buildDust(seed: number, width: number, height: number, count: number): DustStar[] {
   const next = random(seed);
   const stars: DustStar[] = [];
   for (let index = 0; index < count; index += 1) {
@@ -81,7 +81,7 @@ function buildDust(seed: number, width: number, height: number, count: number): 
   return stars;
 }
 
-function drawDust(context: CanvasRenderingContext2D, stars: DustStar[], t: number, parallax: { x: number; y: number }) {
+export function drawDust(context: CanvasRenderingContext2D, stars: DustStar[], t: number, parallax: { x: number; y: number }) {
   context.save();
   for (const star of stars) {
     const depth = star.layer === 0 ? 5 : star.layer === 1 ? 12 : 22;
@@ -109,7 +109,7 @@ function drawDust(context: CanvasRenderingContext2D, stars: DustStar[], t: numbe
   context.restore();
 }
 
-function drawNebula(context: CanvasRenderingContext2D, width: number, height: number, t: number, seed: number, colors: string[]) {
+export function drawNebula(context: CanvasRenderingContext2D, width: number, height: number, t: number, seed: number, colors: string[]) {
   const next = random(seed);
   context.save();
   context.globalCompositeOperation = "lighter";
@@ -130,7 +130,7 @@ function drawNebula(context: CanvasRenderingContext2D, width: number, height: nu
   context.restore();
 }
 
-function drawMilkyWay(context: CanvasRenderingContext2D, width: number, height: number, t: number, seed: number, color: string) {
+export function drawMilkyWay(context: CanvasRenderingContext2D, width: number, height: number, t: number, seed: number, color: string) {
   const next = random(seed);
   const angle = (-16 + next() * 32) * (Math.PI / 180);
   const cx = width / 2;
@@ -151,7 +151,7 @@ function drawMilkyWay(context: CanvasRenderingContext2D, width: number, height: 
   context.restore();
 }
 
-function drawVignette(context: CanvasRenderingContext2D, width: number, height: number) {
+export function drawVignette(context: CanvasRenderingContext2D, width: number, height: number) {
   const gradient = context.createRadialGradient(
     width / 2, height / 2, Math.min(width, height) * 0.22,
     width / 2, height / 2, Math.max(width, height) * 0.75,
@@ -164,9 +164,9 @@ function drawVignette(context: CanvasRenderingContext2D, width: number, height: 
   context.restore();
 }
 
-type ShootingStar = { x: number; y: number; vx: number; vy: number; age: number; life: number };
+export type ShootingStar = { x: number; y: number; vx: number; vy: number; age: number; life: number };
 
-function drawShootingStars(context: CanvasRenderingContext2D, stars: ShootingStar[], color: string) {
+export function drawShootingStars(context: CanvasRenderingContext2D, stars: ShootingStar[], color: string) {
   context.save();
   context.lineCap = "round";
   for (const star of stars) {
@@ -187,7 +187,7 @@ function drawShootingStars(context: CanvasRenderingContext2D, stars: ShootingSta
   context.restore();
 }
 
-function stepShootingStars(stars: ShootingStar[], width: number, height: number, next: () => number, reduced: boolean) {
+export function stepShootingStars(stars: ShootingStar[], width: number, height: number, next: () => number, reduced: boolean) {
   if (reduced) return stars;
   for (const star of stars) {
     star.x += star.vx;
@@ -210,14 +210,14 @@ function stepShootingStars(stars: ShootingStar[], width: number, height: number,
   return alive;
 }
 
-type Ripple = { x: number; y: number; age: number; life: number };
+export type Ripple = { x: number; y: number; age: number; life: number };
 
-function stepRipples(ripples: Ripple[]) {
+export function stepRipples(ripples: Ripple[]) {
   for (const ripple of ripples) ripple.age += 1;
   return ripples.filter(ripple => ripple.age < ripple.life);
 }
 
-function drawRipples(context: CanvasRenderingContext2D, ripples: Ripple[], color: string) {
+export function drawRipples(context: CanvasRenderingContext2D, ripples: Ripple[], color: string) {
   context.save();
   context.lineCap = "round";
   for (const ripple of ripples) {
@@ -245,7 +245,7 @@ function relationForSegment(proposal: StarsProposal, source: number, target: num
   );
 }
 
-function bindParallax(host: HTMLElement, reduced: boolean) {
+export function bindParallax(host: HTMLElement, reduced: boolean) {
   const target = { x: 0, y: 0 };
   const current = { x: 0, y: 0 };
   if (reduced) return { target, current, settle() {} };
@@ -389,247 +389,3 @@ export function mountStarsSymbol(host: HTMLElement, proposal: StarsProposal, han
   };
 }
 
-export function annualSkyRotation(date: Date) {
-  const start = Date.UTC(date.getUTCFullYear(), 0, 1);
-  const next = Date.UTC(date.getUTCFullYear() + 1, 0, 1);
-  const progress = (date.getTime() - start) / (next - start);
-  return progress * Math.PI * 2;
-}
-
-function rotatePoint(x: number, y: number, angle: number) {
-  const dx = x - 0.5;
-  const dy = y - 0.48;
-  return {
-    x: 0.5 + dx * Math.cos(angle) - dy * Math.sin(angle),
-    y: 0.48 + dx * Math.sin(angle) + dy * Math.cos(angle),
-  };
-}
-
-function miniSymbol(item: SavedConstellation) {
-  const layout = buildStarsLayout(item.symbol.templateId, item.notes.length);
-  const lines = layout.segments.map(segment => {
-    const start = layout.points[segment.source]!;
-    const end = layout.points[segment.target]!;
-    return `<line x1="${start.x * 100}" y1="${start.y * 70}" x2="${end.x * 100}" y2="${end.y * 70}" />`;
-  }).join("");
-  const stars = layout.points.map(point => `<circle cx="${point.x * 100}" cy="${point.y * 70}" r="1.8" />`).join("");
-  return `<svg viewBox="0 0 100 70" aria-hidden="true">${lines}${stars}</svg>`;
-}
-
-const SKY_MIN_SCALE = 1;
-const SKY_MAX_SCALE = 2.6;
-const SKY_ZOOM_STEP = 1.35;
-
-type SkyCamera = { scale: number; x: number; y: number };
-
-export function mountStarsSky(
-  host: HTMLElement,
-  constellations: SavedConstellation[],
-  date: Date,
-  onSelect: (item: SavedConstellation) => void,
-) {
-  host.innerHTML = `
-    <div class="stars-sky__camera" data-stars-camera>
-      <canvas class="stars-sky__canvas" aria-hidden="true"></canvas>
-      <div class="stars-sky__objects"></div>
-    </div>
-    <div class="stars-sky-zoom" role="group" aria-label="Sky zoom">
-      <button type="button" class="btn btn--ghost" data-stars-zoom="in" aria-label="Zoom in">+</button>
-      <button type="button" class="btn btn--ghost" data-stars-zoom="out" aria-label="Zoom out">−</button>
-      <button type="button" class="btn btn--ghost" data-stars-zoom="reset" aria-label="Reset zoom">⤾</button>
-    </div>
-  `;
-  const cameraEl = host.querySelector<HTMLElement>("[data-stars-camera]")!;
-  const canvas = host.querySelector<HTMLCanvasElement>("canvas")!;
-  const layer = host.querySelector<HTMLElement>(".stars-sky__objects")!;
-  const zoomInBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="in"]')!;
-  const zoomOutBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="out"]')!;
-  const zoomResetBtn = host.querySelector<HTMLButtonElement>('[data-stars-zoom="reset"]')!;
-  const reduced = prefersReducedMotion();
-  const popover = createStarPopover(host);
-  const parallax = bindParallax(host, reduced);
-  let stopped = false;
-  let raf = 0;
-  let size = { width: 0, height: 0 };
-  let dust: DustStar[] = [];
-  let colors = { onDark: "white", gold: "white" };
-  let shootingStars: ShootingStar[] = [];
-  let ripples: Ripple[] = [];
-  let openPopoverId: string | null = null;
-  let view: SkyCamera = { scale: SKY_MIN_SCALE, x: 0, y: 0 };
-  const angle = annualSkyRotation(date);
-  const shootSeed = random(seedOf(`${date.toISOString()}-shoot`));
-
-  function clampView(next: SkyCamera): SkyCamera {
-    const scale = Math.max(SKY_MIN_SCALE, Math.min(SKY_MAX_SCALE, next.scale));
-    const maxX = (size.width * (scale - 1)) / 2;
-    const maxY = (size.height * (scale - 1)) / 2;
-    return {
-      scale,
-      x: Math.max(-maxX, Math.min(maxX, next.x)),
-      y: Math.max(-maxY, Math.min(maxY, next.y)),
-    };
-  }
-
-  function applyView() {
-    cameraEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
-    zoomOutBtn.disabled = view.scale <= SKY_MIN_SCALE;
-    zoomInBtn.disabled = view.scale >= SKY_MAX_SCALE;
-  }
-
-  function setScale(nextScale: number) {
-    view = clampView({ ...view, scale: nextScale });
-    applyView();
-  }
-
-  zoomInBtn.onclick = () => setScale(view.scale * SKY_ZOOM_STEP);
-  zoomOutBtn.onclick = () => setScale(view.scale / SKY_ZOOM_STEP);
-  zoomResetBtn.onclick = () => {
-    view = { scale: SKY_MIN_SCALE, x: 0, y: 0 };
-    applyView();
-  };
-
-  function onWheel(event: WheelEvent) {
-    event.preventDefault();
-    setScale(view.scale * (event.deltaY < 0 ? SKY_ZOOM_STEP : 1 / SKY_ZOOM_STEP));
-  }
-  cameraEl.addEventListener("wheel", onWheel, { passive: false });
-
-  let dragging = false;
-  let dragLast = { x: 0, y: 0 };
-  function isDragBlocked(target: EventTarget | null) {
-    return target instanceof Element && !!target.closest(".stars-sky-object");
-  }
-  function onPointerDown(event: PointerEvent) {
-    if (event.button !== undefined && event.button !== 0) return;
-    if (isDragBlocked(event.target)) return;
-    dragging = true;
-    dragLast = { x: event.clientX, y: event.clientY };
-    cameraEl.setPointerCapture(event.pointerId);
-    cameraEl.classList.add("is-dragging");
-  }
-  function onPointerMoveDrag(event: PointerEvent) {
-    if (!dragging) return;
-    const dx = event.clientX - dragLast.x;
-    const dy = event.clientY - dragLast.y;
-    dragLast = { x: event.clientX, y: event.clientY };
-    view = clampView({ ...view, x: view.x + dx, y: view.y + dy });
-    applyView();
-  }
-  function onPointerUpDrag(event: PointerEvent) {
-    if (!dragging) return;
-    dragging = false;
-    cameraEl.classList.remove("is-dragging");
-    try { cameraEl.releasePointerCapture(event.pointerId); } catch { /* already released */ }
-  }
-  cameraEl.addEventListener("pointerdown", onPointerDown);
-  cameraEl.addEventListener("pointermove", onPointerMoveDrag);
-  cameraEl.addEventListener("pointerup", onPointerUpDrag);
-  cameraEl.addEventListener("pointercancel", onPointerUpDrag);
-
-  function closeCard() {
-    openPopoverId = null;
-    popover.hideSoon();
-  }
-
-  function onDocumentPointerDown(event: PointerEvent) {
-    const target = event.target as Node | null;
-    if (target && popover.el.contains(target)) return;
-    if (target instanceof Element && target.closest(".stars-sky-object")) return;
-    openPopoverId = null;
-    popover.hideNow();
-  }
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-
-  const frame = (t: number) => {
-    if (stopped) return;
-    const context = canvas.getContext("2d")!;
-    const { width, height } = size;
-    context.clearRect(0, 0, width, height);
-    drawNebula(context, width, height, t, 51023, [colors.gold, colors.onDark]);
-    drawMilkyWay(context, width, height, t, 61031, colors.onDark);
-    parallax.settle();
-    context.save();
-    context.translate(width / 2, height * 0.48);
-    context.rotate(angle);
-    context.translate(-width / 2, -height * 0.48);
-    drawDust(context, dust, t, parallax.current);
-    context.restore();
-    shootingStars = stepShootingStars(shootingStars, width, height, shootSeed, reduced);
-    drawShootingStars(context, shootingStars, colors.onDark);
-    ripples = stepRipples(ripples);
-    drawRipples(context, ripples, colors.gold);
-    drawVignette(context, width, height);
-    if (!reduced) raf = requestAnimationFrame(frame);
-  };
-
-  const layoutAll = () => {
-    if (stopped) return;
-    const { context, width, height } = configureCanvas(canvas, host.getBoundingClientRect());
-    context.clearRect(0, 0, width, height);
-    size = { width, height };
-    colors = { onDark: css("--on-dark", "white"), gold: css("--pastel-gold", "white") };
-    // Density scales with the visible area (with a floor) so the sky always reads as
-    // full — it must never depend on how many notes/constellations exist, or a small
-    // archive renders a sparse, patchy field instead of a real starfield.
-    const density = Math.max(220, Math.round((width * height) / 4200));
-    dust = buildDust(934857, width, height, density);
-    view = clampView(view);
-    applyView();
-
-    layer.innerHTML = "";
-    constellations.forEach((item, index) => {
-      const position = rotatePoint(item.sky.x, item.sky.y, angle);
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "stars-sky-object";
-      button.style.left = `${position.x * width}px`;
-      button.style.top = `${position.y * height}px`;
-      button.style.setProperty("--sky-scale", String(item.sky.scale));
-      button.style.setProperty("--twinkle-delay", `${(seedOf(item.id) % 4000) / 1000}s`);
-      button.style.setProperty("--reveal-delay", revealDelay(index));
-      button.setAttribute("aria-label", `Open ${item.title}, ${item.notes.length} notes`);
-      button.innerHTML = miniSymbol(item);
-      const symbol = button.querySelector<SVGElement>("svg");
-      if (symbol) symbol.style.transform = `rotate(${angle + item.sky.rotation}rad)`;
-
-      const commit = () => {
-        if (!reduced) ripples.push({ x: position.x * width, y: position.y * height, age: 0, life: 26 });
-        onSelect(item);
-      };
-      const showCard = () => {
-        openPopoverId = item.id;
-        popover.showConstellation(item, button, commit);
-      };
-      button.addEventListener("pointerenter", event => {
-        if (event.pointerType === "mouse") showCard();
-      });
-      button.addEventListener("focus", showCard);
-      button.addEventListener("pointerleave", () => closeCard());
-      button.addEventListener("blur", () => closeCard());
-      button.onclick = () => {
-        if (openPopoverId === item.id && !popover.el.hidden) {
-          commit();
-          return;
-        }
-        showCard();
-      };
-      layer.append(button);
-    });
-
-    if (reduced) frame(0);
-  };
-
-  const observer = new ResizeObserver(layoutAll);
-  observer.observe(host);
-  layoutAll();
-  if (!reduced) raf = requestAnimationFrame(frame);
-
-  return () => {
-    stopped = true;
-    if (raf) cancelAnimationFrame(raf);
-    document.removeEventListener("pointerdown", onDocumentPointerDown);
-    observer.disconnect();
-    layer.innerHTML = "";
-  };
-}
