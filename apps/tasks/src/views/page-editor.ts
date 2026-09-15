@@ -467,8 +467,8 @@ function paintProjectPage(
 
   const childHandlers: TaskCardHandlers = {
     onToggle: (item) =>
-      requestToggleDone(confirmHost, item, async () => {
-        acceptTask({ ...item, status: item.status === 'done' ? 'open' : 'done' });
+      requestToggleDone(confirmHost, item, async (updated) => {
+        acceptTask(updated ?? { ...item, status: item.status === 'done' ? 'open' : 'done' });
       }),
     onDelete: (item) =>
       deleteTaskNow(

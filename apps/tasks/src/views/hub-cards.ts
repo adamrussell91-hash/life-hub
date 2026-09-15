@@ -271,6 +271,7 @@ export function renderTaskMicroCard(task: Task, handlers: TaskCardHandlers = {})
   const title = el('p', 'hub-row__title card-title', task.title);
   title.setAttribute('data-hub-morph', 'title');
   const chips = el('div', 'hub-chips');
+  if (task.status === 'done') chips.append(statusChip(task.status));
   chips.append(
     domainChip(task.domain, handlers.onPatch ? (value) => void handlers.onPatch?.(task, { domain: value as TaskDomain }) : undefined)
   );
