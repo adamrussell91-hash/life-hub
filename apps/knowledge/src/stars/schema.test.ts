@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseStarsProposal, StarsProposalSchema } from "./schema";
+import { parseStarsProposal, StarsProposalSchema, SavedConstellationSchema } from "./schema";
 import { groundStarsProposal } from "./client";
 
 function proposal() {
@@ -60,5 +60,33 @@ describe("Stars proposal schema", () => {
     const entries = parsed.notes.map(note => ({ id: note.pageId, title: `Archive ${note.title}`, area: "notes" as const, tags: [], excerpt: "" }));
     expect(groundStarsProposal(parsed, entries).notes[0]!.title).toBe("Archive Note 0");
     expect(() => groundStarsProposal(parsed, entries.slice(1))).toThrow(/outside the current archive/);
+  });
+});
+
+function savedConstellation(sky: Record<string, unknown>) {
+  const base = proposal();
+  return {
+    ...base,
+    id: "stars_abc123",
+    createdAt: "2026-09-11T10:00:00.000Z",
+    updatedAt: "2026-09-11T10:00:00.000Z",
+    sky,
+  };
+}
+
+describe("SavedConstellation sky placement", () => {
+  it("accepts a sky object with no x (position is now derived from createdAt)", () => {
+    const result = SavedConstellationSchema.safeParse(savedConstellation({ y: 0.5, rotation: 0.2, scale: 1 }));
+    expect(result.success).toBe(true);
+  });
+
+  it("still accepts legacy saved data that has an x field, ignoring it", () => {
+    const result = SavedConstellationSchema.safeParse(savedConstellation({ x: 0.4, y: 0.5, rotation: 0.2, scale: 1 }));
+    expect(result.success).toBe(true);
+  });
+
+  it("still requires y within its historical bounds", () => {
+    const result = SavedConstellationSchema.safeParse(savedConstellation({ y: 5, rotation: 0.2, scale: 1 }));
+    expect(result.success).toBe(false);
   });
 });
