@@ -58,7 +58,7 @@ test('Stars persistence stores one approved object and lists it from the index',
   });
   assert.equal(saved.id, 'stars_abc123');
   assert.equal(saved.notes.length, 5);
-  assert.ok(saved.sky.x >= 0.08 && saved.sky.x <= 0.92);
+  assert.ok(saved.sky.y >= 0.12 && saved.sky.y <= 0.84);
   assert.deepEqual(await getConstellation(store, saved.id), saved);
   assert.deepEqual(await listConstellations(store), [saved]);
 });
