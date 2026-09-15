@@ -109,7 +109,7 @@ export const SavedConstellationSchema = StarsProposalBaseSchema.extend({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   sky: z.object({
-    x: z.number().min(0.08).max(0.92),
+    x: z.number().min(0).max(1).optional(),
     y: z.number().min(0.12).max(0.84),
     rotation: z.number(),
     scale: z.number().min(0.7).max(1.3),
