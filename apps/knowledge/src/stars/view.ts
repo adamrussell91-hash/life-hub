@@ -293,10 +293,6 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
     </div>`);
     const sky = host.querySelector<HTMLElement>("[data-stars-sky]")!;
 
-    if (!saved.length && !options.entries.length) {
-      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
-    }
-
     panoramaController = mountStarsPanorama(sky, saved, options.entries, centerMonthIndex, {
       onSelectConstellation: item => {
         selected = item;
@@ -311,6 +307,10 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       },
     });
     canvasTeardown = () => panoramaController?.destroy();
+
+    if (!saved.length && !options.entries.length) {
+      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
+    }
 
     host.querySelector<HTMLFormElement>("[data-stars-search]")!.onsubmit = event => {
       event.preventDefault();
