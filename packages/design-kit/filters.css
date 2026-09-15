@@ -216,6 +216,7 @@ input.hub-search::placeholder {
   font-size: var(--text-xs);
   text-decoration: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .hub-chip.is-active {

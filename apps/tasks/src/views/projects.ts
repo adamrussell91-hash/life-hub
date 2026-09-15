@@ -2,19 +2,21 @@ import type { Goal } from '@/schemas/goal';
 import { isProjectArchived, type Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { projectPageHash } from '@/domain/cards';
-import { findStallCandidates } from '@/domain/stall';
+import { findStallCandidates, type StallCandidate } from '@/domain/stall';
 import {
+  FORECAST_HORIZON_DAYS,
   LIFECYCLE_LABEL,
+  buildProjectForecast,
   buildProjectPulseCard,
   findPortfolioTension,
   findRetroCandidate,
   groupPulseCards,
   lastActivityLabel,
   matchesProjectQuery,
-  projectActivityHeatmap,
   projectLifecycleMix,
   projectRoadmap,
   runningProjectCount,
+  type ForecastItem,
   type ProjectLifecycle,
   type ProjectPulseCard,
   type ProjectsGroupBy,
@@ -39,8 +41,6 @@ import {
 import { createPlusAdd } from '@/views/plus-add';
 import { inspectProjectHealth } from '@/domain/project-health';
 import { projectMilestones } from '@/domain/project-milestones';
-import { activeProjectMeter } from '@/domain/hammond-portfolio';
-import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
 /** Quiet when healthy; a real control when the project has no next action. */
@@ -65,7 +65,6 @@ let projectQuery = '';
 let groupBy: ProjectsGroupBy = 'status';
 let roadmapZoom: RoadmapZoom = 'month';
 let lifecycleFilter: ProjectLifecycle | 'all' = 'all';
-let stalledOpen = false;
 let tensionDismissed = false;
 
 const CLOCK_ICON =
@@ -74,6 +73,8 @@ const DRIFT_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h10"/><path d="m10 7 5 5-5 5"/><path d="M20 5v14"/></svg>';
 const LINK_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4h9v9"/><path d="M18 4 9 13"/><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/></svg>';
+const ENERGY_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>';
 
 type PulseContext = {
   projects: Project[];
@@ -81,6 +82,7 @@ type PulseContext = {
   goals: Goal[];
   cards: ProjectPulseCard[];
   stallIds: Set<string>;
+  stallCandidates: StallCandidate[];
   now: Date;
 };
 
@@ -105,31 +107,6 @@ function renderStatusChart(
       selected: lifecycleFilter
     })
   );
-  return tile;
-}
-
-function renderHeatmap(ctx: PulseContext): HTMLElement {
-  const model = projectActivityHeatmap(ctx.projects, ctx.tasks, ctx.now);
-  const tile = el('section', 'hub-card projects-heatmap');
-  tile.append(el('p', 'hub-card__eyebrow', 'Activity — last 12 weeks'));
-  tile.append(el('p', 'heat-lede', 'A filled cell is a week with any task activity. Not a count.'));
-  const rows = el('div', 'heat-rows');
-  for (const row of model.rows) {
-    const line = el('div', 'heat-row');
-    line.append(el('span', 'heat-row__label', row.title));
-    const cells = el('div', 'heat-cells');
-    for (const hit of row.cells) {
-      const cell = el('span', 'heat-cell');
-      cell.dataset.hit = hit ? 'true' : 'false';
-      cells.append(cell);
-    }
-    line.append(cells);
-    rows.append(line);
-  }
-  if (!model.rows.length) rows.append(el('p', 'empty-state empty-state--compact', 'No live projects to plot.'));
-  const axis = el('div', 'heat-axis');
-  for (const tick of model.axis) axis.append(el('span', undefined, tick));
-  tile.append(rows, axis);
   return tile;
 }
 
@@ -160,7 +137,19 @@ function renderRoadmap(ctx: PulseContext, onZoom: (zoom: RoadmapZoom) => void): 
   );
   const rows = el('div', 'roadmap-rows');
   for (const row of model.rows) {
-    const line = el('div', 'roadmap-row');
+    const line = el('div', 'roadmap-row roadmap-row--linked');
+    line.setAttribute('role', 'button');
+    line.tabIndex = 0;
+    line.setAttribute('aria-label', `Open ${row.label}`);
+    const goToProject = (): void => {
+      location.hash = projectPageHash(row.projectId);
+    };
+    line.addEventListener('click', goToProject);
+    line.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      goToProject();
+    });
     line.append(el('span', 'roadmap-row__label', row.label));
     const track = el('div', 'roadmap-row__track');
     if (row.ghost) {
@@ -204,14 +193,6 @@ function renderTensionBanner(message: string, onDismiss: () => void): HTMLElemen
   dismiss.addEventListener('click', onDismiss);
   banner.append(dismiss);
   return banner;
-}
-
-function milestoneTint(index: number): string {
-  return ['tint-blue', 'tint-peach', 'tint-gold', 'tint-lilac', 'tint-sage'][index % 5]!;
-}
-
-function energyTint(energy: ProjectPulseCard['energy']): string {
-  return energy === 'deep_focus' ? 'tint-blue' : 'tint-gold';
 }
 
 type ProjectBoardActions = {
@@ -274,12 +255,7 @@ function renderProjectBoardCard(
   top.append(title);
   const healthHint = projectNextActionHealth(card.project, tasks);
   if (healthHint) top.append(healthHint);
-  if (card.lifecycle === 'stalled') {
-    top.append(el('span', 'status-badge tint-peach', 'Stalled'));
-  } else {
-    const energy = el('span', `hub-chip ${energyTint(card.energy)}`, card.energyLabel);
-    top.append(energy);
-  }
+  top.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
   article.append(top);
 
   const desc = card.project.arc_summary || card.project.description;
@@ -323,6 +299,10 @@ function renderProjectBoardCard(
   linked.append(svgIcon(LINK_ICON), el('span', undefined, card.linkedLabel));
   article.append(linked);
 
+  const energy = el('div', 'meta-line');
+  energy.append(svgIcon(ENERGY_ICON), el('span', undefined, card.energyLabel));
+  article.append(energy);
+
   if (card.project.current_end_date || card.project.baseline_end_date) {
     const due = el('div', 'meta-line');
     due.append(
@@ -336,12 +316,14 @@ function renderProjectBoardCard(
     article.append(due);
   }
 
-  const chips = el('div', 'pcard__row');
-  chips.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
-  projectMilestones(card.project).slice(0, 3).forEach((milestone, index) => {
-    chips.append(el('span', `hub-chip ${milestoneTint(index)}`, milestone.title));
-  });
-  article.append(chips);
+  const milestones = projectMilestones(card.project).slice(0, 3);
+  if (milestones.length) {
+    const chips = el('div', 'pcard__row pcard__milestones');
+    milestones.forEach((milestone) => {
+      chips.append(el('span', 'pcard__milestone', milestone.title));
+    });
+    article.append(chips);
+  }
 
   const actions = el('div', 'pcard__row pcard__actions');
   const open = el('button', 'btn btn--ghost', 'Open page');
@@ -465,7 +447,7 @@ function removeProjectNodes(canvas: HTMLElement, projectId: string): void {
   const nodes = [...canvas.querySelectorAll<HTMLElement>(`[data-project-id="${CSS.escape(projectId)}"]`)];
   for (const node of nodes) {
     const lane = node.closest('.lane');
-    const stalled = node.closest('#stalled-queue');
+    const forecast = node.closest('#project-forecast');
     node.remove();
     if (lane instanceof HTMLElement) {
       const remaining = lane.querySelectorAll('[data-project-id]').length;
@@ -473,13 +455,10 @@ function removeProjectNodes(canvas: HTMLElement, projectId: string): void {
       if (count) count.textContent = String(remaining);
       if (!remaining) lane.remove();
     }
-    if (stalled instanceof HTMLElement) {
-      const remaining = stalled.querySelectorAll('[data-project-id]').length;
-      const count = stalled.querySelector('.lane__count');
-      if (count) count.textContent = String(remaining);
-      const body = stalled.querySelector('.stalled-body');
-      if (body && !remaining && !body.querySelector('.empty-state')) {
-        body.replaceChildren(el('p', 'empty-state', 'Nothing waiting on an outcome.'));
+    if (forecast instanceof HTMLElement) {
+      const rows = forecast.querySelector('.forecast-rows');
+      if (rows && !rows.querySelector('[data-project-id]')) {
+        rows.replaceWith(el('p', 'empty-state empty-state--compact', `Nothing due in the next ${FORECAST_HORIZON_DAYS} days.`));
       }
     }
   }
@@ -557,53 +536,53 @@ function renderRetro(
   return card;
 }
 
-function renderStalledQueue(
-  stalled: ProjectPulseCard[],
-  tasks: Task[],
+function forecastWhenLabel(item: ForecastItem): string {
+  if (item.kind === 'stalled') return item.label;
+  if (item.daysOut < 0) return `${-item.daysOut} day${item.daysOut === -1 ? '' : 's'} overdue`;
+  if (item.daysOut === 0) return 'Due today';
+  return `Due in ${item.daysOut} day${item.daysOut === 1 ? '' : 's'}`;
+}
+
+/**
+ * "Is anything about to slip" — one chronological list replacing what used
+ * to be three disconnected pieces (a dismissible tension banner, a single
+ * nearest-milestone retro prompt, and a stalled-projects queue that didn't
+ * show the one number that actually matters for a revive/bury call: how
+ * long it's been idle). Milestone rows link straight to the project;
+ * stalled rows keep the same revive/frankenstein/bury actions, now with
+ * idle days shown instead of a vague "flagged" chip.
+ */
+function renderForecast(
+  items: ForecastItem[],
   mergeTargets: Project[],
   confirmHost: HTMLElement,
   onReload: () => void
 ): HTMLElement {
-  const section = el('section', 'hub-card');
-  section.id = 'stalled-queue';
-  const head = el('div', 'stalled-head');
-  const left = el('div', 'stalled-head__left');
-  left.append(el('p', 'hub-card__eyebrow', 'Stalled — choose an outcome'));
-  left.append(el('span', 'lane__count', String(stalled.length)));
-  const toggle = el('button', 'hub-icon-btn');
-  toggle.type = 'button';
-  toggle.setAttribute('aria-label', stalledOpen ? 'Collapse stalled queue' : 'Expand stalled queue');
-  toggle.setAttribute('aria-expanded', stalledOpen ? 'true' : 'false');
-  const chevron = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  chevron.setAttribute('viewBox', '0 0 24 24');
-  chevron.setAttribute('fill', 'none');
-  chevron.setAttribute('stroke', 'currentColor');
-  chevron.setAttribute('stroke-width', '2');
-  chevron.setAttribute('stroke-linecap', 'round');
-  chevron.setAttribute('stroke-linejoin', 'round');
-  chevron.dataset.open = stalledOpen ? 'true' : 'false';
-  chevron.classList.add('stalled-chevron');
-  chevron.innerHTML = '<path d="m6 9 6 6 6-6"/>';
-  toggle.append(chevron);
-  head.append(left, toggle);
-  section.append(head);
-
-  const body = el('div', stalledOpen ? 'stalled-body' : 'stalled-body is-hidden');
-  if (!stalled.length) {
-    body.append(el('p', 'empty-state', 'Nothing waiting on an outcome.'));
-  } else {
-    for (const card of stalled) {
-      body.append(renderStalledCard(card.project, tasks, mergeTargets, confirmHost, onReload));
-    }
+  const section = el('section', 'hub-card projects-forecast');
+  section.id = 'project-forecast';
+  section.append(el('p', 'hub-card__eyebrow', 'Forecast — what needs your eyes'));
+  if (!items.length) {
+    section.append(el('p', 'empty-state empty-state--compact', `Nothing due in the next ${FORECAST_HORIZON_DAYS} days.`));
+    return section;
   }
-  toggle.addEventListener('click', () => {
-    stalledOpen = !stalledOpen;
-    body.classList.toggle('is-hidden', !stalledOpen);
-    chevron.dataset.open = stalledOpen ? 'true' : 'false';
-    toggle.setAttribute('aria-expanded', stalledOpen ? 'true' : 'false');
-    toggle.setAttribute('aria-label', stalledOpen ? 'Collapse stalled queue' : 'Expand stalled queue');
-  });
-  section.append(body);
+  const list = el('div', 'forecast-rows');
+  for (const item of items) {
+    if (item.kind === 'stalled' && item.stall) {
+      list.append(renderStalledCard(item.stall, mergeTargets, confirmHost, onReload));
+      continue;
+    }
+    const row = el('a', `forecast-row forecast-row--${item.kind}`);
+    row.href = projectPageHash(item.project.id);
+    row.dataset.projectId = item.project.id;
+    const main = el('span', 'forecast-row__main');
+    main.append(
+      el('span', 'forecast-row__project', item.project.title),
+      el('span', 'forecast-row__label', item.label)
+    );
+    row.append(main, el('span', `forecast-row__when forecast-row__when--${item.kind}`, forecastWhenLabel(item)));
+    list.append(row);
+  }
+  section.append(list);
   return section;
 }
 
@@ -637,11 +616,11 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   projects = projects.filter((project) => !isProjectArchived(project.status));
 
   const now = new Date();
-  const stallIds = new Set(findStallCandidates(projects, tasks, now).map((item) => item.project.id));
+  const stallCandidates = findStallCandidates(projects, tasks, now);
+  const stallIds = new Set(stallCandidates.map((item) => item.project.id));
   const cards = projects.map((project) => buildProjectPulseCard(project, tasks, stallIds, now));
-  const ctx: PulseContext = { projects, tasks, goals, cards, stallIds, now };
+  const ctx: PulseContext = { projects, tasks, goals, cards, stallIds, stallCandidates, now };
   const retro = findRetroCandidate(cards, now);
-  const stalled = cards.filter((card) => card.lifecycle === 'stalled');
   const mergeTargets = projects.filter((project) => !isProjectArchived(project.status) && project.status !== 'stalled');
 
   const reload = () => void renderProjectsView(canvas);
@@ -672,6 +651,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     ctx.tasks = ctx.tasks.filter((task) => task.parent_project_id !== projectId);
     ctx.cards = ctx.cards.filter((card) => card.project.id !== projectId);
     ctx.stallIds.delete(projectId);
+    ctx.stallCandidates = ctx.stallCandidates.filter((item) => item.project.id !== projectId);
     removeProjectNodes(canvas, projectId);
     refreshPulse();
   }
@@ -702,6 +682,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     const tension = tensionDismissed ? null : findPortfolioTension(ctx.cards, ctx.tasks, ctx.now);
     const nextMix = projectLifecycleMix(ctx.projects, ctx.tasks, ctx.stallIds, ctx.now);
     const nextRunning = runningProjectCount(nextMix);
+    const forecastItems = buildProjectForecast(ctx.cards, ctx.stallCandidates, ctx.now);
 
     canvas.replaceChildren();
     if (flagWarning) canvas.append(el('p', 'empty-state', flagWarning));
@@ -736,13 +717,20 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       active: Boolean(projectQuery.trim())
     });
     filters.panel.append(search.el);
-    toolbar.append(
-      filters.root,
-      createHubPills({
-        label: 'Group by',
+    const groupByRow = el('div', 'projects-groupby');
+    const statusToggle = el('button', `btn ${groupBy === 'status' ? 'btn--primary' : 'btn--ghost'}`, 'Status');
+    statusToggle.type = 'button';
+    statusToggle.setAttribute('aria-pressed', groupBy === 'status' ? 'true' : 'false');
+    statusToggle.addEventListener('click', () => {
+      groupBy = 'status';
+      paint();
+    });
+    groupByRow.append(
+      statusToggle,
+      createHubPills<ProjectsGroupBy>({
+        label: 'Group by (more)',
         role: 'tablist',
         items: [
-          { id: 'status', label: 'Status' },
           { id: 'energy', label: 'Energy' },
           { id: 'goal', label: 'Goal area' },
           { id: 'deadline', label: 'Deadline' }
@@ -752,14 +740,18 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
           groupBy = id;
           paint();
         }
-      }),
-      renderQuickAddProject(ctx.goals, acceptProject)
+      })
     );
+    toolbar.append(filters.root, groupByRow, renderQuickAddProject(ctx.goals, acceptProject));
     canvas.append(toolbar);
-    const meter = activeProjectMeter(ctx.projects, planningProfile);
-    const meterHost = el('div', 'projects-meter-host');
-    meterHost.append(createActiveProjectsMeter(document, { meter }));
-    canvas.append(meterHost);
+    // Forecast goes first: "is anything about to slip" is the thing to
+    // check before browsing the board itself.
+    canvas.append(renderForecast(forecastItems, mergeTargets, stallConfirmHost, reload));
+    // No separate "active projects, limit not set" meter here — the mix
+    // chart below already covers "how many running, is that sustainable"
+    // with an actual per-status breakdown, which made this card pure
+    // duplicate chrome on this page specifically (still used as-is on
+    // Goals, which has no equivalent chart).
     canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
 
     const pulse = el('div', 'projects-pulse');
@@ -774,8 +766,6 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
 
     const retroCard = renderRetro(retro, reload);
     if (retroCard) canvas.append(retroCard);
-
-    canvas.append(renderStalledQueue(stalled, tasks, mergeTargets, stallConfirmHost, reload));
 
     if (reviews.length) {
       canvas.append(el('h2', 'section-title', 'Review log'));
@@ -800,8 +790,6 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       canvas.append(logStack);
     }
 
-    canvas.append(renderHeatmap(ctx));
-
     canvas.scrollTop = scrollTop;
     if (restoreSearch) {
       const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter projects"]');
@@ -816,17 +804,14 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
 }
 
 function renderStalledCard(
-  project: Project,
-  tasks: Task[],
+  candidate: StallCandidate,
   mergeTargets: Project[],
   confirmHost: HTMLElement,
   onDone: () => void
 ): HTMLElement {
+  const { project, idle_days, open_task_count } = candidate;
   const card = el('article', 'stall-card');
   card.dataset.projectId = project.id;
-  const openCount = tasks.filter(
-    (task) => task.parent_project_id === project.id && task.status !== 'done' && task.status !== 'dead'
-  ).length;
   card.append(
     el('p', 'page-header__eyebrow', 'Stalled'),
     el('h3', 'pcard__title', project.title),
@@ -835,12 +820,8 @@ function renderStalledCard(
   const meta = el('div', 'pcard__row');
   meta.append(
     el('span', 'hub-chip', project.type),
-    el('span', 'hub-chip tint-lilac', `${openCount} open tasks`),
-    el(
-      'span',
-      'hub-chip tint-peach',
-      project.stall_flagged_at ? `flagged ${formatDisplayDate(project.stall_flagged_at)}` : 'flagged'
-    )
+    el('span', 'hub-chip tint-lilac', `${open_task_count} open task${open_task_count === 1 ? '' : 's'}`),
+    el('span', 'hub-chip tint-peach', `no activity in ${idle_days}d`)
   );
   card.append(meta);
 
@@ -945,6 +926,5 @@ export function resetProjectsViewStateForTests(): void {
   groupBy = 'status';
   roadmapZoom = 'month';
   lifecycleFilter = 'all';
-  stalledOpen = false;
   tensionDismissed = false;
 }
