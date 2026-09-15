@@ -11,6 +11,7 @@ import {
   personKey
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
+import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
@@ -87,15 +88,44 @@ function notFound() {
   return Object.assign(new Error('Entity not found.'), { status: 404, code: 'entity_not_found' });
 }
 
-async function loadEntity(store, ref) {
+// A GitHub-canonical-import record (github-professional-data.mjs) falls
+// back here exactly as it does in entity-resolvers.mjs, so a Person/
+// Organisation page for one of those 351 imported people/18 organisations
+// loads the same way a native one does.
+async function loadEntity(store, ref, github) {
   if (ref.kind === 'person') {
-    const record = parsePersonRecord(await getJSON(store, personKey(ref.id)));
+    const record = parsePersonRecord(await getJSON(store, personKey(ref.id)))
+      ?? await getGithubPerson(ref.id, github);
     if (!record) throw notFound();
     return record;
   }
-  const record = parseOrganisationRecord(await getJSON(store, organisationKey(ref.id)));
+  const record = parseOrganisationRecord(await getJSON(store, organisationKey(ref.id)))
+    ?? await getGithubOrganisation(ref.id, github);
   if (!record) throw notFound();
   return record;
+}
+
+// Read-only merge of the GitHub-canonical import's `employee_at`/
+// `member_of` relationships into this overview's timeline. Mirrors
+// `toAccessibleEntry` in universal-link-read-repository.mjs: the *other*
+// endpoint of each relationship is resolved and authorised through the same
+// injected `resolveEntity`, and a hidden/absent endpoint is dropped rather
+// than surfaced — never a distinct error. This never touches the native
+// Universal Link repository or its Blob-backed membership index; it is a
+// second, independent source of entries concatenated in before the rest of
+// this module's (unmodified) timeline/current/historical logic runs.
+async function loadGithubRelationshipEntries(ref, accessContext, resolveEntity, github) {
+  const rows = await listGithubRelationshipEntries(ref.kind, ref.id, github);
+  const entries = await mapBounded(rows, 10, async ({ link, otherRef, direction }) => {
+    try {
+      const endpoint = await resolveEntity(otherRef, accessContext);
+      return { link, endpoint, direction };
+    } catch (error) {
+      if (error?.code === 'endpoint_not_found') return null;
+      throw error;
+    }
+  });
+  return entries.filter(Boolean);
 }
 
 function effectiveDate(link) {
@@ -196,17 +226,27 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     });
   }
 
+  // Threaded into every GitHub-canonical Professional import lookup below
+  // (loadEntity's fallback and the relationship merge) so tests can inject
+  // a synthetic env/fetchImpl instead of relying on process.env/global
+  // fetch — production leaves both undefined and gets the real defaults
+  // (github-professional-data.mjs).
+  const github = { env: deps.env, fetchImpl: deps.fetchImpl };
+
   const canonicalRef = formatEntityRef(ref);
-  const record = await loadEntity(store, ref);
+  const record = await loadEntity(store, ref, github);
   const accessContext = createAccessContext({ workflow: 'life' });
   const repo = createRepository({ store, resolveEntity });
   const { outgoing, incoming } = await repo.listForEntity(canonicalRef, accessContext, {
     includeArchived: true
   });
 
+  const githubEntries = await loadGithubRelationshipEntries(ref, accessContext, resolveEntity, github);
+
   const entries = [
     ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
-    ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
+    ...incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
+    ...githubEntries
   ];
 
   const current_relationships = entries.filter((entry) => entry.link.status === 'current');
