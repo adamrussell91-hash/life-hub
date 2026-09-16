@@ -70,6 +70,36 @@ const REGISTRY = new Map([
     })
   ],
   [
+    // Person-to-person core identity relationship (the only registry key
+    // connecting shared:person to shared:person). Direction is not
+    // semantically fixed by role (e.g. 'mentor'/'mentee' reads
+    // directionally, but the underlying link only has one canonical
+    // source/target). Convention: `source_ref` is whichever person was
+    // known first / initiated the relationship — the operator's call at
+    // write time, not automatically derived. A single `inverse_label` is
+    // used for all roles (`declaration()` does not support per-role
+    // inverse labels); human-readable directional wording for a specific
+    // role (e.g. 'mentor of' vs 'mentee of') belongs in
+    // `metadata.human_label` on each side's resolved projection, not in
+    // the registry itself.
+    'professional_relationship',
+    declaration({
+      key: 'professional_relationship',
+      sourceKinds: ['shared:person'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'professional_relationship',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'optional_text',
+      allowedRoles: [
+        'colleague', 'former_colleague', 'mentor', 'mentee',
+        'academic_contact', 'research_collaborator', 'recruiter',
+        'referee', 'conference_contact', 'introduction', 'other'
+      ],
+      metadataKeys: ['human_label']
+    })
+  ],
+  [
     'collaborator',
     declaration({
       key: 'collaborator',
