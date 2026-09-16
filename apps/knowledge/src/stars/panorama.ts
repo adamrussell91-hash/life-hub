@@ -23,7 +23,8 @@ import {
   type Ripple,
   type ShootingStar,
 } from "./canvas";
-import { buildSkyIndex, skyIndexRange, type MonthBucket } from "./skyIndex";
+import { buildSkyIndex, entriesFromCutoff, skyIndexRange, type MonthBucket } from "./skyIndex";
+import { buildPlaceholderStars, type PlaceholderStar } from "./placeholderField";
 import { MONTH_WIDTH_PX, clampMonthIndex, currentMonthIndex, monthDeltaForPixels, screenXForMonth, stepInertia } from "./timeline";
 
 const RESOLVED_BUFFER_MONTHS = 1.5;
@@ -96,6 +97,27 @@ function drawGlyph(context: CanvasRenderingContext2D, item: SavedConstellation, 
   context.restore();
 }
 
+function drawPlaceholderStars(
+  context: CanvasRenderingContext2D,
+  stars: PlaceholderStar[],
+  center: number,
+  width: number,
+  height: number,
+  color: string,
+) {
+  context.save();
+  context.globalAlpha = 0.5;
+  context.fillStyle = color;
+  for (const star of stars) {
+    const x = screenXForMonth(star.monthIndex, center, width);
+    if (x < -20 || x > width + 20) continue;
+    context.beginPath();
+    context.arc(x, star.yRatio * height, 1.2, 0, Math.PI * 2);
+    context.fill();
+  }
+  context.restore();
+}
+
 function drawHaze(context: CanvasRenderingContext2D, x: number, y: number, count: number, color: string) {
   const radius = Math.min(70, 18 + count * 6);
   const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
@@ -124,7 +146,8 @@ export function mountStarsPanorama(
   const reduced = prefersReducedMotion();
   const popover = createStarPopover(host);
   const parallax = bindParallax(host, reduced);
-  const skyIndex = buildSkyIndex(entries, constellations);
+  const skyIndex = buildSkyIndex(entriesFromCutoff(entries), constellations);
+  const placeholderStars = buildPlaceholderStars(currentMonthIndex());
   const shootSeed = random(seedOf(`panorama-${initialMonthIndex}`));
 
   let stopped = false;
@@ -262,6 +285,7 @@ export function mountStarsPanorama(
     drawMilkyWay(context, width, height, t, 61031, colors.onDark);
     parallax.settle();
     drawDust(context, dust, t, parallax.current);
+    drawPlaceholderStars(context, placeholderStars, center, width, height, colors.onDark);
     for (const bucket of hazeBuckets()) {
       const x = screenXForMonth(bucket.monthIndex, center, width);
       if (x < -80 || x > width + 80) continue;

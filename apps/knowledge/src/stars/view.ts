@@ -6,7 +6,7 @@ import { listSavedConstellations, researchStars, saveConstellation } from "./cli
 import { mountStarsSymbol } from "./canvas";
 import { mountStarsPanorama, type PanoramaController } from "./panorama";
 import { mountHorizonArc, type HorizonArc } from "./horizon";
-import { buildSkyIndex, skyIndexRange } from "./skyIndex";
+import { buildSkyIndex, entriesFromCutoff, skyIndexRange } from "./skyIndex";
 import { currentMonthIndex } from "./timeline";
 import type { SavedConstellation, StarsNote, StarsProposal, StarsRelation } from "./schema";
 
@@ -318,7 +318,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       void create(input?.value ?? "");
     };
 
-    const skyIndex = buildSkyIndex(options.entries, saved);
+    const skyIndex = buildSkyIndex(entriesFromCutoff(options.entries), saved);
     const range = skyIndexRange(skyIndex, currentMonthIndex());
     teardownHorizon();
     const horizonHost = host.querySelector<HTMLElement>("[data-stars-horizon]")!;
