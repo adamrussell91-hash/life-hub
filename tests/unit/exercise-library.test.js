@@ -12,6 +12,7 @@ import {
   searchExerciseLibrarySchema,
   saveExerciseLibraryEntrySchema,
   applyCompletedWorkoutToLibrary,
+  applyWorkoutNoteRestrictionsToLibrary,
   daysSinceLastSession,
   isExerciseShelved,
   shelvedExerciseWarnings
@@ -28,8 +29,9 @@ test('parseExerciseLibrary tolerates bad JSON and non-arrays', () => {
   assert.deepEqual(parseExerciseLibrary('[{"name":"Bar Press","target_area":"Chest"}]').length, 1);
 });
 
-test('validateExerciseLibraryEntry requires name and target_area', () => {
-  assert.equal(validateExerciseLibraryEntry({ name: 'X' }), null);
+test('validateExerciseLibraryEntry requires a name and accepts partial updates', () => {
+  assert.equal(validateExerciseLibraryEntry({ name: 'X' }).name, 'X');
+  assert.equal(validateExerciseLibraryEntry({ name: '' }), null);
   const ok = validateExerciseLibraryEntry({
     name: ' Bar Press ',
     target_area: 'Chest',
@@ -72,6 +74,40 @@ test('validateExerciseLibraryEntry clear_shelved nulls out shelving', () => {
   });
   assert.equal(cleared.shelved_until, null);
   assert.equal(cleared.shelved_reason, null);
+});
+
+test('workout notes deterministically shelve a named exercise for the requested duration', () => {
+  const library = [{ name: 'Skull Crusher', target_area: 'Arms', best_weight_kg: 22 }];
+  const record = {
+    type: 'workout',
+    exercises: [{ name: 'Skull Crusher', sets: [{ reps: 10, weight_kg: 18 }] }]
+  };
+  const result = applyWorkoutNoteRestrictionsToLibrary(
+    library,
+    record,
+    'Do not recommend Skull Crusher again for at least two weeks. I am sick of it.',
+    '2026-09-16',
+    '2026-09-16T18:00:00+10:00'
+  );
+  assert.deepEqual(result.restrictions, [{
+    name: 'Skull Crusher',
+    shelved_on: '2026-09-16',
+    shelved_until: '2026-09-30'
+  }]);
+  assert.equal(result.entries[0].best_weight_kg, 22);
+  assert.equal(result.entries[0].shelved_reason.includes('sick of it'), true);
+});
+
+test('workout notes resolve this exercise when the session contains one move', () => {
+  const result = applyWorkoutNoteRestrictionsToLibrary(
+    [],
+    { exercises: [{ name: 'Bayesian Curl', sets: [] }] },
+    'I am sick of this exercise. Do not recommend this move again.',
+    '2026-09-16',
+    '2026-09-16T18:00:00+10:00'
+  );
+  assert.equal(result.entries[0].name, 'Bayesian Curl');
+  assert.equal(result.entries[0].shelved_until, '2026-10-07');
 });
 
 test('isExerciseShelved is true only while shelved_until has not passed and today is known', () => {
