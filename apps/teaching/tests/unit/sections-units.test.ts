@@ -347,6 +347,27 @@ describe('units', () => {
     expect(remove?.disabled).toBe(true);
   });
 
+  it('syncs unit plan blocks after saving so a remount does not lose them', async () => {
+    const onMutated = vi.fn().mockResolvedValue(undefined);
+    const isolated = structuredClone(curriculum);
+    const savedBlocks = [{ id: 'block_unit_1', type: 'divider' }] as Unit['blocks'];
+    vi.mocked(patchUnit).mockResolvedValue({ ...unit, blocks: savedBlocks });
+
+    renderUnitPage(canvas, isolated, unit.id, { onMutated });
+
+    const saveButton = [
+      ...canvas.querySelectorAll<HTMLButtonElement>('.unit-plan-editor__toolbar button')
+    ].find((button) => button.textContent === 'Save plan');
+    saveButton?.click();
+
+    await vi.waitFor(() => {
+      expect(patchUnit).toHaveBeenCalledWith(unit.id, { blocks: [] });
+      expect(onMutated).toHaveBeenCalledOnce();
+    });
+
+    expect(isolated.units.find((entry) => entry.id === unit.id)?.blocks).toEqual(savedBlocks);
+  });
+
   it('applies a restored version in place, clearing an omitted cover', () => {
     const isolated = structuredClone(curriculum);
     renderUnitPage(canvas, isolated, unit.id);
