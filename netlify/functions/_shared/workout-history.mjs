@@ -144,8 +144,15 @@ export function combineSessionAdherenceDays(fromRecords, fromLibrary) {
 function summarizeExercises(exercises) {
   return collapseSetSplitExercises(exercises)
     .map(exercise => {
-      const setCount = Array.isArray(exercise.sets) ? exercise.sets.length : 0;
-      return setCount > 0 ? `${exercise.name} (${setCount} set${setCount === 1 ? '' : 's'})` : exercise.name;
+      const sets = Array.isArray(exercise.sets) ? exercise.sets : [];
+      const details = [];
+      if (sets.length > 0) details.push(`${sets.length} set${sets.length === 1 ? '' : 's'}`);
+      if (typeof exercise.bench_angle_deg === 'number') details.push(`bench ${exercise.bench_angle_deg}°`);
+      const cableTypes = [...new Set(sets.map(set => set?.cable_type).filter(Boolean))];
+      if (cableTypes.length) details.push(`cable ${cableTypes.join('/')}`);
+      if (exercise.intensification) details.push(String(exercise.intensification).replace(/_/g, ' '));
+      if (exercise.superset_group != null) details.push(`superset ${exercise.superset_group}`);
+      return details.length ? `${exercise.name} (${details.join(' · ')})` : exercise.name;
     })
     .filter(Boolean);
 }
