@@ -47,7 +47,7 @@
 }
 
 .rail .hub-rail__hubs {
-  margin-top: auto;
+  margin-top: var(--space-4);
   align-self: stretch;
   width: 100%;
 }

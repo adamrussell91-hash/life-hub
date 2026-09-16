@@ -128,7 +128,7 @@ function cards(definitions: Definition[]) {
     <div class="protocol-card__inner">
       <button type="button" class="protocol-card__front" data-protocol-flip aria-expanded="false" aria-label="Show details for ${escapeHtml(d.name)}">
         <img class="protocol-card__front-art" src="${frontAsset(d.id)}" alt="">
-        <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><em>View protocol</em>
+        <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><span class="protocol-card__description">${escapeHtml(d.description)}</span>
       </button>
       <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
         <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p></div>
