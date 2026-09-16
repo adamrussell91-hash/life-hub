@@ -26,6 +26,10 @@ const SECTION_SELECTORS = {
   urlWatches: '[data-central-node="url-watches"]'
 };
 
+const EMPTY_SECTION_FALLBACK = {
+  thisMonth: 'No goals or events logged for this month yet.'
+};
+
 export function renderCentralNode(root, model) {
   for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
     const container = root.querySelector(selector);
@@ -39,6 +43,9 @@ export function renderCentralNode(root, model) {
     if (key === 'thisWeek' || key === 'thisMonth' || key === 'longTermTrends' || key === 'crossAgentCoordination') {
       if (prose && key !== 'longTermTrends' && key !== 'crossAgentCoordination') {
         renderInlineMarkdown(root, container, prose, { multiline: true });
+        container.removeAttribute('hidden');
+      } else if (EMPTY_SECTION_FALLBACK[key]) {
+        container.textContent = EMPTY_SECTION_FALLBACK[key];
         container.removeAttribute('hidden');
       } else {
         container.textContent = '';

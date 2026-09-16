@@ -426,13 +426,14 @@ test('packCnBoard is one column at 390 px', () => {
   }
 });
 
-test('renderCentralNode omits empty this-month prose and keeps status fallback', () => {
+test('renderCentralNode explains an empty month and keeps status fallback', () => {
   const root = fakeCentralNodeRoot();
   renderCentralNode(root, baseModel({
     sections: { ...baseModel().sections, thisWeek: '', thisMonth: '', todaysStatus: '' }
   }));
   assert.equal(root._sections['this-week'].hidden, true);
-  assert.equal(root._sections['this-month'].hidden, true);
+  assert.equal(root._sections['this-month'].hidden, false);
+  assert.equal(root._sections['this-month'].textContent, 'No goals or events logged for this month yet.');
   assert.match(root._sections['todays-status'].textContent, /No agent notes yet/);
 });
 

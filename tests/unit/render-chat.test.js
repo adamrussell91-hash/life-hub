@@ -200,6 +200,34 @@ test('renderInlineMarkdown skips blank lines between paragraphs', () => {
   assert.equal(container.children[1].children[0].textContent, 'Second.');
 });
 
+test('renderInlineMarkdown renders *italic* segments as em elements', () => {
+  const root = new FakeDocument();
+  const bubble = root.createElement('li');
+  renderInlineMarkdown(root, bubble, 'Now *452 calories*, buddy.');
+
+  assert.equal(bubble.children.length, 3);
+  assert.equal(bubble.children[1].tagName, 'em');
+  assert.equal(bubble.children[1].textContent, '452 calories');
+});
+
+test('renderInlineMarkdown unescapes backslash-escaped markdown punctuation', () => {
+  const root = new FakeDocument();
+  const bubble = root.createElement('li');
+  renderInlineMarkdown(root, bubble, 'Protein averaged \\~100-110g.');
+
+  assert.equal(bubble.children[0].textContent, 'Protein averaged ~100-110g.');
+});
+
+test('renderInlineMarkdown drops standalone --- horizontal rule lines instead of rendering them as text', () => {
+  const root = new FakeDocument();
+  const container = root.createElement('div');
+  renderInlineMarkdown(root, container, 'First.\n---\nSecond.', { multiline: true });
+
+  assert.equal(container.children.length, 2);
+  assert.equal(container.children[0].children[0].textContent, 'First.');
+  assert.equal(container.children[1].children[0].textContent, 'Second.');
+});
+
 test('renderInlineMarkdown re-renders cleanly when switching from multi-line to single-line output', () => {
   const root = new FakeDocument();
   const container = root.createElement('div');

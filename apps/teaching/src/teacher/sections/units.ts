@@ -449,7 +449,8 @@ export function renderUnitPage(
 
   const planEditor = mountUnitPlanEditor(planHost, unit.blocks ?? [], {
     onSave: async (blocks) => {
-      await patchUnit(unit.id, { blocks });
+      const saved = await patchUnit(unit.id, { blocks });
+      unit.blocks = saved.blocks;
       await options.onMutated?.();
     },
     attachedOutcomes: publicOutcomesForPage(unit, curriculum.outcomes ?? [])

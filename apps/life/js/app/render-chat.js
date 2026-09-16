@@ -217,10 +217,9 @@ export function renderInlineMarkdown(root, container, text, { multiline = false 
 
     const line = rawLine.trim();
     if (line === '') continue;
-    if (line === '---') {
+    if (/^-{3,}$/.test(line)) {
       currentList = null;
       currentListType = null;
-      container.append(root.createElement('hr'));
       continue;
     }
     const heading = /^(#{1,3})\s+(.+)$/.exec(line);
@@ -398,12 +397,20 @@ export function renderChatMarkdown(root, container, text) {
   renderInlineMarkdown(root, container, text, { multiline: true });
 }
 
+const ESCAPED_CHAR = /\\([\\`*_{}[\]()#+\-.!~])/g;
+
 function appendInlineSegments(root, container, text) {
-  const segments = text.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).filter(Boolean);
+  const segments = text.split(/(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).filter(Boolean);
   for (const segment of segments) {
     if (segment.startsWith('**') && segment.endsWith('**') && segment.length > 4) {
       const node = root.createElement('strong');
       node.textContent = segment.slice(2, -2);
+      container.append(node);
+      continue;
+    }
+    if (segment.startsWith('*') && segment.endsWith('*') && segment.length > 2) {
+      const node = root.createElement('em');
+      node.textContent = segment.slice(1, -1).replace(ESCAPED_CHAR, '$1');
       container.append(node);
       continue;
     }
@@ -424,7 +431,7 @@ function appendInlineSegments(root, container, text) {
       continue;
     }
     const node = root.createElement('span');
-    node.textContent = segment;
+    node.textContent = segment.replace(ESCAPED_CHAR, '$1');
     container.append(node);
   }
 }
