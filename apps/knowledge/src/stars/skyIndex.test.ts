@@ -45,6 +45,15 @@ describe("buildSkyIndex", () => {
     expect(index.get(marchIndex)?.notes).toHaveLength(0);
   });
 
+  it("gives same-month notes distinct dayRatios so they don't stack on one screen column", () => {
+    const entries = [entry("a", "2026-01-10T00:00:00.000Z"), entry("b", "2026-01-20T00:00:00.000Z")];
+    const index = buildSkyIndex(entries, []);
+    const januaryIndex = monthIndexFromIso("2026-01-10T00:00:00.000Z")!;
+    const notes = index.get(januaryIndex)?.notes ?? [];
+    const byId = new Map(notes.map(note => [note.pageId, note.dayRatio]));
+    expect(byId.get("a")).not.toBe(byId.get("b"));
+  });
+
   it("skips entries with no usable creation date", () => {
     const entries = [entry("a", undefined), entry("b", "not-a-date")];
     const index = buildSkyIndex(entries, []);

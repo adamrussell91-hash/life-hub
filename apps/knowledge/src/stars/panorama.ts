@@ -155,7 +155,10 @@ export function mountStarsPanorama(
       if (Math.abs(bucket.monthIndex - center) > RESOLVED_BUFFER_MONTHS) continue;
       const screenX = screenXForMonth(bucket.monthIndex, center, size.width);
       for (const note of bucket.notes) {
-        items.push({ kind: "note", id: note.pageId, title: note.title, screenX, screenY: noteY(note.pageId) * size.height });
+        // Spread notes across their month's own width by real day-of-month instead of
+        // stacking every note in the bucket on the same column, which read as one straight line.
+        const noteScreenX = screenXForMonth(bucket.monthIndex + (note.dayRatio - 0.5), center, size.width);
+        items.push({ kind: "note", id: note.pageId, title: note.title, screenX: noteScreenX, screenY: noteY(note.pageId) * size.height });
       }
       for (const item of bucket.constellations) {
         items.push({ kind: "constellation", id: item.id, title: item.title, screenX, screenY: item.sky.y * size.height, constellation: item });
