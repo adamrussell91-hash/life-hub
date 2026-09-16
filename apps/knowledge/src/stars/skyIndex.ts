@@ -15,6 +15,22 @@ export function unconnectedEntries(entries: PageManifestEntry[], saved: SavedCon
   return entries.filter(entry => !connected.has(entry.id));
 }
 
+/**
+ * Notes migrated into the archive all carry the migration day as their created_at,
+ * so plotting the full archive stacks thousands of notes onto one screen column.
+ * The sky only has real per-day placement data for notes created after the migration.
+ */
+export const SKY_NOTES_CUTOFF_ISO = "2026-09-01T00:00:00.000Z";
+
+export function entriesFromCutoff(entries: PageManifestEntry[], cutoffIso: string = SKY_NOTES_CUTOFF_ISO): PageManifestEntry[] {
+  const cutoff = Date.parse(cutoffIso);
+  return entries.filter(entry => {
+    if (!entry.created_at) return false;
+    const created = Date.parse(entry.created_at);
+    return !Number.isNaN(created) && created >= cutoff;
+  });
+}
+
 export function buildSkyIndex(entries: PageManifestEntry[], saved: SavedConstellation[]): Map<number, MonthBucket> {
   const buckets = new Map<number, MonthBucket>();
   function bucketFor(monthIndex: number): MonthBucket {

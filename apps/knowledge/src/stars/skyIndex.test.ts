@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSkyIndex, skyIndexRange, unconnectedEntries } from "./skyIndex";
+import { buildSkyIndex, entriesFromCutoff, skyIndexRange, unconnectedEntries } from "./skyIndex";
 import type { PageManifestEntry } from "../domain/page";
 import type { SavedConstellation } from "./schema";
 import { monthIndexFromIso } from "./timeline";
@@ -58,6 +58,18 @@ describe("buildSkyIndex", () => {
     const entries = [entry("a", undefined), entry("b", "not-a-date")];
     const index = buildSkyIndex(entries, []);
     expect(index.size).toBe(0);
+  });
+});
+
+describe("entriesFromCutoff", () => {
+  it("drops entries created before the cutoff", () => {
+    const entries = [entry("old", "2026-08-31T23:59:59.000Z"), entry("new", "2026-09-01T00:00:00.000Z")];
+    expect(entriesFromCutoff(entries, "2026-09-01T00:00:00.000Z").map(item => item.id)).toEqual(["new"]);
+  });
+
+  it("drops entries with no usable creation date", () => {
+    const entries = [entry("missing", undefined), entry("bad", "not-a-date")];
+    expect(entriesFromCutoff(entries, "2026-09-01T00:00:00.000Z")).toEqual([]);
   });
 });
 
