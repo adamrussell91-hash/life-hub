@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Person Brief</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  body { background: var(--cotton); }
+  .canvas { align-items: center; justify-content: center; padding: 44px 0; }
+  .brief-sheet {
+    width: 880px;
+    background: var(--warm-white);
+    border-radius: var(--radius-xl);
+    border: 1px solid var(--line);
+    box-shadow: var(--elev-4);
+    padding: 44px 52px 48px;
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+  }
+  .brief-close { align-self: flex-end; font-size: var(--text-xs); color: var(--muted); font-weight: 600; margin-bottom: -14px; }
+  .brief-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+  .brief-who { display: flex; gap: 16px; align-items: center; }
+  .avatar-lg { width: 56px; height: 56px; font-size: 19px; background: linear-gradient(135deg, var(--navy-2), var(--marine)); }
+  .brief-name { font-size: var(--text-lg); font-weight: 700; color: var(--depth); margin: 0 0 3px; letter-spacing: var(--tracking-tight); }
+  .brief-role { font-size: var(--text-sm); color: var(--muted); margin: 0; }
+  .brief-meta { text-align: right; }
+  .brief-meta .eyebrow { display: block; margin-bottom: 4px; }
+  .brief-meta .value { font-size: var(--text-sm); font-weight: 600; color: var(--depth); }
+
+  .brief-section { display: flex; flex-direction: column; gap: 10px; }
+  .brief-section h2 { font-size: var(--text-base); font-weight: 700; color: var(--depth); margin: 0; letter-spacing: var(--tracking-tight); }
+  .brief-section p, .brief-section li { font-size: var(--text-sm); color: var(--ink); line-height: var(--leading-normal); margin: 0; }
+  .brief-section ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .brief-section b { color: var(--depth); font-weight: 600; }
+
+  .since-box {
+    background: var(--pastel-blue);
+    border-radius: var(--radius-md);
+    padding: 20px 22px;
+  }
+  .since-box h2 { color: var(--pastel-blue-ink); }
+  .since-box li::marker { color: var(--wave); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+
+  .talking-points { display: flex; flex-direction: column; gap: 8px; }
+  .tp-item { display: flex; gap: 10px; font-size: var(--text-sm); color: var(--ink); }
+  .tp-num { flex: 0 0 20px; height: 20px; border-radius: var(--radius-full); background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+  .open-loop { display: flex; align-items: flex-start; gap: 10px; padding: 4px 0; }
+  .open-loop .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea); margin-top: 6px; flex: 0 0 7px; }
+
+  .brief-actions { display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 22px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Overview</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>Search</a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas">
+    <div class="brief-sheet">
+      <span class="brief-close">Close brief &times;</span>
+      <div class="brief-header">
+        <div class="brief-who">
+          <div class="avatar avatar-lg">VL</div>
+          <div>
+            <p class="brief-name">Dr Vicky Leighton</p>
+            <p class="brief-role">Senior Lecturer, Gifted Education &middot; University of Melbourne</p>
+          </div>
+        </div>
+        <div class="brief-meta">
+          <span class="eyebrow">Coffee meeting</span>
+          <span class="value">Thu 8 May &middot; 10:00am &middot; Uni Cafe</span>
+        </div>
+      </div>
+
+      <div class="brief-section">
+        <h2>Who they are</h2>
+        <p>Academic contact, mentor and research collaborator since 2022. Vicky leads gifted education research at Melbourne and has been a steady source of career advice. Human note: <i>&ldquo;Gifted education person I bounce ideas off.&rdquo;</i></p>
+      </div>
+
+      <div class="since-box">
+        <h2>Since you last spoke</h2>
+        <p style="margin-bottom:4px;">You last spoke 3 months ago, at the Gifted Education Network event. Since then:</p>
+        <ul>
+          <li>Vicky joined a university research panel on twice-exceptional learners</li>
+          <li>A new shared network formed &mdash; <b>3 mutual contacts</b> now overlap</li>
+          <li>A relevant article entered Knowledge Hub on gifted underachievement</li>
+          <li>One previous follow-up remains incomplete</li>
+        </ul>
+      </div>
+
+      <div class="two-col">
+        <div class="brief-section">
+          <h2>Open loops</h2>
+          <div class="open-loop"><span class="dot"></span><span>Send the assessment reform draft you promised in March</span></div>
+          <div class="open-loop"><span class="dot"></span><span>Introduce Vicky to James Cho at UNSW</span></div>
+        </div>
+        <div class="brief-section">
+          <h2>Current shared work</h2>
+          <p>Research proposal on twice-exceptional learners &middot; drafting stage, next review 15 May</p>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <div class="brief-section">
+          <h2>Talking points</h2>
+          <div class="talking-points">
+            <div class="tp-item"><span class="tp-num">1</span><span>Ask about the new research panel appointment</span></div>
+            <div class="tp-item"><span class="tp-num">2</span><span>Share the Knowledge Hub article on underachievement</span></div>
+            <div class="tp-item"><span class="tp-num">3</span><span>Confirm HALT Conference attendance, 22 May</span></div>
+          </div>
+        </div>
+        <div class="brief-section">
+          <h2>Mutual connections</h2>
+          <p>Nina Fraser (UNSW), James Cho (Educational Neuroscience), Sarah Whitlam (assessment reform project)</p>
+        </div>
+      </div>
+
+      <div class="brief-actions">
+        <button class="btn btn-outline">Snooze</button>
+        <button class="btn btn-primary">Open full profile</button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

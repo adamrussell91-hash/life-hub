@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>People Home</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .today-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .today-card { padding: 20px; display: flex; flex-direction: column; gap: 10px; min-height: 148px; }
+  .today-card__top { display: flex; align-items: center; justify-content: space-between; }
+  .today-card__title { font-size: var(--text-base); font-weight: 600; color: var(--depth); line-height: var(--leading-snug); margin: 0; }
+  .today-card__detail { font-size: var(--text-sm); color: var(--muted); line-height: var(--leading-snug); margin: 0; }
+  .today-card__action { margin-top: auto; font-size: var(--text-xs); font-weight: 600; color: var(--wave); }
+
+  .signal-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .signal-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .signal-card__label { font-size: var(--text-2xs); font-weight: 600; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--muted); }
+  .signal-card__value { font-size: var(--text-lg); font-weight: 700; color: var(--depth); letter-spacing: var(--tracking-tight); }
+  .signal-card__detail { font-size: var(--text-xs); color: var(--muted); }
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+  .section-title { font-size: var(--text-lg); font-weight: 600; color: var(--depth); margin: 0; letter-spacing: var(--tracking-tight); }
+  .section-link { font-size: var(--text-xs); font-weight: 600; color: var(--wave); }
+
+  .cohort-row { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .activity-strip { display: flex; flex-direction: column; }
+  .activity-row { display: flex; align-items: baseline; gap: 16px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-time { flex: 0 0 128px; font-size: var(--text-xs); color: var(--muted); font-weight: 500; }
+  .activity-text { font-size: var(--text-sm); color: var(--ink); }
+  .activity-text b { color: var(--depth); font-weight: 600; }
+
+  .bottom-row { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+  .panel { padding: 22px 24px; display: flex; flex-direction: column; }
+  .cohort-row { align-content: flex-start; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link">
+        <svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>
+        Home
+      </a>
+      <a class="hub-rail__link is-current">
+        <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>
+        People
+      </a>
+      <a class="hub-rail__link">
+        <svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>
+        Organisations
+      </a>
+      <a class="hub-rail__link">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>
+        Network Ecology
+      </a>
+      <a class="hub-rail__link">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>
+        Overview
+      </a>
+      <a class="hub-rail__link">
+        <svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>
+        Search
+      </a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas">
+    <div class="page-header">
+      <div>
+        <h1 class="page-title">People</h1>
+        <p class="page-subtitle">Your professional relationships, activity and network.</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline">Search</button>
+        <button class="btn btn-primary">+ Add person</button>
+      </div>
+    </div>
+
+    <div class="signal-row">
+      <div class="card signal-card">
+        <div class="signal-card__label">Active relationships</div>
+        <div class="signal-card__value">42</div>
+        <div class="signal-card__detail">Meaningful contact in the past 6 months</div>
+      </div>
+      <div class="card signal-card">
+        <div class="signal-card__label">Upcoming interactions</div>
+        <div class="signal-card__value">6</div>
+        <div class="signal-card__detail">Meetings and events over the next 2 weeks</div>
+      </div>
+      <div class="card signal-card">
+        <div class="signal-card__label">Recent relationship changes</div>
+        <div class="signal-card__value">3</div>
+        <div class="signal-card__detail">Role and organisation changes this month</div>
+      </div>
+      <div class="card signal-card">
+        <div class="signal-card__label">Current opportunity windows</div>
+        <div class="signal-card__value">2</div>
+        <div class="signal-card__detail">Upcoming events with network overlap</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-head">
+        <h2 class="section-title">People Today</h2>
+        <span class="section-link">View all</span>
+      </div>
+      <div class="today-grid">
+        <div class="card today-card">
+          <div class="today-card__top"><span class="chip chip-outline">Reconnect</span></div>
+          <p class="today-card__title">Nina Fraser</p>
+          <p class="today-card__detail">5 months since last contact &middot; attending HALT event next week</p>
+          <span class="today-card__action">Suggest a message</span>
+        </div>
+        <div class="card today-card">
+          <div class="today-card__top"><span class="chip chip-blue">Upcoming</span></div>
+          <p class="today-card__title">Coffee with Vicky Leighton</p>
+          <p class="today-card__detail">Thursday, 8 May &middot; 10:00am</p>
+          <span class="today-card__action">Open Person Brief</span>
+        </div>
+        <div class="card today-card">
+          <div class="today-card__top"><span class="chip chip-sage">Change detected</span></div>
+          <p class="today-card__title">Nina moved to UNSW</p>
+          <p class="today-card__detail">Detected from email signature &middot; 2 days ago</p>
+          <span class="today-card__action">Review evidence</span>
+        </div>
+        <div class="card today-card">
+          <div class="today-card__top"><span class="chip chip-orange">Opportunity</span></div>
+          <p class="today-card__title">Gifted Education Network event</p>
+          <p class="today-card__detail">3 contacts attending &middot; 1 dormant relationship</p>
+          <span class="today-card__action">See who's going</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-row">
+      <div class="card panel">
+        <div class="section-head">
+          <h2 class="section-title">Recent Activity</h2>
+        </div>
+        <div class="activity-strip">
+          <div class="activity-row"><span class="activity-time">Today</span><span class="activity-text">Met <b>Vicky Leighton</b> at the Gifted Education Network event</span></div>
+          <div class="activity-row"><span class="activity-time">Yesterday</span><span class="activity-text"><b>Nina Fraser</b> moved to UNSW</span></div>
+          <div class="activity-row"><span class="activity-time">2 days ago</span><span class="activity-text"><b>Michael Osei</b> began a new role at Deakin University</span></div>
+          <div class="activity-row"><span class="activity-time">4 days ago</span><span class="activity-text"><b>Sarah Whitlam</b> joined the assessment reform project</span></div>
+          <div class="activity-row"><span class="activity-time">1 week ago</span><span class="activity-text">Dormant relationship with <b>James Cho</b> reactivated</span></div>
+          <div class="activity-row"><span class="activity-time">1 week ago</span><span class="activity-text">Person Brief became available for tomorrow's meeting with <b>Vicky Leighton</b></span></div>
+        </div>
+      </div>
+      <div class="card panel">
+        <div class="section-head">
+          <h2 class="section-title">Dynamic Cohorts</h2>
+        </div>
+        <div class="cohort-row">
+          <span class="chip chip-sage">Gifted Education &middot; 14</span>
+          <span class="chip chip-blue">UNSW Network &middot; 6</span>
+          <span class="chip chip-gold">School Leadership &middot; 11</span>
+          <span class="chip chip-lilac">HALT &middot; 8</span>
+          <span class="chip chip-peach">NORTH+ &middot; 5</span>
+          <span class="chip chip-sage">Research Network &middot; 9</span>
+          <span class="chip chip-blue">Former St Pius colleagues &middot; 7</span>
+          <span class="chip chip-gold">Met during 2026 &middot; 12</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

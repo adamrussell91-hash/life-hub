@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Network Ecology</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .canvas { padding: 32px 40px; gap: 18px; }
+  .eco-header { display: flex; align-items: flex-start; justify-content: space-between; }
+  .layer-row { display: flex; gap: 8px; }
+  .layer-chip {
+    padding: 7px 14px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 600;
+    border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,0.6);
+  }
+  .layer-chip.is-on { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  .eco-body { flex: 1; display: grid; grid-template-columns: 1fr 260px; gap: 18px; min-height: 0; }
+
+  .map-frame {
+    position: relative; border-radius: var(--radius-xl); overflow: hidden;
+    background: radial-gradient(ellipse at 30% 20%, #fdfbf6 0%, #f6efe2 55%, #efe6d3 100%);
+    border: 1px solid var(--line); box-shadow: var(--elev-3);
+  }
+  .map-frame svg { width: 100%; height: 100%; display: block; }
+
+  .habitat-label {
+    font-family: var(--font-ui); font-size: 13px; font-weight: 700; letter-spacing: 0.03em;
+  }
+  .habitat-sub { font-family: var(--font-ui); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+
+  .side-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .panel { padding: 18px 20px; }
+  .panel h3 { font-size: var(--text-sm); font-weight: 700; color: var(--depth); margin: 0 0 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps); font-size: 11px; }
+  .insight { font-size: var(--text-xs); color: var(--ink); line-height: var(--leading-normal); padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .insight:last-child { border-bottom: none; }
+  .insight b { color: var(--depth); font-weight: 600; }
+
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 10px; }
+
+  .bridge-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .bridge-row:last-child { border-bottom: none; }
+  .bridge-avatar { width: 26px; height: 26px; font-size: 10px; }
+  .bridge-name { font-size: 12px; font-weight: 600; color: var(--depth); }
+  .bridge-links { font-size: 10.5px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>Organisations</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Overview</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>Search</a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas">
+    <div class="eco-header">
+      <div>
+        <h1 class="page-title" style="font-size:28px;">Network Ecology</h1>
+        <p class="page-subtitle">Your professional biosphere, viewed from above.</p>
+      </div>
+      <div class="layer-row">
+        <span class="layer-chip is-on">Habitats</span>
+        <span class="layer-chip">People</span>
+        <span class="layer-chip">Opportunity</span>
+        <span class="layer-chip">Dormancy</span>
+        <span class="layer-chip">Mycelium</span>
+        <span class="layer-chip">History</span>
+      </div>
+    </div>
+
+    <div class="eco-body">
+      <div class="map-frame">
+        <svg viewBox="-40 -30 1080 700" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="6"/>
+            </filter>
+          </defs>
+
+          <!-- Savannah: School Leadership -->
+          <ellipse cx="175" cy="500" rx="230" ry="150" fill="#f1e2b6" opacity="0.55"/>
+          <circle cx="110" cy="460" r="5" fill="#d9bd66"/>
+          <circle cx="180" cy="520" r="5" fill="#d9bd66"/>
+          <circle cx="250" cy="470" r="4" fill="#d9bd66"/>
+          <circle cx="90" cy="560" r="4" fill="#d9bd66"/>
+          <text x="70" y="600" class="habitat-sub" fill="#6c581f">SAVANNAH</text>
+          <text x="70" y="580" class="habitat-label" fill="#6c581f">School Leadership</text>
+
+          <!-- Forest: Gifted Education -->
+          <ellipse cx="330" cy="230" rx="200" ry="175" fill="#dfe9e1" opacity="0.65"/>
+          <circle cx="270" cy="180" r="16" fill="#b9cdbd"/>
+          <circle cx="330" cy="150" r="20" fill="#aac0af"/>
+          <circle cx="390" cy="190" r="15" fill="#b9cdbd"/>
+          <circle cx="300" cy="260" r="18" fill="#aac0af"/>
+          <circle cx="380" cy="270" r="13" fill="#c3d5c7"/>
+          <circle cx="240" cy="250" r="10" fill="#c3d5c7"/>
+          <text x="235" y="120" class="habitat-sub" fill="#3c5949">FOREST</text>
+          <text x="235" y="100" class="habitat-label" fill="#3c5949">Gifted Education</text>
+
+          <!-- Reef: University Research -->
+          <ellipse cx="720" cy="200" rx="230" ry="165" fill="#dceafa" opacity="0.6"/>
+          <path d="M600 210 Q 640 160 690 190 Q 730 150 780 195 Q 830 165 870 210 Q 820 240 780 220 Q 740 250 700 220 Q 650 245 600 210 Z" fill="#b9d3ee" opacity="0.85"/>
+          <path d="M630 260 Q 680 240 720 265 Q 770 235 820 260" stroke="#9dc0e6" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <text x="590" y="95" class="habitat-sub" fill="#294c71">CORAL REEF</text>
+          <text x="590" y="75" class="habitat-label" fill="#294c71">University Research</text>
+
+          <!-- Mangrove corridor: HALT -->
+          <path d="M420 300 C 480 340, 520 360, 560 400 C 600 440, 640 420, 680 400" stroke="#e8e0f1" stroke-width="46" fill="none" stroke-linecap="round" opacity="0.75"/>
+          <path d="M420 300 C 480 340, 520 360, 560 400 C 600 440, 640 420, 680 400" stroke="#c9b8dc" stroke-width="4" fill="none" stroke-linecap="round" stroke-dasharray="2 10" opacity="0.9"/>
+          <text x="440" y="365" class="habitat-sub" fill="#5d4e70">MANGROVE CORRIDOR</text>
+          <text x="440" y="345" class="habitat-label" fill="#5d4e70">HALT</text>
+
+          <!-- Wetland: HALT Conference (seasonal) -->
+          <ellipse cx="700" cy="440" rx="130" ry="95" fill="#e8e0f1" opacity="0.35" stroke="#c9b8dc" stroke-width="1.5" stroke-dasharray="4 6"/>
+          <text x="640" y="500" class="habitat-sub" fill="#7a6a8d">WETLAND &middot; SEASONAL</text>
+          <text x="640" y="480" class="habitat-label" fill="#7a6a8d">HALT Conference</text>
+
+          <!-- Island: Educational Neuroscience -->
+          <ellipse cx="880" cy="480" rx="90" ry="70" fill="#f2dfd0" opacity="0.7"/>
+          <circle cx="880" cy="480" r="8" fill="#d9ab86"/>
+          <path d="M810 460 Q 850 445 890 455" stroke="#d9ab86" stroke-width="2.5" fill="none" opacity="0.8"/>
+          <text x="820" y="560" class="habitat-sub" fill="#7a5038">ISLAND</text>
+          <text x="810" y="540" class="habitat-label" fill="#7a5038">Educational Neuroscience</text>
+
+          <!-- Ecotone highlight -->
+          <ellipse cx="545" cy="290" rx="85" ry="70" fill="none" stroke="#f68620" stroke-width="2" stroke-dasharray="5 5" opacity="0.85"/>
+          <text x="500" y="235" class="habitat-sub" fill="#a85a0c" font-weight="700">EMERGING ECOTONE</text>
+
+          <!-- connective paths -->
+          <path d="M330 300 Q 420 350 480 380" stroke="#c9c2ae" stroke-width="1.5" fill="none" stroke-dasharray="1 6" opacity="0.8"/>
+          <path d="M480 250 Q 560 240 610 220" stroke="#c9c2ae" stroke-width="1.5" fill="none" stroke-dasharray="1 6" opacity="0.8"/>
+
+          <!-- people markers -->
+          <g>
+            <circle cx="345" cy="195" r="9" fill="#142b51"/>
+            <text x="345" y="199" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" font-family="Inter">VL</text>
+          </g>
+          <g>
+            <circle cx="655" cy="235" r="8" fill="#376fb7"/>
+            <text x="655" y="239" text-anchor="middle" fill="#fff" font-size="8.5" font-weight="700" font-family="Inter">NF</text>
+          </g>
+          <g>
+            <circle cx="560" cy="310" r="8" fill="#a7abb9"/>
+            <text x="560" y="314" text-anchor="middle" fill="#fff" font-size="8.5" font-weight="700" font-family="Inter">SW</text>
+          </g>
+          <g>
+            <circle cx="150" cy="500" r="7" fill="#a7abb9"/>
+            <text x="150" y="504" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="Inter">MO</text>
+          </g>
+          <g opacity="0.55">
+            <circle cx="900" cy="470" r="7" fill="#c79a76"/>
+            <text x="900" y="474" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="Inter">JC</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="side-col">
+        <div class="card panel">
+          <h3>Legend</h3>
+          <div class="legend-row"><span class="legend-dot" style="background:#dfe9e1;"></span>Forest &mdash; mature community</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#dceafa;"></span>Reef &mdash; diverse, overlapping</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#e8e0f1;"></span>Mangrove &mdash; bridges habitats</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#f1e2b6;"></span>Savannah &mdash; broad, dispersed</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#f2dfd0;"></span>Island &mdash; specialised, isolated</div>
+        </div>
+        <div class="card panel">
+          <h3>Bridge people</h3>
+          <div class="bridge-row">
+            <div class="avatar bridge-avatar" style="background:var(--navy);">VL</div>
+            <div><div class="bridge-name">Vicky Leighton</div><div class="bridge-links">Gifted Education &harr; University Research</div></div>
+          </div>
+          <div class="bridge-row">
+            <div class="avatar bridge-avatar" style="background:var(--wave);">NF</div>
+            <div><div class="bridge-name">Nina Fraser</div><div class="bridge-links">University Research &harr; HALT</div></div>
+          </div>
+        </div>
+        <div class="card panel" style="flex:1;">
+          <h3>Insights</h3>
+          <div class="insight">Gifted Education remains your <b>most connected</b> community.</div>
+          <div class="insight">University Research has <b>grown fastest</b> during 2026.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
