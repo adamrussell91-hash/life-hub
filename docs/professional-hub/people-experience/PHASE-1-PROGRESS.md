@@ -91,6 +91,69 @@ that step is left for Adam's explicit review when he's back.
    regression... cover tab switches within one Person page") asked for;
    the regression test added alongside this fix closes that item.
 
+## Phase 2 decisions
+
+9. **Feature 1.6 classifier ported to `.mjs`, not shared.** Netlify
+   Functions run plain `.mjs` with no bundler; `apps/professional` is a
+   separate Vite/TypeScript build target. No cross-app-boundary import
+   exists anywhere else in this repo, so the classifier is duplicated
+   (`netlify/functions/_shared/relationship-state.mjs`), byte-for-byte
+   identical algorithm/constants/reason-text shape, with a "KEEP IN SYNC"
+   comment in both files pointing at each other, and a standalone
+   `tests/unit/relationship-state.test.js` (Node's `node:test`) mirroring
+   the existing Vitest suite's cases against the port independently, rather
+   than assuming the port is bug-free.
+
+10. **Reconnect vs. "Dormant relationships worth reviewing" split.** The
+    brief's Reconnect example ("Last meaningful interaction was five months
+    ago") sits within/near the Cooling window (90–180 days), not deep
+    Dormant (>180 days) — so `computeReconnectSuggestions` is scoped to
+    `cooling` only, small and actionable (cap 5, brief: "three to five
+    suggestions"). `dormant`-classified relationships get their own,
+    separate, deliberately larger, browsable module
+    (`computeDormantForReview`, cap 20) instead of being folded into
+    Reconnect. This is a new split introduced in this task, not specified
+    verbatim by the brief — recorded here per the plan's stop-condition
+    requirement.
+
+11. **"Newly detected organisation changes" omitted, not faked.** The
+    brief's sixth People Today module depends on Change Detection (brief
+    section 22), which the build plan already scoped as Phase 2/3
+    "do not build in Phase 1" work requiring pattern-analysis over
+    Observations — not a simple aggregation query this task's inputs
+    support. No module, placeholder, or fake-data UI hook was added for
+    it; People Home ships with five People Today modules instead of six
+    until Change Detection lands.
+
+12. **Dynamic Cohorts: organisation-only grouping, not organisation +
+    role.** Considered grouping by shared `professional_relationship.role`
+    (e.g. every `mentor`-role link) in addition to shared organisation, and
+    deliberately did not implement it: a role value is already visible
+    per-relationship on the Person Profile itself (Feature 1.3's
+    human_label), and globally grouping "everyone ever labelled mentor"
+    does not share an actual context the way a shared organisation does —
+    it risks conflating unrelated mentor relationships across unrelated
+    fields into one misleading bucket. Cohort labels use the organisation's
+    own `display_name` directly (e.g. "UNSW") rather than a generated
+    creative label ("Gifted Education network") — that needs semantic
+    tagging this task has no data for.
+
+13. **Recent Activity endpoint: a lighter parallel path, not
+    `assembleEntityOverview` reused per person.** `people-activity.mjs`
+    builds timeline entries directly from
+    `loadAllPeopleWithRelationships`'s already-hydrated relationship
+    arrays, mirroring `entity-overview.mjs`'s private `timelineLabel`/
+    `timelineKind`/`effectiveDate` logic rather than calling
+    `assembleEntityOverview` once per person — that function also resolves
+    a `context_href` per entry (an extra I/O hop) and re-lists membership
+    from storage per person, both already paid for by
+    `loadAllPeopleWithRelationships`; reusing it as-is would mean a second
+    full storage scan across the whole population. Sorting and pagination
+    DO reuse the shared pieces exactly: `compareTimelineOrder` and the
+    newly-exported `encodeTimelineCursor`/`decodeTimelineCursor` from
+    `entity-overview.mjs`, so this endpoint's cursor is interchangeable
+    with the Person Profile timeline's own.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -103,7 +166,13 @@ that step is left for Adam's explicit review when he's back.
   checks (`apps-spa-remount`/`hub-sections`/`static-server`, 40/40).
   Not pushed, no PR — stacked commits on `worktree-people-phase1`,
   `bbf5e565`..`e6e2750d`.
-- Phase 2: starting next.
+- Phase 2: **backend (Features 2.2-2.4) complete.** Three new Netlify
+  routes (`GET /api/people/home-signals`, `GET /api/people/cohorts`,
+  `GET /api/people/activity`) plus their `_shared` aggregation modules
+  (`people-collection.mjs`, `people-home-signals.mjs`, `people-cohorts.mjs`)
+  and the ported `relationship-state.mjs` classifier. Data layer only — the
+  People Home UI is a separate task. Verified via root `npm test`
+  (3731/3731). Not pushed, no PR.
 - Phase 3: not started
 - Phase 4: not started
 - Phase 5: not started

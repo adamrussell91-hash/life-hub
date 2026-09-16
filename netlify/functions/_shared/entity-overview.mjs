@@ -316,4 +316,9 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   };
 }
 
-export { compareTimelineOrder, defaultGetUniversalLinkStore };
+// `encodeTimelineCursor`/`decodeTimelineCursor` are exported so
+// `people-activity.mjs` (Phase 2, Recent Activity endpoint) reuses the
+// exact same cursor shape rather than inventing a new one — a caller's
+// cursor is opaque either way, but sharing the encode/decode pair keeps the
+// two endpoints' pagination semantics from silently drifting apart.
+export { compareTimelineOrder, decodeTimelineCursor, defaultGetUniversalLinkStore, encodeTimelineCursor };
