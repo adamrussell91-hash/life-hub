@@ -118,6 +118,14 @@ export interface TimelineEntry {
   label: string;
   context_key: string | null;
   source_ref: string;
+  /**
+   * The underlying link's target ref. Like `source_ref`, this is NOT
+   * necessarily a person ref — for a Task/Communication/Meeting/Event-
+   * derived entry it may be the record on the other side of that link.
+   * Together with `source_ref`, this is what lets a caller ask "does this
+   * timeline entry involve entity X" without assuming which side X was on.
+   */
+  target_ref: string;
   href: string | null;
   context_href: string | null;
 }

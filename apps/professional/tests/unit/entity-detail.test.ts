@@ -356,6 +356,108 @@ describe('renderPersonPage', () => {
     expect(canvas.querySelector('.entity-detail__state-toggle')).not.toBeNull();
   });
 
+  it('derives Relationship Activity State from timeline entries matched by source_ref OR target_ref, not source_ref alone', async () => {
+    // Regression test for a review-flagged bug: matching only `source_ref`
+    // left genuine recent activity undetected (a direct person-to-person
+    // timeline entry can record the counterpart as either side, and a
+    // Task/Communication-derived entry's `source_ref` is never a person at
+    // all), so nearly everything rendered as Dormant regardless of real
+    // activity.
+    const counterpartRef = 'shared:person:person_00000000-0000-4000-8000-000000000099';
+    const now = Date.now();
+    const daysAgo = (n: number) => new Date(now - n * 24 * 60 * 60 * 1000).toISOString();
+
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          current_relationships: [
+            {
+              link: {
+                id: 'l7',
+                relationship_type: 'professional_relationship',
+                status: 'current',
+                temporal_mode: 'period',
+                role: 'colleague',
+                metadata: {}
+              },
+              endpoint: {
+                ref: counterpartRef,
+                kind: 'person',
+                display_label: 'Jane Doe',
+                supporting_label: null,
+                href: null,
+                lifecycle_status: 'active',
+                visibility: 'operator'
+              },
+              direction: 'outgoing'
+            }
+          ],
+          timeline: [
+            // Must NOT match: a Task-derived entry that involves neither
+            // side of it being the counterpart. Placed most recent so it
+            // would corrupt the result if wrongly matched.
+            {
+              id: 't1',
+              kind: 'point',
+              date: daysAgo(1),
+              end_date: null,
+              label: 'contact Someone Else',
+              context_key: null,
+              source_ref: 'tasks:task:task_unrelated',
+              target_ref: 'shared:person:person_00000000-0000-4000-8000-000000000055',
+              href: null,
+              context_href: null
+            },
+            // Matches via source_ref === counterpartRef (the case that
+            // already worked before this fix).
+            {
+              id: 't2',
+              kind: 'point',
+              date: daysAgo(5),
+              end_date: null,
+              label: 'contacted',
+              context_key: null,
+              source_ref: counterpartRef,
+              target_ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000066',
+              href: null,
+              context_href: null
+            },
+            // Matches via target_ref === counterpartRef — the case the bug
+            // missed entirely.
+            {
+              id: 't3',
+              kind: 'point',
+              date: daysAgo(10),
+              end_date: null,
+              label: 'contacted',
+              context_key: null,
+              source_ref: 'tasks:task:task_other',
+              target_ref: counterpartRef,
+              href: null,
+              context_href: null
+            }
+          ]
+        })
+      })
+    );
+
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    const toggle = canvas.querySelector<HTMLButtonElement>('.entity-detail__state-toggle')!;
+    expect(toggle).not.toBeNull();
+    // Recent genuine activity (5 and 10 days ago, picked up via source_ref
+    // and target_ref respectively) must NOT be classified as Dormant.
+    expect(toggle.textContent).toBe('Active');
+
+    toggle.click();
+    const reasons = canvas.querySelector<HTMLElement>('.entity-detail__state-reasons')!;
+    // Cites the most recent MATCHING interaction (5 days ago, via
+    // source_ref) — not the unrelated Task entry from 1 day ago.
+    expect(reasons.textContent).toMatch(/5 days? ago/);
+  });
+
   it('offers accessible role editing only for a current, period relationship', async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(200, {

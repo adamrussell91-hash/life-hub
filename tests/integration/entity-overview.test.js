@@ -199,6 +199,12 @@ test('shows two concurrent current relationships and one ended historical relati
   // ended employee_at role (2025-01).
   assert.equal(body.timeline[0].date, '2025-06-01T00:00:00.000Z');
   assert.equal(body.timeline[1].date, '2025-01-01T00:00:00.000Z');
+  // Regression coverage: a timeline entry must carry `target_ref` alongside
+  // `source_ref` — a client matching a counterpart entity only against
+  // `source_ref` cannot find entries where that counterpart is the target
+  // (see Feature 1.3/1.6 integration in apps/professional/src/components/person-tabs.ts).
+  assert.equal(body.timeline[0].target_ref, second.ref);
+  assert.equal(body.timeline[1].target_ref, unsw.ref);
   assert.equal(body.linked_records.organisations.length, 2);
   assert.equal(body.linked_records.tasks.length, 0);
   assert.equal(body.linked_records.communications.length, 0);

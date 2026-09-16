@@ -129,9 +129,17 @@ function augmentProfessionalRelationships(listHost: HTMLElement, overview: Entit
 // to `RelationshipStateInput` — documented simplifications (Feature 1.6
 // integration, not a new capability):
 //  - lastMeaningfulInteraction/previousMeaningfulInteraction: the two most
-//    recent timeline entries whose `source_ref` matches this relationship's
-//    counterpart-person ref (`overview.timeline` is already sorted newest
-//    first by the server).
+//    recent timeline entries that involve this relationship's counterpart
+//    person — matched on EITHER `source_ref` or `target_ref`, since a
+//    timeline entry's underlying link can have the counterpart on either
+//    side (e.g. a direct person-to-person link records whichever side was
+//    "known first" as `source_ref`, per Feature 1.1's direction
+//    convention — not tied to interaction recency — while a Task/
+//    Communication/Meeting/Event-derived entry's `source_ref` is that
+//    record itself, never the counterpart). Matching only `source_ref`
+//    left `matches` empty for nearly every real relationship, so this
+//    checks both fields. `overview.timeline` is already sorted newest
+//    first by the server.
 //  - upcomingInteraction: always null — no upcoming-interaction data source
 //    exists yet in `EntityOverview`. Follow-up: surface scheduled
 //    meetings/events involving this counterpart.
@@ -140,7 +148,9 @@ function augmentProfessionalRelationships(listHost: HTMLElement, overview: Entit
 //    active linked records.
 function deriveRelationshipStateInput(entry: RelationshipEntry, overview: EntityOverview): RelationshipStateInput {
   const counterpartRef = entry.endpoint.ref;
-  const matches = overview.timeline.filter((item) => item.source_ref === counterpartRef);
+  const matches = overview.timeline.filter(
+    (item) => item.source_ref === counterpartRef || item.target_ref === counterpartRef
+  );
   return {
     lastMeaningfulInteraction: matches[0]?.date ?? null,
     previousMeaningfulInteraction: matches[1]?.date ?? null,
@@ -215,6 +225,15 @@ function renderSharedWorkTab(host: HTMLElement, overview: EntityOverview): void 
 // `.organisations` — the two arrays the server has always returned in
 // `EntityOverview` but that no existing UI rendered. Zero new server calls;
 // same single fetch as every other tab.
+//
+// Known overlap, not a bug: these two lists are built from the same
+// underlying `entries` array as Overview's current relationships and
+// History's historical relationships (deduped only by ref, with no status/
+// role context of their own) — so "Network" today largely just re-lists
+// "everyone connected," current or historical, rather than a distinct
+// notion of network. Left as-is for Phase 1; a later phase can decide
+// whether to scope Network down to something narrower (e.g. current-only,
+// or annotated with relationship status).
 function renderNetworkTab(host: HTMLElement, overview: EntityOverview): void {
   host.replaceChildren();
   const section = el('div', 'entity-detail__section');

@@ -173,7 +173,14 @@ function renderTabbedContent(
     `${overview.entity.kind === 'person' ? 'Person' : 'Organisation'} sections`
   );
 
+  // A single shared panel whose content is swapped on tab switch (rather
+  // than one hidden `<div>` per tab) — still the standard ARIA tabs
+  // pattern as long as `aria-labelledby` tracks whichever tab is
+  // currently active, which `activate()` updates below.
   const contentHost = el('div', 'entity-detail__tab-content');
+  contentHost.id = 'entity-detail-tabpanel';
+  contentHost.setAttribute('role', 'tabpanel');
+  contentHost.tabIndex = 0;
   const buttons = new Map<string, HTMLButtonElement>();
 
   const requestedInitialId = config.initialTabId ?? tabs[0].id;
@@ -185,6 +192,7 @@ function renderTabbedContent(
       const isActive = tabId === id;
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
       btn.classList.toggle('is-active', isActive);
+      if (isActive) contentHost.setAttribute('aria-labelledby', btn.id);
     }
     contentHost.replaceChildren();
     const tab = tabs.find((t) => t.id === id);
@@ -200,6 +208,7 @@ function renderTabbedContent(
     btn.id = `entity-detail-tab-${tab.id}`;
     btn.setAttribute('role', 'tab');
     btn.setAttribute('aria-selected', tab.id === activeId ? 'true' : 'false');
+    btn.setAttribute('aria-controls', contentHost.id);
     btn.addEventListener('click', () => {
       if (tab.id !== activeId) activate(tab.id);
     });

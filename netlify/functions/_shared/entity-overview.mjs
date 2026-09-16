@@ -191,6 +191,7 @@ function baseTimelineEntry({ link, endpoint, direction }) {
     label: timelineLabel({ link, endpoint, direction }),
     context_key: link.context_key,
     source_ref: link.source_ref,
+    target_ref: link.target_ref,
     // Never invent a browser href — only surface one the resolver provided.
     href: endpoint.href ?? null
   };

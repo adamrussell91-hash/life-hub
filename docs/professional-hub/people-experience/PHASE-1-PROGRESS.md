@@ -38,7 +38,12 @@ that step is left for Adam's explicit review when he's back.
    renders `linked_records.people` and `linked_records.organisations` —
    the two arrays `EntityOverview` has always returned but that no
    existing UI rendered — as two labeled lists. Zero new server calls,
-   same single fetch as every other tab.
+   same single fetch as every other tab. Known, accepted overlap: both
+   lists are built from the same `entries` array as Overview's current
+   relationships and History's historical relationships (deduped by ref
+   only, no status/role context), so today Network largely re-lists
+   "everyone connected" rather than a distinct notion of network — left
+   as-is for Phase 1, a later phase can scope it down.
 
 5. **Feature 1.3 `metadata.human_label` pass-through**: chose to extend
    `entity-overview.mjs`'s `current_relationships`/`historical_relationships`
