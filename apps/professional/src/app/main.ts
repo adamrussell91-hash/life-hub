@@ -12,7 +12,7 @@ import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
 import { parseRoute, railHighlightFor } from '@/app/router';
-import { renderPeopleView } from '@/views/people';
+import { renderPeopleHomeView } from '@/views/people-home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import {
@@ -79,7 +79,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
     if (route.name === 'people') {
       renderPageHeader(shell, viewChrome('people'));
-      renderPeopleView(shell.canvas);
+      await renderPeopleHomeView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'organisations') {

@@ -154,6 +154,54 @@ that step is left for Adam's explicit review when he's back.
     `entity-overview.mjs`, so this endpoint's cursor is interchangeable
     with the Person Profile timeline's own.
 
+14. **Feature 2.1 People Home structure: option (a), matching the plan's own
+    recommendation.** `#/people` now renders the People Home dashboard
+    directly (`apps/professional/src/views/people-home.ts`, replacing
+    `views/people.ts`, which is deleted); `railHighlightFor`/`parseRoute`
+    needed no changes. The old flat person/organisation search
+    (`mountEntitySearch`) is reused, unchanged, as the header's "Search"
+    action — it mounts lazily into a collapsible panel on first click rather
+    than being duplicated or rebuilt. `main.ts`'s `people` route branch is
+    now `await`ed, matching the `communications`/`meetings`/`events`
+    pattern, with `isCurrent` threaded through the same way
+    `renderPersonPage`/`renderOrganisationPage` already do.
+
+15. **"Add person" has no real backing action — rendered honestly, not
+    faked.** Rapid Person Capture (brief section 5) is a separate,
+    not-yet-built feature; no create-person route or endpoint exists
+    anywhere in this app (confirmed by search before writing the header).
+    The button is real and reachable but its click handler reveals a
+    visible status line explaining the scope cut, rather than opening a
+    fake modal with nowhere to submit. Follow-up: implement Rapid Person
+    Capture and wire this button to it.
+
+16. **"Dormant relationships worth reviewing" links both sides, not a single
+    "counterpart."** Unlike `reconnect_suggestions` (which pre-picks a
+    counterpart server-side via `is_self`), `dormant_for_review` returns raw
+    `source`/`target` with no `is_self` flag in the client payload, so there
+    is no reliable way to guess which side is "the person to review" versus
+    the operator. Both sides are rendered as links rather than arbitrarily
+    picking one.
+
+17. **Recent Activity's empty state reuses SOURCE-BRIEF.md section 50's
+    "Empty Timeline" copy** ("No relationship events recorded yet.") rather
+    than inventing a second string — the brief doesn't give Recent Activity
+    its own empty-state copy, and this page-level strip is structurally the
+    same "no events yet" case as the Person Profile Timeline tab it
+    aggregates. The Reconnect module's empty state ("No reconnect
+    suggestions right now.") is NOT sourced from the brief — section 20
+    never specifies one — and is a plain, honest string written for this
+    task, not a citation.
+
+18. **Mobile/390px coverage for `people-home.test.ts` is a Vitest smoke
+    check, not a layout assertion** — the same convention
+    `meetings-events.test.ts`/`applications-career.test.ts` already use
+    (set `window.innerWidth`/element width to 390px, assert the same
+    content still renders). jsdom has no layout engine, so no
+    `apps/professional` unit test asserts computed CSS or pixel geometry;
+    that class of check belongs to this repo's Playwright/browser tests,
+    not this Vitest suite.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -166,13 +214,16 @@ that step is left for Adam's explicit review when he's back.
   checks (`apps-spa-remount`/`hub-sections`/`static-server`, 40/40).
   Not pushed, no PR — stacked commits on `worktree-people-phase1`,
   `bbf5e565`..`e6e2750d`.
-- Phase 2: **backend (Features 2.2-2.4) complete.** Three new Netlify
-  routes (`GET /api/people/home-signals`, `GET /api/people/cohorts`,
-  `GET /api/people/activity`) plus their `_shared` aggregation modules
-  (`people-collection.mjs`, `people-home-signals.mjs`, `people-cohorts.mjs`)
-  and the ported `relationship-state.mjs` classifier. Data layer only — the
-  People Home UI is a separate task. Verified via root `npm test`
-  (3731/3731). Not pushed, no PR.
+- Phase 2: **backend (Features 2.2-2.4) complete; Feature 2.1 (People Home
+  UI) complete.** Three Netlify routes (`GET /api/people/home-signals`,
+  `GET /api/people/cohorts`, `GET /api/people/activity`) plus their
+  `_shared` aggregation modules and the ported `relationship-state.mjs`
+  classifier, consumed by `apps/professional/src/views/people-home.ts` (new
+  API wrappers in `src/api/people-home.ts`, response types in
+  `src/domain/types.ts`). `#/people` now renders the People Home dashboard;
+  `views/people.ts` is deleted. Verified: `apps/professional` `npm test`
+  (130/130), `npm run typecheck` (clean), `npm run build` (clean); root
+  `npm test` (3731/3731, unaffected — a separate suite). Not pushed, no PR.
 - Phase 3: not started
 - Phase 4: not started
 - Phase 5: not started

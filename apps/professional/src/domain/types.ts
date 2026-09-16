@@ -421,3 +421,105 @@ export interface CareerOverview {
   organisations: CareerSection;
   deferred: string[];
 }
+
+/**
+ * People Home (Phase 2, Feature 2.1+) — response shapes for the three
+ * aggregation endpoints People Home consumes. Field names/shapes mirror
+ * `netlify/functions/_shared/people-home-signals.mjs` and
+ * `people-cohorts.mjs` exactly, confirmed by direct read of those modules
+ * (not inferred from the brief).
+ */
+export interface PeopleHomeSignalCounts {
+  active_relationships: number;
+  upcoming_interactions: number;
+  recent_relationship_changes: number;
+  current_opportunity_windows: number;
+}
+
+export interface ReconnectSuggestion {
+  link_id: string;
+  person_ref: string;
+  display_name: string | null;
+  days_since_last_interaction: number | null;
+  reasons: string[];
+  active_shared_contexts: number;
+}
+
+/** The two sides of a `professional_relationship` link, as returned by
+ * `describePerson` in `people-home-signals.mjs` — `display_name` is null
+ * when the referenced person could not be resolved in the scan. */
+export interface RelationshipCounterpart {
+  ref: string;
+  display_name: string | null;
+}
+
+export type RelationshipChangeType = 'opened' | 'closed' | 'role_changed';
+
+export interface RelationshipChangeEntry {
+  link_id: string;
+  change_type: RelationshipChangeType | string;
+  changed_at: string;
+  source: RelationshipCounterpart;
+  target: RelationshipCounterpart;
+  role: string | null;
+  human_label: string | null;
+}
+
+export interface NewConnectionEntry {
+  ref: string;
+  display_name: string | null;
+  created_at: string;
+}
+
+export interface DormantReviewEntry {
+  link_id: string;
+  source: RelationshipCounterpart;
+  target: RelationshipCounterpart;
+  role: string | null;
+  human_label: string | null;
+  reasons: string[];
+  days_since_last_interaction: number | null;
+}
+
+export interface PeopleHomeSignalsResponse {
+  signals: PeopleHomeSignalCounts;
+  reconnect_suggestions: ReconnectSuggestion[];
+  recent_changes: RelationshipChangeEntry[];
+  new_connections: NewConnectionEntry[];
+  dormant_for_review: DormantReviewEntry[];
+}
+
+export interface CohortMember {
+  ref: string;
+  display_name: string | null;
+}
+
+export interface DynamicCohort {
+  kind: string;
+  key: string;
+  label: string;
+  organisation_ref: string;
+  members: CohortMember[];
+}
+
+export interface PeopleCohortsResponse {
+  cohorts: DynamicCohort[];
+}
+
+export interface PeopleActivityItem {
+  id: string;
+  kind: 'point' | 'period' | 'change' | string;
+  date: string | null;
+  end_date: string | null;
+  relationship_type: string;
+  status: string;
+  label: string;
+  source_ref: string;
+  target_ref: string;
+  href: string | null;
+}
+
+export interface PeopleActivityResponse {
+  items: PeopleActivityItem[];
+  next_cursor: string | null;
+}
