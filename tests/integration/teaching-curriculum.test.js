@@ -4,6 +4,7 @@ import { createSessionToken } from '../../netlify/functions/_shared/auth-securit
 import { createClassHandler } from '../../netlify/functions/class.mjs';
 import { createClassesHandler } from '../../netlify/functions/classes.mjs';
 import { createCurriculumHandler } from '../../netlify/functions/curriculum.mjs';
+import { createDrivePickerConfigHandler } from '../../netlify/functions/drive-picker-config.mjs';
 import { createLessonHandler } from '../../netlify/functions/lesson.mjs';
 import { createMediaHandler } from '../../netlify/functions/media.mjs';
 import { createMediaItemHandler } from '../../netlify/functions/media-item.mjs';
@@ -641,4 +642,41 @@ test('media item route forwards the reserved upload path', async () => {
   assert.equal(media.provider, 'direct');
   assert.equal(media.title, 'Cover image');
   assert.ok(await store.get(`media_files/${media.id}`));
+});
+
+test('drive picker config returns the public client values behind the Life session', async () => {
+  const deps = {
+    env: { ...env, GOOGLE_CLIENT_ID: 'client-123', GOOGLE_PICKER_API_KEY: 'key-abc' },
+    now: () => Date.parse('2026-08-01T01:00:00Z')
+  };
+  const response = await createDrivePickerConfigHandler(deps)(
+    new Request('https://api.adam-russell.com/api/drive-picker-config', {
+      method: 'GET',
+      headers: {
+        cookie: `life_hub_session=${session}`,
+        origin: 'https://teaching-hub.adam-russell.com'
+      }
+    }),
+    {}
+  );
+
+  assert.equal(response.status, 200);
+  const body = (await response.json()).data;
+  assert.deepEqual(body, { clientId: 'client-123', apiKey: 'key-abc' });
+});
+
+test('drive picker config reports misconfigured when the Netlify env values are missing', async () => {
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z') };
+  const response = await createDrivePickerConfigHandler(deps)(
+    new Request('https://api.adam-russell.com/api/drive-picker-config', {
+      method: 'GET',
+      headers: {
+        cookie: `life_hub_session=${session}`,
+        origin: 'https://teaching-hub.adam-russell.com'
+      }
+    }),
+    {}
+  );
+
+  assert.equal(response.status, 503);
 });
