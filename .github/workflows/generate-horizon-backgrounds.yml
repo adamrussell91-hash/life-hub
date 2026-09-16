@@ -1,0 +1,153 @@
+name: Generate Horizon time backgrounds
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/generate-horizon-backgrounds.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image dependencies
+        run: python -m pip install --disable-pip-version-check pillow numpy
+
+      - name: Generate five time-of-day backgrounds
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageEnhance, ImageFilter, ImageDraw
+          import numpy as np
+          import random
+
+          root = Path('apps/knowledge/public/assets/cognitive-protocols/backgrounds')
+          src_path = root / 'horizon-background.png'
+          src = Image.open(src_path).convert('RGB')
+          W, H = src.size
+
+          def colour_grade(img, brightness=1.0, contrast=1.0, saturation=1.0, tint=(1,1,1), gamma=1.0):
+              arr = np.asarray(img).astype(np.float32) / 255.0
+              arr = np.clip(arr, 0, 1) ** gamma
+              arr *= np.array(tint, dtype=np.float32)
+              arr = np.clip(arr, 0, 1)
+              out = Image.fromarray((arr * 255).astype(np.uint8))
+              out = ImageEnhance.Brightness(out).enhance(brightness)
+              out = ImageEnhance.Contrast(out).enhance(contrast)
+              out = ImageEnhance.Color(out).enhance(saturation)
+              return out
+
+          def radial_overlay(size, centre, radius, colour, alpha_max):
+              w, h = size
+              y, x = np.ogrid[:h, :w]
+              cx, cy = centre
+              rx, ry = radius
+              d = ((x-cx)/rx)**2 + ((y-cy)/ry)**2
+              a = np.clip(1-d, 0, 1)**1.8 * alpha_max
+              overlay = np.zeros((h,w,4), dtype=np.uint8)
+              overlay[...,0] = colour[0]
+              overlay[...,1] = colour[1]
+              overlay[...,2] = colour[2]
+              overlay[...,3] = (a*255).astype(np.uint8)
+              return Image.fromarray(overlay, 'RGBA')
+
+          def polygon_glow(size, points, colour, alpha=80, blur=25):
+              layer = Image.new('RGBA', size, (0,0,0,0))
+              ImageDraw.Draw(layer).polygon(points, fill=(*colour, alpha))
+              return layer.filter(ImageFilter.GaussianBlur(blur))
+
+          def tint_exterior(base_rgba, colour, alpha):
+              layer = Image.new('RGBA', (W,H), (0,0,0,0))
+              ImageDraw.Draw(layer).rectangle((1182,0,1235,638), fill=(*colour,alpha))
+              return Image.alpha_composite(base_rgba, layer)
+
+          def add_sun(base_rgba, centre, radius, colour, glow_strength):
+              layer = Image.new('RGBA', (W,H), (0,0,0,0))
+              glow = radial_overlay((W,H), centre, (65,65), colour, glow_strength).filter(ImageFilter.GaussianBlur(12))
+              layer = Image.alpha_composite(layer, glow)
+              ImageDraw.Draw(layer).ellipse((centre[0]-radius, centre[1]-radius, centre[0]+radius, centre[1]+radius), fill=(*colour,230))
+              return Image.alpha_composite(base_rgba, layer)
+
+          def add_stars(base_rgba, seed, count, alpha):
+              rng = random.Random(seed)
+              layer = Image.new('RGBA', (W,H), (0,0,0,0))
+              draw = ImageDraw.Draw(layer)
+              for _ in range(count):
+                  x = rng.randint(1186,1231)
+                  y = rng.randint(8,285)
+                  r = rng.choice([1,1,1,2])
+                  a = rng.randint(alpha//2, alpha)
+                  draw.ellipse((x-r,y-r,x+r,y+r), fill=(238,245,255,a))
+              return Image.alpha_composite(base_rgba, layer.filter(ImageFilter.GaussianBlur(0.15)))
+
+          def add_fire_glow(base_rgba, strength):
+              glow = radial_overlay((W,H), (105,575), (330,280), (255,120,25), strength)
+              return Image.alpha_composite(base_rgba, glow.filter(ImageFilter.GaussianBlur(18)))
+
+          def add_door_light(base_rgba, colour, alpha, reach_x, bottom_y):
+              points = [(1187,610),(1235,610),(reach_x,bottom_y),(reach_x-145,bottom_y)]
+              return Image.alpha_composite(base_rgba, polygon_glow((W,H), points, colour, alpha, 35))
+
+          def make_variant(kind):
+              if kind == 'sunrise':
+                  im = colour_grade(src, 0.98, 1.01, 1.06, (1.08,0.99,0.95), 0.98).convert('RGBA')
+                  im = tint_exterior(im, (255,154,150), 82)
+                  im = add_sun(im, (1210,380), 13, (255,226,175), 0.34)
+                  im = add_door_light(im, (255,172,100), 58, 900, 720)
+                  im = add_fire_glow(im, 0.22)
+              elif kind == 'morning':
+                  im = colour_grade(src, 1.08, 0.98, 1.00, (1.01,1.03,1.06), 0.96).convert('RGBA')
+                  im = tint_exterior(im, (188,220,255), 36)
+                  im = add_door_light(im, (226,240,255), 42, 1030, 705)
+                  im = Image.alpha_composite(im, radial_overlay((W,H), (100,570), (300,250), (175,205,235), 0.06))
+              elif kind == 'golden-hour':
+                  im = colour_grade(src, 0.98, 1.05, 1.12, (1.14,0.97,0.84), 1.00).convert('RGBA')
+                  im = tint_exterior(im, (255,126,60), 96)
+                  im = add_sun(im, (1210,430), 15, (255,214,132), 0.38)
+                  im = add_door_light(im, (255,142,58), 88, 650, 785)
+                  im = add_fire_glow(im, 0.34)
+              elif kind == 'blue-hour':
+                  im = colour_grade(src, 0.62, 1.08, 1.00, (0.82,0.92,1.18), 1.05).convert('RGBA')
+                  im = tint_exterior(im, (42,87,158), 122)
+                  im = add_stars(im, 11, 26, 150)
+                  im = add_door_light(im, (88,138,212), 22, 1030, 700)
+                  im = add_fire_glow(im, 0.66)
+              elif kind == 'just-after-dusk':
+                  im = colour_grade(src, 0.48, 1.12, 1.02, (0.72,0.83,1.16), 1.08).convert('RGBA')
+                  im = tint_exterior(im, (15,43,102), 152)
+                  im = add_stars(im, 22, 48, 205)
+                  im = add_door_light(im, (42,72,148), 14, 1090, 690)
+                  im = add_fire_glow(im, 0.82)
+                  for centre, radius, strength in [((690,100),(140,90),0.16),((1590,530),(180,120),0.12),((430,515),(140,110),0.11)]:
+                      warm = radial_overlay((W,H), centre, radius, (255,145,55), strength)
+                      im = Image.alpha_composite(im, warm.filter(ImageFilter.GaussianBlur(12)))
+              return im.convert('RGB')
+
+          stages = ['sunrise','morning','golden-hour','blue-hour','just-after-dusk']
+          for stage in stages:
+              out = root / f'horizon-background-{stage}.png'
+              make_variant(stage).save(out, 'PNG', optimize=True)
+              print(out)
+          PY
+
+      - name: Commit generated image files and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/generate-horizon-backgrounds.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/knowledge/public/assets/cognitive-protocols/backgrounds/horizon-background-*.png .github/workflows/generate-horizon-backgrounds.yml
+          git commit -m "Add Horizon time-of-day backgrounds"
+          git push origin HEAD:main
