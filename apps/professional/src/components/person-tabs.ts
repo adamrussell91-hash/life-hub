@@ -1,13 +1,15 @@
 import { renderRelationshipList, type TabDef } from '@/components/entity-detail';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
+import { buildObservationsTab } from '@/components/observations-tab';
+import { buildEvidenceTab } from '@/components/evidence-tab';
 import { classifyRelationshipState, type RelationshipStateInput } from '@/domain/relationship-state';
 import type { EntityOverview, PersonRecord, RelationshipEndpoint, RelationshipEntry } from '@/domain/types';
 
 /**
- * The five Person Profile tabs (Feature 1.2). Observations and Evidence are
- * a separate, already-planned follow-up (they need new server data / a new
- * pure-function module that doesn't exist yet) — this array is the clean
- * extension point for that task to append two more `TabDef`s to.
+ * The seven Person Profile tabs: the original five (Feature 1.2) plus
+ * Observations and Evidence (Features 1.4/1.5). The latter two are the only
+ * tabs that fetch their own data on activation rather than reusing the
+ * already-loaded `overview` — see `observations-tab.ts` / `evidence-tab.ts`.
  */
 export function buildPersonTabs(onRoleChanged: () => void): TabDef[] {
   return [
@@ -35,7 +37,9 @@ export function buildPersonTabs(onRoleChanged: () => void): TabDef[] {
       id: 'history',
       label: 'History',
       render: (host, overview) => renderHistoryTab(host, overview)
-    }
+    },
+    buildObservationsTab(),
+    buildEvidenceTab()
   ];
 }
 

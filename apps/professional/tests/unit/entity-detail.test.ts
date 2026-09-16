@@ -158,7 +158,7 @@ describe('renderPersonPage', () => {
     expect(applicationLink?.getAttribute('href')).toMatch(/#\/application\//);
   });
 
-  it('exposes a back link to People, a 5-tab bar, and no edit/archive/delete/create-link controls', async () => {
+  it('exposes a back link to People, a 7-tab bar, and no edit/archive/delete/create-link controls', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -170,11 +170,12 @@ describe('renderPersonPage', () => {
     for (const forbidden of ['edit', 'archive', 'delete', 'create-link', 'lifecycle']) {
       expect(canvas.innerHTML.toLowerCase()).not.toMatch(new RegExp(`data-${forbidden}|class="[^"]*${forbidden}`));
     }
-    // The only buttons on a default load are the 5 tab buttons — no CRUD
-    // control of any kind.
+    // The only buttons on a default load are the 7 tab buttons — no CRUD
+    // control of any kind. (Observations/Evidence render their own form/
+    // retry buttons, but only once activated — not on a default Overview load.)
     const nonTabButtons = [...canvas.querySelectorAll('button')].filter((b) => b.getAttribute('role') !== 'tab');
     expect(nonTabButtons.length).toBe(0);
-    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(5);
+    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(7);
   });
 
   it('shows a clear empty state when there are no relationships at all', async () => {
@@ -188,14 +189,22 @@ describe('renderPersonPage', () => {
     expect(canvas.textContent).toMatch(/No historical relationships/);
   });
 
-  it('renders a 5-tab tab bar (Overview/Timeline/Shared Work/Network/History) with Overview active initially', async () => {
+  it('renders a 7-tab tab bar (Overview/Timeline/Shared Work/Network/History/Observations/Evidence) with Overview active initially', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
 
     expect(canvas.querySelector('[role="tablist"]')).not.toBeNull();
     const tabs = [...canvas.querySelectorAll('[role="tab"]')];
-    expect(tabs.map((t) => t.textContent)).toEqual(['Overview', 'Timeline', 'Shared Work', 'Network', 'History']);
+    expect(tabs.map((t) => t.textContent)).toEqual([
+      'Overview',
+      'Timeline',
+      'Shared Work',
+      'Network',
+      'History',
+      'Observations',
+      'Evidence'
+    ]);
     expect(tabs[0].getAttribute('aria-selected')).toBe('true');
     expect(tabs.slice(1).every((t) => t.getAttribute('aria-selected') === 'false')).toBe(true);
   });

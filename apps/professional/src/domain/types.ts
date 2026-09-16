@@ -148,6 +148,28 @@ export interface EntityOverview {
   linked_records: LinkedRecords;
 }
 
+/**
+ * Feature 1.4/1.5: a free-text, timestamped note about an entity — "evidence"
+ * that a claim (a relationship, a state) is grounded in something someone
+ * actually observed, rather than an assumption. `source` records where the
+ * observation came from; `linked_ref`, when present, points at the specific
+ * meeting/communication/etc. it was captured during (Phase 1 has no UI to
+ * set this — see `apps/professional/src/components/observations-tab.ts`).
+ */
+export type ObservationSource = 'meeting' | 'communication' | 'manual' | 'imported';
+
+export interface ObservationRecord {
+  schema_version: number;
+  id: string;
+  about_ref: string;
+  text: string;
+  occurred_at: string;
+  source: ObservationSource;
+  linked_ref: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type CommunicationDirection = 'outbound' | 'inbound';
 export type CommunicationChannel =
   | 'email'
