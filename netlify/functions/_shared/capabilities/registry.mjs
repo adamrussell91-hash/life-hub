@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { logEntryToolSchema } from '../chat-schema.mjs';
 import { foodLibraryEntrySchema } from '../food-library.mjs';
 import { saveExerciseLibraryEntrySchema, searchExerciseLibrarySchema } from '../exercise-library.mjs';
+import { saveFitnessResearchSchema } from '../fitness-research.mjs';
 import {
   compareWorkoutWindowsSchema,
   getLastWorkoutSchema,
@@ -266,6 +267,7 @@ export function buildAgentTools({
     tools.push(
       searchExerciseLibrarySchema(),
       saveExerciseLibraryEntrySchema(),
+      saveFitnessResearchSchema(),
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
       compareWorkoutWindowsSchema(),
