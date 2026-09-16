@@ -17,7 +17,77 @@ const voiceAsset: Record<string, string> = {
 };
 function frontAsset(id: string) { return `${ASSET_ROOT}/card-fronts/${id === "fates" ? "fates-the-three-fates" : id}-card-front.png`; }
 function backAsset(id: string) { return `${ASSET_ROOT}/card-backs/${id}-card-back.png`; }
-function backgroundAsset(id: string) { return `${ASSET_ROOT}/backgrounds/${id}-background.png`; }
+export function backgroundAsset(id: string, stage?: number) { return `${ASSET_ROOT}/backgrounds/${id}-background${stage ? `-${stage}` : ""}.png`; }
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+/** 5 sequential lighting stages across the transcript so far — 1 (opening) to 5 (closing). */
+export function lightingStage(viewingIndex: number, totalTurns: number): number {
+  if (totalTurns <= 1) return 1;
+  const fraction = clamp(viewingIndex, 0, totalTurns - 1) / (totalTurns - 1);
+  return clamp(1 + Math.floor(fraction * 5), 1, 5);
+}
+
+const lightingArtCache = new Map<string, boolean>();
+function probeImage(url: string): Promise<boolean> {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = url;
+  });
+}
+/** Swaps in a numbered lighting-stage background once confirmed to exist; leaves the default in place otherwise. */
+function applyStagedBackground(section: HTMLElement, protocolId: string, stage: number) {
+  const url = backgroundAsset(protocolId, stage);
+  const cached = lightingArtCache.get(url);
+  if (cached === true) { section.style.setProperty("--protocol-background", `url('${url}')`); return; }
+  if (cached === false) return;
+  void probeImage(url).then(ok => {
+    lightingArtCache.set(url, ok);
+    if (ok && section.isConnected) section.style.setProperty("--protocol-background", `url('${url}')`);
+  });
+}
+
+export type ForkBranch = { label: string; body: string };
+export type ForkSplit = { leading: string; branches: ForkBranch[] };
+const FORK_MARKER_RE = /\bfork\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*:\s*/gi;
+/** Splits "Fork one: ... Fork two: ..." style replies into branch cards. Returns null when the text doesn't follow that pattern. */
+export function detectForks(text: string): ForkSplit | null {
+  const matches = [...text.matchAll(FORK_MARKER_RE)];
+  if (matches.length < 2) return null;
+  const leading = text.slice(0, matches[0].index).trim();
+  const branches: ForkBranch[] = [];
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index! + matches[i][0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
+    const body = text.slice(start, end).trim();
+    if (body) branches.push({ label: `Fork ${i + 1}`, body });
+  }
+  return branches.length >= 2 ? { leading, branches } : null;
+}
+
+function paragraphs(text: string): string[] {
+  const parts = text.split(/\n{2,}/).map(part => part.trim()).filter(Boolean);
+  return parts.length ? parts : [text.trim()];
+}
+function richTextHtml(text: string): string {
+  return paragraphs(text).map(part => `<p>${escapeHtml(part)}</p>`).join("");
+}
+function turnBodyHtml(text: string): string {
+  const forks = detectForks(text);
+  if (!forks) return richTextHtml(text);
+  const leadingHtml = forks.leading ? richTextHtml(forks.leading) : "";
+  const branchesHtml = `<div class="protocol-forks">${forks.branches.map(branch => `<div class="protocol-fork"><p class="protocol-fork__label">${escapeHtml(branch.label)}</p>${richTextHtml(branch.body)}</div>`).join("")}</div>`;
+  return leadingHtml + branchesHtml;
+}
+
+const SPEAKER_PALETTE = ["#9fb4d8", "#d9a5a5", "#c9b28a", "#a7c4a0", "#b6a7d1"];
+function speakerColor(definition: Definition, speakerId: string): string {
+  if (speakerId === "you") return "#7d93b8";
+  const index = definition.voices.findIndex(voice => voice.id === speakerId);
+  return SPEAKER_PALETTE[(index < 0 ? 0 : index) % SPEAKER_PALETTE.length];
+}
 
 const localCatalog: Definition[] = [
   ["fates", "The Three Fates", "Live dialectic across generative, critical and strategic voices.", "Greek threads", "normal", ["Normal", "Sprint", "Long"], ["Lachesis", "Clotho", "Atropos", "The Weave"]],
@@ -104,74 +174,70 @@ export function statusLabel(session: Session) {
 function voiceSrc(definition: Definition, id: string) {
   return `${ASSET_ROOT}/voices/${voiceAsset[`${definition.id}:${id}`]}.png`;
 }
-function turnHtml(turn: Session["transcript"][number], speaker: string | null) {
-  const who = turn.speaker === "you" ? "You" : turn.speaker;
-  return `<article class="protocol-turn protocol-turn--${escapeHtml(turn.role)} ${turn.speaker === speaker ? "is-speaking" : ""}" data-turn-id="${escapeHtml(turn.id)}"><p>${escapeHtml(who)}</p><div>${escapeHtml(turn.text)}</div></article>`;
+function personaMetaHtml(name: string, role: string) {
+  return `<p class="protocol-turn-card__meta">✦ ${escapeHtml(name)} ✦</p>${role ? `<p class="protocol-turn-card__role">${escapeHtml(role)}</p>` : ""}`;
 }
-function composerHtml(session: Session, definition: Definition) {
+function liveSlotHtml(session: Session, who: string, role: string, precedingText: string | null): string {
+  const preceding = precedingText ? turnBodyHtml(precedingText) : "";
   if (session.error) {
-    return `<div class="confirm-card" data-protocol-composer><p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
   }
   if (["queued", "running"].includes(session.status)) {
-    return `<div class="protocol-session__listening" data-protocol-composer><p aria-live="polite">${escapeHtml(speakerName(session, definition))} is thinking</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(who)} is thinking</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
   }
-  if (!session.checkpoint) return `<div data-protocol-composer></div>`;
-  const who = speakerName(session, definition);
-  return `<form class="protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}"><label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="Reply to ${escapeHtml(who)}"></textarea></label><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</form>`;
+  if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}</div>`;
+  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="Reply to ${escapeHtml(who)}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
 }
-function stageHtml(session: Session, definition: Definition) {
-  return definition.voices.map(voice => `<div class="protocol-speaker ${voice.id === session.speaker ? "is-active" : ""}" data-voice="${escapeHtml(voice.id)}"><img src="${voiceSrc(definition, voice.id)}" alt="${escapeHtml(voice.name)}" width="160" height="160"><span>${escapeHtml(voice.name)}</span><small>${escapeHtml(voice.role || VOICE_ROLES[voice.id] || "")}</small></div>`).join("");
+function readTurnCardHtml(turn: Session["transcript"][number], who: string, role: string): string {
+  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}</article>`;
 }
-export function sessionView(session: Session, definition: Definition) {
+function joiningCardHtml(who: string, role: string): string {
+  return `<div class="protocol-turn-card protocol-turn-card--live">${personaMetaHtml(who, role)}<p>${escapeHtml(who)} is joining the conversation…</p></div>`;
+}
+function renderScrubber(session: Session, index: number, isLatest: boolean, definition: Definition): string {
+  const total = session.transcript.length;
+  if (total === 0) return "";
+  const dots = session.transcript.map((turn, i) => {
+    const current = i === index;
+    const label = turn.speaker === "you" ? "You" : voiceOf(definition, turn.speaker)?.name ?? turn.speaker;
+    return `<button type="button" class="protocol-dot${current ? " is-current" : ""}" data-protocol-scrub-to="${i}" style="--dot-color:${speakerColor(definition, turn.speaker)}" aria-current="${current}" aria-label="${escapeHtml(label)}, turn ${i + 1} of ${total}"></button>`;
+  }).join("");
+  const nudge = !isLatest ? `<button type="button" class="protocol-scrub-nudge" data-protocol-scrub="latest">New reply ↓</button>` : "";
+  return `<nav class="protocol-scrubber" aria-label="Conversation history"><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="prev" ${index === 0 ? "disabled" : ""} aria-label="Previous turn">‹</button><div class="protocol-scrub-dots">${dots}</div><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="next" ${index === total - 1 ? "disabled" : ""} aria-label="Next turn">›</button></nav>${nudge}`;
+}
+export function sessionView(session: Session, definition: Definition, viewingIndex?: number) {
+  const total = session.transcript.length;
+  const index = total === 0 ? 0 : clamp(viewingIndex ?? total - 1, 0, total - 1);
+  const isLatest = total === 0 || index === total - 1;
   const listening = ["queued", "running"].includes(session.status);
-  const turns = session.transcript.map(turn => turnHtml(turn, session.speaker)).join("");
-  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p><h1>${escapeHtml(speakerName(session, definition))}</h1><p class="protocol-session__status">${escapeHtml(statusLabel(session))}</p></header><div class="protocol-stage" aria-live="polite">${stageHtml(session, definition)}</div><div class="protocol-transcript">${turns || `<p class="protocol-transcript__empty">${escapeHtml(speakerName(session, definition))} is joining the conversation…</p>`}</div>${composerHtml(session, definition)}</section>`;
+  const turn = total > 0 ? session.transcript[index] : null;
+  const cardIsLive = isLatest && (listening || Boolean(session.error) || Boolean(session.checkpoint) || !turn);
+  const activeSpeakerId = cardIsLive ? session.speaker : turn ? turn.speaker : session.speaker;
+  const activeVoice = activeSpeakerId && activeSpeakerId !== "you" ? voiceOf(definition, activeSpeakerId) : null;
+  const activeRole = activeVoice ? activeVoice.role || VOICE_ROLES[activeVoice.id] || "" : "";
+  const activeName = activeVoice ? activeVoice.name : activeSpeakerId === "you" ? "You" : speakerName(session, definition);
+  const precedingText = cardIsLive && turn && turn.speaker !== "you" ? turn.text : null;
+  const cardHtml = cardIsLive
+    ? liveSlotHtml(session, activeName, activeRole, precedingText)
+    : turn
+      ? readTurnCardHtml(turn, activeName, activeRole)
+      : joiningCardHtml(activeName, activeRole);
+  const portraitHtml = activeVoice
+    ? `<div class="protocol-portrait"><img src="${voiceSrc(definition, activeVoice.id)}" alt="${escapeHtml(activeVoice.name)}" width="220" height="220"></div>`
+    : activeSpeakerId === "you"
+      ? `<div class="protocol-portrait protocol-portrait--you" aria-hidden="true">You</div>`
+      : "";
+  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
 }
-export function applySession(root: HTMLElement, session: Session, definition: Definition) {
-  const shell = root.querySelector<HTMLElement>(".protocol-session");
-  if (!shell) {
-    root.innerHTML = sessionView(session, definition);
-    return;
-  }
-  const listening = ["queued", "running"].includes(session.status);
-  shell.classList.toggle("is-listening", listening);
-  shell.dataset.speaker = session.speaker ?? "";
-  const title = shell.querySelector("h1");
-  if (title) title.textContent = speakerName(session, definition);
-  const status = shell.querySelector(".protocol-session__status");
-  if (status) status.textContent = statusLabel(session);
-  shell.querySelectorAll<HTMLElement>(".protocol-speaker").forEach(node => {
-    node.classList.toggle("is-active", node.dataset.voice === session.speaker);
-  });
-  const transcript = shell.querySelector(".protocol-transcript");
-  if (transcript) {
-    const ids = new Set(session.transcript.map(turn => turn.id));
-    const seen = new Set<string>();
-    transcript.querySelectorAll("[data-turn-id]").forEach(node => {
-      const id = node.getAttribute("data-turn-id") ?? "";
-      if (!ids.has(id)) node.remove();
-      else seen.add(id);
-    });
-    const empty = transcript.querySelector(".protocol-transcript__empty");
-    if (session.transcript.length && empty) empty.remove();
-    if (!session.transcript.length && !empty) transcript.innerHTML = `<p class="protocol-transcript__empty">${escapeHtml(speakerName(session, definition))} is joining the conversation…</p>`;
-    for (const turn of session.transcript) {
-      if (!seen.has(turn.id)) transcript.insertAdjacentHTML("beforeend", turnHtml(turn, session.speaker));
-    }
-    transcript.querySelectorAll<HTMLElement>(".protocol-turn").forEach(node => {
-      const id = node.getAttribute("data-turn-id");
-      const turn = session.transcript.find(item => item.id === id);
-      node.classList.toggle("is-speaking", Boolean(turn && turn.speaker === session.speaker));
-    });
-    const last = transcript.querySelector<HTMLElement>("[data-turn-id]:last-of-type");
-    last?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-  }
-  const composer = shell.querySelector("[data-protocol-composer]");
-  const next = composerHtml(session, definition);
-  const nextCheckpoint = session.checkpoint?.question ?? "";
-  const sameForm = composer?.matches("[data-protocol-reply]") && composer.getAttribute("data-checkpoint") === nextCheckpoint && !listening && !session.error;
-  if (!sameForm) composer?.insertAdjacentHTML("afterend", next), composer?.remove();
-  if (!composer) shell.insertAdjacentHTML("beforeend", next);
+export function applySession(root: HTMLElement, session: Session, definition: Definition, viewingIndex?: number) {
+  const total = session.transcript.length;
+  const index = total === 0 ? 0 : clamp(viewingIndex ?? total - 1, 0, total - 1);
+  const key = [session.id, session.revision, session.status, session.error?.message ?? "", index, total].join("|");
+  if (root.dataset.protocolRenderKey === key) return;
+  root.dataset.protocolRenderKey = key;
+  root.innerHTML = sessionView(session, definition, index);
+  const section = root.querySelector<HTMLElement>(".protocol-session");
+  if (section) applyStagedBackground(section, definition.id, lightingStage(index, total));
 }
 
 export function renderProtocols({ host }: { host: HTMLElement }) {
@@ -179,9 +245,15 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let selected: Definition | null = null;
   let currentSession: Session | null = null;
   let pollTimer: number | null = null;
+  let viewingIndex: number | null = null;
+  const effectiveIndex = () => {
+    const total = currentSession?.transcript.length ?? 0;
+    if (total === 0) return 0;
+    return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
+  };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
   const paint = () => {
-    if (currentSession && selected) applySession(host, currentSession, selected);
+    if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
     else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1>Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
   };
   const poll = async () => {
@@ -210,6 +282,17 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   host.onclick = event => {
     const target = event.target as HTMLElement;
+    const scrubTo = target.closest<HTMLElement>("[data-protocol-scrub-to]");
+    if (scrubTo && currentSession) { viewingIndex = Number(scrubTo.dataset.protocolScrubTo); paint(); return; }
+    const scrub = target.closest<HTMLElement>("[data-protocol-scrub]")?.dataset.protocolScrub;
+    if (scrub && currentSession) {
+      const total = currentSession.transcript.length;
+      if (scrub === "latest") viewingIndex = null;
+      else if (scrub === "prev") viewingIndex = Math.max(effectiveIndex() - 1, 0);
+      else if (scrub === "next") viewingIndex = Math.min(effectiveIndex() + 1, Math.max(total - 1, 0));
+      paint();
+      return;
+    }
     const flip = target.closest<HTMLButtonElement>("[data-protocol-flip]");
     if (flip) {
       const card = flip.closest<HTMLElement>("[data-protocol-card]");
@@ -220,8 +303,8 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       return;
     }
     const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
-    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; paint(); return; }
-    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; paint(); return; }
+    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); return; }
     const action = target.closest<HTMLButtonElement>("[data-protocol-action]")?.dataset.protocolAction;
     if (action && currentSession) void postAction({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action });
   };
@@ -233,6 +316,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const data = new FormData(form);
       const prompt = String(data.get("prompt") ?? "").trim();
       currentSession = { id: "", status: "queued", stage: "briefing", speaker: selected.voices[0]?.id ?? null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
+      viewingIndex = null;
       paint();
       try {
         await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() });
@@ -258,6 +342,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       checkpoint: null,
       transcript: text.trim() ? [...prior.transcript, { id: `local-${prior.revision}`, role: "user", speaker: "you", stage: prior.stage, text: text.trim() }] : prior.transcript
     };
+    viewingIndex = null;
     paint();
     try { await postAction({ sessionId: prior.id, revision: prior.revision, requestId: crypto.randomUUID(), action, text }); }
     catch { currentSession = { ...prior, error: { message: "The reply could not be sent.", retryable: true } }; paint(); }
