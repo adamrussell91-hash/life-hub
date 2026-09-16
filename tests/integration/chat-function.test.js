@@ -1807,6 +1807,7 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_fitness_research'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_fitness_coaching_profile'));
   assert.equal(typeof receivedArgs.executeTools, 'function');
   const searchHits = await receivedArgs.executeTools({
     name: 'search_exercise_library',
