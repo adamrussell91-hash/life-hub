@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Your Network</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .canvas { padding: 32px 40px; gap: 18px; }
+  .eco-header { display: flex; align-items: flex-start; justify-content: space-between; }
+  .breadcrumb { font-size: var(--text-xs); color: var(--muted); margin-bottom: 4px; }
+  .breadcrumb b { color: var(--depth); font-weight: 600; }
+  .layer-row { display: flex; gap: 8px; }
+  .layer-chip { padding: 7px 14px; border-radius: var(--radius-full); font-size: var(--text-xs); font-weight: 600; border: 1px solid var(--line); color: var(--muted); background: rgba(255,255,255,0.6); }
+  .layer-chip.is-on { background: var(--navy); color: #fff; border-color: var(--navy); }
+
+  .eco-body { flex: 1; display: grid; grid-template-columns: 1fr 270px; gap: 18px; min-height: 0; }
+
+  .map-frame { position: relative; border-radius: var(--radius-xl); overflow: hidden;
+    background: radial-gradient(ellipse at 50% 30%, #fdfbf6 0%, #f6efe2 60%, #efe6d3 100%);
+    border: 1px solid var(--line); box-shadow: var(--elev-3); }
+  .map-frame svg { width: 100%; height: 100%; display: block; }
+
+  .side-col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .panel { padding: 18px 20px; }
+  .panel h3 { font-size: 11px; font-weight: 700; color: var(--depth); margin: 0 0 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps); }
+
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  .legend-row svg { flex: 0 0 20px; width: 20px; height: 10px; overflow: visible; }
+  .legend-dot { width: 10px; height: 10px; border-radius: var(--radius-full); flex: 0 0 10px; }
+
+  .path-item { font-size: 12px; color: var(--ink); line-height: var(--leading-normal); padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .path-item:last-child { border-bottom: none; }
+  .path-item b { color: var(--depth); font-weight: 600; }
+  .path-chain { color: var(--wave); font-weight: 600; }
+
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .n { font-weight: 700; color: var(--depth); font-size: 15px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>Organisations</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Overview</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>Search</a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas">
+    <div class="eco-header">
+      <div>
+        <div class="breadcrumb">Network Ecology / <b>Your Network</b></div>
+        <h1 class="page-title" style="font-size:28px;">Your Network</h1>
+        <p class="page-subtitle">How everyone in your professional world connects to you &mdash; and to each other.</p>
+      </div>
+      <div class="layer-row">
+        <span class="layer-chip">Habitats</span>
+        <span class="layer-chip is-on">EGO view</span>
+        <span class="layer-chip">Opportunity</span>
+        <span class="layer-chip">Dormancy</span>
+        <span class="layer-chip">Mycelium</span>
+        <span class="layer-chip">History</span>
+      </div>
+    </div>
+
+    <div class="eco-body">
+      <div class="map-frame">
+        <svg viewBox="-40 -30 1080 700" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="none"></marker>
+          </defs>
+
+          <!-- faint habitat context so it still reads as the same world -->
+          <ellipse cx="230" cy="150" rx="190" ry="150" fill="#dfe9e1" opacity="0.30"/>
+          <ellipse cx="760" cy="180" rx="220" ry="170" fill="#dceafa" opacity="0.28"/>
+          <ellipse cx="130" cy="470" rx="170" ry="130" fill="#f1e2b6" opacity="0.28"/>
+          <ellipse cx="720" cy="500" rx="160" ry="120" fill="#f2dfd0" opacity="0.25"/>
+
+          <!-- ═══ edges (behind nodes) ═══ -->
+          <!-- direct ties: You -> primary contacts -->
+          <path d="M500 340 L 300 195" stroke="#17375e" stroke-width="3" fill="none"/>
+          <path d="M500 340 L 700 190" stroke="#17375e" stroke-width="3" fill="none"/>
+          <path d="M500 340 L 235 445" stroke="#17375e" stroke-width="2.4" fill="none"/>
+          <path d="M500 340 L 745 460" stroke="#17375e" stroke-width="2.4" fill="none"/>
+
+          <!-- suggested / not-yet-direct tie -->
+          <path d="M500 340 L 660 470" stroke="#a7abb9" stroke-width="1.8" stroke-dasharray="2 6" fill="none"/>
+
+          <!-- mutual connection between two contacts -->
+          <path d="M300 195 Q 480 95 700 190" stroke="#376fb7" stroke-width="1.6" stroke-dasharray="1 5" fill="none" opacity="0.85"/>
+
+          <!-- shared project triangle: You - Vicky - Sarah -->
+          <path d="M500 340 L 430 405" stroke="#f68620" stroke-width="1.8" fill="none" opacity="0.8"/>
+          <path d="M430 405 L 300 195" stroke="#f68620" stroke-width="1.4" stroke-dasharray="1 4" fill="none" opacity="0.6"/>
+          <path d="M430 405 L 745 460" stroke="#f68620" stroke-width="1.4" stroke-dasharray="1 4" fill="none" opacity="0.6"/>
+
+          <!-- org tethers -->
+          <path d="M300 195 L 250 100" stroke="#a7abb9" stroke-width="1.4" fill="none"/>
+          <path d="M700 190 L 800 105" stroke="#a7abb9" stroke-width="1.4" fill="none"/>
+          <path d="M660 470 L 800 105" stroke="#a7abb9" stroke-width="1.2" fill="none" opacity="0.7"/>
+          <path d="M235 445 L 150 530" stroke="#a7abb9" stroke-width="1.4" fill="none"/>
+
+          <!-- UNSW satellite colleagues around James -->
+          <path d="M800 105 L 870 150" stroke="#c7cbd6" stroke-width="1.2" fill="none"/>
+          <path d="M800 105 L 900 120" stroke="#c7cbd6" stroke-width="1.2" fill="none"/>
+          <path d="M800 105 L 895 195" stroke="#c7cbd6" stroke-width="1.2" fill="none"/>
+
+          <!-- ═══ organisation / landmark nodes ═══ -->
+          <g>
+            <rect x="200" y="78" width="100" height="34" rx="8" fill="#ffffff" stroke="#dfe9e1" stroke-width="1.5"/>
+            <text x="250" y="99" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#3c5949">Univ. Melbourne</text>
+          </g>
+          <g>
+            <rect x="750" y="83" width="100" height="34" rx="8" fill="#ffffff" stroke="#dceafa" stroke-width="1.5"/>
+            <text x="800" y="104" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#294c71">UNSW</text>
+          </g>
+          <g>
+            <rect x="100" y="514" width="100" height="34" rx="8" fill="#ffffff" stroke="#f1e2b6" stroke-width="1.5"/>
+            <text x="150" y="535" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#6c581f">Deakin Univ.</text>
+          </g>
+
+          <!-- shared project diamond -->
+          <g>
+            <rect x="406" y="381" width="48" height="48" rx="10" transform="rotate(45 430 405)" fill="#fdecd9" stroke="#f68620" stroke-width="1.5"/>
+            <text x="430" y="447" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#a85a0c">Assessment reform</text>
+          </g>
+
+          <!-- ═══ You (centre) ═══ -->
+          <circle cx="500" cy="340" r="30" fill="#0a1536"/>
+          <text x="500" y="345" text-anchor="middle" font-family="Inter" font-size="13" font-weight="700" fill="#fff">YOU</text>
+
+          <!-- ═══ primary contacts ═══ -->
+          <g>
+            <circle cx="300" cy="195" r="22" fill="#142b51"/>
+            <text x="300" y="200" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#fff">VL</text>
+            <text x="300" y="230" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#0a1536">Vicky Leighton</text>
+            <text x="300" y="244" text-anchor="middle" font-family="Inter" font-size="10" font-weight="500" fill="#6b7788">Mentor &middot; Research collaborator</text>
+          </g>
+          <g>
+            <circle cx="700" cy="190" r="22" fill="#376fb7"/>
+            <text x="700" y="195" text-anchor="middle" font-family="Inter" font-size="11" font-weight="700" fill="#fff">NF</text>
+            <text x="700" y="225" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#0a1536">Nina Fraser</text>
+            <text x="700" y="239" text-anchor="middle" font-family="Inter" font-size="10" font-weight="500" fill="#6b7788">Reconnect &middot; moved to UNSW</text>
+          </g>
+          <g>
+            <circle cx="235" cy="445" r="20" fill="#424860"/>
+            <text x="235" y="450" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#fff">MO</text>
+            <text x="235" y="478" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#0a1536">Michael Osei</text>
+            <text x="235" y="492" text-anchor="middle" font-family="Inter" font-size="10" font-weight="500" fill="#6b7788">New role, Deakin</text>
+          </g>
+          <g>
+            <circle cx="745" cy="460" r="20" fill="#244f7c"/>
+            <text x="745" y="465" text-anchor="middle" font-family="Inter" font-size="10.5" font-weight="700" fill="#fff">SW</text>
+            <text x="745" y="493" text-anchor="middle" font-family="Inter" font-size="12.5" font-weight="700" fill="#0a1536">Sarah Whitlam</text>
+            <text x="745" y="507" text-anchor="middle" font-family="Inter" font-size="10" font-weight="500" fill="#6b7788">Shared project</text>
+          </g>
+
+          <!-- indirect contact -->
+          <g opacity="0.9">
+            <circle cx="660" cy="470" r="17" fill="#a7abb9"/>
+            <text x="660" y="475" text-anchor="middle" font-family="Inter" font-size="10" font-weight="700" fill="#fff">JC</text>
+            <text x="660" y="500" text-anchor="middle" font-family="Inter" font-size="12" font-weight="700" fill="#424860">James Cho</text>
+            <text x="660" y="513" text-anchor="middle" font-family="Inter" font-size="9.5" font-weight="500" fill="#8b93a1">Not yet connected</text>
+          </g>
+
+          <!-- UNSW satellite colleagues (2nd degree, smaller, muted) -->
+          <g opacity="0.75">
+            <circle cx="870" cy="150" r="13" fill="#a7abb9"/>
+            <text x="870" y="154" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#fff">RB</text>
+          </g>
+          <g opacity="0.75">
+            <circle cx="900" cy="120" r="13" fill="#a7abb9"/>
+            <text x="900" y="124" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#fff">TK</text>
+          </g>
+          <g opacity="0.75">
+            <circle cx="895" cy="195" r="13" fill="#a7abb9"/>
+            <text x="895" y="199" text-anchor="middle" font-family="Inter" font-size="8.5" font-weight="700" fill="#fff">AL</text>
+          </g>
+          <text x="900" y="70" text-anchor="middle" font-family="Inter" font-size="10" font-weight="600" fill="#8b93a1">+3 more at UNSW</text>
+        </svg>
+      </div>
+
+      <div class="side-col">
+        <div class="card panel">
+          <h3>Legend</h3>
+          <div class="legend-row"><svg><line x1="0" y1="5" x2="20" y2="5" stroke="#17375e" stroke-width="2.5"/></svg>Direct relationship</div>
+          <div class="legend-row"><svg><line x1="0" y1="5" x2="20" y2="5" stroke="#a7abb9" stroke-width="2" stroke-dasharray="2 4"/></svg>Not yet connected</div>
+          <div class="legend-row"><svg><line x1="0" y1="5" x2="20" y2="5" stroke="#376fb7" stroke-width="1.8" stroke-dasharray="1 4"/></svg>Mutual connection</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#f68620;"></span>Shared work</div>
+          <div class="legend-row"><span class="legend-dot" style="background:#a7abb9;"></span>2nd-degree contact</div>
+        </div>
+
+        <div class="card panel">
+          <h3>Introduction paths</h3>
+          <div class="path-item"><span class="path-chain">You &rarr; Nina &rarr; UNSW &rarr; James Cho</span><br>Nina can introduce you directly.</div>
+          <div class="path-item"><span class="path-chain">You &rarr; Vicky &rarr; Gifted Ed. Network &rarr; Nina</span><br>Both attended the same event.</div>
+        </div>
+
+        <div class="card panel" style="flex:1;">
+          <h3>Network stats</h3>
+          <div class="stat-row"><span>Direct connections</span><span class="n">4</span></div>
+          <div class="stat-row"><span>2nd-degree reach</span><span class="n">6</span></div>
+          <div class="stat-row"><span>Organisations linked</span><span class="n">3</span></div>
+          <div class="stat-row"><span>Shared work</span><span class="n">1</span></div>
+          <div class="stat-row"><span>Mutual connections</span><span class="n">2</span></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

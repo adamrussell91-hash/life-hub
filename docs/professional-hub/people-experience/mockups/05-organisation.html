@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Organisation</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .org-header { display: flex; gap: 20px; align-items: flex-start; }
+  .org-mark {
+    width: 64px; height: 64px; border-radius: var(--radius-md);
+    background: linear-gradient(135deg, var(--navy), var(--marine));
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 20px; flex: 0 0 auto;
+  }
+  .org-name { font-size: var(--text-xl); font-weight: 700; color: var(--depth); margin: 0 0 6px; letter-spacing: var(--tracking-tight); }
+  .org-sub { font-size: var(--text-base); color: var(--muted); margin: 0 0 12px; }
+  .org-roles { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .content-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .panel { padding: 20px 22px; }
+  .panel-title { font-size: var(--text-base); font-weight: 600; color: var(--depth); margin: 0 0 12px; }
+
+  .people-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .person-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-sm); }
+  .person-row .avatar { width: 34px; height: 34px; font-size: 12px; }
+  .person-name { font-size: var(--text-sm); font-weight: 600; color: var(--depth); }
+  .person-role { font-size: 11px; color: var(--muted); }
+
+  .timeline-row { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+  .timeline-row:last-child { border-bottom: none; }
+  .timeline-year { flex: 0 0 56px; font-size: var(--text-sm); font-weight: 700; color: var(--navy); }
+  .timeline-text { font-size: var(--text-sm); color: var(--ink); }
+
+  .opp-card { background: var(--warning-surface); border: 1px solid rgba(246,134,32,0.25); border-radius: var(--radius-md); padding: 16px 18px; }
+  .opp-card h3 { margin: 0 0 6px; font-size: var(--text-sm); font-weight: 700; color: var(--high-sea-ink); }
+  .opp-card p { margin: 0; font-size: var(--text-xs); color: var(--ink); line-height: var(--leading-normal); }
+
+  .work-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--text-sm); }
+  .work-row:last-child { border-bottom: none; }
+  .work-row .muted { color: var(--muted); font-size: var(--text-xs); }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Overview</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>Search</a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas" style="gap:22px;">
+    <div class="org-header">
+      <div class="org-mark">UNSW</div>
+      <div style="flex:1;">
+        <h1 class="org-name">University of New South Wales</h1>
+        <p class="org-sub">Sydney, Australia &middot; connected to 6 people in your network</p>
+        <div class="org-roles">
+          <span class="chip chip-blue">Study institution</span>
+          <span class="chip chip-sage">Research institution</span>
+          <span class="chip chip-gold">Potential employer</span>
+          <span class="chip chip-lilac">Event venue</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-outline">Relational search</button>
+        <button class="btn btn-primary">Open in Network Ecology</button>
+      </div>
+    </div>
+
+    <div class="content-grid">
+      <div class="col">
+        <div class="card panel">
+          <h2 class="panel-title">People connected to UNSW</h2>
+          <div class="people-grid">
+            <div class="person-row"><div class="avatar" style="background:var(--navy);">NF</div><div><div class="person-name">Nina Fraser</div><div class="person-role">Research Fellow</div></div></div>
+            <div class="person-row"><div class="avatar" style="background:var(--wave);">JC</div><div><div class="person-name">James Cho</div><div class="person-role">PhD Candidate</div></div></div>
+            <div class="person-row"><div class="avatar" style="background:var(--orca);">RB</div><div><div class="person-name">Rhea Banks</div><div class="person-role">Senior Lecturer</div></div></div>
+            <div class="person-row"><div class="avatar" style="background:var(--navy-2);">TK</div><div><div class="person-name">Tom Kowalski</div><div class="person-role">Program Director</div></div></div>
+            <div class="person-row"><div class="avatar" style="background:var(--shallow);">AL</div><div><div class="person-name">Amy Lin</div><div class="person-role">Postdoc</div></div></div>
+            <div class="person-row"><div class="avatar" style="background:var(--muted);">DP</div><div><div class="person-name">Dev Patel</div><div class="person-role">Research Fellow</div></div></div>
+          </div>
+        </div>
+
+        <div class="card panel" style="flex:1;">
+          <h2 class="panel-title">Organisation Timeline</h2>
+          <div class="timeline-row"><span class="timeline-year">2021</span><span class="timeline-text">First contact &mdash; Nina Fraser was a PhD candidate here</span></div>
+          <div class="timeline-row"><span class="timeline-year">2023</span><span class="timeline-text">Attended a research seminar on-site</span></div>
+          <div class="timeline-row"><span class="timeline-year">2025</span><span class="timeline-text">James Cho joined as a PhD candidate</span></div>
+          <div class="timeline-row"><span class="timeline-year">2026</span><span class="timeline-text">Nina Fraser moved here as Research Fellow &middot; relationship strengthened</span></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="opp-card">
+          <h3>Opportunity window</h3>
+          <p>UNSW Research Symposium in 3 weeks &middot; 4 contacts attending, 1 dormant relationship worth reconsidering.</p>
+        </div>
+
+        <div class="card panel">
+          <h2 class="panel-title">Current Work</h2>
+          <div class="work-row"><span>Assessment reform research proposal</span><span class="muted">Drafting</span></div>
+          <div class="work-row"><span>Guest lecture invitation</span><span class="muted">Pending</span></div>
+        </div>
+
+        <div class="card panel">
+          <h2 class="panel-title">Related Networks</h2>
+          <div class="cohort-row" style="gap:8px;">
+            <span class="chip chip-sage">Research Network</span>
+            <span class="chip chip-lilac">HALT</span>
+            <span class="chip chip-blue">Educational Neuroscience</span>
+          </div>
+        </div>
+
+        <div class="card panel" style="flex:1;">
+          <h2 class="panel-title">Recent Changes</h2>
+          <div class="obs-item" style="border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:10px;">
+            <p style="font-size:13px; margin:0 0 3px;">Nina Fraser's role updated to Research Fellow</p>
+            <span style="font-size:10.5px; color:var(--muted);">Detected from email signature &middot; 2 days ago</span>
+          </div>
+          <div class="obs-item">
+            <p style="font-size:13px; margin:0 0 3px;">New relationship: James Cho joined as PhD candidate</p>
+            <span style="font-size:10.5px; color:var(--muted);">Added manually &middot; 3 weeks ago</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

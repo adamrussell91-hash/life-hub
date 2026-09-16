@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Person Profile</title>
+<link rel="stylesheet" href="base.css">
+<style>
+  .breadcrumb { font-size: var(--text-xs); color: var(--muted); margin-bottom: 4px; }
+  .breadcrumb b { color: var(--depth); font-weight: 600; }
+
+  .profile-header { display: flex; gap: 22px; align-items: flex-start; }
+  .avatar-xl { width: 76px; height: 76px; font-size: 26px; background: linear-gradient(135deg, var(--navy-2), var(--marine)); }
+  .identity { flex: 1; }
+  .identity-name { font-size: var(--text-xl); font-weight: 700; color: var(--depth); letter-spacing: var(--tracking-tight); margin: 0 0 4px; }
+  .identity-role { font-size: var(--text-base); color: var(--muted); margin: 0 0 12px; }
+  .identity-role b { color: var(--ink); font-weight: 600; }
+  .label-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  .personal-desc { font-size: var(--text-sm); color: var(--orca); font-style: italic; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding-bottom: 0; margin-top: 8px; }
+  .tab { font-size: var(--text-sm); font-weight: 600; color: var(--muted); padding: 10px 4px; border-bottom: 2px solid transparent; margin-right: 22px; }
+  .tab.is-current { color: var(--depth); border-bottom-color: var(--navy); }
+
+  .summary-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .summary-item { padding: 14px 16px; }
+  .summary-item .eyebrow { display: block; margin-bottom: 6px; }
+  .summary-item .value { font-size: var(--text-sm); font-weight: 600; color: var(--depth); line-height: var(--leading-snug); }
+  .summary-item .value.state-active { color: var(--success); }
+
+  .content-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+
+  .rel-list { display: flex; flex-direction: column; }
+  .rel-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 14px 4px; border-bottom: 1px solid var(--line); gap: 12px; }
+  .rel-row:last-child { border-bottom: none; }
+  .rel-main { display: flex; flex-direction: column; gap: 3px; }
+  .rel-type { font-size: var(--text-sm); font-weight: 600; color: var(--depth); }
+  .rel-human { font-size: var(--text-xs); color: var(--orca); font-style: italic; }
+  .rel-meta { font-size: var(--text-xs); color: var(--muted); text-align: right; white-space: nowrap; }
+
+  .activity-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .mini-list { display: flex; flex-direction: column; gap: 10px; }
+  .mini-item { font-size: var(--text-xs); color: var(--ink); line-height: var(--leading-snug); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .mini-item:last-child { border: none; padding-bottom: 0; }
+  .mini-item b { color: var(--depth); font-weight: 600; }
+  .mini-label { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: var(--tracking-caps); color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+
+  .obs-item { padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  .obs-item:last-child { border-bottom: none; }
+  .obs-text { font-size: var(--text-sm); color: var(--ink); margin: 0 0 4px; }
+  .obs-meta { font-size: 10px; color: var(--muted); }
+
+  .panel { padding: 20px 22px; display: flex; flex-direction: column; }
+  .panel-title { font-size: var(--text-base); font-weight: 600; color: var(--depth); margin: 0 0 12px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">LIFE HUB</a>
+    <div class="hub-rail__tagline">Private dashboard</div>
+    <nav class="hub-rail__nav">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/><path d="M7 13h2M7 16h2M15 8h2M15 11h2M15 14h2"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/></svg>Overview</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M19.5 19.5 15.2 15.2"/></svg>Search</a>
+    </nav>
+    <div class="hub-rail__status">Private &middot; live sync</div>
+  </aside>
+
+  <main class="canvas" style="gap:20px;">
+    <div>
+      <div class="breadcrumb">People / <b>Dr Vicky Leighton</b></div>
+      <div class="profile-header">
+        <div class="avatar avatar-xl">VL</div>
+        <div class="identity">
+          <h1 class="identity-name">Dr Vicky Leighton</h1>
+          <p class="identity-role"><b>Senior Lecturer, Gifted Education</b> &middot; University of Melbourne</p>
+          <div class="label-row">
+            <span class="chip chip-blue">Academic contact</span>
+            <span class="chip chip-gold">Mentor</span>
+            <span class="chip chip-sage">Research collaborator</span>
+          </div>
+          <p class="personal-desc">&ldquo;Gifted education person I bounce ideas off.&rdquo;</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-ghost">More</button>
+          <button class="btn btn-outline">Add observation</button>
+          <button class="btn btn-primary">Open Person Brief</button>
+        </div>
+      </div>
+      <div class="tabs">
+        <span class="tab is-current">Overview</span>
+        <span class="tab">Timeline</span>
+        <span class="tab">Shared Work</span>
+        <span class="tab">Observations</span>
+        <span class="tab">Network</span>
+        <span class="tab">Evidence</span>
+        <span class="tab">History</span>
+      </div>
+    </div>
+
+    <div class="summary-strip">
+      <div class="card summary-item"><span class="eyebrow">Last contact</span><span class="value">3 months ago</span></div>
+      <div class="card summary-item"><span class="eyebrow">Next interaction</span><span class="value">Coffee, 8 May</span></div>
+      <div class="card summary-item"><span class="eyebrow">Organisation</span><span class="value">Univ. of Melbourne</span></div>
+      <div class="card summary-item"><span class="eyebrow">Shared contexts</span><span class="value">Gifted Ed, HALT</span></div>
+      <div class="card summary-item"><span class="eyebrow">Shared work</span><span class="value">Research proposal</span></div>
+      <div class="card summary-item"><span class="eyebrow">Relationship state</span><span class="value state-active">&#9679; Active</span></div>
+    </div>
+
+    <div class="content-grid">
+      <div class="col">
+        <div class="card panel">
+          <h2 class="panel-title">Current Relationships</h2>
+          <div class="rel-list">
+            <div class="rel-row">
+              <div class="rel-main"><span class="rel-type">Academic contact</span><span class="rel-human">Context: Gifted Education</span></div>
+              <span class="rel-meta">Since Mar 2022</span>
+            </div>
+            <div class="rel-row">
+              <div class="rel-main"><span class="rel-type">Mentor</span><span class="rel-human">Context: Career development &middot; &ldquo;Gives useful career advice&rdquo;</span></div>
+              <span class="rel-meta">Since Aug 2023</span>
+            </div>
+            <div class="rel-row">
+              <div class="rel-main"><span class="rel-type">Research collaborator</span><span class="rel-human">Context: Research proposal, assessment reform</span></div>
+              <span class="rel-meta">Since Feb 2024</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card panel" style="flex:1;">
+          <h2 class="panel-title">Upcoming &amp; Past Activity</h2>
+          <div class="activity-cols">
+            <div>
+              <span class="mini-label">Upcoming</span>
+              <div class="mini-list">
+                <div class="mini-item"><b>Coffee meeting</b> &middot; 8 May, 10:00am</div>
+                <div class="mini-item"><b>HALT Conference</b> &middot; attending, 22 May</div>
+                <div class="mini-item">Follow up on <b>research proposal</b> draft</div>
+              </div>
+            </div>
+            <div>
+              <span class="mini-label">Past</span>
+              <div class="mini-list">
+                <div class="mini-item">Met at <b>Gifted Education Network</b> event &middot; 3 months ago</div>
+                <div class="mini-item">Introduced <b>Nina Fraser</b> to Vicky &middot; 4 months ago</div>
+                <div class="mini-item">Role change: joined <b>Univ. of Melbourne</b> &middot; Mar 2022</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card panel">
+          <h2 class="panel-title">Observations</h2>
+          <div class="obs-item"><p class="obs-text">&ldquo;Thinking about applying for an EdD.&rdquo;</p><span class="obs-meta">Meeting note &middot; 2 months ago</span></div>
+          <div class="obs-item"><p class="obs-text">&ldquo;Suggested I contact Jane about the panel.&rdquo;</p><span class="obs-meta">Email &middot; 3 months ago</span></div>
+          <div class="obs-item"><p class="obs-text">&ldquo;Values practical classroom application over theory.&rdquo;</p><span class="obs-meta">Meeting note &middot; 5 months ago</span></div>
+        </div>
+
+        <div class="card panel">
+          <h2 class="panel-title">Collection Gaps</h2>
+          <div class="obs-item"><p class="obs-text">Preferred communication channel unknown</p></div>
+          <div class="obs-item"><p class="obs-text">Current project status unclear</p></div>
+        </div>
+
+        <div class="card panel" style="flex:1;">
+          <h2 class="panel-title">Shared Contexts</h2>
+          <div class="cohort-row" style="gap:8px;">
+            <span class="chip chip-sage">Gifted Education</span>
+            <span class="chip chip-lilac">HALT</span>
+            <span class="chip chip-blue">Research Network</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
