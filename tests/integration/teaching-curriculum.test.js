@@ -612,3 +612,33 @@ test('media upload writes a public file behind the Life session', async () => {
   assert.equal(media.provider, 'direct');
   assert.ok(await store.get(`media_files/${media.id}`));
 });
+
+test('media item route forwards the reserved upload path', async () => {
+  const store = memoryStore();
+  const deps = {
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  };
+  const form = new FormData();
+  form.set('file', new File(['image'], 'cover.jpg', { type: 'image/jpeg' }));
+  form.set('title', 'Cover image');
+
+  const response = await createMediaItemHandler(deps)(
+    new Request('https://api.adam-russell.com/api/media/upload', {
+      method: 'POST',
+      headers: {
+        cookie: `life_hub_session=${session}`,
+        origin: 'https://teaching-hub.adam-russell.com'
+      },
+      body: form
+    }),
+    { params: { id: 'upload' } }
+  );
+
+  assert.equal(response.status, 201);
+  const media = (await response.json()).data;
+  assert.equal(media.provider, 'direct');
+  assert.equal(media.title, 'Cover image');
+  assert.ok(await store.get(`media_files/${media.id}`));
+});
