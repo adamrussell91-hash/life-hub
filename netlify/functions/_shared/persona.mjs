@@ -31,6 +31,7 @@ export function buildSystemPrompt({
   workoutTemplates = '',
   exerciseLibrary = '',
   fitnessResearch = '',
+  fitnessCoachingProfile = '',
   skincareRoutines = '',
   treatmentState = '',
   nutritionSkinWeek = '',
