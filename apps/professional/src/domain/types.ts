@@ -523,3 +523,58 @@ export interface PeopleActivityResponse {
   items: PeopleActivityItem[];
   next_cursor: string | null;
 }
+
+/**
+ * Person Brief (Phase 3, Feature 3.1 — `GET /api/people/brief?id=`). Only
+ * the synchronous, non-LLM sections `_shared/person-brief.mjs` assembles —
+ * "Since you last spoke" and "Talking points" (Feature 3.2) are NOT part of
+ * this shape; the view renders those from its own placeholder state, marked
+ * with `data-brief-llm-section` for a follow-up task to find and wire up.
+ */
+export interface PersonBriefNextInteraction {
+  kind: 'meeting' | 'event';
+  title: string;
+  start: string;
+  end: string | null;
+  time_zone: string;
+  location: string | null;
+  href: string | null;
+}
+
+export interface PersonBriefHeader {
+  person: { ref: string; display_name: string; href: string | null };
+  role: string | null;
+  organisation: { ref: string; display_name: string; href: string | null } | null;
+  /** `null` means SOURCE-BRIEF.md section 50's "Empty Brief" copy renders
+   * in place of the meeting-meta block; every other Brief section still
+   * renders normally either way. */
+  next_interaction: PersonBriefNextInteraction | null;
+}
+
+export interface PersonBriefOpenLoop {
+  ref: string;
+  label: string;
+  href: string | null;
+  status: string;
+}
+
+export interface PersonBriefSharedWorkItem {
+  kind: 'communication' | 'task' | 'meeting' | 'event' | 'application' | string;
+  label: string;
+  href: string | null;
+  status: string | null;
+}
+
+export interface PersonBriefMutualConnection {
+  ref: string;
+  display_label: string;
+  href: string | null;
+}
+
+export interface PersonBrief {
+  header: PersonBriefHeader;
+  who_they_are: string;
+  open_loops: PersonBriefOpenLoop[];
+  current_shared_work: PersonBriefSharedWorkItem[];
+  mutual_connections: PersonBriefMutualConnection[];
+}

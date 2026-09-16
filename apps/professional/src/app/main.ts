@@ -6,6 +6,7 @@ import '../../design-kit/motion.css';
 import '../../design-kit/entity-links.css';
 import '../../design-kit/relationship-timeline.css';
 import '../../design-kit/filters.css';
+import '../../design-kit/person-brief.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -37,6 +38,7 @@ import {
 } from '@/views/applications';
 import { renderCareerView } from '@/views/career';
 import { renderPersonPage } from '@/views/person-page';
+import { renderPersonBrief } from '@/views/person-brief';
 import { renderOrganisationPage } from '@/views/organisation-page';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
@@ -200,6 +202,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Organisations', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'person-brief') {
+      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
+      await renderPersonBrief(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'People', title: `${title} — Brief` });
         },
         isCurrent: () => generation === routeGeneration
       });

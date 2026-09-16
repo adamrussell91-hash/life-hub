@@ -9,11 +9,11 @@
 // out here because six new test files in this phase all need the identical
 // setup (rather than each re-deriving its own slightly-different copy).
 
-import { generatePersonId, generateOrganisationId, IDENTITY_SCHEMA_VERSION } from '../../netlify/functions/_shared/identity-schema.mjs';
-import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import { buildIdentityIndexRecord, generatePersonId, generateOrganisationId, IDENTITY_SCHEMA_VERSION } from '../../netlify/functions/_shared/identity-schema.mjs';
+import { resolveOrganisation, resolvePerson, resolveTask } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef, formatEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
-import { personKey, organisationKey } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
+import { personIndexKey, personKey, organisationKey } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from '../../netlify/functions/_shared/universal-link-repository.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
 import {
@@ -24,6 +24,7 @@ import {
 } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import { MEETING_SCHEMA_VERSION, meetingIndexRecord } from '../../netlify/functions/_shared/meeting-schema.mjs';
 import { EVENT_SCHEMA_VERSION, eventIndexRecord } from '../../netlify/functions/_shared/event-schema.mjs';
+import { taskKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
 
 export function memoryStore() {
   const map = new Map();
@@ -40,7 +41,15 @@ export function memoryStore() {
   };
 }
 
-export function makeResolveEntity(store) {
+/**
+ * `tasksStore`, when supplied, is optional — most existing callers never
+ * link a Task and don't need it. Mirrors the local `makeResolveEntity`
+ * `tests/integration/entity-overview.test.js` already established for Task
+ * resolution, factored out here so other suites needing a Task-aware
+ * resolver (e.g. `person-brief` — Open Loops / Current Shared Work) reuse
+ * the identical pattern instead of re-deriving their own.
+ */
+export function makeResolveEntity(store, tasksStore = null) {
   return async function resolveEntity(refInput, accessContext, options = {}) {
     const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
     if (!ref) throw endpointNotFoundError();
@@ -49,6 +58,9 @@ export function makeResolveEntity(store) {
     }
     if (ref.namespace === 'shared' && ref.kind === 'organisation') {
       return resolveOrganisation(ref.id, accessContext, { ...options, getStore: async () => store });
+    }
+    if (ref.namespace === 'tasks' && ref.kind === 'task' && tasksStore) {
+      return resolveTask(ref.id, accessContext, { ...options, getStore: async () => tasksStore });
     }
     throw endpointNotFoundError();
   };
@@ -72,6 +84,24 @@ export async function makePerson(store, overrides = {}) {
     updated_at: overrides.updated_at ?? timestamp
   };
   await store.setJSON(personKey(id), record);
+  // Also write the lightweight index projection a real create-person flow
+  // always writes alongside the authoritative record (identity-repository.mjs)
+  // — `career-overview.mjs`'s `findActiveSelfPerson` (reused by
+  // `person-brief.mjs`'s Mutual Connections) discovers candidate ids via
+  // this index, not the authoritative-record prefix, so a fixture person
+  // without it is invisible to that lookup.
+  await store.setJSON(
+    personIndexKey(id),
+    buildIdentityIndexRecord({
+      id,
+      kind: 'person',
+      displayLabel: record.display_name,
+      sortName: record.sort_name,
+      lifecycleStatus: record.lifecycle_status,
+      isSelf: record.is_self,
+      updatedAt: record.updated_at
+    })
+  );
   return { ...record, ref: formatEntityRef({ namespace: 'shared', kind: 'person', id }) };
 }
 
@@ -100,9 +130,9 @@ export async function makeOrganisation(store, overrides = {}) {
  * that would need to independently reimplement `validateUniversalLinkRecord`
  * to pass `listForEntity`'s own validation). Returns the committed link.
  */
-export async function makeLink(store, { sourceRef, targetRef, relationshipType, role = null, validFrom = null, validTo = null, occurredAt = null, metadata = {}, now }) {
-  const resolveEntity = makeResolveEntity(store);
-  const repo = createUniversalLinkRepository({ store, resolveEntity, ...(now ? { now } : {}) });
+export async function makeLink(store, { sourceRef, targetRef, relationshipType, role = null, validFrom = null, validTo = null, occurredAt = null, metadata = {}, now, resolveEntity }) {
+  const resolve = resolveEntity ?? makeResolveEntity(store);
+  const repo = createUniversalLinkRepository({ store, resolveEntity: resolve, ...(now ? { now } : {}) });
   const accessContext = createAccessContext({ workflow: 'life' });
   const { link } = await repo.createLink(
     { source_ref: sourceRef, target_ref: targetRef, relationship_type: relationshipType, role, valid_from: validFrom, occurred_at: occurredAt, metadata },
@@ -173,4 +203,24 @@ export async function makeEvent(store, overrides = {}) {
   await store.setJSON(eventKey(id), record);
   await store.setJSON(eventIndexKey(id), eventIndexRecord(record));
   return record;
+}
+
+let taskCounter = 0;
+
+/**
+ * Writes a minimal Task record directly to a Tasks-content memory store —
+ * `resolveTask` (entity-resolvers.mjs) only reads `title`/`status` off it,
+ * so this deliberately does not model the full Tasks schema (mirrors
+ * `tests/integration/entity-overview.test.js`'s own inline Task fixtures).
+ */
+export async function makeTask(tasksStore, overrides = {}) {
+  taskCounter += 1;
+  const id = overrides.id ?? `task_${String(taskCounter).padStart(8, '0')}`;
+  const record = {
+    id,
+    title: overrides.title ?? 'Test Task',
+    status: overrides.status ?? 'open'
+  };
+  await tasksStore.setJSON(taskKey(id), record);
+  return { ...record, ref: formatEntityRef({ namespace: 'tasks', kind: 'task', id }) };
 }

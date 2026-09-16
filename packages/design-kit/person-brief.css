@@ -1,0 +1,225 @@
+/* Person Brief (Phase 3, Feature 3.1) — the "reading sheet" layout ported
+ * from docs/professional-hub/people-experience/mockups/03-person-brief.html.
+ * Every rule here is scoped under `.person-brief` — this view still sits
+ * inside the same rail+canvas hub shell as every other route
+ * (`renderHubShell`/`shell.canvas`), so nothing here touches the global
+ * `.canvas`/`.hub-canvas__body` rules the mockup's own standalone
+ * `<style>` block overrode; only the content inside the canvas gets the
+ * centred reading-sheet treatment. Class names are this app's own BEM-ish
+ * `person-brief__*` convention (see `person-brief.ts`), not the mockup's
+ * unprefixed `.brief-*` names — the visual structure is a direct port, the
+ * selectors are not. */
+
+.person-brief {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 44px;
+}
+
+.person-brief__sheet {
+  width: min(880px, 100%);
+  background: var(--warm-white);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--line);
+  box-shadow: var(--elev-4);
+  padding: 44px 52px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.person-brief__close {
+  align-self: flex-end;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.person-brief__close:hover {
+  text-decoration: underline;
+}
+
+.person-brief__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 22px;
+  flex-wrap: wrap;
+}
+
+.person-brief__who {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.person-brief__avatar {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--warm-white);
+  background: linear-gradient(135deg, var(--navy-2), var(--marine));
+}
+
+.person-brief__name {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--depth);
+  margin: 0 0 3px;
+  letter-spacing: var(--tracking-tight);
+}
+
+.person-brief__role {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0;
+}
+
+.person-brief__meta {
+  text-align: right;
+}
+
+.person-brief__meta .eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.person-brief__meta .value {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--depth);
+}
+
+.person-brief__meta .empty-state {
+  max-width: 260px;
+  margin: 0;
+}
+
+.person-brief__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-brief__section h2 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--depth);
+  margin: 0;
+  letter-spacing: var(--tracking-tight);
+}
+
+.person-brief__section p,
+.person-brief__section li {
+  font-size: var(--text-sm);
+  color: var(--ink);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+.person-brief__since {
+  background: var(--pastel-blue);
+  border-radius: var(--radius-md);
+  padding: 20px 22px;
+}
+
+.person-brief__since h2 {
+  color: var(--pastel-blue-ink);
+}
+
+.person-brief__two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+@media (max-width: 640px) {
+  .person-brief__two-col {
+    grid-template-columns: 1fr;
+  }
+  .person-brief__sheet {
+    padding: 28px 20px 32px;
+  }
+}
+
+.person-brief__talking-points {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.person-brief__tp-item {
+  display: flex;
+  gap: 10px;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.person-brief__tp-num {
+  flex: 0 0 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--pastel-gold);
+  color: var(--pastel-gold-ink);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.person-brief__open-loop {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.person-brief__open-loop .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--high-sea);
+  margin-top: 6px;
+  flex: 0 0 7px;
+}
+
+.person-brief__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.person-brief__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.person-brief__snooze-status {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  flex-basis: 100%;
+  text-align: right;
+}

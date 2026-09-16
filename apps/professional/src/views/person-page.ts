@@ -1,5 +1,6 @@
 import { renderEntityDetail } from '@/components/entity-detail';
 import { buildPersonTabs } from '@/components/person-tabs';
+import { personBriefRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
 import type { EntityOverview, PersonRecord } from '@/domain/types';
 
@@ -37,6 +38,14 @@ export async function renderPersonPage(
         self.textContent = 'Self';
         host.append(self);
       }
+      // Brief section 19 / BUILD-PLAN.md Feature 1.3's "Open Person Brief"
+      // quick action — links to the Phase 3 Person Brief reading sheet
+      // (`#/person/<id>/brief`, `views/person-brief.ts`).
+      const brief = document.createElement('a');
+      brief.className = 'btn btn--secondary entity-detail__brief-link';
+      brief.href = personBriefRoute(person.id);
+      brief.textContent = 'Open Person Brief';
+      host.append(brief);
     }
   });
 }

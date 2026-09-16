@@ -55,7 +55,11 @@ function endpointSummary(endpoint) {
   };
 }
 
-async function findActiveSelfPerson(universalStore) {
+// Exported so other callers needing "the active self Person" (e.g.
+// `person-brief.mjs`'s Mutual Connections section, Phase 3 Feature 3.1)
+// reuse this exact lookup rather than re-deriving their own — see that
+// module for why.
+export async function findActiveSelfPerson(universalStore) {
   const keys = await listPersonIndexKeys(universalStore);
   for (const key of keys) {
     const id = key.slice('entities/index/person/'.length);
