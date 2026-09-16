@@ -299,4 +299,4 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   };
 }
 
-export { defaultGetUniversalLinkStore };
+export { compareTimelineOrder, defaultGetUniversalLinkStore };
