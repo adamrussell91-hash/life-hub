@@ -1,6 +1,6 @@
 .canvas:has(> .protocols-root) { display:flex; flex-direction:column; min-height:100dvh; height:100dvh; padding:0; overflow:hidden; }
 .protocols-root { display:flex; flex-direction:column; flex:1; min-height:0; width:100%; }
-.protocol-library { position:relative; min-height:calc(100dvh - 4rem); max-width:92rem; margin:0 auto; padding:clamp(1.5rem,3vw,3rem) 0 4rem; isolation:isolate; }
+.protocol-library { position:relative; flex:1 1 auto; min-height:0; max-width:92rem; margin:0 auto; width:100%; padding:clamp(1.5rem,3vw,3rem) 0 4rem; isolation:isolate; overflow-y:auto; -webkit-overflow-scrolling:touch; }
 .protocol-library::before { content:""; position:absolute; z-index:-1; inset:0 -8vw; opacity:.38; background:radial-gradient(circle at 12% 20%,color-mix(in srgb,var(--pastel-gold) 58%,transparent),transparent 25rem),radial-gradient(circle at 87% 72%,color-mix(in srgb,var(--pastel-lilac) 52%,transparent),transparent 28rem); pointer-events:none; }
 .protocol-library__grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:clamp(1rem,1.8vw,1.65rem); align-items:stretch; margin-top:clamp(1.5rem,2.5vw,2.5rem); }
 .protocol-card { --protocol-paper:var(--paper); --protocol-ink:var(--navy); min-height:25rem; perspective:1600px; animation:protocol-deal .6s cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--protocol-order) * 55ms); }
