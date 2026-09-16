@@ -119,13 +119,26 @@ export function applyWorkoutNoteRestrictionsToLibrary(entries, record, notes, to
   ) {
     targets = exercises;
   }
-  if (targets.length === 0) {
+  const shelvesWorkout = /\b(this|that|same)\s+workout\b/i.test(text) && typeof record?.title === 'string';
+  if (targets.length === 0 && !shelvesWorkout) {
     return { entries: Array.isArray(entries) ? entries.slice() : [], restrictions: [] };
   }
 
   const shelvedUntil = addCalendarDays(today, restrictionDurationDays(text));
   let next = Array.isArray(entries) ? entries.slice() : [];
   const restrictions = [];
+  if (shelvesWorkout) {
+    const name = `Workout: ${record.title.trim()}`;
+    next = upsertExerciseLibraryEntry(next, {
+      name,
+      target_area: 'workout',
+      entry_kind: 'workout',
+      shelved_on: today,
+      shelved_until: shelvedUntil,
+      shelved_reason: text.replace(/\s+/g, ' ').slice(0, 200)
+    }, updatedAt);
+    restrictions.push({ name, shelved_on: today, shelved_until: shelvedUntil });
+  }
   for (const exercise of targets) {
     const name = String(exercise.name ?? '').trim();
     if (!name) continue;
@@ -141,9 +154,8 @@ export function applyWorkoutNoteRestrictionsToLibrary(entries, record, notes, to
 }
 
 /**
- * Non-blocking guardrail alongside workout-lint.mjs: flags any exercise in a proposed
- * workout that Adam has explicitly shelved and hasn't asked back yet, so a shelved move
- * slipping into a proposal shows up on the Confirm card even if the model missed it.
+ * Blocking guardrail used before a workout proposal is shown. Active exercise and
+ * named workout shelves must be cleared or allowed to expire before reuse.
  */
 export function shelvedExerciseWarnings(record, entries, today) {
   if (!record || record.type !== 'workout' || !Array.isArray(record.exercises)) return [];
@@ -154,6 +166,11 @@ export function shelvedExerciseWarnings(record, entries, today) {
   }
   if (shelvedByKey.size === 0) return [];
   const warnings = [];
+  const workoutShelf = shelvedByKey.get(libraryKey({ name: `Workout: ${record.title ?? ''}` }));
+  if (workoutShelf) {
+    const reason = workoutShelf.shelved_reason ? ` (${workoutShelf.shelved_reason})` : '';
+    warnings.push(`"${record.title}" is shelved until ${workoutShelf.shelved_until}${reason} — Adam asked not to repeat this workout.`);
+  }
   for (const exercise of record.exercises) {
     const shelved = shelvedByKey.get(libraryKey({ name: exercise?.name }));
     if (!shelved) continue;
