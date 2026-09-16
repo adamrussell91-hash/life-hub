@@ -25,7 +25,21 @@
 
 const ORGANISATION_LINK_TYPES = new Set(['employee_at', 'member_of']);
 
-export function computeDynamicCohorts(peopleWithRelationships) {
+// Shared low-level grouping helper — factored out so Phase 4's Habitat
+// Classification (`habitat-classification.mjs` / `network-ecology-world.mjs`)
+// reuses the EXACT SAME "who currently shares an organisation" grouping
+// this module's own `computeDynamicCohorts` uses, rather than a second,
+// possibly-subtly-different pass over `peopleWithRelationships`. Unlike
+// `computeDynamicCohorts`'s output, each member entry here keeps the full
+// relationship `link` (not just `ref`/`display_name`) — Habitat's
+// `avgDurationDays` statistic needs `link.valid_from`, which
+// `computeDynamicCohorts`'s own public shape deliberately never exposed
+// (Dynamic Cohorts had no use for it). Only organisations with >= 2
+// currently-linked people are returned — the same ">= 2" floor
+// `computeDynamicCohorts`'s own comment documents below, and the same
+// floor Habitat's `HABITAT_MIN_CLUSTER_SIZE` constant independently pins
+// to the identical value for its own candidate-cluster gate.
+export function groupCurrentOrganisationMembers(peopleWithRelationships) {
   const byOrg = new Map();
 
   for (const { person, relationships } of peopleWithRelationships) {
@@ -42,24 +56,34 @@ export function computeDynamicCohorts(peopleWithRelationships) {
           members: new Map()
         });
       }
-      byOrg.get(endpoint.ref).members.set(person.id, { ref: person.ref, display_name: person.display_name });
+      byOrg.get(endpoint.ref).members.set(person.id, { ref: person.ref, display_name: person.display_name, link });
     }
   }
 
-  const cohorts = [];
+  const groups = [];
   for (const org of byOrg.values()) {
     if (org.members.size < 2) continue;
     const members = [...org.members.values()].sort((a, b) =>
       (a.display_name ?? '').localeCompare(b.display_name ?? '')
     );
-    cohorts.push({
-      kind: 'organisation',
-      key: org.ref,
-      label: org.display_name,
-      organisation_ref: org.ref,
-      members
-    });
+    groups.push({ ref: org.ref, display_name: org.display_name, members });
   }
+  return groups;
+}
+
+export function computeDynamicCohorts(peopleWithRelationships) {
+  const groups = groupCurrentOrganisationMembers(peopleWithRelationships);
+
+  const cohorts = groups.map((org) => ({
+    kind: 'organisation',
+    key: org.ref,
+    label: org.display_name,
+    organisation_ref: org.ref,
+    // Strip `link` back off — `computeDynamicCohorts`'s public shape is
+    // unchanged from before this refactor; only `groupCurrentOrganisationMembers`
+    // (a new export) exposes it.
+    members: org.members.map(({ ref, display_name }) => ({ ref, display_name }))
+  }));
 
   cohorts.sort((a, b) => b.members.length - a.members.length || a.label.localeCompare(b.label));
   return cohorts;

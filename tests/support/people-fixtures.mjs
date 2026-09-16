@@ -10,7 +10,7 @@
 // setup (rather than each re-deriving its own slightly-different copy).
 
 import { buildIdentityIndexRecord, generatePersonId, generateOrganisationId, IDENTITY_SCHEMA_VERSION } from '../../netlify/functions/_shared/identity-schema.mjs';
-import { resolveOrganisation, resolvePerson, resolveTask } from '../../netlify/functions/_shared/entity-resolvers.mjs';
+import { resolveEvent, resolveMeeting, resolveOrganisation, resolvePerson, resolveTask } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef, formatEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
 import { personIndexKey, personKey, organisationKey } from '../../netlify/functions/_shared/universal-link-blobs.mjs';
@@ -50,7 +50,7 @@ export function memoryStore() {
  * resolver (e.g. `person-brief` — Open Loops / Current Shared Work) reuse
  * the identical pattern instead of re-deriving their own.
  */
-export function makeResolveEntity(store, tasksStore = null) {
+export function makeResolveEntity(store, tasksStore = null, professionalStore = null) {
   return async function resolveEntity(refInput, accessContext, options = {}) {
     const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
     if (!ref) throw endpointNotFoundError();
@@ -62,6 +62,18 @@ export function makeResolveEntity(store, tasksStore = null) {
     }
     if (ref.namespace === 'tasks' && ref.kind === 'task' && tasksStore) {
       return resolveTask(ref.id, accessContext, { ...options, getStore: async () => tasksStore });
+    }
+    // Meeting/Event resolution, added for Phase 4 (Network Ecology) —
+    // `network-ecology-world.mjs` resolves attendee links' `source_ref`
+    // (the meeting/event itself) through the same injected `resolveEntity`
+    // every other repository read uses, so its integration tests need this
+    // fixture resolver to handle those two kinds too. Optional third arg
+    // keeps every existing two-arg call site unaffected.
+    if (ref.namespace === 'professional' && ref.kind === 'meeting' && professionalStore) {
+      return resolveMeeting(ref.id, accessContext, { ...options, getStore: async () => professionalStore });
+    }
+    if (ref.namespace === 'professional' && ref.kind === 'event' && professionalStore) {
+      return resolveEvent(ref.id, accessContext, { ...options, getStore: async () => professionalStore });
     }
     throw endpointNotFoundError();
   };

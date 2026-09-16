@@ -259,6 +259,140 @@ that step is left for Adam's explicit review when he's back.
     /api/people/relational-search?organisation_ref=<ref>&role=<role>&text=<text>`,
     all three optional, at least one required.
 
+## Phase 4 decisions
+
+22. **Habitat classification thresholds: delegated, fixed numbers — not
+    re-derived.** BUILD-PLAN.md Feature 4.2 explicitly leaves the six
+    habitats' thresholds as an "open product/algorithm decision... sit
+    with Adam and set them against real (or realistic synthetic) data."
+    This task's own instructions gave exact, delegated placeholder values
+    (`netlify/functions/_shared/habitat-classification.mjs`):
+    `HABITAT_MIN_CLUSTER_SIZE=2`, `FOREST_MIN_DENSITY=0.4`,
+    `FOREST_MIN_DURATION_DAYS=365`, `FOREST_MIN_SIZE=3`,
+    `REEF_MIN_DENSITY=0.3`, `REEF_MIN_ROLE_DIVERSITY=0.5`,
+    `REEF_MIN_SIZE=3`, `SAVANNAH_MIN_SIZE=8`, `SAVANNAH_MAX_DENSITY=0.2`,
+    `ISLAND_MAX_BRIDGE_RATIO=0.1`, `ISLAND_MAX_SIZE=5`,
+    `EVENT_WINDOW_DAYS=30`. These are implemented exactly as given, NOT
+    validated against real or synthetic Adam data — flagged here exactly
+    the way Feature 1.6's `relationship-state.mjs` thresholds were flagged
+    (decision 2 above): named, exported constants at the top of the file
+    specifically so they are trivially tunable later without touching the
+    classification logic. Classification priority order (Wetland > Island
+    > Forest > Reef > Savannah > Unclassified) is likewise the task's own
+    delegated decision, documented in-line in `classifyHabitat`'s doc
+    comment (most-specific/temporal signal first, broad catch-all last).
+
+23. **Mangrove is Bridge People, not a 7th `classifyHabitat` branch.**
+    SOURCE-BRIEF.md section 30 describes Mangrove as bridging behaviour —
+    "People connect otherwise separate communities" — which is a property
+    of a PERSON spanning clusters, not a cluster's own internal density/
+    duration/diversity the way Forest/Reef/Savannah/Island/Wetland are.
+    Implemented as the separate, pure `computeBridgePeople(organisationGroups)`
+    function, which doubles as Feature 4.5's own "Bridge People" — one
+    implementation serves both, per the task's explicit cross-reference.
+    Each result carries a plain-language `description` (e.g. "Connects St
+    Aloysius and UNSW", organisations sorted alphabetically so the text
+    never leaks internal data-load ordering) rather than a rank/score, per
+    Principle 6.
+
+24. **Introduction Paths: plain-text chain only, Sankey rendering
+    deliberately deferred.** BUILD-PLAN.md Feature 4.5 itself phases this:
+    "ship the plain-text chain list first... add the Sankey rendering once
+    the underlying path-finding query... is proven correct." This task
+    builds only `findIntroductionPaths` (`netlify/functions/_shared/introduction-paths.mjs`)
+    and its `GET /api/network-ecology/introduction-paths` route — no
+    `buildSankeyFlow`/`d3-sankey` integration, no flow-diagram rendering.
+    That remains explicitly out of scope for a later task once this
+    path-finding query has shipped and been used.
+
+25. **Introduction Paths' cap: 3 shortest paths, even when many equally-
+    short paths exist.** `MAX_INTRODUCTION_PATHS = 3` — a small, human-
+    scannable number chosen to satisfy brief section 23's "Do not show
+    meaningless degrees of separation" without collapsing to a single path
+    when a genuine choice of introducers exists. Verified with a dedicated
+    fixture (`tests/unit/introduction-paths.test.js`'s "path count is
+    capped" case): a 5-way fan-out with 5 equally-short 2-hop paths from A
+    to Z still returns exactly 3, deterministically sorted by path-ref
+    chain rather than arbitrary enumeration order.
+
+26. **Introduction Paths' graph keeps Organisation nodes as real
+    intermediate hops rather than synthesizing a "colleague at X"
+    person-to-person edge.** The task's own illustrative example showed
+    `[{ref: personA, via: 'colleague at UNSW'}, ...]`, which reads as if
+    two colleagues at the same org are always directly connected. Chose
+    NOT to synthesize that edge: brief section 23 requires "evidenced"
+    connections, and inventing an edge with no backing Universal Link
+    would be LESS evidenced than showing the real `employee_at`/
+    `member_of` hop through the organisation node itself. `network-graph.mjs`
+    documents this decision in full; `maxHops` is defined as bounding
+    total graph hops (edges) walked, which may include an organisation
+    node as one of them.
+
+27. **One shared hop-traversal graph builder
+    (`netlify/functions/_shared/network-graph.mjs`'s `buildRelationshipGraph`)
+    feeds `/api/network-ecology/world`'s base nodes/edges,
+    `/api/network-ecology/ego`'s neighbourhood BFS, AND
+    `findIntroductionPaths`'s shortest-path BFS** — per the task's explicit
+    instruction not to write hop-BFS logic twice. All three read the SAME
+    current-link graph (`professional_relationship` + `employee_at`/
+    `member_of`, `status === 'current'` only).
+
+28. **Organisation clustering reuses Dynamic Cohorts' exact grouping, via
+    a new extracted helper, not a re-derivation.** `people-cohorts.mjs`'s
+    `computeDynamicCohorts` (Phase 2, Feature 2.4) was refactored to call
+    a new exported `groupCurrentOrganisationMembers(peopleWithRelationships)`
+    — the identical "current `employee_at`/`member_of` link, >= 2 members"
+    grouping logic that was previously inline, now shared. Habitat
+    classification's `computeOrganisationClusterStats` and
+    `computeBridgePeople` both consume this SAME helper's output (extended
+    only to keep each member's full `link` record, which
+    `computeDynamicCohorts`'s own public shape never needed, for
+    `avgDurationDays`'s `link.valid_from`). `computeDynamicCohorts`'s own
+    output shape is byte-for-byte unchanged — its existing test suite
+    (`tests/unit/people-cohorts.test.js`, `tests/integration/people-cohorts.test.js`)
+    passes unmodified after the refactor.
+
+29. **Privacy/visibility gap this task closes: an archived person's own
+    top-level `loadAllPeopleWithRelationships` entry, not their appearance
+    as someone else's "other endpoint".** `people-collection.mjs`'s
+    `loadAllPeopleWithRelationships` deliberately resolves each person's
+    OWN ref with `includeArchived: true` (correct for its own documented
+    admin-aggregation purpose), which means an archived person's own
+    `{ person, relationships }` entry still comes back in its output —
+    even though `universal-link-read-repository.mjs` already drops that
+    same archived person whenever they appear as the *other* endpoint of
+    someone else's link (no `includeArchived` there). Network Ecology adds
+    `network-ecology-world.mjs`'s `filterVisiblePeople` — drop any
+    top-level entry whose `person.lifecycle_status === 'archived'` — before
+    it reaches graph/cluster/path assembly, closing exactly the gap
+    BUILD-PLAN.md's Phase 4 server contract calls out ("not just the
+    top-level entity a request names"). See that file's doc comment for
+    the full trace. Proven end-to-end by dedicated fixtures in all three
+    integration test files (archived person created as ACTIVE with real
+    links, THEN transitioned to `archived` directly in the store — an
+    archived record cannot be a link endpoint at *create* time, so the
+    fixture matches how this would actually happen in production).
+
+30. **Event clusters tolerate `attendee` links not existing yet.** Per the
+    task's own carried-over Phase 3 finding, `attendee`'s registry
+    declaration currently only allows `sourceKinds: ['professional:meeting']`
+    — Event attendee links may not exist in practice. `buildEventClusters`
+    (`network-ecology-world.mjs`) queries both Meetings and Events for
+    attendees identically and simply yields zero event-derived clusters
+    for Events until that registry gap closes; this is exercised
+    (`tests/integration/network-ecology-world.test.js`'s "no meetings/
+    events at all" case) and does not error.
+
+31. **World graph's edges are literal Universal Link types only — no
+    synthesized "shared-context" edges.** BUILD-PLAN.md's Phase 4 server
+    contract mentions "shared-context derived edges" as a possibility, but
+    this task's own exact server-contract instructions specify
+    `edges: [{source_ref, target_ref, relationship_type}]` with no such
+    type. Implemented literally: every edge is a real current
+    `professional_relationship`/`employee_at`/`member_of` Universal Link.
+    A future task can layer derived/synthetic edges on top if the canvas
+    frontend needs them — not invented speculatively here.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -294,5 +428,27 @@ that step is left for Adam's explicit review when he's back.
   Verified: `apps/professional` `npm test` (153/153), `npm run typecheck`
   (clean), `npm run build` (clean); root `npm test` (3808/3808). Not
   pushed, no PR.
-- Phase 4: not started
+- Phase 4: **backend complete (Features 4.1-data/4.2/4.5-text); rendering
+  engine (4.1 canvas), EGO Ecology UI (4.3), Your Network (4.4), Sankey
+  upgrade, History mode route (4.6), Opportunity/Dormancy layers (4.7) not
+  started — those are frontend/canvas work for a separate task, and 4.6's
+  own route/scrubber, per this task's explicit scope.** Habitat
+  classification (`netlify/functions/_shared/habitat-classification.mjs` —
+  `classifyHabitat`, `computeOrganisationClusterStats`,
+  `computeBridgePeople`), the shared hop-traversal graph
+  (`netlify/functions/_shared/network-graph.mjs`), Introduction Paths
+  (`netlify/functions/_shared/introduction-paths.mjs`), and their I/O
+  assembly (`netlify/functions/_shared/network-ecology-world.mjs`) are
+  built and tested, behind three new routes: `GET
+  /api/network-ecology/world`, `GET /api/network-ecology/ego?ref=&hops=`,
+  `GET /api/network-ecology/introduction-paths?from=&to=`. See decisions
+  22-31 above, especially 22 (thresholds are delegated placeholders, not
+  yet validated against real data) and 29 (the privacy/visibility gap this
+  task closes, with its dedicated end-to-end tests). Verified: root `npm
+  test` (3872/3872 — 3808 baseline + 64 new: 24 habitat-classification
+  unit, 9 introduction-paths unit, 12 network-ecology-world integration
+  including 2 dedicated privacy tests, 10 network-ecology-ego integration
+  including 1 privacy test, 9 network-ecology-introduction-paths
+  integration including 1 privacy test). `apps/professional` untouched by
+  this task (no frontend work). Not pushed, no PR.
 - Phase 5: not started
