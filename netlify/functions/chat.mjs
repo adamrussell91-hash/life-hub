@@ -147,6 +147,13 @@ import {
   validateFitnessResearchEntry
 } from './_shared/fitness-research.mjs';
 import {
+  FITNESS_COACHING_PROFILE_PATH,
+  formatFitnessCoachingProfileForPrompt,
+  mergeFitnessCoachingProfile,
+  parseFitnessCoachingProfile,
+  validateFitnessCoachingProfilePatch
+} from './_shared/fitness-coaching-profile.mjs';
+import {
   attachWorkoutNotes,
   combineSessionAdherenceDays,
   compareWorkoutWindows,
@@ -551,6 +558,9 @@ export function createChatHandler({
         let fitnessResearchEntries = [];
         let fitnessResearch = '';
         let fitnessResearchSha;
+        let fitnessCoachingProfileData = {};
+        let fitnessCoachingProfile = '';
+        let fitnessCoachingProfileSha;
         // Cold-start: seed in memory (defaults, or legacy catalog migrate below)
         // so the first Hyaluronica write merges onto a full shelf instead of
         // persisting a sparse 1-item library that would block HTTP seed-on-missing.
@@ -650,6 +660,10 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === FITNESS_RESEARCH_PATH && entry.type === 'blob')
             : null;
           fitnessResearchSha = fitnessResearchEntry?.sha;
+          const fitnessCoachingProfileEntry = needsFitnessResearch
+            ? current.tree.find(entry => entry.path === FITNESS_COACHING_PROFILE_PATH && entry.type === 'blob')
+            : null;
+          fitnessCoachingProfileSha = fitnessCoachingProfileEntry?.sha;
           const skincareLibraryEntry = needsSkincareLibrary
             ? current.tree.find(entry => entry.path === SKINCARE_PRODUCT_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -739,6 +753,7 @@ export function createChatHandler({
             nutritionChallengesBlob,
             exerciseLibraryBlob,
             fitnessResearchBlob,
+            fitnessCoachingProfileBlob,
             skincareLibraryBlob,
             skincareMembershipBlob,
             skincareCatalogBlob,
@@ -763,6 +778,7 @@ export function createChatHandler({
             nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
             fitnessResearchEntry ? client.readBlob(fitnessResearchEntry.sha) : null,
+            fitnessCoachingProfileEntry ? client.readBlob(fitnessCoachingProfileEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
@@ -993,6 +1009,16 @@ export function createChatHandler({
           }
           if (needsFitnessResearch) {
             fitnessResearch = formatFitnessResearchForPrompt(fitnessResearchEntries, today);
+          }
+
+          const decodedFitnessCoachingProfile = fitnessCoachingProfileBlob
+            ? decodeBlob(fitnessCoachingProfileBlob)
+            : null;
+          if (decodedFitnessCoachingProfile !== null) {
+            fitnessCoachingProfileData = parseFitnessCoachingProfile(decodedFitnessCoachingProfile);
+          }
+          if (needsFitnessResearch) {
+            fitnessCoachingProfile = formatFitnessCoachingProfileForPrompt(fitnessCoachingProfileData);
           }
 
           if (needsWorkoutHistory) {
@@ -1253,6 +1279,11 @@ export function createChatHandler({
             ? formatFitnessResearchForPrompt([], today)
             : '';
           fitnessResearchSha = undefined;
+          fitnessCoachingProfileData = {};
+          fitnessCoachingProfile = needsFitnessResearch
+            ? formatFitnessCoachingProfileForPrompt({})
+            : '';
+          fitnessCoachingProfileSha = undefined;
           skincareLibrary = needsSkincareLibrary
             ? seedProductLibraryFromDefaults(SKINCARE_ROUTINES)
             : emptyProductLibrary();
@@ -1522,6 +1553,7 @@ export function createChatHandler({
           hammondAuditContract,
           workoutTemplates,
           fitnessResearch,
+          fitnessCoachingProfile,
           lastWorkouts,
           workoutWindowCompare,
           regionStrength,
@@ -1985,6 +2017,30 @@ export function createChatHandler({
                   fitnessResearchSha = result.sha;
                   send({ type: 'status', text: `Stored ${entry.area} research for future workouts.` });
                   return JSON.stringify({ ok: true, area: entry.area, researched_on: entry.researched_on });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'save_fitness_coaching_profile') {
+                const patch = validateFitnessCoachingProfilePatch(event.input);
+                if (!patch) {
+                  return JSON.stringify({ ok: false, error: 'invalid_profile_patch' });
+                }
+                try {
+                  fitnessCoachingProfileData = mergeFitnessCoachingProfile(
+                    fitnessCoachingProfileData,
+                    patch,
+                    getSydneyTimestamp(nowInstant)
+                  );
+                  const result = await client.writeFile({
+                    path: FITNESS_COACHING_PROFILE_PATH,
+                    content: JSON.stringify(fitnessCoachingProfileData, null, 2),
+                    ...(fitnessCoachingProfileSha ? { sha: fitnessCoachingProfileSha } : {}),
+                    message: 'chore(fitness-profile): update coaching context'
+                  });
+                  fitnessCoachingProfileSha = result.sha;
+                  send({ type: 'status', text: 'Stored that coaching preference for future workouts.' });
+                  return JSON.stringify({ ok: true });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
