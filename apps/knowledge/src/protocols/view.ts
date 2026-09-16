@@ -17,15 +17,16 @@ const voiceAsset: Record<string, string> = {
 };
 function frontAsset(id: string) { return `${ASSET_ROOT}/card-fronts/${id === "fates" ? "fates-the-three-fates" : id}-card-front.png`; }
 function backAsset(id: string) { return `${ASSET_ROOT}/card-backs/${id}-card-back.png`; }
-export function backgroundAsset(id: string, stage?: number) { return `${ASSET_ROOT}/backgrounds/${id}-background${stage ? `-${stage}` : ""}.png`; }
+export function backgroundAsset(id: string, stage?: string) { return `${ASSET_ROOT}/backgrounds/${id}-background${stage ? `-${stage}` : ""}.png`; }
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-/** 5 sequential lighting stages across the transcript so far — 1 (opening) to 5 (closing). */
-export function lightingStage(viewingIndex: number, totalTurns: number): number {
-  if (totalTurns <= 1) return 1;
+/** 5 named lighting stages across the transcript so far, opening to closing. */
+export const LIGHTING_STAGES = ["sunrise", "morning", "golden-hour", "blue-hour", "just-after-dusk"] as const;
+export function lightingStage(viewingIndex: number, totalTurns: number): string {
+  if (totalTurns <= 1) return LIGHTING_STAGES[0];
   const fraction = clamp(viewingIndex, 0, totalTurns - 1) / (totalTurns - 1);
-  return clamp(1 + Math.floor(fraction * 5), 1, 5);
+  return LIGHTING_STAGES[clamp(Math.floor(fraction * LIGHTING_STAGES.length), 0, LIGHTING_STAGES.length - 1)];
 }
 
 const lightingArtCache = new Map<string, boolean>();
@@ -37,8 +38,8 @@ function probeImage(url: string): Promise<boolean> {
     img.src = url;
   });
 }
-/** Swaps in a numbered lighting-stage background once confirmed to exist; leaves the default in place otherwise. */
-function applyStagedBackground(section: HTMLElement, protocolId: string, stage: number) {
+/** Swaps in a named lighting-stage background once confirmed to exist; leaves the default in place otherwise. */
+function applyStagedBackground(section: HTMLElement, protocolId: string, stage: string) {
   const url = backgroundAsset(protocolId, stage);
   const cached = lightingArtCache.get(url);
   if (cached === true) { section.style.setProperty("--protocol-background", `url('${url}')`); return; }

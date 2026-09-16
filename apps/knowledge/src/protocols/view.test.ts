@@ -91,15 +91,15 @@ describe("protocol conversation view", () => {
 });
 
 describe("lightingStage", () => {
-  it("stays at stage 1 for a single-turn or empty transcript", () => {
-    expect(lightingStage(0, 0)).toBe(1);
-    expect(lightingStage(0, 1)).toBe(1);
+  it("stays at the opening stage for a single-turn or empty transcript", () => {
+    expect(lightingStage(0, 0)).toBe("sunrise");
+    expect(lightingStage(0, 1)).toBe("sunrise");
   });
 
-  it("spans 1 to 5 across a longer transcript", () => {
-    expect(lightingStage(0, 10)).toBe(1);
-    expect(lightingStage(9, 10)).toBe(5);
-    expect(lightingStage(4, 10)).toBe(3);
+  it("spans sunrise to just-after-dusk across a longer transcript", () => {
+    expect(lightingStage(0, 10)).toBe("sunrise");
+    expect(lightingStage(9, 10)).toBe("just-after-dusk");
+    expect(lightingStage(4, 10)).toBe("golden-hour");
   });
 });
 
@@ -108,8 +108,8 @@ describe("backgroundAsset", () => {
     expect(backgroundAsset("horizon")).toMatch(/horizon-background\.png$/);
   });
 
-  it("builds a numbered staged filename when a stage is given", () => {
-    expect(backgroundAsset("horizon", 3)).toMatch(/horizon-background-3\.png$/);
+  it("builds a named staged filename when a stage is given", () => {
+    expect(backgroundAsset("horizon", "golden-hour")).toMatch(/horizon-background-golden-hour\.png$/);
   });
 });
 

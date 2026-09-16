@@ -36,10 +36,10 @@ When a turn's text matches a numbered "Fork one: ... Fork two: ..." (or equivale
 
 ## Lighting-as-progress
 
-The room's lighting shifts across the conversation to visually mark progress, using real commissioned art (not a CSS color-grade) — Adam is having dawn/day/dusk/night variants painted per protocol.
+The room's lighting shifts across the conversation to visually mark progress, using real commissioned art (not a CSS color-grade) per protocol.
 
-- Five sequential numbered stages, start to finish: `{id}-background-1.png` … `{id}-background-5.png` in `public/assets/cognitive-protocols/backgrounds/`. The existing `{id}-background.png` remains the fallback/default (used whenever a numbered stage for that protocol doesn't exist yet).
-- Stage is derived from how far into the transcript the *currently viewed* turn is (not wall-clock time): the transcript-progress fraction (`viewingIndex / max(totalTurns - 1, 1)`) is bucketed into fifths, giving stage `1 + floor(fraction * 5)` clamped to `[1, 5]`.
+- Five named stages, start to finish: **sunrise → morning → golden-hour → blue-hour → just-after-dusk**, named files `{id}-background-{stage}.png` (e.g. `horizon-background-sunrise.png`) in `public/assets/cognitive-protocols/backgrounds/`. The existing `{id}-background.png` remains the fallback/default. Horizon's set landed directly on `main` via a one-off GitHub Actions generation run (`57f85584`/`ae0d07e2`) using this naming — superseding this doc's original numeric `-1.png`…`-5.png` proposal.
+- Stage is derived from how far into the transcript the *currently viewed* turn is (not wall-clock time): the transcript-progress fraction (`viewingIndex / max(totalTurns - 1, 1)`) is bucketed into fifths across the 5 stages in order.
 - Resolution is fully graceful: any protocol/stage without art yet falls back to `{id}-background.png`, so this ships today with zero visual regression and each protocol "lights up" independently as art lands for it. No hardcoded manifest of "which stages exist" — an `Image()` probe in JS confirms a staged file actually loads before swapping it in; a missing file silently keeps the default background.
 
 ## Data flow
@@ -48,8 +48,8 @@ No API contract changes. `Session` and `Definition` types are untouched. Lightin
 
 ## New pure helpers (`protocols/view.ts`)
 
-- `lightingStage(viewingIndex: number, totalTurns: number): number` — returns 1–5, pure math, easy to unit test.
-- `backgroundAsset(id: string, stage?: number): string` — extends the existing function to build the numbered staged filename when a stage is given.
+- `lightingStage(viewingIndex: number, totalTurns: number): string` — returns one of the 5 stage names, pure math, easy to unit test.
+- `backgroundAsset(id: string, stage?: string): string` — extends the existing function to build the named staged filename when a stage is given.
 - `detectForks(text: string): { label: string; body: string }[] | null` — regex-based; returns `null` on no match so callers fall back to plain text.
 
 ## Testing
@@ -60,4 +60,4 @@ Extend `apps/knowledge/src/protocols/view.test.ts` (vitest, jsdom) with unit tes
 
 - Backend: reduce/eliminate the raw `{"text":"..."}` JSON leaking into turn text.
 - Backend: prompt behavior so personas ask more clarifying questions before answering.
-- Art: drop the 5 numbered renders into `public/assets/cognitive-protocols/backgrounds/` per protocol, named `{id}-background-1.png` … `{id}-background-5.png`. Nothing else changes — they pick up automatically once present.
+- Art: drop the 5 named renders into `public/assets/cognitive-protocols/backgrounds/` per remaining protocol, named `{id}-background-sunrise.png` / `-morning.png` / `-golden-hour.png` / `-blue-hour.png` / `-just-after-dusk.png` (Horizon already has its set). Nothing else changes — they pick up automatically once present.
