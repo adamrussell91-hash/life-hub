@@ -1,8 +1,6 @@
 /** @vitest-environment jsdom */
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { applySession, sessionView, speakerName, statusLabel } from "./view";
+import { applySession, backgroundAsset, detectForks, lightingStage, sessionView, speakerName, statusLabel } from "./view";
 
 const definition = {
   id: "fates",
@@ -36,40 +34,101 @@ function session(partial: Partial<Parameters<typeof sessionView>[0]> = {}) {
 }
 
 describe("protocol conversation view", () => {
-  it("keeps the speaking person prominent in the stage", () => {
+  it("keeps the speaking persona's portrait and role in front of the reply", () => {
     const html = sessionView(session(), definition);
-    expect(html).toContain("protocol-speaker is-active");
-    expect(html).toContain("data-voice=\"lachesis\"");
+    expect(html).toContain("protocol-portrait");
     expect(html).toContain("fates-lachesis-measurer.png");
+    expect(html).toContain("Strategist and measurer");
     expect(html).toContain("Reply to Lachesis");
     expect(speakerName(session(), definition)).toBe("Lachesis");
     expect(statusLabel(session({ status: "queued" }))).toBe("thinking");
   });
 
-  it("updates the active speaker without replacing the portrait node", () => {
+  it("shows one turn card at a time with a scrubber dot per turn", () => {
+    const twoTurns = session({
+      status: "waiting",
+      checkpoint: null,
+      transcript: [
+        { id: "t1", role: "voice", speaker: "lachesis", stage: "briefing", text: "What is prompting this now?" },
+        { id: "t2", role: "user", speaker: "you", stage: "briefing", text: "I am tired" }
+      ]
+    });
+    const latest = sessionView(twoTurns, definition);
+    expect(latest).toContain("data-turn-id=\"t2\"");
+    expect(latest).not.toContain("data-turn-id=\"t1\"");
+    expect((latest.match(/protocol-dot/g) ?? []).length).toBeGreaterThan(0);
+    expect(latest).toContain("Turn 2 of 2");
+
+    const historical = sessionView(twoTurns, definition, 0);
+    expect(historical).toContain("data-turn-id=\"t1\"");
+    expect(historical).not.toContain("data-turn-id=\"t2\"");
+    expect(historical).toContain("New reply ↓");
+  });
+
+  it("reflects updated session state on re-render", () => {
     const root = document.createElement("div");
     applySession(root, session(), definition);
-    const first = root.querySelector<HTMLImageElement>('[data-voice="lachesis"] img');
-    expect(first).toBeTruthy();
+    expect(root.querySelector(".protocol-portrait img")?.getAttribute("src")).toContain("fates-lachesis-measurer.png");
     applySession(root, session({
       speaker: "clotho",
+      revision: 2,
+      checkpoint: null,
       transcript: [
         { id: "t1", role: "voice", speaker: "lachesis", stage: "briefing", text: "What is prompting this now?" },
         { id: "t2", role: "user", speaker: "you", stage: "briefing", text: "I am tired" }
       ]
     }), definition);
-    const again = root.querySelector<HTMLImageElement>('[data-voice="lachesis"] img');
-    expect(again).toBe(first);
-    expect(root.querySelector('[data-voice="clotho"]')?.classList.contains("is-active")).toBe(true);
-    expect(root.querySelector('[data-voice="lachesis"]')?.classList.contains("is-active")).toBe(false);
     expect(root.querySelector("[data-turn-id=\"t2\"]")?.textContent).toContain("I am tired");
-    expect(root.querySelectorAll(".protocol-speaker img")).toHaveLength(4);
   });
 
-  it("lets the session fill the canvas instead of a centred reading column", () => {
-    const css = readFileSync(join(process.cwd(), "src/protocols/style.css"), "utf8");
-    expect(css).toMatch(/\.protocol-session \{ width:100%/);
-    expect(css).toMatch(/\.protocol-session > header[\s\S]*?width:100%; max-width:none/);
-    expect(css).not.toMatch(/protocol-session > header[\s\S]{0,80}42rem/);
+  it("skips a re-render when nothing the current view depends on has changed", () => {
+    const root = document.createElement("div");
+    applySession(root, session(), definition);
+    const before = root.innerHTML;
+    applySession(root, session(), definition);
+    expect(root.innerHTML).toBe(before);
+  });
+});
+
+describe("lightingStage", () => {
+  it("stays at the opening stage for a single-turn or empty transcript", () => {
+    expect(lightingStage(0, 0)).toBe("sunrise");
+    expect(lightingStage(0, 1)).toBe("sunrise");
+  });
+
+  it("spans sunrise to just-after-dusk across a longer transcript", () => {
+    expect(lightingStage(0, 10)).toBe("sunrise");
+    expect(lightingStage(9, 10)).toBe("just-after-dusk");
+    expect(lightingStage(4, 10)).toBe("golden-hour");
+  });
+});
+
+describe("backgroundAsset", () => {
+  it("builds the default filename with no stage", () => {
+    expect(backgroundAsset("horizon")).toMatch(/horizon-background\.png$/);
+  });
+
+  it("builds a named staged filename when a stage is given", () => {
+    expect(backgroundAsset("horizon", "golden-hour")).toMatch(/horizon-background-golden-hour\.png$/);
+  });
+});
+
+describe("detectForks", () => {
+  it("returns null when the text has no fork pattern", () => {
+    expect(detectForks("Just a plain reply with no branches.")).toBeNull();
+  });
+
+  it("returns null for a single fork marker (not actually a branch)", () => {
+    expect(detectForks("Fork one: this is the only option.")).toBeNull();
+  });
+
+  it("splits leading text and each numbered fork into its own branch", () => {
+    const text = "Right, let's see what's here.\n\nFork one: take the job. Closes off academia.\n\nFork two: pursue a PhD. Opens research paths.";
+    const result = detectForks(text);
+    expect(result).not.toBeNull();
+    expect(result?.leading).toBe("Right, let's see what's here.");
+    expect(result?.branches).toHaveLength(2);
+    expect(result?.branches[0]).toEqual({ label: "Fork 1", body: "take the job. Closes off academia." });
+    expect(result?.branches[1]).toEqual({ label: "Fork 2", body: "pursue a PhD. Opens research paths." });
   });
 });
