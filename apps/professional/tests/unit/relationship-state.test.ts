@@ -116,6 +116,44 @@ describe('classifyRelationshipState', () => {
     expect(result.state).toBe('dormant');
   });
 
+  it('boundary: person created exactly NEW_PERSON_WINDOW_DAYS ago with no interaction is still "new" (uses <=)', () => {
+    const result = classifyRelationshipState(
+      baseInput({ lastMeaningfulInteraction: null, personCreatedAt: daysAgo(NEW_PERSON_WINDOW_DAYS) })
+    );
+    expect(result.state).toBe('new');
+  });
+
+  it('boundary: person created one day past NEW_PERSON_WINDOW_DAYS with no interaction is "dormant"', () => {
+    const result = classifyRelationshipState(
+      baseInput({ lastMeaningfulInteraction: null, personCreatedAt: daysAgo(NEW_PERSON_WINDOW_DAYS + 1) })
+    );
+    expect(result.state).toBe('dormant');
+  });
+
+  it('boundary: prior gap of exactly REACTIVATION_GAP_DAYS is NOT "reactivated" (uses >)', () => {
+    const lastDays = 5;
+    const result = classifyRelationshipState(
+      baseInput({
+        lastMeaningfulInteraction: daysAgo(lastDays),
+        previousMeaningfulInteraction: daysAgo(lastDays + REACTIVATION_GAP_DAYS),
+        personCreatedAt: daysAgo(1000)
+      })
+    );
+    expect(result.state).toBe('active');
+  });
+
+  it('boundary: prior gap of REACTIVATION_GAP_DAYS + 1 is "reactivated"', () => {
+    const lastDays = 5;
+    const result = classifyRelationshipState(
+      baseInput({
+        lastMeaningfulInteraction: daysAgo(lastDays),
+        previousMeaningfulInteraction: daysAgo(lastDays + REACTIVATION_GAP_DAYS + 1),
+        personCreatedAt: daysAgo(1000)
+      })
+    );
+    expect(result.state).toBe('reactivated');
+  });
+
   // --- Reactivated requires both conditions ---------------------------
 
   it('recent interaction with no previousMeaningfulInteraction is "active", not "reactivated"', () => {
@@ -150,6 +188,7 @@ describe('classifyRelationshipState', () => {
     );
     expect(result.state).toBe('dormant');
     expect(result.reasons.length).toBeGreaterThan(0);
+    expect(result.reasons.join(' ')).toMatch(/1000/);
   });
 
   it('activeSharedContexts > 0 alone (no recent interaction, no upcoming) yields "active"', () => {
@@ -175,6 +214,7 @@ describe('classifyRelationshipState', () => {
     );
     expect(result.state).toBe('active');
     expect(result.reasons.length).toBeGreaterThan(0);
+    expect(result.reasons.join(' ')).toMatch(/10/);
   });
 
   it('never returns an empty reasons array for any branch', () => {

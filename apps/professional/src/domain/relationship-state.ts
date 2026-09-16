@@ -94,7 +94,8 @@ export function classifyRelationshipState(input: RelationshipStateInput): Relati
       reasons.push(`Last meaningful interaction ${recent} day${recent === 1 ? '' : 's'} ago.`);
     }
     if (hasUpcoming) {
-      reasons.push('Upcoming interaction scheduled.');
+      const daysUntil = Math.round(daysBetween(nowMs, Date.parse(input.upcomingInteraction as string)));
+      reasons.push(`Upcoming interaction in ${daysUntil} day${daysUntil === 1 || daysUntil === -1 ? '' : 's'}.`);
     }
     if (hasSharedContexts) {
       const count = input.activeSharedContexts;
@@ -116,7 +117,11 @@ export function classifyRelationshipState(input: RelationshipStateInput): Relati
 
   // 5. dormant (everything else)
   if (lastMs === null) {
-    return { state: 'dormant', reasons: ['No meaningful interaction recorded.'] };
+    const created = Math.round(daysSincePersonCreated);
+    return {
+      state: 'dormant',
+      reasons: [`No meaningful interaction recorded in the ${created} days since this person was added.`]
+    };
   }
   const days = Math.round(daysSinceLast as number);
   return {
