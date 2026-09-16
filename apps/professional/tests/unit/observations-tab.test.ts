@@ -229,4 +229,47 @@ describe('Observations tab', () => {
     expect(canvas.textContent).not.toMatch(/Should never appear/);
     expect(canvas.querySelector('.entity-detail__observation-list')).toBeNull();
   });
+
+  it('does not mutate the DOM with a late-resolving Observations fetch once a DIFFERENT TAB has been activated (rapid tab-switch, no page navigation)', async () => {
+    // Regression test: `activate()` used to hand every tab the same
+    // page-level `ctx.isCurrent`, which only flips on page navigation.
+    // Switching tabs within one already-loaded Person page (no navigation
+    // at all) left it `true`, so a still-pending Observations fetch could
+    // resolve after Timeline became active and clobber `contentHost` with
+    // stale Observations content — see entity-detail.ts's `renderTabbedContent`.
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(200, { ok: true, data: personOverview() }));
+    let resolveObservationsFetch!: (value: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      resolveObservationsFetch = resolve;
+    });
+    vi.mocked(fetch).mockImplementationOnce(() => pending);
+
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    clickTab(canvas, 'Observations');
+    expect(canvas.textContent).toMatch(/Loading/);
+
+    // Switch to a different tab BEFORE the Observations fetch resolves —
+    // no page navigation happens, so the page-level isCurrent stays true.
+    clickTab(canvas, 'Timeline');
+    expect(canvas.querySelector('.entity-detail__heading')?.textContent).toBe('Relationship timeline');
+    expect(canvas.textContent).toMatch(/No relationship history yet\./);
+
+    // The Observations fetch finally resolves, well after Timeline took over.
+    resolveObservationsFetch(
+      jsonResponse(200, {
+        ok: true,
+        data: { observations: [observation({ id: 'o1', text: 'Stale tab content — must never appear' })] }
+      })
+    );
+    await flush();
+
+    expect(canvas.textContent).not.toMatch(/Stale tab content/);
+    expect(canvas.querySelector('.entity-detail__observation-list')).toBeNull();
+    expect(canvas.querySelector('.entity-detail__observation-form')).toBeNull();
+    // Timeline's content must still be what's actually shown.
+    expect(canvas.querySelector('.entity-detail__heading')?.textContent).toBe('Relationship timeline');
+    expect(canvas.textContent).toMatch(/No relationship history yet\./);
+  });
 });

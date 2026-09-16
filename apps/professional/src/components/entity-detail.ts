@@ -186,8 +186,18 @@ function renderTabbedContent(
   const requestedInitialId = config.initialTabId ?? tabs[0].id;
   let activeId = tabs.some((tab) => tab.id === requestedInitialId) ? requestedInitialId : tabs[0].id;
 
+  // Per-switch staleness guard, independent of the page-level `isCurrent`
+  // (`main.ts`'s route-generation counter, which only flips on page
+  // navigation). Every `activate()` call bumps this and captures its own
+  // value; a tab's `ctx.isCurrent()` composes both checks, so a tab whose
+  // `render` does async work (e.g. Observations, which fetches its own
+  // data) can no longer mutate `contentHost` after a DIFFERENT tab has
+  // since become active — only after page navigation, as before.
+  let tabGeneration = 0;
+
   function activate(id: string): void {
     activeId = id;
+    const thisTabGeneration = ++tabGeneration;
     for (const [tabId, btn] of buttons) {
       const isActive = tabId === id;
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
@@ -197,7 +207,8 @@ function renderTabbedContent(
     contentHost.replaceChildren();
     const tab = tabs.find((t) => t.id === id);
     if (!tab) return;
-    void tab.render(contentHost, overview, { isCurrent: config.isCurrent ?? (() => true) });
+    const stillActive = () => tabGeneration === thisTabGeneration && (config.isCurrent?.() ?? true);
+    void tab.render(contentHost, overview, { isCurrent: stillActive });
   }
 
   for (const tab of tabs) {
