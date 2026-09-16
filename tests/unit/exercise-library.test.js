@@ -98,6 +98,33 @@ test('workout notes deterministically shelve a named exercise for the requested 
   assert.equal(result.entries[0].shelved_reason.includes('sick of it'), true);
 });
 
+test('workout notes shelve a named workout without shelving every exercise', () => {
+  const result = applyWorkoutNoteRestrictionsToLibrary(
+    [],
+    {
+      type: 'workout',
+      title: 'Biceps and Boobs',
+      exercises: [{ name: 'Bar Press', sets: [] }, { name: 'Cable Curl', sets: [] }]
+    },
+    'Do not recommend this workout again for two weeks.',
+    '2026-09-16',
+    '2026-09-16T18:00:00+10:00'
+  );
+  assert.deepEqual(result.restrictions, [{
+    name: 'Workout: Biceps and Boobs',
+    shelved_on: '2026-09-16',
+    shelved_until: '2026-09-30'
+  }]);
+  assert.equal(result.entries.some(entry => entry.name === 'Bar Press'), false);
+  const warnings = shelvedExerciseWarnings({
+    type: 'workout',
+    title: 'Biceps and Boobs',
+    exercises: []
+  }, result.entries, '2026-09-20');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /not to repeat this workout/);
+});
+
 test('workout notes resolve this exercise when the session contains one move', () => {
   const result = applyWorkoutNoteRestrictionsToLibrary(
     [],
