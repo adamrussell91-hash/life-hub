@@ -758,3 +758,149 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Network Ecology (Phase 4, Features 4.1/4.3/4.4/4.7). */
+
+.network-ecology {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.network-ecology__modes {
+  align-self: flex-start;
+}
+
+.network-ecology__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.network-ecology__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.network-ecology__overlay-note {
+  margin: 0;
+}
+
+.network-ecology__status {
+  min-height: 0;
+}
+
+.network-ecology__stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18rem;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.network-ecology__graph-host {
+  position: relative;
+  min-height: 30rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.5);
+  overflow: hidden;
+}
+
+.network-graph-canvas {
+  display: block;
+}
+
+.network-graph-tip {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  max-width: 16rem;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--navy);
+  color: var(--paper, #fff);
+  font-size: var(--text-sm);
+  box-shadow: var(--elev-1);
+}
+
+.network-ecology__panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.network-ecology__panel-name {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.network-ecology__panel-kind {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.network-ecology__panel-bridge {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.network-ecology__panel-link {
+  color: var(--wave, var(--ink));
+}
+
+.network-ecology__recentre {
+  align-self: flex-start;
+}
+
+.network-ecology__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.network-ecology__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink);
+  max-width: 22rem;
+}
+
+.network-ecology__legend-swatch {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.network-ecology__legend-marker {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  border: 2px solid;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .network-ecology__stage {
+    grid-template-columns: 1fr;
+  }
+
+  .network-ecology__graph-host {
+    min-height: 22rem;
+  }
+}

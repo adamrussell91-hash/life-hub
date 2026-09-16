@@ -18,6 +18,10 @@ describe('parseRoute', () => {
     expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
   });
 
+  it('parses the Network Ecology route', () => {
+    expect(parseRoute('#/network-ecology')).toEqual({ name: 'network-ecology' });
+  });
+
   it('parses a valid person/organisation id into a detail route', () => {
     expect(parseRoute(`#/person/${VALID_PERSON_ID}`)).toEqual({ name: 'person', id: VALID_PERSON_ID });
     expect(parseRoute(`#/organisation/${VALID_ORG_ID}`)).toEqual({ name: 'organisation', id: VALID_ORG_ID });
@@ -72,6 +76,10 @@ describe('railHighlightFor', () => {
 
   it('maps the Person Brief route to the same rail item as Person/People', () => {
     expect(railHighlightFor({ name: 'person-brief', id: VALID_PERSON_ID })).toBe('people');
+  });
+
+  it('maps the Network Ecology route to its own rail item', () => {
+    expect(railHighlightFor({ name: 'network-ecology' })).toBe('network-ecology');
   });
 });
 

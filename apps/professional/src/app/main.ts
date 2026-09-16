@@ -40,6 +40,7 @@ import { renderCareerView } from '@/views/career';
 import { renderPersonPage } from '@/views/person-page';
 import { renderPersonBrief } from '@/views/person-brief';
 import { renderOrganisationPage } from '@/views/organisation-page';
+import { renderNetworkEcologyView } from '@/views/network-ecology';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -183,6 +184,13 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'career') {
       renderPageHeader(shell, viewChrome('career'));
       await renderCareerView(shell.canvas);
+      return;
+    }
+    if (route.name === 'network-ecology') {
+      renderPageHeader(shell, viewChrome('network-ecology'));
+      await renderNetworkEcologyView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'person') {

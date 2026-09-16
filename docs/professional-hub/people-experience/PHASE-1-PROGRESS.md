@@ -393,6 +393,71 @@ that step is left for Adam's explicit review when he's back.
     A future task can layer derived/synthetic edges on top if the canvas
     frontend needs them — not invented speculatively here.
 
+32. **Network Ecology canvas is a simplified fork of `apps/tasks/src/views/graph.ts`,
+    not a port of `apps/knowledge/src/archive/forceGraph.ts`.** Both exist
+    in this monorepo as prior `d3-force` canvas implementations.
+    `apps/knowledge`'s version adds camera/zoom/pan, hub-expand/collapse
+    animation, and cross-fade transitions deeply coupled to note/topic
+    semantics — out of proportion to what World View / EGO Ecology / Your
+    Network actually need (a force-directed layout, click-to-select, hover
+    tooltips, habitat-tinted halos). `apps/tasks/src/views/graph.ts`'s
+    plainer pattern (centred `d3-force`, straight-line links, plain circle
+    nodes, simple hit-testing) is the fork base for the new shared
+    `apps/professional/src/components/network-graph-canvas.ts`, which
+    deliberately does NOT provide pan/zoom, animated expand/collapse, or
+    cross-fade transitions between data updates — documented again in that
+    file's own header comment.
+
+33. **Self-ref lookup for "Your Network" (Feature 4.4) via a new, tiny
+    `GET /api/people/self` route, not by extending `GET /api/career`.**
+    Your Network mode needs to know the active self Person's ref before it
+    can call the already-built `GET /api/network-ecology/ego?ref=<self
+    ref>&hops=<n>`. `netlify/functions/_shared/career-overview.mjs`'s
+    `assembleCareerOverview` already computes this internally
+    (`findActiveSelfPerson`) but never returns the ref on its own, and
+    additionally runs several unrelated Applications/Employment/People/
+    Organisations queries the Network Ecology client does not need just to
+    answer "who is me". `netlify/functions/people-self.mjs` reuses
+    `findActiveSelfPerson` directly (same exported helper, same "other
+    callers needing 'the active self Person' should reuse this exact
+    lookup" contract that function's own doc comment already states) behind
+    a new minimal route: `GET /api/people/self` ->
+    `{ self: { ref, display_name } | null }`. Tested end-to-end in
+    `tests/integration/people-self.test.js` (auth/CORS/method guards, the
+    null case, the found case, and an archived self-flagged Person being
+    correctly ignored).
+
+34. **Opportunity/Dormancy overlay (Feature 4.7): real, documented scope
+    cut — no backend change, no fabricated signal.** Checked directly
+    against the actual backend rather than assumed: `NetworkEcologyEdge`
+    (`GET /api/network-ecology/world` and `/ego`) is `{source_ref,
+    target_ref, relationship_type}` — no date of any kind.
+    `classifyRelationshipState` (`apps/professional/src/domain/
+    relationship-state.ts`, ported to `netlify/functions/_shared/
+    relationship-state.mjs`) is this codebase's one existing dormancy/
+    opportunity classifier, and it needs `lastMeaningfulInteraction`,
+    `previousMeaningfulInteraction`, `upcomingInteraction`,
+    `activeSharedContexts`, and `personCreatedAt` per relationship —
+    `people-home-signals.mjs`'s `classifyCurrentProfessionalRelationships`
+    only manages to supply those by cross-referencing the WHOLE
+    population's `professional_relationship` links (grouped by pair,
+    sorted by effective date) plus Meetings/Events, for
+    `professional_relationship` links only. Porting that pipeline into
+    `network-ecology-world.mjs` for every edge of every `/world` and
+    `/ego` response — and extending it to cover `employee_at`/`member_of`
+    links `classifyRelationshipState` was never designed for — is real,
+    out-of-proportion work, not a small addition. A narrower fix (adding
+    just the Universal Link's existing `valid_from` to each edge) was
+    considered and rejected: `valid_from` is when the relationship was
+    RECORDED, not when the two people last actually interacted, so
+    treating an old `valid_from` as "dormant" would misinform rather than
+    honestly inform. **What the user actually sees:** the Opportunity &
+    Dormancy toggle in `apps/professional/src/views/network-ecology.ts`
+    renders a clearly-labeled "not enough data yet" note when switched on,
+    and never marks any node/edge dormant or opportunity — no fabricated
+    signal anywhere in the graph. Revisit once Feature 4.6 (History mode)
+    or a similar effort gives edges real interaction-recency data.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -428,27 +493,42 @@ that step is left for Adam's explicit review when he's back.
   Verified: `apps/professional` `npm test` (153/153), `npm run typecheck`
   (clean), `npm run build` (clean); root `npm test` (3808/3808). Not
   pushed, no PR.
-- Phase 4: **backend complete (Features 4.1-data/4.2/4.5-text); rendering
-  engine (4.1 canvas), EGO Ecology UI (4.3), Your Network (4.4), Sankey
-  upgrade, History mode route (4.6), Opportunity/Dormancy layers (4.7) not
-  started — those are frontend/canvas work for a separate task, and 4.6's
-  own route/scrubber, per this task's explicit scope.** Habitat
-  classification (`netlify/functions/_shared/habitat-classification.mjs` —
+- Phase 4: **backend complete (Features 4.1-data/4.2/4.5-text); frontend
+  complete for Features 4.1 (World View), 4.3 (EGO recentre), 4.4 (Your
+  Network), and 4.7 (Opportunity/Dormancy overlay, as a documented scope
+  cut — see decision 34). Sankey upgrade and Feature 4.6 (History mode,
+  its own route + scrubber) remain explicitly out of scope — a separate
+  follow-up task, not built here.** Habitat classification
+  (`netlify/functions/_shared/habitat-classification.mjs` —
   `classifyHabitat`, `computeOrganisationClusterStats`,
   `computeBridgePeople`), the shared hop-traversal graph
   (`netlify/functions/_shared/network-graph.mjs`), Introduction Paths
   (`netlify/functions/_shared/introduction-paths.mjs`), and their I/O
   assembly (`netlify/functions/_shared/network-ecology-world.mjs`) are
-  built and tested, behind three new routes: `GET
-  /api/network-ecology/world`, `GET /api/network-ecology/ego?ref=&hops=`,
-  `GET /api/network-ecology/introduction-paths?from=&to=`. See decisions
-  22-31 above, especially 22 (thresholds are delegated placeholders, not
-  yet validated against real data) and 29 (the privacy/visibility gap this
-  task closes, with its dedicated end-to-end tests). Verified: root `npm
-  test` (3872/3872 — 3808 baseline + 64 new: 24 habitat-classification
-  unit, 9 introduction-paths unit, 12 network-ecology-world integration
-  including 2 dedicated privacy tests, 10 network-ecology-ego integration
-  including 1 privacy test, 9 network-ecology-introduction-paths
-  integration including 1 privacy test). `apps/professional` untouched by
-  this task (no frontend work). Not pushed, no PR.
+  built and tested, behind three routes: `GET /api/network-ecology/world`,
+  `GET /api/network-ecology/ego?ref=&hops=`, `GET
+  /api/network-ecology/introduction-paths?from=&to=`, plus the new `GET
+  /api/people/self` (decision 33) that Your Network needs to find "me".
+  Frontend: the shared canvas force-graph renderer
+  (`apps/professional/src/components/network-graph-canvas.ts`, forked per
+  decision 32) and the page itself
+  (`apps/professional/src/views/network-ecology.ts`, route
+  `#/network-ecology`) — World View with a 6-entry text legend (habitat
+  never color-only, satisfying brief section 49's accessibility
+  requirement), click-to-select + "Recentre here" into EGO mode with a
+  "Back to World View" action, a "World View"/"Your Network" `.hub-pills`
+  mode toggle, Your Network's self-ref lookup (with an honest "no self
+  person set up yet" state, not a crash, when `self: null`) and its two
+  client-side layer checkboxes (organisation links / relationship links,
+  filtering the already-fetched edge set with no extra fetch), and the
+  Opportunity/Dormancy toggle's "not enough data yet" note (decision 34).
+  See decisions 22-34 above, especially 22 (thresholds are delegated
+  placeholders, not yet validated against real data), 29 (the
+  privacy/visibility gap this task closes, with its dedicated end-to-end
+  tests), and 32-34 (this frontend task's own decisions). Verified:
+  `apps/professional` `npm test` (177/177 — 153 baseline + 24 new: 13
+  network-graph-canvas unit, 9 network-ecology unit, 2 router unit), `npm
+  run typecheck` (clean), `npm run build` (clean); root `npm test`
+  (3879/3879 — 3872 baseline + 7 new `people-self.mjs` integration tests).
+  Not pushed, no PR.
 - Phase 5: not started

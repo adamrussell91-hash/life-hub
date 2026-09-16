@@ -638,3 +638,65 @@ export interface RelationshipRegistryDeclaration {
 export interface RelationshipRegistryResponse {
   relationships: RelationshipRegistryDeclaration[];
 }
+
+/**
+ * Network Ecology (Phase 4) — response shapes mirrored directly from
+ * `netlify/functions/_shared/network-ecology-world.mjs`'s
+ * `assembleWorldGraph`/`assembleEgoGraph` and
+ * `netlify/functions/_shared/habitat-classification.mjs`'s
+ * `classifyHabitat`/`computeBridgePeople` (confirmed by direct read of
+ * those modules, not inferred).
+ */
+export type HabitatType = 'forest' | 'reef' | 'savannah' | 'wetland' | 'island';
+
+export interface NetworkEcologyNode {
+  ref: string;
+  kind: 'person' | 'organisation';
+  display_name: string;
+}
+
+export interface NetworkEcologyEdge {
+  source_ref: string;
+  target_ref: string;
+  relationship_type: string;
+}
+
+export interface NetworkEcologyCluster {
+  id: string;
+  kind: 'organisation' | 'event';
+  label: string;
+  member_refs: string[];
+  habitat: HabitatType | null;
+}
+
+export interface NetworkEcologyBridgePerson {
+  ref: string;
+  display_name: string;
+  organisation_refs: string[];
+  description: string;
+}
+
+/** `GET /api/network-ecology/world`. */
+export interface NetworkEcologyWorld {
+  nodes: NetworkEcologyNode[];
+  edges: NetworkEcologyEdge[];
+  clusters: NetworkEcologyCluster[];
+  bridge_people: NetworkEcologyBridgePerson[];
+}
+
+/** `GET /api/network-ecology/ego?ref=&hops=`. */
+export interface NetworkEcologyEgo {
+  nodes: NetworkEcologyNode[];
+  edges: NetworkEcologyEdge[];
+}
+
+/** `GET /api/people/self` (Phase 4, Feature 4.4 support — see
+ * `netlify/functions/people-self.mjs`). */
+export interface SelfPersonRef {
+  ref: string;
+  display_name: string | null;
+}
+
+export interface SelfPersonResponse {
+  self: SelfPersonRef | null;
+}
