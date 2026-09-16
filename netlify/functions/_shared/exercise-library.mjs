@@ -90,10 +90,19 @@ export function isExerciseShelved(entry, today) {
   return entry.shelved_until >= today;
 }
 
+const DURATION_NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+};
+
 function restrictionDurationDays(notes) {
-  const match = String(notes).match(/(?:for|at least)\s+(\d+)\s*(day|week|month)s?/i);
+  const match = String(notes).match(
+    /(?:for|at least)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(day|week|month)s?/i,
+  );
   if (!match) return 21;
-  const amount = Math.min(Math.max(Number(match[1]) || 1, 1), 365);
+  const raw = match[1].toLowerCase();
+  const value = /^\d+$/.test(raw) ? Number(raw) : DURATION_NUMBER_WORDS[raw];
+  const amount = Math.min(Math.max(value || 1, 1), 365);
   if (match[2].toLowerCase() === 'week') return amount * 7;
   if (match[2].toLowerCase() === 'month') return amount * 30;
   return amount;
