@@ -10,6 +10,9 @@ describe("notebook catalog", () => {
     expect(catalog.map(item => item.label)).toEqual(Object.keys(notesPlace.notebook));
     expect(catalog).toHaveLength(12);
     expect(catalog.find(item => item.label === "Cognitive Psychology")?.image).toBe(cover("cognitive-psychology.jpg"));
+    expect(catalog.find(item => item.label === "Educational Neuroscience")?.image).toBe(
+      cover("educational-neuroscience.jpg"),
+    );
     expect(catalog.find(item => item.label === "Philosophy")?.image).toBe(cover("philosophy.jpg"));
     expect(catalog.find(item => item.label === "Wellbeing")?.image).toBe(cover("wellbeing.jpg"));
     expect(catalog.find(item => item.label === "Social and Political Thought")?.image).toBe(
@@ -24,8 +27,7 @@ describe("notebook catalog", () => {
     );
     expect(catalog.find(item => item.label === "Gifted Education")?.image).toBe(cover("gifted-education.jpg"));
     expect(catalog.find(item => item.label === "Boy's Education")?.image).toBe(cover("boys-education.jpg"));
-    expect(catalog.filter(item => item.image)).toHaveLength(11);
-    expect(catalog.find(item => item.label === "Educational Neuroscience")?.image).toBeUndefined();
+    expect(catalog.filter(item => item.image)).toHaveLength(12);
   });
 
   it("roots covers at the Vite base so /knowledge without a slash still finds them", () => {
