@@ -5,6 +5,7 @@ import notesPlace from "../origin/notesPlace.json";
 const COVER_FILES: Record<string, string> = {
   "Boy's Education": "boys-education.jpg",
   "Cognitive Psychology": "cognitive-psychology.jpg",
+  "Educational Neuroscience": "educational-neuroscience.jpg",
   "Gifted Education": "gifted-education.jpg",
   "Leadership and Innovation": "leadership-and-innovation.jpg",
   Literacy: "literacy.jpg",
