@@ -5,6 +5,7 @@ import { logEntryToolSchema } from '../chat-schema.mjs';
 import { foodLibraryEntrySchema } from '../food-library.mjs';
 import { saveExerciseLibraryEntrySchema, searchExerciseLibrarySchema } from '../exercise-library.mjs';
 import { saveFitnessResearchSchema } from '../fitness-research.mjs';
+import { saveFitnessCoachingProfileSchema } from '../fitness-coaching-profile.mjs';
 import {
   compareWorkoutWindowsSchema,
   getLastWorkoutSchema,
@@ -268,6 +269,7 @@ export function buildAgentTools({
       searchExerciseLibrarySchema(),
       saveExerciseLibraryEntrySchema(),
       saveFitnessResearchSchema(),
+      saveFitnessCoachingProfileSchema(),
       getLastWorkoutSchema(),
       searchWorkoutRecordsSchema(),
       compareWorkoutWindowsSchema(),
