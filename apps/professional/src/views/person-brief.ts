@@ -1,5 +1,7 @@
-import { fetchPersonBrief } from '@/api/people-brief';
+import { ApiClientError } from '@/api/client';
+import { fetchPersonBrief, generatePersonBrief } from '@/api/people-brief';
 import { personRoute } from '@/app/router';
+import { errorMessage } from '@/views/feedback';
 import type { PersonBrief, PersonBriefNextInteraction } from '@/domain/types';
 
 /**
@@ -11,15 +13,23 @@ import type { PersonBrief, PersonBriefNextInteraction } from '@/domain/types';
  * People screen's rail+canvas list/detail layout. Ported into
  * `packages/design-kit/person-brief.css`.
  *
- * Renders ONLY the synchronous, non-LLM sections `GET /api/people/brief`
+ * Renders the synchronous, non-LLM sections `GET /api/people/brief`
  * assembles (header, Who they are, Open loops, Current shared work, Mutual
- * connections). "Since you last spoke" and "Talking points" (Feature 3.2)
- * are NOT fetched or fabricated here — each renders as its own section with
- * an honest "Not yet generated." placeholder, marked
+ * connections) immediately. "Since you last spoke" and "Talking points"
+ * (Feature 3.2, LLM-generated) are fetched separately, AFTER the rest of the
+ * Brief has already rendered — `POST /api/people/brief?...&action=generate`
+ * can be slow (a real model call), so it must never block the synchronous
+ * sections. Each LLM section shows a "Generating…" state and updates in
+ * place when the generate call resolves, still marked
  * `data-brief-llm-section="since-last-spoke"` /
- * `data-brief-llm-section="talking-points"` so a follow-up task can find
- * and wire a real fetch into exactly these two nodes without re-reading
- * this whole file.
+ * `data-brief-llm-section="talking-points"` (now on the wrapping host div
+ * rather than the placeholder `<p>` itself, so the marker survives the
+ * loading → populated / error transition). Threads the same
+ * `options.isCurrent()` stale-navigation guard through this second fetch,
+ * independent of the first — mirrors `observations-tab.ts`'s
+ * `renderObservationsTab`, the established pattern in this app for an
+ * async section that fetches on its own rather than reusing already-loaded
+ * data.
  */
 export interface RenderPersonBriefOptions {
   onTitleReady?: (title: string) => void;
@@ -120,32 +130,123 @@ function buildWhoTheyAre(brief: PersonBrief): HTMLElement {
 }
 
 /**
- * "Since you last spoke" — Feature 3.2's LLM section. This module never
- * fetches or fabricates its content; the placeholder node carries
- * `data-brief-llm-section="since-last-spoke"` so a follow-up task can find
- * it and wire a real fetch in without touching the rest of this file.
+ * "Since you last spoke" — Feature 3.2's LLM section. The host div (not the
+ * placeholder `<p>` itself) carries `data-brief-llm-section="since-last-
+ * spoke"`, so `loadGeneratedSections` below can find it and swap its
+ * contents through loading → populated / error without needing to touch
+ * anything else in this file.
  */
 function buildSinceLastSpoke(): HTMLElement {
   const section = el('div', 'person-brief__section person-brief__since');
   section.append(el('h2', undefined, 'Since you last spoke'));
-  const placeholder = el('p', 'empty-state', 'Not yet generated.');
-  placeholder.dataset.briefLlmSection = 'since-last-spoke';
-  section.append(placeholder);
+  const host = el('div');
+  host.dataset.briefLlmSection = 'since-last-spoke';
+  host.append(el('p', 'empty-state', 'Not yet generated.'));
+  section.append(host);
   return section;
 }
 
 /**
- * "Talking points" — Feature 3.2's other LLM section. Same placeholder
+ * "Talking points" — Feature 3.2's other LLM section. Same host-div
  * contract as `buildSinceLastSpoke` above, marked
  * `data-brief-llm-section="talking-points"`.
  */
 function buildTalkingPoints(): HTMLElement {
   const section = el('div', 'person-brief__section');
   section.append(el('h2', undefined, 'Talking points'));
-  const placeholder = el('p', 'empty-state', 'Not yet generated.');
-  placeholder.dataset.briefLlmSection = 'talking-points';
-  section.append(placeholder);
+  const host = el('div');
+  host.dataset.briefLlmSection = 'talking-points';
+  host.append(el('p', 'empty-state', 'Not yet generated.'));
+  section.append(host);
   return section;
+}
+
+/** `since_last_spoke[0]` is always the server's deterministic opening line
+ * ("You last met 3 months ago, at ... . Since then:") — rendered as a lead
+ * sentence, with the LLM's own bullets (if any) listed beneath it. */
+function renderSinceLastSpoke(host: HTMLElement, items: string[]): void {
+  host.replaceChildren();
+  if (!items.length) {
+    host.append(el('p', 'empty-state', 'Nothing to report.'));
+    return;
+  }
+  const [opening, ...bullets] = items;
+  host.append(el('p', undefined, opening));
+  if (bullets.length) {
+    const list = document.createElement('ul');
+    list.className = 'person-brief__list';
+    for (const bullet of bullets) {
+      const li = document.createElement('li');
+      li.textContent = bullet;
+      list.append(li);
+    }
+    host.append(list);
+  }
+}
+
+function renderTalkingPoints(host: HTMLElement, items: string[]): void {
+  host.replaceChildren();
+  if (!items.length) {
+    host.append(el('p', 'empty-state', 'No talking points generated.'));
+    return;
+  }
+  const wrap = el('div', 'person-brief__talking-points');
+  items.forEach((item, index) => {
+    const row = el('div', 'person-brief__tp-item');
+    row.append(el('span', 'person-brief__tp-num', String(index + 1)));
+    row.append(document.createTextNode(item));
+    wrap.append(row);
+  });
+  host.append(wrap);
+}
+
+/**
+ * Fetches Feature 3.2's LLM sections and populates them in place. Called
+ * AFTER the rest of the Brief has already rendered (never awaited by
+ * `renderPersonBrief` before it returns) so a slow model call never blocks
+ * the synchronous sections. `options.isCurrent()` is checked both before
+ * touching the DOM on success and on failure — the exact guard shape
+ * `observations-tab.ts`'s `renderObservationsTab` already established for
+ * an independent, self-fetching section.
+ */
+async function loadGeneratedSections(sheet: HTMLElement, personId: string, options: RenderPersonBriefOptions): Promise<void> {
+  const sinceHost = sheet.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]');
+  const talkingHost = sheet.querySelector<HTMLElement>('[data-brief-llm-section="talking-points"]');
+  if (!sinceHost || !talkingHost) return;
+
+  sinceHost.replaceChildren(el('p', 'empty-state', 'Generating…'));
+  talkingHost.replaceChildren(el('p', 'empty-state', 'Generating…'));
+
+  try {
+    const generation = await generatePersonBrief(personId);
+    if (options.isCurrent && !options.isCurrent()) return;
+    renderSinceLastSpoke(sinceHost, generation.since_last_spoke);
+    renderTalkingPoints(talkingHost, generation.talking_points);
+  } catch (err) {
+    if (options.isCurrent && !options.isCurrent()) return;
+    // A 503 `people_anthropic_unbound` is an expected, common state in
+    // dev/test environments with no API key bound — an honest, calm
+    // message, not a scary error or a pointless retry button.
+    if (err instanceof ApiClientError && err.code === 'people_anthropic_unbound') {
+      const message = 'Brief generation is not configured.';
+      sinceHost.replaceChildren(el('p', 'empty-state', message));
+      talkingHost.replaceChildren(el('p', 'empty-state', message));
+      return;
+    }
+    const message = errorMessage(err);
+    const retry = (): void => void loadGeneratedSections(sheet, personId, options);
+    sinceHost.replaceChildren(el('p', 'empty-state', message), retryButton(retry));
+    talkingHost.replaceChildren(el('p', 'empty-state', message), retryButton(retry));
+  }
+}
+
+function retryButton(onRetry: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'btn btn--secondary';
+  button.textContent = 'Retry';
+  button.addEventListener('click', onRetry);
+  return button;
 }
 
 function buildOpenLoops(brief: PersonBrief): HTMLElement {
@@ -288,5 +389,11 @@ export async function renderPersonBrief(
   if (options.isCurrent && !options.isCurrent()) return;
   options.onTitleReady?.(brief.header.person.display_name);
 
-  wrap.replaceChildren(buildSheet(brief, personId));
+  const sheet = buildSheet(brief, personId);
+  wrap.replaceChildren(sheet);
+
+  // Feature 3.2's LLM sections load separately and are NOT awaited here —
+  // a real model call can be slow, and the synchronous Brief above must
+  // render immediately regardless of how long generation takes.
+  void loadGeneratedSections(sheet, personId, options);
 }

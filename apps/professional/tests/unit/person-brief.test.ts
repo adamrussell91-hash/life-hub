@@ -53,6 +53,40 @@ function routedFetch(brief: PersonBrief): ReturnType<typeof vi.fn> {
   });
 }
 
+const GENERATION_FIXTURE = {
+  since_last_spoke: ['You last met 3 months ago, at "Coffee meeting". Since then:', 'They started a new role at Acme.'],
+  talking_points: ['Ask how the new role at Acme is going.'],
+  last_meaningful_interaction: '2026-06-17T00:00:00.000Z'
+};
+
+/**
+ * Routes both the GET brief fetch and the POST generate fetch through one
+ * mock, with the generate call independently controllable (deferred,
+ * rejected with a given status, etc.) — every test below that touches the
+ * LLM sections uses this instead of `routedFetch`.
+ */
+function routedFetchWithGeneration(
+  brief: PersonBrief,
+  generate: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+): ReturnType<typeof vi.fn> {
+  return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const href = String(input);
+    if (href.includes('action=generate')) {
+      return generate(input, init);
+    }
+    if (href.includes('/api/people/brief')) {
+      return jsonResponse(200, { ok: true, data: brief });
+    }
+    throw new Error(`Unexpected fetch: ${href}`);
+  });
+}
+
+/** Resolves on the next microtask/macrotask tick, letting an already-kicked-off
+ * (but not awaited by `renderPersonBrief`) generation fetch settle. */
+function flushAsync(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('renderPersonBrief', () => {
   const originalFetch = globalThis.fetch;
 
@@ -124,17 +158,102 @@ describe('renderPersonBrief', () => {
     expect(statusAfter.textContent).toMatch(/not built yet/i);
   });
 
-  it('LLM section placeholders render without erroring, marked with data-brief-llm-section', async () => {
-    globalThis.fetch = routedFetch(briefFixture());
+  it('LLM sections are marked with data-brief-llm-section and show a loading state immediately, without blocking the rest of the Brief', async () => {
+    let resolveGenerate!: (value: Response) => void;
+    globalThis.fetch = routedFetchWithGeneration(
+      briefFixture(),
+      () => new Promise<Response>((resolve) => { resolveGenerate = resolve; })
+    );
     const canvas = document.createElement('div');
     await renderPersonBrief(canvas, PERSON_ID);
 
+    // The synchronous sections are already fully rendered...
+    expect(canvas.querySelector('.person-brief__name')?.textContent).toBe('Dr Vicky Leighton');
+
+    // ...while the LLM sections are present, marked, and mid-flight.
     const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
     const talking = canvas.querySelector<HTMLElement>('[data-brief-llm-section="talking-points"]')!;
     expect(since).not.toBeNull();
     expect(talking).not.toBeNull();
-    expect(since.textContent).toBe('Not yet generated.');
-    expect(talking.textContent).toBe('Not yet generated.');
+    expect(since.textContent).toMatch(/generating/i);
+    expect(talking.textContent).toMatch(/generating/i);
+
+    // Clean up the never-resolved fetch so it doesn't leak into other tests.
+    resolveGenerate(jsonResponse(200, { ok: true, data: GENERATION_FIXTURE }));
+    await flushAsync();
+  });
+
+  it('LLM sections populate in place when generation succeeds (loading -> populated)', async () => {
+    globalThis.fetch = routedFetchWithGeneration(briefFixture(), async () =>
+      jsonResponse(200, { ok: true, data: GENERATION_FIXTURE })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonBrief(canvas, PERSON_ID);
+    await flushAsync();
+
+    const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
+    const talking = canvas.querySelector<HTMLElement>('[data-brief-llm-section="talking-points"]')!;
+
+    expect(since.textContent).toContain('You last met 3 months ago, at "Coffee meeting". Since then:');
+    expect(since.textContent).toContain('They started a new role at Acme.');
+    expect(talking.textContent).toContain('Ask how the new role at Acme is going.');
+  });
+
+  it('shows an honest "not configured" message (not a scary error) on a 503 people_anthropic_unbound', async () => {
+    globalThis.fetch = routedFetchWithGeneration(briefFixture(), async () =>
+      jsonResponse(503, {
+        ok: false,
+        error: { code: 'people_anthropic_unbound', message: 'Brief generation is unavailable', retryable: true }
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonBrief(canvas, PERSON_ID);
+    await flushAsync();
+
+    const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
+    const talking = canvas.querySelector<HTMLElement>('[data-brief-llm-section="talking-points"]')!;
+    expect(since.textContent).toBe('Brief generation is not configured.');
+    expect(talking.textContent).toBe('Brief generation is not configured.');
+    // No retry button for this expected, common dev/test state.
+    expect(since.querySelector('button')).toBeNull();
+  });
+
+  it('shows a retryable error state on a non-503 generation failure', async () => {
+    globalThis.fetch = routedFetchWithGeneration(briefFixture(), async () =>
+      jsonResponse(502, {
+        ok: false,
+        error: { code: 'brief_generation_failed', message: 'Brief generation failed', retryable: true }
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonBrief(canvas, PERSON_ID);
+    await flushAsync();
+
+    const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
+    expect(since.querySelector('button')).not.toBeNull();
+    expect(since.querySelector('button')?.textContent).toBe('Retry');
+  });
+
+  it('does not mutate the LLM sections when isCurrent() has gone false by the time generation resolves (stale-navigation guard)', async () => {
+    let resolveGenerate!: (value: Response) => void;
+    globalThis.fetch = routedFetchWithGeneration(
+      briefFixture(),
+      () => new Promise<Response>((resolve) => { resolveGenerate = resolve; })
+    );
+    const canvas = document.createElement('div');
+    let current = true;
+    await renderPersonBrief(canvas, PERSON_ID, { isCurrent: () => current });
+
+    const since = canvas.querySelector<HTMLElement>('[data-brief-llm-section="since-last-spoke"]')!;
+    expect(since.textContent).toMatch(/generating/i);
+
+    // Navigate away before the late-resolving generate call settles.
+    current = false;
+    resolveGenerate(jsonResponse(200, { ok: true, data: GENERATION_FIXTURE }));
+    await flushAsync();
+
+    // Still showing the loading state — the stale response must never touch the DOM.
+    expect(since.textContent).toMatch(/generating/i);
   });
 
   it('renders the Empty Brief copy verbatim when there is no upcoming interaction', async () => {
