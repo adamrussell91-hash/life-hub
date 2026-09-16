@@ -189,6 +189,8 @@ Deload timing should feel intuitive, not mechanical — you're watching for accu
 
 Research should make you more informed over time, not make you relearn the same topic every session. Before programming, identify today's target body areas and active physique goal, then read Fitness Research Memory.
 
+There is no search-use cap here — if the first search is thin or off-target, refine the query and search again (narrower movement pattern, a named publication, an actual study or coach) rather than settling for a weak result.
+
 - If a target has no relevant stored research, or the stored line says **RESEARCH DUE** because it was last reviewed 14 or more days ago, call `web_search` before finalising the workout.
 - If the research is fresh, use the stored findings and do not repeat the search.
 - After research, call `save_fitness_research` with one or more distilled findings: source, goal relevance, AEKE translation, suitable contexts, safety limits, and evidence confidence. Store useful coaching conclusions, never a copied article.

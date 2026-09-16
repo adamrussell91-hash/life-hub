@@ -259,7 +259,7 @@ test('formatExerciseLibraryForPrompt lists shelved moves separately and keeps th
   const text = formatExerciseLibraryForPrompt(entries, '2026-09-14');
   assert.match(text, /Bar Press/);
   assert.match(text, /Shelved/);
-  assert.match(text, /Skull Crusher \(until 2026-10-05, Adam is over it\)/);
+  assert.match(text, /Skull Crusher \(until 2026-10-05, 21 days remaining, Adam is over it\)/);
   const highlightLines = text.split('\n').filter(line => line.startsWith('- '));
   assert.equal(highlightLines.some(line => line.includes('Skull Crusher')), false);
 });
