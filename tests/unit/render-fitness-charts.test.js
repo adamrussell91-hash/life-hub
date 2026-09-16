@@ -32,6 +32,10 @@ class Node {
     if (selector === '.mind-chart-legend') {
       return this.children.find(node => String(node.className || '').includes('mind-chart-legend')) ?? null;
     }
+    const legendMatch = selector.match(/^\[data-legend="([^"]+)"\]$/);
+    if (legendMatch) {
+      return this.children.find(node => node.dataset?.legend === legendMatch[1]) ?? null;
+    }
     return null;
   }
   getBoundingClientRect() { return { left: 0, top: 0, width: 20, height: 20 }; }
@@ -111,12 +115,17 @@ test('training rhythm combines time-of-day and monthly cadence in one radial car
   });
 
   assert.equal(root.ensure('[data-fitness="training-rhythm-read"]').textContent, 'Usually evenings, around 18:40 · mostly Tue · 4 sessions in the last 30 days · longest gap 8 days');
-  const radial = texts(root.ensure('#fitness-training-radial'));
-  assert.ok(radial.includes('Morning 1'));
-  assert.ok(radial.includes('Evening 3'));
-  assert.ok(radial.includes('11/08 1'));
-  assert.ok(radial.includes('18/08 2'));
-  assert.equal(root.ensure('#fitness-training-radial-card').attributes.hidden, undefined);
+  // Bucket/week labels live in legends below the donut now, not as raw SVG
+  // text crammed around the rings (that overlapped once there were more
+  // than a couple of buckets/weeks).
+  const card = root.ensure('#fitness-training-radial-card');
+  const timeLegend = texts(card.children.find(node => node.dataset?.legend === 'time-of-day'));
+  const weekLegend = texts(card.children.find(node => node.dataset?.legend === 'monthly-rhythm'));
+  assert.ok(timeLegend.includes('Morning 1'));
+  assert.ok(timeLegend.includes('Evening 3'));
+  assert.ok(weekLegend.includes('11/08 1'));
+  assert.ok(weekLegend.includes('18/08 2'));
+  assert.equal(card.attributes.hidden, undefined);
   assert.ok(root.ensure('#fitness-training-radial-card').children.some(node => node.dataset?.role === 'fitness-tip'));
   assert.equal(root.ensure('[data-fitness="year-read"]').textContent, '4 sessions in 2026');
   assert.ok(texts(root.ensure('#fitness-year-chart')).includes('Aug'));
@@ -167,4 +176,45 @@ test('who-is-improving uses a legend and short week labels', () => {
   const legend = texts(root.ensure('#fitness-bump-card'));
   assert.ok(legend.includes('Squat'));
   assert.ok(legend.includes('Press'));
+});
+
+test('training load and pain vs load share one card, and either can appear alone', () => {
+  const bothRoot = chartRoot();
+  renderFitnessCharts(bothRoot, {
+    painHeat: [{
+      term: 'Right groin',
+      points: [{ date: '2026-08-24', count: 2, spiked: true }, { date: '2026-08-31', count: 0, spiked: false }]
+    }],
+    loadHorizon: [{
+      key: 'load',
+      points: [
+        { date: '2026-08-24', value: 4000, ratio: 1.1, band: 'medium' },
+        { date: '2026-08-31', value: 4200, ratio: 1.2, band: 'medium' }
+      ]
+    }]
+  });
+  const mergedCard = bothRoot.ensure('#fitness-load-pain-card');
+  assert.equal(mergedCard.attributes.hidden, undefined);
+  assert.equal(bothRoot.ensure('#fitness-load-section').attributes.hidden, undefined);
+  assert.equal(bothRoot.ensure('#fitness-pain-section').attributes.hidden, undefined);
+  assert.match(bothRoot.ensure('[data-fitness="load-read"]').textContent, /1\.2× your 4-week average/);
+  assert.ok(texts(bothRoot.ensure('#fitness-pain-heat')).includes('Right groin'));
+
+  const loadOnlyRoot = chartRoot();
+  renderFitnessCharts(loadOnlyRoot, {
+    loadHorizon: [{
+      key: 'load',
+      points: [
+        { date: '2026-08-24', value: 4000, ratio: 1.1, band: 'medium' },
+        { date: '2026-08-31', value: 4200, ratio: 1.2, band: 'medium' }
+      ]
+    }]
+  });
+  assert.equal(loadOnlyRoot.ensure('#fitness-load-pain-card').attributes.hidden, undefined, 'card stays visible when only load has data');
+  assert.equal(loadOnlyRoot.ensure('#fitness-load-section').attributes.hidden, undefined);
+  assert.equal(loadOnlyRoot.ensure('#fitness-pain-section').attributes.hidden, '', 'pain section hides itself when there is nothing to show');
+
+  const neitherRoot = chartRoot();
+  renderFitnessCharts(neitherRoot, {});
+  assert.equal(neitherRoot.ensure('#fitness-load-pain-card').attributes.hidden, '');
 });

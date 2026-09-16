@@ -54,10 +54,9 @@ function setWidth(el, pct) {
   else el.style['--bar'] = `${pct}%`;
 }
 
-function paintLegend(root, host, items) {
+function paintLegend(root, host, items, key = 'default') {
   if (!host) return;
-  const kids = [...(host.children ?? [])];
-  let legend = kids.find(node => String(node.className || '').split(/\s+/).includes('mind-chart-legend'));
+  let legend = host.querySelector?.(`[data-legend="${key}"]`);
   if (!items?.length) {
     legend?.replaceChildren?.();
     return;
@@ -65,6 +64,7 @@ function paintLegend(root, host, items) {
   if (!legend) {
     legend = root.createElement('ul');
     legend.className = 'mind-chart-legend';
+    legend.dataset.legend = key;
     host.append(legend);
   }
   legend.replaceChildren();
@@ -109,9 +109,22 @@ function placeTip(mark, tip, event) {
   const wide = Boolean(rect && (rect.width || rect.height));
   const x = wide ? rect.left + rect.width / 2 : Number(event?.clientX) || 0;
   const y = wide ? rect.top : Number(event?.clientY) || 0;
-  tip.style.position = 'fixed';
-  tip.style.left = `${Math.round(x)}px`;
-  tip.style.top = `${Math.round(y)}px`;
+  // Cards use backdrop-filter, which creates a new containing block for
+  // position:fixed descendants — a fixed/viewport-relative tip renders in
+  // the wrong spot. Position relative to the card (tip's parent) instead.
+  const host = tip.parentNode;
+  const hostRect = typeof host?.getBoundingClientRect === 'function' ? host.getBoundingClientRect() : null;
+  if (hostRect) {
+    const left = Math.max(0, Math.min(x - hostRect.left, hostRect.width));
+    const top = Math.max(0, y - hostRect.top);
+    tip.style.position = 'absolute';
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+  } else {
+    tip.style.position = 'fixed';
+    tip.style.left = `${Math.round(x)}px`;
+    tip.style.top = `${Math.round(y)}px`;
+  }
   tip.style.right = 'auto';
   tip.style.bottom = 'auto';
   tip.style.transform = 'translate(-50%, calc(-100% - 8px))';
@@ -271,8 +284,17 @@ function renderTrainingRhythm(root, when, rhythm) {
   paintDonut(root, svg, timeItems, { radius: 40, tip, prefix: 'Time of day · ' });
   appendRadialLabel(root, svg, 80, 75, when?.typicalTime ?? `${rhythm?.count ?? 0} sessions`);
   appendRadialLabel(root, svg, 80, 89, 'typical start');
-  timeItems.forEach((item, index) => appendRadialLabel(root, svg, 18 + index * 41, 150, `${item.label} ${item.value}`));
-  rhythmItems.forEach((item, index) => appendRadialLabel(root, svg, 20 + index * 30, 12, `${item.label} ${item.value}`));
+  // Printing one label per bucket/week directly around the rings collides
+  // once there are more than 2-3 of them (5 weeks, 4 time buckets). Use
+  // legends instead, matching the region-volume donut below.
+  paintLegend(root, card, timeItems.map(item => ({
+    label: `${item.label} ${item.value}`,
+    swatch: item.colour
+  })), 'time-of-day');
+  paintLegend(root, card, rhythmItems.map(item => ({
+    label: `${item.label} ${item.value}`,
+    swatch: item.colour
+  })), 'monthly-rhythm');
 }
 
 function renderWhen(root, when) {
@@ -328,10 +350,16 @@ function renderBump(root, ranks) {
   const svg = root.querySelector('#fitness-bump-chart');
   if (!card || !svg || typeof root.createElementNS !== 'function') return;
   const themes = [...new Set(ranks.flatMap(row => Object.keys(row.rankByTheme)))];
+  // The card spans the full bento width, but the chart's viewBox drives its
+  // rendered size (width:100% + height:auto scales to the viewBox aspect
+  // ratio). A fixed narrow viewBox here left the lines letterboxed into a
+  // fraction of the card. Measure the actual rendered width instead.
+  const measuredWidth = Math.round(svg.getBoundingClientRect?.().width) || 0;
+  const width = measuredWidth >= 320 ? measuredWidth : 640;
   const chart = buildBumpChart({
     ranks,
     themes,
-    width: 320,
+    width,
     height: 200,
     pad: { top: 12, right: 16, bottom: 28, left: 24 }
   });
@@ -416,14 +444,15 @@ function renderStream(root, weekly) {
   })));
 }
 
-function renderPainHeat(root, series) {
-  const card = showCard(root, '#fitness-pain-card', series?.length >= 1);
+function renderPainHeat(root, series, { cardSelector = '#fitness-load-pain-card', manageCard = true } = {}) {
+  const card = manageCard ? showCard(root, cardSelector, series?.length >= 1) : root.querySelector(cardSelector);
   const host = root.querySelector('#fitness-pain-heat');
   if (!card || !host) return;
   const heat = buildWatchlistHeat(series);
   host.replaceChildren();
+  setHidden(root.querySelector('#fitness-pain-section') ?? host, heat.empty);
   if (heat.empty) {
-    setHidden(card, true);
+    if (manageCard) setHidden(card, true);
     return;
   }
   for (const row of heat.rows) {
@@ -454,14 +483,16 @@ function bandFill(band) {
   return 'var(--wave)';
 }
 
-function renderHorizon(root, metrics) {
-  const card = showCard(root, '#fitness-horizon-card', metrics?.length >= 1);
+function renderHorizon(root, metrics, { cardSelector = '#fitness-load-pain-card', manageCard = true } = {}) {
+  const ready = metrics?.length >= 1;
+  const card = manageCard ? showCard(root, cardSelector, ready) : root.querySelector(cardSelector);
   const latest = metrics?.[0]?.points?.at(-1);
   setText(root, '[data-fitness="load-read"]', Number.isFinite(latest?.ratio)
     ? `${latest.ratio.toFixed(1)}× your 4-week average`
     : '');
   const svg = root.querySelector('#fitness-horizon-chart');
-  if (!card || !svg || typeof root.createElementNS !== 'function') return;
+  setHidden(root.querySelector('#fitness-load-section') ?? svg, !ready);
+  if (!card || !svg || typeof root.createElementNS !== 'function' || !ready) return;
   const chart = buildHorizonBands(metrics, { width: 320, height: 28 });
   clearSvg(svg);
   svg.setAttribute('viewBox', '0 0 320 28');
@@ -834,8 +865,9 @@ export function renderFitnessCharts(root, charts = {}) {
   renderTrainingRhythm(root, charts.trainWhen, charts.monthRhythm);
   renderBump(root, charts.bumpRanks);
   renderStream(root, charts.regionStream);
-  renderPainHeat(root, charts.painHeat);
-  renderHorizon(root, charts.loadHorizon);
+  showCard(root, '#fitness-load-pain-card', (charts.painHeat?.length ?? 0) >= 1 || (charts.loadHorizon?.length ?? 0) >= 1);
+  renderPainHeat(root, charts.painHeat, { manageCard: false });
+  renderHorizon(root, charts.loadHorizon, { manageCard: false });
   renderTwoRing(root, charts.regionVolume, charts.regionVolumePrior);
   const push = charts.pushPull?.find(item => item.key === 'push')?.value ?? 0;
   const pull = charts.pushPull?.find(item => item.key === 'pull')?.value ?? 0;
