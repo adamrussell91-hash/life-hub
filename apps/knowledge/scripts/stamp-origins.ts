@@ -109,6 +109,7 @@ export function syncManifestOrigins(
       excerpt: excerptFromTidyBody(page.body),
       ...(page.origins?.length ? { origins: page.origins } : {}),
       ...(page.source_notion_id ? { source_notion_id: page.source_notion_id } : {}),
+      ...(page.created_at ? { created_at: page.created_at } : {}),
     };
   });
 }
