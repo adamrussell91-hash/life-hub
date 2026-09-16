@@ -113,6 +113,19 @@ describe("stamp origins", () => {
     ).toEqual([{ kind: "notebook", label: "Boy's Education" }]);
   });
 
+  it("backfills created_at from the page file onto a list row that never got it", () => {
+    const ready = page({
+      id: "page_notion_00c518fb7b884781a60f702ec3185eb3",
+      created_at: "2025-06-12T00:00:00.000Z",
+    });
+    expect(
+      syncManifestOrigins(
+        [{ id: ready.id, title: ready.title, area: ready.area, tags: ready.tags, excerpt: "Lecture." }],
+        [ready],
+      )[0]?.created_at,
+    ).toBe("2025-06-12T00:00:00.000Z");
+  });
+
   it("copies tidied topic tags from the page file onto a stale list row", () => {
     const ready = page({
       id: "page_notion_00c518fb7b884781a60f702ec3185eb3",

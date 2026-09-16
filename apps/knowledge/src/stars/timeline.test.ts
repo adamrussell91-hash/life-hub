@@ -4,6 +4,7 @@ import {
   clampMonthIndex,
   currentMonthIndex,
   dateFromMonthIndex,
+  dayRatioFromIso,
   formatMonthIndex,
   monthIndexForRatio,
   monthIndexFromDate,
@@ -66,6 +67,14 @@ describe("Stars timeline math", () => {
     }
     expect(velocity).toBe(0);
     expect(steps).toBeGreaterThan(1);
+  });
+
+  it("places a date within its own month as a 0-1 ratio, defaulting to mid-month when unusable", () => {
+    expect(dayRatioFromIso("2026-09-01T00:00:00.000Z")).toBe(0);
+    expect(dayRatioFromIso("2026-09-30T00:00:00.000Z")).toBe(1);
+    expect(dayRatioFromIso("2026-09-15T00:00:00.000Z")).toBeCloseTo(14 / 29, 5);
+    expect(dayRatioFromIso(undefined)).toBe(0.5);
+    expect(dayRatioFromIso("not-a-date")).toBe(0.5);
   });
 
   it("maps a month index to a slider ratio and back", () => {
