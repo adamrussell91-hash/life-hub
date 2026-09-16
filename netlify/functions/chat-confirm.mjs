@@ -19,6 +19,7 @@ import { resolveWorkoutConfirmTarget } from './_shared/workout-confirm-path.mjs'
 import { buildTemplateRecord, renderTemplateMarkdown, templatePathForTitle } from './_shared/workout-templates.mjs';
 import {
   applyCompletedWorkoutToLibrary,
+  applyWorkoutNoteRestrictionsToLibrary,
   EXERCISE_LIBRARY_PATH,
   parseExerciseLibrary
 } from './_shared/exercise-library.mjs';
@@ -251,6 +252,8 @@ export function createChatConfirmHandler({
           exercisePersonalBests = await upsertExerciseLibraryProgress(
             client,
             validation.record,
+            validation.notes,
+            getSydneyDateKey(new Date(now())),
             getSydneyTimestamp(new Date(now()))
           );
         } catch {
@@ -1561,7 +1564,7 @@ async function upsertWorkoutTemplate(client, record) {
   });
 }
 
-async function upsertExerciseLibraryProgress(client, record, updatedAt) {
+async function upsertExerciseLibraryProgress(client, record, notes, today, updatedAt) {
   const current = await client.resolveTree();
   const entry = current.tree.find(item => item.path === EXERCISE_LIBRARY_PATH && item.type === 'blob');
   if (!entry) return [];
@@ -1570,7 +1573,16 @@ async function upsertExerciseLibraryProgress(client, record, updatedAt) {
   if (content === null) return [];
 
   const libraryEntries = parseExerciseLibrary(content);
-  const { entries: nextEntries, pbs } = applyCompletedWorkoutToLibrary(libraryEntries, record, updatedAt);
+  const progress = applyCompletedWorkoutToLibrary(libraryEntries, record, updatedAt);
+  const restricted = applyWorkoutNoteRestrictionsToLibrary(
+    progress.entries,
+    record,
+    notes,
+    today,
+    updatedAt
+  );
+  const nextEntries = restricted.entries;
+  const pbs = progress.pbs;
   if (pbs.length === 0 && JSON.stringify(nextEntries) === JSON.stringify(libraryEntries)) return [];
 
   await client.writeFile({
