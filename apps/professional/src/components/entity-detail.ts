@@ -5,6 +5,16 @@ import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
 import type { EntityOverview, RelationshipEntry } from '@/domain/types';
 
+export interface TabDef {
+  id: string;
+  label: string;
+  render: (
+    host: HTMLElement,
+    overview: EntityOverview,
+    ctx: { isCurrent: () => boolean }
+  ) => void | Promise<void>;
+}
+
 export interface EntityDetailConfig {
   ref: string;
   backHref: string;
@@ -13,6 +23,17 @@ export interface EntityDetailConfig {
   isCurrent?: () => boolean;
   /** Person-only: sort name + a quiet "Self" indicator. Organisation-only: legal name. */
   renderExtraFields?: (overview: EntityOverview, host: HTMLElement) => void;
+  /**
+   * Optional tab bar rendered below the summary block. When absent (e.g.
+   * Organisation Profile today), `renderEntityDetail` falls back to the
+   * original flat stacked-sections layout, unchanged. When present (Person
+   * Profile), only the active tab's content is rendered, and switching
+   * tabs never re-fetches the already-loaded `overview` — it is captured
+   * once per load in a closure and handed to every tab's `render`.
+   */
+  tabs?: TabDef[];
+  /** Which tab id is active initially. Defaults to tabs[0].id if tabs is set. */
+  initialTabId?: string;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -105,7 +126,7 @@ function renderRoleEditor(item: HTMLElement, entry: RelationshipEntry, onChanged
   item.append(roleLine, editButton, form);
 }
 
-function renderRelationshipList(
+export function renderRelationshipList(
   host: HTMLElement,
   entries: RelationshipEntry[],
   emptyMessage: string,
@@ -132,6 +153,63 @@ function renderRelationshipList(
     list.append(item);
   }
   host.append(list);
+}
+
+// Hand-written `role="tablist"` / `role="tab"` bar styled with the shared
+// `.hub-pills` class, following the precedent in
+// `apps/tasks/src/views/calendar.ts`'s `renderViewTabs` — there is no
+// higher-level `<Tabs>` component in packages/design-kit yet. `overview` is
+// captured once by the caller and handed unchanged to every tab's
+// `render()`, so switching tabs never triggers a second fetch.
+function renderTabbedContent(
+  tabs: TabDef[],
+  overview: EntityOverview,
+  config: EntityDetailConfig
+): { tablist: HTMLElement; contentHost: HTMLElement } {
+  const tablist = el('div', 'hub-pills entity-detail__tabs');
+  tablist.setAttribute('role', 'tablist');
+  tablist.setAttribute(
+    'aria-label',
+    `${overview.entity.kind === 'person' ? 'Person' : 'Organisation'} sections`
+  );
+
+  const contentHost = el('div', 'entity-detail__tab-content');
+  const buttons = new Map<string, HTMLButtonElement>();
+
+  const requestedInitialId = config.initialTabId ?? tabs[0].id;
+  let activeId = tabs.some((tab) => tab.id === requestedInitialId) ? requestedInitialId : tabs[0].id;
+
+  function activate(id: string): void {
+    activeId = id;
+    for (const [tabId, btn] of buttons) {
+      const isActive = tabId === id;
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      btn.classList.toggle('is-active', isActive);
+    }
+    contentHost.replaceChildren();
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab) return;
+    void tab.render(contentHost, overview, { isCurrent: config.isCurrent ?? (() => true) });
+  }
+
+  for (const tab of tabs) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hub-pills__btn entity-detail__tab';
+    btn.textContent = tab.label;
+    btn.id = `entity-detail-tab-${tab.id}`;
+    btn.setAttribute('role', 'tab');
+    btn.setAttribute('aria-selected', tab.id === activeId ? 'true' : 'false');
+    btn.addEventListener('click', () => {
+      if (tab.id !== activeId) activate(tab.id);
+    });
+    buttons.set(tab.id, btn);
+    tablist.append(btn);
+  }
+
+  activate(activeId);
+
+  return { tablist, contentHost };
 }
 
 export async function renderEntityDetail(canvas: HTMLElement, config: EntityDetailConfig): Promise<void> {
@@ -164,6 +242,17 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     );
     summary.append(kindLine);
     if (config.renderExtraFields) config.renderExtraFields(overview, summary);
+
+    // Tabbed layout (Person Profile) vs. the original flat stacked-sections
+    // layout (Organisation Profile today) are two entirely separate render
+    // branches — when `config.tabs` is absent, everything below this `if`
+    // runs exactly as it did before tabs existed, so Organisation Profile's
+    // output is byte-for-byte unchanged.
+    if (config.tabs && config.tabs.length) {
+      const { tablist, contentHost } = renderTabbedContent(config.tabs, overview, config);
+      canvas.append(back, summary, tablist, contentHost);
+      return;
+    }
 
     const currentSection = el('section', 'entity-detail__section');
     currentSection.append(el('h2', 'entity-detail__heading', 'Current relationships'));

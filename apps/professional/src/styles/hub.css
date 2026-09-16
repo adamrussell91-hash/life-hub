@@ -212,6 +212,43 @@
   color: var(--muted);
 }
 
+.entity-detail__tabs {
+  margin-bottom: var(--space-5);
+}
+
+.entity-detail__tab-content {
+  min-height: 4rem;
+}
+
+.entity-detail__human-label {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.entity-detail__state-toggle {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+}
+
+.entity-detail__state-reasons {
+  margin: var(--space-1) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.entity-detail__network-group {
+  margin-bottom: var(--space-4);
+}
+
+.entity-detail__subheading {
+  font-size: var(--text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-tight);
+  color: var(--muted);
+  margin: 0 0 var(--space-2);
+}
+
 /* Relationship timeline styles live in packages/design-kit/relationship-timeline.css */
 
 .communications__actions {

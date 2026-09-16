@@ -5,6 +5,7 @@ import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/entity-links.css';
 import '../../design-kit/relationship-timeline.css';
+import '../../design-kit/filters.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';

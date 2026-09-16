@@ -92,6 +92,16 @@ export interface RelationshipLink {
   valid_to: string | null;
   source_ref: string;
   target_ref: string;
+  /**
+   * Registry-declared, relationship-type-specific data (registry key:
+   * `metadata_keys`) — e.g. `professional_relationship`'s
+   * `human_label`, a directional human-readable phrasing (e.g. "mentor
+   * of") that the generic `role` enum value alone can't express. Always
+   * present as an object (possibly empty) as of the `entity-overview.mjs`
+   * pass-through added for Feature 1.3; optional here only because older
+   * cached/mocked fixtures may omit it.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface RelationshipEntry {

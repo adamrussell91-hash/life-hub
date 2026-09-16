@@ -492,6 +492,61 @@ test('B5: overview preserves current and historical relationships for an archive
   assert.equal(ordinarySearch.data.groups.person.length, 0, 'ordinary suggestions must not surface an archived Person');
 });
 
+test('Feature 1.3: current and historical relationships carry metadata (e.g. professional_relationship human_label)', async () => {
+  const store = memoryStore();
+  const deps = baseDeps(store);
+  const entities = createEntitiesHandler(deps);
+  const links = createUniversalLinksHandler(deps);
+  const overview = createEntityOverviewHandler(deps);
+
+  const seth = await createPerson(entities);
+  const jane = await createPerson(entities, { display_name: 'Jane Doe' });
+  const alsoJane = await createPerson(entities, { display_name: 'Alex Roe' });
+
+  const mentorLink = await (await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: {
+      source_ref: seth.ref,
+      target_ref: jane.ref,
+      relationship_type: 'professional_relationship',
+      role: 'mentor',
+      valid_from: '2025-01-01T00:00:00.000Z',
+      metadata: { human_label: 'Mentor to Jane Doe' }
+    }
+  }))).json();
+
+  // A relationship with no metadata supplied must still come back with an
+  // explicit (empty) metadata object, not an absent field.
+  await links(request({
+    url: 'https://api.adam-russell.com/api/universal-links',
+    method: 'POST',
+    body: {
+      source_ref: seth.ref,
+      target_ref: alsoJane.ref,
+      relationship_type: 'professional_relationship',
+      role: 'colleague',
+      valid_from: '2025-02-01T00:00:00.000Z'
+    }
+  }));
+
+  await links(request({
+    url: `https://api.adam-russell.com/api/universal-links?id=${mentorLink.data.link.id}&action=end`,
+    method: 'PATCH',
+    body: { valid_to: '2026-01-01T00:00:00.000Z' }
+  }));
+
+  const response = await overview(request({ url: `https://api.adam-russell.com/api/entities/overview?ref=${encodeURIComponent(seth.ref)}` }));
+  const body = (await response.json()).data;
+
+  assert.equal(response.status, 200);
+  assert.equal(body.current_relationships.length, 1);
+  assert.deepEqual(body.current_relationships[0].link.metadata, {});
+
+  assert.equal(body.historical_relationships.length, 1);
+  assert.deepEqual(body.historical_relationships[0].link.metadata, { human_label: 'Mentor to Jane Doe' });
+});
+
 test('rejects a ref for an unsupported kind', async () => {
   const store = memoryStore();
   const handler = createEntityOverviewHandler(baseDeps(store));
