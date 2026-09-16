@@ -16,6 +16,15 @@ export function monthIndexFromIso(iso: string | undefined | null): number | null
   return monthIndexFromDate(date);
 }
 
+/** Where a date falls within its own month, as 0 (1st) to 1 (last day) — spreads same-month items across the month's screen width instead of stacking them on one column. */
+export function dayRatioFromIso(iso: string | undefined | null): number {
+  if (!iso) return 0.5;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return 0.5;
+  const daysInMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+  return (date.getUTCDate() - 1) / Math.max(1, daysInMonth - 1);
+}
+
 export function dateFromMonthIndex(monthIndex: number): Date {
   const year = EPOCH_YEAR + Math.floor(monthIndex / 12);
   const month = ((monthIndex % 12) + 12) % 12;

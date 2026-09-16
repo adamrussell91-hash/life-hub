@@ -1,8 +1,8 @@
 import type { PageManifestEntry } from "../domain/page";
 import type { SavedConstellation } from "./schema";
-import { monthIndexFromIso } from "./timeline";
+import { dayRatioFromIso, monthIndexFromIso } from "./timeline";
 
-export type PanoramaNote = { pageId: string; title: string; monthIndex: number };
+export type PanoramaNote = { pageId: string; title: string; monthIndex: number; dayRatio: number };
 
 export type MonthBucket = {
   monthIndex: number;
@@ -28,7 +28,7 @@ export function buildSkyIndex(entries: PageManifestEntry[], saved: SavedConstell
   for (const entry of unconnectedEntries(entries, saved)) {
     const monthIndex = monthIndexFromIso(entry.created_at);
     if (monthIndex === null) continue;
-    bucketFor(monthIndex).notes.push({ pageId: entry.id, title: entry.title, monthIndex });
+    bucketFor(monthIndex).notes.push({ pageId: entry.id, title: entry.title, monthIndex, dayRatio: dayRatioFromIso(entry.created_at) });
   }
   for (const item of saved) {
     const monthIndex = monthIndexFromIso(item.createdAt);
