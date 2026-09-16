@@ -528,6 +528,113 @@
   max-width: 28rem;
 }
 
+.people-home__search-modes {
+  margin-bottom: var(--space-3);
+}
+
+/* Relational Search panel (Phase 3, Feature 3.3, layer 1) */
+
+.relational-search__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.relational-search__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.relational-search__label {
+  display: block;
+}
+
+.relational-search__org-selected {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.relational-search__org-selected-label {
+  flex: 1;
+  font-size: var(--text-base);
+  color: var(--ink);
+}
+
+.relational-search__org-clear {
+  border: 0;
+  background: transparent;
+  color: var(--wave, var(--ink));
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  padding: 0;
+}
+
+.relational-search__role-select,
+.relational-search__text-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+}
+
+.relational-search__validation {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.relational-search__status {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: var(--space-3) 0 0;
+}
+
+.relational-search__results {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.relational-search__result {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.relational-search__result-name {
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+
+.relational-search__result-reasons {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-px);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .people-home__signals {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));

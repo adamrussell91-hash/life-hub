@@ -1,4 +1,5 @@
 import { mountEntitySearch, type EntitySearchHandle } from '@/components/entity-search';
+import { mountRelationalSearchPanel, type RelationalSearchPanelHandle } from '@/components/relational-search-panel';
 import { fetchPeopleActivity, fetchPeopleCohorts, fetchPeopleHomeSignals } from '@/api/people-home';
 import { organisationRoute, personRoute } from '@/app/router';
 import { parseSharedRef } from '@/domain/ids';
@@ -117,19 +118,47 @@ function buildHeader(): HTMLElement {
   const searchPanel = el('div', 'people-home__search-panel');
   searchPanel.hidden = true;
   let searchHandle: EntitySearchHandle | null = null;
+  let relationalSearchHandle: RelationalSearchPanelHandle | null = null;
 
-  const searchButton = document.createElement('button');
-  searchButton.type = 'button';
-  searchButton.className = 'btn btn--secondary people-home__search-toggle';
-  searchButton.textContent = 'Search';
-  searchButton.setAttribute('aria-expanded', 'false');
-  searchButton.addEventListener('click', () => {
-    const opening = searchPanel.hidden;
-    searchPanel.hidden = !opening;
-    searchButton.setAttribute('aria-expanded', String(opening));
-    if (!opening) return;
-    if (!searchHandle) {
-      searchHandle = mountEntitySearch(searchPanel, {
+  // Two search modes sharing one panel: "Search by name" (Phase 1's
+  // MiniSearch-backed name/label lookup, unchanged) and "Relational
+  // search" (Phase 3, Feature 3.3 layer 1 — structured organisation/
+  // role/text filters). They are a genuinely different query shape (see
+  // `SOURCE-BRIEF.md` section 45's "who do I know at UNSW connected to
+  // gifted education" example, which a name search cannot answer), not
+  // a restyle of the same widget — hence a mode toggle rather than
+  // merging them into one input.
+  const modeTablist = el('div', 'hub-pills people-home__search-modes');
+  modeTablist.setAttribute('role', 'tablist');
+  modeTablist.setAttribute('aria-label', 'Search mode');
+
+  const nameSearchContainer = el('div', 'people-home__search-mode-panel');
+  const relationalSearchContainer = el('div', 'people-home__search-mode-panel');
+  relationalSearchContainer.hidden = true;
+
+  const nameModeButton = document.createElement('button');
+  nameModeButton.type = 'button';
+  nameModeButton.className = 'hub-pills__btn people-home__search-mode-tab';
+  nameModeButton.textContent = 'Search by name';
+  nameModeButton.setAttribute('role', 'tab');
+
+  const relationalModeButton = document.createElement('button');
+  relationalModeButton.type = 'button';
+  relationalModeButton.className = 'hub-pills__btn people-home__search-mode-tab';
+  relationalModeButton.textContent = 'Relational search';
+  relationalModeButton.setAttribute('role', 'tab');
+
+  function activateMode(mode: 'name' | 'relational'): void {
+    const isName = mode === 'name';
+    nameSearchContainer.hidden = !isName;
+    relationalSearchContainer.hidden = isName;
+    nameModeButton.setAttribute('aria-selected', String(isName));
+    nameModeButton.classList.toggle('is-active', isName);
+    relationalModeButton.setAttribute('aria-selected', String(!isName));
+    relationalModeButton.classList.toggle('is-active', !isName);
+
+    if (isName && !searchHandle) {
+      searchHandle = mountEntitySearch(nameSearchContainer, {
         kinds: 'person,organisation',
         label: 'Search people and organisations',
         placeholder: 'Search by name',
@@ -141,9 +170,43 @@ function buildHeader(): HTMLElement {
         }
       });
     }
-    searchPanel.querySelector('input')?.focus();
+    if (!isName && !relationalSearchHandle) {
+      relationalSearchHandle = mountRelationalSearchPanel(relationalSearchContainer);
+    }
+    searchPanel.querySelector<HTMLInputElement>(`${isName ? '.entity-search__input' : '.relational-search__text-input'}`)?.focus();
+  }
+
+  nameModeButton.addEventListener('click', () => activateMode('name'));
+  relationalModeButton.addEventListener('click', () => activateMode('relational'));
+  modeTablist.append(nameModeButton, relationalModeButton);
+
+  let panelInitialized = false;
+  const searchButton = document.createElement('button');
+  searchButton.type = 'button';
+  searchButton.className = 'btn btn--secondary people-home__search-toggle';
+  searchButton.textContent = 'Search';
+  searchButton.setAttribute('aria-expanded', 'false');
+  searchButton.addEventListener('click', () => {
+    const opening = searchPanel.hidden;
+    searchPanel.hidden = !opening;
+    searchButton.setAttribute('aria-expanded', String(opening));
+    if (!opening) return;
+    // Default to "Search by name" the first time the panel opens; a
+    // later reopen keeps whichever mode the operator last had active
+    // rather than resetting it.
+    if (!panelInitialized) {
+      panelInitialized = true;
+      activateMode('name');
+    } else {
+      searchPanel
+        .querySelector<HTMLInputElement>(
+          relationalSearchContainer.hidden ? '.entity-search__input' : '.relational-search__text-input'
+        )
+        ?.focus();
+    }
   });
 
+  searchPanel.append(modeTablist, nameSearchContainer, relationalSearchContainer);
   actions.append(addPerson, searchButton);
   header.append(copy, actions, addPersonStatus, searchPanel);
   return header;

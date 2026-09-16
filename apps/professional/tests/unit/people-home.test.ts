@@ -139,9 +139,20 @@ function routedFetch(options: {
   cohorts?: unknown | 'error';
   activity?: (url: string) => unknown;
   search?: unknown;
+  registry?: unknown;
+  relationalSearch?: unknown;
 }): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL) => {
     const href = String(input);
+    if (href.includes('/api/relationship-registry')) {
+      return jsonResponse(200, {
+        ok: true,
+        data: options.registry ?? { relationships: [{ key: 'professional_relationship', allowed_roles: ['mentor', 'colleague'] }] }
+      });
+    }
+    if (href.includes('/api/people/relational-search')) {
+      return jsonResponse(200, { ok: true, data: options.relationalSearch ?? { results: [] } });
+    }
     if (href.includes('/api/people/home-signals')) {
       if (options.home === 'error') {
         return jsonResponse(500, { ok: false, error: { code: 'internal_error', message: 'Signals failed.' } });
@@ -407,6 +418,60 @@ describe('renderPeopleHomeView', () => {
     } finally {
       vi.useRealTimers();
       location.hash = '';
+    }
+  });
+
+  it('toggles between "Search by name" and "Relational search" modes within the same panel', async () => {
+    vi.useFakeTimers();
+    try {
+      globalThis.fetch = routedFetch({
+        relationalSearch: {
+          results: [
+            { person_ref: `shared:person:${PERSON_NINA}`, display_name: 'Nina Example', matched_reasons: ['Role: mentor'] }
+          ]
+        }
+      });
+      const canvas = document.createElement('div');
+      await renderPeopleHomeView(canvas);
+
+      const searchToggle = canvas.querySelector<HTMLButtonElement>('.people-home__search-toggle')!;
+      searchToggle.click();
+
+      const nameTab = canvas.querySelector<HTMLButtonElement>('.people-home__search-mode-tab')!;
+      expect(nameTab.textContent).toBe('Search by name');
+      expect(nameTab.getAttribute('aria-selected')).toBe('true');
+      // Default mode shows the existing name search input.
+      expect(canvas.querySelector('.entity-search__input')).not.toBeNull();
+
+      const relationalTab = [...canvas.querySelectorAll<HTMLButtonElement>('.people-home__search-mode-tab')].find(
+        (btn) => btn.textContent === 'Relational search'
+      )!;
+      relationalTab.click();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(relationalTab.getAttribute('aria-selected')).toBe('true');
+      expect(nameTab.getAttribute('aria-selected')).toBe('false');
+      const relationalPanel = canvas.querySelector<HTMLElement>('.relational-search')!;
+      expect(relationalPanel.hidden).toBe(false);
+
+      const textInput = canvas.querySelector<HTMLInputElement>('.relational-search__text-input')!;
+      textInput.value = 'mentor';
+      textInput.dispatchEvent(new Event('input', { bubbles: true }));
+      const form = canvas.querySelector('.relational-search__form')!;
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await vi.advanceTimersByTimeAsync(0);
+
+      const link = canvas.querySelector<HTMLAnchorElement>('.relational-search__result-name')!;
+      expect(link.textContent).toBe('Nina Example');
+      expect(link.getAttribute('href')).toBe(`#/person/${PERSON_NINA}`);
+
+      // Switching back to name search leaves the relational panel intact
+      // (not destroyed) but hidden.
+      nameTab.click();
+      expect(canvas.querySelector<HTMLElement>('.relational-search')!.hidden).toBe(true);
+      expect(canvas.querySelector('.entity-search__input')).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
     }
   });
 

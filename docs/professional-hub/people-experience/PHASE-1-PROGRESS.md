@@ -202,6 +202,63 @@ that step is left for Adam's explicit review when he's back.
     that class of check belongs to this repo's Playwright/browser tests,
     not this Vitest suite.
 
+19. **Feature 3.3 Relational Search ships layer 1 (structured queries)
+    only — layer 2 (LLM natural-language query parsing) deliberately
+    deferred to Phase 5.** BUILD-PLAN.md's own Feature 3.3 section allows
+    this explicitly ("Explicitly Phase 3-and-a-half: ship (1) in Phase 3,
+    treat (2) as acceptable to defer into Phase 5... if Phase 3's time
+    budget is tight"), and Adam delegated the decision to ship layer 1 only
+    given the size of this build. No Anthropic/LLM call of any kind exists
+    anywhere in `_shared/relational-search.mjs` or
+    `people-relational-search.mjs` — only structured filter/explain logic.
+    A future Phase 5 task can wrap the same `GET
+    /api/people/relational-search` endpoint with an LLM query-planning
+    layer that translates a free-text question (e.g. "who have I not
+    spoken with recently but share an active project with?") into the
+    three structured params below, per the plan's own note that layer 2
+    "wraps this endpoint rather than replacing it."
+
+20. **Relational query design: three optional filters
+    (`organisation_ref`/`role`/`text`), ANDed together, never ranked.**
+    SOURCE-BRIEF.md section 45 gives example questions but no query
+    grammar, so this task's own scoping decision (given in the task brief)
+    is implemented exactly: `organisation_ref` matches a CURRENT
+    `employee_at`/`member_of` link; `role` matches a CURRENT
+    `professional_relationship` link whose `role` is one of the
+    registry's declared `allowed_roles` (`relationship-registry.mjs`);
+    `text` case-insensitively matches EITHER a current
+    `professional_relationship` link's `metadata.human_label` OR any of
+    the person's Observations' `text` — the only place topic-level context
+    like "gifted education" lives in this data model today, since there is
+    no dedicated topic-tagging system (not built here — out of scope).
+    At least one filter is required; an all-empty query is a 400
+    `missing_filter`. Every result carries `matched_reasons: string[]`
+    citing exactly which filter(s) matched and how (e.g. "Employed at
+    UNSW", "Role: academic_contact", "Human label mentions '...'",
+    "Observation mentions '...'"). Per Principle 6 (brief section 2/26),
+    results are never ranked or scored — `runRelationalSearch`
+    (`netlify/functions/_shared/relational-search.mjs`) only filters and
+    explains, returning a stable alphabetical-by-display-name order and
+    nothing resembling a score/rank field. AND semantics are load-bearing
+    and tested: a person matching only one of several given filters is
+    excluded (`tests/unit/relational-search.test.js`'s "AND semantics"
+    case constructs people matching org-only, role-only, and both, and
+    asserts only the both-matching person is returned).
+
+21. **Route shape deviates from the plan's own `?q=<encoded>` shorthand —
+    three named query params instead.** BUILD-PLAN.md's Server Contract
+    Summary lists `GET /api/people/relational-search?q=<encoded>`, but a
+    single opaque blob would need its own parsing grammar invented for no
+    real benefit when three named params (`organisation_ref`, `role`,
+    `text`) work fine and match every other Professional route's existing
+    query-param convention (`entity-overview.mjs`'s `?ref=`,
+    `entity-search.mjs`'s `?q=&kinds=`, `people-brief.mjs`'s
+    `?id=&action=`) — the same class of documented shorthand deviation
+    prior Phase 3 tasks in this build (Features 3.1/3.2) have made for
+    their own routes. Implemented as `GET
+    /api/people/relational-search?organisation_ref=<ref>&role=<role>&text=<text>`,
+    all three optional, at least one required.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -224,6 +281,18 @@ that step is left for Adam's explicit review when he's back.
   `views/people.ts` is deleted. Verified: `apps/professional` `npm test`
   (130/130), `npm run typecheck` (clean), `npm run build` (clean); root
   `npm test` (3731/3731, unaffected — a separate suite). Not pushed, no PR.
-- Phase 3: not started
+- Phase 3: **complete.** Feature 3.1 (Person Brief page —
+  `apps/professional/src/views/person-brief.ts`, route `#/person/<id>/brief`,
+  `GET /api/people/brief?id=`), Feature 3.2 ("Since you last spoke" +
+  Talking Points LLM generation — `POST /api/people/brief?id=&action=generate`,
+  `_shared/person-brief-generation.mjs`), and Feature 3.3 layer 1
+  (Relational Search — `GET /api/people/relational-search?organisation_ref=
+  &role=&text=`, `_shared/relational-search.mjs`, the "Relational search"
+  mode in People Home's header search panel) are all built and tested.
+  Feature 3.3 layer 2 (LLM natural-language query parsing) is deliberately
+  deferred to Phase 5 per the plan's own allowance — see decision 19 above.
+  Verified: `apps/professional` `npm test` (153/153), `npm run typecheck`
+  (clean), `npm run build` (clean); root `npm test` (3808/3808). Not
+  pushed, no PR.
 - Phase 4: not started
 - Phase 5: not started

@@ -25,6 +25,7 @@ import {
 import { MEETING_SCHEMA_VERSION, meetingIndexRecord } from '../../netlify/functions/_shared/meeting-schema.mjs';
 import { EVENT_SCHEMA_VERSION, eventIndexRecord } from '../../netlify/functions/_shared/event-schema.mjs';
 import { taskKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
+import { createObservationRepository } from '../../netlify/functions/_shared/observation-repository.mjs';
 
 export function memoryStore() {
   const map = new Map();
@@ -213,6 +214,16 @@ let taskCounter = 0;
  * so this deliberately does not model the full Tasks schema (mirrors
  * `tests/integration/entity-overview.test.js`'s own inline Task fixtures).
  */
+/**
+ * Writes an Observation via the real repository (never hand-crafted JSON,
+ * same reasoning as `makeLink`) — used by Relational Search (Feature 3.3)
+ * fixtures needing a person's Observations text as a match target.
+ */
+export async function makeObservation(professionalStore, { aboutRef, text, occurredAt = '2026-01-01T00:00:00.000Z', source = 'manual' }) {
+  const repo = createObservationRepository({ store: professionalStore });
+  return repo.createObservation({ about_ref: aboutRef, text, occurred_at: occurredAt, source, linked_ref: null });
+}
+
 export async function makeTask(tasksStore, overrides = {}) {
   taskCounter += 1;
   const id = overrides.id ?? `task_${String(taskCounter).padStart(8, '0')}`;

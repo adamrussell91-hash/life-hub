@@ -594,3 +594,47 @@ export interface PersonBriefGeneration {
   talking_points: string[];
   last_meaningful_interaction: string | null;
 }
+
+/**
+ * Relational Search (Phase 3, Feature 3.3), Layer 1 — structured filters
+ * only (`GET /api/people/relational-search?organisation_ref=&role=&text=`).
+ * Every filter is optional but at least one must be set; the server
+ * rejects an all-empty query with 400 `missing_filter`. Results are never
+ * ranked or scored (brief Principle 6) — only filtered, explained via
+ * `matched_reasons`, and returned in a stable alphabetical order.
+ */
+export interface RelationalSearchFilters {
+  organisation_ref?: string;
+  role?: string;
+  text?: string;
+}
+
+export interface RelationalSearchResult {
+  person_ref: string;
+  display_name: string;
+  matched_reasons: string[];
+}
+
+export interface RelationalSearchResponse {
+  results: RelationalSearchResult[];
+}
+
+/** `GET /api/relationship-registry` projection — only the fields this app's
+ * client code needs (role dropdown sourcing for Relational Search's `role`
+ * filter uses `allowed_roles` off the `professional_relationship` entry). */
+export interface RelationshipRegistryDeclaration {
+  key: string;
+  source_kinds: string[];
+  target_kinds: string[];
+  inverse_label: string;
+  cardinality: string;
+  temporal_mode: string;
+  role_mode: string;
+  metadata_keys: string[];
+  allowed_visibility: string[];
+  allowed_roles?: string[];
+}
+
+export interface RelationshipRegistryResponse {
+  relationships: RelationshipRegistryDeclaration[];
+}
