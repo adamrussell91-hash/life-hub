@@ -1806,6 +1806,8 @@ test('loads exercise library highlights into Chadwick system prompt', async () =
   assert.match(receivedArgs.system, /Bar Press/);
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'search_exercise_library'));
   assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_exercise_library_entry'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_fitness_research'));
+  assert.ok(receivedArgs.tools.some(tool => tool.name === 'save_fitness_coaching_profile'));
   assert.equal(typeof receivedArgs.executeTools, 'function');
   const searchHits = await receivedArgs.executeTools({
     name: 'search_exercise_library',
@@ -2328,7 +2330,7 @@ test('an invalid save_exercise_library_entry call returns an error tool result w
   const result = await receivedArgs.executeTools({
     id: 'call_1',
     name: 'save_exercise_library_entry',
-    input: { name: 'Missing target area' }
+    input: { name: '' }
   });
   assert.deepEqual(JSON.parse(result), { ok: false, error: 'invalid_entry' });
   assert.ok(!calls.some(call => call.options?.method === 'PUT'), 'an invalid entry must not trigger a write');

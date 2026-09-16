@@ -1,5 +1,5 @@
 import { formatLogDate } from '../../../apps/life/js/core/central-node-write.js';
-import { daysBetween } from '../../../apps/life/js/core/time.js';
+import { addCalendarDays, daysBetween } from '../../../apps/life/js/core/time.js';
 import { collapseSetSplitExercises } from './workout-history.mjs';
 
 export const EXERCISE_LIBRARY_PATH = 'data/exercise-library.json';
@@ -20,12 +20,11 @@ export function parseExerciseLibrary(content) {
 export function validateExerciseLibraryEntry(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   if (typeof input.name !== 'string' || input.name.trim() === '') return null;
-  if (typeof input.target_area !== 'string' || input.target_area.trim() === '') return null;
 
-  const entry = {
-    name: input.name.trim(),
-    target_area: input.target_area.trim()
-  };
+  const entry = { name: input.name.trim() };
+  if (typeof input.target_area === 'string' && input.target_area.trim()) {
+    entry.target_area = input.target_area.trim();
+  }
 
   const equipment = normalizeStringList(input.equipment);
   if (equipment) entry.equipment = equipment;
@@ -70,6 +69,9 @@ export function validateExerciseLibraryEntry(input) {
   } else if (input.shelved_until != null) {
     if (typeof input.shelved_until !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(input.shelved_until)) return null;
     entry.shelved_until = input.shelved_until;
+    if (typeof input.shelved_on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.shelved_on)) {
+      entry.shelved_on = input.shelved_on;
+    }
     if (typeof input.shelved_reason === 'string' && input.shelved_reason.trim()) {
       entry.shelved_reason = input.shelved_reason.trim().slice(0, 200);
     }
@@ -88,10 +90,72 @@ export function isExerciseShelved(entry, today) {
   return entry.shelved_until >= today;
 }
 
+function restrictionDurationDays(notes) {
+  const match = String(notes).match(/(?:for|at least)\s+(\d+)\s*(day|week|month)s?/i);
+  if (!match) return 21;
+  const amount = Math.min(Math.max(Number(match[1]) || 1, 1), 365);
+  if (match[2].toLowerCase() === 'week') return amount * 7;
+  if (match[2].toLowerCase() === 'month') return amount * 30;
+  return amount;
+}
+
 /**
- * Non-blocking guardrail alongside workout-lint.mjs: flags any exercise in a proposed
- * workout that Adam has explicitly shelved and hasn't asked back yet, so a shelved move
- * slipping into a proposal shows up on the Confirm card even if the model missed it.
+ * Turn explicit post-workout boredom / exclusion notes into durable exercise shelves.
+ * This is deterministic because Fitness notes are written without a Chadwick chat turn.
+ */
+export function applyWorkoutNoteRestrictionsToLibrary(entries, record, notes, today, updatedAt) {
+  const text = typeof notes === 'string' ? notes.trim() : '';
+  if (!text || !today || !/(do not|don't|dont|stop|avoid|sick of|bored of|over this|retire|shelve)/i.test(text)) {
+    return { entries: Array.isArray(entries) ? entries.slice() : [], restrictions: [] };
+  }
+
+  const exercises = collapseSetSplitExercises(record?.exercises ?? []);
+  const lower = text.toLowerCase();
+  let targets = exercises.filter(exercise => lower.includes(String(exercise.name ?? '').trim().toLowerCase()));
+  if (
+    targets.length === 0
+    && exercises.length === 1
+    && /\b(this|that)\s+(exercise|move)\b/i.test(text)
+  ) {
+    targets = exercises;
+  }
+  const shelvesWorkout = /\b(this|that|same)\s+workout\b/i.test(text) && typeof record?.title === 'string';
+  if (targets.length === 0 && !shelvesWorkout) {
+    return { entries: Array.isArray(entries) ? entries.slice() : [], restrictions: [] };
+  }
+
+  const shelvedUntil = addCalendarDays(today, restrictionDurationDays(text));
+  let next = Array.isArray(entries) ? entries.slice() : [];
+  const restrictions = [];
+  if (shelvesWorkout) {
+    const name = `Workout: ${record.title.trim()}`;
+    next = upsertExerciseLibraryEntry(next, {
+      name,
+      target_area: 'workout',
+      entry_kind: 'workout',
+      shelved_on: today,
+      shelved_until: shelvedUntil,
+      shelved_reason: text.replace(/\s+/g, ' ').slice(0, 200)
+    }, updatedAt);
+    restrictions.push({ name, shelved_on: today, shelved_until: shelvedUntil });
+  }
+  for (const exercise of targets) {
+    const name = String(exercise.name ?? '').trim();
+    if (!name) continue;
+    next = upsertExerciseLibraryEntry(next, {
+      name,
+      shelved_on: today,
+      shelved_until: shelvedUntil,
+      shelved_reason: text.replace(/\s+/g, ' ').slice(0, 200)
+    }, updatedAt);
+    restrictions.push({ name, shelved_on: today, shelved_until: shelvedUntil });
+  }
+  return { entries: next, restrictions };
+}
+
+/**
+ * Blocking guardrail used before a workout proposal is shown. Active exercise and
+ * named workout shelves must be cleared or allowed to expire before reuse.
  */
 export function shelvedExerciseWarnings(record, entries, today) {
   if (!record || record.type !== 'workout' || !Array.isArray(record.exercises)) return [];
@@ -102,6 +166,11 @@ export function shelvedExerciseWarnings(record, entries, today) {
   }
   if (shelvedByKey.size === 0) return [];
   const warnings = [];
+  const workoutShelf = shelvedByKey.get(libraryKey({ name: `Workout: ${record.title ?? ''}` }));
+  if (workoutShelf) {
+    const reason = workoutShelf.shelved_reason ? ` (${workoutShelf.shelved_reason})` : '';
+    warnings.push(`"${record.title}" is shelved until ${workoutShelf.shelved_until}${reason} — Adam asked not to repeat this workout.`);
+  }
   for (const exercise of record.exercises) {
     const shelved = shelvedByKey.get(libraryKey({ name: exercise?.name }));
     if (!shelved) continue;
@@ -119,7 +188,7 @@ export function upsertExerciseLibraryEntry(entries, entry, updatedAt) {
   // flipping in_rotation) must not silently wipe last_performed/best_weight_kg/
   // times_performed that this same call didn't mention.
   if (index === -1) {
-    list.push({ ...entry, updated_at: updatedAt });
+    list.push({ target_area: 'unspecified', ...entry, updated_at: updatedAt });
   } else {
     list[index] = { ...list[index], ...entry, updated_at: updatedAt };
   }
@@ -288,7 +357,9 @@ export function formatExerciseLibraryForPrompt(entries, today = null) {
   if (shelved.length) {
     const list = shelved.map(entry => {
       const reason = entry.shelved_reason ? `, ${entry.shelved_reason}` : '';
-      return `${entry.name} (until ${entry.shelved_until}${reason})`;
+      const start = entry.shelved_on ? `shelved ${entry.shelved_on}, ` : '';
+      const remaining = daysBetween(today, entry.shelved_until);
+      return `${entry.name} (${start}until ${entry.shelved_until}, ${remaining} day${remaining === 1 ? '' : 's'} remaining${reason})`;
     }).join('; ');
     lines.push(`Shelved — do not program these until the date listed unless Adam explicitly asks for one back: ${list}`);
   }
@@ -380,7 +451,7 @@ export function saveExerciseLibraryEntrySchema() {
         shelved_reason: { type: 'string', description: 'Short reason, e.g. "Adam said he is bored of it" or "front shoulder was cranky on this".' },
         clear_shelved: { type: 'boolean', description: 'Set true to lift a shelve early, e.g. Adam explicitly asks for the move back.' }
       },
-      required: ['name', 'target_area']
+      required: ['name']
     }
   };
 }

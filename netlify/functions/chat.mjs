@@ -140,6 +140,20 @@ import {
   validateExerciseLibraryEntry
 } from './_shared/exercise-library.mjs';
 import {
+  FITNESS_RESEARCH_PATH,
+  formatFitnessResearchForPrompt,
+  parseFitnessResearch,
+  upsertFitnessResearch,
+  validateFitnessResearchEntry
+} from './_shared/fitness-research.mjs';
+import {
+  FITNESS_COACHING_PROFILE_PATH,
+  formatFitnessCoachingProfileForPrompt,
+  mergeFitnessCoachingProfile,
+  parseFitnessCoachingProfile,
+  validateFitnessCoachingProfilePatch
+} from './_shared/fitness-coaching-profile.mjs';
+import {
   attachWorkoutNotes,
   combineSessionAdherenceDays,
   compareWorkoutWindows,
@@ -401,6 +415,7 @@ export function createChatHandler({
     const needsFoodLibrary = Boolean(allowedTypes?.includes('meal'));
     const needsWorkoutTemplates = slug === 'chadwick' || Boolean(allowedTypes?.includes('workout'));
     const needsExerciseLibrary = slug === 'chadwick';
+    const needsFitnessResearch = slug === 'chadwick';
     const needsSaraClinicalContext = slug === 'sara';
     const needsWorkoutHistory = slug === 'chadwick' || needsSaraClinicalContext;
     const needsSkincareLibrary = slug === 'hyaluronica';
@@ -540,6 +555,12 @@ export function createChatHandler({
         let exerciseLibraryEntries = [];
         let exerciseLibrary = '';
         let exerciseLibrarySha;
+        let fitnessResearchEntries = [];
+        let fitnessResearch = '';
+        let fitnessResearchSha;
+        let fitnessCoachingProfileData = {};
+        let fitnessCoachingProfile = '';
+        let fitnessCoachingProfileSha;
         // Cold-start: seed in memory (defaults, or legacy catalog migrate below)
         // so the first Hyaluronica write merges onto a full shelf instead of
         // persisting a sparse 1-item library that would block HTTP seed-on-missing.
@@ -635,6 +656,14 @@ export function createChatHandler({
             ? current.tree.find(entry => entry.path === EXERCISE_LIBRARY_PATH && entry.type === 'blob')
             : null;
           exerciseLibrarySha = exerciseLibraryEntry?.sha;
+          const fitnessResearchEntry = needsFitnessResearch
+            ? current.tree.find(entry => entry.path === FITNESS_RESEARCH_PATH && entry.type === 'blob')
+            : null;
+          fitnessResearchSha = fitnessResearchEntry?.sha;
+          const fitnessCoachingProfileEntry = needsFitnessResearch
+            ? current.tree.find(entry => entry.path === FITNESS_COACHING_PROFILE_PATH && entry.type === 'blob')
+            : null;
+          fitnessCoachingProfileSha = fitnessCoachingProfileEntry?.sha;
           const skincareLibraryEntry = needsSkincareLibrary
             ? current.tree.find(entry => entry.path === SKINCARE_PRODUCT_LIBRARY_PATH && entry.type === 'blob')
             : null;
@@ -723,6 +752,8 @@ export function createChatHandler({
             foodLibraryBlob,
             nutritionChallengesBlob,
             exerciseLibraryBlob,
+            fitnessResearchBlob,
+            fitnessCoachingProfileBlob,
             skincareLibraryBlob,
             skincareMembershipBlob,
             skincareCatalogBlob,
@@ -746,6 +777,8 @@ export function createChatHandler({
             foodLibraryEntry ? client.readBlob(foodLibraryEntry.sha) : null,
             nutritionChallengesEntry ? client.readBlob(nutritionChallengesEntry.sha) : null,
             exerciseLibraryEntry ? client.readBlob(exerciseLibraryEntry.sha) : null,
+            fitnessResearchEntry ? client.readBlob(fitnessResearchEntry.sha) : null,
+            fitnessCoachingProfileEntry ? client.readBlob(fitnessCoachingProfileEntry.sha) : null,
             skincareLibraryEntry ? client.readBlob(skincareLibraryEntry.sha) : null,
             skincareMembershipEntry ? client.readBlob(skincareMembershipEntry.sha) : null,
             skincareCatalogEntry ? client.readBlob(skincareCatalogEntry.sha) : null,
@@ -968,6 +1001,24 @@ export function createChatHandler({
             exerciseLibraryEntries = parseExerciseLibrary(decodedExerciseLibrary);
             exerciseLibrary = formatExerciseLibraryForPrompt(exerciseLibraryEntries, today);
             sessionAdherenceDays = daysSinceLastSession(exerciseLibraryEntries, today);
+          }
+
+          const decodedFitnessResearch = fitnessResearchBlob ? decodeBlob(fitnessResearchBlob) : null;
+          if (decodedFitnessResearch !== null) {
+            fitnessResearchEntries = parseFitnessResearch(decodedFitnessResearch);
+          }
+          if (needsFitnessResearch) {
+            fitnessResearch = formatFitnessResearchForPrompt(fitnessResearchEntries, today);
+          }
+
+          const decodedFitnessCoachingProfile = fitnessCoachingProfileBlob
+            ? decodeBlob(fitnessCoachingProfileBlob)
+            : null;
+          if (decodedFitnessCoachingProfile !== null) {
+            fitnessCoachingProfileData = parseFitnessCoachingProfile(decodedFitnessCoachingProfile);
+          }
+          if (needsFitnessResearch) {
+            fitnessCoachingProfile = formatFitnessCoachingProfileForPrompt(fitnessCoachingProfileData);
           }
 
           if (needsWorkoutHistory) {
@@ -1223,6 +1274,16 @@ export function createChatHandler({
           exerciseLibraryEntries = [];
           exerciseLibrary = '';
           exerciseLibrarySha = undefined;
+          fitnessResearchEntries = [];
+          fitnessResearch = needsFitnessResearch
+            ? formatFitnessResearchForPrompt([], today)
+            : '';
+          fitnessResearchSha = undefined;
+          fitnessCoachingProfileData = {};
+          fitnessCoachingProfile = needsFitnessResearch
+            ? formatFitnessCoachingProfileForPrompt({})
+            : '';
+          fitnessCoachingProfileSha = undefined;
           skincareLibrary = needsSkincareLibrary
             ? seedProductLibraryFromDefaults(SKINCARE_ROUTINES)
             : emptyProductLibrary();
@@ -1491,6 +1552,8 @@ export function createChatHandler({
           clementineProtocol,
           hammondAuditContract,
           workoutTemplates,
+          fitnessResearch,
+          fitnessCoachingProfile,
           lastWorkouts,
           workoutWindowCompare,
           regionStrength,
@@ -1904,7 +1967,10 @@ export function createChatHandler({
                 return searchExerciseLibrary(exerciseLibraryEntries, event.input ?? {});
               }
               if (event.name === 'save_exercise_library_entry') {
-                const entry = validateExerciseLibraryEntry(event.input);
+                const input = event.input?.shelved_until
+                  ? { ...event.input, shelved_on: event.input.shelved_on ?? today }
+                  : event.input;
+                const entry = validateExerciseLibraryEntry(input);
                 if (!entry) {
                   return JSON.stringify({ ok: false, error: 'invalid_entry' });
                 }
@@ -1927,6 +1993,54 @@ export function createChatHandler({
                     name: entry.name,
                     target_area: entry.target_area
                   });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'save_fitness_research') {
+                const entry = validateFitnessResearchEntry(event.input, today);
+                if (!entry) {
+                  return JSON.stringify({ ok: false, error: 'invalid_research_entry' });
+                }
+                try {
+                  fitnessResearchEntries = upsertFitnessResearch(
+                    fitnessResearchEntries,
+                    entry,
+                    getSydneyTimestamp(nowInstant)
+                  );
+                  const result = await client.writeFile({
+                    path: FITNESS_RESEARCH_PATH,
+                    content: JSON.stringify(fitnessResearchEntries, null, 2),
+                    ...(fitnessResearchSha ? { sha: fitnessResearchSha } : {}),
+                    message: `chore(fitness-research): upsert ${entry.area}`
+                  });
+                  fitnessResearchSha = result.sha;
+                  send({ type: 'status', text: `Stored ${entry.area} research for future workouts.` });
+                  return JSON.stringify({ ok: true, area: entry.area, researched_on: entry.researched_on });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+              if (event.name === 'save_fitness_coaching_profile') {
+                const patch = validateFitnessCoachingProfilePatch(event.input);
+                if (!patch) {
+                  return JSON.stringify({ ok: false, error: 'invalid_profile_patch' });
+                }
+                try {
+                  fitnessCoachingProfileData = mergeFitnessCoachingProfile(
+                    fitnessCoachingProfileData,
+                    patch,
+                    getSydneyTimestamp(nowInstant)
+                  );
+                  const result = await client.writeFile({
+                    path: FITNESS_COACHING_PROFILE_PATH,
+                    content: JSON.stringify(fitnessCoachingProfileData, null, 2),
+                    ...(fitnessCoachingProfileSha ? { sha: fitnessCoachingProfileSha } : {}),
+                    message: 'chore(fitness-profile): update coaching context'
+                  });
+                  fitnessCoachingProfileSha = result.sha;
+                  send({ type: 'status', text: 'Stored that coaching preference for future workouts.' });
+                  return JSON.stringify({ ok: true });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }
@@ -2707,19 +2821,21 @@ async function persistOrProposeLogEntry({ client, slug, today, validation, send,
       return { ok: false, error: 'write_failed' };
     }
   }
+  const restrictionWarnings = shelvedExerciseWarnings(
+    proposal.record,
+    exerciseLibraryEntries,
+    today
+  );
+  if (restrictionWarnings.length > 0) {
+    send({ type: 'record_rejected', errors: restrictionWarnings });
+    return { ok: false, status: 'rejected', error: 'shelved_exercise', errors: restrictionWarnings };
+  }
   send({
     type: 'record_proposal',
     record: proposal.record,
     notes: proposal.notes,
     path,
-    // Phase 6a: deterministic protocol lint, non-blocking -- Adam can always
-    // Confirm anyway. No-op (empty array) for anything but a workout proposal.
-    // shelvedExerciseWarnings catches a shelved move slipping into the plan even
-    // if Chadwick's own read of the Exercise Library missed it.
-    warnings: [
-      ...lintWorkoutProposal(proposal.record),
-      ...shelvedExerciseWarnings(proposal.record, exerciseLibraryEntries, today)
-    ]
+    warnings: lintWorkoutProposal(proposal.record)
   });
   return { ok: true, status: 'awaiting_confirm' };
 }
