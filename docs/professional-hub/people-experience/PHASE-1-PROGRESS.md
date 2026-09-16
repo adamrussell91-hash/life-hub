@@ -63,13 +63,47 @@ that step is left for Adam's explicit review when he's back.
    former; derive from shared current relationships/active linked records
    for the latter) rather than fabricated. `lastMeaningfulInteraction`/
    `previousMeaningfulInteraction` come from the two most recent timeline
-   entries whose `source_ref` matches the relationship's counterpart-person
-   ref.
+   entries whose ref matches the relationship's counterpart person —
+   corrected post-review (see #7) to check both `source_ref` and
+   `target_ref`, not `source_ref` alone.
+
+7. **Review fix: `TimelineEntry` needed `target_ref`.** First cut of #6
+   only matched `item.source_ref === counterpartRef`, which is wrong for
+   almost all real data (`source_ref` on a Task/Communication/Meeting-
+   derived timeline entry is that record's own ref, never a person ref;
+   even a direct person-link only matches if the counterpart happens to be
+   the link's `source_ref` per #3's "operator picks" direction rule) — this
+   silently misclassified nearly everything as Dormant. Fixed by adding
+   `target_ref` to `baseTimelineEntry`'s output (purely additive) and
+   matching either field client-side. Caught by code review before this
+   branch's only human reviewer (Adam) ever saw it; a regression test with
+   mixed timeline data now pins the correct behaviour.
+
+8. **Review fix: tab-switch stale-render race.** The tab shell's
+   `isCurrent()` only tracked page-level navigation (`routeGeneration`),
+   not which tab is currently active. A tab that starts an async fetch
+   (Observations, Evidence) and is then switched away from — without any
+   page navigation — could still write its late-resolving result into the
+   shared `contentHost`, clobbering whatever tab the user had since
+   switched to. Fixed with a second, tab-switch-scoped generation counter
+   composed into the `isCurrent` passed to each tab's `render`. This is
+   also what BUILD-PLAN.md Phase 1 required-tests item 7 ("rapid-navigation
+   regression... cover tab switches within one Person page") asked for;
+   the regression test added alongside this fix closes that item.
 
 ## Phase status
 
-- Phase 1: in progress
-- Phase 2: not started
+- Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
+  shell + header + human labels + activity state, 1.4 Observations
+  backend + tab, 1.5 Evidence tab + Collection Gaps, 1.6 Activity State
+  classifier) built, spec-reviewed, code-quality-reviewed, and fixed to
+  approval. Verified via the plan's own Phase 1 verification commands:
+  `apps/professional` `npm test` (118/118), `npm run typecheck` (clean),
+  `npm run build` (clean); root `npm test` (3667/3667); umbrella SPA
+  checks (`apps-spa-remount`/`hub-sections`/`static-server`, 40/40).
+  Not pushed, no PR — stacked commits on `worktree-people-phase1`,
+  `bbf5e565`..`e6e2750d`.
+- Phase 2: starting next.
 - Phase 3: not started
 - Phase 4: not started
 - Phase 5: not started
