@@ -180,6 +180,7 @@ export function renderTeacherHome(
         });
       }
     });
+    applyDashboardCalendarPresentation(calendarHost);
   };
   paintCalendar();
 
@@ -212,6 +213,22 @@ export function renderTeacherHome(
       disposers.length = 0;
     }
   };
+}
+
+function applyDashboardCalendarPresentation(host: HTMLElement): void {
+  const root = host.querySelector<HTMLElement>(':scope > .class-calendar');
+  const workspace = root?.querySelector<HTMLElement>('.hub-calendar__workspace');
+  const rail = root?.querySelector<HTMLElement>('[data-calendar="rail"]');
+
+  if (rail) rail.hidden = true;
+  if (workspace) workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
+
+  for (const dated of host.querySelectorAll<HTMLElement>('[data-date]')) {
+    const date = dated.dataset.date;
+    const num = dated.querySelector<HTMLElement>('.class-calendar__day-num');
+    if (!date || !num || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    num.textContent = String(Number(date.slice(8, 10)));
+  }
 }
 
 function buildClassesPanel(
