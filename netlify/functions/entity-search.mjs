@@ -290,7 +290,9 @@ async function searchEventKind(getProfessionalStore, query) {
       ref: formatEntityRef({ namespace: 'professional', kind: 'event', id: record.id }),
       kind: 'event',
       display_label: title,
-      supporting_label: record.occurrence_state,
+      supporting_label: [record.event_type?.replace(/_/g, ' '), record.occurrence_state]
+        .filter(Boolean)
+        .join(' · '),
       href: `/professional/#/event/${encodeURIComponent(record.id)}`,
       lifecycle_status: record.occurrence_state,
       visibility: 'operator'
