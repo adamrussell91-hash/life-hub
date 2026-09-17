@@ -4,13 +4,19 @@ import type { CurriculumResponse } from '@/teacher/nav';
 import { renderPageHeader } from '@/teacher/page-header';
 import { renderScopeOverview, subjectsWithScope } from '@/teacher/sections/scope-overview';
 import {
-  renderScopeTimelineEditor,
+  renderScopeTimelineEditor as renderScopeTimelineEditorBase,
   type ScopeTimelineEditorOptions
 } from '@/teacher/sections/scope-timeline';
+import {
+  curriculumForScopeTimeline,
+  enhanceScopeUnitPicker
+} from '@/teacher/sections/scope-unit-picker-context';
 
 export interface ScopeSequencesIndexOptions {
   onCreated?: EntityCreatedHandler;
 }
+
+const pickerListeners = new WeakMap<HTMLElement, EventListener>();
 
 export function renderScopeSequencesIndex(
   canvas: HTMLElement,
@@ -58,7 +64,32 @@ export function renderScopeSequencesIndex(
   };
 }
 
-/** @deprecated Prefer renderScopeTimelineEditor — kept as a thin wrapper for callers. */
+export function renderScopeTimelineEditor(
+  canvas: HTMLElement,
+  curriculum: CurriculumResponse,
+  subjectId: string,
+  options?: ScopeTimelineEditorOptions
+): void {
+  const priorListener = pickerListeners.get(canvas);
+  if (priorListener) canvas.removeEventListener('click', priorListener);
+
+  const visibleCurriculum = curriculumForScopeTimeline(curriculum, subjectId);
+  renderScopeTimelineEditorBase(canvas, visibleCurriculum, subjectId, options);
+
+  const enhanceOpenPicker = (): void => {
+    const picker = document.querySelector<HTMLElement>('.scope-timeline__picker');
+    if (!picker) return;
+    enhanceScopeUnitPicker(picker, curriculum, subjectId);
+  };
+
+  const listener: EventListener = () => {
+    queueMicrotask(enhanceOpenPicker);
+  };
+  pickerListeners.set(canvas, listener);
+  canvas.addEventListener('click', listener);
+}
+
+/** @deprecated Prefer renderScopeTimelineEditor. Kept as a thin wrapper for callers. */
 export function renderScopeSequenceStub(
   canvas: HTMLElement,
   curriculum: CurriculumResponse,
@@ -67,5 +98,3 @@ export function renderScopeSequenceStub(
 ): void {
   renderScopeTimelineEditor(canvas, curriculum, subjectId, options);
 }
-
-export { renderScopeTimelineEditor } from '@/teacher/sections/scope-timeline';
