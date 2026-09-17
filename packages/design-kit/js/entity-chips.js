@@ -47,16 +47,13 @@ export function renderEntityChips(options) {
   for (const chip of chips) {
     const item = document.createElement('li');
     item.className = `entity-chip entity-chip--${chip.state}`;
+    if (chip.relationshipType === 'tagged_with') item.classList.add('entity-chip--tag');
     if (chip.readonly) item.classList.add('entity-chip--readonly');
     item.dataset.ref = chip.ref;
     item.dataset.chipId = chip.id;
     if (chip.relationshipType) item.dataset.relationshipType = chip.relationshipType;
     if (chip.readonly) item.dataset.readonly = 'true';
 
-    // A chip backed by a resolved href opens the target's unified page —
-    // the same "clicking a chip opens the target's unified page" behaviour
-    // named for Tasks, Communications, Programs, etc. Only a server-
-    // resolved href is ever used; nothing here invents one.
     const label = chip.href ? document.createElement('a') : document.createElement('span');
     label.className = 'entity-chip__label';
     label.textContent = chip.label;
@@ -67,7 +64,8 @@ export function renderEntityChips(options) {
 
     const meta = document.createElement('span');
     meta.className = 'entity-chip__meta';
-    const metaParts = [chip.relationshipType, chip.supportingLabel].filter(Boolean);
+    const visibleRelationship = chip.relationshipType === 'tagged_with' ? null : chip.relationshipType;
+    const metaParts = [visibleRelationship, chip.supportingLabel].filter(Boolean);
     meta.textContent = metaParts.join(' · ');
 
     item.append(label);
@@ -86,9 +84,13 @@ export function renderEntityChips(options) {
     } else if (chip.state === 'saved' && onEndSaved) {
       const end = document.createElement('button');
       end.type = 'button';
-      end.className = 'entity-chip__action entity-chip__action--end';
-      end.setAttribute('aria-label', `${endLabel} relationship with ${chip.label}`);
-      end.textContent = endLabel;
+      const isRemove = endLabel.toLowerCase() === 'remove';
+      end.className = `entity-chip__action entity-chip__action--end${isRemove ? ' entity-chip__action--remove' : ''}`;
+      end.setAttribute(
+        'aria-label',
+        isRemove ? `Remove ${chip.label}` : `${endLabel} relationship with ${chip.label}`
+      );
+      end.textContent = isRemove ? '×' : endLabel;
       end.addEventListener('click', () => onEndSaved(chip));
       item.append(end);
     }

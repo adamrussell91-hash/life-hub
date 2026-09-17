@@ -29,6 +29,19 @@ import { createEntityChipList } from './entity-chips.js';
  * @typedef {{ link: TaggerLink, endpoint: { ref: string, kind: string, display_label: string, href?: string | null } }} TaggerLinkEntry
  */
 
+function kindLabel(kind) {
+  if (typeof kind !== 'string' || !kind) return null;
+  return kind
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function createdLinkFrom(result) {
+  if (!result || typeof result !== 'object' || Array.isArray(result)) return null;
+  const link = result.link;
+  return link && typeof link === 'object' && typeof link.id === 'string' ? link : null;
+}
+
 /**
  * @param {{
  *   host: HTMLElement,
@@ -74,6 +87,8 @@ export function mountEntityTagger(options) {
   status.className = 'entity-tagger__status';
   status.hidden = true;
 
+  let mutationVersion = 0;
+
   function reportError(message) {
     status.hidden = false;
     status.textContent = message;
@@ -85,9 +100,11 @@ export function mountEntityTagger(options) {
     chips: [],
     onRemovePending: () => undefined,
     onEndSaved: async (chip) => {
+      mutationVersion += 1;
       try {
         await options.suppressLink(chip.id);
-        await refresh();
+        chipList.removeById(chip.id);
+        status.hidden = true;
       } catch (err) {
         reportError(err instanceof Error ? err.message : 'Could not remove tag.');
       }
@@ -102,15 +119,52 @@ export function mountEntityTagger(options) {
     search: options.search,
     onSelect: (item) => {
       input.value = '';
+      const pendingId = `pending:${item.ref}:${relationshipType}`;
+      const added = chipList.addPending({
+        id: pendingId,
+        ref: item.ref,
+        label: item.display_label,
+        relationshipType,
+        state: 'pending',
+        supportingLabel: kindLabel(item.kind),
+        href: item.href ?? null
+      });
+      if (!added) return;
+
+      mutationVersion += 1;
       void (async () => {
         try {
-          await options.createLink({
+          const result = await options.createLink({
             source_ref: options.sourceRef,
             target_ref: item.ref,
             relationship_type: relationshipType
           });
-          await refresh();
+          const link = createdLinkFrom(result);
+          if (!link) {
+            chipList.removeById(pendingId);
+            await refresh();
+            return;
+          }
+          const saved = {
+            id: link.id,
+            ref: item.ref,
+            label: item.display_label,
+            relationshipType,
+            state: 'saved',
+            supportingLabel: kindLabel(item.kind),
+            href: item.href ?? null
+          };
+          const current = chipList.getChips();
+          let replaced = false;
+          const next = current.map((chip) => {
+            if (chip.id !== pendingId) return chip;
+            replaced = true;
+            return saved;
+          });
+          chipList.setChips(replaced ? next : [...next, saved]);
+          status.hidden = true;
         } catch (err) {
+          chipList.removeById(pendingId);
           reportError(err instanceof Error ? err.message : 'Could not save tag.');
         }
       })();
@@ -121,8 +175,10 @@ export function mountEntityTagger(options) {
   options.host.replaceChildren(root);
 
   async function refresh() {
+    const startedAtVersion = mutationVersion;
     try {
       const { outgoing, incoming } = await options.listLinks(options.sourceRef);
+      if (startedAtVersion !== mutationVersion) return;
       const saved = [...outgoing, ...incoming]
         .filter((entry) => entry.link.status === 'current' && entry.link.relationship_type === relationshipType)
         .map((entry) => ({
@@ -131,12 +187,13 @@ export function mountEntityTagger(options) {
           label: entry.endpoint.display_label,
           relationshipType: entry.link.relationship_type,
           state: 'saved',
-          supportingLabel: entry.endpoint.kind,
+          supportingLabel: kindLabel(entry.endpoint.kind),
           href: entry.endpoint.href ?? null
         }));
       chipList.setChips(saved);
       status.hidden = true;
     } catch (err) {
+      if (startedAtVersion !== mutationVersion) return;
       reportError(err instanceof Error ? err.message : 'Could not load tags.');
     }
   }
