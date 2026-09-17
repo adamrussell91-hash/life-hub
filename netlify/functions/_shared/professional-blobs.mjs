@@ -9,6 +9,7 @@ import {
   isValidApplicationId,
   isValidApplicationOperationId
 } from './application-schema.mjs';
+import { isValidObservationId } from './observation-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -31,6 +32,9 @@ export const EVENT_OPERATION_PREFIX = 'events/operations/';
 export const APPLICATION_PREFIX = 'applications/records/';
 export const APPLICATION_INDEX_PREFIX = 'applications/index/';
 export const APPLICATION_OPERATION_PREFIX = 'applications/operations/';
+
+export const OBSERVATION_PREFIX = 'observations/records/';
+export const OBSERVATION_BY_ABOUT_REF_PREFIX = 'observations/by-about-ref/';
 
 function assertValidCommunicationId(id) {
   if (!isValidCommunicationId(id)) {
@@ -107,6 +111,16 @@ function assertValidApplicationOperationId(id) {
     throw Object.assign(new Error(`Invalid Application operation id: ${JSON.stringify(id)}`), {
       status: 400,
       code: 'invalid_application_operation_id'
+    });
+  }
+  return id;
+}
+
+function assertValidObservationId(id) {
+  if (!isValidObservationId(id)) {
+    throw Object.assign(new Error(`Invalid Observation id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_observation_id'
     });
   }
   return id;
@@ -193,4 +207,25 @@ export function applicationOperationKey(id) {
 
 export async function listApplicationIndexKeys(store) {
   return (await listBlobKeys(store, APPLICATION_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function observationKey(id) {
+  return `${OBSERVATION_PREFIX}${assertValidObservationId(id)}`;
+}
+
+// Secondary index: one key per (about_ref, observation) pair, so listing
+// observations for one Person/Organisation doesn't require scanning every
+// observation in the store. The about_ref segment is a canonical ref string
+// (e.g. "shared:person:person_x"), used as-is — nothing else in this file
+// base64/URL-encodes a ref used as a key segment, so a plain
+// canonical-ref-as-path-segment stays consistent with the rest of this file
+// rather than inventing a new encoding scheme.
+export function observationByAboutRefKey(aboutRef, id) {
+  return `${OBSERVATION_BY_ABOUT_REF_PREFIX}${aboutRef}/${assertValidObservationId(id)}`;
+}
+
+export async function listObservationIndexKeysForAboutRef(store, aboutRef) {
+  return (await listBlobKeys(store, `${OBSERVATION_BY_ABOUT_REF_PREFIX}${aboutRef}/`)).filter(
+    (key) => !isIndexKey(key)
+  );
 }

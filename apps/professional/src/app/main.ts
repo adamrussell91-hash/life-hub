@@ -5,13 +5,15 @@ import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/entity-links.css';
 import '../../design-kit/relationship-timeline.css';
+import '../../design-kit/filters.css';
+import '../../design-kit/person-brief.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
 import { parseRoute, railHighlightFor } from '@/app/router';
-import { renderPeopleView } from '@/views/people';
+import { renderPeopleHomeView } from '@/views/people-home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import {
@@ -36,7 +38,9 @@ import {
 } from '@/views/applications';
 import { renderCareerView } from '@/views/career';
 import { renderPersonPage } from '@/views/person-page';
+import { renderPersonBrief } from '@/views/person-brief';
 import { renderOrganisationPage } from '@/views/organisation-page';
+import { renderNetworkEcologyView } from '@/views/network-ecology';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -78,7 +82,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
     if (route.name === 'people') {
       renderPageHeader(shell, viewChrome('people'));
-      renderPeopleView(shell.canvas);
+      await renderPeopleHomeView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'organisations') {
@@ -180,6 +186,13 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await renderCareerView(shell.canvas);
       return;
     }
+    if (route.name === 'network-ecology') {
+      renderPageHeader(shell, viewChrome('network-ecology'));
+      await renderNetworkEcologyView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
     if (route.name === 'person') {
       renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
       await renderPersonPage(shell.canvas, route.id, {
@@ -197,6 +210,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Organisations', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'person-brief') {
+      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
+      await renderPersonBrief(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'People', title: `${title} — Brief` });
         },
         isCurrent: () => generation === routeGeneration
       });

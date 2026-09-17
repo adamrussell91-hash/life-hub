@@ -75,7 +75,16 @@ function matchRank(query, label, sortName) {
 // privacy leak — a former active name can't resurface just because an old
 // index entry was never repaired, and a redacted (deidentified/deleted)
 // record can't appear even if its index entry is stale.
-async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived) {
+// Exported (Phase 5) so `_shared/relational-search-nl.mjs` can resolve a
+// free-text organisation NAME (extracted by the NL query-planning LLM) to
+// a real organisation ref, reusing the EXACT same indexed-candidate +
+// authoritative-re-validation search this route already uses for the
+// "Search by name" picker — rather than inventing a second, parallel
+// name-resolution path. No `_shared` module owns this logic today (it has
+// always lived here, at the route level), so this export is the smallest
+// change that lets a `_shared` module genuinely reuse it instead of
+// duplicating it.
+export async function searchIdentityKind(store, kind, listKeys, loadKey, parseAuthoritative, query, includeArchived) {
   const indexKeys = await listKeys(store);
   const indexRecords = await mapBounded(indexKeys, READ_BATCH_SIZE, key => getJSON(store, key));
 

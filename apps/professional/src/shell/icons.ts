@@ -39,6 +39,18 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M4.5 9.5h15v9h-15v-9Z',
     'M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2',
     'M12 13v2'
+  ],
+  // Three connected habitat "nodes" — matches the rail icon drawn in
+  // docs/professional-hub/people-experience/mockups/04-network-ecology.html
+  // (`circle cx=6 cy=6.5`/`circle cx=18 cy=9`/`circle cx=8 cy=18`, connected
+  // by two paths), re-expressed as 18px outline paths to match this rail's
+  // stroke-only icon convention.
+  'network-ecology': [
+    'M6 6.5a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z',
+    'M18 9a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z',
+    'M8 18a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z',
+    'M7.7 8.1 9 15.5',
+    'M16.1 10 10 16.3'
   ]
 };
 

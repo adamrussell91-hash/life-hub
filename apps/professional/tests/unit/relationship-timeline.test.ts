@@ -11,6 +11,7 @@ function entry(overrides: Partial<TimelineEntry>): TimelineEntry {
     label: 'works_at Example University',
     context_key: null,
     source_ref: 'shared:person:person_x',
+    target_ref: 'shared:organisation:organisation_x',
     href: null,
     context_href: null,
     ...overrides
