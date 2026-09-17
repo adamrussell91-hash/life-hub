@@ -463,7 +463,7 @@ test('event kind is searchable and returns its canonical umbrella-relative href'
       ref: 'professional:event:event_00000000-0000-0000-0000-000000000001',
       kind: 'event',
       display_label: 'Professional development day',
-      supporting_label: 'scheduled',
+      supporting_label: 'professional development · scheduled',
       href: '/professional/#/event/event_00000000-0000-0000-0000-000000000001',
       lifecycle_status: 'scheduled',
       visibility: 'operator'
