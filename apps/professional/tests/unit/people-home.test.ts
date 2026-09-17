@@ -475,7 +475,7 @@ describe('renderPeopleHomeView', () => {
     }
   });
 
-  it('renders the header with title, subtitle, and Add person (documented scope cut, no fake modal)', async () => {
+  it('renders the header with title, subtitle, and Add person', async () => {
     globalThis.fetch = routedFetch({});
     const canvas = document.createElement('div');
     await renderPeopleHomeView(canvas);
@@ -484,13 +484,110 @@ describe('renderPeopleHomeView', () => {
     expect(canvas.querySelector('.people-home__subtitle')?.textContent).toBe(
       'Your professional relationships, activity and network.'
     );
+    expect(canvas.querySelector<HTMLButtonElement>('.people-home__add-person')?.textContent).toBe('Add person');
+  });
+
+  it('opens the Add person panel, creates a person with no other fields, and navigates to their profile', async () => {
+    const PERSON_ID = 'person_00000000-0000-4000-8000-000000000099';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/people/home-signals')) return jsonResponse(200, { ok: true, data: homeSignalsFixture() });
+      if (href.includes('/api/people/cohorts')) return jsonResponse(200, { ok: true, data: cohortsFixture() });
+      if (href.includes('/api/people/activity')) return jsonResponse(200, { ok: true, data: activityPage1() });
+      if (href.endsWith('/api/entities') && init?.method === 'POST') {
+        return jsonResponse(201, {
+          ok: true,
+          data: {
+            ref: `shared:person:${PERSON_ID}`,
+            schema_version: 1,
+            id: PERSON_ID,
+            kind: 'person',
+            display_name: 'Taylor New',
+            sort_name: null,
+            aliases: [],
+            lifecycle_status: 'active',
+            is_self: false,
+            retention_reason: null,
+            retention_review_at: null,
+            created_at: '2026-09-17T00:00:00.000Z',
+            updated_at: '2026-09-17T00:00:00.000Z'
+          }
+        });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+    globalThis.fetch = fetchMock;
+
+    const canvas = document.createElement('div');
+    await renderPeopleHomeView(canvas);
+
     const addPerson = canvas.querySelector<HTMLButtonElement>('.people-home__add-person')!;
-    expect(addPerson.textContent).toBe('Add person');
-    const status = canvas.querySelector<HTMLElement>('.people-home__add-person-status')!;
-    expect(status.hidden).toBe(true);
+    const panel = canvas.querySelector<HTMLElement>('.people-home__add-person-panel')!;
+    expect(panel.hidden).toBe(true);
     addPerson.click();
+    expect(panel.hidden).toBe(false);
+    expect(addPerson.getAttribute('aria-expanded')).toBe('true');
+
+    panel.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value = 'Taylor New';
+    panel.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(location.hash).toBe(`#/person/${PERSON_ID}`);
+    location.hash = '';
+  });
+
+  it('keeps the Add person panel open and shows a warning with a link to the new profile when a follow-up write fails', async () => {
+    const PERSON_ID = 'person_00000000-0000-4000-8000-000000000098';
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/people/home-signals')) return jsonResponse(200, { ok: true, data: homeSignalsFixture() });
+      if (href.includes('/api/people/cohorts')) return jsonResponse(200, { ok: true, data: cohortsFixture() });
+      if (href.includes('/api/people/activity')) return jsonResponse(200, { ok: true, data: activityPage1() });
+      if (href.endsWith('/api/entities') && init?.method === 'POST') {
+        return jsonResponse(201, {
+          ok: true,
+          data: {
+            ref: `shared:person:${PERSON_ID}`,
+            schema_version: 1,
+            id: PERSON_ID,
+            kind: 'person',
+            display_name: 'Sam Partial',
+            sort_name: null,
+            aliases: [],
+            lifecycle_status: 'active',
+            is_self: false,
+            retention_reason: null,
+            retention_review_at: null,
+            created_at: '2026-09-17T00:00:00.000Z',
+            updated_at: '2026-09-17T00:00:00.000Z'
+          }
+        });
+      }
+      if (href.endsWith('/api/observations') && init?.method === 'POST') {
+        return jsonResponse(500, { ok: false, error: { code: 'internal_error', message: 'Observations down.' } });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const canvas = document.createElement('div');
+    await renderPeopleHomeView(canvas);
+
+    const addPerson = canvas.querySelector<HTMLButtonElement>('.people-home__add-person')!;
+    addPerson.click();
+    const panel = canvas.querySelector<HTMLElement>('.people-home__add-person-panel')!;
+    panel.querySelector<HTMLInputElement>('[aria-label="Name"]')!.value = 'Sam Partial';
+    panel.querySelector<HTMLTextAreaElement>('[aria-label="One optional observation"]')!.value = 'Met at a workshop.';
+    panel.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(location.hash).not.toBe(`#/person/${PERSON_ID}`);
+    expect(panel.hidden).toBe(true);
+    const status = canvas.querySelector<HTMLElement>('.people-home__add-person-status')!;
     expect(status.hidden).toBe(false);
-    expect(status.textContent).toMatch(/not built yet/);
+    expect(status.textContent).toMatch(/Saving the observation failed: Observations down\./);
+    const link = status.querySelector('a')!;
+    expect(link.getAttribute('href')).toBe(`#/person/${PERSON_ID}`);
+    location.hash = '';
   });
 
   it('renders correctly at desktop width and at a 390px mobile width', async () => {

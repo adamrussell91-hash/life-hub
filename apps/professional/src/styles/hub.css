@@ -384,7 +384,8 @@
 .event-detail__edit,
 .event-detail__reschedule,
 .application-form,
-.application-detail__edit {
+.application-detail__edit,
+.add-person-form {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -414,7 +415,9 @@
 .application-form textarea,
 .application-detail__edit input,
 .application-detail__edit select,
-.application-detail__edit textarea {
+.application-detail__edit textarea,
+.add-person-form input,
+.add-person-form textarea {
   width: 100%;
   box-sizing: border-box;
   min-height: 2.5rem;
@@ -523,9 +526,58 @@
   font-size: var(--text-sm);
 }
 
+.people-home__add-person-panel {
+  flex-basis: 100%;
+  max-width: 34rem;
+}
+
 .people-home__search-panel {
   flex-basis: 100%;
   max-width: 28rem;
+}
+
+/* Add person (Rapid Person Capture, SOURCE-BRIEF.md section 5) */
+
+.add-person-form__label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.add-person-form__status {
+  color: var(--danger, #b00020);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.add-person-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.add-person-form__selected-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.add-person-form__clear {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--wave, #376fb7);
+  text-decoration: underline;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.add-person-form__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
 }
 
 .people-home__search-modes {
