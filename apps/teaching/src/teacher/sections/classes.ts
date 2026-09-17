@@ -263,7 +263,7 @@ export function renderClassPage(
 
   const activeUnits = cls.active_unit_ids
     .map((id) => unitsById.get(id))
-    .filter((unit): unit is Unit => Boolean(unit) && unit.status === 'active');
+    .filter((unit): unit is Unit => unit?.status === 'active');
   const currentActiveUnitId = activeUnits.some((unit) => unit.id === cls.current_unit_id)
     ? (cls.current_unit_id ?? '')
     : (activeUnits[0]?.id ?? '');
@@ -272,7 +272,6 @@ export function renderClassPage(
   root.className = 'class-page';
   root.style.gap = 'var(--space-4)';
 
-  // 1. Banner
   const bannerHost = document.createElement('div');
   bannerHost.className = 'class-page__banner';
   const banner = renderEntityBanner(bannerHost, {
@@ -291,7 +290,6 @@ export function renderClassPage(
   });
   disposers.push(banner.dispose);
 
-  // Body
   const body = document.createElement('div');
   body.className = 'class-page__body';
   body.style.gap = 'var(--space-4)';
@@ -300,7 +298,6 @@ export function renderClassPage(
   main.className = 'class-page__main';
   main.style.gap = 'var(--space-4)';
 
-  // Calendar — local state, re-paint host only
   const calendarHost = document.createElement('div');
   calendarHost.className = 'class-page__calendar-host';
   main.append(calendarHost);
@@ -320,7 +317,11 @@ export function renderClassPage(
   errorBanner.setAttribute('role', 'alert');
 
   const addLessonsToCalendar = (): void => {
-    options.onScheduleUnit?.();
+    if (options.onScheduleUnit) {
+      options.onScheduleUnit();
+      return;
+    }
+    options.onCreateLesson?.();
   };
 
   const paintCalendar = (): void => {
@@ -401,7 +402,6 @@ export function renderClassPage(
   paintCalendar();
   main.append(errorBanner);
 
-  // 6. Unit sequence
   const sequenceHost = document.createElement('div');
   sequenceHost.className = 'class-page__sequence-host';
   main.append(sequenceHost);
@@ -430,7 +430,6 @@ export function renderClassPage(
   });
   disposers.push(sequence.dispose);
 
-  // 7. Side column — announcements + resources + folded custom
   const side = document.createElement('aside');
   side.className = 'class-page__side';
   side.style.gap = 'var(--space-4)';
@@ -556,7 +555,7 @@ function collectionContextForClass(
       title: lessonsById.get(row.lesson_id)?.title ?? row.lesson_id,
       date: row.date,
       schedule_order: row.schedule_order,
-      published: true // teacher preview treats scheduled rows as listable
+      published: true
     }));
 
   return {
