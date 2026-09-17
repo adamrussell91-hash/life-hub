@@ -159,6 +159,7 @@ export function createMockApi() {
     (seedData.organisations as OrganisationRecord[]).map((o) => [o.id, { ...o }])
   );
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
+  const observations = new Map<string, Record<string, unknown>>();
   const communications = new Map<string, CommunicationRecord>();
   const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
   const meetings = new Map<string, Record<string, unknown>>();
@@ -346,6 +347,106 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } });
       }
       return json(200, { ok: true, data: overview });
+    }
+
+    if (path === '/api/entities' && method === 'POST') {
+      const input = body as { kind?: string; display_name?: string };
+      for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
+        if (input && Object.prototype.hasOwnProperty.call(input, key)) {
+          return json(400, {
+            ok: false,
+            error: { code: 'access_field_not_accepted', message: `Field "${key}" is not accepted.` }
+          });
+        }
+      }
+      if (input?.kind !== 'person' && input?.kind !== 'organisation') {
+        return json(400, {
+          ok: false,
+          error: { code: 'unsupported_entity_kind', message: 'kind must be "person" or "organisation".' }
+        });
+      }
+      const displayName = typeof input.display_name === 'string' ? input.display_name.trim() : '';
+      if (!displayName) {
+        return json(400, {
+          ok: false,
+          error: { code: 'display_name_required', message: 'display_name is required.' }
+        });
+      }
+      const now = new Date().toISOString();
+      if (input.kind === 'person') {
+        const id = `person_${randomUUID()}`;
+        const record: PersonRecord = {
+          schema_version: 1,
+          id,
+          kind: 'person',
+          display_name: displayName,
+          sort_name: null,
+          aliases: [],
+          lifecycle_status: 'active',
+          is_self: false,
+          retention_reason: null,
+          retention_review_at: null,
+          created_at: now,
+          updated_at: now
+        };
+        people.set(id, record);
+        return json(201, { ok: true, data: { ref: refFor(record), ...record } });
+      }
+      const id = `organisation_${randomUUID()}`;
+      const record: OrganisationRecord = {
+        schema_version: 1,
+        id,
+        kind: 'organisation',
+        display_name: displayName,
+        legal_name: null,
+        aliases: [],
+        lifecycle_status: 'active',
+        retention_reason: null,
+        retention_review_at: null,
+        created_at: now,
+        updated_at: now
+      };
+      organisations.set(id, record);
+      return json(201, { ok: true, data: { ref: refFor(record), ...record } });
+    }
+
+    if (path === '/api/observations' && method === 'GET') {
+      const aboutRef = url.searchParams.get('about_ref');
+      if (!aboutRef) {
+        return json(400, { ok: false, error: { code: 'missing_about_ref', message: 'about_ref query param required.' } });
+      }
+      const list = [...observations.values()]
+        .filter((o) => o.about_ref === aboutRef)
+        .sort((a, b) => Date.parse(b.occurred_at as string) - Date.parse(a.occurred_at as string));
+      return json(200, { ok: true, data: { observations: list } });
+    }
+
+    if (path === '/api/observations' && method === 'POST') {
+      const input = body as {
+        about_ref?: string;
+        text?: string;
+        occurred_at?: string;
+        source?: string;
+        linked_ref?: string | null;
+      };
+      const text = typeof input?.text === 'string' ? input.text.trim() : '';
+      if (!input?.about_ref || !text || !input?.occurred_at) {
+        return json(400, { ok: false, error: { code: 'invalid_input', message: 'Invalid observation.' } });
+      }
+      const now = new Date().toISOString();
+      const record = {
+        schema_version: 1,
+        id: `observation_${randomUUID()}`,
+        about_ref: input.about_ref,
+        text,
+        occurred_at: input.occurred_at,
+        source: input.source ?? 'manual',
+        linked_ref: input.linked_ref ?? null,
+        created_at: now,
+        updated_at: now
+      };
+      observations.set(record.id, record);
+      return json(201, { ok: true, data: { observation: record, created: true } });
     }
 
     if (path === '/api/communications' && method === 'GET') {

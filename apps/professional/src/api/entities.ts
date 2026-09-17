@@ -1,8 +1,23 @@
-import { apiGet } from './client';
-import type { EntityOverview, SearchableEntityKinds, SearchGroups } from '@/domain/types';
+import { apiGet, apiPost } from './client';
+import type { EntityOverview, EntityRecord, SearchableEntityKinds, SearchGroups } from '@/domain/types';
 
 export interface SearchOptions {
   signal?: AbortSignal;
+}
+
+export interface CreateEntityInput {
+  kind: 'person' | 'organisation';
+  display_name: string;
+}
+
+/** `POST /api/entities` — creates a Person or Organisation identity with
+ * only a display name; every other field grows through later activity
+ * (`identity-schema.mjs`'s `validatePersonCreateInput`/`validateOrganisation
+ * CreateInput` fill in the rest server-side). Returns the redacted record
+ * plus its canonical `ref`, same shape `fetchEntityOverview`'s `entity`
+ * field uses. */
+export function createEntity(input: CreateEntityInput, options: SearchOptions = {}): Promise<EntityRecord> {
+  return apiPost<EntityRecord>('/api/entities', input, { signal: options.signal });
 }
 
 /** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */

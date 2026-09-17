@@ -34,6 +34,8 @@ export function createUniversalLink(
     target_ref: string;
     relationship_type: string;
     role?: string | null;
+    valid_from?: string | null;
+    metadata?: Record<string, unknown>;
   },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ link: UniversalLinkRecord; created: boolean }> {
