@@ -10,7 +10,7 @@
  */
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
-import { KnowledgeApiError, searchPages } from '../api/client';
+import { KnowledgeApiError, searchPages, searchRelatedEntities } from '../api/client';
 import {
   connectedDisplayRefs,
   peerHubRefForRelationship,
@@ -47,6 +47,16 @@ export type RelatedStatus =
   | 'failure';
 
 export type PageRelationshipRow = DualReadRelationshipRow;
+
+const RELATED_SEARCH_KINDS = [
+  'page',
+  'event',
+  'meeting',
+  'application',
+  'unit',
+  'lesson',
+  'program',
+] as const;
 
 export function hubRefFromEntityRef(entityRef: string): string | null {
   const parts = entityRef.split(':');
@@ -227,22 +237,22 @@ export function mountPageRelationshipsEditor(options: {
 }): PageRelationshipsEditorHandle {
   const root = document.createElement('section');
   root.className = 'compose__field compose__relationships';
-  root.setAttribute('aria-label', 'Related pages');
+  root.setAttribute('aria-label', 'Related items');
 
   const heading = document.createElement('h3');
   heading.className = 'compose__relationships-heading';
-  heading.textContent = 'Related pages';
+  heading.textContent = 'Related items';
 
   const copy = document.createElement('p');
   copy.className = 'compose__hint';
   copy.textContent =
-    'Link other archive pages with the shared picker. Incoming links owned by another page are read-only. Title, body, tags, and attachments keep their own Save — relationships only change when you use Save relationships.';
+    'Link Knowledge notes and records from other hubs, including professional development events. Incoming links owned by another record are read-only.';
 
   const pickerInput = document.createElement('input');
   pickerInput.type = 'text';
   pickerInput.className = 'compose__relationship-picker';
-  pickerInput.placeholder = 'Type @ to link a page';
-  pickerInput.setAttribute('aria-label', 'Link a related page');
+  pickerInput.placeholder = 'Type @ to link a note, event, meeting, or other item';
+  pickerInput.setAttribute('aria-label', 'Link a related item');
   pickerInput.disabled = Boolean(options.disabled);
 
   const chipsHost = document.createElement('div');
@@ -301,28 +311,45 @@ export function mountPageRelationshipsEditor(options: {
 
   const picker = createEntityPicker({
     input: pickerInput,
-    allowedKinds: ['page'],
-    emptyText: 'No matching pages.',
+    allowedKinds: [...RELATED_SEARCH_KINDS],
+    emptyText: 'No matching notes, events, meetings, or related records.',
     search: async (query: string, signal: AbortSignal) => {
       const q = query.trim().toLowerCase();
-      let hits = options.entries;
+      const selected = new Set(chips.map(chip => chip.hubRef));
+
+      if (q.length >= 2) {
+        try {
+          const result = await searchRelatedEntities(query, RELATED_SEARCH_KINDS, signal);
+          if (signal.aborted) return { groups: {} };
+          const groups: Record<string, typeof result.groups[string]> = {};
+          for (const kind of RELATED_SEARCH_KINDS) {
+            groups[kind] = (result.groups[kind] ?? []).filter(item => {
+              const hubRef = hubRefFromEntityRef(item.ref);
+              return Boolean(
+                hubRef &&
+                hubRef !== options.pageId &&
+                !selected.has(hubRef),
+              );
+            });
+          }
+          return { groups };
+        } catch {
+          // Keep Knowledge page linking usable if the shared entity index is unavailable.
+        }
+      }
+
+      let hits = options.entries.filter(
+        entry =>
+          entry.title.toLowerCase().includes(q) || entry.id.toLowerCase().includes(q),
+      );
       if (q.length >= 2) {
         try {
           hits = await searchPages(query);
           if (signal.aborted) return { groups: { page: [] } };
         } catch {
-          hits = options.entries.filter(
-            entry =>
-              entry.title.toLowerCase().includes(q) || entry.id.toLowerCase().includes(q),
-          );
+          // The in-memory Knowledge entries above remain the fallback.
         }
-      } else {
-        hits = options.entries.filter(
-          entry =>
-            entry.title.toLowerCase().includes(q) || entry.id.toLowerCase().includes(q),
-        );
       }
-      const selected = new Set(chips.map(chip => chip.hubRef));
       return {
         groups: {
           page: hits
