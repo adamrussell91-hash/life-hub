@@ -1,13 +1,14 @@
 /**
  * Knowledge page dual-read relationships and write-cutover helpers.
  */
-import { formatEntityRef } from './entity-ref.mjs';
+import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
 import { formatEntityRefFromHubRef } from './hub-ref-entity-adapter.mjs';
 import {
   combineConnectedRelationships,
   knowledgeRelationshipWriteMode
 } from './knowledge-universal-links.mjs';
 import { createKnowledgeRelationshipOperationRepository } from './knowledge-relationship-operation-repository.mjs';
+import { getRelationshipDeclaration } from './relationship-registry.mjs';
 import { bindKnowledgeUniversalLinks } from './knowledge-ul-runtime.mjs';
 
 /**
@@ -145,12 +146,28 @@ export async function loadKnowledgePageRelationships({
 export function intendedTargetsFromConnected(connectedValues) {
   const targets = [];
   const rejected = [];
+  const allowedTargetKinds = new Set(
+    getRelationshipDeclaration('related_to')?.target_kinds ?? []
+  );
+
   for (const value of Array.isArray(connectedValues) ? connectedValues : []) {
     if (typeof value !== 'string' || !value.trim()) {
       rejected.push({ value, reason: 'malformed' });
       continue;
     }
-    const ref = formatEntityRefFromHubRef(value);
+
+    // Existing Knowledge callers still submit legacy HubRefs. Cross-hub
+    // pickers submit canonical EntityRefs. Accept either without expanding
+    // the legacy HubRef registry itself.
+    let ref = formatEntityRefFromHubRef(value);
+    if (!ref) {
+      const canonical = parseEntityRef(value);
+      const kindKey = canonical ? `${canonical.namespace}:${canonical.kind}` : '';
+      if (canonical && allowedTargetKinds.has(kindKey)) {
+        ref = formatEntityRef(canonical);
+      }
+    }
+
     if (!ref) {
       rejected.push({ value, reason: 'unsupported' });
       continue;
