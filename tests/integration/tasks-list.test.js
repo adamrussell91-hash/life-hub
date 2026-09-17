@@ -113,6 +113,47 @@ test('Tasks list returns stored records the remounted SPA can render', async () 
   assert.deepEqual((await response.json()).data.tasks, [stored]);
 });
 
+test('Tasks list rejects Professional meetings, events, and schedule projections', async () => {
+  const realTask = {
+    id: 'task-1',
+    title: 'Prepare agenda',
+    status: 'open',
+    domain: 'teaching',
+    kind: 'task',
+    bucket: 'active'
+  };
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore({
+      'tasks/_index': ['task-1', 'meeting_1', 'event_1', 'proj_1'],
+      'tasks/task-1': realTask,
+      'tasks/meeting_1': {
+        id: 'meeting_1',
+        title: 'Leadership meeting',
+        scheduled_start: '2026-08-05T00:00:00.000Z'
+      },
+      'tasks/event_1': {
+        id: 'event_1',
+        title: 'Professional learning day',
+        kind: 'event',
+        start: '2026-08-06T00:00:00.000Z'
+      },
+      'tasks/proj_1': {
+        id: 'proj_1',
+        projection_id: 'proj_meeting_1',
+        source_ref: 'professional:meeting:meeting_1',
+        kind: 'meeting',
+        title: 'Leadership meeting'
+      }
+    })
+  });
+
+  const response = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.tasks.map((item) => item.id), ['task-1']);
+});
+
 test('Tasks list fills missing depends_on and tags so Board and Graph can iterate them', async () => {
   const stored = {
     id: 'task-dirty',

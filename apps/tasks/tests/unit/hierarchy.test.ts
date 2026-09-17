@@ -49,17 +49,23 @@ describe('hierarchy helpers', () => {
     expect(isSomeday(task({ id: 'c', title: 'C', bucket: 'someday' }))).toBe(true);
   });
 
-  it('excludes steps and someday from board tasks', () => {
+  it('keeps the board task-only and excludes steps, someday, meetings, and events', () => {
     const tasks = [
       task({ id: 'board', title: 'Board' }),
       task({ id: 'step', title: 'Step', kind: 'step', parent_task_id: 'board' }),
-      task({ id: 'parked', title: 'Parked', bucket: 'someday' })
+      task({ id: 'parked', title: 'Parked', bucket: 'someday' }),
+      task({ id: 'meeting_123', title: 'Professional meeting', kind: 'meeting' }),
+      task({ id: 'event_123', title: 'Professional event', kind: 'event' }),
+      task({ id: 'meeting_legacy', title: 'Legacy meeting leak', kind: undefined })
     ];
     expect(boardTasks(tasks).map((t) => t.id)).toEqual(['board']);
     expect(somedayTasks(tasks).map((t) => t.id)).toEqual(['parked']);
     expect(isBoardTask(tasks[0])).toBe(true);
     expect(isBoardTask(tasks[1])).toBe(false);
     expect(isBoardTask(tasks[2])).toBe(false);
+    expect(isBoardTask(tasks[3])).toBe(false);
+    expect(isBoardTask(tasks[4])).toBe(false);
+    expect(isBoardTask(tasks[5])).toBe(false);
   });
 
   it('orders steps by step_order then title', () => {
