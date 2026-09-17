@@ -18,6 +18,7 @@ export interface TaskRelationshipsHandle {
   refresh: () => Promise<void>;
 }
 
+
 /**
  * Relationships section for the full Task editor only.
  * Task JSON never receives Person or Universal Link IDs — every relationship

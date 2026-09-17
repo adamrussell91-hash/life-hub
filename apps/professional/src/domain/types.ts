@@ -11,13 +11,28 @@ export type EntityKind =
   | 'event'
   | 'application'
   | 'program'
-  | 'lesson';
+  | 'lesson'
+  | 'page'
+  | 'unit'
+  | 'class';
 
-export type SearchableEntityKind = 'person' | 'organisation' | 'task' | 'application' | 'program';
-export type SearchableEntityKinds =
-  | SearchableEntityKind
-  | 'person,organisation'
-  | 'person,organisation,task';
+export type SearchableEntityKind =
+  | 'person'
+  | 'organisation'
+  | 'task'
+  | 'application'
+  | 'program'
+  | 'page'
+  | 'unit'
+  | 'lesson'
+  | 'class'
+  | 'event'
+  | 'meeting';
+// A comma-joined list of any SearchableEntityKind — kept as `string` rather
+// than an enumerated union of literal combinations, so a caller (the
+// generic tag-anything widget in particular) can request any subset of
+// kinds without this type needing a new literal added for it.
+export type SearchableEntityKinds = string;
 
 export interface SearchResult {
   ref: string;
@@ -36,7 +51,7 @@ export interface SearchGroups {
   communication?: SearchResult[];
   application?: SearchResult[];
   program?: SearchResult[];
-
+  [kind: string]: SearchResult[] | undefined;
 }
 
 export interface PersonRecord {

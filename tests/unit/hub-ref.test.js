@@ -42,7 +42,7 @@ test('parses Life decision refs', () => {
   assert.equal(formatHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }), 'life:decision:aotfw-sources');
   assert.equal(
     hrefForHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }),
-    'https://life-hub.adam-russell.com/#central-node'
+    '/#central-node'
   );
   assert.match(labelForHubRef({ hub: 'life', kind: 'decision', id: 'aotfw-sources' }), /aotfw-sources/);
 });
@@ -69,18 +69,22 @@ test('normalizeConnected rejects an invalid ref instead of dropping it', () => {
   );
 });
 
-test('hub ref hrefs point at the Teaching unit and Tasks project routes', () => {
+test('hub ref hrefs point at relative umbrella paths, not a per-hub subdomain', () => {
   assert.equal(
     hrefForHubRef({ hub: 'teaching', kind: 'unit', id: 'unit_aotfw' }),
-    'https://teaching-hub.adam-russell.com/units/unit_aotfw'
+    '/teaching/units/unit_aotfw'
   );
   assert.equal(
     hrefForHubRef({ hub: 'tasks', kind: 'project', id: 'proj_aotfw' }),
-    'https://tasks-hub.adam-russell.com/#/project/proj_aotfw'
+    '/tasks/#/project/proj_aotfw'
   );
   assert.equal(
     hrefForHubRef({ hub: 'knowledge', kind: 'page', id: 'page_aotfw' }),
-    'https://knowledge-hub.adam-russell.com/#page/page_aotfw'
+    '/knowledge/#page/page_aotfw'
+  );
+  assert.equal(
+    hrefForHubRef({ hub: 'tasks', kind: 'program', id: 'program_1' }),
+    '/tasks/#/programs?id=program_1'
   );
   assert.equal(labelForHubRef({ hub: 'teaching', kind: 'unit', id: 'unit_aotfw' }), 'Teaching unit unit_aotfw');
 });

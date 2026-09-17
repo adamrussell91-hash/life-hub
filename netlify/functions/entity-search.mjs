@@ -18,9 +18,20 @@ import {
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON,
   listApplicationIndexKeys,
-  applicationKey
+  listEventIndexKeys,
+  listMeetingIndexKeys,
+  applicationKey,
+  eventKey,
+  meetingKey,
+  EVENT_INDEX_PREFIX,
+  MEETING_INDEX_PREFIX,
+  APPLICATION_INDEX_PREFIX
 } from './_shared/professional-blobs.mjs';
 import { parseApplicationRecord } from './_shared/application-schema.mjs';
+import { parseEventRecord } from './_shared/event-schema.mjs';
+import { parseMeetingRecord, meetingDisplayLabel } from './_shared/meeting-schema.mjs';
+import { defaultGetContentStore as defaultGetTeachingStore, listJSON as listTeachingJSON } from './_shared/teaching-blobs.mjs';
+import { listKnowledgePages, rankKnowledgePages } from './_shared/knowledge-data.mjs';
 import { listGithubOrganisationCandidates, listGithubPersonCandidates } from './_shared/github-professional-data.mjs';
 
 export const config = { path: '/api/entities/search' };
@@ -37,8 +48,26 @@ const READ_BATCH_SIZE = 10;
 // `universal-link-content`, and no new Task index is created: the
 // existing `tasks/_index` (`readTaskIndex`) is reused as-is.
 // Application search is opt-in via kinds=application (not in DEFAULT_KINDS).
-const SUPPORTED_KINDS = new Set(['person', 'organisation', 'task', 'application', 'program']);
+// The remaining kinds (page, unit, lesson, class, event, meeting) back the
+// generic `@`-tag-anything widget (`tagged_with` in relationship-registry.mjs)
+// — a caller wiring up tagging for a new page never needs to add a new
+// per-kind search route, only request the kind it needs here.
+const SUPPORTED_KINDS = new Set([
+  'person',
+  'organisation',
+  'task',
+  'application',
+  'program',
+  'page',
+  'unit',
+  'lesson',
+  'class',
+  'event',
+  'meeting'
+]);
 const DEFAULT_KINDS = ['person', 'organisation', 'task'];
+// Every kind the generic tagger searches across at once.
+export const ALL_SEARCHABLE_KINDS = [...SUPPORTED_KINDS];
 
 function normalize(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -186,7 +215,7 @@ async function searchApplicationKind(getProfessionalStore, query) {
   const ids = [
     ...new Set(
       indexKeys
-        .map((key) => key.slice('applications/index/'.length))
+        .map((key) => key.slice(APPLICATION_INDEX_PREFIX.length))
         .filter(Boolean)
     )
   ];
@@ -242,9 +271,109 @@ async function searchProgramKind(getTasksStore, query) {
   return out;
 }
 
+async function searchEventKind(getProfessionalStore, query) {
+  const store = await getProfessionalStore();
+  const indexKeys = await listEventIndexKeys(store);
+  const ids = [...new Set(indexKeys.map((key) => key.slice(EVENT_INDEX_PREFIX.length)).filter(Boolean))];
+  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
+    parseEventRecord(await getProfessionalJSON(store, eventKey(id)))
+  );
+
+  const out = [];
+  for (const record of records) {
+    if (!record) continue;
+    const title = typeof record.title === 'string' ? record.title : '';
+    const rank = matchRank(query, title, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'professional', kind: 'event', id: record.id }),
+      kind: 'event',
+      display_label: title,
+      supporting_label: record.occurrence_state,
+      href: `/professional/#/event/${encodeURIComponent(record.id)}`,
+      lifecycle_status: record.occurrence_state,
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
+async function searchMeetingKind(getProfessionalStore, query) {
+  const store = await getProfessionalStore();
+  const indexKeys = await listMeetingIndexKeys(store);
+  const ids = [...new Set(indexKeys.map((key) => key.slice(MEETING_INDEX_PREFIX.length)).filter(Boolean))];
+  const records = await mapBounded(ids, READ_BATCH_SIZE, async (id) =>
+    parseMeetingRecord(await getProfessionalJSON(store, meetingKey(id)))
+  );
+
+  const out = [];
+  for (const record of records) {
+    if (!record) continue;
+    const label = meetingDisplayLabel(record);
+    const rank = matchRank(query, label, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'professional', kind: 'meeting', id: record.id }),
+      kind: 'meeting',
+      display_label: label,
+      supporting_label: record.state,
+      href: `/professional/#/meeting/${encodeURIComponent(record.id)}`,
+      lifecycle_status: record.state,
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
+async function searchKnowledgePageKind(query, { env, fetchImpl, listPages = listKnowledgePages }) {
+  const pages = await listPages({ env, fetchImpl });
+  return rankKnowledgePages(pages, query)
+    // rankKnowledgePages orders by its own descending score already —
+    // matchRank's 0/1 split just decides tie-break order against every
+    // other kind in the same combined sort below.
+    .map((page, index) => ({
+      rank: index === 0 ? 0 : 1,
+      ref: formatEntityRef({ namespace: 'knowledge', kind: 'page', id: page.id }),
+      kind: 'page',
+      display_label: typeof page.title === 'string' && page.title ? page.title : page.id,
+      supporting_label: page.area ?? null,
+      href: `/knowledge/#page/${encodeURIComponent(page.id)}`,
+      lifecycle_status: null,
+      visibility: 'operator'
+    }));
+}
+
+async function searchTeachingRecordsKind(getTeachingStore, prefix, kind, query) {
+  const store = await getTeachingStore();
+  const records = await listTeachingJSON(store, prefix);
+  const out = [];
+  for (const record of records) {
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    if (record.status === 'trashed' || record.status === 'deleted') continue;
+    const title = typeof record.title === 'string' ? record.title : '';
+    const rank = matchRank(query, title, null);
+    if (rank === null) continue;
+    const href = hrefForHubRef({ hub: 'teaching', kind, id: record.id });
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'teaching', kind, id: record.id }),
+      kind,
+      display_label: title || record.id,
+      supporting_label: typeof record.status === 'string' ? record.status : null,
+      href: href ?? (kind === 'class' ? `/teaching/classes/${encodeURIComponent(record.id)}` : null),
+      lifecycle_status: typeof record.status === 'string' ? record.status : 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
 export function createEntitySearchHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
   const getProfessionalStore = deps.getProfessionalStore ?? defaultGetProfessionalStore;
+  const getTeachingStore = deps.getTeachingStore ?? defaultGetTeachingStore;
 
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -314,7 +443,21 @@ export function createEntitySearchHandler(deps = {}) {
         : [],
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
       requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
-      requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : []
+      requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : [],
+      requestedKinds.has('event') ? searchEventKind(getProfessionalStore, query) : [],
+      requestedKinds.has('meeting') ? searchMeetingKind(getProfessionalStore, query) : [],
+      requestedKinds.has('page')
+        ? searchKnowledgePageKind(query, { env, fetchImpl: deps.fetchImpl, listPages: deps.listKnowledgePages })
+        : [],
+      requestedKinds.has('unit')
+        ? searchTeachingRecordsKind(getTeachingStore, 'units/', 'unit', query)
+        : [],
+      requestedKinds.has('lesson')
+        ? searchTeachingRecordsKind(getTeachingStore, 'lessons/', 'lesson', query)
+        : [],
+      requestedKinds.has('class')
+        ? searchTeachingRecordsKind(getTeachingStore, 'classes/', 'class', query)
+        : []
     ]);
 
     // Exact prefix matches rank before token matches across every group
@@ -326,7 +469,19 @@ export function createEntitySearchHandler(deps = {}) {
       .slice(0, MAX_RESULTS)
       .map(({ rank, ...result }) => result); // eslint-disable-line no-unused-vars
 
-    const groups = { person: [], organisation: [], task: [], application: [], program: [] };
+    const groups = {
+      person: [],
+      organisation: [],
+      task: [],
+      application: [],
+      program: [],
+      event: [],
+      meeting: [],
+      page: [],
+      unit: [],
+      lesson: [],
+      class: []
+    };
     for (const result of ranked) groups[result.kind].push(result);
 
     return withCors(okResponse(200, { groups }), request, env);
