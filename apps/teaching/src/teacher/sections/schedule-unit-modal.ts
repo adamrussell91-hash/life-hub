@@ -27,7 +27,7 @@ export function openScheduleUnitModal(options: {
   if (!cls) return;
 
   const units = options.curriculum.units
-    .filter((unit) => unit.subject_id === cls.subject_id)
+    .filter((unit) => unit.status === 'active' && unit.subject_id === cls.subject_id)
     .sort((a, b) => a.title.localeCompare(b.title));
 
   const lessonsById = new Map(options.curriculum.lessons.map((lesson) => [lesson.id, lesson]));
