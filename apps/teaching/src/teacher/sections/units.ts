@@ -155,6 +155,7 @@ export function renderUnitsIndex(
 
       const heading = document.createElement('h2');
       heading.className = 'units-index__group-title';
+
       heading.textContent = group.label;
 
       const grid = document.createElement('div');
@@ -411,7 +412,7 @@ export function renderUnitPage(
   );
   if (exportItem) exportItem.dataset.export = 'unit';
 
-  const pageHeader = renderPageHeader(canvas, {
+  renderPageHeader(canvas, {
     actions: [historyHost, optionsMenu.el]
   });
 
@@ -449,17 +450,16 @@ export function renderUnitPage(
   planHost.className = 'unit-page__plan-editor';
 
   const planEditor = mountUnitPlanEditor(planHost, unit.blocks ?? [], {
-    onSave: async (blocks) => {
+    onSave: async (blocks, refresh = false) => {
       const saved = await patchUnit(unit.id, { blocks });
       unit.blocks = saved.blocks;
-      await options.onMutated?.();
+      if (refresh) await options.onMutated?.();
     },
     attachedOutcomes: publicOutcomesForPage(unit, curriculum.outcomes ?? [])
   });
 
   const subject = curriculum.subjects.find((entry) => entry.id === unit.subject_id);
   const stripHost = document.createElement('div');
-  pageHeader.insertAdjacentElement('afterend', stripHost);
   const outcomeStrip = subject
     ? mountOutcomeStrip(stripHost, {
         catalog: curriculum.outcomes ?? [],
@@ -581,7 +581,7 @@ export function renderUnitPage(
     lessonsSection.append(list);
   }
 
-  root.append(coverHost, planSection, tagsHost, lessonsSection);
+  root.append(coverHost, stripHost, planSection, tagsHost, lessonsSection);
   canvas.append(root);
 
   return {
@@ -621,7 +621,7 @@ function mountUnitPlanEditor(
   host: HTMLElement,
   initialBlocks: Block[],
   options: {
-    onSave: (blocks: Block[]) => Promise<void>;
+    onSave: (blocks: Block[], refresh?: boolean) => Promise<void>;
     attachedOutcomes?: ReturnType<typeof publicOutcomesForPage>;
   }
 ): { dispose: () => void; updateOutcomes: (next: ReturnType<typeof publicOutcomesForPage>) => void } {
@@ -629,6 +629,10 @@ function mountUnitPlanEditor(
   let nextId = nextBlockIdFactory('block_unit', blocks);
   let destroyed = false;
   let attachedOutcomes = options.attachedOutcomes ?? [];
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  let saveChain = Promise.resolve();
+  let revision = 0;
+  let savedRevision = 0;
 
   const root = document.createElement('div');
   root.className = 'unit-plan-editor lesson-builder lesson-builder--no-chat';
@@ -646,6 +650,7 @@ function mountUnitPlanEditor(
 
   const toolbar = document.createElement('div');
   toolbar.className = 'unit-plan-editor__toolbar';
+  toolbar.hidden = true;
 
   const saveButton = document.createElement('button');
   saveButton.type = 'button';
@@ -661,6 +666,44 @@ function mountUnitPlanEditor(
   root.append(railHost, pageCol);
   host.replaceChildren(root);
 
+  function saveErrorMessage(error: unknown): string {
+    return error instanceof ApiClientError
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : 'Unable to save unit plan.';
+  }
+
+  function persistLatest(refresh = false): Promise<void> {
+    const targetRevision = revision;
+    const snapshot = structuredClone(blocks);
+    if (!refresh && targetRevision <= savedRevision) return saveChain;
+
+    saveChain = saveChain.then(async () => {
+      if (!refresh && targetRevision <= savedRevision) return;
+      try {
+        await options.onSave(snapshot, refresh);
+        savedRevision = Math.max(savedRevision, targetRevision);
+        if (!destroyed) errorBanner.hidden = true;
+      } catch (error: unknown) {
+        if (!destroyed) {
+          errorBanner.hidden = false;
+          errorBanner.textContent = saveErrorMessage(error);
+        }
+      }
+    });
+
+    return saveChain;
+  }
+
+  function scheduleSave(): void {
+    if (saveTimer !== null) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      void persistLatest();
+    }, 400);
+  }
+
   const canvas: BlockCanvasHandle = mountBlockCanvas(canvasHost, {
     blocks,
     allowCollectionAtRoot: true,
@@ -669,6 +712,8 @@ function mountUnitPlanEditor(
     onChange: (next) => {
       blocks = next;
       nextId = nextBlockIdFactory('block_unit', blocks);
+      revision += 1;
+      scheduleSave();
     }
   });
 
@@ -690,22 +735,11 @@ function mountUnitPlanEditor(
 
   saveButton.addEventListener('click', () => {
     if (destroyed) return;
-    errorBanner.hidden = true;
-    saveButton.disabled = true;
-    void options
-      .onSave(structuredClone(blocks))
-      .catch((error: unknown) => {
-        errorBanner.hidden = false;
-        errorBanner.textContent =
-          error instanceof ApiClientError
-            ? error.message
-            : error instanceof Error
-              ? error.message
-              : 'Unable to save unit plan.';
-      })
-      .finally(() => {
-        saveButton.disabled = false;
-      });
+    if (saveTimer !== null) {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    void persistLatest(true);
   });
 
   return {
@@ -714,6 +748,11 @@ function mountUnitPlanEditor(
       canvas.update(blocks);
     },
     dispose: () => {
+      if (saveTimer !== null) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      void persistLatest();
       destroyed = true;
       palette.dispose();
       canvas.dispose();
