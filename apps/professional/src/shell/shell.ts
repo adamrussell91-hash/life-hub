@@ -33,7 +33,8 @@ const NAV: NavItem[] = [
   { id: 'meetings', label: 'Meetings', href: '#/meetings' },
   { id: 'events', label: 'Events', href: '#/events' },
   { id: 'applications', label: 'Applications', href: '#/applications' },
-  { id: 'career', label: 'Career', href: '#/career' }
+  { id: 'career', label: 'Career', href: '#/career' },
+  { id: 'network-ecology', label: 'Network Ecology', href: '#/network-ecology' }
 ];
 
 export function viewChrome(view: RailViewId): { eyebrow: string; title: string } {
@@ -187,6 +188,12 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
         label: 'Communications',
         paths: RAIL_ICON_PATHS.communications,
         href: '#/communications'
+      },
+      {
+        id: 'network-ecology',
+        label: 'Network Ecology',
+        paths: RAIL_ICON_PATHS['network-ecology'],
+        href: '#/network-ecology'
       }
     ]
   });

@@ -15,11 +15,13 @@ export type RailViewId =
   | 'meetings'
   | 'events'
   | 'applications'
-  | 'career';
+  | 'career'
+  | 'network-ecology';
 
 export type Route =
   | { name: 'people' }
   | { name: 'person'; id: string }
+  | { name: 'person-brief'; id: string }
   | { name: 'organisations' }
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
@@ -36,6 +38,7 @@ export type Route =
   | { name: 'application-new' }
   | { name: 'application'; id: string }
   | { name: 'career' }
+  | { name: 'network-ecology' }
   | { name: 'not-found'; path: string };
 
 /**
@@ -59,6 +62,7 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 1 && segments[0] === 'events') return { name: 'events' };
   if (segments.length === 1 && segments[0] === 'applications') return { name: 'applications' };
   if (segments.length === 1 && segments[0] === 'career') return { name: 'career' };
+  if (segments.length === 1 && segments[0] === 'network-ecology') return { name: 'network-ecology' };
 
   if (segments.length === 2 && segments[0] === 'communication' && segments[1] === 'new') {
     return { name: 'communication-new' };
@@ -76,6 +80,17 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 2 && segments[0] === 'person') {
     const id = safeDecode(segments[1]!);
     if (id && isValidPersonId(id)) return { name: 'person', id };
+    return { name: 'not-found', path };
+  }
+
+  // Person Brief (Phase 3, Feature 3.1) — a 3-segment path, `#/person/<id>/
+  // brief`. Every other detail route in this app is 2 segments
+  // (`#/<kind>/<id>`); this is the first 3-segment route, so it gets its own
+  // branch rather than trying to generalise `safeDecode`'s existing
+  // strict-2-segment handling.
+  if (segments.length === 3 && segments[0] === 'person' && segments[2] === 'brief') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidPersonId(id)) return { name: 'person-brief', id };
     return { name: 'not-found', path };
   }
 
@@ -125,7 +140,7 @@ function safeDecode(segment: string): string | null {
 }
 
 export function railHighlightFor(route: Route): RailViewId | null {
-  if (route.name === 'people' || route.name === 'person') return 'people';
+  if (route.name === 'people' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
   if (
@@ -149,11 +164,16 @@ export function railHighlightFor(route: Route): RailViewId | null {
     return 'applications';
   }
   if (route.name === 'career') return 'career';
+  if (route.name === 'network-ecology') return 'network-ecology';
   return null;
 }
 
 export function personRoute(id: string): string {
   return `#/person/${encodeURIComponent(id)}`;
+}
+
+export function personBriefRoute(id: string): string {
+  return `#/person/${encodeURIComponent(id)}/brief`;
 }
 
 export function organisationRoute(id: string): string {

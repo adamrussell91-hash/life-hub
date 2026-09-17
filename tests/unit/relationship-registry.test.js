@@ -9,6 +9,7 @@ import {
 } from '../../netlify/functions/_shared/relationship-registry.mjs';
 
 const person = parseEntityRef('shared:person:person_seth');
+const personTwo = parseEntityRef('shared:person:person_nina');
 const organisation = parseEntityRef('shared:organisation:organisation_unsw');
 const task = parseEntityRef('tasks:task:task_email_seth');
 const communication = parseEntityRef('professional:communication:communication_001');
@@ -30,6 +31,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'member_of',
     'participates_in',
     'preparation',
+    'professional_relationship',
     'provider',
     'recipient',
     'referee',
@@ -37,6 +39,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'venue'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
+  assert.equal(getRelationshipDeclaration('professional_relationship').inverse_label, 'professional_relationship');
   assert.equal(getRelationshipDeclaration('collaborator').inverse_label, 'collaborates_on');
   assert.equal(getRelationshipDeclaration('contact').inverse_label, 'contacted_for_task');
   assert.equal(getRelationshipDeclaration('recipient').inverse_label, 'received_communication');
@@ -53,7 +56,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields, but excludes teaching_protected-only relationships', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 18);
+  assert.equal(projected.length, 19);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as
@@ -379,5 +382,99 @@ test('Slice 10 application relationship keys accept application kinds', () => {
       relationshipType: 'related_to'
     }).key,
     'related_to'
+  );
+});
+
+test('professional_relationship accepts a valid person-to-person link with an allowed role and human_label', () => {
+  const decl = validateRelationshipInput({
+    sourceRef: person,
+    targetRef: personTwo,
+    relationshipType: 'professional_relationship',
+    role: 'mentor',
+    validFrom: '2025-02-01T00:00:00.000Z',
+    metadata: { human_label: 'Research person I bounce ideas off' }
+  });
+  assert.equal(decl.key, 'professional_relationship');
+});
+
+test('professional_relationship accepts empty metadata (human_label is optional)', () => {
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: person,
+      targetRef: personTwo,
+      relationshipType: 'professional_relationship',
+      role: 'colleague',
+      metadata: {}
+    }).key,
+    'professional_relationship'
+  );
+});
+
+test('professional_relationship rejects a role outside the allowed enum', () => {
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: person,
+        targetRef: personTwo,
+        relationshipType: 'professional_relationship',
+        role: 'best_friend'
+      }),
+    (error) => error.code === 'invalid_role'
+  );
+});
+
+test('professional_relationship rejects a non-person source or target kind', () => {
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: task,
+        targetRef: personTwo,
+        relationshipType: 'professional_relationship'
+      }),
+    (error) => error.code === 'invalid_source_kind'
+  );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: person,
+        targetRef: task,
+        relationshipType: 'professional_relationship'
+      }),
+    (error) => error.code === 'invalid_target_kind'
+  );
+});
+
+test('professional_relationship rejects an undeclared metadata key', () => {
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: person,
+        targetRef: personTwo,
+        relationshipType: 'professional_relationship',
+        metadata: { score: 5 }
+      }),
+    (error) => error.code === 'unknown_metadata_key'
+  );
+});
+
+test('professional_relationship is a period relationship: accepts valid_from, rejects occurred_at', () => {
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: person,
+      targetRef: personTwo,
+      relationshipType: 'professional_relationship',
+      validFrom: '2025-02-01T00:00:00.000Z'
+    }).key,
+    'professional_relationship'
+  );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: person,
+        targetRef: personTwo,
+        relationshipType: 'professional_relationship',
+        occurredAt: '2026-01-01T00:00:00.000Z'
+      }),
+    (error) => error.code === 'occurred_at_on_period_relationship'
   );
 });

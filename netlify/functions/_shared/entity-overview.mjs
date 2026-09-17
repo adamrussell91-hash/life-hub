@@ -191,6 +191,7 @@ function baseTimelineEntry({ link, endpoint, direction }) {
     label: timelineLabel({ link, endpoint, direction }),
     context_key: link.context_key,
     source_ref: link.source_ref,
+    target_ref: link.target_ref,
     // Never invent a browser href — only surface one the resolver provided.
     href: endpoint.href ?? null
   };
@@ -249,8 +250,24 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     ...githubEntries
   ];
 
-  const current_relationships = entries.filter((entry) => entry.link.status === 'current');
-  const historical_relationships = entries.filter((entry) => entry.link.status === 'ended');
+  // `metadata` (registry-declared, relationship-type-specific data — e.g.
+  // `professional_relationship`'s `human_label`, Feature 1.3) already lives
+  // on every raw link record (`validateUniversalLinkRecord` and the
+  // GitHub-import merge both set it), but is made explicit and normalised
+  // here — defaulting to `{}` rather than leaving it `undefined` — so every
+  // `current_relationships`/`historical_relationships` entry's `link`
+  // reliably carries the field regardless of which source produced it.
+  const withNormalisedMetadata = (entry) => ({
+    ...entry,
+    link: { ...entry.link, metadata: entry.link.metadata ?? {} }
+  });
+
+  const current_relationships = entries
+    .filter((entry) => entry.link.status === 'current')
+    .map(withNormalisedMetadata);
+  const historical_relationships = entries
+    .filter((entry) => entry.link.status === 'ended')
+    .map(withNormalisedMetadata);
 
   // Building the base timeline entries and sorting them is synchronous —
   // no I/O — so it costs nothing extra to do for every entry. Only the
@@ -299,4 +316,9 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   };
 }
 
-export { defaultGetUniversalLinkStore };
+// `encodeTimelineCursor`/`decodeTimelineCursor` are exported so
+// `people-activity.mjs` (Phase 2, Recent Activity endpoint) reuses the
+// exact same cursor shape rather than inventing a new one — a caller's
+// cursor is opaque either way, but sharing the encode/decode pair keeps the
+// two endpoints' pagination semantics from silently drifting apart.
+export { compareTimelineOrder, decodeTimelineCursor, defaultGetUniversalLinkStore, encodeTimelineCursor };
