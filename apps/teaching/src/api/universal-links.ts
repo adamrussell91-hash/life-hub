@@ -21,8 +21,21 @@ export interface UniversalLinkEntry {
   endpoint: UniversalLinkEndpoint;
 }
 
-export function unitEntityRef(unitId: string): string {
-  return `teaching:unit:${unitId}`;
+export interface EntitySearchResult {
+  ref: string;
+  kind: string;
+  display_label: string;
+  supporting_label: string | null;
+  href: string | null;
+}
+
+export function searchEntities(
+  query: string,
+  kinds: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ groups: Record<string, EntitySearchResult[]> }> {
+  const params = new URLSearchParams({ q: query, kinds });
+  return apiGet(`/api/entities/search?${params.toString()}`, { signal: options.signal });
 }
 
 export function listUniversalLinksForEntity(

@@ -30,7 +30,7 @@ import {
 } from '@/views/hub-kit';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { projectNextActionHealth } from '@/views/projects';
-import { renderProjectRelationshipsSection } from '@/views/task-relationships';
+import { mountTagAnythingSection } from '@/views/entity-tagger';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -522,14 +522,15 @@ function paintProjectPage(
 
   paintProjectTasks();
 
-  const relationships = renderProjectRelationshipsSection(project.id);
+  const tagsHost = el('div', 'page-card__tags');
+  mountTagAnythingSection(tagsHost, `tasks:project:${project.id}`);
 
   card.append(
     head,
     fields,
     labeledField('Quality bar', qualityHost),
     notes.el,
-    relationships.section,
+    tagsHost,
     metrics,
     track,
     renderQuickAdd((created) => {

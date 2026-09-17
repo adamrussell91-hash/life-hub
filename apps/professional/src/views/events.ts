@@ -26,7 +26,7 @@ import {
   mountTaskLinkPanel,
   renderRelationshipSection
 } from '@/components/schedule-relationships';
-import { createUniversalLink } from '@/api/universal-links';
+import { mountTagAnythingSection } from '@/views/entity-tagger';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -587,10 +587,8 @@ export async function renderEventDetailView(
     const relationships = el('section', 'event-detail__relationships');
     relationships.append(el('p', undefined, 'Loading relationships…'));
 
-    const addPanel = el('section', 'event-detail__add-relationship');
-    addPanel.append(el('h2', undefined, 'Add relationship'));
-    const addStatus = el('p', 'event-form__status');
-    addStatus.hidden = true;
+    const addPanel = el('div', 'event-detail__add-relationship');
+    mountTagAnythingSection(addPanel, `professional:event:${record.id}`);
 
     function reloadRelationships(): void {
       void loadEntityRelationships(`professional:event:${record.id}`)
@@ -612,61 +610,6 @@ export async function renderEventDetailView(
           );
         });
     }
-
-    async function addRelationship(targetRef: string, relationshipType: string): Promise<void> {
-      addStatus.hidden = true;
-      try {
-        await createUniversalLink({
-          source_ref: `professional:event:${record.id}`,
-          target_ref: targetRef,
-          relationship_type: relationshipType
-        });
-        reloadRelationships();
-      } catch (err) {
-        addStatus.hidden = false;
-        addStatus.textContent = err instanceof ApiClientError ? err.message : 'Could not save relationship.';
-      }
-    }
-
-    const addPresenterInput = document.createElement('input');
-    addPresenterInput.type = 'text';
-    addPresenterInput.placeholder = 'Type @ to add a presenter';
-    addPresenterInput.setAttribute('aria-label', 'Add presenter');
-    const addPresenterPicker = createEntityPicker({
-      input: addPresenterInput,
-      allowedKinds: ['person'],
-      emptyText: 'No matching people.',
-      search: async (query, signal) => {
-        const result = await searchEntities(query, 'person', { signal });
-        return { groups: { person: result.groups.person } };
-      },
-      onSelect: (item) => {
-        addPresenterInput.value = '';
-        void addRelationship(item.ref, 'presenter');
-      }
-    });
-
-    const addKnowledgeInput = document.createElement('input');
-    addKnowledgeInput.type = 'text';
-    addKnowledgeInput.placeholder = 'Type @ to link a Knowledge page';
-    addKnowledgeInput.setAttribute('aria-label', 'Add related knowledge page');
-    const addKnowledgePicker = mountKnowledgePagePicker({
-      input: addKnowledgeInput,
-      onSelect: (item) => {
-        addKnowledgeInput.value = '';
-        void addRelationship(item.ref, 'related_to');
-      }
-    });
-
-    addPanel.append(
-      el('label', undefined, 'Presenter'),
-      addPresenterInput,
-      addPresenterPicker.root,
-      el('label', undefined, 'Related Knowledge page'),
-      addKnowledgeInput,
-      addKnowledgePicker.root,
-      addStatus
-    );
 
     const taskPanels = el('div', 'event-detail__task-panels');
     mountTaskLinkPanel({

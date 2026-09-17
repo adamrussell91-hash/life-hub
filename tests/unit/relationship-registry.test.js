@@ -37,6 +37,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'recipient',
     'referee',
     'related_to',
+    'tagged_with',
     'venue'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
@@ -54,11 +55,25 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.equal(getRelationshipDeclaration('application_action').inverse_label, 'has_application_action');
   assert.equal(getRelationshipDeclaration('participates_in').inverse_label, 'has_participant');
   assert.equal(getRelationshipDeclaration('presenter').inverse_label, 'presents_at');
+  assert.equal(getRelationshipDeclaration('tagged_with').inverse_label, 'tagged_with');
+});
+
+test('tagged_with accepts any declared kind on either side, including pairs no specific key declares', () => {
+  const lesson = parseEntityRef('teaching:lesson:lesson_photosynthesis');
+  const meeting = parseEntityRef('professional:meeting:meeting_001');
+  assert.equal(
+    validateRelationshipInput({ sourceRef: lesson, targetRef: person, relationshipType: 'tagged_with' }).key,
+    'tagged_with'
+  );
+  assert.equal(
+    validateRelationshipInput({ sourceRef: meeting, targetRef: task, relationshipType: 'tagged_with' }).key,
+    'tagged_with'
+  );
 });
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields, but excludes teaching_protected-only relationships', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 20);
+  assert.equal(projected.length, 21);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as

@@ -26,7 +26,7 @@ import { mountLessonPalette } from '@/teacher/lesson-canvas/mount-palette';
 import { homepagePaletteFamilies } from '@/teacher/lesson-canvas/palette-catalog';
 import { readBuilderChromePrefs } from '@/teacher/lesson-canvas/prefs';
 import { mountOutcomeStrip, publicOutcomesForPage } from '@/outcomes/strip';
-import { renderUnitRelationshipsSection } from '@/teacher/sections/unit-relationships';
+import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 import { renderBlock } from '@/blocks/render';
 
 export const UNITS_INDEX_GROUP_STORAGE_KEY = 'teaching-hub.units-index-group';
@@ -480,7 +480,9 @@ export function renderUnitPage(
 
   planSection.append(planHeading, planHost);
 
-  const relationships = renderUnitRelationshipsSection(unit.id);
+  const tagsHost = document.createElement('div');
+  tagsHost.className = 'unit-page__tags';
+  mountTagAnythingSection(tagsHost, `teaching:unit:${unit.id}`);
 
   const lessonsSection = document.createElement('section');
   lessonsSection.className = 'unit-page__lessons glass-panel';
@@ -579,7 +581,7 @@ export function renderUnitPage(
     lessonsSection.append(list);
   }
 
-  root.append(coverHost, planSection, relationships.section, lessonsSection);
+  root.append(coverHost, planSection, tagsHost, lessonsSection);
   canvas.append(root);
 
   return {

@@ -41,6 +41,31 @@ function declaration({
   });
 }
 
+// Every entity kind any declaration below already resolves, minus
+// `teaching:student_reference` (never generic — `teaching_protected` only,
+// see `participates_in`). Backs `tagged_with`, the one relationship type
+// with no closed set of permitted pairs: every other key here answers "is
+// THIS pair meaningful," but a caller tagging arbitrary things together
+// (a Person onto a Lesson, a Note onto a Meeting, anything onto anything)
+// needs one relationship that's always valid rather than a new declaration
+// per pair discovered on demand.
+const ALL_TAGGABLE_KINDS = [
+  'shared:person',
+  'shared:organisation',
+  'tasks:task',
+  'tasks:project',
+  'tasks:program',
+  'professional:communication',
+  'professional:meeting',
+  'professional:event',
+  'professional:application',
+  'knowledge:page',
+  'teaching:unit',
+  'teaching:lesson',
+  'teaching:class',
+  'life:decision'
+];
+
 // Slice 1 declarations — the first-slice set named in the implementation
 // programme. Register further relationship keys only in the slice whose
 // workflow needs them.
@@ -285,6 +310,23 @@ const REGISTRY = new Map([
       temporalMode: 'timeless',
       roleMode: 'none',
       metadataKeys: ['migration_source']
+    })
+  ],
+  [
+    // The generic "@ tag anything" relationship — the shared entity-tagger
+    // widget writes this by default so a Person can be tagged onto a
+    // Lesson, a Note onto a Meeting, or any other pair nobody has declared
+    // a specific key for yet. Symmetric, like `related_to`: no direction
+    // carries meaning beyond "these two are linked."
+    'tagged_with',
+    declaration({
+      key: 'tagged_with',
+      sourceKinds: ALL_TAGGABLE_KINDS,
+      targetKinds: ALL_TAGGABLE_KINDS,
+      inverseLabel: 'tagged_with',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
     })
   ],
   [

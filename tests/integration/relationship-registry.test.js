@@ -58,7 +58,7 @@ test('returns projectRelationshipRegistry output and omits duplicate_fields and 
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const body = await response.json();
   assert.ok(Array.isArray(body.data.relationships));
-  assert.equal(body.data.relationships.length, 20);
+  assert.equal(body.data.relationships.length, 21);
   // participates_in (StudentReference membership, teaching_protected only)
   // must never appear on this generic, non-workflow-scoped route.
   assert.equal(body.data.relationships.some(r => r.key === 'participates_in'), false);

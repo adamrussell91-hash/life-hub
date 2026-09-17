@@ -7,13 +7,6 @@ export const HUB_REF_KINDS = {
   life: new Set(['decision'])
 };
 
-export const HUB_SITES = {
-  life: 'https://life-hub.adam-russell.com',
-  teaching: 'https://teaching-hub.adam-russell.com',
-  knowledge: 'https://knowledge-hub.adam-russell.com',
-  tasks: 'https://tasks-hub.adam-russell.com'
-};
-
 export function parseHubRef(value) {
   if (typeof value !== 'string') return null;
   const raw = value.trim();
@@ -59,24 +52,29 @@ export function normalizeConnected(list) {
   return out;
 }
 
+// The umbrella is one origin with every hub mounted under its own path
+// (life-hub.adam-russell.com/teaching/, /tasks/, /knowledge/, /professional/)
+// — never a separate subdomain per hub. These must stay relative and match
+// entity-resolvers.mjs's own resolution for the same kinds, or a link
+// resolves to a host that doesn't exist.
 export function hrefForHubRef(ref) {
   if (ref?.hub === 'teaching' && ref.kind === 'unit') {
-    return `${HUB_SITES.teaching}/units/${encodeURIComponent(ref.id)}`;
+    return `/teaching/units/${encodeURIComponent(ref.id)}`;
   }
   if (ref?.hub === 'teaching' && ref.kind === 'lesson') {
-    return `${HUB_SITES.teaching}/lessons/${encodeURIComponent(ref.id)}`;
+    return `/teaching/lessons/${encodeURIComponent(ref.id)}`;
   }
   if (ref?.hub === 'tasks' && ref.kind === 'project') {
-    return `${HUB_SITES.tasks}/#/project/${encodeURIComponent(ref.id)}`;
+    return `/tasks/#/project/${encodeURIComponent(ref.id)}`;
   }
   if (ref?.hub === 'tasks' && ref.kind === 'program') {
-    return `${HUB_SITES.tasks}/#/programs?id=${encodeURIComponent(ref.id)}`;
+    return `/tasks/#/programs?id=${encodeURIComponent(ref.id)}`;
   }
   if (ref?.hub === 'life' && ref.kind === 'decision') {
-    return `${HUB_SITES.life}/#central-node`;
+    return `/#central-node`;
   }
   if (ref?.hub === 'knowledge' && ref.kind === 'page') {
-    return `${HUB_SITES.knowledge}/#page/${encodeURIComponent(ref.id)}`;
+    return `/knowledge/#page/${encodeURIComponent(ref.id)}`;
   }
   return null;
 }
