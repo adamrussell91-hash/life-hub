@@ -1,5 +1,7 @@
 import type { Task } from '@/schemas/task';
 
+const PROFESSIONAL_RECORD_ID_PREFIX = /^(meeting|event|communication|application)[_-]/i;
+
 export function isStep(task: Task): boolean {
   return task.kind === 'step' || Boolean(task.parent_task_id && task.kind !== 'task');
 }
@@ -10,6 +12,8 @@ export function isSomeday(task: Task): boolean {
 
 /** Tasks that belong on the sprint board and day/week focus views. */
 export function isBoardTask(task: Task): boolean {
+  if (task.kind && task.kind !== 'task') return false;
+  if (PROFESSIONAL_RECORD_ID_PREFIX.test(task.id)) return false;
   return !isStep(task) && !isSomeday(task);
 }
 

@@ -23,9 +23,20 @@ import {
 export const config = { path: '/api/tasks' };
 
 const DOMAINS = new Set(['teaching', 'life', 'wedding', 'health', 'other']);
+const PROFESSIONAL_RECORD_ID_PREFIX = /^(meeting|event|communication|application)[_-]/i;
 
 function readTaskId(request) {
   return new URL(request.url).searchParams.get('id') ?? '';
+}
+
+function isTaskDomainRecord(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+  if (typeof item.id !== 'string' || typeof item.title !== 'string') return false;
+  if (PROFESSIONAL_RECORD_ID_PREFIX.test(item.id)) return false;
+  if (typeof item.source_ref === 'string' && item.source_ref.startsWith('professional:')) return false;
+  if (typeof item.projection_id === 'string') return false;
+  const kind = typeof item.kind === 'string' ? item.kind : '';
+  return !kind || kind === 'task' || kind === 'step';
 }
 
 function mergeTask(existing, patch) {
@@ -51,13 +62,13 @@ export function createTasksHandler(deps = {}) {
         const id = readTaskId(request);
         if (id) {
           const task = await getJSON(store, taskKey(id));
-          if (!task || typeof task !== 'object' || Array.isArray(task)) {
+          if (!isTaskDomainRecord(task)) {
             return withCors(errorResponse(404, 'not_found', 'Task not found', false), request, env);
           }
           return withCors(okResponse(200, normalizeTaskRecord(task)), request, env);
         }
         const tasks = (await listJSON(store, TASK_PREFIX))
-          .filter(item => typeof item.id === 'string' && typeof item.title === 'string')
+          .filter(isTaskDomainRecord)
           .map(normalizeTaskRecord);
         return withCors(okResponse(200, { tasks }), request, env);
       }
@@ -109,7 +120,7 @@ export function createTasksHandler(deps = {}) {
           return withCors(errorResponse(400, 'missing_id', 'id query param required', false), request, env);
         }
         const existing = await getJSON(store, taskKey(id));
-        if (!existing || typeof existing !== 'object' || Array.isArray(existing)) {
+        if (!isTaskDomainRecord(existing)) {
           return withCors(errorResponse(404, 'not_found', 'Task not found', false), request, env);
         }
         if (request.method === 'DELETE') {
