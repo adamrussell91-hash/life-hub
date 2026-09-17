@@ -2,6 +2,7 @@ import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderPageHeader } from '@/teacher/page-header';
+import { mountScopeDateControls } from '@/teacher/sections/scope-date-controls';
 import { renderScopeOverview, subjectsWithScope } from '@/teacher/sections/scope-overview';
 import {
   renderScopeTimelineEditor as renderScopeTimelineEditorBase,
@@ -75,6 +76,17 @@ export function renderScopeTimelineEditor(
 
   const visibleCurriculum = curriculumForScopeTimeline(curriculum, subjectId);
   renderScopeTimelineEditorBase(canvas, visibleCurriculum, subjectId, options);
+
+  mountScopeDateControls(canvas, curriculum, subjectId, {
+    onSaved: (scope, item) => {
+      options?.onPatched?.(scope);
+      renderScopeTimelineEditor(canvas, curriculum, subjectId, {
+        ...options,
+        selectedUnitId: item.kind === 'unit' ? item.unit_id : undefined,
+        selectedNoteId: item.kind === 'note' ? item.id : undefined
+      });
+    }
+  });
 
   const enhanceOpenPicker = (): void => {
     const picker = document.querySelector<HTMLElement>('.scope-timeline__picker');
