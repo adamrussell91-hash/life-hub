@@ -30,6 +30,7 @@ import {
 } from '@/views/hub-kit';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { projectNextActionHealth } from '@/views/projects';
+import { renderProjectRelationshipsSection } from '@/views/task-relationships';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -521,11 +522,14 @@ function paintProjectPage(
 
   paintProjectTasks();
 
+  const relationships = renderProjectRelationshipsSection(project.id);
+
   card.append(
     head,
     fields,
     labeledField('Quality bar', qualityHost),
     notes.el,
+    relationships.section,
     metrics,
     track,
     renderQuickAdd((created) => {

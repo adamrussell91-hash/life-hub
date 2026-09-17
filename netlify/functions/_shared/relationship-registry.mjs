@@ -100,10 +100,13 @@ const REGISTRY = new Map([
     })
   ],
   [
+    // Also permits `tasks:project` as a source — a Person can be tagged as
+    // involved in a Project the same way they can on a Task, without a
+    // second registry key (the inverse label reads correctly either way).
     'collaborator',
     declaration({
       key: 'collaborator',
-      sourceKinds: ['tasks:task'],
+      sourceKinds: ['tasks:task', 'tasks:project'],
       targetKinds: ['shared:person'],
       inverseLabel: 'collaborates_on',
       cardinality: 'many_to_many',
@@ -216,6 +219,21 @@ const REGISTRY = new Map([
       sourceKinds: ['professional:event'],
       targetKinds: ['shared:organisation'],
       inverseLabel: 'provides_event',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    // No prior registry key let an Event link to a Person at all (venue and
+    // provider only reach Organisation) — this is what "who is presenting
+    // this session" is tagged with.
+    'presenter',
+    declaration({
+      key: 'presenter',
+      sourceKinds: ['professional:event'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'presents_at',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
       roleMode: 'none'

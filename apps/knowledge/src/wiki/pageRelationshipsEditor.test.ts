@@ -59,6 +59,16 @@ describe("pageRelationshipsEditor ownership", () => {
     expect(hubRefFromEntityRef("shared:person:person_x")).toBeNull();
   });
 
+  it("maps incoming Professional event/meeting/application refs, matching the registry's related_to targets", () => {
+    expect(hubRefFromEntityRef("professional:event:event_x")).toBe("professional:event:event_x");
+    expect(hubRefFromEntityRef("professional:meeting:meeting_x")).toBe("professional:meeting:meeting_x");
+    expect(hubRefFromEntityRef("professional:application:application_x")).toBe(
+      "professional:application:application_x",
+    );
+    expect(hubRefFromEntityRef("teaching:lesson:lesson_x")).toBe("teaching:lesson:lesson_x");
+    expect(hubRefFromEntityRef("tasks:program:program_x")).toBe("tasks:program:program_x");
+  });
+
   it("marks B→A as incoming readonly on page A and excludes it from replace payloads", () => {
     const ready = chipsFromDualRead({
       pageId: "page_alpha",
@@ -139,7 +149,7 @@ describe("pageRelationshipsEditor ownership", () => {
       ],
       entries: [{ id: "page_gamma", title: "Gamma" }],
     });
-    expect(ready.chips[0]?.href).toBe("https://knowledge-hub.adam-russell.com/#page/page_gamma");
+    expect(ready.chips[0]?.href).toBe("/knowledge/#page/page_gamma");
   });
 
   it("passes the resolved href through to the rendered chip as a clickable link", () => {
@@ -150,7 +160,7 @@ describe("pageRelationshipsEditor ownership", () => {
       pageId: "page_alpha",
       chips: [ownedOutgoing("page_gamma", "Gamma")].map((chip) => ({
         ...chip,
-        href: "https://knowledge-hub.adam-russell.com/#page/page_gamma",
+        href: "/knowledge/#page/page_gamma",
       })),
       status: "ready",
       message: "",
@@ -159,7 +169,7 @@ describe("pageRelationshipsEditor ownership", () => {
     });
     const link = host.querySelector<HTMLAnchorElement>(".entity-chip__label--link");
     expect(link).not.toBeNull();
-    expect(link?.getAttribute("href")).toBe("https://knowledge-hub.adam-russell.com/#page/page_gamma");
+    expect(link?.getAttribute("href")).toBe("/knowledge/#page/page_gamma");
   });
 
   it("renders incoming chips as read-only without a remove action", () => {

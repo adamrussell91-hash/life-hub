@@ -31,6 +31,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'member_of',
     'participates_in',
     'preparation',
+    'presenter',
     'professional_relationship',
     'provider',
     'recipient',
@@ -52,11 +53,12 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.equal(getRelationshipDeclaration('referee').inverse_label, 'referee_for');
   assert.equal(getRelationshipDeclaration('application_action').inverse_label, 'has_application_action');
   assert.equal(getRelationshipDeclaration('participates_in').inverse_label, 'has_participant');
+  assert.equal(getRelationshipDeclaration('presenter').inverse_label, 'presents_at');
 });
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields, but excludes teaching_protected-only relationships', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 19);
+  assert.equal(projected.length, 20);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as

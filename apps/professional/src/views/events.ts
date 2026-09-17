@@ -26,6 +26,7 @@ import {
   mountTaskLinkPanel,
   renderRelationshipSection
 } from '@/components/schedule-relationships';
+import { createUniversalLink } from '@/api/universal-links';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -196,6 +197,11 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     orgRel.append(option);
   }
 
+  const presenterInput = document.createElement('input');
+  presenterInput.type = 'text';
+  presenterInput.placeholder = 'Type @ to add a presenter';
+  presenterInput.setAttribute('aria-label', 'Presenter');
+
   const knowledgeInput = document.createElement('input');
   knowledgeInput.type = 'text';
   knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
@@ -231,6 +237,27 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         relationshipType,
         state: 'pending',
         supportingLabel: relationshipType,
+        href: item.href ?? null
+      });
+    }
+  });
+
+  const presenterPicker = createEntityPicker({
+    input: presenterInput,
+    allowedKinds: ['person'],
+    emptyText: 'No matching people.',
+    search: async (query, signal) => {
+      const result = await searchEntities(query, 'person', { signal });
+      return { groups: { person: result.groups.person } };
+    },
+    onSelect: (item) => {
+      chipList.addPending({
+        id: `pending:${item.ref}:presenter`,
+        ref: item.ref,
+        label: `${item.display_label} (presenter)`,
+        relationshipType: 'presenter',
+        state: 'pending',
+        supportingLabel: 'presenter',
         href: item.href ?? null
       });
     }
@@ -288,6 +315,9 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     el('label', undefined, 'Provider / venue'),
     orgInput,
     picker.root,
+    el('label', undefined, 'Presenter'),
+    presenterInput,
+    presenterPicker.root,
     chipsHost,
     el('label', undefined, 'Related Knowledge page'),
     knowledgeInput,
@@ -321,14 +351,16 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     const pending = chipList.getChips().filter((chip) => chip.state === 'pending');
     const links: Array<{
       target_ref: string;
-      relationship_type: 'provider' | 'venue' | 'related_to';
+      relationship_type: 'provider' | 'venue' | 'related_to' | 'presenter';
     }> = pending.map((chip) => ({
       target_ref: chip.ref,
       relationship_type: (chip.relationshipType === 'venue'
         ? 'venue'
         : chip.relationshipType === 'related_to'
           ? 'related_to'
-          : 'provider') as 'provider' | 'venue' | 'related_to'
+          : chip.relationshipType === 'presenter'
+            ? 'presenter'
+            : 'provider') as 'provider' | 'venue' | 'related_to' | 'presenter'
     }));
     try {
       const result = await createEvent({
@@ -555,6 +587,87 @@ export async function renderEventDetailView(
     const relationships = el('section', 'event-detail__relationships');
     relationships.append(el('p', undefined, 'Loading relationships…'));
 
+    const addPanel = el('section', 'event-detail__add-relationship');
+    addPanel.append(el('h2', undefined, 'Add relationship'));
+    const addStatus = el('p', 'event-form__status');
+    addStatus.hidden = true;
+
+    function reloadRelationships(): void {
+      void loadEntityRelationships(`professional:event:${record.id}`)
+        .then((entries) => {
+          renderRelationshipSection(
+            relationships,
+            entries,
+            'No provider, venue, presenter, knowledge, or learning task links yet.'
+          );
+        })
+        .catch((err) => {
+          relationships.replaceChildren(
+            el('h2', undefined, 'Relationships'),
+            el(
+              'p',
+              'empty-state',
+              err instanceof ApiClientError ? err.message : 'Relationships unavailable.'
+            )
+          );
+        });
+    }
+
+    async function addRelationship(targetRef: string, relationshipType: string): Promise<void> {
+      addStatus.hidden = true;
+      try {
+        await createUniversalLink({
+          source_ref: `professional:event:${record.id}`,
+          target_ref: targetRef,
+          relationship_type: relationshipType
+        });
+        reloadRelationships();
+      } catch (err) {
+        addStatus.hidden = false;
+        addStatus.textContent = err instanceof ApiClientError ? err.message : 'Could not save relationship.';
+      }
+    }
+
+    const addPresenterInput = document.createElement('input');
+    addPresenterInput.type = 'text';
+    addPresenterInput.placeholder = 'Type @ to add a presenter';
+    addPresenterInput.setAttribute('aria-label', 'Add presenter');
+    const addPresenterPicker = createEntityPicker({
+      input: addPresenterInput,
+      allowedKinds: ['person'],
+      emptyText: 'No matching people.',
+      search: async (query, signal) => {
+        const result = await searchEntities(query, 'person', { signal });
+        return { groups: { person: result.groups.person } };
+      },
+      onSelect: (item) => {
+        addPresenterInput.value = '';
+        void addRelationship(item.ref, 'presenter');
+      }
+    });
+
+    const addKnowledgeInput = document.createElement('input');
+    addKnowledgeInput.type = 'text';
+    addKnowledgeInput.placeholder = 'Type @ to link a Knowledge page';
+    addKnowledgeInput.setAttribute('aria-label', 'Add related knowledge page');
+    const addKnowledgePicker = mountKnowledgePagePicker({
+      input: addKnowledgeInput,
+      onSelect: (item) => {
+        addKnowledgeInput.value = '';
+        void addRelationship(item.ref, 'related_to');
+      }
+    });
+
+    addPanel.append(
+      el('label', undefined, 'Presenter'),
+      addPresenterInput,
+      addPresenterPicker.root,
+      el('label', undefined, 'Related Knowledge page'),
+      addKnowledgeInput,
+      addKnowledgePicker.root,
+      addStatus
+    );
+
     const taskPanels = el('div', 'event-detail__task-panels');
     mountTaskLinkPanel({
       host: taskPanels,
@@ -599,27 +712,11 @@ export async function renderEventDetailView(
       rescheduleForm,
       edit,
       relationships,
+      addPanel,
       taskPanels
     );
 
-    void loadEntityRelationships(`professional:event:${record.id}`)
-      .then((entries) => {
-        renderRelationshipSection(
-          relationships,
-          entries,
-          'No provider, venue, knowledge, or learning task links yet.'
-        );
-      })
-      .catch((err) => {
-        relationships.replaceChildren(
-          el('h2', undefined, 'Relationships'),
-          el(
-            'p',
-            'empty-state',
-            err instanceof ApiClientError ? err.message : 'Relationships unavailable.'
-          )
-        );
-      });
+    reloadRelationships();
 
     if (record.incomplete_links) {
       const incomplete = el('section', 'event-detail__incomplete');
