@@ -321,7 +321,7 @@ export function mountPageRelationshipsEditor(options: {
         try {
           const result = await searchRelatedEntities(query, RELATED_SEARCH_KINDS, signal);
           if (signal.aborted) return { groups: {} };
-          const groups: Record<string, typeof result.groups[string]> = {};
+          const groups: Record<string, (typeof result.groups)[string]> = {};
           for (const kind of RELATED_SEARCH_KINDS) {
             groups[kind] = (result.groups[kind] ?? []).filter(item => {
               const hubRef = hubRefFromEntityRef(item.ref);
