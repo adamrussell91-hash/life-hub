@@ -17,6 +17,19 @@ vi.mock("../api/client", async () => {
     searchPages: vi.fn(async () => [
       { id: "page_beta", title: "Beta note", area: "notes", tags: [], excerpt: "" },
     ]),
+    searchRelatedEntities: vi.fn(async () => ({
+      groups: {
+        event: [
+          {
+            ref: "professional:event:event_warlight",
+            kind: "event",
+            display_label: "Warlight Professional Development",
+            supporting_label: "professional development · completed",
+            href: "/professional/#/event/event_warlight",
+          },
+        ],
+      },
+    })),
   };
 });
 
@@ -67,6 +80,41 @@ describe("pageRelationshipsEditor ownership", () => {
     );
     expect(hubRefFromEntityRef("teaching:lesson:lesson_x")).toBe("teaching:lesson:lesson_x");
     expect(hubRefFromEntityRef("tasks:program:program_x")).toBe("tasks:program:program_x");
+  });
+
+  it("finds and attaches a Professional development event through the shared picker", async () => {
+    vi.useFakeTimers();
+    try {
+      const host = document.createElement("div");
+      document.body.append(host);
+      const onChange = vi.fn();
+      const handle = mountPageRelationshipsEditor({
+        host,
+        pageId: "page_alpha",
+        chips: [],
+        status: "ready",
+        message: "",
+        entries: [],
+        onChange,
+        onSave: () => undefined,
+        onRetryLoad: () => undefined,
+      });
+
+      const input = host.querySelector<HTMLInputElement>(".compose__relationship-picker")!;
+      input.value = "@War";
+      input.setSelectionRange(input.value.length, input.value.length);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(250);
+
+      const eventOption = host.querySelector<HTMLButtonElement>(".entity-picker__option");
+      expect(eventOption?.textContent).toContain("Warlight Professional Development");
+      eventOption?.click();
+
+      expect(handle.getDesiredHubRefs()).toEqual(["professional:event:event_warlight"]);
+      expect(onChange).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("marks B→A as incoming readonly on page A and excludes it from replace payloads", () => {
