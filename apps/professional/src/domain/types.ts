@@ -619,6 +619,27 @@ export interface RelationalSearchResponse {
   results: RelationalSearchResult[];
 }
 
+/**
+ * `POST /api/people/relational-search?action=plan` (Phase 5, Layer 2 —
+ * natural-language relational search). Plans AND executes in one call:
+ * `organisation_ref`/`organisation_matched`/`role`/`text` are the RESOLVED
+ * Layer 1 filter the model's free-text question was translated into (for
+ * UI transparency — "never opaque"), `organisation_name` is the resolved
+ * display name (or the model's raw guess, on no match), and `unsupported`/
+ * `unsupported_reason` are set instead of a forced bad-fit filter when the
+ * question genuinely needs more than organisation/role/text can express.
+ */
+export interface RelationalSearchPlanResponse {
+  organisation_ref: string;
+  organisation_name: string;
+  organisation_matched: boolean;
+  role: string;
+  text: string;
+  unsupported: boolean;
+  unsupported_reason: string;
+  results: RelationalSearchResult[];
+}
+
 /** `GET /api/relationship-registry` projection — only the fields this app's
  * client code needs (role dropdown sourcing for Relational Search's `role`
  * filter uses `allowed_roles` off the `professional_relationship` entry). */

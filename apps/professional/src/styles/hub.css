@@ -532,7 +532,43 @@
   margin-bottom: var(--space-3);
 }
 
-/* Relational Search panel (Phase 3, Feature 3.3, layer 1) */
+/* Relational Search panel (Phase 3, Feature 3.3, layer 1; Phase 5, layer 2) */
+
+.relational-search__submodes {
+  margin-bottom: var(--space-3);
+}
+
+.relational-search__nl-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.relational-search__nl-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+}
+
+.relational-search__nl-interpretation {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+  margin: var(--space-3) 0 0;
+}
+
+.relational-search__nl-status {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  margin: var(--space-3) 0 0;
+}
 
 .relational-search__form {
   display: flex;
@@ -863,10 +899,19 @@
   align-self: flex-start;
 }
 
+.network-ecology__mycelium-note {
+  margin: 0;
+}
+
 .network-ecology__legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-4);
+  transition: opacity 160ms ease;
+}
+
+.network-ecology__legend--dimmed {
+  opacity: 0.35;
 }
 
 .network-ecology__legend-item {

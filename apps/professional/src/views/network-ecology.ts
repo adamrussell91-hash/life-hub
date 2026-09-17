@@ -219,7 +219,18 @@ export async function renderNetworkEcologyView(
 
   const { label: overlayLabel, input: overlayCheckbox } = checkboxLabel('Show opportunity & dormancy', false);
 
-  toolbar.append(backButton, orgLayerLabel, relLayerLabel, overlayLabel);
+  // Mycelium layer (Phase 5, brief section 37) — World View only, per the
+  // brief's own framing: it reveals the raw Universal Link graph beneath
+  // the HABITAT terrain, and only World View draws habitat terrain at all
+  // (EGO/Your Network/History either never carry `habitat`, or — History —
+  // are a different recomputed snapshot; none is "the terrain" this toggle
+  // fades). No new fetch: it only changes how the already-fetched
+  // `nodes`/`edges` are drawn (`network-graph-canvas.ts`'s `myceliumMode`
+  // render switch).
+  const { label: myceliumLabel, input: myceliumCheckbox } = checkboxLabel('Mycelium — show raw connections', false);
+  let myceliumEnabled = false;
+
+  toolbar.append(backButton, orgLayerLabel, relLayerLabel, overlayLabel, myceliumLabel);
 
   const historyBar = el('div', 'network-ecology__history-bar');
   historyBar.hidden = true;
@@ -257,10 +268,23 @@ export async function renderNetworkEcologyView(
   panel.hidden = true;
   stage.append(graphHost, panel);
 
+  // Chosen treatment (documented per the task's "your call"): the legend
+  // STAYS visible when Mycelium is on, dimmed via a CSS class, with an
+  // explicit note rather than hiding outright — habitats are still
+  // faintly drawn (see `network-graph-canvas.ts`'s faded halo), so an
+  // entirely-hidden legend would describe less than what's still on
+  // screen.
+  const myceliumNote = el(
+    'p',
+    'network-ecology__mycelium-note empty-state',
+    'Habitat view paused — showing the raw Universal Link structure beneath the terrain (Mycelium layer, brief section 37).'
+  );
+  myceliumNote.hidden = true;
+
   const legend = el('div', 'network-ecology__legend');
   legend.setAttribute('aria-label', 'Habitat legend');
 
-  root.append(modePills, toolbar, historyBar, overlayNote, statusHost, stage, legend);
+  root.append(modePills, toolbar, historyBar, overlayNote, statusHost, stage, myceliumNote, legend);
   canvas.append(root);
 
   let mode: ViewMode = 'world';
@@ -287,11 +311,20 @@ export async function renderNetworkEcologyView(
     orgLayerLabel.hidden = mode !== 'your-network';
     relLayerLabel.hidden = mode !== 'your-network';
     historyBar.hidden = mode !== 'history';
+    // Mycelium is World View only (see the toggle's own doc comment above).
+    myceliumLabel.hidden = mode !== 'world';
     // History mode's clusters DO carry a classified habitat (organisation
     // clusters only — see `_shared/network-ecology-history.mjs`'s own
     // scoping note), so the legend is just as meaningful there as in World
     // View.
     legend.hidden = mode !== 'world' && mode !== 'history';
+    updateMyceliumChrome();
+  }
+
+  function updateMyceliumChrome(): void {
+    const active = myceliumEnabled && mode === 'world';
+    myceliumNote.hidden = !active;
+    legend.classList.toggle('network-ecology__legend--dimmed', active);
   }
 
   function showPanel(node: GraphNode | null): void {
@@ -347,6 +380,7 @@ export async function renderNetworkEcologyView(
     graphHost.replaceChildren();
     graphHandle = mountNetworkGraph(graphHost, nodes, edges, {
       reducedMotion,
+      myceliumMode: myceliumEnabled && mode === 'world',
       onNodeSelect: (node) => showPanel(node)
     });
   }
@@ -539,6 +573,13 @@ export async function renderNetworkEcologyView(
 
   overlayCheckbox.addEventListener('change', () => {
     overlayNote.hidden = !overlayCheckbox.checked;
+  });
+
+  myceliumCheckbox.addEventListener('change', () => {
+    if (mode !== 'world') return;
+    myceliumEnabled = myceliumCheckbox.checked;
+    graphHandle?.setMyceliumMode(myceliumEnabled);
+    updateMyceliumChrome();
   });
 
   updateChrome();

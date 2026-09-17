@@ -553,6 +553,172 @@ that step is left for Adam's explicit review when he's back.
     (clean), `npm run build` (clean); root `npm test` (3904/3904 — 3879
     baseline + 25 new `network-ecology-history` unit + integration tests).
 
+## Phase 5 decisions
+
+36. **Mycelium is a pure rendering-mode switch on `network-graph-canvas.ts`,
+    a clean prop addition — no refactor needed.** Confirmed before writing
+    any code: `NetworkEcologyWorld`'s `edges` (`domain/types.ts`) already
+    carry `source_ref`/`target_ref`/`relationship_type` for every link, and
+    `network-ecology.ts`'s World View already hands the canvas component
+    the FULL edge list (no habitat-based edge filtering happens today) —
+    so "the raw graph underneath" is already fully present client-side the
+    moment World View loads; only how it is DRAWN needed to change. Added
+    `myceliumMode?: boolean` to `GraphMountOptions` (initial value at
+    mount) and a new `GraphHandle.setMyceliumMode(value: boolean): void`
+    method that mutates a closure-local flag and calls the existing
+    `draw()` once — it never touches `simNodes`/`simLinks`, never restarts
+    the `d3-force` simulation, and never triggers a fetch. `draw()` itself
+    only gained two small branches (already parameterized by
+    `HABITAT_META`-driven per-node halo drawing and a single edge-stroke
+    loop, exactly as anticipated): habitat halo `globalAlpha` drops from
+    0.4 to 0.08 (faded, not removed — brief section 37's own words, "the
+    surface ecology becomes partially translucent"), and every edge is
+    drawn with one plain, thin (`lineWidth: 1`), low-saturation stroke
+    (`--shallow` token, alpha 0.35, dormancy ignored) instead of the
+    habitat view's `--wave` accent + dormancy-based alpha — "elegant and
+    restrained... not a technical graph debugger" (brief section 37),
+    which is also why relationship type is deliberately NOT colour-coded
+    here. `network-ecology.ts`: a "Mycelium — show raw connections"
+    checkbox in the toolbar, hidden outside World mode (only World View
+    draws habitat terrain at all — EGO/Your Network never carry `habitat`,
+    per decision 1 in the Phase 4 section above), wired straight to
+    `graphHandle.setMyceliumMode` with no re-fetch. State persists across
+    an EGO recentre / History mode / whatever else — the closure-local
+    `myceliumEnabled` variable in the view, threaded into
+    `mountNetworkGraph`'s options on the next fresh World View mount (e.g.
+    after "Back to World View").
+
+37. **Habitat legend: stays visible, dimmed, with an explicit note — not
+    hidden outright.** The task text offered either choice. Since the
+    habitat halo is FADED (0.08 alpha), not fully hidden, in Mycelium mode,
+    an entirely-hidden legend would describe less than what remains
+    faintly on screen. Implemented as a `network-ecology__legend--dimmed`
+    CSS class (opacity 0.35) toggled alongside a
+    `.network-ecology__mycelium-note` paragraph ("Habitat view paused —
+    showing the raw Universal Link structure beneath the terrain"), both
+    driven by one `updateMyceliumChrome()` function called from
+    `updateChrome()` and the checkbox's own `change` handler.
+
+38. **Natural-language relational search: plan-and-execute in one call,
+    following `person-brief-generation.mjs`'s pattern exactly, not
+    `knowledge-clementine-coach.mjs`'s older one.** New
+    `netlify/functions/_shared/relational-search-nl.mjs`:
+    `planRelationalQuery({question, apiKey, fetchImpl, complete, store})`
+    translates a free-text question into Layer 1's exact filter shape
+    (`{organisation_ref, role, text}`), reusing `person-brief-generation.mjs`'s
+    established shape (`MODEL_ID = 'claude-sonnet-5'`, `deps.complete`/
+    `deps.fetchImpl` injection, a stray-```json-fence-stripping JSON parse,
+    a `{status: 502, code: '..._plan_failed', retryable: true}` error for
+    any malformed/failed model interaction — never a crash or garbage
+    output). Two closed-vocabulary enforcement points, one for each
+    filter the model cannot be trusted to invent:
+    - **Role**: the system prompt is built with the REAL, current
+      `getRelationshipDeclaration('professional_relationship').allowed_roles`
+      (never hardcoded) and explicitly told never to invent outside it —
+      but the model's word is not trusted blindly either: any returned
+      `role` NOT actually in that list is silently DROPPED before it ever
+      reaches `runRelationalSearch` (which would otherwise itself reject it
+      with `invalid_role`). Proven by
+      `tests/unit/relational-search-nl.test.js`'s "a model-hallucinated
+      role value is dropped, not passed through, against the real registry
+      enum" test, which asserts the fixture role is genuinely outside
+      `getRelationshipDeclaration('professional_relationship').allowed_roles`
+      (not just outside some fake test enum) before asserting it gets
+      dropped.
+    - **Organisation**: the model cannot know a real `organisation_ref` (an
+      opaque id it is never shown), so it is asked for a plain
+      organisation NAME instead. That name is resolved to a ref by
+      **reusing `entity-search.mjs`'s own `searchIdentityKind`** — newly
+      exported from that route file specifically for this reuse (no
+      `_shared` module owned this logic before; it always lived at the
+      route level) — via a new `resolveOrganisationByName(store, name)` in
+      `relational-search-nl.mjs`. This is the EXACT SAME indexed-candidate-
+      then-authoritative-re-validation search the "Search by name" picker
+      already runs against the organisation index, not a second, invented
+      resolution path. A name that doesn't resolve is a clean "no match"
+      (`organisation_ref` left empty, `organisation_matched: false`) —
+      this is where organisation invention gets caught, symmetric to the
+      role check.
+    - The model is also allowed to say a question is honestly
+      `unsupported` (with a short `unsupported_reason`) when it needs more
+      than these three filters can express — e.g. multi-hop reasoning,
+      ranking — rather than being forced into a bad-fit filter. Route
+      (`netlify/functions/people-relational-search.mjs`) treats
+      `unsupported` (or a plan that resolved to zero filters) as "zero
+      results, no error" rather than calling `runRelationalSearch` (which
+      would 400 on an all-empty query).
+    - Route: `POST /api/people/relational-search?action=plan`, body
+      `{question}`, mirroring `people-brief.mjs`'s `POST
+      ?action=generate&id=` sub-routing and 503-when-unbound shape exactly
+      (`503 people_relational_search_nl_unbound` when
+      `env.ANTHROPIC_API_KEY` is empty). PLANS and EXECUTES in one call —
+      response is `{organisation_ref, organisation_name,
+      organisation_matched, role, text, unsupported, unsupported_reason,
+      results}` — the resolved filter fields double as the UI's
+      transparency line ("never opaque" principle), and `results` carries
+      the exact same `matched_reasons`-bearing shape Layer 1 already
+      returns. A POST to this route without `?action=plan` now returns 400
+      `invalid_action` rather than the previous blanket 405 (POST is a
+      supported method now) — the one pre-existing integration test that
+      asserted 405 for POST was updated accordingly (renamed to assert 405
+      only for a genuinely unsupported method, PATCH).
+    - Frontend: `relational-search-panel.ts` gained its own internal
+      two-tab switch ("Structured filters" / "Ask a question") — a
+      SEPARATE, second-level toggle from `people-home.ts`'s outer "Search
+      by name" vs "Relational search" mode switch (documented in-code
+      since the task described "three modes" together). "Ask a question"
+      is a single text input + submit, calling the new
+      `askRelationalSearchQuestion` API client function, showing the
+      resolved-filter transparency line (`describePlanInterpretation`,
+      e.g. "Searching: organisation = UNSW, text contains \"gifted
+      education\"") before the results, which reuse the EXACT SAME
+      `renderResultsInto` helper Layer 1's structured mode uses (extracted
+      from the pre-existing inline `renderResults`, not duplicated). A 503
+      `people_relational_search_nl_unbound` shows "Ask-a-question search is
+      not configured." — the same honest, non-scary "not configured"
+      pattern `person-brief.ts` already established for
+      `people_anthropic_unbound`.
+
+39. **Deliberately deferred (not built): full per-fact Evidence Ledger and
+    advanced multi-signal Opportunity detection — genuinely open product
+    questions, not implementation gaps.** Per this task's own explicit
+    scoping instruction. Documented here with the actual reasoning, not
+    just "deferred":
+    - **Full per-fact Evidence Ledger** (brief's per-fact provenance/
+      evidence-trail concept — every displayed fact traceable to its
+      source record(s), individually). The Evidence tab built in Phase 1
+      (Feature 1.5) already surfaces SOURCE-linked observations and
+      relationship provenance at the person level; a full per-FACT ledger
+      is a materially different, finer-grained data model question: which
+      individual facts warrant their own evidence trail (every relationship
+      change? every brief bullet? every classification like a habitat
+      label or dormancy flag?), what "evidence" means for a derived/
+      computed fact (e.g. a habitat classification isn't sourced from one
+      record, it's computed from a whole cluster's stats) versus a directly
+      observed one, and how much of this the UI should surface versus
+      leave as an internal audit trail. These are product-design decisions
+      about what the feature IS, not an engineering estimate — building
+      something today would mean guessing at that shape and likely
+      rebuilding it once Adam actually defines what "evidence" means for a
+      derived fact. Left as an explicit open question for a future,
+      dedicated product conversation.
+    - **Advanced multi-signal Opportunity detection** (beyond the existing
+      Feature 4.7 toggle's honest "not enough data yet" state — see Phase 4
+      decision 34 above). The existing gap is NOT just missing data
+      plumbing: `classifyRelationshipState` needs
+      `lastMeaningfulInteraction`/`previousMeaningfulInteraction`/
+      `upcomingInteraction`/`activeSharedContexts`/`personCreatedAt` per
+      relationship, and "advanced multi-signal" implies combining several
+      independent signals (e.g. recency + shared-context overlap + role
+      change + introduction-path proximity) into one opportunity score or
+      ranking — which directly collides with Principle 6 ("never rank or
+      score people") unless carefully scoped to stay descriptive rather
+      than evaluative. What signals count, how they combine, and how to
+      phrase the result without it reading as a score are product
+      decisions Adam needs to make, not additional plumbing this task could
+      correctly guess at. Left as an explicit open question alongside the
+      Evidence Ledger.
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -633,4 +799,29 @@ that step is left for Adam's explicit review when he's back.
   mode unit tests), `npm run typecheck` (clean), `npm run build` (clean);
   root `npm test` (3904/3904 — 3879 baseline + 25 new
   `network-ecology-history` unit + integration tests). Not pushed, no PR.
-- Phase 5: not started
+- Phase 5: **partial — 2 of 4 items shipped, 2 explicitly deferred.**
+  Shipped: the Mycelium layer (World View's raw-graph rendering-mode
+  toggle, `network-graph-canvas.ts`'s new `myceliumMode`/
+  `setMyceliumMode`, `network-ecology.ts`'s toolbar checkbox — decisions
+  36-37 above) and natural-language relational search (Layer 2 on top of
+  Phase 3's Feature 3.3 structured search — `POST
+  /api/people/relational-search?action=plan`,
+  `_shared/relational-search-nl.mjs`'s `planRelationalQuery`, the "Ask a
+  question" mode in `relational-search-panel.ts` — decision 38 above).
+  Deliberately deferred, per this task's own explicit scoping: the full
+  per-fact Evidence Ledger and advanced multi-signal Opportunity detection
+  — both genuinely open product-design questions, not implementation gaps
+  (decision 39 above explains why each needs Adam's own product input
+  before they can be correctly built at all, not just more engineering
+  time). Verified: `apps/professional` `npm test` (196/196 — 182 baseline
+  + 14 new: `network-graph-canvas.test.ts` 19 total (6 new Mycelium
+  rendering tests), `network-ecology.test.ts` 18 total (4 new Mycelium
+  toggle/wiring tests), `relational-search-panel.test.ts` 9 total (4 new
+  "Ask a question" mode tests, all 5 pre-existing tests still green
+  unchanged) — 6+4+4=14), `npm run typecheck` (clean), `npm run build` (clean);
+  root `npm test` (3926/3926 — 3904 baseline + 6 new integration tests in
+  `tests/integration/people-relational-search.test.js` [1 new "POST
+  without action=plan is now 400, not the old blanket 405" test + 5 new
+  `?action=plan` tests: 503 unbound, success path, malformed model output,
+  hallucinated-role dropped, honestly-unsupported question] + 16 new unit
+  tests in `tests/unit/relational-search-nl.test.js`). Not pushed, no PR.

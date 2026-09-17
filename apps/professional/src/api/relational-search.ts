@@ -1,6 +1,7 @@
-import { apiGet } from './client';
+import { apiGet, apiPost } from './client';
 import type {
   RelationalSearchFilters,
+  RelationalSearchPlanResponse,
   RelationalSearchResponse,
   RelationshipRegistryResponse
 } from '@/domain/types';
@@ -37,4 +38,23 @@ export function fetchRelationshipRegistry(
   options: RelationalSearchRequestOptions = {}
 ): Promise<RelationshipRegistryResponse> {
   return apiGet<RelationshipRegistryResponse>('/api/relationship-registry', { signal: options.signal });
+}
+
+/**
+ * `POST /api/people/relational-search?action=plan` (Phase 5, Layer 2).
+ * May reject with an `ApiClientError` whose `code` is
+ * `people_relational_search_nl_unbound` (503 — not configured, an
+ * expected/common state in dev/test environments without an API key
+ * bound) or `relational_search_nl_plan_failed` (502 — the model call or
+ * its output failed, retryable).
+ */
+export function askRelationalSearchQuestion(
+  question: string,
+  options: RelationalSearchRequestOptions = {}
+): Promise<RelationalSearchPlanResponse> {
+  return apiPost<RelationalSearchPlanResponse>(
+    '/api/people/relational-search?action=plan',
+    { question },
+    { signal: options.signal }
+  );
 }

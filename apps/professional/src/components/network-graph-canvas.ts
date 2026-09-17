@@ -68,11 +68,26 @@ export interface GraphMountOptions {
    * the simulation is settled synchronously (many manual `.tick()` calls,
    * no live animation) and drawn once, instead of animating tick-by-tick. */
   reducedMotion?: boolean;
+  /** Mycelium layer (Phase 5, brief section 37 — World View only). When
+   * true, habitat cluster halos are drawn heavily faded rather than off
+   * ("the surface ecology becomes partially translucent", not hidden
+   * outright) and every edge is drawn with a plain, thin, low-saturation
+   * stroke instead of the habitat-view's accent colour — "elegant and
+   * restrained... not a technical graph debugger", so relationship type is
+   * deliberately NOT colour-coded here. Initial value only; toggling after
+   * mount goes through `GraphHandle.setMyceliumMode`, which just flips the
+   * flag and redraws — it never touches `simNodes`/`simLinks` or restarts
+   * the simulation, so this is a pure rendering-mode switch over data the
+   * caller already has client-side (no new fetch). */
+  myceliumMode?: boolean;
 }
 
 export interface GraphHandle {
   destroy(): void;
   setData(nodes: GraphNode[], edges: GraphEdge[]): void;
+  /** See `GraphMountOptions.myceliumMode` — flips the rendering mode on
+   * the CURRENT data and redraws once; does not touch simulation state. */
+  setMyceliumMode(value: boolean): void;
 }
 
 interface SimNode extends GraphNode {
@@ -253,6 +268,7 @@ export function mountNetworkGraph(
   let simLinks: SimLink[] = [];
   let selectedId: string | null = null;
   let hoverNode: SimNode | null = null;
+  let myceliumMode = options.myceliumMode ?? false;
 
   host.replaceChildren();
 
@@ -287,24 +303,36 @@ export function mountNetworkGraph(
     ctx.clearRect(0, 0, width, height);
 
     // Habitat halos, per-node (documented decision above — no hull).
+    // Mycelium mode fades the terrain heavily rather than removing it
+    // outright ("the surface ecology becomes partially translucent" —
+    // brief section 37), so a faint sense of habitat regions survives
+    // underneath the raw graph.
     for (const node of simNodes) {
       if (node.x == null || node.y == null || !node.habitat) continue;
       ctx.beginPath();
       ctx.fillStyle = habitatFillColor(node.habitat);
-      ctx.globalAlpha = 0.4;
+      ctx.globalAlpha = myceliumMode ? 0.08 : 0.4;
       ctx.arc(node.x, node.y, nodeRadius(node) + 16, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
 
-    // Edges.
-    ctx.lineWidth = 1.25;
+    // Edges. Mycelium mode draws every edge with one plain, thin,
+    // low-saturation stroke — "elegant and restrained... not a technical
+    // graph debugger" (brief section 37) — rather than the habitat view's
+    // accent colour and dormancy-based alpha.
+    ctx.lineWidth = myceliumMode ? 1 : 1.25;
     for (const link of simLinks) {
       const s = typeof link.source === 'object' ? link.source : null;
       const t = typeof link.target === 'object' ? link.target : null;
       if (!s || !t || s.x == null || t.x == null || s.y == null || t.y == null) continue;
-      ctx.strokeStyle = tokenColor('--wave', '#376fb7');
-      ctx.globalAlpha = link.dormant ? 0.22 : 0.6;
+      if (myceliumMode) {
+        ctx.strokeStyle = tokenColor('--shallow', '#a7abb9');
+        ctx.globalAlpha = 0.35;
+      } else {
+        ctx.strokeStyle = tokenColor('--wave', '#376fb7');
+        ctx.globalAlpha = link.dormant ? 0.22 : 0.6;
+      }
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
@@ -462,6 +490,11 @@ export function mountNetworkGraph(
       selectedId = null;
       hoverNode = null;
       build(nodes, edges);
+    },
+    setMyceliumMode(value: boolean): void {
+      if (destroyed) return;
+      myceliumMode = value;
+      draw();
     }
   };
 }

@@ -44,6 +44,7 @@ function routedFetch(options: {
   registry?: unknown | 'error';
   orgSearch?: unknown;
   relationalSearch?: unknown | 'error';
+  nlPlan?: unknown | 'error-503' | 'error-502';
 }): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL) => {
     const href = String(input);
@@ -58,6 +59,36 @@ function routedFetch(options: {
         ok: true,
         data: options.orgSearch ?? { groups: { person: [], organisation: [], task: [] } }
       });
+    }
+    if (href.includes('/api/people/relational-search') && href.includes('action=plan')) {
+      if (options.nlPlan === 'error-503') {
+        return jsonResponse(503, {
+          ok: false,
+          error: { code: 'people_relational_search_nl_unbound', message: 'Ask-a-question search is unavailable', retryable: true }
+        });
+      }
+      if (options.nlPlan === 'error-502') {
+        return jsonResponse(502, {
+          ok: false,
+          error: { code: 'relational_search_nl_plan_failed', message: 'Could not plan the query.', retryable: true }
+        });
+      }
+      return jsonResponse(
+        200,
+        {
+          ok: true,
+          data: options.nlPlan ?? {
+            organisation_ref: '',
+            organisation_name: '',
+            organisation_matched: false,
+            role: '',
+            text: '',
+            unsupported: false,
+            unsupported_reason: '',
+            results: []
+          }
+        }
+      );
     }
     if (href.includes('/api/people/relational-search')) {
       if (options.relationalSearch === 'error') {
@@ -213,5 +244,131 @@ describe('mountRelationalSearchPanel', () => {
     const status = container.querySelector<HTMLElement>('.relational-search__status')!;
     expect(status.hidden).toBe(false);
     expect(status.textContent).toBe('No matches.');
+  });
+
+  // --- "Ask a question" mode (Phase 5, Layer 2) ------------------------
+
+  it('renders a third "Ask a question" mode alongside "Structured filters", hidden until activated', async () => {
+    globalThis.fetch = routedFetch({});
+    const container = document.createElement('div');
+    mountRelationalSearchPanel(container);
+    await vi.advanceTimersByTimeAsync(0);
+
+    const tabs = [...container.querySelectorAll<HTMLButtonElement>('.relational-search__submode-tab')];
+    expect(tabs.map((t) => t.textContent)).toEqual(['Structured filters', 'Ask a question']);
+
+    const structuredPanel = container.querySelector<HTMLElement>('.relational-search__submode-panel:not(.relational-search__nl-panel)')!;
+    const nlPanel = container.querySelector<HTMLElement>('.relational-search__nl-panel')!;
+    expect(structuredPanel.hidden).toBe(false);
+    expect(nlPanel.hidden).toBe(true);
+
+    const nlTab = tabs.find((t) => t.textContent === 'Ask a question')!;
+    nlTab.click();
+    expect(structuredPanel.hidden).toBe(true);
+    expect(nlPanel.hidden).toBe(false);
+    expect(nlTab.classList.contains('is-active')).toBe(true);
+  });
+
+  it('"Ask a question" submits the question and shows the resolved-filter transparency line plus results', async () => {
+    globalThis.fetch = routedFetch({
+      nlPlan: {
+        organisation_ref: `shared:organisation:${ORG_UNSW}`,
+        organisation_name: 'UNSW',
+        organisation_matched: true,
+        role: '',
+        text: 'gifted education',
+        unsupported: false,
+        unsupported_reason: '',
+        results: [
+          {
+            person_ref: `shared:person:${PERSON_ALICE}`,
+            display_name: 'Alice Example',
+            matched_reasons: ['Employed at UNSW', "Observation mentions 'gifted education'"]
+          }
+        ]
+      }
+    });
+    const container = document.createElement('div');
+    mountRelationalSearchPanel(container);
+    await vi.advanceTimersByTimeAsync(0);
+
+    container.querySelector<HTMLButtonElement>('.relational-search__submode-tab:nth-child(2)')!.click();
+
+    const nlInput = container.querySelector<HTMLInputElement>('.relational-search__nl-input')!;
+    nlInput.value = 'Who do I know at UNSW connected to gifted education?';
+    nlInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const nlSubmit = container.querySelector<HTMLButtonElement>('.relational-search__nl-submit')!;
+    expect(nlSubmit.disabled).toBe(false);
+
+    const nlForm = container.querySelector<HTMLFormElement>('.relational-search__nl-form')!;
+    nlForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const interpretation = container.querySelector<HTMLElement>('.relational-search__nl-interpretation')!;
+    expect(interpretation.hidden).toBe(false);
+    expect(interpretation.textContent).toContain('organisation = UNSW');
+    expect(interpretation.textContent).toContain('text contains "gifted education"');
+
+    const resultItem = container.querySelector<HTMLElement>('.relational-search__nl-results .relational-search__result')!;
+    expect(resultItem).not.toBeNull();
+    const link = resultItem.querySelector<HTMLAnchorElement>('.relational-search__result-name')!;
+    expect(link.textContent).toBe('Alice Example');
+    expect(link.getAttribute('href')).toBe(`#/person/${PERSON_ALICE}`);
+  });
+
+  it('"Ask a question" shows an honest "not configured" message on a 503 people_relational_search_nl_unbound', async () => {
+    globalThis.fetch = routedFetch({ nlPlan: 'error-503' });
+    const container = document.createElement('div');
+    mountRelationalSearchPanel(container);
+    await vi.advanceTimersByTimeAsync(0);
+
+    container.querySelector<HTMLButtonElement>('.relational-search__submode-tab:nth-child(2)')!.click();
+
+    const nlInput = container.querySelector<HTMLInputElement>('.relational-search__nl-input')!;
+    nlInput.value = 'Who do I know at UNSW?';
+    nlInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const nlForm = container.querySelector<HTMLFormElement>('.relational-search__nl-form')!;
+    nlForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    const nlStatus = container.querySelector<HTMLElement>('.relational-search__nl-status')!;
+    expect(nlStatus.hidden).toBe(false);
+    expect(nlStatus.textContent).toBe('Ask-a-question search is not configured.');
+    // No scary generic error and no crash — an honest, expected state.
+    const interpretation = container.querySelector<HTMLElement>('.relational-search__nl-interpretation')!;
+    expect(interpretation.hidden).toBe(true);
+  });
+
+  it('"Ask a question" surfaces an honestly-unsupported question without pretending to have results', async () => {
+    globalThis.fetch = routedFetch({
+      nlPlan: {
+        organisation_ref: '',
+        organisation_name: '',
+        organisation_matched: false,
+        role: '',
+        text: '',
+        unsupported: true,
+        unsupported_reason: 'This needs multi-hop reasoning the structured filters cannot express.',
+        results: []
+      }
+    });
+    const container = document.createElement('div');
+    mountRelationalSearchPanel(container);
+    await vi.advanceTimersByTimeAsync(0);
+
+    container.querySelector<HTMLButtonElement>('.relational-search__submode-tab:nth-child(2)')!.click();
+    const nlInput = container.querySelector<HTMLInputElement>('.relational-search__nl-input')!;
+    nlInput.value = 'Who should introduce me to someone at UNSW?';
+    nlInput.dispatchEvent(new Event('input', { bubbles: true }));
+    container.querySelector<HTMLFormElement>('.relational-search__nl-form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    const interpretation = container.querySelector<HTMLElement>('.relational-search__nl-interpretation')!;
+    expect(interpretation.hidden).toBe(false);
+    expect(interpretation.textContent).toMatch(/multi-hop reasoning/);
   });
 });

@@ -27,10 +27,11 @@ const destroySpy = vi.fn();
 const setDataSpy = vi.fn((nodes: GraphNode[], edges: GraphEdge[]) => {
   lastSetDataArgs = { nodes, edges };
 });
+const setMyceliumModeSpy = vi.fn();
 const mountNetworkGraphMock = vi.fn(
   (_host: HTMLElement, nodes: GraphNode[], edges: GraphEdge[], options: GraphMountOptions = {}): GraphHandle => {
     lastMountArgs = { nodes, edges, options };
-    return { destroy: destroySpy, setData: setDataSpy };
+    return { destroy: destroySpy, setData: setDataSpy, setMyceliumMode: setMyceliumModeSpy };
   }
 );
 
@@ -142,6 +143,7 @@ describe('renderNetworkEcologyView', () => {
     mountNetworkGraphMock.mockClear();
     destroySpy.mockClear();
     setDataSpy.mockClear();
+    setMyceliumModeSpy.mockClear();
   });
 
   afterEach(() => {
@@ -479,5 +481,102 @@ describe('renderNetworkEcologyView', () => {
 
     expect(canvas.textContent).toMatch(/History failed\.|server could not complete/i);
     expect(canvas.querySelector('.network-ecology__status button')).not.toBeNull();
+  });
+
+  // --- Phase 5: Mycelium layer -----------------------------------------
+
+  function myceliumCheckboxIn(canvas: HTMLElement): HTMLInputElement {
+    return [...canvas.querySelectorAll<HTMLInputElement>('.network-ecology__toggle input')].find((input) =>
+      input.parentElement?.textContent?.includes('Mycelium')
+    )!;
+  }
+
+  it('the Mycelium toggle is only shown in World View', async () => {
+    globalThis.fetch = routedFetch({});
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    const myceliumLabel = myceliumCheckboxIn(canvas).parentElement as HTMLLabelElement;
+    expect(myceliumLabel.hidden).toBe(false);
+
+    const yourNetworkBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'Your Network'
+    )!;
+    yourNetworkBtn.click();
+    await flush();
+    await flush();
+
+    expect(myceliumLabel.hidden).toBe(true);
+  });
+
+  it('toggling Mycelium in World View flips the canvas render mode without any new fetch', async () => {
+    const fetchSpy = routedFetch({});
+    globalThis.fetch = fetchSpy;
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    // Mounted initially with myceliumMode off.
+    expect(lastMountArgs?.options.myceliumMode).toBe(false);
+    const callCountAfterLoad = fetchSpy.mock.calls.length;
+
+    const myceliumCheckbox = myceliumCheckboxIn(canvas);
+    myceliumCheckbox.checked = true;
+    myceliumCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(fetchSpy.mock.calls.length).toBe(callCountAfterLoad);
+    expect(setMyceliumModeSpy).toHaveBeenCalledWith(true);
+    expect(mountNetworkGraphMock).toHaveBeenCalledTimes(1); // never remounted
+
+    myceliumCheckbox.checked = false;
+    myceliumCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(setMyceliumModeSpy).toHaveBeenCalledWith(false);
+    expect(fetchSpy.mock.calls.length).toBe(callCountAfterLoad);
+  });
+
+  it('the habitat legend dims and shows a "habitat view paused" note when Mycelium is on', async () => {
+    globalThis.fetch = routedFetch({});
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    const legend = canvas.querySelector('.network-ecology__legend')!;
+    const note = canvas.querySelector('.network-ecology__mycelium-note')!;
+    expect(legend.classList.contains('network-ecology__legend--dimmed')).toBe(false);
+    expect(note.hasAttribute('hidden')).toBe(true);
+
+    const myceliumCheckbox = myceliumCheckboxIn(canvas);
+    myceliumCheckbox.checked = true;
+    myceliumCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(legend.classList.contains('network-ecology__legend--dimmed')).toBe(true);
+    expect(note.hasAttribute('hidden')).toBe(false);
+    expect(note.textContent).toMatch(/habitat view paused/i);
+    // The legend itself stays present (not removed) — the six habitat/
+    // bridge entries are still there, just dimmed.
+    expect(canvas.querySelectorAll('.network-ecology__legend-item').length).toBe(6);
+  });
+
+  it('a fresh World View mount after Mycelium was enabled remounts with myceliumMode already on', async () => {
+    const fetchSpy = routedFetch({});
+    globalThis.fetch = fetchSpy;
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    const myceliumCheckbox = myceliumCheckboxIn(canvas);
+    myceliumCheckbox.checked = true;
+    myceliumCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+
+    // Recentre into EGO mode, then back to World View — World View always
+    // does a fresh fetch + mount (`destroyGraph()` before `loadWorld`).
+    lastMountArgs?.options.onNodeSelect?.({ id: REF_B, kind: 'person', label: 'Blair B' });
+    canvas.querySelector<HTMLButtonElement>('.network-ecology__recentre')!.click();
+    await flush();
+    await flush();
+    mountNetworkGraphMock.mockClear();
+
+    canvas.querySelector<HTMLButtonElement>('.network-ecology__back')!.click();
+    await flush();
+    await flush();
+
+    expect(lastMountArgs?.options.myceliumMode).toBe(true);
   });
 });

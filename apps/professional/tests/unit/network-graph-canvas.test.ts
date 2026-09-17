@@ -34,6 +34,45 @@ function mockContext(): CanvasRenderingContext2D {
   } as unknown as CanvasRenderingContext2D;
 }
 
+/** A context that additionally records, at each `fill()`/`stroke()` call,
+ * the live `globalAlpha`/`strokeStyle`/`lineWidth` at that moment —
+ * `draw()` mutates these properties in place between calls, so a snapshot
+ * taken at call-time is the only reliable way to assert what a given
+ * fill/stroke actually used. */
+function mockRecordingContext(): {
+  ctx: CanvasRenderingContext2D;
+  fillCalls: number[];
+  strokeCalls: Array<{ alpha: number; style: unknown; width: number }>;
+} {
+  const fillCalls: number[] = [];
+  const strokeCalls: Array<{ alpha: number; style: unknown; width: number }> = [];
+  const ctx = {
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    stroke: vi.fn(function (this: CanvasRenderingContext2D) {
+      strokeCalls.push({ alpha: this.globalAlpha, style: this.strokeStyle, width: this.lineWidth });
+    }),
+    fill: vi.fn(function (this: CanvasRenderingContext2D) {
+      fillCalls.push(this.globalAlpha);
+    }),
+    arc: vi.fn(),
+    fillText: vi.fn(),
+    setLineDash: vi.fn(),
+    strokeStyle: '',
+    fillStyle: '',
+    lineWidth: 1,
+    globalAlpha: 1,
+    font: '',
+    textAlign: 'center',
+    textBaseline: 'middle'
+  } as unknown as CanvasRenderingContext2D;
+  return { ctx, fillCalls, strokeCalls };
+}
+
 function stubRect(canvasEl: HTMLCanvasElement): void {
   canvasEl.getBoundingClientRect = () =>
     ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
@@ -172,5 +211,113 @@ describe('mountNetworkGraph', () => {
     const handle = mountNetworkGraph(host, nodes, edges, { reducedMotion: true });
     handle.destroy();
     expect(host.childElementCount).toBe(0);
+  });
+});
+
+describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () => {
+  let getContextSpy: { mockRestore: () => void };
+  let recording: ReturnType<typeof mockRecordingContext>;
+
+  beforeEach(() => {
+    recording = mockRecordingContext();
+    getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(recording.ctx);
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+    getContextSpy.mockRestore();
+  });
+
+  it('fades (does not remove) the habitat halo when myceliumMode is on at mount', () => {
+    const nodes = [
+      { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
+    ] as unknown as GraphNode[];
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountNetworkGraph(host, nodes, [], { reducedMotion: true, myceliumMode: true });
+
+    // First fill() call is the habitat halo (drawn before node fills).
+    expect(recording.fillCalls[0]).toBeCloseTo(0.08);
+    expect(recording.fillCalls[0]).toBeGreaterThan(0); // faded, not fully hidden
+  });
+
+  it('draws the full habitat halo (unfaded) when myceliumMode is off', () => {
+    const nodes = [
+      { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
+    ] as unknown as GraphNode[];
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountNetworkGraph(host, nodes, [], { reducedMotion: true, myceliumMode: false });
+
+    expect(recording.fillCalls[0]).toBeCloseTo(0.4);
+  });
+
+  it('draws every edge with one plain, low-saturation style regardless of dormancy when myceliumMode is on', () => {
+    const nodes = [
+      { id: 'a', kind: 'person', label: 'A', fx: 0, fy: 0 },
+      { id: 'b', kind: 'person', label: 'B', fx: 100, fy: 0 }
+    ] as unknown as GraphNode[];
+    const edges: GraphEdge[] = [
+      { source: 'a', target: 'b', relationshipType: 'professional_relationship', dormant: true }
+    ];
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountNetworkGraph(host, nodes, edges, { reducedMotion: true, myceliumMode: true });
+
+    expect(recording.strokeCalls.length).toBe(1); // no bridge/opportunity rings on these nodes
+    expect(recording.strokeCalls[0]!.alpha).toBeCloseTo(0.35);
+    expect(recording.strokeCalls[0]!.width).toBe(1);
+    // Falls back to the documented default since no --shallow token is set.
+    expect(recording.strokeCalls[0]!.style).toBe('#a7abb9');
+  });
+
+  it('habitat-view edges use the accent colour and dormancy-based alpha instead, when myceliumMode is off', () => {
+    const nodes = [
+      { id: 'a', kind: 'person', label: 'A', fx: 0, fy: 0 },
+      { id: 'b', kind: 'person', label: 'B', fx: 100, fy: 0 }
+    ] as unknown as GraphNode[];
+    const edges: GraphEdge[] = [{ source: 'a', target: 'b', relationshipType: 'professional_relationship', dormant: true }];
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountNetworkGraph(host, nodes, edges, { reducedMotion: true, myceliumMode: false });
+
+    expect(recording.strokeCalls[0]!.alpha).toBeCloseTo(0.22); // dormant habitat-view alpha
+    expect(recording.strokeCalls[0]!.style).toBe('#376fb7'); // --wave fallback
+  });
+
+  it('setMyceliumMode(true) redraws with the faded halo without touching simulation/selection state', () => {
+    const nodes = [
+      { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
+    ] as unknown as GraphNode[];
+    const onNodeSelect = vi.fn();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const handle = mountNetworkGraph(host, nodes, [], { reducedMotion: true, onNodeSelect });
+    const canvasEl = host.querySelector('canvas')!;
+    stubRect(canvasEl);
+
+    // Select the node first, to confirm the toggle doesn't clear selection.
+    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true }));
+    expect(onNodeSelect).toHaveBeenCalledTimes(1);
+
+    recording.fillCalls.length = 0;
+    handle.setMyceliumMode(true);
+    expect(recording.fillCalls[0]).toBeCloseTo(0.08);
+
+    recording.fillCalls.length = 0;
+    handle.setMyceliumMode(false);
+    expect(recording.fillCalls[0]).toBeCloseTo(0.4);
+
+    // No second onNodeSelect call was fired by toggling render mode alone.
+    expect(onNodeSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('setMyceliumMode is a no-op after destroy()', () => {
+    const nodes: GraphNode[] = [{ id: 'a', kind: 'person', label: 'A' }];
+    const host = document.createElement('div');
+    document.body.append(host);
+    const handle = mountNetworkGraph(host, nodes, [], { reducedMotion: true });
+    handle.destroy();
+    expect(() => handle.setMyceliumMode(true)).not.toThrow();
   });
 });
