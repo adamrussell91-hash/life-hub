@@ -9,7 +9,10 @@ import {
   createKnowledgeRelationshipOperationRepository,
   RELATIONSHIP_INCOMPLETE_CODE
 } from '../../netlify/functions/_shared/knowledge-relationship-operation-repository.mjs';
-import { applyKnowledgeRelationshipCutover } from '../../netlify/functions/_shared/knowledge-page-relationships.mjs';
+import {
+  applyKnowledgeRelationshipCutover,
+  intendedTargetsFromConnected
+} from '../../netlify/functions/_shared/knowledge-page-relationships.mjs';
 
 const SECRET = 's'.repeat(32);
 const testEnv = {
@@ -175,6 +178,24 @@ test('Knowledge page route returns dual-read relationships from indexed listForE
   assert.ok(page.relationships.some((row) => row.target_ref === 'teaching:unit:unit_alpha'));
   assert.ok(page.relationships.some((row) => row.target_ref === 'knowledge:page:page_beta'));
   assert.equal(listForEntityCalls, 1);
+});
+
+test('canonical Professional events are valid Knowledge related_to targets', () => {
+  const result = intendedTargetsFromConnected([
+    'page_beta',
+    'professional:event:event_warlight',
+    'teaching:lesson:lesson_reading',
+    'shared:person:person_should_not_be_related_to'
+  ]);
+
+  assert.deepEqual(result.targets, [
+    'knowledge:page:page_beta',
+    'professional:event:event_warlight',
+    'teaching:lesson:lesson_reading'
+  ]);
+  assert.deepEqual(result.rejected, [
+    { value: 'shared:person:person_should_not_be_related_to', reason: 'unsupported' }
+  ]);
 });
 
 test('cutover write creates related_to links, preserves legacy connected, retries are idempotent', async () => {
