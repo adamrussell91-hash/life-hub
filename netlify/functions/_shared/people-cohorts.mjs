@@ -25,6 +25,17 @@
 
 const ORGANISATION_LINK_TYPES = new Set(['employee_at', 'member_of']);
 
+// Default inclusion predicate: current links only — unchanged behaviour for
+// every existing caller. `groupCurrentOrganisationMembers`'s optional
+// `isLinkIncluded` override (Phase 4, Feature 4.6 — History mode) lets
+// `network-ecology-history.mjs` reuse this EXACT grouping (">= 2
+// currently-linked people", membership Map, sort) for a point-in-time
+// grouping ("was this membership active as of date X") instead of
+// duplicating it — only WHICH links pass changes.
+function isCurrentLink(link) {
+  return link.status === 'current';
+}
+
 // Shared low-level grouping helper — factored out so Phase 4's Habitat
 // Classification (`habitat-classification.mjs` / `network-ecology-world.mjs`)
 // reuses the EXACT SAME "who currently shares an organisation" grouping
@@ -39,13 +50,13 @@ const ORGANISATION_LINK_TYPES = new Set(['employee_at', 'member_of']);
 // `computeDynamicCohorts`'s own comment documents below, and the same
 // floor Habitat's `HABITAT_MIN_CLUSTER_SIZE` constant independently pins
 // to the identical value for its own candidate-cluster gate.
-export function groupCurrentOrganisationMembers(peopleWithRelationships) {
+export function groupCurrentOrganisationMembers(peopleWithRelationships, { isLinkIncluded = isCurrentLink } = {}) {
   const byOrg = new Map();
 
   for (const { person, relationships } of peopleWithRelationships) {
     for (const entry of relationships) {
       const { link, endpoint } = entry;
-      if (link.status !== 'current') continue;
+      if (!isLinkIncluded(link)) continue;
       if (!ORGANISATION_LINK_TYPES.has(link.relationship_type)) continue;
       if (endpoint.kind !== 'organisation') continue;
 

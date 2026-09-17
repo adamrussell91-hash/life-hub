@@ -1,5 +1,5 @@
 import { apiGet } from './client';
-import type { NetworkEcologyEgo, NetworkEcologyWorld, SelfPersonResponse } from '@/domain/types';
+import type { NetworkEcologyEgo, NetworkEcologyHistory, NetworkEcologyWorld, SelfPersonResponse } from '@/domain/types';
 
 /** `GET /api/network-ecology/world` (Phase 4, Feature 4.1). */
 export function fetchNetworkEcologyWorld(options: { signal?: AbortSignal } = {}): Promise<NetworkEcologyWorld> {
@@ -16,6 +16,19 @@ export function fetchNetworkEcologyEgo(
 ): Promise<NetworkEcologyEgo> {
   const params = new URLSearchParams({ ref, hops: String(hops) });
   return apiGet<NetworkEcologyEgo>(`/api/network-ecology/ego?${params.toString()}`, { signal: options.signal });
+}
+
+/** `GET /api/network-ecology/history?date=<ISO date>` (Phase 4, Feature 4.6
+ * — History mode). `date` is passed straight through, unmodified — the
+ * caller (`views/network-ecology.ts`) sends the raw `<input type="date">`
+ * value (`YYYY-MM-DD`), which the server's `parseHistoryDate` already
+ * accepts directly. */
+export function fetchNetworkEcologyHistory(
+  date: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<NetworkEcologyHistory> {
+  const params = new URLSearchParams({ date });
+  return apiGet<NetworkEcologyHistory>(`/api/network-ecology/history?${params.toString()}`, { signal: options.signal });
 }
 
 /** `GET /api/people/self` (Phase 4, Feature 4.4 support) — the active self

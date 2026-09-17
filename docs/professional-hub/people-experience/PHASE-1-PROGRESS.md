@@ -458,6 +458,101 @@ that step is left for Adam's explicit review when he's back.
     signal anywhere in the graph. Revisit once Feature 4.6 (History mode)
     or a similar effort gives edges real interaction-recency data.
 
+35. **Feature 4.6 (History mode / Ecological Succession) — scrubber
+    simplified to a plain date input, the point-in-time-filtering rule,
+    and visibility-by-CURRENT-status (not historical).** Three decisions,
+    documented together since they were made as one piece of work:
+
+    - **Scrubber -> `<input type="date">` + "Recompute" button.** The
+      mockup/brief's radial time-scrubber UI (dragging through a
+      year-circle, `radial-year.js`) is NOT built. Given this build's
+      remaining budget (delegated by Adam), History mode ships a plain
+      date input plus an explicit "Recompute" button instead — same
+      underlying point-in-time recomputation
+      (`GET /api/network-ecology/history?date=`), a plainer interaction.
+      Recompute is a genuine full server-side recompute-on-read per
+      request (no persisted history store — see below), so it is
+      deliberately NEVER triggered by typing/changing the date value
+      alone, only by the explicit click — the same "full-recompute
+      approach... at each scrubbed point" the plan's own Feature 4.2 note
+      already anticipated for this feature.
+    - **Point-in-time filtering rule: a link is "active as of date X" iff
+      `valid_from <= X` AND (`valid_to` is null OR `valid_to >= X`)** —
+      implemented as `isLinkActiveAsOf(link, cutoffMs)` in the new
+      `netlify/functions/_shared/network-ecology-history.mjs`. Critically,
+      this includes a link that has since ENDED (status `ended` today)
+      as long as it was active at the historical instant being queried —
+      the core "was active back then" case the task called out as most
+      likely to be gotten wrong. `valid_from: null` (period relationships
+      may omit it) is treated as "no known lower bound", never excluding a
+      link on that basis alone. No new persisted history-tracking store —
+      recomputed on read from the SAME Universal Link period data
+      `/world` already reads, per the plan's own explicit instruction.
+    - **`loadAllPeopleWithRelationships` needed NO new parameter or
+      variant.** Verified by direct read of
+      `universal-link-read-repository.mjs`: `listForEntity`'s ordinary
+      read already discloses any link whose status is in
+      `ORDINARY_READ_STATUSES` (`{'current', 'ended'}`), with
+      `valid_from`/`valid_to` both intact — so an already-ended link is
+      already present in the exact same full scan `/world` performs. Only
+      `/world`'s OWN downstream helpers additionally filtered ended links
+      out via `status === 'current'` checks. Rather than duplicating those
+      helpers, two small backward-compatible extension points were added:
+      `network-graph.mjs`'s `buildRelationshipGraph(peopleWithRelationships,
+      { isLinkIncluded })` and `people-cohorts.mjs`'s
+      `groupCurrentOrganisationMembers(peopleWithRelationships,
+      { isLinkIncluded })` — both take an OPTIONAL predicate, defaulting to
+      the existing "current only" check, so `/world`, `/ego`, and Dynamic
+      Cohorts' existing one-argument calls are entirely unaffected (all
+      three suites' existing tests still pass unmodified). History mode
+      supplies `isLinkActiveAsOf` as that predicate instead.
+    - **Visibility: evaluated by CURRENT `lifecycle_status`, never
+      historical.** Reuses `/world`'s own `filterVisiblePeople` directly
+      (not reimplemented) — a person archived TODAY is excluded from a
+      History query even for a date before they were ever archived,
+      because visibility is a property of the record's current state, not
+      the queried instant. Same rule `/world` already enforces, applied
+      unchanged rather than inventing a separate policy for this endpoint;
+      confirmed by a dedicated privacy test mirroring `/world`'s own
+      (archived-after-the-query-date, still excluded).
+    - **Scoping cut: event (Wetland) clusters are not recomputed for
+      History mode** — `clusters` in `GET /api/network-ecology/history` is
+      always `kind: 'organisation'` only. `attendee` links (the only type
+      event clusters are built from) are declared `temporalMode: 'point'`
+      (`relationship-registry.mjs`) — they carry `occurred_at`, never a
+      `valid_from`/`valid_to` PERIOD, so "was this attendee link active as
+      of historical date X" is not a well-defined point-in-time query the
+      way it is for the period-typed links organisation clusters use.
+      Re-deriving Wetland's own separate "is the meeting near this date"
+      time-window semantics for an arbitrary historical cutoff is a
+      distinct, larger piece of work than this task's explicit deliverable
+      and is not exercised by any of its required tests (all of which are
+      organisation-cluster/habitat-change tests).
+
+    Backend: `netlify/functions/network-ecology-history.mjs` (route) +
+    `netlify/functions/_shared/network-ecology-history.mjs` (assembly),
+    reusing `classifyHabitat`/`computeOrganisationClusterStats`/
+    `computeBridgePeople` from `habitat-classification.mjs` completely
+    UNCHANGED — proven by a dedicated test
+    (`tests/unit/network-ecology-history.test.js`'s "habitat classification
+    differs at two different historical dates" test) that constructs a
+    6-person organisation cluster (deliberately sized above
+    `ISLAND_MAX_SIZE` so Island cannot pre-empt the result) where a 6th
+    `professional_relationship` link starts in 2026: queried at a 2025
+    date the cluster's density is 5/15 (~0.33, below `FOREST_MIN_DENSITY`)
+    and does NOT classify as forest; queried at a 2026 date (after that
+    link starts) density is 6/15 (0.4) and DOES classify as forest — same
+    underlying stored data, genuinely different classification purely from
+    the query date crossing the link's `valid_from`. Frontend: History
+    mode in `apps/professional/src/views/network-ecology.ts` (4th
+    `.hub-pills` tab), `apps/professional/src/api/network-ecology.ts`'s
+    `fetchNetworkEcologyHistory(date)`, and
+    `NetworkEcologyHistory`/mirrored types in `domain/types.ts`. Verified:
+    `apps/professional` `npm test` (182/182 — 177 baseline + 5 new History
+    mode unit tests in `network-ecology.test.ts`), `npm run typecheck`
+    (clean), `npm run build` (clean); root `npm test` (3904/3904 — 3879
+    baseline + 25 new `network-ecology-history` unit + integration tests).
+
 ## Phase status
 
 - Phase 1: **complete.** All six features (1.1 registry key, 1.2/1.3 tab
@@ -493,42 +588,49 @@ that step is left for Adam's explicit review when he's back.
   Verified: `apps/professional` `npm test` (153/153), `npm run typecheck`
   (clean), `npm run build` (clean); root `npm test` (3808/3808). Not
   pushed, no PR.
-- Phase 4: **backend complete (Features 4.1-data/4.2/4.5-text); frontend
-  complete for Features 4.1 (World View), 4.3 (EGO recentre), 4.4 (Your
-  Network), and 4.7 (Opportunity/Dormancy overlay, as a documented scope
-  cut — see decision 34). Sankey upgrade and Feature 4.6 (History mode,
-  its own route + scrubber) remain explicitly out of scope — a separate
-  follow-up task, not built here.** Habitat classification
+- Phase 4: **FULLY complete — all 7 features (4.1-data World View backend,
+  4.2 Habitat classification, 4.3 EGO recentre, 4.4 Your Network, 4.5-text
+  Introduction Paths/Bridge People, 4.6 History mode, 4.7
+  Opportunity/Dormancy overlay).** Habitat classification
   (`netlify/functions/_shared/habitat-classification.mjs` —
   `classifyHabitat`, `computeOrganisationClusterStats`,
   `computeBridgePeople`), the shared hop-traversal graph
   (`netlify/functions/_shared/network-graph.mjs`), Introduction Paths
   (`netlify/functions/_shared/introduction-paths.mjs`), and their I/O
   assembly (`netlify/functions/_shared/network-ecology-world.mjs`) are
-  built and tested, behind three routes: `GET /api/network-ecology/world`,
+  built and tested, behind four routes: `GET /api/network-ecology/world`,
   `GET /api/network-ecology/ego?ref=&hops=`, `GET
-  /api/network-ecology/introduction-paths?from=&to=`, plus the new `GET
-  /api/people/self` (decision 33) that Your Network needs to find "me".
-  Frontend: the shared canvas force-graph renderer
+  /api/network-ecology/introduction-paths?from=&to=`, `GET
+  /api/network-ecology/history?date=` (Feature 4.6 — new
+  `netlify/functions/_shared/network-ecology-history.mjs`, see decision 35),
+  plus the `GET /api/people/self` (decision 33) that Your Network needs to
+  find "me". Frontend: the shared canvas force-graph renderer
   (`apps/professional/src/components/network-graph-canvas.ts`, forked per
-  decision 32) and the page itself
+  decision 32, unchanged by Feature 4.6 — History mode feeds it the exact
+  same node/edge/cluster shape World View does) and the page itself
   (`apps/professional/src/views/network-ecology.ts`, route
   `#/network-ecology`) — World View with a 6-entry text legend (habitat
   never color-only, satisfying brief section 49's accessibility
   requirement), click-to-select + "Recentre here" into EGO mode with a
-  "Back to World View" action, a "World View"/"Your Network" `.hub-pills`
-  mode toggle, Your Network's self-ref lookup (with an honest "no self
-  person set up yet" state, not a crash, when `self: null`) and its two
-  client-side layer checkboxes (organisation links / relationship links,
-  filtering the already-fetched edge set with no extra fetch), and the
-  Opportunity/Dormancy toggle's "not enough data yet" note (decision 34).
-  See decisions 22-34 above, especially 22 (thresholds are delegated
+  "Back to World View" action, a "World View"/"Your Network"/"History"
+  `.hub-pills` mode toggle, Your Network's self-ref lookup (with an honest
+  "no self person set up yet" state, not a crash, when `self: null`) and
+  its two client-side layer checkboxes (organisation links / relationship
+  links, filtering the already-fetched edge set with no extra fetch), the
+  Opportunity/Dormancy toggle's "not enough data yet" note (decision 34),
+  and History mode's date input + explicit "Recompute" button (decision 35
+  — never auto-fetches on keystroke, only on the explicit click; displays
+  "Showing network as of <date>" from the server's own echoed `date`).
+  Sankey upgrade for Introduction Paths remains explicitly out of scope
+  (plain-text chain list only), unaffected by this phase's completion. See
+  decisions 22-35 above, especially 22 (thresholds are delegated
   placeholders, not yet validated against real data), 29 (the
   privacy/visibility gap this task closes, with its dedicated end-to-end
-  tests), and 32-34 (this frontend task's own decisions). Verified:
-  `apps/professional` `npm test` (177/177 — 153 baseline + 24 new: 13
-  network-graph-canvas unit, 9 network-ecology unit, 2 router unit), `npm
-  run typecheck` (clean), `npm run build` (clean); root `npm test`
-  (3879/3879 — 3872 baseline + 7 new `people-self.mjs` integration tests).
-  Not pushed, no PR.
+  tests), 32-34 (Phase 4 frontend's own decisions), and 35 (Feature 4.6's
+  three decisions: scrubber -> date input, the point-in-time-filtering
+  rule, and visibility-by-current-not-historical-status). Verified:
+  `apps/professional` `npm test` (182/182 — 177 baseline + 5 new History
+  mode unit tests), `npm run typecheck` (clean), `npm run build` (clean);
+  root `npm test` (3904/3904 — 3879 baseline + 25 new
+  `network-ecology-history` unit + integration tests). Not pushed, no PR.
 - Phase 5: not started

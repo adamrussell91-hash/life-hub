@@ -684,6 +684,23 @@ export interface NetworkEcologyWorld {
   bridge_people: NetworkEcologyBridgePerson[];
 }
 
+/** `GET /api/network-ecology/history?date=` (Phase 4, Feature 4.6 — History
+ * mode). Mirrors `NetworkEcologyWorld` exactly, plus the echoed `date` (the
+ * server's parsed cutoff instant, ISO-formatted) so the client can confirm
+ * exactly what point in time it is displaying. Event (Wetland) clusters are
+ * never present here — `clusters` is always `kind: 'organisation'` only,
+ * a documented backend scoping decision (see
+ * `netlify/functions/_shared/network-ecology-history.mjs`'s own doc
+ * comment) — the type does not need to say so itself since `NetworkEcologyCluster`
+ * already allows `kind: 'event'` in general. */
+export interface NetworkEcologyHistory {
+  date: string;
+  nodes: NetworkEcologyNode[];
+  edges: NetworkEcologyEdge[];
+  clusters: NetworkEcologyCluster[];
+  bridge_people: NetworkEcologyBridgePerson[];
+}
+
 /** `GET /api/network-ecology/ego?ref=&hops=`. */
 export interface NetworkEcologyEgo {
   nodes: NetworkEcologyNode[];

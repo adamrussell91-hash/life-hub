@@ -1,4 +1,9 @@
-import { fetchNetworkEcologyEgo, fetchNetworkEcologyWorld, fetchSelfPerson } from '@/api/network-ecology';
+import {
+  fetchNetworkEcologyEgo,
+  fetchNetworkEcologyHistory,
+  fetchNetworkEcologyWorld,
+  fetchSelfPerson
+} from '@/api/network-ecology';
 import {
   HABITAT_META,
   HABITAT_ORDER,
@@ -67,8 +72,42 @@ export interface NetworkEcologyOptions {
   isCurrent?: () => boolean;
 }
 
-type ViewMode = 'world' | 'ego' | 'your-network';
+type ViewMode = 'world' | 'ego' | 'your-network' | 'history';
 type EdgeLayer = 'organisation' | 'relationship';
+
+/**
+ * Feature 4.6 — History mode. SCOPING DECISION (delegated by Adam for this
+ * build, documented per the task's own instruction): the mockup/brief's
+ * radial time-scrubber UI (dragging through a year-circle) is replaced
+ * with a plain `<input type="date">` + "Recompute" button — same
+ * underlying point-in-time recomputation
+ * (`GET /api/network-ecology/history?date=`), a plainer interaction, given
+ * this build's remaining budget. Recompute is a full server-side
+ * recompute-on-read per request (see `_shared/network-ecology-history.mjs`'s
+ * own doc comment: "no new persisted store"), so it is deliberately never
+ * triggered by typing/changing the date input alone — only by the
+ * explicit "Recompute" click, exactly the plan's own note about the
+ * "full-recompute approach" the History scrubber needs.
+ */
+function todayDateInputValue(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/** Formats the server's echoed `date` (an ISO instant) as a plain reading
+ * date, e.g. "15 March 2025" — UTC, matching how the server's own
+ * `parseHistoryDate` interprets a bare `YYYY-MM-DD` input (UTC midnight),
+ * so the displayed date never shifts by a day relative to what was typed. */
+function formatHistoryDate(iso: string): string {
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return iso;
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+    parsed
+  );
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -162,7 +201,10 @@ export async function renderNetworkEcologyView(
   const yourNetworkModeBtn = el('button', 'hub-pills__btn', 'Your Network');
   yourNetworkModeBtn.type = 'button';
   yourNetworkModeBtn.setAttribute('role', 'tab');
-  modePills.append(worldModeBtn, yourNetworkModeBtn);
+  const historyModeBtn = el('button', 'hub-pills__btn', 'History');
+  historyModeBtn.type = 'button';
+  historyModeBtn.setAttribute('role', 'tab');
+  modePills.append(worldModeBtn, yourNetworkModeBtn, historyModeBtn);
 
   const toolbar = el('div', 'network-ecology__toolbar');
 
@@ -178,6 +220,23 @@ export async function renderNetworkEcologyView(
   const { label: overlayLabel, input: overlayCheckbox } = checkboxLabel('Show opportunity & dormancy', false);
 
   toolbar.append(backButton, orgLayerLabel, relLayerLabel, overlayLabel);
+
+  const historyBar = el('div', 'network-ecology__history-bar');
+  historyBar.hidden = true;
+  const historyDateLabel = el('label', 'network-ecology__history-date-label', 'Date');
+  const historyDateInput = document.createElement('input');
+  historyDateInput.type = 'date';
+  historyDateInput.className = 'network-ecology__history-date';
+  historyDateInput.value = todayDateInputValue();
+  historyDateLabel.append(historyDateInput);
+  const historyRecomputeBtn = el('button', 'btn btn--primary network-ecology__recompute', 'Recompute');
+  historyRecomputeBtn.type = 'button';
+  const historyAsOf = el(
+    'p',
+    'network-ecology__history-as-of',
+    'Choose a date and click Recompute to see the network as of that date.'
+  );
+  historyBar.append(historyDateLabel, historyRecomputeBtn, historyAsOf);
 
   const overlayNote = el(
     'p',
@@ -201,7 +260,7 @@ export async function renderNetworkEcologyView(
   const legend = el('div', 'network-ecology__legend');
   legend.setAttribute('aria-label', 'Habitat legend');
 
-  root.append(modePills, toolbar, overlayNote, statusHost, stage, legend);
+  root.append(modePills, toolbar, historyBar, overlayNote, statusHost, stage, legend);
   canvas.append(root);
 
   let mode: ViewMode = 'world';
@@ -222,10 +281,17 @@ export async function renderNetworkEcologyView(
     worldModeBtn.setAttribute('aria-selected', String(isWorldish));
     yourNetworkModeBtn.classList.toggle('is-active', mode === 'your-network');
     yourNetworkModeBtn.setAttribute('aria-selected', String(mode === 'your-network'));
+    historyModeBtn.classList.toggle('is-active', mode === 'history');
+    historyModeBtn.setAttribute('aria-selected', String(mode === 'history'));
     backButton.hidden = mode !== 'ego';
     orgLayerLabel.hidden = mode !== 'your-network';
     relLayerLabel.hidden = mode !== 'your-network';
-    legend.hidden = mode !== 'world';
+    historyBar.hidden = mode !== 'history';
+    // History mode's clusters DO carry a classified habitat (organisation
+    // clusters only — see `_shared/network-ecology-history.mjs`'s own
+    // scoping note), so the legend is just as meaningful there as in World
+    // View.
+    legend.hidden = mode !== 'world' && mode !== 'history';
   }
 
   function showPanel(node: GraphNode | null): void {
@@ -403,6 +469,37 @@ export async function renderNetworkEcologyView(
     }
   }
 
+  async function loadHistory(dateValue: string): Promise<void> {
+    mode = 'history';
+    updateChrome();
+    showPanel(null);
+    destroyGraph();
+    showViewLoading(statusHost, `Loading the network as of ${dateValue}…`);
+    statusHost.hidden = false;
+    const token = ++fetchToken;
+    try {
+      const history = await fetchNetworkEcologyHistory(dateValue);
+      if (!isCurrent() || token !== fetchToken) return;
+      statusHost.hidden = true;
+      statusHost.replaceChildren();
+      const habitatByRef = buildHabitatByRef(history.clusters);
+      const bridgeRefs = new Set(history.bridge_people.map((b) => b.ref));
+      const nodes = toGraphNodes(history.nodes, habitatByRef, bridgeRefs);
+      const edges = toGraphEdges(history.edges);
+      renderLegend();
+      mountOrUpdateGraph(nodes, edges);
+      // Show the queried date clearly, unambiguously, from the SERVER's
+      // own echoed `date` — never just the raw input value — so what is
+      // displayed always matches exactly what the server actually
+      // computed against.
+      historyAsOf.textContent = `Showing network as of ${formatHistoryDate(history.date)}.`;
+    } catch (err) {
+      if (!isCurrent() || token !== fetchToken) return;
+      statusHost.hidden = false;
+      renderLoadError(statusHost, err, () => void loadHistory(dateValue));
+    }
+  }
+
   worldModeBtn.addEventListener('click', () => {
     if (mode === 'world') return;
     void loadWorld();
@@ -410,6 +507,22 @@ export async function renderNetworkEcologyView(
   yourNetworkModeBtn.addEventListener('click', () => {
     if (mode === 'your-network') return;
     void loadYourNetwork();
+  });
+  historyModeBtn.addEventListener('click', () => {
+    if (mode === 'history') return;
+    // Switching INTO History mode never fetches by itself — only the
+    // explicit "Recompute" click does (see the module-level doc comment
+    // above `todayDateInputValue`). Reset to a clean prompt state instead.
+    mode = 'history';
+    updateChrome();
+    showPanel(null);
+    destroyGraph();
+    statusHost.hidden = true;
+    statusHost.replaceChildren();
+    historyAsOf.textContent = 'Choose a date and click Recompute to see the network as of that date.';
+  });
+  historyRecomputeBtn.addEventListener('click', () => {
+    void loadHistory(historyDateInput.value);
   });
   backButton.addEventListener('click', () => void loadWorld());
 

@@ -80,10 +80,24 @@ function egoFixture(centerRef: string) {
   };
 }
 
+function historyFixture(date: string) {
+  return {
+    date,
+    nodes: [
+      { ref: REF_A, kind: 'person', display_name: 'Alex A' },
+      { ref: REF_ORG, kind: 'organisation', display_name: 'Acme Org' }
+    ],
+    edges: [{ source_ref: REF_A, target_ref: REF_ORG, relationship_type: 'employee_at' }],
+    clusters: [{ id: REF_ORG, kind: 'organisation', label: 'Acme Org', member_refs: [REF_A], habitat: 'island' }],
+    bridge_people: []
+  };
+}
+
 function routedFetch(options: {
   world?: unknown | 'error';
   ego?: (ref: string) => unknown;
   self?: unknown | 'error';
+  history?: ((date: string) => unknown) | 'error';
 }): ReturnType<typeof vi.fn> {
   return vi.fn(async (input: RequestInfo | URL) => {
     const href = String(input);
@@ -97,6 +111,15 @@ function routedFetch(options: {
       const url = new URL(href, 'https://example.test');
       const ref = url.searchParams.get('ref') ?? REF_A;
       const data = options.ego ? options.ego(ref) : egoFixture(ref);
+      return jsonResponse(200, { ok: true, data });
+    }
+    if (href.includes('/api/network-ecology/history')) {
+      if (options.history === 'error') {
+        return jsonResponse(500, { ok: false, error: { code: 'internal_error', message: 'History failed.' } });
+      }
+      const url = new URL(href, 'https://example.test');
+      const date = url.searchParams.get('date') ?? '';
+      const data = options.history ? options.history(date) : historyFixture(`${date}T00:00:00.000Z`);
       return jsonResponse(200, { ok: true, data });
     }
     if (href.includes('/api/people/self')) {
@@ -312,6 +335,149 @@ describe('renderNetworkEcologyView', () => {
     await renderNetworkEcologyView(canvas);
 
     expect(canvas.textContent).toMatch(/World failed\.|server could not complete/i);
+    expect(canvas.querySelector('.network-ecology__status button')).not.toBeNull();
+  });
+
+  // --- Feature 4.6: History mode --------------------------------------
+
+  it('clicking the History pill renders the date input without fetching', async () => {
+    const fetchSpy = routedFetch({});
+    globalThis.fetch = fetchSpy;
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+    mountNetworkGraphMock.mockClear();
+    const callCountBeforeHistory = fetchSpy.mock.calls.length;
+
+    const historyBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'History'
+    )!;
+    historyBtn.click();
+    await flush();
+
+    expect(historyBtn.classList.contains('is-active')).toBe(true);
+    const dateInput = canvas.querySelector<HTMLInputElement>('.network-ecology__history-date');
+    expect(dateInput).not.toBeNull();
+    expect(dateInput!.type).toBe('date');
+    // Switching modes alone must never fetch — only the explicit Recompute
+    // click does.
+    expect(fetchSpy.mock.calls.length).toBe(callCountBeforeHistory);
+    expect(mountNetworkGraphMock).not.toHaveBeenCalled();
+    expect(canvas.querySelector('.network-ecology__history-as-of')?.textContent).toMatch(/choose a date/i);
+  });
+
+  it('typing/changing the date value alone never triggers a fetch — only clicking Recompute does', async () => {
+    const fetchSpy = routedFetch({});
+    globalThis.fetch = fetchSpy;
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    const historyBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'History'
+    )!;
+    historyBtn.click();
+    await flush();
+
+    const callCountAfterModeSwitch = fetchSpy.mock.calls.length;
+    const dateInput = canvas.querySelector<HTMLInputElement>('.network-ecology__history-date')!;
+    dateInput.value = '2025-03-15';
+    dateInput.dispatchEvent(new Event('input', { bubbles: true }));
+    dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush();
+
+    expect(fetchSpy.mock.calls.length).toBe(callCountAfterModeSwitch);
+
+    const recomputeBtn = canvas.querySelector<HTMLButtonElement>('.network-ecology__recompute')!;
+    recomputeBtn.click();
+    await flush();
+    await flush();
+
+    const historyCalls = fetchSpy.mock.calls.map((c) => String(c[0])).filter((href) => href.includes('/history'));
+    expect(historyCalls.length).toBe(1);
+    expect(historyCalls[0]).toContain('date=2025-03-15');
+  });
+
+  it('Recompute fetches history data, renders it via the shared canvas, and displays the queried date', async () => {
+    globalThis.fetch = routedFetch({ history: (date) => historyFixture(`${date}T00:00:00.000Z`) });
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+    mountNetworkGraphMock.mockClear();
+
+    const historyBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'History'
+    )!;
+    historyBtn.click();
+    await flush();
+
+    const dateInput = canvas.querySelector<HTMLInputElement>('.network-ecology__history-date')!;
+    dateInput.value = '2025-03-15';
+    const recomputeBtn = canvas.querySelector<HTMLButtonElement>('.network-ecology__recompute')!;
+    recomputeBtn.click();
+    await flush();
+    await flush();
+
+    expect(mountNetworkGraphMock).toHaveBeenCalledTimes(1);
+    expect(lastMountArgs?.nodes.map((n) => n.id).sort()).toEqual([REF_A, REF_ORG].sort());
+    // History's cluster data tags habitat per node, exactly like World View.
+    expect(lastMountArgs?.nodes.find((n) => n.id === REF_A)?.habitat).toBe('island');
+    // The queried date is shown clearly and unambiguously.
+    expect(canvas.querySelector('.network-ecology__history-as-of')?.textContent).toMatch(/15 March 2025/);
+    // History mode's habitats are meaningful too, so the legend is shown.
+    expect(canvas.querySelector('.network-ecology__legend')?.hasAttribute('hidden')).toBe(false);
+  });
+
+  it('honors the stale-navigation guard for History mode: a superseded Recompute never mounts the graph', async () => {
+    let resolveHistory: () => void = () => {};
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/network-ecology/world')) {
+        return jsonResponse(200, { ok: true, data: worldFixture() });
+      }
+      if (href.includes('/api/network-ecology/history')) {
+        return new Promise<Response>((resolve) => {
+          resolveHistory = () =>
+            resolve(jsonResponse(200, { ok: true, data: historyFixture('2025-03-15T00:00:00.000Z') }));
+        });
+      }
+      throw new Error(`Unexpected fetch: ${href}`);
+    });
+
+    const canvas = document.createElement('div');
+    let current = true;
+    await renderNetworkEcologyView(canvas, { isCurrent: () => current });
+    mountNetworkGraphMock.mockClear();
+
+    const historyBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'History'
+    )!;
+    historyBtn.click();
+    await flush();
+    const recomputeBtn = canvas.querySelector<HTMLButtonElement>('.network-ecology__recompute')!;
+    recomputeBtn.click();
+
+    current = false;
+    resolveHistory();
+    await flush();
+    await flush();
+
+    expect(mountNetworkGraphMock).not.toHaveBeenCalled();
+  });
+
+  it('shows a retry action when History mode fails to load', async () => {
+    globalThis.fetch = routedFetch({ history: 'error' });
+    const canvas = document.createElement('div');
+    await renderNetworkEcologyView(canvas);
+
+    const historyBtn = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (b) => b.textContent === 'History'
+    )!;
+    historyBtn.click();
+    await flush();
+    const recomputeBtn = canvas.querySelector<HTMLButtonElement>('.network-ecology__recompute')!;
+    recomputeBtn.click();
+    await flush();
+    await flush();
+
+    expect(canvas.textContent).toMatch(/History failed\.|server could not complete/i);
     expect(canvas.querySelector('.network-ecology__status button')).not.toBeNull();
   });
 });

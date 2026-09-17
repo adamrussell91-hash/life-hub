@@ -32,6 +32,17 @@
 
 const TRAVERSABLE_LINK_TYPES = new Set(['employee_at', 'member_of', 'professional_relationship']);
 
+// Default inclusion predicate: current links only, exactly the historical
+// (pre-Feature-4.6) behaviour below. `buildRelationshipGraph`'s optional
+// `isLinkIncluded` override (Phase 4, Feature 4.6 — History mode) lets
+// `network-ecology-history.mjs` reuse this EXACT node/edge/dedup/adjacency
+// assembly for a point-in-time graph ("was this link active as of date X")
+// instead of duplicating it — only WHICH links pass changes, never how a
+// passing link becomes a node/edge.
+function isCurrentLink(link) {
+  return link.status === 'current';
+}
+
 // The connecting context an edge represents — cited identically regardless
 // of which direction it is traversed in, so a hop landing ON an
 // organisation node and a hop landing on the PERSON on its other side both
@@ -60,7 +71,7 @@ function describeVia(edge, nodes) {
  *   adjacency: Map<ref, Array<{ ref, via, edge }>> — both directions of
  *          every edge, for BFS.
  */
-export function buildRelationshipGraph(peopleWithRelationships) {
+export function buildRelationshipGraph(peopleWithRelationships, { isLinkIncluded = isCurrentLink } = {}) {
   const nodes = new Map();
   const edgesById = new Map();
 
@@ -69,7 +80,7 @@ export function buildRelationshipGraph(peopleWithRelationships) {
 
     for (const entry of relationships ?? []) {
       const { link, endpoint, direction } = entry;
-      if (!link || link.status !== 'current') continue;
+      if (!link || !isLinkIncluded(link)) continue;
       if (!TRAVERSABLE_LINK_TYPES.has(link.relationship_type)) continue;
       if (!endpoint || (endpoint.kind !== 'person' && endpoint.kind !== 'organisation')) continue;
 
