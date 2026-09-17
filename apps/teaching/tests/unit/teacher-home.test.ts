@@ -136,7 +136,7 @@ describe('teacher home dashboard', () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
-    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('Dashboard');
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe('');
     expect(canvas.querySelector('.entity-banner__edit')?.textContent).toBe('Change cover');
     expect(
       canvas.querySelector('[data-home-hero-clock], .home-dashboard__hero-time')
@@ -170,7 +170,6 @@ describe('teacher home dashboard', () => {
     canvas.querySelector<HTMLButtonElement>('.entity-banner__edit')!.click();
     expect(document.querySelector('.entity-banner__dialog')).not.toBeNull();
 
-    // Asserted before the suite's fallback cleanup gets a chance to help.
     result.dispose();
     expect(document.querySelector('.entity-banner__dialog')).toBeNull();
 
@@ -183,12 +182,17 @@ describe('teacher home dashboard', () => {
 
     const todayCol = canvas.querySelector('.class-calendar__week-day[data-today="true"]');
     expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
-    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12/08/26');
+    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12');
 
     const dayNumbers = [
       ...canvas.querySelectorAll('.class-calendar__week-day .class-calendar__day-num')
     ].map((el) => el.textContent);
-    expect(dayNumbers).toEqual(['10/08/26', '11/08/26', '12/08/26', '13/08/26', '14/08/26']);
+    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
+
+    expect(canvas.querySelector<HTMLElement>('[data-calendar="rail"]')?.hidden).toBe(true);
+    expect(
+      canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
+    ).toBe('minmax(0, 1fr)');
 
     const lessonLink = canvas.querySelector<HTMLAnchorElement>(
       'a.event-chip[href="/lessons/lesson_aotfw_008"]'
@@ -252,9 +256,7 @@ describe('teacher home dashboard', () => {
     const result = renderTeacherHome(canvas, curriculum, { onCreated });
     dispose = result.dispose;
 
-    const addBtn = canvas.querySelector<HTMLButtonElement>(
-      '.class-calendar__week-heading .icon-plus-btn'
-    );
+    const addBtn = canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]');
     expect(addBtn).not.toBeNull();
     addBtn?.click();
 
