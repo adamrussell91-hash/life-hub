@@ -90,6 +90,46 @@ export const searchPages = async (query: string): Promise<PageManifestEntry[]> =
         `/search?q=${encodeURIComponent(query)}`,
       ));
 
+export type RelatedEntitySuggestion = {
+  ref: string;
+  kind: string;
+  display_label: string;
+  supporting_label?: string | null;
+  href?: string | null;
+  lifecycle_status?: string | null;
+};
+
+export type RelatedEntitySearchResponse = {
+  groups: Record<string, RelatedEntitySuggestion[]>;
+};
+
+function sharedApiBase() {
+  return API_BASE.endsWith("/knowledge")
+    ? API_BASE.slice(0, -"/knowledge".length)
+    : API_BASE;
+}
+
+/**
+ * Search canonical entities through the umbrella entity index.
+ * Knowledge has its own API prefix in production, so cross-hub search uses
+ * the shared /api root rather than nesting under /api/knowledge.
+ */
+export async function searchRelatedEntities(
+  query: string,
+  kinds: readonly string[],
+  signal?: AbortSignal,
+): Promise<RelatedEntitySearchResponse> {
+  const params = new URLSearchParams({
+    q: query,
+    kinds: kinds.join(","),
+  });
+  return apiFetch<RelatedEntitySearchResponse>(
+    `/entities/search?${params.toString()}`,
+    { signal },
+    sharedApiBase(),
+  );
+}
+
 export async function getAttachmentUrl(
   pageId: string,
   attachmentId: string,
