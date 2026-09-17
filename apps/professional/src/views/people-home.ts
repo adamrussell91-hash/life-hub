@@ -1,5 +1,6 @@
 import { mountEntitySearch, type EntitySearchHandle } from '@/components/entity-search';
 import { mountRelationalSearchPanel, type RelationalSearchPanelHandle } from '@/components/relational-search-panel';
+import { mountAddPersonForm } from '@/components/add-person-form';
 import { fetchPeopleActivity, fetchPeopleCohorts, fetchPeopleHomeSignals } from '@/api/people-home';
 import { organisationRoute, personRoute } from '@/app/router';
 import { parseSharedRef } from '@/domain/ids';
@@ -92,27 +93,62 @@ function buildHeader(): HTMLElement {
 
   const actions = el('div', 'people-home__header-actions');
 
-  // "Add person" has no real backing flow yet — Rapid Person Capture
-  // (SOURCE-BRIEF.md section 5) is a separate, not-yet-built feature (no
-  // route, no create-person endpoint exist anywhere in this app today,
-  // confirmed by search before writing this). Rendering a fake modal with
-  // nowhere real to submit would be worse than an honest, visible scope-cut
-  // notice, so the button stays real but explains itself instead of
-  // pretending to do something it can't yet do.
+  // Rapid Person Capture (SOURCE-BRIEF.md section 5). The status paragraph
+  // is reused for post-submit warnings (a link/observation write that
+  // failed after the person itself was created successfully) rather than
+  // adding a second element — there is only ever one outstanding message
+  // at a time here.
   const addPersonStatus = el('p', 'people-home__add-person-status');
   addPersonStatus.hidden = true;
   const addPersonStatusId = 'people-home-add-person-status';
   addPersonStatus.id = addPersonStatusId;
+
+  const addPersonPanel = el('div', 'people-home__add-person-panel');
+  addPersonPanel.hidden = true;
+  let addPersonMounted: { focusName: () => void } | null = null;
 
   const addPerson = document.createElement('button');
   addPerson.type = 'button';
   addPerson.className = 'btn btn--primary people-home__add-person';
   addPerson.textContent = 'Add person';
   addPerson.setAttribute('aria-describedby', addPersonStatusId);
+  addPerson.setAttribute('aria-expanded', 'false');
   addPerson.addEventListener('click', () => {
-    addPersonStatus.hidden = false;
-    addPersonStatus.textContent =
-      'Rapid person capture (brief section 5) is not built yet — adding a person from here is a scoped follow-up, not implemented in this phase.';
+    const opening = addPersonPanel.hidden;
+    addPersonPanel.hidden = !opening;
+    addPerson.setAttribute('aria-expanded', String(opening));
+    if (!opening) return;
+    addPersonStatus.hidden = true;
+    if (!addPersonMounted) {
+      addPersonMounted = mountAddPersonForm(addPersonPanel, {
+        onCreated: ({ person, warnings }) => {
+          const parsed = parseSharedRef(person.ref);
+          if (warnings.length === 0) {
+            if (parsed?.kind === 'person') location.hash = personRoute(parsed.id);
+            return;
+          }
+          // A link/observation write failed after the person itself was
+          // created — stay on the page and surface it, with a way to
+          // still reach the new profile, rather than silently losing the
+          // warning by navigating away.
+          addPersonPanel.hidden = true;
+          addPerson.setAttribute('aria-expanded', 'false');
+          addPersonStatus.hidden = false;
+          addPersonStatus.replaceChildren(document.createTextNode(`${warnings.join(' ')} `));
+          if (parsed?.kind === 'person') {
+            const link = document.createElement('a');
+            link.href = personRoute(parsed.id);
+            link.textContent = `Open ${person.display_name}’s profile`;
+            addPersonStatus.append(link);
+          }
+        },
+        onCancel: () => {
+          addPersonPanel.hidden = true;
+          addPerson.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+    addPersonMounted.focusName();
   });
 
   const searchPanel = el('div', 'people-home__search-panel');
@@ -208,7 +244,7 @@ function buildHeader(): HTMLElement {
 
   searchPanel.append(modeTablist, nameSearchContainer, relationalSearchContainer);
   actions.append(addPerson, searchButton);
-  header.append(copy, actions, addPersonStatus, searchPanel);
+  header.append(copy, actions, addPersonStatus, addPersonPanel, searchPanel);
   return header;
 }
 
