@@ -6,6 +6,7 @@ import {
   yearMonthFromDate
 } from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
+import { applyCalendarPresentation } from '@/teacher/calendar-presentation';
 import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
 import {
   renderClassCalendar,
@@ -61,7 +62,7 @@ export function renderTeacherHome(
   const banner = renderEntityBanner(bannerHost, {
     cover: readDashboardCover(),
     media: curriculum.media,
-    title: 'Dashboard',
+    title: '',
     entityId: 'dashboard',
     editable: true,
     onSave: (cover) => {
@@ -99,6 +100,13 @@ export function renderTeacherHome(
     curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
   );
 
+  const openCalendarAdd = (): void => {
+    openBlankLesson({
+      curriculum,
+      onCreated: options.onCreated ?? (() => undefined)
+    });
+  };
+
   const paintCalendar = (): void => {
     const model = buildClassCalendarModel({
       scheduled: curriculum.scheduled_lessons,
@@ -132,12 +140,7 @@ export function renderTeacherHome(
       },
       monthDelta,
       onNavigate: navigate,
-      onScheduleLesson: () => {
-        openBlankLesson({
-          curriculum,
-          onCreated: options.onCreated ?? (() => undefined)
-        });
-      },
+      onScheduleLesson: openCalendarAdd,
       chipMeta: (lesson) => {
         const cls = lesson.classId ? classesById.get(lesson.classId) : undefined;
         return cls ? classEyebrow(cls) : undefined;
@@ -180,7 +183,10 @@ export function renderTeacherHome(
         });
       }
     });
-    applyDashboardCalendarPresentation(calendarHost);
+    applyCalendarPresentation(calendarHost, {
+      onAdd: openCalendarAdd,
+      addLabel: 'Create lesson'
+    });
   };
   paintCalendar();
 
@@ -213,22 +219,6 @@ export function renderTeacherHome(
       disposers.length = 0;
     }
   };
-}
-
-function applyDashboardCalendarPresentation(host: HTMLElement): void {
-  const root = host.querySelector<HTMLElement>(':scope > .class-calendar');
-  const workspace = root?.querySelector<HTMLElement>('.hub-calendar__workspace');
-  const rail = root?.querySelector<HTMLElement>('[data-calendar="rail"]');
-
-  if (rail) rail.hidden = true;
-  if (workspace) workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
-
-  for (const dated of host.querySelectorAll<HTMLElement>('[data-date]')) {
-    const date = dated.dataset.date;
-    const num = dated.querySelector<HTMLElement>('.class-calendar__day-num');
-    if (!date || !num || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
-    num.textContent = String(Number(date.slice(8, 10)));
-  }
 }
 
 function buildClassesPanel(
