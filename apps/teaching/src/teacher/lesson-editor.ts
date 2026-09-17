@@ -62,6 +62,7 @@ import { renderContextBar, type TeacherShellRefs } from '@/teacher/shell';
 import { mountSavePublishControls, SaveController, type SavePublishHandle } from '@/teacher/save-publish';
 import { confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
+import { mountTagAnythingSection } from '@/teacher/entity-tagger';
 
 export interface LessonEditorHandle {
   /**
@@ -184,11 +185,15 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
 
     const pageHost = document.createElement('div');
 
+    const tagsHost = document.createElement('div');
+    tagsHost.className = 'lesson-editor__tags';
+    mountTagAnythingSection(tagsHost, `teaching:lesson:${lesson.id}`);
+
     const compositionStatus = document.createElement('p');
     compositionStatus.className = 'lesson-editor__composition-status';
     compositionStatus.hidden = true;
 
-    pageCol.append(publishPanel, pageHost, compositionStatus);
+    pageCol.append(publishPanel, tagsHost, pageHost, compositionStatus);
     chatCol.append(aiHost, labHost);
     builder.append(railHost, pageCol, chatCol, chatFab);
     builder.insertAdjacentHTML('beforeend', fullPageExitHtml(false));

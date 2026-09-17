@@ -26,24 +26,70 @@ describe("parseHubRef", () => {
       id: "aotfw-sources",
     });
     expect(hrefForHubRef({ hub: "life", kind: "decision", id: "aotfw-sources" })).toBe(
-      "https://life-hub.adam-russell.com/#central-node",
+      "/#central-node",
     );
+  });
+
+  it("parses Teaching lesson and Professional event/meeting/application refs", () => {
+    expect(parseHubRef("teaching:lesson:lesson_1")).toEqual({
+      hub: "teaching",
+      kind: "lesson",
+      id: "lesson_1",
+    });
+    expect(parseHubRef("tasks:program:program_1")).toEqual({
+      hub: "tasks",
+      kind: "program",
+      id: "program_1",
+    });
+    expect(parseHubRef("professional:event:event_1")).toEqual({
+      hub: "professional",
+      kind: "event",
+      id: "event_1",
+    });
+    expect(parseHubRef("professional:meeting:meeting_1")).toEqual({
+      hub: "professional",
+      kind: "meeting",
+      id: "meeting_1",
+    });
+    expect(parseHubRef("professional:application:application_1")).toEqual({
+      hub: "professional",
+      kind: "application",
+      id: "application_1",
+    });
   });
 
   it("rejects unknown hubs and kinds", () => {
     expect(parseHubRef("life://diary/x")).toBeNull();
-    expect(parseHubRef("teaching:lesson:lesson_1")).toBeNull();
+    expect(parseHubRef("professional:organisation:organisation_1")).toBeNull();
   });
 
-  it("builds outbound Teaching and Tasks hrefs", () => {
+  // The umbrella is one origin (life-hub.adam-russell.com) with each hub
+  // mounted under its own path, never a separate subdomain — these hrefs
+  // must stay relative to match entity-resolvers.mjs's own resolution.
+  it("builds outbound Teaching, Tasks, and Professional hrefs as relative umbrella paths", () => {
     expect(hrefForHubRef({ hub: "teaching", kind: "unit", id: "unit_aotfw" })).toBe(
-      "https://teaching-hub.adam-russell.com/units/unit_aotfw",
+      "/teaching/units/unit_aotfw",
+    );
+    expect(hrefForHubRef({ hub: "teaching", kind: "lesson", id: "lesson_1" })).toBe(
+      "/teaching/lessons/lesson_1",
     );
     expect(hrefForHubRef({ hub: "tasks", kind: "project", id: "proj_aotfw" })).toBe(
-      "https://tasks-hub.adam-russell.com/#/project/proj_aotfw",
+      "/tasks/#/project/proj_aotfw",
+    );
+    expect(hrefForHubRef({ hub: "tasks", kind: "program", id: "program_1" })).toBe(
+      "/tasks/#/program/program_1",
     );
     expect(hrefForHubRef({ hub: "knowledge", kind: "page", id: "page_aotfw" })).toBe(
-      "https://knowledge-hub.adam-russell.com/#page/page_aotfw",
+      "/knowledge/#page/page_aotfw",
+    );
+    expect(hrefForHubRef({ hub: "professional", kind: "event", id: "event_1" })).toBe(
+      "/professional/#/event/event_1",
+    );
+    expect(hrefForHubRef({ hub: "professional", kind: "meeting", id: "meeting_1" })).toBe(
+      "/professional/#/meeting/meeting_1",
+    );
+    expect(hrefForHubRef({ hub: "professional", kind: "application", id: "application_1" })).toBe(
+      "/professional/#/application/application_1",
     );
   });
 });

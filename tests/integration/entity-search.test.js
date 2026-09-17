@@ -3,6 +3,8 @@ import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createEntitiesHandler } from '../../netlify/functions/entities.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
+import { eventIndexKey, eventKey, meetingIndexKey, meetingKey } from '../../netlify/functions/_shared/professional-blobs.mjs';
+import { unitKey, draftLessonKey, classKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -423,4 +425,141 @@ test('without GITHUB_TOKEN configured, search behaves exactly as before — no G
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+// The generic `@`-tag-anything widget searches every declared kind through
+// this one route — these cover the kinds added for it (event, meeting,
+// page, unit, lesson, class) alongside the pre-existing person/task/etc.
+test('event kind is searchable and returns its canonical umbrella-relative href', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  await professionalStore.setJSON(eventIndexKey('event_00000000-0000-0000-0000-000000000001'), true);
+  await professionalStore.setJSON(eventKey('event_00000000-0000-0000-0000-000000000001'), {
+    schema_version: 1,
+    id: 'event_00000000-0000-0000-0000-000000000001',
+    title: 'Professional development day',
+    event_type: 'professional_development',
+    start: '2026-09-18T00:00:00.000Z',
+    end: '2026-09-18T06:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    all_day: false,
+    occurrence_state: 'scheduled',
+    location_text: null,
+    accreditation_category: null,
+    hours: null,
+    attendance_state: null,
+    certificate: null,
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z'
+  });
+  const handler = createEntitySearchHandler(
+    baseDeps(store, { getProfessionalStore: async () => professionalStore })
+  );
+  const response = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=development&kinds=event' }))
+  ).json();
+  assert.deepEqual(response.data.groups.event, [
+    {
+      ref: 'professional:event:event_00000000-0000-0000-0000-000000000001',
+      kind: 'event',
+      display_label: 'Professional development day',
+      supporting_label: 'scheduled',
+      href: '/professional/#/event/event_00000000-0000-0000-0000-000000000001',
+      lifecycle_status: 'scheduled',
+      visibility: 'operator'
+    }
+  ]);
+});
+
+test('meeting kind is searchable', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  await professionalStore.setJSON(meetingIndexKey('meeting_00000000-0000-0000-0000-000000000001'), true);
+  await professionalStore.setJSON(meetingKey('meeting_00000000-0000-0000-0000-000000000001'), {
+    schema_version: 1,
+    id: 'meeting_00000000-0000-0000-0000-000000000001',
+    title: 'Faculty planning meeting',
+    scheduled_start: '2026-09-18T00:00:00.000Z',
+    scheduled_end: '2026-09-18T01:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    location_text: null,
+    agenda: null,
+    notes: null,
+    state: 'scheduled',
+    occurrence_history: [],
+    created_at: '2026-09-01T00:00:00.000Z',
+    updated_at: '2026-09-01T00:00:00.000Z'
+  });
+  const handler = createEntitySearchHandler(
+    baseDeps(store, { getProfessionalStore: async () => professionalStore })
+  );
+  const response = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=faculty&kinds=meeting' }))
+  ).json();
+  assert.equal(response.data.groups.meeting.length, 1);
+  assert.equal(response.data.groups.meeting[0].display_label, 'Faculty planning meeting');
+  assert.equal(response.data.groups.meeting[0].ref, 'professional:meeting:meeting_00000000-0000-0000-0000-000000000001');
+});
+
+test('unit, lesson, and class kinds are searchable against Teaching content', async () => {
+  const store = memoryStore();
+  const teachingStore = memoryStore();
+  await teachingStore.setJSON(unitKey('unit_photosynthesis'), {
+    id: 'unit_photosynthesis',
+    title: 'Photosynthesis',
+    status: 'active'
+  });
+  await teachingStore.setJSON(draftLessonKey('lesson_photosynthesis_1'), {
+    id: 'lesson_photosynthesis_1',
+    title: 'Photosynthesis: light reactions',
+    status: 'active'
+  });
+  await teachingStore.setJSON(classKey('class_9sci1'), {
+    id: 'class_9sci1',
+    title: '9 Science 1',
+    status: 'active'
+  });
+  const handler = createEntitySearchHandler(baseDeps(store, { getTeachingStore: async () => teachingStore }));
+
+  const unitResponse = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=photosynthesis&kinds=unit' }))
+  ).json();
+  assert.equal(unitResponse.data.groups.unit.length, 1);
+  assert.equal(unitResponse.data.groups.unit[0].ref, 'teaching:unit:unit_photosynthesis');
+
+  const lessonResponse = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=light&kinds=lesson' }))
+  ).json();
+  assert.equal(lessonResponse.data.groups.lesson.length, 1);
+  assert.equal(lessonResponse.data.groups.lesson[0].ref, 'teaching:lesson:lesson_photosynthesis_1');
+
+  const classResponse = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=science&kinds=class' }))
+  ).json();
+  assert.equal(classResponse.data.groups.class.length, 1);
+  assert.equal(classResponse.data.groups.class[0].ref, 'teaching:class:class_9sci1');
+  assert.equal(classResponse.data.groups.class[0].href, '/teaching/classes/class_9sci1');
+});
+
+test('page kind delegates to the Knowledge manifest through an injectable lister', async () => {
+  const store = memoryStore();
+  const listKnowledgePages = async () => [
+    { id: 'page_pd_notes', title: 'PD day notes', area: 'notes', excerpt: '', tags: [] },
+    { id: 'page_unrelated', title: 'Florist moodboard', area: 'notes', excerpt: '', tags: [] }
+  ];
+  const handler = createEntitySearchHandler(baseDeps(store, { listKnowledgePages }));
+  const response = await (
+    await handler(request({ url: 'https://api.adam-russell.com/api/entities/search?q=PD&kinds=page' }))
+  ).json();
+  assert.deepEqual(response.data.groups.page, [
+    {
+      ref: 'knowledge:page:page_pd_notes',
+      kind: 'page',
+      display_label: 'PD day notes',
+      supporting_label: 'notes',
+      href: '/knowledge/#page/page_pd_notes',
+      lifecycle_status: null,
+      visibility: 'operator'
+    }
+  ]);
 });

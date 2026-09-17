@@ -40,6 +40,15 @@ export function createUniversalLink(
   return apiPost('/api/universal-links', body, { signal: options.signal });
 }
 
+export function suppressUniversalLink(
+  id: string,
+  reason = 'operator_requested',
+  options: { signal?: AbortSignal } = {}
+): Promise<{ link: UniversalLinkRecord }> {
+  const params = new URLSearchParams({ id, action: 'suppress' });
+  return apiPatch(`/api/universal-links?${params.toString()}`, { reason }, { signal: options.signal });
+}
+
 export function endUniversalLink(
   id: string,
   body: { valid_to?: string | null } = {},

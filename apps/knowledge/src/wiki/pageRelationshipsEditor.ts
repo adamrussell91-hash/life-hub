@@ -55,9 +55,10 @@ export function hubRefFromEntityRef(entityRef: string): string | null {
   if (!namespace || !kind || !id) return null;
   if (namespace === 'knowledge' && kind === 'page') return id;
   if (
-    (namespace === 'teaching' && kind === 'unit') ||
-    (namespace === 'tasks' && kind === 'project') ||
-    (namespace === 'life' && kind === 'decision')
+    (namespace === 'teaching' && (kind === 'unit' || kind === 'lesson')) ||
+    (namespace === 'tasks' && (kind === 'project' || kind === 'program')) ||
+    (namespace === 'life' && kind === 'decision') ||
+    (namespace === 'professional' && (kind === 'event' || kind === 'meeting' || kind === 'application'))
   ) {
     return `${namespace}:${kind}:${id}`;
   }

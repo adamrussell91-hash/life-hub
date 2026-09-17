@@ -12,7 +12,7 @@ import {
   validateRelationshipInput
 } from '../../netlify/functions/_shared/relationship-registry.mjs';
 import { programKey } from '../../netlify/functions/_shared/tasks-blobs.mjs';
-import { draftLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
+import { classKey, draftLessonKey } from '../../netlify/functions/_shared/teaching-blobs.mjs';
 import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
 
 const SECRET = 's'.repeat(32);
@@ -106,7 +106,7 @@ test('Program resolver returns a safe canonical projection and hides raw fields'
   assert.equal(projection.supporting_label, 'NSW DoE');
   assert.equal(
     projection.href,
-    'https://tasks-hub.adam-russell.com/#/programs?id=prog_tom'
+    '/tasks/#/programs?id=prog_tom'
   );
   assert.equal(JSON.stringify(projection).includes('never return'), false);
   await assert.rejects(
@@ -145,7 +145,7 @@ test('Lesson resolver projects safe fields and applies lifecycle treatment', asy
     getStore: async () => store
   });
   assert.equal(active.display_label, 'Poetry workshop');
-  assert.equal(active.href, 'https://teaching-hub.adam-russell.com/lessons/lesson_active');
+  assert.equal(active.href, '/teaching/lessons/lesson_active');
   assert.equal(JSON.stringify(active).includes('student-facing body'), false);
   assert.equal(JSON.stringify(active).includes('private'), false);
 
@@ -205,7 +205,7 @@ test('authenticated Program search uses programs/_index and returns its canonica
     kind: 'program',
     display_label: 'Tournament of Minds',
     supporting_label: 'NSW',
-    href: 'https://tasks-hub.adam-russell.com/#/programs?id=prog_tom',
+    href: '/tasks/#/programs?id=prog_tom',
     lifecycle_status: 'active',
     visibility: 'operator'
   });
@@ -213,7 +213,7 @@ test('authenticated Program search uses programs/_index and returns its canonica
   assert.equal(JSON.stringify(body).includes('never return'), false);
 });
 
-test('generic search rejects Lesson, Class, and StudentReference before Teaching storage access', async () => {
+test('generic search rejects StudentReference (never generic, teaching_protected only)', async () => {
   const sharedStore = memoryStore();
   let teachingStoreAccessed = false;
   const handler = createEntitySearchHandler({
@@ -227,14 +227,43 @@ test('generic search rejects Lesson, Class, and StudentReference before Teaching
       return memoryStore();
     }
   });
-  for (const kind of ['lesson', 'class', 'student_reference']) {
+  const response = await handler(
+    authenticatedRequest('/api/entities/search?q=Poetry&kinds=student_reference')
+  );
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, 'invalid_kind');
+  assert.equal(teachingStoreAccessed, false);
+});
+
+// Lesson and Class became searchable (correction: this repo's tag-anything
+// widget needs every declared kind reachable through this one route — see
+// entity-search.mjs's Teaching section), unlike StudentReference above.
+test('generic search accepts Lesson and Class, reaching Teaching storage', async () => {
+  const sharedStore = memoryStore();
+  const teachingStore = memoryStore({
+    [draftLessonKey('lesson_poetry')]: { id: 'lesson_poetry', title: 'Poetry workshop', status: 'active' },
+    [classKey('class_poetry')]: { id: 'class_poetry', title: 'Poetry class', status: 'active' }
+  });
+  const handler = createEntitySearchHandler({
+    env,
+    now: () => NOW,
+    getContentStore: async () => sharedStore,
+    getTasksStore: async () => memoryStore(),
+    getProfessionalStore: async () => memoryStore(),
+    getTeachingStore: async () => teachingStore
+  });
+  for (const [kind, ref] of [
+    ['lesson', 'teaching:lesson:lesson_poetry'],
+    ['class', 'teaching:class:class_poetry']
+  ]) {
     const response = await handler(
       authenticatedRequest(`/api/entities/search?q=Poetry&kinds=${kind}`)
     );
-    assert.equal(response.status, 400);
-    assert.equal((await response.json()).error.code, 'invalid_kind');
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.data.groups[kind].length, 1);
+    assert.equal(body.data.groups[kind][0].ref, ref);
   }
-  assert.equal(teachingStoreAccessed, false);
 });
 
 test('related_to permits Program and Lesson but rejects invalid shape', () => {
