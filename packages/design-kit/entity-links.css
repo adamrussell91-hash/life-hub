@@ -1,5 +1,51 @@
 /* Shared entity picker + chips — tokens only. */
 
+.entity-tagger {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.entity-tagger__heading {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.entity-tagger__hint {
+  margin: 0;
+  max-width: 52rem;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+
+.entity-tagger__picker {
+  width: min(100%, 28rem);
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  padding: var(--space-2) var(--space-3);
+  font: inherit;
+}
+
+.entity-tagger__picker:focus {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+.entity-tagger__chips {
+  margin-top: var(--space-1);
+}
+
+.entity-tagger__status {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 .entity-picker {
   position: relative;
   z-index: 5;
@@ -97,6 +143,13 @@
   border-style: dashed;
 }
 
+.entity-chip--tag {
+  gap: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--wash);
+  padding: 0.35rem 0.45rem 0.35rem 0.7rem;
+}
+
 .entity-chip__label {
   overflow-wrap: anywhere;
   font-weight: var(--weight-medium);
@@ -108,15 +161,32 @@
   text-underline-offset: 2px;
 }
 
+.entity-chip--tag .entity-chip__label--link {
+  text-decoration: none;
+}
+
 .entity-chip__label--link:hover,
 .entity-chip__label--link:focus-visible {
   text-decoration-thickness: 2px;
+}
+
+.entity-chip--tag .entity-chip__label--link:hover,
+.entity-chip--tag .entity-chip__label--link:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .entity-chip__meta {
   color: var(--muted);
   font-size: var(--text-sm);
   overflow-wrap: anywhere;
+}
+
+.entity-chip--tag .entity-chip__meta {
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  font-size: var(--text-xs);
 }
 
 .entity-chip__action {
@@ -128,9 +198,24 @@
   line-height: 1;
 }
 
+.entity-chip__action--remove {
+  display: inline-grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border-radius: var(--radius-full);
+  font-size: 1rem;
+}
+
 .entity-chip__action:hover,
 .entity-chip__action:focus-visible {
   color: var(--ink);
+}
+
+.entity-chip__action--remove:hover,
+.entity-chip__action--remove:focus-visible {
+  background: var(--surface);
 }
 
 .entity-chip__action:focus-visible {
