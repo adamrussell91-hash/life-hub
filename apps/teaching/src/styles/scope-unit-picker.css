@@ -1,0 +1,23 @@
+.scope-timeline__picker-unit {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.scope-timeline__picker-unit-copy {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  width: 100%;
+}
+
+.scope-timeline__picker-unit-title {
+  color: var(--ink);
+  line-height: 1.3;
+}
+
+.scope-timeline__picker-unit-meta {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  line-height: 1.35;
+}
