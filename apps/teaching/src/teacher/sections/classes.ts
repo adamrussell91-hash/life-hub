@@ -9,6 +9,7 @@ import {
   yearMonthFromDate
 } from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
+import { applyCalendarPresentation } from '@/teacher/calendar-presentation';
 import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
 import { renderClassCalendar, type ScheduleCalendarView } from '@/teacher/class-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
@@ -243,22 +244,33 @@ export function renderClassPage(
   });
 
   const today = resolveScheduleToday(curriculum.schedule_anchor_date);
+  const visibleUnitIds = new Set(
+    curriculum.units.filter((unit) => unit.status !== 'trashed').map((unit) => unit.id)
+  );
 
   const classScheduled = curriculum.scheduled_lessons
-    .filter((entry) => entry.class_id === cls.id)
+    .filter((entry) => entry.class_id === cls.id && visibleUnitIds.has(entry.unit_id))
     .sort(compareScheduledLessons);
 
   const lessonTitles = new Map(
     curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
   );
-  const unitTitles = new Map(curriculum.units.map((unit) => [unit.id, unit.title] as const));
+  const unitTitles = new Map(
+    curriculum.units
+      .filter((unit) => unit.status !== 'trashed')
+      .map((unit) => [unit.id, unit.title] as const)
+  );
 
   const activeUnits = cls.active_unit_ids
     .map((id) => unitsById.get(id))
-    .filter((unit): unit is Unit => Boolean(unit));
+    .filter((unit): unit is Unit => Boolean(unit) && unit.status === 'active');
+  const currentActiveUnitId = activeUnits.some((unit) => unit.id === cls.current_unit_id)
+    ? (cls.current_unit_id ?? '')
+    : (activeUnits[0]?.id ?? '');
 
   const root = document.createElement('div');
   root.className = 'class-page';
+  root.style.gap = 'var(--space-4)';
 
   // 1. Banner
   const bannerHost = document.createElement('div');
@@ -282,9 +294,11 @@ export function renderClassPage(
   // Body
   const body = document.createElement('div');
   body.className = 'class-page__body';
+  body.style.gap = 'var(--space-4)';
 
   const main = document.createElement('div');
   main.className = 'class-page__main';
+  main.style.gap = 'var(--space-4)';
 
   // Calendar — local state, re-paint host only
   const calendarHost = document.createElement('div');
@@ -304,6 +318,10 @@ export function renderClassPage(
   errorBanner.className = 'class-page__error';
   errorBanner.hidden = true;
   errorBanner.setAttribute('role', 'alert');
+
+  const addLessonsToCalendar = (): void => {
+    options.onScheduleUnit?.();
+  };
 
   const paintCalendar = (): void => {
     const model = buildClassCalendarModel({
@@ -339,7 +357,7 @@ export function renderClassPage(
       monthDelta,
       unitTitles,
       onNavigate: navigate,
-      onScheduleLesson: () => options.onCreateLesson?.(),
+      onScheduleLesson: addLessonsToCalendar,
       onLessonOverflow: (scheduledId, anchor) => {
         openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
       },
@@ -348,7 +366,7 @@ export function renderClassPage(
       lessons: curriculum.lessons
         .filter((lesson) => {
           const unit = unitsById.get(lesson.unit_id);
-          return unit?.subject_id === cls.subject_id;
+          return unit?.status === 'active' && unit.subject_id === cls.subject_id;
         })
         .map((lesson) => ({
           id: lesson.id,
@@ -375,6 +393,10 @@ export function renderClassPage(
         });
       }
     });
+    applyCalendarPresentation(calendarHost, {
+      onAdd: addLessonsToCalendar,
+      addLabel: 'Add lessons to calendar'
+    });
   };
   paintCalendar();
   main.append(errorBanner);
@@ -388,7 +410,7 @@ export function renderClassPage(
     units: activeUnits,
     scheduled: classScheduled,
     lessonTitles,
-    currentUnitId: cls.current_unit_id ?? activeUnits[0]?.id ?? '',
+    currentUnitId: currentActiveUnitId,
     classId: cls.id,
     today,
     onMoveUp: (scheduledId) => {
@@ -411,13 +433,23 @@ export function renderClassPage(
   // 7. Side column — announcements + resources + folded custom
   const side = document.createElement('aside');
   side.className = 'class-page__side';
+  side.style.gap = 'var(--space-4)';
 
   const sideHost = document.createElement('div');
   sideHost.className = 'class-page__homepage-regions';
+  sideHost.style.display = 'flex';
+  sideHost.style.flexDirection = 'column';
+  sideHost.style.gap = 'var(--space-4)';
   side.append(sideHost);
 
   const resolveContext = collectionContextForClass(cls, curriculum);
   let editorHandle: HomepageEditorHandle | null = null;
+
+  function normalizeRegionSpacing(): void {
+    for (const region of sideHost.querySelectorAll<HTMLElement>('.homepage-regions__section')) {
+      region.style.marginTop = '0';
+    }
+  }
 
   function showViewMode(): void {
     editorHandle?.destroy();
@@ -437,6 +469,7 @@ export function renderClassPage(
         omitEmpty: ['custom']
       }
     );
+    normalizeRegionSpacing();
 
     const announcements = sideHost.querySelector('[data-homepage-region="announcements"]');
     if (announcements && !announcements.querySelector('.homepage-regions__blocks')) {
@@ -479,6 +512,7 @@ export function renderClassPage(
         showViewMode();
       }
     });
+    normalizeRegionSpacing();
   }
 
   showViewMode();
@@ -503,7 +537,7 @@ function collectionContextForClass(
   curriculum: CurriculumResponse
 ): CollectionResolveContext {
   const unit = cls.current_unit_id
-    ? curriculum.units.find((u) => u.id === cls.current_unit_id)
+    ? curriculum.units.find((u) => u.id === cls.current_unit_id && u.status !== 'trashed')
     : undefined;
   const lessonsById = new Map(curriculum.lessons.map((l) => [l.id, l]));
   const unitLessons = (unit?.lesson_ids ?? [])
@@ -514,16 +548,19 @@ function collectionContextForClass(
     .filter((x): x is { lesson_id: string; title: string } => x !== null);
 
   const schedule = curriculum.scheduled_lessons
-    .filter((row) => row.class_id === cls.id)
+    .filter((row) => row.class_id === cls.id && curriculum.units.some(
+      (candidate) => candidate.id === row.unit_id && candidate.status !== 'trashed'
+    ))
     .map((row) => ({
       lesson_id: row.lesson_id,
       title: lessonsById.get(row.lesson_id)?.title ?? row.lesson_id,
+      date: row.date,
       schedule_order: row.schedule_order,
       published: true // teacher preview treats scheduled rows as listable
     }));
 
   return {
-    currentUnitId: cls.current_unit_id,
+    currentUnitId: unit?.id,
     unitLessons,
     schedule
   };
