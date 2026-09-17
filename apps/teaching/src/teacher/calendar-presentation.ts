@@ -30,7 +30,7 @@ export function applyCalendarPresentation(
   for (const dayAdd of root.querySelectorAll<HTMLElement>(
     '.class-calendar__week-heading > .icon-plus-btn'
   )) {
-    dayAdd.remove();
+    dayAdd.hidden = true;
   }
 
   const nav = root.querySelector<HTMLElement>('.hub-calendar__nav');
