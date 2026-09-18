@@ -17,6 +17,7 @@ import { gradientForEntityId, renderEntityBanner } from '@/teacher/entity-banner
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
+import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -277,7 +278,13 @@ function renderUnitCard(
       metaText,
       editableTitle: true
     },
-    { onMutated: options.onMutated }
+    {
+      onTitleSave: async (title) => {
+        const saved = await patchUnit(unit.id, { title });
+        unit.title = saved.title || title;
+      },
+      onMutated: options.onMutated
+    }
   );
 
   const mediaEl = document.createElement('div');
@@ -438,6 +445,22 @@ export function renderUnitPage(
     }
   });
 
+  const titleEditor = mountEntityPageTitle(coverHost, {
+    value: unit.title,
+    ariaLabel: 'Unit name',
+    onPreview: (title) => {
+      banner.update({ title });
+    },
+    onSave: async (title) => {
+      const saved = await patchUnit(unit.id, { title });
+      unit.title = saved.title || title;
+    },
+    onSaved: (title) => {
+      unit.title = title;
+      banner.update({ title });
+    }
+  });
+
   const planSection = document.createElement('section');
   planSection.className = 'unit-page__plan glass-panel';
   planSection.dataset.unitSection = 'plan';
@@ -506,6 +529,7 @@ export function renderUnitPage(
       if (restored.cover) unit.cover = restored.cover;
       else delete unit.cover;
       banner.update({ title: unit.title, cover: unit.cover ?? null });
+      titleEditor.update(unit.title);
     }
   });
 
@@ -589,6 +613,7 @@ export function renderUnitPage(
       for (const dispose of rowDisposers.splice(0).reverse()) dispose();
       optionsMenu.dispose();
       historyPanel.dispose();
+      titleEditor.dispose();
       banner.dispose();
       planEditor.dispose();
       outcomeStrip?.dispose();
