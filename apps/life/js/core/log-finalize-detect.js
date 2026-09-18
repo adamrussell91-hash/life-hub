@@ -28,7 +28,9 @@ const SARA_COMPOSITION_VALUE_RES = [
   /\b(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b/i,
   /\b\d+(?:\.\d+)?\s*(?:kg|kilograms?)\s*(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b/i,
   /\bvisceral\s+fat(?:\s+level)?\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
-  /\bbody\s+age\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i
+  /\bbody\s+age\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
+  /\b(?:bmi|body\s+water|water\s+percentage|bone\s+mass|bmr|basal\s+metabolic\s+rate|metabolic\s+age|subcutaneous\s+fat|fat[- ]?free\s+(?:mass|body\s+weight)|protein\s+(?:percentage|percent|%?)|muscle\s+(?:percentage|percent|%?))\b[^0-9]{0,18}\d+(?:\.\d+)?/i,
+  /\b\d+(?:\.\d+)?\s*(?:%|kg|kcal(?:\/day)?|years?)?\s*(?:bmi|body\s+water|bone\s+mass|bmr|basal\s+metabolic\s+rate|metabolic\s+age|subcutaneous\s+fat|fat[- ]?free\s+(?:mass|body\s+weight)|protein\s+(?:percentage|percent)|muscle\s+(?:percentage|percent))\b/i
 ];
 
 const SARA_TAPE_SITE = '(?:neck|shoulders?|chest|waist|hips?|right\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|left\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|right\\s+thigh|left\\s+thigh|calves?|right\\s+calf|left\\s+calf)';
@@ -66,7 +68,7 @@ export function saraBodyCoverageNudge(missingTypes = []) {
     'You have not proposed every body record Adam supplied.',
     `Missing log_entry type(s): ${label}.`,
     'Call log_entry once for EACH missing type now.',
-    'For each type, include every supported figure Adam supplied for that record group. Do not choose a representative subset and do not drop tape sites.',
+    'For each type, include every figure Adam supplied for that record group. Use dedicated fields where they exist and extra_metrics for any other numeric scale or tape figure. Do not choose a representative subset and do not drop tape sites.',
     'Weight belongs in composition when any composition metric is present. Tape measurements always require a separate measurements record.',
     'Do not claim anything is saved. Each new body record must produce its Confirm card.'
   ].join(' ');
