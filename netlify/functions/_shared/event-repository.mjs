@@ -138,7 +138,9 @@ export function createEventRepository(deps = {}) {
         entityRef: eventRef,
         rawLink: { ...rawLink, source_ref: eventRef },
         index,
-        permittedTypes: PERMITTED_CREATE_LINK_TYPES
+        permittedTypes: PERMITTED_CREATE_LINK_TYPES,
+        defaultOccurredAt: validated.start,
+        pointTypesRequiringOccurredAt: new Set(['attendee'])
       })
     );
     for (const intent of draftIntents) {

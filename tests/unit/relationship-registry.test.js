@@ -95,7 +95,8 @@ test('projectRelationshipRegistry exposes every declaration without duplicate_fi
   ]);
   assert.equal('duplicate_fields' in contact, false);
   const attendee = projected.find(decl => decl.key === 'attendee');
-  assert.deepEqual(attendee.allowed_roles, ['chair', 'minute_taker']);
+  assert.deepEqual(attendee.allowed_roles, ['chair', 'minute_taker', 'facilitator', 'presenter']);
+  assert.deepEqual(attendee.source_kinds, ['professional:meeting', 'professional:event']);
 });
 
 test('accepts a well formed period relationship', () => {
@@ -278,6 +279,40 @@ test('attendee accepts null, chair, and minute_taker roles only', () => {
         relationshipType: 'attendee',
         role: 'observer',
         occurredAt: '2026-09-12T10:00:00.000Z'
+      }),
+    (error) => error.code === 'invalid_role'
+  );
+});
+
+test('attendee also accepts an Event source with facilitator/presenter roles', () => {
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: event,
+      targetRef: person,
+      relationshipType: 'attendee',
+      role: null,
+      occurredAt: '2026-09-18T00:00:00.000Z'
+    }).key,
+    'attendee'
+  );
+  assert.equal(
+    validateRelationshipInput({
+      sourceRef: event,
+      targetRef: person,
+      relationshipType: 'attendee',
+      role: 'facilitator',
+      occurredAt: '2026-09-18T00:00:00.000Z'
+    }).key,
+    'attendee'
+  );
+  assert.throws(
+    () =>
+      validateRelationshipInput({
+        sourceRef: event,
+        targetRef: person,
+        relationshipType: 'attendee',
+        role: 'observer',
+        occurredAt: '2026-09-18T00:00:00.000Z'
       }),
     (error) => error.code === 'invalid_role'
   );

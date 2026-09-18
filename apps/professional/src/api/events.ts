@@ -4,7 +4,8 @@ import type { EventRecord } from '@/domain/types';
 export interface EventLinkInput {
   source_ref?: string;
   target_ref: string;
-  relationship_type: 'venue' | 'provider' | 'related_to' | 'presenter';
+  relationship_type: 'venue' | 'provider' | 'related_to' | 'presenter' | 'attendee';
+  occurred_at?: string | null;
   role?: string | null;
   context_key?: string | null;
   context_ref?: string | null;
