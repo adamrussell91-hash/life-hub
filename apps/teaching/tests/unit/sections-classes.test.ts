@@ -253,7 +253,7 @@ describe('classes section', () => {
     const isolated = structuredClone(curriculum);
     const renamed = {
       ...isolated.classes[0],
-      display_name: 'English Advanced 12ENA6'
+      title: 'English Advanced 12ENA6'
     } as Class;
     vi.mocked(patchClass).mockResolvedValue(renamed);
 
@@ -263,16 +263,16 @@ describe('classes section', () => {
     const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
     expect(input.value).toBe('Year 12 English Advanced');
 
-    input.value = renamed.display_name!;
+    input.value = renamed.title;
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.dispatchEvent(new Event('blur'));
 
     await vi.waitFor(() => {
       expect(patchClass).toHaveBeenCalledWith(classRow.id, {
-        display_name: 'English Advanced 12ENA6'
+        title: 'English Advanced 12ENA6'
       });
     });
-    expect(isolated.classes[0]?.display_name).toBe('English Advanced 12ENA6');
+    expect(isolated.classes[0]?.title).toBe('English Advanced 12ENA6');
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
       'English Advanced 12ENA6'
     );
