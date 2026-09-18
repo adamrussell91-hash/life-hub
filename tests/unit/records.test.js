@@ -189,7 +189,7 @@ test('accepts every canonical domain record and nullable observations', () => {
       ...common, type: 'composition', weight_kg: null, body_fat_pct: null,
       skeletal_muscle_kg: null, visceral_fat_level: null, body_age: null
     },
-    { ...common, type: 'measurements', chest: null, waist: 0, shoulders: 121 },
+    { ...common, type: 'measurements', chest: null, waist: 0, shoulders: 121, right_calf: 40.5, left_calf: 40 },
     {
       ...common, type: 'sleep', bed_time: '23:10', wake_time: '06:40',
       duration_h: null, quality: null
