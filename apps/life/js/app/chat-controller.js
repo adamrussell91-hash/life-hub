@@ -1030,8 +1030,20 @@ export function createChatController({
       if (error.code === 'write_conflict' && !overwrite) {
         showChatError(root, 'A record already exists for that session. Confirm again to overwrite it.');
         proposal.confirm.dataset.overwrite = '1';
+      } else if (error.code === 'invalid_record') {
+        const details = Array.isArray(error.data?.errors)
+          ? error.data.errors.filter(item => typeof item === 'string' && item.trim()).join(', ')
+          : '';
+        showChatError(
+          root,
+          details
+            ? `Record validation failed: ${details}`
+            : 'Record validation failed. Ask the agent to propose the record again.'
+        );
+      } else if (error.code === 'github_unavailable' || error.code === 'repository_not_found') {
+        showChatError(root, `The record was not saved because the data store was unavailable (${error.code}). Confirm again.`);
       } else {
-        showChatError(root, 'Saving that record failed. You can try again.');
+        showChatError(root, `The record was not saved (${error.code || 'request_failed'}). Confirm again.`);
       }
     }
   }

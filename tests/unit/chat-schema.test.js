@@ -485,3 +485,42 @@ test('medical schema includes visit fields and episode', () => {
     assert.ok(keys.includes(key), key);
   }
 });
+
+
+test('composition accepts retained extra numeric body metrics', () => {
+  const result = validateLogEntry({
+    type: 'composition',
+    date: '2026-09-19',
+    time: '07:42',
+    fields: {
+      weight_kg: 91.2,
+      body_fat_pct: 17.4,
+      extra_metrics: [
+        { key: 'body_water_pct', label: 'Body water', value: 56.2, unit: '%' },
+        { key: 'bone_mass_kg', label: 'Bone mass', value: 3.4, unit: 'kg' },
+        { key: 'bmr_kcal_day', label: 'BMR', value: 1890, unit: 'kcal/day' }
+      ]
+    }
+  }, { id: 'composition-test', now: '2026-09-19T07:42:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.extra_metrics.length, 3);
+});
+
+test('measurements accepts retained extra numeric tape sites', () => {
+  const result = validateLogEntry({
+    type: 'measurements',
+    date: '2026-09-19',
+    time: '07:43',
+    fields: {
+      waist: 86,
+      extra_metrics: [
+        { key: 'right_forearm_cm', label: 'Right forearm', value: 31.5, unit: 'cm' },
+        { key: 'left_forearm_cm', label: 'Left forearm', value: 31, unit: 'cm' }
+      ]
+    }
+  }, { id: 'measurements-test', now: '2026-09-19T07:43:00+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.extra_metrics[0].value, 31.5);
+});

@@ -10,7 +10,26 @@ export const BODY_ENTRY_PATH = /^data\/body\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-(co
 const COMPOSITION_FIELDS = [
   { key: 'weight_kg', label: 'weight', unit: 'kg' },
   { key: 'body_fat_pct', label: 'body fat', unit: '%' },
-  { key: 'skeletal_muscle_kg', label: 'skeletal muscle', unit: 'kg' }
+  { key: 'skeletal_muscle_kg', label: 'skeletal muscle', unit: 'kg' },
+  { key: 'visceral_fat_level', label: 'visceral fat', unit: '' },
+  { key: 'body_age', label: 'body age', unit: 'y' }
+];
+
+const MEASUREMENT_FIELDS = [
+  { key: 'neck', label: 'neck' },
+  { key: 'shoulders', label: 'shoulders' },
+  { key: 'chest', label: 'chest' },
+  { key: 'waist', label: 'waist' },
+  { key: 'hips', label: 'hips' },
+  { key: 'right_arm_flexed', label: 'right arm flexed' },
+  { key: 'left_arm_flexed', label: 'left arm flexed' },
+  { key: 'right_arm_relaxed', label: 'right arm relaxed' },
+  { key: 'left_arm_relaxed', label: 'left arm relaxed' },
+  { key: 'right_thigh', label: 'right thigh' },
+  { key: 'left_thigh', label: 'left thigh' },
+  { key: 'right_calf', label: 'right calf' },
+  { key: 'left_calf', label: 'left calf' },
+  { key: 'calves', label: 'calves' }
 ];
 
 export function selectLatestBodyEntries(tree, { limit = 2 } = {}) {
@@ -52,6 +71,14 @@ function formatDelta(current, previous, unit) {
   return ` (${sign}${delta}${unit} vs last reading)`;
 }
 
+
+function formatExtraMetrics(metrics) {
+  if (!Array.isArray(metrics)) return [];
+  return metrics
+    .filter(metric => metric && typeof metric.label === 'string' && typeof metric.value === 'number' && Number.isFinite(metric.value))
+    .map(metric => `${metric.label} ${metric.value}${typeof metric.unit === 'string' ? metric.unit : ''}`);
+}
+
 export function formatBodyStateForPrompt({
   compositionRecords = [],
   measurementRecords = [],
@@ -67,18 +94,20 @@ export function formatBodyStateForPrompt({
         return `${label} ${value}${unit}${formatDelta(value, previousComposition?.[key], unit)}`;
       })
       .filter(Boolean);
+    bits.push(...formatExtraMetrics(latestComposition.extra_metrics));
     if (bits.length) lines.push(`Body composition (${latestComposition.date ?? 'latest'}): ${bits.join(', ')}.`);
   }
 
   const [latestMeasurements, previousMeasurements] = measurementRecords;
   if (latestMeasurements) {
-    const tapeBits = [];
-    if (typeof latestMeasurements.shoulders === 'number' && Number.isFinite(latestMeasurements.shoulders)) {
-      tapeBits.push(`shoulders ${latestMeasurements.shoulders}cm${formatDelta(latestMeasurements.shoulders, previousMeasurements?.shoulders, 'cm')}`);
-    }
-    if (typeof latestMeasurements.waist === 'number' && Number.isFinite(latestMeasurements.waist)) {
-      tapeBits.push(`waist ${latestMeasurements.waist}cm${formatDelta(latestMeasurements.waist, previousMeasurements?.waist, 'cm')}`);
-    }
+    const tapeBits = MEASUREMENT_FIELDS
+      .map(({ key, label }) => {
+        const value = latestMeasurements[key];
+        if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+        return `${label} ${value}cm${formatDelta(value, previousMeasurements?.[key], 'cm')}`;
+      })
+      .filter(Boolean);
+    tapeBits.push(...formatExtraMetrics(latestMeasurements.extra_metrics));
     if (tapeBits.length) lines.push(`Latest tape (${latestMeasurements.date ?? 'latest'}): ${tapeBits.join(', ')}.`);
 
     const ratio = computeShoulderWaistRatio(latestMeasurements);

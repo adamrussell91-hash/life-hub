@@ -1898,3 +1898,125 @@ test('U: agent ownership mismatch rejects; nothing writes; pending remains', asy
   assert.equal(queue[0].id, 'act_u');
   assert.equal(calls.filter((call) => call.options?.method === 'PUT').length, 0);
 });
+
+
+test('body confirm derives its canonical path from the validated record, not the client slug', async () => {
+  const { calls, fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const bodyCandidate = {
+    type: 'composition',
+    date: '2026-08-01',
+    time: '07:42',
+    fields: {
+      weight_kg: 91.2,
+      body_fat_pct: 17.4,
+      skeletal_muscle_kg: 39.8,
+      visceral_fat_level: 8,
+      body_age: 34
+    }
+  };
+
+  const response = await handler(request({
+    candidate: bodyCandidate,
+    slug: 'sara'
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/body/2026/08/2026-08-01-composition-0742.md');
+  assert.match(String(calls[0].url), /2026-08-01-composition-0742\.md/);
+});
+
+test('body confirm retries once after a transient GitHub write conflict', async () => {
+  const calls = [];
+  let bodyPutCount = 0;
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+
+    if (options?.method === 'PUT' && String(url).includes('composition-0742.md')) {
+      bodyPutCount += 1;
+      if (bodyPutCount === 1) {
+        return Response.json({ message: 'branch changed' }, { status: 409 });
+      }
+      return Response.json({
+        content: { sha: 'a'.repeat(40) },
+        commit: { sha: 'b'.repeat(40) }
+      });
+    }
+
+    if (String(url).includes('/commits/')) {
+      return Response.json({
+        sha: 'c'.repeat(40),
+        commit: { tree: { sha: 'd'.repeat(40) } }
+      });
+    }
+    if (String(url).includes('/git/trees/')) {
+      return Response.json({ tree: [] });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({
+        content: { sha: 'e'.repeat(40) },
+        commit: { sha: 'f'.repeat(40) }
+      });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const bodyCandidate = {
+    type: 'composition',
+    date: '2026-08-01',
+    time: '07:42',
+    fields: { weight_kg: 91.2, body_fat_pct: 17.4 }
+  };
+
+  const response = await handler(request({ candidate: bodyCandidate, slug: 'sara' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(bodyPutCount, 2);
+  assert.equal(payload.data.path, 'data/body/2026/08/2026-08-01-composition-0742.md');
+});
+
+test('body confirm accepts every supported tape field in one record', async () => {
+  const { fetchImpl } = githubFetchStub();
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T16:00:00+10:00')
+  });
+  const bodyCandidate = {
+    type: 'measurements',
+    date: '2026-08-01',
+    time: '07:43',
+    fields: {
+      neck: 39,
+      shoulders: 124,
+      chest: 105,
+      waist: 86,
+      hips: 98,
+      right_arm_flexed: 38.5,
+      left_arm_flexed: 38,
+      right_arm_relaxed: 35,
+      left_arm_relaxed: 34.5,
+      right_thigh: 59,
+      left_thigh: 58.5,
+      right_calf: 40.5,
+      left_calf: 40
+    }
+  };
+
+  const response = await handler(request({ candidate: bodyCandidate, slug: 'sara' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.data.path, 'data/body/2026/08/2026-08-01-measurements-0743.md');
+});

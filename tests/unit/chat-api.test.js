@@ -231,3 +231,31 @@ test('confirm throws a structured error when the response body is not JSON', asy
     error => error.status === 502 && error.code === 'request_failed'
   );
 });
+
+
+test('confirm preserves server validation details on failure', async () => {
+  const chatApi = createChatApi(async () => Response.json({
+    ok: false,
+    error: {
+      code: 'invalid_record',
+      message: 'This record could not be validated.',
+      retryable: false
+    },
+    data: {
+      errors: ['weight_kg must be between 0 and 500']
+    }
+  }, { status: 400 }));
+
+  await assert.rejects(
+    chatApi.confirm({
+      candidate: { type: 'composition', date: '2026-09-19', fields: { weight_kg: 999 } },
+      slug: 'composition-2200'
+    }),
+    error => {
+      assert.equal(error.code, 'invalid_record');
+      assert.deepEqual(error.data?.errors, ['weight_kg must be between 0 and 500']);
+      assert.equal(error.message, 'This record could not be validated.');
+      return true;
+    }
+  );
+});

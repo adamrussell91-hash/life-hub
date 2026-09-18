@@ -1,6 +1,8 @@
 import {
   forceLogNudgeFor,
   forceStatusFor,
+  missingSaraBodyLogTypes,
+  saraBodyCoverageNudge,
   shouldForceAgentLog
 } from '../../../apps/life/js/core/log-finalize-detect.js';
 import { streamWithChadwickPlanForce } from './chadwick-plan-force.mjs';
@@ -11,10 +13,21 @@ export {
   shouldForceAgentLog
 };
 
+function noteLogEntry(toolCall, seenTypes) {
+  if (toolCall?.name !== 'log_entry') return false;
+  const type = toolCall.input?.type;
+  if (typeof type === 'string' && type) seenTypes.add(type);
+  return true;
+}
+
 /**
- * Persona-agnostic log force: Chadwick keeps its early Confirm bypass;
- * every other logging agent gets a post-stream nudge if Adam asked to log
- * (or the agent claimed a save) without calling log_entry.
+ * Persona-agnostic log force: Chadwick keeps its early Confirm bypass.
+ * Other logging agents get a post-stream nudge when Adam asked to log
+ * or the agent claimed a save without calling log_entry.
+ *
+ * Sara also gets deterministic body coverage enforcement. If one message
+ * contains both composition and tape figures, the stream keeps nudging until
+ * every required record type has produced a log_entry proposal.
  */
 export async function* streamWithAgentLogForce(anthropic, {
   slug,
@@ -32,13 +45,14 @@ export async function* streamWithAgentLogForce(anthropic, {
 
   let assistantText = '';
   let sawLogEntry = false;
+  const seenLogTypes = new Set();
 
   if (typeof streamOpts.executeTools === 'function') {
     const innerExecute = streamOpts.executeTools;
     streamOpts = {
       ...streamOpts,
       executeTools: async (toolCall) => {
-        if (toolCall?.name === 'log_entry') sawLogEntry = true;
+        if (noteLogEntry(toolCall, seenLogTypes)) sawLogEntry = true;
         return innerExecute(toolCall);
       }
     };
@@ -48,29 +62,58 @@ export async function* streamWithAgentLogForce(anthropic, {
     if (event.type === 'text' && typeof event.delta === 'string') {
       assistantText += event.delta;
     }
-    if (event.type === 'tool_call' && event.name === 'log_entry') {
+    if (event.type === 'tool_call' && noteLogEntry(event, seenLogTypes)) {
       sawLogEntry = true;
     }
     yield event;
   }
 
-  if (!shouldForceAgentLog({ slug, userMessage, assistantText, sawLogEntry })) return;
+  const maxForcedPasses = slug === 'sara' ? 3 : 1;
+  for (let attempt = 0; attempt < maxForcedPasses; attempt += 1) {
+    const missingBodyTypes = slug === 'sara'
+      ? missingSaraBodyLogTypes({ userMessage, loggedTypes: seenLogTypes })
+      : [];
 
-  yield { type: 'status', text: forceStatusFor(slug) };
+    const needsForce = shouldForceAgentLog({
+      slug,
+      userMessage,
+      assistantText,
+      sawLogEntry,
+      loggedTypes: seenLogTypes
+    });
 
-  const forceMessages = [
-    ...(streamOpts.messages ?? []),
-    {
-      role: 'assistant',
-      content: assistantText || '(claimed a save without calling log_entry)'
-    },
-    { role: 'user', content: forceLogNudgeFor(slug) }
-  ];
+    if (!needsForce && missingBodyTypes.length === 0) return;
 
-  for await (const event of anthropic.streamMessage({
-    ...streamOpts,
-    messages: forceMessages
-  })) {
-    yield event;
+    yield { type: 'status', text: forceStatusFor(slug) };
+
+    const nudge = missingBodyTypes.length
+      ? saraBodyCoverageNudge(missingBodyTypes)
+      : forceLogNudgeFor(slug);
+
+    const forceMessages = [
+      ...(streamOpts.messages ?? []),
+      {
+        role: 'assistant',
+        content: assistantText || '(claimed a save without calling log_entry)'
+      },
+      { role: 'user', content: nudge }
+    ];
+
+    let forcedText = '';
+    for await (const event of anthropic.streamMessage({
+      ...streamOpts,
+      messages: forceMessages
+    })) {
+      if (event.type === 'text' && typeof event.delta === 'string') {
+        forcedText += event.delta;
+      }
+      if (event.type === 'tool_call' && noteLogEntry(event, seenLogTypes)) {
+        sawLogEntry = true;
+      }
+      yield event;
+    }
+    assistantText += forcedText;
+
+    if (slug !== 'sara') return;
   }
 }

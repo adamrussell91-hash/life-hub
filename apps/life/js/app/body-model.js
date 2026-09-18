@@ -35,14 +35,14 @@ const MEASUREMENT_GOOD_UP = new Set([
   'chest', 'shoulders',
   'right_arm_flexed', 'left_arm_flexed',
   'right_arm_relaxed', 'left_arm_relaxed',
-  'right_thigh', 'left_thigh', 'calves'
+  'right_thigh', 'left_thigh', 'right_calf', 'left_calf', 'calves'
 ]);
 
 export const TAPE_SITES = [
   'neck', 'shoulders', 'chest', 'waist', 'hips',
   'right_arm_flexed', 'left_arm_flexed',
   'right_arm_relaxed', 'left_arm_relaxed',
-  'right_thigh', 'left_thigh', 'calves'
+  'right_thigh', 'left_thigh', 'right_calf', 'left_calf', 'calves'
 ];
 
 const TAPE_LABELS = {
@@ -57,6 +57,8 @@ const TAPE_LABELS = {
   left_arm_relaxed: 'Left arm relaxed',
   right_thigh: 'Right thigh',
   left_thigh: 'Left thigh',
+  right_calf: 'Right calf',
+  left_calf: 'Left calf',
   calves: 'Calves'
 };
 
