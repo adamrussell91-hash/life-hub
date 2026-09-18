@@ -1247,8 +1247,8 @@ export function createTableEditor(
   addCol.className = 'btn btn--secondary';
   addCol.textContent = 'Add column';
   addCol.addEventListener('click', () => {
+    rows = rows.map((row) => [...ensureRowWidth([...row]), '']);
     headers = [...headers, `Column ${headers.length + 1}`];
-    rows = rows.map((row) => [...ensureRowWidth(row), '']);
     emitChange();
     renderTable();
   });
