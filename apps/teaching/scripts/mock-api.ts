@@ -1494,18 +1494,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasCurrent = record.current_scheduled_lesson_id !== undefined;
     const hasHomepage = record.homepage !== undefined;
     const hasCover = record.cover !== undefined;
-    const hasDisplayName = record.display_name !== undefined;
+    const hasTitle = record.title !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasDisplayName && !hasStatus) {
+    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasTitle && !hasStatus) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, display_name, and/or status'
+        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, title, and/or status'
       );
     }
 
@@ -1565,12 +1565,12 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       cover = coverParsed.data;
     }
 
-    let display_name: string | undefined;
-    if (hasDisplayName) {
-      if (typeof record.display_name !== 'string' || !record.display_name.trim()) {
-        return errorResponse(400, 'validation_error', 'display_name must be a non-empty string');
+    let title: string | undefined;
+    if (hasTitle) {
+      if (typeof record.title !== 'string' || !record.title.trim()) {
+        return errorResponse(400, 'validation_error', 'title must be a non-empty string');
       }
-      display_name = record.display_name.trim();
+      title = record.title.trim();
     }
 
     const rawClass = store.getJSON(classKey(classId));
@@ -1619,8 +1619,8 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       }
     }
 
-    if (display_name !== undefined) {
-      merged.display_name = display_name;
+    if (title !== undefined) {
+      merged.title = title;
     }
 
     if (hasStatus) {
