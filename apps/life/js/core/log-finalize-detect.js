@@ -23,7 +23,7 @@ const CLAIMED_HYALURONICA_RE = /\b(?:logged (?:the )?(?:routine|am|pm)|saved (?:
 const SARA_WEIGHT_VALUE_RE = /\b(?:body\s+weight|weight|weigh(?:ed|ing)?)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)?\b|\b\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b[^a-z0-9]{0,8}(?:body\s+)?weight\b/i;
 
 const SARA_COMPOSITION_VALUE_RES = [
-  /\b(?:body\s*fat|bf)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:%|percent)\b?/i,
+  /\b(?:body\s*fat|bf)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:%|percent\b)/i,
   /\b(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b/i,
   /\bvisceral\s+fat(?:\s+level)?\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
   /\bbody\s+age\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i
