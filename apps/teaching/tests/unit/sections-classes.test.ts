@@ -259,7 +259,7 @@ describe('classes section', () => {
 
     renderClassPage(canvas, isolated, classRow.id);
 
-    expect(canvas.querySelector('.entity-page-title__edit')?.textContent).toBe('Edit name');
+    expect(canvas.querySelector('.entity-page-title__edit')).toBeNull();
     const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
     expect(input.value).toBe('Year 12 English Advanced');
 
