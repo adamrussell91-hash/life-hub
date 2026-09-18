@@ -177,7 +177,7 @@ describe('entity-card-expand', () => {
   });
 
   it('uses the same live title path for classes', async () => {
-    vi.mocked(patchClass).mockResolvedValue({ display_name: 'English Advanced 12ENA6' } as never);
+    vi.mocked(patchClass).mockResolvedValue({ title: 'English Advanced 12ENA6' } as never);
 
     openEntityCardExpand({
       kind: 'class',
@@ -194,7 +194,7 @@ describe('entity-card-expand', () => {
 
     await vi.waitFor(() => {
       expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
-        display_name: 'English Advanced 12ENA6'
+        title: 'English Advanced 12ENA6'
       });
     });
   });
