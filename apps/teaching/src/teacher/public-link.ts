@@ -1,3 +1,5 @@
+import { withAppBase } from '@/app/base-path';
+
 /**
  * Shared student public-path helpers and a discreet Copy/Open control.
  * Lesson drafts stay gated: Publish creates the readable snapshot.
@@ -6,14 +8,19 @@
 export type PublicEntityKind = 'lesson' | 'unit' | 'class';
 
 export function publicStudentPath(kind: PublicEntityKind, id: string): string {
+  let path: string;
   switch (kind) {
     case 'lesson':
-      return `/s/lessons/${id}`;
+      path = `/s/lessons/${id}`;
+      break;
     case 'unit':
-      return `/s/units/${id}`;
+      path = `/s/units/${id}`;
+      break;
     case 'class':
-      return `/s/classes/${id}`;
+      path = `/s/classes/${id}`;
+      break;
   }
+  return withAppBase(path);
 }
 
 export function absolutePublicUrl(kind: PublicEntityKind, id: string, origin = location.origin): string {

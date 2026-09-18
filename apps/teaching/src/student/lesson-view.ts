@@ -1,4 +1,5 @@
 import { FAILURE } from '@/app/failure';
+import { withAppBase } from '@/app/base-path';
 import { apiGet, ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import { renderBlock } from '@/blocks/render';
@@ -126,7 +127,7 @@ function renderLessonNav(
     const href = `/s/classes/${classId}/lessons/${prev.lesson_id}`;
     const link = document.createElement('a');
     link.className = 'student-lesson__nav-prev student-pager__link';
-    link.href = href;
+    link.href = withAppBase(href);
     const dir = document.createElement('span');
     dir.className = 'student-pager__dir';
     dir.textContent = 'Previous';
@@ -145,7 +146,7 @@ function renderLessonNav(
     const href = `/s/classes/${classId}/lessons/${next.lesson_id}`;
     const link = document.createElement('a');
     link.className = 'student-lesson__nav-next student-pager__link';
-    link.href = href;
+    link.href = withAppBase(href);
     const dir = document.createElement('span');
     dir.className = 'student-pager__dir';
     dir.textContent = 'Next';

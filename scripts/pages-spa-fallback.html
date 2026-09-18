@@ -7,6 +7,15 @@
       (function () {
         var path = location.pathname;
         var prefixes = ['/teaching', '/knowledge', '/tasks', '/professional'];
+        if (path === '/s' || path.indexOf('/s/') === 0) {
+          var teachingPath = '/teaching' + path;
+          sessionStorage.setItem(
+            'life-hub-spa-redirect',
+            teachingPath + location.search + location.hash
+          );
+          location.replace('/teaching/');
+          return;
+        }
         for (var i = 0; i < prefixes.length; i++) {
           var prefix = prefixes[i];
           if (path === prefix || path.indexOf(prefix + '/') === 0) {
