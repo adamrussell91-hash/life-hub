@@ -71,6 +71,14 @@ function formatDelta(current, previous, unit) {
   return ` (${sign}${delta}${unit} vs last reading)`;
 }
 
+
+function formatExtraMetrics(metrics) {
+  if (!Array.isArray(metrics)) return [];
+  return metrics
+    .filter(metric => metric && typeof metric.label === 'string' && typeof metric.value === 'number' && Number.isFinite(metric.value))
+    .map(metric => `${metric.label} ${metric.value}${typeof metric.unit === 'string' ? metric.unit : ''}`);
+}
+
 export function formatBodyStateForPrompt({
   compositionRecords = [],
   measurementRecords = [],
@@ -86,6 +94,7 @@ export function formatBodyStateForPrompt({
         return `${label} ${value}${unit}${formatDelta(value, previousComposition?.[key], unit)}`;
       })
       .filter(Boolean);
+    bits.push(...formatExtraMetrics(latestComposition.extra_metrics));
     if (bits.length) lines.push(`Body composition (${latestComposition.date ?? 'latest'}): ${bits.join(', ')}.`);
   }
 
@@ -98,6 +107,7 @@ export function formatBodyStateForPrompt({
         return `${label} ${value}cm${formatDelta(value, previousMeasurements?.[key], 'cm')}`;
       })
       .filter(Boolean);
+    tapeBits.push(...formatExtraMetrics(latestMeasurements.extra_metrics));
     if (tapeBits.length) lines.push(`Latest tape (${latestMeasurements.date ?? 'latest'}): ${tapeBits.join(', ')}.`);
 
     const ratio = computeShoulderWaistRatio(latestMeasurements);
