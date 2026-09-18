@@ -24,18 +24,24 @@ const SARA_WEIGHT_VALUE_RE = /\b(?:body\s+weight|weight|weigh(?:ed|ing)?)\b[^0-9
 
 const SARA_COMPOSITION_VALUE_RES = [
   /\b(?:body\s*fat|bf)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:%|percent\b)/i,
+  /\b\d+(?:\.\d+)?\s*(?:%|percent)\s*(?:body\s*fat|bf)\b/i,
   /\b(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b/i,
+  /\b\d+(?:\.\d+)?\s*(?:kg|kilograms?)\s*(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b/i,
   /\bvisceral\s+fat(?:\s+level)?\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
   /\bbody\s+age\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i
 ];
 
-const SARA_MEASUREMENT_VALUE_RE = /\b(?:neck|shoulders?|chest|waist|hips?|right\s+(?:arm|bicep)(?:\s+(?:flexed|relaxed))?|left\s+(?:arm|bicep)(?:\s+(?:flexed|relaxed))?|right\s+thigh|left\s+thigh|calves?|right\s+calf|left\s+calf)\b[^0-9]{0,18}\d+(?:\.\d+)?\s*(?:cm|centimetres?|in|inches?)?\b/i;
+const SARA_TAPE_SITE = '(?:neck|shoulders?|chest|waist|hips?|right\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|left\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|right\\s+thigh|left\\s+thigh|calves?|right\\s+calf|left\\s+calf)';
+const SARA_MEASUREMENT_VALUE_RES = [
+  new RegExp(`\\b${SARA_TAPE_SITE}\\b[^0-9]{0,18}\\d+(?:\\.\\d+)?\\s*(?:cm|centimetres?|in|inches?)?\\b`, 'i'),
+  new RegExp(`\\b\\d+(?:\\.\\d+)?\\s*(?:cm|centimetres?|in|inches?)\\s*${SARA_TAPE_SITE}\\b`, 'i')
+];
 
 export function saraBodyLogTypesFromMessage(text) {
   if (typeof text !== 'string' || !text.trim()) return [];
   const hasWeight = SARA_WEIGHT_VALUE_RE.test(text);
   const hasComposition = SARA_COMPOSITION_VALUE_RES.some(pattern => pattern.test(text));
-  const hasMeasurements = SARA_MEASUREMENT_VALUE_RE.test(text);
+  const hasMeasurements = SARA_MEASUREMENT_VALUE_RES.some(pattern => pattern.test(text));
   const types = [];
   if (hasComposition) types.push('composition');
   else if (hasWeight) types.push('weight');
