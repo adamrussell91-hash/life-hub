@@ -64,6 +64,23 @@ export function suggestFirstMilestone(task: Task): string {
   return `Find out what "${title}" would actually take`;
 }
 
+/** A tiny implementation-intention nudge for an idea the Sweep just surfaced — an open loop, not a reminder. */
+export function suggestIfThen(task: Task): string {
+  const title = task.title.trim() || 'this';
+  return `If it's a free evening → spend 10 min on "${title}"`;
+}
+
+/** One-line insight for the Life coverage preview card — stacked area vs. the gap, or a settled state. */
+export function lifeCoverageHeadline(coverage: LifeCoverageArea[]): string {
+  const withDreams = coverage.filter((row) => row.count > 0);
+  const empty = coverage.filter((row) => row.count === 0);
+  if (withDreams.length === 0) return 'No dreams tagged with a life area yet.';
+  const top = [...withDreams].sort((a, b) => b.count - a.count)[0];
+  if (empty.length === 0) return `${top.label} is stacked. Every area has something.`;
+  const gap = empty[0].label;
+  return `${top.label} is stacked. ${gap} has nothing.`;
+}
+
 /** Blob creates historically omitted this array — never assume it exists. */
 export function somedayLinkedProjectIds(task: Pick<Task, 'linked_project_ids'>): string[] {
   return Array.isArray(task.linked_project_ids) ? task.linked_project_ids : [];
