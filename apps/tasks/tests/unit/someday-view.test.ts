@@ -135,10 +135,30 @@ describe('renderSomedayView', () => {
     expect(canvas.textContent).toContain('Study at Cambridge');
     expect(canvas.querySelector('.someday-chip--horizon')?.textContent).toBe('Goal');
     expect(canvas.querySelector('.someday-chip--area')?.textContent).toBe('Career');
-    const wheelLink = canvas.querySelector<HTMLAnchorElement>('.someday-hero__wheel-link');
+    const wheelLink = canvas.querySelector<HTMLAnchorElement>('.someday-preview-card');
     expect(wheelLink?.getAttribute('href')).toBe('#/someday/wheel');
+    const odysseyCta = canvas.querySelector<HTMLAnchorElement>('.someday-cta');
+    expect(odysseyCta?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
     const branchLink = canvas.querySelector<HTMLAnchorElement>('.someday-card__branch');
     expect(branchLink?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
+  });
+
+  it('shows the open-loop ring and if-then nudge only on Sweep-flagged (review-now) cards', async () => {
+    const due = task({ id: 't1', title: 'Study at Cambridge', review_at: '2020-01-01' });
+    const parked = task({ id: 't2', title: 'Move to Lisbon', review_at: '2099-01-01' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([due, parked]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+
+    const canvas = document.createElement('div');
+    await renderSomedayView(canvas);
+
+    const cards = [...canvas.querySelectorAll('.someday-card')];
+    const dueCard = cards.find((c) => c.textContent?.includes('Study at Cambridge'))!;
+    const parkedCard = cards.find((c) => c.textContent?.includes('Move to Lisbon'))!;
+    expect(dueCard.querySelector('.someday-open-loop')).toBeTruthy();
+    expect(dueCard.querySelector('.someday-card__if-then')?.textContent).toContain('Study at Cambridge');
+    expect(parkedCard.querySelector('.someday-open-loop')).toBeNull();
+    expect(parkedCard.querySelector('.someday-card__if-then')).toBeNull();
   });
 
   it('promoting to project keeps the dream in the list and records the backlink', async () => {

@@ -4,13 +4,16 @@ import { tasksApi } from '@/services/client-api';
 import { somedayTasks } from '@/domain/hierarchy';
 import { isReviewDue } from '@/domain/date-truth';
 import {
+  computeLifeCoverage,
   HORIZON_TARGETS,
   LIFE_AREAS,
+  lifeCoverageHeadline,
   MATURITY_LEVELS,
   somedayLinkedGoalIds,
   somedayLinkedProjectIds,
   stalledLinkedProjects,
-  suggestFirstMilestone
+  suggestFirstMilestone,
+  suggestIfThen
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
@@ -50,7 +53,7 @@ function selectField(options: {
   onChange: (value: string) => void;
 }): HTMLSelectElement {
   const select = document.createElement('select');
-  select.className = 'hub-search__input';
+  select.className = 'hub-search__input someday-select';
   select.setAttribute('aria-label', options.ariaLabel);
   const blank = document.createElement('option');
   blank.value = '';
@@ -135,12 +138,21 @@ function renderStalledPaths(
 
 function renderSomedayCard(
   task: Task,
+  flagged: boolean,
   projects: Project[],
   allTasks: Task[],
   onChange: (next: Task | null) => void
 ): HTMLElement {
-  const card = el('article', 'glass-tile someday-card');
+  const card = el('article', `glass-tile someday-card${flagged ? ' someday-card--flagged' : ''}`);
   const titleRow = el('div', 'someday-card__title-row');
+  if (flagged) {
+    const ring = document.createElement('span');
+    ring.className = 'someday-open-loop';
+    ring.setAttribute('aria-hidden', 'true');
+    ring.innerHTML =
+      '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--line)" stroke-width="2.5"/><circle cx="9" cy="9" r="7" fill="none" stroke="var(--warning)" stroke-width="2.5" stroke-dasharray="26 44" stroke-linecap="round" transform="rotate(-90 9 9)"/></svg>';
+    titleRow.append(ring);
+  }
   const title = el('h3', 'someday-card__title', task.title);
   titleRow.append(title);
   const branch = el('a', 'btn btn--ghost btn--sm someday-card__branch', 'Branch it →');
@@ -149,6 +161,9 @@ function renderSomedayCard(
   card.append(titleRow);
 
   if (task.description) card.append(el('p', 'someday-card__copy', task.description));
+  if (flagged) {
+    card.append(el('p', 'someday-card__if-then', suggestIfThen(task)));
+  }
 
   const linkedProjects = somedayLinkedProjectIds(task).length;
   const linkedGoals = somedayLinkedGoalIds(task).length;
@@ -339,10 +354,43 @@ function paintSomeday(
 
   const hero = el('div', 'someday-hero');
   hero.append(el('span', 'someday-hero__icon', '🌈'));
-  const wheelLink = el('a', 'btn btn--ghost btn--sm someday-hero__wheel-link', 'Life coverage →');
-  wheelLink.href = '#/someday/wheel';
-  hero.append(wheelLink);
   canvas.append(hero);
+
+  if (items.length > 0) {
+    const odysseyTarget = items[0];
+    const odysseyCta = el('a', 'someday-cta');
+    odysseyCta.href = `#/someday/odyssey/${encodeURIComponent(odysseyTarget.id)}`;
+    const ctaIcon = el('div', 'someday-cta__icon');
+    ctaIcon.innerHTML =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>';
+    const ctaBody = el('div', 'someday-cta__body');
+    ctaBody.append(
+      el('div', 'someday-cta__title', 'Start an Odyssey'),
+      el('div', 'someday-cta__subtitle', 'Sketch three futures before you pick one')
+    );
+    const ctaChevron = el('div', 'someday-cta__chevron');
+    ctaChevron.innerHTML =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+    odysseyCta.append(ctaIcon, ctaBody, ctaChevron);
+    canvas.append(odysseyCta);
+  }
+
+  const coverage = computeLifeCoverage(items);
+  const wheelCard = el('a', 'someday-preview-card');
+  wheelCard.href = '#/someday/wheel';
+  const wheelIcon = el('div', 'someday-preview-card__icon');
+  wheelIcon.innerHTML =
+    '<svg width="26" height="26" viewBox="0 0 110 110"><polygon points="55,15 82,25 96,50 82,90 55,100 25,85 12,50 32,30" fill="var(--pastel-blue)" stroke="var(--wave)" stroke-width="2"/><polygon points="55,20 66,52 50,52 71,68 62,46 45,46" fill="var(--wave)" opacity="0.55"/></svg>';
+  const wheelBody = el('div', 'someday-preview-card__body');
+  wheelBody.append(
+    el('div', 'someday-preview-card__title', 'Life coverage'),
+    el('div', 'someday-preview-card__subtitle', lifeCoverageHeadline(coverage))
+  );
+  const wheelChevron = el('div', 'someday-preview-card__chevron');
+  wheelChevron.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+  wheelCard.append(wheelIcon, wheelBody, wheelChevron);
+  canvas.append(wheelCard);
 
   const filters = createCollapsibleFilters({
     id: 'someday',
@@ -456,7 +504,7 @@ function paintSomeday(
     group.append(heading);
     const grid = el('div', 'someday-grid');
     for (const item of reviewNow) {
-      grid.append(renderSomedayCard(item, projects, allTasks, (next) => onCardChange(item, next)));
+      grid.append(renderSomedayCard(item, true, projects, allTasks, (next) => onCardChange(item, next)));
     }
     group.append(grid);
     canvas.append(group);
@@ -466,7 +514,7 @@ function paintSomeday(
     group.append(el('h2', 'someday-group__title', 'Parked'));
     const grid = el('div', 'someday-grid');
     for (const item of parked) {
-      grid.append(renderSomedayCard(item, projects, allTasks, (next) => onCardChange(item, next)));
+      grid.append(renderSomedayCard(item, false, projects, allTasks, (next) => onCardChange(item, next)));
     }
     group.append(grid);
     canvas.append(group);
