@@ -1,3 +1,4 @@
+import { publicStudentPath } from '@/teacher/public-link';
 import { ApiClientError } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
@@ -197,7 +198,7 @@ export function renderClassPage(
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
   let classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
-  const studentPath = `/s/classes/${cls.id}`;
+  const studentPath = publicStudentPath('class', cls.id);
 
   const optionsMenu = mountPageOptionsMenu(
     [

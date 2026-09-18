@@ -46,6 +46,8 @@ test('prepare-web publishes built SPAs and a Pages 404 dispatcher', async () => 
   const fallback = await readFile(new URL('scripts/pages-spa-fallback.html', root), 'utf8');
   assert.match(fallback, /life-hub-spa-redirect/);
   assert.match(fallback, /\/teaching/);
+  assert.match(fallback, /path === '\/s'/);
+  assert.match(fallback, /'\/teaching' \+ path/);
   assert.match(fallback, /\/knowledge/);
   assert.match(fallback, /\/tasks/);
   assert.match(fallback, /\/professional/);
