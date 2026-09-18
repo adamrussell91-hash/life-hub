@@ -147,7 +147,8 @@ const DOMAIN_PROPERTIES = {
     right_arm_flexed: { type: 'number' }, left_arm_flexed: { type: 'number' },
     right_arm_relaxed: { type: 'number' }, left_arm_relaxed: { type: 'number' },
     right_thigh: { type: 'number' }, left_thigh: { type: 'number' },
-    calves: { type: 'number' }
+    right_calf: { type: 'number' }, left_calf: { type: 'number' },
+    calves: { type: 'number', description: 'Legacy combined/average calf measurement. Prefer right_calf and left_calf when both are supplied.' }
   },
   bloods: {
     markers: {
@@ -255,7 +256,7 @@ export function logEntryToolSchema(allowedTypes = RECORD_TYPES) {
     name: 'log_entry',
     description: allowedTypes.length === 1 && allowedTypes[0] === 'mind_session'
       ? 'Write one mind_session record for Adam. Life Hub saves immediately (no Confirm card). Call at close or when Adam asks to record. Returns { ok: true, status: "written", path } on success.'
-      : 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record.',
+      : 'Propose one Life Hub record for Adam to review and confirm before it is saved. Never call this unless Adam has clearly described a specific record. For Sara body updates spanning more than one record type, call log_entry once per required type and include every supplied field in its matching record.',
     input_schema: {
       type: 'object',
       properties: {
