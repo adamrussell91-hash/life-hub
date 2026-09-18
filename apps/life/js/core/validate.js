@@ -147,6 +147,35 @@ function stringArray(record, field, errors, required = false) {
   }
 }
 
+
+function numericMetricArray(record, field, errors) {
+  const value = record[field];
+  if (value == null) return;
+  if (!Array.isArray(value)) {
+    errors.push(`${field} must be an array`);
+    return;
+  }
+  value.forEach((metric, index) => {
+    const prefix = `${field}[${index}]`;
+    if (!isObject(metric)) {
+      errors.push(`${prefix} must be an object`);
+      return;
+    }
+    if (typeof metric.key !== 'string' || !/^[a-z0-9]+(?:_[a-z0-9]+)*$/.test(metric.key)) {
+      errors.push(`${prefix}.key must be snake_case`);
+    }
+    if (typeof metric.label !== 'string' || !metric.label.trim()) {
+      errors.push(`${prefix}.label must be a non-empty string`);
+    }
+    if (typeof metric.value !== 'number' || !Number.isFinite(metric.value)) {
+      errors.push(`${prefix}.value must be a finite number`);
+    }
+    if (typeof metric.unit !== 'string') {
+      errors.push(`${prefix}.unit must be a string`);
+    }
+  });
+}
+
 function validateMeal(record, errors) {
   enumeration(record, 'meal', MEALS, errors, true);
   for (const field of MEAL_NUMBERS) {
@@ -321,10 +350,12 @@ function validateWeight(record, errors) {
 
 function validateComposition(record, errors) {
   for (const field of COMPOSITION_NUMBERS) finiteNumber(record, field, errors);
+  numericMetricArray(record, 'extra_metrics', errors);
 }
 
 function validateMeasurements(record, errors) {
   for (const field of MEASUREMENT_NUMBERS) finiteNumber(record, field, errors);
+  numericMetricArray(record, 'extra_metrics', errors);
 }
 
 function validateSleep(record, errors) {
