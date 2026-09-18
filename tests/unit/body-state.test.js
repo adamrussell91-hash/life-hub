@@ -144,3 +144,28 @@ test('formatBodyStateForPrompt surfaces all supported composition and tape value
     assert.ok(text.includes(expected), expected);
   }
 });
+
+
+test('formatBodyStateForPrompt includes retained extra body metrics', () => {
+  const text = formatBodyStateForPrompt({
+    compositionRecords: [{
+      date: '2026-09-19',
+      weight_kg: 91.2,
+      extra_metrics: [
+        { key: 'body_water_pct', label: 'Body water', value: 56.2, unit: '%' },
+        { key: 'bone_mass_kg', label: 'Bone mass', value: 3.4, unit: 'kg' }
+      ]
+    }],
+    measurementRecords: [{
+      date: '2026-09-19',
+      waist: 86,
+      extra_metrics: [
+        { key: 'right_forearm_cm', label: 'Right forearm', value: 31.5, unit: 'cm' }
+      ]
+    }]
+  });
+
+  assert.ok(text.includes('Body water 56.2%'));
+  assert.ok(text.includes('Bone mass 3.4kg'));
+  assert.ok(text.includes('Right forearm 31.5cm'));
+});
