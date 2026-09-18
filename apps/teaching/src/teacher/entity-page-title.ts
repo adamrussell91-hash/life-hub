@@ -21,7 +21,7 @@ export interface EntityPageTitleHandle {
  *
  * Unit and Class pages pass onSave and use the shared title autosave path.
  * Lesson pages delegate persistence to their existing SaveController while
- * still using the same visible edit control and immediate preview behaviour.
+ * keeping the title itself as the editing surface.
  */
 export function mountEntityPageTitle(
   host: HTMLElement,
@@ -39,22 +39,12 @@ export function mountEntityPageTitle(
   input.setAttribute('aria-label', options.ariaLabel);
   input.autocomplete = 'off';
 
-  const edit = document.createElement('button');
-  edit.type = 'button';
-  edit.className = 'entity-page-title__edit';
-  edit.textContent = 'Edit name';
-  edit.setAttribute('aria-label', `Edit ${options.ariaLabel.toLowerCase()}`);
-  edit.addEventListener('click', () => {
-    input.focus();
-    input.select();
-  });
-
   const status = document.createElement('span');
   status.className = 'entity-page-title__status';
   status.setAttribute('aria-live', 'polite');
   status.hidden = !options.onSave;
 
-  root.append(input, edit, status);
+  root.append(input, status);
   host.append(root);
 
   let autosave: TitleAutosaveHandle | null = null;
