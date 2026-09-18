@@ -6,7 +6,7 @@ import { coerceCalendarDate, normalizeMedicalFields } from '../../../apps/life/j
 import { collapseSetSplitExercises } from './workout-history.mjs';
 import { slugifyWorkoutTitle } from './workout-templates.mjs';
 
-const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'skincare', 'mind_session', 'medical'];
+const RECORD_TYPES = ['meal', 'workout', 'diary', 'weight', 'composition', 'measurements', 'bloods', 'skincare', 'mind_session', 'medical'];
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const DOMAIN_PROPERTIES = {
@@ -148,6 +148,26 @@ const DOMAIN_PROPERTIES = {
     right_arm_relaxed: { type: 'number' }, left_arm_relaxed: { type: 'number' },
     right_thigh: { type: 'number' }, left_thigh: { type: 'number' },
     calves: { type: 'number' }
+  },
+  bloods: {
+    markers: {
+      type: 'array',
+      description: 'Every readable pathology marker from one collection. Omit a reference bound when the report does not show one.',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Canonical snake_case marker key, e.g. ggt, alt, crp, ferritin.' },
+          label: { type: 'string' },
+          category: { type: 'string' },
+          value: { type: 'number' },
+          unit: { type: 'string' },
+          ref_low: { type: 'number' },
+          ref_high: { type: 'number' },
+          status: { type: 'string', enum: ['Normal', 'High', 'Low'] }
+        },
+        required: ['key', 'label', 'category', 'value', 'unit', 'status']
+      }
+    }
   },
   skincare: {
     routine: { type: 'string', enum: ['am', 'pm'] },
