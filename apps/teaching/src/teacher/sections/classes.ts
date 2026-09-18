@@ -104,16 +104,9 @@ export function renderClassesIndex(
             cover: cls.cover ?? null,
             media: curriculum.media,
             fullPagePath: path,
-            metaText: classTitle,
-            editableTitle: true
+            metaText: classTitle
           },
-          {
-            onTitleSave: async (title) => {
-              const saved = await patchClass(cls.id, { title });
-              cls.title = saved.title || title;
-            },
-            onMutated: options.onMutated
-          }
+          { onMutated: options.onMutated }
         ).dispose
       );
 
