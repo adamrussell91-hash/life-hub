@@ -8,6 +8,7 @@ import {
 } from '@/domain/ids';
 
 export type RailViewId =
+  | 'home'
   | 'people'
   | 'organisations'
   | 'relationships'
@@ -18,6 +19,7 @@ export type RailViewId =
   | 'career';
 
 export type Route =
+  | { name: 'home' }
   | { name: 'people' }
   | { name: 'person'; id: string }
   | { name: 'organisations' }
@@ -47,10 +49,11 @@ export type Route =
 export function parseRoute(hash: string = location.hash): Route {
   const raw = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
   const path = raw.replace(/\/+$/, '');
-  if (path === '' || path === '/') return { name: 'people' };
+  if (path === '' || path === '/') return { name: 'home' };
 
   const segments = path.split('/').filter(Boolean);
 
+  if (segments.length === 1 && segments[0] === 'home') return { name: 'home' };
   if (segments.length === 1 && segments[0] === 'people') return { name: 'people' };
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
@@ -125,6 +128,7 @@ function safeDecode(segment: string): string | null {
 }
 
 export function railHighlightFor(route: Route): RailViewId | null {
+  if (route.name === 'home') return 'home';
   if (route.name === 'people' || route.name === 'person') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';

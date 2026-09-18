@@ -306,7 +306,8 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
         attendance_state: 'registered',
         links: [
           { target_ref: orgRef, relationship_type: 'provider' },
-          { target_ref: 'knowledge:page:page_pd_notes', relationship_type: 'related_to' }
+          { target_ref: 'knowledge:page:page_pd_notes', relationship_type: 'related_to' },
+          { target_ref: sethRef, relationship_type: 'attendee', role: 'facilitator' }
         ]
       }
     })
@@ -396,6 +397,12 @@ test('Slice 9 acceptance path: meeting+event links, reschedule, calendar project
     [...eventLinks.outgoing, ...eventLinks.incoming].some(
       (entry) => entry.link.relationship_type === 'learning_for'
     )
+  );
+  assert.ok(
+    [...eventLinks.outgoing, ...eventLinks.incoming].some(
+      (entry) => entry.link.relationship_type === 'attendee' && entry.link.role === 'facilitator'
+    ),
+    'the Event detail "People" card reads this the same way Meetings already do'
   );
   assert.ok(
     [...personLinks.outgoing, ...personLinks.incoming].some(

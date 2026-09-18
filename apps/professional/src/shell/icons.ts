@@ -1,6 +1,7 @@
 /** Distinct 18px outline paths per rail destination (RAIL.md). */
 
 export const RAIL_ICON_PATHS: Record<string, string[]> = {
+  home: ['M4 11.5 12 4l8 7.5', 'M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9'],
   people: [
     'M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
     'M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5',
