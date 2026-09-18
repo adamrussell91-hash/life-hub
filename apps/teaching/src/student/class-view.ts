@@ -61,8 +61,8 @@ function renderPublishedClass(content: HTMLElement, cls: PublishedClass): void {
 
   page.append(
     renderStudentHero({
-      title: cls.title || cls.code,
-      eyebrow: cls.title ? cls.code : undefined,
+      title: cls.display_name || cls.title || cls.code,
+      eyebrow: cls.display_name || cls.title ? cls.code : undefined,
       entityId: cls.id,
       cover: cls.cover
     })
