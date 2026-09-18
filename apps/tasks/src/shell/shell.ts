@@ -626,6 +626,20 @@ export function parseNewExcursionPage(hash = location.hash): boolean {
   return path === 'excursions/new';
 }
 
+export type SomedaySubPage =
+  | { kind: 'wheel' }
+  | { kind: 'odyssey'; taskId: string };
+
+/** Someday sub-pages: `#/someday/wheel` (Life coverage) and `#/someday/odyssey/:id` — not rail destinations. */
+export function parseSomedaySubPage(hash = location.hash): SomedaySubPage | null {
+  const path = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+  const parts = path.split('/');
+  if (parts[0] !== 'someday') return null;
+  if (parts[1] === 'wheel') return { kind: 'wheel' };
+  if (parts[1] === 'odyssey' && parts[2]) return { kind: 'odyssey', taskId: decodeURIComponent(parts[2]) };
+  return null;
+}
+
 /** Full map card: `#/maps/:mapId/station/:id` or `#/maps/:mapId/event/:id`. */
 export function parseMapItemPage(
   hash = location.hash
@@ -648,6 +662,7 @@ export function isKnownHashView(hash = location.hash): boolean {
   if (parseEntityPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
   if (parseMapItemPage(hash)) return true;
+  if (parseSomedaySubPage(hash)) return true;
   return KNOWN_VIEWS.includes(id as HubViewId);
 }
 

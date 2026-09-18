@@ -9,6 +9,8 @@ export const GoalSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   parent_area_id: z.string().nullable().default(null),
+  /** The Someday / Maybe idea this goal was promoted from — the idea itself stays put. */
+  parent_someday_id: z.string().nullable().optional(),
   status: GoalStatusSchema.default('active'),
   tags: z.array(z.string()).default([]),
   created_at: z.string(),
@@ -25,6 +27,7 @@ export const GoalCreateSchema = GoalSchema.omit({
 }).partial({
   description: true,
   parent_area_id: true,
+  parent_someday_id: true,
   status: true,
   tags: true
 }).extend({

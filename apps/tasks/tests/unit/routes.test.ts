@@ -6,7 +6,8 @@ import {
   parseEntityPage,
   parseHashRoute,
   parseMapItemPage,
-  parseNewExcursionPage
+  parseNewExcursionPage,
+  parseSomedaySubPage
 } from '@/shell/shell';
 
 describe('hash routes', () => {
@@ -99,5 +100,23 @@ describe('hash routes', () => {
     location.hash = '#/someday';
     expect(hashViewId()).toBe('someday');
     expect(parseHashRoute()).toBe('someday');
+  });
+
+  it('recognises the Someday sub-pages without adding them to the rail', () => {
+    location.hash = '#/someday/wheel';
+    expect(parseSomedaySubPage()).toEqual({ kind: 'wheel' });
+    expect(isKnownHashView()).toBe(true);
+    expect(hashViewId()).toBe('someday');
+    expect(knownHubViews()).not.toContain('wheel');
+
+    location.hash = '#/someday/odyssey/task_someday_podcast';
+    expect(parseSomedaySubPage()).toEqual({ kind: 'odyssey', taskId: 'task_someday_podcast' });
+    expect(isKnownHashView()).toBe(true);
+
+    location.hash = '#/someday';
+    expect(parseSomedaySubPage()).toBeNull();
+
+    location.hash = '#/someday/odyssey';
+    expect(parseSomedaySubPage()).toBeNull();
   });
 });

@@ -30,6 +30,36 @@ export const CognitiveLoadSchema = z.enum(['low', 'medium', 'high']);
 export const TaskDepthSchema = z.enum(['deep', 'shallow', 'admin']);
 export const WaitingStatusSchema = z.enum(['waiting', 'follow_up_due', 'resolved']);
 
+/** How developed a Someday / Maybe idea is — independent of how many there are. */
+export const SomedayMaturitySchema = z.enum(['new', 'developing', 'set']);
+/** What altitude a Someday idea would land at if promoted — Hammond Horizons vocabulary. */
+export const SomedayHorizonSchema = z.enum(['area', 'goal', 'project']);
+
+export type OdysseyNode = {
+  id: string;
+  title: string;
+  question: string;
+  resources: number;
+  confidence: number;
+  coherence: number;
+  children: OdysseyNode[];
+};
+
+/** One branch in a Someday item's Odyssey tree — recursive, so a path can branch again.
+ *  All fields required by design: `newOdysseyNode()` always fills every one, so the
+ *  recursive ZodType stays exact (input === output) instead of fighting `.default()` variance. */
+export const OdysseyNodeSchema: z.ZodType<OdysseyNode> = z.lazy(() =>
+  z.object({
+    id: z.string().min(1),
+    title: z.string(),
+    question: z.string(),
+    resources: z.number().min(0).max(100),
+    confidence: z.number().min(0).max(100),
+    coherence: z.number().min(0).max(100),
+    children: z.array(OdysseyNodeSchema)
+  })
+);
+
 export const TaskSchema = z.object({
   schema_version: schemaVersion,
   id: z.string().min(1),
@@ -74,7 +104,19 @@ export const TaskSchema = z.object({
   waiting_status: WaitingStatusSchema.nullable().default(null),
   contexts: z.array(TaskContextSchema).default([]),
   cognitive_load: CognitiveLoadSchema.nullable().default(null),
-  depth: TaskDepthSchema.nullable().default(null)
+  depth: TaskDepthSchema.nullable().default(null),
+  /** Someday / Maybe only — how developed the idea is. Optional/omitted for board tasks and old records. */
+  maturity: SomedayMaturitySchema.nullable().optional(),
+  /** Someday / Maybe only — free-text life area, used to compute Life coverage. */
+  life_area: z.string().nullable().optional(),
+  /** Someday / Maybe only — altitude this idea would land at if promoted. */
+  horizon_target: SomedayHorizonSchema.nullable().optional(),
+  /** Projects spawned by promoting this Someday idea. The idea stays; each attempt is tracked here. */
+  linked_project_ids: z.array(z.string()).optional(),
+  /** Goals spawned by promoting this Someday idea. The idea stays. */
+  linked_goal_ids: z.array(z.string()).optional(),
+  /** Someday / Maybe only — branching daydream tree ("Odyssey mode"). */
+  odyssey_paths: z.array(OdysseyNodeSchema).optional()
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -126,7 +168,13 @@ export const TaskCreateSchema = TaskSchema.omit({
   waiting_status: true,
   contexts: true,
   cognitive_load: true,
-  depth: true
+  depth: true,
+  maturity: true,
+  life_area: true,
+  horizon_target: true,
+  linked_project_ids: true,
+  linked_goal_ids: true,
+  odyssey_paths: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

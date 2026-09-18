@@ -27,6 +27,7 @@ import {
   parseHashRoute,
   parseMapItemPage,
   parseNewExcursionPage,
+  parseSomedaySubPage,
   renderHubShell,
   renderPageHeader,
   renderPrimaryNav,
@@ -46,6 +47,8 @@ import { renderClareView } from '@/views/clare';
 import { installClareSession } from '@/chat/clare-session';
 import { attachVisualViewportInset } from '@/chat/visual-viewport';
 import { renderExcursionsView, renderNewExcursionPage } from '@/views/excursions';
+import { renderSomedayWheelView } from '@/views/someday-wheel';
+import { renderSomedayOdysseyView } from '@/views/someday-odyssey';
 import { renderArchiveView } from '@/views/archive';
 import { renderProgramsView } from '@/views/programs';
 import { renderStressView } from '@/views/stress';
@@ -168,7 +171,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
   }
 
   async function paint(opts?: { force?: boolean }) {
-    const nextView = isKnownHashView() && !parseEntityPage() && !parseMapItemPage() && !parseNewExcursionPage()
+    const nextView = isKnownHashView() && !parseEntityPage() && !parseMapItemPage() && !parseNewExcursionPage() && !parseSomedaySubPage()
       ? parseHashRoute()
       : null;
     const soft = !opts?.force && nextView !== null && isSoftViewChange(lastView, nextView);
@@ -245,6 +248,27 @@ async function bootApp(root: HTMLElement): Promise<void> {
         title: 'Page not found'
       });
       renderNotFound(shell.canvas, location.hash);
+      return;
+    }
+    const somedaySub = parseSomedaySubPage();
+    if (somedaySub) {
+      resetPaint();
+      renderPrimaryNav(shell.railNav, 'someday');
+      renderPageHeader(shell, {
+        eyebrow: 'Plan',
+        title: somedaySub.kind === 'wheel' ? 'Life coverage' : 'Odyssey mode'
+      });
+      clare.sync('someday');
+      try {
+        await renderReminderStrip(shell.reminderHost, () => void paint({ force: true }));
+        if (somedaySub.kind === 'wheel') {
+          await renderSomedayWheelView(shell.canvas);
+        } else {
+          await renderSomedayOdysseyView(shell.canvas, somedaySub.taskId);
+        }
+      } catch (err) {
+        renderLoadError(shell.canvas, err, () => void paint({ force: true }), 'Could not load Someday');
+      }
       return;
     }
     if (parseNewExcursionPage()) {

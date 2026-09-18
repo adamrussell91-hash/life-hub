@@ -96,6 +96,8 @@ export const ProjectSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   parent_goal_id: z.string().nullable().default(null),
+  /** The Someday / Maybe idea this project was promoted from — the idea itself stays put. */
+  parent_someday_id: z.string().nullable().optional(),
   tags: z.array(z.string()).default([]),
   arc_summary: z.string().default(''),
   /** Why this project exists — distinct from description. */
@@ -172,6 +174,7 @@ export const ProjectCreateSchema = ProjectSchema.omit({
 }).partial({
   description: true,
   parent_goal_id: true,
+  parent_someday_id: true,
   tags: true,
   arc_summary: true,
   purpose: true,
