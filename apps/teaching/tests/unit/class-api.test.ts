@@ -128,6 +128,26 @@ describe('PATCH /api/classes/:id (mock)', () => {
     expect(cls.meeting_days).toEqual([2, 4]);
   });
 
+  it('persists a custom class title', async () => {
+    const api = freshApi();
+    const cookie = await signIn(api);
+
+    const res = await api.request('PATCH', PATH, {
+      cookie,
+      body: { title: 'English Advanced 12ENA6' }
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.title).toBe('English Advanced 12ENA6');
+
+    const curriculum = await (
+      await api.request('GET', '/api/curriculum', { cookie })
+    ).json();
+    const cls = curriculum.data.classes.find((row: Class) => row.id === CLASS_ID);
+    expect(cls.title).toBe('English Advanced 12ENA6');
+  });
+
   it('persists homepage on PATCH', async () => {
     const api = freshApi();
     const cookie = await signIn(api);
