@@ -18,6 +18,7 @@ import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { mountEntityPageTitle } from '@/teacher/entity-page-title';
+import { renameLesson } from '@/teacher/lessons-library/api';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -567,7 +568,13 @@ export function renderUnitPage(
           previewText: lesson.excerpt,
           editableTitle: true
         },
-        { onMutated: options.onMutated }
+        {
+          onTitleSave: async (title) => {
+            const saved = await renameLesson(lesson.id, title);
+            lesson.title = saved.title;
+          },
+          onMutated: options.onMutated
+        }
       );
 
       const info = document.createElement('div');
