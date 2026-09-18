@@ -93,7 +93,7 @@ export const BRISKET_FORCE_MEAL_NUDGE = [
 export const SARA_FORCE_LOG_NUDGE = [
   'You have not called log_entry yet.',
   'Call log_entry NOW for the body or medical record Adam just asked to save, using only what he said.',
-  'For body data, include every supported figure he supplied. If the message spans composition and tape measurements, call log_entry separately for each record type.',
+  'For body data, include every numeric figure he supplied. Use extra_metrics for figures without a dedicated field. If the message spans composition and tape measurements, call log_entry separately for each record type.',
   'Do not web_search. Do not claim it is saved until log_entry returns written or awaiting_confirm.',
   'A Confirm card (or immediate write for a matched medical append) is the only way this lands.'
 ].join(' ');
