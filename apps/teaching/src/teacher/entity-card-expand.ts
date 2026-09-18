@@ -69,7 +69,7 @@ async function defaultTitleSave(model: EntityCardExpandModel, title: string): Pr
       await patchUnit(model.id, { title });
       return;
     case 'class':
-      await patchClass(model.id, { display_name: title });
+      await patchClass(model.id, { title });
       return;
   }
 }
