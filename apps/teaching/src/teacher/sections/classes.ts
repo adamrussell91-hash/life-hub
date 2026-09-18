@@ -109,8 +109,8 @@ export function renderClassesIndex(
           },
           {
             onTitleSave: async (title) => {
-              const saved = await patchClass(cls.id, { display_name: title });
-              cls.display_name = saved.display_name || title;
+              const saved = await patchClass(cls.id, { title });
+              cls.title = saved.title || title;
             },
             onMutated: options.onMutated
           }
@@ -303,12 +303,12 @@ export function renderClassPage(
       banner.update({ title });
     },
     onSave: async (title) => {
-      const saved = await patchClass(pageClass.id, { display_name: title });
-      pageClass.display_name = saved.display_name || title;
-      classTitle = pageClass.display_name;
+      const saved = await patchClass(pageClass.id, { title });
+      pageClass.title = saved.title || title;
+      classTitle = pageClass.title;
     },
     onSaved: (title) => {
-      pageClass.display_name = title;
+      pageClass.title = title;
       classTitle = title;
       banner.update({ title });
     }
