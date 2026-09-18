@@ -1,4 +1,5 @@
 import { createSkipLink } from '@/app/failure';
+import { withAppBase } from '@/app/base-path';
 import { navigate } from '@/app/router';
 
 export function createStudentShell(contentExtraClass = ''): {
@@ -40,7 +41,7 @@ export function studentAnchor(
 ): HTMLAnchorElement {
   const link = document.createElement('a');
   link.className = className;
-  link.href = href;
+  link.href = withAppBase(href);
   if (text) link.textContent = text;
   link.addEventListener('click', (event) => {
     event.preventDefault();
