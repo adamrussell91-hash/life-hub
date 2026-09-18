@@ -32,6 +32,7 @@ export function patchClass(
     current_scheduled_lesson_id?: string | null;
     homepage?: ClassHomepage;
     cover?: Cover | null;
+    title?: string;
   }
 ): Promise<Class> {
   return apiPatch(`/api/classes/${id}`, body);

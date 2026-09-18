@@ -16,6 +16,7 @@ import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
+import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import type { CurriculumResponse } from '@/teacher/nav';
 import {
   mountHomepageEditor,
@@ -104,9 +105,15 @@ export function renderClassesIndex(
             media: curriculum.media,
             fullPagePath: path,
             metaText: classTitle,
-            editableTitle: false
+            editableTitle: true
           },
-          { onMutated: options.onMutated }
+          {
+            onTitleSave: async (title) => {
+              const saved = await patchClass(cls.id, { title });
+              cls.title = saved.title || title;
+            },
+            onMutated: options.onMutated
+          }
         ).dispose
       );
 
@@ -196,7 +203,7 @@ export function renderClassPage(
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const unitsById = new Map(curriculum.units.map((unit) => [unit.id, unit]));
-  const classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
+  let classTitle = classDisplayTitle(pageClass, yearsById, subjectsById);
   const studentPath = `/s/classes/${cls.id}`;
 
   const optionsMenu = mountPageOptionsMenu(
@@ -288,7 +295,25 @@ export function renderClassPage(
       await options.onCoverMutated?.();
     }
   });
-  disposers.push(banner.dispose);
+
+  const titleEditor = mountEntityPageTitle(bannerHost, {
+    value: classTitle,
+    ariaLabel: 'Class name',
+    onPreview: (title) => {
+      banner.update({ title });
+    },
+    onSave: async (title) => {
+      const saved = await patchClass(pageClass.id, { title });
+      pageClass.title = saved.title || title;
+      classTitle = pageClass.title;
+    },
+    onSaved: (title) => {
+      pageClass.title = title;
+      classTitle = title;
+      banner.update({ title });
+    }
+  });
+  disposers.push(titleEditor.dispose, banner.dispose);
 
   const body = document.createElement('div');
   body.className = 'class-page__body';

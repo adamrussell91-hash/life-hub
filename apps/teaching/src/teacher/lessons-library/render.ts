@@ -23,7 +23,7 @@ import { mountPublicLinkControl } from '@/teacher/public-link';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { createHubFilter } from '../../../design-kit/js/hub-filter-menu.js';
-import { duplicateLesson, patchLessonLibrary } from './api';
+import { duplicateLesson, patchLessonLibrary, renameLesson } from './api';
 import { duplicateIdSet, findNearDuplicates } from './duplicates';
 import { exportUnitPack } from './export-unit';
 import { badgeLabel, el, formatLessonCount, formatRelativeTime } from './format';
@@ -546,7 +546,15 @@ export function renderLessonsLibrary(
           previewText: row.excerpt,
           editableTitle: true
         },
-        { onMutated: options.onMutated }
+        {
+          onTitleSave: async (title) => {
+            const saved = await renameLesson(row.id, title);
+            row.title = saved.title;
+            const summary = curriculum.lessons.find((lesson) => lesson.id === row.id);
+            if (summary) summary.title = saved.title;
+          },
+          onMutated: options.onMutated
+        }
       ).dispose
     );
 

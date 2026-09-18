@@ -249,6 +249,36 @@ describe('classes section', () => {
     expect(unitLink).not.toBeNull();
   });
 
+  it('live saves a custom class name from the full class page', async () => {
+    const isolated = structuredClone(curriculum);
+    const renamed = {
+      ...isolated.classes[0],
+      title: 'English Advanced 12ENA6'
+    } as Class;
+    vi.mocked(patchClass).mockResolvedValue(renamed);
+
+    renderClassPage(canvas, isolated, classRow.id);
+
+    expect(canvas.querySelector('.entity-page-title__edit')?.textContent).toBe('Edit name');
+    const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
+    expect(input.value).toBe('Year 12 English Advanced');
+
+    input.value = renamed.title;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith(classRow.id, {
+        title: 'English Advanced 12ENA6'
+      });
+    });
+    expect(isolated.classes[0]?.title).toBe('English Advanced 12ENA6');
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
+      'English Advanced 12ENA6'
+    );
+    expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+  });
+
   it('opens a lesson from the unit sequence', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
     const link = canvas.querySelector<HTMLAnchorElement>(

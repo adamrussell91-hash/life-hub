@@ -23,6 +23,7 @@ import {
   type PedagogicalMode
 } from '@/curriculum/pedagogical-mode';
 import { renderEntityBanner, type EntityBannerHandle } from '@/teacher/entity-banner';
+import { mountEntityPageTitle } from '@/teacher/entity-page-title';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import {
   deleteBlocksById,
@@ -794,18 +795,15 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     }
   });
 
-  const title = document.createElement('input');
-  title.type = 'text';
-  title.className = 'lesson-page__title';
-  title.value = lesson.title;
-  title.placeholder = 'Untitled lesson';
-  title.setAttribute('aria-label', 'Lesson title');
-  title.addEventListener('input', () => {
-    // Retitling repaints the banner scrim only; remounting would drop the field.
-    banner.update({ title: title.value });
-    emitLesson({ ...lesson, title: title.value });
+  const titleEditor = mountEntityPageTitle(coverHost, {
+    value: lesson.title,
+    ariaLabel: 'Lesson name',
+    inputClassName: 'lesson-page__title',
+    onPreview: (title) => {
+      banner.update({ title });
+      emitLesson({ ...lesson, title });
+    }
   });
-  coverHost.append(title);
 
   const modeRow = document.createElement('label');
   modeRow.className = 'lesson-page__mode';
@@ -880,7 +878,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     update(next: Lesson, nextMedia?: Media[]) {
       lesson = next;
       if (nextMedia) media = nextMedia;
-      title.value = lesson.title;
+      titleEditor.update(lesson.title);
       modeSelect.value = resolvePedagogicalMode(lesson.pedagogical_mode);
       banner.update({
         cover: lesson.cover ?? null,
@@ -899,6 +897,7 @@ export function mountLessonPage(host: HTMLElement, options: MountLessonPageOptio
     dispose() {
       canvas.dispose();
       strip?.dispose();
+      titleEditor.dispose();
       banner.dispose();
       optionsMenu.dispose();
       root.remove();

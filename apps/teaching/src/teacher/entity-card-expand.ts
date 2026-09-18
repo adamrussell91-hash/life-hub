@@ -1,10 +1,11 @@
-import { apiPatch, apiPut } from '@/api/client';
+import { apiPut } from '@/api/client';
 import { navigate } from '@/app/router';
 import type { Cover, Media } from '@/schemas';
 import { renderEntityBanner } from '@/teacher/entity-banner';
 import { getLesson } from '@/teacher/lessons-library/api';
 import { patchClass } from '@/teacher/schedule-api';
 import { patchUnit } from '@/teacher/unit-api';
+import { bindTitleAutosave } from '@/teacher/title-autosave';
 import { openMorphingDialog } from '../../design-kit/js/morphing-dialog.js';
 
 export type EntityCardKind = 'lesson' | 'unit' | 'class';
@@ -65,9 +66,10 @@ async function defaultTitleSave(model: EntityCardExpandModel, title: string): Pr
       return;
     }
     case 'unit':
-      await apiPatch(`/api/units/${model.id}`, { title });
+      await patchUnit(model.id, { title });
       return;
     case 'class':
+      await patchClass(model.id, { title });
       return;
   }
 }
@@ -94,12 +96,10 @@ export function openEntityCardExpand(
   if (activeClose) activeClose();
 
   let disposed = false;
-  let titleDirty = false;
-  let savingTitle = false;
   let currentTitle = model.title;
   let currentCover = model.cover ?? null;
   let currentEyebrow = model.eyebrow;
-  const editableTitle = model.editableTitle ?? model.kind !== 'class';
+  const editableTitle = model.editableTitle ?? true;
 
   const dialog = document.createElement('div');
   dialog.className = 'entity-card-expand glass-panel glass-tile';
@@ -194,31 +194,32 @@ export function openEntityCardExpand(
     }
   });
 
-  const saveTitle = async (): Promise<void> => {
-    if (!editableTitle || savingTitle) return;
-    const trimmed = titleInput.value.trim();
-    if (!trimmed) {
-      titleInput.value = currentTitle;
-      return;
-    }
-    if (trimmed === currentTitle && !titleDirty) return;
-    savingTitle = true;
-    errorBanner.hidden = true;
-    try {
-      const save = callbacks.onTitleSave ?? ((title) => defaultTitleSave(model, title));
-      await save(trimmed);
-      currentTitle = trimmed;
-      titleDirty = false;
-      banner.update({ title: currentTitle, eyebrow: currentEyebrow, cover: currentCover });
-      await callbacks.onMutated?.();
-    } catch (error) {
-      errorBanner.hidden = false;
-      errorBanner.textContent =
-        error instanceof Error ? error.message : 'Unable to save title.';
-    } finally {
-      savingTitle = false;
-    }
-  };
+  const titleAutosave = editableTitle
+    ? bindTitleAutosave(titleInput, {
+        initialValue: currentTitle,
+        onPreview: (title) => {
+          banner.update({ title, eyebrow: currentEyebrow, cover: currentCover });
+        },
+        onSave: async (title) => {
+          errorBanner.hidden = true;
+          const save = callbacks.onTitleSave ?? ((next) => defaultTitleSave(model, next));
+          await save(title);
+        },
+        onSaved: async (title) => {
+          currentTitle = title;
+          model.title = title;
+          banner.update({ title: currentTitle, eyebrow: currentEyebrow, cover: currentCover });
+          await callbacks.onMutated?.();
+        },
+        onError: (error) => {
+          errorBanner.hidden = false;
+          errorBanner.textContent =
+            error instanceof Error ? error.message : 'Unable to save title.';
+        }
+      })
+    : null;
+
+  const flushTitle = (): Promise<void> => titleAutosave?.flush() ?? Promise.resolve();
 
   const session = openMorphingDialog({
     trigger: options.trigger ?? null,
@@ -228,6 +229,7 @@ export function openEntityCardExpand(
     labelledBy: 'entity-card-expand-title',
     onRequestClose: () => close(),
     onClose: () => {
+      titleAutosave?.dispose();
       banner.dispose();
       if (activeClose === closeSelf) activeClose = null;
       callbacks.onClose?.();
@@ -238,8 +240,9 @@ export function openEntityCardExpand(
 
   const close = (): void => {
     if (disposed) return;
-    disposed = true;
-    void saveTitle().finally(() => {
+    void flushTitle().finally(() => {
+      if (disposed) return;
+      disposed = true;
       session.close();
     });
   };
@@ -249,27 +252,14 @@ export function openEntityCardExpand(
 
   closeBtn.addEventListener('click', () => close());
   fullPageBtn.addEventListener('click', () => {
-    void saveTitle().finally(() => {
-      close();
+    void flushTitle().finally(() => {
+      if (!disposed) {
+        disposed = true;
+        session.close();
+      }
       navigate(model.fullPagePath);
     });
   });
-
-  if (editableTitle) {
-    titleInput.addEventListener('input', () => {
-      titleDirty = titleInput.value.trim() !== currentTitle;
-      banner.update({ title: titleInput.value, eyebrow: currentEyebrow, cover: currentCover });
-    });
-    titleInput.addEventListener('blur', () => {
-      void saveTitle();
-    });
-    titleInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') {
-        event.preventDefault();
-        void saveTitle();
-      }
-    });
-  }
 
   void hydrateLessonCover(model)
     .then((cover) => {

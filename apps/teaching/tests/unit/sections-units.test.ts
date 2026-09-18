@@ -303,6 +303,32 @@ describe('units', () => {
     expect(families).toContain('Layout');
   });
 
+  it('live saves the unit name from the full unit page', async () => {
+    const isolated = structuredClone(curriculum);
+    const renamed = {
+      ...isolated.units.find((entry) => entry.id === unit.id)!,
+      title: 'Area of Study B: Critical Study of Literature'
+    };
+    vi.mocked(patchUnit).mockResolvedValue(renamed);
+
+    renderUnitPage(canvas, isolated, unit.id);
+
+    expect(canvas.querySelector('.entity-page-title__edit')?.textContent).toBe('Edit name');
+    const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
+    expect(input.value).toBe('Artist of the Floating World');
+
+    input.value = renamed.title;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+
+    await vi.waitFor(() => {
+      expect(patchUnit).toHaveBeenCalledWith(unit.id, { title: renamed.title });
+    });
+    expect(isolated.units.find((entry) => entry.id === unit.id)?.title).toBe(renamed.title);
+    expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(renamed.title);
+    expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+  });
+
   it('uses the shared banner and removes its cover without remounting the unit plan', async () => {
     const onMutated = vi.fn().mockResolvedValue(undefined);
     const onCoverMutated = vi.fn().mockResolvedValue(undefined);
