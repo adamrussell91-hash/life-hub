@@ -7,6 +7,8 @@ import {
   isLogFinalize,
   isThinMindTurn,
   isVeraFlushMessage,
+  missingSaraBodyLogTypes,
+  saraBodyLogTypesFromMessage,
   shouldForceAgentLog,
   shouldNudgeMissingLogEntry,
   shouldStripWebSearch
@@ -93,4 +95,88 @@ test('shouldNudgeMissingLogEntry surfaces chat-only claims', () => {
     assistantText: "It's in the books.",
     sawRecordProposal: true
   }), false);
+});
+
+
+test('Sara body detector requires composition and tape records from one mixed update', () => {
+  const message = 'Weight 91.2 kg, body fat 17.4%, skeletal muscle 39.8 kg, visceral fat 8, body age 34, waist 86 cm, shoulders 124 cm, chest 105 cm, right arm flexed 38.5 cm.';
+  assert.deepEqual(saraBodyLogTypesFromMessage(message), ['composition', 'measurements']);
+  assert.deepEqual(
+    missingSaraBodyLogTypes({ userMessage: message, loggedTypes: ['composition'] }),
+    ['measurements']
+  );
+  assert.deepEqual(
+    missingSaraBodyLogTypes({ userMessage: message, loggedTypes: ['composition', 'measurements'] }),
+    []
+  );
+});
+
+test('Sara body detector keeps weight-only updates as weight records', () => {
+  assert.deepEqual(saraBodyLogTypesFromMessage('I weigh 90.7 kg today'), ['weight']);
+  assert.deepEqual(
+    missingSaraBodyLogTypes({ userMessage: 'Weight 90.7 kg', loggedTypes: ['composition'] }),
+    []
+  );
+});
+
+test('streamWithAgentLogForce makes Sara finish every body record group', async () => {
+  const calls = [];
+  const message = 'Weight 91.2 kg, body fat 17.4%, waist 86 cm and shoulders 124 cm.';
+  const anthropic = {
+    async *streamMessage(args) {
+      calls.push(args);
+      if (calls.length === 1) {
+        yield {
+          type: 'tool_call',
+          id: 'composition',
+          name: 'log_entry',
+          input: {
+            type: 'composition',
+            date: '2026-09-19',
+            fields: { weight_kg: 91.2, body_fat_pct: 17.4 }
+          }
+        };
+        yield { type: 'done' };
+        return;
+      }
+      yield {
+        type: 'tool_call',
+        id: 'measurements',
+        name: 'log_entry',
+        input: {
+          type: 'measurements',
+          date: '2026-09-19',
+          fields: { waist: 86, shoulders: 124 }
+        }
+      };
+      yield { type: 'done' };
+    }
+  };
+
+  const events = await collect(streamWithAgentLogForce(anthropic, {
+    slug: 'sara',
+    userMessage: message,
+    messages: [{ role: 'user', content: message }]
+  }));
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].messages.at(-1).content, /Missing log_entry type\(s\): measurements/);
+  assert.deepEqual(
+    events.filter(event => event.type === 'tool_call' && event.name === 'log_entry').map(event => event.input.type),
+    ['composition', 'measurements']
+  );
+});
+
+test('Sara body figures trigger logging even without an explicit save command', () => {
+  assert.equal(shouldForceAgentLog({
+    slug: 'sara',
+    userMessage: 'Waist 86 cm, chest 105 cm',
+    sawLogEntry: false,
+    loggedTypes: []
+  }), true);
+});
+
+test('claimedDomainSave catches Sara body-save language', () => {
+  assert.equal(claimedDomainSave('Your measurements are logged.', 'sara'), true);
+  assert.equal(claimedDomainSave('Saved to Body.', 'sara'), true);
 });
