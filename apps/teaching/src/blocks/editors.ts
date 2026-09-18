@@ -1157,6 +1157,9 @@ export function createTableEditor(
     headerRow.className = 'block-editor__table-header-row';
 
     headers.forEach((header, colIndex) => {
+      const headerCell = document.createElement('div');
+      headerCell.className = 'block-editor__table-header-cell';
+
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'block-editor__table-header';
@@ -1166,12 +1169,34 @@ export function createTableEditor(
         headers[colIndex] = input.value;
         emitChange();
       });
-      headerRow.append(input);
+
+      const removeColumn = document.createElement('button');
+      removeColumn.type = 'button';
+      removeColumn.className = 'btn btn--ghost block-editor__table-remove-column';
+      removeColumn.textContent = 'Remove';
+      removeColumn.setAttribute('aria-label', `Remove column ${colIndex + 1}`);
+      removeColumn.disabled = headers.length <= 1;
+      removeColumn.addEventListener('click', () => {
+        if (headers.length <= 1) return;
+        rows = rows.map((row) =>
+          ensureRowWidth([...row]).filter((_, index) => index !== colIndex)
+        );
+        headers = headers.filter((_, index) => index !== colIndex);
+        emitChange();
+        renderTable();
+      });
+
+      headerCell.append(input, removeColumn);
+      headerRow.append(headerCell);
     });
     tableWrap.append(headerRow);
 
     rows.forEach((row, rowIndex) => {
       ensureRowWidth(row);
+
+      const rowWrap = document.createElement('div');
+      rowWrap.className = 'block-editor__table-row-wrap';
+
       const rowEl = document.createElement('div');
       rowEl.className = 'block-editor__table-row';
 
@@ -1188,7 +1213,19 @@ export function createTableEditor(
         rowEl.append(input);
       });
 
-      tableWrap.append(rowEl);
+      const removeRow = document.createElement('button');
+      removeRow.type = 'button';
+      removeRow.className = 'btn btn--ghost block-editor__table-remove-row';
+      removeRow.textContent = 'Remove row';
+      removeRow.setAttribute('aria-label', `Remove row ${rowIndex + 1}`);
+      removeRow.addEventListener('click', () => {
+        rows = rows.filter((_, index) => index !== rowIndex);
+        emitChange();
+        renderTable();
+      });
+
+      rowWrap.append(rowEl, removeRow);
+      tableWrap.append(rowWrap);
     });
   }
 
@@ -1210,8 +1247,8 @@ export function createTableEditor(
   addCol.className = 'btn btn--secondary';
   addCol.textContent = 'Add column';
   addCol.addEventListener('click', () => {
+    rows = rows.map((row) => [...ensureRowWidth([...row]), '']);
     headers = [...headers, `Column ${headers.length + 1}`];
-    rows = rows.map((row) => [...ensureRowWidth(row), '']);
     emitChange();
     renderTable();
   });
