@@ -200,17 +200,18 @@ const REGISTRY = new Map([
     })
   ],
   [
-    // Meeting attendee. Allowed optional roles: chair, minute_taker (null ok).
+    // Meeting or Event attendee. Allowed optional roles: chair, minute_taker
+    // (Meetings); facilitator, presenter (Events); null is always fine.
     'attendee',
     declaration({
       key: 'attendee',
-      sourceKinds: ['professional:meeting'],
+      sourceKinds: ['professional:meeting', 'professional:event'],
       targetKinds: ['shared:person'],
       inverseLabel: 'attends',
       cardinality: 'many_to_many',
       temporalMode: 'point',
       roleMode: 'optional_text',
-      allowedRoles: ['chair', 'minute_taker']
+      allowedRoles: ['chair', 'minute_taker', 'facilitator', 'presenter']
     })
   ],
   [

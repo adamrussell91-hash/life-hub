@@ -5,13 +5,14 @@ const VALID_PERSON_ID = 'person_00000000-0000-4000-8000-000000000001';
 const VALID_ORG_ID = 'organisation_00000000-0000-4000-8000-000000000002';
 
 describe('parseRoute', () => {
-  it('defaults an empty or root hash to People', () => {
-    expect(parseRoute('')).toEqual({ name: 'people' });
-    expect(parseRoute('#/')).toEqual({ name: 'people' });
-    expect(parseRoute('#')).toEqual({ name: 'people' });
+  it('defaults an empty or root hash to Home', () => {
+    expect(parseRoute('')).toEqual({ name: 'home' });
+    expect(parseRoute('#/')).toEqual({ name: 'home' });
+    expect(parseRoute('#')).toEqual({ name: 'home' });
   });
 
   it('parses each flat destination', () => {
+    expect(parseRoute('#/home')).toEqual({ name: 'home' });
     expect(parseRoute('#/people')).toEqual({ name: 'people' });
     expect(parseRoute('#/organisations')).toEqual({ name: 'organisations' });
     expect(parseRoute('#/relationships')).toEqual({ name: 'relationships' });
@@ -71,6 +72,7 @@ describe('railHighlightFor', () => {
     expect(railHighlightFor({ name: 'person', id: VALID_PERSON_ID })).toBe('people');
     expect(railHighlightFor({ name: 'organisation', id: VALID_ORG_ID })).toBe('organisations');
     expect(railHighlightFor({ name: 'people' })).toBe('people');
+    expect(railHighlightFor({ name: 'home' })).toBe('home');
     expect(railHighlightFor({ name: 'not-found', path: 'x' })).toBeNull();
   });
 

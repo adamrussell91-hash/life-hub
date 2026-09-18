@@ -14,6 +14,7 @@ import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/a
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
 import { parseRoute, railHighlightFor } from '@/app/router';
 import { renderPeopleHomeView } from '@/views/people-home';
+import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import {
@@ -50,9 +51,9 @@ function renderNotFound(canvas: HTMLElement, hash: string): void {
   const home = document.createElement('button');
   home.type = 'button';
   home.className = 'btn btn--primary';
-  home.textContent = 'Back to People';
+  home.textContent = 'Back to Home';
   home.addEventListener('click', () => {
-    location.hash = '#/people';
+    location.hash = '#/home';
   });
   canvas.append(lede, home);
 }
@@ -80,6 +81,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    if (route.name === 'home') {
+      renderPageHeader(shell, viewChrome('home'));
+      await renderHomeView(shell.canvas);
+      return;
+    }
     if (route.name === 'people') {
       renderPageHeader(shell, viewChrome('people'));
       await renderPeopleHomeView(shell.canvas, {
@@ -231,7 +237,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
     void paint();
   });
 
-  if (!location.hash || location.hash === '#/') location.hash = '#/people';
+  if (!location.hash || location.hash === '#/') location.hash = '#/home';
   await paint();
 }
 

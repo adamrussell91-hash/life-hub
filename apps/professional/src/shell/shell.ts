@@ -26,6 +26,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { id: 'home', label: 'Home', href: '#/home' },
   { id: 'people', label: 'People', href: '#/people' },
   { id: 'organisations', label: 'Organisations', href: '#/organisations' },
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
@@ -97,7 +98,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
 
   const brand = document.createElement('a');
   brand.className = 'hub-rail__brand';
-  brand.href = '#/people';
+  brand.href = '#/home';
   brand.textContent = 'Professional Hub';
   top.append(brand);
 
@@ -161,6 +162,13 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
     currentHub: 'professional',
     primary: [
       {
+        id: 'home',
+        label: 'Home',
+        paths: RAIL_ICON_PATHS.home,
+        href: '#/home',
+        current: active === 'home'
+      },
+      {
         id: 'people',
         label: 'People',
         paths: RAIL_ICON_PATHS.people,
@@ -173,16 +181,15 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
         paths: RAIL_ICON_PATHS.organisations,
         href: '#/organisations',
         current: active === 'organisations'
-      },
+      }
+    ],
+    more: [
       {
         id: 'relationships',
         label: 'Relationships',
         paths: RAIL_ICON_PATHS.relationships,
-        href: '#/relationships',
-        current: active === 'relationships'
-      }
-    ],
-    more: [
+        href: '#/relationships'
+      },
       {
         id: 'communications',
         label: 'Communications',

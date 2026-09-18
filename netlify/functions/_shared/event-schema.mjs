@@ -38,7 +38,8 @@ export const PERMITTED_CREATE_LINK_TYPES = new Set([
   'venue',
   'provider',
   'related_to',
-  'presenter'
+  'presenter',
+  'attendee'
 ]);
 
 export function generateEventId() {
