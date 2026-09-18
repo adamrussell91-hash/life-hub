@@ -1494,17 +1494,18 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
     const hasCurrent = record.current_scheduled_lesson_id !== undefined;
     const hasHomepage = record.homepage !== undefined;
     const hasCover = record.cover !== undefined;
+    const hasDisplayName = record.display_name !== undefined;
     const statusFields = parseStatusPatch(body);
     if (!statusFields.ok) {
       return errorResponse(400, statusFields.code, statusFields.message);
     }
     const hasStatus = statusFields.hasStatus;
 
-    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasStatus) {
+    if (!hasMeetingDays && !hasCurrent && !hasHomepage && !hasCover && !hasDisplayName && !hasStatus) {
       return errorResponse(
         400,
         'validation_error',
-        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, and/or status'
+        'Provide meeting_days, current_scheduled_lesson_id, homepage, cover, display_name, and/or status'
       );
     }
 
@@ -1564,6 +1565,14 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       cover = coverParsed.data;
     }
 
+    let display_name: string | undefined;
+    if (hasDisplayName) {
+      if (typeof record.display_name !== 'string' || !record.display_name.trim()) {
+        return errorResponse(400, 'validation_error', 'display_name must be a non-empty string');
+      }
+      display_name = record.display_name.trim();
+    }
+
     const rawClass = store.getJSON(classKey(classId));
     if (!rawClass) return notFoundResponse('Class not found');
     const classParsed = ClassSchema.safeParse(rawClass);
@@ -1608,6 +1617,10 @@ export function createMockApi(options: CreateMockApiOptions): MockApi {
       } else {
         merged.cover = cover;
       }
+    }
+
+    if (display_name !== undefined) {
+      merged.display_name = display_name;
     }
 
     if (hasStatus) {
