@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderMeetingsView, renderMeetingNewView } from '@/views/meetings';
-import { renderEventNewView, renderEventsView } from '@/views/events';
+import { renderEventDetailView, renderEventNewView, renderEventsView } from '@/views/events';
 import { parseRoute, railHighlightFor, meetingRoute, eventRoute } from '@/app/router';
 
 const VALID_MEETING_ID = 'meeting_00000000-0000-4000-8000-000000000010';
@@ -323,5 +323,228 @@ describe('renderEventNewView', () => {
     expect(canvas.querySelector('[aria-label="Related knowledge page"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Hours"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Organisation link"]')).toBeTruthy();
+  });
+
+  it('renders an attendee picker with a role control', async () => {
+    const canvas = document.createElement('div');
+    await renderEventNewView(canvas);
+    expect(canvas.querySelector('[aria-label="Attendee role"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Attendee"]')).toBeTruthy();
+  });
+
+  it('posts a picked attendee as relationship_type "attendee", not "provider"', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/entities/search')) {
+        return Response.json({
+          ok: true,
+          data: {
+            groups: {
+              person: [
+                {
+                  ref: 'shared:person:person_00000000-0000-4000-8000-000000000002',
+                  kind: 'person',
+                  display_label: 'Kate Simmons',
+                  supporting_label: null,
+                  href: null,
+                  lifecycle_status: 'active',
+                  visibility: 'operator'
+                }
+              ],
+              organisation: [],
+              task: []
+            }
+          }
+        });
+      }
+      if (init?.method === 'POST' && !href.includes('action=')) {
+        return Response.json(
+          {
+            ok: true,
+            data: {
+              event: {
+                schema_version: 1,
+                id: VALID_EVENT_ID,
+                title: 'PD Day',
+                event_type: 'professional_development',
+                start: '2026-10-01T00:00:00.000Z',
+                end: '2026-10-01T06:00:00.000Z',
+                time_zone: 'Australia/Sydney',
+                all_day: false,
+                occurrence_state: 'scheduled',
+                location_text: null,
+                accreditation_category: null,
+                hours: null,
+                attendance_state: 'registered',
+                certificate: null,
+                created_at: '2026-09-01T10:00:00.000Z',
+                updated_at: '2026-09-01T10:00:00.000Z'
+              },
+              links: [],
+              created: true
+            }
+          },
+          { status: 201 }
+        );
+      }
+      return Response.json({ ok: true, data: { groups: { person: [], organisation: [], task: [] } } });
+    });
+
+    const canvas = document.createElement('div');
+    await renderEventNewView(canvas);
+
+    const attendeeInput = canvas.querySelector('[aria-label="Attendee"]') as HTMLInputElement;
+    attendeeInput.value = '@Kate';
+    attendeeInput.setSelectionRange(attendeeInput.value.length, attendeeInput.value.length);
+    attendeeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(
+      () => {
+        expect(canvas.textContent).toMatch(/Kate Simmons/);
+      },
+      { timeout: 1000 }
+    );
+    const option = [...canvas.querySelectorAll('[role="option"]')].find((node) =>
+      node.textContent?.includes('Kate Simmons')
+    ) as HTMLElement | undefined;
+    option?.click();
+
+    const titleInput = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    titleInput.value = 'PD Day';
+    const form = canvas.querySelector('form.event-form') as HTMLFormElement;
+    form.requestSubmit();
+
+    await vi.waitFor(() => {
+      const postCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[1]?.method === 'POST' && !String(call[0]).includes('action='));
+      expect(postCall).toBeTruthy();
+    });
+    const postCall = vi
+      .mocked(fetch)
+      .mock.calls.find((call) => call[1]?.method === 'POST' && !String(call[0]).includes('action='));
+    const body = JSON.parse(String(postCall?.[1]?.body));
+    expect(body.links).toEqual([
+      expect.objectContaining({
+        relationship_type: 'attendee',
+        target_ref: 'shared:person:person_00000000-0000-4000-8000-000000000002'
+      })
+    ]);
+  });
+});
+
+describe('renderEventDetailView redesign', () => {
+  const originalFetch = globalThis.fetch;
+  const eventRecord = {
+    schema_version: 1,
+    id: VALID_EVENT_ID,
+    title: 'Critical Study PD Day',
+    event_type: 'professional_development',
+    start: '2026-09-18T00:00:00.000Z',
+    end: '2026-09-18T05:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    all_day: false,
+    occurrence_state: 'scheduled',
+    location_text: "St Aloysius' College",
+    accreditation_category: null,
+    hours: 6,
+    attendance_state: 'registered',
+    certificate: null,
+    created_at: '2026-09-01T10:00:00.000Z',
+    updated_at: '2026-09-01T10:00:00.000Z'
+  };
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({
+          ok: true,
+          data: {
+            outgoing: [
+              {
+                link: {
+                  id: 'ul_attendee',
+                  relationship_type: 'attendee',
+                  status: 'current',
+                  source_ref: `professional:event:${VALID_EVENT_ID}`,
+                  target_ref: 'shared:person:person_1'
+                },
+                endpoint: { ref: 'shared:person:person_1', kind: 'person', display_label: 'Kate Simmons' }
+              },
+              {
+                link: {
+                  id: 'ul_provider',
+                  relationship_type: 'provider',
+                  status: 'current',
+                  source_ref: `professional:event:${VALID_EVENT_ID}`,
+                  target_ref: 'shared:organisation:org_1'
+                },
+                endpoint: { ref: 'shared:organisation:org_1', kind: 'organisation', display_label: 'Warlight Education' }
+              }
+            ],
+            incoming: []
+          }
+        });
+      }
+      if (href.includes('action=complete')) {
+        return Response.json({
+          ok: true,
+          data: { event: { ...eventRecord, occurrence_state: 'completed' } }
+        });
+      }
+      return Response.json({ ok: true, data: { event: eventRecord } });
+    });
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('shows exactly one All day control, gated behind Edit details', async () => {
+    const canvas = document.createElement('div');
+    await renderEventDetailView(canvas, VALID_EVENT_ID);
+    expect(canvas.querySelectorAll('[aria-label="All day"]')).toHaveLength(1);
+    const menuBtn = canvas.querySelector('.event-detail__menu-btn') as HTMLButtonElement;
+    expect(canvas.querySelector('.event-detail__panel')?.hasAttribute('hidden')).toBe(true);
+    menuBtn.click();
+    const editItem = [...canvas.querySelectorAll('.event-detail__menu-item')].find(
+      (node) => node.textContent === 'Edit details'
+    ) as HTMLButtonElement;
+    editItem.click();
+    expect(canvas.querySelector('.event-detail__panel')?.hasAttribute('hidden')).toBe(false);
+  });
+
+  it('labels the schedule section "Agenda" and splits People from Linked', async () => {
+    const canvas = document.createElement('div');
+    await renderEventDetailView(canvas, VALID_EVENT_ID);
+    expect(canvas.textContent).toMatch(/Agenda/);
+    await vi.waitFor(() => {
+      expect(canvas.textContent).toMatch(/Kate Simmons/);
+    });
+    const peopleCard = [...canvas.querySelectorAll('.event-detail__card')].find((card) =>
+      card.querySelector('h2')?.textContent === 'People'
+    ) as HTMLElement;
+    const linkedCard = [...canvas.querySelectorAll('.event-detail__card')].find((card) =>
+      card.querySelector('h2')?.textContent === 'Linked'
+    ) as HTMLElement;
+    expect(peopleCard.textContent).toMatch(/Kate Simmons/);
+    expect(peopleCard.textContent).not.toMatch(/Warlight Education/);
+    expect(linkedCard.textContent).toMatch(/Warlight Education/);
+    expect(linkedCard.textContent).not.toMatch(/Kate Simmons/);
+  });
+
+  it('marks the event complete from the options menu', async () => {
+    const canvas = document.createElement('div');
+    await renderEventDetailView(canvas, VALID_EVENT_ID);
+    const menuBtn = canvas.querySelector('.event-detail__menu-btn') as HTMLButtonElement;
+    menuBtn.click();
+    const completeItem = [...canvas.querySelectorAll('.event-detail__menu-item')].find(
+      (node) => node.textContent === 'Mark complete'
+    ) as HTMLButtonElement;
+    completeItem.click();
+    await vi.waitFor(() => {
+      expect(canvas.textContent).toMatch(/Completed/);
+    });
   });
 });

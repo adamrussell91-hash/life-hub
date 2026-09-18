@@ -37,7 +37,8 @@ export const EVENT_OPERATION_ID_PATTERN = /^eop_[0-9a-f]{32}$/;
 export const PERMITTED_CREATE_LINK_TYPES = new Set([
   'venue',
   'provider',
-  'related_to'
+  'related_to',
+  'attendee'
 ]);
 
 export function generateEventId() {
