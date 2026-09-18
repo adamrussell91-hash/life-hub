@@ -694,7 +694,8 @@
 
 .someday-hero {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
 }
@@ -702,6 +703,23 @@
 .someday-hero__icon {
   font-size: var(--text-xl);
   line-height: 1;
+}
+
+.btn--sm {
+  min-height: 1.75rem;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.someday-card__title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.someday-card__branch {
+  flex-shrink: 0;
 }
 
 .someday-card__title {
@@ -717,11 +735,488 @@
   font-size: var(--text-sm);
 }
 
+.someday-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.someday-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  background: var(--shore);
+  color: var(--orca);
+}
+
+.someday-chip--horizon {
+  background: var(--pastel-lilac);
+  color: var(--pastel-lilac-ink);
+}
+
+.someday-chip--area {
+  background: var(--pastel-sage);
+  color: var(--pastel-sage-ink);
+}
+
+.someday-maturity {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--orca);
+  background: transparent;
+}
+
+.someday-maturity--new {
+  background: transparent;
+}
+
+.someday-maturity--developing {
+  background: color-mix(in srgb, var(--orca) 55%, transparent);
+}
+
+.someday-maturity--set {
+  background: var(--orca);
+  border-color: var(--orca);
+}
+
+.someday-card__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.hub-field--compact {
+  flex: 1 1 8rem;
+}
+
+.hub-field--compact .hub-search__input {
+  min-height: 2rem;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.someday-card__stalled {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.someday-card__stalled-row {
+  padding: var(--space-3);
+  border-radius: var(--radius-xs);
+  background: var(--warning-surface);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--line));
+}
+
+.someday-card__stalled-copy {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--warning);
+}
+
+.someday-card__stalled-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .someday-card__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-4);
+}
+
+.someday-group__sweep {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-regular);
+  color: var(--muted);
+  margin-top: var(--space-1);
+}
+
+/* ── Someday: Life coverage (constellation) ─────────────────────────────── */
+
+.someday-back-link {
+  display: inline-block;
+  margin-bottom: var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.someday-wheel {
+  max-width: 34rem;
+}
+
+.someday-wheel__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+
+.someday-wheel__subtitle {
+  margin: var(--space-1) 0 var(--space-4);
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.someday-wheel__panel {
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  background: radial-gradient(120% 120% at 28% 18%, var(--marine) 0%, var(--depth) 68%);
+  display: flex;
+  justify-content: center;
+  box-shadow: var(--elev-3);
+}
+
+.someday-wheel__svg {
+  width: 100%;
+  max-width: 22rem;
+  height: auto;
+}
+
+.someday-wheel__speck {
+  fill: var(--warm-white);
+  opacity: 0.28;
+}
+
+.someday-wheel__core {
+  fill: var(--sand);
+}
+
+.someday-wheel__glow-outer,
+.someday-wheel__glow-inner {
+  fill: var(--high-sea);
+}
+
+.someday-wheel__sparkle {
+  fill: var(--warm-white);
+}
+
+.someday-wheel__unlit-ring {
+  fill: none;
+  stroke: var(--high-sea);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+  opacity: 0.55;
+}
+
+.someday-wheel__unlit-dot {
+  fill: none;
+}
+
+.someday-wheel__label {
+  font-size: 10.5px;
+  font-weight: var(--weight-semibold);
+  fill: var(--warm-white);
+}
+
+.someday-wheel__label--unlit {
+  fill: var(--high-sea);
+}
+
+.someday-wheel__key {
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.someday-wheel__gap-banner {
+  border-radius: var(--radius-xs);
+  padding: var(--space-3);
+  background: var(--warning-surface);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--line));
+  margin-bottom: var(--space-4);
+}
+
+.someday-wheel__gap-copy {
+  margin: 0;
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.someday-wheel__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.someday-wheel__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.someday-wheel__row-label {
+  width: 5rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.someday-wheel__row--unlit .someday-wheel__row-label {
+  color: var(--warning);
+}
+
+.someday-wheel__track {
+  flex: 1;
+  height: 0.375rem;
+  border-radius: var(--radius-full);
+  background: var(--shore);
+  overflow: hidden;
+}
+
+.someday-wheel__fill {
+  height: 100%;
+  background: var(--high-sea);
+}
+
+.someday-wheel__count {
+  width: 1.25rem;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+/* ── Someday: Odyssey mode (branching tree) ─────────────────────────────── */
+
+.someday-odyssey {
+  max-width: 36rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.someday-odyssey__title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+
+.someday-odyssey__subtitle {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  color: var(--muted);
+  font-size: var(--text-base);
+}
+
+.someday-odyssey__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.someday-odyssey__crumb {
+  border: none;
+  background: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.someday-odyssey__crumb.is-current {
+  background: var(--navy);
+  color: #fff;
+}
+
+.someday-odyssey__crumb-sep {
+  color: var(--shallow);
+}
+
+.someday-odyssey__board {
+  padding: var(--space-4);
+}
+
+.someday-odyssey__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.someday-odyssey__level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.someday-odyssey__level--0 {
+  gap: var(--space-3);
+}
+
+.someday-odyssey__node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.someday-odyssey__node .someday-odyssey__level {
+  margin-left: var(--space-6);
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--line);
+}
+
+.someday-odyssey__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line);
+  background: var(--glass);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.someday-odyssey__chip-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: #fff;
+}
+
+.someday-odyssey__chip--wave .someday-odyssey__chip-dot { background: var(--wave); }
+.someday-odyssey__chip--success .someday-odyssey__chip-dot { background: var(--success); }
+.someday-odyssey__chip--lilac .someday-odyssey__chip-dot { background: var(--pastel-lilac-ink); }
+
+.someday-odyssey__chip--wave.is-focused { border-color: var(--wave); background: var(--pastel-blue); }
+.someday-odyssey__chip--success.is-focused { border-color: var(--success); background: var(--pastel-sage); }
+.someday-odyssey__chip--lilac.is-focused { border-color: var(--pastel-lilac-ink); background: var(--pastel-lilac); }
+
+.someday-odyssey__chip-label {
+  font-weight: var(--weight-semibold);
+}
+
+.someday-odyssey__chip-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3rem;
+  border-radius: var(--radius-full);
+  background: var(--orca);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: var(--weight-bold);
+}
+
+.someday-odyssey__leaf-hint {
+  margin: 0 0 0 var(--space-6);
+  color: var(--muted);
+  font-size: var(--text-xs);
+  font-style: italic;
+}
+
+.someday-odyssey__detail {
+  padding: var(--space-4);
+}
+
+.someday-odyssey__detail-label {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.someday-odyssey__detail-label--wave { color: var(--wave); }
+.someday-odyssey__detail-label--success { color: var(--success); }
+.someday-odyssey__detail-label--lilac { color: var(--pastel-lilac-ink); }
+
+.someday-odyssey__detail-title {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+
+.someday-odyssey__detail-copy,
+.someday-odyssey__detail-question {
+  margin: var(--space-2) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.someday-odyssey__detail-stats {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.someday-odyssey__detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.someday-odyssey__add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--line);
+  background: var(--glass);
+}
+
+.someday-odyssey__add--wave { border-color: color-mix(in srgb, var(--wave) 45%, var(--line)); }
+.someday-odyssey__add--success { border-color: color-mix(in srgb, var(--success) 45%, var(--line)); }
+.someday-odyssey__add--lilac { border-color: color-mix(in srgb, var(--pastel-lilac-ink) 45%, var(--line)); }
+
+.someday-odyssey__gauges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.someday-odyssey__range {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.someday-odyssey__range-top {
+  display: flex;
+  justify-content: space-between;
+}
+
+.someday-odyssey__range-value {
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
 }
 
 .someday-add .hub-search,
