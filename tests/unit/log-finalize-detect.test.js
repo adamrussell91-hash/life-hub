@@ -186,3 +186,15 @@ test('Sara body detector recognises value before label phrasing', () => {
   const message = '91.2 kg weight, 17.4% body fat, 86 cm waist, 124 cm shoulders and 38.5 cm right bicep flexed.';
   assert.deepEqual(saraBodyLogTypesFromMessage(message), ['composition', 'measurements']);
 });
+
+
+test('Sara detects additional smart scale metrics as composition data', () => {
+  assert.deepEqual(
+    saraBodyLogTypesFromMessage('Body water 56.2%, bone mass 3.4 kg and BMR 1890 kcal/day'),
+    ['composition']
+  );
+  assert.deepEqual(
+    saraBodyLogTypesFromMessage('56.2% body water, 3.4 kg bone mass'),
+    ['composition']
+  );
+});
