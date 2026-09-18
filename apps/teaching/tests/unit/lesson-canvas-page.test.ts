@@ -137,6 +137,7 @@ describe('mountLessonPage', () => {
     const { onChange } = mount();
     const title = host.querySelector<HTMLInputElement | HTMLElement>('.lesson-page__title');
     expect(title).not.toBeNull();
+    expect(host.querySelector('.entity-page-title__edit')).toBeNull();
 
     if (title instanceof HTMLInputElement || title instanceof HTMLTextAreaElement) {
       expect(title.value).toBe('Intro to Testing');
