@@ -279,9 +279,9 @@ function buildClassesPanel(
         editableTitle: true
       }, {
         onTitleSave: async (title) => {
-          const saved = await patchClass(cls.id, { display_name: title });
-          const next = saved.display_name || title;
-          cls.display_name = next;
+          const saved = await patchClass(cls.id, { title });
+          const next = saved.title || title;
+          cls.title = next;
           const label = tile.querySelector<HTMLElement>('.home-class-tile__title');
           if (label) label.textContent = next;
         }
