@@ -14,7 +14,7 @@ import {
 } from '@/teacher/class-calendar';
 import { renderPageHeader } from '@/teacher/page-header';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
-import { patchClass, patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
+import { patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
 import { mountCreateControl } from '@/teacher/create/control';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
@@ -275,16 +275,7 @@ function buildClassesPanel(
         cover: cls.cover ?? null,
         media,
         fullPagePath: path,
-        metaText: classTitle,
-        editableTitle: true
-      }, {
-        onTitleSave: async (title) => {
-          const saved = await patchClass(cls.id, { title });
-          const next = saved.title || title;
-          cls.title = next;
-          const label = tile.querySelector<HTMLElement>('.home-class-tile__title');
-          if (label) label.textContent = next;
-        }
+        metaText: classTitle
       });
 
       const eyebrow = document.createElement('p');
