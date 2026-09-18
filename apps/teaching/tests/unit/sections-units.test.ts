@@ -313,7 +313,7 @@ describe('units', () => {
 
     renderUnitPage(canvas, isolated, unit.id);
 
-    expect(canvas.querySelector('.entity-page-title__edit')?.textContent).toBe('Edit name');
+    expect(canvas.querySelector('.entity-page-title__edit')).toBeNull();
     const input = canvas.querySelector<HTMLInputElement>('.entity-page-title__input')!;
     expect(input.value).toBe('Artist of the Floating World');
 

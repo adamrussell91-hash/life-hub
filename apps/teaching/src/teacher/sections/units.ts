@@ -18,7 +18,6 @@ import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
 import { wireEntityCardExpand } from '@/teacher/entity-card-expand';
 import { mountEntityPageTitle } from '@/teacher/entity-page-title';
-import { renameLesson } from '@/teacher/lessons-library/api';
 import {
   mountBlockCanvas,
   type BlockCanvasHandle
@@ -276,16 +275,9 @@ function renderUnitCard(
       cover: unit.cover ?? null,
       media,
       fullPagePath: path,
-      metaText,
-      editableTitle: true
+      metaText
     },
-    {
-      onTitleSave: async (title) => {
-        const saved = await patchUnit(unit.id, { title });
-        unit.title = saved.title || title;
-      },
-      onMutated: options.onMutated
-    }
+    { onMutated: options.onMutated }
   );
 
   const mediaEl = document.createElement('div');
@@ -565,16 +557,9 @@ export function renderUnitPage(
           media: curriculum.media,
           fullPagePath: path,
           metaText: lesson.published ? 'Published' : 'Draft',
-          previewText: lesson.excerpt,
-          editableTitle: true
+          previewText: lesson.excerpt
         },
-        {
-          onTitleSave: async (title) => {
-            const saved = await renameLesson(lesson.id, title);
-            lesson.title = saved.title;
-          },
-          onMutated: options.onMutated
-        }
+        { onMutated: options.onMutated }
       );
 
       const info = document.createElement('div');

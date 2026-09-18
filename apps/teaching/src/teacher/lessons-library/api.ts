@@ -8,15 +8,6 @@ export function getLesson(id: string): Promise<Lesson> {
   return apiGet(`/api/lessons/${id}`);
 }
 
-export async function renameLesson(id: string, title: string): Promise<Lesson> {
-  const lesson = await getLesson(id);
-  return apiPut(`/api/lessons/${id}`, {
-    ...lesson,
-    title,
-    updated_at: new Date().toISOString()
-  });
-}
-
 export function patchLessonLibrary(id: string, body: LessonLibraryPatch): Promise<Lesson> {
   return apiPatch(`/api/lessons/${id}`, body);
 }

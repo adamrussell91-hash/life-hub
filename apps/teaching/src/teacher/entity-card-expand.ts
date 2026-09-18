@@ -5,7 +5,6 @@ import { renderEntityBanner } from '@/teacher/entity-banner';
 import { getLesson } from '@/teacher/lessons-library/api';
 import { patchClass } from '@/teacher/schedule-api';
 import { patchUnit } from '@/teacher/unit-api';
-import { bindTitleAutosave } from '@/teacher/title-autosave';
 import { openMorphingDialog } from '../../design-kit/js/morphing-dialog.js';
 
 export type EntityCardKind = 'lesson' | 'unit' | 'class';
@@ -20,12 +19,10 @@ export interface EntityCardExpandModel {
   fullPagePath: string;
   metaText?: string;
   previewText?: string;
-  editableTitle?: boolean;
 }
 
 export interface EntityCardExpandCallbacks {
   onCoverSave?: (cover: Cover | null) => void | Promise<void>;
-  onTitleSave?: (title: string) => void | Promise<void>;
   onMutated?: () => void | Promise<void>;
   onClose?: () => void;
 }
@@ -54,26 +51,6 @@ async function defaultCoverSave(model: EntityCardExpandModel, cover: Cover | nul
   }
 }
 
-async function defaultTitleSave(model: EntityCardExpandModel, title: string): Promise<void> {
-  switch (model.kind) {
-    case 'lesson': {
-      const lesson = await getLesson(model.id);
-      await apiPut(`/api/lessons/${model.id}`, {
-        ...lesson,
-        title,
-        updated_at: new Date().toISOString()
-      });
-      return;
-    }
-    case 'unit':
-      await patchUnit(model.id, { title });
-      return;
-    case 'class':
-      await patchClass(model.id, { title });
-      return;
-  }
-}
-
 async function hydrateLessonCover(model: EntityCardExpandModel): Promise<Cover | null | undefined> {
   if (model.kind !== 'lesson' || model.cover !== undefined) return model.cover ?? null;
   const lesson = await getLesson(model.id);
@@ -85,8 +62,8 @@ export interface OpenEntityCardExpandOptions {
 }
 
 /**
- * Opens a glass expanded card for quick looks and light edits, with a full-page
- * escape hatch. Only one expand panel is open at a time.
+ * Opens a glass expanded card for quick looks and cover edits, with a full-page
+ * escape hatch. Titles are intentionally read-only here.
  */
 export function openEntityCardExpand(
   model: EntityCardExpandModel,
@@ -96,10 +73,9 @@ export function openEntityCardExpand(
   if (activeClose) activeClose();
 
   let disposed = false;
-  let currentTitle = model.title;
+  const currentTitle = model.title;
   let currentCover = model.cover ?? null;
-  let currentEyebrow = model.eyebrow;
-  const editableTitle = model.editableTitle ?? true;
+  const currentEyebrow = model.eyebrow;
 
   const dialog = document.createElement('div');
   dialog.className = 'entity-card-expand glass-panel glass-tile';
@@ -123,14 +99,6 @@ export function openEntityCardExpand(
 
   const body = document.createElement('div');
   body.className = 'entity-card-expand__body';
-
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.id = 'entity-card-expand-title';
-  titleInput.className = 'entity-card-expand__title-input';
-  titleInput.setAttribute('data-hub-morph', 'title');
-  titleInput.value = model.title;
-  titleInput.setAttribute('aria-label', 'Title');
 
   const titleHeading = document.createElement('h2');
   titleHeading.id = 'entity-card-expand-title';
@@ -162,8 +130,7 @@ export function openEntityCardExpand(
 
   footer.append(fullPageBtn);
 
-  if (editableTitle) body.append(titleInput);
-  else body.append(titleHeading);
+  body.append(titleHeading);
   if (model.metaText) body.append(meta);
   if (model.previewText) body.append(preview);
   body.append(errorBanner, footer);
@@ -194,33 +161,6 @@ export function openEntityCardExpand(
     }
   });
 
-  const titleAutosave = editableTitle
-    ? bindTitleAutosave(titleInput, {
-        initialValue: currentTitle,
-        onPreview: (title) => {
-          banner.update({ title, eyebrow: currentEyebrow, cover: currentCover });
-        },
-        onSave: async (title) => {
-          errorBanner.hidden = true;
-          const save = callbacks.onTitleSave ?? ((next) => defaultTitleSave(model, next));
-          await save(title);
-        },
-        onSaved: async (title) => {
-          currentTitle = title;
-          model.title = title;
-          banner.update({ title: currentTitle, eyebrow: currentEyebrow, cover: currentCover });
-          await callbacks.onMutated?.();
-        },
-        onError: (error) => {
-          errorBanner.hidden = false;
-          errorBanner.textContent =
-            error instanceof Error ? error.message : 'Unable to save title.';
-        }
-      })
-    : null;
-
-  const flushTitle = (): Promise<void> => titleAutosave?.flush() ?? Promise.resolve();
-
   const session = openMorphingDialog({
     trigger: options.trigger ?? null,
     frame: dialog,
@@ -229,7 +169,6 @@ export function openEntityCardExpand(
     labelledBy: 'entity-card-expand-title',
     onRequestClose: () => close(),
     onClose: () => {
-      titleAutosave?.dispose();
       banner.dispose();
       if (activeClose === closeSelf) activeClose = null;
       callbacks.onClose?.();
@@ -240,11 +179,8 @@ export function openEntityCardExpand(
 
   const close = (): void => {
     if (disposed) return;
-    void flushTitle().finally(() => {
-      if (disposed) return;
-      disposed = true;
-      session.close();
-    });
+    disposed = true;
+    session.close();
   };
 
   const closeSelf = close;
@@ -252,13 +188,11 @@ export function openEntityCardExpand(
 
   closeBtn.addEventListener('click', () => close());
   fullPageBtn.addEventListener('click', () => {
-    void flushTitle().finally(() => {
-      if (!disposed) {
-        disposed = true;
-        session.close();
-      }
-      navigate(model.fullPagePath);
-    });
+    if (!disposed) {
+      disposed = true;
+      session.close();
+    }
+    navigate(model.fullPagePath);
   });
 
   void hydrateLessonCover(model)
@@ -271,8 +205,7 @@ export function openEntityCardExpand(
       // Cover is optional; keep the gradient fallback.
     });
 
-  if (editableTitle) titleInput.focus();
-  else fullPageBtn.focus();
+  fullPageBtn.focus();
 
   return { close };
 }
