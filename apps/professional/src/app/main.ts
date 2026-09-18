@@ -11,6 +11,7 @@ import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
 import { parseRoute, railHighlightFor } from '@/app/router';
+import { renderHomeView } from '@/views/home';
 import { renderPeopleView } from '@/views/people';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
@@ -46,9 +47,9 @@ function renderNotFound(canvas: HTMLElement, hash: string): void {
   const home = document.createElement('button');
   home.type = 'button';
   home.className = 'btn btn--primary';
-  home.textContent = 'Back to People';
+  home.textContent = 'Back to Home';
   home.addEventListener('click', () => {
-    location.hash = '#/people';
+    location.hash = '#/home';
   });
   canvas.append(lede, home);
 }
@@ -76,6 +77,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
 
+    if (route.name === 'home') {
+      renderPageHeader(shell, viewChrome('home'));
+      await renderHomeView(shell.canvas);
+      return;
+    }
     if (route.name === 'people') {
       renderPageHeader(shell, viewChrome('people'));
       renderPeopleView(shell.canvas);
@@ -207,7 +213,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
     void paint();
   });
 
-  if (!location.hash || location.hash === '#/') location.hash = '#/people';
+  if (!location.hash || location.hash === '#/') location.hash = '#/home';
   await paint();
 }
 
