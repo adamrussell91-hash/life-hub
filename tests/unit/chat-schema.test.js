@@ -374,6 +374,44 @@ test('diary schema includes source_agent', () => {
   assert.ok(Object.hasOwn(DOMAIN_PROPERTIES.diary, 'source_agent'));
 });
 
+
+test('validates a structured bloods panel and exposes bloods to log_entry', () => {
+  const result = validateLogEntry({
+    type: 'bloods',
+    date: '2026-09-17',
+    time: '08:19',
+    fields: {
+      markers: [
+        {
+          key: 'ggt',
+          label: 'GGT',
+          category: 'Liver Function',
+          value: 233,
+          unit: 'U/L',
+          ref_high: 51,
+          status: 'High'
+        },
+        {
+          key: 'crp',
+          label: 'CRP',
+          category: 'Inflammation Markers',
+          value: 2.1,
+          unit: 'mg/L',
+          ref_high: 3.3,
+          status: 'Normal'
+        }
+      ]
+    }
+  }, { id: 'bloods-2026-09-17', now: '2026-09-18T22:28:54+10:00' });
+
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.type, 'bloods');
+  assert.equal(result.record.markers.length, 2);
+  assert.equal(buildRecordSlug(result.record), 'bloods-0819');
+  assert.ok(logEntryToolSchema(['weight', 'bloods', 'medical']).input_schema.properties.type.enum.includes('bloods'));
+  assert.ok(Object.hasOwn(DOMAIN_PROPERTIES.bloods, 'markers'));
+});
+
 test('medical slugs include a title stem so same-day visits do not collide', () => {
   assert.equal(
     buildRecordSlug({ type: 'medical', title: 'GP review', time: '09:15' }),
