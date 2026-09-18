@@ -34,7 +34,7 @@ const MEASUREMENT_NUMBERS = [
   'chest', 'waist', 'hips', 'shoulders', 'neck',
   'right_arm_flexed', 'left_arm_flexed',
   'right_arm_relaxed', 'left_arm_relaxed',
-  'right_thigh', 'left_thigh', 'calves'
+  'right_thigh', 'left_thigh', 'right_calf', 'left_calf', 'calves'
 ];
 
 function isObject(value) {
