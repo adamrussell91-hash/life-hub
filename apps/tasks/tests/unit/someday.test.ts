@@ -7,12 +7,14 @@ import {
   countOdysseyNodes,
   findOdysseyPath,
   LIFE_AREAS,
+  lifeCoverageHeadline,
   maturityWeight,
   newOdysseyNode,
   removeOdysseyNode,
   somedayLinkedProjectIds,
   stalledLinkedProjects,
-  suggestFirstMilestone
+  suggestFirstMilestone,
+  suggestIfThen
 } from '@/domain/someday';
 import { groupSomedayForReview } from '@/views/someday';
 
@@ -122,6 +124,28 @@ describe('suggestFirstMilestone', () => {
     expect(suggestFirstMilestone(task({ id: '1', title: 'Study at Cambridge' }))).toBe(
       'Find out what "Study at Cambridge" would actually take'
     );
+  });
+});
+
+describe('suggestIfThen', () => {
+  it('names the idea in a tiny implementation-intention nudge', () => {
+    expect(suggestIfThen(task({ id: '1', title: 'Study at Cambridge' }))).toBe(
+      'If it\'s a free evening → spend 10 min on "Study at Cambridge"'
+    );
+  });
+});
+
+describe('lifeCoverageHeadline', () => {
+  it('names the stacked area and the gap', () => {
+    const coverage = computeLifeCoverage([
+      task({ id: '1', title: 'a', life_area: 'explore' }),
+      task({ id: '2', title: 'b', life_area: 'explore' })
+    ]);
+    expect(lifeCoverageHeadline(coverage)).toBe('Explore is stacked. Career has nothing.');
+  });
+
+  it('handles no dreams tagged yet', () => {
+    expect(lifeCoverageHeadline(computeLifeCoverage([]))).toBe('No dreams tagged with a life area yet.');
   });
 });
 
