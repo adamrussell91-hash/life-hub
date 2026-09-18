@@ -6,7 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { normalizeTaskRecord } from './_shared/task-shape.mjs';
+import { coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
 import {
   defaultGetTasksStore,
   deleteKey,
@@ -93,9 +93,9 @@ export function createTasksHandler(deps = {}) {
           title,
           description: typeof parsed.value.description === 'string' ? parsed.value.description : '',
           kind: 'task',
-          bucket: 'active',
+          bucket: typeof parsed.value.bucket === 'string' && parsed.value.bucket ? parsed.value.bucket : 'active',
           domain,
-          status: 'open',
+          status: typeof parsed.value.status === 'string' && parsed.value.status ? parsed.value.status : 'open',
           priority: typeof parsed.value.priority === 'string' ? parsed.value.priority : 'medium',
           parent_project_id: typeof parsed.value.parent_project_id === 'string'
             ? parsed.value.parent_project_id
@@ -106,7 +106,14 @@ export function createTasksHandler(deps = {}) {
           depends_on: [],
           tags: [],
           attachments: [],
-          source: 'manual'
+          source: 'manual',
+          // Someday / Maybe fields — no-ops for board tasks that never set them.
+          maturity: typeof parsed.value.maturity === 'string' ? parsed.value.maturity : null,
+          life_area: typeof parsed.value.life_area === 'string' ? parsed.value.life_area : null,
+          horizon_target: typeof parsed.value.horizon_target === 'string' ? parsed.value.horizon_target : null,
+          linked_project_ids: coerceStringArray(parsed.value.linked_project_ids),
+          linked_goal_ids: coerceStringArray(parsed.value.linked_goal_ids),
+          odyssey_paths: Array.isArray(parsed.value.odyssey_paths) ? parsed.value.odyssey_paths : []
         };
         await setJSON(store, taskKey(id), task);
         const ids = await readTaskIndex(store);
