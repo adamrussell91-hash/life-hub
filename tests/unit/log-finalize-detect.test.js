@@ -180,3 +180,9 @@ test('claimedDomainSave catches Sara body-save language', () => {
   assert.equal(claimedDomainSave('Your measurements are logged.', 'sara'), true);
   assert.equal(claimedDomainSave('Saved to Body.', 'sara'), true);
 });
+
+
+test('Sara body detector recognises value before label phrasing', () => {
+  const message = '91.2 kg weight, 17.4% body fat, 86 cm waist, 124 cm shoulders and 38.5 cm right bicep flexed.';
+  assert.deepEqual(saraBodyLogTypesFromMessage(message), ['composition', 'measurements']);
+});
