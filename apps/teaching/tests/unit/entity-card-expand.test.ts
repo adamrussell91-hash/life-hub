@@ -17,6 +17,8 @@ vi.mock('@/api/client', () => ({
 
 import { navigate } from '@/app/router';
 import { getLesson } from '@/teacher/lessons-library/api';
+import { patchClass } from '@/teacher/schedule-api';
+import { patchUnit } from '@/teacher/unit-api';
 import { openEntityCardExpand, wireEntityCardExpand } from '@/teacher/entity-card-expand';
 
 describe('entity-card-expand', () => {
@@ -111,6 +113,90 @@ describe('entity-card-expand', () => {
     action.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(document.querySelector('.entity-card-expand')).toBeNull();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('live saves a unit title and keeps the edited value', async () => {
+    vi.mocked(patchUnit).mockResolvedValue({
+      type: 'unit',
+      id: 'unit_aotfw',
+      title: 'Critical Study of Literature',
+      slug: 'artist_of_the_floating_world',
+      status: 'active',
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      schema_version: 1,
+      year_id: 'year_12',
+      subject_id: 'subject_y12_engadv',
+      lesson_ids: []
+    });
+
+    openEntityCardExpand({
+      kind: 'unit',
+      id: 'unit_aotfw',
+      title: 'Artist of the Floating World',
+      media: [],
+      fullPagePath: '/units/unit_aotfw'
+    });
+
+    const input = document.querySelector<HTMLInputElement>('.entity-card-expand__title-input')!;
+    input.value = 'Critical Study of Literature';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+
+    await vi.waitFor(() => {
+      expect(patchUnit).toHaveBeenCalledWith('unit_aotfw', {
+        title: 'Critical Study of Literature'
+      });
+    });
+    expect(input.value).toBe('Critical Study of Literature');
+    expect(document.querySelector('.entity-banner__title')?.textContent).toBe(
+      'Critical Study of Literature'
+    );
+  });
+
+  it('rolls a failed unit rename back to the last saved title', async () => {
+    vi.mocked(patchUnit).mockRejectedValueOnce(new Error('Save failed'));
+
+    openEntityCardExpand({
+      kind: 'unit',
+      id: 'unit_aotfw',
+      title: 'Artist of the Floating World',
+      media: [],
+      fullPagePath: '/units/unit_aotfw'
+    });
+
+    const input = document.querySelector<HTMLInputElement>('.entity-card-expand__title-input')!;
+    input.value = 'Broken rename';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+
+    await vi.waitFor(() => {
+      expect(input.value).toBe('Artist of the Floating World');
+    });
+    expect(document.querySelector('.entity-card-expand__error')?.textContent).toBe('Save failed');
+  });
+
+  it('uses the same live title path for classes', async () => {
+    vi.mocked(patchClass).mockResolvedValue({ display_name: 'English Advanced 12ENA6' } as never);
+
+    openEntityCardExpand({
+      kind: 'class',
+      id: 'class_2026_12engadv1',
+      title: 'Year 12 English Advanced',
+      media: [],
+      fullPagePath: '/classes/class_2026_12engadv1'
+    });
+
+    const input = document.querySelector<HTMLInputElement>('.entity-card-expand__title-input')!;
+    input.value = 'English Advanced 12ENA6';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('blur'));
+
+    await vi.waitFor(() => {
+      expect(patchClass).toHaveBeenCalledWith('class_2026_12engadv1', {
+        display_name: 'English Advanced 12ENA6'
+      });
+    });
   });
 
   it('hydrates lesson cover on open', async () => {
