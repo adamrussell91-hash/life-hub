@@ -98,3 +98,49 @@ test('formatBodyStateForPrompt omits gap to target when no target is supplied', 
   assert.match(text, /1\.43/);
   assert.doesNotMatch(text, /target/i);
 });
+
+
+test('formatBodyStateForPrompt surfaces all supported composition and tape values', () => {
+  const text = formatBodyStateForPrompt({
+    compositionRecords: [{
+      date: '2026-09-19',
+      weight_kg: 91.2,
+      body_fat_pct: 17.4,
+      skeletal_muscle_kg: 39.8,
+      visceral_fat_level: 8,
+      body_age: 34
+    }],
+    measurementRecords: [{
+      date: '2026-09-19',
+      neck: 39,
+      shoulders: 124,
+      chest: 105,
+      waist: 86,
+      hips: 98,
+      right_arm_flexed: 38.5,
+      left_arm_flexed: 38,
+      right_arm_relaxed: 35,
+      left_arm_relaxed: 34.5,
+      right_thigh: 59,
+      left_thigh: 58.5,
+      right_calf: 40.5,
+      left_calf: 40
+    }]
+  });
+
+  for (const expected of [
+    'visceral fat 8',
+    'body age 34y',
+    'neck 39cm',
+    'chest 105cm',
+    'hips 98cm',
+    'right arm flexed 38.5cm',
+    'left arm relaxed 34.5cm',
+    'right thigh 59cm',
+    'left thigh 58.5cm',
+    'right calf 40.5cm',
+    'left calf 40cm'
+  ]) {
+    assert.ok(text.includes(expected), expected);
+  }
+});
