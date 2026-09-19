@@ -822,6 +822,14 @@
   font-size: var(--text-xs);
 }
 
+.someday-card {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--elev-1);
+}
+
 .someday-card__title-row {
   display: flex;
   align-items: flex-start;
