@@ -619,6 +619,11 @@
 }
 
 .hierarchy-card {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--elev-1);
   cursor: pointer;
   transition: box-shadow 0.15s ease;
 }
@@ -1165,7 +1170,11 @@
 }
 
 .someday-odyssey__board {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   padding: var(--space-4);
+  box-shadow: var(--elev-1);
 }
 
 .someday-odyssey__empty {
@@ -1257,7 +1266,11 @@
 }
 
 .someday-odyssey__detail {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
   padding: var(--space-4);
+  box-shadow: var(--elev-1);
 }
 
 .someday-odyssey__detail-label {
