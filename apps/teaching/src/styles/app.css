@@ -325,11 +325,6 @@ a:hover {
   flex: 1 1 auto;
 }
 
-.teacher-layout__rail > .hub-rail__hubs {
-  margin-top: auto;
-  flex-shrink: 0;
-}
-
 .teacher-layout__rail-status {
   padding: var(--space-2) var(--space-3);
   font-family: var(--font-ui);
@@ -6886,10 +6881,6 @@ input.scope-timeline__note-title:focus-visible {
     padding: var(--space-4) var(--space-3) var(--space-8);
     min-width: 0;
     max-width: 100%;
-  }
-
-  .teacher-layout__rail > .hub-rail__hubs {
-    margin-top: 0;
   }
 
   .teacher-layout__context-bar {
