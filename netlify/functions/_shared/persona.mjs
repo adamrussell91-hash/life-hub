@@ -10,6 +10,7 @@ export function buildSystemPrompt({
   slug,
   digest = '',
   constraints = '',
+  aboutMe = '',
   centralNodeLog = '',
   centralNodeFull = '',
   governanceLogTail = '',
@@ -91,7 +92,10 @@ export function buildSystemPrompt({
     'If you want to note what the record was in Adam’s own words (e.g. the specific food, or how a workout felt), use the top-level `notes` parameter on log_entry — never invent a field for this inside `fields`, since only the schema’s exact domain fields belong there and anything else is rejected.',
     'Every proposed log_entry is shown to Adam as a Confirm card before that record is saved — specialists never silently auto-save structured records. Exceptions: Vera mind_session writes immediately (no Confirm card); Sara medical appends to a matched existing Medical Overview visit also write immediately. New medical visits still await Confirm. A successful log_entry tool result means awaiting confirm unless status is "written". Do not say or claim the meal is logged, "in the books," or saved to Nutrition/today’s eating record until Adam hits Confirm. Saving to the Food Library is not the same as logging today’s meal. If log_entry returns errors, fix the fields (time must be HH:MM or omit time) and call log_entry again — never narrate a completed day log after a rejection. Confirmed logs do write; applicable agent tools may also write when they succeed or when Adam confirms a high-risk action (for example Hammond Central Node patches and Governance Log entries).',
     digest ? `Recent context:\n${digest}` : '',
-    constraints ? `Standing medical and dietary constraints:\n${constraints}` : ''
+    constraints ? `Standing medical and dietary constraints:\n${constraints}` : '',
+    aboutMe && !centralNodeFull
+      ? `About Me (standing personal context — obey it; it wins on the points it states):\n${aboutMe}`
+      : ''
   ].filter(Boolean).join('\n\n');
 
   const sampleBlock = formatWritingSampleBlock(
