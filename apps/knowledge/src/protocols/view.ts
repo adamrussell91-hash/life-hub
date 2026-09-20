@@ -178,13 +178,92 @@ function voiceSrc(definition: Definition, id: string) {
 function personaMetaHtml(name: string, role: string) {
   return `<p class="protocol-turn-card__meta">✦ ${escapeHtml(name)} ✦</p>${role ? `<p class="protocol-turn-card__role">${escapeHtml(role)}</p>` : ""}`;
 }
-function liveSlotHtml(session: Session, who: string, role: string, precedingText: string | null): string {
+
+const THINKING_STATUSES: Record<string, string> = {
+  "fates:lachesis": "Lachesis is measuring the thread against the loom.",
+  "fates:clotho": "Clotho is spinning a fresh possibility into the pattern.",
+  "fates:atropos": "Atropos is testing which thread must be cut away.",
+  "fates:weave": "The Weave is gathering the loose threads into one pattern.",
+  "horizon:ketill": "Ketill is consulting Odin's old counsel beside the hearth.",
+  "horizon:alvar": "Alvar is scanning the far horizon for the shape of what comes next.",
+  "horizon:sigrid": "Sigrid is asking the Norns what this path will cost.",
+  "refinery:builder": "The Builder is setting the first sound beams in place.",
+  "refinery:breaker": "The Breaker is tapping the argument for hidden cracks.",
+  "refinery:reforger": "The Reforger is heating the strongest pieces for another pass.",
+  "cartographers:surveyor": "The Surveyor is taking bearings before marking the map.",
+  "cartographers:miner": "The Miner is following the richest seam of evidence.",
+  "cartographers:cartographer": "The Cartographer is drawing the lines that connect the terrain.",
+  "mirror:retrospective": "The Retrospective is polishing the record of what has already happened.",
+  "mirror:prospective": "The Prospective is looking for the wish hidden inside the plan.",
+  "mirror:present": "The Present is holding the mirror steady in the difficult light.",
+  "consilium:principle": "The Principle is opening the old books of duty and promise.",
+  "consilium:consequence": "The Consequence is counting who bears the weight of each outcome.",
+  "consilium:virtue": "The Virtue is asking what kind of person this choice rehearses.",
+  "witness:trace": "Process Trace is replaying the path, one decision at a time.",
+  "witness:patterns": "Pattern Match is checking whether the familiar shape is really there.",
+  "witness:recalibration": "Recalibration is setting the confidence dial back to honest.",
+  "tribunal:inverter": "The Inverter is turning the frame inside out.",
+  "tribunal:scaler": "The Scaler is stepping back until the proportions make sense.",
+  "tribunal:context-shifter": "The Context Shifter is moving the whole question to a different room.",
+};
+
+export function thinkingStatus(definition: Definition, speakerId: string | null, name: string): string {
+  return THINKING_STATUSES[`${definition.id}:${speakerId ?? ""}`] ?? `${name} is considering the next move.`;
+}
+
+type ProtocolActionPayload = Record<string, unknown> & {
+  sessionId?: string;
+  revision?: number;
+  action?: string;
+};
+
+function protocolErrorMessage(payload: unknown): string {
+  const message = (payload as { error?: { message?: unknown } } | null)?.error?.message;
+  return typeof message === "string" && message.trim() ? message : "The protocol request could not be completed.";
+}
+
+function sessionFromProtocolPayload(payload: unknown): Session | null {
+  const session = (payload as { data?: { session?: unknown } } | null)?.data?.session;
+  return session && typeof session === "object" ? session as Session : null;
+}
+
+/** Retries a reply once after a concurrent poll has made its client revision stale. */
+export async function postProtocolAction(payload: ProtocolActionPayload, fetchImpl: typeof fetch = fetch): Promise<Session> {
+  const post = (body: ProtocolActionPayload) => fetchImpl(`${API_BASE}/protocols`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const readBody = (response: Response) => response.json().catch(() => null);
+
+  let response = await post(payload);
+  let body = await readBody(response);
+
+  if (!response.ok && response.status === 409 && payload.sessionId && payload.action) {
+    const latestResponse = await fetchImpl(`${API_BASE}/protocols?sessionId=${encodeURIComponent(payload.sessionId)}`, { credentials: "include" });
+    const latest = latestResponse.ok ? sessionFromProtocolPayload(await readBody(latestResponse)) : null;
+    if (latest?.status === "waiting" && latest.allowedActions.includes(payload.action)) {
+      response = await post({ ...payload, revision: latest.revision });
+      body = await readBody(response);
+    } else if (latest) {
+      return latest;
+    }
+  }
+
+  if (!response.ok) throw new Error(protocolErrorMessage(body));
+  const session = sessionFromProtocolPayload(body);
+  if (!session) throw new Error("The protocol returned an invalid session.");
+  return session;
+}
+
+function liveSlotHtml(session: Session, definition: Definition, who: string, role: string, precedingText: string | null): string {
   const preceding = precedingText ? turnBodyHtml(precedingText) : "";
   if (session.error) {
     return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
   }
   if (["queued", "running"].includes(session.status)) {
-    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(who)} is thinking</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
   }
   if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}</div>`;
   return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="Reply to ${escapeHtml(who)}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
@@ -219,7 +298,7 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const activeName = activeVoice ? activeVoice.name : activeSpeakerId === "you" ? "You" : speakerName(session, definition);
   const precedingText = cardIsLive && turn && turn.speaker !== "you" ? turn.text : null;
   const cardHtml = cardIsLive
-    ? liveSlotHtml(session, activeName, activeRole, precedingText)
+    ? liveSlotHtml(session, definition, activeName, activeRole, precedingText)
     : turn
       ? readTurnCardHtml(turn, activeName, activeRole)
       : joiningCardHtml(activeName, activeRole);
@@ -274,10 +353,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     }
   };
   const postAction = async (payload: Record<string, unknown>) => {
-    const response = await fetch(`${API_BASE}/protocols`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body?.error?.message ?? "The protocol could not continue.");
-    currentSession = body.data.session;
+    currentSession = await postProtocolAction(payload);
     paint();
     void poll();
   };
@@ -346,7 +422,10 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     viewingIndex = null;
     paint();
     try { await postAction({ sessionId: prior.id, revision: prior.revision, requestId: crypto.randomUUID(), action, text }); }
-    catch { currentSession = { ...prior, error: { message: "The reply could not be sent.", retryable: true } }; paint(); }
+    catch (reason) {
+      currentSession = { ...prior, error: { message: reason instanceof Error ? reason.message : "The reply could not be sent.", retryable: true } };
+      paint();
+    }
   };
   paint();
   void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);
