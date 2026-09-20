@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  extractAboutMe,
   extractConstraints,
   extractCrossAgentCoordination,
   extractLongTermTrends,
@@ -49,6 +50,13 @@ test('extracts only the Constraints & Priorities section', () => {
 
 test('returns an empty string when the heading is missing', () => {
   assert.equal(extractConstraints('# Purpose\nNo constraints here.'), '');
+  assert.equal(extractAboutMe('# Purpose\nNo about me here.'), '');
+});
+
+test('extractAboutMe stops before the next section', () => {
+  const result = extractAboutMe('## 👤 About Me\n- Corey comes first every time.\n## 🔴 Current Constraints & Priorities\n- Fat < 50g\n');
+  assert.match(result, /Corey comes first every time/);
+  assert.doesNotMatch(result, /Fat < 50g/);
 });
 
 test('rejects non-string input', () => {
