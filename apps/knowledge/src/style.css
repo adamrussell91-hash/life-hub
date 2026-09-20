@@ -42,6 +42,7 @@
 .rail__nav {
   display: flex;
   flex-direction: column;
+  flex: 0 0 auto;
   gap: var(--space-1);
   width: 100%;
 }

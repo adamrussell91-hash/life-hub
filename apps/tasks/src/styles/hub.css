@@ -49,7 +49,7 @@
 
 .hub-rail__hubs {
   flex: 0 0 auto;
-  margin-top: auto;
+  margin-top: var(--space-4);
 }
 
 /* Kit accordion rows. Cards.css .hub-row is a canvas tile — keep it off the rail. */

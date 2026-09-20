@@ -83,6 +83,46 @@ test('mobile hides the desktop rail so every hub uses the locked bottom bar', as
   assert.match(mobile, /\.hub-more-sheet/);
 });
 
+test('desktop hub switchers stay directly with each hub navigation', async () => {
+  const [
+    knowledgeCss,
+    tasksCss,
+    teachingCss,
+    lifeHtml,
+    professionalShell,
+    tasksShell,
+    teachingShell
+  ] = await Promise.all([
+    readFile(new URL('../../apps/knowledge/src/style.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/tasks/src/styles/hub.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/teaching/src/styles/app.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/professional/src/shell/shell.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/tasks/src/shell/shell.ts', import.meta.url), 'utf8'),
+    readFile(new URL('../../apps/teaching/src/teacher/shell.ts', import.meta.url), 'utf8')
+  ]);
+
+  assert.match(knowledgeCss, /\.rail__nav\s*\{[^}]*flex:\s*0 0 auto/s);
+  assert.match(knowledgeCss, /\.rail \.hub-rail__hubs\s*\{[^}]*margin-top:\s*var\(--space-4\)/s);
+
+  assert.match(tasksCss, /\.hub-rail__hubs\s*\{[^}]*margin-top:\s*var\(--space-4\)/s);
+  assert.doesNotMatch(tasksCss, /\.hub-rail__hubs\s*\{[^}]*margin-top:\s*auto/s);
+  assert.match(tasksShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'tasks'\)/);
+
+  assert.doesNotMatch(teachingCss, /\.teacher-layout__rail\s*>\s*\.hub-rail__hubs\s*\{[^}]*margin-top:\s*auto/s);
+  assert.match(teachingShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'teaching'\)/);
+
+  const lifeRail = lifeHtml.match(/<nav class="rail-nav"[\s\S]*?<\/nav>/)?.[0] ?? '';
+  assert.ok(lifeRail.indexOf('<p class="hub-rail__section">Hubs</p>') > lifeRail.indexOf('data-section="chat"'));
+
+  assert.match(professionalShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'professional'\)/);
+});
+
+test('Knowledge protocol ambience is clipped to the canvas and cannot wash over the rail', async () => {
+  const css = await readFile(new URL('../../apps/knowledge/src/protocols/style.css', import.meta.url), 'utf8');
+  assert.match(css, /\.protocols-root\s*\{[^}]*overflow-x:\s*clip/s);
+});
+
 test('Life rail puts domains inside the Life accordion, not a flat Domains list', async () => {
   const html = await readFile(new URL('../../apps/life/index.html', import.meta.url), 'utf8');
   assert.match(html, /data-hub-accordion/);
