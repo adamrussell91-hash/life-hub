@@ -500,9 +500,17 @@ function replaceHeadingClearBody(content, headingRe, newHeading) {
  * Mechanically advance stale This Week / This Month headings and clear their bodies.
  * Malformed or missing headings are left untouched. Not a Hammond-authored patch.
  */
-export function rollStaleSections(content, today) {
+export function rollStaleSections(content, today, { rollTodaysStatus = true } = {}) {
   if (typeof content !== 'string' || !isCalendarDate(today)) return content;
   let next = content;
+
+  // Prior-day Status heading looks like "today" to agents. Advance + clear body.
+  if (rollTodaysStatus) {
+    const status = extractTodaysStatusBlock(next);
+    if (status.dateKey && status.dateKey < today) {
+      next = replaceTodaysStatus(next, { dateKey: today, body: '' });
+    }
+  }
 
   const weekMatch = THIS_WEEK_HEADING_RE.exec(next);
   if (weekMatch) {
@@ -562,7 +570,8 @@ export function applyLogToCentralNode(content, {
   } else if (record.type === 'workout') {
     // Protocol: Central Node after finish — planned autosaves leave Status alone.
     if (!shouldUpdateWorkoutStatus(record)) {
-      return sanitizeCentralNode(dedupeRecentActions(next), record.date);
+      // Planned autosaves must not day-roll Today's Status.
+      return sanitizeCentralNode(dedupeRecentActions(next), record.date, { rollTodaysStatus: false });
     }
     const existingExercise = /\*\*Exercise:\*\*\s*(.+)/i.exec(body)?.[1]?.replace(/\.\s*$/, '').trim();
     const looksLikeFinishedSession = Boolean(existingExercise) && (
@@ -666,11 +675,12 @@ const APPT_DATE_RE = /^\s*[-*]\s*\*\*(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\b/;
  * Does not invent pattern prose — only removes stale / cancelled / dump noise.
  */
 export function sanitizeCentralNode(content, today, {
-  historyCutoff = CENTRAL_NODE_HISTORY_CUTOFF
+  historyCutoff = CENTRAL_NODE_HISTORY_CUTOFF,
+  rollTodaysStatus = true
 } = {}) {
   if (typeof content !== 'string' || !isCalendarDate(today)) return content;
   let next = content;
-  next = rollStaleSections(next, today);
+  next = rollStaleSections(next, today, { rollTodaysStatus });
   next = purgeStaleRecentActions(next, today);
   next = purgePastUpcomingAppointments(next, today);
   next = purgePenicillinChallengeLines(next);
