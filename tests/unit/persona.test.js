@@ -13,6 +13,23 @@ test('builds a named agent prompt naming its writable record types', () => {
   assert.match(prompt, /workout/);
   assert.match(prompt, /Streak: 2/);
   assert.match(prompt, /Fat < 50g/);
+  assert.doesNotMatch(prompt, /Corey comes first every time/);
+});
+
+test('About Me reaches a non-Hammond prompt and is not repeated when Hammond already has the full node', () => {
+  const aboutMe = 'Corey comes first every time. Do not recommend leaving or quitting a job unless he is explicitly talking about that.';
+  const brisket = buildSystemPrompt({ slug: 'brisket', digest: '', constraints: '', aboutMe });
+  assert.match(brisket, /About Me \(standing personal context/);
+  assert.match(brisket, /Corey comes first every time/);
+  assert.match(brisket, /Do not recommend leaving or quitting a job/);
+  const hammond = buildSystemPrompt({
+    slug: 'hammond',
+    digest: '',
+    constraints: '',
+    aboutMe,
+    centralNodeFull: `## 👤 About Me\n${aboutMe}`
+  });
+  assert.equal(hammond.split('Corey comes first every time').length - 1, 1);
 });
 
 test('penelope prompt includes protocol when provided', () => {

@@ -96,6 +96,7 @@ import {
   SKIP_INTAKE_RE as AUDIT_SKIP_INTAKE_RE
 } from './_shared/hammond-audit.mjs';
 import {
+  extractAboutMe,
   extractConstraints,
   extractCrossAgentCoordination,
   extractRecentAgentActions,
@@ -530,6 +531,7 @@ export function createChatHandler({
 
         let digest = '';
         let constraints = '';
+        let aboutMe = '';
         let centralNodeLog = '';
         let centralNodeFull = '';
         let centralNodeMarkdown = '';
@@ -949,6 +951,7 @@ export function createChatHandler({
           if (decodedCentralNode !== null) {
             const centralNodeForTurn = sanitizeCentralNode(decodedCentralNode, today);
             constraints = extractConstraints(centralNodeForTurn);
+            aboutMe = extractAboutMe(centralNodeForTurn);
             // Chadwick needs This Week so the EP day-before rule can see Veronica.
             const needsThisWeek = needsNutritionChallenges || slug === 'chadwick';
             centralNodeLog = [
@@ -1530,6 +1533,7 @@ export function createChatHandler({
           slug,
           digest,
           constraints,
+          aboutMe,
           centralNodeLog,
           centralNodeFull,
           governanceLogTail,

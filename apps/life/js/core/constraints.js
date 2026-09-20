@@ -1,6 +1,7 @@
 const PURPOSE_HEADING = '# Purpose';
 const WRITING_RULES_HEADING = '## 📏 Writing Rules';
 const AGENT_DIRECTORY_HEADING = '## 🤖 Agent Directory';
+const ABOUT_ME_HEADING = '## 👤 About Me';
 const CONSTRAINTS_HEADING = '## 🔴 Current Constraints & Priorities';
 const TODAYS_STATUS_HEADING = "## ⚡ Today's Status";
 const THIS_WEEK_HEADING = '## 📅 This Week';
@@ -24,6 +25,10 @@ export function extractSection(markdown, headingPrefix) {
 
 export function extractConstraints(markdown) {
   return extractSection(markdown, CONSTRAINTS_HEADING);
+}
+
+export function extractAboutMe(markdown) {
+  return extractSection(markdown, ABOUT_ME_HEADING);
 }
 
 export function extractTodaysStatus(markdown) {
@@ -54,6 +59,7 @@ export {
   PURPOSE_HEADING,
   WRITING_RULES_HEADING,
   AGENT_DIRECTORY_HEADING,
+  ABOUT_ME_HEADING,
   CONSTRAINTS_HEADING,
   TODAYS_STATUS_HEADING,
   THIS_WEEK_HEADING,

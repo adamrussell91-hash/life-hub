@@ -27,6 +27,38 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - **Clare DeMind (Tasks Agent):** Dump triage, Now/Later/Trash, confirm-before-write task mutations. Reads Hammond→Clare before a dump; writes Clare→Hammond (or Clare→[Agent]) when task load or a deadline collides with a Life constraint.
 - **Ann O'Tation (Teaching Agent):** Lesson diagnosis and classroom-ready repair. Reads Hammond→Ann before responding; writes Ann→Hammond (or Ann→[Agent]) when a lesson/load collision or teaching deadline hits a Life constraint.
 ---
+## 👤 About Me
+*Standing personal context. Obey it. Corey outranks every other tie-break, including health. Health outranks the degree and the HPGE review.*
+### Work
+- The HPGE career direction review is not a remembered stay/leave/expand/drop/apply decision. It is about where he wants to go next in high-potential gifted education. A good outcome is a clear, concrete direction. A bad outcome is more confusion and anxiety.
+- No job or sector is closed. He would seriously consider one if it came up. University lecturing is the least appealing: the pay is poor, and he does not want to teach a class on a screen.
+- Do not recommend leaving or quitting a job unless he is explicitly talking about that.
+- No realistic income, savings, or buffer number would change the current job. Only a lottery win would, and he treats that as very unlikely.
+- A 12-month win that counts is a promotion. Body-fat percentage is a biomarker, not this win.
+### Study
+- UNSW Master of Gifted Education is finished. Conferral 30 Sep 2026.
+- University of Wollongong Master of Leadership is still open: one literacy-elective assessment left in 2026, then the major research project in Semester 1 2027. Finish at the end of Semester 1 2027.
+- Clare and Hammond treat study as a background hum, never as a live deadline. He does not care about the remaining work.
+### Money
+- Only debt is the home loan with Corey. No dependants. No support obligations.
+### Time
+- Real weekday, not the ideal: up 6:15, exhausted. At work by 8:15, about twenty minutes late. No lunch. Bell 3:10, leaves around 4:30, home 5:00–5:30, and feels guilty about that. A workout if he can. Usually does not walk the dog. Cooks if he can. Two episodes of reality TV. Aims to sleep at 10:30; actually around 11:30.
+- Time that is his: maybe one or two hours at night, and only if there is no marking or university work. Usually one weekend day.
+- Do not schedule over a class. 22:00–06:00 is sleep. Do not schedule into it.
+### People
+- Corey comes first every time. He is the only person whose time Adam is trying not to lose.
+- Do not coach him to leave the marriage.
+- Family who matter: Bob (paternal grandfather); Donna and Joe (maternal aunts); Joe's children Ruby and Fletcher; Fletcher's wife Taylor.
+- His birth father, that person's wife, and his half-sister are invisible. Do not name them. Do not mention them. Do not involve them. Do not suggest contact.
+- Friends are mostly in Newcastle. He texts, and he is bad at giving them time. They are busy too. The hole is time, not the absence of friends. What he needs and does not ask for: support, and someone to listen occasionally. Not judgment. Not instructions about his life.
+### Season
+- This season is comfortable, slow growth.
+- Protect capacity means stopping before he is so sick of work that he hates it.
+- A good night, the one that counts: dinner out, plus a show or a talk, and actually enjoying the dinner. At home: tea, television, books, and foot rubs from Corey.
+- A good holiday is comforting adventure: see the world without feeling scared or in danger.
+- He travels on his own from 1 December 2026. Korea honeymoon: 23 December 2026 to 10 January 2027.
+- Dreams he already says out loud: write a book; study at Harvard, Cambridge, Oxford, or Yale.
+---
 ## 🔴 Current Constraints & Priorities
 *Active protocols and rules all agents must respect. Full medical history lives in Life Hub Medical Overview.*
 ### Medical Status
@@ -60,7 +92,7 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - **TBC:** Dr Chris Keily follow-up (biologics review)
 ### Work
 - Year 12 English Advanced Module B teaching active
-- UNSW Master of Ed (Gifted) — EDGL909 formally withdrawn. Goal reframed 8 Apr: finish and be free, no doctorate. Holiday task: confirm Sem 2 unit options or full 2027 deferral.
+- UNSW Master of Gifted Education is finished (conferral 30 Sep 2026). Wollongong Master of Leadership runs to the end of Semester 1 2027 and is a background hum, not a live deadline. Detail is in About Me.
 - MindWorks HPGE program coordination (reclassified as work, not a personal goal, 8 Apr)
 ### School Bell Times
 - **Period 1:** 8\:30am-9\:23am
@@ -111,7 +143,7 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - Be fit, healthy and vital (High)
 - Lean athletic physique recomposition toward 78–82kg at 8–10% BF (High)
 - Build a life worth enjoying (High)
-- Complete MEd (Medium)
+- Complete Wollongong Master of Leadership (Medium)
 - Set up salary sacrifice (High)
 - HPGE career direction review scheduled 28 Sep (Term 3 holidays, post-wedding)
 ---
