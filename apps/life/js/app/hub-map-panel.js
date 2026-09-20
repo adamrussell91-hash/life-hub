@@ -222,7 +222,7 @@ export function renderHubMapPanel(host, { map, nodeId, handlers }) {
       kind.append(Object.assign(el(doc, 'option', '', label), { value }));
     }
     connections.append(addForm(doc, {
-      placeholder: 'Add a page inside this one',
+      placeholder: 'Add a sub-page',
       label: 'New child name',
       focusKey: 'add-child',
       extra: kind,

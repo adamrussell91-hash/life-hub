@@ -234,8 +234,9 @@ export function parentIndex(map) {
   return parents;
 }
 
-export function defaultExpanded(map) {
-  return new Set(map.nodes.filter(node => node.kind === 'hub').map(node => node.id));
+/** Opens on Life Hub and its five hubs. Expanding a hub reveals its pages. */
+export function defaultExpanded() {
+  return new Set([CENTRAL_ID]);
 }
 
 export function visibleIds(map, expanded) {

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { createHubMapCanvas } from '../../apps/life/js/app/hub-map-canvas.js';
-import { defaultExpanded, updateNode, validateMap, visibleIds, addLink } from '../../apps/life/js/app/hub-map-model.js';
+import { updateNode, validateMap, visibleIds, addLink } from '../../apps/life/js/app/hub-map-model.js';
 
 const node = (id, name, hub, kind, extra = {}) => ({
   id, name, hub, kind, route: '', status: 'unreviewed', features: [], plans: [], notes: '', ...extra
@@ -50,12 +50,8 @@ function setup() {
     onToggle: id => calls.toggle.push(id)
   });
   const map = fixtureMap();
-  const draw = (extra = {}) => api.render({
-    map,
-    visible: visibleIds(map, defaultExpanded(map)),
-    expanded: defaultExpanded(map),
-    ...extra
-  });
+  const opened = new Set(['life-hub', 'hub-life', 'hub-tasks']);
+  const draw = (extra = {}) => api.render({ map, visible: visibleIds(map, opened), expanded: opened, ...extra });
   return { window, document, api, calls, map, draw };
 }
 
@@ -127,4 +123,18 @@ test('destroy removes the pointer listeners', () => {
   const canvas = document.querySelector('#canvas');
   canvas.dispatchEvent(new window.Event('pointerdown'));
   assert.equal(canvas.classList.contains('is-panning'), false);
+});
+
+test('expanding a hub keeps the clicked card at the same spot on screen', () => {
+  const { document, api, map } = setup();
+  const collapsed = new Set(['life-hub']);
+  const expanded = new Set(['life-hub', 'hub-life']);
+  const offset = () => Number(/translate\([^,]+px, (-?[\d.]+)px\)/.exec(document.querySelector('#world').style.transform)[1]);
+  api.render({ map, visible: visibleIds(map, collapsed), expanded: collapsed });
+  const before = offset();
+  const topBefore = Number(document.querySelector('[data-node-id="hub-life"]').style.top.replace('px', ''));
+  api.render({ map, visible: visibleIds(map, expanded), expanded, anchorId: 'hub-life' });
+  const topAfter = Number(document.querySelector('[data-node-id="hub-life"]').style.top.replace('px', ''));
+  assert.notEqual(topAfter, topBefore, 'the hub card moves inside the world when its pages appear');
+  assert.equal(offset() + topAfter, before + topBefore, 'so the world shifts to keep it in place on screen');
 });

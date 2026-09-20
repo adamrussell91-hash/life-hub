@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultExpanded, validateMap, visibleIds } from '../../apps/life/js/app/hub-map-model.js';
+import { validateMap, visibleIds } from '../../apps/life/js/app/hub-map-model.js';
 import {
   CARD_H, CARD_W, COL_PITCH, ROW_PITCH, layoutMap, linkPath, structurePath
 } from '../../apps/life/js/app/hub-map-layout.js';
@@ -64,7 +64,7 @@ test('layoutMap only places visible nodes', () => {
   const visible = visibleIds(map, new Set(['life-hub']));
   const { positions } = layoutMap(map, visible);
   assert.deepEqual([...positions.keys()].sort(), ['hub-life', 'hub-tasks', 'life-hub']);
-  const opened = layoutMap(map, visibleIds(map, defaultExpanded(map))).positions;
+  const opened = layoutMap(map, visibleIds(map, new Set(['life-hub', 'hub-life', 'hub-tasks']))).positions;
   assert.equal(opened.has('life-home'), true);
   assert.equal(opened.has('body-bloods'), false);
 });

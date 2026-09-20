@@ -90,6 +90,7 @@ export function createHubMapCanvas({ canvas, world, edges, nodes, zoomLabel, onS
   let tx = 0;
   let ty = 0;
   let layout = null;
+  let previous = new Map();
   let fitted = false;
   let drag = null;
 
@@ -109,11 +110,17 @@ export function createHubMapCanvas({ canvas, world, edges, nodes, zoomLabel, onS
 
   function fit() {
     const width = canvasWidth();
+    const height = canvas.clientHeight || canvas.getBoundingClientRect?.().height || 0;
     const padding = 16;
     scale = layout && width > 0 ? clamp((width - padding * 2) / layout.width) : 1;
     if (scale > 1) scale = 1;
     tx = padding;
     ty = padding;
+    // A tall map opens centred on Life Hub, not stranded at the top of the first hub.
+    const central = layout?.positions.get(CENTRAL_ID);
+    if (central && height > 0 && layout.height * scale + padding * 2 > height) {
+      ty = height / 2 - (central.y + central.h / 2) * scale;
+    }
     applyTransform();
   }
 
@@ -130,8 +137,17 @@ export function createHubMapCanvas({ canvas, world, edges, nodes, zoomLabel, onS
     zoomAround(rect.width / 2, rect.height / 2, factor);
   }
 
-  function render({ map, visible, expanded, selectedId = null, filter = 'all' }) {
-    layout = layoutMap(map, visible);
+  function render({ map, visible, expanded, selectedId = null, filter = 'all', anchorId = null }) {
+    const next = layoutMap(map, visible);
+    // Keep the card the user just acted on where it was on screen.
+    if (fitted && anchorId && previous.has(anchorId) && next.positions.has(anchorId)) {
+      const before = previous.get(anchorId);
+      const after = next.positions.get(anchorId);
+      tx += (before.x - after.x) * scale;
+      ty += (before.y - after.y) * scale;
+    }
+    layout = next;
+    previous = next.positions;
     world.style.width = `${layout.width}px`;
     world.style.height = `${layout.height}px`;
     edges.setAttribute('width', String(layout.width));
@@ -208,6 +224,29 @@ export function createHubMapCanvas({ canvas, world, edges, nodes, zoomLabel, onS
   };
   listen(canvas, 'pointerup', endDrag);
   listen(canvas, 'pointercancel', endDrag);
+  // The canvas pans with a transform, never with its own scroll position.
+  listen(canvas, 'scroll', () => {
+    canvas.scrollTop = 0;
+    canvas.scrollLeft = 0;
+  });
+  // Tabbing to a card that has panned out of view brings it back.
+  listen(canvas, 'focusin', event => {
+    const cardEl = event.target?.closest?.('.hub-map-card');
+    const position = cardEl && layout?.positions.get(cardEl.getAttribute('data-node-id'));
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (!position || !width || !height) return;
+    const margin = 16;
+    const left = position.x * scale + tx;
+    const right = left + position.w * scale;
+    const top = position.y * scale + ty;
+    const bottom = top + position.h * scale;
+    if (left < margin) tx += margin - left;
+    else if (right > width - margin) tx -= right - (width - margin);
+    if (top < margin) ty += margin - top;
+    else if (bottom > height - margin) ty -= bottom - (height - margin);
+    applyTransform();
+  });
   listen(canvas, 'wheel', event => {
     event.preventDefault();
     if (event.ctrlKey || event.metaKey) {

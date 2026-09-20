@@ -32,7 +32,9 @@ function setup({ loadResult, saveImpl } = {}) {
   const card = id => q(`[data-node-id="${id}"]`);
   const runTimers = async () => { while (timers.length) await timers.shift()(); await Promise.resolve(); };
   const flushMicrotasks = () => new Promise(resolve => setTimeout(resolve, 0));
-  return { window, document, controller, saves, q, card, runTimers, flushMicrotasks };
+  const expandLife = () => card('hub-life').querySelector('.hub-map-card__toggle').click();
+  const openLife = async () => { await controller.open(); expandLife(); };
+  return { window, document, controller, saves, q, card, runTimers, flushMicrotasks, expandLife, openLife };
 }
 
 test('returns a no-op controller when the markup is missing', async () => {
@@ -41,12 +43,15 @@ test('returns a no-op controller when the markup is missing', async () => {
   await controller.open();
 });
 
-test('open loads the seed and shows hubs and pages, with sections hidden', async () => {
-  const { controller, q, card } = setup();
+test('open loads the seed and shows Life Hub with its five hubs, pages collapsed', async () => {
+  const { controller, q, card, expandLife } = setup();
   await controller.open();
   assert.ok(card('life-hub'));
+  for (const hub of ['hub-life', 'hub-teaching', 'hub-knowledge', 'hub-tasks', 'hub-professional']) assert.ok(card(hub), hub);
+  assert.equal(card('life-home'), null, 'pages appear when a hub is expanded');
+  expandLife();
   assert.ok(card('life-home'));
-  assert.equal(card('life-body-bloods'), null);
+  assert.equal(card('life-body-bloods'), null, 'sections stay hidden until their page is expanded');
   assert.match(q('#hub-map-save-state').textContent, /Starter map/);
   assert.match(q('[data-hub-map-filter="all"]').textContent, /^All 89$/);
   assert.match(q('[data-hub-map-filter="unreviewed"]').textContent, /^Unreviewed 88$/);
@@ -72,12 +77,12 @@ test('a load failure shows an error with Retry', async () => {
   error.querySelector('button').click();
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(error.hidden, true);
-  assert.ok(window.document.querySelector('[data-node-id="life-home"]'));
+  assert.ok(window.document.querySelector('[data-node-id="hub-life"]'));
 });
 
 test('the chevron expands a page to reveal its sections', async () => {
-  const { controller, card } = setup();
-  await controller.open();
+  const { controller, card, openLife } = setup();
+  await openLife();
   card('life-body').querySelector('.hub-map-card__toggle').click();
   assert.ok(card('life-body-bloods'));
   card('hub-life').querySelector('.hub-map-card__toggle').click();
@@ -85,8 +90,8 @@ test('the chevron expands a page to reveal its sections', async () => {
 });
 
 test('selecting a card opens the panel; editing status autosaves after the debounce', async () => {
-  const { window, controller, saves, q, card, runTimers, flushMicrotasks } = setup();
-  await controller.open();
+  const { window, controller, saves, q, card, runTimers, flushMicrotasks , openLife } = setup();
+  await openLife();
   card('life-home').querySelector('.hub-map-card__main').click();
   assert.equal(q('#hub-map-panel').hidden, false);
   assert.ok(q('#hub-map-stage').classList.contains('has-panel'));
@@ -105,8 +110,8 @@ test('selecting a card opens the panel; editing status autosaves after the debou
 });
 
 test('later saves send the sha returned by the previous save', async () => {
-  const { window, controller, saves, q, card, runTimers, flushMicrotasks } = setup();
-  await controller.open();
+  const { window, controller, saves, q, card, runTimers, flushMicrotasks , openLife } = setup();
+  await openLife();
   card('life-home').querySelector('.hub-map-card__main').click();
   for (const value of ['partial', 'built']) {
     const status = q('#hub-map-panel select');
@@ -120,13 +125,13 @@ test('later saves send the sha returned by the previous save', async () => {
 
 test('a failed save keeps the edit on screen and offers Try again', async () => {
   let fail = true;
-  const { window, controller, saves, q, card, runTimers, flushMicrotasks } = setup({
+  const { window, controller, saves, q, card, runTimers, flushMicrotasks , openLife } = setup({
     saveImpl: async (map, _base, count) => {
       if (fail) throw Object.assign(new Error('boom'), { status: 503, code: 'github_unavailable' });
       return { map, sha: `sha-${count}` };
     }
   });
-  await controller.open();
+  await openLife();
   card('life-home').querySelector('.hub-map-card__main').click();
   const status = q('#hub-map-panel select');
   status.value = 'built';
@@ -144,10 +149,10 @@ test('a failed save keeps the edit on screen and offers Try again', async () => 
 });
 
 test('a write conflict offers to reload the server copy', async () => {
-  const { window, controller, q, card, runTimers, flushMicrotasks } = setup({
+  const { window, controller, q, card, runTimers, flushMicrotasks , openLife } = setup({
     saveImpl: async () => { throw Object.assign(new Error('conflict'), { status: 409, code: 'write_conflict' }); }
   });
-  await controller.open();
+  await openLife();
   card('life-home').querySelector('.hub-map-card__main').click();
   const status = q('#hub-map-panel select');
   status.value = 'built';
@@ -159,8 +164,8 @@ test('a write conflict offers to reload the server copy', async () => {
 });
 
 test('the status filter dims cards that do not match', async () => {
-  const { controller, q, card } = setup();
-  await controller.open();
+  const { controller, q, card , openLife } = setup();
+  await openLife();
   q('[data-hub-map-filter="built"]').click();
   assert.ok(card('life-home').className.includes('is-dim'));
   assert.equal(card('hub-life').className.includes('is-dim'), false);
@@ -168,8 +173,8 @@ test('the status filter dims cards that do not match', async () => {
 });
 
 test('adding a child selects and reveals it', async () => {
-  const { window, controller, q, card } = setup();
-  await controller.open();
+  const { window, controller, q, card , openLife } = setup();
+  await openLife();
   card('life-body').querySelector('.hub-map-card__main').click();
   const form = q('[data-focus="add-child"]').closest('form');
   form.querySelector('input').value = 'Scan results';
@@ -179,16 +184,18 @@ test('adding a child selects and reveals it', async () => {
 });
 
 test('import accepts a valid map and rejects bad files without changing anything', async () => {
-  const { controller, q, card } = setup();
+  const { controller, q, card, expandLife } = setup();
   await controller.open();
   controller.importText('{nope');
   assert.match(q('#hub-map-error').textContent, /not valid JSON/);
   controller.importText(JSON.stringify({ version: 1, nodes: [], edges: [] }));
   assert.match(q('#hub-map-error').textContent, /not a valid hub map/);
+  expandLife();
   assert.ok(card('life-home'), 'map unchanged');
   const changed = buildHubMapSeed();
   changed.nodes.find(n => n.id === 'life-home').name = 'Home base';
   controller.importText(JSON.stringify(changed));
   assert.equal(q('#hub-map-error').hidden, true);
+  expandLife();
   assert.match(card('life-home').textContent, /Home base/);
 });

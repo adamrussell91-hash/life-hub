@@ -141,10 +141,13 @@ test('addLink and removeLink manage cross-links', () => {
   assert.equal(removeLink(map, 'life-home', 'tasks-board'), null);
 });
 
-test('visibleIds follows the expanded set and defaultExpanded opens hubs only', () => {
+test('visibleIds follows the expanded set and defaultExpanded opens on the hubs only', () => {
   const map = validateMap(fixture()).map;
   const expanded = defaultExpanded(map);
-  assert.deepEqual([...expanded].sort(), ['hub-life', 'hub-tasks', 'life-hub']);
+  assert.deepEqual([...expanded], ['life-hub']);
+  assert.deepEqual([...visibleIds(map, expanded)].sort(), ['hub-life', 'hub-tasks', 'life-hub']);
+  expanded.add('hub-life');
+  expanded.add('hub-tasks');
   assert.deepEqual([...visibleIds(map, expanded)].sort(),
     ['hub-life', 'hub-tasks', 'life-hub', 'life-body', 'life-home', 'tasks-board'].sort());
   expanded.add('life-body');
@@ -157,7 +160,7 @@ test('visibleIds follows the expanded set and defaultExpanded opens hubs only', 
 test('nearestVisible climbs to the closest visible ancestor', () => {
   const map = validateMap(fixture()).map;
   const parents = parentIndex(map);
-  const visible = visibleIds(map, defaultExpanded(map));
+  const visible = visibleIds(map, new Set(['life-hub', 'hub-life', 'hub-tasks']));
   assert.equal(nearestVisible(parents, 'body-bloods', visible), 'life-body');
   assert.equal(nearestVisible(parents, 'life-home', visible), 'life-home');
   assert.equal(nearestVisible(parents, 'missing', visible), null);

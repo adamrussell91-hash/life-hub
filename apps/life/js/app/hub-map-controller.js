@@ -63,7 +63,7 @@ export function createHubMapController({
     onToggle: id => {
       if (state.expanded.has(id)) state.expanded.delete(id);
       else state.expanded.add(id);
-      renderAll();
+      renderAll(id);
     }
   });
 
@@ -124,9 +124,10 @@ export function createHubMapController({
     }
   }
 
-  function renderAll() {
+  function renderAll(anchorId = null) {
     if (!state.map) return;
     canvas.render({
+      anchorId,
       map: state.map,
       visible: visibleIds(state.map, state.expanded),
       expanded: state.expanded,
@@ -143,7 +144,9 @@ export function createHubMapController({
       for (const ancestor of ancestorsOf(parentIndex(state.map), id)) state.expanded.add(ancestor);
     }
     state.selectedId = id;
-    renderAll();
+    renderAll(reveal ? id : null);
+    // On a phone the panel sits under the canvas; bring it into view.
+    if (id) panelEl?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }
 
   function commit(next) {
