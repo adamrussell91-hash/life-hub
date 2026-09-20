@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { describe, expect, it } from "vitest";
-import { applySession, backgroundAsset, detectForks, lightingStage, sessionView, speakerName, statusLabel } from "./view";
+import { describe, expect, it, vi } from "vitest";
+import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
 
 const definition = {
   id: "fates",
@@ -42,6 +42,17 @@ describe("protocol conversation view", () => {
     expect(html).toContain("Reply to Lachesis");
     expect(speakerName(session(), definition)).toBe("Lachesis");
     expect(statusLabel(session({ status: "queued" }))).toBe("thinking");
+  });
+
+  it("gives each thinking persona an in-world status line", () => {
+    const horizon = {
+      ...definition,
+      id: "horizon",
+      name: "The Horizon Council",
+      voices: [{ id: "ketill", name: "Ketill the Hearthkeeper", role: "Near horizon" }],
+    };
+    expect(thinkingStatus(horizon, "ketill", "Ketill the Hearthkeeper")).toContain("Odin");
+    expect(sessionView(session({ status: "running", speaker: "ketill", transcript: [], checkpoint: null }), horizon)).toContain("consulting Odin");
   });
 
   it("shows one turn card at a time with a scrubber dot per turn", () => {
@@ -87,6 +98,53 @@ describe("protocol conversation view", () => {
     const before = root.innerHTML;
     applySession(root, session(), definition);
     expect(root.innerHTML).toBe(before);
+  });
+});
+
+describe("postProtocolAction", () => {
+  it("refreshes a stale session and retries the same reply once", async () => {
+    const latest = session({ revision: 4 });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("?sessionId=")) {
+        return new Response(JSON.stringify({ data: { session: latest } }), { status: 200 });
+      }
+      const revision = JSON.parse(String(init?.body)).revision;
+      if (revision === 3) {
+        return new Response(JSON.stringify({ error: { message: "Session changed. Refresh before continuing." } }), { status: 409 });
+      }
+      return new Response(JSON.stringify({ data: { session: latest } }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await expect(postProtocolAction({
+      sessionId: latest.id,
+      revision: 3,
+      requestId: "request-1",
+      action: "answer",
+      text: "I can picture us growing further apart.",
+    }, fetchImpl)).resolves.toEqual(latest);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetchImpl.mock.calls[0][1]?.body))).toMatchObject({ revision: 3, requestId: "request-1" });
+    expect(JSON.parse(String(fetchImpl.mock.calls[2][1]?.body))).toMatchObject({ revision: 4, requestId: "request-1" });
+  });
+
+  it("adopts a session that another request has already advanced", async () => {
+    const latest = session({ status: "running", revision: 4, checkpoint: null });
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("?sessionId=")) {
+        return new Response(JSON.stringify({ data: { session: latest } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: { message: "Session changed. Refresh before continuing." } }), { status: 409 });
+    }) as unknown as typeof fetch;
+
+    await expect(postProtocolAction({ sessionId: latest.id, revision: 3, requestId: "request-2", action: "answer", text: "My reply" }, fetchImpl)).resolves.toEqual(latest);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a backend error message when a reply cannot be retried", async () => {
+    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { message: "The session has ended." } }), { status: 410 })) as unknown as typeof fetch;
+
+    await expect(postProtocolAction({ sessionId: "sess-1", revision: 3, requestId: "request-3", action: "answer", text: "My reply" }, fetchImpl)).rejects.toThrow("The session has ended.");
   });
 });
 
