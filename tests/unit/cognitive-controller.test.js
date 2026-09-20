@@ -39,6 +39,37 @@ test('Tribunal voices receive identical original context and cannot see outputs'
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});
 test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer']);for(const [mode,expected] of [['break',['breaker']],['build-break',['builder','breaker']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
 test('Mirror deep waits for framing, long arc asks what to protect; Horizon fallback explicit',async()=>{const {calls}=await run('mirror','deep');assert.equal(calls[0].stage,'framing');const s=start('mirror');s.intake.timescale='long-arc';assert.match(buildPrompt(s,{speaker:'present',stage:'present'}).system,/sit with, tolerate|protect/);const h=start('horizon');assert.match(buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system,/extrapolated from current trajectory/);});
+test('Horizon speakers receive their own Norse lives, and other protocols do not',()=>{
+  const h=start('horizon');
+  const ketill=buildPrompt(h,{speaker:'ketill',stage:'ketill'}).system;
+  const alvar=buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system;
+  const sigrid=buildPrompt(h,{speaker:'sigrid',stage:'sigrid',gate:'answer'}).system;
+  const map=buildPrompt(h,{speaker:'controller',stage:'map'}).system;
+  const fates=buildPrompt(start('fates','sprint'),{speaker:'lachesis',stage:'briefing',gate:'answer'}).system;
+  for(const system of [ketill,alvar,sigrid,map]) assert.match(system,/not analysts dressed as Norse/);
+  assert.match(ketill,/Miðgarðr/);
+  assert.match(ketill,/jǫrð/);
+  assert.match(ketill,/You are Ketill only/);
+  assert.match(ketill,/six months to two years/);
+  assert.doesNotMatch(ketill,/You are Alvar only/);
+  assert.match(alvar,/Yggdrasill/);
+  assert.match(alvar,/örlög/);
+  assert.match(alvar,/You are Alvar only/);
+  assert.match(alvar,/extrapolated from current trajectory/);
+  assert.doesNotMatch(alvar,/You are Sigrid only/);
+  assert.match(sigrid,/iron ring/);
+  assert.match(sigrid,/unexamined drift/);
+  assert.match(sigrid,/You are Sigrid only/);
+  assert.match(sigrid,/Ask that and stop/);
+  assert.match(map,/map compiler, not a fourth/);
+  assert.equal(fates.includes('Hearthkeeper'),false);
+  assert.equal(fates.includes('Miðgarðr'),false);
+  const stated=start('horizon');
+  stated.intake.desiredFuture='A small workshop and a quiet winter';
+  const aimed=buildPrompt(stated,{speaker:'alvar',stage:'alvar'}).system;
+  assert.match(aimed,/You are Alvar only/);
+  assert.equal(aimed.includes('Fallback required'),false);
+});
 test('voices are told to use relevant notes organically and never narrate an empty archive',()=>{
   const s=start('fates','sprint');
   s.evidence=[{id:'knowledge:note-1',kind:'knowledge_hub_note',title:'Workload and rest',text:'You wrote that afternoon marking leaves no recovery.'}];
