@@ -68,6 +68,7 @@ test('Horizon speakers receive their own Norse lives, and other protocols do not
   stated.intake.desiredFuture='A small workshop and a quiet winter';
   const aimed=buildPrompt(stated,{speaker:'alvar',stage:'alvar'}).system;
   assert.match(aimed,/You are Alvar only/);
+  assert.match(aimed,/Do not use the extrapolation fallback/);
   assert.equal(aimed.includes('Fallback required'),false);
 });
 test('voices are told to use relevant notes organically and never narrate an empty archive',()=>{
