@@ -48,6 +48,8 @@ import { createTasksApi } from './tasks-api.js';
 import { createScheduleApi } from './schedule-api.js';
 import { createShortcutsApi } from './shortcuts-api.js';
 import { renderShortcuts } from './render-shortcuts.js';
+import { createHubMapApi } from './hub-map-api.js';
+import { createHubMapController } from './hub-map-controller.js';
 import { createTeachingApi } from './teaching-api.js';
 import { createSkincareController } from './skincare-controller.js';
 import { buildSkincareModel } from './skincare-model.js';
@@ -109,6 +111,7 @@ const knowledgeApi = createKnowledgeApi(fetchImpl);
 const tasksApi = createTasksApi(fetchImpl);
 const scheduleApi = createScheduleApi(fetchImpl);
 const shortcutsApi = createShortcutsApi(fetchImpl);
+const hubMap = createHubMapController({ root: document, api: createHubMapApi(fetchImpl) });
 
 let controller;
 let chatController;
@@ -160,6 +163,7 @@ const medicalController = createMedicalController({
 
 controller = createAppController({
   root: document,
+  hubMap,
   sessionApi,
   cache,
   loadLive,

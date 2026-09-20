@@ -1188,7 +1188,44 @@
           <div data-shortcuts="confirm"></div>
         </section>
 
+        <section id="hub-map-dashboard" class="dashboard hub-map" aria-label="Hub map" hidden>
+          <div class="hub-map__toolbar">
+            <div class="hub-map__filters" role="group" aria-label="Filter by build status">
+              <button type="button" class="hub-chip is-active" data-hub-map-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="hub-chip" data-hub-map-filter="unreviewed" aria-pressed="false">Unreviewed</button>
+              <button type="button" class="hub-chip" data-hub-map-filter="not-started" aria-pressed="false">Not started</button>
+              <button type="button" class="hub-chip" data-hub-map-filter="partial" aria-pressed="false">Partial</button>
+              <button type="button" class="hub-chip" data-hub-map-filter="built" aria-pressed="false">Built</button>
+            </div>
+            <div class="hub-map__actions">
+              <span id="hub-map-save-state" class="hub-map__save-state" role="status" aria-live="polite"></span>
+              <button type="button" class="btn btn--secondary" data-hub-map="export">Export</button>
+              <button type="button" class="btn btn--secondary" data-hub-map="import">Import</button>
+              <button type="button" class="btn btn--primary" data-hub-map="fit">Fit view</button>
+              <input type="file" id="hub-map-file" accept="application/json" hidden />
+            </div>
+          </div>
+          <p id="hub-map-error" class="hub-map__error" role="alert" hidden></p>
+          <div id="hub-map-stage" class="hub-map__stage">
+            <div id="hub-map-canvas" class="hub-map__canvas" role="application" aria-label="Hub map canvas" tabindex="0">
+              <div id="hub-map-world" class="hub-map__world">
+                <svg id="hub-map-edges" class="hub-map__edges" aria-hidden="true"></svg>
+                <div id="hub-map-nodes" class="hub-map__nodes"></div>
+              </div>
+              <div class="hub-map__zoom">
+                <button type="button" data-hub-map="zoom-out" aria-label="Zoom out">−</button>
+                <span id="hub-map-zoom-label">100%</span>
+                <button type="button" data-hub-map="zoom-in" aria-label="Zoom in">+</button>
+              </div>
+            </div>
+            <aside id="hub-map-panel" class="hub-map__panel metric-card" aria-label="Edit page" hidden></aside>
+          </div>
+        </section>
+
         <section id="central-node-dashboard" class="dashboard" aria-label="Central Node" hidden>
+          <div class="cn-map-link">
+            <button id="central-node-map-button" class="btn btn--secondary" type="button">Hub map</button>
+          </div>
           <div data-central-node="progress" class="hub-progress"></div>
           <div id="cn-board" class="cn-board">
             <article id="cn-tile-status" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="todays-status-label">

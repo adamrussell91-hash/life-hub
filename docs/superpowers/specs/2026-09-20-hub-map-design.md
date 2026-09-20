@@ -15,7 +15,7 @@ One page that maps the whole of Life Hub so Adam can keep up with his own build.
 
 ## Scope rule
 
-Nodes are **hubs, main pages, sections and page types** only. A page type is one template card (for example "Task", "Project", "Lesson", "Note"). Individual tasks, lessons, projects or notes are never nodes. The map holds roughly 90 nodes across Life, Teaching, Knowledge, Tasks and Professional (about 68 visible when opened, the rest revealed by expanding a page).
+Nodes are **hubs, main pages, sections and page types** only. A page type is one template card (for example "Task", "Project", "Lesson", "Note"). Individual tasks, lessons, projects or notes are never nodes. The map holds roughly 90 nodes across Life, Teaching, Knowledge, Tasks and Professional (6 visible when opened; about 68 with every hub expanded).
 
 ## Layout
 
@@ -51,7 +51,7 @@ The initial file is seeded from the real routes and code (Life sections, Tasks r
 ## Canvas
 
 - Central node "Life Hub", with the five hubs around it.
-- Opens collapsed to hubs and main pages. Clicking a hub expands its sections and page types.
+- Opens on Life Hub and its five hubs. Expanding a hub reveals its main pages; expanding a page reveals its sections and page types. The card you expand stays where it is on screen, and Fit view centres on Life Hub.
 - Structure edges are solid. Cross-link edges are dashed.
 - Status chip on every card. A filter shows only `partial` or `not-started`.
 - Pan, zoom, fit view. Works at 390px and desktop.
