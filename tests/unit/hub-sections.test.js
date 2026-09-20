@@ -121,9 +121,8 @@ test('Life desktop hub switcher and mobile More sheet include Professional', asy
   assert.match(html, /data-hub-panel="professional"/);
 });
 
-test('hub switcher host prefers the rail so it stays out of the scrolling nav', () => {
-  const rail = { classList: { contains: name => name === 'hub-rail' } };
-  const nav = { closest: selector => (selector === '.hub-rail' ? rail : null) };
-  assert.equal(hubSwitcherHost(nav), rail);
-  assert.equal(hubSwitcherHost(nav), rail);
+test('hub switcher host stays in the hub nav so it follows its pages', () => {
+  const nav = { closest: () => ({ classList: { contains: () => true } }) };
+  assert.equal(hubSwitcherHost(nav), nav);
+  assert.equal(hubSwitcherHost(nav), nav);
 });
