@@ -21,6 +21,7 @@ export function createGoalsHandler(deps = {}) {
           title,
           description: typeof body.description === 'string' ? body.description : '',
           parent_area_id: typeof body.parent_area_id === 'string' ? body.parent_area_id : null,
+          parent_someday_id: typeof body.parent_someday_id === 'string' ? body.parent_someday_id : null,
           status: 'active',
           created_at: timestamp,
           updated_at: timestamp

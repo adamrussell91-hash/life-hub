@@ -14,11 +14,65 @@ const CLAIMED_PENELOPE_RE = /\b(?:heading to the vault|into the vault|to the vau
 
 const CLAIMED_BRISKET_RE = /\b(?:in the books|meal(?:'s| is)? (?:logged|saved)|logged (?:it|the meal|today)|saved (?:to|in|on) nutrition|on nutrition)\b/i;
 
-const CLAIMED_SARA_RE = /\b(?:saved (?:it|to medical|on medical)|logged (?:it|the visit)|on medical overview|written to medical|awaiting confirm)\b/i;
+const CLAIMED_SARA_RE = /\b(?:saved (?:it|to medical|on medical|to body|on body)|logged (?:it|the visit|the body data|the measurements?|the composition|the weight)|(?:body data|body measurements?|measurements?|composition|weight) (?:is |are )?(?:logged|saved)|on medical overview|written to medical|written to body|awaiting confirm)\b/i;
 
 const CLAIMED_VERA_RE = /\b(?:session (?:is |was )?(?:logged|saved|recorded)|logged (?:the )?session|written to mind|on mind)\b/i;
 
 const CLAIMED_HYALURONICA_RE = /\b(?:logged (?:the )?(?:routine|am|pm)|saved (?:the )?(?:routine|am|pm)|on skincare)\b/i;
+
+const SARA_WEIGHT_VALUE_RE = /\b(?:body\s+weight|weight|weigh(?:ed|ing)?)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)?\b|\b\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b[^a-z0-9]{0,8}(?:body\s+)?weight\b/i;
+
+const SARA_COMPOSITION_VALUE_RES = [
+  /\b(?:body\s*fat|bf)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:%|percent\b)/i,
+  /\b\d+(?:\.\d+)?\s*(?:%|percent)\s*(?:body\s*fat|bf)\b/i,
+  /\b(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b[^0-9]{0,12}\d+(?:\.\d+)?\s*(?:kg|kilograms?)\b/i,
+  /\b\d+(?:\.\d+)?\s*(?:kg|kilograms?)\s*(?:skeletal\s+muscle(?:\s+mass)?|total\s+muscle\s+mass|muscle\s+mass)\b/i,
+  /\bvisceral\s+fat(?:\s+level)?\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
+  /\bbody\s+age\b[^0-9]{0,12}\d+(?:\.\d+)?\b/i,
+  /\b(?:bmi|body\s+water|water\s+percentage|bone\s+mass|bmr|basal\s+metabolic\s+rate|metabolic\s+age|subcutaneous\s+fat|fat[- ]?free\s+(?:mass|body\s+weight)|protein\s+(?:percentage|percent|%?)|muscle\s+(?:percentage|percent|%?))\b[^0-9]{0,18}\d+(?:\.\d+)?/i,
+  /\b\d+(?:\.\d+)?\s*(?:%|kg|kcal(?:\/day)?|years?)?\s*(?:bmi|body\s+water|bone\s+mass|bmr|basal\s+metabolic\s+rate|metabolic\s+age|subcutaneous\s+fat|fat[- ]?free\s+(?:mass|body\s+weight)|protein\s+(?:percentage|percent)|muscle\s+(?:percentage|percent))\b/i
+];
+
+const SARA_TAPE_SITE = '(?:neck|shoulders?|chest|waist|hips?|right\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|left\\s+(?:arm|biceps?)(?:\\s+(?:flexed|relaxed))?|right\\s+thigh|left\\s+thigh|calves?|right\\s+calf|left\\s+calf)';
+const SARA_MEASUREMENT_VALUE_RES = [
+  new RegExp(`\\b${SARA_TAPE_SITE}\\b[^0-9]{0,18}\\d+(?:\\.\\d+)?\\s*(?:cm|centimetres?|in|inches?)?\\b`, 'i'),
+  new RegExp(`\\b\\d+(?:\\.\\d+)?\\s*(?:cm|centimetres?|in|inches?)\\s*${SARA_TAPE_SITE}\\b`, 'i')
+];
+
+export function saraBodyLogTypesFromMessage(text) {
+  if (typeof text !== 'string' || !text.trim()) return [];
+  const hasWeight = SARA_WEIGHT_VALUE_RE.test(text);
+  const hasComposition = SARA_COMPOSITION_VALUE_RES.some(pattern => pattern.test(text));
+  const hasMeasurements = SARA_MEASUREMENT_VALUE_RES.some(pattern => pattern.test(text));
+  const types = [];
+  if (hasComposition) types.push('composition');
+  else if (hasWeight) types.push('weight');
+  if (hasMeasurements) types.push('measurements');
+  return types;
+}
+
+export function missingSaraBodyLogTypes({ userMessage, loggedTypes = [] } = {}) {
+  const expected = saraBodyLogTypesFromMessage(userMessage);
+  if (!expected.length) return [];
+  const seen = loggedTypes instanceof Set ? loggedTypes : new Set(loggedTypes ?? []);
+  return expected.filter(type => {
+    if (type === 'weight' && seen.has('composition')) return false;
+    return !seen.has(type);
+  });
+}
+
+export function saraBodyCoverageNudge(missingTypes = []) {
+  const missing = [...new Set(missingTypes)].filter(type => ['weight', 'composition', 'measurements'].includes(type));
+  const label = missing.length ? missing.join(', ') : 'the missing body record';
+  return [
+    'You have not proposed every body record Adam supplied.',
+    `Missing log_entry type(s): ${label}.`,
+    'Call log_entry once for EACH missing type now.',
+    'For each type, include every figure Adam supplied for that record group. Use dedicated fields where they exist and extra_metrics for any other numeric scale or tape figure. Do not choose a representative subset and do not drop tape sites.',
+    'Weight belongs in composition when any composition metric is present. Tape measurements always require a separate measurements record.',
+    'Do not claim anything is saved. Each new body record must produce its Confirm card.'
+  ].join(' ');
+}
 
 export const PENELOPE_FORCE_DIARY_NUDGE = [
   'You have not called log_entry yet.',
@@ -39,6 +93,7 @@ export const BRISKET_FORCE_MEAL_NUDGE = [
 export const SARA_FORCE_LOG_NUDGE = [
   'You have not called log_entry yet.',
   'Call log_entry NOW for the body or medical record Adam just asked to save, using only what he said.',
+  'For body data, include every numeric figure he supplied. Use extra_metrics for figures without a dedicated field. If the message spans composition and tape measurements, call log_entry separately for each record type.',
   'Do not web_search. Do not claim it is saved until log_entry returns written or awaiting_confirm.',
   'A Confirm card (or immediate write for a matched medical append) is the only way this lands.'
 ].join(' ');
@@ -95,8 +150,6 @@ export function isThinMindTurn({ slug, message } = {}) {
 }
 
 export function shouldStripWebSearch({ slug, message } = {}) {
-  // Chadwick keeps web_search on every turn — exercise-science research is part of
-  // programming, including lock-in turns that still need a sourced progression call.
   if (slug === 'chadwick') return false;
   if (!LOG_AGENTS.has(slug)) return false;
   if (isLogFinalize(message)) return true;
@@ -140,14 +193,19 @@ export function shouldForcePenelopeDiaryProposal({ userMessage, assistantText, s
   });
 }
 
-export function shouldForceAgentLog({ slug, userMessage, assistantText, sawLogEntry } = {}) {
-  if (sawLogEntry) return false;
+export function shouldForceAgentLog({
+  slug,
+  userMessage,
+  assistantText,
+  sawLogEntry,
+  loggedTypes = []
+} = {}) {
   if (!LOG_AGENTS.has(slug)) return false;
-  // Chadwick lock-in / claim is handled by streamWithChadwickPlanForce.
   if (slug === 'chadwick') return false;
+  if (slug === 'sara' && missingSaraBodyLogTypes({ userMessage, loggedTypes }).length) return true;
+  if (sawLogEntry) return false;
   if (isLogFinalize(userMessage)) return true;
   if (slug === 'vera' && isVeraFlushMessage(userMessage)) return true;
-  if (slug === 'chadwick' && isWorkoutLockIn(userMessage)) return true;
   return claimedDomainSave(assistantText, slug);
 }
 

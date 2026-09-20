@@ -1,5 +1,5 @@
-function httpError(message, status, code) {
-  return Object.assign(new Error(message), { status, code });
+function httpError(message, status, code, data = null) {
+  return Object.assign(new Error(message), { status, code, data });
 }
 
 export const CHAT_EVENTS_POLL_MS = 400;
@@ -58,7 +58,12 @@ export function createChatApi(fetchImpl = fetch, { pollMs = CHAT_EVENTS_POLL_MS 
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok || payload?.ok !== true) {
-        throw httpError('Confirm request failed', response.status, payload?.error?.code ?? 'request_failed');
+        throw httpError(
+          payload?.error?.message ?? 'Confirm request failed',
+          response.status,
+          payload?.error?.code ?? 'request_failed',
+          payload?.data ?? null
+        );
       }
       return payload.data;
     }

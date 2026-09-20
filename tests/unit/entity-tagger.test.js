@@ -97,3 +97,29 @@ test('generic tag selection updates live without waiting for a fresh relationshi
   assert.deepEqual(suppressed, ['link_1']);
   assert.equal(host.querySelectorAll('.entity-chip').length, 0);
 });
+
+
+test('tagger presents one compact Connections composer surface', async () => {
+  setupDom();
+  const host = document.createElement('div');
+  document.body.append(host);
+
+  mountEntityTagger({
+    host,
+    sourceRef: 'teaching:unit:unit_1',
+    search: async () => ({ groups: {} }),
+    listLinks: async () => ({ outgoing: [], incoming: [] }),
+    createLink: async () => ({ link: { id: 'link_1' } }),
+    suppressLink: async () => undefined
+  });
+
+  await tick();
+
+  const tagger = host.querySelector('.entity-tagger');
+  const field = host.querySelector('.entity-tagger__field');
+  assert.equal(host.querySelector('.entity-tagger__heading').textContent, 'Connections');
+  assert.ok(field);
+  assert.ok(field.contains(host.querySelector('.entity-tagger__picker')));
+  assert.ok(field.contains(host.querySelector('.entity-tagger__chips')));
+  assert.equal(tagger.querySelector('.entity-tagger__hint'), null);
+});

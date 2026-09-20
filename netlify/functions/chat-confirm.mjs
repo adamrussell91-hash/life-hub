@@ -111,6 +111,7 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const CENTRAL_NODE_PATH = 'central-node.md';
 const HAMMOND_SLUG = 'hammond';
+const BODY_LOG_TYPES = new Set(['weight', 'composition', 'measurements']);
 
 export const config = { path: '/api/chat/confirm' };
 
@@ -172,7 +173,7 @@ export function createChatConfirmHandler({
       now: getSydneyTimestamp(new Date(now()))
     });
     if (!validation.valid) {
-      return errorResponse(400, 'invalid_record', 'This record could not be validated.', false, PRIVATE_CACHE);
+      return errorResponse(400, 'invalid_record', 'This record could not be validated.', false, PRIVATE_CACHE, { errors: validation.errors });
     }
 
     let path;
@@ -182,7 +183,7 @@ export function createChatConfirmHandler({
       // Never trust the request `slug` here — that field is overloaded as the
       // agent id on other confirm kinds, and a photo Confirm with slug=brisket
       // would write data/nutrition/…/…-brisket.md instead of …-lunch-1600.md.
-      pathSlug = validation.record.type === 'meal'
+      pathSlug = validation.record.type === 'meal' || BODY_LOG_TYPES.has(validation.record.type)
         ? buildRecordSlug(validation.record)
         : parsed.slug;
       path = buildCanonicalPath({
@@ -233,13 +234,34 @@ export function createChatConfirmHandler({
     }
 
     try {
-      const persisted = await persistLogEntry(client, {
+      const persistConfirmedRecord = async (sha = existingSha) => persistLogEntry(client, {
         record: validation.record,
         notes: validation.notes,
         path,
-        existingSha,
+        existingSha: sha,
         nowDateKey: getSydneyDateKey(new Date(now()))
       });
+
+      let persisted;
+      try {
+        persisted = await persistConfirmedRecord();
+      } catch (error) {
+        if (!(error instanceof GitHubClientError)
+          || error.code !== 'write_conflict'
+          || !BODY_LOG_TYPES.has(validation.record.type)) {
+          throw error;
+        }
+
+        // Body updates often arrive as two Confirm cards from the same chat turn.
+        // Another record can advance the branch between clicks. Re-read the tree and
+        // retry the confirmed body write once against the current state. If this exact
+        // path already landed, use its SHA so a repeated Confirm is idempotent.
+        const refreshed = await client.resolveTree();
+        const refreshedSha = refreshed.tree.find(
+          entry => entry.path === path && entry.type === 'blob'
+        )?.sha;
+        persisted = await persistConfirmedRecord(refreshedSha);
+      }
       let exercisePersonalBests;
       if (validation.record.type === 'workout' && validation.record.status === 'completed') {
         try {
