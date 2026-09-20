@@ -65,20 +65,17 @@ export function mountEntityTagger(options) {
 
   const heading = document.createElement('h3');
   heading.className = 'entity-tagger__heading';
-  heading.textContent = options.heading ?? 'Tags';
+  heading.textContent = options.heading ?? 'Connections';
   root.append(heading);
 
-  const hint = document.createElement('p');
-  hint.className = 'entity-tagger__hint';
-  hint.textContent =
-    options.hint ?? 'Type @ to tag anything — a person, note, task, event, unit, or anything else in the hub.';
-  root.append(hint);
+  const field = document.createElement('div');
+  field.className = 'entity-tagger__field';
 
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'entity-tagger__picker';
-  input.placeholder = 'Type @ to tag something';
-  input.setAttribute('aria-label', options.heading ?? 'Tag something');
+  input.placeholder = 'Type @ to add a connection';
+  input.setAttribute('aria-label', options.heading ?? 'Add a connection');
 
   const chipsHost = document.createElement('div');
   chipsHost.className = 'entity-tagger__chips';
@@ -171,7 +168,8 @@ export function mountEntityTagger(options) {
     }
   });
 
-  root.append(input, picker.root, chipsHost, status);
+  field.append(chipsHost, input);
+  root.append(field, picker.root, status);
   options.host.replaceChildren(root);
 
   async function refresh() {
