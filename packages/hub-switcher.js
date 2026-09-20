@@ -87,7 +87,7 @@ export function hubSwitcherHtml(currentId) {
 }
 
 export function hubSwitcherHost(node) {
-  return node?.closest?.('.hub-rail') ?? node;
+  return node;
 }
 
 function createIcon(doc, paths) {
