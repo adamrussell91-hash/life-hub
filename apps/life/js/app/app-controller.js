@@ -50,7 +50,8 @@ const HASH_SECTIONS = new Set([
   'body-medical',
   'mind',
   'central-node',
-  'shortcuts'
+  'shortcuts',
+  'hub-map'
 ]);
 
 export function sectionFromHash(hash) {
@@ -76,6 +77,7 @@ function clampDateToYearMonth(date, yearMonth) {
 export function createAppController(dependencies) {
   const {
     root,
+    hubMap,
     sessionApi,
     cache,
     loadLive,
@@ -236,6 +238,7 @@ export function createAppController(dependencies) {
   for (const button of root.querySelectorAll?.('[data-section="shortcuts"]') ?? []) {
     bind(button, 'click', () => showSection('shortcuts'));
   }
+  bind(root.querySelector('#central-node-map-button'), 'click', () => showSection('hub-map'));
   bindHubAccordion(root.querySelector('[data-hub-accordion]'));
   bind(root.querySelector('#more-nav-button'), 'click', () => openMoreSheet());
   bind(root.querySelector('#more-sheet-close'), 'click', () => closeMoreSheet());
@@ -640,7 +643,8 @@ export function createAppController(dependencies) {
     'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
     mind: { eyebrow: 'Mood and themes', title: 'Mind' },
     'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' },
-    shortcuts: { eyebrow: 'Action OS', title: 'Shortcuts' }
+    shortcuts: { eyebrow: 'Action OS', title: 'Shortcuts' },
+    'hub-map': { eyebrow: 'Every hub and page', title: 'Hub map' }
   };
 
   function closeMoreSheet() {
@@ -697,6 +701,7 @@ export function createAppController(dependencies) {
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     const shortcuts = root.querySelector('#shortcuts-dashboard');
+    const hubMapSection = root.querySelector('#hub-map-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
     if (fitness) fitness.hidden = name !== 'fitness';
@@ -708,6 +713,7 @@ export function createAppController(dependencies) {
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     if (shortcuts) shortcuts.hidden = name !== 'shortcuts';
+    if (hubMapSection) hubMapSection.hidden = name !== 'hub-map';
     if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
   }
 
@@ -750,6 +756,7 @@ export function createAppController(dependencies) {
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'shortcuts') void loadShortcutsPanel();
+    if (name === 'hub-map') void hubMap?.open();
     if (name === 'home') void loadHubPulse();
     const lifeDomain = name !== 'home' && name !== 'chat';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {

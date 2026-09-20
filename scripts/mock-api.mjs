@@ -6,6 +6,8 @@ import { dump } from 'js-yaml';
 import { parseDateRange, CONFIG_PATHS, RESEARCH_PATH } from '../netlify/functions/_shared/repo-policy.mjs';
 import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
 import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
+import { buildHubMapSeed } from '../apps/life/js/app/hub-map-seed.js';
+import { validateMap } from '../apps/life/js/app/hub-map-model.js';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
 import { getSydneyTimestamp } from '../apps/life/js/core/time.js';
@@ -81,6 +83,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
   const sessions = new Map();
   const confirmedFiles = new Map();
   let nextSessionId = 0;
+  const hubMap = { map: null, version: 0 };
 
   const readSession = request => {
     const id = readCookie(request, 'life_hub_mock');
@@ -201,6 +204,35 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) 
           files: files.map(({ path, sha, content }) => ({ path, sha, content }))
         }
       });
+      return true;
+    }
+
+    if (url.pathname === '/api/hub-map') {
+      if (request.method !== 'GET' && request.method !== 'POST') {
+        return methodNotAllowed(response, 'GET, POST');
+      }
+      if (!readSession(request)) return unauthenticated(response);
+      const sha = () => (hubMap.map ? `mock-${hubMap.version}` : null);
+      if (request.method === 'GET') {
+        json(response, 200, {
+          ok: true,
+          data: { map: hubMap.map ?? buildHubMapSeed(), sha: sha(), seeded: !hubMap.map }
+        });
+        return true;
+      }
+      const body = await readJson(request);
+      const checked = validateMap(body?.map);
+      if (!checked.ok || (body.baseSha !== null && typeof body.baseSha !== 'string')) {
+        error(response, 400, 'invalid_request', 'Provide a valid hub map.', false);
+        return true;
+      }
+      if (body.baseSha !== sha()) {
+        error(response, 409, 'write_conflict', 'The hub map was updated elsewhere. Reload to continue.', true);
+        return true;
+      }
+      hubMap.map = checked.map;
+      hubMap.version += 1;
+      json(response, 200, { ok: true, data: { map: hubMap.map, sha: sha(), seeded: false } });
       return true;
     }
 
