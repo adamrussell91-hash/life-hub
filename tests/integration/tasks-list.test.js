@@ -227,6 +227,44 @@ test('Tasks POST/PATCH/DELETE use the Life session and keep the index', async ()
   assert.equal(anon.status, 401);
 });
 
+test('Tasks POST keeps someday category and origin date, and drops an invalid origin', async () => {
+  const store = memoryStore({ 'tasks/_index': [] });
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => store
+  });
+  const created = await handler(
+    request({
+      method: 'POST',
+      origin: 'https://tasks-hub.adam-russell.com',
+      body: {
+        title: 'See the northern lights',
+        domain: 'life',
+        bucket: 'someday',
+        someday_kind: 'bucket_list',
+        origin_date: '2014-06-01'
+      }
+    })
+  );
+  assert.equal(created.status, 201);
+  const body = await created.json();
+  assert.equal(body.data.someday_kind, 'bucket_list');
+  assert.equal(body.data.origin_date, '2014-06-01');
+
+  const patched = await handler(
+    request({
+      method: 'PATCH',
+      url: `https://api.adam-russell.com/api/tasks?id=${body.data.id}`,
+      body: { someday_kind: 'career', origin_date: 'not-a-date' }
+    })
+  );
+  assert.equal(patched.status, 200);
+  const next = await patched.json();
+  assert.equal(next.data.someday_kind, 'career');
+  assert.equal(next.data.origin_date, null);
+});
+
 test('Tasks list includes a just-created project task when Blobs list() is stale', async () => {
   const store = memoryStore({
     'tasks/_index': ['task-1'],

@@ -220,9 +220,14 @@ describe('tasks store', () => {
       title: 'Learn pottery',
       domain: 'life',
       bucket: 'someday',
-      status: 'deferred'
+      status: 'deferred',
+      someday_kind: 'dreams_jar',
+      origin_date: '2019-04-02'
     });
     expect(someday.bucket).toBe('someday');
+    expect(someday.someday_kind).toBe('dreams_jar');
+    expect(someday.origin_date).toBe('2019-04-02');
+    expect((await store.getTask(someday.id))?.origin_date).toBe('2019-04-02');
     expect(backlogTasks(await store.listTasks()).some((t) => t.id === someday.id)).toBe(false);
   });
 

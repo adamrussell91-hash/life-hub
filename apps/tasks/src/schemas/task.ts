@@ -34,6 +34,9 @@ export const WaitingStatusSchema = z.enum(['waiting', 'follow_up_due', 'resolved
 export const SomedayMaturitySchema = z.enum(['new', 'developing', 'set']);
 /** What altitude a Someday idea would land at if promoted — Hammond Horizons vocabulary. */
 export const SomedayHorizonSchema = z.enum(['area', 'goal', 'project']);
+/** Which Someday bucket an idea belongs to. Career stays in Tasks; the other two also feed Life Hub Future Map. */
+export const SomedayKindSchema = z.enum(['bucket_list', 'dreams_jar', 'career']);
+const OriginDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 export type OdysseyNode = {
   id: string;
@@ -111,6 +114,10 @@ export const TaskSchema = z.object({
   life_area: z.string().nullable().optional(),
   /** Someday / Maybe only — altitude this idea would land at if promoted. */
   horizon_target: SomedayHorizonSchema.nullable().optional(),
+  /** Someday / Maybe only — bucket list, dreams jar, or career. */
+  someday_kind: SomedayKindSchema.nullable().optional(),
+  /** When a bucket-list or dreams-jar item began. May predate created_at. */
+  origin_date: OriginDateSchema.nullable().optional(),
   /** Projects spawned by promoting this Someday idea. The idea stays; each attempt is tracked here. */
   linked_project_ids: z.array(z.string()).optional(),
   /** Goals spawned by promoting this Someday idea. The idea stays. */
@@ -172,6 +179,8 @@ export const TaskCreateSchema = TaskSchema.omit({
   maturity: true,
   life_area: true,
   horizon_target: true,
+  someday_kind: true,
+  origin_date: true,
   linked_project_ids: true,
   linked_goal_ids: true,
   odyssey_paths: true

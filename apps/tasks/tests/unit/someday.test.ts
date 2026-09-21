@@ -11,6 +11,7 @@ import {
   LIFE_COVERAGE_SEATS,
   lifeCoverageHeadline,
   lifeCoverageStarRadius,
+  matchesSomedayKind,
   maturityWeight,
   newOdysseyNode,
   removeOdysseyNode,
@@ -168,6 +169,19 @@ describe('lifeCoverageHeadline', () => {
 
   it('handles no dreams tagged yet', () => {
     expect(lifeCoverageHeadline(computeLifeCoverage([]))).toBe('No dreams tagged with a life area yet.');
+  });
+
+  it('keeps career out of the origin-date categories and matches the someday filter', () => {
+    const bucket = task({ id: 'b', title: 'Aurora', someday_kind: 'bucket_list' });
+    const dream = task({ id: 'd', title: 'Sea', someday_kind: 'dreams_jar' });
+    const career = task({ id: 'c', title: 'Studio', someday_kind: 'career' });
+    const plain = task({ id: 'p', title: 'Loose idea' });
+    expect(matchesSomedayKind(bucket, 'bucket_list')).toBe(true);
+    expect(matchesSomedayKind(career, 'bucket_list')).toBe(false);
+    expect(matchesSomedayKind(career, 'career')).toBe(true);
+    expect(matchesSomedayKind(plain, 'uncategorised')).toBe(true);
+    expect(matchesSomedayKind(dream, 'uncategorised')).toBe(false);
+    expect(matchesSomedayKind(career, 'all')).toBe(true);
   });
 });
 

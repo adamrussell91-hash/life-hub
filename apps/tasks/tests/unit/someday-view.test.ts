@@ -3,7 +3,7 @@ import type { Project } from '@/schemas/project';
 import type { Goal } from '@/schemas/goal';
 import type { OdysseyNode, Task } from '@/schemas/task';
 import { tasksApi } from '@/services/client-api';
-import { renderSomedayView } from '@/views/someday';
+import { renderSomedayView, resetSomedayViewFilters } from '@/views/someday';
 import { renderSomedayWheelView } from '@/views/someday-wheel';
 import { renderSomedayOdysseyView } from '@/views/someday-odyssey';
 
@@ -106,6 +106,7 @@ function goal(partial: Partial<Goal> & Pick<Goal, 'id' | 'title'>): Goal {
 }
 
 beforeEach(() => {
+  resetSomedayViewFilters();
   vi.mocked(tasksApi.listTasks).mockReset();
   vi.mocked(tasksApi.listProjects).mockReset();
   vi.mocked(tasksApi.getTask).mockReset();
@@ -141,6 +142,48 @@ describe('renderSomedayView', () => {
     expect(odysseyCta?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
     const branchLink = canvas.querySelector<HTMLAnchorElement>('.someday-card__branch');
     expect(branchLink?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
+  });
+
+  it('filters by category and shows origin dates only for bucket list and dreams jar', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({
+        id: 'b',
+        title: 'See the northern lights',
+        someday_kind: 'bucket_list',
+        origin_date: '2014-06-01'
+      }),
+      task({
+        id: 'd',
+        title: 'Live by the sea',
+        someday_kind: 'dreams_jar',
+        origin_date: '2018-03-12'
+      }),
+      task({ id: 'c', title: 'Run a studio', someday_kind: 'career' })
+    ]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+
+    const canvas = document.createElement('div');
+    await renderSomedayView(canvas);
+
+    expect(canvas.textContent).toContain('Origin 01/06/14');
+    expect(canvas.textContent).toContain('Origin 12/03/18');
+    const career = [...canvas.querySelectorAll('.someday-card')].find((card) =>
+      card.textContent?.includes('Run a studio')
+    );
+    expect(career?.textContent).not.toContain('Origin');
+    expect(career?.textContent).not.toContain('No origin date');
+
+    canvas.querySelector<HTMLButtonElement>('.hub-filters__toggle')?.click();
+    const category = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-filter')].find(
+      (btn) => btn.getAttribute('aria-label') === 'Category'
+    );
+    category?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.hub-menu__opt')]
+      .find((btn) => btn.textContent?.trim() === 'Bucket list')
+      ?.click();
+
+    const titles = [...canvas.querySelectorAll('.someday-card__title')].map((node) => node.textContent);
+    expect(titles).toEqual(['See the northern lights']);
   });
 
   it('shows the open-loop ring and if-then nudge only on Sweep-flagged (review-now) cards', async () => {
