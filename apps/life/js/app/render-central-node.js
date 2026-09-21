@@ -9,6 +9,7 @@ import { buildChordLayout } from './chart-kit/chord-layout.js';
 import { buildCompletionRing, focusCrossAgentEdges, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
 import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-surfaces.js';
+import { createCardSwipe } from '../../../../packages/design-kit/js/card-swipe.js';
 import { formatGrams } from '../core/aggregate.js';
 
 const TILE_FALLBACK_HEIGHT = 160;
@@ -30,7 +31,7 @@ const EMPTY_SECTION_FALLBACK = {
   thisMonth: 'No goals or events logged for this month yet.'
 };
 
-export function renderCentralNode(root, model) {
+export function renderCentralNode(root, model, options = {}) {
   for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
     const container = root.querySelector(selector);
     if (!container) continue;
@@ -74,6 +75,7 @@ export function renderCentralNode(root, model) {
   renderTrendScan(root, model);
   renderChordTile(root, model);
   renderGovernanceHeat(root, model);
+  renderBindingGoal(root, model.bindingGoal, options.onOpenSection);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -441,6 +443,53 @@ function renderCompletionRing(root, completeness) {
   if (fill) animateRingFill(fill, ring);
   const label = root.querySelector('[data-value="completion-ring-label"]');
   if (label) label.textContent = `${completeness.complete} of ${completeness.total}`;
+}
+
+const GOAL_SECTION = {
+  weight: 'body',
+  fat: 'body',
+  ratio: 'body',
+  lift: 'fitness'
+};
+
+let bindingSwipe = null;
+
+function renderBindingGoal(root, bindingGoal, onOpenSection) {
+  bindingSwipe?.destroy?.();
+  bindingSwipe = null;
+  const host = root.querySelector('[data-central-node="binding-goal"]');
+  if (!host) return;
+  host.replaceChildren();
+  if (!bindingGoal?.rows?.length) return;
+
+  const verdict = root.createElement('p');
+  verdict.className = 'cn-binding__verdict';
+  verdict.textContent = bindingGoal.verdict;
+  host.append(verdict);
+
+  const rows = bindingGoal.rows.slice();
+  if (bindingGoal.bindingId) {
+    rows.sort((left, right) => (
+      (left.id === bindingGoal.bindingId ? 0 : 1) - (right.id === bindingGoal.bindingId ? 0 : 1)
+    ));
+  }
+  const deck = createCardSwipe({
+    root,
+    label: 'Goal gaps',
+    fluid: true,
+    items: rows.map(row => {
+      const section = GOAL_SECTION[row.id] ?? 'body';
+      return {
+        id: row.id,
+        title: row.id === bindingGoal.bindingId ? `${row.label} · binding` : row.label,
+        description: row.detail,
+        actionLabel: section === 'fitness' ? 'Open Fitness' : 'Open Body',
+        onAction: () => onOpenSection?.(section)
+      };
+    })
+  });
+  bindingSwipe = deck;
+  host.append(deck.el);
 }
 
 function renderDayProgress(root, completeness) {
