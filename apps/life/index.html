@@ -83,6 +83,7 @@
               <button class="hub-nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/calendar.png" alt=""></span><span>Calendar</span></button>
               <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><img class="nav-icon" src="assets/icons/navigation/central-node.png" alt=""></span><span>Central Node</span></button>
               <button class="hub-nav-item" type="button" data-section="shortcuts"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span><span>Shortcuts</span></button>
+              <button class="hub-nav-item" type="button" data-section="future-map"><span class="nav-glyph" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span><span>Future map</span></button>
             </div>
           </div>
         </div>
@@ -1188,6 +1189,19 @@
           <div data-shortcuts="confirm"></div>
         </section>
 
+        <section id="future-map-dashboard" class="dashboard" aria-label="Future map" hidden>
+          <article class="metric-card" aria-labelledby="future-map-label">
+            <p class="metric-label" id="future-map-label">Bucket list and dreams jar</p>
+            <p class="metric-context">Career someday goals stay in Tasks. Origin is when the item began.</p>
+            <div class="hub-chips" role="group" aria-label="Filter future map">
+              <button type="button" class="hub-chip is-active" data-future-map-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="hub-chip" data-future-map-filter="bucket_list" aria-pressed="false">Bucket list</button>
+              <button type="button" class="hub-chip" data-future-map-filter="dreams_jar" aria-pressed="false">Dreams jar</button>
+            </div>
+            <div data-future-map="list"></div>
+          </article>
+        </section>
+
         <section id="hub-map-dashboard" class="dashboard hub-map" aria-label="Hub map" hidden>
           <div class="hub-map__toolbar">
             <div class="hub-map__filters" role="group" aria-label="Filter by build status">
@@ -1364,6 +1378,7 @@
           <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/skincare.png" alt=""></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><img src="assets/icons/navigation/central-node.png" alt=""></span>Central Node</button>
           <button type="button" data-section="shortcuts"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span>Shortcuts</button>
+          <button type="button" data-section="future-map"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span>Future map</button>
           <p class="hub-more-sheet__section">Hubs</p>
           <a href="/teaching/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>Teaching</a>
           <a href="/knowledge/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>Knowledge</a>

@@ -7504,7 +7504,9 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   margin-top: 0.5rem;
 }
 
-.shortcuts-list {
+#future-map-dashboard .hub-chips {
+  margin-top: var(--space-3, 0.75rem);
+}
   list-style: none;
   margin: var(--space-3, 0.75rem) 0 0;
   padding: 0;
