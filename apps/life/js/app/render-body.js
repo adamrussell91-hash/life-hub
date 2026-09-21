@@ -32,6 +32,7 @@ export function renderBody(root, model, {
   onLogComposition,
   onViewBloods,
   onViewMedical,
+  forecast = null,
   quiet = false
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
@@ -58,7 +59,9 @@ export function renderBody(root, model, {
   const host = root.querySelector('#body-sections');
   if (host) {
     const reuseImg = quiet ? host.querySelector('.body-figure__img') : null;
-    host.replaceChildren(
+    const cards = [];
+    if (forecast) cards.push(forecastCard(root, forecast));
+    cards.push(
       sectionCard(root, model.scale, {
         onLogWeight,
         kind: 'scale',
@@ -75,9 +78,224 @@ export function renderBody(root, model, {
       }),
       medicalLinks(root, onViewBloods, onViewMedical)
     );
+    host.replaceChildren(...cards);
   }
 
   dashboard.removeAttribute('hidden');
+}
+
+
+function forecastCard(root, forecast) {
+  const article = root.createElement('article');
+  article.className = 'metric-card body-forecast';
+  article.dataset.bodySection = 'forecast';
+
+  const head = root.createElement('div');
+  head.className = 'body-forecast__head';
+  const copy = root.createElement('div');
+  const label = root.createElement('p');
+  label.className = 'metric-label';
+  label.textContent = 'Forecast';
+  const caption = root.createElement('p');
+  caption.className = 'metric-caption';
+  caption.textContent = 'Independent clocks. No blended progress score.';
+  copy.append(label, caption);
+  const binding = root.createElement('span');
+  binding.className = 'body-forecast__binding';
+  binding.textContent = bindingText(forecast);
+  head.append(copy, binding);
+  article.append(head);
+
+  const current = root.createElement('div');
+  current.className = 'body-forecast__current';
+  current.append(
+    forecastMetric(root, 'Weight', forecast.current?.weight_kg == null ? '—' : `${forecast.current.weight_kg} kg`, weightGapText(forecast)),
+    forecastMetric(root, 'Body fat', forecast.current?.body_fat_pct == null ? '—' : `${forecast.current.body_fat_pct}%`, fatGapText(forecast)),
+    forecastMetric(root, 'Shoulder:waist', forecast.tape?.current_ratio == null ? '—' : Number(forecast.tape.current_ratio).toFixed(2), ratioGapText(forecast))
+  );
+  article.append(current);
+
+  const scenarios = root.createElement('div');
+  scenarios.className = 'body-forecast__scenarios';
+  scenarios.append(
+    scenarioCard(root, 'As logged', forecast.body?.as_logged, forecast),
+    scenarioCard(root, 'On plan', forecast.body?.on_plan, forecast)
+  );
+  article.append(scenarios);
+
+  const clocks = root.createElement('div');
+  clocks.className = 'body-forecast__clocks';
+  clocks.append(clockCard(root, {
+    label: 'Shoulder:waist',
+    value: forecast.tape?.current_ratio == null
+      ? 'No reading'
+      : `${Number(forecast.tape.current_ratio).toFixed(2)} → ${forecast.tape.target_ratio ?? '—'}`,
+    status: forecast.tape?.status,
+    detail: clockDetail(forecast.tape)
+  }));
+  for (const lift of forecast.lifts ?? []) {
+    clocks.append(clockCard(root, {
+      label: lift.exercise ?? lift.id ?? 'Lift',
+      value: lift.current_e1rm_kg == null
+        ? `Target ${lift.target_e1rm_kg ?? '—'} kg`
+        : `${lift.current_e1rm_kg} → ${lift.target_e1rm_kg} kg`,
+      status: lift.status,
+      detail: liftDetail(lift)
+    }));
+  }
+  article.append(clocks);
+  return article;
+}
+
+function forecastMetric(root, labelText, valueText, detailText) {
+  const item = root.createElement('div');
+  item.className = 'body-forecast__metric';
+  const label = root.createElement('span');
+  label.className = 'body-forecast__metric-label';
+  label.textContent = labelText;
+  const value = root.createElement('strong');
+  value.className = 'body-forecast__metric-value';
+  value.textContent = valueText;
+  const detail = root.createElement('span');
+  detail.className = 'body-forecast__metric-detail';
+  detail.textContent = detailText;
+  item.append(label, value, detail);
+  return item;
+}
+
+function scenarioCard(root, labelText, scenario, forecast) {
+  const card = root.createElement('section');
+  card.className = 'body-forecast__scenario';
+  const top = root.createElement('div');
+  top.className = 'body-forecast__scenario-top';
+  const label = root.createElement('span');
+  label.className = 'body-forecast__scenario-label';
+  label.textContent = labelText;
+  const pill = statusPill(root, scenario?.status);
+  top.append(label, pill);
+
+  const main = root.createElement('strong');
+  main.className = 'body-forecast__scenario-main';
+  main.textContent = scenario?.status === 'dated'
+    ? formatDisplayDate(scenario.date)
+    : scenario?.status === 'will_not_arrive'
+      ? 'Will not arrive'
+      : scenario?.status === 'complete'
+        ? 'In target'
+        : 'Date locked';
+
+  const detail = root.createElement('p');
+  detail.className = 'metric-caption body-forecast__scenario-detail';
+  detail.textContent = scenarioDetail(scenario, forecast);
+  card.append(top, main, detail);
+  return card;
+}
+
+function clockCard(root, { label, value, status, detail }) {
+  const card = root.createElement('section');
+  card.className = 'body-forecast__clock';
+  const top = root.createElement('div');
+  top.className = 'body-forecast__clock-top';
+  const name = root.createElement('span');
+  name.className = 'body-forecast__clock-label';
+  name.textContent = label;
+  top.append(name, statusPill(root, status));
+  const valueEl = root.createElement('strong');
+  valueEl.className = 'body-forecast__clock-value';
+  valueEl.textContent = value;
+  const detailEl = root.createElement('span');
+  detailEl.className = 'body-forecast__clock-detail';
+  detailEl.textContent = detail;
+  card.append(top, valueEl, detailEl);
+  return card;
+}
+
+function statusPill(root, status) {
+  const pill = root.createElement('span');
+  pill.className = 'body-forecast__status';
+  pill.dataset.status = status ?? 'locked';
+  pill.textContent = status === 'dated'
+    ? 'Dated'
+    : status === 'complete'
+      ? 'Met'
+      : status === 'will_not_arrive'
+        ? 'Off course'
+        : 'Locked';
+  return pill;
+}
+
+function weightGapText(forecast) {
+  const gap = forecast.current?.gaps?.weight_to_enter_band_kg;
+  return gap == null ? 'Target 78–82 kg' : gap === 0 ? 'Inside 78–82 kg' : `${gap} kg to enter 78–82`;
+}
+
+function fatGapText(forecast) {
+  const gap = forecast.current?.gaps?.body_fat_to_enter_band_pct_points;
+  return gap == null ? 'Target 8–10%' : gap === 0 ? 'Inside 8–10%' : `${gap} points to 10%`;
+}
+
+function ratioGapText(forecast) {
+  const gap = forecast.tape?.gap;
+  return gap == null ? 'Target 1.60' : gap <= 0 ? 'Target met' : `${Number(gap).toFixed(2)} to 1.60`;
+}
+
+function scenarioDetail(scenario, forecast) {
+  if (!scenario) return 'Forecast unavailable.';
+  if (scenario.status === 'dated') {
+    const binding = scenario.binding_condition === 'body_fat' ? 'body fat is binding' : 'weight is binding';
+    return `${binding}. 8% clock: ${scenario.tight_body_fat_date ? formatDisplayDate(scenario.tight_body_fat_date) : 'not reached in band'}.`;
+  }
+  if (scenario.status === 'will_not_arrive') return scenario.reason ?? 'Current direction does not enter the target box.';
+  if (scenario.status === 'complete') return 'Weight and body fat are simultaneously inside the target box.';
+  return bodyLockText(forecast);
+}
+
+function bodyLockText(forecast) {
+  const attempts = forecast.input_quality?.energy_calibration?.attempts ?? [];
+  let bestCount = 0;
+  let largestGap = null;
+  for (const attempt of attempts) {
+    bestCount = Math.max(bestCount, Number(attempt?.weight?.trend?.observation_count ?? 0));
+    const gap = Number(attempt?.weight?.trend?.max_gap_days);
+    if (Number.isFinite(gap)) largestGap = largestGap == null ? gap : Math.min(largestGap, gap);
+  }
+  if (bestCount < 5) {
+    const missing = 5 - bestCount;
+    const gapNote = largestGap != null && largestGap > 21 ? ' and close the >21-day gap' : '';
+    return `${bestCount}/5 recent weight days. Need ${missing} more reading${missing === 1 ? '' : 's'}${gapNote}.`;
+  }
+  const missing = forecast.input_quality?.energy_calibration?.missing ?? [];
+  return missing[0] ?? 'More overlapping weight and complete nutrition data is required.';
+}
+
+function clockDetail(clock) {
+  if (!clock) return 'No clock available.';
+  if (clock.status === 'dated') return `Current trend: ${formatDisplayDate(clock.date)}.`;
+  if (clock.status === 'complete') return `Target met on ${formatDisplayDate(clock.date)}.`;
+  if (clock.status === 'will_not_arrive') return clock.reason ?? 'Current trend is not moving toward target.';
+  return (clock.missing ?? []).join(' · ') || 'More measurements required.';
+}
+
+function liftDetail(lift) {
+  if (!lift) return 'No clock available.';
+  if (lift.status === 'dated') {
+    const deadline = lift.deadline ? formatDisplayDate(lift.deadline) : null;
+    return deadline
+      ? `Trend date ${formatDisplayDate(lift.date)} · deadline ${deadline}`
+      : `Trend date ${formatDisplayDate(lift.date)}`;
+  }
+  if (lift.status === 'complete') return `Target met on ${formatDisplayDate(lift.date)}.`;
+  if (lift.status === 'will_not_arrive') return 'Current comparable e1RM trend is not rising toward target.';
+  return (lift.missing ?? []).join(' · ') || 'More comparable hard sessions required.';
+}
+
+function bindingText(forecast) {
+  const binding = forecast.physique_binding?.as_logged;
+  if (binding?.status === 'dated') return `Binding: ${formatDisplayDate(binding.date)}`;
+  const blockers = binding?.blockers ?? [];
+  if (blockers.includes('body_box') || blockers.includes('body_fat_8')) return 'Binding: body trend';
+  if (blockers.includes('shoulder_waist')) return 'Binding: tape';
+  return 'Live model';
 }
 
 function sectionCard(root, section, hooks) {
