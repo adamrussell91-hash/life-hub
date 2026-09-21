@@ -1,26 +1,37 @@
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
+import type { Program } from '@/schemas/program';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { toDateKey } from '@/domain/queries';
 import {
-  chronologyBounds,
+  chronologyAxisKeys,
+  chronologyItemsInWindow,
+  chronologyWindow,
+  clipChronologySpan,
   collectChronologyItems,
   dayOffset,
-  type ChronologyItem
+  filterChronologyItems,
+  packChronologyLanes,
+  type ChronologyFilters,
+  type ChronologyItem,
+  type ChronologySource,
+  type ChronologyZoom
 } from '@/domain/chronology';
+import { statusBadgeClass, statusLabel } from '@/domain/cards';
+import { ProjectStatusSchema } from '@/schemas/project';
 import {
   getFocus,
   hydrateFocusFromHash,
-  isFocusedTaskId,
-  setFocus,
   subscribeFocus
 } from '@/domain/focus';
-import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
-import { renderTaskEditor } from '@/views/task-editor';
+import { createCollapsibleFilters } from '@/views/collapsible-filters';
+import { createHubFilter, createHubPills, createHubToolbar } from '@/views/hub-kit';
+import { renderLoadError, showViewLoading } from '@/views/feedback';
 
-const PX_PER_DAY = 22;
+const LANE_TOP = 2.75;
+const LANE_HEIGHT = 2.85;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -38,7 +49,115 @@ function rangeLabel(item: ChronologyItem): string {
   return `${formatDisplayDate(item.startKey)} → ${formatDisplayDate(item.endKey)}`;
 }
 
-function groupByDueDate(items: ChronologyItem[]): { dueKey: string; items: ChronologyItem[] }[] {
+function pct(offset: number, days: number): string {
+  return `${(Math.max(0, offset) / Math.max(1, days)) * 100}%`;
+}
+
+function isPast(item: ChronologyItem, todayKey: string): boolean {
+  return item.endKey < todayKey;
+}
+
+function isFocusedItem(item: ChronologyItem): boolean {
+  const focus = getFocus();
+  return Boolean(focus && focus.type === 'project' && focus.id === item.id);
+}
+
+type TimelineSession = {
+  zoom: ChronologyZoom;
+  source: ChronologySource | 'all';
+  status: string;
+};
+
+const session: TimelineSession = {
+  zoom: 'all',
+  source: 'all',
+  status: 'all'
+};
+
+export function resetTimelineSession(): void {
+  session.zoom = 'all';
+  session.source = 'all';
+  session.status = 'all';
+}
+
+function filtersAreSet(): boolean {
+  return session.source !== 'all' || (session.status !== 'all' && session.status !== '');
+}
+
+function paintBar(
+  item: ChronologyItem,
+  boundsDays: number,
+  boundsStart: Date,
+  top: string
+): HTMLAnchorElement | null {
+  const clipped = clipChronologySpan(item, boundsStart, boundsDays);
+  if (!clipped) return null;
+  const todayKey = toDateKey(new Date());
+  const row = document.createElement('a');
+  row.className = 'chronology__bar';
+  row.href = item.href;
+  row.style.left = pct(clipped.left, boundsDays);
+  row.style.width = pct(clipped.span, boundsDays);
+  row.style.top = top;
+  row.dataset.id = item.id;
+  row.dataset.source = item.source;
+  row.dataset.status = item.status;
+  row.classList.toggle('is-focused', isFocusedItem(item));
+  row.classList.toggle('is-past', isPast(item, todayKey));
+  row.title = `${item.title} · ${item.kindLabel} · ${statusLabel(item.status)} · ${rangeLabel(item)}`;
+  row.setAttribute(
+    'aria-label',
+    `${item.title}, ${item.kindLabel}, ${statusLabel(item.status)}, ${rangeLabel(item)}`
+  );
+  row.append(el('span', 'chronology__bar-title', item.title));
+  const badge = el('span', statusBadgeClass(item.status), statusLabel(item.status));
+  row.append(badge);
+  return row;
+}
+
+function paintTrack(
+  items: ChronologyItem[],
+  bounds: { start: Date; end: Date; days: number }
+): HTMLElement {
+  const lanes = packChronologyLanes(items);
+  const track = el('div', 'chronology__track');
+  track.style.minHeight = `${Math.max(14, LANE_TOP + Math.max(1, lanes.length) * LANE_HEIGHT + 1.25)}rem`;
+
+  const axis = el('div', 'chronology__axis');
+  for (const key of chronologyAxisKeys(bounds.start, bounds.days)) {
+    const tick = el('span', 'chronology__tick');
+    tick.style.left = pct(dayOffset(bounds.start, key), bounds.days);
+    tick.textContent = formatDisplayDate(key);
+    axis.append(tick);
+  }
+  track.append(axis);
+
+  const todayOffset = dayOffset(bounds.start, toDateKey(new Date()));
+  if (todayOffset >= 0 && todayOffset <= bounds.days) {
+    const todayMark = el('div', 'chronology__today');
+    todayMark.style.left = pct(todayOffset, bounds.days);
+    todayMark.setAttribute('aria-hidden', 'true');
+    track.append(todayMark);
+  }
+
+  if (!items.length) {
+    track.append(
+      el('p', 'empty-state', 'No dated projects, excursions, or programs match this view.')
+    );
+  }
+
+  lanes.forEach((lane, laneIndex) => {
+    const top = `${LANE_TOP + laneIndex * LANE_HEIGHT}rem`;
+    for (const item of lane) {
+      const bar = paintBar(item, bounds.days, bounds.start, top);
+      if (bar) track.append(bar);
+    }
+  });
+
+  return track;
+}
+
+function groupByEndDate(items: ChronologyItem[]): { dueKey: string; items: ChronologyItem[] }[] {
   const groups = new Map<string, ChronologyItem[]>();
   for (const item of items) {
     const bucket = groups.get(item.endKey);
@@ -50,78 +169,18 @@ function groupByDueDate(items: ChronologyItem[]): { dueKey: string; items: Chron
     .map(([dueKey, group]) => ({ dueKey, items: group }));
 }
 
-function paintTrack(
-  items: ChronologyItem[],
-  onOpen: (taskId: string) => void
-): HTMLElement {
-  const bounds = chronologyBounds(items);
-  const width = bounds.days * PX_PER_DAY;
-  const track = el('div', 'chronology__track');
-  track.style.width = `${width}px`;
-  track.style.minHeight = `${Math.max(10, 3 + items.length * 1.45)}rem`;
-
-  const axis = el('div', 'chronology__axis');
-  axis.style.width = `${width}px`;
-  for (let i = 0; i < bounds.days; i += 7) {
-    const tick = el('span', 'chronology__tick');
-    tick.style.left = `${i * PX_PER_DAY}px`;
-    const date = new Date(bounds.start);
-    date.setDate(date.getDate() + i);
-    tick.textContent = formatDisplayDate(date);
-    axis.append(tick);
-  }
-  track.append(axis);
-
-  const todayOffset = dayOffset(bounds.start, toDateKey(new Date()));
-  if (todayOffset >= 0 && todayOffset <= bounds.days) {
-    const todayMark = el('div', 'chronology__today');
-    todayMark.style.left = `${todayOffset * PX_PER_DAY}px`;
-    todayMark.setAttribute('aria-hidden', 'true');
-    track.append(todayMark);
-  }
-
-  if (!items.length) {
-    track.append(el('p', 'empty-state', 'No dated tasks yet. Give work a due date to see it here.'));
-  }
-
-  items.forEach((item, index) => {
-    const row = el('button', 'chronology__bar');
-    row.type = 'button';
-    const left = dayOffset(bounds.start, item.startKey) * PX_PER_DAY;
-    const span = Math.max(
-      1,
-      dayOffset(bounds.start, item.endKey) - dayOffset(bounds.start, item.startKey) + 1
-    );
-    row.style.left = `${left}px`;
-    row.style.width = `${span * PX_PER_DAY}px`;
-    row.style.top = `${2.5 + index * 1.45}rem`;
-    row.dataset.taskId = item.taskId;
-    row.dataset.status = item.status;
-    row.classList.toggle('is-focused', isFocusedTaskId(item.taskId));
-    row.textContent = item.title;
-    row.title = `${item.title} · ${rangeLabel(item)}`;
-    row.addEventListener('click', () => onOpen(item.taskId));
-    track.append(row);
-  });
-
-  return track;
-}
-
-/** Phone layout — full titles by due date. Horizontal bars crush to 2 letters under 720px. */
-function paintList(
-  items: ChronologyItem[],
-  onOpen: (taskId: string) => void
-): HTMLElement {
+/** Phone layout — full titles by target date. Horizontal bars hide under 720px. */
+function paintList(items: ChronologyItem[]): HTMLElement {
   const list = el('ol', 'chronology__list');
-  list.setAttribute('aria-label', 'Dated work by due date');
+  list.setAttribute('aria-label', 'Dated work by target date');
 
   if (!items.length) {
-    list.append(el('p', 'empty-state', 'No dated tasks yet. Give work a due date to see it here.'));
+    list.append(el('p', 'empty-state', 'No dated projects, excursions, or programs match this view.'));
     return list;
   }
 
   const todayKey = toDateKey(new Date());
-  for (const group of groupByDueDate(items)) {
+  for (const group of groupByEndDate(items)) {
     const day = el('li', 'chronology__day');
     day.dataset.dueKey = group.dueKey;
     if (group.dueKey === todayKey) day.classList.add('is-today');
@@ -132,17 +191,22 @@ function paintList(
 
     const stack = el('div', 'chronology__day-items');
     for (const item of group.items) {
-      const row = el('button', 'chronology__item');
-      row.type = 'button';
-      row.dataset.taskId = item.taskId;
+      const row = document.createElement('a');
+      row.className = 'chronology__item';
+      row.href = item.href;
+      row.dataset.id = item.id;
+      row.dataset.source = item.source;
       row.dataset.status = item.status;
-      row.classList.toggle('is-focused', isFocusedTaskId(item.taskId));
-      row.setAttribute('aria-label', `${item.title}, due ${formatDisplayDate(item.endKey)}`);
-      row.append(el('span', 'chronology__item-title', item.title));
-      const metaBits = [rangeLabel(item)];
-      if (item.projectTitle) metaBits.push(item.projectTitle);
-      row.append(el('span', 'chronology__item-meta', metaBits.join(' · ')));
-      row.addEventListener('click', () => onOpen(item.taskId));
+      row.classList.toggle('is-focused', isFocusedItem(item));
+      row.setAttribute(
+        'aria-label',
+        `${item.title}, ${item.kindLabel}, ${statusLabel(item.status)}, ${rangeLabel(item)}`
+      );
+      const titleRow = el('span', 'chronology__item-head');
+      titleRow.append(el('span', 'chronology__item-title', item.title));
+      titleRow.append(el('span', statusBadgeClass(item.status), statusLabel(item.status)));
+      row.append(titleRow);
+      row.append(el('span', 'chronology__item-meta', `${item.kindLabel} · ${rangeLabel(item)}`));
       stack.append(row);
     }
     day.append(stack);
@@ -160,8 +224,13 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading timeline…', '.chronology');
   let tasks: Task[];
   let projects: Project[];
+  let programs: Program[] = [];
   try {
-    [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
+    [tasks, projects, programs] = await Promise.all([
+      tasksApi.listTasks(),
+      tasksApi.listProjects(),
+      tasksApi.listPrograms().catch(() => [] as Program[])
+    ]);
   } catch (err) {
     renderLoadError(canvas, err, () => void renderTimelineView(canvas), 'Could not load timeline');
     return;
@@ -173,41 +242,102 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const lede = el(
     'p',
     'view-lede',
-    'Chronology — how dated work unfolds. Not the Gantt: no dependency arrows here.'
+    'Projects, excursions, and programs — how the larger pieces unfold. Open a bar for the full page.'
   );
+  const toolbar = createHubToolbar('chronology-toolbar');
+  const left = el('div', 'chronology-toolbar__group');
+  const right = el('div', 'chronology-toolbar__group');
+  const zoomHost = el('div');
   const scroll = el('div', 'chronology__scroll');
-  const preview = el('aside', 'graph-preview chronology__preview');
-  preview.hidden = true;
-  const side = el('div', 'chronology__side');
-  side.append(preview);
-  root.append(lede, scroll, side);
-  canvas.replaceChildren(root);
 
-  function openTask(taskId: string): void {
-    const task = tasks.find((entry) => entry.id === taskId);
-    if (!task) return;
-    setFocus({ type: 'task', id: taskId });
-    preview.hidden = false;
-    void renderTaskEditor(preview, task, projects, () => void renderTimelineView(canvas)).catch((err) => {
-      preview.replaceChildren(el('p', 'empty-state', errorMessage(err)));
-    });
+  function currentFilters(): ChronologyFilters {
+    return { source: session.source, status: session.status };
   }
 
-  function paint(): void {
-    const items = collectChronologyItems(tasks, projects);
-    scroll.replaceChildren(paintTrack(items, openTask), paintList(items, openTask));
-
-    const focus = getFocus();
-    if (focus?.type === 'task' && items.some((item) => item.taskId === focus.id)) {
-      openTask(focus.id);
+  const filters = createCollapsibleFilters({
+    id: 'timeline',
+    ariaLabel: 'Filters',
+    className: 'hub-filters--inline',
+    active: filtersAreSet()
+  });
+  const kind = createHubFilter({
+    key: 'Kind',
+    label: 'Kind',
+    defaultValue: 'all',
+    value: session.source,
+    options: [
+      { value: 'all', label: 'All kinds' },
+      { value: 'project', label: 'Project' },
+      { value: 'excursion', label: 'Excursion' },
+      { value: 'program', label: 'Program' }
+    ],
+    onChange: (value) => {
+      session.source = value as ChronologySource | 'all';
+      filters.toggle.classList.toggle('is-set', filtersAreSet());
+      paint();
     }
+  });
+  const status = createHubFilter({
+    key: 'Status',
+    label: 'Status',
+    defaultValue: 'all',
+    value: session.status,
+    options: [
+      { value: 'all', label: 'All statuses' },
+      ...ProjectStatusSchema.options
+        .filter((value) => value !== 'archived_dead')
+        .map((value) => ({ value, label: statusLabel(value) }))
+    ],
+    onChange: (value) => {
+      session.status = value;
+      filters.toggle.classList.toggle('is-set', filtersAreSet());
+      paint();
+    }
+  });
+  filters.panel.append(kind.el, status.el);
+  left.append(filters.root);
+
+  function paintZoom(): void {
+    zoomHost.replaceChildren(
+      createHubPills<ChronologyZoom>({
+        label: 'Zoom',
+        items: [
+          { id: 'week', label: 'Week' },
+          { id: 'month', label: 'Month' },
+          { id: 'term', label: 'Term' },
+          { id: 'all', label: 'All' }
+        ],
+        value: session.zoom,
+        onSelect: (id) => {
+          session.zoom = id;
+          paintZoom();
+          paint();
+        }
+      })
+    );
+  }
+
+  right.append(zoomHost);
+  toolbar.append(left, right);
+  root.append(lede, toolbar, scroll);
+  canvas.replaceChildren(root);
+  paintZoom();
+
+  function paint(): void {
+    const items = filterChronologyItems(
+      collectChronologyItems(tasks, projects, programs),
+      currentFilters()
+    );
+    const bounds = chronologyWindow(session.zoom, items);
+    const visible = chronologyItemsInWindow(items, bounds.start, bounds.end);
+    scroll.replaceChildren(paintTrack(visible, bounds), paintList(visible));
   }
 
   subscribeFocus((ref) => {
     for (const node of scroll.querySelectorAll<HTMLElement>('.chronology__bar, .chronology__item')) {
       node.classList.toggle(
         'is-focused',
-        Boolean(ref && ref.type === 'task' && node.dataset.taskId === ref.id)
+        Boolean(ref && ref.type === 'project' && node.dataset.id === ref.id)
       );
     }
   });
