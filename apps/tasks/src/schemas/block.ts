@@ -29,6 +29,7 @@ export const BlockTypeSchema = z.enum([
   'diagram',
   'mind_map',
   'concept_map',
+  'whiteboard',
   'columns',
   'section',
   'spacer',
@@ -559,6 +560,23 @@ export const ConceptMapBlockSchema = z.object({
   ...blockTimestamps
 });
 
+export const WhiteboardBlockSchema = z.object({
+  id: z.string().min(1),
+  type: z.literal('block'),
+  block_type: z.literal('whiteboard'),
+  variant: z.string().default('large'),
+  visibility: VisibilitySchema,
+  content: z.object({
+    document_id: z.string().min(1),
+    seed_document_id: z.string().min(1).optional(),
+    title: z.string().optional(),
+    height_px: z.number().int().min(360).max(1400).default(640),
+    published_snapshot: z.unknown().optional()
+  }),
+  ...blockLayout,
+  ...blockTimestamps
+});
+
 export const TimelineEventSchema = z.object({
   id: z.string().min(1),
   when: z.string(),
@@ -674,6 +692,7 @@ const leafBlockSchemas = [
   DiagramBlockSchema,
   MindMapBlockSchema,
   ConceptMapBlockSchema,
+  WhiteboardBlockSchema,
   OutcomesBlockSchema
 ] as const;
 
