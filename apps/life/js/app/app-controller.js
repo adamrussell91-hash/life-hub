@@ -109,6 +109,7 @@ export function createAppController(dependencies) {
     renderCalendar,
     chatApi,
     buildBodyModel,
+    buildForecast,
     renderBody,
     bodyController,
     buildBloodsModel,
@@ -1390,7 +1391,15 @@ export function createAppController(dependencies) {
       date: latestResult.date,
       range: bodyRange
     });
+    const forecast = typeof buildForecast === 'function'
+      ? buildForecast({
+          items: latestResult.events,
+          asOf: latestResult.date,
+          targetsConfig: latestResult.targetsConfig
+        })
+      : null;
     renderBody(root, model, {
+      forecast,
       onRangeChange: next => {
         bodyRange = next;
         renderBodySection();
