@@ -458,7 +458,7 @@ export function createAppController(dependencies) {
         // rings (and any other metric rings) to their stamped fill before/after paint.
         if (syncQuiet) settleMetricRings(root);
         const model = buildHomeModel({ ...result, date });
-        renderHome(root, model, { quiet: syncQuiet });
+        renderHome(root, model, { quiet: syncQuiet, onOpenSection: showSection });
         if (syncQuiet) settleMetricRings(root);
         if (currentSection === 'home') void loadHubPulse();
         if (currentSection === 'nutrition') renderNutritionSection();
@@ -562,7 +562,7 @@ export function createAppController(dependencies) {
       if (!isCurrentLifecycle(version) || !requireUnexpiredSession()) return;
       latestResult = { ...result, date };
       const model = buildHomeModel({ ...result, date });
-      renderHome(root, model);
+      renderHome(root, model, { onOpenSection: showSection });
       renderWarnings?.(root, result.warnings.filter(warning => warning.path));
       authenticated = true;
       rendered = true;

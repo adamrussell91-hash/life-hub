@@ -282,52 +282,57 @@
           </div>
 
           <div class="support-grid">
-            <article class="metric-card workout-card" aria-labelledby="workout-label">
+            <article class="metric-card" aria-labelledby="stimulus-label">
               <div class="metric-heading">
                 <div>
-                  <p class="metric-label" id="workout-label">Movement</p>
-                  <p class="metric-context">Today's training</p>
-                </div>
-                <span class="metric-icon workout" aria-hidden="true">↗</span>
-              </div>
-              <div class="workout-summary">
-                <div>
-                  <strong data-value="workout">—</strong>
-                  <span data-value="workout-state">Checking records</span>
-                </div>
-                <div class="streak-block">
-                  <span class="flame" aria-hidden="true">◆</span>
-                  <p><strong data-value="streak">—</strong><span>day streak</span></p>
+                  <p class="metric-label" id="stimulus-label">Stimulus</p>
+                  <p class="metric-context">Loaded work that counts</p>
                 </div>
               </div>
+              <p class="home-pulse__value" data-home="stimulus-rate">—</p>
+              <p class="metric-caption" data-home="stimulus-detail">Checking records</p>
+              <p class="home-pulse__gate" data-home="stimulus-gate"></p>
             </article>
 
-            <article class="metric-card logging-card" aria-labelledby="logging-label">
+            <article class="metric-card" aria-labelledby="scale-label">
               <div class="metric-heading">
                 <div>
-                  <p class="metric-label" id="logging-label">Logging</p>
-                  <p class="metric-context">Daily completeness</p>
+                  <p class="metric-label" id="scale-label">Scale</p>
+                  <p class="metric-context">Toward the recomp box</p>
                 </div>
-                <span class="logging-total" data-value="logging">— of 5</span>
               </div>
-              <div class="logging-list" aria-label="Logging categories">
-                <span data-complete="nutrition"><i></i>Nutrition</span>
-                <span data-complete="fitness"><i></i>Fitness</span>
-                <span data-complete="diary"><i></i>Diary</span>
-                <span data-complete="body"><i></i>Body</span>
-                <span data-complete="skincare"><i></i>Skincare</span>
-              </div>
-              <div class="progress-track progress-track--logging" data-progress="logging" role="progressbar" aria-label="Logging completeness" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
+              <p class="home-pulse__value" data-home="scale-headline">—</p>
+              <p class="metric-caption" data-home="scale-detail">Checking records</p>
             </article>
           </div>
 
-          <section class="week-card" aria-labelledby="week-label">
-            <div>
-              <p class="section-kicker">This week</p>
-              <h2 id="week-label">A quiet start is still a start.</h2>
-              <p data-week-detail>Log a meal, workout, or diary entry and the strip will light up.</p>
+          <section class="home-paths-card metric-card" aria-labelledby="paths-label">
+            <div class="home-paths-card__head">
+              <div>
+                <p class="section-kicker">Recomp forecast</p>
+                <h2 id="paths-label" data-home="paths-headline">As logged versus on plan.</h2>
+                <p class="metric-caption" data-home="paths-detail">Independent clocks. No blended progress score.</p>
+              </div>
+              <button type="button" class="btn btn--primary" data-home="open-body">Open Body</button>
             </div>
-            <div class="week-strip" aria-label="This week logging coverage"></div>
+            <div class="home-paths-card__scenarios">
+              <article class="home-paths-card__path" data-home-path="as_logged">
+                <div class="home-paths-card__path-top">
+                  <span class="home-paths-card__path-label">As logged</span>
+                  <span class="home-paths-card__status" data-home-path-status data-status="locked">Locked</span>
+                </div>
+                <strong class="home-paths-card__path-main" data-home-path-main>—</strong>
+                <p class="metric-caption" data-home-path-detail></p>
+              </article>
+              <article class="home-paths-card__path" data-home-path="on_plan">
+                <div class="home-paths-card__path-top">
+                  <span class="home-paths-card__path-label">On plan</span>
+                  <span class="home-paths-card__status" data-home-path-status data-status="locked">Locked</span>
+                </div>
+                <strong class="home-paths-card__path-main" data-home-path-main>—</strong>
+                <p class="metric-caption" data-home-path-detail></p>
+              </article>
+            </div>
           </section>
 
           <section class="hub-pulse" aria-labelledby="hubs-heading">

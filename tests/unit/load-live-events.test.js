@@ -90,8 +90,8 @@ test('loads the current Sydney date window through existing parsers and exact Ho
   assert.equal(model.nutrition.protein_g, 80);
   assert.equal(model.nutrition.fat_g, 27);
   assert.equal(model.dayType, 'workout_30');
-  assert.equal(model.workoutStreak, 1);
-  assert.equal(model.completeness.complete, 3);
+  assert.ok(model.forecastCards?.paths);
+  assert.match(model.forecastCards.stimulus.rate, /loaded|No loaded/i);
 });
 
 test('returns stable warnings for invalid Markdown and target configuration', async () => {

@@ -102,13 +102,19 @@ const baseModel = {
   targets: { calories: 1600, protein_g: 120, fat_ceiling_g: 50 },
   dayType: 'movement',
   recovery: false,
-  workoutStreak: 0,
-  completeness: { complete: 0, total: 5 },
-  weekDays: [],
-  weekSummary: { loggedDays: 0, headline: 'Quiet', detail: 'Nothing yet' },
   overFatCeiling: false,
-  progress: { calories: 0, protein: 0, fat: 0, logging: 0 },
-  hammondLine: null
+  progress: { calories: 0, protein: 0, fat: 0 },
+  hammondLine: null,
+  forecastCards: {
+    paths: {
+      headline: 'Forecast needs more data.',
+      detail: 'Need readings.',
+      asLogged: { status: 'locked', main: 'Date locked', detail: 'Need readings.' },
+      onPlan: { status: 'locked', main: 'Date locked', detail: 'Need readings.' }
+    },
+    stimulus: { rate: 'No loaded sessions', detail: 'None', gate: 'Gate unknown.' },
+    scale: { headline: 'No usable scale reading.', detail: 'Log weight.' }
+  }
 };
 
 test('renderHome shows hammondLine and clears hidden when present', () => {

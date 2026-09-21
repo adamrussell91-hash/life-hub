@@ -40,6 +40,7 @@ class FakeElement {
     this.style = { setProperty() {} };
     this.classList = new FakeClassList(this);
     this.textContent = '';
+    this.onclick = null;
   }
 
   setAttribute(name, value) {
@@ -50,6 +51,14 @@ class FakeElement {
     delete this.attributes[name];
   }
 
+  getAttribute(name) {
+    return this.attributes[name] ?? null;
+  }
+
+  querySelector(selector) {
+    return this.nodes?.get(selector) ?? null;
+  }
+
   replaceChildren() {}
 }
 
@@ -58,6 +67,9 @@ class FakeDocument {
     this.app = new FakeElement();
     this.home = new FakeElement();
     this.home.className = 'dashboard';
+    this.openBody = new FakeElement();
+    this.asLogged = pathHost();
+    this.onPlan = pathHost();
     this.nodes = new Map([
       ['#app', this.app],
       ['#home-dashboard', this.home],
@@ -68,16 +80,17 @@ class FakeDocument {
       ['[data-target="protein"]', new FakeElement()],
       ['[data-value="fat"]', new FakeElement()],
       ['[data-target="fat"]', new FakeElement()],
-      ['[data-value="workout"]', new FakeElement()],
-      ['[data-value="workout-state"]', new FakeElement()],
-      ['[data-value="streak"]', new FakeElement()],
-      ['[data-value="logging"]', new FakeElement()],
       ['[data-value="sync"]', new FakeElement()],
-      ['#week-label', new FakeElement()],
-      ['[data-week-detail]', new FakeElement()],
-      ['.week-strip', new FakeElement()],
-      ['[data-progress="logging"]', new FakeElement()],
-      ['[data-percent="logging"]', new FakeElement()],
+      ['[data-home="paths-headline"]', new FakeElement()],
+      ['[data-home="paths-detail"]', new FakeElement()],
+      ['[data-home-path="as_logged"]', this.asLogged],
+      ['[data-home-path="on_plan"]', this.onPlan],
+      ['[data-home="stimulus-rate"]', new FakeElement()],
+      ['[data-home="stimulus-detail"]', new FakeElement()],
+      ['[data-home="stimulus-gate"]', new FakeElement()],
+      ['[data-home="scale-headline"]', new FakeElement()],
+      ['[data-home="scale-detail"]', new FakeElement()],
+      ['[data-home="open-body"]', this.openBody],
       ['[data-percent="calories"]', new FakeElement()],
       ['[data-percent="protein"]', new FakeElement()],
       ['[data-percent="fat"]', new FakeElement()],
@@ -95,17 +108,40 @@ class FakeDocument {
   }
 }
 
+function pathHost() {
+  const host = new FakeElement();
+  host.nodes = new Map([
+    ['[data-home-path-status]', Object.assign(new FakeElement(), { dataset: { status: 'locked' } })],
+    ['[data-home-path-main]', new FakeElement()],
+    ['[data-home-path-detail]', new FakeElement()]
+  ]);
+  return host;
+}
+
 const baseModel = {
   date: '2026-07-30',
   nutrition: { calories: 800, protein_g: 40, fat_g: 55 },
   targets: { calories: 1900, protein_g: 120, fat_ceiling_g: 50 },
   dayType: 'movement',
-  workoutStreak: 0,
-  completeness: { complete: 1, total: 5 },
-  weekDays: [],
-  weekSummary: { headline: 'Quiet', detail: 'Detail' },
-  progress: { calories: 42, protein: 33, fat: 110, logging: 20 },
-  overFatCeiling: true
+  progress: { calories: 42, protein: 33, fat: 110 },
+  overFatCeiling: true,
+  forecastCards: {
+    paths: {
+      headline: 'As logged versus on plan.',
+      detail: 'Independent clocks.',
+      asLogged: { status: 'locked', main: 'Date locked', detail: 'Need more readings.' },
+      onPlan: { status: 'dated', main: '01/10/26', detail: 'Weight is binding.' }
+    },
+    stimulus: {
+      rate: '2/week loaded',
+      detail: '10 upper-body loaded sets/week.',
+      gate: 'Preservation gate met for the on-plan scenario.'
+    },
+    scale: {
+      headline: '88 kg · 6 kg to enter 78–82 kg',
+      detail: '8 points to enter 8–10% fat.'
+    }
+  }
 };
 
 test('renderHome adds nutrition--fat-over on Home when over the fat ceiling', () => {
@@ -129,4 +165,18 @@ test('renderHome formats fat grams without float noise', () => {
   });
   assert.equal(root.nodes.get('[data-value="fat"]').textContent, '135.1 g');
   assert.equal(root.nodes.get('[data-value="protein"]').textContent, '139.7 g');
+});
+
+test('renderHome paints forecast pulse cards and opens Body', () => {
+  const root = new FakeDocument();
+  const opened = [];
+  renderHome(root, baseModel, { onOpenSection: section => opened.push(section) });
+  assert.equal(root.nodes.get('[data-home="paths-headline"]').textContent, 'As logged versus on plan.');
+  assert.equal(root.asLogged.querySelector('[data-home-path-main]').textContent, 'Date locked');
+  assert.equal(root.onPlan.querySelector('[data-home-path-main]').textContent, '01/10/26');
+  assert.equal(root.onPlan.querySelector('[data-home-path-status]').dataset.status, 'dated');
+  assert.equal(root.nodes.get('[data-home="stimulus-rate"]').textContent, '2/week loaded');
+  assert.equal(root.nodes.get('[data-home="scale-headline"]').textContent, '88 kg · 6 kg to enter 78–82 kg');
+  root.openBody.onclick();
+  assert.deepEqual(opened, ['body']);
 });

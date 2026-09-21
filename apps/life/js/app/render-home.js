@@ -2,12 +2,6 @@ import { applyRingTarget } from './chart-kit/apply-ring.js';
 import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate } from '../core/time.js';
 
-const DAY_TYPE_LABELS = {
-  movement: 'Movement day',
-  workout_30: '30-minute workout',
-  workout_45_60: '45–60 minute workout'
-};
-
 const setText = (root, selector, value) => {
   const element = root.querySelector(selector);
   if (element) element.textContent = String(value);
@@ -15,12 +9,38 @@ const setText = (root, selector, value) => {
 
 const formatDate = date => formatDisplayDate(date);
 
-const setProgress = (root, name, value) => {
-  const element = root.querySelector(`[data-progress="${name}"]`);
-  if (!element) return;
-  element.style.setProperty('--progress', `${Math.min(Math.max(value, 0), 100)}%`);
-  element.setAttribute('aria-valuenow', String(Math.min(Math.max(value, 0), 100)));
+const STATUS_LABEL = {
+  dated: 'Dated',
+  complete: 'Met',
+  will_not_arrive: 'Off course',
+  locked: 'Locked'
 };
+
+function paintPath(root, key, path) {
+  const host = root.querySelector(`[data-home-path="${key}"]`);
+  if (!host || !path) return;
+  const status = host.querySelector('[data-home-path-status]');
+  if (status) {
+    const statusName = path.status ?? 'locked';
+    status.dataset.status = statusName;
+    status.textContent = STATUS_LABEL[statusName] ?? 'Locked';
+  }
+  setText(host, '[data-home-path-main]', path.main ?? '—');
+  setText(host, '[data-home-path-detail]', path.detail ?? '');
+}
+
+function paintForecastCards(root, cards) {
+  if (!cards) return;
+  setText(root, '[data-home="paths-headline"]', cards.paths.headline);
+  setText(root, '[data-home="paths-detail"]', cards.paths.detail);
+  paintPath(root, 'as_logged', cards.paths.asLogged);
+  paintPath(root, 'on_plan', cards.paths.onPlan);
+  setText(root, '[data-home="stimulus-rate"]', cards.stimulus.rate);
+  setText(root, '[data-home="stimulus-detail"]', cards.stimulus.detail);
+  setText(root, '[data-home="stimulus-gate"]', cards.stimulus.gate);
+  setText(root, '[data-home="scale-headline"]', cards.scale.headline);
+  setText(root, '[data-home="scale-detail"]', cards.scale.detail);
+}
 
 export function renderHome(root, model, options = {}) {
   const quiet = options.quiet === true;
@@ -34,13 +54,9 @@ export function renderHome(root, model, options = {}) {
   setText(root, '[data-target="protein"]', `/ ${formatGrams(model.targets.protein_g)} g`);
   setText(root, '[data-value="fat"]', `${formatGrams(model.nutrition.fat_g)} g`);
   setText(root, '[data-target="fat"]', `/ ${formatGrams(model.targets.fat_ceiling_g)} g`);
-  setText(root, '[data-value="workout"]', DAY_TYPE_LABELS[model.dayType] ?? 'Movement day');
-  setText(root, '[data-value="workout-state"]', model.dayType === 'movement' ? 'No completed session' : 'Completed');
-  setText(root, '[data-value="streak"]', model.workoutStreak);
-  setText(root, '[data-value="logging"]', `${model.completeness.complete} of ${model.completeness.total}`);
   setText(root, '[data-value="sync"]', 'Live data ready');
-  setText(root, '#week-label', model.weekSummary.headline);
-  setText(root, '[data-week-detail]', model.weekSummary.detail);
+
+  paintForecastCards(root, model.forecastCards);
 
   const hammondLine = root.querySelector('[data-value="hammond-line"]');
   if (hammondLine) {
@@ -53,20 +69,9 @@ export function renderHome(root, model, options = {}) {
     }
   }
 
-  const weekStrip = root.querySelector('.week-strip');
-  if (weekStrip && Array.isArray(model.weekDays)) {
-    weekStrip.replaceChildren();
-    weekStrip.setAttribute('aria-label', 'This week logging coverage');
-    for (const day of model.weekDays) {
-      const cell = root.createElement('span');
-      if (day.isToday) cell.classList.add('is-current');
-      if (day.logged) cell.dataset.hit = 'true';
-      const label = root.createElement('small');
-      label.textContent = day.letter;
-      const dot = root.createElement('i');
-      cell.append(label, dot);
-      weekStrip.append(cell);
-    }
+  const openBody = root.querySelector('[data-home="open-body"]');
+  if (openBody) {
+    openBody.onclick = () => options.onOpenSection?.('body');
   }
 
   const ringMap = {
@@ -81,14 +86,6 @@ export function renderHome(root, model, options = {}) {
       quiet
     });
     setText(root, `[data-percent="${name}"]`, `${model.progress[name]}%`);
-  }
-  setProgress(root, 'logging', model.progress.logging);
-  setText(root, '[data-percent="logging"]', `${model.progress.logging}%`);
-
-  for (const [category, complete] of Object.entries(model.completeness)) {
-    if (category === 'complete' || category === 'total') continue;
-    const item = root.querySelector(`[data-complete="${category}"]`);
-    if (item) item.dataset.checked = String(complete);
   }
 
   const fatOver = Boolean(model.overFatCeiling);
