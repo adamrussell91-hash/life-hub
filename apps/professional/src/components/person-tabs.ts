@@ -72,7 +72,7 @@ const STATE_LABELS: Record<string, string> = {
  */
 function renderOverviewTab(host: HTMLElement, overview: EntityOverview, onRoleChanged: () => void): void {
   host.replaceChildren();
-  const section = el('div', 'entity-detail__section');
+  const section = el('div', 'entity-detail__section entity-detail__current');
   section.append(el('h2', 'entity-detail__heading', 'Current relationships'));
   const listHost = el('div');
   section.append(listHost);

@@ -513,17 +513,24 @@ describe('renderPersonPage', () => {
     await renderPersonPage(canvas, PERSON_ID);
 
     const editButtons = [...canvas.querySelectorAll('button.entity-detail__role-edit')];
-    // Exactly one: the period relationship gets an edit control, the
-    // timeless one does not.
-    expect(editButtons.length).toBe(1);
-    expect(editButtons[0].getAttribute('aria-label')).toBe('Edit role for Example University');
+    // The phone card and the desktop list each get an edit control. CSS
+    // shows one of them.
+    expect(editButtons.length).toBe(2);
+    expect(editButtons.every((button) => button.getAttribute('aria-label') === 'Edit role for Example University')).toBe(
+      true
+    );
     expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Gifted Education Teacher');
-    const row = editButtons[0].closest('li');
+    const row = editButtons[0].closest('li') ?? editButtons[1].closest('li');
     expect(row?.querySelector('.entity-detail__relationship-identity')?.textContent).toBe(
       'employee_at · Example University'
     );
     expect(row?.textContent).toMatch(/Example University Gifted Education Teacher/);
     expect(row?.textContent).not.toMatch(/UniversityGifted/);
+    const card = canvas.querySelector('.person-card');
+    expect(card?.querySelector('.person-card__kicker')?.textContent).toBe('Employee');
+    expect(card?.querySelector('.person-card__org')?.textContent).toBe('Example University');
+    expect(card?.querySelector('.person-card__status')?.textContent).toBe('Active');
+    expect(card?.querySelector('.person-card__brief')?.getAttribute('href')).toContain('/brief');
   });
 
   it('saving a role edit calls change_role and reloads the overview', async () => {
