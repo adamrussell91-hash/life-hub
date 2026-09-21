@@ -12,6 +12,7 @@
 
 import { addCalendarDays, daysBetween } from '../../../apps/life/js/core/time.js';
 import { calculateWorkoutStreak } from '../../../apps/life/js/core/aggregate.js';
+import { selectLatestBodyEntries } from './body-state.mjs';
 
 // Mirrors repo-policy.mjs's EVENT_PATH -- the 5 domains it recognises as real Life
 // Hub data paths (data/<domain>/<year>/<month>/<date>-<name>.md). Duplicated here
@@ -72,6 +73,13 @@ export function selectHammondEventEntries(tree, { from, to } = {}) {
     if (match.groups.date < from || match.groups.date > to) continue;
     entries.push(entry);
   }
+  // Latest composition and tape can sit outside the heatmap window. The binding-goal
+  // line needs those two files; older meals and workouts stay excluded.
+  const seen = new Set(entries.map(entry => entry.path));
+  const latestBody = selectLatestBodyEntries(tree, { limit: 1 });
+  for (const entry of [...latestBody.composition, ...latestBody.measurements]) {
+    if (!seen.has(entry.path)) entries.push(entry);
+  }
   return entries.sort((a, b) => a.path.localeCompare(b.path));
 }
 
@@ -91,8 +99,21 @@ export function formatCentralNodeModelForPrompt(model) {
     `Protein (7d): ${describeProteinTrend(model.week)}.`,
     `Logging completeness (30d): ${logging.hit}/${logging.total} days (${logging.pct}%).`,
     `Exercise completed (30d): ${exercise.hit}/${exercise.total} days (${exercise.pct}%).`,
-    `Eating targets met (30d): ${eating.hit}/${eating.total} days (${eating.pct}%).`
-  ].join('\n');
+    `Eating targets met (30d): ${eating.hit}/${eating.total} days (${eating.pct}%).`,
+    bindingLines(model.bindingGoal)
+  ].filter(Boolean).join('\n');
+}
+
+function bindingLines(bindingGoal) {
+  if (!bindingGoal?.verdict) return '';
+  const rows = (bindingGoal.rows ?? [])
+    .map(row => `${row.label}: ${row.detail}`)
+    .join('\n');
+  return [
+    'Binding goal (gap to the standing bands — weight 78–82 kg, fat 8–10%, shoulder:waist 1.6, named lifts — not a forecast date):',
+    bindingGoal.verdict,
+    rows
+  ].filter(Boolean).join('\n');
 }
 
 function rateOf(series, pred) {

@@ -18,6 +18,7 @@ import {
 import { openGovernanceEntries } from '../core/governance-log.js';
 import { getDayTargets } from '../core/targets.js';
 import { addCalendarDays, enumerateDateKeys } from '../core/time.js';
+import { buildBindingGoal } from './binding-goal.js';
 import {
   buildDomainWeekly,
   buildGovernanceHeatSeries,
@@ -135,6 +136,7 @@ export function buildCentralNodeModel({
     crossAgent,
     governanceOpen,
     governanceHeat,
+    bindingGoal: buildBindingGoal({ events, date }),
     inverseLinks: inverseLinks && typeof inverseLinks === 'object'
       ? inverseLinks
       : { groups: [], status: 'ready' },

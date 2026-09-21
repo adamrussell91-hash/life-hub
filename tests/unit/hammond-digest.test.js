@@ -241,6 +241,31 @@ test('selectHammondEventEntries includes all five domains inside the window and 
   assert.ok(selected.every(entry => !entry.path.includes(outWindow)));
 });
 
+test('selectHammondEventEntries keeps the latest composition and tape outside the heatmap window', () => {
+  const inWindow = addCalendarDays(TODAY, -10);
+  const [year, month] = '2026-05-01'.split('-');
+  const oldComposition = {
+    path: `data/body/${year}/${month}/2026-05-01-composition.md`,
+    type: 'blob',
+    sha: 'old-comp'
+  };
+  const oldTape = {
+    path: `data/body/${year}/${month}/2026-05-01-measurements.md`,
+    type: 'blob',
+    sha: 'old-tape'
+  };
+  const tree = [
+    ...treeFor('nutrition', [inWindow, '2026-05-01']),
+    oldComposition,
+    oldTape
+  ];
+  const selected = selectHammondEventEntries(tree, { from: getCnModelWindowStart(TODAY), to: TODAY });
+  const paths = selected.map(entry => entry.path);
+  assert.ok(paths.includes(oldComposition.path));
+  assert.ok(paths.includes(oldTape.path));
+  assert.equal(paths.some(path => path.includes('2026-05-01-note.md')), false);
+});
+
 test('formatCentralNodeModelForPrompt reports rates and rising/falling/flat protein trends', () => {
   const rising = formatCentralNodeModelForPrompt({
     week: [
@@ -304,4 +329,6 @@ test('formatCentralNodeModelForPrompt works against real buildCentralNodeModel o
   const text = formatCentralNodeModelForPrompt(model);
   assert.match(text, /Central Node computed snapshot/);
   assert.match(text, /Logging completeness \(30d\):/);
+  assert.match(text, /Binding goal \(gap to the standing bands/);
+  assert.match(text, /No binding goal yet/);
 });

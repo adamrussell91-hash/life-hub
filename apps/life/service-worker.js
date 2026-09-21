@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v169';
+const CACHE_NAME = 'life-hub-shell-v171';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -72,6 +72,7 @@ const SHELL_FILES = [
   'js/app/bloods-charts-layout.js',
   'js/app/calendar-model.js',
   'js/app/calendar-write.js',
+  'js/app/binding-goal.js',
   'js/app/central-node-charts.js',
   'js/app/central-node-model.js',
   'js/app/chart-kit/animate.js',

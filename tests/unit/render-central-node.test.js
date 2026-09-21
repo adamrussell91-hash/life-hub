@@ -187,6 +187,8 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
   }
   const liveSnapshot = new FakeElement('p');
   liveSnapshot.dataset.liveSnapshot = '';
+  const bindingGoal = new FakeElement('div');
+  bindingGoal.dataset.centralNode = 'binding-goal';
   const completionLabel = new FakeElement('span');
   completionLabel.dataset.value = 'completion-ring-label';
 
@@ -207,7 +209,7 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
 
   tiles['cn-tile-status'].append(completionRing, completionLabel, ...Object.values(liveComplete), liveSnapshot, sections['todays-status']);
   tiles['cn-tile-week'].append(weekHorizon, sections['this-week']);
-  tiles['cn-tile-month'].append(sections['this-month']);
+  tiles['cn-tile-month'].append(sections['this-month'], bindingGoal);
   tiles['cn-tile-trends'].append(stream, trendScan, trendMore, sections['long-term-trends']);
   tiles['cn-tile-radial'].append(radialYear);
   tiles['cn-tile-governance'].append(governanceHeat, governanceLog);
@@ -246,6 +248,7 @@ function fakeCentralNodeRoot({ boardWidth = 900 } = {}) {
     '[data-central-node="todays-status"]': sections['todays-status'],
     '[data-central-node="this-week"]': sections['this-week'],
     '[data-central-node="this-month"]': sections['this-month'],
+    '[data-central-node="binding-goal"]': bindingGoal,
     '[data-central-node="long-term-trends"]': sections['long-term-trends'],
     '[data-central-node="cross-agent"]': sections['cross-agent'],
     '[data-central-node="recent-actions"]': sections['recent-actions'],
@@ -328,6 +331,7 @@ test('central node board markup packs tiles and unmounts the protein line and he
   assert.match(block, /id="cn-tile-status"[\s\S]*cn-tile__question">Has today been logged\?/);
   assert.match(block, /id="cn-tile-week"[\s\S]*How is protein moving\?/);
   assert.match(block, /id="cn-tile-month"[\s\S]*What's on the month\?/);
+  assert.match(block, /id="cn-tile-binding"[\s\S]*Which goal is binding\?/);
   assert.match(block, /id="cn-tile-trends"[\s\S]*Where is attention going\?/);
   assert.match(block, /id="cn-tile-radial"[\s\S]*Who showed up this year\?/);
   assert.match(block, /id="cn-tile-governance"[\s\S]*What's still open\?/);
@@ -351,6 +355,43 @@ test('central node board markup packs tiles and unmounts the protein line and he
   assert.match(block, /id="central-node-chat-button"/);
   const week = block.slice(block.indexOf('id="cn-tile-week"'), block.indexOf('id="cn-tile-month"'));
   assert.ok(week.indexOf('central-node-week-horizon') < week.indexOf('data-central-node="this-week"'));
+});
+
+test('renderCentralNode paints a goal deck and opens the owning section', () => {
+  const root = fakeCentralNodeRoot();
+  const opened = [];
+  renderCentralNode(root, baseModel({
+    bindingGoal: {
+      bindingId: 'fat',
+      verdict: 'Body fat is binding. It is outside 8–10%, so the recomp box is not met.',
+      rows: [
+        { id: 'weight', label: 'Weight', status: 'inside', detail: '80 kg on 01/08/26, inside 78–82 kg.' },
+        { id: 'fat', label: 'Body fat', status: 'outside', detail: '14% on 01/08/26, 4 points above 10.' },
+        { id: 'lift', label: 'Lifts', status: 'unread', detail: 'No completed load on Bar Press, curl, or row.' }
+      ]
+    }
+  }), {
+    onOpenSection: name => opened.push(name)
+  });
+  const host = root.querySelector('[data-central-node="binding-goal"]');
+  const nodes = [];
+  (function walk(node) {
+    nodes.push(node);
+    for (const child of node?.children ?? []) walk(child);
+  })(host);
+  const buttons = nodes.filter(node => node.tagName === 'button');
+  const openBody = buttons.find(node => node.textContent === 'Open Body');
+  const openFitness = buttons.find(node => node.textContent === 'Open Fitness');
+  assert.match(host.textContent, /Body fat is binding/);
+  assert.match(host.textContent, /1 of 3 · Body fat · binding/);
+  assert.ok(openBody);
+  assert.ok(openFitness);
+  openBody.click();
+  openFitness.click();
+  assert.deepEqual(opened, ['body', 'fitness']);
+  const second = buttons.find(node => node.getAttribute?.('aria-label') === 'Goal gaps 2 of 3');
+  second.click();
+  assert.match(host.textContent, /2 of 3 · Weight/);
 });
 
 test('renderCentralNode shows inverse links and URL watch statuses', () => {

@@ -314,6 +314,7 @@ import {
 } from './_shared/medical-overview-read.mjs';
 import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
+import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
 import { createAnthropicClient, AnthropicClientError } from './_shared/anthropic-client.mjs';
@@ -1152,12 +1153,19 @@ export function createChatHandler({
             hammondDigest = summarizeHammondDigest({ tree: current.tree, fitnessRecords, today });
             const cnEvents = parseHammondEventDocuments(hammondCnEntries, hammondCnBlobs);
             hammondEvents = cnEvents;
-            hammondCnSummary = formatCentralNodeModelForPrompt(buildCentralNodeModel({
+            const centralNodeModel = buildCentralNodeModel({
               events: cnEvents,
               targetsConfig: TARGETS_CONFIG,
               centralNodeMarkdown,
               date: today
-            }));
+            });
+            // 90-day fitness is already parsed for the digest. The 30-day heatmap
+            // must not grow, but the binding-goal lifts need those completed sets.
+            centralNodeModel.bindingGoal = buildBindingGoal({
+              events: [...cnEvents, ...fitnessRecords.map(record => ({ record }))],
+              date: today
+            });
+            hammondCnSummary = formatCentralNodeModelForPrompt(centralNodeModel);
             hammondDiaryDigest = hammondDiaryDigestForTurn({
               slug,
               message: parsed.message,
