@@ -375,6 +375,17 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
+    if (path === '/api/priority-assess' && method === 'POST') {
+      const b = (body ?? {}) as Record<string, unknown>;
+      return json(200, {
+        ok: true,
+        data: await s.applyPriorityAssessments({
+          mode: b.mode === 'floor' ? 'floor' : 'full',
+          apply: b.apply === true
+        })
+      });
+    }
+
     if (path === '/api/search' && method === 'GET') {
       const q = url.searchParams.get('q') ?? '';
       const [tasks, projects] = await Promise.all([s.listTasks(), s.listProjects()]);

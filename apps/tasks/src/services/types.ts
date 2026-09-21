@@ -181,6 +181,11 @@ export interface TasksStore {
     skipped_ai: boolean;
     reason: string | null;
   }>;
+  applyPriorityAssessments(options?: {
+    mode?: import('@/domain/priority-assess').PriorityAssessMode;
+    apply?: boolean;
+    now?: Date;
+  }): Promise<import('@/domain/priority-assess').PriorityAssessResult>;
 
   getCapacitySnapshot(now?: Date): Promise<CapacitySnapshot>;
   ensureCapacityShare(): Promise<CapacityShare>;
