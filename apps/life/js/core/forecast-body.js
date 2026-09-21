@@ -239,9 +239,20 @@ export function buildOnPlanIntake(items, asOf, days, targetsConfig, weightKg) {
   };
 }
 
+function latestExplicitRegimeBoundary(items, asOf, days) {
+  const from = addCalendarDays(asOf, -(days - 1));
+  return (items ?? []).map(recordOf)
+    .filter(record => record?.date >= from
+      && record.date <= asOf
+      && (record.forecast_regime_boundary === true || record.regime_boundary === true))
+    .sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
+}
+
 function calibrationForWindow(items, asOf, days, targetsConfig, libraryByName, measuredRmrKcal) {
-  const weight = buildWeightTrend(items, asOf, days);
-  const intake = estimateHabitualIntake(items, { asOf, days });
+  const boundary = latestExplicitRegimeBoundary(items, asOf, days);
+  const effectiveDays = boundary ? Math.min(days, daysBetween(boundary.date, asOf) + 1) : days;
+  const weight = buildWeightTrend(items, asOf, effectiveDays);
+  const intake = estimateHabitualIntake(items, { asOf, days: effectiveDays });
   const missing = [...weight.missing];
   if (intake.complete_days < MIN_COMPLETE_DAYS) missing.push(`at least ${MIN_COMPLETE_DAYS} complete nutrition days`);
   if ((intake.complete_day_coverage ?? 0) < MIN_COMPLETE_COVERAGE) missing.push('sufficient complete-day nutrition coverage');
@@ -282,6 +293,7 @@ function calibrationForWindow(items, asOf, days, targetsConfig, libraryByName, m
   return {
     status: warnings.length ? 'locked' : 'ready',
     window: weight.window,
+    regime_boundary: boundary ? { date: boundary.date, id: boundary.id ?? null, type: boundary.type ?? null } : null,
     missing: warnings,
     body,
     weight,
