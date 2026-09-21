@@ -1,6 +1,7 @@
 import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import { createEntityPicker } from '../../design-kit/js/entity-picker.js';
 import { createEntityChipList } from '../../design-kit/js/entity-chips.js';
+import { createViewOnMap } from '../../design-kit/js/view-on-map.js';
 import {
   createEvent,
   eventStateAction,
@@ -19,7 +20,6 @@ import { searchEntities } from '@/api/entities';
 import type { UniversalLinkEntry } from '@/api/universal-links';
 import { ApiClientError } from '@/api/client';
 import { eventRoute } from '@/app/router';
-import { RAIL_ICON_PATHS, createOutlineIcon } from '@/shell/icons';
 import type { EventCertificate, EventOccurrenceState, EventRecord } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
@@ -438,13 +438,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   canvas.append(form);
 }
 
-const OCCURRENCE_TINT: Record<EventOccurrenceState, string> = {
-  completed: 'sage',
-  scheduled: 'blue',
-  rescheduled: 'blue',
-  cancelled: 'danger'
-};
-
 const OCCURRENCE_LABEL: Record<EventOccurrenceState, string> = {
   completed: 'Completed',
   scheduled: 'Scheduled',
@@ -477,41 +470,47 @@ function certificateSummary(certificate: EventCertificate | null): string {
   return parts.length ? parts.join(' · ') : 'No certificate on file';
 }
 
-function kebabIcon(): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.classList.add('event-detail__menu-icon');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const cy of [5, 12, 19]) {
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', '12');
-    circle.setAttribute('cy', String(cy));
-    circle.setAttribute('r', '1.6');
-    circle.setAttribute('fill', 'currentColor');
-    svg.append(circle);
-  }
-  return svg;
-}
-
-function relationshipRow(entry: UniversalLinkEntry): HTMLElement {
+function relationshipChip(entry: UniversalLinkEntry): HTMLElement {
   const label = entry.endpoint?.display_label ?? entry.link.target_ref ?? entry.link.source_ref;
-  const row = el('div', 'event-detail__linked-row');
+  const item = el('li', 'entity-chip entity-chip--tag');
   const href = entry.endpoint?.href;
   if (href) {
-    const link = el('a', 'event-detail__linked-label', label);
+    const link = el('a', 'entity-chip__label entity-chip__label--link', label);
     link.href = href;
-    row.append(link);
+    item.append(link);
   } else {
-    row.append(el('span', 'event-detail__linked-label', label));
+    item.append(el('span', 'entity-chip__label', label));
   }
-  row.append(el('span', 'event-detail__linked-type', entry.link.relationship_type));
-  return row;
+  item.append(el('span', 'entity-chip__meta', entry.link.relationship_type.replace(/_/g, ' ')));
+  return item;
+}
+
+function paintLinkedList(host: HTMLElement, title: string, entries: UniversalLinkEntry[], empty: string): void {
+  host.replaceChildren(el('p', 'event-detail__kicker', title));
+  if (!entries.length) {
+    host.append(el('p', 'empty-state', empty));
+    return;
+  }
+  const list = document.createElement('ul');
+  list.className = 'entity-chips__list';
+  for (const entry of entries) list.append(relationshipChip(entry));
+  host.append(list);
+}
+
+export interface EventDetailHeader {
+  title: string;
+  supporting: string;
+  actions: HTMLElement;
 }
 
 export async function renderEventDetailView(
   canvas: HTMLElement,
   id: string,
-  options: { onTitleReady?: (title: string) => void; isCurrent?: () => boolean } = {}
+  options: {
+    onTitleReady?: (title: string) => void;
+    onHeaderReady?: (header: EventDetailHeader) => void;
+    isCurrent?: () => boolean;
+  } = {}
 ): Promise<void> {
   showViewLoading(canvas, 'Loading…');
 
@@ -532,13 +531,6 @@ export async function renderEventDetailView(
     options.onTitleReady?.(record.title);
 
     const root = el('div', 'event-detail');
-
-    const topbar = el('div', 'event-detail__topbar');
-    const back = el('a', 'btn btn--ghost', 'Back to Events');
-    back.href = '#/events';
-    topbar.append(back);
-    root.append(topbar);
-
     const actionStatus = el('p', 'event-form__status');
     actionStatus.hidden = true;
 
@@ -553,85 +545,40 @@ export async function renderEventDetailView(
       }
     }
 
-    // ── Hero: icon, title, status/type chips, and the options menu ──────
-    const hero = el('div', 'event-detail__hero');
-    const heroLeft = el('div', 'event-detail__hero-left');
-    const heroIcon = el('div', 'event-detail__hero-icon');
-    heroIcon.append(createOutlineIcon(RAIL_ICON_PATHS.events!));
-    const heroBody = el('div');
-    heroBody.append(el('h1', 'event-detail__title', record.title));
-    const chips = el('div', 'event-detail__chips');
-    chips.append(
-      el(
-        'span',
-        `event-detail__status-chip event-detail__status-chip--${OCCURRENCE_TINT[record.occurrence_state]}`,
-        OCCURRENCE_LABEL[record.occurrence_state]
-      ),
-      el('span', 'event-detail__type-chip', record.event_type.replace(/_/g, ' '))
-    );
-    heroBody.append(chips);
-    heroBody.append(el('p', 'event-detail__sub', record.location_text || 'No location'));
-    heroLeft.append(heroIcon, heroBody);
-    hero.append(heroLeft);
-
     const canReschedule = record.occurrence_state === 'scheduled' || record.occurrence_state === 'rescheduled';
-
-    const editPanel = el('div', 'event-detail__panel');
+    const editPanel = el('section', 'event-detail__card event-detail__panel');
     editPanel.hidden = true;
-    const agendaReschedulePanel = el('div', 'event-detail__panel');
-    agendaReschedulePanel.hidden = true;
+    const reschedulePanel = el('section', 'event-detail__card event-detail__panel');
+    reschedulePanel.hidden = true;
 
-    const menuWrap = el('div', 'event-detail__menu-wrap');
-    const menuBtn = el('button', 'event-detail__menu-btn') as HTMLButtonElement;
-    menuBtn.type = 'button';
-    menuBtn.setAttribute('aria-haspopup', 'true');
-    menuBtn.setAttribute('aria-label', 'Event options');
-    menuBtn.append(kebabIcon());
-    const menu = el('div', 'event-detail__menu');
-    menu.setAttribute('role', 'menu');
-    menu.hidden = true;
-    menuBtn.addEventListener('click', () => {
-      menu.hidden = !menu.hidden;
+    const headerActions = el('div', 'event-detail__actions');
+    const editBtn = el('button', 'btn btn--secondary', 'Edit') as HTMLButtonElement;
+    editBtn.type = 'button';
+    editBtn.addEventListener('click', () => {
+      editPanel.hidden = !editPanel.hidden;
     });
-
-    function menuItem(label: string, onSelect: () => void, danger = false): HTMLButtonElement {
-      const button = el(
-        'button',
-        `event-detail__menu-item${danger ? ' event-detail__menu-item--danger' : ''}`,
-        label
-      ) as HTMLButtonElement;
-      button.type = 'button';
-      button.setAttribute('role', 'menuitem');
-      button.addEventListener('click', () => {
-        menu.hidden = true;
-        onSelect();
-      });
-      return button;
-    }
-
-    menu.append(
-      menuItem('Edit details', () => {
-        editPanel.hidden = !editPanel.hidden;
-      })
-    );
     if (canReschedule) {
-      menu.append(
-        menuItem('Reschedule', () => {
-          agendaReschedulePanel.hidden = !agendaReschedulePanel.hidden;
-        }),
-        menuItem('Mark complete', () => void runAction('Complete', () => eventStateAction(record.id, 'complete'))),
-        menuItem(
-          'Cancel event',
-          () => void runAction('Cancel', () => eventStateAction(record.id, 'cancel')),
-          true
-        )
+      const rescheduleBtn = el('button', 'btn btn--ghost', 'Reschedule') as HTMLButtonElement;
+      rescheduleBtn.type = 'button';
+      rescheduleBtn.addEventListener('click', () => {
+        reschedulePanel.hidden = !reschedulePanel.hidden;
+      });
+      const completeBtn = el('button', 'btn btn--secondary', 'Mark complete') as HTMLButtonElement;
+      completeBtn.type = 'button';
+      completeBtn.addEventListener('click', () =>
+        void runAction('Complete', () => eventStateAction(record.id, 'complete'))
       );
+      headerActions.append(rescheduleBtn, completeBtn);
     }
-    menuWrap.append(menuBtn, menu);
-    hero.append(menuWrap);
-    root.append(hero, actionStatus);
+    headerActions.append(editBtn);
 
-    // ── Edit panel (hidden until "Edit details") ─────────────────────────
+    const supporting = `${OCCURRENCE_LABEL[record.occurrence_state]} ${record.event_type.replace(/_/g, ' ')}`;
+    if (options.onHeaderReady) {
+      options.onHeaderReady({ title: record.title, supporting, actions: headerActions });
+    } else {
+      root.append(headerActions);
+    }
+
     const rescheduleForm = document.createElement('form');
     rescheduleForm.className = 'event-detail__reschedule';
     const newStart = document.createElement('input');
@@ -642,30 +589,21 @@ export async function renderEventDetailView(
     newEnd.type = 'datetime-local';
     newEnd.value = utcIsoToWallLocal(record.end, record.time_zone);
     newEnd.setAttribute('aria-label', 'New end');
-    const rescheduleBtn = el('button', 'btn btn--primary', 'Save new time') as HTMLButtonElement;
-    rescheduleBtn.type = 'submit';
-    rescheduleForm.append(
-      el('label', undefined, 'New start'),
-      newStart,
-      el('label', undefined, 'New end'),
-      newEnd,
-      rescheduleBtn
-    );
+    const saveTime = el('button', 'btn btn--primary', 'Save new time') as HTMLButtonElement;
+    saveTime.type = 'submit';
+    rescheduleForm.append(el('label', undefined, 'New start'), newStart, el('label', undefined, 'New end'), newEnd, saveTime);
     rescheduleForm.addEventListener('submit', (event) => {
       event.preventDefault();
       void runAction('Reschedule', () =>
         rescheduleEvent(record.id, {
           start: wallLocalToUtcIso(newStart.value, record.time_zone),
           end: wallLocalToUtcIso(newEnd.value, record.time_zone),
-          // all_day stays as already set on the record — Reschedule only moves
-          // the date/time. Change it from the Edit panel, the single place
-          // that owns this flag, instead of a second control here.
           time_zone: record.time_zone,
           all_day: record.all_day
         })
       );
     });
-    agendaReschedulePanel.append(rescheduleForm);
+    reschedulePanel.append(el('h2', 'event-detail__section-title', 'Reschedule'), rescheduleForm);
 
     const edit = document.createElement('form');
     edit.className = 'event-detail__edit';
@@ -729,13 +667,15 @@ export async function renderEventDetailView(
       certIssuedAt,
       save
     );
+    if (canReschedule) {
+      const cancel = el('button', 'btn btn--ghost event-detail__cancel', 'Cancel event') as HTMLButtonElement;
+      cancel.type = 'button';
+      cancel.addEventListener('click', () => void runAction('Cancel', () => eventStateAction(record.id, 'cancel')));
+      edit.append(cancel);
+    }
     edit.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const nextCertificate = certificateFromFields(
-        certName.value,
-        certReference.value,
-        certIssuedAt.value
-      );
+      const nextCertificate = certificateFromFields(certName.value, certReference.value, certIssuedAt.value);
       await runAction('Update', () =>
         updateEvent(record.id, {
           title: title.value,
@@ -744,21 +684,15 @@ export async function renderEventDetailView(
           hours: hours.value ? Number(hours.value) : null,
           accreditation_category: accreditation.value || null,
           attendance_state: attendance.value || null,
-          // Preserve existing certificate when the form still carries its values;
-          // only clear when the operator empties every certificate field.
           certificate: nextCertificate ?? null
         })
       );
     });
+    editPanel.append(el('h2', 'event-detail__section-title', 'Edit details'), edit);
 
-    editPanel.append(edit);
-
-    // ── Incomplete-links alert (if any), high on the page since it's actionable ──
     if (record.incomplete_links) {
-      const incomplete = el('section', 'event-detail__incomplete');
-      incomplete.append(
-        el('p', undefined, `Incomplete links (operation ${record.incomplete_links.operation_id}).`)
-      );
+      const incomplete = el('section', 'confirm-card event-detail__incomplete');
+      incomplete.append(el('p', undefined, `Incomplete links (operation ${record.incomplete_links.operation_id}).`));
       const retry = el('button', 'btn btn--primary', 'Retry links') as HTMLButtonElement;
       retry.type = 'button';
       retry.addEventListener('click', async () => {
@@ -771,62 +705,55 @@ export async function renderEventDetailView(
             await load();
             return;
           }
-          incomplete.append(
-            el('p', undefined, err instanceof ApiClientError ? err.message : 'Retry failed.')
-          );
+          incomplete.append(el('p', undefined, err instanceof ApiClientError ? err.message : 'Retry failed.'));
           retry.disabled = false;
         }
       });
-      incomplete.append(retry);
+      const actions = el('div', 'confirm-card__actions');
+      actions.append(retry);
+      incomplete.append(actions);
       root.append(incomplete);
     }
 
-    root.append(editPanel);
+    const session = el('section', 'event-detail__card event-detail__session');
+    const sessionWhen = el('div', 'event-detail__session-when');
+    sessionWhen.append(
+      el('p', 'event-detail__session-date', formatDisplayDateRange(record.start, record.end)),
+      el('p', 'event-detail__session-time', agendaTimeDetail(record))
+    );
+    const sessionWhere = el('div', 'event-detail__session-where');
+    sessionWhere.append(
+      el('p', 'event-detail__session-place', record.location_text || 'No location'),
+      el(
+        'p',
+        'event-detail__session-meta',
+        [record.hours != null ? `${record.hours} hours` : null, record.attendance_state || null]
+          .filter(Boolean)
+          .join(' · ')
+      )
+    );
+    session.append(sessionWhen, sessionWhere);
+    const map = createViewOnMap({
+      address: record.location_text ?? undefined,
+      locationName: record.location_text ?? undefined
+    });
+    if (map?.el) session.append(map.el);
 
-    // ── Facts + Agenda (left column) ─────────────────────────────────────
     function factRow(label: string, value: string): HTMLElement {
       const wrap = el('div', 'event-detail__fact');
       wrap.append(el('span', 'event-detail__fact-label', label), el('span', 'event-detail__fact-value', value));
       return wrap;
     }
 
-    const factsCard = el('section', 'event-detail__card');
-    factsCard.append(el('h2', 'event-detail__section-title', 'Details'));
-    const factsGrid = el('div', 'event-detail__facts-grid');
-    factsGrid.append(
-      factRow('When', formatDisplayDateRange(record.start, record.end)),
-      factRow('Time', agendaTimeDetail(record)),
-      factRow('Where', record.location_text || 'No location'),
-      factRow('Hours', record.hours != null ? `${record.hours} hrs` : '—'),
-      factRow('Accreditation', record.accreditation_category || 'Not specified'),
-      factRow('Attendance', record.attendance_state ?? '—'),
-      factRow('Certificate', certificateSummary(record.certificate))
-    );
-    factsCard.append(factsGrid);
-
-    const agendaCard = el('section', 'event-detail__card');
-    agendaCard.append(el('h2', 'event-detail__section-title', 'Agenda'));
-    const agendaSummary = el('div', 'event-detail__agenda-summary');
-    agendaSummary.append(
-      el('p', 'event-detail__agenda-date', formatDisplayDateRange(record.start, record.end)),
-      el('p', 'event-detail__agenda-time', agendaTimeDetail(record))
-    );
-    agendaCard.append(agendaSummary, agendaReschedulePanel);
-
-    const leftCol = el('div', 'event-detail__col');
-    leftCol.append(factsCard, agendaCard);
-
-    // ── Linked + People + Learning Task + Tag anything (right column) ────
-    const linkedCard = el('section', 'event-detail__card');
-    linkedCard.append(el('h2', 'event-detail__section-title', 'Linked'), el('p', undefined, 'Loading…'));
-
-    const peopleCard = el('section', 'event-detail__card');
-    peopleCard.append(el('h2', 'event-detail__section-title', 'People'), el('p', undefined, 'Loading…'));
-
-    const taskCard = el('section', 'event-detail__card');
+    const purposeCard = el('section', 'event-detail__card');
+    purposeCard.append(el('h2', 'event-detail__section-title', 'This session is for'));
+    const linkedHost = el('div', 'event-detail__linked-host');
+    linkedHost.append(el('p', 'event-detail__kicker', 'Knowledge'), el('p', undefined, 'Loading…'));
+    purposeCard.append(linkedHost);
+    const taskHost = el('div', 'event-detail__task-host');
     mountTaskLinkPanel({
-      host: taskCard,
-      heading: 'Learning Task',
+      host: taskHost,
+      heading: 'Learning task',
       relationshipType: 'learning_for',
       incompleteOperationId:
         record.learning_operation?.status === 'incomplete'
@@ -836,7 +763,7 @@ export async function renderEventDetailView(
         record.learning_operation?.status === 'committed'
           ? `Learning Task ${record.learning_operation.task_id}`
           : record.learning_operation?.status === 'incomplete'
-            ? 'Learning link incomplete.'
+            ? 'Learning task link is incomplete. Retry the existing link. Do not create a second task until this one lands.'
             : null,
       onSubmit: async (input) => {
         try {
@@ -858,45 +785,45 @@ export async function renderEventDetailView(
         paint(result.event);
       }
     });
+    purposeCard.append(taskHost);
+
+    const whoCard = el('section', 'event-detail__card');
+    whoCard.append(el('h2', 'event-detail__section-title', 'Who'));
+    const peopleHost = el('div', 'event-detail__people-host');
+    peopleHost.append(el('p', undefined, 'Loading…'));
+    const evidence = el('div', 'event-detail__evidence');
+    evidence.append(
+      el('p', 'event-detail__kicker', 'Evidence'),
+      factRow('Certificate', certificateSummary(record.certificate)),
+      factRow('Accreditation', record.accreditation_category || 'Not specified')
+    );
+    whoCard.append(peopleHost, evidence);
+
+    const columns = el('div', 'event-detail__columns');
+    columns.append(purposeCard, whoCard);
 
     const tagCard = el('section', 'event-detail__card');
     mountTagAnythingSection(tagCard, `professional:event:${record.id}`);
 
-    const rightCol = el('div', 'event-detail__col');
-    rightCol.append(linkedCard, peopleCard, taskCard, tagCard);
-
-    const columns = el('div', 'event-detail__columns');
-    columns.append(leftCol, rightCol);
-    root.append(columns);
-
+    root.append(actionStatus, session, reschedulePanel, editPanel, columns, tagCard);
     canvas.append(root);
 
-    // People-kind relationships land in the People card whether they came
-    // from the attendee picker on the New Event form or from "Tag anything"
-    // below — both write through the same Universal Links store.
     void loadEntityRelationships(`professional:event:${record.id}`)
       .then((entries) => {
         const people = entries.filter((entry) => entry.endpoint?.kind === 'person');
         const other = entries.filter((entry) => entry.endpoint?.kind !== 'person');
-
-        linkedCard.replaceChildren(el('h2', 'event-detail__section-title', 'Linked'));
-        if (!other.length) {
-          linkedCard.append(el('p', 'empty-state', 'No provider, venue, presenter, or knowledge links yet.'));
-        } else {
-          for (const entry of other) linkedCard.append(relationshipRow(entry));
-        }
-
-        peopleCard.replaceChildren(el('h2', 'event-detail__section-title', 'People'));
-        if (!people.length) {
-          peopleCard.append(el('p', 'empty-state', 'No people linked yet.'));
-        } else {
-          for (const entry of people) peopleCard.append(relationshipRow(entry));
-        }
+        paintLinkedList(
+          linkedHost,
+          'Knowledge',
+          other,
+          'No provider, venue, or knowledge links yet.'
+        );
+        paintLinkedList(peopleHost, 'People', people, 'No people linked yet.');
       })
       .catch((err) => {
         const message = err instanceof ApiClientError ? err.message : 'Relationships unavailable.';
-        linkedCard.replaceChildren(el('h2', 'event-detail__section-title', 'Linked'), el('p', 'empty-state', message));
-        peopleCard.replaceChildren(el('h2', 'event-detail__section-title', 'People'), el('p', 'empty-state', message));
+        linkedHost.replaceChildren(el('p', 'event-detail__kicker', 'Knowledge'), el('p', 'empty-state', message));
+        peopleHost.replaceChildren(el('p', 'empty-state', message));
       });
   }
 
