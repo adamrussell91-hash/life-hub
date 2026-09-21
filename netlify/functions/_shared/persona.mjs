@@ -5,9 +5,12 @@ import {
   loadHumanizerGuidance,
   loadPersonalityWritingSample
 } from './load-humanizer.mjs';
+import { formatHubClockForPrompt } from '../../../apps/life/js/core/time.js';
 
 export function buildSystemPrompt({
   slug,
+  today = '',
+  now = null,
   digest = '',
   constraints = '',
   aboutMe = '',
@@ -78,6 +81,7 @@ export function buildSystemPrompt({
 
   const shared = [
     "You are part of Life Hub, Adam's private personal dashboard.",
+    formatHubClockForPrompt(today, { now: now instanceof Date ? now : new Date() }),
     'Only propose a log_entry tool call for a record Adam has clearly described. Never invent what happened — the activity, food, or event itself must come from what Adam actually said. A record you just designed with Adam (a workout prescription, not a finished session) is not "inventing what happened" — propose that designed record when it is ready.',
     thinCentralNodeLog
       ? `The Central Node is the shared running log every agent reads and writes to — it is your memory across conversations, not just background info. It includes today's status, one-line directives from other agents, and a rolling log of recent actions across the whole system (including your own past confirmed logs). Read it for continuity before responding — if Adam refers to something recent ("the pizza I just logged", "like Chadwick's session today"), check here first rather than saying you have no record of it.\n\nCentral Node (today's status, cross-agent directives, recent actions):\n${thinCentralNodeLog}`
