@@ -12,6 +12,7 @@ import {
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { defaultGetProfessionalStore } from './professional-blobs.mjs';
+import { getGithubActiveSelfPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
 
 function sectionOk(items) {
   return { status: 'ok', items };
@@ -58,17 +59,21 @@ function endpointSummary(endpoint) {
 // Exported so other callers needing "the active self Person" (e.g.
 // `person-brief.mjs`'s Mutual Connections section, Phase 3 Feature 3.1)
 // reuse this exact lookup rather than re-deriving their own — see that
-// module for why.
-export async function findActiveSelfPerson(universalStore) {
-  const keys = await listPersonIndexKeys(universalStore);
-  for (const key of keys) {
-    const id = key.slice('entities/index/person/'.length);
-    const record = parsePersonRecord(await getJSON(universalStore, personKey(id)));
-    if (record?.is_self === true && record.lifecycle_status === 'active') {
-      return record;
+// module for why. Blob-backed identities win over the GitHub-canonical
+// Professional import: a later native self Person must not be shadowed
+// by the imported workspace-owner row.
+export async function findActiveSelfPerson(universalStore, options = {}) {
+  if (universalStore) {
+    const keys = await listPersonIndexKeys(universalStore);
+    for (const key of keys) {
+      const id = key.slice('entities/index/person/'.length);
+      const record = parsePersonRecord(await getJSON(universalStore, personKey(id)));
+      if (record?.is_self === true && record.lifecycle_status === 'active') {
+        return record;
+      }
     }
   }
-  return null;
+  return getGithubActiveSelfPerson(options);
 }
 
 /**
@@ -84,6 +89,7 @@ export async function assembleCareerOverview(deps = {}) {
   const createEventRepo = deps.createEventRepository ?? createEventRepository;
   const createLinkRepo = deps.createUniversalLinkRepository ?? createUniversalLinkRepository;
   const now = deps.now ?? (() => new Date().toISOString());
+  const github = { env: deps.env, fetchImpl: deps.fetchImpl };
 
   const deferred = ['publication', 'presentation'];
   const accessContext = createAccessContext({ workflow: 'life' });
@@ -108,7 +114,7 @@ export async function assembleCareerOverview(deps = {}) {
   let employment;
   let selfRef = null;
   try {
-    const self = await findActiveSelfPerson(universalStore);
+    const self = await findActiveSelfPerson(universalStore, github);
     if (!self) {
       employment = sectionOk([]);
     } else {
@@ -132,6 +138,25 @@ export async function assembleCareerOverview(deps = {}) {
           valid_from: entry.link.valid_from ?? null,
           valid_to: entry.link.valid_to ?? null
         });
+      }
+      const githubRows = await listGithubRelationshipEntries('person', self.id, github);
+      for (const row of githubRows) {
+        if (row.link.relationship_type !== 'employee_at') continue;
+        if (row.link.status !== 'current') continue;
+        if (seen.has(row.otherRef)) continue;
+        try {
+          const endpoint = await resolveEntity(row.otherRef, accessContext, github);
+          seen.add(row.otherRef);
+          items.push({
+            ...endpointSummary(endpoint),
+            role: row.link.role ?? null,
+            valid_from: row.link.valid_from ?? null,
+            valid_to: row.link.valid_to ?? null
+          });
+        } catch (error) {
+          if (error?.code === 'endpoint_not_found') continue;
+          throw error;
+        }
       }
       employment = sectionOk(items);
     }

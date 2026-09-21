@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   derivePersonId,
   deriveOrganisationId,
+  getGithubActiveSelfPerson,
   getGithubOrganisation,
   getGithubPerson,
   isProfessionalDataRepoBound,
@@ -142,6 +143,33 @@ test('caches parsed data for repeated calls within the TTL, issuing only one set
   await listGithubPersonCandidates({ env, fetchImpl });
   await listGithubOrganisationCandidates({ env, fetchImpl });
   assert.equal(calls.length, 3);
+});
+
+test('honors a single is_self flag and ignores a second self-claim', async () => {
+  const { fetchImpl } = memoryFetch({
+    people: [
+      { legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true },
+      { legacy_id: 'leg-other', display_name: 'Lauren Stuart', is_self: true },
+      { legacy_id: 'leg-plain', display_name: 'Kate Jones' }
+    ],
+    organisations: ORGANISATIONS,
+    relationships: []
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const people = await listGithubPersonCandidates({ env, fetchImpl });
+  const self = people.find((record) => record.display_name === 'Adam Russell');
+  const other = people.find((record) => record.display_name === 'Lauren Stuart');
+  assert.equal(self.is_self, true);
+  assert.equal(other.is_self, false);
+  const found = await getGithubActiveSelfPerson({ env, fetchImpl });
+  assert.equal(found.id, derivePersonId('leg-self'));
+  assert.equal(found.display_name, 'Adam Russell');
+});
+
+test('getGithubActiveSelfPerson returns null when no imported person is self', async () => {
+  const { fetchImpl } = memoryFetch({ people: PEOPLE, organisations: ORGANISATIONS, relationships: RELATIONSHIPS });
+  const env = { GITHUB_TOKEN: 'token' };
+  assert.equal(await getGithubActiveSelfPerson({ env, fetchImpl }), null);
 });
 
 test('a relationship whose legacy id does not resolve to a known person/organisation is dropped, not thrown', async () => {

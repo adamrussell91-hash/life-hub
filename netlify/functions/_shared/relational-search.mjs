@@ -163,7 +163,7 @@ export function runRelationalSearch(peopleWithRelationships, rawFilters = {}) {
  * serial loop or unbounded `Promise.all`), then runs the pure filter above.
  */
 export async function searchPeopleRelationally(rawFilters, deps = {}) {
-  const { store, professionalStore, resolveEntity, createRepository, now } = deps;
+  const { store, professionalStore, resolveEntity, createRepository, now, env, fetchImpl } = deps;
   if (!store) throw new Error('searchPeopleRelationally requires a universal link store.');
   if (!professionalStore) throw new Error('searchPeopleRelationally requires a professional store.');
 
@@ -171,7 +171,7 @@ export async function searchPeopleRelationally(rawFilters, deps = {}) {
   const createObservations = deps.createObservationRepository ?? createObservationRepository;
   const observationRepo = createObservations({ store: professionalStore });
 
-  const peopleWithRelationships = await loadPeople({ store, now, resolveEntity, createRepository });
+  const peopleWithRelationships = await loadPeople({ store, now, resolveEntity, createRepository, env, fetchImpl });
 
   const withObservations = await mapBounded(peopleWithRelationships, OBSERVATIONS_BATCH_SIZE, async (entry) => {
     const observations = await observationRepo.listObservationsForAboutRef(entry.person.ref);
