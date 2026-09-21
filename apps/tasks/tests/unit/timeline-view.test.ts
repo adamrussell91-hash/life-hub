@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tasksApi } from '@/services/client-api';
 import { setFocus } from '@/domain/focus';
-import { renderTimelineView } from '@/views/timeline';
+import { resetCollapsibleFiltersForTests } from '@/views/collapsible-filters';
+import { renderTimelineView, resetTimelineSession } from '@/views/timeline';
 import type { SeedData } from '@/services/types';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
@@ -33,6 +34,8 @@ function datedProject(partial: Partial<Project> & Pick<Project, 'id' | 'title'>)
 
 describe('timeline view', () => {
   beforeEach(() => {
+    resetTimelineSession();
+    resetCollapsibleFiltersForTests();
     setFocus(null, { persistUrl: false });
     vi.mocked(tasksApi.listTasks).mockReset();
     vi.mocked(tasksApi.listProjects).mockReset();
@@ -121,5 +124,69 @@ describe('timeline view', () => {
     expect(canvas.querySelector<HTMLAnchorElement>('.chronology__item')?.href).toContain(
       '#/project/proj_open'
     );
+  });
+
+  it('zooms and filters without remounting', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      datedProject({
+        id: 'proj_camp',
+        title: 'Spring camp',
+        type: 'excursion',
+        created_at: '2026-08-01T00:00:00.000Z',
+        current_end_date: '2026-09-10'
+      }),
+      datedProject({
+        id: 'proj_unit',
+        title: 'Artist of the Floating World',
+        type: 'standard',
+        created_at: '2026-01-01T00:00:00.000Z',
+        current_end_date: '2026-09-25'
+      }),
+      datedProject({
+        id: 'proj_mw',
+        title: 'MindWorks',
+        type: 'academic_program',
+        created_at: '2026-07-01T00:00:00.000Z',
+        current_end_date: '2026-11-15'
+      })
+    ]);
+
+    const canvas = document.createElement('main');
+    await renderTimelineView(canvas);
+
+    const zoom = canvas.querySelector('[aria-label="Zoom"]');
+    expect(zoom).not.toBeNull();
+    expect([...zoom!.querySelectorAll('.hub-pills__btn')].map((btn) => btn.textContent)).toEqual([
+      'Week',
+      'Month',
+      'Term',
+      'All'
+    ]);
+    expect(canvas.querySelector('.hub-filters__toggle')?.getAttribute('aria-label')).toBe('Filters');
+
+    const week = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'Week'
+    );
+    week?.click();
+    expect(tasksApi.listProjects).toHaveBeenCalledTimes(1);
+    expect(canvas.querySelector('[aria-label="Zoom"] [aria-pressed="true"]')?.textContent).toBe('Week');
+
+    const all = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'All'
+    );
+    all?.click();
+
+    canvas.querySelector<HTMLButtonElement>('.hub-filters__toggle')?.click();
+    const kind = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-filter')].find((btn) =>
+      btn.getAttribute('aria-label') === 'Kind'
+    );
+    kind?.click();
+    const excursion = [...document.querySelectorAll<HTMLButtonElement>('.hub-menu__opt')].find(
+      (btn) => btn.textContent?.trim() === 'Excursion'
+    );
+    excursion?.click();
+
+    const titles = [...canvas.querySelectorAll('.chronology__bar-title')].map((node) => node.textContent);
+    expect(titles).toEqual(['Spring camp']);
   });
 });

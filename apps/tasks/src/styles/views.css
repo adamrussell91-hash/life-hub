@@ -8113,6 +8113,21 @@ button.column-bar--row.is-active {
   margin-bottom: 0;
 }
 
+.chronology-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.chronology-toolbar__group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .chronology__scroll {
   flex: 1 1 auto;
   min-width: 0;

@@ -2,14 +2,19 @@ import { describe, expect, it } from 'vitest';
 import {
   chronologyAxisKeys,
   chronologyBounds,
+  chronologyItemsInWindow,
   chronologyTickStep,
+  chronologyWindow,
+  clipChronologySpan,
   collectChronologyItems,
   dayOffset,
+  filterChronologyItems,
   packChronologyLanes
 } from '@/domain/chronology';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { Program } from '@/schemas/program';
+import { toDateKey } from '@/domain/queries';
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
   return {
@@ -239,5 +244,60 @@ describe('chronology', () => {
     expect(chronologyTickStep(80)).toBe(14);
     expect(chronologyTickStep(200)).toBe(30);
     expect(chronologyAxisKeys(new Date(2026, 0, 1), 200)).toContain('2026-02-01');
+  });
+
+  it('filters by kind and status', () => {
+    const items = collectChronologyItems(
+      [],
+      [
+        project({ id: 'p1', title: 'Camp', type: 'excursion', status: 'active', current_end_date: '2026-10-10' }),
+        project({ id: 'p2', title: 'Unit', type: 'standard', status: 'stalled', current_end_date: '2026-09-25' }),
+        project({
+          id: 'p3',
+          title: 'MindWorks',
+          type: 'academic_program',
+          status: 'active',
+          current_end_date: '2026-11-15'
+        })
+      ]
+    );
+    expect(filterChronologyItems(items, { source: 'excursion', status: 'all' }).map((item) => item.title)).toEqual([
+      'Camp'
+    ]);
+    expect(filterChronologyItems(items, { source: 'all', status: 'stalled' }).map((item) => item.title)).toEqual([
+      'Unit'
+    ]);
+  });
+
+  it('zooms to a week window around today and clips bars that overflow', () => {
+    const items = collectChronologyItems(
+      [],
+      [
+        project({
+          id: 'p1',
+          title: 'Long unit',
+          created_at: '2026-01-01T00:00:00.000Z',
+          current_end_date: '2026-11-15'
+        }),
+        project({
+          id: 'p2',
+          title: 'Later heat',
+          created_at: '2026-11-01T00:00:00.000Z',
+          current_end_date: '2026-11-18'
+        })
+      ]
+    );
+    const today = new Date(2026, 8, 21);
+    const week = chronologyWindow('week', items, today);
+    expect(week.days).toBe(21);
+    expect(toDateKey(week.start)).toBe('2026-09-21');
+    expect(chronologyItemsInWindow(items, week.start, week.end).map((item) => item.title)).toEqual([
+      'Long unit'
+    ]);
+    const clipped = clipChronologySpan(items[0]!, week.start, week.days);
+    expect(clipped?.left).toBe(0);
+    expect(clipped?.span).toBe(21);
+    const all = chronologyWindow('all', items, today);
+    expect(all.days).toBeGreaterThan(week.days);
   });
 });

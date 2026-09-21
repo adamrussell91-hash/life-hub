@@ -217,6 +217,68 @@ export function chronologyTickStep(days: number): number {
   return 7;
 }
 
+export type ChronologyZoom = 'week' | 'month' | 'term' | 'all';
+
+export type ChronologyFilters = {
+  source: ChronologySource | 'all';
+  status: string;
+};
+
+export function filterChronologyItems(
+  items: ChronologyItem[],
+  filters: ChronologyFilters
+): ChronologyItem[] {
+  return items.filter((item) => {
+    if (filters.source !== 'all' && item.source !== filters.source) return false;
+    if (filters.status && filters.status !== 'all' && item.status !== filters.status) return false;
+    return true;
+  });
+}
+
+function mondayOf(date: Date): Date {
+  const start = startOfDay(date);
+  return addDays(start, -((start.getDay() + 6) % 7));
+}
+
+export function chronologyWindow(
+  zoom: ChronologyZoom,
+  items: ChronologyItem[],
+  today = new Date()
+): { start: Date; end: Date; days: number } {
+  if (zoom === 'all') return chronologyBounds(items, today);
+  const todayStart = startOfDay(today);
+  if (zoom === 'week') {
+    const start = mondayOf(todayStart);
+    return { start, end: addDays(start, 20), days: 21 };
+  }
+  const start = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
+  const months = zoom === 'month' ? 4 : 6;
+  const endExclusive = new Date(start.getFullYear(), start.getMonth() + months, 1);
+  const days = Math.round((endExclusive.getTime() - start.getTime()) / 86_400_000);
+  return { start, end: addDays(endExclusive, -1), days };
+}
+
+export function chronologyItemsInWindow(
+  items: ChronologyItem[],
+  start: Date,
+  end: Date
+): ChronologyItem[] {
+  const startKey = toDateKey(start);
+  const endKey = toDateKey(end);
+  return items.filter((item) => item.endKey >= startKey && item.startKey <= endKey);
+}
+
+export function clipChronologySpan(
+  item: ChronologyItem,
+  boundsStart: Date,
+  days: number
+): { left: number; span: number } | null {
+  const left = Math.max(0, dayOffset(boundsStart, item.startKey));
+  const right = Math.min(days, dayOffset(boundsStart, item.endKey) + 1);
+  const span = right - left;
+  return span > 0 ? { left, span } : null;
+}
+
 export function chronologyAxisKeys(start: Date, days: number): string[] {
   const step = chronologyTickStep(days);
   if (step < 30) {
