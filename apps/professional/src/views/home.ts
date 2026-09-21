@@ -266,9 +266,10 @@ function renderYearStrip(today: YmdParts, events: EventRecord[], meetings: Meeti
   for (let m = 0; m < 12; m += 1) {
     const label = el(
       'span',
-      `pro-home__yearstrip-month${m === today.month - 1 ? ' pro-home__yearstrip-month--current' : ''}${m === 0 ? ' pro-home__yearstrip-month--start' : ''}`,
-      MONTH_ABBR[m]!
+      `pro-home__yearstrip-month${m === today.month - 1 ? ' pro-home__yearstrip-month--current' : ''}${m === 0 ? ' pro-home__yearstrip-month--start' : ''}`
     );
+    label.append(el('span', 'pro-home__yearstrip-month-full', MONTH_ABBR[m]!));
+    label.append(el('span', 'pro-home__yearstrip-month-short', MONTH_ABBR[m]!.slice(0, 1)));
     label.style.left = `${((dayOfYear(today.year, { year: today.year, month: m + 1, day: 1 }) - 1) / totalDays) * 100}%`;
     axis.append(label);
   }

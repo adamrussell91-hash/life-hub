@@ -1252,6 +1252,10 @@
   color: var(--wave);
 }
 
+.pro-home__yearstrip-month-short {
+  display: none;
+}
+
 .pro-home__yearstrip-track {
   position: relative;
   height: 2.25rem;
@@ -1435,5 +1439,19 @@
 @media (max-width: 900px) {
   .pro-home__body {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .pro-home__yearstrip-month {
+    letter-spacing: 0;
+  }
+
+  .pro-home__yearstrip-month-full {
+    display: none;
+  }
+
+  .pro-home__yearstrip-month-short {
+    display: inline;
   }
 }
