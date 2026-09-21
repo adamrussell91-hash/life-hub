@@ -27,6 +27,8 @@ test('seed About Me states the standing rules and does not name the invisible bi
   const text = loadCentralNodeSeed();
   const about = text.slice(text.indexOf('## 👤 About Me'), text.indexOf('## 🔴 Current Constraints'));
   assert.match(about, /Corey comes first every time/);
+  assert.match(about, /Gifted Education Teacher at St Aloysius' College/);
+  assert.match(about, /St Pius X High School/);
   assert.match(about, /Do not recommend leaving or quitting a job unless he is explicitly talking about that/);
   assert.match(about, /Korea honeymoon: 23 December 2026 to 10 January 2027/);
   assert.match(about, /1 December 2026/);

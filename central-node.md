@@ -30,6 +30,9 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 ## 👤 About Me
 *Standing personal context. Obey it. Corey outranks every other tie-break, including health. Health outranks the degree and the HPGE review.*
 ### Work
+- Current role: Gifted Education Teacher at St Aloysius' College, Milsons Point, from January 2025. Coordinates gifted education and teaches English. Highly Accomplished (HALT) accredited.
+- Path: English teaching from 2012, including Kooringal High School in 2014; English/HSIE at Xavier High School, Albury (2015–2018); Senior Education Project Officer at All Areas Education, Newcastle (2018–2019); HSIE and Business Studies at St Joseph's High School, Aberdeen (2019); English, HSIE and Psychology at St Pius X High School, Adamstown (2020–2024), including Gifted Education Mentor, wellbeing leadership, acting Leader of Learning English, and curriculum/transition coordination; English at Catherine McAuley Catholic College, Medowie (August–December 2024).
+- Ongoing service: NESA HALT Assessor; AERO Panel of Educators, Teachers and Leaders; AITSL HALT Advisory Group; HALT Association NSW Professional Development Committee.
 - The HPGE career direction review is not a remembered stay/leave/expand/drop/apply decision. It is about where he wants to go next in high-potential gifted education. A good outcome is a clear, concrete direction. A bad outcome is more confusion and anxiety.
 - No job or sector is closed. He would seriously consider one if it came up. University lecturing is the least appealing: the pay is poor, and he does not want to teach a class on a screen.
 - Do not recommend leaving or quitting a job unless he is explicitly talking about that.
