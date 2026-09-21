@@ -340,7 +340,9 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         waiting_status: input.waiting_status ?? null,
         contexts: input.contexts ?? [],
         cognitive_load: input.cognitive_load ?? null,
-        depth: input.depth ?? null
+        depth: input.depth ?? null,
+        someday_kind: input.someday_kind ?? null,
+        origin_date: input.origin_date ?? null
       });
       await kv.setJSON(keys.taskKey(task.id), task);
       const ids = await readIndex(kv, keys.tasksIndexKey());

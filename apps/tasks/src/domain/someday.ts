@@ -26,6 +26,34 @@ export const HORIZON_TARGETS: Array<{ id: 'area' | 'goal' | 'project'; label: st
   { id: 'project', label: 'Project' }
 ];
 
+/** Someday categories. Career does not appear on Life Hub Future Map. */
+export const SOMEDAY_KINDS = [
+  { id: 'bucket_list', label: 'Bucket list' },
+  { id: 'dreams_jar', label: 'Dreams jar' },
+  { id: 'career', label: 'Career' }
+] as const;
+
+export type SomedayKind = (typeof SOMEDAY_KINDS)[number]['id'];
+export type SomedayKindFilter = 'all' | 'uncategorised' | SomedayKind;
+
+export function somedayKindLabel(kind: string | null | undefined): string {
+  return SOMEDAY_KINDS.find((entry) => entry.id === kind)?.label ?? 'Uncategorised';
+}
+
+/** Bucket list and dreams jar carry an origin date and also appear on Future Map. */
+export function showsOriginDate(kind: string | null | undefined): boolean {
+  return kind === 'bucket_list' || kind === 'dreams_jar';
+}
+
+export function matchesSomedayKind(
+  task: Pick<Task, 'someday_kind'>,
+  filter: SomedayKindFilter
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'uncategorised') return !task.someday_kind;
+  return task.someday_kind === filter;
+}
+
 /** Organic constellation seats — spaced so cores and labels do not collide. */
 export const LIFE_COVERAGE_VIEWBOX = { width: 1000, height: 560 } as const;
 

@@ -9,11 +9,16 @@ import {
   LIFE_AREAS,
   lifeCoverageHeadline,
   MATURITY_LEVELS,
+  matchesSomedayKind,
+  showsOriginDate,
+  SOMEDAY_KINDS,
+  somedayKindLabel,
   somedayLinkedGoalIds,
   somedayLinkedProjectIds,
   stalledLinkedProjects,
   suggestFirstMilestone,
-  suggestIfThen
+  suggestIfThen,
+  type SomedayKindFilter
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
@@ -30,7 +35,15 @@ import type { TaskDomain } from '@/schemas/task';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 let somedayDomain: TaskDomain | 'all' = 'all';
+let somedayKind: SomedayKindFilter = 'all';
 let somedayQuery = '';
+
+/** Tests share this module. Clear filters so one case cannot hide another. */
+export function resetSomedayViewFilters(): void {
+  somedayDomain = 'all';
+  somedayKind = 'all';
+  somedayQuery = '';
+}
 
 export function groupSomedayForReview(
   items: Task[],
@@ -172,6 +185,11 @@ function renderSomedayCard(
     task.priority,
     task.review_at ? `Review ${formatDisplayDate(task.review_at)}` : 'No review date'
   ];
+  if (showsOriginDate(task.someday_kind)) {
+    metaParts.push(
+      task.origin_date ? `Origin ${formatDisplayDate(task.origin_date)}` : 'No origin date'
+    );
+  }
   if (linkedProjects) metaParts.push(`${linkedProjects} linked project${linkedProjects === 1 ? '' : 's'}`);
   if (linkedGoals) metaParts.push(`${linkedGoals} linked goal${linkedGoals === 1 ? '' : 's'}`);
   card.append(el('p', 'hierarchy-meta', metaParts.join(' · ')));
@@ -191,6 +209,9 @@ function renderSomedayCard(
   if (task.life_area) {
     const label = LIFE_AREAS.find((a) => a.id === task.life_area)?.label ?? task.life_area;
     chipsRow.append(el('span', 'someday-chip someday-chip--area', label));
+  }
+  if (task.someday_kind) {
+    chipsRow.append(el('span', 'someday-chip someday-chip--kind', somedayKindLabel(task.someday_kind)));
   }
   card.append(chipsRow);
 
@@ -237,6 +258,36 @@ function renderSomedayCard(
     }
   });
   fieldsRow.append(labeledField('Horizon', horizonSelect, 'hub-field hub-field--compact'));
+
+  const kindSelect = selectField({
+    ariaLabel: `Category for “${task.title}”`,
+    value: task.someday_kind ?? '',
+    placeholder: 'Category…',
+    choices: SOMEDAY_KINDS.map((kind) => ({ id: kind.id, label: kind.label })),
+    onChange: (value) => {
+      void tasksApi
+        .updateTask(task.id, { someday_kind: value || null })
+        .then((next) => onChange(next))
+        .catch((err) => window.alert(errorMessage(err)));
+    }
+  });
+  fieldsRow.append(labeledField('Category', kindSelect, 'hub-field hub-field--compact'));
+
+  if (showsOriginDate(task.someday_kind)) {
+    const origin = createHubField({
+      type: 'date',
+      ariaLabel: `Origin date for ${task.title}`,
+      value: task.origin_date ?? ''
+    });
+    origin.input.addEventListener('change', () => {
+      const origin_date = origin.input.value || null;
+      void tasksApi
+        .updateTask(task.id, { origin_date })
+        .then((next) => onChange(next))
+        .catch((err) => window.alert(errorMessage(err)));
+    });
+    fieldsRow.append(labeledField('Origin', origin.el, 'hub-field hub-field--compact'));
+  }
   card.append(fieldsRow);
 
   const review = createHubField({
@@ -395,7 +446,7 @@ function paintSomeday(
   const filters = createCollapsibleFilters({
     id: 'someday',
     ariaLabel: 'Filters',
-    active: somedayDomain !== 'all' || Boolean(somedayQuery.trim())
+    active: somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim())
   });
   const search = createHubSearch({
     placeholder: 'Filter someday ideas…',
@@ -418,6 +469,21 @@ function paintSomeday(
         somedayDomain = value as TaskDomain | 'all';
         paintSomeday(canvas, items, allTasks, projects, setItems);
       }
+    }).el,
+    createHubFilter({
+      key: 'Category',
+      label: 'Category',
+      defaultValue: 'all',
+      options: [
+        { value: 'all', label: 'All' },
+        ...SOMEDAY_KINDS.map((kind) => ({ value: kind.id, label: kind.label })),
+        { value: 'uncategorised', label: 'Uncategorised' }
+      ],
+      value: somedayKind,
+      onChange: (value) => {
+        somedayKind = value as SomedayKindFilter;
+        paintSomeday(canvas, items, allTasks, projects, setItems);
+      }
     }).el
   );
   canvas.append(filters.root);
@@ -429,20 +495,41 @@ function paintSomeday(
     ariaLabel: 'Someday idea',
     required: true
   });
+  const origin = createHubField({
+    type: 'date',
+    ariaLabel: 'Origin date for the new someday idea'
+  });
+  const originWrap = labeledField('Origin', origin.el, 'hub-field hub-field--compact');
+  originWrap.hidden = true;
+  const kind = selectField({
+    ariaLabel: 'Category for the new someday idea',
+    value: '',
+    placeholder: 'Category…',
+    choices: SOMEDAY_KINDS.map((entry) => ({ id: entry.id, label: entry.label })),
+    onChange: (value) => {
+      originWrap.hidden = !showsOriginDate(value);
+    }
+  });
   const submit = el('button', 'btn btn--decisive', 'Park it');
   submit.type = 'submit';
-  addForm.append(title.el, submit);
+  addForm.append(title.el, labeledField('Category', kind, 'hub-field hub-field--compact'), originWrap, submit);
   addForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
     try {
+      const someday_kind = kind.value || null;
       const created = await tasksApi.createTask({
         title: title.input.value.trim(),
         domain: 'other',
         bucket: 'someday',
-        status: 'deferred'
+        status: 'deferred',
+        someday_kind,
+        origin_date: showsOriginDate(someday_kind) ? origin.input.value || null : null
       });
       title.input.value = '';
+      kind.value = '';
+      origin.input.value = '';
+      originWrap.hidden = true;
       setItems([created, ...items]);
     } catch (err) {
       canvas.append(el('p', 'empty-state', errorMessage(err)));
@@ -460,6 +547,7 @@ function paintSomeday(
   const query = somedayQuery.trim().toLowerCase();
   const visible = items.filter((item) => {
     if (somedayDomain !== 'all' && item.domain !== somedayDomain) return false;
+    if (!matchesSomedayKind(item, somedayKind)) return false;
     if (
       query &&
       !item.title.toLowerCase().includes(query) &&
