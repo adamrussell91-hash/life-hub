@@ -46,7 +46,7 @@ export function createPeopleHomeSignalsHandler(deps = {}) {
         const eventRepo = createEvents({ store: professionalStore });
 
         const [peopleWithRelationships, meetings, events] = await Promise.all([
-          loadPeople({ store, now: nowValue, resolveEntity, createRepository }),
+          loadPeople({ store, now: nowValue, resolveEntity, createRepository, env }),
           meetingRepo.listMeetings(),
           eventRepo.listEvents()
         ]);

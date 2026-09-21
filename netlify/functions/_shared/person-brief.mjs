@@ -369,7 +369,7 @@ export async function assemblePersonBrief(personId, deps = {}) {
   });
 
   let mutualConnections = [];
-  const self = await findSelf(universalStore);
+  const self = await findSelf(universalStore, { env: deps.env, fetchImpl: deps.fetchImpl });
   if (self && self.id !== personId) {
     const selfRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
     const selfOverview = await assembleEntityOverview(selfRef, {

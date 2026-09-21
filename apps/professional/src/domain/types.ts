@@ -155,12 +155,21 @@ export interface LinkedRecords {
   people: RelationshipEndpoint[];
 }
 
+export interface SharedContextWithSelf {
+  ref: string;
+  display_label: string;
+  relationship_type: string;
+}
+
 export interface EntityOverview {
   entity: EntityRecord;
   current_relationships: RelationshipEntry[];
   historical_relationships: RelationshipEntry[];
   timeline: TimelineEntry[];
   linked_records: LinkedRecords;
+  /** Current organisations this person shares with the operator. Empty when
+   * there is no self Person, the subject IS self, or there is no overlap. */
+  shared_contexts_with_self?: SharedContextWithSelf[];
 }
 
 /**

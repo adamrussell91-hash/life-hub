@@ -43,6 +43,7 @@ export function createNetworkEcologyEgoHandler(deps = {}) {
         const graph = await assembleEgoGraph(ref, {
           store,
           hops,
+          env,
           resolveEntity,
           createRepository,
           now: now(),

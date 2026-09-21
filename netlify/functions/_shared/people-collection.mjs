@@ -10,6 +10,7 @@ import {
   personKey
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
+import { listGithubPersonCandidates, listGithubRelationshipEntries } from './github-professional-data.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -51,12 +52,29 @@ function personIdFromKey(key) {
  * `link.id` themselves, since different callers want different dedup
  * granularity — e.g. Signals needs it per relationship type, Cohorts needs
  * it per organisation).
+ *
+ * Also merges the GitHub-canonical Professional import (the 350-person
+ * Notion directory). Search and Person pages already fall back to that
+ * import; People Home / cohorts / network ecology previously scanned
+ * Blobs only and therefore could not see anyone imported, or who the
+ * operator is. Blob-backed records win on id collision. A missing or
+ * unbound GitHub token degrades to the Blob-only set, same as
+ * entity-search.mjs.
  */
-export async function loadAllPeopleWithRelationships({ store, now, resolveEntity, createRepository } = {}) {
+export async function loadAllPeopleWithRelationships({
+  store,
+  now,
+  resolveEntity,
+  createRepository,
+  env,
+  fetchImpl
+} = {}) {
   if (!store) {
     throw new Error('loadAllPeopleWithRelationships requires a store.');
   }
-  const resolve = resolveEntity ?? defaultResolveEntity;
+  const github = { env, fetchImpl };
+  const resolve = (ref, ctx, options = {}) =>
+    (resolveEntity ?? defaultResolveEntity)(ref, ctx, { ...github, ...options });
   const buildRepository = createRepository ?? createUniversalLinkRepository;
   const repo = buildRepository({ store, resolveEntity: resolve });
   const accessContext = createAccessContext({ workflow: 'life' });
@@ -78,5 +96,41 @@ export async function loadAllPeopleWithRelationships({ store, now, resolveEntity
     return { person: { ...record, ref }, relationships };
   });
 
-  return results.filter(Boolean);
+  const native = results.filter(Boolean);
+  const nativeIds = new Set(native.map((row) => row.person.id));
+  const githubPeople = await listGithubPersonCandidates(github);
+  const endpointCache = new Map();
+
+  async function resolveGithubEndpoint(otherRef) {
+    if (endpointCache.has(otherRef)) return endpointCache.get(otherRef);
+    try {
+      const endpoint = await resolve(otherRef, accessContext);
+      endpointCache.set(otherRef, endpoint);
+      return endpoint;
+    } catch (error) {
+      if (error?.code === 'endpoint_not_found') {
+        endpointCache.set(otherRef, null);
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  const imported = await mapBounded(
+    githubPeople.filter((record) => !nativeIds.has(record.id)),
+    PEOPLE_BATCH_SIZE,
+    async (record) => {
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id: record.id });
+      const rows = await listGithubRelationshipEntries('person', record.id, github);
+      const relationships = [];
+      for (const { link, otherRef, direction } of rows) {
+        const endpoint = await resolveGithubEndpoint(otherRef);
+        if (!endpoint) continue;
+        relationships.push({ link, endpoint, direction });
+      }
+      return { person: { ...record, ref }, relationships };
+    }
+  );
+
+  return [...native, ...imported];
 }

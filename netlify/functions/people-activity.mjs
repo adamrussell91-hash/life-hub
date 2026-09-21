@@ -118,7 +118,7 @@ export function createPeopleActivityHandler(deps = {}) {
         const limitParam = url.searchParams.get('limit');
         const parsedLimit = limitParam !== null ? Number.parseInt(limitParam, 10) : undefined;
 
-        const peopleWithRelationships = await loadPeople({ store, now: now(), resolveEntity, createRepository });
+        const peopleWithRelationships = await loadPeople({ store, now: now(), resolveEntity, createRepository, env });
         const timeline = buildActivityEntries(peopleWithRelationships);
         const { items, next_cursor } = paginateActivity(timeline, {
           limit: Number.isInteger(parsedLimit) ? parsedLimit : undefined,

@@ -38,6 +38,17 @@ export async function renderPersonPage(
         self.textContent = 'Self';
         host.append(self);
       }
+      const shared = overview.shared_contexts_with_self ?? [];
+      if (!person.is_self && shared.length) {
+        const connection = document.createElement('p');
+        connection.className = 'entity-detail__shared-context';
+        const names = shared.map((item) => item.display_label);
+        connection.textContent =
+          names.length === 1
+            ? `You know them through ${names[0]}.`
+            : `You know them through ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}.`;
+        host.append(connection);
+      }
       // Brief section 19 / BUILD-PLAN.md Feature 1.3's "Open Person Brief"
       // quick action — links to the Phase 3 Person Brief reading sheet
       // (`#/person/<id>/brief`, `views/person-brief.ts`).

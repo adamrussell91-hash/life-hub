@@ -21,7 +21,7 @@ export function createPeopleCohortsHandler(deps = {}) {
       }
 
       try {
-        const peopleWithRelationships = await loadPeople({ store, now: now(), resolveEntity, createRepository });
+        const peopleWithRelationships = await loadPeople({ store, now: now(), resolveEntity, createRepository, env });
         const cohorts = computeDynamicCohorts(peopleWithRelationships);
         return withCors(okResponse(200, { cohorts }), request, env);
       } catch (error) {

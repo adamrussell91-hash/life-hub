@@ -62,10 +62,17 @@ export function filterVisiblePeople(peopleWithRelationships) {
 }
 
 async function loadVisiblePeople(deps) {
-  const { store, resolveEntity, createRepository, now } = deps;
+  const { store, resolveEntity, createRepository, now, env, fetchImpl } = deps;
   if (!store) throw new Error('Network Ecology assembly requires a universal link store.');
   const loadPeople = deps.loadAllPeopleWithRelationships ?? loadAllPeopleWithRelationships;
-  const peopleWithRelationships = await loadPeople({ store, now, resolveEntity, createRepository });
+  const peopleWithRelationships = await loadPeople({
+    store,
+    now,
+    resolveEntity,
+    createRepository,
+    env,
+    fetchImpl
+  });
   return filterVisiblePeople(peopleWithRelationships);
 }
 

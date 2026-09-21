@@ -35,6 +35,7 @@ export function createNetworkEcologyWorldHandler(deps = {}) {
         const world = await assembleWorldGraph({
           store,
           professionalStore,
+          env,
           resolveEntity,
           createRepository,
           now: now(),

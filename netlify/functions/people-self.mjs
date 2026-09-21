@@ -42,7 +42,7 @@ export function createPeopleSelfHandler(deps = {}) {
       }
 
       try {
-        const self = await findSelf(store);
+        const self = await findSelf(store, { env, fetchImpl: deps.fetchImpl });
         if (!self) {
           return withCors(okResponse(200, { self: null }), request, env);
         }

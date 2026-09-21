@@ -3,7 +3,7 @@ import { IDENTITY_SCHEMA_VERSION, parseOrganisationRecord, parsePersonRecord } f
 import { formatEntityRef } from './entity-ref.mjs';
 
 // Read-only bridge onto the private `life-hub-data` repository's imported
-// Professional directory (351 people / 18 organisations / 74 relationships,
+// Professional directory (350 people / 18 organisations / 74 relationships,
 // migrated from Notion — see docs/migrations/professional-import.md). This
 // data's canonical home is GitHub, not `universal-link-content` Blobs — the
 // user explicitly chose not to duplicate it into Netlify storage. Every
@@ -129,9 +129,16 @@ function isStringArray(value) {
 function normalizePeople(rows) {
   const byId = new Map();
   const idByLegacyId = new Map();
+  // Exactly one imported Person may be the operator. A second `is_self:
+  // true` row is treated as an ordinary contact rather than throwing —
+  // a hard fail here would blank the whole directory over one bad flag.
+  let claimedSelf = false;
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row || typeof row !== 'object' || !isNonEmptyString(row.legacy_id) || !isNonEmptyString(row.display_name)) continue;
     const id = derivePersonId(row.legacy_id);
+    const wantsSelf = row.is_self === true;
+    const isSelf = wantsSelf && !claimedSelf;
+    if (isSelf) claimedSelf = true;
     const record = parsePersonRecord({
       schema_version: IDENTITY_SCHEMA_VERSION,
       id,
@@ -140,7 +147,7 @@ function normalizePeople(rows) {
       sort_name: typeof row.sort_name === 'string' ? row.sort_name : null,
       aliases: isStringArray(row.aliases) ? row.aliases : [],
       lifecycle_status: 'active',
-      is_self: false,
+      is_self: isSelf,
       retention_reason: null,
       retention_review_at: null,
       created_at: LEGACY_IMPORT_TIMESTAMP,
@@ -279,6 +286,11 @@ export async function getGithubOrganisation(id, options = {}) {
 export async function listGithubPersonCandidates(options = {}) {
   const data = await loadProfessionalData(options);
   return data ? [...data.peopleById.values()] : [];
+}
+
+export async function getGithubActiveSelfPerson(options = {}) {
+  const people = await listGithubPersonCandidates(options);
+  return people.find((record) => record.is_self === true && record.lifecycle_status === 'active') ?? null;
 }
 
 export async function listGithubOrganisationCandidates(options = {}) {

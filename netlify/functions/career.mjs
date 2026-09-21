@@ -26,6 +26,7 @@ export function createCareerHandler(deps = {}) {
         const overview = await assembleCareerOverview({
           professionalStore: store,
           universalStore: await getUniversalLinkStore(),
+          env,
           resolveEntity,
           createUniversalLinkRepository:
             deps.createUniversalLinkRepository ?? createUniversalLinkRepository,

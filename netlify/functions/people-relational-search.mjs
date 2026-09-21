@@ -67,6 +67,7 @@ export function createPeopleRelationalSearchHandler(deps = {}) {
           const results = await searchPeopleRelationally(filters, {
             store,
             professionalStore,
+            env,
             resolveEntity,
             createRepository,
             now: now(),
@@ -126,6 +127,7 @@ export function createPeopleRelationalSearchHandler(deps = {}) {
               {
                 store,
                 professionalStore,
+                env,
                 resolveEntity,
                 createRepository,
                 now: now(),

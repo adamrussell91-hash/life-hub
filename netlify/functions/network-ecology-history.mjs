@@ -40,6 +40,7 @@ export function createNetworkEcologyHistoryHandler(deps = {}) {
         if (!dateParam) throw missingDateError();
         const history = await assembleHistoryGraph(dateParam, {
           store,
+          env,
           resolveEntity,
           createRepository,
           now: now(),

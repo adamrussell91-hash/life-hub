@@ -12,6 +12,7 @@ import {
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
+import { findActiveSelfPerson } from './career-overview.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
@@ -86,6 +87,26 @@ function paginateTimeline(timeline, { limit, cursor } = {}) {
 
 function notFound() {
   return Object.assign(new Error('Entity not found.'), { status: 404, code: 'entity_not_found' });
+}
+
+function currentOrganisationContexts(relationships) {
+  const seen = new Set();
+  const items = [];
+  for (const entry of relationships ?? []) {
+    if (entry.link.status !== 'current') continue;
+    if (entry.link.relationship_type !== 'employee_at' && entry.link.relationship_type !== 'member_of') {
+      continue;
+    }
+    if (entry.endpoint?.kind !== 'organisation') continue;
+    if (seen.has(entry.endpoint.ref)) continue;
+    seen.add(entry.endpoint.ref);
+    items.push({
+      ref: entry.endpoint.ref,
+      display_label: entry.endpoint.display_label,
+      relationship_type: entry.link.relationship_type
+    });
+  }
+  return items;
 }
 
 // A GitHub-canonical-import record (github-professional-data.mjs) falls
@@ -306,13 +327,36 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     bucket.push(entry.endpoint);
   }
 
+  let shared_contexts_with_self = [];
+  if (ref.kind === 'person' && record.is_self !== true) {
+    const self = await findActiveSelfPerson(store, github);
+    if (self && self.id !== record.id) {
+      const selfCanonical = formatEntityRef({ namespace: 'shared', kind: 'person', id: self.id });
+      const selfListed = await repo.listForEntity(selfCanonical, accessContext, { includeArchived: true });
+      const selfGithub = await loadGithubRelationshipEntries(
+        { namespace: 'shared', kind: 'person', id: self.id },
+        accessContext,
+        resolveEntity,
+        github
+      );
+      const selfCurrent = [
+        ...selfListed.outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
+        ...selfListed.incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
+        ...selfGithub
+      ];
+      const subjectOrgs = new Set(currentOrganisationContexts(current_relationships).map((org) => org.ref));
+      shared_contexts_with_self = currentOrganisationContexts(selfCurrent).filter((org) => subjectOrgs.has(org.ref));
+    }
+  }
+
   return {
     entity: { ref: canonicalRef, ...redactIdentityRecord(record) },
     current_relationships,
     historical_relationships,
     timeline,
     timeline_next_cursor,
-    linked_records
+    linked_records,
+    shared_contexts_with_self
   };
 }
 
