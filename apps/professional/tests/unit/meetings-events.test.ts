@@ -432,7 +432,7 @@ describe('renderEventNewView', () => {
   });
 });
 
-describe('renderEventDetailView redesign', () => {
+describe('renderEventDetailView session layout', () => {
   const originalFetch = globalThis.fetch;
   const eventRecord = {
     schema_version: 1,
@@ -501,50 +501,51 @@ describe('renderEventDetailView redesign', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows exactly one All day control, gated behind Edit details', async () => {
+  it('shows exactly one All day control, gated behind Edit', async () => {
     const canvas = document.createElement('div');
     await renderEventDetailView(canvas, VALID_EVENT_ID);
     expect(canvas.querySelectorAll('[aria-label="All day"]')).toHaveLength(1);
-    const menuBtn = canvas.querySelector('.event-detail__menu-btn') as HTMLButtonElement;
-    expect(canvas.querySelector('.event-detail__panel')?.hasAttribute('hidden')).toBe(true);
-    menuBtn.click();
-    const editItem = [...canvas.querySelectorAll('.event-detail__menu-item')].find(
-      (node) => node.textContent === 'Edit details'
-    ) as HTMLButtonElement;
-    editItem.click();
-    expect(canvas.querySelector('.event-detail__panel')?.hasAttribute('hidden')).toBe(false);
+    const editPanel = [...canvas.querySelectorAll('.event-detail__panel')].find((panel) =>
+      panel.querySelector('[aria-label="All day"]')
+    ) as HTMLElement;
+    expect(editPanel.hasAttribute('hidden')).toBe(true);
+    const editBtn = [...canvas.querySelectorAll('button')].find((node) => node.textContent === 'Edit') as HTMLButtonElement;
+    editBtn.click();
+    expect(editPanel.hasAttribute('hidden')).toBe(false);
   });
 
-  it('labels the schedule section "Agenda" and splits People from Linked', async () => {
+  it('leads with the session and splits Who from what the session is for', async () => {
     const canvas = document.createElement('div');
     await renderEventDetailView(canvas, VALID_EVENT_ID);
-    expect(canvas.textContent).toMatch(/Agenda/);
+    expect(canvas.querySelector('.event-detail__session')).toBeTruthy();
+    expect(canvas.textContent).not.toMatch(/Agenda/);
+    expect(canvas.querySelectorAll('.event-detail h1')).toHaveLength(0);
     await vi.waitFor(() => {
       expect(canvas.textContent).toMatch(/Kate Simmons/);
     });
-    const peopleCard = [...canvas.querySelectorAll('.event-detail__card')].find((card) =>
-      card.querySelector('h2')?.textContent === 'People'
+    const whoCard = [...canvas.querySelectorAll('.event-detail__card')].find(
+      (card) => card.querySelector('h2')?.textContent === 'Who'
     ) as HTMLElement;
-    const linkedCard = [...canvas.querySelectorAll('.event-detail__card')].find((card) =>
-      card.querySelector('h2')?.textContent === 'Linked'
+    const purposeCard = [...canvas.querySelectorAll('.event-detail__card')].find(
+      (card) => card.querySelector('h2')?.textContent === 'This session is for'
     ) as HTMLElement;
-    expect(peopleCard.textContent).toMatch(/Kate Simmons/);
-    expect(peopleCard.textContent).not.toMatch(/Warlight Education/);
-    expect(linkedCard.textContent).toMatch(/Warlight Education/);
-    expect(linkedCard.textContent).not.toMatch(/Kate Simmons/);
+    expect(whoCard.textContent).toMatch(/Kate Simmons/);
+    expect(whoCard.textContent).not.toMatch(/Warlight Education/);
+    expect(purposeCard.textContent).toMatch(/Warlight Education/);
+    expect(purposeCard.textContent).not.toMatch(/Kate Simmons/);
   });
 
-  it('marks the event complete from the options menu', async () => {
+  it('marks the event complete from the toolbar', async () => {
     const canvas = document.createElement('div');
     await renderEventDetailView(canvas, VALID_EVENT_ID);
-    const menuBtn = canvas.querySelector('.event-detail__menu-btn') as HTMLButtonElement;
-    menuBtn.click();
-    const completeItem = [...canvas.querySelectorAll('.event-detail__menu-item')].find(
+    const completeBtn = [...canvas.querySelectorAll('button')].find(
       (node) => node.textContent === 'Mark complete'
     ) as HTMLButtonElement;
-    completeItem.click();
+    completeBtn.click();
     await vi.waitFor(() => {
+      expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes('action=complete'))).toBe(true);
       expect(canvas.textContent).toMatch(/Completed/);
     });
   });
+
 });

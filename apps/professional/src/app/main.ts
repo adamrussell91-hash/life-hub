@@ -7,6 +7,7 @@ import '../../design-kit/entity-links.css';
 import '../../design-kit/relationship-timeline.css';
 import '../../design-kit/filters.css';
 import '../../design-kit/person-brief.css';
+import '../../design-kit/view-on-map.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -161,6 +162,15 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Events', title });
+        },
+        onHeaderReady: (header) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, {
+            eyebrow: 'Events',
+            title: header.title,
+            supporting: header.supporting,
+            actions: header.actions
+          });
         },
         isCurrent: () => generation === routeGeneration
       });

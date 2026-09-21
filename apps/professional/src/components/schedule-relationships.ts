@@ -170,22 +170,24 @@ export function mountTaskLinkPanel(options: {
     }
   });
 
-  const retry = el('button', 'btn btn--primary', 'Retry incomplete Task link') as HTMLButtonElement;
-  retry.type = 'button';
-  retry.hidden = !options.incompleteOperationId || !options.onRetry;
-  retry.addEventListener('click', async () => {
-    if (!options.incompleteOperationId || !options.onRetry) return;
-    retry.disabled = true;
-    try {
-      await options.onRetry(options.incompleteOperationId);
-    } catch (err) {
-      status.hidden = false;
-      status.textContent = err instanceof Error ? err.message : 'Retry failed.';
-      retry.disabled = false;
-    }
-  });
+  root.append(mode, title, taskInput, picker.root, chipsHost, submit, status);
 
-  root.append(mode, title, taskInput, picker.root, chipsHost, submit, retry, status);
+  if (options.incompleteOperationId && options.onRetry) {
+    const retry = el('button', 'btn btn--primary', 'Retry incomplete Task link') as HTMLButtonElement;
+    retry.type = 'button';
+    retry.addEventListener('click', async () => {
+      if (!options.incompleteOperationId || !options.onRetry) return;
+      retry.disabled = true;
+      try {
+        await options.onRetry(options.incompleteOperationId);
+      } catch (err) {
+        status.hidden = false;
+        status.textContent = err instanceof Error ? err.message : 'Retry failed.';
+        retry.disabled = false;
+      }
+    });
+    root.append(retry);
+  }
   options.host.append(root);
   return { root };
 }
