@@ -235,6 +235,60 @@ describe('renderSomedayWheelView', () => {
     expect(canvas.querySelectorAll('.someday-wheel__star--unlit').length).toBeGreaterThan(0);
     expect(canvas.querySelector('.someday-wheel__star--lit')).toBeTruthy();
   });
+
+  it('does not repeat the Life coverage title in the canvas', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    const canvas = document.createElement('div');
+    await renderSomedayWheelView(canvas);
+    expect(canvas.querySelector('.someday-wheel__title')).toBeNull();
+    expect(canvas.querySelector('h2.someday-wheel__title')).toBeNull();
+    expect(canvas.querySelector('.someday-back-link')).toBeTruthy();
+  });
+
+  it('opens an area from a star click and lists the dreams parked there', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({ id: '1', title: 'Sail around Ireland', life_area: 'explore', maturity: 'set' }),
+      task({ id: '2', title: 'Learn Portuguese', life_area: 'explore', maturity: 'new' })
+    ]);
+
+    const canvas = document.createElement('div');
+    await renderSomedayWheelView(canvas);
+
+    const explore = canvas.querySelector<SVGGElement>('.someday-wheel__star[data-area="explore"]');
+    expect(explore?.getAttribute('role')).toBe('button');
+    explore!.dispatchEvent(new Event('click', { bubbles: true }));
+
+    expect(canvas.querySelector('.someday-wheel__detail-title')?.textContent).toBe('Explore · 2 dreams');
+    const dreams = [...canvas.querySelectorAll<HTMLAnchorElement>('.someday-wheel__dream')];
+    expect(dreams.map((link) => link.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('Sail around Ireland'), expect.stringContaining('Learn Portuguese')])
+    );
+    expect(dreams.find((link) => link.textContent?.includes('Sail around Ireland'))?.getAttribute('href')).toBe(
+      '#/someday/odyssey/1'
+    );
+  });
+
+  it('opens an unlit area from a row click', async () => {
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({ id: '1', title: 'Sail around Ireland', life_area: 'explore', maturity: 'set' })
+    ]);
+
+    const canvas = document.createElement('div');
+    await renderSomedayWheelView(canvas);
+
+    const healthRow = [...canvas.querySelectorAll<HTMLButtonElement>('.someday-wheel__row')].find((row) =>
+      row.textContent?.includes('Health')
+    );
+    expect(healthRow?.type).toBe('button');
+    healthRow!.dispatchEvent(new Event('click', { bubbles: true }));
+
+    expect(canvas.querySelector('.someday-wheel__detail-empty')?.textContent).toBe(
+      'Nothing parked in Health yet.'
+    );
+    expect(canvas.querySelector<HTMLAnchorElement>('.someday-wheel__detail a')?.getAttribute('href')).toBe(
+      '#/someday'
+    );
+  });
 });
 
 describe('renderSomedayOdysseyView', () => {

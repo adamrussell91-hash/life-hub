@@ -26,6 +26,31 @@ export const HORIZON_TARGETS: Array<{ id: 'area' | 'goal' | 'project'; label: st
   { id: 'project', label: 'Project' }
 ];
 
+/** Organic constellation seats — spaced so cores and labels do not collide. */
+export const LIFE_COVERAGE_VIEWBOX = { width: 1000, height: 560 } as const;
+
+export type LifeCoverageSeat = { x: number; y: number; labelDy: number };
+
+export const LIFE_COVERAGE_SEATS: Record<string, LifeCoverageSeat> = {
+  career: { x: 168, y: 118, labelDy: -38 },
+  explore: { x: 830, y: 128, labelDy: -38 },
+  health: { x: 390, y: 200, labelDy: 42 },
+  learn: { x: 155, y: 328, labelDy: 42 },
+  create: { x: 508, y: 318, labelDy: 42 },
+  money: { x: 848, y: 338, labelDy: 42 },
+  love: { x: 278, y: 478, labelDy: 42 },
+  friends: { x: 708, y: 488, labelDy: 42 }
+};
+
+/** Extra gap between cores so a label cannot sit on a neighbour. */
+export const LIFE_COVERAGE_LABEL_CLEARANCE = 36;
+
+/** Core / unlit-ring radius — size from count, capped so neighbours stay clear. */
+export function lifeCoverageStarRadius(count: number): number {
+  if (count <= 0) return 18;
+  return Math.min(28, 8 + count * 1.1);
+}
+
 /** Brightness weight for the Life coverage constellation — size still comes from count alone. */
 export function maturityWeight(maturity: Task['maturity']): number {
   switch (maturity) {

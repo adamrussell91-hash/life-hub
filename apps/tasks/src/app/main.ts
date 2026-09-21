@@ -256,7 +256,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       renderPrimaryNav(shell.railNav, 'someday');
       renderPageHeader(shell, {
         eyebrow: 'Plan',
-        title: somedaySub.kind === 'wheel' ? 'Life coverage' : 'Odyssey mode'
+        title: somedaySub.kind === 'wheel' ? 'Life coverage' : 'Odyssey mode',
+        supporting:
+          somedaySub.kind === 'wheel'
+            ? "Where your someday dreams cluster — and where they don't."
+            : undefined
       });
       clare.sync('someday');
       try {
