@@ -3,6 +3,7 @@ import katex from 'katex';
 import { getApiBaseUrl } from '@/api/config';
 import { buildChartSvg, buildChartTableRows } from '@/blocks/chart-svg';
 import { mountGraphMaker } from '@/blocks/graph-maker/mount';
+import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import type { CollectionLink } from '@/blocks/collection-resolve';
 import { buildHtmlAppSrcdoc } from '@/blocks/html-app-srcdoc';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
@@ -1976,6 +1977,44 @@ export function renderDiagramBlock(
   return wrapBlock(root, block, mode);
 }
 
+export function renderWhiteboardBlock(
+  block: Extract<Block, { block_type: 'whiteboard' }>,
+  mode: RenderMode
+): HTMLElement {
+  if (mode === 'print') {
+    return wrapBlock(
+      renderPrintFallback({
+        label: 'Interactive whiteboard',
+        title: block.content.title
+      }),
+      block,
+      mode
+    );
+  }
+
+  const root = document.createElement('figure');
+  root.className = 'block-whiteboard';
+
+  if (block.content.title?.trim()) {
+    const title = document.createElement('figcaption');
+    title.className = 'block-whiteboard__title';
+    title.textContent = block.content.title;
+    root.append(title);
+  }
+
+  const surface = document.createElement('div');
+  surface.className = 'block-whiteboard__surface';
+  surface.style.height = `${block.content.height_px ?? 640}px`;
+  root.append(surface);
+
+  void mountHubWhiteboard(surface, block, {
+    readOnly: true,
+    published: mode === 'student'
+  });
+
+  return wrapBlock(root, block, mode);
+}
+
 export function renderMindMapBlock(
   block: Extract<Block, { block_type: 'mind_map' }>,
   mode: RenderMode
@@ -2103,6 +2142,8 @@ export function renderBlock(
       return renderMindMapBlock(block, mode);
     case 'concept_map':
       return renderConceptMapBlock(block, mode);
+    case 'whiteboard':
+      return renderWhiteboardBlock(block, mode);
     }
   } catch {
     const fallback = document.createElement('p');
