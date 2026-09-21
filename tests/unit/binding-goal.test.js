@@ -27,8 +27,9 @@ test('body fat outside the band is binding and is not treated as a lift plan', (
   });
 
   assert.match(goal.verdict, /^Body fat is binding/);
+  assert.equal(goal.bindingId, 'fat');
   assert.match(goal.verdict, /serves the fat band, not the 31 October lifts/);
-  assert.match(goal.rows.find(row => row.id === 'fat').detail, /14% on 1 Aug 2026, 4 points above 10/);
+  assert.match(goal.rows.find(row => row.id === 'fat').detail, /14% on 01\/08\/26, 4 points above 10/);
   assert.match(goal.rows.find(row => row.id === 'weight').detail, /inside 78–82 kg/);
   assert.match(goal.rows.find(row => row.id === 'ratio').detail, /Frozen until the next tape/);
   assert.match(goal.rows.find(row => row.id === 'lift').detail, /short of 65/);
@@ -44,6 +45,7 @@ test('in-band weight and fat leave shoulder:waist binding', () => {
   });
 
   assert.match(goal.verdict, /^Shoulder:waist is binding/);
+  assert.equal(goal.bindingId, 'ratio');
   assert.doesNotMatch(goal.verdict, /31 October/);
   assert.equal(goal.rows.find(row => row.id === 'ratio').status, 'outside');
   assert.equal(goal.rows.find(row => row.id === 'lift').status, 'unread');
@@ -69,6 +71,7 @@ test('a full set of in-band readings is not called binding', () => {
   });
 
   assert.equal(goal.verdict, 'All four goals are inside their targets.');
+  assert.equal(goal.bindingId, null);
   assert.ok(goal.rows.every(row => row.status === 'inside'));
 });
 
@@ -82,6 +85,7 @@ test('weight outside the band is binding when body fat is already inside', () =>
   });
 
   assert.match(goal.verdict, /^Weight is binding/);
+  assert.equal(goal.bindingId, 'weight');
   assert.doesNotMatch(goal.verdict, /31 October/);
 });
 
@@ -97,5 +101,6 @@ test('missing readings stay missing and a future weigh-in is ignored', () => {
   });
 
   assert.match(goal.verdict, /^No binding goal yet/);
+  assert.equal(goal.bindingId, null);
   assert.ok(goal.rows.every(row => row.status === 'unread'));
 });

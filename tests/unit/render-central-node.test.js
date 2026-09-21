@@ -357,22 +357,41 @@ test('central node board markup packs tiles and unmounts the protein line and he
   assert.ok(week.indexOf('central-node-week-horizon') < week.indexOf('data-central-node="this-week"'));
 });
 
-test('renderCentralNode paints the binding-goal verdict and not a date', () => {
+test('renderCentralNode paints a goal deck and opens the owning section', () => {
   const root = fakeCentralNodeRoot();
+  const opened = [];
   renderCentralNode(root, baseModel({
     bindingGoal: {
+      bindingId: 'fat',
       verdict: 'Body fat is binding. It is outside 8–10%, so the recomp box is not met.',
       rows: [
-        { id: 'fat', label: 'Body fat', status: 'outside', detail: '14% on 1 Aug 2026, 4 points above 10.' },
+        { id: 'weight', label: 'Weight', status: 'inside', detail: '80 kg on 01/08/26, inside 78–82 kg.' },
+        { id: 'fat', label: 'Body fat', status: 'outside', detail: '14% on 01/08/26, 4 points above 10.' },
         { id: 'lift', label: 'Lifts', status: 'unread', detail: 'No completed load on Bar Press, curl, or row.' }
       ]
     }
-  }));
+  }), {
+    onOpenSection: name => opened.push(name)
+  });
   const host = root.querySelector('[data-central-node="binding-goal"]');
+  const nodes = [];
+  (function walk(node) {
+    nodes.push(node);
+    for (const child of node?.children ?? []) walk(child);
+  })(host);
+  const buttons = nodes.filter(node => node.tagName === 'button');
+  const openBody = buttons.find(node => node.textContent === 'Open Body');
+  const openFitness = buttons.find(node => node.textContent === 'Open Fitness');
   assert.match(host.textContent, /Body fat is binding/);
-  assert.match(host.textContent, /4 points above 10/);
-  assert.doesNotMatch(host.textContent, /arrive|forecast date|weeks/);
-  assert.equal(host.querySelector('[data-status="unread"]')?.textContent.includes('No completed load'), true);
+  assert.match(host.textContent, /1 of 3 · Body fat · binding/);
+  assert.ok(openBody);
+  assert.ok(openFitness);
+  openBody.click();
+  openFitness.click();
+  assert.deepEqual(opened, ['body', 'fitness']);
+  const second = buttons.find(node => node.getAttribute?.('aria-label') === 'Goal gaps 2 of 3');
+  second.click();
+  assert.match(host.textContent, /2 of 3 · Weight/);
 });
 
 test('renderCentralNode shows inverse links and URL watch statuses', () => {

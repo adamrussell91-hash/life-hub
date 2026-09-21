@@ -1,11 +1,11 @@
 import { buildFitnessGoals } from './fitness-charts-model.js';
+import { formatDisplayDate } from '../core/time.js';
 
 // Standing recomp box from Constraints. Shoulder:waist is physique-target.yml.
 // These are gaps to a band, not a time-to-goal. A date needs a slope this data does not have.
 const WEIGHT = { min: 78, max: 82 };
 const FAT = { min: 8, max: 10 };
 const SHOULDER_WAIST = 1.6;
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function records(events, date) {
   return (events ?? [])
@@ -27,13 +27,6 @@ function roundTo(value, places) {
   return Math.round(value * factor) / factor;
 }
 
-function shortDate(iso) {
-  const [year, month, day] = String(iso).split('-');
-  const index = Number(month) - 1;
-  if (!year || !MONTHS[index] || !day) return iso;
-  return `${Number(day)} ${MONTHS[index]} ${year}`;
-}
-
 function bandStatus(value, min, max) {
   if (value < min) return { status: 'outside', gap: roundTo(min - value, 1), edge: 'below', bound: min };
   if (value > max) return { status: 'outside', gap: roundTo(value - max, 1), edge: 'above', bound: max };
@@ -52,8 +45,8 @@ function weightRow(list) {
   }
   const band = bandStatus(record.weight_kg, WEIGHT.min, WEIGHT.max);
   const detail = band.status === 'inside'
-    ? `${record.weight_kg} kg on ${shortDate(record.date)}, inside ${WEIGHT.min}–${WEIGHT.max} kg.`
-    : `${record.weight_kg} kg on ${shortDate(record.date)}, ${band.gap} kg ${band.edge} ${band.bound}.`;
+    ? `${record.weight_kg} kg on ${formatDisplayDate(record.date)}, inside ${WEIGHT.min}–${WEIGHT.max} kg.`
+    : `${record.weight_kg} kg on ${formatDisplayDate(record.date)}, ${band.gap} kg ${band.edge} ${band.bound}.`;
   return { id: 'weight', label: 'Weight', status: band.status, detail };
 }
 
@@ -67,8 +60,8 @@ function fatRow(list) {
   }
   const band = bandStatus(record.body_fat_pct, FAT.min, FAT.max);
   const detail = band.status === 'inside'
-    ? `${record.body_fat_pct}% on ${shortDate(record.date)}, inside ${FAT.min}–${FAT.max}%.`
-    : `${record.body_fat_pct}% on ${shortDate(record.date)}, ${band.gap} points ${band.edge} ${band.bound}.`;
+    ? `${record.body_fat_pct}% on ${formatDisplayDate(record.date)}, inside ${FAT.min}–${FAT.max}%.`
+    : `${record.body_fat_pct}% on ${formatDisplayDate(record.date)}, ${band.gap} points ${band.edge} ${band.bound}.`;
   return { id: 'fat', label: 'Body fat', status: band.status, detail };
 }
 
@@ -95,7 +88,7 @@ function ratioRow(list) {
     id: 'ratio',
     label: 'Shoulder:waist',
     status,
-    detail: `${ratio} on ${shortDate(record.date)}, ${place}. Frozen until the next tape.`
+    detail: `${ratio} on ${formatDisplayDate(record.date)}, ${place}. Frozen until the next tape.`
   };
 }
 
@@ -120,18 +113,18 @@ function liftRow(events, date) {
       id: 'lift',
       label: furthest.label,
       status: 'outside',
-      detail: `${furthest.current} kg on ${shortDate(furthest.date)}, ${furthest.remaining} kg short of ${furthest.target}.${missingNote}`
+      detail: `${furthest.current} kg on ${formatDisplayDate(furthest.date)}, ${furthest.remaining} kg short of ${furthest.target}.${missingNote}`
     };
   }
   return {
     id: 'lift',
     label: furthest.label,
     status: 'inside',
-    detail: `${furthest.current} kg on ${shortDate(furthest.date)}, on the ${furthest.target} kg target.${missingNote}`
+    detail: `${furthest.current} kg on ${formatDisplayDate(furthest.date)}, on the ${furthest.target} kg target.${missingNote}`
   };
 }
 
-function verdict(rows) {
+function judge(rows) {
   const fat = rows.find(row => row.id === 'fat');
   const weight = rows.find(row => row.id === 'weight');
   const ratio = rows.find(row => row.id === 'ratio');
@@ -142,25 +135,39 @@ function verdict(rows) {
     : '';
 
   if (fat.status === 'outside') {
-    return `Body fat is binding. It is outside 8–10%, so the recomp box is not met.${conflict}`;
+    return {
+      bindingId: 'fat',
+      verdict: `Body fat is binding. It is outside 8–10%, so the recomp box is not met.${conflict}`
+    };
   }
   if (weight.status === 'outside') {
-    return 'Weight is binding. Body fat is not the open gap, and weight is outside 78–82 kg.';
+    return {
+      bindingId: 'weight',
+      verdict: 'Weight is binding. Body fat is not the open gap, and weight is outside 78–82 kg.'
+    };
   }
   if (ratio.status === 'outside') {
-    return 'Shoulder:waist is binding. Weight and body fat are in band, and the ratio is still short of 1.6.';
+    return {
+      bindingId: 'ratio',
+      verdict: 'Shoulder:waist is binding. Weight and body fat are in band, and the ratio is still short of 1.6.'
+    };
   }
   if (lift.status === 'outside') {
-    return `${lift.label} is binding. The physique bands are met, and this is the furthest lift that has a completed load.`;
+    return {
+      bindingId: 'lift',
+      verdict: `${lift.label} is binding. The physique bands are met, and this is the furthest lift that has a completed load.`
+    };
   }
   const missing = rows.filter(row => row.status === 'unread').map(row => row.label);
-  if (missing.length) return `No binding goal yet. Missing: ${missing.join(', ')}.`;
-  return 'All four goals are inside their targets.';
+  if (missing.length) {
+    return { bindingId: null, verdict: `No binding goal yet. Missing: ${missing.join(', ')}.` };
+  }
+  return { bindingId: null, verdict: 'All four goals are inside their targets.' };
 }
 
 export function buildBindingGoal({ events, date } = {}) {
   if (!date) throw new RangeError('Binding goal date is unavailable');
   const list = records(events, date);
   const rows = [weightRow(list), fatRow(list), ratioRow(list), liftRow(events, date)];
-  return { rows, verdict: verdict(rows) };
+  return { rows, ...judge(rows) };
 }

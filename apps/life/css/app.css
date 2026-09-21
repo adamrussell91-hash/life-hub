@@ -4756,8 +4756,7 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .cn-watchlist-heat__age { color: var(--muted); font-size: var(--text-xs); }
 .cn-binding__verdict { margin: 0 0 8px; color: var(--marine); font-weight: 600; }
-.cn-binding__list { margin: 0; padding-left: 1.1rem; }
-.cn-binding__list li[data-status="unread"] { color: var(--muted); }
+#cn-tile-binding .hub-card-swipe { margin-top: 4px; }
 .constraints-card summary .cn-tile__question { display: block; }
 .mind-factor-list {
   display: flex;

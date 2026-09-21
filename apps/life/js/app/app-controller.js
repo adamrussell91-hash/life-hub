@@ -1481,7 +1481,10 @@ export function createAppController(dependencies) {
 
   function renderCentralNodeSection() {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
-    renderCentralNode(root, buildCentralNodeModel(latestResult), { quiet: syncQuiet });
+    renderCentralNode(root, buildCentralNodeModel(latestResult), {
+      quiet: syncQuiet,
+      onOpenSection: showSection
+    });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
     (packCnBoardFn ?? packCnBoard)(root);
     const button = root.querySelector('#central-node-chat-button');
@@ -1503,7 +1506,10 @@ export function createAppController(dependencies) {
         if (!latestResult) return;
         latestResult = { ...latestResult, inverseLinks, urlWatches };
         if (currentSection !== 'central-node' || !buildCentralNodeModel || !renderCentralNode) return;
-        renderCentralNode(root, buildCentralNodeModel(latestResult), { quiet: syncQuiet });
+        renderCentralNode(root, buildCentralNodeModel(latestResult), {
+      quiet: syncQuiet,
+      onOpenSection: showSection
+    });
         (packCnBoardFn ?? packCnBoard)(root);
       })
       .finally(() => {
