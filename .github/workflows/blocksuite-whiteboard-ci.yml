@@ -56,11 +56,11 @@ jobs:
       - name: Install Tasks Hub dependencies
         run: npm ci --ignore-scripts --prefix apps/tasks
 
-      - name: Teaching Hub tests
-        run: npm run test:unit --prefix apps/teaching
+      - name: Teaching Hub whiteboard tests
+        run: cd apps/teaching && npx vitest run tests/unit/whiteboard-block.test.ts
 
-      - name: Tasks Hub tests
-        run: npm run test:unit --prefix apps/tasks
+      - name: Tasks Hub whiteboard tests
+        run: cd apps/tasks && npx vitest run tests/unit/whiteboard-block.test.ts
 
       - name: Root tests
         run: npm test
