@@ -178,22 +178,30 @@ function hasLoadedResistance(record) {
 export function buildTrainingSupport(items, asOf, days, targetsConfig, libraryByName, proteinGDay, weightKg) {
   const summary = summariseTrainingBehaviour(items, { asOf, days }, { targetsConfig, libraryByName });
   const sessions = Number(summary.sessions_per_week ?? 0);
-  const sets = Number(summary.loaded_sets_per_week ?? 0);
+  const weeks = days / 7;
+  const regions = summary.loaded_sets_by_muscle_group ?? {};
+  const upperBodySets = ['chest', 'shoulders', 'arms', 'back', 'full_body']
+    .reduce((sum, key) => sum + Number(regions[key] ?? 0), 0);
+  const upperBodySetsPerWeek = weeks > 0 ? upperBodySets / weeks : 0;
   const proteinPerKg = weightKg > 0 && proteinGDay != null ? proteinGDay / weightKg : null;
-  const sufficient = sessions >= 2 && sets >= 10 && proteinPerKg != null && proteinPerKg >= 1.62;
+  const sufficient = sessions >= 2
+    && upperBodySetsPerWeek >= 10
+    && proteinPerKg != null
+    && proteinPerKg >= 1.62;
   return {
     ...summary,
+    upper_body_loaded_sets_per_week: round(upperBodySetsPerWeek, 1),
     protein_g_kg_day: round(proteinPerKg, 2),
     thresholds: {
       resistance_sessions_week: 2,
-      loaded_sets_week: 10,
+      upper_body_loaded_sets_week_proxy: 10,
       protein_g_kg_day: 1.62
     },
     lean_preservation_supported: sufficient,
     interpretation: sufficient
       ? 'Meets the forecast scenario gate for lean preservation.'
       : 'Does not meet the forecast scenario gate; Forbes/Hall partition is used.',
-    note: 'The gate combines established population-level resistance/protein evidence. It is a scenario assumption, not a guarantee of individual FFM preservation.'
+    note: 'The resistance threshold is a practical upper-body hypertrophy proxy informed by ACSM volume evidence, not a claim that 10 aggregate sets is an exact biological cutoff. The preservation state remains a scenario assumption, not a guarantee.'
   };
 }
 
