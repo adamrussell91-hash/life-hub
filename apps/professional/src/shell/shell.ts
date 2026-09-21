@@ -221,6 +221,8 @@ export interface PageHeaderConfig {
   title: string;
   supporting?: string;
   actions?: HTMLElement | null;
+  /** Person profile: quieter phone title, utilities stay on the eyebrow row. */
+  person?: boolean;
 }
 
 function createTitleRow(title: HTMLElement): HTMLElement {
@@ -232,6 +234,7 @@ function createTitleRow(title: HTMLElement): HTMLElement {
 
 /** Kit page header: uppercase eyebrow → h1 → optional supporting → actions. */
 export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): void {
+  refs.pageHeader.classList.toggle('page-header--person', config.person === true);
   refs.pageHeader.replaceChildren();
   const copy = document.createElement('div');
   copy.className = 'page-header__copy';

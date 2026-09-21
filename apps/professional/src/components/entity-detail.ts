@@ -55,7 +55,12 @@ function el<K extends keyof HTMLElementTagNameMap>(
  * and opens the next one with the new role (server-side `changeRole`), so
  * the prior role stays queryable history rather than being overwritten.
  */
-function renderRoleEditor(item: HTMLElement, entry: RelationshipEntry, onChanged: () => void): void {
+function renderRoleEditor(
+  item: HTMLElement,
+  entry: RelationshipEntry,
+  onChanged: () => void,
+  options: { leadingSpace?: boolean } = {}
+): void {
   const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? 'No role set');
 
   const editButton = document.createElement('button');
@@ -123,7 +128,73 @@ function renderRoleEditor(item: HTMLElement, entry: RelationshipEntry, onChanged
   });
 
   form.append(label, input, save, cancel, status);
+  if (options.leadingSpace !== false) item.append(document.createTextNode(' '));
   item.append(roleLine, editButton, form);
+}
+
+const RELATIONSHIP_KICKERS: Record<string, string> = {
+  employee_at: 'Employee',
+  member_of: 'Member',
+  works_at: 'Works at',
+  studied_at: 'Studied at',
+  professional_relationship: 'Relationship',
+  collaborator: 'Collaborator'
+};
+
+function relationshipKicker(type: string): string {
+  return RELATIONSHIP_KICKERS[type] ?? type.replaceAll('_', ' ').replace(/^\w/, (char) => char.toUpperCase());
+}
+
+/**
+ * Phone summary (option B): one glass card above the tabs. The desktop
+ * overview list stays in the tab; CSS shows only one of them per width.
+ */
+export function renderPersonSummaryCard(
+  host: HTMLElement,
+  overview: EntityOverview,
+  briefHref: string,
+  onRoleChanged: () => void
+): void {
+  const card = el('section', 'person-card');
+  card.setAttribute('aria-label', 'Current relationships');
+
+  const relationships = overview.current_relationships;
+  if (!relationships.length) {
+    card.append(el('p', 'person-card__empty', 'No current relationships.'));
+  } else {
+    for (const entry of relationships) {
+      const block = el('div', 'person-card__rel');
+      const human = entry.link.metadata?.human_label;
+      const kicker =
+        entry.link.relationship_type === 'professional_relationship' && typeof human === 'string' && human
+          ? human
+          : relationshipKicker(entry.link.relationship_type);
+      block.append(el('p', 'person-card__kicker', kicker));
+      block.append(el('p', 'person-card__org', entry.endpoint.display_label));
+      const roleLine = el('div', 'person-card__roleline');
+      if (entry.link.temporal_mode === 'period' && entry.link.status === 'current') {
+        renderRoleEditor(roleLine, entry, onRoleChanged, { leadingSpace: false });
+      } else if (entry.link.role) {
+        roleLine.append(el('span', 'entity-detail__relationship-role', entry.link.role));
+      }
+      if (roleLine.childNodes.length) block.append(roleLine);
+      card.append(block);
+    }
+  }
+
+  const status = overview.entity.lifecycle_status;
+  const chip = el('p', 'person-card__status', status ? status.charAt(0).toUpperCase() + status.slice(1) : '');
+  chip.dataset.status = status;
+  card.append(chip);
+
+  const brief = document.createElement('a');
+  brief.className = 'person-card__brief';
+  brief.href = briefHref;
+  brief.append(document.createTextNode('Open Person Brief'), el('span', 'person-card__brief-arrow', '→'));
+  brief.querySelector('span')?.setAttribute('aria-hidden', 'true');
+  card.append(brief);
+
+  host.append(card);
 }
 
 export function renderRelationshipList(
@@ -143,7 +214,11 @@ export function renderRelationshipList(
     const item = document.createElement('li');
     const label = el('span', 'entity-detail__relationship-label', entry.link.relationship_type);
     const endpoint = el('span', 'entity-detail__relationship-endpoint', entry.endpoint.display_label);
-    item.append(label, document.createTextNode(' · '), endpoint);
+    // Keep type and organisation on one inline run so the separator stays
+    // attached. The role is a sibling so it can wrap instead of gluing on.
+    const identity = el('span', 'entity-detail__relationship-identity');
+    identity.append(label, document.createTextNode(' · '), endpoint);
+    item.append(identity);
     // Role editing only makes sense for a period relationship that is
     // still current — a point-in-time or timeless link, or an already-
     // ended period, has no "current role" to change.
