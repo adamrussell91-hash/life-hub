@@ -92,8 +92,8 @@ function ratioRow(list) {
   };
 }
 
-function liftRow(events, date) {
-  const goals = buildFitnessGoals({ events, date }).filter(goal => goal.kind === 'e1rm');
+function liftRow(events, date, targetsConfig) {
+  const goals = buildFitnessGoals({ events, date, targetsConfig }).filter(goal => goal.kind === 'e1rm');
   const measured = goals.filter(goal => goal.current != null);
   if (!measured.length) {
     return {
@@ -165,9 +165,9 @@ function judge(rows) {
   return { bindingId: null, verdict: 'All four goals are inside their targets.' };
 }
 
-export function buildBindingGoal({ events, date } = {}) {
+export function buildBindingGoal({ events, date, targetsConfig = null } = {}) {
   if (!date) throw new RangeError('Binding goal date is unavailable');
   const list = records(events, date);
-  const rows = [weightRow(list), fatRow(list), ratioRow(list), liftRow(events, date)];
+  const rows = [weightRow(list), fatRow(list), ratioRow(list), liftRow(events, date, targetsConfig)];
   return { rows, ...judge(rows) };
 }

@@ -1163,7 +1163,8 @@ export function createChatHandler({
             // must not grow, but the binding-goal lifts need those completed sets.
             centralNodeModel.bindingGoal = buildBindingGoal({
               events: [...cnEvents, ...fitnessRecords.map(record => ({ record }))],
-              date: today
+              date: today,
+              targetsConfig: TARGETS_CONFIG
             });
             hammondCnSummary = formatCentralNodeModelForPrompt(centralNodeModel);
             hammondDiaryDigest = hammondDiaryDigestForTurn({
