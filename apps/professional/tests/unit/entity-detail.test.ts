@@ -518,6 +518,12 @@ describe('renderPersonPage', () => {
     expect(editButtons.length).toBe(1);
     expect(editButtons[0].getAttribute('aria-label')).toBe('Edit role for Example University');
     expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Gifted Education Teacher');
+    const row = editButtons[0].closest('li');
+    expect(row?.querySelector('.entity-detail__relationship-identity')?.textContent).toBe(
+      'employee_at · Example University'
+    );
+    expect(row?.textContent).toMatch(/Example University Gifted Education Teacher/);
+    expect(row?.textContent).not.toMatch(/UniversityGifted/);
   });
 
   it('saving a role edit calls change_role and reloads the overview', async () => {

@@ -210,16 +210,48 @@
   gap: var(--space-2);
 }
 
+.entity-detail__relationship-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.entity-detail__relationship-identity {
+  min-width: 0;
+}
+
 .entity-detail__relationship-label {
   font-weight: var(--weight-medium);
 }
 
-.entity-detail__relationship-endpoint {
+.entity-detail__relationship-endpoint,
+.entity-detail__relationship-role {
   color: var(--muted);
 }
 
-.entity-detail__tabs {
+/* Seven section tabs do not fit a phone (or a narrow canvas). Scroll the
+   strip instead of shrinking labels until "Shared Work" wraps and
+   "Observations" clips. */
+.entity-detail__tabs.hub-pills {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-bottom: var(--space-5);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.entity-detail__tabs.hub-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.entity-detail__tabs.hub-pills > .hub-pills__btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .entity-detail__tab-content {
@@ -1622,12 +1654,38 @@
   .page-header {
     flex-wrap: wrap;
     align-items: flex-start;
+    gap: var(--space-2);
+    margin-bottom: var(--space-3);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .page-header__copy {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Desktop page titles are --text-2xl (42px). On a phone that size
+     eats the first screen. --text-xl is the small page-title step. */
+  .page-header__title {
+    font-size: var(--text-xl);
+    overflow-wrap: anywhere;
+  }
+
+  .page-header__eyebrow {
+    font-size: var(--text-2xs);
+    margin-bottom: var(--space-1);
   }
 
   .page-header__actions {
     flex-wrap: wrap;
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .entity-detail__relationship-identity {
+    flex-basis: 100%;
   }
 
   .event-detail__session,

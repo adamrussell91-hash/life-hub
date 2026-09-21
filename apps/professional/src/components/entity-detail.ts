@@ -123,7 +123,7 @@ function renderRoleEditor(item: HTMLElement, entry: RelationshipEntry, onChanged
   });
 
   form.append(label, input, save, cancel, status);
-  item.append(roleLine, editButton, form);
+  item.append(document.createTextNode(' '), roleLine, editButton, form);
 }
 
 export function renderRelationshipList(
@@ -143,7 +143,11 @@ export function renderRelationshipList(
     const item = document.createElement('li');
     const label = el('span', 'entity-detail__relationship-label', entry.link.relationship_type);
     const endpoint = el('span', 'entity-detail__relationship-endpoint', entry.endpoint.display_label);
-    item.append(label, document.createTextNode(' · '), endpoint);
+    // Keep type and organisation on one inline run so the separator stays
+    // attached. The role is a sibling so it can wrap instead of gluing on.
+    const identity = el('span', 'entity-detail__relationship-identity');
+    identity.append(label, document.createTextNode(' · '), endpoint);
+    item.append(identity);
     // Role editing only makes sense for a period relationship that is
     // still current — a point-in-time or timeless link, or an already-
     // ended period, has no "current role" to change.
