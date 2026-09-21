@@ -19,6 +19,7 @@ import {
   calendarHash,
   collectCalendarItems,
   collectPlanningMarkers,
+  bookedLoadMinutes,
   collectWorkBlockItems,
   dayTaskMinutes,
   filterCalendarItems,
@@ -41,7 +42,7 @@ import {
 } from '@/domain/calendar';
 import type { WorkBlock } from '@/schemas/work-block';
 import type { PlanningProfile } from '@/schemas/planning-profile';
-import { dayCapacity, protectedSpansForDate } from '@/domain/hammond-capacity';
+import { availableWindowMinutes, protectedSpansForDate } from '@/domain/hammond-capacity';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 import {
   blockStyle,
@@ -62,7 +63,7 @@ import { keyDateKindFromLabel } from '@/domain/excursion';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { materializeExcursionAdminTask } from '@/views/excursion-admin';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
-import { renderPressureStrips } from '@/views/pinch-strip';
+import { pinchLineLabel, renderPressureStrips } from '@/views/pinch-strip';
 import { requestToggleDone } from '@/views/dashboard';
 import { mountTaskCard } from '@/views/hub-cards';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
@@ -83,6 +84,28 @@ import {
 
 const MONTH_EVENT_LIMIT = 2;
 const WEEKDAY_HEADINGS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
+
+function hoursLabel(minutes: number): string {
+  return formatLoad(minutes) || '0h';
+}
+
+/** Remaining work-window hours after open tasks and work blocks on the visible range. */
+function liveCapacityText(
+  mode: CalendarMode,
+  dateKey: string,
+  days: Date[],
+  items: CalendarItem[],
+  profile: PlanningProfile | null
+): string {
+  const keys = mode === 'week' ? days.map(toDateKey) : [dateKey];
+  let available = 0;
+  let booked = 0;
+  for (const key of keys) {
+    available += availableWindowMinutes(key, profile, { skipFallbackWeekend: mode === 'week' });
+    booked += bookedLoadMinutes(itemsForDay(items, key));
+  }
+  return `${hoursLabel(Math.max(0, available - booked))} left · ${hoursLabel(booked)} booked`;
+}
 
 const sessionFilters: CalendarFilters = {
   domain: 'all',
@@ -723,22 +746,34 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
         })
       );
     }
-    canvas.append(filters.root);
+    const meta = el('div', 'calendar-meta');
+    meta.append(filters.root);
+    const capacity = el(
+      'p',
+      'hub-calendar__capacity',
+      liveCapacityText(session.mode, selectedDateKey!, days, items, planningProfile)
+    );
+    capacity.setAttribute(
+      'aria-label',
+      session.mode === 'week'
+        ? `Remaining capacity this week: ${capacity.textContent}`
+        : `Remaining capacity for ${formatDisplayDate(selectedDateKey!)}: ${capacity.textContent}`
+    );
+    meta.append(capacity);
 
-    const capacity = dayCapacity(selectedDateKey || toDateKey(today), planningProfile);
-    canvas.append(
+    const weekPinches = detectPinchPoints(tasks, today, { days: 7 });
+    meta.append(
       el(
         'p',
-        'hub-calendar__capacity',
-        `Capacity ${Math.round(capacity.available_minutes / 60)}h available (${capacity.work_source === 'profile' ? 'profile' : 'fallback 08:00–16:30'})`
+        weekPinches.length ? 'pinch-clear pinch-clear--alert' : 'pinch-clear',
+        pinchLineLabel(weekPinches.length)
       )
     );
+    canvas.append(meta);
 
-    if (session.mode === 'week') {
-      const pressure = el('div', 'pressure-host');
-      renderPressureStrips(pressure, tasks, today, () => void reload());
-      canvas.append(pressure);
-    }
+    const pressure = el('div', 'pressure-host');
+    renderPressureStrips(pressure, tasks, today, () => void reload(), { emptyClear: false });
+    if (pressure.childElementCount) canvas.append(pressure);
 
     if (!composeDraft.dateKey) composeDraft = { dateKey: selectedDateKey!, dueTime: composeDraft.dueTime };
 
@@ -1584,9 +1619,6 @@ function renderLocksWidget(
 ): HTMLElement {
   const card = el('section', 'hub-calendar__detail calendar-locks');
   card.append(el('h3', 'hub-calendar__detail-heading', "This week's locks"));
-  card.append(
-    el('p', 'hub-calendar__detail-empty', "Each day's single highest-priority dated task.")
-  );
   const list = el('div', 'calendar-locks__list');
   for (const day of days) {
     const lock = itemsForDay(items, day).find((item) => item.kind === 'task' && item.task);
@@ -1604,35 +1636,35 @@ function renderLocksWidget(
   return card;
 }
 
-/** GTD-style next actions: real backlog tasks (open/deferred, no due date), grouped by
- *  whatever tag they actually carry — there is no reserved "context" convention in this
- *  app, so this groups on real data rather than inventing a taxonomy. */
+/** Compact GTD next-action rows — same backlog as the full cards, without the card chrome. */
 function renderNextActionsWidget(tasks: Task[], openTask: (task: Task) => void): HTMLElement {
   const card = el('section', 'hub-calendar__detail calendar-next-actions');
   card.append(el('h3', 'hub-calendar__detail-heading', 'Next actions'));
   const backlog = backlogTasks(tasks);
   if (!backlog.length) {
-    card.append(
-      el('p', 'hub-calendar__detail-empty', 'Backlog is empty — everything has a date or is done.')
-    );
+    card.append(el('p', 'hub-calendar__detail-empty', 'Backlog is empty.'));
     return card;
   }
   const groups = new Map<string, Task[]>();
-  for (const task of backlog.slice(0, 12)) {
+  for (const task of backlog.slice(0, 8)) {
     const tag = task.tags[0] ?? 'No tag';
     if (!groups.has(tag)) groups.set(tag, []);
     groups.get(tag)!.push(task);
   }
-  const stack = el('div', 'task-stack');
+  const list = el('div', 'calendar-next-actions__list');
   for (const [tag, group] of groups) {
-    stack.append(el('p', 'calendar-next-actions__group', tag));
+    list.append(el('p', 'calendar-next-actions__group', tag));
     for (const task of group) {
-      mountTaskCard(stack, task, { onEdit: () => openTask(task) });
+      const row = el('button', 'calendar-next-action');
+      row.type = 'button';
+      row.append(el('span', 'calendar-next-action__title', task.title));
+      row.addEventListener('click', () => openTask(task));
+      list.append(row);
     }
   }
-  card.append(stack);
-  if (backlog.length > 12) {
-    const more = el('a', 'calendar-next-actions__more', `+${backlog.length - 12} more in Backlog →`);
+  card.append(list);
+  if (backlog.length > 8) {
+    const more = el('a', 'calendar-next-actions__more', `+${backlog.length - 8} more in Backlog →`);
     more.href = '#/backlog';
     card.append(more);
   }
@@ -1797,14 +1829,7 @@ function renderDeepHoursWidget(tasks: Task[], projects: Project[], days: Date[])
   const pct = Math.min(100, Math.round((hours / TARGET_HOURS) * 100));
 
   const card = el('section', 'hub-calendar__detail calendar-deep-hours');
-  card.append(el('h3', 'hub-calendar__detail-heading', 'Deep hours this week'));
-  card.append(
-    el(
-      'p',
-      'hub-calendar__detail-empty',
-      'Logged on tasks under deep-focus projects — target is a goal you set, not a measurement.'
-    )
-  );
+  card.append(el('h3', 'hub-calendar__detail-heading', 'Deep hours'));
   const row = el('div', 'calendar-deep-hours__row');
   const track = el('div', 'calendar-deep-hours__track');
   const fill = el('div', 'calendar-deep-hours__fill');

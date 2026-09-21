@@ -129,7 +129,7 @@ describe('calendar productivity layer', () => {
     expect(widget?.textContent).toContain('calls');
   });
 
-  it('opens the real task editor from a Next actions card menu, not a dead click', async () => {
+  it('opens the real task editor from a Next actions row, not a dead click', async () => {
     vi.mocked(tasksApi.listTasks).mockResolvedValue([
       task({ id: 'task_ctx', title: 'Ring the printer people', due_date: null, tags: ['calls'] })
     ]);
@@ -138,14 +138,11 @@ describe('calendar productivity layer', () => {
     const canvas = document.createElement('main');
     await renderWeekView(canvas);
 
-    const menuBtn = canvas.querySelector<HTMLButtonElement>(
-      'button[aria-label="Ring the printer people card menu"]'
+    const row = [...canvas.querySelectorAll<HTMLButtonElement>('.calendar-next-action')].find((btn) =>
+      btn.textContent?.includes('Ring the printer people')
     );
-    expect(menuBtn).toBeTruthy();
-    menuBtn!.click();
-    const editBtn = document.querySelector<HTMLButtonElement>('button[data-card-menu-item="edit"]');
-    expect(editBtn).toBeTruthy();
-    editBtn!.click();
+    expect(row).toBeTruthy();
+    row!.click();
 
     await vi.waitFor(() => {
       expect(canvas.querySelector('.task-editor')).not.toBeNull();
@@ -296,7 +293,14 @@ describe('calendar productivity layer', () => {
 
   it('omits the stall banner entirely when nothing is stalled, rather than showing an empty one', async () => {
     vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
-    vi.mocked(tasksApi.listProjects).mockResolvedValue([project({ id: 'proj_fresh', title: 'New project' })]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      project({
+        id: 'proj_fresh',
+        title: 'New project',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+    ]);
 
     location.hash = '#/month?date=2026-08-17';
     const canvas = document.createElement('main');
@@ -330,7 +334,6 @@ describe('calendar productivity layer', () => {
 
     const widget = canvas.querySelector('.calendar-deep-hours');
     expect(widget?.textContent).toContain('1.5h / 8h target');
-    expect(widget?.textContent).toContain('not a measurement');
   });
 
   it('shows the real Areas/Goals/Projects/Actions hierarchy with live counts and real routes', async () => {

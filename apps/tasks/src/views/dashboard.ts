@@ -13,7 +13,8 @@ import { parseDueTimeHours } from '@/domain/daily-dial';
 import { hoursToDueTime } from '@/domain/time-grid';
 import { tasksApi } from '@/services/client-api';
 import type { TaskTemplate, ProjectTemplate, ExcursionTemplate } from '@/schemas/templates';
-import { renderPressureStrips } from '@/views/pinch-strip';
+import { detectPinchPoints } from '@/domain/pinch';
+import { pinchLineLabel, renderPressureStrips } from '@/views/pinch-strip';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { errorMessage, renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
@@ -194,7 +195,17 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
         }
       }).el
     );
-    canvas.append(filters.root);
+    const meta = el('div', 'calendar-meta');
+    meta.append(filters.root);
+    const pinches = detectPinchPoints(tasks, today, { days: 7 });
+    meta.append(
+      el(
+        'p',
+        pinches.length ? 'pinch-clear pinch-clear--alert' : 'pinch-clear',
+        pinchLineLabel(pinches.length)
+      )
+    );
+    canvas.append(meta);
 
     const confirmHost = el('div', 'task-confirm');
     const dialHost = el('div', 'daily-dial-host');
@@ -236,8 +247,8 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
     canvas.append(clareLink);
 
     const pressure = el('div', 'pressure-host');
-    renderPressureStrips(pressure, tasks, today, () => void paint());
-    canvas.append(pressure);
+    renderPressureStrips(pressure, tasks, today, () => void paint(), { emptyClear: false });
+    if (pressure.childElementCount) canvas.append(pressure);
     canvas.append(
       renderQuickAdd(
         (created) => {
@@ -258,7 +269,13 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
       tasks = dropTask(tasks, taskId);
       const pressure = canvas.querySelector('.pressure-host');
       if (pressure instanceof HTMLElement) {
-        renderPressureStrips(pressure, tasks, today, () => void paint());
+        renderPressureStrips(pressure, tasks, today, () => void paint(), { emptyClear: false });
+      }
+      const pinchLine = canvas.querySelector('.calendar-meta .pinch-clear');
+      if (pinchLine) {
+        const nextPinches = detectPinchPoints(tasks, today, { days: 7 });
+        pinchLine.classList.toggle('pinch-clear--alert', nextPinches.length > 0);
+        pinchLine.textContent = pinchLineLabel(nextPinches.length);
       }
       if (!canvas.querySelector('.hub-card-slot') && !canvas.querySelector('.empty-state')) {
         canvas.append(

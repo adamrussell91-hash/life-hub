@@ -36,6 +36,19 @@ export function weekdayKeyForDate(dateKey: string): (typeof WEEKDAY_KEYS)[number
   return WEEKDAY_KEYS[d.getUTCDay()]!;
 }
 
+export function availableWindowMinutes(
+  dateKey: string,
+  profile: PlanningProfile | null,
+  options: { skipFallbackWeekend?: boolean } = {}
+): number {
+  const cap = dayCapacity(dateKey, profile);
+  if (options.skipFallbackWeekend && cap.work_source === 'fallback') {
+    const weekday = weekdayKeyForDate(dateKey);
+    if (weekday === 'sat' || weekday === 'sun') return 0;
+  }
+  return cap.available_minutes;
+}
+
 export function dayCapacity(
   date: string,
   profile: PlanningProfile | null
