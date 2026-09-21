@@ -3168,17 +3168,17 @@ main { max-width: 76rem; margin: 0 auto; }
   font-weight: 750;
 }
 .body-forecast__metric-value {
-  font-size: clamp(1.15rem, 2.4vw, 1.65rem);
+  font-size: var(--text-lg);
 }
 .body-forecast__scenario-main {
   display: block;
   margin-top: 0.55rem;
-  font-size: clamp(1.05rem, 2vw, 1.35rem);
+  font-size: var(--text-lg);
 }
 .body-forecast__clock-value {
   display: block;
   margin-top: 0.42rem;
-  font-size: 1rem;
+  font-size: var(--text-base);
 }
 .body-forecast__metric-detail,
 .body-forecast__clock-detail {
