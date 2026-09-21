@@ -162,8 +162,18 @@ export function createMockApi() {
   const observations = new Map<string, Record<string, unknown>>();
   const communications = new Map<string, CommunicationRecord>();
   const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
-  const meetings = new Map<string, Record<string, unknown>>();
-  const events = new Map<string, Record<string, unknown>>();
+  const meetings = new Map<string, Record<string, unknown>>(
+    ((seedData as { meetings?: Record<string, unknown>[] }).meetings ?? []).map((meeting) => [
+      String(meeting.id),
+      { ...meeting }
+    ])
+  );
+  const events = new Map<string, Record<string, unknown>>(
+    ((seedData as { events?: Record<string, unknown>[] }).events ?? []).map((event) => [
+      String(event.id),
+      { ...event }
+    ])
+  );
   const applications = new Map<string, Record<string, unknown>>();
 
   let authenticated = false;
