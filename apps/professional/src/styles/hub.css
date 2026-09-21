@@ -1489,7 +1489,12 @@
 .event-detail .task-link-panel {
   display: flex;
   flex-direction: column;
+  align-items: start;
   gap: var(--space-3);
+}
+
+.event-detail .task-link-panel [hidden] {
+  display: none !important;
 }
 
 .event-detail .task-link-panel h2 {
@@ -1515,16 +1520,22 @@
   font-size: var(--text-base);
 }
 
-.event-detail__edit,
-.event-detail__reschedule {
-  max-width: none;
-}
-
 .event-detail__cancel {
   color: var(--danger);
 }
 
 @media (max-width: 720px) {
+  .page-header {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .page-header__actions {
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .event-detail__session,
   .event-detail__columns {
     grid-template-columns: minmax(0, 1fr);
