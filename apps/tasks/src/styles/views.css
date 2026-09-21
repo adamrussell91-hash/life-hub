@@ -845,7 +845,11 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-right: 2.25rem;
+}
+
+.someday-card__title-row .card-menu {
+  position: static;
+  flex: none;
 }
 
 .someday-card__title {
