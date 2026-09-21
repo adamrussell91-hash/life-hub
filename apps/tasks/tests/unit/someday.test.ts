@@ -7,7 +7,10 @@ import {
   countOdysseyNodes,
   findOdysseyPath,
   LIFE_AREAS,
+  LIFE_COVERAGE_LABEL_CLEARANCE,
+  LIFE_COVERAGE_SEATS,
   lifeCoverageHeadline,
+  lifeCoverageStarRadius,
   maturityWeight,
   newOdysseyNode,
   removeOdysseyNode,
@@ -116,6 +119,25 @@ describe('computeLifeCoverage', () => {
   it('ignores items with no life area set', () => {
     const coverage = computeLifeCoverage([task({ id: '1', title: 'Untagged dream' })]);
     expect(coverage.every((row) => row.count === 0)).toBe(true);
+  });
+});
+
+describe('life coverage constellation seats', () => {
+  it('keeps every pair of stars far enough apart that cores and labels cannot overlap', () => {
+    const seats = LIFE_AREAS.map((area) => {
+      const seat = LIFE_COVERAGE_SEATS[area.id];
+      if (!seat) throw new Error(`missing constellation seat for ${area.id}`);
+      return { id: area.id, ...seat };
+    });
+    const minGap = lifeCoverageStarRadius(99) + lifeCoverageStarRadius(99) + LIFE_COVERAGE_LABEL_CLEARANCE;
+    for (let i = 0; i < seats.length; i += 1) {
+      for (let j = i + 1; j < seats.length; j += 1) {
+        const left = seats[i];
+        const right = seats[j];
+        const gap = Math.hypot(left.x - right.x, left.y - right.y);
+        expect(gap, `${left.id}–${right.id}`).toBeGreaterThanOrEqual(minGap);
+      }
+    }
   });
 });
 

@@ -982,40 +982,44 @@
 }
 
 .someday-wheel {
-  max-width: 34rem;
-}
-
-.someday-wheel__title {
-  margin: 0;
-  font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
-  color: var(--ink);
-}
-
-.someday-wheel__subtitle {
-  margin: var(--space-1) 0 var(--space-4);
-  color: var(--muted);
-  font-size: var(--text-base);
+  width: 100%;
 }
 
 .someday-wheel__panel {
+  width: 100%;
+  min-height: min(36rem, 62vh);
   border-radius: var(--radius-lg);
-  padding: var(--space-4);
+  padding: var(--space-5);
   background: radial-gradient(120% 120% at 28% 18%, var(--marine) 0%, var(--depth) 68%);
   display: flex;
   justify-content: center;
+  align-items: center;
   box-shadow: var(--elev-3);
 }
 
 .someday-wheel__svg {
+  display: block;
   width: 100%;
-  max-width: 22rem;
   height: auto;
 }
 
 .someday-wheel__speck {
   fill: var(--warm-white);
   opacity: 0.28;
+}
+
+.someday-wheel__hit {
+  fill: transparent;
+}
+
+.someday-wheel__core,
+.someday-wheel__glow-outer,
+.someday-wheel__glow-inner,
+.someday-wheel__unlit-ring,
+.someday-wheel__unlit-dot,
+.someday-wheel__sparkle,
+.someday-wheel__select-ring {
+  pointer-events: none;
 }
 
 .someday-wheel__core {
@@ -1034,8 +1038,8 @@
 .someday-wheel__unlit-ring {
   fill: none;
   stroke: var(--high-sea);
-  stroke-width: 1.4;
-  stroke-dasharray: 3 3;
+  stroke-width: 2.4;
+  stroke-dasharray: 5 5;
   opacity: 0.55;
 }
 
@@ -1043,21 +1047,105 @@
   fill: none;
 }
 
+.someday-wheel__select-ring {
+  fill: none;
+  stroke: var(--wave);
+  stroke-width: 2.5;
+}
+
+.someday-wheel__star {
+  cursor: pointer;
+  outline: none;
+}
+
+.someday-wheel__star:focus-visible .someday-wheel__hit {
+  stroke: var(--wave);
+  stroke-width: 3;
+}
+
+.someday-wheel__star:hover .someday-wheel__core,
+.someday-wheel__star.is-hot .someday-wheel__core,
+.someday-wheel__star.is-selected .someday-wheel__core {
+  filter: brightness(1.08);
+}
+
 .someday-wheel__label {
-  font-size: 10.5px;
+  font-size: 28px;
   font-weight: var(--weight-semibold);
   fill: var(--warm-white);
+  pointer-events: none;
 }
 
 .someday-wheel__label--unlit {
   fill: var(--high-sea);
 }
 
-.someday-wheel__key {
+.someday-wheel__key,
+.someday-wheel__hint {
   text-align: center;
   color: var(--muted);
   font-size: var(--text-xs);
   margin: var(--space-2) 0 var(--space-4);
+}
+
+.someday-wheel__hint {
+  font-size: var(--text-sm);
+}
+
+.someday-wheel__detail {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--glass);
+  box-shadow: var(--elev-2);
+}
+
+.someday-wheel__detail-title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.someday-wheel__detail-empty {
+  margin: 0 0 var(--space-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.someday-wheel__dreams {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.someday-wheel__dream {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  text-decoration: none;
+  color: var(--ink);
+  background: var(--shore);
+}
+
+.someday-wheel__dream:hover,
+.someday-wheel__dream:focus-visible {
+  background: color-mix(in srgb, var(--high-sea) 12%, var(--shore));
+}
+
+.someday-wheel__dream-title {
+  font-weight: var(--weight-semibold);
+}
+
+.someday-wheel__dream-meta {
+  color: var(--muted);
+  font-size: var(--text-xs);
 }
 
 .someday-wheel__gap-banner {
@@ -1085,8 +1173,27 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) 0;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-2);
+  border: 0;
   border-bottom: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.someday-wheel__row:hover,
+.someday-wheel__row.is-hot,
+.someday-wheel__row.is-selected {
+  background: color-mix(in srgb, var(--high-sea) 10%, transparent);
+}
+
+.someday-wheel__row:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
 }
 
 .someday-wheel__row-label {
@@ -1118,6 +1225,13 @@
   text-align: right;
   font-size: var(--text-xs);
   color: var(--muted);
+}
+
+@media (max-width: 720px) {
+  .someday-wheel__panel {
+    min-height: 18rem;
+    padding: var(--space-3);
+  }
 }
 
 /* ── Someday: Odyssey mode (branching tree) ─────────────────────────────── */
