@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
+import { TARGETS_CONFIG } from '../../netlify/functions/_shared/targets-config.mjs';
 
 function event(record) {
   return { record };
@@ -8,6 +9,7 @@ function event(record) {
 
 test('body fat outside the band is binding and is not treated as a lift plan', () => {
   const goal = buildBindingGoal({
+    targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
       event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 14 }),
@@ -37,6 +39,7 @@ test('body fat outside the band is binding and is not treated as a lift plan', (
 
 test('in-band weight and fat leave shoulder:waist binding', () => {
   const goal = buildBindingGoal({
+    targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
       event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 9 }),
@@ -53,6 +56,7 @@ test('in-band weight and fat leave shoulder:waist binding', () => {
 
 test('a full set of in-band readings is not called binding', () => {
   const goal = buildBindingGoal({
+    targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
       event({ type: 'composition', date: '2026-08-01', weight_kg: 80, body_fat_pct: 9 }),
@@ -77,6 +81,7 @@ test('a full set of in-band readings is not called binding', () => {
 
 test('weight outside the band is binding when body fat is already inside', () => {
   const goal = buildBindingGoal({
+    targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
       event({ type: 'weight', date: '2026-08-01', weight_kg: 88 }),
@@ -91,6 +96,7 @@ test('weight outside the band is binding when body fat is already inside', () =>
 
 test('missing readings stay missing and a future weigh-in is ignored', () => {
   const goal = buildBindingGoal({
+    targetsConfig: TARGETS_CONFIG,
     date: '2026-08-11',
     events: [
       event({ type: 'composition', date: '2026-08-12', weight_kg: 70, body_fat_pct: 20 }),

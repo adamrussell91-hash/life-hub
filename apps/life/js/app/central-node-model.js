@@ -136,7 +136,7 @@ export function buildCentralNodeModel({
     crossAgent,
     governanceOpen,
     governanceHeat,
-    bindingGoal: buildBindingGoal({ events, date }),
+    bindingGoal: buildBindingGoal({ events, date, targetsConfig }),
     inverseLinks: inverseLinks && typeof inverseLinks === 'object'
       ? inverseLinks
       : { groups: [], status: 'ready' },
