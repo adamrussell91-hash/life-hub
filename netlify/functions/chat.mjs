@@ -1531,6 +1531,8 @@ export function createChatHandler({
           : activation.forceToolChoice && !(evidencePack.active && evidencePack.answerable);
         const system = buildSystemPrompt({
           slug,
+          today,
+          now: nowInstant,
           digest,
           constraints,
           aboutMe,

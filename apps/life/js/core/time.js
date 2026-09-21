@@ -50,6 +50,37 @@ export function getSydneyDateKey(instant = new Date()) {
   return `${p.year}-${p.month}-${p.day}`;
 }
 
+/** Long en-AU form for a calendar key, e.g. "Monday 21 September 2026". */
+export function formatHubLongDate(dateKey) {
+  if (!isCalendarDate(dateKey)) return '';
+  return new Intl.DateTimeFormat('en-AU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(utcDate(dateKey));
+}
+
+/**
+ * Authoritative hub clock for agent system prompts.
+ * Life Hub calendar day is always Australia/Sydney — never the server's UTC date.
+ */
+export function formatHubClockForPrompt(today, { now = new Date() } = {}) {
+  if (!isCalendarDate(today)) return '';
+  let localBit = '';
+  if (now instanceof Date && !Number.isNaN(now.valueOf())) {
+    const p = parts(now, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    localBit = ` Local time about ${p.hour}:${p.minute}.`;
+  }
+  return [
+    `Hub clock (authoritative — ${SYDNEY_TZ}): Today is ${formatHubLongDate(today)} (${today}).${localBit}`,
+    'Trust this clock for "today", "tomorrow", nearest-weekday math, and appointment dating.',
+    'Never invent a calendar day from UTC, model priors, or a Today\'s Status heading that disagrees with this clock.',
+    'If Today\'s Status is dated earlier than today, treat it as a stale prior-day board — not as the current date.'
+  ].join(' ');
+}
+
 /** Minutes since midnight, Sydney wall-clock time -- for ordering "is this lesson past yet?". */
 export function getSydneyMinutesOfDay(instant = new Date()) {
   const p = parts(instant, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
