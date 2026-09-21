@@ -101,8 +101,7 @@ function stimulusCard(forecast, events, date, targetsConfig) {
     ? 'Preservation gate met for the on-plan scenario.'
     : training.lean_preservation_supported === false
       ? 'Preservation gate not met — Forbes/Hall partition is used.'
-      : (training.hypertrophy_stimulus?.note
-        ?? 'Need overlapping intake and weight history to score the preservation gate.');
+      : 'Need overlapping intake and weight history to score the preservation gate.';
   return {
     rate,
     detail,
