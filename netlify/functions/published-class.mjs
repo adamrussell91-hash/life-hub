@@ -15,6 +15,11 @@ import {
   unitKey
 } from './_shared/teaching-blobs.mjs';
 import { buildPublishedClass } from './_shared/teaching-student.mjs';
+import {
+  containsWhiteboardBlocks,
+  defaultGetWhiteboardStore,
+  materialiseWhiteboardSnapshots
+} from './_shared/whiteboard-blobs.mjs';
 
 export const config = { path: '/api/published/classes/:id' };
 
@@ -71,8 +76,38 @@ export function createPublishedClassHandler(deps = {}) {
       if (lessonId) publishedLessonIds.add(lessonId);
     }
 
+    let publicClass = rawClass;
+    const homepage = rawClass.homepage ?? {};
+    const homepageHasWhiteboard = ['announcements', 'resources', 'custom']
+      .some((key) => containsWhiteboardBlocks(homepage[key]));
+    if (homepageHasWhiteboard) {
+      try {
+        const whiteboardStore = await (deps.getWhiteboardStore ?? defaultGetWhiteboardStore)(env);
+        publicClass = {
+          ...rawClass,
+          homepage: {
+            ...homepage,
+            announcements: await materialiseWhiteboardSnapshots(homepage.announcements ?? [], whiteboardStore),
+            resources: await materialiseWhiteboardSnapshots(homepage.resources ?? [], whiteboardStore),
+            custom: await materialiseWhiteboardSnapshots(homepage.custom ?? [], whiteboardStore)
+          }
+        };
+      } catch {
+        return withCors(
+          errorResponse(
+            503,
+            'whiteboard_snapshot_failed',
+            'Class whiteboard content is temporarily unavailable.',
+            true
+          ),
+          request,
+          env
+        );
+      }
+    }
+
     return withCors(okResponse(200, buildPublishedClass({
-      cls: rawClass,
+      cls: publicClass,
       units,
       lessons,
       scheduled,
