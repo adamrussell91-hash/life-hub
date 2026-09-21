@@ -109,6 +109,12 @@ export type PressureStripOptions = {
   emptyClear?: boolean;
 };
 
+export function pinchLineLabel(count: number): string {
+  return count
+    ? `${count} pinch point${count === 1 ? '' : 's'} this week`
+    : 'No pinch this week';
+}
+
 /** Due-soon strip + pinch flags for Day / Week (in-app reminders). */
 export function renderPressureStrips(
   host: HTMLElement,
@@ -139,7 +145,7 @@ export function renderPressureStrips(
 
   if (!pinches.length) {
     if (!soon.length && options.emptyClear !== false) {
-      host.append(el('p', 'pinch-clear', 'No pinch points in the next week.'));
+      host.append(el('p', 'pinch-clear', pinchLineLabel(0)));
     }
     return;
   }

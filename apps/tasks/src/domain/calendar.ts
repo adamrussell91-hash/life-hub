@@ -372,6 +372,16 @@ export function dayTaskMinutes(items: CalendarItem[], fallback = 45): number {
     .reduce((sum, item) => sum + (item.task?.estimated_duration ?? fallback), 0);
 }
 
+/** Open task estimates plus confirmed work blocks — the load that eats a work window. */
+export function bookedLoadMinutes(items: CalendarItem[], fallback = 45): number {
+  return items.reduce((sum, item) => {
+    if (item.status === 'done' || item.status === 'dead' || item.status === 'cancelled') return sum;
+    if (item.kind === 'work_block') return sum + (item.duration_minutes ?? 0);
+    if (item.kind === 'task') return sum + (item.task?.estimated_duration ?? fallback);
+    return sum;
+  }, 0);
+}
+
 export function formatLoad(minutes: number): string {
   if (minutes <= 0) return '';
   const hours = Math.floor(minutes / 60);

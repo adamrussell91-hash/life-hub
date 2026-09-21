@@ -275,6 +275,53 @@ describe('calendar views', () => {
     scrollSpy.mockRestore();
   });
 
+  it('puts filter, remaining capacity, and pinch on one live meta row', async () => {
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+
+    const meta = canvas.querySelector('.calendar-meta');
+    expect(meta?.querySelector('.hub-filters')).not.toBeNull();
+    expect(meta?.querySelector('.hub-calendar__capacity')?.textContent).toBe(
+      '41h left · 1h 30m booked'
+    );
+    expect(meta?.querySelector('.pinch-clear')?.textContent).toMatch(/pinch/i);
+    expect(canvas.querySelector('.hub-calendar__capacity')?.textContent).not.toMatch(/fallback/i);
+  });
+
+  it('updates remaining capacity when a task is dropped onto the week', async () => {
+    vi.mocked(tasksApi.listTasks).mockImplementation(async () => [
+      task({
+        id: 'task_outside',
+        title: 'Outside the week',
+        due_date: '2026-08-10',
+        estimated_duration: 120
+      })
+    ]);
+    location.hash = '#/week?date=2026-08-17';
+    const canvas = document.createElement('main');
+    await renderWeekView(canvas);
+    expect(canvas.querySelector('.hub-calendar__capacity')?.textContent).toBe('42h 30m left · 0h booked');
+
+    const friday = canvas.querySelector<HTMLElement>('.hub-calendar__week-day[data-date="2026-08-21"]')!;
+    const transfer = {
+      data: { 'text/task-id': 'task_outside', 'text/plain': 'task_outside' } as Record<string, string>,
+      getData(type: string) {
+        return this.data[type] ?? '';
+      },
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      effectAllowed: 'move',
+      dropEffect: 'move'
+    };
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: transfer });
+    friday.dispatchEvent(drop);
+
+    expect(canvas.querySelector('.hub-calendar__capacity')?.textContent).toBe('40h 30m left · 2h booked');
+  });
+
   it('renders a week time grid without Add or day-agenda rail blocks', async () => {
     location.hash = '#/week?date=2026-08-17';
     const canvas = document.createElement('main');
