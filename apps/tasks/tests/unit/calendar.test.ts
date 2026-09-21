@@ -3,6 +3,7 @@ import {
   addMonths,
   calendarHash,
   collectCalendarItems,
+  bookedLoadMinutes,
   dayTaskMinutes,
   filterCalendarItems,
   formatLoad,
@@ -229,6 +230,7 @@ describe('calendar domain', () => {
     const day = itemsForDay(items, '2026-08-10');
     expect(visibleOverflow(day, 3)).toEqual({ visible: day.slice(0, 3), hidden: 1 });
     expect(dayTaskMinutes(day)).toBe(150);
+    expect(bookedLoadMinutes(day)).toBe(150);
     expect(formatLoad(150)).toBe('2h 30m');
     expect(overdueItems(items, new Date(2026, 7, 23)).map((item) => item.id)).toEqual([
       'task:a',

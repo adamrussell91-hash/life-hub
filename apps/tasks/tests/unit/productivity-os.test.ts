@@ -27,7 +27,7 @@ import {
 import { createProjectPlan, updateProjectPlanStage } from '@/domain/project-plan';
 import { activeProjectMeter, assessNewCommitment } from '@/domain/hammond-portfolio';
 import { buildHorizonsChain } from '@/domain/hammond-horizons';
-import { dayCapacity, protectedSpansForDate } from '@/domain/hammond-capacity';
+import { availableWindowMinutes, dayCapacity, protectedSpansForDate } from '@/domain/hammond-capacity';
 import {
   threefoldWorkAudit,
   inferWorkMode,
@@ -462,6 +462,8 @@ describe('hammond capacity pace depth handoff', () => {
   it('uses labelled fallback work windows', () => {
     const day = dayCapacity('2026-09-08', null);
     expect(day.work_source).toBe('fallback');
+    expect(availableWindowMinutes('2026-09-08', null)).toBe(510);
+    expect(availableWindowMinutes('2026-09-12', null, { skipFallbackWeekend: true })).toBe(0);
     expect(protectedSpansForDate('2026-09-08', {
       ...DEFAULT_PLANNING_PROFILE,
       protected_windows: {
