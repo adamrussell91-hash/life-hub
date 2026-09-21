@@ -11,6 +11,7 @@ import {
 } from '@/blocks/layout-editors';
 import { renderCollectionBlock } from '@/blocks/render';
 import { mountRichTextTiptap } from '@/blocks/rich-text-tiptap';
+import { mountHubWhiteboard } from '@/blocks/whiteboard-runtime';
 import { sanitizeRichTextHtml } from '@/blocks/sanitize';
 import { sanitizeSvgMarkup } from '@/blocks/sanitize-svg';
 import { isHttpUrl } from '@/blocks/url-safety';
@@ -3317,6 +3318,83 @@ export function createConceptMapEditor(
   return editorShell(block, onChange, fields, getLatest);
 }
 
+export function createWhiteboardEditor(
+  block: Extract<Block, { block_type: 'whiteboard' }>,
+  onChange: BlockChangeHandler<Extract<Block, { block_type: 'whiteboard' }>>,
+  getLatest: () => Extract<Block, { block_type: 'whiteboard' }> = () => block
+): HTMLElement {
+  const fields = document.createElement('div');
+  fields.className = 'block-editor__fields block-editor__whiteboard-fields';
+
+  const meta = document.createElement('div');
+  meta.className = 'block-editor__whiteboard-meta';
+
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.className = 'block-editor__whiteboard-title';
+  title.value = block.content.title ?? '';
+  title.placeholder = 'Whiteboard title (optional)';
+  title.setAttribute('aria-label', 'Whiteboard title');
+
+  const height = document.createElement('input');
+  height.type = 'number';
+  height.className = 'block-editor__whiteboard-height';
+  height.min = '360';
+  height.max = '1400';
+  height.step = '40';
+  height.value = String(block.content.height_px ?? 640);
+  height.setAttribute('aria-label', 'Whiteboard height in pixels');
+
+  const status = document.createElement('span');
+  status.className = 'block-editor__whiteboard-status';
+  status.setAttribute('role', 'status');
+
+  const surface = document.createElement('div');
+  surface.className = 'block-editor__whiteboard-surface';
+  surface.style.height = `${block.content.height_px ?? 640}px`;
+
+  const emitMetadata = () => {
+    const latest = getLatest();
+    const nextHeight = Math.max(360, Math.min(1400, Number(height.value) || 640));
+    surface.style.height = `${nextHeight}px`;
+    onChange({
+      ...latest,
+      content: {
+        ...latest.content,
+        title: title.value.trim() || undefined,
+        height_px: nextHeight
+      }
+    });
+  };
+
+  title.addEventListener('input', emitMetadata);
+  height.addEventListener('change', emitMetadata);
+
+  meta.append(title, height, status);
+  fields.append(meta, surface);
+
+  void mountHubWhiteboard(surface, block, {
+    readOnly: false,
+    onBlockChange: (next) => {
+      const latest = getLatest();
+      const { seed_document_id: _seed, ...content } = latest.content;
+      onChange({
+        ...latest,
+        content: {
+          ...content,
+          document_id: next.content.document_id
+        }
+      });
+    },
+    onStatus: (message, isError = false) => {
+      status.textContent = message;
+      status.classList.toggle('block-editor__whiteboard-status--error', isError);
+    }
+  });
+
+  return editorShell(block, onChange, fields, getLatest);
+}
+
 export function createCollectionEditor(
   block: Extract<Block, { block_type: 'collection' }>,
   onChange: BlockChangeHandler<Extract<Block, { block_type: 'collection' }>>,
@@ -3478,6 +3556,8 @@ export function createBlockEditor(
       return createMindMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'mind_map' }>);
     case 'concept_map':
       return createConceptMapEditor(block, onChange, latest as () => Extract<Block, { block_type: 'concept_map' }>);
+    case 'whiteboard':
+      return createWhiteboardEditor(block, onChange, latest as () => Extract<Block, { block_type: 'whiteboard' }>);
     case 'spacer':
       return createSpacerEditor(block, onChange, latest as () => Extract<Block, { block_type: 'spacer' }>);
     case 'section':
