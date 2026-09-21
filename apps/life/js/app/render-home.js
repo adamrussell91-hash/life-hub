@@ -21,11 +21,25 @@ function paintPath(root, key, path) {
   if (!host || !path) return;
   const status = host.querySelector('[data-home-path-status]');
   if (status) {
-    status.dataset.status = path.status ?? 'locked';
-    status.textContent = STATUS_LABEL[path.status] ?? 'Locked';
+    const statusName = path.status ?? 'locked';
+    status.dataset.status = statusName;
+    status.textContent = STATUS_LABEL[statusName] ?? 'Locked';
   }
   setText(host, '[data-home-path-main]', path.main ?? '—');
   setText(host, '[data-home-path-detail]', path.detail ?? '');
+}
+
+function paintForecastCards(root, cards) {
+  if (!cards) return;
+  setText(root, '[data-home="paths-headline"]', cards.paths.headline);
+  setText(root, '[data-home="paths-detail"]', cards.paths.detail);
+  paintPath(root, 'as_logged', cards.paths.asLogged);
+  paintPath(root, 'on_plan', cards.paths.onPlan);
+  setText(root, '[data-home="stimulus-rate"]', cards.stimulus.rate);
+  setText(root, '[data-home="stimulus-detail"]', cards.stimulus.detail);
+  setText(root, '[data-home="stimulus-gate"]', cards.stimulus.gate);
+  setText(root, '[data-home="scale-headline"]', cards.scale.headline);
+  setText(root, '[data-home="scale-detail"]', cards.scale.detail);
 }
 
 export function renderHome(root, model, options = {}) {
@@ -42,18 +56,7 @@ export function renderHome(root, model, options = {}) {
   setText(root, '[data-target="fat"]', `/ ${formatGrams(model.targets.fat_ceiling_g)} g`);
   setText(root, '[data-value="sync"]', 'Live data ready');
 
-  const cards = model.forecastCards;
-  if (cards) {
-    setText(root, '[data-home="paths-headline"]', cards.paths.headline);
-    setText(root, '[data-home="paths-detail"]', cards.paths.detail);
-    paintPath(root, 'as_logged', cards.paths.asLogged);
-    paintPath(root, 'on_plan', cards.paths.onPlan);
-    setText(root, '[data-home="stimulus-rate"]', cards.stimulus.rate);
-    setText(root, '[data-home="stimulus-detail"]', cards.stimulus.detail);
-    setText(root, '[data-home="stimulus-gate"]', cards.stimulus.gate);
-    setText(root, '[data-home="scale-headline"]', cards.scale.headline);
-    setText(root, '[data-home="scale-detail"]', cards.scale.detail);
-  }
+  paintForecastCards(root, model.forecastCards);
 
   const hammondLine = root.querySelector('[data-value="hammond-line"]');
   if (hammondLine) {
