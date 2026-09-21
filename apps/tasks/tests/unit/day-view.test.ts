@@ -86,6 +86,7 @@ describe('Today view mutations', () => {
     document.body.append(canvas);
     await renderDayView(canvas);
     expect(canvas.textContent).toContain('Plan Pathfinders STEAM');
+    expect(canvas.textContent).toContain('Assess priorities');
     expect(canvas.textContent).not.toContain('Nothing due today');
   });
 

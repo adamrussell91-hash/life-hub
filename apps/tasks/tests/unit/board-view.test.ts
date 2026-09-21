@@ -89,6 +89,7 @@ describe('board view mutations', () => {
     expect(toolbar?.querySelector('.hub-filters__toggle')?.getAttribute('aria-label')).toBe('Filters');
     expect(toolbar?.querySelector('.plus-add__btn')?.getAttribute('aria-label')).toBe('Add a task');
     expect(filters?.nextElementSibling?.classList.contains('plus-add')).toBe(true);
+    expect(toolbar?.textContent).toContain('Assess priorities');
   });
 
   it('inserts a quick-add card without remounting the board', async () => {
