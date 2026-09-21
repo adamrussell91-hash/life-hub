@@ -1,6 +1,19 @@
 import { addCalendarDays } from './time.js';
 
-const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
+export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack', 'dessert'];
+// A logged day at or above this total is complete enough to treat as daily intake.
+// Below it, recorded foods stay real but are not a full day. Zero is unknown, not fasting.
+export const NUTRITION_COMPLETE_KCAL = 1000;
+
+export function nutritionLoggingStatus(loggedCalories, loggedMealCount) {
+  const meals = Number(loggedMealCount) || 0;
+  const calories = Number(loggedCalories);
+  const kcal = Number.isFinite(calories) ? calories : 0;
+  if (meals <= 0 || kcal <= 0) return 'unlogged';
+  if (kcal >= NUTRITION_COMPLETE_KCAL) return 'complete';
+  return 'partial';
+}
+
 const OMEGA3_LEVELS = ['high', 'medium', 'low', 'none'];
 const DAY_TYPE_RANK = { movement: 0, workout_30: 1, workout_45_60: 2 };
 const BODY_TYPES = new Set(['weight', 'composition']);
@@ -35,16 +48,34 @@ export function aggregateNutrition(items, date) {
     meals.filter(meal => meal.omega3 === level).length
   ]));
 
+  const calories = sum(meals, 'calories');
+  const protein_g = sum(meals, 'protein_g');
+  const mealTypes = [
+    ...MEAL_TYPES.filter(mealType => meals.some(meal => meal.meal === mealType)),
+    ...[...new Set(meals.map(meal => meal.meal).filter(meal => meal && !MEAL_TYPES.includes(meal)))].sort()
+  ];
+  const nutrition_logging_status = nutritionLoggingStatus(calories, meals.length);
+  // daily_intake_* is null unless the day is complete. logged_* is only what was written down.
+  // Unlogged must stay unknown — a 0 here is "nothing recorded", not "ate nothing".
+  const intakeKnown = nutrition_logging_status === 'complete';
+
   return {
-    calories: sum(meals, 'calories'),
-    protein_g: sum(meals, 'protein_g'),
+    calories,
+    protein_g,
     fat_g: sum(meals, 'fat_g'),
     carbs_g: sum(meals, 'carbs_g'),
     sodium_mg: sum(meals, 'sodium_mg'),
     calcium_mg: sum(meals, 'calcium_mg'),
     polyphenol_score: sum(meals, 'polyphenol_score'),
     omega3,
-    meals: distribution
+    meals: distribution,
+    logged_calories: calories,
+    logged_protein_g: protein_g,
+    logged_meal_count: meals.length,
+    meal_types: mealTypes,
+    nutrition_logging_status,
+    daily_intake_kcal: intakeKnown ? calories : null,
+    daily_intake_protein_g: intakeKnown ? protein_g : null
   };
 }
 

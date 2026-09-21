@@ -35,7 +35,14 @@ test('matches the approved sample Home totals for parsed events', () => {
       dinner: { protein_g: 0 },
       snack: { protein_g: 0 },
       dessert: { protein_g: 0 }
-    }
+    },
+    logged_calories: 1130,
+    logged_protein_g: 80,
+    logged_meal_count: 2,
+    meal_types: ['breakfast', 'lunch'],
+    nutrition_logging_status: 'complete',
+    daily_intake_kcal: 1130,
+    daily_intake_protein_g: 80
   });
   assert.equal(resolveDayType(events, '2026-07-30'), 'workout_30');
   assert.deepEqual(getTopSets(events[2]), { 'Chest Press': { weight_kg: 34, reps: 8 } });
@@ -88,7 +95,14 @@ test('empty and missing additive nutrition values contribute zero', () => {
       dinner: { protein_g: 0 },
       snack: { protein_g: 0 },
       dessert: { protein_g: 0 }
-    }
+    },
+    logged_calories: 0,
+    logged_protein_g: 0,
+    logged_meal_count: 1,
+    meal_types: ['snack'],
+    nutrition_logging_status: 'unlogged',
+    daily_intake_kcal: null,
+    daily_intake_protein_g: null
   });
 });
 

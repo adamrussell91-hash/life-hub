@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v170';
+const CACHE_NAME = 'life-hub-shell-v171';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -175,6 +175,7 @@ const SHELL_FILES = [
   'js/core/records.js',
   'js/core/search.js',
   'js/core/targets.js',
+  'js/core/forecast-targets.js',
   'js/core/time.js',
   'js/core/trends.js',
   'js/core/validate.js',

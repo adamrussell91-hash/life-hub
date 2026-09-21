@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildFitnessModel } from '../../apps/life/js/app/fitness-model.js';
+import { TARGETS_CONFIG } from '../../netlify/functions/_shared/targets-config.mjs';
 import {
   acwrBand,
   buildFitnessGoals,
@@ -253,7 +254,8 @@ test('fitness goals track the three named lifts, four-week frequency, and a safe
       volumeSession('2026-09-10', 200)
     ]),
     date: '2026-09-12',
-    workoutsPerWeek: 1.5
+    workoutsPerWeek: 1.5,
+    targetsConfig: TARGETS_CONFIG
   });
 
   assert.equal(charts.length, 5);
