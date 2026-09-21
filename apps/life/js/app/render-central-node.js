@@ -74,6 +74,7 @@ export function renderCentralNode(root, model) {
   renderTrendScan(root, model);
   renderChordTile(root, model);
   renderGovernanceHeat(root, model);
+  renderBindingGoal(root, model.bindingGoal);
   packCnBoard(root);
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
@@ -441,6 +442,25 @@ function renderCompletionRing(root, completeness) {
   if (fill) animateRingFill(fill, ring);
   const label = root.querySelector('[data-value="completion-ring-label"]');
   if (label) label.textContent = `${completeness.complete} of ${completeness.total}`;
+}
+
+function renderBindingGoal(root, bindingGoal) {
+  const host = root.querySelector('[data-central-node="binding-goal"]');
+  if (!host || !bindingGoal) return;
+  host.replaceChildren();
+  const verdict = root.createElement('p');
+  verdict.className = 'cn-binding__verdict';
+  verdict.textContent = bindingGoal.verdict;
+  host.append(verdict);
+  const list = root.createElement('ul');
+  list.className = 'cn-binding__list';
+  for (const row of bindingGoal.rows ?? []) {
+    const item = root.createElement('li');
+    item.dataset.status = row.status;
+    item.textContent = `${row.label}: ${row.detail}`;
+    list.append(item);
+  }
+  host.append(list);
 }
 
 function renderDayProgress(root, completeness) {
