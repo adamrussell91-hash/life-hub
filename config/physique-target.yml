@@ -1,5 +1,3 @@
-# Physique target — the tracked shoulder:waist ratio and body fat goal that Chadwick's
-# and Brisket's programming is measured against (Tom Holland-style taper).
-# Hand-edited by Adam, not written by any agent tool.
-shoulder_waist_ratio: 1.6
-body_fat_pct: 8
+# Authoritative physique and strength targets live in config/targets.yml under `forecast`.
+# load-physique-target.mjs reads that block. This file stays so Netlify included_files
+# still resolves; do not put target numbers here.
