@@ -828,22 +828,24 @@
 }
 
 .someday-card {
+  position: relative;
   background: var(--glass);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   box-shadow: var(--elev-1);
+  cursor: pointer;
+}
+
+.someday-card--open {
+  cursor: default;
 }
 
 .someday-card__title-row {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-}
-
-.someday-card__branch {
-  flex-shrink: 0;
-  margin-left: auto;
+  padding-right: 2.25rem;
 }
 
 .someday-card__title {
@@ -953,13 +955,6 @@
 .someday-card__stalled-actions {
   display: flex;
   gap: var(--space-2);
-}
-
-.someday-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
 }
 
 .someday-group__sweep {

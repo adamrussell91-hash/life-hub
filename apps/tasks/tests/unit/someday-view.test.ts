@@ -107,6 +107,7 @@ function goal(partial: Partial<Goal> & Pick<Goal, 'id' | 'title'>): Goal {
 
 beforeEach(() => {
   resetSomedayViewFilters();
+  document.querySelectorAll('.hub-menu').forEach((node) => node.remove());
   vi.mocked(tasksApi.listTasks).mockReset();
   vi.mocked(tasksApi.listProjects).mockReset();
   vi.mocked(tasksApi.getTask).mockReset();
@@ -136,12 +137,55 @@ describe('renderSomedayView', () => {
     expect(canvas.textContent).toContain('Study at Cambridge');
     expect(canvas.querySelector('.someday-chip--horizon')?.textContent).toBe('Goal');
     expect(canvas.querySelector('.someday-chip--area')?.textContent).toBe('Career');
+    expect(canvas.querySelector('.someday-card select')).toBeNull();
+    expect(canvas.textContent).not.toContain('Promote to task');
     const wheelLink = canvas.querySelector<HTMLAnchorElement>('.someday-preview-card');
     expect(wheelLink?.getAttribute('href')).toBe('#/someday/wheel');
     const odysseyCta = canvas.querySelector<HTMLAnchorElement>('.someday-cta');
     expect(odysseyCta?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
-    const branchLink = canvas.querySelector<HTMLAnchorElement>('.someday-card__branch');
-    expect(branchLink?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
+    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
+    const branch = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
+      (btn) => btn.textContent === 'Branch it'
+    );
+    expect(branch).toBeTruthy();
+    branch?.click();
+    expect(location.hash).toBe(`#/someday/odyssey/${dream.id}`);
+    location.hash = '';
+  });
+
+  it('stays closed until opened, and shows fields only after Edit', async () => {
+    const dream = task({
+      id: 't1',
+      title: 'Study at Cambridge',
+      description: 'A long-held one',
+      review_at: '2020-01-01'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([dream]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+
+    const canvas = document.createElement('div');
+    await renderSomedayView(canvas);
+
+    const card = canvas.querySelector<HTMLElement>('.someday-card')!;
+    expect(card.querySelector('select')).toBeNull();
+    expect(card.querySelector('.someday-card__copy')).toBeNull();
+    expect(card.querySelector('.someday-card__if-then')).toBeNull();
+    expect(canvas.textContent).not.toContain('Promote to task');
+    expect(canvas.textContent).not.toContain('Park until');
+
+    card.click();
+    const opened = canvas.querySelector<HTMLElement>('.someday-card')!;
+    expect(opened.classList.contains('someday-card--open')).toBe(true);
+    expect(opened.querySelector('.someday-card__copy')?.textContent).toContain('A long-held one');
+    expect(opened.querySelector('.someday-card__if-then')).toBeTruthy();
+    expect(opened.querySelector('select')).toBeNull();
+
+    opened.querySelector<HTMLButtonElement>('.card-menu')?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')]
+      .find((btn) => btn.textContent === 'Edit')
+      ?.click();
+    expect(canvas.querySelector('select')).toBeTruthy();
+    expect(canvas.textContent).not.toContain('Promote to task');
   });
 
   it('filters by category and shows origin dates only for bucket list and dreams jar', async () => {
@@ -199,8 +243,13 @@ describe('renderSomedayView', () => {
     const dueCard = cards.find((c) => c.textContent?.includes('Study at Cambridge'))!;
     const parkedCard = cards.find((c) => c.textContent?.includes('Move to Lisbon'))!;
     expect(dueCard.querySelector('.someday-open-loop')).toBeTruthy();
-    expect(dueCard.querySelector('.someday-card__if-then')?.textContent).toContain('Study at Cambridge');
+    expect(dueCard.querySelector('.someday-card__if-then')).toBeNull();
     expect(parkedCard.querySelector('.someday-open-loop')).toBeNull();
+    dueCard.click();
+    const opened = [...canvas.querySelectorAll('.someday-card')].find((c) =>
+      c.textContent?.includes('Study at Cambridge')
+    );
+    expect(opened?.querySelector('.someday-card__if-then')?.textContent).toContain('Study at Cambridge');
     expect(parkedCard.querySelector('.someday-card__if-then')).toBeNull();
   });
 
@@ -216,11 +265,12 @@ describe('renderSomedayView', () => {
     const canvas = document.createElement('div');
     await renderSomedayView(canvas);
 
-    const promoteButton = [...canvas.querySelectorAll('button')].find(
+    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
+    const promoteButton = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
       (btn) => btn.textContent === 'Promote to project'
     );
     expect(promoteButton).toBeTruthy();
-    promoteButton!.dispatchEvent(new Event('click', { bubbles: true }));
+    promoteButton!.click();
     await vi.waitFor(() => {
       expect(tasksApi.createProject).toHaveBeenCalledWith(
         expect.objectContaining({ title: dream.title, parent_someday_id: dream.id })
@@ -247,16 +297,38 @@ describe('renderSomedayView', () => {
 
     const canvas = document.createElement('div');
     await renderSomedayView(canvas);
-    const promoteGoalButton = [...canvas.querySelectorAll('button')].find(
+    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
+    const promoteGoalButton = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
       (btn) => btn.textContent === 'Promote to goal'
     );
-    promoteGoalButton!.dispatchEvent(new Event('click', { bubbles: true }));
+    promoteGoalButton!.click();
 
     await vi.waitFor(() => {
       expect(tasksApi.createGoal).toHaveBeenCalledWith(
         expect.objectContaining({ title: dream.title, parent_someday_id: dream.id })
       );
       expect(tasksApi.deleteTask).not.toHaveBeenCalled();
+      expect(canvas.textContent).toContain('Write a novel');
+    });
+  });
+
+  it('removes a card only after confirm', async () => {
+    const dream = task({ id: 't1', title: 'Retrain as a sailing instructor' });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([dream]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+    vi.mocked(tasksApi.deleteTask).mockResolvedValue(undefined);
+    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+
+    const canvas = document.createElement('div');
+    await renderSomedayView(canvas);
+    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')]
+      .find((btn) => btn.textContent === 'Remove')
+      ?.click();
+
+    await vi.waitFor(() => {
+      expect(tasksApi.deleteTask).toHaveBeenCalledWith(dream.id);
+      expect(canvas.textContent).toContain('Nothing in Someday / Maybe yet.');
     });
   });
 });
