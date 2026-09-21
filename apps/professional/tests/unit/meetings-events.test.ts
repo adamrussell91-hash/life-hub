@@ -543,6 +543,7 @@ describe('renderEventDetailView session layout', () => {
     ) as HTMLButtonElement;
     completeBtn.click();
     await vi.waitFor(() => {
+      expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes('action=complete'))).toBe(true);
       expect(canvas.textContent).toMatch(/Completed/);
     });
   });

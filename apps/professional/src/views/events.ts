@@ -727,7 +727,11 @@ export async function renderEventDetailView(
       el(
         'p',
         'event-detail__session-meta',
-        [record.hours != null ? `${record.hours} hours` : null, record.attendance_state || null]
+        [
+          OCCURRENCE_LABEL[record.occurrence_state],
+          record.hours != null ? `${record.hours} hours` : null,
+          record.attendance_state || null
+        ]
           .filter(Boolean)
           .join(' · ')
       )
