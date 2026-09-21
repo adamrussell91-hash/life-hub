@@ -1,4 +1,4 @@
-import { renderEntityDetail } from '@/components/entity-detail';
+import { renderEntityDetail, renderPersonSummaryCard } from '@/components/entity-detail';
 import { buildPersonTabs } from '@/components/person-tabs';
 import { personBriefRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
@@ -57,6 +57,7 @@ export async function renderPersonPage(
       brief.href = personBriefRoute(person.id);
       brief.textContent = 'Open Person Brief';
       host.append(brief);
+      renderPersonSummaryCard(host, overview, brief.href, reload);
     }
   });
 }

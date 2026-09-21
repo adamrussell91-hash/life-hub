@@ -210,11 +210,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'person') {
-      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
+      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…', person: true });
       await renderPersonPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'People', title });
+          renderPageHeader(shell, { eyebrow: 'People', title, person: true });
         },
         isCurrent: () => generation === routeGeneration
       });
