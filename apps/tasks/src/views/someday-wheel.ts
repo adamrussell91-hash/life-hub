@@ -1,6 +1,14 @@
+import type { Task } from '@/schemas/task';
 import { tasksApi } from '@/services/client-api';
 import { somedayTasks } from '@/domain/hierarchy';
-import { computeLifeCoverage, type LifeCoverageArea } from '@/domain/someday';
+import {
+  computeLifeCoverage,
+  LIFE_COVERAGE_SEATS,
+  LIFE_COVERAGE_VIEWBOX,
+  lifeCoverageStarRadius,
+  MATURITY_LEVELS,
+  type LifeCoverageArea
+} from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
 import { el } from '@/views/hub-kit';
 
@@ -15,42 +23,86 @@ function svgEl<K extends keyof SVGElementTagNameMap>(
   return node;
 }
 
-/** Fixed, organic (not geometric) placement — a real constellation, not a spider chart. */
-const POSITIONS: Record<string, { x: number; y: number; labelDy: number }> = {
-  explore: { x: 240, y: 60, labelDy: -26 },
-  career: { x: 70, y: 55, labelDy: -25 },
-  create: { x: 150, y: 130, labelDy: 25 },
-  money: { x: 235, y: 150, labelDy: 25 },
-  learn: { x: 55, y: 150, labelDy: 25 },
-  love: { x: 110, y: 205, labelDy: 25 },
-  friends: { x: 195, y: 210, labelDy: 25 },
-  health: { x: 150, y: 85, labelDy: 27 }
-};
-
-function starRadius(count: number): number {
-  return Math.min(28, 4 + count * 1.1);
+function setHot(root: HTMLElement, areaId: string | null): void {
+  for (const node of root.querySelectorAll('[data-area]')) {
+    node.classList.toggle('is-hot', node.getAttribute('data-area') === areaId);
+  }
 }
 
-function buildStar(area: LifeCoverageArea): SVGGElement {
-  const pos = POSITIONS[area.id] ?? { x: 150, y: 130, labelDy: 25 };
-  const group = svgEl('g', { class: `someday-wheel__star someday-wheel__star--${area.count === 0 ? 'unlit' : 'lit'}` });
+function wireAreaTarget(
+  node: Element,
+  areaId: string,
+  root: HTMLElement,
+  onSelect: (id: string) => void
+): void {
+  node.setAttribute('data-area', areaId);
+  node.addEventListener('click', () => onSelect(areaId));
+  node.addEventListener('mouseenter', () => setHot(root, areaId));
+  node.addEventListener('mouseleave', () => setHot(root, null));
+}
+
+function buildStar(
+  area: LifeCoverageArea,
+  selected: boolean,
+  root: HTMLElement,
+  onSelect: (id: string) => void
+): SVGGElement {
+  const pos = LIFE_COVERAGE_SEATS[area.id] ?? { x: 500, y: 280, labelDy: 42 };
+  const group = svgEl('g', {
+    class: `someday-wheel__star someday-wheel__star--${area.count === 0 ? 'unlit' : 'lit'}${selected ? ' is-selected' : ''}`,
+    role: 'button',
+    tabindex: 0,
+    'aria-pressed': selected ? 'true' : 'false',
+    'aria-label': `${area.label}: ${area.count} dream${area.count === 1 ? '' : 's'}`
+  });
+
+  const coreR = lifeCoverageStarRadius(area.count);
+  group.append(svgEl('circle', { cx: pos.x, cy: pos.y, r: coreR + 16, class: 'someday-wheel__hit' }));
 
   if (area.count === 0) {
     group.append(
-      svgEl('circle', { cx: pos.x, cy: pos.y, r: 16, class: 'someday-wheel__unlit-ring' }),
+      svgEl('circle', { cx: pos.x, cy: pos.y, r: coreR, class: 'someday-wheel__unlit-ring' }),
       svgEl('circle', { cx: pos.x, cy: pos.y, r: 5, class: 'someday-wheel__unlit-dot' })
     );
   } else {
-    const r = starRadius(area.count);
     const opacity = 0.35 + area.avgMaturity * 0.65;
     group.append(
-      svgEl('circle', { cx: pos.x, cy: pos.y, r: r * 2.4, class: 'someday-wheel__glow-outer', style: `opacity:${(opacity * 0.14).toFixed(2)}` }),
-      svgEl('circle', { cx: pos.x, cy: pos.y, r: r * 1.7, class: 'someday-wheel__glow-inner', style: `opacity:${(opacity * 0.22).toFixed(2)}` }),
-      svgEl('circle', { cx: pos.x, cy: pos.y, r, class: 'someday-wheel__core', style: `opacity:${opacity.toFixed(2)}` })
+      svgEl('circle', {
+        cx: pos.x,
+        cy: pos.y,
+        r: coreR * 2.1,
+        class: 'someday-wheel__glow-outer',
+        style: `opacity:${(opacity * 0.14).toFixed(2)}`
+      }),
+      svgEl('circle', {
+        cx: pos.x,
+        cy: pos.y,
+        r: coreR * 1.5,
+        class: 'someday-wheel__glow-inner',
+        style: `opacity:${(opacity * 0.22).toFixed(2)}`
+      }),
+      svgEl('circle', {
+        cx: pos.x,
+        cy: pos.y,
+        r: coreR,
+        class: 'someday-wheel__core',
+        style: `opacity:${opacity.toFixed(2)}`
+      })
     );
     if (area.avgMaturity > 0.85) {
-      group.append(svgEl('circle', { cx: pos.x - r * 0.3, cy: pos.y - r * 0.3, r: 1.8, class: 'someday-wheel__sparkle' }));
+      group.append(
+        svgEl('circle', {
+          cx: pos.x - coreR * 0.3,
+          cy: pos.y - coreR * 0.3,
+          r: 2.2,
+          class: 'someday-wheel__sparkle'
+        })
+      );
     }
+  }
+
+  if (selected) {
+    group.append(svgEl('circle', { cx: pos.x, cy: pos.y, r: coreR + 10, class: 'someday-wheel__select-ring' }));
   }
 
   const label = svgEl('text', {
@@ -61,26 +113,52 @@ function buildStar(area: LifeCoverageArea): SVGGElement {
   });
   label.textContent = area.label;
   group.append(label);
+
+  wireAreaTarget(group, area.id, root, onSelect);
+  group.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect(area.id);
+    }
+  });
   return group;
 }
 
-function buildConstellation(coverage: LifeCoverageArea[]): SVGSVGElement {
-  const svg = svgEl('svg', { viewBox: '0 0 300 260', class: 'someday-wheel__svg', role: 'img' });
-  svg.setAttribute(
-    'aria-label',
-    coverage.map((row) => `${row.label}: ${row.count} dream${row.count === 1 ? '' : 's'}`).join(', ')
-  );
-  for (let i = 0; i < 26; i += 1) {
-    const x = (i * 37) % 300;
-    const y = (i * 53) % 260;
-    svg.append(svgEl('circle', { cx: x, cy: y, r: 0.8, class: 'someday-wheel__speck' }));
+function buildConstellation(
+  coverage: LifeCoverageArea[],
+  selectedId: string | null,
+  root: HTMLElement,
+  onSelect: (id: string) => void
+): SVGSVGElement {
+  const { width, height } = LIFE_COVERAGE_VIEWBOX;
+  const svg = svgEl('svg', {
+    viewBox: `0 0 ${width} ${height}`,
+    class: 'someday-wheel__svg',
+    role: 'group'
+  });
+  svg.setAttribute('aria-label', 'Life coverage constellation. Click a star to see its dreams.');
+  for (let i = 0; i < 36; i += 1) {
+    const x = (i * 89) % width;
+    const y = (i * 73) % height;
+    svg.append(svgEl('circle', { cx: x, cy: y, r: 1.1, class: 'someday-wheel__speck' }));
   }
-  for (const area of coverage) svg.append(buildStar(area));
+  for (const area of coverage) svg.append(buildStar(area, area.id === selectedId, root, onSelect));
   return svg;
 }
 
-function buildAreaRow(area: LifeCoverageArea, maxCount: number): HTMLElement {
-  const row = el('div', `someday-wheel__row${area.count === 0 ? ' someday-wheel__row--unlit' : ''}`);
+function buildAreaRow(
+  area: LifeCoverageArea,
+  maxCount: number,
+  selected: boolean,
+  root: HTMLElement,
+  onSelect: (id: string) => void
+): HTMLButtonElement {
+  const row = el(
+    'button',
+    `someday-wheel__row${area.count === 0 ? ' someday-wheel__row--unlit' : ''}${selected ? ' is-selected' : ''}`
+  );
+  row.type = 'button';
+  row.setAttribute('aria-pressed', selected ? 'true' : 'false');
   row.append(el('span', 'someday-wheel__row-label', area.label));
   const track = el('div', 'someday-wheel__track');
   const fill = el('div', 'someday-wheel__fill');
@@ -88,7 +166,37 @@ function buildAreaRow(area: LifeCoverageArea, maxCount: number): HTMLElement {
   track.append(fill);
   row.append(track);
   row.append(el('span', 'someday-wheel__count', String(area.count)));
+  wireAreaTarget(row, area.id, root, onSelect);
   return row;
+}
+
+function maturityLabel(task: Task): string {
+  return MATURITY_LEVELS.find((level) => level.id === task.maturity)?.label ?? 'New';
+}
+
+function buildAreaDetail(area: LifeCoverageArea, dreams: Task[]): HTMLElement {
+  const panel = el('div', 'someday-wheel__detail');
+  const countLabel = area.count === 1 ? '1 dream' : `${area.count} dreams`;
+  panel.append(el('h2', 'someday-wheel__detail-title', `${area.label} · ${countLabel}`));
+  if (dreams.length === 0) {
+    panel.append(el('p', 'someday-wheel__detail-empty', `Nothing parked in ${area.label} yet.`));
+    const add = el('a', 'btn btn--secondary btn--sm', 'Park a dream');
+    add.href = '#/someday';
+    panel.append(add);
+    return panel;
+  }
+  const list = el('ul', 'someday-wheel__dreams');
+  for (const dream of dreams) {
+    const item = el('li');
+    const link = el('a', 'someday-wheel__dream');
+    link.href = `#/someday/odyssey/${encodeURIComponent(dream.id)}`;
+    link.append(el('span', 'someday-wheel__dream-title', dream.title));
+    link.append(el('span', 'someday-wheel__dream-meta', maturityLabel(dream)));
+    item.append(link);
+    list.append(item);
+  }
+  panel.append(list);
+  return panel;
 }
 
 export async function renderSomedayWheelView(canvas: HTMLElement): Promise<void> {
@@ -96,13 +204,25 @@ export async function renderSomedayWheelView(canvas: HTMLElement): Promise<void>
   try {
     const tasks = somedayTasks(await tasksApi.listTasks());
     const coverage = computeLifeCoverage(tasks);
-    paintWheel(canvas, coverage);
+    let selectedId: string | null = null;
+    const paint = () =>
+      paintWheel(canvas, coverage, tasks, selectedId, (id) => {
+        selectedId = selectedId === id ? null : id;
+        paint();
+      });
+    paint();
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load life coverage.')));
   }
 }
 
-function paintWheel(canvas: HTMLElement, coverage: LifeCoverageArea[]): void {
+function paintWheel(
+  canvas: HTMLElement,
+  coverage: LifeCoverageArea[],
+  items: Task[],
+  selectedId: string | null,
+  onSelect: (id: string) => void
+): void {
   canvas.replaceChildren();
   const root = el('div', 'someday-wheel');
 
@@ -110,17 +230,26 @@ function paintWheel(canvas: HTMLElement, coverage: LifeCoverageArea[]): void {
   back.href = '#/someday';
   root.append(back);
 
-  root.append(
-    el('h2', 'someday-wheel__title', 'Life coverage'),
-    el('p', 'someday-wheel__subtitle', "Where your someday dreams cluster — and where they don't.")
-  );
-
   const panel = el('div', 'someday-wheel__panel');
-  panel.append(buildConstellation(coverage));
+  panel.append(buildConstellation(coverage, selectedId, root, onSelect));
   root.append(panel);
   root.append(
     el('p', 'someday-wheel__key', 'Size = how many dreams. Brightness = how developed they are.')
   );
+
+  const selected = coverage.find((row) => row.id === selectedId) ?? null;
+  if (selected) {
+    root.append(
+      buildAreaDetail(
+        selected,
+        items.filter((task) => task.life_area === selected.id)
+      )
+    );
+  } else {
+    root.append(
+      el('p', 'someday-wheel__hint', 'Click a star — or a row — to see the dreams parked there.')
+    );
+  }
 
   const unlit = coverage.filter((row) => row.count === 0);
   if (unlit.length) {
@@ -141,7 +270,7 @@ function paintWheel(canvas: HTMLElement, coverage: LifeCoverageArea[]): void {
   const list = el('div', 'someday-wheel__list');
   const maxCount = Math.max(1, ...coverage.map((row) => row.count));
   for (const area of [...coverage].sort((a, b) => b.count - a.count)) {
-    list.append(buildAreaRow(area, maxCount));
+    list.append(buildAreaRow(area, maxCount, area.id === selectedId, root, onSelect));
   }
   root.append(list);
 
