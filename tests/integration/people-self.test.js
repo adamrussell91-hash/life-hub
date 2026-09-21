@@ -86,6 +86,34 @@ test('returns the active self Person ref and display name', async () => {
   assert.equal(body.data.self.display_name, 'Adam Russell');
 });
 
+test('falls back to the GitHub-imported self Person when Blobs have none', async () => {
+  const store = memoryStore();
+  const { derivePersonId, resetProfessionalDataCache } = await import(
+    '../../netlify/functions/_shared/github-professional-data.mjs'
+  );
+  resetProfessionalDataCache();
+  const fetchImpl = async (url) => {
+    const href = String(url);
+    const body = (data) => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
+    });
+    if (href.endsWith('/data/professional/people.json')) {
+      return body([{ legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true }]);
+    }
+    if (href.endsWith('/data/professional/organisations.json')) return body([]);
+    if (href.endsWith('/data/professional/relationships.json')) return body([]);
+    return { ok: false, status: 404 };
+  };
+  const handler = createPeopleSelfHandler(baseDeps(store, { fetchImpl, env: { ...env, GITHUB_TOKEN: 'token' } }));
+  const response = await handler(request({ url: URL_BASE }));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.data.self.display_name, 'Adam Russell');
+  assert.equal(body.data.self.ref, `shared:person:${derivePersonId('leg-self')}`);
+});
+
 test('ignores an archived self-flagged Person', async () => {
   const store = memoryStore();
   await makePerson(store, { display_name: 'Old Self', is_self: true, lifecycle_status: 'archived' });

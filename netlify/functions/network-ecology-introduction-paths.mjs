@@ -45,6 +45,7 @@ export function createNetworkEcologyIntroductionPathsHandler(deps = {}) {
         if (!to) throw missingRefError('to');
         const paths = await assembleIntroductionPaths(from, to, {
           store,
+          env,
           resolveEntity,
           createRepository,
           now: now(),

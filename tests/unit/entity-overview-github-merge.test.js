@@ -116,6 +116,62 @@ test('the reciprocal Organisation overview shows the same relationship as incomi
   assert.equal(overview.linked_records.people.length, 1);
 });
 
+test('a colleague who shares a current workplace with the imported self gets shared_contexts_with_self', async () => {
+  const store = emptyStore();
+  const fetchImpl = githubFetch({
+    people: [
+      { legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true },
+      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' }
+    ],
+    organisations: ORGANISATIONS,
+    relationships: [
+      {
+        person_legacy_id: 'leg-self',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: 'Gifted Education Teacher',
+        valid_from: null,
+        valid_to: null
+      },
+      {
+        person_legacy_id: 'leg-colleague',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const colleagueId = derivePersonId('leg-colleague');
+  const organisationId = deriveOrganisationId('leg-org-1');
+
+  const overview = await assembleEntityOverview(`shared:person:${colleagueId}`, {
+    store,
+    env: GITHUB_ENV,
+    fetchImpl,
+    resolveEntity: makeResolveEntity(store, fetchImpl)
+  });
+
+  assert.equal(overview.entity.display_name, 'Natalie Shih');
+  assert.deepEqual(overview.shared_contexts_with_self, [
+    {
+      ref: `shared:organisation:${organisationId}`,
+      display_label: 'St. Aloysius College',
+      relationship_type: 'employee_at'
+    }
+  ]);
+
+  const selfOverview = await assembleEntityOverview(`shared:person:${derivePersonId('leg-self')}`, {
+    store,
+    env: GITHUB_ENV,
+    fetchImpl,
+    resolveEntity: makeResolveEntity(store, fetchImpl)
+  });
+  assert.equal(selfOverview.entity.is_self, true);
+  assert.deepEqual(selfOverview.shared_contexts_with_self, []);
+});
+
 test('a native Blob-backed Person keeps working unchanged when the GitHub import has nothing for it', async () => {
   const { generatePersonId, IDENTITY_SCHEMA_VERSION } = await import('../../netlify/functions/_shared/identity-schema.mjs');
   const { personKey } = await import('../../netlify/functions/_shared/universal-link-blobs.mjs');

@@ -67,6 +67,28 @@ describe('renderPersonPage', () => {
     expect(canvas.querySelector('.entity-detail__self-indicator')).toBeNull();
   });
 
+  it('names the shared workplace when the overview says how you know them', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          shared_contexts_with_self: [
+            {
+              ref: `shared:organisation:${ORG_ID}`,
+              display_label: 'St. Aloysius College',
+              relationship_type: 'employee_at'
+            }
+          ]
+        })
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+    expect(canvas.querySelector('.entity-detail__shared-context')?.textContent).toBe(
+      'You know them through St. Aloysius College.'
+    );
+  });
+
   it('shows a quiet Self indicator only when is_self is true', async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(200, { ok: true, data: personOverview({ entity: { ...personOverview().entity, is_self: true } }) })
