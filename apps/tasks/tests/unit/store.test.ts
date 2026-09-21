@@ -252,6 +252,39 @@ describe('tasks store', () => {
     expect(successor?.due_date).toBe('2026-08-25');
     expect(JSON.parse(successor!.recurrence_rule!).completed_count).toBe(1);
   });
+
+  it('raises priority when a due date moves closer and Assess can lower it', async () => {
+    const kv = memoryKv();
+    await seedIfEmpty(kv, keys, seed);
+    const store = createTasksStore(kv, keys);
+    const created = await store.createTask({
+      title: 'Call the school',
+      domain: 'teaching',
+      priority: 'low',
+      due_date: '2099-01-01'
+    });
+    const closer = await store.updateTask(created.id, { due_date: '2020-01-01' });
+    expect(closer.priority).toBe('urgent');
+
+    const preview = await store.applyPriorityAssessments({
+      mode: 'full',
+      apply: false,
+      now: new Date('2026-09-21T12:00:00+10:00')
+    });
+    expect(preview.applied).toBe(false);
+    expect(preview.changes.some((row) => row.id === created.id)).toBe(false);
+
+    const far = await store.updateTask(created.id, { due_date: '2099-01-01', priority: 'urgent' });
+    expect(far.priority).toBe('urgent');
+    const assessed = await store.applyPriorityAssessments({
+      mode: 'full',
+      apply: true,
+      now: new Date('2026-09-21T12:00:00+10:00')
+    });
+    expect(assessed.applied).toBe(true);
+    const updated = assessed.tasks.find((row) => row.id === created.id);
+    expect(updated?.priority).toBe('low');
+  });
 });
 
 describe('queries', () => {

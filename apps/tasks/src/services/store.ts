@@ -53,6 +53,7 @@ import {
   resolveExcursionTemplateId
 } from '@/domain/excursion-catalog';
 import { addDays, backlogTasks, hubCalendarDate, toDateKey } from '@/domain/queries';
+import { applyDueDatePriorityFloor, assessOpenTaskPriorities } from '@/domain/priority-assess';
 import { DEFAULT_HUB_PREFS, parseHubPrefs, resolveTimeZoneInput, type HubPrefs } from '@/domain/hub-prefs';
 import {
   defaultAgentProtocol,
@@ -371,6 +372,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
               ? null
               : (patch.completed_at ?? existing.completed_at)
       });
+      next = applyDueDatePriorityFloor(next, patch);
       await kv.setJSON(keys.taskKey(id), next);
       if (patch.status === 'done' && existing.status !== 'done') {
         await spawnRecurringSuccessor(this, next);
@@ -1499,6 +1501,21 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         reason: result.reason
       });
       return result;
+    },
+
+    async applyPriorityAssessments(options = {}) {
+      const mode = options.mode === 'floor' ? 'floor' : 'full';
+      const now = options.now ?? new Date();
+      const tasks = await this.listTasks();
+      const preview = assessOpenTaskPriorities(tasks, now, mode);
+      if (!options.apply || !preview.changes.length) {
+        return { ...preview, applied: false, tasks: [] };
+      }
+      const updated: Task[] = [];
+      for (const change of preview.changes) {
+        updated.push(await this.updateTask(change.id, { priority: change.suggested as Task['priority'] }));
+      }
+      return { ...preview, applied: true, tasks: updated };
     },
 
     async getCapacitySnapshot(now = new Date()) {

@@ -7,6 +7,7 @@ import {
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
+import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
 import {
   defaultGetTasksStore,
   deleteKey,
@@ -138,7 +139,9 @@ export function createTasksHandler(deps = {}) {
         }
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
-        const next = normalizeTaskRecord(mergeTask(existing, parsed.value));
+        const next = normalizeTaskRecord(
+          applyDueDatePriorityFloor(mergeTask(existing, parsed.value), parsed.value)
+        );
         await setJSON(store, taskKey(id), next);
         return withCors(okResponse(200, next), request, env);
       }

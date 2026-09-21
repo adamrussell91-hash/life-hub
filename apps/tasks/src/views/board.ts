@@ -26,6 +26,7 @@ import { pageHeaderStatusSlot } from '@/shell/shell';
 import { requestToggleDone } from '@/views/dashboard';
 import { runningProjectIds } from '@/domain/dashboard-overview';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
+import { createPriorityAssessControls, maybeApplyPriorityFloors } from '@/views/priority-assess';
 
 /** Session-scoped project / domain filters for Kanban. */
 let boardProjectFilter: string | 'all' = 'all';
@@ -164,6 +165,12 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
   let projects: Awaited<ReturnType<typeof tasksApi.listProjects>>;
   try {
     [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
+    const floors = await maybeApplyPriorityFloors();
+    for (const updated of floors?.tasks ?? []) {
+      const index = tasks.findIndex((entry) => entry.id === updated.id);
+      if (index >= 0) tasks[index] = updated;
+      else tasks.push(updated);
+    }
   } catch (err) {
     canvas.replaceChildren(
       el('p', 'empty-state', err instanceof Error ? err.message : 'Could not load dashboard')
@@ -277,7 +284,10 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
     filterRow.root,
     renderQuickAdd((created) => {
       upsertTask(created);
-    }, boardProjectFilter === 'all' ? null : boardProjectFilter)
+    }, boardProjectFilter === 'all' ? null : boardProjectFilter),
+    createPriorityAssessControls({
+      onApplied: reloadBoard
+    }).el
   );
   if (boardRunningOnly) {
     const clear = el('button', 'btn btn--secondary', 'Running projects');

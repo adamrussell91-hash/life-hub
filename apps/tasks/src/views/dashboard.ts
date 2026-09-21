@@ -35,6 +35,7 @@ import {
 } from '@/views/hub-kit';
 import { mountDailyDial, type DailyDialHandle } from '@/views/daily-dial';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
+import { createPriorityAssessControls, maybeApplyPriorityFloors } from '@/views/priority-assess';
 
 export { renderProjectsView } from '@/views/projects';
 
@@ -141,6 +142,8 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   let dialFocusHour: number | null = null;
   try {
     [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
+    const floors = await maybeApplyPriorityFloors();
+    for (const updated of floors?.tasks ?? []) upsertTask(tasks, updated);
   } catch (err) {
     renderLoadError(canvas, err, () => void renderDayView(canvas), 'Could not load Today');
     return;
@@ -232,8 +235,14 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
     goClare.addEventListener('click', () => {
       window.dispatchEvent(new CustomEvent('tasks-hub:open-clare'));
     });
+    const assess = createPriorityAssessControls({
+      onApplied: async () => {
+        tasks = await tasksApi.listTasks().catch(() => tasks);
+        paint();
+      }
+    });
     clareLink.append(goClare);
-    canvas.append(clareLink);
+    canvas.append(clareLink, assess.el);
 
     const pressure = el('div', 'pressure-host');
     renderPressureStrips(pressure, tasks, today, () => void paint());

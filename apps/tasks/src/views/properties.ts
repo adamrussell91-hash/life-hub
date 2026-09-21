@@ -22,7 +22,7 @@ const SECTION_META: Record<
   },
   priorities: {
     title: 'Urgency / priority',
-    lede: 'How soon a task needs attention — urgent down to low.'
+    lede: 'How soon a task needs attention — urgent down to low. Due dates raise this automatically; Assess can lower it too.'
   },
   statuses: {
     title: 'Statuses',

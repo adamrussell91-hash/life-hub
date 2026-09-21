@@ -334,6 +334,15 @@ export const tasksApi = {
       reason: string | null;
     }>('/api/stress-flags', { action: 'intuitive_scan' }),
 
+  assessPriorities: (body?: { mode?: 'floor' | 'full'; apply?: boolean }) =>
+    apiPost<import('@/domain/priority-assess').PriorityAssessResult>('/api/priority-assess', {
+      mode: body?.mode ?? 'full',
+      apply: body?.apply === true
+    }).then((result) => {
+      if (result.tasks?.length) notifyTasksChanged(result.tasks);
+      return result;
+    }),
+
   raiseStressFlag: (body: {
     pattern_description: string;
     pattern_kind?: string;
