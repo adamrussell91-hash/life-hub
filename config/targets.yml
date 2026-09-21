@@ -12,3 +12,28 @@ trend_thresholds:
   skeletal_muscle_kg: [0.1, 0.3, 0.6]
   measurement_cm: [0.3, 0.8, 1.5]
   mood_score: [1, 2, 3]
+# Body-composition and strength forecast targets. Authoritative copy — do not
+# restate these numbers in UI code. The server mirror is targets-config.mjs.
+forecast:
+  body_composition:
+    weight_kg_min: 78
+    weight_kg_max: 82
+    body_fat_pct_min: 8
+    body_fat_pct_max: 10
+    body_fat_pct_tight: 8
+    shoulder_waist_ratio: 1.60
+  strength:
+    deadline: '2026-10-31'
+    lifts:
+      - id: chest-e1rm
+        label: Chest e1RM
+        exercise: Bar Press
+        e1rm_kg: 65
+      - id: arms-e1rm
+        label: Arms e1RM
+        exercise: Cable Bar Wide Grip Curl
+        e1rm_kg: 60
+      - id: back-e1rm
+        label: Back e1RM
+        exercise: Reverse Wide Grip Bent Over Row
+        e1rm_kg: 47

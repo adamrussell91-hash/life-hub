@@ -531,7 +531,7 @@ function buildMonthStats(events, from, to) {
   };
 }
 
-export function buildFitnessModel({ events, date, libraryByName = null }) {
+export function buildFitnessModel({ events, date, libraryByName = null, targetsConfig = null }) {
   if (!date) throw new RangeError('Fitness display date is unavailable');
   const workoutEvts = workoutEvents(events);
   const weekDates = enumerateDateKeys(addCalendarDays(date, -(WEEK_DAYS - 1)), date);
@@ -607,7 +607,8 @@ export function buildFitnessModel({ events, date, libraryByName = null }) {
       weekCompletedCount,
       weekTarget: WORKOUT_TARGET_PER_WEEK,
       monthDates,
-      workoutsPerWeek: longTerm.workoutsPerWeek
+      workoutsPerWeek: longTerm.workoutsPerWeek,
+      targetsConfig
     })
   };
 }

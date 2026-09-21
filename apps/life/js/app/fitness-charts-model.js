@@ -1,4 +1,5 @@
 import { addCalendarDays, daysBetween, enumerateDateKeys, formatWeekday, getSydneyWeekStart } from '../core/time.js';
+import { strengthTargets } from '../core/forecast-targets.js';
 import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
 import { MONTHS, minutesFromTime } from './chart-kit/polar-clock.js';
 import {
@@ -46,11 +47,6 @@ const TRAIN_BANDS = [
 ];
 const PUSH_NAME = /press|dip|push|fly|pec|bench/i;
 const PULL_NAME = /row|pull|curl|lat|chin/i;
-const E1RM_GOALS = [
-  { id: 'chest-e1rm', label: 'Chest e1RM', exercise: 'Bar Press', target: 65 },
-  { id: 'arms-e1rm', label: 'Arms e1RM', exercise: 'Cable Bar Wide Grip Curl', target: 60 },
-  { id: 'back-e1rm', label: 'Back e1RM', exercise: 'Reverse Wide Grip Bent Over Row', target: 47 }
-];
 
 function completedRecords(events, from, to) {
   return (events ?? [])
@@ -327,8 +323,8 @@ function currentExerciseE1rm(records, exerciseName) {
   return latest;
 }
 
-function goalDeadline(date) {
-  return `${String(date).slice(0, 4)}-10-31`;
+function goalDeadline(date, targetsConfig) {
+  return strengthTargets(targetsConfig).deadline ?? `${String(date).slice(0, 4)}-10-31`;
 }
 
 function buildFrequencyGoal(records, date, average) {
@@ -374,17 +370,20 @@ function buildLoadConsistencyGoal(records, date) {
   };
 }
 
-export function buildFitnessGoals({ events, date, workoutsPerWeek = null } = {}) {
+export function buildFitnessGoals({ events, date, workoutsPerWeek = null, targetsConfig = null } = {}) {
   const records = (events ?? [])
     .map(event => event?.record ?? event)
     .filter(record => record?.status === 'completed' && record.date && record.date <= date);
-  const deadline = goalDeadline(date);
-  const e1rmGoals = E1RM_GOALS.map(goal => {
+  const deadline = goalDeadline(date, targetsConfig);
+  const e1rmGoals = strengthTargets(targetsConfig).lifts.map(goal => {
     const latest = currentExerciseE1rm(records, goal.exercise);
     const current = roundOne(latest?.value);
     const remaining = current == null ? goal.target : Math.max(0, roundOne(goal.target - current));
     return {
-      ...goal,
+      id: goal.id,
+      label: goal.label,
+      exercise: goal.exercise,
+      target: goal.target,
       kind: 'e1rm',
       current,
       remaining,
@@ -394,13 +393,12 @@ export function buildFitnessGoals({ events, date, workoutsPerWeek = null } = {})
       complete: current != null && current >= goal.target
     };
   });
-  return [
-    e1rmGoals[0],
-    e1rmGoals[1],
-    buildFrequencyGoal(records, date, workoutsPerWeek),
-    e1rmGoals[2],
-    buildLoadConsistencyGoal(records, date)
-  ];
+  const frequency = buildFrequencyGoal(records, date, workoutsPerWeek);
+  const load = buildLoadConsistencyGoal(records, date);
+  if (e1rmGoals.length >= 3) {
+    return [e1rmGoals[0], e1rmGoals[1], frequency, e1rmGoals[2], ...e1rmGoals.slice(3), load];
+  }
+  return [...e1rmGoals, frequency, load];
 }
 
 function trainBandForMinutes(minutes) {
@@ -763,7 +761,8 @@ export function buildFitnessCharts({
   weekCompletedCount = 0,
   weekTarget = 4,
   monthDates = [],
-  workoutsPerWeek = null
+  workoutsPerWeek = null,
+  targetsConfig = null
 } = {}) {
   const from = monthDates[0] ?? addCalendarDays(date, -(MONTH_DAYS - 1));
   const windowDates = monthDates.length ? monthDates : enumerateDateKeys(from, date);
@@ -852,6 +851,6 @@ export function buildFitnessCharts({
     year: Number(String(date).slice(0, 4)),
     repRead: buildRepRead(buildRepRanges(records)),
     weekTarget,
-    fitnessGoals: buildFitnessGoals({ events, date, workoutsPerWeek })
+    fitnessGoals: buildFitnessGoals({ events, date, workoutsPerWeek, targetsConfig })
   };
 }

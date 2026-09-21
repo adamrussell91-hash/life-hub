@@ -46,7 +46,14 @@ test('builds today\'s macros, day type, and full target profile from the existin
       dinner: { protein_g: 0 },
       snack: { protein_g: 0 },
       dessert: { protein_g: 0 }
-    }
+    },
+    logged_calories: 1130,
+    logged_protein_g: 80,
+    logged_meal_count: 2,
+    meal_types: ['breakfast', 'lunch'],
+    nutrition_logging_status: 'complete',
+    daily_intake_kcal: 1130,
+    daily_intake_protein_g: 80
   });
   assert.equal(model.dayType, 'movement');
   assert.deepEqual(model.targets, {
