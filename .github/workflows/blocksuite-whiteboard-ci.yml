@@ -12,6 +12,7 @@ on:
       - 'netlify/functions/whiteboards.mjs'
       - 'netlify/functions/_shared/whiteboard-blobs.mjs'
       - 'netlify/functions/lesson-publish.mjs'
+      - 'tests/unit/whiteboard-documents.test.js'
       - '.github/workflows/blocksuite-whiteboard-ci.yml'
 
 permissions:
