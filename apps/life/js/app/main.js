@@ -49,6 +49,7 @@ import { createTasksApi } from './tasks-api.js';
 import { createScheduleApi } from './schedule-api.js';
 import { createShortcutsApi } from './shortcuts-api.js';
 import { renderShortcuts } from './render-shortcuts.js';
+import { renderFutureMap } from './render-future-map.js';
 import { createHubMapApi } from './hub-map-api.js';
 import { createHubMapController } from './hub-map-controller.js';
 import { createTeachingApi } from './teaching-api.js';
@@ -189,6 +190,7 @@ controller = createAppController({
   scheduleApi,
   shortcutsApi,
   renderShortcuts,
+  renderFutureMap,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,
@@ -232,7 +234,7 @@ document.addEventListener('keydown', (event) => {
     placeholder: 'Jump in Life Hub',
     groups: [{
       heading: 'Go to',
-      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'shortcuts'].map((id) => ({
+      items: ['home', 'chat', 'nutrition', 'fitness', 'body', 'mind', 'skincare', 'calendar', 'central-node', 'shortcuts', 'future-map'].map((id) => ({
         id,
         label: id.replace(/-/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()),
         onSelect: () => document.querySelector(`[data-section="${id}"]`)?.click()

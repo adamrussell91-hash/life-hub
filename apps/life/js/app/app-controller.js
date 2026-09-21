@@ -35,7 +35,8 @@ const MORE_SECTIONS = new Set([
   'mind',
   'skincare',
   'central-node',
-  'shortcuts'
+  'shortcuts',
+  'future-map'
 ]);
 
 const HASH_SECTIONS = new Set([
@@ -51,6 +52,7 @@ const HASH_SECTIONS = new Set([
   'mind',
   'central-node',
   'shortcuts',
+  'future-map',
   'hub-map'
 ]);
 
@@ -102,6 +104,7 @@ export function createAppController(dependencies) {
     scheduleApi,
     shortcutsApi,
     renderShortcuts,
+    renderFutureMap,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -203,7 +206,7 @@ export function createAppController(dependencies) {
   bind(root.querySelector('#sign-out-button'), 'click', () => void signOut());
   for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
     const target = button.dataset.section;
-    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'shortcuts' || target === 'more') continue;
+    if (target === 'home' || target === 'chat' || target === 'nutrition' || target === 'fitness' || target === 'skincare' || target === 'calendar' || target === 'body' || target === 'mind' || target === 'central-node' || target === 'shortcuts' || target === 'future-map' || target === 'more') continue;
     bind(button, 'click', () => {
       setStatus('This section arrives in a later Life Hub phase.');
       showProvider('This section arrives in a later Life Hub phase.', 'info');
@@ -238,6 +241,9 @@ export function createAppController(dependencies) {
   }
   for (const button of root.querySelectorAll?.('[data-section="shortcuts"]') ?? []) {
     bind(button, 'click', () => showSection('shortcuts'));
+  }
+  for (const button of root.querySelectorAll?.('[data-section="future-map"]') ?? []) {
+    bind(button, 'click', () => showSection('future-map'));
   }
   bind(root.querySelector('#central-node-map-button'), 'click', () => showSection('hub-map'));
   bindHubAccordion(root.querySelector('[data-hub-accordion]'));
@@ -645,6 +651,7 @@ export function createAppController(dependencies) {
     mind: { eyebrow: 'Mood and themes', title: 'Mind' },
     'central-node': { eyebrow: 'Coordination hub', title: 'Central Node' },
     shortcuts: { eyebrow: 'Action OS', title: 'Shortcuts' },
+    'future-map': { eyebrow: 'Bucket list and dreams jar', title: 'Future map' },
     'hub-map': { eyebrow: 'Every hub and page', title: 'Hub map' }
   };
 
@@ -702,6 +709,7 @@ export function createAppController(dependencies) {
     const mind = root.querySelector('#mind-dashboard');
     const centralNode = root.querySelector('#central-node-dashboard');
     const shortcuts = root.querySelector('#shortcuts-dashboard');
+    const futureMap = root.querySelector('#future-map-dashboard');
     const hubMapSection = root.querySelector('#hub-map-dashboard');
     if (home) home.hidden = name !== 'home';
     if (nutrition) nutrition.hidden = name !== 'nutrition';
@@ -714,6 +722,7 @@ export function createAppController(dependencies) {
     if (mind) mind.hidden = name !== 'mind';
     if (centralNode) centralNode.hidden = name !== 'central-node';
     if (shortcuts) shortcuts.hidden = name !== 'shortcuts';
+    if (futureMap) futureMap.hidden = name !== 'future-map';
     if (hubMapSection) hubMapSection.hidden = name !== 'hub-map';
     if (chat) chat.hidden = name !== 'chat' && !chatPanel?.isOpen?.();
   }
@@ -757,6 +766,7 @@ export function createAppController(dependencies) {
     if (name === 'mind') renderMindSection();
     if (name === 'central-node') renderCentralNodeSection();
     if (name === 'shortcuts') void loadShortcutsPanel();
+    if (name === 'future-map') void loadFutureMap();
     if (name === 'hub-map') void hubMap?.open();
     if (name === 'home') void loadHubPulse();
     const lifeDomain = name !== 'home' && name !== 'chat';
@@ -939,6 +949,10 @@ export function createAppController(dependencies) {
   }
 
   let shortcutsPanel = { catalog: [], promoted: [], proposal: null, agentSlug: null };
+  let futureMapTasks = [];
+  let futureMapKind = 'all';
+  let futureMapStatus = 'ready';
+  let futureMapError = '';
 
   function paintShortcuts(overrides = {}) {
     if (typeof renderShortcuts !== 'function') return;
@@ -956,6 +970,38 @@ export function createAppController(dependencies) {
         paintShortcuts();
       }
     });
+  }
+
+  function paintFutureMap() {
+    if (typeof renderFutureMap !== 'function') return;
+    renderFutureMap(root, {
+      status: futureMapStatus,
+      tasks: futureMapTasks,
+      kind: futureMapKind,
+      error: futureMapError,
+      onKind: (next) => {
+        futureMapKind = next || 'all';
+        paintFutureMap();
+      }
+    });
+  }
+
+  async function loadFutureMap() {
+    if (!tasksApi?.listTasks || typeof renderFutureMap !== 'function') return;
+    if (currentSection !== 'future-map') return;
+    futureMapStatus = 'loading';
+    futureMapError = '';
+    paintFutureMap();
+    try {
+      futureMapTasks = await tasksApi.listTasks();
+      if (currentSection !== 'future-map') return;
+      futureMapStatus = 'ready';
+      paintFutureMap();
+    } catch {
+      futureMapStatus = 'error';
+      futureMapError = 'Could not load the future map.';
+      paintFutureMap();
+    }
   }
 
   async function loadShortcutsPanel() {

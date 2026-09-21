@@ -154,6 +154,7 @@ const SHELL_FILES = [
   'js/app/mind-thread-sheet.js',
   'js/app/render-nutrition.js',
   'js/app/render-shortcuts.js',
+  'js/app/render-future-map.js',
   'js/app/render-skincare.js',
   'js/app/shortcuts-api.js',
   'js/app/skincare-api.js',

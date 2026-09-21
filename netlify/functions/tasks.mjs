@@ -6,7 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
-import { coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
+import { coerceOriginDate, coerceSomedayKind, coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
 import {
   defaultGetTasksStore,
@@ -44,6 +44,14 @@ function mergeTask(existing, patch) {
   const next = { ...existing };
   for (const [key, value] of Object.entries(patch)) {
     if (key === 'id' || key === 'schema_version' || key === 'created_at') continue;
+    if (key === 'someday_kind') {
+      next.someday_kind = coerceSomedayKind(value);
+      continue;
+    }
+    if (key === 'origin_date') {
+      next.origin_date = coerceOriginDate(value);
+      continue;
+    }
     next[key] = value;
   }
   next.updated_at = new Date().toISOString();
@@ -112,6 +120,8 @@ export function createTasksHandler(deps = {}) {
           maturity: typeof parsed.value.maturity === 'string' ? parsed.value.maturity : null,
           life_area: typeof parsed.value.life_area === 'string' ? parsed.value.life_area : null,
           horizon_target: typeof parsed.value.horizon_target === 'string' ? parsed.value.horizon_target : null,
+          someday_kind: coerceSomedayKind(parsed.value.someday_kind),
+          origin_date: coerceOriginDate(parsed.value.origin_date),
           linked_project_ids: coerceStringArray(parsed.value.linked_project_ids),
           linked_goal_ids: coerceStringArray(parsed.value.linked_goal_ids),
           odyssey_paths: Array.isArray(parsed.value.odyssey_paths) ? parsed.value.odyssey_paths : []
