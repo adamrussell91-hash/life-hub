@@ -96,8 +96,11 @@ async function readHome(page) {
     calories: document.querySelector('[data-value="calories"]')?.textContent,
     protein: document.querySelector('[data-value="protein"]')?.textContent,
     fat: document.querySelector('[data-value="fat"]')?.textContent,
-    streak: document.querySelector('[data-value="streak"]')?.textContent,
-    logging: document.querySelector('[data-value="logging"]')?.textContent,
+    pathsHeadline: document.querySelector('[data-home="paths-headline"]')?.textContent,
+    asLoggedStatus: document.querySelector('[data-home-path="as_logged"] [data-home-path-status]')?.dataset?.status,
+    onPlanStatus: document.querySelector('[data-home-path="on_plan"] [data-home-path-status]')?.dataset?.status,
+    stimulus: document.querySelector('[data-home="stimulus-rate"]')?.textContent,
+    scale: document.querySelector('[data-home="scale-headline"]')?.textContent,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
     railDisplay: getComputedStyle(document.querySelector('.desktop-rail')).display,
     mobileDisplay: getComputedStyle(document.querySelector('.mobile-nav')).display
@@ -146,40 +149,23 @@ test('signs in and renders the approved Home values at desktop width', async () 
   await signIn(page);
   const home = await readHome(page);
 
-  assert.deepEqual(home, {
-    calories: '1,130',
-    protein: '80 g',
-    fat: '27 g',
-    streak: '1',
-    logging: '3 of 5',
-    overflow: false,
-    railDisplay: 'flex',
-    mobileDisplay: 'none'
-  });
+  assert.equal(home.calories, '1,130');
+  assert.equal(home.protein, '80 g');
+  assert.equal(home.fat, '27 g');
+  assert.equal(home.overflow, false);
+  assert.equal(home.railDisplay, 'flex');
+  assert.equal(home.mobileDisplay, 'none');
+  assert.match(home.pathsHeadline, /logged|plan|forecast|data/i);
+  assert.match(home.asLoggedStatus, /locked|dated|will_not_arrive|complete/);
+  assert.match(home.onPlanStatus, /locked|dated|will_not_arrive|complete/);
+  assert.ok(home.stimulus);
+  assert.ok(home.scale);
   assert.equal(await page.locator('[data-ring="protein"]').count(), 1);
   assert.equal(await page.locator('[data-progress="protein"]').count(), 0);
+  assert.equal(await page.locator('[data-value="logging"]').count(), 0);
+  assert.equal(await page.locator('.week-strip').count(), 0);
+  assert.equal(await page.locator('[data-home="open-body"]').count(), 1);
 
-  await page.waitForFunction(() => {
-    const total = document.querySelector('[data-value="logging"]');
-    if (!total || !/\d+ of \d+/.test(total.textContent || '')) return false;
-    const wrap = total.closest('.hub-count');
-    return Boolean(wrap && !wrap.classList.contains('is-ticking') && wrap.querySelector('.hub-count__fx'));
-  });
-  const loggingOverlay = await page.evaluate(() => {
-    const total = document.querySelector('[data-value="logging"]');
-    const wrap = total?.closest('.hub-count');
-    const fx = wrap?.querySelector('.hub-count__fx');
-    return {
-      text: total?.textContent,
-      ticking: Boolean(wrap?.classList.contains('is-ticking')),
-      hasFx: Boolean(fx),
-      fxDisplay: fx ? getComputedStyle(fx).display : 'missing'
-    };
-  });
-  assert.equal(loggingOverlay.text, '3 of 5');
-  assert.equal(loggingOverlay.ticking, false);
-  assert.equal(loggingOverlay.hasFx, true);
-  assert.equal(loggingOverlay.fxDisplay, 'none');
   assert.match(await page.evaluate(() => sessionStorage.getItem('life-hub:session-expiry')), /^2026-/);
   assert.equal(await page.locator('#sign-in-view').isHidden(), true);
   await assertNoSecretResponses();
