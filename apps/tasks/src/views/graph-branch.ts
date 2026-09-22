@@ -112,7 +112,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   function applyPan(): void {
     stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   }
-  function applyFit(): void {
+  function applyFit(): { scale: number; panX: number; panY: number } {
     const fitted = fitBranchView(layout, {
       width: viewport.clientWidth || layout.width,
       height: viewport.clientHeight || layout.height
@@ -121,6 +121,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     panX = fitted.panX;
     panY = fitted.panY;
     applyPan();
+    return fitted;
   }
 
   const paint = (): void => {
@@ -503,10 +504,15 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     }
 
     stage.replaceChildren(svg);
-    applyFit();
+    const fitted = applyFit();
     viewport.querySelector('[data-part="minimap"]')?.remove();
-    const fittedH = viewport.clientWidth > 0 ? layout.height * (viewport.clientWidth / Math.max(layout.width, 1)) : 0;
-    const overflows = scale !== 1 || Math.abs(panX) > 2 || Math.abs(panY) > 2 || fittedH > viewport.clientHeight + 24;
+    const stillOverflows =
+      layout.height * scale > viewport.clientHeight + 24 || layout.width * scale > viewport.clientWidth + 24;
+    const userMoved =
+      Math.abs(scale - fitted.scale) > 0.02 ||
+      Math.abs(panX - fitted.panX) > 2 ||
+      Math.abs(panY - fitted.panY) > 2;
+    const overflows = stillOverflows || userMoved;
     if (overflows) {
       const mini = el('div', 'graph-minimap');
       mini.dataset.part = 'minimap';
