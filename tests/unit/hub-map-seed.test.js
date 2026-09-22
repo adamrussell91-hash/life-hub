@@ -9,6 +9,11 @@ test('the seed is a valid map', () => {
   assert.equal(result.ok, true);
 });
 
+test('the seed does not include the retired Life Shortcuts page', () => {
+  const { nodes } = buildHubMapSeed();
+  assert.equal(nodes.some(node => node.id === 'life-shortcuts' || node.route === '#shortcuts'), false);
+});
+
 test('the seed covers the five hubs and stays at template level', () => {
   const { nodes } = buildHubMapSeed();
   const hubs = nodes.filter(node => node.kind === 'hub' && node.id !== 'life-hub').map(node => node.hub);
