@@ -80,12 +80,26 @@ test.describe('Backlog', () => {
     await openBacklog(page, '#/list');
     await expect(page.getByRole('heading', { name: 'Backlog', level: 1 })).toBeVisible();
     await expect(page.locator('.page-header__copy > .page-header__eyebrow')).toHaveText('Views');
+    await expect(page.locator('.page-header__title-row .backlog-count')).toHaveCount(0);
+    await expect(page.locator('.page-header__title-row > *')).toHaveCount(1);
     await expect(page.locator('.backlog-zone')).toHaveCount(4);
     await expect(page.getByRole('button', { name: 'Triage' })).toBeVisible();
 
     await page.goto('/#/backlog');
     await expect(page.locator('.backlog-page')).toBeVisible();
     await expect(page.locator('.backlog-zone[data-zone="today"]')).toBeVisible();
+  });
+
+  test('task title opens the task page', async ({ page }) => {
+    await signIn(page);
+    const task = await createBacklogTask(page, `Open page ${Date.now()}`);
+    await openBacklog(page);
+    const title = page.locator(`[data-task-id="${task.id}"] .backlog-row__title`);
+    await expect(title).toHaveAttribute('href', `#/task/${task.id}`);
+    await title.click();
+    await expect(page).toHaveURL(new RegExp(`#/task/${task.id}`));
+    await expect(page.locator('.page-card')).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('.page-header__title-row .backlog-count')).toHaveCount(0);
   });
 
   test('quick add with a parsed date never lands in the backlog', async ({ page }) => {

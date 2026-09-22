@@ -26,7 +26,7 @@ import {
   vagueDateHint
 } from '@/domain/backlog';
 import { addDays, startOfDay, toDateKey } from '@/domain/queries';
-import { projectPageHash } from '@/domain/cards';
+import { projectPageHash, taskPageHash } from '@/domain/cards';
 import { tasksApi } from '@/services/client-api';
 import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
 import { getTaskPropertiesSync } from '@/services/task-properties';
@@ -39,12 +39,11 @@ import {
   el,
   priorityFilterOptions
 } from '@/views/hub-kit';
-import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
+import { renderQuickAdd } from '@/views/task-editor';
 import { parseBacklogTriage } from '@/shell/shell';
 import { createOutlineIcon } from '@/shell/icons';
 import { prefersReducedMotion } from '../../design-kit/js/hub-motion.js';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { enhanceInlineEdit } from '../../design-kit/js/hub-inline-edit.js';
 import { offerTimedUndo, showHubToast } from '../../design-kit/js/hub-feedback.js';
 
 const EASE = 'cubic-bezier(.2,.8,.2,1)';
@@ -503,12 +502,37 @@ function moveToProject(state: Session, ids: string[], projectId: string | null):
   announce(state.page, projectId ? 'Moved to project' : 'Moved to no project');
 }
 
-function openEditor(state: Session, task: Task): void {
-  const host = state.page.querySelector<HTMLElement>('.backlog-confirm') ?? state.page;
-  void renderTaskEditor(host, task, state.projects, (updated) => {
-    upsert(state.tasks, updated);
-    reconcile(state);
+function openTaskPage(task: Task): void {
+  location.hash = taskPageHash(task.id);
+}
+
+function startRename(title: HTMLElement, onCommit: (value: string) => void): void {
+  if (title.querySelector('input')) return;
+  const current = title.textContent?.trim() ?? '';
+  const input = el('input') as HTMLInputElement;
+  input.className = 'hub-inline-edit__input';
+  input.value = current;
+  input.setAttribute('aria-label', title.getAttribute('aria-label') || 'Rename task');
+  const commit = () => {
+    const next = input.value.trim() || current;
+    title.textContent = next;
+    if (next !== current) onCommit(next);
+  };
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      commit();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      title.textContent = current;
+    }
   });
+  input.addEventListener('blur', commit);
+  title.replaceChildren(input);
+  input.focus();
+  input.select();
 }
 
 function pickDate(state: Session, ids: string[]): void {
@@ -608,26 +632,14 @@ function bindRowChrome(state: Session, row: HTMLElement, task: Task): void {
       });
     }
   });
-  const title = row.querySelector<HTMLElement>('.backlog-row__title');
-  if (title) {
-    enhanceInlineEdit(title, {
-      onCommit: (value: string) => {
-        if (value && value !== task.title) void mutate(state, [task.id], { title: value });
-      }
-    });
-    title.addEventListener('dblclick', (event) => {
-      event.stopPropagation();
-      title.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    });
-  }
   row.addEventListener('click', (event) => {
     if ((event.target as HTMLElement).closest('button, input, a, .hub-inline-edit__input')) return;
     focusRow(state, task.id);
   });
   row.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' && !(event.target as HTMLElement).closest('input')) {
+    if (event.key === 'Enter' && !(event.target as HTMLElement).closest('input, a')) {
       event.preventDefault();
-      openEditor(state, task);
+      openTaskPage(task);
     }
   });
 
@@ -684,9 +696,9 @@ function buildRow(state: Session, rowModel: BacklogRow, extras: { stale?: boolea
   check.append(input, box, tick);
 
   const main = el('div', 'backlog-row__main');
-  const title = el('span', 'backlog-row__title', task.title);
-  title.setAttribute('data-hub-inline-edit', '');
-  title.setAttribute('aria-label', 'Rename task');
+  const title = el('a', 'backlog-row__title', task.title) as HTMLAnchorElement;
+  title.href = taskPageHash(task.id);
+  title.setAttribute('aria-label', task.title);
   main.append(title);
   if (extras.vague) {
     main.append(el('span', 'backlog-row__flag', vagueDateHint(task.title) ?? '· no date'));
@@ -710,6 +722,7 @@ function buildRow(state: Session, rowModel: BacklogRow, extras: { stale?: boolea
   actions.append(today, week, date, snooze, move, del);
 
   const menu = renderCardMenu(`${task.title} actions`, [
+    { id: 'open', label: 'Open', onSelect: () => openTaskPage(task) },
     { id: 'today', label: 'Move to… Today', onSelect: () => scheduleIds(state, selectedIds(state, task.id), toDateKey(viewNow()), 'today') },
     {
       id: 'week',
@@ -906,17 +919,8 @@ function paintZones(state: Session): void {
   }
 }
 
-function paintHeader(state: Session, view: BacklogView): void {
-  const titleRow = document.querySelector('.page-header__title-row');
-  if (titleRow) {
-    let pill = titleRow.querySelector<HTMLElement>('.backlog-count');
-    if (!pill) {
-      pill = el('span', 'backlog-count');
-      titleRow.append(pill);
-    }
-    pill.textContent = String(view.total);
-    pill.setAttribute('data-hub-count', '');
-  }
+function paintHeader(state: Session): void {
+  document.querySelector('.page-header__title-row .backlog-count')?.remove();
   const actions = document.querySelector('.page-header__actions');
   if (actions && !actions.querySelector('.backlog-header-actions')) {
     const cluster = el('div', 'backlog-header-actions');
@@ -1024,7 +1028,7 @@ function reconcile(state: Session): void {
   const vagueIds = new Set(
     suggestions.filter((item) => item.kind === 'vague_date').flatMap((item) => item.taskIds)
   );
-  paintHeader(state, view);
+  paintHeader(state);
   paintZones(state);
   paintSuggestions(state, suggestions);
   reconcileGroups(state, view, vagueIds);
@@ -1241,15 +1245,21 @@ function onKey(state: Session, event: KeyboardEvent): void {
     return;
   }
   if (key === 'e' || key === 'E') {
-    const row = current
+    const title = current
       ? state.page.querySelector<HTMLElement>(`[data-task-id="${current}"] .backlog-row__title`)
       : null;
-    row?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const task = current ? findTask(current) : null;
+    if (title && task) {
+      event.preventDefault();
+      startRename(title, (value) => {
+        if (value && value !== task.title) void mutate(state, [task.id], { title: value });
+      });
+    }
     return;
   }
   if (key === 'Enter' && current) {
     const task = findTask(current);
-    if (task) openEditor(state, task);
+    if (task) openTaskPage(task);
     return;
   }
   const targets = current ? selectedIds(state, current) : [...state.selected];
@@ -1380,7 +1390,7 @@ function paintTriage(state: Session): void {
     ['A', 'Archive', () => archiveIds(state, [task.id])],
     ['Space', 'Skip', () => skipTriage(state)],
     ['Z', 'Undo', () => undoTriage(state)],
-    ['Enter', 'Open', () => openEditor(state, task)],
+    ['Enter', 'Open', () => openTaskPage(task)],
     ['Esc', 'Exit', () => exitTriage(state)]
   ];
   for (const [key, label, fn] of buttons) {
@@ -1525,7 +1535,7 @@ function handleTriageKey(state: Session, event: KeyboardEvent): void {
     flash('A');
     archiveIds(state, [task.id]);
   } else if (key === 'Enter') {
-    openEditor(state, task);
+    openTaskPage(task);
   }
 }
 

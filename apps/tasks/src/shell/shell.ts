@@ -594,7 +594,9 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
   eyebrow.textContent = config.eyebrow;
   const title = restoreHeaderTitle(existingTitle);
   title.textContent = config.title;
-  titleRow.querySelectorAll('.hub-mark').forEach((el) => el.remove());
+  for (const child of [...titleRow.children]) {
+    if (!child.classList.contains('page-header__title')) child.remove();
+  }
   let supporting = copy.querySelector('.page-header__supporting');
   if (config.supporting) {
     if (!supporting) {

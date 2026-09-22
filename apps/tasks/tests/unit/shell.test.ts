@@ -78,7 +78,7 @@ describe('hub shell chrome', () => {
     expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
   });
 
-  it('strips a leftover title-row hub tile on re-render', () => {
+  it('strips leftover title-row chrome on re-render', () => {
     const root = document.createElement('div');
     const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
     renderPageHeader(refs, { eyebrow: 'Home', title: 'Dashboard' });
@@ -87,21 +87,31 @@ describe('hub shell chrome', () => {
     leftover.className = 'hub-mark';
     leftover.src = '/icons/tasks.svg';
     leftover.alt = '';
-    refs.pageHeader.querySelector('.page-header__title-row')?.prepend(leftover);
+    const count = document.createElement('span');
+    count.className = 'backlog-count';
+    count.textContent = '6';
+    const row = refs.pageHeader.querySelector('.page-header__title-row');
+    row?.prepend(leftover);
+    row?.append(count);
     expect(refs.pageHeader.querySelector('.hub-mark')).not.toBeNull();
+    expect(refs.pageHeader.querySelector('.backlog-count')?.textContent).toBe('6');
 
-    renderPageHeader(refs, { eyebrow: 'Home', title: 'Dashboard' });
+    renderPageHeader(refs, { eyebrow: 'Views', title: 'Today' });
     expect(refs.pageHeader.querySelector('.hub-mark')).toBeNull();
-    expect(refs.pageHeader.querySelector('.page-header__title')?.textContent).toBe('Dashboard');
+    expect(refs.pageHeader.querySelector('.backlog-count')).toBeNull();
+    expect(refs.pageHeader.querySelector('.page-header__title')?.textContent).toBe('Today');
+    expect(row?.children).toHaveLength(1);
   });
 
-  it('never puts a hub tile beside any view title', () => {
+  it('never puts a hub tile or count beside any view title', () => {
     const root = document.createElement('div');
     const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
     for (const view of knownHubViews()) {
       renderPageHeader(refs, viewChrome(view));
       expect(refs.pageHeader.querySelector('.hub-mark'), view).toBeNull();
+      expect(refs.pageHeader.querySelector('.backlog-count'), view).toBeNull();
       expect(refs.pageHeader.querySelector('img'), view).toBeNull();
+      expect(refs.pageHeader.querySelector('.page-header__title-row')?.children).toHaveLength(1);
     }
   });
 
