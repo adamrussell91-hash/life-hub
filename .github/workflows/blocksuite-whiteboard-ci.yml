@@ -16,37 +16,17 @@ on:
       - '.github/workflows/blocksuite-whiteboard-ci.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref }}
-          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Refresh lockfiles
-        run: |
-          npm install --package-lock-only --ignore-scripts
-          npm install --package-lock-only --ignore-scripts --prefix apps/teaching
-          npm install --package-lock-only --ignore-scripts --prefix apps/tasks
-
-      - name: Commit refreshed lockfiles
-        run: |
-          if git diff --quiet -- package-lock.json apps/teaching/package-lock.json apps/tasks/package-lock.json; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json apps/teaching/package-lock.json apps/tasks/package-lock.json
-          git commit -m "chore: refresh BlockSuite lockfiles"
-          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Install root dependencies
         run: npm ci --ignore-scripts
