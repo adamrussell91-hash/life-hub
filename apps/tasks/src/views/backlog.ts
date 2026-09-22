@@ -209,7 +209,9 @@ function enterRow(row: HTMLElement): void {
 }
 
 function domainLabel(id: string): string {
-  return getTaskPropertiesSync().domains.find((entry) => entry.id === id)?.label ?? id;
+  const raw = getTaskPropertiesSync().domains.find((entry) => entry.id === id)?.label ?? id;
+  if (!raw) return id;
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
 
 function effortLabel(row: BacklogRow): string | null {
