@@ -15,6 +15,7 @@ import {
 import { applyAgentAvatarToBubble, renderAgentHero, renderAgentPicker, renderChatEmpty } from './render-agent-picker.js';
 import { bindChatComposer } from './chat-composer.js';
 import { syncChatChrome, toggleChatChrome } from './chat-chrome.js';
+import { applyHubScrollHide } from '../../../../packages/design-kit/js/hub-motion.js';
 import { renderProtocolPills } from './render-protocol-pills.js';
 import { findProtocol, isAgentStatusLine, pickStatusLine } from './agent-protocols.js';
 import { isHammondAuditTrigger, nextAuditPhase } from './hammond-audit.js';
@@ -171,7 +172,9 @@ export function createChatController({
   }
 
   function paintRoster() {
-    const slug = stickyAgentSlug() ?? null;
+    // UI selection follows the locked agent only. Section defaults still route
+    // the next send via stickyAgentSlug(), but must not re-highlight the roster.
+    const slug = lockedAgentSlug();
     renderAgentPicker(root, {
       selectedSlug: slug,
       onSelect: selectAgent
@@ -309,13 +312,22 @@ export function createChatController({
     return flushInFlight;
   }
 
+  function revealAgentMenuChrome() {
+    if (typeof root.querySelectorAll !== 'function') return;
+    for (const el of root.querySelectorAll('[data-hub-scroll-hide]')) {
+      applyHubScrollHide(el, { force: false });
+    }
+  }
+
   function resetThread() {
     transcript = [];
     savedMindSessionThisThread = false;
     flushAttempted = false;
     clearAuditSession();
-    lastAgentSlug = pinnedAgentSlug;
-    lastAgentAt = pinnedAgentSlug ? now() : 0;
+    pinnedAgentSlug = null;
+    lastAgentSlug = null;
+    lastAgentAt = 0;
+    selectedProtocolId = null;
     sending = false;
     setChatBusy(root, false);
     showChatError(root, '');
@@ -325,8 +337,10 @@ export function createChatController({
     turnFollow = false;
     clearChatTurnAnchors(list);
     list?.replaceChildren?.();
-    const slug = stickyAgentSlug();
-    if (slug) applyAgentAccent(slug);
+    const panel = root.querySelector('#chat-view');
+    panel?.style?.removeProperty?.('--agent-accent');
+    renderAgentHero(root, null);
+    revealAgentMenuChrome();
     paintRoster();
     syncChatChrome(root);
     clearUnread();
@@ -465,8 +479,9 @@ export function createChatController({
     });
   }
 
-  // Hard-reset the visible thread and API memory, but keep whoever Adam pinned
-  // so the next message still goes to the same agent with the same accent.
+  // Hard-reset the visible thread and API memory, and return to the agent
+  // chooser. Sticky routing only resumes after Adam picks an avatar (or a
+  // section default answers the first free-typed send).
   function startNewChat() {
     if (flushInFlight) {
       return flushInFlight.finally(() => {
@@ -1072,7 +1087,7 @@ export function createChatController({
     flushVeraSession,
     startCentralNodeAudit,
     syncAccent,
-    getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
+    getSelectedAgentSlug: lockedAgentSlug,
     getSelectedProtocolId: () => selectedProtocolId,
     clearUnread
   };
