@@ -152,7 +152,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'event-new') {
-      renderPageHeader(shell, { eyebrow: 'Events', title: 'Add event' });
+      renderPageHeader(shell, {
+        eyebrow: 'Events',
+        title: 'Add event',
+        supporting: 'The left side is the record. Step through the rest.'
+      });
       await renderEventNewView(shell.canvas);
       return;
     }
