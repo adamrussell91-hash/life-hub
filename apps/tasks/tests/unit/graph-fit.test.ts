@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { fitBranchView } from '@/domain/graph-branch-layout';
+import { mountBranchView } from '@/views/graph-branch';
 import { lineLabelX, lineViewWidth, mountLinesView } from '@/views/graph-lines';
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
@@ -130,6 +131,41 @@ describe('graph page fit', () => {
     const x = Number(terminus?.getAttribute('x') ?? 0);
     const w = Number(terminus?.getAttribute('width') ?? 0);
     expect(x + (Number.isFinite(w) ? w : 0)).toBeLessThanOrEqual(632);
+    host.remove();
+  });
+
+  it('shows the Branch minimap only after the user leaves the fitted view', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountBranchView(host, {
+      tasks: [
+        task({ id: 'task_a', title: 'Station one', step_order: 0 }),
+        task({ id: 'task_b', title: 'Station two', step_order: 1, depends_on: ['task_a'] })
+      ],
+      projects: [project()],
+      now: new Date('2026-09-22T00:00:00.000Z'),
+      selectedId: null,
+      search: '',
+      insights: [],
+      hideDone: false,
+      reducedMotion: true,
+      onSelect: () => undefined,
+      onLink: () => undefined,
+      onUnlink: () => undefined,
+      onToggleHideDone: () => undefined,
+      onReviewInsight: () => undefined,
+      onWhatIf: () => undefined,
+      onApplyWhatIf: () => undefined
+    });
+    expect(host.querySelector('[data-part="minimap"]')).toBeNull();
+
+    const viewport = host.querySelector('.graph-branch__viewport');
+    viewport?.dispatchEvent(new WheelEvent('wheel', { deltaY: 80, ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(host.querySelector('[data-part="minimap"]')).not.toBeNull();
+
+    const fit = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Fit');
+    fit?.click();
+    expect(host.querySelector('[data-part="minimap"]')).toBeNull();
     host.remove();
   });
 });
