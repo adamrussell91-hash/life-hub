@@ -8,6 +8,11 @@ async function signIn(page) {
     await page.getByRole('button', { name: /sign in/i }).click();
   }
   await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(async () => {
+    await fetch('/api/reset-seed', { method: 'POST' });
+  });
+  await page.goto('/#/board');
+  await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('heading', { name: /Dashboard|Graph|Today/ })).toBeVisible();
 }
 
@@ -62,8 +67,8 @@ test('orbit pause button and space stop movement', async ({ page }) => {
   const body = page.locator('.or-body').first();
   if (!(await body.count())) return;
   const pause = page.getByRole('button', { name: /pause orbit|pause/i });
-  const before = await body.evaluate((el) => ({ cx: el.getAttribute('cx'), cy: el.getAttribute('cy') }));
   await pause.click();
+  const before = await body.evaluate((el) => ({ cx: el.getAttribute('cx'), cy: el.getAttribute('cy') }));
   await page.waitForTimeout(400);
   const afterPause = await body.evaluate((el) => ({ cx: el.getAttribute('cx'), cy: el.getAttribute('cy') }));
   expect(afterPause).toEqual(before);

@@ -8,7 +8,6 @@ import {
   pace,
   projectRoute,
   serviceStatus,
-  unlockCount,
   type ServiceStatusId
 } from '@/domain/graph-model';
 import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
@@ -68,14 +67,16 @@ function severityForService(status: ServiceStatusId): InsightSeverity | null {
 
 function blockedCause(project: Project, tasks: Task[], now: Date): Task | null {
   const route = projectRoute(project, tasks);
-  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const blocked: Task[] = [];
   for (const station of route.stations) {
-    if (!station.task) continue;
-    const state = nodeState(station.task, tasks, now);
-    if (state.state === 'blocked') return station.task;
+    if (station.task && nodeState(station.task, tasks, now).state === 'blocked') {
+      blocked.push(station.task);
+    }
   }
+  if (blocked.length) return blocked.find((task) => task.blocked_since) ?? blocked[0]!;
   const waiting = route.stations.find((s) => s.task && nodeState(s.task, tasks, now).state === 'waiting');
-  return waiting?.task ?? byId.get(route.mainline.find((s) => s.task && s.task.status !== 'done')?.id ?? '') ?? null;
+  if (waiting?.task) return waiting.task;
+  return route.mainline.find((s) => s.task && s.task.status !== 'done')?.task ?? null;
 }
 
 function daysBlocked(task: Task, now: Date): number {
@@ -185,10 +186,10 @@ export function buildGraphInsights(
     }
 
     const byId = new Map(tasks.map((t) => [t.id, t]));
+    const dependents = (id: string) => children.filter((item) => (item.depends_on ?? []).includes(id));
     for (const task of children) {
       if (task.status === 'done' || task.status === 'dead') continue;
-      if ((task.depends_on ?? []).length) continue;
-      if (!task.parent_task_id && path.length > 1 && !path.includes(task.id)) {
+      if (!task.parent_task_id && !(task.depends_on ?? []).length && path.length > 1 && !path.includes(task.id)) {
         const likely = path.find((id) => {
           const node = byId.get(id);
           return node && node.status !== 'done';
@@ -212,6 +213,32 @@ export function buildGraphInsights(
             ]
           });
         }
+      }
+      for (const other of children) {
+        if (other.id === task.id || other.status === 'done' || other.status === 'dead') continue;
+        if ((task.depends_on ?? []).includes(other.id) || (other.depends_on ?? []).includes(task.id)) continue;
+        if (task.step_order !== other.step_order) continue;
+        const shared = dependents(task.id).some((down) => (other.depends_on ?? []).includes(down.id) || dependents(other.id).some((item) => item.id === down.id));
+        if (!shared) continue;
+        const to = nodeState(other, tasks, now).state === 'blocked' ? other : task;
+        const from = to.id === other.id ? task : other;
+        if (insights.some((row) => row.id === `branch-link-${from.id}-${to.id}`)) continue;
+        insights.push({
+          id: `branch-link-${from.id}-${to.id}`,
+          view: 'branch',
+          severity: 'low',
+          anchor: { kind: 'link', from: from.id, to: to.id },
+          headline: 'Clare: link?',
+          detail: `${to.title} probably needs ${from.title} first.`,
+          proposal: [
+            {
+              kind: 'task_update',
+              summary: `Link ${to.title} to ${from.title}`,
+              task_id: to.id,
+              patch: { depends_on: [...(to.depends_on ?? []), from.id] }
+            }
+          ]
+        });
       }
     }
 
@@ -273,7 +300,6 @@ export function buildGraphInsights(
     });
   }
 
-  void unlockCount;
   return insights.filter((insight) => !isInsightDismissed(insight, dismissed));
 }
 

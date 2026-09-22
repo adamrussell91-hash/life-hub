@@ -1,82 +1,103 @@
 /**
- * Transit lines — promoted from the parked weight-line.
- * A project is a line. Tasks are stations. Geometry only; Tasks paints the page.
+ * Transit lines — geometry and motion constants for Tasks Graph Lines.
+ * Numbers come from docs/proposals/graph-reference/lines.html (port exactly).
  */
-import { fx, node, text } from './scene.js';
+import { fx } from './scene.js';
 
-export const TRANSIT_STATION_R = 7;
-export const TRANSIT_MILESTONE_R = 11;
-export const TRANSIT_LINE_Y = 36;
-export const TRANSIT_PAD_X = 28;
+/** Port exactly from the Lines reference `G` block. */
+export const TRANSIT_G = {
+  padL: 44,
+  termGap: 22,
+  trackW: 7,
+  branchW: 4.5,
+  travelledOpacity: 0.32,
+  labelY: -24,
+  subY: 30,
+  ghostLabelY: 50,
+  branchDrop: 78,
+  branchElbow: 16,
+  r: { done: 8, open: 8, current: 11, waiting: 8, blocked: 8, suggested: 8, milestone: 12, branch: 6 },
+  stroke: { open: 3.5, current: 4.5, halo: 2.5 },
+  termH: 30,
+  termPadX: 14,
+  minStep: 118,
+  vStep: 64,
+  vTrackX: 22,
+  vTrackW: 6,
+  barrierW: 7,
+  barrierH: 30,
+  barrierRx: 3.5,
+  hereR: 18,
+  ghostR: 13,
+  addR: 20,
+  linePadTop: 22
+};
 
-function stationX(index, count, width) {
-  if (count <= 1) return width / 2;
-  return TRANSIT_PAD_X + (index / (count - 1)) * (width - TRANSIT_PAD_X * 2);
+export const TRANSIT_EASE = 'cubic-bezier(.2,.8,.2,1)';
+export const TRANSIT_OVERSHOOT = 'cubic-bezier(.34,1.3,.64,1)';
+
+const measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+
+export function measureText(text, font) {
+  if (!measureCtx) return text.length * 7;
+  measureCtx.font = font;
+  return measureCtx.measureText(text).width;
 }
 
-export function buildTransitLine(input, { width = 720, height = 88, scale = false } = {}) {
+export function fitText(text, font, max) {
+  if (measureText(text, font) <= max) return text;
+  let next = text;
+  while (next.length > 1 && measureText(`${next}…`, font) > max) next = next.slice(0, -1);
+  return `${next}…`;
+}
+
+export function terminusWidth(label, date) {
+  return Math.ceil(measureText(`${label} · ${date}`, '600 13px Inter, ui-sans-serif, sans-serif')) + TRANSIT_G.termPadX * 2;
+}
+
+export function transitStep(width, stationCount, termW) {
+  const n = Math.max(stationCount, 1);
+  const trackEnd = width - termW - 4;
+  return (trackEnd - TRANSIT_G.termGap - TRANSIT_G.padL) / (n - 0.5);
+}
+
+export function transitXs(count, step) {
+  return Array.from({ length: count }, (_, i) => TRANSIT_G.padL + i * step);
+}
+
+export function transitTerminusX(lastX, step) {
+  return lastX + step * 0.5 + TRANSIT_G.termGap;
+}
+
+export function branchPath(x, y, endX) {
+  const e = TRANSIT_G.branchElbow;
+  const by = y + TRANSIT_G.branchDrop;
+  return `M${fx(x)} ${fx(y)}V${fx(by - e)}Q${fx(x)} ${fx(by)} ${fx(x + e)} ${fx(by)}H${fx(endX)}`;
+}
+
+export function verticalBranchPath(x0, y, count) {
+  const bx = x0 + 30;
+  const by = y + 44;
+  return `M${fx(x0)} ${fx(y)}V${fx(y + 26)}Q${fx(x0)} ${fx(y + 36)} ${fx(x0 + 10)} ${fx(y + 36)}H${fx(bx)}V${fx(by + (count - 1) * 52)}`;
+}
+
+/** Kept for older callers. Lines now paints from TRANSIT_G directly. */
+export function buildTransitLine(input, { width = 720, height = 88 } = {}) {
   const stations = input.stations ?? [];
-  const count = Math.max(1, stations.length);
-  const dates = stations.map((s) => s.dateKey).filter(Boolean);
-  const min = dates.length ? dates.reduce((a, b) => (a < b ? a : b)) : null;
-  const max = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
-  const y = TRANSIT_LINE_Y;
-  const placed = stations.map((station, index) => {
-    let x = stationX(index, count, width);
-    if (scale && min && max && station.dateKey) {
-      const span = Math.max(1, Date.parse(`${max}T00:00:00Z`) - Date.parse(`${min}T00:00:00Z`));
-      const t = (Date.parse(`${station.dateKey}T00:00:00Z`) - Date.parse(`${min}T00:00:00Z`)) / span;
-      x = TRANSIT_PAD_X + t * (width - TRANSIT_PAD_X * 2);
-    }
-    return { ...station, x, y, r: station.kind === 'milestone' ? TRANSIT_MILESTONE_R : TRANSIT_STATION_R };
-  });
-  const path = placed.map((s, i) => `${i ? 'L' : 'M'}${fx(s.x)} ${fx(s.y)}`).join(' ');
-  const nodes = [
-    node('path', { d: path, fill: 'none' }, { cls: 'tl-track', anim: 'draw', delay: input.delay ?? 0, dur: 600 }),
-    ...placed.map((s, i) =>
-      node('circle', { cx: fx(s.x), cy: fx(s.y), r: s.r }, {
-        cls: `tl-station tl-station--${s.state ?? 'open'}`,
-        hit: s.id,
-        anim: 'grow',
-        delay: (input.delay ?? 0) + i * 40,
-        origin: [s.x, s.y]
-      })
-    )
-  ];
-  if (input.terminusLabel) {
-    const last = placed[placed.length - 1];
-    if (last) {
-      nodes.push(text(last.x + 18, y + 4, input.terminusLabel, { size: 11, cls: 'tl-terminus' }));
-    }
-  }
-  return {
-    width,
-    height,
-    label: input.label ?? 'Transit line',
-    stations: placed,
-    path,
-    nodes,
-    hits: placed.map((s) => ({ id: s.id, title: s.title }))
-  };
+  const n = Math.max(1, stations.length);
+  const termW = terminusWidth(input.terminusLabel ?? 'End', input.terminusDate ?? '');
+  const step = transitStep(width, n, termW);
+  const xs = transitXs(n, step);
+  const y = step < TRANSIT_G.minStep ? 52 : 40;
+  const placed = stations.map((station, i) => ({
+    ...station,
+    x: xs[i],
+    y,
+    r: station.kind === 'milestone' ? TRANSIT_G.r.milestone : TRANSIT_G.r.open
+  }));
+  return { width, height, stations: placed, path: placed.map((s, i) => `${i ? 'L' : 'M'}${s.x} ${s.y}`).join(' ') };
 }
 
-export function wrapTransitStations(stations, width, rowGap = 56) {
-  const usable = Math.max(160, width - TRANSIT_PAD_X * 2);
-  const spacing = 56;
-  const perRow = Math.max(2, Math.floor(usable / spacing));
-  const rows = [];
-  for (let i = 0; i < stations.length; i += perRow) {
-    rows.push(stations.slice(i, i + perRow));
-  }
-  const points = [];
-  rows.forEach((row, r) => {
-    const y = TRANSIT_LINE_Y + r * rowGap;
-    const reverse = r % 2 === 1;
-    const ordered = reverse ? [...row].reverse() : row;
-    ordered.forEach((station, i) => {
-      const x = stationX(i, Math.max(row.length, 2), width);
-      points.push({ ...station, x, y, row: r });
-    });
-  });
-  return points;
+export function wrapTransitStations(stations, width) {
+  return buildTransitLine({ stations }, { width }).stations.map((s) => ({ ...s, row: 0 }));
 }

@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en" data-hub="tasks">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Graph reference: Orbit</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Token values mirror packages/design-kit/tokens.css. In the hub, use the var() names, never these literals. */
+:root{
+  --warm-white:#fbf8f2;--depth:#0a1536;--navy:#17375e;--shallow:#a7abb9;--wave:#376fb7;--high-sea:#f68620;--high-sea-ink:#a85a0c;
+  --ink:#13233a;--muted:#6b7788;--line:rgba(23,55,94,.10);--glass:rgba(255,255,255,.70);
+  --danger:#9b2c2c;--danger-surface:rgba(155,44,44,.08);--warning-surface:rgba(246,134,32,.12);
+  --font-ui:Inter,ui-sans-serif,sans-serif;--text-2xs:.6875rem;--text-xs:.75rem;--text-sm:.8125rem;--text-md:1.0625rem;
+  --radius-sm:.875rem;--radius-md:1.25rem;--radius-full:999px;
+  --elev-1:0 1px 2px rgba(20,35,70,.06);--elev-3:0 18px 48px rgba(39,55,74,.10),inset 0 1px 0 rgba(255,255,255,.96);
+  --tracking-caps:.08em;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+.page{max-width:1120px;margin:0 auto;padding:32px 24px 64px}
+.eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+h1{font-size:2rem;letter-spacing:-.015em;margin:4px 0 20px;color:var(--navy);font-weight:600}
+.pills{display:inline-flex;gap:4px;padding:4px;background:rgba(23,55,94,.05);border-radius:var(--radius-sm);margin-bottom:16px}
+.pills button{font:500 var(--text-sm)/1 var(--font-ui);border:0;background:none;color:var(--muted);padding:9px 16px;border-radius:10px}
+.pills button.is-active{background:#fff;color:var(--navy);box-shadow:var(--elev-1)}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--elev-3);padding:20px 24px 24px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 288px;gap:28px;align-items:start}
+.stage{position:relative}
+svg.orbit{display:block;width:100%;height:auto;touch-action:none}
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.btn{font:500 var(--text-sm)/1 var(--font-ui);border-radius:10px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--navy);white-space:nowrap;display:inline-flex;align-items:center;gap:8px}
+.btn svg{width:12px;height:12px}
+.btn--ghost{background:none;border-color:transparent;color:var(--muted)}
+.btn--primary{background:var(--navy);border-color:var(--navy);color:#fff}
+.ahead{display:flex;align-items:center;gap:10px;flex:1;min-width:240px}
+.ahead label{font-size:var(--text-xs);color:var(--muted);font-weight:500;white-space:nowrap}
+.ahead output{font:600 var(--text-sm)/1 var(--font-ui);color:var(--navy);min-width:132px;white-space:nowrap}
+input[type=range]{flex:1;accent-color:var(--wave);height:4px}
+.tip{position:absolute;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(20,35,70,.12);padding:10px 12px;font-size:var(--text-sm);line-height:1.4;white-space:nowrap;opacity:0;transform:translateY(4px);transition:opacity .12s,transform .12s}
+.tip.is-on{opacity:1;transform:none}
+.tip b{font-weight:600;display:block}
+.tip span{color:var(--muted)}
+.paused{position:absolute;top:8px;left:8px;font:600 var(--text-2xs)/1 var(--font-ui);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:999px;padding:6px 10px;opacity:0;transition:opacity .2s}
+.paused.is-on{opacity:1}
+/* Panel */
+.panel h3{font:600 var(--text-2xs)/1 var(--font-ui);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);margin:6px 0 12px}
+.load{display:grid;grid-template-columns:88px 1fr 34px;gap:8px 10px;align-items:center;font-size:var(--text-sm);margin-bottom:22px}
+.load .bar{height:8px;border-radius:4px;background:rgba(23,55,94,.06);overflow:hidden}
+.load .bar i{display:block;height:100%;border-radius:4px}
+.load .n{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.note{border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;font-size:var(--text-sm);line-height:1.45}
+.note--warn{background:var(--warning-surface);border:1px solid rgba(168,90,12,.18)}
+.note--danger{background:var(--danger-surface);border:1px solid rgba(155,44,44,.16)}
+.note__head{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:4px}
+.clare{width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;font:600 11px/22px var(--font-ui);text-align:center;flex:0 0 22px}
+.note p{margin:0 0 10px;color:var(--ink)}
+.note p span{color:var(--muted)}
+.note .row{display:flex;gap:6px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;font-size:var(--text-xs);color:var(--muted);margin-top:16px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;display:block}
+.demo{display:flex;gap:8px;margin:0 0 14px;font-size:12px;color:var(--muted);align-items:center;flex-wrap:wrap}
+.ring-lbl{font:600 10px/1 var(--font-ui);letter-spacing:.08em;text-transform:uppercase;fill:var(--muted)}
+.today{font:600 12px/1 var(--font-ui);fill:var(--navy)}
+.body{cursor:pointer}
+@media (max-width:760px){.layout{grid-template-columns:minmax(0,1fr)}.page{padding:20px 16px 48px}.card{padding:16px}.ahead{flex:1 1 100%;min-width:0;flex-wrap:wrap}.ahead input{flex:1 1 100%;order:3}.ahead output{min-width:0;flex:1}.load{grid-template-columns:96px 1fr 28px}}
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="eyebrow">Views</p>
+  <h1>Graph</h1>
+  <div class="pills"><button>Lines</button><button>Branch</button><button class="is-active">Orbit</button></div>
+  <div class="demo">Reference controls (not part of the product): <button class="btn" id="replay">Replay entrance</button></div>
+  <section class="card">
+    <div class="layout">
+      <div class="stage" id="stage">
+        <svg class="orbit" id="orb" viewBox="0 0 640 640" role="img" aria-label="Tasks orbiting today. Closer means sooner."></svg>
+        <div class="paused" id="pausedTag">Paused</div>
+        <div class="tip" id="tip"></div>
+        <div class="controls">
+          <button class="btn" id="pp" aria-pressed="false"></button>
+          <div class="ahead"><label for="ahead">Look ahead</label><input id="ahead" type="range" min="0" max="30" step="1" value="0"><output id="aheadOut">Today</output><button class="btn btn--ghost" id="now">Now</button></div>
+        </div>
+      </div>
+      <aside class="panel">
+        <h3>Load this week</h3>
+        <div class="load" id="load"></div>
+        <div id="notes"></div>
+        <div class="legend" id="legend"></div>
+      </aside>
+    </div>
+  </section>
+</div>
+<script>
+/* ---------- Geometry and physics (port exactly) ---------- */
+const O = { size:640, cx:320, cy:320, core:30, r0:52, rMax:262, later:292, horizon:30,
+  heatDays:14, base:0.000078, exp:1.35, sizes:[0,4.5,6.5,9.5], halo:2, trailMs:2200, trailMaxRad:1.3, trailOpacity:.22,
+  rings:[[7,'1 week'],[14,'2 weeks'],[30,'1 month']] };
+const DOMAINS = { teaching:{label:'Teaching',c:'#376fb7'}, professional:{label:'Professional',c:'#5d4e70'}, life:{label:'Life',c:'#2f7a4f'}, health:{label:'Health',c:'#f68620'} };
+const DANGER=[155,44,44];
+const BASE=new Date(2026,8,22);
+/* ---------- Fixture ---------- */
+const TASKS=[
+ ['Mark essays 9B','teaching',1,3],['Permission notes','teaching',2,3],['Excursion roll','teaching',2,1],['Parent email re Finals','teaching',2,1],
+ ['Book bus','teaching',3,1],['Year 10 reports','teaching',4,3],['Excursion form','teaching',7,2],['Seating maintenance','teaching',10,1],
+ ['Term 4 unit plan','teaching',20,3],['Ask Simone re room','teaching',-1,1],['Comp shortlist','life',5,2],['Josh leadership options','life',12,1],
+ ['HPGE draft procedures','professional',-3,3],['NESA assessor report','professional',8,3],['HALT advisory prep','professional',24,2],
+ ['Book dentist','health',28,1],['Renew first aid','health',41,1]
+].map(([title,domain,due,effort],i)=>({id:'o'+i,title,domain,due,effort}));
+const NS='http://www.w3.org/2000/svg';const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function s(t,a={},p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+function heatColour(h,k){const a=hex(h);return 'rgb('+a.map((v,i)=>Math.round(v+(DANGER[i]-v)*k)).join(',')+')'}
+/* Stable, well-spread start angle from the task id (FNV-1a, then Knuth multiplicative scramble). */
+function hashAngle(id){let x=2166136261;for(const ch of id){x^=ch.charCodeAt(0);x=Math.imul(x,16777619)>>>0}x=Math.imul(x,2654435761)>>>0;return x/4294967296*Math.PI*2}
+const fmt=d=>d.toLocaleDateString('en-AU',{weekday:'short',day:'numeric',month:'short'});
+function radiusFor(days){
+  if(days<=0)return 14+Math.min(-days,4)*3;               // overdue core, deeper = more overdue
+  if(days>O.horizon)return O.later;                        // "later" belt
+  return O.r0+(days/O.horizon)*(O.rMax-O.r0);
+}
+function heatFor(days){return days<=0?1:Math.max(0,Math.min(1,1-days/O.heatDays))}
+function omegaFor(r){return O.base*Math.pow(O.rMax/Math.max(r,14),O.exp)}
+
+/* ---------- Scene ---------- */
+const svg=document.getElementById('orb');
+const gRings=s('g',{},svg),gCol=s('g',{},svg),gTrails=s('g',{},svg),gBodies=s('g',{},svg),gTop=s('g',{},svg);
+s('circle',{cx:O.cx,cy:O.cy,r:O.core,fill:'rgba(155,44,44,.09)'},gRings);
+s('circle',{cx:O.cx,cy:O.cy,r:O.later,fill:'none',stroke:'rgba(23,55,94,.06)','stroke-width':22},gRings);
+O.rings.forEach(([d,l])=>{const r=radiusFor(d);
+  s('circle',{cx:O.cx,cy:O.cy,r,fill:'none',stroke:'rgba(23,55,94,.16)','stroke-dasharray':'2 6','stroke-linecap':'round'},gRings);
+  const t=s('text',{class:'ring-lbl',x:O.cx,y:O.cy-r-7,'text-anchor':'middle'},gRings);t.textContent=l;});
+const lt=s('text',{class:'ring-lbl',x:O.cx,y:O.cy-O.later-16,'text-anchor':'middle'},gRings);lt.textContent='Later';
+const td=s('text',{class:'today',x:O.cx,y:O.cy+4,'text-anchor':'middle'},gTop);td.textContent='Today';
+const selRing=s('circle',{r:0,fill:'none',stroke:'#376fb7','stroke-width':2,opacity:0},gTop);
+
+let lookAhead=0,tweenFrom=0,tweenStart=0,paused=reduced,hover=null,selected=null,entrance=0,last=performance.now(),easeOut=1;
+const bodies=TASKS.map(t=>{
+  const trail=s('path',{fill:'none','stroke-linecap':'round',opacity:O.trailOpacity},gTrails);
+  const g=s('g',{class:'body',tabindex:0,role:'button','aria-label':t.title},gBodies);
+  const c=s('circle',{r:O.sizes[t.effort],stroke:'#fff','stroke-width':O.halo},g);
+  const b={...t,a:hashAngle(t.id),trail,g,c,r:0};
+  g.addEventListener('pointerenter',()=>{hover=b;showTip(b)});
+  g.addEventListener('pointerleave',()=>{hover=null;hideTip()});
+  g.addEventListener('focus',()=>{hover=b;showTip(b)});g.addEventListener('blur',()=>{hover=null;hideTip()});
+  g.addEventListener('click',()=>{selected=selected===b?null:b});
+  return b;
+});
+/* ---------- Tooltip ---------- */
+const tip=document.getElementById('tip');
+function effDays(b){return b.due-lookAhead}
+function showTip(b){const d=effDays(b);const when=d<0?Math.abs(d)+' days overdue':d===0?'due today':'due in '+d+' days';
+  tip.innerHTML='<b>'+b.title+'</b><span>'+DOMAINS[b.domain].label+' · '+when+'</span>';
+  const box=svg.getBoundingClientRect(),sc=box.width/O.size;const x=+b.c.getAttribute('cx')*sc,y=+b.c.getAttribute('cy')*sc;
+  tip.style.left=Math.min(x+14,box.width-200)+'px';tip.style.top=(y-14)+'px';tip.classList.add('is-on');}
+function hideTip(){tip.classList.remove('is-on')}
+/* ---------- Frame loop: one rAF, delta time capped at 50ms ---------- */
+function frame(now){
+  const dt=Math.min(now-last,50);last=now;
+  const target=(paused||hover)?0:1;easeOut+=(target-easeOut)*Math.min(1,dt/120); // ease to a stop over ~200ms
+  const lt=reduced?1:Math.min(1,(now-tweenStart)/250);const la=tweenFrom+(lookAhead-tweenFrom)*(1-Math.pow(1-lt,3));
+  const ent=reduced?1:Math.min(1,(now-entrance)/700);
+  for(const b of bodies){
+    const d=b.due-la,targetR=radiusFor(d),k=heatFor(d);
+    const stagger=Math.min(1,Math.max(0,(ent*1.4)-k*0.4));const e=1-Math.pow(1-stagger,3)*(1-0.12*Math.sin(stagger*Math.PI));
+    const r=(O.rMax+40)+(targetR-(O.rMax+40))*e;b.r=r;
+    const w=omegaFor(r);b.a+=w*dt*easeOut;
+    const x=O.cx+r*Math.cos(b.a),y=O.cy+r*Math.sin(b.a),col=heatColour(DOMAINS[b.domain].c,k);
+    b.c.setAttribute('cx',x.toFixed(1));b.c.setAttribute('cy',y.toFixed(1));b.c.setAttribute('fill',col);
+    b.c.setAttribute('opacity',Math.min(1,stagger*1.5));
+    const L=Math.min(w*O.trailMs,O.trailMaxRad),a0=b.a-L;
+    b.trail.setAttribute('d',`M${(O.cx+r*Math.cos(a0)).toFixed(1)} ${(O.cy+r*Math.sin(a0)).toFixed(1)}A${r.toFixed(1)} ${r.toFixed(1)} 0 0 1 ${x.toFixed(1)} ${y.toFixed(1)}`);
+    b.trail.setAttribute('stroke',col);b.trail.setAttribute('stroke-width',O.sizes[b.effort]*.8);
+  }
+  if(selected){selRing.setAttribute('cx',selected.c.getAttribute('cx'));selRing.setAttribute('cy',selected.c.getAttribute('cy'));selRing.setAttribute('r',O.sizes[selected.effort]+6);selRing.setAttribute('opacity',1)}else selRing.setAttribute('opacity',0);
+  drawCollision(now);
+  document.getElementById('pausedTag').classList.toggle('is-on',paused);
+  requestAnimationFrame(frame);
+}
+/* ---------- Collisions: ≥3 tasks landing the same day within 7 days (use capacity minutes in the hub) ---------- */
+let collisionArc=null;
+function collisionDay(){const days={};bodies.forEach(b=>{const d=b.due-lookAhead;if(d>=0&&d<=7)(days[d]=days[d]||[]).push(b)});
+  return Object.entries(days).map(([d,l])=>({d:+d,l})).filter(x=>x.l.length>=3).sort((a,b)=>b.l.length-a.l.length)[0]}
+function drawCollision(now){
+  const c=collisionDay();
+  if(!c){if(collisionArc){collisionArc.remove();collisionArc=null}return}
+  const r=radiusFor(c.d);
+  // centre the arc on the average angle of the colliding bodies; span 40°
+  let sx=0,sy=0;c.l.forEach(b=>{sx+=Math.cos(b.a);sy+=Math.sin(b.a)});const mid=Math.atan2(sy,sx),span=0.35;
+  const p=a=>[(O.cx+r*Math.cos(a)).toFixed(1),(O.cy+r*Math.sin(a)).toFixed(1)];
+  const [x0,y0]=p(mid-span),[x1,y1]=p(mid+span);
+  if(!collisionArc){collisionArc=s('path',{fill:'none',stroke:'#a85a0c','stroke-width':7,'stroke-linecap':'round'},gCol)}
+  collisionArc.setAttribute('d',`M${x0} ${y0}A${r} ${r} 0 0 1 ${x1} ${y1}`);
+  collisionArc.setAttribute('opacity',reduced?.75:(.55+.3*(1+Math.sin(now/480))/2));
+}
+/* ---------- Panel ---------- */
+function renderPanel(){
+  const wk={};Object.keys(DOMAINS).forEach(k=>wk[k]=0);
+  bodies.forEach(b=>{const d=b.due-lookAhead;if(d>=0&&d<=7)wk[b.domain]+=1});
+  const max=Math.max(...Object.values(wk),1);
+  document.getElementById('load').innerHTML=Object.entries(DOMAINS).map(([k,v])=>`<span>${v.label}</span><div class="bar"><i style="width:${wk[k]/max*100}%;background:${v.c}"></i></div><span class="n">${wk[k]}</span>`).join('');
+  const c=collisionDay();const od=bodies.filter(b=>b.due-lookAhead<0);
+  let html='';
+  if(c){const dd=new Date(BASE);dd.setDate(BASE.getDate()+lookAhead+c.d);
+    html+=`<div class="note note--warn"><div class="note__head"><span class="clare">C</span>Collision on ${fmt(dd)}</div><p>${c.l.length} tasks land that day. <span>${c.l.map(b=>b.title).join(', ')}.</span></p><div class="row"><button class="btn btn--primary">Suggest a move</button><button class="btn btn--ghost">Dismiss</button></div></div>`;}
+  if(od.length)html+=`<div class="note note--danger"><div class="note__head"><span class="clare">C</span>${od.length} overdue</div><p>Spinning at the centre. <span>${od.map(b=>b.title).join(', ')}.</span></p><div class="row"><button class="btn">Show them</button></div></div>`;
+  document.getElementById('notes').innerHTML=html;
+  document.getElementById('legend').innerHTML=Object.values(DOMAINS).map(v=>`<span><i style="background:${v.c}"></i>${v.label}</span>`).join('')+`<span><i style="background:#9b2c2c"></i>Closing in</span><span>Size = effort</span>`;
+}
+/* ---------- Controls ---------- */
+const pp=document.getElementById('pp');
+function setPaused(p){paused=p;pp.setAttribute('aria-pressed',String(p));
+  pp.innerHTML=p?'<svg viewBox="0 0 12 12"><path d="M3 1.5v9l7-4.5z" fill="currentColor"/></svg>Play':'<svg viewBox="0 0 12 12"><rect x="2.5" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>Pause';}
+pp.onclick=()=>setPaused(!paused);
+addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='INPUT'&&e.target.tagName!=='BUTTON'){e.preventDefault();setPaused(!paused)}
+  if(e.key==='['||e.key===']'){const v=Math.max(0,Math.min(30,lookAhead+(e.key===']'?1:-1)));setAhead(v)}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)setPaused(true)});
+function setAhead(v){tweenFrom=lookAhead;tweenStart=performance.now();lookAhead=v;document.getElementById('ahead').value=v;
+  const dd=new Date(BASE);dd.setDate(BASE.getDate()+v);document.getElementById('aheadOut').textContent=v?`+${v} days · ${fmt(dd)}`:'Today';renderPanel();}
+document.getElementById('ahead').oninput=e=>setAhead(+e.target.value);
+document.getElementById('now').onclick=()=>setAhead(0);
+document.getElementById('replay').onclick=()=>{entrance=performance.now()};
+setPaused(paused);renderPanel();entrance=performance.now();requestAnimationFrame(frame);
+if(location.hash==='#ahead7')setTimeout(()=>setAhead(7),50);
+</script>
+</body>
+</html>

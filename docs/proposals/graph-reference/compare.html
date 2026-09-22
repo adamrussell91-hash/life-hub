@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Graph: reference vs build</title>
+<style>
+body{margin:0;font:14px/1.4 Inter,system-ui,sans-serif;background:#fbf8f2;color:#13233a}
+header{position:sticky;top:0;background:#fff;border-bottom:1px solid rgba(23,55,94,.1);padding:12px 20px;display:flex;gap:12px;align-items:center;z-index:2}
+button{font:inherit;border:1px solid rgba(23,55,94,.15);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+button.on{background:#17375e;color:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px}
+.row h2{grid-column:1/-1;margin:8px 0 0;font-size:15px}
+figure{margin:0;background:#fff;border-radius:12px;padding:8px;border:1px solid rgba(23,55,94,.1)}
+figcaption{font-size:12px;color:#6b7788;margin-bottom:6px}
+img{width:100%;display:block}
+.overlay{position:relative}
+.overlay img+img{position:absolute;inset:0;opacity:.5;mix-blend-mode:difference}
+</style></head>
+<body>
+<header><b>Reference (left) vs build (right)</b> <span style="color:#6b7788">Build images come from graph-visual.spec.mjs → compare/</span>
+<button id="mode">Switch to difference overlay</button></header>
+<main id="main"></main>
+<script>
+const shots=['lines-1280','lines-390','branch-1280','branch-trace-1280','orbit-1280','orbit-390'];
+let overlay=false;
+function draw(){document.getElementById('main').innerHTML=shots.map(s=>overlay
+ ?`<section class="row"><h2>${s}</h2><figure style="grid-column:1/-1" class="overlay"><img src="golden/${s}.png"><img src="compare/${s}.png"></figure></section>`
+ :`<section class="row"><h2>${s}</h2><figure><figcaption>Reference</figcaption><img src="golden/${s}.png"></figure><figure><figcaption>Build</figcaption><img src="compare/${s}.png" alt="not captured yet"></figure></section>`).join('')}
+document.getElementById('mode').onclick=e=>{overlay=!overlay;e.target.classList.toggle('on',overlay);e.target.textContent=overlay?'Switch to side by side':'Switch to difference overlay';draw()};
+draw();
+</script></body></html>

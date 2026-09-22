@@ -93,12 +93,43 @@ describe('buildGraphInsights', () => {
     expect(insights.some((row) => row.view === 'lines' && row.id.startsWith('lines-service'))).toBe(true);
   });
 
+  it('blames the station with blocked_since, not an earlier unfinished child', () => {
+    const pid = 'p-tom';
+    const tasks = [
+      task({ id: 't3', title: 'Permission notes', parent_project_id: pid, step_order: 3, status: 'in_progress' }),
+      task({ id: 't3a', title: 'Risk form', parent_project_id: pid, step_order: 1, parent_task_id: 't3', depends_on: ['t3'] }),
+      task({ id: 't4', title: 'Get bus quote', parent_project_id: pid, step_order: 4 }),
+      task({
+        id: 't5',
+        title: 'Book bus',
+        parent_project_id: pid,
+        step_order: 5,
+        depends_on: ['t4'],
+        blocked_since: '2026-09-18T09:00:00+10:00'
+      })
+    ];
+    const insights = buildGraphInsights(
+      tasks,
+      [project({ id: pid, title: 'Tournament of Minds', current_end_date: '2026-12-01' })],
+      now
+    );
+    const alert = insights.find((row) => row.id === `lines-service-${pid}`);
+    expect(alert?.detail).toMatch(/Book bus/);
+    expect(alert?.detail).not.toMatch(/Risk form/);
+  });
+
   it('emits a suggested station when the line is behind pace', () => {
     const tasks = [
       task({ id: 'a', title: 'A', step_order: 0, status: 'done' }),
-      task({ id: 'b', title: 'B', step_order: 1 })
+      task({ id: 'b', title: 'B', step_order: 1 }),
+      task({ id: 'c', title: 'C', step_order: 2 }),
+      task({ id: 'd', title: 'D', step_order: 3 })
     ];
-    const insights = buildGraphInsights(tasks, [project()], now);
+    const insights = buildGraphInsights(
+      tasks,
+      [project({ created_at: '2026-08-01T00:00:00.000Z', current_end_date: '2026-09-20' })],
+      now
+    );
     const suggest = insights.find((row) => row.id.startsWith('lines-suggest'));
     expect(suggest?.proposal?.[0]?.kind).toBe('task_create');
   });
