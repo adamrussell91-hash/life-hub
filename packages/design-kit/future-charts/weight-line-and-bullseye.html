@@ -1,0 +1,395 @@
+<title>Future Charts: Weight Line and Bullseye</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  color-scheme: light;
+  --cotton:#f5f1e9; --warm-white:#fbf8f2; --ink:#13233a; --muted:#6b7788; --navy:#17375e; --marine:#142b51;
+  --wave:#376fb7; --shallow:#a7abb9; --high-sea:#f68620; --high-sea-ink:#a85a0c;
+  --sage:#dfe9e1; --sage-ink:#3c5949; --peach:#f2dfd0; --peach-ink:#7a5038; --fat:#b0683a; --fat-fill:#e8c3a6;
+  --lean-fill:#b9cde6; --track:#e6ebf2; --line:rgba(23,55,94,.10); --shore:#eae7da;
+  --shadow-card:0 .65rem 1.75rem rgba(31,53,91,.06);
+  --font:Inter, ui-sans-serif, system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+body{background:var(--cotton);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;padding-inline:16px;padding-block:0 48px;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto}
+header.page{padding-block:36px 18px;display:grid;gap:10px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0}
+h1{font-size:clamp(26px,4vw,34px);letter-spacing:-.015em;line-height:1.15;margin:0;text-wrap:balance;font-weight:700;color:var(--navy)}
+.lede{margin:0;max-width:68ch;color:var(--ink)}
+.note{margin:0;max-width:68ch;color:var(--muted);font-size:13px}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--cotton) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding-block:10px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.seg{display:inline-flex;background:var(--warm-white);border:1px solid var(--line);border-radius:999px;padding:3px;gap:2px}
+.seg button{font:inherit;font-size:13px;font-weight:600;border:0;background:transparent;color:var(--muted);padding:6px 14px;border-radius:999px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--navy);color:#fff}
+.btn{font:inherit;font-size:13px;font-weight:600;border:1px solid var(--line);background:var(--warm-white);color:var(--navy);padding:7px 14px;border-radius:999px;cursor:pointer}
+.btn:hover,.seg button:hover:not([aria-pressed="true"]){background:#fff;color:var(--navy)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+
+section.metric{margin-top:34px;display:grid;gap:14px}
+.metric-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 20px}
+.metric-head h2{margin:0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.metric-head .value{font-size:30px;font-weight:700;letter-spacing:-.015em;color:var(--ink);line-height:1.1}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--sage);color:var(--sage-ink)}
+.chip.bad{background:var(--peach);color:var(--peach-ink)}
+.chip.neutral{background:var(--track);color:var(--muted)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px;align-items:start}
+.concept{background:var(--warm-white);border-radius:20px;box-shadow:var(--shadow-card);padding:18px 18px 16px;display:grid;gap:10px;border:1px solid rgba(23,55,94,.05)}
+.concept header{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start}
+.tag{width:26px;height:26px;border-radius:8px;background:var(--navy);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center}
+.concept h3{margin:0;font-size:16px;font-weight:700;color:var(--ink);line-height:1.3}
+.what{margin:2px 0 0;font-size:13px;color:var(--muted);line-height:1.4}
+.replay{width:30px;height:30px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--navy);cursor:pointer;font-size:15px;line-height:1}
+.replay:hover{background:var(--track)}
+.scope{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.scope b{color:var(--wave);font-weight:700}
+.stat{font-size:13px;color:var(--ink);min-height:1.4em}
+.stat strong{color:var(--navy)}
+.plot svg{display:block;width:100%;height:auto;overflow:visible}
+.plot .empty{font-size:13px;color:var(--muted);padding:28px 0;text-align:center}
+.why{margin:0;font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px;line-height:1.45}
+.controls{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.controls input[type=range]{flex:1;accent-color:var(--navy);min-width:0}
+
+/* SVG text + marks */
+.t{fill:var(--ink);font-family:var(--font)}
+.t-m{fill:var(--muted);font-family:var(--font)}
+.t-a{fill:var(--high-sea-ink);font-family:var(--font)}
+.t-s{fill:var(--sage-ink);font-family:var(--font)}
+.grid-l{stroke:var(--line);stroke-width:1}
+.hit{cursor:pointer}
+.pulse{transform-box:fill-box;transform-origin:center;animation:pulse 2.2s ease-out infinite}
+@keyframes pulse{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.6);opacity:0}}
+.cell{transition:fill .45s ease}
+
+#tip{position:fixed;z-index:20;pointer-events:none;background:var(--navy);color:#fff;border-radius:10px;padding:8px 11px;font-size:12px;line-height:1.4;max-width:240px;box-shadow:0 8px 24px rgba(10,21,54,.25)}
+#tip b{display:block;font-size:12.5px;margin-bottom:1px}
+#tip span{color:rgba(255,255,255,.72)}
+
+.upgrades{margin-top:40px;background:var(--warm-white);border-radius:20px;padding:20px 22px;display:grid;gap:10px;box-shadow:var(--shadow-card)}
+.upgrades h2{margin:0;font-size:16px;color:var(--navy)}
+.upgrades ul{margin:0;padding-left:18px;display:grid;gap:6px;max-width:80ch;font-size:14px}
+@media (prefers-reduced-motion: reduce){.pulse{animation:none}.cell{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="page">
+    <p class="eyebrow">Life Hub design kit · future charts</p>
+    <h1>The Weight Line and Bullseye rings</h1>
+    <p class="lede">★ Great graphs for the future. Designed for the Body page weight card in September 2026 and parked: both show progress beautifully but neither feels like going down, which weight needs. Keep them for a metric where the destination is a place, not a descent.</p>
+    <p class="note">Standalone prototype with sample data. Not in the chart library yet. Promote through CHARTS.md before any hub uses them.</p>
+  </header>
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Range">
+      <button type="button" data-range="monthly">Month</button>
+      <button type="button" data-range="six_month">6M</button>
+      <button type="button" data-range="year">Year</button>
+      <button type="button" data-range="five_year" aria-pressed="true">5Y</button>
+    </div>
+    <button type="button" class="btn" id="replay-all">↻ Replay all</button>
+  </div>
+  <section class="metric" id="sec-weight">
+    <div class="metric-head"><div><h2>Weight</h2><div class="value" data-count="weight">86.3 kg</div></div><div class="chips" id="chips-weight"></div></div>
+    <div class="grid" id="grid-weight"></div>
+  </section>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+(() => {
+const NS = 'http://www.w3.org/2000/svg';
+const TODAY = '2026-09-22';
+const TARGET = { wLo: 78, wHi: 82, fLo: 8, fHi: 10 };
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const d2n = s => Date.parse(s + 'T00:00:00Z') / 864e5;
+const n2d = n => new Date(Math.round(n) * 864e5).toISOString().slice(0, 10);
+const r1 = v => Math.round(v * 10) / 10;
+const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+const monYY = s => `${MON[+s.slice(5, 7) - 1]} ’${s.slice(2, 4)}`;
+const monYYYY = s => `${MON[+s.slice(5, 7) - 1]} ${s.slice(0, 4)}`;
+const full = s => `${+s.slice(8, 10)} ${MON[+s.slice(5, 7) - 1]} ${s.slice(0, 4)}`;
+const lin = ([d0, d1], [a, b]) => v => a + ((v - d0) / ((d1 - d0) || 1)) * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = t => 1 - Math.pow(1 - t, 3);
+const easeInOut = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeBack = t => { const c = 1.4; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+const RANGE_DAYS = { monthly: 30, six_month: 182, year: 365, five_year: 1826 };
+let RANGE = 'five_year';
+
+function rng(seed) { return () => { seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ---------- sample data ---------- */
+const anchors = [
+  ['2021-09-25', 103.6], ['2021-11-20', 104.9], ['2022-04-01', 112.7], ['2022-10-01', 115.8], ['2023-04-01', 114.0],
+  ['2023-10-01', 116.7], ['2024-01-20', 124.0], ['2024-04-12', 130.2], ['2024-06-20', 127.0], ['2024-10-01', 112.0],
+  ['2025-04-01', 96.5], ['2025-10-01', 90.0], ['2026-06-01', 87.3], ['2026-09-16', 86.8]
+].map(([d, v]) => [d2n(d), v]);
+function interp(n) {
+  if (n <= anchors[0][0]) return anchors[0][1];
+  for (let i = 1; i < anchors.length; i++) if (n <= anchors[i][0]) {
+    const [x0, y0] = anchors[i - 1], [x1, y1] = anchors[i];
+    const t = (n - x0) / (x1 - x0); const s = t * t * (3 - 2 * t);
+    return y0 + (y1 - y0) * s;
+  }
+  return anchors.at(-1)[1];
+}
+const R = rng(11);
+const WEIGHT = [];
+{
+  let n = d2n('2021-09-25'); const end = d2n('2026-09-16'); const tight = d2n('2025-01-01');
+  while (n <= end) { WEIGHT.push({ date: n2d(n), value: r1(interp(n) + (R() - .5) * 1.2) }); n += n < tight ? 8 + Math.floor(R() * 8) : 3 + Math.floor(R() * 3); }
+  WEIGHT.push({ date: '2026-09-19', value: 86.9 }, { date: TODAY, value: 86.3 });
+}
+const COMP = [
+  { date: '2021-11-20', fat: 35.2 }, { date: '2022-03-12', fat: 50.5 }, { date: '2022-09-17', fat: 55.0 },
+  { date: '2023-03-25', fat: 55.1 }, { date: '2023-11-04', fat: 59.2 },
+  { date: '2025-05-20', fat: 24.8, muscle: 36.0 }, { date: '2026-08-10', fat: 20.0, muscle: 39.9 },
+  { date: '2026-09-01', fat: 19.6, muscle: 39.9 }, { date: '2026-09-20', fat: 18.9, muscle: 40.2 }
+].map(c => ({ ...c, weight: weightOn(c.date) }));
+function weightOn(date) {
+  const n = d2n(date); let best = null, bd = 1e9;
+  for (const p of WEIGHT) { const d = Math.abs(d2n(p.date) - n); if (d < bd) { bd = d; best = p; } }
+  return bd <= 7 ? best.value : r1(interp(n));
+}
+const fromDate = () => n2d(d2n(TODAY) - (RANGE_DAYS[RANGE] - 1));
+const inRange = list => { const f = fromDate(); return list.filter(p => p.date >= f && p.date <= TODAY); };
+const PEAK = WEIGHT.reduce((a, b) => b.value > a.value ? b : a);
+const CUR = WEIGHT.at(-1);
+
+/* ---------- dom helpers ---------- */
+function S(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v != null) e.setAttribute(k, v);
+  if (parent) parent.append(e);
+  return e;
+}
+function T(parent, x, y, str, { size = 10.5, weight = 400, anchor = 'start', cls = 't' } = {}) {
+  const e = S('text', { x: r1(x), y: r1(y), 'font-size': size, 'font-weight': weight, 'text-anchor': anchor, class: cls }, parent);
+  e.textContent = str; return e;
+}
+function svgBox(host, w, h, label) {
+  host.replaceChildren();
+  return S('svg', { viewBox: `0 0 ${w} ${h}`, role: 'img', 'aria-label': label }, host);
+}
+function empty(host, msg) { host.replaceChildren(); const p = document.createElement('p'); p.className = 'empty'; p.textContent = msg; host.append(p); }
+function tween(ms, fn, { delay = 0, easing = ease } = {}) {
+  if (reduce || ms === 0) { fn(1); return Promise.resolve(); }
+  return new Promise(res => {
+    const start = performance.now() + delay;
+    const step = now => {
+      const t = clamp((now - start) / ms, 0, 1);
+      if (now >= start) fn(easing(t));
+      if (t < 1) requestAnimationFrame(step); else res();
+    };
+    requestAnimationFrame(step);
+  });
+}
+function monotone(pts) {
+  const n = pts.length; if (n < 2) return ''; if (n === 2) return `M${pts[0]}L${pts[1]}`;
+  const x = pts.map(p => p[0]), y = pts.map(p => p[1]); const dx = [], m = [];
+  for (let i = 0; i < n - 1; i++) { dx[i] = x[i + 1] - x[i] || 1e-6; m[i] = (y[i + 1] - y[i]) / dx[i]; }
+  const t = [m[0]]; for (let i = 1; i < n - 1; i++) t[i] = m[i - 1] * m[i] <= 0 ? 0 : (m[i - 1] + m[i]) / 2; t[n - 1] = m[n - 2];
+  for (let i = 0; i < n - 1; i++) { if (m[i] === 0) { t[i] = t[i + 1] = 0; continue; } const a = t[i] / m[i], b = t[i + 1] / m[i], s = a * a + b * b; if (s > 9) { const k = 3 / Math.sqrt(s); t[i] = k * a * m[i]; t[i + 1] = k * b * m[i]; } }
+  let d = `M${r1(x[0])},${r1(y[0])}`;
+  for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += `C${r1(x[i] + h)},${r1(y[i] + t[i] * h)} ${r1(x[i + 1] - h)},${r1(y[i + 1] - t[i + 1] * h)} ${r1(x[i + 1])},${r1(y[i + 1])}`; }
+  return d;
+}
+function rolling(pts, k) {
+  if (k <= 1) return pts.map(p => ({ ...p }));
+  return pts.map((p, i) => { const a = Math.max(0, i - k), b = Math.min(pts.length - 1, i + k); let s = 0; for (let j = a; j <= b; j++) s += pts[j].value; return { date: p.date, value: s / (b - a + 1) }; });
+}
+function bucket(pts, mode) {
+  if (mode === 'raw') return pts.map(p => ({ ...p }));
+  const key = d => mode === 'week' ? n2d(d2n(d) - ((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7)) : mode === 'month' ? d.slice(0, 7) + '-15' : mode === 'quarter' ? `${d.slice(0, 4)}-${String(Math.floor((+d.slice(5, 7) - 1) / 3) * 3 + 2).padStart(2, '0')}-15` : `${d.slice(0, 4)}-${+d.slice(5, 7) <= 6 ? '04-01' : '10-01'}`;
+  const m = new Map(); for (const p of pts) { const k = key(p.date); const b = m.get(k) ?? { s: 0, c: 0, last: p.date }; b.s += p.value; b.c++; b.last = p.date; m.set(k, b); }
+  return [...m.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, b]) => ({ date: k, value: b.s / b.c, n: b.c }));
+}
+function slopePerWeek(pts) {
+  if (pts.length < 3) return null; const xs = pts.map(p => d2n(p.date)), ys = pts.map(p => p.value);
+  const mx = xs.reduce((a, b) => a + b) / xs.length, my = ys.reduce((a, b) => a + b) / ys.length;
+  let num = 0, den = 0; xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
+  return den ? (num / den) * 7 : null;
+}
+
+/* ---------- tooltip ---------- */
+const tip = document.getElementById('tip');
+function showTip(evt, title, lines) {
+  tip.innerHTML = `<b>${title}</b>${lines.map(l => `<span>${l}</span>`).join('<br>')}`;
+  tip.hidden = false;
+  const cx = evt.clientX ?? 0, cy = evt.clientY ?? 0; const w = tip.offsetWidth, h = tip.offsetHeight;
+  tip.style.left = clamp(cx + 14, 8, innerWidth - w - 8) + 'px';
+  tip.style.top = clamp(cy - h - 12, 8, innerHeight - h - 8) + 'px';
+}
+const hideTip = () => { tip.hidden = true; };
+function bindHit(elm, title, lines) {
+  elm.classList.add('hit'); elm.setAttribute('tabindex', '0'); elm.setAttribute('aria-label', `${title}. ${lines.join('. ')}`);
+  elm.addEventListener('pointerenter', e => showTip(e, title, lines));
+  elm.addEventListener('pointermove', e => showTip(e, title, lines));
+  elm.addEventListener('pointerleave', hideTip);
+  elm.addEventListener('focus', () => { const r = elm.getBoundingClientRect(); showTip({ clientX: r.left + r.width / 2, clientY: r.top }, title, lines); });
+  elm.addEventListener('blur', hideTip);
+}
+addEventListener('scroll', hideTip, { passive: true });
+
+/* ======================================================================
+   WEIGHT B · The Weight Line (transit map)
+   ====================================================================== */
+function transit(host, stat, animate) {
+  const W = 360, H = 128, ly = 66, x0 = 22, x1 = 338;
+  const after = WEIGHT.filter(p => p.date >= PEAK.date);
+  const x = lin([PEAK.value, TARGET.wLo], [x0, x1]);
+  const svg = svgBox(host, W, H, 'Weight journey from the summit to the target band drawn as a transit line with a station every 10 kg');
+  const stations = [120, 110, 100, 90].filter(v => v < PEAK.value).map(v => ({ v, hit: after.find(p => p.value < v) }));
+  // tracks
+  S('line', { x1: x(CUR.value), x2: x(TARGET.wHi), y1: ly, y2: ly, stroke: '#a7abb9', 'stroke-width': 6, 'stroke-linecap': 'round', 'stroke-dasharray': '0 10' }, svg);
+  S('line', { x1: x(TARGET.wHi), x2: x1, y1: ly, y2: ly, stroke: '#9fc0a8', 'stroke-width': 12, 'stroke-linecap': 'round' }, svg);
+  const done = S('line', { x1: x0, x2: x0, y1: ly, y2: ly, stroke: '#17375e', 'stroke-width': 7, 'stroke-linecap': 'round' }, svg);
+  T(svg, (x(TARGET.wHi) + x1) / 2, ly - 16, 'Target', { size: 10.5, weight: 700, anchor: 'middle', cls: 't-s' });
+  T(svg, (x(TARGET.wHi) + x1) / 2, ly + 22, '78–82', { size: 9.5, anchor: 'middle', cls: 't-s' });
+  // summit terminus
+  const sG = S('g', {}, svg);
+  S('circle', { cx: x0, cy: ly, r: 8, fill: '#fbf8f2', stroke: '#17375e', 'stroke-width': 3.5 }, sG);
+  S('line', { x1: x0, x2: x0, y1: 26, y2: ly - 9, stroke: '#17375e', 'stroke-width': 1 }, sG);
+  T(sG, x0 - 6, 20, `Summit ${f1(PEAK.value)}`, { size: 10.5, weight: 700 });
+  T(sG, x0 - 6, ly + 22, monYY(PEAK.date), { size: 9.5, cls: 't-m' });
+  bindHit(sG, `Summit ${f1(PEAK.value)} kg`, [full(PEAK.date), 'Where the line starts']);
+  const sEls = [];
+  let prev = PEAK;
+  for (const s of stations) {
+    const sx = x(s.v); const g = S('g', { opacity: .35 }, svg);
+    S('circle', { cx: r1(sx), cy: ly, r: 6, fill: '#fbf8f2', stroke: '#17375e', 'stroke-width': 3 }, g);
+    T(g, sx, ly - 16, s.v, { size: 10.5, weight: 700, anchor: 'middle' });
+    const lab = s.hit ? monYY(s.hit.date) : 'next';
+    T(g, sx, ly + 22, lab, { size: 9.5, anchor: 'middle', cls: 't-m' });
+    let weeks = null;
+    if (s.hit) { weeks = Math.round((d2n(s.hit.date) - d2n(prev.date)) / 7); const mx = (x(prev === PEAK ? PEAK.value : prev.v) + sx) / 2; T(g, mx, ly + 40, `${weeks} wk`, { size: 9, anchor: 'middle', cls: 't-m' }); prev = { ...s.hit, v: s.v }; }
+    bindHit(g, `Below ${s.v} kg`, s.hit ? [`First on ${full(s.hit.date)}`, `${weeks} weeks after the previous station`, `${Math.round((d2n(s.hit.date) - d2n(PEAK.date)) / 7)} weeks after the summit`] : ['Not reached yet']);
+    sEls.push({ g, sx, reached: !!s.hit });
+  }
+  // you are here
+  const hx = x(CUR.value);
+  const here = S('g', { opacity: 0 }, svg);
+  S('line', { x1: hx, x2: hx, y1: 22, y2: ly - 8, stroke: '#a85a0c', 'stroke-width': 1.2 }, here);
+  T(here, hx, 16, `You are here · ${f1(CUR.value)}`, { size: 10.5, weight: 700, anchor: 'middle', cls: 't-a' });
+  const train = S('g', {}, svg);
+  S('circle', { cx: 0, cy: ly, r: 6, fill: '#f68620', class: 'pulse' }, train);
+  S('circle', { cx: 0, cy: ly, r: 6, fill: '#f68620', stroke: '#fbf8f2', 'stroke-width': 2.2 }, train);
+  const recent = WEIGHT.filter(p => d2n(p.date) >= d2n(TODAY) - 56);
+  const slope = slopePerWeek(recent);
+  const gap = CUR.value - TARGET.wHi;
+  const eta = slope != null && slope < -0.03 ? Math.round(gap / -slope) : null;
+  stat.innerHTML = `<strong>${stations.filter(s => s.hit).length} of ${stations.length}</strong> stations passed · last 8 weeks <strong>${slope == null ? '—' : (slope > 0 ? '+' : '−') + Math.abs(slope).toFixed(2)} kg/wk</strong>${eta && eta < 104 ? ` · band in ~${eta} wk` : ''}`;
+  return tween(animate ? 2000 : 0, t => {
+    const cx = x0 + (hx - x0) * t; done.setAttribute('x2', cx); train.setAttribute('transform', `translate(${r1(cx)},0)`);
+    for (const s of sEls) s.g.setAttribute('opacity', s.reached && cx >= s.sx - 1 ? 1 : .35);
+  }, { easing: easeInOut }).then(() => tween(animate ? 300 : 0, t => here.setAttribute('opacity', t)));
+}
+
+/* ======================================================================
+   WEIGHT C · Bullseye rings
+   ====================================================================== */
+function rings(host, stat, animate) {
+  const pts = inRange(WEIGHT);
+  if (pts.length < 2) return empty(host, 'Not enough weigh-ins in this range.');
+  const mode = RANGE === 'monthly' ? 'raw' : RANGE === 'six_month' ? 'week' : RANGE === 'year' ? 'month' : 'quarter';
+  const b = bucket(pts, mode);
+  const W = 360, H = 196, cx = 98, cy = 98;
+  const maxV = Math.max(...b.map(p => p.value), CUR.value + 2);
+  const r = lin([TARGET.wLo, maxV], [22, 90]);
+  const svg = svgBox(host, W, H, 'Weight as rings closing in on a target bullseye');
+  S('circle', { cx, cy, r: 92, fill: '#f5f1e9' }, svg);
+  S('circle', { cx, cy, r: r(TARGET.wHi), fill: '#dfe9e1' }, svg);
+  S('circle', { cx, cy, r: r(TARGET.wLo), fill: '#c9dccd' }, svg);
+  T(svg, cx, cy + 3.5, '80', { size: 10, weight: 700, anchor: 'middle', cls: 't-s' });
+  const g = S('g', { transform: `rotate(-90 ${cx} ${cy})` }, svg);
+  const pk = b.reduce((a, c) => c.value > a.value ? c : a);
+  const col = i => { const t = b.length > 1 ? i / (b.length - 1) : 1; const a = [167, 171, 185], z = [23, 55, 94]; return `rgb(${a.map((v, j) => Math.round(v + (z[j] - v) * t)).join(',')})`; };
+  const ringEls = b.map((p, i) => {
+    const isPk = p === pk;
+    const c = S('circle', { cx, cy, r: r1(r(p.value)), fill: 'none', stroke: isPk ? '#a85a0c' : col(i), 'stroke-width': isPk ? 1.6 : 1.3, 'stroke-opacity': isPk ? 1 : .35 + .55 * (i / Math.max(1, b.length - 1)), 'stroke-dasharray': isPk ? '3 3' : null }, g);
+    return { c, p, len: 2 * Math.PI * r(p.value), isPk };
+  });
+  const now = S('circle', { cx, cy, r: r(CUR.value), fill: 'none', stroke: '#17375e', 'stroke-width': 3.2, opacity: 0 }, svg);
+  const hl = S('circle', { cx, cy, r: 0, fill: 'none', stroke: '#f68620', 'stroke-width': 2.5, opacity: 0 }, svg);
+  // legend panel
+  const lx = 212;
+  const row = (yy, sw, a, bb) => { sw(yy); T(svg, lx + 22, yy + 4, a, { size: 11.5, weight: 700 }); T(svg, lx + 22, yy + 18, bb, { size: 9.5, cls: 't-m' }); };
+  row(38, yy => S('line', { x1: lx, x2: lx + 14, y1: yy, y2: yy, stroke: '#a85a0c', 'stroke-width': 1.8, 'stroke-dasharray': '3 3' }, svg), `${f1(pk.value)} kg`, `outermost ring · ${monYYYY(pk.date)}`);
+  row(82, yy => S('line', { x1: lx, x2: lx + 14, y1: yy, y2: yy, stroke: '#17375e', 'stroke-width': 3.2 }, svg), `${f1(CUR.value)} kg`, 'today');
+  row(126, yy => S('circle', { cx: lx + 7, cy: yy, r: 6, fill: '#dfe9e1', stroke: '#9fc0a8' }, svg), '78–82 kg', 'the bullseye');
+  T(svg, lx, 176, `${b.length} rings · one per ${mode === 'raw' ? 'weigh-in' : mode}`, { size: 9.5, cls: 't-m' });
+  // hover by radius
+  const pad = S('circle', { cx, cy, r: 94, fill: 'transparent', class: 'hit' }, svg);
+  pad.addEventListener('pointermove', e => {
+    const bb = svg.getBoundingClientRect(); const vx = (e.clientX - bb.left) * W / bb.width - cx, vy = (e.clientY - bb.top) * H / bb.height - cy;
+    const d = Math.hypot(vx, vy); let best = null, bd = 1e9; for (const rr of ringEls) { const dd = Math.abs(r(rr.p.value) - d); if (dd < bd) { bd = dd; best = rr; } }
+    if (!best || bd > 6) { hl.setAttribute('opacity', 0); hideTip(); return; }
+    hl.setAttribute('r', r(best.p.value)); hl.setAttribute('opacity', 1);
+    showTip(e, mode === 'raw' ? full(best.p.date) : mode === 'week' ? `Week of ${full(best.p.date)}` : mode === 'quarter' ? `Quarter around ${monYYYY(best.p.date)}` : monYYYY(best.p.date), [`${f1(best.p.value)} kg${best.p.n > 1 ? ` average of ${best.p.n}` : ''}`, `${f1(best.p.value - TARGET.wHi)} kg outside the bullseye`]);
+  });
+  pad.addEventListener('pointerleave', () => { hl.setAttribute('opacity', 0); hideTip(); });
+  stat.innerHTML = `Rings tighten as you close in · <strong>${f1(CUR.value - TARGET.wHi)} kg</strong> from the bullseye edge`;
+  for (const rr of ringEls) { rr.c.style.strokeDasharray = rr.isPk ? '' : `${rr.len} ${rr.len}`; rr.c.style.strokeDashoffset = rr.isPk ? 0 : rr.len; if (rr.isPk) rr.c.setAttribute('opacity', 0); }
+  const per = Math.min(90, 1300 / ringEls.length);
+  const draws = ringEls.map((rr, i) => tween(animate ? 380 : 0, t => { if (rr.isPk) rr.c.setAttribute('opacity', t); else rr.c.style.strokeDashoffset = rr.len * (1 - t); }, { delay: i * per }));
+  return Promise.all(draws).then(() => {
+    const from = r(pk.value), to = r(CUR.value);
+    return tween(animate ? 800 : 0, t => { now.setAttribute('opacity', 1); now.setAttribute('r', from + (to - from) * t); }, { easing: easeBack });
+  });
+}
+
+/* ---------- concept registry ---------- */
+const CONCEPTS = {
+  weight: [
+    { tag: 'B', name: 'The Weight Line', what: 'A transit line from the summit to the target band with a station every 10 kg, the date you first passed each one, and weeks between stops.', scope: 'journey', why: 'Turns a noisy line into milestones you can name. The dotted track ahead and the 8-week pace say how many stops are left. Pairs with your MindWorks transit-map style.', fn: transit },
+    { tag: 'C', name: 'Bullseye rings', what: 'Each month or quarter is a ring. Bigger weight, bigger ring. The target band is the bullseye, so the rings tighten as you close in.', scope: 'range', why: 'The most playful of the three and very compact. Density of rings shows how steady the months were. The final ring squeezes in from the peak to today.', fn: rings }
+  ]
+};
+
+const cards = [];
+for (const [key, list] of Object.entries(CONCEPTS)) {
+  const grid = document.getElementById('grid-' + key);
+  for (const c of list) {
+    const art = document.createElement('article'); art.className = 'concept';
+    art.innerHTML = `<header><span class="tag">${c.tag}</span><div><h3>${c.name}</h3><p class="what">${c.what}</p></div><button type="button" class="replay" aria-label="Replay ${c.name}">↻</button></header>
+      <div class="scope">${c.scope === 'range' ? 'Follows <b>range</b>' : c.scope === 'journey' ? 'Whole journey since the summit' : 'Every reading'}</div>
+      <div class="stat"></div><div class="plot"></div><p class="why">${c.why}</p>`;
+    grid.append(art);
+    const entry = { c, art, draw: (anim) => c.fn(art.querySelector('.plot'), art.querySelector('.stat'), anim, art) };
+    art.querySelector('.replay').addEventListener('click', () => entry.draw(true));
+    cards.push(entry);
+  }
+}
+
+/* ---------- headline chips ---------- */
+function chips() {
+  const w = inRange(WEIGHT), f = inRange(COMP), m = inRange(COMP).filter(p => p.muscle != null);
+  const chip = (label, good) => `<span class="chip ${good == null ? 'neutral' : good ? '' : 'bad'}">${label}</span>`;
+  const pct = (a, b) => ((b - a) / a) * 100;
+  const sg = v => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)}`;
+  const prevW = WEIGHT.at(-2), lastF = COMP.at(-1), prevF = COMP.at(-2), mus = COMP.filter(p => p.muscle != null);
+  document.getElementById('chips-weight').innerHTML = (w.length > 1 ? chip(`${sg(pct(w[0].value, w.at(-1).value))}% over range`, w.at(-1).value < w[0].value) : '') + chip(`${sg(CUR.value - prevW.value)} kg since last`, CUR.value < prevW.value);
+}
+function countUp(anim) {
+  const targets = { weight: [CUR.value, ' kg', PEAK.value], fat: [COMP.at(-1).fat, '%', COMP[0].fat], muscle: [COMP.at(-1).muscle, ' kg', 36.0] };
+  for (const el of document.querySelectorAll('[data-count]')) {
+    const [to, unit, fromV] = targets[el.dataset.count];
+    tween(anim ? 1400 : 0, t => { el.textContent = f1(fromV + (to - fromV) * t) + unit; }, { easing: ease });
+  }
+}
+function drawAll(anim) { hideTip(); chips(); countUp(anim); for (const c of cards) c.draw(anim); }
+
+document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => {
+  RANGE = b.dataset.range;
+  document.querySelectorAll('[data-range]').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  drawAll(true);
+}));
+document.getElementById('replay-all').addEventListener('click', () => drawAll(true));
+drawAll(true);
+})();
+</script>

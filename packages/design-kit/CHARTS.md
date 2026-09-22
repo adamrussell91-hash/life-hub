@@ -191,6 +191,17 @@ Agents may name catalog ids + focus/schedule payloads. They must not emit third-
 
 ---
 
+## Future charts — parked, not in the library
+
+★ **Great graphs for the future.** Finished designs kept for a later job. They are **not** library types: do not use them until promoted with a row above and a Log line. Prototypes and notes live in `packages/design-kit/future-charts/`.
+
+| Id | When it would fit | Prototype |
+|----|-------------------|-----------|
+| `weight-line` ★ | Milestone journey toward a destination (transit line, station per step, dates passed, "you are here"). | `future-charts/weight-line-and-bullseye.html` |
+| `bullseye-rings` ★ | Convergence on a target (rings per period tightening on a bullseye). | `future-charts/weight-line-and-bullseye.html` |
+
+---
+
 ## How to add or change a type
 
 1. Edit the module under the implementation root (or add one file there).
@@ -208,6 +219,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `weight-line`, `bullseye-rings` (future) | Parked in `future-charts/` with a ★ future flag. Designed for the Body weight card, rejected there because weight must read as going down. Not library types until promoted. |
 | 2026-09-22 | `gate-rings`, `region-rose`, `glide-slope`, `twin-clocks`, `recomp-plane`, `scene` | Home forecast cards get charts. Data from `home-forecast-charts.js`; engine adds display-only `trace`/`trace_range` per body scenario (`traceBodyScenario`), never changing forecast dates. Classes `hc-*` in `app.css`, tokens only. |
 | 2026-09-11 | Stars | Added the Knowledge-only saved constellation engine: controlled symbol templates, grounded note relationships, source-mapped synthesis, and annual night-sky placement. No Universe renderer changes. |
 | 2026-09-06 | `mood-mix` | Tasks project portfolio / home Projects tile consumes Life `mood-mix` donut for lifecycle share (“What’s the mix?”). Drops the board area-line spark. Typed consumer in `apps/tasks/src/chart-kit/mood-mix.ts`. |
