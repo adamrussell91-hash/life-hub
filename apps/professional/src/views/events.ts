@@ -10,14 +10,13 @@ import {
   isEventTaskLinkIncompleteError,
   linkEventTask,
   listEvents,
-  rescheduleEvent,
   retryEventLinks,
   retryEventTaskLink,
   updateEvent,
   type EventLinkInput
 } from '@/api/events';
 import { searchEntities } from '@/api/entities';
-import type { UniversalLinkEntry } from '@/api/universal-links';
+import { createUniversalLink, endUniversalLink, type UniversalLinkEntry } from '@/api/universal-links';
 import { ApiClientError } from '@/api/client';
 import { eventRoute } from '@/app/router';
 import type { EventCertificate, EventOccurrenceState, EventRecord } from '@/domain/types';
@@ -141,11 +140,71 @@ function monthTitle(year: number, month: number): string {
   return new Date(year, month, 1).toLocaleString('en-AU', { month: 'long', year: 'numeric' });
 }
 
-export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
+interface EventComposeDraft {
+  title?: string;
+  start?: string;
+  end?: string;
+  timeZone?: string;
+  location?: string | null;
+  allDay?: boolean;
+  hours?: number | null;
+  accreditation?: string | null;
+  certificate?: EventCertificate | null;
+  chips?: Array<{
+    id: string;
+    ref: string;
+    label: string;
+    relationshipType?: string | null;
+    state: 'pending' | 'saved';
+    supportingLabel?: string | null;
+    href?: string | null;
+  }>;
+}
+
+interface EventComposePayload {
+  title: string;
+  startIso: string;
+  endIso: string;
+  timeZone: string;
+  allDay: boolean;
+  location: string | null;
+  hours: number | null;
+  accreditation: string | null;
+  certificate: EventCertificate | null;
+  pendingLinks: EventLinkInput[];
+}
+
+function chipsFromLinks(entries: UniversalLinkEntry[]): NonNullable<EventComposeDraft['chips']> {
+  return entries.map((entry) => {
+    const type = entry.link.relationship_type;
+    const label = entry.endpoint?.display_label ?? entry.link.target_ref;
+    const role = entry.link.role ?? null;
+    const suffix = role || type;
+    return {
+      id: entry.link.id,
+      ref: entry.endpoint?.ref ?? entry.link.target_ref,
+      label: suffix ? `${label} (${suffix})` : label,
+      relationshipType: type,
+      state: 'saved' as const,
+      supportingLabel: role,
+      href: entry.endpoint?.href ?? null
+    };
+  });
+}
+
+export async function renderEventNewView(
+  canvas: HTMLElement,
+  options: {
+    draft?: EventComposeDraft;
+    onCancel?: () => void;
+    onSave?: (payload: EventComposePayload) => Promise<void>;
+  } = {}
+): Promise<void> {
   canvas.replaceChildren();
   const form = document.createElement('form');
   form.className = 'event-form event-compose';
   form.noValidate = true;
+  const draft = options.draft;
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -165,9 +224,13 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   end.className = 'event-compose__sr';
   end.setAttribute('aria-label', 'Ends');
   const now = new Date();
-  const zone = defaultZone();
-  start.value = utcIsoToWallLocal(now.toISOString(), zone);
-  end.value = utcIsoToWallLocal(new Date(now.getTime() + 2 * 60 * 60_000).toISOString(), zone);
+  const zone = draft?.timeZone || defaultZone();
+  start.value = utcIsoToWallLocal(draft?.start ?? now.toISOString(), zone);
+  end.value = utcIsoToWallLocal(
+    draft?.end ?? new Date(now.getTime() + 2 * 60 * 60_000).toISOString(),
+    zone
+  );
+  if (draft?.title) title.value = draft.title;
 
   const timeZone = document.createElement('input');
   timeZone.type = 'text';
@@ -178,9 +241,11 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   locationField.type = 'text';
   locationField.placeholder = 'Location';
   locationField.setAttribute('aria-label', 'Location');
+  if (draft?.location) locationField.value = draft.location;
 
   const allDay = document.createElement('input');
   allDay.type = 'checkbox';
+  allDay.checked = Boolean(draft?.allDay);
   allDay.setAttribute('aria-label', 'All day');
 
   const hours = document.createElement('input');
@@ -189,25 +254,30 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   hours.step = '0.5';
   hours.placeholder = 'Hours';
   hours.setAttribute('aria-label', 'Hours');
+  if (draft?.hours != null) hours.value = String(draft.hours);
 
   const accreditation = document.createElement('input');
   accreditation.type = 'text';
   accreditation.placeholder = 'Accreditation category';
   accreditation.setAttribute('aria-label', 'Accreditation category');
+  if (draft?.accreditation) accreditation.value = draft.accreditation;
 
   const certName = document.createElement('input');
   certName.type = 'text';
   certName.placeholder = 'Certificate name';
   certName.setAttribute('aria-label', 'Certificate name');
+  if (draft?.certificate?.name) certName.value = draft.certificate.name;
 
   const certReference = document.createElement('input');
   certReference.type = 'text';
   certReference.placeholder = 'Certificate reference';
   certReference.setAttribute('aria-label', 'Certificate reference');
+  if (draft?.certificate?.reference) certReference.value = draft.certificate.reference;
 
   const certIssuedAt = document.createElement('input');
   certIssuedAt.type = 'date';
   certIssuedAt.setAttribute('aria-label', 'Certificate issued at');
+  certIssuedAt.value = issuedAtDateValue(draft?.certificate);
 
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
@@ -233,11 +303,23 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   knowledgeInput.placeholder = 'Type @ to link a Knowledge page';
   knowledgeInput.setAttribute('aria-label', 'Related knowledge page');
 
+  const status = el('p', 'event-form__status');
+  status.hidden = true;
+
   const chipsHost = el('div', 'event-form__chips');
   const chipList = createEntityChipList({
     container: chipsHost,
-    chips: [],
-    onRemovePending: () => undefined
+    chips: draft?.chips ?? [],
+    onRemovePending: () => undefined,
+    onEndSaved: (chip: { id: string }) => {
+      void endUniversalLink(chip.id)
+        .then(() => chipList.removeById(chip.id))
+        .catch((err: unknown) => {
+          status.hidden = false;
+          status.textContent = err instanceof ApiClientError ? err.message : 'Could not remove that link.';
+        });
+    },
+    endLabel: 'Remove'
   });
 
   const picker = createEntityPicker({
@@ -350,12 +432,17 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     }
   });
 
-  const status = el('p', 'event-form__status');
-  status.hidden = true;
   const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
   save.type = 'submit';
-  const cancel = el('a', 'btn btn--ghost', 'Cancel');
-  cancel.href = '#/events';
+  const cancel = options.onCancel
+    ? (el('button', 'btn btn--ghost', 'Cancel') as HTMLButtonElement)
+    : (el('a', 'btn btn--ghost', 'Cancel') as HTMLAnchorElement);
+  if (cancel instanceof HTMLButtonElement) {
+    cancel.type = 'button';
+    cancel.addEventListener('click', () => options.onCancel?.());
+  } else {
+    cancel.href = '#/events';
+  }
 
   const allDayLabel = el('label', 'event-compose__switch');
   allDayLabel.append(allDay, document.createTextNode(' All day'));
@@ -460,7 +547,9 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     endTime.disabled = allDay.checked;
   });
 
-  let selectedKind: (typeof EVENT_KINDS)[number] = EVENT_KINDS[0];
+  const draftKindLabel = draft?.accreditation?.split(' · ')[0] ?? '';
+  let selectedKind: (typeof EVENT_KINDS)[number] =
+    EVENT_KINDS.find((kind) => kind.label === draftKindLabel) ?? EVENT_KINDS[0];
   const typeButtons: HTMLButtonElement[] = [];
   const typeGrid = el('div', 'event-compose__types');
   for (const kind of EVENT_KINDS) {
@@ -486,7 +575,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
 
   hours.className = 'event-compose__sr';
   hours.value = hours.value || '0';
-  const hoursValue = el('b', 'event-compose__stepper-value', '0.0');
+  const hoursValue = el('b', 'event-compose__stepper-value', hours.value === '0' ? '0.0' : Number(hours.value).toFixed(1));
   function paintHours(): void {
     const value = Number(hours.value || 0);
     hoursValue.textContent = value.toFixed(1);
@@ -511,6 +600,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   const hoursRow = el('div', 'event-compose__hours');
   hoursRow.append(hoursCopy, stepper);
 
+  const draftPriority = draft?.accreditation?.split(' · ')[1] ?? '';
   const chipButtons: HTMLButtonElement[] = [];
   const chipRow = el('div', 'event-compose__chips');
   for (const area of PRIORITY_AREAS) {
@@ -518,7 +608,9 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     chip.type = 'button';
     chip.className = 'event-compose__chip';
     chip.textContent = area;
-    chip.setAttribute('aria-pressed', 'false');
+    const selected = area === draftPriority;
+    chip.classList.toggle('is-on', selected);
+    chip.setAttribute('aria-pressed', selected ? 'true' : 'false');
     chip.addEventListener('click', () => {
       const on = !chip.classList.contains('is-on');
       chipButtons.forEach((node) => {
@@ -535,8 +627,10 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     const priority = chipButtons.find((node) => node.classList.contains('is-on'))?.textContent ?? '';
     accreditation.value = [selectedKind.label, priority].filter(Boolean).join(' · ');
   }
-  syncAccreditation();
+  if (!draft?.accreditation) syncAccreditation();
   paintHours();
+  startTime.disabled = allDay.checked;
+  endTime.disabled = allDay.checked;
 
   function section(title: string, ...nodes: HTMLElement[]): HTMLElement {
     const card = el('section', 'event-detail__card event-compose__section');
@@ -626,20 +720,36 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
           : {})
       };
     });
+    const payload: EventComposePayload = {
+      title: title.value,
+      startIso,
+      endIso,
+      timeZone: timeZone.value,
+      allDay: allDay.checked,
+      location: locationField.value || null,
+      hours: hours.value ? Number(hours.value) : null,
+      accreditation: accreditation.value || null,
+      certificate: certificateFromFields(certName.value, certReference.value, certIssuedAt.value),
+      pendingLinks: links
+    };
     try {
+      if (options.onSave) {
+        await options.onSave(payload);
+        return;
+      }
       const result = await createEvent({
-        title: title.value,
+        title: payload.title,
         event_type: 'professional_development',
-        start: startIso,
-        end: endIso,
-        time_zone: timeZone.value,
-        all_day: allDay.checked,
-        location_text: locationField.value || null,
-        hours: hours.value ? Number(hours.value) : null,
-        accreditation_category: accreditation.value || null,
+        start: payload.startIso,
+        end: payload.endIso,
+        time_zone: payload.timeZone,
+        all_day: payload.allDay,
+        location_text: payload.location,
+        hours: payload.hours,
+        accreditation_category: payload.accreditation,
         attendance_state: 'registered',
-        certificate: certificateFromFields(certName.value, certReference.value, certIssuedAt.value),
-        links
+        certificate: payload.certificate,
+        links: payload.pendingLinks
       });
       window.location.hash = eventRoute(result.event.id);
     } catch (err) {
@@ -764,29 +874,77 @@ export async function renderEventDetailView(
     }
 
     const canReschedule = record.occurrence_state === 'scheduled' || record.occurrence_state === 'rescheduled';
-    const editPanel = el('section', 'event-detail__card event-detail__panel');
-    editPanel.hidden = true;
-    const reschedulePanel = el('section', 'event-detail__card event-detail__panel');
-    reschedulePanel.hidden = true;
 
     const headerActions = el('div', 'event-detail__actions');
     const editBtn = el('button', 'btn btn--secondary', 'Edit') as HTMLButtonElement;
     editBtn.type = 'button';
     editBtn.addEventListener('click', () => {
-      editPanel.hidden = !editPanel.hidden;
+      void (async () => {
+        showViewLoading(canvas, 'Loading…');
+        let entries: UniversalLinkEntry[] = [];
+        try {
+          entries = await loadEntityRelationships(`professional:event:${record.id}`);
+        } catch {
+          entries = [];
+        }
+        if (options.isCurrent && !options.isCurrent()) return;
+        options.onHeaderReady?.({
+          title: record.title,
+          supporting: 'Same page as Add event.',
+          actions: el('div')
+        });
+        await renderEventNewView(canvas, {
+          draft: {
+            title: record.title,
+            start: record.start,
+            end: record.end,
+            timeZone: record.time_zone,
+            location: record.location_text,
+            allDay: record.all_day,
+            hours: record.hours,
+            accreditation: record.accreditation_category,
+            certificate: record.certificate,
+            chips: chipsFromLinks(entries)
+          },
+          onCancel: () => paint(record),
+          onSave: async (payload) => {
+            await updateEvent(record.id, {
+              title: payload.title,
+              location_text: payload.location,
+              all_day: payload.allDay,
+              hours: payload.hours,
+              accreditation_category: payload.accreditation,
+              certificate: payload.certificate,
+              start: payload.startIso,
+              end: payload.endIso,
+              time_zone: payload.timeZone
+            });
+            const sourceRef = `professional:event:${record.id}`;
+            for (const link of payload.pendingLinks) {
+              await createUniversalLink({
+                source_ref: sourceRef,
+                target_ref: link.target_ref,
+                relationship_type: link.relationship_type,
+                ...(link.role ? { role: link.role } : {})
+              });
+            }
+            await load();
+          }
+        });
+      })();
     });
     if (canReschedule) {
-      const rescheduleBtn = el('button', 'btn btn--ghost', 'Reschedule') as HTMLButtonElement;
-      rescheduleBtn.type = 'button';
-      rescheduleBtn.addEventListener('click', () => {
-        reschedulePanel.hidden = !reschedulePanel.hidden;
-      });
       const completeBtn = el('button', 'btn btn--secondary', 'Mark complete') as HTMLButtonElement;
       completeBtn.type = 'button';
       completeBtn.addEventListener('click', () =>
         void runAction('Complete', () => eventStateAction(record.id, 'complete'))
       );
-      headerActions.append(rescheduleBtn, completeBtn);
+      const cancelEvent = el('button', 'btn btn--ghost', 'Cancel event') as HTMLButtonElement;
+      cancelEvent.type = 'button';
+      cancelEvent.addEventListener('click', () =>
+        void runAction('Cancel', () => eventStateAction(record.id, 'cancel'))
+      );
+      headerActions.append(completeBtn, cancelEvent);
     }
     headerActions.append(editBtn);
 
@@ -796,117 +954,6 @@ export async function renderEventDetailView(
     } else {
       root.append(headerActions);
     }
-
-    const rescheduleForm = document.createElement('form');
-    rescheduleForm.className = 'event-detail__reschedule';
-    const newStart = document.createElement('input');
-    newStart.type = 'datetime-local';
-    newStart.value = utcIsoToWallLocal(record.start, record.time_zone);
-    newStart.setAttribute('aria-label', 'New start');
-    const newEnd = document.createElement('input');
-    newEnd.type = 'datetime-local';
-    newEnd.value = utcIsoToWallLocal(record.end, record.time_zone);
-    newEnd.setAttribute('aria-label', 'New end');
-    const saveTime = el('button', 'btn btn--primary', 'Save new time') as HTMLButtonElement;
-    saveTime.type = 'submit';
-    rescheduleForm.append(el('label', undefined, 'New start'), newStart, el('label', undefined, 'New end'), newEnd, saveTime);
-    rescheduleForm.addEventListener('submit', (event) => {
-      event.preventDefault();
-      void runAction('Reschedule', () =>
-        rescheduleEvent(record.id, {
-          start: wallLocalToUtcIso(newStart.value, record.time_zone),
-          end: wallLocalToUtcIso(newEnd.value, record.time_zone),
-          time_zone: record.time_zone,
-          all_day: record.all_day
-        })
-      );
-    });
-    reschedulePanel.append(el('h2', 'event-detail__section-title', 'Reschedule'), rescheduleForm);
-
-    const edit = document.createElement('form');
-    edit.className = 'event-detail__edit';
-    const title = document.createElement('input');
-    title.type = 'text';
-    title.value = record.title;
-    title.setAttribute('aria-label', 'Title');
-    const locationField = document.createElement('input');
-    locationField.type = 'text';
-    locationField.value = record.location_text ?? '';
-    locationField.placeholder = 'Location';
-    locationField.setAttribute('aria-label', 'Location');
-    const allDay = document.createElement('input');
-    allDay.type = 'checkbox';
-    allDay.checked = record.all_day;
-    allDay.setAttribute('aria-label', 'All day');
-    const allDayLabel = el('label');
-    allDayLabel.append(allDay, document.createTextNode(' All day'));
-    const hours = document.createElement('input');
-    hours.type = 'number';
-    hours.min = '0';
-    hours.step = '0.5';
-    hours.value = record.hours != null ? String(record.hours) : '';
-    hours.setAttribute('aria-label', 'Hours');
-    const accreditation = document.createElement('input');
-    accreditation.type = 'text';
-    accreditation.value = record.accreditation_category ?? '';
-    accreditation.setAttribute('aria-label', 'Accreditation category');
-    const attendance = document.createElement('select');
-    attendance.setAttribute('aria-label', 'Attendance');
-    for (const value of ['', 'registered', 'attended', 'partial', 'absent']) {
-      const option = document.createElement('option');
-      option.value = value;
-      option.textContent = value || 'None';
-      if ((record.attendance_state ?? '') === value) option.selected = true;
-      attendance.append(option);
-    }
-    const certName = document.createElement('input');
-    certName.type = 'text';
-    certName.value = record.certificate?.name ?? '';
-    certName.setAttribute('aria-label', 'Certificate name');
-    const certReference = document.createElement('input');
-    certReference.type = 'text';
-    certReference.value = record.certificate?.reference ?? '';
-    certReference.setAttribute('aria-label', 'Certificate reference');
-    const certIssuedAt = document.createElement('input');
-    certIssuedAt.type = 'date';
-    certIssuedAt.value = issuedAtDateValue(record.certificate);
-    certIssuedAt.setAttribute('aria-label', 'Certificate issued at');
-    const save = el('button', 'btn btn--secondary', 'Update') as HTMLButtonElement;
-    save.type = 'submit';
-    edit.append(
-      title,
-      locationField,
-      allDayLabel,
-      hours,
-      accreditation,
-      attendance,
-      certName,
-      certReference,
-      certIssuedAt,
-      save
-    );
-    if (canReschedule) {
-      const cancel = el('button', 'btn btn--ghost event-detail__cancel', 'Cancel event') as HTMLButtonElement;
-      cancel.type = 'button';
-      cancel.addEventListener('click', () => void runAction('Cancel', () => eventStateAction(record.id, 'cancel')));
-      edit.append(cancel);
-    }
-    edit.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const nextCertificate = certificateFromFields(certName.value, certReference.value, certIssuedAt.value);
-      await runAction('Update', () =>
-        updateEvent(record.id, {
-          title: title.value,
-          location_text: locationField.value || null,
-          all_day: allDay.checked,
-          hours: hours.value ? Number(hours.value) : null,
-          accreditation_category: accreditation.value || null,
-          attendance_state: attendance.value || null,
-          certificate: nextCertificate ?? null
-        })
-      );
-    });
-    editPanel.append(el('h2', 'event-detail__section-title', 'Edit details'), edit);
 
     if (record.incomplete_links) {
       const incomplete = el('section', 'confirm-card event-detail__incomplete');
@@ -1027,7 +1074,7 @@ export async function renderEventDetailView(
     const tagCard = el('section', 'event-detail__card');
     mountTagAnythingSection(tagCard, `professional:event:${record.id}`);
 
-    root.append(actionStatus, session, reschedulePanel, editPanel, columns, tagCard);
+    root.append(actionStatus, session, columns, tagCard);
     canvas.append(root);
 
     void loadEntityRelationships(`professional:event:${record.id}`)

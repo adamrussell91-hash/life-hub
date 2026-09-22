@@ -131,8 +131,11 @@ describe('class page calendar cleanup', () => {
       onScheduleUnit
     });
 
-    const rail = canvas.querySelector<HTMLElement>('[data-calendar="rail"]');
-    expect(rail?.hidden).toBe(true);
+    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
+    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
     expect(
       canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
     ).toBe('minmax(0, 1fr)');
@@ -142,11 +145,7 @@ describe('class page calendar cleanup', () => {
     add?.click();
     expect(onScheduleUnit).toHaveBeenCalledTimes(1);
 
-    for (const legacyAdd of canvas.querySelectorAll<HTMLButtonElement>(
-      '.class-calendar__week-heading > .icon-plus-btn'
-    )) {
-      expect(legacyAdd.hidden).toBe(true);
-    }
+    expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
 
     canvas.querySelector<HTMLButtonElement>('[data-calendar-view="month"]')?.click();
     const today = canvas.querySelector<HTMLElement>('.class-calendar__day[data-today="true"]');

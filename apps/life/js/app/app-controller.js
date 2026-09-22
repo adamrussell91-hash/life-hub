@@ -109,6 +109,7 @@ export function createAppController(dependencies) {
     renderCalendar,
     chatApi,
     buildBodyModel,
+    buildBodyChartData,
     buildForecast,
     renderBody,
     bodyController,
@@ -1390,8 +1391,17 @@ export function createAppController(dependencies) {
           targetsConfig: latestResult.targetsConfig
         })
       : null;
+    const charts = typeof buildBodyChartData === 'function'
+      ? buildBodyChartData({
+          events: latestResult.events,
+          date: latestResult.date,
+          range: bodyRange,
+          targetsConfig: latestResult.targetsConfig
+        })
+      : null;
     renderBody(root, model, {
       forecast,
+      charts,
       onRangeChange: next => {
         bodyRange = next;
         renderBodySection();

@@ -359,6 +359,37 @@ export function createMockApi() {
       return json(200, { ok: true, data: overview });
     }
 
+    if (path === '/api/entities' && method === 'PATCH') {
+      const ref = url.searchParams.get('ref');
+      const action = url.searchParams.get('action') ?? 'update';
+      const record = ref ? findByRef(ref) : null;
+      if (!ref || !record || !('kind' in record)) {
+        return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Entity not found.' } });
+      }
+      if (action !== 'update') {
+        return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
+      }
+      const input = (body ?? {}) as { display_name?: unknown; sort_name?: unknown; aliases?: unknown };
+      if (typeof input.display_name === 'string') {
+        const displayName = input.display_name.trim();
+        if (!displayName) {
+          return json(400, {
+            ok: false,
+            error: { code: 'display_name_required', message: 'display_name cannot be empty.' }
+          });
+        }
+        record.display_name = displayName;
+      }
+      if (record.kind === 'person' && input.sort_name !== undefined) {
+        record.sort_name = typeof input.sort_name === 'string' && input.sort_name.trim() ? input.sort_name : null;
+      }
+      if (Array.isArray(input.aliases)) {
+        record.aliases = input.aliases.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      }
+      record.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { ref: refFor(record), ...record } });
+    }
+
     if (path === '/api/entities' && method === 'POST') {
       const input = body as { kind?: string; display_name?: string };
       for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
@@ -932,7 +963,10 @@ export function createMockApi() {
             'hours',
             'attendance_state',
             'certificate',
-            'all_day'
+            'all_day',
+            'start',
+            'end',
+            'time_zone'
           ].includes(key)
         ) {
           event[key] = patch[key];

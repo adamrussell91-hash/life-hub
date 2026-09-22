@@ -183,162 +183,42 @@ function model(events = []) {
   });
 }
 
-function click(node) {
-  const handler = node.listeners.find(([type]) => type === 'click')?.[1];
-  assert.ok(handler, 'expected click handler');
-  handler({ preventDefault() {}, stopPropagation() {}, target: node });
+function assertKitWorkspace(calendar, mode) {
+  assert.ok(calendar.className.includes('hub-calendar--workspace'));
+  assert.equal(calendar.className.includes('hub-calendar--mobile'), false);
+  assert.ok(calendar.querySelector('.hub-calendar__nav'));
+  assert.ok(calendar.querySelector('.hub-calendar__workspace'));
+  assert.ok(calendar.querySelector('.hub-calendar__rail'));
+  assert.ok(calendar.querySelector('[data-calendar="compose-title"]'));
+  if (mode === 'month') {
+    assert.ok(calendar.querySelector('.hub-calendar__grid'));
+  } else {
+    assert.ok(calendar.querySelector('.hub-calendar__timegrid'));
+  }
 }
 
-test('mobile day view paints Now card, day strip, and segmented control', () => {
+test('phone day view uses the kit workspace, not a second mobile skin', () => {
   const root = fakeRoot({ mobile: true });
   renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
-    { record: { type: 'task', date: '2026-08-05', title: 'Call clinic', status: 'open', id: 't1' }, body: '', path: 't1' }
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'day', now: new Date('2026-08-05T08:00:00') });
-
-  const calendar = root._host.children[0];
-  assert.ok(calendar.className.includes('hub-calendar--mobile-day'));
-  assert.ok(calendar.className.includes('hub-calendar--mobile'));
-  assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
-  assert.ok(calendar.querySelector('[data-calendar="day-strip"]'));
-  assert.ok(calendar.querySelector('[data-calendar="mobile-segments"]'));
-  assert.equal(calendar.querySelector('[data-calendar="now-tasks"]')?.children[0]?.textContent, '1');
-  assert.equal(
-    calendar.querySelectorAll('[data-calendar="day-pill"]').length,
-    7
-  );
-  assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
-  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
+  assertKitWorkspace(root._host.children[0], 'day');
 });
 
-test('mobile Now ring reflects timed schedule progress, not clock time', () => {
+test('phone week view uses the kit workspace, not a second mobile skin', () => {
   const root = fakeRoot({ mobile: true });
   renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
-    { record: { type: 'meal', date: '2026-08-05', time: '12:30', meal: 'Lunch' }, body: '', path: 'm' }
-  ]), { view: 'day', now: new Date('2026-08-05T10:00:00') });
-
-  const ring = root._host.querySelector('[data-calendar="now-ring"]');
-  assert.equal(ring?.dataset.value, '1');
-  assert.equal(ring?.dataset.target, '2');
-  const fill = ring?.querySelector?.('[data-role="fill"]');
-  assert.ok(fill);
-  const dasharray = Number(fill.getAttribute('stroke-dasharray'));
-  const dashoffset = Number(fill.getAttribute('stroke-dashoffset'));
-  assert.ok(dasharray > 0);
-  assert.ok(Math.abs(dashoffset - dasharray * 0.5) < 0.01);
-
-  const title = root._host.querySelector('.hub-calendar__now-card-title')?.textContent;
-  assert.equal(title, 'Lunch');
-});
-
-test('mobile week view uses shared shell with week agenda, not time-grid', () => {
-  const root = fakeRoot({ mobile: true });
-  renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
-    { record: { type: 'meal', date: '2026-08-06', time: '12:30', meal: 'Lunch' }, body: '', path: 'm' }
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'week', now: new Date('2026-08-05T08:00:00') });
-
-  const calendar = root._host.children[0];
-  assert.ok(calendar.className.includes('hub-calendar--mobile-week'));
-  assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
-  assert.ok(calendar.querySelector('[data-calendar="day-strip"]'));
-  assert.ok(calendar.querySelector('[data-calendar="week-agenda"]'));
-  assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
-  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
-  const rows = calendar.querySelectorAll('[data-calendar="mobile-row"]');
-  assert.equal(rows.length, 2);
+  assertKitWorkspace(root._host.children[0], 'week');
 });
 
-test('mobile month view uses month grid + day panels, not desktop workspace', () => {
+test('phone month view uses the kit workspace, not a second mobile skin', () => {
   const root = fakeRoot({ mobile: true });
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'month', now: new Date('2026-08-05T08:00:00') });
-
-  const calendar = root._host.children[0];
-  assert.ok(calendar.className.includes('hub-calendar--mobile-month'));
-  assert.ok(calendar.querySelector('[data-calendar="now-card"]'));
-  assert.ok(calendar.querySelector('[data-calendar="mobile-month-grid"]'));
-  assert.ok(calendar.querySelector('[data-calendar="mobile-segments"]'));
-  assert.ok(calendar.querySelector('[data-calendar="schedule-list"]'));
-  assert.equal(calendar.querySelector('.hub-calendar__workspace'), null);
-  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
-  assert.ok(calendar.querySelectorAll('[data-calendar="mobile-month-day"]').length >= 28);
-});
-
-test('mobile Schedule panel lists only timed items', () => {
-  const root = fakeRoot({ mobile: true });
-  renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
-    { record: { type: 'task', date: '2026-08-05', title: 'Call clinic', status: 'open', id: 't1' }, body: '', path: 't1' },
-    { record: { type: 'meal', date: '2026-08-05', time: '12:30', meal: 'Lunch' }, body: '', path: 'm' }
-  ]), { view: 'day', mobilePanel: 'schedule', now: new Date('2026-08-05T08:00:00') });
-
-  const list = root._host.querySelector('[data-calendar="schedule-list"]');
-  const rows = list.querySelectorAll('[data-calendar="mobile-row"]');
-  assert.equal(rows.length, 2);
-  const titles = rows.map(row => row.querySelector('.hub-calendar__mobile-row-title')?.textContent);
-  assert.deepEqual(titles, ['Push', 'Lunch']);
-});
-
-test('mobile Tasks panel groups by parsed status and Other', () => {
-  const root = fakeRoot({ mobile: true });
-  renderCalendar(root, model([
-    { record: { type: 'task', date: '2026-08-05', title: 'Draft slides', status: 'in_progress', id: 't1' }, body: '', path: 't1' },
-    { record: { type: 'task', date: '2026-08-05', title: 'Buy milk', status: 'open', id: 't2' }, body: '', path: 't2' },
-    { record: { type: 'knowledge_page', date: '2026-08-05', title: 'Read notes', area: 'Body' }, body: '', path: 'k1' }
-  ]), { view: 'day', mobilePanel: 'tasks', now: new Date('2026-08-05T08:00:00') });
-
-  const list = root._host.querySelector('[data-calendar="tasks-list"]');
-  const groups = collect(list).filter(node => node.className === 'hub-calendar__mobile-group');
-  assert.deepEqual(groups.map(node => node.textContent), ['In progress', 'Open', 'Other']);
-  const rows = list.querySelectorAll('[data-calendar="mobile-row"]');
-  assert.equal(rows.length, 3);
-  assert.equal(rows[0].querySelector('.hub-calendar__mobile-row-title')?.textContent, 'Draft slides');
-  assert.equal(rows[2].querySelector('.hub-calendar__mobile-row-meta')?.textContent, 'Knowledge');
-});
-
-test('tapping a mobile row opens the event sheet with title and meta', () => {
-  const root = fakeRoot({ mobile: true });
-  renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: 'Bench focus', path: 'w' }
-  ]), { view: 'day', now: new Date('2026-08-05T08:00:00') });
-
-  const row = root._host.querySelector('[data-calendar="mobile-row"]');
-  click(row);
-  const sheet = root._host.querySelector('[data-calendar="event-sheet"]');
-  assert.equal(sheet.open, true);
-  assert.equal(sheet.querySelector('[data-calendar="event-sheet-title"]')?.textContent, 'Push');
-  const bodyText = collect(sheet.querySelector('[data-calendar="event-sheet-body"]'))
-    .map(node => node.textContent)
-    .join(' ');
-  assert.match(bodyText, /9:00|09:00/);
-  assert.match(bodyText, /Workout/);
-  assert.match(bodyText, /Bench focus/);
-});
-
-test('mobile FAB opens compose sheet and submit still calls onCreateLog', () => {
-  const root = fakeRoot({ mobile: true });
-  let payload = null;
-  renderCalendar(root, model(), {
-    view: 'day',
-    now: new Date('2026-08-05T08:00:00'),
-    onCreateLog: next => { payload = next; }
-  });
-
-  click(root._host.querySelector('[data-calendar="mobile-fab"]'));
-  const sheet = root._host.querySelector('[data-calendar="compose-sheet"]');
-  assert.equal(sheet.open, true);
-
-  const title = sheet.querySelector('[data-calendar="compose-title"]');
-  title.value = 'Felt steady';
-  const form = collect(sheet).find(node => node.tagName === 'FORM');
-  const submit = form.listeners.find(([type]) => type === 'submit')[1];
-  submit({ preventDefault() {} });
-  assert.equal(payload.candidate.type, 'diary');
-  assert.equal(payload.candidate.notes, 'Felt steady');
-  assert.equal(payload.slug, 'diary-0000');
+  assertKitWorkspace(root._host.children[0], 'month');
 });
 
 test('desktop day view stays on the time-grid path', () => {
@@ -347,10 +227,7 @@ test('desktop day view stays on the time-grid path', () => {
     { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'day' });
   const calendar = root._host.children[0];
-  assert.equal(calendar.className.includes('hub-calendar--mobile-day'), false);
-  assert.equal(calendar.className.includes('hub-calendar--mobile'), false);
-  assert.ok(calendar.querySelector('.hub-calendar__timegrid'));
-  assert.ok(calendar.querySelector('.hub-calendar__rail'));
+  assertKitWorkspace(calendar, 'day');
   assert.equal(calendar.querySelector('[data-calendar="now-card"]'), null);
 });
 

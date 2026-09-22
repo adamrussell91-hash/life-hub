@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import {
   blockStyle,
   formatBlockTime,
@@ -16,49 +16,19 @@ import type { CalendarDayLesson, ClassCalendarModel } from '@/schedule/class-cal
 
 export type ScheduleCalendarView = 'day' | 'week' | 'month' | 'timeline';
 
-export interface CalendarLessonOption {
-  id: string;
-  title: string;
-  unitId: string;
-  classId?: string;
-}
-
-export interface CalendarClassOption {
-  id: string;
-  label: string;
-}
-
 export interface RenderClassCalendarOptions {
-  onSelectDate: (date: string, options?: { startTime?: string | null; focusCompose?: boolean; scheduledId?: string | null }) => void;
+  onSelectDate: (date: string, options?: { scheduledId?: string | null }) => void;
   onShiftMonth: (delta: -1 | 1) => void;
   monthDelta?: number;
-  unitTitles?: Map<string, string>;
   /** SPA navigation for lesson links; when set, anchors preventDefault then call this. */
   onNavigate?: (path: string) => void;
-  /** Empty-day CTA — opens schedule flow when provided. */
-  onScheduleLesson?: () => void;
   /** Lesson path, or null to render a non-link chip (e.g. unpublished student lessons). */
   lessonHref?: (lesson: CalendarDayLesson) => string | null;
   view?: ScheduleCalendarView;
   onViewChange?: (view: ScheduleCalendarView) => void;
   /** Secondary line on lesson chips (e.g. class code on the dashboard). */
   chipMeta?: (lesson: CalendarDayLesson) => string | undefined;
-  /** Teacher ⋯ on day-detail rows. Dashboard omits this. */
-  onLessonOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
-  lessons?: CalendarLessonOption[];
-  classes?: CalendarClassOption[];
-  classId?: string;
-  /** Subject for scope-and-sequence deep links. */
-  subjectId?: string;
-  composeDraft?: { date: string; startTime: string | null };
   selectedScheduledId?: string | null;
-  onComposeLesson?: (draft: {
-    date: string;
-    startTime: string | null;
-    lessonId: string;
-    classId: string;
-    unitId: string;
-  }) => void;
   onRescheduleLesson?: (scheduledId: string, patch: { date?: string; start_time?: string | null }) => void;
 }
 
@@ -66,14 +36,10 @@ type CalendarHandlers = {
   onSelectDate: RenderClassCalendarOptions['onSelectDate'];
   onShiftMonth: (delta: -1 | 1) => void;
   onNavigate?: (path: string) => void;
-  onScheduleLesson?: () => void;
   lessonHref?: (lesson: CalendarDayLesson) => string | null;
   onViewChange?: (view: ScheduleCalendarView) => void;
   chipMeta?: (lesson: CalendarDayLesson) => string | undefined;
-  onLessonOverflow?: (scheduledId: string, anchor: HTMLElement) => void;
-  onComposeLesson?: RenderClassCalendarOptions['onComposeLesson'];
   onRescheduleLesson?: RenderClassCalendarOptions['onRescheduleLesson'];
-  subjectId?: string;
   today: string;
   selectedDate: string;
   view: ScheduleCalendarView;
@@ -99,29 +65,16 @@ export function renderClassCalendar(
     onSelectDate,
     onShiftMonth,
     monthDelta = 0,
-    unitTitles,
     onNavigate,
-    onScheduleLesson,
     lessonHref,
     view = 'month',
     onViewChange,
     chipMeta,
-    onLessonOverflow,
-    lessons,
-    classes,
-    classId,
-    composeDraft,
-    selectedScheduledId,
-    onComposeLesson,
-    onRescheduleLesson,
-    subjectId
+    onRescheduleLesson
   }: RenderClassCalendarOptions
 ): void {
-  let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
-  if (root && !root.querySelector('[data-calendar="rail"]')) {
-    root.remove();
-    root = null;
-  }
+  let root = host.querySelector<HTMLElement>('.class-calendar');
+  root?.querySelector('[data-calendar="rail"]')?.remove();
   if (!root) {
     root = document.createElement('div');
     root.className = 'class-calendar hub-calendar hub-calendar--workspace';
@@ -178,11 +131,8 @@ export function renderClassCalendar(
     body.className = 'class-calendar__body hub-calendar__body';
     body.dataset.calendar = 'body';
 
-    const rail = document.createElement('div');
-    rail.className = 'hub-calendar__rail';
-    rail.dataset.calendar = 'rail';
-
-    workspace.append(body, rail);
+    workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
+    workspace.append(body);
     root.append(nav, workspace);
     host.replaceChildren(root);
   }
@@ -191,14 +141,10 @@ export function renderClassCalendar(
     onSelectDate,
     onShiftMonth,
     onNavigate,
-    onScheduleLesson,
     lessonHref,
     onViewChange,
     chipMeta,
-    onLessonOverflow,
-    onComposeLesson,
     onRescheduleLesson,
-    subjectId,
     today: model.today,
     selectedDate: model.selectedDate,
     view
@@ -227,6 +173,7 @@ export function renderClassCalendar(
   for (const tab of root.querySelectorAll<HTMLButtonElement>('[data-calendar-view]')) {
     const selected = tab.dataset.calendarView === view;
     tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    tab.classList.toggle('is-active', selected);
     tab.classList.toggle('is-selected', selected);
   }
 
@@ -239,11 +186,11 @@ export function renderClassCalendar(
       body.append(buildTimelineBody(model, root));
     } else {
       const grid = document.createElement('div');
-      grid.className = 'class-calendar__grid';
+      grid.className = 'class-calendar__grid hub-calendar__grid';
       grid.setAttribute('role', 'grid');
       for (const heading of ['M', 'T', 'W', 'T', 'F', 'S', 'S']) {
         const cell = document.createElement('span');
-        cell.className = 'class-calendar__weekday';
+        cell.className = 'class-calendar__weekday hub-calendar__weekday';
         cell.textContent = heading;
         grid.append(cell);
       }
@@ -253,28 +200,6 @@ export function renderClassCalendar(
       applyMonthMotion(grid, monthDelta);
       body.append(grid);
     }
-  }
-
-  const rail = root.querySelector<HTMLElement>('[data-calendar="rail"]');
-  if (rail) {
-    rail.replaceChildren();
-    rail.append(
-      renderCompose(
-        root,
-        composeDraft ?? { date: model.selectedDate, startTime: null },
-        lessons ?? [],
-        classes ?? [],
-        classId
-      )
-    );
-    const detail = document.createElement('div');
-    detail.className = 'class-calendar__detail hub-calendar__detail';
-    const selected = selectedScheduledId
-      ? model.dayLessons.find((lesson) => lesson.scheduledId === selectedScheduledId)
-        ?? model.monthDays.flatMap((day) => day.lessons).find((lesson) => lesson.scheduledId === selectedScheduledId)
-      : undefined;
-    renderDayDetail(detail, model, unitTitles, root, selected);
-    rail.append(detail);
   }
 
   bindNav(root);
@@ -348,7 +273,7 @@ function buildDayCell(
   root: HTMLElement
 ): HTMLElement {
   const cell = document.createElement('div');
-  cell.className = 'class-calendar__day';
+  cell.className = 'class-calendar__day hub-calendar__day';
   cell.setAttribute('role', 'gridcell');
   cell.tabIndex = 0;
   cell.dataset.date = day.date;
@@ -370,8 +295,8 @@ function buildDayCell(
   });
 
   const num = document.createElement('span');
-  num.className = 'class-calendar__day-num';
-  num.textContent = formatDisplayDate(day.date);
+  num.className = 'class-calendar__day-num hub-calendar__day-num';
+  num.textContent = String(Number(day.date.slice(8, 10)));
   num.title = formatDisplayDate(day.date);
   cell.append(num);
 
@@ -399,7 +324,7 @@ function buildTimeGrid(
   const monday = weekStartMonday(model.selectedDate);
   const dates = view === 'day'
     ? [model.selectedDate]
-    : enumerateDateKeys(monday, addCalendarDays(monday, 4));
+    : enumerateDateKeys(monday, addCalendarDays(monday, 6));
   const byDate = new Map(model.monthDays.map((day) => [day.date, day]));
 
   const grid = document.createElement('div');
@@ -427,23 +352,9 @@ function buildTimeGrid(
     weekday.textContent = formatWeekdayShort(date);
     const num = document.createElement('span');
     num.className = 'class-calendar__day-num hub-calendar__day-num';
-    num.textContent = formatDisplayDate(date);
+    num.textContent = String(Number(date.slice(8, 10)));
     num.title = formatDisplayDate(date);
     heading.append(weekday, num);
-    const schedule = handlersByRoot.get(root)?.onScheduleLesson;
-    if (schedule) {
-      const addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'icon-plus-btn';
-      addBtn.setAttribute('aria-label', `Create for ${date}`);
-      addBtn.textContent = '+';
-      addBtn.addEventListener('click', (event) => {
-        event.stopPropagation();
-        handlersByRoot.get(root)?.onSelectDate(date);
-        schedule();
-      });
-      heading.append(addBtn);
-    }
     grid.append(heading);
   }
 
@@ -460,7 +371,7 @@ function buildTimeGrid(
     if (date === model.selectedDate) cell.dataset.selected = 'true';
     cell.addEventListener('click', (event) => {
       if ((event.target as HTMLElement).closest('.event-chip')) return;
-      handlersByRoot.get(root)?.onSelectDate(date, { startTime: null, focusCompose: true });
+      handlersByRoot.get(root)?.onSelectDate(date);
     });
     for (const item of allDay) cell.append(buildLessonChip(item.lesson, root));
     grid.append(cell);
@@ -494,9 +405,7 @@ function buildTimeGrid(
     }
     hours.addEventListener('click', (event) => {
       if ((event.target as HTMLElement).closest('.event-chip')) return;
-      const rect = hours.getBoundingClientRect();
-      const startTime = hoursToDueTime(hoursFromOffset(event.clientY - rect.top));
-      handlersByRoot.get(root)?.onSelectDate(date, { startTime, focusCompose: true });
+      handlersByRoot.get(root)?.onSelectDate(date);
     });
     hours.addEventListener('dragover', (event) => {
       if (!handlersByRoot.get(root)?.onRescheduleLesson) return;
@@ -540,95 +449,6 @@ function toTimedItem(lesson: CalendarDayLesson): {
     durationMin: lesson.durationMin ?? 60,
     lesson
   };
-}
-
-function renderCompose(
-  root: HTMLElement,
-  draft: { date: string; startTime: string | null },
-  lessons: CalendarLessonOption[],
-  classes: CalendarClassOption[],
-  classId?: string
-): HTMLElement {
-  const card = document.createElement('section');
-  card.className = 'hub-calendar__detail calendar-compose-card';
-  const heading = document.createElement('div');
-  heading.className = 'calendar-agenda__head';
-  const title = document.createElement('h3');
-  title.className = 'hub-calendar__detail-heading';
-  title.textContent = 'Add';
-  heading.append(title);
-  card.append(heading);
-
-  if (!lessons.length || !handlersByRoot.get(root)?.onComposeLesson) {
-    const empty = document.createElement('p');
-    empty.className = 'hub-calendar__detail-empty';
-    empty.textContent = handlersByRoot.get(root)?.onScheduleLesson
-      ? 'Create a lesson, then place it on this day.'
-      : 'Select a lesson to place on this day.';
-    card.append(empty);
-    return card;
-  }
-
-  const form = document.createElement('form');
-  form.className = 'calendar-compose quick-add';
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const lessonId = lessonField.value;
-    const chosen = lessons.find((lesson) => lesson.id === lessonId);
-    const nextClassId = classField?.value || classId || chosen?.classId;
-    if (!chosen || !nextClassId) return;
-    handlersByRoot.get(root)?.onComposeLesson?.({
-      date: dateField.value || draft.date,
-      startTime: timeField.value || null,
-      lessonId: chosen.id,
-      classId: nextClassId,
-      unitId: chosen.unitId
-    });
-  });
-
-  let classField: HTMLSelectElement | undefined;
-  if (!classId && classes.length) {
-    classField = document.createElement('select');
-    classField.className = 'hub-search__input';
-    classField.setAttribute('aria-label', 'Class');
-    for (const item of classes) {
-      const option = document.createElement('option');
-      option.value = item.id;
-      option.textContent = item.label;
-      classField.append(option);
-    }
-    form.append(classField);
-  }
-
-  const lessonField = document.createElement('select');
-  lessonField.className = 'hub-search__input';
-  lessonField.setAttribute('aria-label', 'Lesson');
-  for (const lesson of lessons) {
-    const option = document.createElement('option');
-    option.value = lesson.id;
-    option.textContent = lesson.title;
-    lessonField.append(option);
-  }
-
-  const dateField = document.createElement('input');
-  dateField.className = 'hub-search__input';
-  dateField.type = 'date';
-  dateField.setAttribute('aria-label', 'Date');
-  dateField.value = draft.date;
-
-  const timeField = document.createElement('input');
-  timeField.className = 'hub-search__input';
-  timeField.type = 'time';
-  timeField.setAttribute('aria-label', 'Time');
-  if (draft.startTime) timeField.value = draft.startTime;
-
-  const submit = document.createElement('button');
-  submit.type = 'submit';
-  submit.className = 'btn btn--primary';
-  submit.textContent = 'Add';
-  form.append(lessonField, dateField, timeField, submit);
-  card.append(form);
-  return card;
 }
 
 function buildTimelineBody(model: ClassCalendarModel, root: HTMLElement): HTMLElement {
@@ -678,123 +498,6 @@ function buildTimelineBody(model: ClassCalendarModel, root: HTMLElement): HTMLEl
 
   list.append(...rows);
   return list;
-}
-
-function renderDayDetail(
-  detail: HTMLElement,
-  model: ClassCalendarModel,
-  unitTitles: Map<string, string> | undefined,
-  root: HTMLElement,
-  selected?: CalendarDayLesson
-): void {
-  if (selected) {
-    const heading = document.createElement('h3');
-    heading.className = 'class-calendar__detail-heading hub-calendar__detail-heading';
-    heading.textContent = selected.title;
-    const meta = document.createElement('p');
-    meta.className = 'class-calendar__detail-empty';
-    const unitName = unitTitles?.get(selected.unitId);
-    const chip = handlersByRoot.get(root)?.chipMeta?.(selected);
-    meta.textContent = [
-      selected.startTime ?? 'All day',
-      chip,
-      unitName,
-      selected.status
-    ].filter(Boolean).join(' · ');
-    detail.append(heading, meta);
-    const href = resolveLessonHref(root, selected);
-    if (href) {
-      const open = document.createElement('a');
-      open.className = 'btn btn--secondary';
-      open.href = href;
-      open.textContent = 'Open lesson';
-      wireSpaLink(open, root);
-      detail.append(open);
-    }
-    const subjectId = handlersByRoot.get(root)?.subjectId;
-    if (subjectId && selected.unitId) {
-      const scope = document.createElement('a');
-      scope.className = 'btn btn--ghost';
-      scope.href = `/scope-sequences/${encodeURIComponent(subjectId)}?selectUnit=${encodeURIComponent(selected.unitId)}`;
-      scope.textContent = 'In year sequence';
-      wireSpaLink(scope, root);
-      detail.append(scope);
-    }
-    return;
-  }
-
-  const heading = document.createElement('h3');
-  heading.className = 'class-calendar__detail-heading';
-  heading.textContent = formatDetailHeading(model.selectedDate);
-  detail.append(heading);
-
-  if (model.dayLessons.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'class-calendar__detail-empty';
-    empty.textContent = 'No lessons scheduled this day.';
-    detail.append(empty);
-
-    if (handlersByRoot.get(root)?.onScheduleLesson) {
-      const scheduleBtn = document.createElement('button');
-      scheduleBtn.type = 'button';
-      scheduleBtn.className = 'icon-plus-btn class-calendar__schedule-plus';
-      scheduleBtn.setAttribute('aria-label', 'Schedule a lesson');
-      scheduleBtn.textContent = '+';
-      scheduleBtn.addEventListener('click', () => {
-        handlersByRoot.get(root)?.onScheduleLesson?.();
-      });
-      detail.append(scheduleBtn);
-    }
-    return;
-  }
-
-  const list = document.createElement('div');
-  list.className = 'class-calendar__detail-list';
-
-  for (const lesson of model.dayLessons) {
-    const wrap = document.createElement('div');
-    wrap.className = 'class-calendar__detail-row';
-
-    const href = resolveLessonHref(root, lesson);
-    const row = document.createElement(href ? 'a' : 'div');
-    row.className = 'class-calendar__detail-lesson';
-    if (href && row instanceof HTMLAnchorElement) {
-      row.href = href;
-      wireSpaLink(row, root);
-    }
-
-    const title = document.createElement('span');
-    title.className = 'class-calendar__detail-title';
-    title.textContent = lesson.title;
-
-    const meta = document.createElement('span');
-    meta.className = 'class-calendar__detail-meta';
-    const unitName = unitTitles?.get(lesson.unitId);
-    const chip = handlersByRoot.get(root)?.chipMeta?.(lesson);
-    meta.textContent = [chip, unitName, lesson.status].filter(Boolean).join(' · ');
-
-    row.append(title, meta);
-    wrap.append(row);
-
-    const overflow = handlersByRoot.get(root)?.onLessonOverflow;
-    if (overflow) {
-      const more = document.createElement('button');
-      more.type = 'button';
-      more.className = 'class-calendar__detail-more';
-      more.setAttribute('aria-label', 'More actions');
-      more.textContent = '⋯';
-      more.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        handlersByRoot.get(root)?.onLessonOverflow?.(lesson.scheduledId, more);
-      });
-      wrap.append(more);
-    }
-
-    list.append(wrap);
-  }
-
-  detail.append(list);
 }
 
 function resolveLessonHref(root: HTMLElement, lesson: CalendarDayLesson): string | null {
@@ -878,24 +581,8 @@ function formatWeekdayShort(date: string): string {
 }
 
 function labelForView(model: ClassCalendarModel, view: ScheduleCalendarView): string {
-  if (view === 'day') return formatDetailHeading(model.selectedDate);
+  if (view === 'day') return formatDisplayDate(model.selectedDate);
   if (view !== 'week') return model.monthLabel;
   const monday = weekStartMonday(model.selectedDate);
-  return formatMonthRange(monday, addCalendarDays(monday, 4));
-}
-
-function formatMonthRange(start: string, end: string): string {
-  const startDate = parseDateKey(start);
-  const endDate = parseDateKey(end);
-  const startLabel = startDate.toLocaleDateString('en-AU', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-  const endLabel = endDate.toLocaleDateString('en-AU', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-  return startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
+  return formatDisplayDateRange(monday, addCalendarDays(monday, 6));
 }

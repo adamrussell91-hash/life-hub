@@ -22,7 +22,7 @@ Flat freeze (no `css/` subfolder):
 | `rail.css` / `mobile.css` | Locked left rail + phone bottom bar |
 | `motion.css`, `morphing-popover.css`, `hub-compose.css`, `adaptive-slider.css`, `card-swipe.css`, `hub-interactions.css`, `chat-prose.css`, `js/*` | Shared motion / morph / toast / compose / slider / swipe deck / chat prose / date / mobile mount. Closed-field chips: `createMorphingClosedFieldPopover` |
 | `icons/` | Hub tiles + glyphs |
-| `AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`, `TASKS.md`, `CHARTS.md` | Locked rules. Charts/graphs: `CHARTS.md` only |
+| `AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`, `TASKS.md`, `CHARTS.md`, `CALENDAR.md` | Locked rules. Charts/graphs: `CHARTS.md` only. Calendars: `CALENDAR.md` only |
 
 ## Publish
 

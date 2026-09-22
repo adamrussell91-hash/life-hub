@@ -249,10 +249,7 @@ export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
   const selectedRange = BODY_RANGES.includes(range) ? range : DEFAULT_BODY_RANGE;
   const bounds = rangeWindow(date, selectedRange);
 
-  const weightObs = observationsFor(events, 'weight', 'weight_kg');
-  // Composition files may also carry weight_kg; prefer dedicated weight type, else composition weight.
-  const compositionWeight = observationsFor(events, 'composition', 'weight_kg');
-  const mergedWeight = mergeObservations(weightObs, compositionWeight);
+  const mergedWeight = weightObservations(events);
 
   const fatObs = observationsFor(events, 'composition', 'body_fat_pct');
   const muscleObs = observationsFor(events, 'composition', 'skeletal_muscle_kg');
@@ -302,6 +299,14 @@ export function buildBodyModel({ events, date, range = DEFAULT_BODY_RANGE }) {
       metrics: tapeMetrics
     }
   };
+}
+
+/** Every weigh-in: dedicated weight logs win; composition files fill the other days. */
+export function weightObservations(events) {
+  return mergeObservations(
+    observationsFor(events, 'weight', 'weight_kg'),
+    observationsFor(events, 'composition', 'weight_kg')
+  );
 }
 
 function mergeObservations(primary, secondary) {

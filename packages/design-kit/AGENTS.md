@@ -6,6 +6,8 @@ Tasks Hub agents: also read `TASKS.md` (Teaching chrome, board home).
 
 Charts / graphs: read `CHARTS.md` only. That file is the library — catalog, APIs, tokens, log. Do not hunt Life or Knowledge for a look.
 
+Calendars: read `CALENDAR.md` only. Tasks Hub is the reference paint. Do not invent a second calendar skin.
+
 Rail work: also read `RAIL.md`. The left rail is locked — one width, brand goes home, icon + label rows.
 
 Mobile work: also read `MOBILE.md`. Under 720px every hub uses the same bottom bar + More sheet. Do not keep the rail as a top strip.
@@ -45,7 +47,8 @@ This freeze is **flat** (CSS at the kit root). There is no `css/` directory.
 22. `js/hub-command-search.js` — shared command palette. Teaching keeps `.search-palette` markup; call `enhanceSearchPalette` on that panel. Other hubs use `openHubCommandSearch`.
 23. `js/hub-surfaces.js` — pin list, labeled progress, step indicator, run widget, schedule/slots/reminders, task/activities/collection disclosure, scroll island, progressive input stack, journal nav, save toggle, status picker.
 24. `CHARTS.md` — **locked** chart and graph library (catalog, APIs, tokens, log). Implementation roots listed there. Do not invent a type that is not in that file.
-25. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`, `hub-compose.html`, `adaptive-slider.html`, `card-swipe.html`, `hub-toast.html`, `hub-ai-bar.html`)
+25. `CALENDAR.md` + `calendar.css` — **locked** calendar. Tasks Hub is the reference paint (Day / Week / Month, 7-day Monday week, `.event-chip`, workspace + rail). Do not invent a postcard, a five-day week, or a second phone skin.
+26. `snippets/` — copy the HTML, then wire behaviour (`shell.html`, `rail.html`, `mobile-chrome.html`, `hub-utilities.html`, `sign-in.html`, `sign-in.js`, `confirm-card.html`, `hub-kinetic.html`, `hub-scroll-hide.html`, `morphing-popover.html`, `hub-compose.html`, `adaptive-slider.html`, `card-swipe.html`, `hub-toast.html`, `hub-ai-bar.html`)
 
 ### Passphrase gate (mandatory)
 
@@ -64,7 +67,11 @@ Do **not** bind only to the button’s `click`. Do **not** put `onsubmit="return
 
 ### Display dates (mandatory)
 
-Every hub shows calendar days as **`dd/mm/yy`** via `js/format-display-date.js`. Do not call `toLocaleDateString` for a day, and do not show `YYYY-MM-DD` in the UI. Month-only labels, times, and storage keys stay as they are.
+Every hub shows calendar days as **`dd/mm/yy`** via `js/format-display-date.js`. Do not call `toLocaleDateString` for a day, and do not show `YYYY-MM-DD` in the UI. Month-only labels, times, and storage keys stay as they are. Month **cell numbers** stay the day of month (`12`). See `CALENDAR.md`.
+
+### Calendar (mandatory)
+
+Every hub calendar uses `calendar.css` + `CALENDAR.md`. Reference paint: Tasks `#/week` / `#/month`. Day / Week / Month pills (`.is-active`), seven-day Monday week, `.event-chip`, `.hub-calendar--workspace`. Knowledge has no calendar today — when it gets one, start from this object.
 
 ### Left rail (mandatory)
 
