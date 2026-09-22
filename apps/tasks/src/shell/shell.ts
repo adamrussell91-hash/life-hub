@@ -133,6 +133,49 @@ export function resetRailDisclosureStateForTests(): void {
 
 const STRETCH_VIEWS: HubViewId[] = ['orbit', 'universe', 'branch'];
 
+export type GraphPageView = 'lines' | 'branch' | 'orbit';
+
+function graphQuery(hash = location.hash): URLSearchParams {
+  return new URLSearchParams(hash.split('?')[1] ?? '');
+}
+
+export function graphViewFromHash(hash = location.hash): GraphPageView {
+  const id = hashViewId(hash);
+  if (id === 'orbit') return 'orbit';
+  if (id === 'branch') return 'branch';
+  const view = graphQuery(hash).get('view');
+  if (view === 'orbit' || view === 'branch') return view;
+  return 'lines';
+}
+
+/** Old Graph family routes → Lines / Branch / Orbit. Null when the hash is already canonical. */
+export function canonicalizeGraphHash(hash = location.hash): string | null {
+  const id = hashViewId(hash);
+  const query = graphQuery(hash);
+  const rest = new URLSearchParams(query);
+  rest.delete('mode');
+  rest.delete('view');
+  const suffix = rest.toString();
+  const withView = (view?: GraphPageView) => {
+    if (view && view !== 'lines') rest.set('view', view);
+    const qs = rest.toString();
+    return qs ? `#/graph?${qs}` : '#/graph';
+  };
+
+  if (id === 'orbit') return withView('orbit');
+  if (id === 'branch') return withView('branch');
+  if (id === 'universe') return withView('lines');
+  if (id === 'graph') {
+    if (query.get('mode') === 'workstreams') return withView('lines');
+    if (query.get('mode') === 'blockers') return withView('branch');
+    const view = query.get('view');
+    if (view && view !== 'lines' && view !== 'branch' && view !== 'orbit') return withView('lines');
+    if (query.has('mode')) return withView(graphViewFromHash(hash));
+    void suffix;
+  }
+  return null;
+}
+
 const NAV: NavItem[] = [
   ...MAJOR_ITEMS,
   ...NAV_SECTIONS.flatMap((section) => section.items),
@@ -685,10 +728,10 @@ export function isKnownHashView(hash = location.hash): boolean {
 }
 
 export function parseHashRoute(): HubViewId {
-  const id = hashViewId();
-  if (id === 'constellation') return 'graph';
+  const id = hashViewId() as HubViewId;
+  if (id === 'constellation' || id === 'orbit' || id === 'branch' || id === 'universe') return 'graph';
   if (id === 'backlog') return 'list';
-  return KNOWN_VIEWS.includes(id as HubViewId) ? (id as HubViewId) : 'board';
+  return KNOWN_VIEWS.includes(id) ? id : 'board';
 }
 
 const CALENDAR_VIEWS = new Set<HubViewId>(['week', 'month']);

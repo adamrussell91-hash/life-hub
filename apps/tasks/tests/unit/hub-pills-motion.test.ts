@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyHubPillsThumb } from '../../design-kit/js/hub-motion.js';
 import { createHubPills } from '@/views/hub-kit';
-import { universeViewToolsHtml } from '@/views/universe-chrome';
 
 function size(el: HTMLElement, left: number, width: number): void {
   Object.defineProperty(el, 'offsetLeft', { configurable: true, value: left });
@@ -42,8 +41,9 @@ describe('hub pills sliding thumb', () => {
     expect(pills.style.getPropertyValue('--hub-pill-x')).toBe('66px');
   });
 
-  it('does not mount a thumb on independent universe toggles', () => {
-    document.body.innerHTML = universeViewToolsHtml(true, false);
+  it('does not mount a thumb on independent loose pill groups', () => {
+    document.body.innerHTML =
+      '<div class="hub-pills hub-pills--loose" role="group"><button type="button" class="hub-pills__btn is-active">Dark</button></div>';
     const group = document.querySelector('.hub-pills')!;
     expect(group.classList.contains('hub-pills--loose')).toBe(true);
     expect(applyHubPillsThumb(group, { reduced: true })).toBeNull();

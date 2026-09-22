@@ -398,6 +398,41 @@ export function createClareHandler(deps = {}) {
               results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
               continue;
             }
+            if (mutation.kind === 'task_create') {
+              const title = typeof mutation.patch?.title === 'string' ? mutation.patch.title.trim() : '';
+              const domain = typeof mutation.patch?.domain === 'string' ? mutation.patch.domain.trim() : '';
+              if (!title || !domain) {
+                results.push({ summary: mutation.summary, ok: false, note: 'Title and domain are required' });
+                continue;
+              }
+              const task = {
+                schema_version: 1,
+                id: newTaskId(),
+                title,
+                description: typeof mutation.patch.description === 'string' ? mutation.patch.description : '',
+                kind: 'task',
+                bucket: 'active',
+                domain,
+                status: typeof mutation.patch.status === 'string' ? mutation.patch.status : 'open',
+                priority: typeof mutation.patch.priority === 'string' ? mutation.patch.priority : 'medium',
+                parent_project_id: mutation.patch.parent_project_id ?? null,
+                parent_task_id: mutation.patch.parent_task_id ?? null,
+                depends_on: Array.isArray(mutation.patch.depends_on) ? mutation.patch.depends_on : [],
+                step_order: Number(mutation.patch.step_order) || 0,
+                due_date: mutation.patch.due_date ?? null,
+                estimated_duration: mutation.patch.estimated_duration ?? null,
+                tags: ['clare'],
+                created_at: nowIso,
+                updated_at: nowIso,
+                completed_at: null,
+                source: 'suggested_by_agent'
+              };
+              await setJSON(store, taskKey(task.id), task);
+              const ids = await readIndex(store, 'tasks/_index');
+              await writeTaskIndex(store, [...ids, task.id]);
+              results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+              continue;
+            }
             if (mutation.kind === 'project_update' || (mutation.kind === 'page_blocks' && mutation.entity_type === 'project')) {
               const id = mutation.project_id ?? mutation.entity_id;
               const existing = await getJSON(store, `${PROJECT_PREFIX}${id}`);
@@ -459,6 +494,57 @@ export function createClareHandler(deps = {}) {
           calibrations.push(result.calibration);
         }
         return withCors(okResponse(201, { tasks, negotiations, calibrations }), request, env);
+      }
+
+      if (action === 'graph_insights') {
+        const findings = Array.isArray(body.findings) ? body.findings : [];
+        const apiKey = typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY.trim() : '';
+        if (!apiKey) {
+          return withCors(okResponse(200, { insights: findings, offline: true }), request, env);
+        }
+        try {
+          const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-5',
+              max_tokens: 2000,
+              thinking: { type: 'disabled' },
+              system:
+                'Enrich Tasks Graph insights. Return JSON {insights:[{id,view,severity,anchor,headline,detail,proposal,draft}]} only. Keep any AgentMutation kinds. Australian English. No exclamation marks. Do not invent user facts.',
+              messages: [
+                {
+                  role: 'user',
+                  content: JSON.stringify({
+                    view: body.view ?? 'lines',
+                    findings,
+                    tasks: Array.isArray(body.tasks) ? body.tasks.slice(0, 40) : [],
+                    projects: Array.isArray(body.projects) ? body.projects.slice(0, 20) : []
+                  })
+                }
+              ]
+            })
+          });
+          if (!response.ok) {
+            return withCors(okResponse(200, { insights: findings, offline: true }), request, env);
+          }
+          const payload = await response.json();
+          const text = Array.isArray(payload?.content)
+            ? payload.content.find((block) => block?.type === 'text')?.text ?? ''
+            : '';
+          const cleaned = String(text).replace(/^```json\s*|\s*```$/g, '').trim();
+          const parsed = JSON.parse(cleaned);
+          if (Array.isArray(parsed?.insights) && parsed.insights.length) {
+            return withCors(okResponse(200, { insights: parsed.insights }), request, env);
+          }
+        } catch {
+          /* fall through to deterministic findings */
+        }
+        return withCors(okResponse(200, { insights: findings, offline: true }), request, env);
       }
 
       if (action === 'record_actual') {

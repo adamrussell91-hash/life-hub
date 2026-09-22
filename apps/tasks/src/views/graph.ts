@@ -1,400 +1,137 @@
-import {
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type Simulation
-} from 'd3-force';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
-import { isBlocked } from '@/domain/board';
 import { tasksApi } from '@/services/client-api';
-import { hashQuery } from '@/shell/shell';
-import { showViewLoading } from '@/views/feedback';
-import { renderGraphFamilyPills } from '@/views/stretch-pills';
-import { renderBoardTaskTile, renderTaskLinkList } from '@/views/task-tile';
-import { renderBlockerPipes } from '@/views/blocker-pipes';
-import { createVizNodeList } from '@/views/viz-node-list';
+import { onTasksChanged, onTasksDeleted } from '@/services/task-cache';
+import { loadTaskProperties } from '@/services/task-properties';
+import { canonicalizeGraphHash, graphViewFromHash, hashQuery, type GraphPageView } from '@/shell/shell';
+import { setFocus } from '@/domain/focus';
+import { addDays, toDateKey } from '@/domain/queries';
+import {
+  buildGraphInsights,
+  insightFingerprint,
+  rankInsights,
+  type GraphInsight,
+  type InsightDismissal
+} from '@/domain/graph-insights';
+import { parseHubPrefs } from '@/domain/hub-prefs';
+import { showConfirmWrite, showViewLoading } from '@/views/feedback';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
-import { createHubSearch, createHubToolbar } from '@/views/hub-kit';
-
-type GraphMode = 'blockers' | 'workstreams';
-
-function tokenColor(name: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
-type GraphNode = {
-  id: string;
-  kind: 'task' | 'project';
-  label: string;
-  domain?: string;
-  x?: number;
-  y?: number;
-  vx?: number;
-  vy?: number;
-  fx?: number | null;
-  fy?: number | null;
-};
-
-type GraphLink = {
-  source: string | GraphNode;
-  target: string | GraphNode;
-  kind: 'blocker' | 'workstream';
-};
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function buildWorkstreamModel(tasks: Task[], projects: Project[]): {
-  nodes: GraphNode[];
-  links: GraphLink[];
-} {
-  const nodes: GraphNode[] = [
-    ...projects.map((p) => ({
-      id: p.id,
-      kind: 'project' as const,
-      label: p.title
-    })),
-    ...tasks
-      .filter((t) => t.parent_project_id)
-      .map((t) => ({
-        id: t.id,
-        kind: 'task' as const,
-        label: t.title,
-        domain: t.domain
-      }))
-  ];
-  const projectIds = new Set(projects.map((p) => p.id));
-  const links: GraphLink[] = tasks
-    .filter((t) => t.parent_project_id && projectIds.has(t.parent_project_id))
-    .map((t) => ({
-      source: t.parent_project_id!,
-      target: t.id,
-      kind: 'workstream' as const
-    }));
-  return { nodes, links };
-}
-
-function renderBlockerDetail(task: Task, tasks: Task[]): HTMLElement {
-  const byId = new Map(tasks.map((item) => [item.id, item]));
-  const detail = el('div', 'task-tile__detail-body');
-  const blockers = task.depends_on
-    .map((id) => byId.get(id))
-    .filter((item): item is Task => Boolean(item));
-  const blocking = tasks.filter((item) => item.depends_on.includes(task.id));
-
-  if (blockers.length) {
-    detail.append(
-      renderTaskLinkList(
-        'Blocked by',
-        blockers.map((blocker) => ({
-          title: blocker.title,
-          meta: blocker.status.replace('_', ' ')
-        }))
-      )
-    );
-  }
-  if (blocking.length) {
-    detail.append(
-      renderTaskLinkList(
-        'Blocking',
-        blocking.map((blocked) => ({
-          title: blocked.title,
-          meta: isBlocked(blocked, byId) ? 'blocked' : blocked.status.replace('_', ' ')
-        }))
-      )
-    );
-  }
-  if (!blockers.length && !blocking.length) {
-    detail.append(el('p', 'hierarchy-meta', 'No blocker links on this task.'));
-  }
-  return detail;
-}
-
-function mountBlockerGraph(
-  host: HTMLElement,
-  tasks: Task[],
-  projects: Project[],
-  editorHost: HTMLElement,
-  selectedId: string | null,
-  expandedId: string | null,
-  onSelect: (taskId: string | null) => void,
-  onExpand: (taskId: string, open: boolean) => void,
-  onRefresh: () => void
-): void {
-  host.replaceChildren();
-  const byId = new Map(tasks.map((task) => [task.id, task]));
-  const focusId = selectedId;
-
-  if (focusId) {
-    const back = el('button', 'btn btn--ghost blocker-pipe-back', '← Back to overview');
-    back.type = 'button';
-    back.addEventListener('click', () => onSelect(null));
-    host.append(back);
-  }
-
-  host.append(
-    renderBlockerPipes(focusId, tasks, (gateId) => {
-      onSelect(selectedId === gateId ? null : gateId);
-    })
-  );
-
-  const expandHost = el('div', 'task-stack blocker-expand');
-  if (selectedId) {
-    const task = byId.get(selectedId);
-    if (task) {
-      const waitingOn = task.depends_on
-        .map((id) => byId.get(id)?.title)
-        .filter(Boolean)
-        .join(', ');
-      expandHost.append(
-        renderBoardTaskTile(
-          task,
-          waitingOn ? `waiting on ${waitingOn}` : 'blocker links',
-          renderBlockerDetail(task, tasks),
-          {
-            editorHost,
-            projects,
-            onSaved: onRefresh,
-            open: expandedId === selectedId,
-            onToggle: (taskId, open) => onExpand(taskId, open)
-          }
-        )
-      );
-    }
-  }
-  host.append(expandHost);
-}
-
-function mountWorkstreamGraph(
-  host: HTMLElement,
-  tasks: Task[],
-  projects: Project[],
-  editorHost: HTMLElement,
-  selectedId: string | null,
-  expandedId: string | null,
-  onSelect: (taskId: string | null) => void,
-  onExpand: (taskId: string, open: boolean) => void,
-  onRefresh: () => void
-): void {
-  const { nodes, links } = buildWorkstreamModel(tasks, projects);
-  host.replaceChildren();
-
-  if (!nodes.length) {
-    host.append(
-      el(
-        'p',
-        'empty-state',
-        'No project workstreams match this filter. Assign tasks to a project.'
-      )
-    );
-    return;
-  }
-
-  const width = host.clientWidth || 960;
-  const height = Math.max(520, Math.floor(window.innerHeight * 0.62));
-  const canvas = document.createElement('canvas');
-  canvas.className = 'graph-canvas';
-  canvas.width = Math.floor(width * devicePixelRatio);
-  canvas.height = Math.floor(height * devicePixelRatio);
-  canvas.style.width = `${width}px`;
-  canvas.style.height = `${height}px`;
-  host.append(canvas);
-
-  const tip = el('div', 'graph-tip');
-  tip.hidden = true;
-  host.append(tip);
-
-  const ctx = canvas.getContext('2d')!;
-  const simNodes = nodes.map((n) => ({ ...n }));
-  const simLinks = links.map((l) => ({ ...l }));
-
-  let selected: string | null = selectedId;
-  let hover: GraphNode | null = null;
-
-  const simulation: Simulation<GraphNode, GraphLink> = forceSimulation(simNodes)
-    .force(
-      'link',
-      forceLink<GraphNode, GraphLink>(simLinks)
-        .id((n) => n.id)
-        .distance(88)
-        .strength(0.45)
-    )
-    .force('charge', forceManyBody<GraphNode>().strength(-640))
-    .force('x', forceX(width / 2).strength(0.04))
-    .force('y', forceY(height / 2).strength(0.04))
-    .force('collide', forceCollide<GraphNode>().radius((n) => (n.kind === 'project' ? 46 : 28)))
-    .on('tick', draw);
-
-  function draw(): void {
-    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-    ctx.clearRect(0, 0, width, height);
-
-    ctx.lineWidth = 1.25;
-    for (const link of simLinks) {
-      const s = typeof link.source === 'object' ? link.source : null;
-      const t = typeof link.target === 'object' ? link.target : null;
-      if (!s || !t || s.x == null || t.x == null || s.y == null || t.y == null) continue;
-      ctx.strokeStyle = tokenColor('--wave', '#376fb7');
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(t.x, t.y);
-      ctx.stroke();
-    }
-
-    for (const node of simNodes) {
-      if (node.x == null || node.y == null) continue;
-      const r = node.kind === 'project' ? 16 : 11;
-      ctx.beginPath();
-      ctx.fillStyle =
-        node.kind === 'project'
-          ? tokenColor('--navy', '#17375e')
-          : node.id === selected || node === hover
-            ? tokenColor('--wave', '#376fb7')
-            : tokenColor('--navy-2', '#244f7c');
-      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-      ctx.fill();
-      if (node.id === selected || node === hover) {
-        ctx.fillStyle = tokenColor('--ink', '#13233a');
-        ctx.font = `${getComputedStyle(document.documentElement).getPropertyValue('--text-xs') || '12px'} ${getComputedStyle(document.documentElement).getPropertyValue('--font-ui') || 'Inter, sans-serif'}`;
-        ctx.fillText(node.label.slice(0, 28), node.x + r + 6, node.y + 4);
-      }
-    }
-  }
-
-  function nodeAt(mx: number, my: number): GraphNode | null {
-    for (const node of simNodes) {
-      if (node.x == null || node.y == null) continue;
-      const r = node.kind === 'project' ? 22 : 18;
-      if (Math.hypot(node.x - mx, node.y - my) <= r) return node;
-    }
-    return null;
-  }
-
-  function showSelection(node: GraphNode): void {
-    selected = node.id;
-    if (node.kind === 'task') onSelect(node.id);
-    else onSelect(null);
-    draw();
-  }
-
-  const expandHost = el('div', 'task-stack graph-expand');
-  if (selectedId) {
-    const task = tasks.find((item) => item.id === selectedId);
-    if (task) {
-      const project = projects.find((item) => item.id === task.parent_project_id);
-      const detail = el('div', 'task-tile__detail-body');
-      detail.append(
-        el(
-          'p',
-          'hierarchy-meta',
-          project ? `Project · ${project.title}` : 'No project assigned'
-        )
-      );
-      expandHost.append(
-        renderBoardTaskTile(task, project?.title ?? task.domain, detail, {
-          editorHost,
-          projects,
-          onSaved: onRefresh,
-          open: expandedId === selectedId,
-          onToggle: (taskId, open) => onExpand(taskId, open)
-        })
-      );
-    }
-  }
-  host.append(expandHost);
-
-  host.append(
-    createVizNodeList(
-      'Workstream nodes',
-      simNodes.map((node) => ({ id: node.id, kind: node.kind, label: node.label })),
-      (node) => {
-        const hit = simNodes.find((entry) => entry.id === node.id);
-        if (hit) showSelection(hit);
-      },
-      { selectedId: selected, collapsed: simNodes.length > 12 }
-    )
-  );
-
-  canvas.addEventListener('mousemove', (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const node = nodeAt(event.clientX - rect.left, event.clientY - rect.top);
-    hover = node;
-    if (node) {
-      tip.hidden = false;
-      tip.textContent = node.label;
-      tip.style.left = `${event.clientX - rect.left + 12}px`;
-      tip.style.top = `${event.clientY - rect.top + 12}px`;
-    } else {
-      tip.hidden = true;
-    }
-    draw();
-  });
-
-  canvas.addEventListener('click', (event) => {
-    const rect = canvas.getBoundingClientRect();
-    const node = nodeAt(event.clientX - rect.left, event.clientY - rect.top);
-    if (node) showSelection(node);
-  });
-
-  simulation.alpha(1).restart();
-}
-
-function hashGraphMode(): GraphMode {
-  return hashQuery().get('mode') === 'workstreams' ? 'workstreams' : 'blockers';
-}
+import { createHubFilter, createHubPills, createHubSearch, createHubToolbar, domainFilterOptions, el } from '@/views/hub-kit';
+import { createVizNodeList } from '@/views/viz-node-list';
+import { renderGraphDrawer } from '@/views/graph-drawer';
+import { mountLinesView, type LinesMount } from '@/views/graph-lines';
+import { mountBranchView, type BranchMount } from '@/views/graph-branch';
+import { mountOrbitView, type OrbitMount } from '@/views/graph-orbit';
 
 type LiveGraph = {
   canvas: HTMLElement;
-  mode: GraphMode;
-  setMode: (mode: GraphMode) => void;
+  teardown: () => void;
 };
 
 let liveGraph: LiveGraph | null = null;
+let selectedId: string | null = null;
+let insightsOpen = true;
+let listMode = false;
+let lookAhead = 0;
+let orbitPaused = false;
+let hideDone = false;
+let scaleLines = false;
+let focusedProjectId: string | null = null;
+let hubFilter = 'all';
+let projectFilter = 'all';
+let searchQuery = '';
 
-/** Graph rail page — readable blocker map plus workstream force layout. */
+function prefersReducedMotion(): boolean {
+  return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
+}
+
+function setGraphView(view: GraphPageView): void {
+  const query = hashQuery();
+  if (view === 'lines') query.delete('view');
+  else query.set('view', view);
+  const qs = query.toString();
+  const next = qs ? `#/graph?${qs}` : '#/graph';
+  if (location.hash !== next) location.hash = next;
+}
+
+async function loadDismissals(): Promise<InsightDismissal[]> {
+  try {
+    const prefs = parseHubPrefs(await tasksApi.getHubPrefs());
+    return prefs.dismissed_insight_ids;
+  } catch {
+    return [];
+  }
+}
+
 export async function renderGraphView(canvas: HTMLElement): Promise<void> {
-  if (liveGraph && liveGraph.canvas === canvas && canvas.querySelector('.graph-host > .graph-stage')) {
-    liveGraph.setMode(hashGraphMode());
-    return;
+  const redirect = canonicalizeGraphHash();
+  if (redirect && redirect !== location.hash) {
+    history.replaceState(null, '', redirect);
   }
 
-  showViewLoading(canvas, 'Loading graph…', '.graph-host');
-  const [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
+  liveGraph?.teardown();
+  showViewLoading(canvas, 'Loading graph…', '.graph-page');
+  await loadTaskProperties();
+  const [tasks, projects, dismissals] = await Promise.all([
+    tasksApi.listTasks(),
+    tasksApi.listProjects(),
+    loadDismissals()
+  ]);
 
-  const session: LiveGraph = {
-    canvas,
-    mode: hashGraphMode(),
-    setMode: () => undefined
-  };
-  liveGraph = session;
+  let workingTasks = tasks;
+  let workingProjects = projects;
+  let dismissed = dismissals;
+  let insights = rankInsights(buildGraphInsights(workingTasks, workingProjects, new Date(), dismissed));
+  let view = graphViewFromHash();
+  let mount: LinesMount | BranchMount | OrbitMount | null = null;
 
-  canvas.replaceChildren();
+  const page = el('div', 'graph-page');
+  const pills = () =>
+    createHubPills({
+      label: 'Graph view',
+      items: [
+        { id: 'lines', label: 'Lines' },
+        { id: 'branch', label: 'Branch' },
+        { id: 'orbit', label: 'Orbit' }
+      ],
+      value: view,
+      onSelect: (id) => {
+        view = id;
+        setGraphView(id);
+        void paintView();
+      }
+    });
 
   const toolbar = createHubToolbar('graph-toolbar');
   const search = createHubSearch({
-    placeholder: session.mode === 'blockers' ? 'Filter gates…' : 'Filter nodes…',
-    ariaLabel: 'Filter graph'
-  });
-  function onNavigate(href: string): void {
-    if (href.startsWith('#/graph')) {
-      session.setMode(href.includes('workstreams') ? 'workstreams' : 'blockers');
-      if (location.hash !== href) location.hash = href;
-      return;
+    placeholder: 'Search graph…',
+    ariaLabel: 'Search graph',
+    onInput: (value) => {
+      searchQuery = value;
+      void paintView();
     }
-    location.hash = href;
+  });
+  const insightsBtn = el('button', 'btn btn--ghost', 'Insights');
+  insightsBtn.type = 'button';
+  insightsBtn.setAttribute('aria-pressed', insightsOpen ? 'true' : 'false');
+  const listBtn = el('button', 'btn btn--ghost', 'List');
+  listBtn.type = 'button';
+  listBtn.setAttribute('aria-pressed', listMode ? 'true' : 'false');
+  const matchCount = el('p', 'graph-toolbar__meta', '');
+  const confirmHost = el('div', 'graph-confirm');
+  const stage = el('div', 'graph-stage');
+  const drawer = el('aside', 'graph-drawer glass-panel');
+  drawer.hidden = true;
+  const insightDrawer = el('aside', 'graph-insights glass-panel');
+  const live = el('p', 'visually-hidden');
+  live.setAttribute('aria-live', 'polite');
+
+  function scopedTasks(): Task[] {
+    return workingTasks.filter((task) => {
+      if (hubFilter !== 'all' && task.domain !== hubFilter) return false;
+      if (projectFilter !== 'all' && task.parent_project_id !== projectFilter) return false;
+      return true;
+    });
   }
 
   function paintChrome(): void {
@@ -403,98 +140,339 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
       ariaLabel: 'Filters',
       className: 'hub-filters--inline'
     });
-    filters.panel.append(search.el);
-    toolbar.replaceChildren(renderGraphFamilyPills('graph', session.mode, onNavigate), filters.root);
-    search.input.placeholder = session.mode === 'blockers' ? 'Filter gates…' : 'Filter nodes…';
+    const hub = createHubFilter({
+      key: 'hub',
+      label: 'Hub',
+      value: hubFilter,
+      defaultValue: 'all',
+      options: domainFilterOptions(true),
+      onChange: (value) => {
+        hubFilter = value;
+        void paintView();
+      }
+    });
+    const proj = createHubFilter({
+      key: 'project',
+      label: 'Project',
+      value: projectFilter,
+      defaultValue: 'all',
+      options: [
+        { value: 'all', label: 'All projects' },
+        ...workingProjects.map((p) => ({ value: p.id, label: p.title }))
+      ],
+      onChange: (value) => {
+        projectFilter = value;
+        void paintView();
+      }
+    });
+    filters.panel.append(hub.el, proj.el, search.el, insightsBtn, listBtn, matchCount);
+    toolbar.replaceChildren(pills(), filters.root);
   }
 
-  paintChrome();
-  canvas.append(toolbar);
-
-  const confirmHost = el('div', 'graph-confirm');
-  canvas.append(confirmHost);
-
-  const host = el('div', 'graph-host');
-  const stage = el('div', 'graph-stage');
-  host.append(stage);
-  canvas.append(host);
-
-  let selectedId: string | null = null;
-  let expandedId: string | null = null;
-
-  const paint = () => {
-    confirmHost.replaceChildren();
-    const q = search.input.value.trim().toLowerCase();
-    const filteredTasks = q
-      ? tasks.filter((task) => task.title.toLowerCase().includes(q) || task.description.toLowerCase().includes(q))
-      : tasks;
-    const filteredProjects = q
-      ? projects.filter((project) => project.title.toLowerCase().includes(q))
-      : projects;
-    const scopedTasks = filteredTasks.length ? filteredTasks : tasks;
-
-    if (selectedId && !scopedTasks.some((task) => task.id === selectedId)) {
-      selectedId = null;
-      expandedId = null;
+  function paintInsights(): void {
+    insightDrawer.hidden = !insightsOpen;
+    insightDrawer.replaceChildren(el('h2', 'graph-insights__title', 'Insights'));
+    const rows = insights.filter((ins) => insightsOpen);
+    if (!rows.length) {
+      insightDrawer.append(el('p', 'hierarchy-meta', 'No insights right now.'));
+      return;
     }
-    if (expandedId && expandedId !== selectedId) {
-      expandedId = null;
+    for (const insight of rows) {
+      const btn = el('button', `graph-insight graph-insight--${insight.severity}`, `${insight.headline}. ${insight.detail}`);
+      btn.type = 'button';
+      btn.addEventListener('click', () => reviewInsight(insight));
+      insightDrawer.append(btn);
     }
+  }
 
-    if (session.mode === 'blockers') {
-      mountBlockerGraph(
-        stage,
-        scopedTasks,
-        projects,
-        confirmHost,
-        selectedId,
-        expandedId,
-        (taskId) => {
-          selectedId = taskId;
-          expandedId = null;
-          paint();
-        },
-        (taskId, open) => {
-          expandedId = open ? taskId : null;
-          paint();
-        },
-        paint
+  function reviewInsight(insight: GraphInsight): void {
+    if (insight.anchor.kind === 'task') {
+      selectedId = insight.anchor.id;
+      openDrawer();
+    }
+    if (!insight.proposal?.length && !insight.draft) return;
+    const summary = insight.detail + (insight.draft ? ` Draft: ${insight.draft.subject ?? ''}` : '');
+    showConfirmWrite(confirmHost, insight.headline, summary, async () => {
+      if (insight.proposal?.length) {
+        await tasksApi.applyAgentMutations(insight.proposal);
+        live.textContent = `${insight.headline} applied.`;
+      }
+      if (insight.draft) {
+        const mail = `mailto:${encodeURIComponent(insight.draft.to ?? '')}?subject=${encodeURIComponent(insight.draft.subject ?? '')}&body=${encodeURIComponent(insight.draft.body)}`;
+        const copy = el('button', 'btn btn--secondary', 'Copy');
+        copy.type = 'button';
+        copy.addEventListener('click', () => void navigator.clipboard.writeText(insight.draft!.body));
+        const open = el('a', 'btn btn--primary', 'Open in Mail');
+        (open as HTMLAnchorElement).href = mail;
+        confirmHost.append(copy, open);
+      }
+    });
+  }
+
+  async function dismissInsight(insight: GraphInsight): Promise<void> {
+    dismissed = [...dismissed, { id: insight.id, fingerprint: insightFingerprint(insight) }];
+    try {
+      await tasksApi.updateHubPrefs({ dismissed_insight_ids: dismissed });
+    } catch {
+      /* mock or offline — keep in memory */
+    }
+    insights = rankInsights(buildGraphInsights(workingTasks, workingProjects, new Date(), dismissed));
+    paintInsights();
+  }
+
+  function openDrawer(): void {
+    const task = workingTasks.find((item) => item.id === selectedId) ?? null;
+    renderGraphDrawer(drawer, task, workingTasks, workingProjects, {
+      onComplete: (item) => void completeTask(item.id),
+      onOpen: (item) => {
+        location.hash = `#/task/${item.id}`;
+      },
+      onReschedule: (item) => {
+        const next = prompt('New due date (YYYY-MM-DD)', item.due_date ?? '');
+        if (next) void tasksApi.updateTask(item.id, { due_date: next });
+      },
+      onSnooze: (item) => {
+        const due = item.due_date ? new Date(`${item.due_date}T12:00:00`) : new Date();
+        void tasksApi.updateTask(item.id, { due_date: toDateKey(addDays(due, 1)) });
+      },
+      onAskClare: (item) => {
+        setFocus({ type: 'task', id: item.id });
+        location.hash = `#/clare?focus=task:${encodeURIComponent(item.id)}`;
+      },
+      onClose: () => {
+        selectedId = null;
+        drawer.hidden = true;
+      }
+    });
+  }
+
+  async function completeTask(id: string): Promise<void> {
+    const task = await tasksApi.updateTask(id, { status: 'done', completed_at: new Date().toISOString() });
+    workingTasks = workingTasks.map((item) => (item.id === task.id ? task : item));
+    live.textContent = `${task.title} completed.`;
+    void paintView();
+  }
+
+  function listNodes() {
+    const scoped = scopedTasks();
+    if (view === 'lines') {
+      return workingProjects
+        .filter((p) => scoped.some((t) => t.parent_project_id === p.id))
+        .map((p) => ({ id: p.id, kind: 'project', label: `${p.title} · ${insights.find((i) => i.anchor.kind === 'project' && i.anchor.id === p.id)?.headline ?? 'line'}` }));
+    }
+    if (view === 'orbit') {
+      return scoped
+        .filter((t) => t.due_date)
+        .map((t) => ({ id: t.id, kind: 'task', label: `${t.title} · ${t.due_date}` }));
+    }
+    return scoped.map((t) => ({
+      id: t.id,
+      kind: 'task',
+      label: `${t.title} · blocked by ${(t.depends_on ?? []).length} · unlocks later`
+    }));
+  }
+
+  async function paintView(): Promise<void> {
+    view = graphViewFromHash();
+    paintChrome();
+    insights = rankInsights(buildGraphInsights(scopedTasks(), workingProjects, new Date(), dismissed));
+    paintInsights();
+    if (mount && !prefersReducedMotion()) {
+      stage.classList.add('is-fading');
+      await new Promise((resolve) => window.setTimeout(resolve, 160));
+    }
+    mount?.teardown();
+    mount = null;
+    const q = searchQuery.trim().toLowerCase();
+    const matches = scopedTasks().filter((t) => t.title.toLowerCase().includes(q));
+    matchCount.textContent = q ? `${matches.length} match${matches.length === 1 ? '' : 'es'}` : '';
+    stage.replaceChildren();
+    stage.classList.remove('is-fading');
+    if (listMode) {
+      stage.append(
+        createVizNodeList(
+          `${view} list`,
+          listNodes(),
+          (node) => {
+            if (node.kind === 'task') {
+              selectedId = node.id;
+              openDrawer();
+            } else {
+              focusedProjectId = node.id;
+            }
+          },
+          { selectedId }
+        )
       );
       return;
     }
-
-    mountWorkstreamGraph(
-      stage,
-      scopedTasks,
-      filteredProjects.length ? filteredProjects : projects,
-      confirmHost,
+    const common = {
+      tasks: scopedTasks(),
+      projects: workingProjects,
+      now: new Date(),
       selectedId,
-      expandedId,
-      (taskId) => {
-        selectedId = taskId;
-        expandedId = null;
-        paint();
+      search: searchQuery,
+      insights,
+      reducedMotion: prefersReducedMotion(),
+      onSelect: (id: string) => {
+        selectedId = id;
+        openDrawer();
+        void paintView();
       },
-      (taskId, open) => {
-        expandedId = open ? taskId : null;
-        paint();
-      },
-      paint
-    );
-  };
+      onReviewInsight: (id: string) => {
+        const insight = insights.find((row) => row.id === id);
+        if (insight) reviewInsight(insight);
+      }
+    };
+    if (view === 'lines') {
+      mount = mountLinesView(stage, {
+        ...common,
+        scale: scaleLines,
+        focusedProjectId,
+        onComplete: (id) => void completeTask(id),
+        onFocusProject: (id) => {
+          focusedProjectId = id;
+          void paintView();
+        },
+        onAddStation: (projectId, stepOrder) => {
+          const domain = workingProjects.find((p) => p.id === projectId)
+            ? scopedTasks().find((t) => t.parent_project_id === projectId)?.domain ?? 'other'
+            : 'other';
+          void tasksApi.createTask({
+            title: 'New station',
+            domain,
+            parent_project_id: projectId,
+            step_order: stepOrder
+          });
+        },
+        onReorder: (taskId, stepOrder) => {
+          void tasksApi.updateTask(taskId, { step_order: stepOrder });
+        },
+        onToggleScale: () => {
+          scaleLines = !scaleLines;
+          void paintView();
+        }
+      });
+    } else if (view === 'branch') {
+      mount = mountBranchView(stage, {
+        ...common,
+        hideDone,
+        onLink: (fromId, toId) => {
+          const target = workingTasks.find((t) => t.id === toId);
+          if (!target) return;
+          void tasksApi.updateTask(toId, { depends_on: [...(target.depends_on ?? []), fromId] });
+        },
+        onUnlink: (fromId, toId) => {
+          const target = workingTasks.find((t) => t.id === toId);
+          if (!target) return;
+          void tasksApi.updateTask(toId, { depends_on: (target.depends_on ?? []).filter((id) => id !== fromId) });
+        },
+        onToggleHideDone: () => {
+          hideDone = !hideDone;
+          void paintView();
+        },
+        onWhatIf: () => undefined,
+        onApplyWhatIf: () => undefined
+      });
+    } else {
+      mount = mountOrbitView(stage, {
+        ...common,
+        lookAhead,
+        paused: orbitPaused || prefersReducedMotion(),
+        onPauseChange: (paused) => {
+          orbitPaused = paused;
+        },
+        onLookAhead: (days) => {
+          lookAhead = days;
+          if (mount && 'setLookAhead' in mount) mount.setLookAhead(days);
+        },
+        onReschedule: (taskId, dateKey) => {
+          showConfirmWrite(confirmHost, 'Move due date', `Set due date to ${dateKey}?`, async () => {
+            await tasksApi.updateTask(taskId, { due_date: dateKey });
+          });
+        }
+      });
+    }
+    if (selectedId) {
+      openDrawer();
+      mount?.focus(selectedId);
+    }
+  }
 
-  session.setMode = (next) => {
-    if (session.mode === next) return;
-    session.mode = next;
-    paintChrome();
-    paint();
-  };
+  insightsBtn.addEventListener('click', () => {
+    insightsOpen = !insightsOpen;
+    insightsBtn.setAttribute('aria-pressed', insightsOpen ? 'true' : 'false');
+    paintInsights();
+  });
+  listBtn.addEventListener('click', () => {
+    listMode = !listMode;
+    listBtn.setAttribute('aria-pressed', listMode ? 'true' : 'false');
+    void paintView();
+  });
 
-  search.input.addEventListener('input', () => paint());
-  paint();
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === ' ' && view === 'orbit' && mount && 'setPaused' in mount) {
+      event.preventDefault();
+      mount.setPaused(!mount.isPaused());
+    }
+    if (event.key === 'Escape') {
+      focusedProjectId = null;
+      selectedId = null;
+      drawer.hidden = true;
+      void paintView();
+    }
+    if ((event.key === '[' || event.key === ']') && view === 'orbit') {
+      lookAhead = Math.max(0, Math.min(30, lookAhead + (event.key === ']' ? 1 : -1)));
+      if (mount && 'setLookAhead' in mount) mount.setLookAhead(lookAhead);
+    }
+  };
+  document.addEventListener('keydown', onKey);
+
+  const stopChanged = onTasksChanged((incoming) => {
+    for (const task of incoming) {
+      const idx = workingTasks.findIndex((item) => item.id === task.id);
+      if (idx >= 0) workingTasks[idx] = task;
+      else workingTasks.push(task);
+    }
+    void paintView();
+  });
+  const stopDeleted = onTasksDeleted((ids) => {
+    workingTasks = workingTasks.filter((task) => !ids.includes(task.id));
+    void paintView();
+  });
+
+  void tasksApi.graphInsights?.({
+    view,
+    findings: insights,
+    tasks: scopedTasks().slice(0, 40),
+    projects: workingProjects.slice(0, 20)
+  }).then((enriched) => {
+    if (Array.isArray(enriched?.insights) && enriched.insights.length) {
+      insights = rankInsights(enriched.insights as GraphInsight[]);
+      paintInsights();
+    }
+  }).catch(() => {
+    matchCount.textContent = `${matchCount.textContent} Clare offline, showing basic insights`.trim();
+  });
+
+  page.append(toolbar, confirmHost, stage, drawer, insightDrawer, live);
+  canvas.replaceChildren(page);
+  paintChrome();
+  await paintView();
+
+  const teardown = () => {
+    document.removeEventListener('keydown', onKey);
+    stopChanged();
+    stopDeleted();
+    mount?.teardown();
+    if (liveGraph?.teardown === teardown) liveGraph = null;
+  };
+  liveGraph = { canvas, teardown };
+  void dismissInsight;
 }
 
-/** Test hook — drop the live graph session between specs. */
 export function resetGraphSession(): void {
+  liveGraph?.teardown();
   liveGraph = null;
+  selectedId = null;
 }
