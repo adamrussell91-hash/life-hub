@@ -1,13 +1,14 @@
 import { expect, test } from '@playwright/test';
 
 async function signIn(page) {
-  await page.goto('/');
+  await page.goto('/#/board');
   const pass = page.getByLabel('Passphrase');
-  if (await pass.count()) {
+  if (await pass.isVisible().catch(() => false)) {
     await pass.fill('tasks-hub-local');
     await page.getByRole('button', { name: /sign in/i }).click();
-    await expect(page.locator('.hub-shell, .page-header')).toBeVisible({ timeout: 20_000 });
   }
+  await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: /Dashboard|Graph|Today/ })).toBeVisible();
 }
 
 async function openGraph(page, hash = '#/graph') {
@@ -20,7 +21,7 @@ async function openGraph(page, hash = '#/graph') {
 test('graph pills and old routes', async ({ page }) => {
   await signIn(page);
   await openGraph(page, '#/graph');
-  const pills = page.locator('.hub-pills__btn');
+  const pills = page.locator('.graph-page .hub-pills__btn');
   await expect(pills).toHaveText(['Lines', 'Branch', 'Orbit']);
   await expect(page.locator('.graph-lines, .empty-state__title')).toBeVisible();
 
@@ -46,14 +47,13 @@ test('graph pills and old routes', async ({ page }) => {
 test('selection persists across view switches', async ({ page }) => {
   await signIn(page);
   await openGraph(page, '#/graph');
-  const station = page.locator('[data-station-id]').first();
-  if (await station.count()) {
-    await station.click();
-    await expect(page.locator('.graph-drawer')).toBeVisible();
-    await page.getByRole('button', { name: 'Branch' }).click();
-    await expect(page.locator('.graph-branch')).toBeVisible();
-    await expect(page.locator('.graph-drawer')).toBeVisible();
-  }
+  const station = page.locator('.graph-page [data-station-id^="task_"]').first();
+  await expect(station).toBeVisible();
+  await station.dispatchEvent('click');
+  await expect(page.locator('.graph-drawer:not([hidden])')).toBeVisible();
+  await page.locator('.graph-page .hub-pills__btn', { hasText: 'Branch' }).click();
+  await expect(page.locator('.graph-branch')).toBeVisible();
+  await expect(page.locator('.graph-drawer:not([hidden])')).toBeVisible();
 });
 
 test('orbit pause button and space stop movement', async ({ page }) => {
@@ -75,7 +75,7 @@ test('reduced motion starts orbit paused', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await signIn(page);
   await openGraph(page, '#/graph?view=orbit');
-  await expect(page.getByRole('button', { name: /play|pause/i })).toHaveText(/play/i);
+  await expect(page.locator('.graph-page .btn', { hasText: /play/i }).first()).toBeVisible();
 });
 
 test('390px lines stay vertical', async ({ page }) => {

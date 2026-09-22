@@ -213,6 +213,7 @@ export function mountLinesView(
       circle.setAttribute('cy', String(station.y));
       circle.setAttribute('r', station.kind === 'milestone' ? '10' : '7');
       circle.setAttribute('class', `graph-station__mark graph-station__mark--${station.state ?? 'open'}`);
+      if (station.state !== 'done') circle.setAttribute('fill', 'transparent');
       g.append(circle);
       if (current?.id === station.id) {
         const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');

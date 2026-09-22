@@ -163,10 +163,13 @@
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
+  pointer-events: none;
 }
 
-.graph-station {
+.graph-station,
+.graph-station__mark {
   cursor: pointer;
+  pointer-events: auto;
 }
 
 .graph-station.is-search-dim,
