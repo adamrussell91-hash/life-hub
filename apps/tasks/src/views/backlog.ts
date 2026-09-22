@@ -273,7 +273,9 @@ async function persist(id: string, patch: Partial<Task> | 'delete'): Promise<voi
     await tasksApi.deleteTask(id, { agent: 'Tasks Hub', reason: 'Backlog delete' });
     return;
   }
-  await tasksApi.updateTask(id, patch);
+  const { updated_at: _updatedAt, created_at: _createdAt, id: _id, schema_version: _schema, ...safe } =
+    patch as Partial<Task> & { schema_version?: number };
+  await tasksApi.updateTask(id, safe);
 }
 
 function selectedIds(state: Session, fallback: string): string[] {
@@ -298,7 +300,7 @@ async function mutate(
     .map((id) => findTask(id))
     .filter((task): task is Task => Boolean(task))
     .map((task) => ({
-      task,
+      task: { ...task },
       before:
         patch === 'delete'
           ? { ...task }
@@ -399,10 +401,13 @@ async function undoPersisted(
   snaps: Array<{ task: Task; before: Partial<Task> }>,
   wasDelete: boolean
 ): Promise<void> {
-  if (wasDelete) {
-    for (const { task } of snaps) upsert(state.tasks, task);
-    reconcile(state);
-    try {
+  for (const { task } of snaps) {
+    upsert(state.tasks, { ...task });
+    state.pending.set(task.id, { updatedAt: task.updated_at, snapshot: task });
+  }
+  reconcile(state);
+  try {
+    if (wasDelete) {
       await Promise.all(
         snaps.map(async ({ task }) => {
           const created = await tasksApi.createTask({
@@ -422,26 +427,34 @@ async function undoPersisted(
           upsert(state.tasks, created);
         })
       );
-      reconcile(state);
-    } catch {
-      toastError(() => void undoPersisted(state, snaps, wasDelete));
+    } else {
+      await Promise.all(snaps.map(({ task, before }) => persist(task.id, before)));
     }
-    return;
-  }
-  for (const { task, before } of snaps) {
-    await mutate(state, [task.id], before);
+    for (const { task } of snaps) state.pending.delete(task.id);
+    reconcile(state);
+  } catch {
+    toastError(() => void undoPersisted(state, snaps, wasDelete));
   }
 }
 
 function scheduleIds(state: Session, ids: string[], dateKey: string, label: string): void {
+  const unique = [...new Set(ids)].filter((id) => {
+    if (state.pending.has(id) || state.exiting.has(id)) return false;
+    return findTask(id)?.due_date !== dateKey;
+  });
+  if (!unique.length) return;
+  for (const id of unique) {
+    const task = findTask(id);
+    if (task) state.pending.set(id, { updatedAt: task.updated_at, snapshot: { ...task } });
+  }
   const zone = state.page.querySelector<HTMLElement>(`[data-zone-key="${dateKey}"]`);
-  void mutate(state, ids, { due_date: dateKey }, {
+  void mutate(state, unique, { due_date: dateKey }, {
     toast: `Scheduled for ${label} · Undo`,
     leave: true,
     flyTo: zone,
     outcome: 'scheduled'
   });
-  announce(state.page, `Scheduled ${ids.length} task${ids.length === 1 ? '' : 's'} for ${label}`);
+  announce(state.page, `Scheduled ${unique.length} task${unique.length === 1 ? '' : 's'} for ${label}`);
 }
 
 function snoozeIds(state: Session, ids: string[], days: number): void {

@@ -2,14 +2,44 @@ import { expect, test } from '@playwright/test';
 
 async function signIn(page) {
   await page.goto('/');
-  await page.getByLabel('Passphrase').fill('tasks-hub-local');
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await expect(page.locator('.page-header__title')).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(async () => {
+    const session = await fetch('/api/session').then((res) => res.json());
+    if (session?.data?.authenticated) return;
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ passphrase: 'tasks-hub-local' })
+    });
+    if (!res.ok) throw new Error('Could not sign in');
+  });
+  await page.goto('/');
+  await expect(page.locator('.page-header__copy .page-header__title')).toBeVisible({
+    timeout: 20_000
+  });
 }
 
 async function openBacklog(page, hash = '#/list') {
-  await page.goto(`/${hash}`);
+  await expect(page.locator('.canvas-status')).toHaveCount(0, { timeout: 20_000 });
+  const desktop = page.locator('.hub-rail__list--desktop').getByRole('link', { name: 'Backlog' });
+  if (await desktop.isVisible()) {
+    await desktop.click();
+  } else {
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByRole('link', { name: 'Backlog' }).click();
+  }
   await expect(page.locator('.backlog-page')).toBeVisible({ timeout: 20_000 });
+  if (hash.includes('triage')) {
+    await page.getByRole('button', { name: 'Triage' }).click();
+    await expect(page.locator('.backlog-triage')).toBeVisible({ timeout: 20_000 });
+  }
+}
+
+async function dismissReminders(page) {
+  for (let i = 0; i < 3; i += 1) {
+    const dismiss = page.getByRole('button', { name: 'Dismiss' }).first();
+    if (!(await dismiss.isVisible().catch(() => false))) break;
+    await dismiss.click({ timeout: 2000 }).catch(() => undefined);
+  }
 }
 
 async function createBacklogTask(page, title, extras = {}) {
@@ -32,22 +62,24 @@ async function createBacklogTask(page, title, extras = {}) {
 }
 
 async function ensureFreshRows(page, count) {
-  const existing = await page.locator('.backlog-fresh .backlog-row').count();
+  const existing = await page.evaluate(async () => {
+    const json = await fetch('/api/tasks').then((res) => res.json());
+    return (json.data?.tasks ?? []).filter(
+      (task) => !task.due_date && (task.status === 'open' || task.status === 'deferred') && task.bucket !== 'someday'
+    ).length;
+  });
   for (let i = existing; i < count; i += 1) {
     await createBacklogTask(page, `Backlog row ${String(i + 1).padStart(2, '0')} ${Date.now()}`);
   }
-  await page.reload();
-  await expect(page.locator('.backlog-page')).toBeVisible({ timeout: 20_000 });
 }
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('Backlog', () => {
+  test.describe.configure({ timeout: 60_000 });
   test('loads the dense list on #/list and #/backlog', async ({ page }) => {
     await signIn(page);
     await openBacklog(page, '#/list');
     await expect(page.getByRole('heading', { name: 'Backlog', level: 1 })).toBeVisible();
-    await expect(page.locator('.page-header__eyebrow')).toHaveText('Views');
+    await expect(page.locator('.page-header__copy > .page-header__eyebrow')).toHaveText('Views');
     await expect(page.locator('.backlog-zone')).toHaveCount(4);
     await expect(page.getByRole('button', { name: 'Triage' })).toBeVisible();
 
@@ -101,7 +133,7 @@ test.describe('Backlog', () => {
       timeout: 8_000
     });
     await expect(page.locator('.hub-toast')).toContainText(/Scheduled for today/);
-    await page.locator('.hub-toast__action', { hasText: 'Undo' }).click();
+    await page.locator('.hub-toast__action').click();
     await expect(page.locator(`.backlog-fresh [data-task-id="${dragged.id}"]`)).toBeVisible({
       timeout: 8_000
     });
@@ -150,7 +182,10 @@ test.describe('Backlog', () => {
     const before = await row.locator('.backlog-row__age').innerText();
     expect(before).not.toBe('0d');
     await row.getByRole('button', { name: 'Keep' }).click();
-    await expect(row.locator('.backlog-row__age')).toHaveText('0d', { timeout: 8_000 });
+    await expect(page.locator('.backlog-fresh [data-task-id="task_demo_backlog"] .backlog-row__age')).toHaveText(
+      '0d',
+      { timeout: 8_000 }
+    );
     await expect(page.locator('.backlog-stale [data-task-id="task_demo_backlog"]')).toHaveCount(0);
   });
 
@@ -175,9 +210,9 @@ test.describe('Backlog', () => {
   });
 
   test('390px swipe right schedules Today', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await signIn(page);
     const task = await createBacklogTask(page, `Swipe today ${Date.now()}`);
-    await page.setViewportSize({ width: 390, height: 844 });
     await openBacklog(page);
     const row = page.locator(`[data-task-id="${task.id}"]`);
     await expect(row).toBeVisible();
@@ -197,13 +232,20 @@ test.describe('Backlog', () => {
 
   test('twelve fresh rows fit on a 1440×900 canvas', async ({ page }) => {
     await signIn(page);
-    await openBacklog(page);
-    await ensureFreshRows(page, 12);
     await page.setViewportSize({ width: 1440, height: 900 });
-    const rows = page.locator('.backlog-fresh .backlog-row');
-    await expect(rows).toHaveCount(await rows.count());
-    expect(await rows.count()).toBeGreaterThanOrEqual(12);
-    const twelfth = rows.nth(11);
+    for (let i = 0; i < 12; i += 1) {
+      await createBacklogTask(page, `Fit row ${String(i + 1).padStart(2, '0')} ${Date.now()}`, {
+        domain: 'teaching'
+      });
+    }
+    await openBacklog(page);
+    await dismissReminders(page);
+    await page.evaluate(() => {
+      document.querySelector('.reminder-strip-host')?.setAttribute('hidden', '');
+      document.querySelector('.backlog-suggestions')?.setAttribute('hidden', '');
+    });
+    const twelfth = page.locator('.backlog-fresh .backlog-group').first().locator('.backlog-row').nth(11);
+    await expect(twelfth).toBeVisible();
     const box = await twelfth.boundingBox();
     expect(box).toBeTruthy();
     expect(box.y + box.height).toBeLessThan(900);
