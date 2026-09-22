@@ -18,6 +18,9 @@
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
+    "@blocksuite/blocks": "0.19.5",
+    "@blocksuite/presets": "0.19.5",
+    "@blocksuite/store": "0.19.5",
     "@netlify/blobs": "9.1.2",
     "@tiptap/core": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
@@ -26,6 +29,7 @@
     "happy-dom": "^17.4.4",
     "katex": "^0.16.22",
     "photoswipe": "^5.4.4",
+    "yjs": "13.6.18",
     "zod": "3.25.76"
   },
   "devDependencies": {

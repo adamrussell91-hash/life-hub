@@ -30,6 +30,7 @@ import {
   createCardStackEditor,
   createTimelineEditor,
   createVideoEditor,
+  createWhiteboardEditor,
   type BlockChangeHandler,
   type BlockEditorContext
 } from '@/blocks/editors';
@@ -75,6 +76,7 @@ import {
   renderTimelineBlock,
   renderTabsBlock,
   renderVideoBlock,
+  renderWhiteboardBlock,
   type RenderMode
 } from '@/blocks/render';
 import type { Block } from '@/schemas/block';
@@ -226,6 +228,10 @@ export const blockRegistry: {
   concept_map: {
     render: renderConceptMapBlock,
     createEditor: createConceptMapEditor
+  },
+  whiteboard: {
+    render: renderWhiteboardBlock,
+    createEditor: createWhiteboardEditor
   }
 };
 
@@ -264,6 +270,7 @@ export {
   createTimelineEditor,
   createTabsEditor,
   createVideoEditor,
+  createWhiteboardEditor,
   renderAccordionBlock,
   renderAttachmentBlock,
   renderAudioBlock,
@@ -297,7 +304,8 @@ export {
   renderCardStackBlock,
   renderTimelineBlock,
   renderTabsBlock,
-  renderVideoBlock
+  renderVideoBlock,
+  renderWhiteboardBlock
 };
 
 export type { BlockChangeHandler, BlockEditorContext, RenderMode };

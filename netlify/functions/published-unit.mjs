@@ -19,6 +19,11 @@ import {
   sanitizeBlocksDeep,
   toPublicOutcome
 } from './_shared/teaching-student.mjs';
+import {
+  containsWhiteboardBlocks,
+  defaultGetWhiteboardStore,
+  materialiseWhiteboardSnapshots
+} from './_shared/whiteboard-blobs.mjs';
 
 export const config = { path: '/api/published/units/:id' };
 
@@ -49,7 +54,26 @@ export function createPublishedUnitHandler(deps = {}) {
     }
 
     const lessons = orderLessonsByUnitIds(unit.lesson_ids ?? [], matching);
-    const studentBlocks = sanitizeBlocksDeep(filterBlocksForStudent(unit.blocks ?? []));
+    const filteredBlocks = filterBlocksForStudent(unit.blocks ?? []);
+    let resolvedBlocks = filteredBlocks;
+    if (containsWhiteboardBlocks(filteredBlocks)) {
+      try {
+        const whiteboardStore = await (deps.getWhiteboardStore ?? defaultGetWhiteboardStore)(env);
+        resolvedBlocks = await materialiseWhiteboardSnapshots(filteredBlocks, whiteboardStore);
+      } catch {
+        return withCors(
+          errorResponse(
+            503,
+            'whiteboard_snapshot_failed',
+            'Unit whiteboard content is temporarily unavailable.',
+            true
+          ),
+          request,
+          env
+        );
+      }
+    }
+    const studentBlocks = sanitizeBlocksDeep(resolvedBlocks);
     const ids = attachedOutcomeIds({ outcome_ids: unit.outcome_ids });
     const outcomes = [];
     for (const outcomeId of ids) {

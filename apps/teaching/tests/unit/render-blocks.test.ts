@@ -383,7 +383,8 @@ describe('blockRegistry', () => {
       'table',
       'tabs',
       'timeline',
-      'video'
+      'video',
+      'whiteboard'
     ]);
 
     for (const key of Object.keys(blockRegistry) as Array<Block['block_type']>) {

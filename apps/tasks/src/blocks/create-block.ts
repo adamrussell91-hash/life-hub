@@ -32,6 +32,7 @@ export const NEW_BLOCK_TYPES = [
   'diagram',
   'mind_map',
   'concept_map',
+  'whiteboard',
   'columns',
   'section',
   'spacer',
@@ -71,6 +72,7 @@ export const NEW_BLOCK_LABEL: Record<NewBlockType, string> = {
   diagram: 'Diagram',
   mind_map: 'Mind map',
   concept_map: 'Concept map',
+  whiteboard: 'Whiteboard',
   columns: 'Columns',
   section: 'Section',
   spacer: 'Spacer',
@@ -141,7 +143,7 @@ export const BLOCK_GROUPS: Array<{ label: string; types: readonly NewBlockType[]
   },
   {
     label: 'Visualisation',
-    types: ['chart', 'equation', 'diagram', 'mind_map', 'concept_map']
+    types: ['chart', 'equation', 'diagram', 'mind_map', 'concept_map', 'whiteboard']
   },
   {
     label: 'Layout',
@@ -446,6 +448,17 @@ export function createBlock(type: NewBlockType, id: string): Block {
           edges: [{ id: `${id}_e1`, from: `${id}_n1`, to: `${id}_n2`, label: 'relates to' }]
         }
       };
+    case 'whiteboard':
+      return {
+        ...shared,
+        block_type: 'whiteboard',
+        variant: 'large',
+        content: {
+          document_id: `whiteboard_${id}`,
+          title: '',
+          height_px: 640
+        }
+      };
     case 'columns':
       return {
         ...shared,
@@ -611,6 +624,15 @@ export function cloneBlockWithNewIds(
         ...series,
         id: nextId()
       }))
+    };
+  } else if (cloned.block_type === 'whiteboard') {
+    const sourceDocumentId =
+      cloned.content.seed_document_id ?? cloned.content.document_id;
+    const { published_snapshot: _publishedSnapshot, ...content } = cloned.content;
+    cloned.content = {
+      ...content,
+      document_id: `whiteboard_${cloned.id}`,
+      seed_document_id: sourceDocumentId
     };
   } else if (cloned.block_type === 'mind_map' || cloned.block_type === 'concept_map') {
     const idMap = new Map<string, string>();
