@@ -111,8 +111,10 @@ describe('renderHomeView', () => {
   it('renders a month calendar with an event chip on the right day', async () => {
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
-    expect(canvas.querySelector('.pro-home__grid')).toBeTruthy();
-    const chip = [...canvas.querySelectorAll('.pro-home__chip')].find((node) =>
+    expect(canvas.querySelector('.hub-calendar__grid')).toBeTruthy();
+    expect(canvas.querySelector('.hub-calendar__nav')).toBeTruthy();
+    expect(canvas.querySelector('.hub-calendar__today')?.textContent).toBe('Today');
+    const chip = [...canvas.querySelectorAll('.event-chip')].find((node) =>
       node.textContent?.includes('Critical Study PD Day')
     );
     expect(chip).toBeTruthy();
