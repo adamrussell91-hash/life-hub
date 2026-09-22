@@ -31,18 +31,23 @@ import {
   labeledField
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
+import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import type { TaskDomain } from '@/schemas/task';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 let somedayDomain: TaskDomain | 'all' = 'all';
 let somedayKind: SomedayKindFilter = 'all';
 let somedayQuery = '';
+let openSomedayId: string | null = null;
+let editingSomedayId: string | null = null;
 
 /** Tests share this module. Clear filters so one case cannot hide another. */
 export function resetSomedayViewFilters(): void {
   somedayDomain = 'all';
   somedayKind = 'all';
   somedayQuery = '';
+  openSomedayId = null;
+  editingSomedayId = null;
 }
 
 export function groupSomedayForReview(
@@ -149,14 +154,49 @@ function renderStalledPaths(
   return wrap;
 }
 
+function persistSomeday(task: Task, patch: Partial<Task>, onChange: (next: Task | null) => void): void {
+  void tasksApi
+    .updateTask(task.id, patch)
+    .then((next) => onChange(next))
+    .catch((err) => window.alert(errorMessage(err)));
+}
+
+function isSomedayControl(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        'button, a, input, textarea, select, label, .card-menu, .hub-menu, .someday-card__fields, .someday-card__stalled'
+      )
+    )
+  );
+}
+
+type SomedayCardHandlers = {
+  open: boolean;
+  editing: boolean;
+  onChange: (next: Task | null) => void;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDone: () => void;
+};
+
+/** Closed summary. Open the card, then choose Edit — same shape as the other hub cards. */
 function renderSomedayCard(
   task: Task,
   flagged: boolean,
   projects: Project[],
   allTasks: Task[],
-  onChange: (next: Task | null) => void
+  handlers: SomedayCardHandlers
 ): HTMLElement {
-  const card = el('article', `glass-tile someday-card${flagged ? ' someday-card--flagged' : ''}`);
+  const card = el(
+    'article',
+    `glass-tile someday-card${flagged ? ' someday-card--flagged' : ''}${handlers.open ? ' someday-card--open' : ''}`
+  );
+  card.tabIndex = 0;
+  card.setAttribute('aria-expanded', handlers.open ? 'true' : 'false');
+  card.setAttribute('aria-label', `${task.title} someday card`);
+
   const titleRow = el('div', 'someday-card__title-row');
   if (flagged) {
     const ring = document.createElement('span');
@@ -166,33 +206,73 @@ function renderSomedayCard(
       '<svg width="18" height="18" viewBox="0 0 18 18"><circle cx="9" cy="9" r="7" fill="none" stroke="var(--line)" stroke-width="2.5"/><circle cx="9" cy="9" r="7" fill="none" stroke="var(--warning)" stroke-width="2.5" stroke-dasharray="26 44" stroke-linecap="round" transform="rotate(-90 9 9)"/></svg>';
     titleRow.append(ring);
   }
-  const title = el('h3', 'someday-card__title', task.title);
-  titleRow.append(title);
-  const branch = el('a', 'btn btn--ghost btn--sm someday-card__branch', 'Branch it →');
-  branch.href = `#/someday/odyssey/${encodeURIComponent(task.id)}`;
-  titleRow.append(branch);
+  titleRow.append(el('h3', 'someday-card__title', task.title));
+  const menu: CardMenuItem[] = [
+    handlers.editing
+      ? { id: 'done', label: 'Done', onSelect: handlers.onDone }
+      : { id: 'edit', label: 'Edit', onSelect: handlers.onEdit },
+    {
+      id: 'branch',
+      label: 'Branch it',
+      onSelect: () => {
+        location.hash = `#/someday/odyssey/${encodeURIComponent(task.id)}`;
+      }
+    },
+    {
+      id: 'project',
+      label: 'Promote to project',
+      onSelect: () => {
+        void spawnProjectFromSomeday(task)
+          .then((project) =>
+            tasksApi.updateTask(task.id, {
+              linked_project_ids: [...somedayLinkedProjectIds(task), project.id]
+            })
+          )
+          .then((next) => handlers.onChange(next))
+          .catch((err) => window.alert(errorMessage(err)));
+      }
+    },
+    {
+      id: 'goal',
+      label: 'Promote to goal',
+      onSelect: () => {
+        void tasksApi
+          .createGoal({ title: task.title, description: task.description, parent_someday_id: task.id })
+          .then((goal) =>
+            tasksApi.updateTask(task.id, {
+              linked_goal_ids: [...somedayLinkedGoalIds(task), goal.id]
+            })
+          )
+          .then((next) => handlers.onChange(next))
+          .catch((err) => window.alert(errorMessage(err)));
+      }
+    },
+    {
+      id: 'remove',
+      label: 'Remove',
+      danger: true,
+      onSelect: () => {
+        if (!window.confirm(`Remove “${task.title}”?`)) return;
+        void tasksApi
+          .deleteTask(task.id)
+          .then(() => handlers.onChange(null))
+          .catch((err) => window.alert(errorMessage(err)));
+      }
+    }
+  ];
+  titleRow.append(renderCardMenu(`${task.title} card menu`, menu, { heading: 'Someday' }));
   card.append(titleRow);
 
-  if (task.description) card.append(el('p', 'someday-card__copy', task.description));
-  if (flagged) {
-    card.append(el('p', 'someday-card__if-then', suggestIfThen(task)));
+  const metaParts: string[] = [];
+  if (showsOriginDate(task.someday_kind) && task.origin_date) {
+    metaParts.push(`Origin ${formatDisplayDate(task.origin_date)}`);
   }
-
+  if (task.review_at) metaParts.push(`Review ${formatDisplayDate(task.review_at)}`);
   const linkedProjects = somedayLinkedProjectIds(task).length;
   const linkedGoals = somedayLinkedGoalIds(task).length;
-  const metaParts = [
-    task.domain,
-    task.priority,
-    task.review_at ? `Review ${formatDisplayDate(task.review_at)}` : 'No review date'
-  ];
-  if (showsOriginDate(task.someday_kind)) {
-    metaParts.push(
-      task.origin_date ? `Origin ${formatDisplayDate(task.origin_date)}` : 'No origin date'
-    );
-  }
   if (linkedProjects) metaParts.push(`${linkedProjects} linked project${linkedProjects === 1 ? '' : 's'}`);
   if (linkedGoals) metaParts.push(`${linkedGoals} linked goal${linkedGoals === 1 ? '' : 's'}`);
-  card.append(el('p', 'hierarchy-meta', metaParts.join(' · ')));
+  if (metaParts.length) card.append(el('p', 'hierarchy-meta', metaParts.join(' · ')));
 
   const chipsRow = el('div', 'someday-card__chips');
   const maturity = task.maturity ?? null;
@@ -215,158 +295,84 @@ function renderSomedayCard(
   }
   card.append(chipsRow);
 
-  const fieldsRow = el('div', 'someday-card__fields');
-
-  const maturitySelect = selectField({
-    ariaLabel: `How developed “${task.title}” is`,
-    value: task.maturity ?? '',
-    placeholder: 'Maturity…',
-    choices: MATURITY_LEVELS.map((m) => ({ id: m.id, label: m.label })),
-    onChange: (value) => {
-      void tasksApi
-        .updateTask(task.id, { maturity: value || null })
-        .then((next) => onChange(next))
-        .catch((err) => window.alert(errorMessage(err)));
-    }
-  });
-  fieldsRow.append(labeledField('Maturity', maturitySelect, 'hub-field hub-field--compact'));
-
-  const areaSelect = selectField({
-    ariaLabel: `Life area for “${task.title}”`,
-    value: task.life_area ?? '',
-    placeholder: 'Life area…',
-    choices: LIFE_AREAS,
-    onChange: (value) => {
-      void tasksApi
-        .updateTask(task.id, { life_area: value || null })
-        .then((next) => onChange(next))
-        .catch((err) => window.alert(errorMessage(err)));
-    }
-  });
-  fieldsRow.append(labeledField('Life area', areaSelect, 'hub-field hub-field--compact'));
-
-  const horizonSelect = selectField({
-    ariaLabel: `What altitude “${task.title}” would land at`,
-    value: task.horizon_target ?? '',
-    placeholder: 'If promoted…',
-    choices: HORIZON_TARGETS,
-    onChange: (value) => {
-      void tasksApi
-        .updateTask(task.id, { horizon_target: value || null })
-        .then((next) => onChange(next))
-        .catch((err) => window.alert(errorMessage(err)));
-    }
-  });
-  fieldsRow.append(labeledField('Horizon', horizonSelect, 'hub-field hub-field--compact'));
-
-  const kindSelect = selectField({
-    ariaLabel: `Category for “${task.title}”`,
-    value: task.someday_kind ?? '',
-    placeholder: 'Category…',
-    choices: SOMEDAY_KINDS.map((kind) => ({ id: kind.id, label: kind.label })),
-    onChange: (value) => {
-      void tasksApi
-        .updateTask(task.id, { someday_kind: value || null })
-        .then((next) => onChange(next))
-        .catch((err) => window.alert(errorMessage(err)));
-    }
-  });
-  fieldsRow.append(labeledField('Category', kindSelect, 'hub-field hub-field--compact'));
-
-  if (showsOriginDate(task.someday_kind)) {
-    const origin = createHubField({
-      type: 'date',
-      ariaLabel: `Origin date for ${task.title}`,
-      value: task.origin_date ?? ''
-    });
-    origin.input.addEventListener('change', () => {
-      const origin_date = origin.input.value || null;
-      void tasksApi
-        .updateTask(task.id, { origin_date })
-        .then((next) => onChange(next))
-        .catch((err) => window.alert(errorMessage(err)));
-    });
-    fieldsRow.append(labeledField('Origin', origin.el, 'hub-field hub-field--compact'));
+  if (handlers.open) {
+    if (task.description) card.append(el('p', 'someday-card__copy', task.description));
+    if (flagged) card.append(el('p', 'someday-card__if-then', suggestIfThen(task)));
+    const linked = projects.filter((p) => somedayLinkedProjectIds(task).includes(p.id));
+    const stalledPaths = renderStalledPaths(task, stalledLinkedProjects(task, linked, allTasks), (next) =>
+      handlers.onChange(next)
+    );
+    if (stalledPaths) card.append(stalledPaths);
   }
-  card.append(fieldsRow);
 
-  const review = createHubField({
-    type: 'date',
-    ariaLabel: `Review date for ${task.title}`,
-    value: task.review_at ?? ''
-  });
-  review.input.addEventListener('change', () => {
-    const review_at = review.input.value || null;
-    void tasksApi
-      .updateTask(task.id, { review_at })
-      .then((next) => onChange(next))
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  card.append(labeledField('Review at', review.el));
+  if (handlers.editing) {
+    const fieldsRow = el('div', 'someday-card__fields');
+    const maturitySelect = selectField({
+      ariaLabel: `How developed “${task.title}” is`,
+      value: task.maturity ?? '',
+      placeholder: 'Maturity…',
+      choices: MATURITY_LEVELS.map((m) => ({ id: m.id, label: m.label })),
+      onChange: (value) => persistSomeday(task, { maturity: value || null }, handlers.onChange)
+    });
+    fieldsRow.append(labeledField('Maturity', maturitySelect, 'hub-field hub-field--compact'));
+    const areaSelect = selectField({
+      ariaLabel: `Life area for “${task.title}”`,
+      value: task.life_area ?? '',
+      placeholder: 'Life area…',
+      choices: LIFE_AREAS,
+      onChange: (value) => persistSomeday(task, { life_area: value || null }, handlers.onChange)
+    });
+    fieldsRow.append(labeledField('Life area', areaSelect, 'hub-field hub-field--compact'));
+    const horizonSelect = selectField({
+      ariaLabel: `What altitude “${task.title}” would land at`,
+      value: task.horizon_target ?? '',
+      placeholder: 'If promoted…',
+      choices: HORIZON_TARGETS,
+      onChange: (value) => persistSomeday(task, { horizon_target: value || null }, handlers.onChange)
+    });
+    fieldsRow.append(labeledField('Horizon', horizonSelect, 'hub-field hub-field--compact'));
+    const kindSelect = selectField({
+      ariaLabel: `Category for “${task.title}”`,
+      value: task.someday_kind ?? '',
+      placeholder: 'Category…',
+      choices: SOMEDAY_KINDS.map((kind) => ({ id: kind.id, label: kind.label })),
+      onChange: (value) => persistSomeday(task, { someday_kind: value || null }, handlers.onChange)
+    });
+    fieldsRow.append(labeledField('Category', kindSelect, 'hub-field hub-field--compact'));
+    if (showsOriginDate(task.someday_kind)) {
+      const origin = createHubField({
+        type: 'date',
+        ariaLabel: `Origin date for ${task.title}`,
+        value: task.origin_date ?? ''
+      });
+      origin.input.addEventListener('change', () => {
+        persistSomeday(task, { origin_date: origin.input.value || null }, handlers.onChange);
+      });
+      fieldsRow.append(labeledField('Origin', origin.el, 'hub-field hub-field--compact'));
+    }
+    const review = createHubField({
+      type: 'date',
+      ariaLabel: `Review date for ${task.title}`,
+      value: task.review_at ?? ''
+    });
+    review.input.addEventListener('change', () => {
+      persistSomeday(task, { review_at: review.input.value || null }, handlers.onChange);
+    });
+    fieldsRow.append(labeledField('Review', review.el, 'hub-field hub-field--compact'));
+    card.append(fieldsRow);
+  }
 
-  const linked = projects.filter((p) => somedayLinkedProjectIds(task).includes(p.id));
-  const stalledPaths = renderStalledPaths(task, stalledLinkedProjects(task, linked, allTasks), (next) =>
-    onChange(next)
-  );
-  if (stalledPaths) card.append(stalledPaths);
-
-  const parkUntil = el('button', 'btn btn--ghost', 'Park until…');
-  parkUntil.type = 'button';
-  parkUntil.addEventListener('click', () => {
-    const raw = window.prompt('Park until (YYYY-MM-DD)', task.review_at ?? '');
-    if (raw == null) return;
-    const review_at = raw.trim() || null;
-    void tasksApi
-      .updateTask(task.id, { review_at })
-      .then((next) => onChange(next))
-      .catch((err) => window.alert(errorMessage(err)));
+  const toggle = () => handlers.onToggle();
+  card.addEventListener('click', (event) => {
+    if (isSomedayControl(event.target)) return;
+    toggle();
   });
-
-  const actions = el('div', 'someday-card__actions');
-  const promoteTask = el('button', 'btn btn--primary', 'Promote to task');
-  promoteTask.type = 'button';
-  promoteTask.addEventListener('click', () => {
-    void tasksApi
-      .updateTask(task.id, { bucket: 'active', status: 'open' })
-      .then(() => onChange(null))
-      .catch((err) => window.alert(errorMessage(err)));
+  card.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target !== card) return;
+    event.preventDefault();
+    toggle();
   });
-  const promoteProject = el('button', 'btn btn--secondary', 'Promote to project');
-  promoteProject.type = 'button';
-  promoteProject.addEventListener('click', () => {
-    void spawnProjectFromSomeday(task)
-      .then((project) =>
-        tasksApi.updateTask(task.id, {
-          linked_project_ids: [...somedayLinkedProjectIds(task), project.id]
-        })
-      )
-      .then((next) => onChange(next))
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  const promoteGoal = el('button', 'btn btn--ghost', 'Promote to goal');
-  promoteGoal.type = 'button';
-  promoteGoal.addEventListener('click', () => {
-    void tasksApi
-      .createGoal({ title: task.title, description: task.description, parent_someday_id: task.id })
-      .then((goal) =>
-        tasksApi.updateTask(task.id, {
-          linked_goal_ids: [...somedayLinkedGoalIds(task), goal.id]
-        })
-      )
-      .then((next) => onChange(next))
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  const trash = el('button', 'btn btn--ghost', 'Remove');
-  trash.type = 'button';
-  trash.addEventListener('click', () => {
-    if (!window.confirm(`Remove “${task.title}”?`)) return;
-    void tasksApi
-      .deleteTask(task.id)
-      .then(() => onChange(null))
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  actions.append(parkUntil, promoteTask, promoteProject, promoteGoal, trash);
-  card.append(actions);
   return card;
 }
 
@@ -571,12 +577,42 @@ function paintSomeday(
 
   const { reviewNow, parked } = groupSomedayForReview(visible);
   const onCardChange = (item: Task, next: Task | null) => {
+    if (!next) {
+      if (openSomedayId === item.id) openSomedayId = null;
+      if (editingSomedayId === item.id) editingSomedayId = null;
+    }
     setItems(
       next
         ? items.map((entry) => (entry.id === next.id ? next : entry))
         : items.filter((entry) => entry.id !== item.id)
     );
   };
+
+  const repaint = () => paintSomeday(canvas, items, allTasks, projects, setItems);
+  const somedayCardHandlers = (item: Task, onChange: (next: Task | null) => void): SomedayCardHandlers => ({
+    open: openSomedayId === item.id,
+    editing: editingSomedayId === item.id,
+    onChange,
+    onToggle: () => {
+      if (openSomedayId === item.id) {
+        openSomedayId = null;
+        editingSomedayId = null;
+      } else {
+        openSomedayId = item.id;
+        editingSomedayId = null;
+      }
+      repaint();
+    },
+    onEdit: () => {
+      openSomedayId = item.id;
+      editingSomedayId = item.id;
+      repaint();
+    },
+    onDone: () => {
+      editingSomedayId = null;
+      repaint();
+    }
+  });
 
   if (reviewNow.length) {
     const group = el('section', 'someday-group');
@@ -592,7 +628,9 @@ function paintSomeday(
     group.append(heading);
     const grid = el('div', 'someday-grid');
     for (const item of reviewNow) {
-      grid.append(renderSomedayCard(item, true, projects, allTasks, (next) => onCardChange(item, next)));
+      grid.append(
+        renderSomedayCard(item, true, projects, allTasks, somedayCardHandlers(item, (next) => onCardChange(item, next)))
+      );
     }
     group.append(grid);
     canvas.append(group);
@@ -602,7 +640,9 @@ function paintSomeday(
     group.append(el('h2', 'someday-group__title', 'Parked'));
     const grid = el('div', 'someday-grid');
     for (const item of parked) {
-      grid.append(renderSomedayCard(item, false, projects, allTasks, (next) => onCardChange(item, next)));
+      grid.append(
+        renderSomedayCard(item, false, projects, allTasks, somedayCardHandlers(item, (next) => onCardChange(item, next)))
+      );
     }
     group.append(grid);
     canvas.append(group);
