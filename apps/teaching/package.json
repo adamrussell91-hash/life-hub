@@ -19,6 +19,7 @@
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^3.1.0",
     "@blocksuite/blocks": "0.19.5",
+    "@blocksuite/icons": "2.1.75",
     "@blocksuite/presets": "0.19.5",
     "@blocksuite/store": "0.19.5",
     "@netlify/blobs": "9.1.2",
@@ -38,5 +39,8 @@
     "typescript": "5.9.2",
     "vite": "7.1.2",
     "vitest": "3.2.4"
+  },
+  "overrides": {
+    "@blocksuite/icons": "2.1.75"
   }
 }
