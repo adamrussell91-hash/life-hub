@@ -92,6 +92,13 @@ describe('graph page fit', () => {
     expect(fitted.panY).toBe(150);
   });
 
+  it('does not shrink a tall branch map to a postage stamp', () => {
+    const fitted = fitBranchView({ width: 400, height: 2000 }, { width: 800, height: 500 });
+    expect(fitted.scale).toBe(1);
+    expect(fitted.panX).toBe(200);
+    expect(fitted.panY).toBe(0);
+  });
+
   it('keeps the terminus date inside the line viewBox', () => {
     const host = document.createElement('div');
     Object.defineProperty(host, 'clientWidth', { configurable: true, value: 640 });
