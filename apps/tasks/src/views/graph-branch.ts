@@ -506,8 +506,11 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     stage.replaceChildren(svg);
     const fitted = applyFit();
     viewport.querySelector('[data-part="minimap"]')?.remove();
+    const vw = viewport.clientWidth;
+    const vh = viewport.clientHeight;
+    const measured = vw >= 40 && vh >= 40;
     const stillOverflows =
-      layout.height * scale > viewport.clientHeight + 24 || layout.width * scale > viewport.clientWidth + 24;
+      measured && (layout.height * scale > vh + 24 || layout.width * scale > vw + 24);
     const userMoved =
       Math.abs(scale - fitted.scale) > 0.02 ||
       Math.abs(panX - fitted.panX) > 2 ||
