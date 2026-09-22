@@ -29,16 +29,6 @@
   clip: rect(0, 0, 0, 0);
 }
 
-.page-header__title-row .backlog-count {
-  margin-left: var(--space-2);
-  align-self: center;
-  font-size: var(--text-2xs);
-  padding: var(--space-px) var(--space-2);
-  border-radius: var(--radius-xs);
-  background: var(--shore);
-  color: var(--muted);
-}
-
 .backlog-header-actions {
   display: flex;
   align-items: center;
@@ -365,6 +355,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
   font-size: var(--text-base);
   font-weight: var(--weight-regular);
   background-image: linear-gradient(currentColor, currentColor);
