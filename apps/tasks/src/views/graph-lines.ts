@@ -94,6 +94,20 @@ function lineColour(domain: string | undefined, shade: number): string {
   return mixHex(base, '#0a1536', 0.3);
 }
 
+/** Keep terminus / ghost copy inside the painted SVG, not hanging off the page. */
+export function lineLabelX(x: number, viewWidth: number): { x: number; anchor: 'start' | 'end' } {
+  const pad = 8;
+  const maxX = Math.max(pad, viewWidth - pad);
+  const clamped = Math.min(Math.max(x, pad), maxX);
+  const anchor = clamped > viewWidth / 2 ? 'end' : 'start';
+  return { x: clamped, anchor };
+}
+
+export function lineViewWidth(clientWidth: number): number {
+  const measured = Math.floor(clientWidth);
+  return Math.max(measured || 720, 320);
+}
+
 function daysSince(from: string | null | undefined, now: Date): number {
   if (!from) return 0;
   const start = new Date(from);
@@ -509,7 +523,12 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       },
       gg
     );
-    const gt = svgEl('text', { class: 'sub graph-ghost__label', x: gx, y: y + g.ghostLabelY, 'text-anchor': 'middle' }, gg);
+    const ghostLabel = lineLabelX(gx, width);
+    const gt = svgEl(
+      'text',
+      { class: 'sub graph-ghost__label', x: ghostLabel.x, y: y + g.ghostLabelY, 'text-anchor': ghostLabel.anchor },
+      gg
+    );
     gt.textContent = (line.pace?.behind ?? 0) < 0 ? 'ahead of pace' : 'pace says be here by today';
     popIn(gg, base + 1000, 'pop', input.reducedMotion);
   }
@@ -567,9 +586,11 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     }
   });
 
-  const tg = svgEl('g', { class: 'pop', 'data-part': 'terminus' }, svg);
-  svgEl('rect', { x: termX, y: y - g.termH / 2, width: termW, height: g.termH, rx: g.termH / 2, fill: col }, tg);
-  const tt = svgEl('text', { class: 'term', x: termX + termW / 2, y: y + 4.5, 'text-anchor': 'middle' }, tg);
+  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
+  const termBox = lineLabelX(termX + termW, width);
+  const termLeft = Math.max(4, termBox.x - termW);
+  svgEl('rect', { x: termLeft, y: y - g.termH / 2, width: termW, height: g.termH, rx: g.termH / 2, fill: col }, tg);
+  const tt = svgEl('text', { class: 'term graph-terminus', x: termLeft + termW / 2, y: y + 4.5, 'text-anchor': 'middle' }, tg);
   tt.textContent = termText;
   popIn(tg, base + 720, 'slide', input.reducedMotion);
 }
@@ -667,7 +688,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       });
     }
   });
-  const tg = svgEl('g', { class: 'pop', 'data-part': 'terminus' }, svg);
+  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
   const tw = terminusWidth(line.terminus.label, line.terminus.date);
   svgEl('rect', { x: x0 - 12, y: endY, width: tw, height: 30, rx: 15, fill: col }, tg);
   const tt = svgEl('text', { class: 'term', x: x0 - 12 + tw / 2, y: endY + 19.5, 'text-anchor': 'middle' }, tg);
@@ -716,7 +737,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     const ordered = [...open, ...finished];
     const measured = root.clientWidth || host.clientWidth || 0;
     if (measured < 280) return;
-    const width = measured;
+    const width = lineViewWidth(measured);
     const vertical = width < 560;
     root.classList.toggle('is-mobile', vertical);
     toggle.textContent = input.scale ? 'Schematic' : 'To scale';

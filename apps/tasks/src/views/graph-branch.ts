@@ -8,7 +8,7 @@ import {
   serviceStatus,
   wouldCreateCycle
 } from '@/domain/graph-model';
-import { canLink, layoutBranchFlow, type BranchLayout } from '@/domain/graph-branch-layout';
+import { canLink, fitBranchView, layoutBranchFlow, type BranchLayout } from '@/domain/graph-branch-layout';
 import type { GraphInsight } from '@/domain/graph-insights';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import {
@@ -109,9 +109,19 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   let scale = 1;
   let panX = 0;
   let panY = 0;
-  const applyPan = () => {
+  function applyPan(): void {
     stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-  };
+  }
+  function applyFit(): void {
+    const fitted = fitBranchView(layout, {
+      width: viewport.clientWidth || layout.width,
+      height: viewport.clientHeight || layout.height
+    });
+    scale = fitted.scale;
+    panX = fitted.panX;
+    panY = fitted.panY;
+    applyPan();
+  }
 
   const paint = (): void => {
     hide.textContent = input.hideDone ? 'Show done' : 'Hide done';
@@ -493,6 +503,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     }
 
     stage.replaceChildren(svg);
+    applyFit();
     viewport.querySelector('[data-part="minimap"]')?.remove();
     const fittedH = viewport.clientWidth > 0 ? layout.height * (viewport.clientWidth / Math.max(layout.width, 1)) : 0;
     const overflows = scale !== 1 || Math.abs(panX) > 2 || Math.abs(panY) > 2 || fittedH > viewport.clientHeight + 24;
@@ -507,12 +518,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   };
 
   paint();
-  fit.addEventListener('click', () => {
-    scale = 1;
-    panX = 0;
-    panY = 0;
-    applyPan();
-  });
+  fit.addEventListener('click', applyFit);
   viewport.addEventListener(
     'wheel',
     (event) => {
@@ -540,6 +546,8 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
 
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(applyFit) : null;
+  resizeObserver?.observe(viewport);
   return {
     root,
     update: (next) => {
@@ -554,6 +562,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     teardown: () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      resizeObserver?.disconnect();
       host.replaceChildren();
     }
   };

@@ -83,6 +83,25 @@ test('reduced motion starts orbit paused', async ({ page }) => {
   await expect(page.locator('.graph-page .btn', { hasText: /play/i }).first()).toBeVisible();
 });
 
+test('line terminus dates stay inside the page', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await signIn(page);
+  await openGraph(page, '#/graph');
+  const pageBox = await page.locator('.graph-page').boundingBox();
+  expect(pageBox).toBeTruthy();
+  const overflow = await page.evaluate(() => {
+    const root = document.querySelector('.graph-page');
+    return root ? root.scrollWidth - root.clientWidth : 0;
+  });
+  expect(overflow).toBeLessThanOrEqual(1);
+  const terminus = page.locator('.graph-terminus').first();
+  if (await terminus.count()) {
+    const box = await terminus.boundingBox();
+    expect(box).toBeTruthy();
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual((pageBox?.x ?? 0) + (pageBox?.width ?? 0) + 2);
+  }
+});
+
 test('390px lines stay vertical', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page);
