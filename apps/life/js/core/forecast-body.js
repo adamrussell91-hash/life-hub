@@ -175,28 +175,36 @@ function hasLoadedResistance(record) {
     && (record.exercises ?? []).some(exercise => (exercise.sets ?? []).some(validLoadedSet));
 }
 
+/** Lean-preservation scenario gate. Single source for the engine and the Home charts. */
+export const LEAN_PRESERVATION_GATE = Object.freeze({
+  resistance_sessions_week: 2,
+  upper_body_loaded_sets_week_proxy: 10,
+  protein_g_kg_day: 1.62
+});
+export const UPPER_BODY_REGIONS = Object.freeze(['chest', 'shoulders', 'arms', 'back', 'full_body']);
+
+export function upperBodySetsPerWeek(loadedSetsByRegion, days) {
+  const weeks = days / 7;
+  if (!(weeks > 0)) return 0;
+  const total = UPPER_BODY_REGIONS.reduce((sum, key) => sum + Number(loadedSetsByRegion?.[key] ?? 0), 0);
+  return total / weeks;
+}
+
 export function buildTrainingSupport(items, asOf, days, targetsConfig, libraryByName, proteinGDay, weightKg) {
   const summary = summariseTrainingBehaviour(items, { asOf, days }, { targetsConfig, libraryByName });
   const sessions = Number(summary.sessions_per_week ?? 0);
-  const weeks = days / 7;
-  const regions = summary.loaded_sets_by_muscle_group ?? {};
-  const upperBodySets = ['chest', 'shoulders', 'arms', 'back', 'full_body']
-    .reduce((sum, key) => sum + Number(regions[key] ?? 0), 0);
-  const upperBodySetsPerWeek = weeks > 0 ? upperBodySets / weeks : 0;
+  const upperBodySetsWeek = upperBodySetsPerWeek(summary.loaded_sets_by_muscle_group ?? {}, days);
+  const gate = LEAN_PRESERVATION_GATE;
   const proteinPerKg = weightKg > 0 && proteinGDay != null ? proteinGDay / weightKg : null;
-  const sufficient = sessions >= 2
-    && upperBodySetsPerWeek >= 10
+  const sufficient = sessions >= gate.resistance_sessions_week
+    && upperBodySetsWeek >= gate.upper_body_loaded_sets_week_proxy
     && proteinPerKg != null
-    && proteinPerKg >= 1.62;
+    && proteinPerKg >= gate.protein_g_kg_day;
   return {
     ...summary,
-    upper_body_loaded_sets_per_week: round(upperBodySetsPerWeek, 1),
+    upper_body_loaded_sets_per_week: round(upperBodySetsWeek, 1),
     protein_g_kg_day: round(proteinPerKg, 2),
-    thresholds: {
-      resistance_sessions_week: 2,
-      upper_body_loaded_sets_week_proxy: 10,
-      protein_g_kg_day: 1.62
-    },
+    thresholds: { ...gate },
     lean_preservation_supported: sufficient,
     interpretation: sufficient
       ? 'Meets the forecast scenario gate for lean preservation.'
@@ -393,6 +401,119 @@ function simulateOne({ asOf, body, intake, expenditure, partitionMode, targets, 
   };
 }
 
+export const TRACE_HORIZON_DAYS = 365;
+export const TRACE_STEP_DAYS = 7;
+
+function inWeightBand(state, targets) {
+  return state.weight_kg >= Number(targets.weight_kg_min) && state.weight_kg <= Number(targets.weight_kg_max);
+}
+
+function inBodyFatBand(state, targets) {
+  return state.body_fat_pct >= Number(targets.body_fat_pct_min) && state.body_fat_pct <= Number(targets.body_fat_pct_max);
+}
+
+function openWindow(window, inside, day) {
+  if (inside && window.from == null) {
+    window.from = day;
+    window.to = day;
+  } else if (inside && window.closed === false) {
+    window.to = day;
+  } else if (!inside && window.from != null) {
+    window.closed = true;
+  }
+}
+
+function windowDates(window, asOf, horizonDays) {
+  if (window.from == null) return null;
+  return {
+    from: addCalendarDays(asOf, window.from),
+    to: addCalendarDays(asOf, window.to),
+    from_day: window.from,
+    to_day: window.to,
+    open_ended: window.closed === false && window.to === horizonDays
+  };
+}
+
+/**
+ * Display trace of one body scenario: weekly points plus the FIRST contiguous
+ * stay inside the weight band and inside the body-fat band. Uses the same
+ * dynamics as simulateOne; it never changes a forecast date. Charts only.
+ */
+export function traceBodyScenario({
+  asOf,
+  body,
+  intakeKcalDay,
+  expenditureKcalDay,
+  partitionMode = 'forbes',
+  targets,
+  horizonDays = TRACE_HORIZON_DAYS,
+  stepDays = TRACE_STEP_DAYS
+}) {
+  const intake = num(intakeKcalDay);
+  const expenditure = num(expenditureKcalDay);
+  if (!targets || body?.status !== 'ready' || intake == null || expenditure == null) return null;
+  let state = {
+    fat_mass_kg: body.fat_mass_kg,
+    fat_free_mass_kg: body.fat_free_mass_kg,
+    weight_kg: body.weight_kg,
+    body_fat_pct: body.body_fat_pct
+  };
+  const initial = { ...state };
+  const weight = { from: null, to: null, closed: false };
+  const fat = { from: null, to: null, closed: false };
+  const point = day => ({
+    day,
+    date: addCalendarDays(asOf, day),
+    weight_kg: round(state.weight_kg, 2),
+    body_fat_pct: round(state.body_fat_pct, 2),
+    fat_mass_kg: round(state.fat_mass_kg, 2),
+    fat_free_mass_kg: round(state.fat_free_mass_kg, 2)
+  });
+  const points = [point(0)];
+  openWindow(weight, inWeightBand(state, targets), 0);
+  openWindow(fat, inBodyFatBand(state, targets), 0);
+  for (let day = 1; day <= horizonDays; day++) {
+    const expenditureToday = expenditure
+      + RMR_FAT_KCAL_PER_KG_DAY * (state.fat_mass_kg - initial.fat_mass_kg)
+      + RMR_FFM_KCAL_PER_KG_DAY * (state.fat_free_mass_kg - initial.fat_free_mass_kg);
+    state = stepBody(state, intake - expenditureToday, partitionMode);
+    openWindow(weight, inWeightBand(state, targets), day);
+    openWindow(fat, inBodyFatBand(state, targets), day);
+    if (day % stepDays === 0 || day === horizonDays) points.push(point(day));
+  }
+  const weightBand = windowDates(weight, asOf, horizonDays);
+  const fatBand = windowDates(fat, asOf, horizonDays);
+  let overlap = null;
+  if (weightBand && fatBand) {
+    const from = Math.max(weightBand.from_day, fatBand.from_day);
+    const to = Math.min(weightBand.to_day, fatBand.to_day);
+    if (from <= to) overlap = { from: addCalendarDays(asOf, from), to: addCalendarDays(asOf, to), from_day: from, to_day: to };
+  }
+  const missDays = weightBand && fatBand && !overlap
+    ? Math.max(fatBand.from_day - weightBand.to_day, weightBand.from_day - fatBand.to_day)
+    : null;
+  return {
+    horizon_days: horizonDays,
+    step_days: stepDays,
+    points,
+    weight_band: weightBand,
+    body_fat_band: fatBand,
+    overlap,
+    miss_days: missDays
+  };
+}
+
+function traceRangeWindows({ asOf, body, intake, expenditureRangeKcalDay, partitionMode, targets }) {
+  const pick = expenditure => {
+    const trace = traceBodyScenario({ asOf, body, intakeKcalDay: intake, expenditureKcalDay: expenditure, partitionMode, targets });
+    return trace ? { weight_band: trace.weight_band, body_fat_band: trace.body_fat_band } : null;
+  };
+  return {
+    low_expenditure: pick(Math.min(...expenditureRangeKcalDay)),
+    high_expenditure: pick(Math.max(...expenditureRangeKcalDay))
+  };
+}
+
 export function simulateBodyScenario({
   asOf,
   body,
@@ -414,8 +535,16 @@ export function simulateBodyScenario({
     asOf, body, intake, expenditure, partitionMode, targets,
     horizonDays: Math.min(MAX_HORIZON, horizonDays)
   });
+  const trace = traceBodyScenario({
+    asOf, body, intakeKcalDay: intake, expenditureKcalDay: expenditure, partitionMode, targets
+  });
+  const traceRange = Array.isArray(expenditureRangeKcalDay) && expenditureRangeKcalDay.length === 2
+    ? traceRangeWindows({ asOf, body, intake, expenditureRangeKcalDay, partitionMode, targets })
+    : null;
   if (!centre.date) {
     return {
+      trace,
+      trace_range: traceRange,
       status: 'will_not_arrive',
       reason: centre.crossed_below_weight_before_body_fat
         ? 'projected weight falls below the target band before body fat reaches the box'
@@ -436,6 +565,8 @@ export function simulateBodyScenario({
   }
   const binding = [centre.weight_entry_date, centre.body_fat_entry_date].filter(Boolean).sort().at(-1);
   return {
+    trace,
+    trace_range: traceRange,
     status: 'dated',
     partition_mode: partitionMode,
     intake_kcal_day: round(intake, 1),
