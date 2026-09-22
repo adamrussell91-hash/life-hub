@@ -53,8 +53,8 @@ test('open loads the seed and shows Life Hub with its five hubs, pages collapsed
   assert.ok(card('life-home'));
   assert.equal(card('life-body-bloods'), null, 'sections stay hidden until their page is expanded');
   assert.match(q('#hub-map-save-state').textContent, /Starter map/);
-  assert.match(q('[data-hub-map-filter="all"]').textContent, /^All 88$/);
-  assert.match(q('[data-hub-map-filter="unreviewed"]').textContent, /^Unreviewed 87$/);
+  assert.match(q('[data-hub-map-filter="all"]').textContent, /^All 87$/);
+  assert.match(q('[data-hub-map-filter="unreviewed"]').textContent, /^Unreviewed 86$/);
 });
 
 test('a load failure shows an error with Retry', async () => {
