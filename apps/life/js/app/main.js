@@ -12,6 +12,7 @@ import {
 } from './app-controller.js';
 import { createBodyController } from './body-controller.js';
 import { buildBodyModel } from './body-model.js';
+import { buildBodyChartData } from './body-chart-data.js';
 import { buildForecast } from '../core/forecast-engine.js';
 import { buildBloodsModel } from './bloods-model.js';
 import { createMedicalController } from './medical-controller.js';
@@ -193,6 +194,7 @@ controller = createAppController({
   renderCalendar,
   chatApi,
   buildBodyModel,
+  buildBodyChartData,
   buildForecast,
   renderBody,
   bodyController,
