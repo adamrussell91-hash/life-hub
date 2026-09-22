@@ -388,7 +388,7 @@ export function pace(project: Project, tasks: Task[], now: Date = new Date()): P
   const elapsed = Math.max(0, daysBetween(start, now));
   const expectedDone = Math.min(1, elapsed / span);
   const ghostAt = expectedDone * Math.max(1, totalStations - 1);
-  const ghostIndex = Math.round(ghostAt);
+  const ghostIndex = Math.floor(ghostAt + 1e-9);
   const actualDone = spine.filter((s) => (s.task ? isDone(s.task) : false)).length;
   return {
     expectedDone,
@@ -435,7 +435,15 @@ export function serviceStatus(
 
   const measured = pace(project, tasks, now);
   const byId = new Map(tasks.map((t) => [t.id, t]));
-  const blockedAhead = unfinished.some((s) => s.task && isBlocked(s.task, byId));
+  const blockedAhead = unfinished.some((s) => {
+    if (!s.task) return false;
+    if (s.task.blocked_since) return true;
+    if (!isBlocked(s.task, byId)) return false;
+    return (s.task.depends_on ?? []).some((id) => {
+      const dep = byId.get(id);
+      return !dep || dep.parent_project_id !== project.id;
+    });
+  });
   const terminus = terminusDate(project, tasks);
   const terminusSoon = Boolean(terminus && daysBetween(now, terminus) < DUE_SOON_DAYS);
   const behind = measured?.behind ?? 0;

@@ -348,6 +348,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
 
   const setPaused = (next: boolean) => {
     paused = next;
+    if (paused) easeOut = 0;
     applyPauseChrome();
     input.onPauseChange(paused);
   };
@@ -356,8 +357,11 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     const dt = Math.min(now - last, 50);
     last = now;
     const target = paused || hover || hidden || document.hidden || pointerOver ? 0 : 1;
-    easeOut += (target - easeOut) * Math.min(1, dt / 120);
-    if (target === 0 && easeOut < 0.04) easeOut = 0;
+    if (paused || pointerOver) easeOut = 0;
+    else {
+      easeOut += (target - easeOut) * Math.min(1, dt / 120);
+      if (target === 0 && easeOut < 0.04) easeOut = 0;
+    }
     if (target === 1 && easeOut > 0.96) easeOut = 1;
     const lt = input.reducedMotion ? 1 : Math.min(1, (now - tweenStart) / 250);
     const la = tweenFrom + (lookAhead - tweenFrom) * (1 - (1 - lt) ** 3);
