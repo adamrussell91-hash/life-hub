@@ -187,7 +187,7 @@ describe('teacher home dashboard', () => {
     const dayNumbers = [
       ...canvas.querySelectorAll('.class-calendar__week-day .class-calendar__day-num')
     ].map((el) => el.textContent);
-    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
+    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14', '15', '16']);
 
     expect(canvas.querySelector<HTMLElement>('[data-calendar="rail"]')?.hidden).toBe(true);
     expect(

@@ -110,6 +110,7 @@ describe('renderClassCalendar', () => {
     const outside = host.querySelector('.class-calendar__day[data-outside="true"]');
 
     expect(today).not.toBeNull();
+    expect(today!.querySelector('.hub-calendar__day-num')?.textContent).toBe('12');
     expect(today!.getAttribute('aria-current')).toBe('date');
     expect(selected).not.toBeNull();
     expect(outside).not.toBeNull();
@@ -348,8 +349,17 @@ describe('renderClassCalendar', () => {
     });
 
     expect(host.querySelector('.hub-calendar__timegrid')).not.toBeNull();
+    expect(host.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('7');
     const todayCol = host.querySelector('.class-calendar__week-day[data-today="true"]');
     expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
+    expect(todayCol?.querySelector('.hub-calendar__day-num')?.textContent).toBe('12');
+    const weekNums = [
+      ...host.querySelectorAll('.class-calendar__week-day .hub-calendar__day-num')
+    ].map((el) => el.textContent);
+    expect(weekNums).toEqual(['10', '11', '12', '13', '14', '15', '16']);
+    expect(host.querySelector('[data-calendar="month-label"]')?.textContent).toBe(
+      '10/08/26 – 16/08/26'
+    );
     expect(host.querySelector('.event-chip__meta')?.textContent).toBe('12ENA6');
 
     host.querySelector<HTMLButtonElement>('[data-calendar-view="timeline"]')!.click();

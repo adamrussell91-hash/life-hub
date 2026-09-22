@@ -26,7 +26,7 @@ const ACCREDITATION_TARGET_HOURS = 100;
 const MONTH_ABBR = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
-const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const WEEKDAY_HEADINGS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 interface YmdParts {
   year: number;
@@ -107,74 +107,145 @@ function statusChip(state: EventOccurrenceState): HTMLElement {
   return el('span', `pro-home__chip-tag pro-home__chip-tag--${STATE_TINT[state]}`, STATE_LABEL[state]);
 }
 
-function renderCalendar(today: YmdParts, events: EventRecord[]): HTMLElement {
-  const byDay = new Map<string, EventRecord[]>();
-  for (const event of events) {
-    const key = sydneyDateKey(event.start);
-    const bucket = byDay.get(key);
-    if (bucket) bucket.push(event);
-    else byDay.set(key, [event]);
-  }
-
-  const card = el('section', 'pro-home__calendar');
-  const head = el('div', 'pro-home__cal-head');
-  const monthLabel = new Date(Date.UTC(today.year, today.month - 1, 1)).toLocaleDateString('en-AU', {
+function monthLabel(year: number, month: number): string {
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-AU', {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC'
   });
-  head.append(el('span', 'pro-home__cal-title', monthLabel));
-  card.append(head);
+}
 
-  const dow = el('div', 'pro-home__dow');
-  for (const label of DOW) dow.append(el('span', undefined, label));
-  card.append(dow);
+function shiftMonth(view: YmdParts, delta: number): YmdParts {
+  const date = new Date(Date.UTC(view.year, view.month - 1 + delta, 1));
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: 1 };
+}
 
-  const firstWeekday = (new Date(Date.UTC(today.year, today.month - 1, 1)).getUTCDay() + 6) % 7;
-  const total = daysInMonth(today.year, today.month);
-  const prevTotal = daysInMonth(today.year, today.month - 1 <= 0 ? 12 : today.month - 1);
-  const cellCount = Math.ceil((firstWeekday + total) / 7) * 7;
+function eventTint(state: EventOccurrenceState): 'sage' | 'blue' | 'sand' {
+  if (state === 'completed') return 'sage';
+  if (state === 'cancelled') return 'sand';
+  return 'blue';
+}
 
-  const grid = el('div', 'pro-home__grid');
-  for (let i = 0; i < cellCount; i += 1) {
-    const offset = i - firstWeekday;
-    const inMonth = offset >= 0 && offset < total;
-    let dayNum: number;
-    let cellParts: YmdParts;
-    if (offset < 0) {
-      dayNum = prevTotal + offset + 1;
-      const prevMonth = today.month - 1 <= 0 ? 12 : today.month - 1;
-      const prevYear = today.month - 1 <= 0 ? today.year - 1 : today.year;
-      cellParts = { year: prevYear, month: prevMonth, day: dayNum };
-    } else if (offset >= total) {
-      dayNum = offset - total + 1;
-      const nextMonth = today.month + 1 > 12 ? 1 : today.month + 1;
-      const nextYear = today.month + 1 > 12 ? today.year + 1 : today.year;
-      cellParts = { year: nextYear, month: nextMonth, day: dayNum };
-    } else {
-      dayNum = offset + 1;
-      cellParts = { year: today.year, month: today.month, day: dayNum };
+function renderCalendar(today: YmdParts, events: EventRecord[]): HTMLElement {
+  const host = el('div');
+  let view: YmdParts = { year: today.year, month: today.month, day: 1 };
+
+  const paint = (): void => {
+    const byDay = new Map<string, EventRecord[]>();
+    for (const event of events) {
+      const key = sydneyDateKey(event.start);
+      const bucket = byDay.get(key);
+      if (bucket) bucket.push(event);
+      else byDay.set(key, [event]);
     }
 
-    const key = ymdKey(cellParts);
-    const isToday = inMonth && key === ymdKey(today);
-    const cell = el('div', `pro-home__day${inMonth ? '' : ' pro-home__day--out'}${isToday ? ' pro-home__day--today' : ''}`);
-    cell.append(el('span', 'pro-home__daynum', String(dayNum)));
+    const card = el('section', 'hub-calendar hub-calendar--workspace');
+    const nav = el('div', 'hub-calendar__nav');
+    const paging = el('div', 'hub-calendar__paging');
+    paging.setAttribute('role', 'group');
+    paging.setAttribute('aria-label', 'Month navigation');
 
-    const dayEvents = byDay.get(key) ?? [];
-    const shown = dayEvents.slice(0, 2);
-    for (const event of shown) {
-      const chip = el('a', `pro-home__chip pro-home__chip--${STATE_TINT[event.occurrence_state]}`, event.title);
-      chip.href = eventRoute(event.id);
-      cell.append(chip);
+    const prev = el('button', 'hub-calendar__nav-btn', '‹') as HTMLButtonElement;
+    prev.type = 'button';
+    prev.setAttribute('aria-label', 'Previous month');
+    prev.addEventListener('click', () => {
+      view = shiftMonth(view, -1);
+      paint();
+    });
+
+    const label = el('span', 'hub-calendar__month-label', monthLabel(view.year, view.month));
+
+    const next = el('button', 'hub-calendar__nav-btn', '›') as HTMLButtonElement;
+    next.type = 'button';
+    next.setAttribute('aria-label', 'Next month');
+    next.addEventListener('click', () => {
+      view = shiftMonth(view, 1);
+      paint();
+    });
+
+    const todayBtn = el('button', 'hub-calendar__today', 'Today') as HTMLButtonElement;
+    todayBtn.type = 'button';
+    todayBtn.addEventListener('click', () => {
+      view = { year: today.year, month: today.month, day: 1 };
+      paint();
+    });
+
+    paging.append(prev, label, next, todayBtn);
+    nav.append(paging);
+
+    const firstWeekday = (new Date(Date.UTC(view.year, view.month - 1, 1)).getUTCDay() + 6) % 7;
+    const total = daysInMonth(view.year, view.month);
+    const prevTotal = daysInMonth(
+      view.month - 1 <= 0 ? view.year - 1 : view.year,
+      view.month - 1 <= 0 ? 12 : view.month - 1
+    );
+    const cellCount = Math.ceil((firstWeekday + total) / 7) * 7;
+
+    const grid = el('div', 'hub-calendar__grid');
+    grid.setAttribute('role', 'grid');
+    grid.setAttribute('aria-label', 'Month calendar');
+    for (const heading of WEEKDAY_HEADINGS) {
+      grid.append(el('span', 'hub-calendar__weekday', heading));
     }
-    if (dayEvents.length > shown.length) {
-      cell.append(el('span', 'pro-home__more', `+${dayEvents.length - shown.length} more`));
+
+    for (let i = 0; i < cellCount; i += 1) {
+      const offset = i - firstWeekday;
+      const inMonth = offset >= 0 && offset < total;
+      let dayNum: number;
+      let cellParts: YmdParts;
+      if (offset < 0) {
+        dayNum = prevTotal + offset + 1;
+        const prevMonth = view.month - 1 <= 0 ? 12 : view.month - 1;
+        const prevYear = view.month - 1 <= 0 ? view.year - 1 : view.year;
+        cellParts = { year: prevYear, month: prevMonth, day: dayNum };
+      } else if (offset >= total) {
+        dayNum = offset - total + 1;
+        const nextMonth = view.month + 1 > 12 ? 1 : view.month + 1;
+        const nextYear = view.month + 1 > 12 ? view.year + 1 : view.year;
+        cellParts = { year: nextYear, month: nextMonth, day: dayNum };
+      } else {
+        dayNum = offset + 1;
+        cellParts = { year: view.year, month: view.month, day: dayNum };
+      }
+
+      const key = ymdKey(cellParts);
+      const cell = el('div', 'hub-calendar__day');
+      cell.setAttribute('role', 'gridcell');
+      cell.dataset.date = key;
+      if (!inMonth) cell.dataset.outside = 'true';
+      if (inMonth && key === ymdKey(today)) {
+        cell.dataset.today = 'true';
+        cell.setAttribute('aria-current', 'date');
+      }
+      cell.append(el('span', 'hub-calendar__day-num', String(dayNum)));
+
+      const dayEvents = byDay.get(key) ?? [];
+      const shown = dayEvents.slice(0, 2);
+      for (const event of shown) {
+        const chip = el('a', 'event-chip') as HTMLAnchorElement;
+        chip.href = eventRoute(event.id);
+        chip.dataset.tint = eventTint(event.occurrence_state);
+        if (event.occurrence_state === 'cancelled') chip.classList.add('is-done');
+        chip.append(el('span', 'event-chip__title', event.title));
+        cell.append(chip);
+      }
+      if (dayEvents.length > shown.length) {
+        cell.append(el('span', 'event-chip-more', `+${dayEvents.length - shown.length} more`));
+      }
+      grid.append(cell);
     }
-    grid.append(cell);
-  }
-  card.append(grid);
-  return card;
+
+    const body = el('div', 'hub-calendar__body');
+    body.append(grid);
+    const workspace = el('div', 'hub-calendar__workspace');
+    workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
+    workspace.append(body);
+    card.append(nav, workspace);
+    host.replaceChildren(card);
+  };
+
+  paint();
+  return host;
 }
 
 function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElement {

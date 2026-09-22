@@ -5,15 +5,19 @@ export interface CalendarPresentationOptions {
 
 /**
  * Teaching Hub calendar presentation shared by dashboard and class pages.
- * The underlying calendar keeps its scheduling model, while the reading view
- * stays compact: day numbers only, no persistent compose rail, one add action.
+ * Chrome is the kit `.hub-calendar`. The reading view stays compact: no
+ * persistent compose rail, one add action. Day numbers are painted by the
+ * kit renderer.
  */
 export function applyCalendarPresentation(
   host: HTMLElement,
   options: CalendarPresentationOptions = {}
 ): void {
-  const root = host.querySelector<HTMLElement>(':scope > .class-calendar');
-  if (!root) return;
+  const root = host.firstElementChild;
+  if (!(root instanceof HTMLElement)) return;
+  if (!root.classList.contains('hub-calendar') && !root.classList.contains('class-calendar')) {
+    return;
+  }
 
   const workspace = root.querySelector<HTMLElement>('.hub-calendar__workspace');
   const rail = root.querySelector<HTMLElement>('[data-calendar="rail"]');

@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import {
   blockStyle,
   formatBlockTime,
@@ -227,6 +227,7 @@ export function renderClassCalendar(
   for (const tab of root.querySelectorAll<HTMLButtonElement>('[data-calendar-view]')) {
     const selected = tab.dataset.calendarView === view;
     tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    tab.classList.toggle('is-active', selected);
     tab.classList.toggle('is-selected', selected);
   }
 
@@ -239,11 +240,11 @@ export function renderClassCalendar(
       body.append(buildTimelineBody(model, root));
     } else {
       const grid = document.createElement('div');
-      grid.className = 'class-calendar__grid';
+      grid.className = 'class-calendar__grid hub-calendar__grid';
       grid.setAttribute('role', 'grid');
       for (const heading of ['M', 'T', 'W', 'T', 'F', 'S', 'S']) {
         const cell = document.createElement('span');
-        cell.className = 'class-calendar__weekday';
+        cell.className = 'class-calendar__weekday hub-calendar__weekday';
         cell.textContent = heading;
         grid.append(cell);
       }
@@ -348,7 +349,7 @@ function buildDayCell(
   root: HTMLElement
 ): HTMLElement {
   const cell = document.createElement('div');
-  cell.className = 'class-calendar__day';
+  cell.className = 'class-calendar__day hub-calendar__day';
   cell.setAttribute('role', 'gridcell');
   cell.tabIndex = 0;
   cell.dataset.date = day.date;
@@ -370,8 +371,8 @@ function buildDayCell(
   });
 
   const num = document.createElement('span');
-  num.className = 'class-calendar__day-num';
-  num.textContent = formatDisplayDate(day.date);
+  num.className = 'class-calendar__day-num hub-calendar__day-num';
+  num.textContent = String(Number(day.date.slice(8, 10)));
   num.title = formatDisplayDate(day.date);
   cell.append(num);
 
@@ -399,7 +400,7 @@ function buildTimeGrid(
   const monday = weekStartMonday(model.selectedDate);
   const dates = view === 'day'
     ? [model.selectedDate]
-    : enumerateDateKeys(monday, addCalendarDays(monday, 4));
+    : enumerateDateKeys(monday, addCalendarDays(monday, 6));
   const byDate = new Map(model.monthDays.map((day) => [day.date, day]));
 
   const grid = document.createElement('div');
@@ -427,7 +428,7 @@ function buildTimeGrid(
     weekday.textContent = formatWeekdayShort(date);
     const num = document.createElement('span');
     num.className = 'class-calendar__day-num hub-calendar__day-num';
-    num.textContent = formatDisplayDate(date);
+    num.textContent = String(Number(date.slice(8, 10)));
     num.title = formatDisplayDate(date);
     heading.append(weekday, num);
     const schedule = handlersByRoot.get(root)?.onScheduleLesson;
@@ -878,24 +879,8 @@ function formatWeekdayShort(date: string): string {
 }
 
 function labelForView(model: ClassCalendarModel, view: ScheduleCalendarView): string {
-  if (view === 'day') return formatDetailHeading(model.selectedDate);
+  if (view === 'day') return formatDisplayDate(model.selectedDate);
   if (view !== 'week') return model.monthLabel;
   const monday = weekStartMonday(model.selectedDate);
-  return formatMonthRange(monday, addCalendarDays(monday, 4));
-}
-
-function formatMonthRange(start: string, end: string): string {
-  const startDate = parseDateKey(start);
-  const endDate = parseDateKey(end);
-  const startLabel = startDate.toLocaleDateString('en-AU', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-  const endLabel = endDate.toLocaleDateString('en-AU', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-  return startLabel === endLabel ? startLabel : `${startLabel} – ${endLabel}`;
+  return formatDisplayDateRange(monday, addCalendarDays(monday, 6));
 }
