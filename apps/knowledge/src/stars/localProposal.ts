@@ -1,6 +1,6 @@
 import type { PageManifestEntry } from "../domain/page";
 import type { StarsProposal, StarsRelationType } from "./schema";
-import { buildStarsLayout, STARS_TEMPLATE_LABELS, templateForQuery } from "./templates";
+import { buildStarsLayout, chooseStarsTemplate, STARS_TEMPLATE_LABELS } from "./templates";
 
 const STOP = new Set(["about", "and", "for", "from", "models", "of", "the", "with"]);
 
@@ -26,13 +26,17 @@ export function buildLocalStarsProposal(query: string, entries: PageManifestEntr
     .sort((left, right) => right.score - left.score || String(right.entry.created_at ?? "").localeCompare(String(left.entry.created_at ?? "")));
   const count = Math.min(8, ranked.length);
   if (count < 5) throw new Error("Stars needs at least five notes in the local archive.");
-  const notes = ranked.slice(0, count).map(({ entry }, index) => ({
+  const picked = ranked.slice(0, count);
+  const notes = picked.map(({ entry }, index) => ({
     pageId: entry.id,
     title: entry.title,
     excerpt: entry.excerpt,
     role: index === 0 ? "Starting point" : index === count - 1 ? "Implication" : "Connected perspective",
   }));
-  const templateId = templateForQuery(query);
+  const templateId = chooseStarsTemplate({
+    query,
+    notes: picked.map(({ entry }) => ({ title: entry.title, excerpt: entry.excerpt, tags: entry.tags })),
+  });
   const relations = buildStarsLayout(templateId, notes.length).segments.map((segment, index) => ({
     sourceId: notes[segment.source]!.pageId,
     targetId: notes[segment.target]!.pageId,

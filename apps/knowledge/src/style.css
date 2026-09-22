@@ -4852,9 +4852,9 @@ body.is-stars-fullscreen .local-banner {
 }
 
 .stars-panorama__hit.is-constellation {
-  width: 64px;
-  height: 64px;
-  margin: -32px 0 0 -32px;
+  width: 96px;
+  height: 96px;
+  margin: -48px 0 0 -48px;
 }
 
 .stars-panorama__hit:focus-visible {

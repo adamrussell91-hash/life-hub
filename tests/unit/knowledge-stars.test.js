@@ -8,6 +8,7 @@ import {
 } from '../../netlify/functions/_shared/knowledge-stars.mjs';
 import { createKnowledgeStarsHandler } from '../../netlify/functions/knowledge-stars.mjs';
 import { runChatTurn } from '../../netlify/functions/_shared/knowledge-chat-turn.mjs';
+import { assignedSymbolInstruction, chooseStarsTemplate } from '../../apps/knowledge/src/stars/chooseTemplate.mjs';
 
 const env = { LIFE_HUB_PASSPHRASE_HASH: 'configured', SESSION_SECRET: 'x'.repeat(32) };
 
@@ -124,5 +125,39 @@ test('Clementine Stars reuses archive synthesis and writes the strict renderer p
   assert.equal(started.maxTokens, 4000);
   assert.match(started.system, /Return only one JSON object/);
   assert.match(started.system, /Every drawn line must have a defensible intellectual relationship/);
+  assert.match(started.system, /Assigned symbol: eye/);
+  assert.match(started.system, /templateId to "eye"/);
   assert.match(started.system, /Note 0/);
+});
+
+test('Stars template choice follows the grouping instead of defaulting to a spiral', () => {
+  assert.equal(chooseStarsTemplate('models of reading'), 'eye');
+  assert.equal(chooseStarsTemplate('leadership under uncertainty'), 'compass');
+  assert.equal(chooseStarsTemplate('curriculum differentiation for gifted students'), 'tree');
+  assert.equal(chooseStarsTemplate('feedback loops in assessment'), 'cycle');
+  assert.equal(chooseStarsTemplate('bridging inclusion and neurodiversity'), 'bridge');
+  assert.equal(chooseStarsTemplate('research methods and iterative inquiry'), 'spiral');
+  assert.notEqual(chooseStarsTemplate('what notes do I have?'), 'spiral');
+  assert.match(assignedSymbolInstruction('tree'), /templateId to "tree"/);
+});
+
+test('Clementine Stars assigns a compass when the query is about leadership', async () => {
+  let started;
+  const result = await runChatTurn({
+    voice: 'You are Clementine.',
+    universityJob: 'Work only from the archive.',
+    hat: 'stars',
+    messages: [{ role: 'user', content: 'leadership strategy in a school' }],
+    compose: true,
+    priorResearch: { query: 'leadership', findings: [], gaps: [], followUpQueries: [] },
+    write: {
+      start: async input => {
+        started = input;
+        return { status: 'done', reply: JSON.stringify(proposal()) };
+      }
+    }
+  });
+  assert.equal(result.status, 'done');
+  assert.match(started.system, /Assigned symbol: compass/);
+  assert.match(started.system, /templateId to "compass"/);
 });

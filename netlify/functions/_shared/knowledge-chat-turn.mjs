@@ -1,5 +1,6 @@
 import { resolveChatPlan, writeMaxTokens } from './knowledge-chat-plan.mjs';
 import { knowledgeKernelFetch } from './knowledge-kernel.mjs';
+import { assignedSymbolInstruction, chooseStarsTemplate } from '../../../apps/knowledge/src/stars/chooseTemplate.mjs';
 import { assembleClementinePrompt, loadKnowledgePrompt } from './knowledge-prompts.mjs';
 import { formatKnowledgeQualityBlock } from './load-humanizer.mjs';
 import {
@@ -161,10 +162,20 @@ function assembledSystem(input, archive) {
   const plan = resolveChatPlan(input.hat, { scope: input.scope, depth: input.depth });
   const query = lastUserQuery(input.messages);
   const coverage = archive.research ? coverageFromResearch(archive.research) : undefined;
+  const starsAssignment = input.hat === 'stars'
+    ? assignedSymbolInstruction(chooseStarsTemplate({
+      query,
+      notes: (archive.research?.findings ?? []).map(finding => ({
+        title: finding.title,
+        excerpt: finding.excerpt,
+        tags: finding.tags
+      }))
+    }))
+    : '';
   const synthesis = input.hat === 'synthesis'
     ? `\n${loadKnowledgePrompt('clementine-thematic-synthesis.md', input.cwd)}`
     : input.hat === 'stars'
-      ? `\n${loadKnowledgePrompt('clementine-stars.md', input.cwd)}`
+      ? `\n${loadKnowledgePrompt('clementine-stars.md', input.cwd)}\n${starsAssignment}`
     : input.hat === 'fromBook'
       ? `\n${loadKnowledgePrompt('clementine-book-note.md', input.cwd)}`
       : input.hat === 'makeNote'
