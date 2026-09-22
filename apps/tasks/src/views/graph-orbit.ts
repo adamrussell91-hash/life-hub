@@ -55,7 +55,10 @@ export function mountOrbitView(
   host.replaceChildren();
   const root = el('div', 'graph-orbit');
   const width = Math.max(host.clientWidth || 640, 320);
-  const height = Math.max(420, Math.min(width, 720));
+  const chrome = 96;
+  const remaining = host.clientHeight > chrome ? host.clientHeight - chrome : 0;
+  const fallback = Math.min(width, 520);
+  const height = Math.max(280, remaining || fallback);
   const cx = width / 2;
   const cy = height / 2;
   const rMax = Math.min(cx, cy) - 40;

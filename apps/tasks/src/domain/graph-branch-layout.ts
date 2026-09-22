@@ -148,6 +148,25 @@ export function layoutBranchFlow(
   return { boxes, edges, lanes, width: maxX + 24, height: yCursor + 8 };
 }
 
+/** Scale a branch diagram down so the whole map sits in the viewport. */
+export function fitBranchView(
+  layout: Pick<BranchLayout, 'width' | 'height'>,
+  viewport: { width: number; height: number }
+): { scale: number; panX: number; panY: number } {
+  const viewportWidth = Math.max(viewport.width, 1);
+  const viewportHeight = Math.max(viewport.height, 1);
+  const scale = Math.min(
+    1,
+    viewportWidth / Math.max(layout.width, 1),
+    viewportHeight / Math.max(layout.height, 1)
+  );
+  return {
+    scale,
+    panX: Math.max(0, (viewportWidth - layout.width * scale) / 2),
+    panY: Math.max(0, (viewportHeight - layout.height * scale) / 2)
+  };
+}
+
 export function canLink(fromId: string, toId: string, tasks: Task[]): boolean {
   return !wouldCreateCycle(fromId, toId, tasks);
 }

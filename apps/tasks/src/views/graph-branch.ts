@@ -1,7 +1,7 @@
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { criticalPath, doFirst, nodeState, projectedDates, wouldCreateCycle } from '@/domain/graph-model';
-import { canLink, layoutBranchFlow } from '@/domain/graph-branch-layout';
+import { canLink, fitBranchView, layoutBranchFlow } from '@/domain/graph-branch-layout';
 import type { GraphInsight } from '@/domain/graph-insights';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { orthogonalPath } from '../../../life/js/app/chart-kit/flowchart-lanes.js';
@@ -216,15 +216,20 @@ export function mountBranchView(
   let scale = 1;
   let panX = 0;
   let panY = 0;
-  const applyPan = () => {
+  function applyPan(): void {
     stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-  };
-  fit.addEventListener('click', () => {
-    scale = 1;
-    panX = 0;
-    panY = 0;
+  }
+  function applyFit(): void {
+    const fitted = fitBranchView(layout, {
+      width: viewport.clientWidth || layout.width,
+      height: viewport.clientHeight || layout.height
+    });
+    scale = fitted.scale;
+    panX = fitted.panX;
+    panY = fitted.panY;
     applyPan();
-  });
+  }
+  fit.addEventListener('click', applyFit);
   viewport.addEventListener('wheel', (event) => {
     if (!event.ctrlKey && Math.abs(event.deltaY) < 40) return;
     event.preventDefault();
@@ -251,6 +256,9 @@ export function mountBranchView(
   minimap.setAttribute('aria-hidden', 'true');
   viewport.append(minimap);
   host.append(root);
+  applyFit();
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(applyFit) : null;
+  resizeObserver?.observe(viewport);
   void input.onWhatIf;
   void input.onApplyWhatIf;
   return {
@@ -260,6 +268,9 @@ export function mountBranchView(
       node?.scrollIntoView({ block: 'center', inline: 'center', behavior: input.reducedMotion ? 'auto' : 'smooth' });
       node?.classList.add('is-pulse');
     },
-    teardown: () => host.replaceChildren()
+    teardown: () => {
+      resizeObserver?.disconnect();
+      host.replaceChildren();
+    }
   };
 }
