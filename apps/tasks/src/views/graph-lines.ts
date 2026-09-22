@@ -104,7 +104,7 @@ function daysSince(from: string | null | undefined, now: Date): number {
 function visualState(task: Task, all: Task[], now: Date): VisualState {
   const row = nodeState(task, all, now);
   if (row.state === 'done') return 'done';
-  if (row.state === 'blocked' && task.blocked_since) return 'blocked';
+  if (row.state === 'blocked' && daysSince(task.blocked_since, now) > 0) return 'blocked';
   if (row.state === 'waiting') return 'waiting';
   if (row.state === 'current' || row.state === 'stalled') return 'current';
   return 'open';
