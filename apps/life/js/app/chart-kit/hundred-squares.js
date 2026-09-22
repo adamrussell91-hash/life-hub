@@ -5,9 +5,11 @@
  * Body page scrubs it and marks the squares that changed.
  */
 import { formatDisplayDate } from '../../core/time.js';
-import { formatNumber, fx, node, text } from './scene.js';
+import { formatNumber, fx, legend, node, text } from './scene.js';
 
 export const SQUARE_KINDS = ['fat', 'muscle', 'rest'];
+/** Wide grid so the chart sits as short as Carved away, not a tall 10×10. */
+export const SQUARE_COLS = 20;
 
 /** Kind of each of the 100 squares, row-major from the top left. */
 export function squareKinds(squares) {
@@ -24,21 +26,22 @@ export function buildHundredSquares(chart, { width = 520 } = {}) {
   }
   const reading = chart.readings[Math.max(0, Math.min(chart.readings.length - 1, chart.index ?? chart.readings.length - 1))];
   const kinds = squareKinds(reading.squares);
-  const grid = Math.min(168, Math.max(120, width * 0.44));
   const gap = 2.2;
-  const cell = (grid - gap * 9) / 10;
-  const x0 = 2;
-  const y0 = 6;
-  const height = Math.max(grid + 20, 176);
+  const pad = 2;
+  const cell = Math.max(7, Math.min(16, (width - pad * 2 - gap * (SQUARE_COLS - 1)) / SQUARE_COLS));
+  const rows = Math.ceil(100 / SQUARE_COLS);
+  const x0 = pad;
+  const y0 = 4;
+  const gridH = rows * cell + (rows - 1) * gap;
   const nodes = [];
   const hits = {};
 
   kinds.forEach((kind, i) => {
-    const r = Math.floor(i / 10);
-    const c = i % 10;
+    const r = Math.floor(i / SQUARE_COLS);
+    const c = i % SQUARE_COLS;
     nodes.push(node('rect', {
-      x: fx(x0 + c * (cell + gap)), y: fx(y0 + r * (cell + gap)), width: fx(cell), height: fx(cell), rx: 2.5, 'data-cell': i
-    }, { cls: `bc-cell bc-cell--${kind}`, hit: `sq-${kind}`, anim: 'fade', delay: c * 14 + r * 10, dur: 260 }));
+      x: fx(x0 + c * (cell + gap)), y: fx(y0 + r * (cell + gap)), width: fx(cell), height: fx(cell), rx: 2, 'data-cell': i
+    }, { cls: `bc-cell bc-cell--${kind}`, hit: `sq-${kind}`, anim: 'fade', delay: c * 10 + r * 12, dur: 260 }));
   });
 
   const pct = n => `${n} square${n === 1 ? '' : 's'}`;
@@ -59,21 +62,16 @@ export function buildHundredSquares(chart, { width = 520 } = {}) {
     detail: 'Everything that is neither fat nor skeletal muscle.'
   };
 
-  const lx = x0 + grid + 18;
-  nodes.push(text(lx, 20, formatDisplayDate(reading.date), { size: 13, weight: 700 }));
-  nodes.push(text(lx, 35, `${formatNumber(reading.weightKg, 1)} kg on the scale`, { size: 10, cls: 'hc-text hc-text--muted' }));
-  const rows = [
-    ['fat', reading.squares.fat, 'Fat'],
-    ['muscle', reading.squares.muscle, 'Skeletal muscle'],
-    ['rest', reading.squares.rest, 'Everything else']
-  ];
-  rows.forEach(([kind, count, name], j) => {
-    const ry = 66 + j * 34;
-    nodes.push(node('rect', { x: fx(lx), y: fx(ry - 11), width: 12, height: 12, rx: 3 }, { cls: `bc-cell bc-cell--${kind}`, hit: `sq-${kind}` }));
-    nodes.push(text(lx + 20, ry, count, { size: 15, weight: 700 }));
-    nodes.push(text(lx + 20, ry + 13, name, { size: 10, cls: 'hc-text hc-text--muted' }));
-  });
-  nodes.push(text(lx, height - 6, 'Each square is 1% of your weight.', { size: 10, cls: 'hc-text hc-text--muted' }));
+  const keyY = y0 + gridH + 16;
+  nodes.push(text(x0, keyY, `${formatDisplayDate(reading.date)} · ${formatNumber(reading.weightKg, 1)} kg`, { size: 12, weight: 700 }));
+  const key = legend([
+    ['bc-cell bc-cell--fat', `${reading.squares.fat} fat`],
+    ['bc-cell bc-cell--muscle', `${reading.squares.muscle} muscle`],
+    ['bc-cell bc-cell--rest', `${reading.squares.rest} else`]
+  ], { x: x0, y: keyY + 16, width: width - pad * 2, swatch: [10, 10] });
+  nodes.push(...key.nodes);
+  nodes.push(text(x0, keyY + 16 + key.height + 6, 'Each square is 1% of your weight.', { size: 10, cls: 'hc-text hc-text--muted' }));
+  const height = keyY + 16 + key.height + 18;
 
   const first = chart.readings[0];
   const share = r => r.squares.muscle;

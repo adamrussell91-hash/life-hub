@@ -224,6 +224,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `shed-stack`, `stairs-down`, `hundred-squares` | Body Weight shows shed stack and stairs side by side (no pill toggle). Shed stack gets a token colour key (you / band / year). 100 squares uses 20 columns so the grid is as short as Carved away. |
 | 2026-09-22 | `shed-stack`, `stairs-down`, `carved-away`, `recomp-scissors`, `hundred-squares`, `scene` | Body page Weight, Body fat and Skeletal muscle line charts replaced. Data from `body-chart-data.js` (targets from `config/targets.yml`). Scene renderer gains `fall` and `drop` entrances, per-node `dur` and `motion` paths. Classes `bc-*` in `app.css`, tokens only. |
 | 2026-09-22 | `weight-line`, `bullseye-rings` (future) | Parked in `future-charts/` with a ★ future flag. Designed for the Body weight card, rejected there because weight must read as going down. Not library types until promoted. |
 | 2026-09-22 | `gate-rings`, `region-rose`, `glide-slope`, `twin-clocks`, `recomp-plane`, `scene` | Home forecast cards get charts. Data from `home-forecast-charts.js`; engine adds display-only `trace`/`trace_range` per body scenario (`traceBodyScenario`), never changing forecast dates. Classes `hc-*` in `app.css`, tokens only. |
