@@ -718,6 +718,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
 
   let input = first;
   let ro: ResizeObserver | null = null;
+  let lastWidth = 0;
   let entrancePlayed = false;
 
   const paint = (): void => {
@@ -725,7 +726,8 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     const finished = models.filter((m) => m.service.status === 'arrived');
     const open = models.filter((m) => m.service.status !== 'arrived');
     const ordered = [...open, ...finished];
-    const width = Math.max(root.clientWidth || host.clientWidth || 720, 280);
+    const measured = root.clientWidth || host.clientWidth || 0;
+    const width = Math.max(measured, 280);
     const vertical = width < 560;
     root.classList.toggle('is-mobile', vertical);
     toggle.textContent = input.scale ? 'Schematic' : 'To scale';
@@ -825,12 +827,18 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     }
     const loose = input.tasks.filter((t) => !t.parent_project_id && t.status !== 'done' && t.status !== 'dead');
     foot.innerHTML = loose.length ? `${loose.length} tasks without a project · <a href="#/list">Open Backlog</a>` : '';
-    entrancePlayed = true;
+    lastWidth = width;
+    if (measured >= 280) entrancePlayed = true;
   };
 
   paint();
   if (typeof ResizeObserver === 'function') {
-    ro = new ResizeObserver(() => paint());
+    ro = new ResizeObserver(() => {
+      const next = root.clientWidth;
+      if (next < 280) return;
+      if (entrancePlayed && Math.abs(next - lastWidth) < 8) return;
+      paint();
+    });
     ro.observe(root);
   }
 
