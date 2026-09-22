@@ -234,8 +234,8 @@ describe('renderClassCalendar', () => {
     expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
     expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+3/);
     expect(day.querySelector('.calendar-dot')).toBeNull();
-    // Detail list still lists all lessons
-    expect(host.querySelectorAll('.class-calendar__detail-lesson')).toHaveLength(5);
+    expect(host.querySelector('.class-calendar__detail-lesson')).toBeNull();
+    expect(host.querySelector('[data-calendar="rail"]')).toBeNull();
   });
 
   it('applies month motion only when monthDelta is non-zero', () => {
@@ -262,64 +262,24 @@ describe('renderClassCalendar', () => {
     expect(host.querySelector('[role="grid"]')!.getAttribute('data-motion')).toBe('back');
   });
 
-  it('puts an overflow control on day-detail rows when onLessonOverflow is set', () => {
-    const onLessonOverflow = vi.fn();
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      onLessonOverflow
-    });
-
-    const overflow = host.querySelector<HTMLButtonElement>(
-      '.class-calendar__detail-row [aria-label="More actions"]'
-    );
-    expect(overflow).not.toBeNull();
-    overflow!.click();
-    expect(onLessonOverflow).toHaveBeenCalledWith('s1', overflow);
-  });
-
-  it('omits calendar overflow when onLessonOverflow is missing', () => {
-    renderClassCalendar(host, modelForAugust(), {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
-    });
-    expect(host.querySelector('.class-calendar__detail [aria-label="More actions"]')).toBeNull();
-  });
-
-  it('renders day detail with lesson links, unit titles, and empty state', () => {
-    const withLessons = modelForAugust();
-    renderClassCalendar(host, withLessons, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      unitTitles: new Map([['u1', 'Art of the Fiction Writer']])
-    });
-
-    const detail = host.querySelector('.class-calendar__detail')!;
-    expect(detail.querySelector('.class-calendar__detail-heading')?.textContent).toBe(
-      'Wednesday 12/08/26'
-    );
-    const row = detail.querySelector<HTMLAnchorElement>('a.class-calendar__detail-lesson')!;
-    expect(row.getAttribute('href')).toBe('/lessons/l1');
-    expect(row.textContent).toContain('Narrative Structure and Unreliable Memory');
-    expect(row.textContent).toContain('Art of the Fiction Writer');
-    expect(row.textContent).toContain('current');
-
-    const emptyModel = modelForAugust({
-      scheduled: [],
-      selectedDate: '2026-08-13',
-      today: '2026-08-12'
-    });
-    renderClassCalendar(host, emptyModel, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      onScheduleLesson: vi.fn()
-    });
-    const emptyDetail = host.querySelector('.class-calendar__detail')!;
-    expect(emptyDetail.textContent).toContain('No lessons scheduled this day.');
-    expect(
-      emptyDetail.querySelector('button')?.getAttribute('aria-label')
-    ).toBe('Schedule a lesson');
+  it('never renders a standing Add card or calendar rail in any view', () => {
+    const model = modelForAugust({ scheduled: [] });
+    for (const view of ['day', 'week', 'month', 'timeline'] as const) {
+      renderClassCalendar(host, model, {
+        onSelectDate: vi.fn(),
+        onShiftMonth: vi.fn(),
+        view
+      });
+      expect(host.querySelector('.calendar-compose-card'), view).toBeNull();
+      expect(host.querySelector('.calendar-compose'), view).toBeNull();
+      expect(host.querySelector('[data-calendar="rail"]'), view).toBeNull();
+      expect(host.querySelector('.class-calendar__detail'), view).toBeNull();
+      expect(host.querySelector('.class-calendar__week-heading > .icon-plus-btn'), view).toBeNull();
+      expect(host.textContent, view).not.toContain('No lessons scheduled this day.');
+      expect(
+        [...host.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
+      ).toBe(false);
+    }
   });
 
   it('sets accessible names on day cells', () => {
@@ -390,6 +350,8 @@ describe('renderClassCalendar', () => {
     expect(host.querySelector('.event-chip--timed')).not.toBeNull();
     expect(host.querySelector('.calendar-compose-card')).toBeNull();
     expect(host.querySelector('.calendar-compose')).toBeNull();
+    expect(host.querySelector('[data-calendar="rail"]')).toBeNull();
+    expect(host.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
     expect(
       [...host.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
     ).toBe(false);

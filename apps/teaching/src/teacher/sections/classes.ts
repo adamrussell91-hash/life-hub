@@ -256,11 +256,6 @@ export function renderClassPage(
   const lessonTitles = new Map(
     curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
   );
-  const unitTitles = new Map(
-    curriculum.units
-      .filter((unit) => unit.status !== 'trashed')
-      .map((unit) => [unit.id, unit.title] as const)
-  );
 
   const activeUnits = cls.active_unit_ids
     .map((id) => unitsById.get(id))
@@ -370,13 +365,7 @@ export function renderClassPage(
         paintCalendar();
       },
       monthDelta,
-      unitTitles,
       onNavigate: navigate,
-      onScheduleLesson: addLessonsToCalendar,
-      onLessonOverflow: (scheduledId, anchor) => {
-        openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
-      },
-      subjectId: cls.subject_id,
       selectedScheduledId,
       onRescheduleLesson: (scheduledId, patch) => {
         void runScheduleMutation(options, errorBanner, async () => {

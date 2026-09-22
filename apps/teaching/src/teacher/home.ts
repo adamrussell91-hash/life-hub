@@ -135,7 +135,6 @@ export function renderTeacherHome(
       },
       monthDelta,
       onNavigate: navigate,
-      onScheduleLesson: openCalendarAdd,
       chipMeta: (lesson) => {
         const cls = lesson.classId ? classesById.get(lesson.classId) : undefined;
         return cls ? classEyebrow(cls) : undefined;
