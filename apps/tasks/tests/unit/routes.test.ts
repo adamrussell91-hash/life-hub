@@ -3,6 +3,7 @@ import {
   hashViewId,
   isKnownHashView,
   knownHubViews,
+  parseBacklogTriage,
   parseEntityPage,
   parseHashRoute,
   parseMapItemPage,
@@ -108,6 +109,25 @@ describe('hash routes', () => {
     location.hash = '#/someday';
     expect(hashViewId()).toBe('someday');
     expect(parseHashRoute()).toBe('someday');
+  });
+
+  it('aliases #/backlog to the list view and recognises triage', () => {
+    location.hash = '#/backlog';
+    expect(hashViewId()).toBe('backlog');
+    expect(isKnownHashView()).toBe(true);
+    expect(parseHashRoute()).toBe('list');
+    expect(parseBacklogTriage()).toBe(false);
+
+    location.hash = '#/list';
+    expect(parseHashRoute()).toBe('list');
+    expect(parseBacklogTriage()).toBe(false);
+
+    location.hash = '#/backlog/triage';
+    expect(hashViewId()).toBe('backlog');
+    expect(isKnownHashView()).toBe(true);
+    expect(parseHashRoute()).toBe('list');
+    expect(parseBacklogTriage()).toBe(true);
+    expect(knownHubViews()).not.toContain('backlog');
   });
 
   it('recognises the Someday sub-pages without adding them to the rail', () => {

@@ -490,12 +490,18 @@ export function renderQuickAdd(
     dueTime?: string | null;
     standing?: boolean;
     durationMinutes?: number | null;
+    parse?: boolean;
+    placeholder?: string;
+    inline?: boolean;
+    now?: Date;
+    onParsed?: (parsed: import('@/domain/backlog').QuickAddParse) => void;
   } = {}
 ): HTMLElement {
   const form = el('form', 'quick-add hub-toolbar');
   const title = createHubSearch({
     type: 'text',
-    placeholder: options.standing ? 'Add to this day…' : 'New task title',
+    placeholder:
+      options.placeholder ?? (options.standing ? 'Add to this day…' : 'New task title'),
     ariaLabel: 'New task title',
     required: true
   });
@@ -520,6 +526,8 @@ export function renderQuickAdd(
   });
   const submit = el('button', 'btn btn--primary', 'Add');
   submit.type = 'submit';
+  const chips = el('div', 'quick-add__chips');
+  chips.hidden = true;
   if (options.dueDate) {
     const when = el('div', 'quick-add__when');
     when.append(
@@ -530,16 +538,44 @@ export function renderQuickAdd(
   } else {
     form.append(title.el, domain.el, submit);
   }
-  const plus = options.standing
-    ? null
-    : createPlusAdd({
-        ariaLabel: options.dueDate ? 'Add a task for this day' : 'Add a task',
-        panel: form
-      });
+  if (options.parse) form.append(chips);
+  const plus =
+    options.standing || options.inline
+      ? null
+      : createPlusAdd({
+          ariaLabel: options.dueDate ? 'Add a task for this day' : 'Add a task',
+          panel: form
+        });
+
+  const paintChips = async () => {
+    if (!options.parse) return;
+    const { parseQuickAdd } = await import('@/domain/backlog');
+    const parsed = parseQuickAdd(title.input.value, options.now ?? new Date(), taskDomains());
+    options.onParsed?.(parsed);
+    chips.replaceChildren();
+    const bits: Array<[string, string]> = [];
+    if (parsed.domain) bits.push(['Hub', parsed.domain]);
+    if (parsed.due_date) bits.push(['Date', parsed.due_date]);
+    if (parsed.effort) bits.push(['Effort', parsed.effort]);
+    for (const tag of parsed.tags) bits.push(['Tag', tag]);
+    chips.hidden = bits.length === 0;
+    for (const [label, value] of bits) {
+      const chip = el('span', 'hub-chip', `${label} ${value}`);
+      chips.append(chip);
+    }
+  };
+  if (options.parse) title.input.addEventListener('input', () => void paintChips());
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
     try {
+      const { parseQuickAdd } = options.parse
+        ? await import('@/domain/backlog')
+        : { parseQuickAdd: null };
+      const parsed = parseQuickAdd
+        ? parseQuickAdd(title.input.value, options.now ?? new Date(), taskDomains())
+        : null;
       const body: {
         title: string;
         domain: string;
@@ -549,13 +585,17 @@ export function renderQuickAdd(
         estimated_duration?: number;
         kind: 'task';
         bucket: 'active';
+        tags?: string[];
       } = {
-        title: title.input.value.trim(),
-        domain: domain.getValue(),
+        title: (parsed?.title || title.input.value).trim(),
+        domain: parsed?.domain || domain.getValue(),
         parent_project_id: projectId,
         kind: 'task',
         bucket: 'active'
       };
+      if (parsed?.tags.length) body.tags = parsed.tags;
+      if (parsed?.estimated_duration) body.estimated_duration = parsed.estimated_duration;
+      if (parsed?.due_date) body.due_date = parsed.due_date;
       if (options.dueDate) {
         // Never drop a dated compose to backlog because iOS "Reset" cleared the date.
         const nextDue = due.input.value.trim() || options.dueDate;
@@ -564,11 +604,13 @@ export function renderQuickAdd(
         const nextTime = time.input.value.trim();
         if (nextTime) {
           body.due_time = nextTime;
-          body.estimated_duration = options.durationMinutes ?? 60;
+          body.estimated_duration = options.durationMinutes ?? body.estimated_duration ?? 60;
         }
       }
       const created = await tasksApi.createTask(body);
       title.input.value = '';
+      chips.replaceChildren();
+      chips.hidden = true;
       plus?.close();
       onCreated(created);
     } catch (err) {
@@ -578,7 +620,7 @@ export function renderQuickAdd(
     }
   });
   if (plus) return plus.root;
-  const wrap = el('div', 'calendar-compose');
+  const wrap = el('div', options.inline ? 'backlog-quick-add' : 'calendar-compose');
   wrap.append(form);
   return wrap;
 }

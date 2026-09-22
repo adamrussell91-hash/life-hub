@@ -1475,6 +1475,10 @@
   margin: 0 0 var(--space-4);
 }
 
+.reminder-strip-host:empty {
+  margin: 0;
+}
+
 .reminder-card {
   display: grid;
   grid-template-columns: minmax(10rem, 1.3fr) minmax(0, 1fr) auto;
