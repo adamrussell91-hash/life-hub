@@ -327,7 +327,15 @@ function harness(options = {}) {
       documentRoot.querySelector('#fitness-dashboard').hidden = false;
     },
     fitnessTemplateLibrary: options.fitnessTemplateLibrary,
-    buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
+    buildCentralNodeModel: options.buildCentralNodeModel
+      ?? (input => ({ date: input.date, source: input, kind: 'central-node' })),
+    chatAnswerOpenLoop(item) {
+      calls.chatAnswers = calls.chatAnswers ?? [];
+      calls.chatAnswers.push(item);
+    },
+    chatSelectAgent() {
+      calls.chatSelects = (calls.chatSelects ?? 0) + 1;
+    },
     renderCentralNode(documentRoot, model) {
       calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
       documentRoot.querySelector('#central-node-dashboard').hidden = false;
@@ -1167,6 +1175,25 @@ test('packs the central node board after rendering governance', async () => {
   await state.controller.start();
   state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
   assert.deepEqual(order, ['governance', 'pack']);
+});
+
+test('the Central Node floating chat button hands waiting items to Hammond', async () => {
+  const waiting = [{
+    source: 'governance',
+    title: 'Sleep lock',
+    status: 'Awaiting Adam',
+    body: 'Need a yes or no on the 22:30 lights-out rule.'
+  }];
+  const state = harness({
+    buildCentralNodeModel: () => ({ date: '2026-08-01', needsYou: waiting })
+  });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+
+  state.root.querySelector('#central-node-chat-button').dispatchEvent(new Event('click'));
+
+  assert.deepEqual(state.calls.chatAnswers, [waiting]);
+  assert.equal(state.chatPanelCalls.opens.length, 1);
 });
 
 test('the Central Node floating chat button opens the chat panel into its section, themed with Hammond\'s colour', async () => {

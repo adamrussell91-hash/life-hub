@@ -208,6 +208,7 @@ controller = createAppController({
   chatSelectAgent: slug => chatController?.selectAgent?.(slug),
   chatSyncAccent: () => chatController?.syncAccent?.(),
   chatStartCentralNodeAudit: () => chatController?.startCentralNodeAudit?.(),
+  chatAnswerOpenLoop: item => chatController?.answerOpenLoop?.(item),
   chatFlushVeraSession: () => chatController?.flushVeraSession?.(),
   buildCentralNodeModel,
   renderCentralNode,

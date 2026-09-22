@@ -1,5 +1,5 @@
 import { aggregateNutrition } from '../core/aggregate.js';
-import { collectOpenLoops } from '../core/open-loops.js';
+import { collectOpenLoops, isNeedsYouLoop } from '../core/open-loops.js';
 import { addCalendarDays, enumerateDateKeys, getSydneyWeekStart, isCalendarDate } from '../core/time.js';
 import { diaryEntries } from './mind-model.js';
 
@@ -224,6 +224,6 @@ export function buildBoardLoops({
     weekFlags,
     tasks
   }).filter(loop => !hidden.has(loopId(loop)));
-  const needsYou = loops.filter(loop => loop.source === 'governance').slice(0, 2);
+  const needsYou = loops.filter(isNeedsYouLoop).slice(0, 2);
   return { loops, needsYou };
 }

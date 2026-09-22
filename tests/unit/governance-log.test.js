@@ -13,6 +13,9 @@ import {
   latestHammondReview,
   formatHammondReviewLine,
   isOpenLoopEntry,
+  isAwaitingAdamStatus,
+  formatNeedsYouForPrompt,
+  formatNeedsYouItem,
   decisionTraces,
   tracesForRef
 } from '../../apps/life/js/core/governance-log.js';
@@ -196,9 +199,49 @@ test('latestHammondReview returns the newest fresh review and ignores Pattern Re
 
 test('isOpenLoopEntry is only unresolved drift / tension / decision / escalation', () => {
   assert.equal(isOpenLoopEntry({ entryType: 'Drift Detection', status: 'Still Active' }), true);
+  assert.equal(isOpenLoopEntry({ entryType: 'Drift Detection', status: 'Awaiting Adam' }), true);
+  assert.equal(isOpenLoopEntry({ entryType: 'Drift Detection' }), false);
   assert.equal(isOpenLoopEntry({ entryType: 'Mind Insight' }), false);
   assert.equal(isOpenLoopEntry({ entryType: 'Weekly Review' }), false);
   assert.equal(isOpenLoopEntry({ entryType: 'Major Decision', status: 'Resolved' }), false);
+  assert.equal(isAwaitingAdamStatus('Awaiting Adam'), true);
+  assert.equal(isAwaitingAdamStatus('Still Active'), false);
+});
+
+test('a completed Drift Detection with no Status is not an open loop', () => {
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-08-19',
+    entryType: 'Drift Detection',
+    title: '19 Aug — Long-Term Trends purge',
+    body: 'Rewrote section to reflect current live throughline.'
+  });
+  assert.deepEqual(openGovernanceEntries(log, '2026-09-22'), []);
+});
+
+test('formatNeedsYouForPrompt is the full Awaiting Adam item, not a clipped title', () => {
+  const longBody = `Need a yes or no on the 22:30 lights-out rule. ${'Keep the full ask. '.repeat(20)}`;
+  const block = formatNeedsYouForPrompt([
+    {
+      dateKey: '2026-08-19',
+      entryType: 'Drift Detection',
+      title: 'Sleep lock',
+      status: 'Awaiting Adam',
+      ageDays: 34,
+      body: longBody
+    },
+    {
+      dateKey: '2026-08-01',
+      title: 'Study load',
+      status: 'Still Active',
+      body: 'Not on the Needs you card.'
+    }
+  ]);
+  assert.match(block, /Title: Sleep lock/);
+  assert.match(block, /Type: Drift Detection/);
+  assert.match(block, /What you asked:/);
+  assert.equal(block.includes(longBody.trim()), true);
+  assert.doesNotMatch(block, /Study load/);
+  assert.equal(formatNeedsYouItem({ title: '' }), '');
 });
 
 test('oldestOpenGovernanceEntry picks the oldest unresolved entry', () => {

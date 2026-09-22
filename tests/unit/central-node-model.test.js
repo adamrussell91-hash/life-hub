@@ -283,8 +283,14 @@ test('hides dismissed loops from the board and keeps two governance needs', () =
       dateKey: '2026-07-10',
       entryType: 'Major Decision',
       title: 'Second loop',
-      status: 'Still Active',
+      status: 'Awaiting Adam',
       body: 'Also open.'
+    }),
+    formatGovernanceEntry({
+      dateKey: '2026-08-19',
+      entryType: 'Drift Detection',
+      title: '19 Aug — Long-Term Trends purge',
+      body: 'Rewrote section to reflect current live throughline.'
     })
   ].join('\n');
   const model = buildCentralNodeModel({
@@ -297,6 +303,7 @@ test('hides dismissed loops from the board and keeps two governance needs', () =
   });
   assert.equal(model.openLoops.some(loop => loop.title === 'Open loop'), false);
   assert.ok(model.openLoops.some(loop => loop.title === 'Second loop'));
+  assert.equal(model.openLoops.some(loop => loop.title === '19 Aug — Long-Term Trends purge'), false);
   assert.equal(model.needsYou.length, 1);
   assert.equal(model.needsYou[0].title, 'Second loop');
 });

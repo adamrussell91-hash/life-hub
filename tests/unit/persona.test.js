@@ -611,6 +611,22 @@ test('Hammond prompt includes governance log tail when provided', () => {
   assert.match(prompt, /Hold the line/);
 });
 
+test('Hammond prompt includes Needs you cards and Brisket does not', () => {
+  const block = 'Title: Sleep lock\nWhat you asked:\nNeed a yes or no on the 22:30 lights-out rule.';
+  const hammond = buildSystemPrompt({
+    slug: 'hammond',
+    needsYouForPrompt: block
+  });
+  assert.match(hammond, /Needs you cards on Central Node right now/);
+  assert.match(hammond, /Do not say it is missing, not in your queue/);
+  assert.match(hammond, /22:30 lights-out/);
+  const brisket = buildSystemPrompt({
+    slug: 'brisket',
+    needsYouForPrompt: block
+  });
+  assert.equal(brisket.includes('Sleep lock'), false);
+});
+
 test('Hammond prompt includes the one-time carried-over Notion items when the governance log is empty', () => {
   const prompt = buildSystemPrompt({
     slug: 'hammond',

@@ -1,5 +1,5 @@
 import { extractCrossAgentCoordination } from './constraints.js';
-import { openGovernanceEntries } from './governance-log.js';
+import { formatNeedsYouItem, isAwaitingAdamStatus, openGovernanceEntries } from './governance-log.js';
 import { daysBetween, getSydneyWeekStart, isCalendarDate } from './time.js';
 
 export const WEEK_FLAGS_PATH = 'data/remember/week-flags.json';
@@ -8,10 +8,10 @@ const TITLE_MAX = 80;
 const DATE_IN_TEXT = /(?:since|opened|from|due|until|by|as of)\s+(\d{4}-\d{2}-\d{2})/i;
 const EDGE_RE = /(?:\*\*)?([A-Za-z][A-Za-z .']*?)(?:\*\*)?\s*→\s*(?:\*\*)?([A-Za-z][A-Za-z .']*?)(?:\*\*)?\s*:/;
 
-function clipTitle(text) {
+function clipTitle(text, max = TITLE_MAX) {
   const title = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!title) return '';
-  return title.length > TITLE_MAX ? `${title.slice(0, TITLE_MAX - 1).trimEnd()}…` : title;
+  return title.length > max ? `${title.slice(0, max - 1).trimEnd()}…` : title;
 }
 
 function dateKeyFrom(value) {
@@ -52,6 +52,11 @@ function fromGovernance(markdown, today) {
     source: 'governance',
     owner: 'Hammond',
     title: clipTitle(entry.title || entry.entryType || 'Open loop'),
+    entryType: entry.entryType || null,
+    body: String(entry.body ?? '').trim(),
+    status: entry.status || null,
+    chosen: entry.chosen || null,
+    reasoning: entry.reasoning || null,
     dateKey: isCalendarDate(entry.dateKey) ? entry.dateKey : null
   }, today));
 }
@@ -175,6 +180,26 @@ export function formatOpenLoopLine(loop) {
   if (!loop || typeof loop.owner !== 'string' || typeof loop.title !== 'string') return null;
   const age = typeof loop.ageDays === 'number' ? ` — ${loop.ageDays}d open.` : '.';
   return `${loop.owner}: ${loop.title}${age}`;
+}
+
+export function formatNeedsYouSupport(item) {
+  const age = typeof item?.ageDays === 'number' ? `Open ${item.ageDays} days.` : 'Open loop.';
+  const excerpt = clipTitle(item?.body, 160);
+  return excerpt ? `${age} ${excerpt}` : age;
+}
+
+export function formatNeedsYouHandoff(items) {
+  const list = (Array.isArray(items) ? items : [items]).filter(Boolean);
+  const bodies = list.map(formatNeedsYouItem).filter(Boolean);
+  if (!bodies.length) return '';
+  const lead = bodies.length === 1
+    ? 'I am answering this open loop from Central Node.'
+    : 'I am answering these open loops from Central Node.';
+  return `${lead}\n\n${bodies.join('\n\n---\n\n')}`;
+}
+
+export function isNeedsYouLoop(loop) {
+  return loop?.source === 'governance' && isAwaitingAdamStatus(loop.status);
 }
 
 export function parseWeekFlags(content) {

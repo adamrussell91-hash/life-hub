@@ -18,6 +18,13 @@ import {
 } from '../../apps/life/js/core/context-integrity.js';
 import { formatHubAgentContext } from '../../netlify/functions/_shared/hub-agent-context.mjs';
 import { buildSystemPrompt } from '../../netlify/functions/_shared/persona.mjs';
+import {
+  appendGovernanceEntry,
+  emptyGovernanceLog,
+  formatNeedsYouForPrompt,
+  openGovernanceEntries
+} from '../../apps/life/js/core/governance-log.js';
+import { buildBoardLoops } from '../../apps/life/js/app/central-node-board.js';
 
 const PAIN_LINE =
   '- Chadwick→Sara: Lower-body session — left knee: sharp anterior pain on descent; avoid loaded flexion.';
@@ -153,6 +160,28 @@ test('Behaviour fixture: constraint present → must-not prescribe as if clear',
     mustNotPatterns: [/back squat/i, /push through/i]
   });
   assert.equal(good.ok, true);
+});
+
+test('Delivery: Hammond prompt gets the same Needs you item the board shows', () => {
+  const ask = 'UNIQUE_NEEDS_YOU_ASK: yes or no on the 22:30 lights-out rule.';
+  const log = appendGovernanceEntry(emptyGovernanceLog(), {
+    dateKey: '2026-08-19',
+    entryType: 'Drift Detection',
+    title: 'Sleep lock',
+    status: 'Awaiting Adam',
+    body: ask
+  });
+  const today = '2026-09-22';
+  const board = buildBoardLoops({ today, governanceLogMarkdown: log });
+  assert.equal(board.needsYou.length, 1);
+  assert.equal(board.needsYou[0].title, 'Sleep lock');
+  assert.match(board.needsYou[0].body, /UNIQUE_NEEDS_YOU_ASK/);
+
+  const block = formatNeedsYouForPrompt(openGovernanceEntries(log, today));
+  const system = buildSystemPrompt({ slug: 'hammond', needsYouForPrompt: block });
+  assertContextDelivered(system, 'UNIQUE_NEEDS_YOU_ASK', 'Needs you body');
+  assert.match(system, /Hammond is waiting on you/);
+  assert.match(system, /What you asked:/);
 });
 
 test('Behaviour fixture negative control: without constraint, squat programming is allowed', () => {

@@ -244,6 +244,8 @@ import {
   GOVERNANCE_LOG_PATH,
   appendGovernanceEntry,
   emptyGovernanceLog,
+  formatNeedsYouForPrompt,
+  openGovernanceEntries,
   recentGovernanceTail
 } from '../../apps/life/js/core/governance-log.js';
 import { sanitizeCentralNode } from '../../apps/life/js/core/central-node-write.js';
@@ -1549,6 +1551,9 @@ export function createChatHandler({
           centralNodeFull,
           governanceLogTail,
           governanceLogIsEmpty: needsHammondTools && governanceLog === emptyGovernanceLog(),
+          needsYouForPrompt: needsHammondTools
+            ? formatNeedsYouForPrompt(openGovernanceEntries(governanceLog, today))
+            : '',
           hammondDigest,
           hammondCnSummary,
           pendingCnPatches: needsHammondTools ? formatPendingCnPatchesForPrompt(pendingCnPatches) : '',

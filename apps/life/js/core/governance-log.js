@@ -264,8 +264,12 @@ export function tracesForRef(entries, ref) {
   });
 }
 
+function normalizeStatus(status) {
+  return typeof status === 'string' ? status.trim().toLowerCase() : '';
+}
+
 function isResolvedStatus(status) {
-  return typeof status === 'string' && status.trim().toLowerCase() === 'resolved';
+  return normalizeStatus(status) === 'resolved';
 }
 
 // Completed notes / insights are not open loops. A March Pattern Review with
@@ -276,6 +280,19 @@ const OPEN_LOOP_TYPES = new Set([
   'Drift Detection',
   'Escalation'
 ]);
+
+// Missing status is a note, not a loop. The 19 Aug Long-Term Trends purge sat
+// on Needs you for 34 days because Hammond already rewrote the section and
+// never set Status.
+const OPEN_LOOP_STATUSES = new Set([
+  'still active',
+  'awaiting adam',
+  'stale'
+]);
+
+export function isAwaitingAdamStatus(status) {
+  return normalizeStatus(status) === 'awaiting adam';
+}
 
 const HAMMOND_REVIEW_TYPES = new Set([
   "Coach's Notes",
@@ -290,7 +307,39 @@ const HAMMOND_REVIEW_FRESH_DAYS = 8;
 const REVIEW_LINE_MAX = 80;
 
 export function isOpenLoopEntry(entry) {
-  return Boolean(entry && OPEN_LOOP_TYPES.has(entry.entryType) && !isResolvedStatus(entry.status));
+  return Boolean(
+    entry
+    && OPEN_LOOP_TYPES.has(entry.entryType)
+    && OPEN_LOOP_STATUSES.has(normalizeStatus(entry.status))
+    && !isResolvedStatus(entry.status)
+  );
+}
+
+export function formatNeedsYouItem(entry) {
+  const title = String(entry?.title || entry?.entryType || '').replace(/\s+/g, ' ').trim();
+  if (!title) return '';
+  const lines = [`Title: ${title}`];
+  if (entry.entryType) lines.push(`Type: ${entry.entryType}`);
+  if (entry.dateKey) {
+    const age = typeof entry.ageDays === 'number' ? ` (${entry.ageDays} days)` : '';
+    lines.push(`Opened: ${entry.dateKey}${age}`);
+  }
+  if (entry.status) lines.push(`Status: ${entry.status}`);
+  if (entry.chosen) lines.push(`Chosen: ${entry.chosen}`);
+  if (entry.reasoning) lines.push(`Reasoning: ${entry.reasoning}`);
+  const body = String(entry.body ?? '').trim();
+  if (body) {
+    lines.push('', 'What you asked:', body);
+  }
+  return lines.join('\n');
+}
+
+export function formatNeedsYouForPrompt(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter(entry => isAwaitingAdamStatus(entry?.status))
+    .map(formatNeedsYouItem)
+    .filter(Boolean)
+    .join('\n\n---\n\n');
 }
 
 function clipReviewLabel(text) {

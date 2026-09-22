@@ -37,6 +37,7 @@ import {
 } from '../core/log-finalize-detect.js';
 import { appendChatThreadItem, beginChatTurnAnchor, clearChatTurnAnchors } from './chat-turn-anchor.js';
 import { lockConfirmCardReceipt } from './confirm-card-receipt.js';
+import { formatNeedsYouHandoff } from '../core/open-loops.js';
 
 const STATUS_BUBBLE_CLASS = 'chat-message--status';
 const LIBRARY_SAVE_NUDGE_TEXT = 'That stayed in chat only — ask me to lock it onto Fitness so you get a Confirm card.';
@@ -1053,6 +1054,13 @@ export function createChatController({
     return send('central node audit');
   }
 
+  async function answerOpenLoop(item) {
+    const message = formatNeedsYouHandoff(item);
+    if (!message) return;
+    selectAgent('hammond');
+    return send(message);
+  }
+
   bindComposer();
   bindNewChat();
   bindTools();
@@ -1071,6 +1079,7 @@ export function createChatController({
     startNewChat,
     flushVeraSession,
     startCentralNodeAudit,
+    answerOpenLoop,
     syncAccent,
     getSelectedAgentSlug: () => stickyAgentSlug() ?? null,
     getSelectedProtocolId: () => selectedProtocolId,

@@ -2,6 +2,7 @@ import { renderInlineMarkdown } from './render-chat.js';
 import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate, isCalendarDate } from '../core/time.js';
 import { loopId } from './central-node-board.js';
+import { formatNeedsYouSupport } from '../core/open-loops.js';
 
 const LOOP_STORE_KEY = 'life-hub-cn-loop-hidden';
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -123,7 +124,7 @@ function renderNeedsYou(root, model) {
     title.textContent = item.title;
     const support = root.createElement('p');
     support.className = 'page-header__supporting';
-    support.textContent = typeof item.ageDays === 'number' ? `Open ${item.ageDays} days.` : 'Open loop.';
+    support.textContent = formatNeedsYouSupport(item);
     const actions = root.createElement('div');
     actions.className = 'confirm-card__actions';
     const later = root.createElement('button');
@@ -137,6 +138,7 @@ function renderNeedsYou(root, model) {
     answer.type = 'button';
     answer.textContent = 'Answer';
     answer.dataset.act = 'answer';
+    answer.dataset.loopId = loopId(item);
     actions.append(later, answer);
     card.append(eyebrow, title, support, actions);
     host.append(card);
@@ -595,11 +597,14 @@ function renderAgents(root, model) {
   });
 }
 
-function bindBoard(root, { storage, onLoopsChange } = {}) {
+function bindBoard(root, options = {}) {
   const host = root.querySelector('#central-node-dashboard') ?? root;
-  if (!host?.addEventListener || host.dataset?.cnBoardBound === '1') return;
+  if (!host?.addEventListener) return;
+  host._cnBoard = options;
+  if (host.dataset?.cnBoardBound === '1') return;
   if (host.dataset) host.dataset.cnBoardBound = '1';
   host.addEventListener('click', event => {
+    const board = host._cnBoard ?? {};
     const about = event.target.closest?.('[data-cn="about-chip"]');
     if (about) {
       const tile = about.closest('article');
@@ -609,12 +614,14 @@ function bindBoard(root, { storage, onLoopsChange } = {}) {
     }
     const answer = event.target.closest?.('[data-act="answer"]');
     if (answer) {
-      root.querySelector('#central-node-chat-button')?.click();
+      const item = (board.items ?? []).find(loop => loopId(loop) === answer.dataset.loopId);
+      if (board.onAnswer && item) board.onAnswer(item);
+      else root.querySelector('#central-node-chat-button')?.click();
       return;
     }
     const act = event.target.closest?.('[data-act]');
     if (!act?.dataset.loopId) return;
-    hideLoopId(act.dataset.loopId, storage);
+    hideLoopId(act.dataset.loopId, board.storage);
     const said = {
       dismiss: 'Dismissed. Hammond will stop putting this on the board.',
       archive: 'Archived. It leaves the board and sits in change history.',
@@ -622,7 +629,7 @@ function bindBoard(root, { storage, onLoopsChange } = {}) {
     };
     const read = root.querySelector('[data-cn="loop-read"]');
     if (read) read.textContent = said[act.dataset.act] ?? said.dismiss;
-    onLoopsChange?.(readHiddenLoopIds(storage));
+    board.onLoopsChange?.(readHiddenLoopIds(board.storage));
   });
 }
 
@@ -643,7 +650,9 @@ export function renderCentralNode(root, model, options = {}) {
   renderMarkdown(root, '[data-central-node="about-me"]', model.sections?.aboutMe, 'No About Me notes yet.');
   bindBoard(root, {
     storage: options.storage ?? globalThis.localStorage,
-    onLoopsChange: options.onLoopsChange
+    onLoopsChange: options.onLoopsChange,
+    onAnswer: options.onAnswer,
+    items: model.needsYou ?? []
   });
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }

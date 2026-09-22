@@ -18,6 +18,7 @@ export function buildSystemPrompt({
   centralNodeFull = '',
   governanceLogTail = '',
   governanceLogIsEmpty = false,
+  needsYouForPrompt = '',
   hammondDigest = '',
   hammondCnSummary = '',
   pendingCnPatches = '',
@@ -292,6 +293,9 @@ export function buildSystemPrompt({
       : '',
     pendingCnPatches
       ? `Pending Central Node patches awaiting Adam's Confirm (proposed in an earlier turn, not yet applied or dismissed):\n${pendingCnPatches}\n\nMention these proactively if relevant, or if Adam asks what's outstanding — do not silently re-propose the same edit.`
+      : '',
+    needsYouForPrompt
+      ? `Needs you cards on Central Node right now. Adam can see these as "Hammond is waiting on you." You wrote them. They are live. If he answers, chats, or pastes a title or date from this list, this is the item. Do not say it is missing, not in your queue, or not a live thread.\n${needsYouForPrompt}`
       : '',
     governanceLogTail
       ? `Governance Log (recent tail — durable protocol notes and Coach's Notes):\n${governanceLogTail}`

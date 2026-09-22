@@ -246,6 +246,7 @@ test('renderGovernance flags an open loop past 21 days as STALE', () => {
     dateKey: '2026-08-19',
     entryType: 'Drift Detection',
     title: 'Long-Term Trends purge',
+    status: 'Still Active',
     body: 'Section needs condensing.'
   });
   const { root, container } = fakeRoot();
@@ -261,6 +262,7 @@ test('renderGovernance does not flag a recently opened loop as STALE', () => {
     dateKey: '2026-09-05',
     entryType: 'Drift Detection',
     title: 'New tension',
+    status: 'Still Active',
     body: 'Just opened.'
   });
   const { root, container } = fakeRoot();

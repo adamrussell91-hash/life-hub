@@ -123,6 +123,7 @@ export function createAppController(dependencies) {
     chatSelectAgent,
     chatSyncAccent,
     chatStartCentralNodeAudit,
+    chatAnswerOpenLoop,
     chatFlushVeraSession,
     buildCentralNodeModel,
     renderCentralNode,
@@ -152,6 +153,7 @@ export function createAppController(dependencies) {
   let authenticated = false;
   let rendered = false;
   let latestResult = null;
+  let latestNeedsYou = [];
   let lastPaintedKey = null;
   let lastPaintedEventCount = null;
   let currentSection = 'home';
@@ -274,6 +276,15 @@ export function createAppController(dependencies) {
     bind(root.querySelector('#bloods-back'), 'click', () => showSection('body'));
     bind(root.querySelector('#medical-back'), 'click', () => showSection('body'));
   bind(root.querySelector('#central-node-chat-button'), 'click', () => {
+    if (chatPanel?.isOpen()) {
+      void chatFlushVeraSession?.();
+      chatPanel.close();
+      return;
+    }
+    if (latestNeedsYou.length) {
+      answerCentralNodeLoop(latestNeedsYou);
+      return;
+    }
     toggleSectionChat('#central-node-dashboard', CENTRAL_NODE_AGENT_SLUG);
   });
   bind(root.querySelector('#central-node-audit-button'), 'click', () => {
@@ -685,15 +696,25 @@ export function createAppController(dependencies) {
     }
   }
 
-  function openCentralNodeAudit() {
-    if (!chatPanel) return;
+  function openHammondChat() {
+    if (!chatPanel) return false;
     chatSelectAgent?.(CENTRAL_NODE_AGENT_SLUG);
     const slot = root.querySelector('#central-node-dashboard');
     if (slot && !chatPanel.isOpen()) {
       chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
       chatClearUnread?.();
     }
+    return true;
+  }
+
+  function openCentralNodeAudit() {
+    if (!openHammondChat()) return;
     void chatStartCentralNodeAudit?.();
+  }
+
+  function answerCentralNodeLoop(item) {
+    if (!openHammondChat()) return;
+    void chatAnswerOpenLoop?.(item);
   }
 
   function setSectionVisibility(name) {
@@ -1496,7 +1517,7 @@ export function createAppController(dependencies) {
 
   function paintCentralNode() {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
-    renderCentralNode(root, buildCentralNodeModel({
+    const model = buildCentralNodeModel({
       ...latestResult,
       hubSignals: {
         scheduledLessons: cnHubSignals.scheduledLessons,
@@ -1505,11 +1526,14 @@ export function createAppController(dependencies) {
         weekFlags: latestResult.weekFlags
       },
       hiddenLoopIds: readHiddenLoopIds(localStorage)
-    }), {
+    });
+    latestNeedsYou = model.needsYou ?? [];
+    renderCentralNode(root, model, {
       quiet: syncQuiet,
       onOpenSection: showSection,
       storage: localStorage,
-      onLoopsChange: () => paintCentralNode()
+      onLoopsChange: () => paintCentralNode(),
+      onAnswer: answerCentralNodeLoop
     });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
     (packCnBoardFn ?? packCnBoard)(root);

@@ -86,7 +86,7 @@ export function appendGovernanceLogSchema() {
         },
         status: {
           type: 'string',
-          description: 'Optional status (e.g. Still Active, Resolved)'
+          description: 'Still Active, Awaiting Adam, Stale, Resolved, or Wrongly Framed. Board open loops need Still Active, Awaiting Adam, or Stale.'
         },
         dateKey: {
           type: 'string',

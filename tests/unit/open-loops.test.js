@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import {
   collectOpenLoops,
   oldestOpenLoop,
-  formatOpenLoopLine
+  formatOpenLoopLine,
+  formatNeedsYouHandoff,
+  formatNeedsYouSupport,
+  isNeedsYouLoop
 } from '../../apps/life/js/core/open-loops.js';
 
 const TODAY = '2026-08-11';
@@ -43,6 +46,30 @@ test('collectOpenLoops includes the oldest open governance entry as Hammond', ()
   assert.equal(loops[0].title, 'MEd Sem 2');
   assert.equal(loops[0].dateKey, '2026-05-24');
   assert.equal(loops[0].ageDays, 79);
+  assert.equal(loops[0].status, 'Still Active');
+  assert.equal(loops[0].body, 'Unactioned.');
+  assert.equal(isNeedsYouLoop(loops[0]), false);
+});
+
+test('Needs you is only Awaiting Adam, and Answer handoff carries the entry', () => {
+  const item = {
+    source: 'governance',
+    owner: 'Hammond',
+    title: 'Sleep lock',
+    status: 'Awaiting Adam',
+    dateKey: '2026-08-19',
+    ageDays: 34,
+    body: 'Need a yes or no on the 22:30 lights-out rule.'
+  };
+  assert.equal(isNeedsYouLoop(item), true);
+  assert.match(formatNeedsYouSupport(item), /Open 34 days/);
+  assert.match(formatNeedsYouSupport(item), /22:30 lights-out/);
+  const handoff = formatNeedsYouHandoff(item);
+  assert.match(handoff, /answering this open loop from Central Node/);
+  assert.match(handoff, /Title: Sleep lock/);
+  assert.match(handoff, /Opened: 2026-08-19/);
+  assert.match(handoff, /What you asked:/);
+  assert.match(handoff, /22:30 lights-out/);
 });
 
 test('collectOpenLoops includes Cross-Agent directives', () => {

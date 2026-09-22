@@ -497,12 +497,21 @@ test('renderCentralNode writes collapsed About Me and constraints', () => {
 test('renderCentralNode shows Needs you cards and latest deposits', () => {
   const root = fakeCentralNodeRoot();
   renderCentralNode(root, baseModel({
-    needsYou: [{ source: 'governance', owner: 'Hammond', title: 'Open loop', dateKey: '2026-07-01', ageDays: 29 }],
+    needsYou: [{
+      source: 'governance',
+      owner: 'Hammond',
+      title: 'Open loop',
+      dateKey: '2026-07-01',
+      ageDays: 29,
+      status: 'Awaiting Adam',
+      body: 'Need a yes or no on the sleep lock.'
+    }],
     deposits: [{ from: 'Chadwick', to: 'Brisket', text: 'Session logged.' }],
     openLoops: [{ source: 'governance', owner: 'Hammond', title: 'Open loop', dateKey: '2026-07-01', ageDays: 29 }]
   }));
   assert.match(root._needs.textContent, /Open loop/);
   assert.match(root._needs.textContent, /Hammond is waiting on you/);
+  assert.match(root._needs.textContent, /Need a yes or no on the sleep lock/);
   assert.match(root._deposits.textContent, /Chadwick to Brisket/);
   assert.match(root._supporting.textContent, /1 deposit/);
   const loop = root.querySelector('#cn-loops').children[0];
@@ -533,14 +542,26 @@ test('loop hide writes local storage and dismisses from the board callback', () 
   assert.match(root.querySelector('[data-cn="loop-read"]').textContent, /Dismissed/);
 });
 
-test('Answer on a Needs you card opens Hammond chat', () => {
+test('Answer on a Needs you card hands the loop to Hammond', () => {
   const root = fakeCentralNodeRoot();
   let opened = 0;
+  let handed = null;
   root._chatButton.addEventListener('click', () => { opened += 1; });
-  renderCentralNode(root, baseModel({
-    needsYou: [{ source: 'governance', owner: 'Hammond', title: 'Open loop', dateKey: '2026-07-01', ageDays: 29 }]
-  }));
+  const item = {
+    source: 'governance',
+    owner: 'Hammond',
+    title: 'Open loop',
+    dateKey: '2026-07-01',
+    ageDays: 29,
+    status: 'Awaiting Adam',
+    body: 'Need a yes or no on the sleep lock.'
+  };
+  renderCentralNode(root, baseModel({ needsYou: [item] }), {
+    onAnswer: loop => { handed = loop; }
+  });
   const answer = root._needs.querySelector('[data-act="answer"]');
   answer.click();
-  assert.equal(opened, 1);
+  assert.equal(opened, 0);
+  assert.equal(handed.title, 'Open loop');
+  assert.equal(handed.body, 'Need a yes or no on the sleep lock.');
 });
