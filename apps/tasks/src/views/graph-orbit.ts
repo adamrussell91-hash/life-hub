@@ -382,9 +382,8 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       const stagger = Math.min(1, Math.max(0, ent * 1.4 - k * 0.4));
       const e = 1 - (1 - stagger) ** 3 * (1 - 0.12 * Math.sin(stagger * Math.PI));
       const r = ORBIT.rMax + 40 + (targetR - (ORBIT.rMax + 40)) * e;
-      b.radius = r;
       const w = omegaForRadius(r);
-      if (!paused && easeOut > 0) {
+      if (!paused && !pointerOver && easeOut > 0) {
         b.angle += w * dt * easeOut;
         b.radius = r;
       } else if (!b.circle.hasAttribute('cx')) {
