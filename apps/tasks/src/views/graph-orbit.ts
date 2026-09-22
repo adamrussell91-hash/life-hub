@@ -163,7 +163,17 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
   let easeOut = paused ? 0 : 1;
   let raf = 0;
   let last = performance.now();
+  let lastCommit = 0;
   let hidden = document.hidden;
+  let pointerOver = false;
+  svg.addEventListener('pointerenter', () => {
+    pointerOver = true;
+    easeOut = 0;
+  });
+  svg.addEventListener('pointerleave', () => {
+    pointerOver = false;
+    hover = null;
+  });
   const io =
     typeof IntersectionObserver === 'function'
       ? new IntersectionObserver((entries) => {
@@ -345,8 +355,10 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
   const frame = (now: number) => {
     const dt = Math.min(now - last, 50);
     last = now;
-    const target = paused || hover || hidden || document.hidden ? 0 : 1;
+    const target = paused || hover || hidden || document.hidden || pointerOver ? 0 : 1;
     easeOut += (target - easeOut) * Math.min(1, dt / 120);
+    if (target === 0 && easeOut < 0.04) easeOut = 0;
+    if (target === 1 && easeOut > 0.96) easeOut = 1;
     const lt = input.reducedMotion ? 1 : Math.min(1, (now - tweenStart) / 250);
     const la = tweenFrom + (lookAhead - tweenFrom) * (1 - (1 - lt) ** 3);
     const ent = input.reducedMotion ? 1 : Math.min(1, (now - entrance) / 700);
@@ -354,6 +366,8 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     let sy = 0;
     let collide: BodyRuntime[] = [];
     const dayBuckets = new Map<number, BodyRuntime[]>();
+    const commit = easeOut === 0 || now - lastCommit >= 180;
+    if (commit) lastCommit = now;
     for (const b of bodies) {
       const metrics = orbitBody(b.task, input.now, la);
       const days = metrics?.effectiveDays ?? 0;
@@ -369,8 +383,10 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       b.angle += w * dt * easeOut;
       const pt = bodyPoint(ORBIT.cx, ORBIT.cy, r, b.angle);
       const col = heatColour(b.colour.startsWith('#') ? b.colour : '#376fb7', k);
-      b.circle.setAttribute('cx', pt.x.toFixed(1));
-      b.circle.setAttribute('cy', pt.y.toFixed(1));
+      if (commit) {
+        b.circle.setAttribute('cx', pt.x.toFixed(1));
+        b.circle.setAttribute('cy', pt.y.toFixed(1));
+      }
       b.circle.setAttribute('fill', col);
       b.circle.setAttribute('opacity', String(Math.min(1, stagger * 1.5)));
       b.trail.setAttribute('d', trailPath(ORBIT.cx, ORBIT.cy, r, b.angle, w));

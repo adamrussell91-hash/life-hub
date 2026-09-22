@@ -26,16 +26,18 @@ export function drawIn(path: SVGPathElement, delay: number, duration: number, re
   if (!length || typeof path.animate !== 'function') return;
   path.style.strokeDasharray = String(length);
   path.style.strokeDashoffset = String(length);
+  const clear = () => {
+    path.style.strokeDasharray = '';
+    path.style.strokeDashoffset = '';
+  };
   const anim = path.animate([{ strokeDashoffset: String(length) }, { strokeDashoffset: '0' }], {
     duration,
     delay,
     easing: EASE,
     fill: 'forwards'
   });
-  anim.addEventListener?.('finish', () => {
-    path.style.strokeDasharray = '';
-    path.style.strokeDashoffset = '';
-  });
+  anim.addEventListener?.('finish', clear);
+  window.setTimeout(clear, delay + duration + 16);
 }
 
 export function popIn(

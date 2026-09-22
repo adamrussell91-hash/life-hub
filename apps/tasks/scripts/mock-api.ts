@@ -169,9 +169,14 @@ export function createMockApi({ seed }: MockApiOptions) {
     }
 
     if (path === '/api/graph-visual-seed' && method === 'POST') {
-      const { seedGraphVisualFixture } = await import('./seed-graph-visual');
-      const result = await seedGraphVisualFixture(kv);
-      return json(200, { ok: true, data: result });
+      try {
+        const { seedGraphVisualFixture } = await import('./seed-graph-visual');
+        const result = await seedGraphVisualFixture(kv);
+        return json(200, { ok: true, data: result });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return json(500, { ok: false, error: { code: 'seed_failed', message } });
+      }
     }
 
     const s = store();

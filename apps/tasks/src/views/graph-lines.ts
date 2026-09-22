@@ -104,7 +104,7 @@ function daysSince(from: string | null | undefined, now: Date): number {
 function visualState(task: Task, all: Task[], now: Date): VisualState {
   const row = nodeState(task, all, now);
   if (row.state === 'done') return 'done';
-  if (row.state === 'blocked') return 'blocked';
+  if (row.state === 'blocked' && task.blocked_since) return 'blocked';
   if (row.state === 'waiting') return 'waiting';
   if (row.state === 'current' || row.state === 'stalled') return 'current';
   return 'open';
@@ -447,6 +447,7 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       fill: 'forwards',
       easing: 'cubic-bezier(.2,.8,.2,1)'
     });
+    window.setTimeout(() => travelled.setAttribute('opacity', String(g.travelledOpacity)), base + 1200);
   } else {
     travelled.setAttribute('opacity', String(g.travelledOpacity));
   }
@@ -478,11 +479,11 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     st.branch.stations.forEach((bs, j) => {
       const x = bx + g.branchElbow + bstep * (j + 0.6);
       const grp = paintStation(branch, bs, x, by, col, true, input);
-      const t1 = svgEl('text', { class: 'sub', x, y: by + 22, 'text-anchor': 'middle', 'data-part': 'station-title' }, grp);
-      t1.textContent = fitText(bs.title, '500 12px Inter, ui-sans-serif, sans-serif', bstep - 10);
+      const t1 = svgEl('text', { class: 'lbl', x, y: by + 22, 'text-anchor': 'middle', 'data-part': 'station-title' }, grp);
+      t1.textContent = fitText(bs.title, '500 13px Inter, ui-sans-serif, sans-serif', bstep - 10);
       t1.style.fill = 'var(--ink)';
       t1.style.fontWeight = '500';
-      t1.style.fontSize = '12px';
+      t1.style.fontSize = '13px';
       const t2 = svgEl('text', { class: subClass(bs.tone), x, y: by + 37, 'text-anchor': 'middle', 'data-part': 'station-sub' }, grp);
       t2.textContent = bs.sub;
       popIn(grp, base + 900 + j * 80, 'pop', input.reducedMotion);
@@ -638,6 +639,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       delay: base + 900,
       fill: 'forwards'
     });
+    window.setTimeout(() => travelled.setAttribute('opacity', String(g.travelledOpacity)), base + 1200);
   } else travelled.setAttribute('opacity', String(g.travelledOpacity));
 
   line.stations.forEach((st, i) => {

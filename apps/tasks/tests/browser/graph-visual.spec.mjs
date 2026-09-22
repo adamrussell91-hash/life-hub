@@ -23,9 +23,10 @@ async function signIn(page) {
   await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
   const seeded = await page.evaluate(async () => {
     const res = await fetch('/api/graph-visual-seed', { method: 'POST' });
-    return res.ok;
+    const body = await res.json().catch(() => null);
+    return { ok: res.ok, status: res.status, body };
   });
-  expect(seeded).toBe(true);
+  expect(seeded, JSON.stringify(seeded)).toMatchObject({ ok: true });
 }
 async function open(page, hash) {
   await page.evaluate((h) => { location.hash = h; }, hash);

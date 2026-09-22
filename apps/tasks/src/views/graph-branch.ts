@@ -494,8 +494,9 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
 
     stage.replaceChildren(svg);
     viewport.querySelector('[data-part="minimap"]')?.remove();
-    const overflows = layout.width > viewport.clientWidth + 8 || layout.height > viewport.clientHeight + 8;
-    if (overflows && viewport.clientWidth > 0 && viewport.clientHeight > 0) {
+    const fittedH = viewport.clientWidth > 0 ? layout.height * (viewport.clientWidth / Math.max(layout.width, 1)) : 0;
+    const overflows = scale !== 1 || Math.abs(panX) > 2 || Math.abs(panY) > 2 || fittedH > viewport.clientHeight + 24;
+    if (overflows) {
       const mini = el('div', 'graph-minimap');
       mini.dataset.part = 'minimap';
       mini.setAttribute('aria-hidden', 'true');
