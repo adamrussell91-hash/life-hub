@@ -7,6 +7,8 @@ test('loads the checked-in central-node.md seed', () => {
   assert.match(text, /Today's Status/);
   assert.match(text, /Recent Agent Actions/);
   assert.match(text, /Writing Rules/);
+  assert.match(text, /## 👤 About Me/);
+  assert.match(text, /About Me\*\* is standing context/);
 });
 
 test('seed Agent Directory lists live Clare and Ann, not Clementine', () => {

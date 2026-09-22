@@ -230,6 +230,7 @@ test('content error: this_month is not subject to the This Week rule', () => {
 
 test('CENTRAL_NODE_SECTIONS lists all patchable keys', () => {
   assert.deepEqual([...CENTRAL_NODE_SECTIONS].sort(), [
+    'about_me',
     'agent_directory',
     'constraints',
     'cross_agent',
@@ -241,6 +242,28 @@ test('CENTRAL_NODE_SECTIONS lists all patchable keys', () => {
     'todays_status',
     'writing_rules'
   ].sort());
+});
+
+test('classify: about_me writes are confirm', () => {
+  assert.equal(
+    classifyCentralNodePatchRisk({
+      section: 'about_me',
+      op: 'replace_section',
+      payload: { text: '- Teach English.' }
+    }),
+    'confirm'
+  );
+});
+
+test('apply replace_section inserts About Me when the heading is missing', () => {
+  const next = applyCentralNodePatch(FIXTURE, {
+    section: 'about_me',
+    op: 'replace_section',
+    payload: { text: '- Teach English. Finish the MEd.' }
+  });
+  assert.match(next, /## 👤 About Me\n- Teach English. Finish the MEd./);
+  assert.ok(next.indexOf('## 🤖 Agent Directory') < next.indexOf('## 👤 About Me'));
+  assert.ok(next.indexOf('## 👤 About Me') < next.indexOf('## 🔴 Current Constraints'));
 });
 
 test('apply replace_section rewrites this_month body', () => {

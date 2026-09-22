@@ -12,7 +12,7 @@ import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
 import { renderFitnessSurfaceWidgets, renderNutritionSurfaceWidgets } from './render-surface-widgets.js';
-import { packCnBoard } from './render-central-node.js';
+import { packCnBoard, readHiddenLoopIds } from './render-central-node.js';
 import { settleMetricRings } from './chart-kit/animate.js';
 
 const SESSION_EXPIRY_KEY = 'life-hub:session-expiry';
@@ -169,7 +169,8 @@ export function createAppController(dependencies) {
   let teachingCalendarInFlight = null;
   let knowledgeEvents = [];
   let knowledgeCalendarInFlight = null;
-  let cnPanelsInFlight = null;
+  let cnHubSignals = { scheduledLessons: [], tasks: [], knowledgePages: [] };
+  let cnHubSignalsInFlight = null;
   let tasksEvents = [];
   let tasksCalendarInFlight = null;
   let professionalEvents = [];
@@ -1452,43 +1453,61 @@ export function createAppController(dependencies) {
     });
   }
 
-  function renderCentralNodeSection() {
+  function paintCentralNode() {
     if (!latestResult || !buildCentralNodeModel || !renderCentralNode) return;
-    renderCentralNode(root, buildCentralNodeModel(latestResult), {
+    renderCentralNode(root, buildCentralNodeModel({
+      ...latestResult,
+      hubSignals: {
+        scheduledLessons: cnHubSignals.scheduledLessons,
+        tasks: cnHubSignals.tasks,
+        knowledgePages: cnHubSignals.knowledgePages,
+        weekFlags: latestResult.weekFlags
+      },
+      hiddenLoopIds: readHiddenLoopIds(localStorage)
+    }), {
       quiet: syncQuiet,
-      onOpenSection: showSection
+      onOpenSection: showSection,
+      storage: localStorage,
+      onLoopsChange: () => paintCentralNode()
     });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
     (packCnBoardFn ?? packCnBoard)(root);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
-    loadCnKnowledgePanels();
   }
 
-  function loadCnKnowledgePanels() {
-    if (!knowledgeApi?.listBacklinks && !knowledgeApi?.listUrlWatches) return Promise.resolve();
-    if (cnPanelsInFlight) return cnPanelsInFlight;
-    const backlinks = knowledgeApi.listBacklinks
-      ? knowledgeApi.listBacklinks().catch(() => ({ groups: [], status: 'unavailable' }))
-      : Promise.resolve({ groups: [], status: 'unavailable' });
-    const watches = knowledgeApi.listUrlWatches
-      ? knowledgeApi.listUrlWatches().catch(() => ({ watches: [], status: 'unavailable' }))
-      : Promise.resolve({ watches: [], status: 'unavailable' });
-    cnPanelsInFlight = Promise.all([backlinks, watches])
-      .then(([inverseLinks, urlWatches]) => {
-        if (!latestResult) return;
-        latestResult = { ...latestResult, inverseLinks, urlWatches };
-        if (currentSection !== 'central-node' || !buildCentralNodeModel || !renderCentralNode) return;
-        renderCentralNode(root, buildCentralNodeModel(latestResult), {
-      quiet: syncQuiet,
-      onOpenSection: showSection
-    });
-        (packCnBoardFn ?? packCnBoard)(root);
+  function renderCentralNodeSection() {
+    paintCentralNode();
+    loadCnHubSignals();
+  }
+
+  function loadCnHubSignals() {
+    if (cnHubSignalsInFlight) return cnHubSignalsInFlight;
+    const teaching = teachingApi?.getCurriculum
+      ? teachingApi.getCurriculum().then(data => data?.scheduled_lessons ?? []).catch(() => [])
+      : Promise.resolve([]);
+    const tasks = tasksApi?.listTasks
+      ? tasksApi.listTasks().then(list => Array.isArray(list) ? list : []).catch(() => [])
+      : Promise.resolve([]);
+    const pages = knowledgeApi?.listPages
+      ? knowledgeApi.listPages().then(list => Array.isArray(list) ? list : []).catch(() => [])
+      : Promise.resolve([]);
+    cnHubSignalsInFlight = Promise.all([teaching, tasks, pages])
+      .then(([scheduledLessons, taskList, knowledgePages]) => {
+        const next = {
+          scheduledLessons: Array.isArray(scheduledLessons) ? scheduledLessons : [],
+          tasks: Array.isArray(taskList) ? taskList : [],
+          knowledgePages: Array.isArray(knowledgePages) ? knowledgePages : []
+        };
+        const hadData = cnHubSignals.scheduledLessons.length || cnHubSignals.tasks.length || cnHubSignals.knowledgePages.length;
+        const hasData = next.scheduledLessons.length || next.tasks.length || next.knowledgePages.length;
+        cnHubSignals = next;
+        if (currentSection === 'central-node' && (hasData || hadData)) paintCentralNode();
       })
       .finally(() => {
-        cnPanelsInFlight = null;
+        cnHubSignalsInFlight = null;
       });
-    return cnPanelsInFlight;
+    return cnHubSignalsInFlight;
   }
 
   function showSignedOut(message = '') {
@@ -1654,7 +1673,8 @@ export function createAppController(dependencies) {
     teachingCalendarInFlight = null;
     knowledgeEvents = [];
     knowledgeCalendarInFlight = null;
-    cnPanelsInFlight = null;
+    cnHubSignals = { scheduledLessons: [], tasks: [], knowledgePages: [] };
+    cnHubSignalsInFlight = null;
     tasksEvents = [];
     tasksCalendarInFlight = null;
     professionalEvents = [];

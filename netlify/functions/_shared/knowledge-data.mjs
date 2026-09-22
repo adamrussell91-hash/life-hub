@@ -179,6 +179,7 @@ function summarizeManifestEntry(item) {
     tags: Array.isArray(item.tags) ? item.tags.filter(tag => typeof tag === 'string') : [],
     excerpt: typeof item.excerpt === 'string' ? item.excerpt : '',
     created_at: typeof item.created_at === 'string' ? item.created_at : undefined,
+    updated_at: typeof item.updated_at === 'string' ? item.updated_at : undefined,
     origins: Array.isArray(item.origins) ? item.origins : undefined,
     connected: Array.isArray(item.connected) ? item.connected : undefined,
     path: typeof item.path === 'string' ? item.path : `pages/${id}.json`
@@ -418,6 +419,7 @@ export async function saveKnowledgePage(input, { env, fetchImpl = fetch, nowIso 
     tags: stored.tags,
     excerpt: excerptFromBody(stored.body),
     created_at: stored.created_at,
+    updated_at: stored.updated_at,
     path: `pages/${id}.json`,
     ...(stored.origins ? { origins: stored.origins } : {}),
     ...(stored.connected?.length ? { connected: stored.connected } : {})

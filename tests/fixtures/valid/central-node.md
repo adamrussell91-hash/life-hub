@@ -1,6 +1,10 @@
 # Purpose
 This page serves as the central coordination hub for all AI agents. Each agent should read this page before making decisions and update it with relevant information that other agents need to know.
 ---
+## 👤 About Me
+- English teaching and gifted-education study.
+- Goal: maintain the workout streak.
+---
 ## 🔴 Current Constraints & Priorities
 ### Medical Status
 - Test condition (confirmed 1 Jan 2026): stable, routine monitoring only.
