@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from './client';
+import { apiGet, apiPatch, apiPost } from './client';
 import type { EntityOverview, EntityRecord, SearchableEntityKinds, SearchGroups } from '@/domain/types';
 
 export interface SearchOptions {
@@ -18,6 +18,23 @@ export interface CreateEntityInput {
  * field uses. */
 export function createEntity(input: CreateEntityInput, options: SearchOptions = {}): Promise<EntityRecord> {
   return apiPost<EntityRecord>('/api/entities', input, { signal: options.signal });
+}
+
+export interface UpdatePersonInput {
+  display_name?: string;
+  sort_name?: string | null;
+  aliases?: string[];
+}
+
+/** `PATCH /api/entities?ref=<canonical ref>&action=update` — ordinary
+ * Person fields only. `is_self` and lifecycle stay off this path. */
+export function updatePerson(
+  ref: string,
+  patch: UpdatePersonInput,
+  options: SearchOptions = {}
+): Promise<EntityRecord> {
+  const params = new URLSearchParams({ ref, action: 'update' });
+  return apiPatch<EntityRecord>(`/api/entities?${params.toString()}`, patch, { signal: options.signal });
 }
 
 /** `GET /api/entities/search?q=<encoded>&kinds=<kind[,kind]>` — one request. */

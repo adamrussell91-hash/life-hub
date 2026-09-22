@@ -67,6 +67,56 @@ describe('renderPersonPage', () => {
     expect(canvas.querySelector('.entity-detail__self-indicator')).toBeNull();
   });
 
+  it('lets you edit a created person name, sort name, and aliases', async () => {
+    const overview = personOverview();
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const href = String(input);
+      if (init?.method === 'PATCH' && href.includes('/api/entities')) {
+        return jsonResponse(200, {
+          ok: true,
+          data: {
+            ...overview.entity,
+            display_name: 'Seth Updated',
+            sort_name: 'Updated, Seth',
+            aliases: ['Sethy']
+          }
+        });
+      }
+      return jsonResponse(200, { ok: true, data: overview });
+    });
+
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    const edit = canvas.querySelector<HTMLButtonElement>('[aria-label="Edit Seth Example"]');
+    expect(edit).toBeTruthy();
+    const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')!;
+    expect(form.hidden).toBe(true);
+    edit!.click();
+    expect(form.hidden).toBe(false);
+    const name = canvas.querySelector<HTMLInputElement>('[aria-label="Name"]')!;
+    const sortName = canvas.querySelector<HTMLInputElement>('[aria-label="Sort name"]')!;
+    const aliases = canvas.querySelector<HTMLInputElement>('[aria-label="Aliases"]')!;
+    expect(name.value).toBe('Seth Example');
+    name.value = 'Seth Updated';
+    sortName.value = 'Updated, Seth';
+    aliases.value = 'Sethy';
+    form.requestSubmit();
+
+    await vi.waitFor(() => {
+      const patchCall = vi.mocked(fetch).mock.calls.find((call) => call[1]?.method === 'PATCH');
+      expect(patchCall).toBeTruthy();
+    });
+    const patchCall = vi.mocked(fetch).mock.calls.find((call) => call[1]?.method === 'PATCH');
+    expect(String(patchCall?.[0])).toContain(`ref=${encodeURIComponent(`shared:person:${PERSON_ID}`)}`);
+    expect(String(patchCall?.[0])).toContain('action=update');
+    expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({
+      display_name: 'Seth Updated',
+      sort_name: 'Updated, Seth',
+      aliases: ['Sethy']
+    });
+  });
+
   it('names the shared workplace when the overview says how you know them', async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(200, {
@@ -180,7 +230,7 @@ describe('renderPersonPage', () => {
     expect(applicationLink?.getAttribute('href')).toMatch(/#\/application\//);
   });
 
-  it('exposes a back link to People, a 7-tab bar, and no edit/archive/delete/create-link controls', async () => {
+  it('exposes a back link to People, a 7-tab bar, identity edit, and no archive/delete/create-link controls', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -188,15 +238,11 @@ describe('renderPersonPage', () => {
     const back = canvas.querySelector('.entity-detail__back');
     expect(back?.getAttribute('href')).toBe('#/people');
     expect(back?.textContent).toBe('Back to People');
+    expect(canvas.querySelector('[aria-label="Edit Seth Example"]')).toBeTruthy();
 
-    for (const forbidden of ['edit', 'archive', 'delete', 'create-link', 'lifecycle']) {
+    for (const forbidden of ['archive', 'delete', 'create-link', 'lifecycle']) {
       expect(canvas.innerHTML.toLowerCase()).not.toMatch(new RegExp(`data-${forbidden}|class="[^"]*${forbidden}`));
     }
-    // The only buttons on a default load are the 7 tab buttons — no CRUD
-    // control of any kind. (Observations/Evidence render their own form/
-    // retry buttons, but only once activated — not on a default Overview load.)
-    const nonTabButtons = [...canvas.querySelectorAll('button')].filter((b) => b.getAttribute('role') !== 'tab');
-    expect(nonTabButtons.length).toBe(0);
     expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(7);
   });
 
