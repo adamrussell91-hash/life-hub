@@ -118,18 +118,25 @@ export async function renderEventsView(canvas: HTMLElement): Promise<void> {
 
 const COMPOSE_STEPS = ['Event', 'When', 'People', 'Evidence'] as const;
 
+const EVENT_KINDS = [
+  { id: 'course', label: 'Course', hint: 'Structured learning' },
+  { id: 'workshop', label: 'Workshop', hint: 'Facilitated session' },
+  { id: 'mentoring', label: 'Mentoring', hint: 'Coaching or observation' },
+  { id: 'conference', label: 'Conference', hint: 'Talks and panels' },
+  { id: 'on_country', label: 'On Country', hint: 'Place-based learning' },
+  { id: 'other', label: 'Other', hint: 'Anything else' }
+] as const;
+
+const PRIORITY_AREAS = [
+  'Curriculum & assessment',
+  'Students with disability',
+  'Aboriginal education',
+  'Wellbeing'
+] as const;
+
 function splitWallLocal(value: string): { date: string; time: string } {
   const [date = '', time = ''] = value.split('T');
   return { date, time: time.slice(0, 5) };
-}
-
-function formatClock(hhmm: string): string {
-  const [hourRaw, minuteRaw] = hhmm.split(':');
-  const hour = Number(hourRaw);
-  const minute = Number(minuteRaw);
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '';
-  const suffix = hour >= 12 ? 'pm' : 'am';
-  return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
 }
 
 function monthTitle(year: number, month: number): string {
@@ -141,7 +148,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   const form = document.createElement('form');
   form.className = 'event-form event-compose';
   form.noValidate = true;
-  let refreshPreview = (): void => undefined;
 
   const title = document.createElement('input');
   title.type = 'text';
@@ -233,7 +239,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   const chipList = createEntityChipList({
     container: chipsHost,
     chips: [],
-    onRemovePending: () => refreshPreview()
+    onRemovePending: () => undefined
   });
 
   const picker = createEntityPicker({
@@ -261,7 +267,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: relationshipType,
         href: item.href ?? null
       });
-      refreshPreview();
     }
   });
 
@@ -283,7 +288,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: 'presenter',
         href: item.href ?? null
       });
-      refreshPreview();
     }
   });
 
@@ -299,7 +303,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: 'related_to',
         href: item.href
       });
-      refreshPreview();
     }
   });
 
@@ -346,7 +349,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: role,
         href: item.href ?? null
       });
-      refreshPreview();
     }
   });
 
@@ -372,22 +374,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     wrap.append(el('label', 'event-compose__label', label), control);
     if (extra) wrap.append(extra);
     return wrap;
-  }
-
-  const preview = el('aside', 'event-detail__card event-compose__preview');
-  const previewKicker = el('p', 'event-detail__kicker', 'How it will land');
-  const previewTitle = el('h2', 'event-compose__preview-title', 'Untitled event');
-  const previewDate = el('p', 'event-compose__preview-date');
-  const previewTime = el('p', 'event-compose__preview-time');
-  const previewPlace = el('p', 'event-compose__preview-place');
-  const previewMeta = el('p', 'event-compose__preview-meta');
-  const previewFacts = el('dl', 'event-compose__facts');
-  preview.append(previewKicker, previewTitle, previewDate, previewTime, previewPlace, previewMeta, previewFacts);
-
-  function factRow(label: string, value: string): HTMLElement {
-    const row = el('div', 'event-detail__fact');
-    row.append(el('dt', 'event-detail__fact-label', label), el('dd', 'event-detail__fact-value', value));
-    return row;
   }
 
   const calHost = el('div', 'event-compose__cal');
@@ -437,38 +423,9 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
       cell.addEventListener('click', () => {
         writeWall(ymd, startTime.value || '09:00', endTime.value || '11:00');
         paintCalendar();
-        paintPreview();
       });
       calHost.append(cell);
     }
-  }
-
-  function paintPreview(): void {
-    const name = title.value.trim();
-    previewTitle.textContent = name || 'Untitled event';
-    previewTitle.classList.toggle('is-empty', !name);
-    const date = selectedDate();
-    previewDate.textContent = formatDisplayDate(date) || 'Date not set';
-    if (allDay.checked) {
-      previewTime.textContent = `All day · ${timeZone.value || 'Timezone not set'}`;
-    } else {
-      const range = [formatClock(startTime.value), formatClock(endTime.value)].filter(Boolean).join(' – ');
-      previewTime.textContent = range
-        ? `${range} · ${timeZone.value}`
-        : timeZone.value || 'Time not set';
-    }
-    previewPlace.textContent = locationField.value.trim() || 'No location yet';
-    previewMeta.textContent = hours.value ? `Scheduled · ${hours.value} hours` : 'Scheduled';
-    const people = chipList
-      .getChips()
-      .map((chip) => chip.label)
-      .join(', ');
-    const evidence = [certName.value.trim(), accreditation.value.trim()].filter(Boolean).join(' · ');
-    previewFacts.replaceChildren(
-      factRow('Hours', hours.value ? `${hours.value} hours` : 'Not set'),
-      factRow('People', people || 'None yet'),
-      factRow('Evidence', evidence || 'None yet')
-    );
   }
 
   const prevMonth = el('button', 'btn btn--ghost', '‹') as HTMLButtonElement;
@@ -496,16 +453,13 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
 
   startTime.addEventListener('input', () => {
     writeWall(selectedDate() || splitWallLocal(start.value).date, startTime.value, endTime.value);
-    paintPreview();
   });
   endTime.addEventListener('input', () => {
     writeWall(selectedDate() || splitWallLocal(end.value).date, startTime.value, endTime.value);
-    paintPreview();
   });
   allDay.addEventListener('change', () => {
     startTime.disabled = allDay.checked;
     endTime.disabled = allDay.checked;
-    paintPreview();
   });
 
   const stepsNav = document.createElement('ol');
@@ -545,11 +499,96 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     stepsNav.append(item);
   });
 
+  let selectedKind = EVENT_KINDS[0];
+  const typeButtons: HTMLButtonElement[] = [];
+  const typeGrid = el('div', 'event-compose__types');
+  for (const kind of EVENT_KINDS) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'event-compose__type';
+    button.setAttribute('aria-label', `Event type ${kind.label}`);
+    button.setAttribute('aria-pressed', kind.id === selectedKind.id ? 'true' : 'false');
+    if (kind.id === selectedKind.id) button.classList.add('is-on');
+    button.append(el('strong', undefined, kind.label), el('span', undefined, kind.hint));
+    button.addEventListener('click', () => {
+      selectedKind = kind;
+      typeButtons.forEach((node) => {
+        const on = node === button;
+        node.classList.toggle('is-on', on);
+        node.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+      syncAccreditation();
+    });
+    typeButtons.push(button);
+    typeGrid.append(button);
+  }
+
+  hours.className = 'event-compose__sr';
+  hours.value = hours.value || '0';
+  const hoursValue = el('b', 'event-compose__stepper-value', '0.0');
+  function paintHours(): void {
+    const value = Number(hours.value || 0);
+    hoursValue.textContent = value.toFixed(1);
+  }
+  function bumpHours(delta: number): void {
+    const next = Math.max(0, Math.round((Number(hours.value || 0) + delta) * 2) / 2);
+    hours.value = String(next);
+    paintHours();
+  }
+  const minus = el('button', undefined, '−') as HTMLButtonElement;
+  minus.type = 'button';
+  minus.setAttribute('aria-label', 'Decrease hours');
+  minus.addEventListener('click', () => bumpHours(-0.5));
+  const plus = el('button', undefined, '+') as HTMLButtonElement;
+  plus.type = 'button';
+  plus.setAttribute('aria-label', 'Increase hours');
+  plus.addEventListener('click', () => bumpHours(0.5));
+  const stepper = el('div', 'event-compose__stepper');
+  stepper.append(minus, hoursValue, plus, hours);
+  const hoursCopy = el('div');
+  hoursCopy.append(el('b', undefined, 'Hours to log'), el('p', undefined, 'Optional. Use when this event should count as time on the record.'));
+  const hoursRow = el('div', 'event-compose__hours');
+  hoursRow.append(hoursCopy, stepper);
+
+  const chipButtons: HTMLButtonElement[] = [];
+  const chipRow = el('div', 'event-compose__chips');
+  for (const area of PRIORITY_AREAS) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'event-compose__chip';
+    chip.textContent = area;
+    chip.setAttribute('aria-pressed', 'false');
+    chip.addEventListener('click', () => {
+      const on = !chip.classList.contains('is-on');
+      chipButtons.forEach((node) => {
+        node.classList.toggle('is-on', node === chip && on);
+        node.setAttribute('aria-pressed', node === chip && on ? 'true' : 'false');
+      });
+      syncAccreditation();
+    });
+    chipButtons.push(chip);
+    chipRow.append(chip);
+  }
+  accreditation.classList.add('event-compose__sr');
+  function syncAccreditation(): void {
+    const priority = chipButtons.find((node) => node.classList.contains('is-on'))?.textContent ?? '';
+    accreditation.value = [selectedKind.label, priority].filter(Boolean).join(' · ');
+  }
+  syncAccreditation();
+  paintHours();
+
+  function block(label: string, ...nodes: HTMLElement[]): HTMLElement {
+    const card = el('section', 'event-detail__card event-compose__block');
+    card.append(el('label', 'event-compose__label', label), ...nodes);
+    return card;
+  }
+
   const eventPanel = el('section', 'event-compose__panel');
   eventPanel.append(
-    field('Title', title),
-    field('Hours', hours),
-    field('Accreditation', accreditation)
+    block('Event type', typeGrid),
+    block('Title', title),
+    hoursRow,
+    block('Priority area', chipRow, accreditation)
   );
 
   const monthNav = el('div', 'event-compose__month-nav');
@@ -587,9 +626,10 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     field('Related Knowledge page', knowledgeInput, knowledgePicker.root)
   );
 
+  whenPanel.classList.add('event-detail__card');
+  peoplePanel.classList.add('event-detail__card');
+  evidencePanel.classList.add('event-detail__card');
   panels.push(eventPanel, whenPanel, peoplePanel, evidencePanel);
-  const editor = el('div', 'event-detail__card event-compose__editor');
-  editor.append(...panels);
 
   back.addEventListener('click', () => showStep(Math.max(0, currentStep - 1)));
   next.addEventListener('click', () => showStep(Math.min(panels.length - 1, currentStep + 1)));
@@ -598,17 +638,10 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   actions.append(back, next, save);
   const footer = el('div', 'event-compose__footer');
   footer.append(cancel, status, actions);
-  editor.append(footer);
+  form.append(stepsNav, eventPanel, whenPanel, peoplePanel, evidencePanel, footer);
 
-  const split = el('div', 'event-compose__split');
-  split.append(preview, editor);
-  form.append(stepsNav, split);
-
-  refreshPreview = paintPreview;
   syncTimesFromWall();
   paintCalendar();
-  paintPreview();
-  form.addEventListener('input', () => paintPreview());
   showStep(0);
 
   form.addEventListener('submit', async (event) => {

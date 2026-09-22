@@ -311,17 +311,18 @@ describe('renderEventNewView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders a full-page compose with preview and steps', async () => {
+  it('renders a full-page hours log with type buttons and no preview', async () => {
     const canvas = document.createElement('div');
     await renderEventNewView(canvas);
     expect(canvas.querySelector('form.event-form.event-compose')).toBeTruthy();
-    expect(canvas.querySelector('.event-compose__preview')).toBeTruthy();
+    expect(canvas.querySelector('.event-compose__preview')).toBeNull();
     expect(canvas.querySelectorAll('.event-compose__step')).toHaveLength(4);
-    expect(canvas.textContent).toMatch(/Untitled event/);
+    expect(canvas.querySelectorAll('.event-compose__type')).toHaveLength(6);
+    expect(canvas.querySelector('[aria-label="Hours"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Increase hours"]')).toBeTruthy();
+    expect(canvas.textContent).toMatch(/Hours to log/);
     const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
-    title.value = 'Staff briefing';
-    title.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(canvas.querySelector('.event-compose__preview-title')?.textContent).toBe('Staff briefing');
+    expect(title.classList.contains('event-compose__title')).toBe(true);
   });
 
   it('renders location, all-day, certificate, and knowledge picker controls', async () => {
@@ -336,6 +337,68 @@ describe('renderEventNewView', () => {
     expect(canvas.querySelector('[aria-label="Related knowledge page"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Hours"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Organisation link"]')).toBeTruthy();
+  });
+
+  it('posts selected type and hours on the hours log', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST' && !String(input).includes('action=')) {
+        return Response.json(
+          {
+            ok: true,
+            data: {
+              event: {
+                schema_version: 1,
+                id: VALID_EVENT_ID,
+                title: 'Phonics 101',
+                event_type: 'professional_development',
+                start: '2026-10-01T00:00:00.000Z',
+                end: '2026-10-01T06:00:00.000Z',
+                time_zone: 'Australia/Sydney',
+                all_day: false,
+                occurrence_state: 'scheduled',
+                location_text: null,
+                accreditation_category: 'Workshop',
+                hours: 2,
+                attendance_state: 'registered',
+                certificate: null,
+                created_at: '2026-09-01T10:00:00.000Z',
+                updated_at: '2026-09-01T10:00:00.000Z'
+              },
+              links: [],
+              created: true
+            }
+          },
+          { status: 201 }
+        );
+      }
+      return Response.json({ ok: true, data: { groups: { person: [], organisation: [], task: [] } } });
+    });
+
+    const canvas = document.createElement('div');
+    await renderEventNewView(canvas);
+    (canvas.querySelector('[aria-label="Event type Workshop"]') as HTMLButtonElement).click();
+    (canvas.querySelector('[aria-label="Increase hours"]') as HTMLButtonElement).click();
+    (canvas.querySelector('[aria-label="Increase hours"]') as HTMLButtonElement).click();
+    (canvas.querySelector('[aria-label="Increase hours"]') as HTMLButtonElement).click();
+    (canvas.querySelector('[aria-label="Increase hours"]') as HTMLButtonElement).click();
+    const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    title.value = 'Phonics 101';
+    (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+
+    await vi.waitFor(() => {
+      const postCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[1]?.method === 'POST' && !String(call[0]).includes('action='));
+      expect(postCall).toBeTruthy();
+    });
+    const postCall = vi
+      .mocked(fetch)
+      .mock.calls.find((call) => call[1]?.method === 'POST' && !String(call[0]).includes('action='));
+    const body = JSON.parse(String(postCall?.[1]?.body));
+    expect(body.title).toBe('Phonics 101');
+    expect(body.hours).toBe(2);
+    expect(body.accreditation_category).toBe('Workshop');
+    expect(body.event_type).toBe('professional_development');
   });
 
   it('renders an attendee picker with a role control', async () => {

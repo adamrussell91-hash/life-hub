@@ -155,7 +155,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       renderPageHeader(shell, {
         eyebrow: 'Events',
         title: 'Add event',
-        supporting: 'The left side is the record. Step through the rest.'
+        supporting: 'A record for your hours, not a party invite. Date and people come next.'
       });
       await renderEventNewView(shell.canvas);
       return;
