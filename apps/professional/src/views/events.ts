@@ -499,7 +499,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     stepsNav.append(item);
   });
 
-  let selectedKind = EVENT_KINDS[0];
+  let selectedKind: (typeof EVENT_KINDS)[number] = EVENT_KINDS[0];
   const typeButtons: HTMLButtonElement[] = [];
   const typeGrid = el('div', 'event-compose__types');
   for (const kind of EVENT_KINDS) {
