@@ -10,11 +10,12 @@ Open a prototype by loading the `.html` file in a browser.
 
 | Id | File | What it shows | Why parked | Good future fit |
 |----|------|---------------|------------|-----------------|
-| `weight-line` | `weight-line-and-bullseye.html` | A transit line from a starting value to a target band, a station at every round step (e.g. 10 kg), the date each station was first passed, weeks between stations, a pulsing "you are here" marker and a dotted track still to travel. Train animates from the start, lighting stations as it passes. | Body page weight (Sep 2026): weight must feel like going down. A horizontal line reads as travel, not descent. | Any milestone journey toward a destination: lift e1RM targets, savings goals, study hours, reading streaks, MindWorks progressions. |
+| `weight-line` | `weight-line-and-bullseye.html` | Promoted 2026-09-22 to library type `transit-lines` (`apps/life/js/app/chart-kit/transit-lines.js`). Prototype kept for the original look. | Promoted — used by Tasks Graph Lines. | Tasks project lines; any milestone journey toward a destination. |
 | `bullseye-rings` | `weight-line-and-bullseye.html` | One ring per period, radius set by value, closing in on a target bullseye. Peak ring dashed, today's ring bold and squeezing in from the peak on load. Hover picks the nearest ring by radius. | Body page weight (Sep 2026): same reason. Rings tighten but nothing moves down. | Convergence stories: variance tightening, time-to-target closing, accuracy drills, hitting a band on repeated attempts. |
 
 ## Log
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `weight-line` | Promoted to `transit-lines` for Tasks Graph Lines. Prototype file kept. |
 | 2026-09-22 | `weight-line`, `bullseye-rings` | Parked from the Body page chart redesign (round one concepts B and C for weight). |

@@ -1,16 +1,24 @@
 import { HUB_TZ } from '@/domain/queries';
 
+export type DismissedInsight = {
+  id: string;
+  fingerprint: string;
+};
+
 export type HubPrefs = {
   schema_version: 1;
   /** IANA timezone Clare uses for "today" / due words. Default Australia/Sydney. */
   timezone: string;
   updated_at: string | null;
+  /** Graph insight dismissals — come back only if the underlying copy changes. */
+  dismissed_insight_ids: DismissedInsight[];
 };
 
 export const DEFAULT_HUB_PREFS: HubPrefs = {
   schema_version: 1,
   timezone: HUB_TZ,
-  updated_at: null
+  updated_at: null,
+  dismissed_insight_ids: []
 };
 
 /** Common city / shorthand → IANA. Clare can learn these from chat. */
@@ -85,9 +93,21 @@ export function parseHubPrefs(raw: unknown): HubPrefs {
     typeof body.timezone === 'string' && isValidTimeZone(body.timezone)
       ? body.timezone
       : DEFAULT_HUB_PREFS.timezone;
+  const dismissed = Array.isArray(body.dismissed_insight_ids)
+    ? body.dismissed_insight_ids
+        .map((row) => {
+          if (!row || typeof row !== 'object') return null;
+          const item = row as { id?: unknown; fingerprint?: unknown };
+          const id = String(item.id ?? '').trim();
+          const fingerprint = String(item.fingerprint ?? '').trim();
+          return id && fingerprint ? { id, fingerprint } : null;
+        })
+        .filter((row): row is DismissedInsight => Boolean(row))
+    : [];
   return {
     schema_version: 1,
     timezone,
-    updated_at: typeof body.updated_at === 'string' ? body.updated_at : null
+    updated_at: typeof body.updated_at === 'string' ? body.updated_at : null,
+    dismissed_insight_ids: dismissed
   };
 }

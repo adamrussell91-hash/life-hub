@@ -777,6 +777,25 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
     async getHubPrefs(): Promise<HubPrefs> {
       return parseHubPrefs(await kv.getJSON(keys.hubPrefsKey()));
     },
+    async updateHubPrefs(patch: Partial<HubPrefs>): Promise<HubPrefs> {
+      const prefs: HubPrefs = {
+        ...DEFAULT_HUB_PREFS,
+        ...(await this.getHubPrefs()),
+        ...patch,
+        schema_version: 1,
+        updated_at: nowIso()
+      };
+      await kv.setJSON(keys.hubPrefsKey(), parseHubPrefs(prefs));
+      return parseHubPrefs(prefs);
+    },
+    async graphInsights(input: {
+      view?: string;
+      findings?: unknown[];
+      tasks?: unknown[];
+      projects?: unknown[];
+    }): Promise<{ insights: unknown[]; offline?: boolean }> {
+      return { insights: Array.isArray(input.findings) ? input.findings : [], offline: true };
+    },
     async setHubTimezone(timezoneOrCity: string): Promise<{ ok: boolean; timezone: string; note: string }> {
       const resolved = resolveTimeZoneInput(timezoneOrCity);
       if (!resolved) {
@@ -1095,6 +1114,22 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         try {
           if (mutation.kind === 'task_update') {
             await this.updateTask(mutation.task_id, sanitizeTaskPatch(mutation.patch));
+            results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
+            continue;
+          }
+          if (mutation.kind === 'task_create') {
+            const patch = sanitizeTaskPatch(mutation.patch);
+            const title = String(mutation.patch.title ?? '').trim();
+            const domain = String(mutation.patch.domain ?? '').trim();
+            if (!title || !domain) {
+              results.push({ summary: mutation.summary, ok: false, note: 'Title and domain are required' });
+              continue;
+            }
+            await this.createTask({
+              title,
+              domain,
+              ...patch
+            });
             results.push({ summary: mutation.summary, ok: true, note: mutationLabel(mutation) });
             continue;
           }

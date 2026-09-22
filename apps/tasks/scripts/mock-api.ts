@@ -561,6 +561,17 @@ export function createMockApi({ seed }: MockApiOptions) {
             data: await s.recordClareActual(String(b.task_id), Number(b.actual_minutes))
           });
         }
+        if (b.action === 'graph_insights') {
+          return json(200, {
+            ok: true,
+            data: await s.graphInsights({
+              view: typeof b.view === 'string' ? b.view : undefined,
+              findings: Array.isArray(b.findings) ? b.findings : [],
+              tasks: Array.isArray(b.tasks) ? b.tasks : [],
+              projects: Array.isArray(b.projects) ? b.projects : []
+            })
+          });
+        }
       }
     }
 
@@ -686,6 +697,18 @@ export function createMockApi({ seed }: MockApiOptions) {
             })
           });
         }
+      }
+    }
+
+    if (path === '/api/hub-prefs') {
+      if (method === 'GET') {
+        return json(200, { ok: true, data: await s.getHubPrefs() });
+      }
+      if (method === 'PATCH' || method === 'PUT') {
+        return json(200, {
+          ok: true,
+          data: await s.updateHubPrefs((body ?? {}) as Partial<import('../src/domain/hub-prefs').HubPrefs>)
+        });
       }
     }
 

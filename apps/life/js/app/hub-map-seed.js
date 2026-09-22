@@ -154,13 +154,9 @@ export function buildHubMapSeed() {
   add('tasks-map-item', 'Map item page', 'tasks', 'page-type', 'tasks-maps');
   add('tasks-search', 'Search', 'tasks', 'page', 'hub-tasks', { route: '#/search' });
   add('tasks-properties', 'Properties', 'tasks', 'page', 'hub-tasks', { route: '#/properties' });
-  add('tasks-orbit', 'Orbit', 'tasks', 'page', 'hub-tasks', { route: '#/orbit' });
-  add('tasks-universe', 'Universe', 'tasks', 'page', 'hub-tasks', {
-    route: '#/universe',
-    features: ['Search', 'Dark mode toggle', 'Colour key', 'Fullscreen']
-  });
+  add('tasks-orbit', 'Orbit', 'tasks', 'page', 'hub-tasks', { route: '#/graph?view=orbit' });
   add('tasks-branch', 'Branch', 'tasks', 'page', 'hub-tasks', {
-    route: '#/branch',
+    route: '#/graph?view=branch',
     features: ['Project task tree', 'Preview card']
   });
 
@@ -190,7 +186,6 @@ export function buildHubMapSeed() {
   link('life-central-node', 'knowledge-archive', 'backlinks and URL watch');
   link('tasks-graph', 'tasks-task', 'opens');
   link('tasks-branch', 'tasks-task', 'opens');
-  link('tasks-universe', 'tasks-task', 'opens');
   link('tasks-maps', 'tasks-projects', 'station links');
   link('tasks-maps', 'tasks-excursions', 'station links');
 

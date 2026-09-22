@@ -478,5 +478,19 @@ export const tasksApi = {
     apiPatch<import('@/schemas/planning-direction').PlanningDirection>(
       '/api/planning-direction',
       body
-    )
+    ),
+
+  getHubPrefs: () => apiGet<import('@/domain/hub-prefs').HubPrefs>('/api/hub-prefs'),
+  updateHubPrefs: (body: Partial<import('@/domain/hub-prefs').HubPrefs>) =>
+    apiPatch<import('@/domain/hub-prefs').HubPrefs>('/api/hub-prefs', body),
+  graphInsights: (body: {
+    view?: string;
+    findings?: unknown[];
+    tasks?: unknown[];
+    projects?: unknown[];
+  }) =>
+    apiPost<{ insights: unknown[]; offline?: boolean }>('/api/clare', {
+      action: 'graph_insights',
+      ...body
+    })
 };
