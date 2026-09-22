@@ -220,6 +220,15 @@ async function bootApp(root: HTMLElement): Promise<void> {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'People', title, person: true });
         },
+        onHeaderReady: (header) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, {
+            eyebrow: 'People',
+            title: header.title,
+            person: true,
+            actions: header.actions
+          });
+        },
         isCurrent: () => generation === routeGeneration
       });
       return;
