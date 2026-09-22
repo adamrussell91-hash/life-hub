@@ -108,6 +108,9 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
 | `range-bar` | Value on a reference span, with an optional balance tick. | `rangeBarLayout(value, refLow, refHigh, { width, padding })`, `rangeBarTick(fraction, { width, padding })` | `range-bar.js` |
 | `scene` | Declarative SVG scene (nodes + hits) for interactive charts. Mount with `mountSceneChart` in `js/app/render-scene-chart.js` (hover tip, click select, arrow keys, entrance motion: draw, grow, fade, fall, drop and a SMIL motion path; per-node `dur`; resize). | `node`, `text`, `arcPath`, `wedgePath`, `legend`, `linearScale`, `monthStarts` | `scene.js` |
+| `transit-lines` | Milestone journey as a metro line: one line per project, a station per task, terminus pill, branches and interchanges. Promoted from parked `weight-line`. | `buildTransitLine`, `wrapTransitStations` | `transit-lines.js` |
+| `flowchart-lanes` | Swimlane flowchart: labelled boxes, orthogonal connectors, project lanes. Used by Tasks Branch. | `buildFlowchartLanes`, `orthogonalPath` | `flowchart-lanes.js` |
+| `orbit-radar` | Polar due-date radar. Bodies orbit today; radius is days to go. Reuses `polar-clock` helpers. | `buildOrbitRadar`, `radiusForDays`, `bodyPoint` | `orbit-radar.js` |
 | `gate-rings` | Several values each against its own threshold, thresholds aligned on one spoke (0 to 2× scale). Home Stimulus. | `buildGateRings(stimulusChart, { width })` | `gate-rings.js` |
 | `region-rose` | Area-true Nightingale rose + ranked bars against a reference. Home Stimulus → Regions. | `buildRegionRose(stimulusChart, { width })` | `region-rose.js` |
 | `glide-slope` | Measured series vs robust trend with split stalks, projected into a target band with a slope wedge and entry rail. Home Scale. | `buildGlideSlope(glideChart, { width, height })` | `glide-slope.js` |
@@ -125,11 +128,11 @@ Use only when the data matches the type. Do not pick these for a generic count i
 
 ## Graphs — library (copy these habits)
 
-Default for a hub Graph **page**: search, select a node, preview card. Two Tasks modes (blockers / workstreams) reuse this look with a different model.
+Default for a hub Graph **page**: search, select a node, preview card. Tasks Graph uses Lines / Branch / Orbit (`transit-lines`, `flowchart-lanes`, `orbit-radar`).
 
 ### `force-graph` — canvas layout + interaction
 
-- **When:** A node/edge page (Knowledge archive, Tasks blockers / workstreams).
+- **When:** A node/edge page (Knowledge archive).
 - **Root:** `apps/knowledge/src/archive/forceGraph.ts`
 - **API:** `mountForceGraph(host, model, handlers, options) → GraphMount`. Options: `{ variant, search, excerptFor }`. Handlers: `{ onNoteSelect }`.
 - **Behaviour helper:** `forceGraphBehavior.ts` (stage size, search attach, click/hover, show-all tuning). Do not rewrite force physics.
@@ -173,7 +176,7 @@ Consumers are not a second catalog. Open them only to wire data, not to restyle.
 |-----|--------|--------|
 | Life | `nutrition-charts.js`, `bloods-charts.js`, `central-node-charts.js`, `fitness-charts-model.js`, `render-fitness-charts.js`, `render-home.js`, `render-nutrition.js`, `render-mind.js`, `render-skincare.js`, `render-body.js`, `render-bloods.js`, `render-central-node.js` (all under `apps/life/js/app/`) | — |
 | Knowledge | — | `apps/knowledge/src/archive/` (library root) |
-| Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,area-line,animate,mood-mix}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts`, `views/dashboard-overview.ts` | `apps/tasks/src/views/graph.ts`, `blocks/graph-svg.ts`, `blocks/graph-layout.ts` — blockers + workstreams |
+| Tasks | `apps/tasks/src/chart-kit/{ring,apply-ring,columns,area-line,animate,mood-mix}.ts`, `blocks/chart-svg.ts`, `views/project-portfolio-chart.ts`, `views/dashboard-overview.ts` | `apps/tasks/src/views/graph.ts` — Lines (`transit-lines`), Branch (`flowchart-lanes`), Orbit (`orbit-radar`) |
 | Teaching | `apps/teaching/src/blocks/chart-svg.ts` | `blocks/graph-svg.ts`, `graph-layout.ts`, `graph-maker/` |
 
 Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, trends).
@@ -202,7 +205,6 @@ Agents may name catalog ids + focus/schedule payloads. They must not emit third-
 
 | Id | When it would fit | Prototype |
 |----|-------------------|-----------|
-| `weight-line` ★ | Milestone journey toward a destination (transit line, station per step, dates passed, "you are here"). | `future-charts/weight-line-and-bullseye.html` |
 | `bullseye-rings` ★ | Convergence on a target (rings per period tightening on a bullseye). | `future-charts/weight-line-and-bullseye.html` |
 
 ---
@@ -224,6 +226,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Tasks Graph rebuilt as Lines / Branch / Orbit. `weight-line` promoted to `transit-lines`. Branch uses `flowchart-lanes`. Orbit uses `orbit-radar` plus `polar-clock` helpers. |
 | 2026-09-22 | `shed-stack`, `stairs-down`, `hundred-squares` | Body Weight shows shed stack and stairs side by side (no pill toggle). Shed stack gets a token colour key (you / band / year). 100 squares uses 20 columns so the grid is as short as Carved away. |
 | 2026-09-22 | `shed-stack`, `stairs-down`, `carved-away`, `recomp-scissors`, `hundred-squares`, `scene` | Body page Weight, Body fat and Skeletal muscle line charts replaced. Data from `body-chart-data.js` (targets from `config/targets.yml`). Scene renderer gains `fall` and `drop` entrances, per-node `dur` and `motion` paths. Classes `bc-*` in `app.css`, tokens only. |
 | 2026-09-22 | `weight-line`, `bullseye-rings` (future) | Parked in `future-charts/` with a ★ future flag. Designed for the Body weight card, rejected there because weight must read as going down. Not library types until promoted. |

@@ -96,6 +96,15 @@ export interface TasksStore {
   getClareCalibration(domain: Task['domain']): Promise<ClareCalibration>;
   listClareCalibrations(): Promise<ClareCalibration[]>;
   getHubPrefs(): Promise<import('@/domain/hub-prefs').HubPrefs>;
+  updateHubPrefs(
+    patch: Partial<import('@/domain/hub-prefs').HubPrefs>
+  ): Promise<import('@/domain/hub-prefs').HubPrefs>;
+  graphInsights(input: {
+    view?: string;
+    findings?: unknown[];
+    tasks?: unknown[];
+    projects?: unknown[];
+  }): Promise<{ insights: unknown[]; offline?: boolean }>;
   setHubTimezone(
     timezoneOrCity: string
   ): Promise<{ ok: boolean; timezone: string; note: string }>;

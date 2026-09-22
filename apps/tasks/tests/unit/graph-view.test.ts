@@ -7,7 +7,14 @@ import type { Project } from '@/schemas/project';
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
-    listProjects: vi.fn()
+    listProjects: vi.fn(),
+    getHubPrefs: vi.fn(),
+    updateHubPrefs: vi.fn(),
+    updateTask: vi.fn(),
+    createTask: vi.fn(),
+    applyAgentMutations: vi.fn(),
+    graphInsights: vi.fn(),
+    getTaskProperties: vi.fn()
   }
 }));
 
@@ -56,7 +63,7 @@ const projects: Project[] = [
     milestones: [],
     status: 'active',
     baseline_end_date: null,
-    current_end_date: null,
+    current_end_date: '2026-09-30',
     review_summary: null,
     stall_flagged_at: null,
     created_at: '2026-08-01T00:00:00.000Z',
@@ -69,29 +76,20 @@ const projects: Project[] = [
   }
 ];
 
-describe('graph view mode pills', () => {
+describe('graph view pills', () => {
   beforeEach(() => {
     resetGraphSession();
     location.hash = '#/graph';
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-      setTransform: vi.fn(),
-      clearRect: vi.fn(),
-      beginPath: vi.fn(),
-      moveTo: vi.fn(),
-      lineTo: vi.fn(),
-      stroke: vi.fn(),
-      fill: vi.fn(),
-      arc: vi.fn(),
-      fillText: vi.fn(),
-      strokeStyle: '',
-      fillStyle: '',
-      lineWidth: 1,
-      font: '',
-      textAlign: 'center',
-      textBaseline: 'middle'
-    } as unknown as CanvasRenderingContext2D);
     vi.mocked(tasksApi.listTasks).mockReset();
     vi.mocked(tasksApi.listProjects).mockReset();
+    vi.mocked(tasksApi.getHubPrefs).mockResolvedValue({
+      schema_version: 1,
+      timezone: 'Australia/Sydney',
+      updated_at: null,
+      dismissed_insight_ids: []
+    });
+    vi.mocked(tasksApi.graphInsights).mockResolvedValue({ insights: [] });
+    vi.mocked(tasksApi.getTaskProperties).mockRejectedValue(new Error('offline'));
     vi.mocked(tasksApi.listTasks).mockResolvedValue([
       task({ id: 'task_lesson', title: 'Finish lesson pack', depends_on: ['task_notes'] }),
       task({ id: 'task_notes', title: 'Write notes' })
@@ -105,34 +103,28 @@ describe('graph view mode pills', () => {
     vi.restoreAllMocks();
   });
 
-  it('switches blockers and workstreams without refetching', async () => {
+  it('shows Lines, Branch and Orbit only and stays on one fetch', async () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderGraphView(canvas);
 
-    expect(canvas.querySelector('.graph-host')).not.toBeNull();
+    const labels = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].map((btn) => btn.textContent);
+    expect(labels).toEqual(['Lines', 'Branch', 'Orbit']);
+    expect(canvas.querySelector('.graph-page')).not.toBeNull();
+    expect(canvas.querySelector('.graph-lines')).not.toBeNull();
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
-    const blockers = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
-      (btn) => btn.textContent === 'Blockers'
-    );
-    const workstreams = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
-      (btn) => btn.textContent === 'Workstreams'
-    );
-    expect(blockers?.classList.contains('is-active')).toBe(true);
 
-    workstreams?.click();
-
-    expect(canvas.querySelector('.canvas-status')).toBeNull();
-    expect(canvas.querySelector('.graph-host')).not.toBeNull();
+    const branch = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'Branch'
+    );
+    branch?.click();
+    await vi.waitFor(() => {
+      expect(location.hash).toBe('#/graph?view=branch');
+    });
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(1);
-    const nextWorkstreams = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
-      (btn) => btn.textContent === 'Workstreams'
-    );
-    expect(nextWorkstreams?.classList.contains('is-active')).toBe(true);
-    expect(location.hash).toBe('#/graph?mode=workstreams');
   });
 
-  it('remounts when a stretch view left a graph-host on the canvas', async () => {
+  it('remounts when a leftover host sits on the canvas', async () => {
     const canvas = document.createElement('main');
     document.body.append(canvas);
     await renderGraphView(canvas);
@@ -144,15 +136,15 @@ describe('graph view mode pills', () => {
     leftover.textContent = 'orbit leftover';
     canvas.append(leftover);
 
-    location.hash = '#/graph?mode=workstreams';
+    location.hash = '#/graph?view=orbit';
     await renderGraphView(canvas);
 
-    expect(canvas.querySelector('.graph-stage')).not.toBeNull();
+    expect(canvas.querySelector('.graph-orbit')).not.toBeNull();
     expect(canvas.textContent).not.toContain('orbit leftover');
-    const workstreams = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
-      (btn) => btn.textContent === 'Workstreams'
+    const orbit = [...canvas.querySelectorAll<HTMLButtonElement>('.hub-pills__btn')].find(
+      (btn) => btn.textContent === 'Orbit'
     );
-    expect(workstreams?.classList.contains('is-active')).toBe(true);
+    expect(orbit?.classList.contains('is-active')).toBe(true);
     expect(vi.mocked(tasksApi.listTasks)).toHaveBeenCalledTimes(2);
   });
 });

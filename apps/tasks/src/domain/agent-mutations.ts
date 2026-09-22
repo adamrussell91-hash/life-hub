@@ -3,10 +3,15 @@ import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 
 export type AgentMutation =
-  | {
+    | {
       kind: 'task_update';
       summary: string;
       task_id: string;
+      patch: Record<string, unknown>;
+    }
+  | {
+      kind: 'task_create';
+      summary: string;
       patch: Record<string, unknown>;
     }
   | {
@@ -70,6 +75,12 @@ export function parseAgentMutations(raw: unknown): AgentMutation[] {
       out.push({ kind, summary, task_id, patch });
       continue;
     }
+    if (kind === 'task_create') {
+      const patch = asRecord(body.patch);
+      if (!patch) continue;
+      out.push({ kind, summary, patch });
+      continue;
+    }
     if (kind === 'project_update') {
       const project_id = String(body.project_id ?? '').trim();
       const patch = asRecord(body.patch);
@@ -121,6 +132,8 @@ export function mutationLabel(mutation: AgentMutation): string {
   switch (mutation.kind) {
     case 'task_update':
       return `Update task ${mutation.task_id}`;
+    case 'task_create':
+      return `Create task`;
     case 'project_update':
       return `Update project ${mutation.project_id}`;
     case 'page_blocks':
@@ -166,6 +179,9 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'due_time',
     'estimated_duration',
     'parent_project_id',
+    'parent_task_id',
+    'depends_on',
+    'step_order',
     'tags',
     'page_blocks',
     'bucket',
@@ -202,7 +218,8 @@ export function sanitizeProjectPatch(patch: Record<string, unknown>): Partial<Pr
     'purpose',
     'desired_outcome',
     'quality_bar',
-    'review_at'
+    'review_at',
+    'milestones'
   ] as const;
   for (const key of allow) {
     if (key in patch) out[key] = patch[key];

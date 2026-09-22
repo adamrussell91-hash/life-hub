@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   bindEditablePageTitle,
+  canonicalizeGraphHash,
+  graphViewFromHash,
   hashQuery,
   isSoftViewChange,
   parseHashRoute,
@@ -236,11 +238,31 @@ describe('view surfaces', () => {
   });
 });
 
+describe('graph hash', () => {
+  it('reads Lines by default and Branch / Orbit from query or old routes', () => {
+    expect(graphViewFromHash('#/graph')).toBe('lines');
+    expect(graphViewFromHash('#/graph?view=branch')).toBe('branch');
+    expect(graphViewFromHash('#/graph?view=orbit')).toBe('orbit');
+    expect(graphViewFromHash('#/orbit')).toBe('orbit');
+    expect(graphViewFromHash('#/branch')).toBe('branch');
+  });
+
+  it('canonicalises old Graph family hashes', () => {
+    expect(canonicalizeGraphHash('#/orbit')).toBe('#/graph?view=orbit');
+    expect(canonicalizeGraphHash('#/branch')).toBe('#/graph?view=branch');
+    expect(canonicalizeGraphHash('#/universe')).toBe('#/graph');
+    expect(canonicalizeGraphHash('#/graph?mode=workstreams')).toBe('#/graph');
+    expect(canonicalizeGraphHash('#/graph?mode=blockers')).toBe('#/graph?view=branch');
+    expect(canonicalizeGraphHash('#/graph')).toBeNull();
+    expect(canonicalizeGraphHash('#/graph?view=orbit')).toBeNull();
+  });
+});
+
 describe('hashQuery', () => {
   it('reads query params from a view hash', () => {
     window.location.hash = '#/excursions?template=ext_ethics_olympiad';
     expect(hashQuery().get('template')).toBe('ext_ethics_olympiad');
-    window.location.hash = '#/graph?mode=workstreams';
-    expect(hashQuery().get('mode')).toBe('workstreams');
+    window.location.hash = '#/graph?view=orbit';
+    expect(hashQuery().get('view')).toBe('orbit');
   });
 });

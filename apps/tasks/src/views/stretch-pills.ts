@@ -1,39 +1,23 @@
-import type { HubViewId } from '@/shell/shell';
+import type { GraphPageView } from '@/shell/shell';
+import { el } from '@/views/hub-kit';
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-const MODES: Array<{ id: HubViewId; label: string; href: string }> = [
-  { id: 'graph', label: 'Blockers', href: '#/graph' },
-  { id: 'graph', label: 'Workstreams', href: '#/graph?mode=workstreams' },
-  { id: 'universe', label: 'Universe', href: '#/universe' },
-  { id: 'orbit', label: 'Orbit', href: '#/orbit' },
-  { id: 'branch', label: 'Branch', href: '#/branch' }
+const MODES: Array<{ id: GraphPageView; label: string; href: string }> = [
+  { id: 'lines', label: 'Lines', href: '#/graph' },
+  { id: 'branch', label: 'Branch', href: '#/graph?view=branch' },
+  { id: 'orbit', label: 'Orbit', href: '#/graph?view=orbit' }
 ];
 
-/** Graph page pills — blockers / workstreams plus stretch views. */
+/** Graph page pills — Lines, Branch, Orbit. */
 export function renderGraphFamilyPills(
-  active: HubViewId,
-  graphMode: 'blockers' | 'workstreams' = 'blockers',
+  active: GraphPageView,
+  _unused?: unknown,
   onNavigate?: (href: string) => void
 ): HTMLElement {
   const pills = el('div', 'hub-pills');
   pills.setAttribute('role', 'group');
   pills.setAttribute('aria-label', 'Graph view');
   for (const mode of MODES) {
-    const isGraph = mode.href.startsWith('#/graph');
-    const pressed =
-      isGraph && active === 'graph'
-        ? (mode.href.includes('workstreams') ? graphMode === 'workstreams' : graphMode === 'blockers')
-        : active === mode.id;
+    const pressed = active === mode.id;
     const btn = el('button', `hub-pills__btn${pressed ? ' is-active' : ''}`, mode.label);
     btn.type = 'button';
     btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');

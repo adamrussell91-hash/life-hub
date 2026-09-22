@@ -27,7 +27,7 @@ Agent writes: propose → **confirm card** → apply.
 |---------|------|
 | **Board** | Home. Task / project / excursion cards as Teaching tiles (glass, `--hub-tile-gap`). |
 | **Calendar** | Reference paint for every hub. Day / Week / Month, 7-day Monday week, `.event-chip`. See `CALENDAR.md`. |
-| **Graph** | A rail page, not home. Two modes on that page: **blockers** (task nodes, blocked-by edges) and **workstreams** (clustered projects / areas). |
+| **Graph** | A rail page, not home. Three views: **Lines** (project transit), **Branch** (dependency flowchart), **Orbit** (due-date radar). |
 | **Charts** | Blocks on the board (counts, trends). Not a third chrome system. |
 
 Status colour uses existing tokens only: Wave, Marine, Depth, pastel chips. High Sea is accent / decisive, never body text on orange, never focus rings.
