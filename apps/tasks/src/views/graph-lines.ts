@@ -94,13 +94,11 @@ function lineColour(domain: string | undefined, shade: number): string {
   return mixHex(base, '#0a1536', 0.3);
 }
 
-/** Keep terminus / ghost copy inside the painted SVG, not hanging off the page. */
 export function lineLabelX(x: number, viewWidth: number): { x: number; anchor: 'start' | 'end' } {
   const pad = 8;
   const maxX = Math.max(pad, viewWidth - pad);
   const clamped = Math.min(Math.max(x, pad), maxX);
-  const anchor = clamped > viewWidth / 2 ? 'end' : 'start';
-  return { x: clamped, anchor };
+  return { x: clamped, anchor: clamped > viewWidth / 2 ? 'end' : 'start' };
 }
 
 export function lineViewWidth(clientWidth: number): number {
@@ -587,8 +585,8 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
   });
 
   const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
-  const termBox = lineLabelX(termX + termW, width);
-  const termLeft = Math.max(4, termBox.x - termW);
+  const termRight = lineLabelX(termX + termW, width).x;
+  const termLeft = Math.max(4, termRight - termW);
   svgEl('rect', { x: termLeft, y: y - g.termH / 2, width: termW, height: g.termH, rx: g.termH / 2, fill: col }, tg);
   const tt = svgEl('text', { class: 'term graph-terminus', x: termLeft + termW / 2, y: y + 4.5, 'text-anchor': 'middle' }, tg);
   tt.textContent = termText;

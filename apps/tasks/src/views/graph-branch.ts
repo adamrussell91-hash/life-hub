@@ -112,16 +112,35 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   function applyPan(): void {
     stage.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
   }
-  function applyFit(): { scale: number; panX: number; panY: number } {
-    const fitted = fitBranchView(layout, {
+
+  function fittedView(): ReturnType<typeof fitBranchView> {
+    return fitBranchView(layout, {
       width: viewport.clientWidth || layout.width,
       height: viewport.clientHeight || layout.height
     });
+  }
+
+  function refreshMinimap(): void {
+    viewport.querySelector('[data-part="minimap"]')?.remove();
+    const fitted = fittedView();
+    const userMoved =
+      Math.abs(scale - fitted.scale) > 0.02 ||
+      Math.abs(panX - fitted.panX) > 2 ||
+      Math.abs(panY - fitted.panY) > 2;
+    if (!userMoved) return;
+    const mini = el('div', 'graph-minimap');
+    mini.dataset.part = 'minimap';
+    mini.setAttribute('aria-hidden', 'true');
+    viewport.append(mini);
+  }
+
+  function applyFit(): void {
+    const fitted = fittedView();
     scale = fitted.scale;
     panX = fitted.panX;
     panY = fitted.panY;
     applyPan();
-    return fitted;
+    refreshMinimap();
   }
 
   const paint = (): void => {
@@ -505,33 +524,12 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
 
     stage.replaceChildren(svg);
     applyFit();
-    refreshMinimap();
     void input.onWhatIf;
     void input.onApplyWhatIf;
   };
 
-  function refreshMinimap(): void {
-    viewport.querySelector('[data-part="minimap"]')?.remove();
-    const fitted = fitBranchView(layout, {
-      width: viewport.clientWidth || layout.width,
-      height: viewport.clientHeight || layout.height
-    });
-    const userMoved =
-      Math.abs(scale - fitted.scale) > 0.02 ||
-      Math.abs(panX - fitted.panX) > 2 ||
-      Math.abs(panY - fitted.panY) > 2;
-    if (!userMoved) return;
-    const mini = el('div', 'graph-minimap');
-    mini.dataset.part = 'minimap';
-    mini.setAttribute('aria-hidden', 'true');
-    viewport.append(mini);
-  }
-
   paint();
-  fit.addEventListener('click', () => {
-    applyFit();
-    refreshMinimap();
-  });
+  fit.addEventListener('click', applyFit);
   viewport.addEventListener(
     'wheel',
     (event) => {
@@ -561,13 +559,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
 
-  const resizeObserver =
-    typeof ResizeObserver === 'function'
-      ? new ResizeObserver(() => {
-          applyFit();
-          refreshMinimap();
-        })
-      : null;
+  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(applyFit) : null;
   resizeObserver?.observe(viewport);
   return {
     root,
