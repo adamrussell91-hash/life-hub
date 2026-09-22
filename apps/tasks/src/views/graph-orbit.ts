@@ -391,7 +391,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       }
       const pt = bodyPoint(ORBIT.cx, ORBIT.cy, b.radius, b.angle);
       const col = heatColour(b.colour.startsWith('#') ? b.colour : '#376fb7', k);
-      if (commit) {
+      if (commit && !paused && !pointerOver) {
         b.circle.setAttribute('cx', pt.x.toFixed(1));
         b.circle.setAttribute('cy', pt.y.toFixed(1));
       }
