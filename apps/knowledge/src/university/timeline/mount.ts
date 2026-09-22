@@ -180,6 +180,12 @@ export function mountUniversityTimeline(
       { passive: false },
     );
 
+    host.addEventListener("selectstart", event => {
+      if (dragReady || dragging || (event.target as HTMLElement).closest("[data-tl-viewport]")) {
+        event.preventDefault();
+      }
+    });
+
     host.addEventListener("pointerdown", event => {
       if (event.button !== 0) return;
       if (!(event.target as HTMLElement).closest("[data-tl-viewport]")) return;
@@ -188,13 +194,19 @@ export function mountUniversityTimeline(
       dragging = false;
       lastX = event.clientX;
       originX = event.clientX;
-      viewport()?.setPointerCapture(event.pointerId);
+      if (!(event.target as HTMLElement).closest("button, a, input, label")) {
+        event.preventDefault();
+      }
+      document.getSelection()?.removeAllRanges();
+      viewport()?.setPointerCapture?.(event.pointerId);
     });
 
     host.addEventListener("pointermove", event => {
       if (!dragReady) return;
       if (!dragging && Math.abs(event.clientX - originX) < 6) return;
       dragging = true;
+      host.classList.add("is-panning");
+      document.getSelection()?.removeAllRanges();
       const rect = chart()?.getBoundingClientRect();
       const span = state.camera.endMs - state.camera.startMs;
       const deltaMs = ((lastX - event.clientX) / Math.max(1, rect?.width ?? width)) * span;
@@ -203,12 +215,15 @@ export function mountUniversityTimeline(
       updateChart();
     });
 
-    host.addEventListener("pointerup", () => {
+    const endPan = () => {
       const wasDragging = dragging;
       dragReady = false;
       dragging = false;
+      host.classList.remove("is-panning");
       if (wasDragging) suppressClick = true;
-    });
+    };
+    host.addEventListener("pointerup", endPan);
+    host.addEventListener("pointercancel", endPan);
   }
 
   const frame = requestAnimationFrame(paint);

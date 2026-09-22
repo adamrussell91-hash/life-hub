@@ -50,6 +50,19 @@ async function flush() {
   await new Promise(resolve => requestAnimationFrame(() => resolve(undefined)));
 }
 
+class TestPointerEvent extends Event {
+  button: number;
+  clientX: number;
+  pointerId: number;
+
+  constructor(type: string, init: { button?: number; clientX?: number; bubbles?: boolean } = {}) {
+    super(type, { bubbles: init.bubbles ?? true });
+    this.button = init.button ?? 0;
+    this.clientX = init.clientX ?? 0;
+    this.pointerId = 1;
+  }
+}
+
 describe("mountUniversityTimeline", () => {
   it("zooms from the degree into units, then opens an assessment grade card", async () => {
     const host = document.createElement("section");
@@ -74,6 +87,31 @@ describe("mountUniversityTimeline", () => {
       expect(host.querySelector("[data-tl-card]")?.textContent).toContain("High Distinction");
       expect(host.querySelector("[data-tl-card]")?.textContent).toContain("7 / 7");
     }
+
+    stop();
+    host.remove();
+  });
+
+  it("blocks text selection while panning the timeline", async () => {
+    const host = document.createElement("section");
+    host.className = "uni-tl";
+    host.style.width = "900px";
+    document.body.append(host);
+    const stop = mountUniversityTimeline(host, catalogue);
+    await flush();
+
+    const pane = host.querySelector<HTMLElement>("[data-tl-viewport]")!;
+    const idle = new Event("selectstart", { bubbles: true, cancelable: true });
+    expect(pane.dispatchEvent(idle)).toBe(false);
+
+    pane.dispatchEvent(new TestPointerEvent("pointerdown", { button: 0, clientX: 240 }));
+    pane.dispatchEvent(new TestPointerEvent("pointermove", { clientX: 180 }));
+    expect(host.classList.contains("is-panning")).toBe(true);
+    const duringPan = new Event("selectstart", { bubbles: true, cancelable: true });
+    expect(host.dispatchEvent(duringPan)).toBe(false);
+
+    pane.dispatchEvent(new TestPointerEvent("pointerup"));
+    expect(host.classList.contains("is-panning")).toBe(false);
 
     stop();
     host.remove();
