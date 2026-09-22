@@ -1243,112 +1243,125 @@
           <div class="cn-map-link">
             <button id="central-node-map-button" class="btn btn--secondary" type="button">Hub map</button>
           </div>
-          <div data-central-node="progress" class="hub-progress"></div>
+          <p class="page-header__supporting" data-central-node="supporting"></p>
+          <div data-central-node="todays-status" class="prose-section status-prose" hidden></div>
+
+          <p class="cn-band-title">Needs you</p>
+          <div id="cn-needs" class="cn-needs" data-central-node="needs-you"></div>
+
+          <p class="cn-band-title">What the evidence says</p>
           <div id="cn-board" class="cn-board">
-            <article id="cn-tile-status" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="todays-status-label">
-              <p class="cn-tile__question">Has today been logged?</p>
-              <p class="metric-label" id="todays-status-label">Today's Status</p>
-              <div class="status-hybrid">
-                <div class="completion-ring-wrap">
-                  <svg id="central-node-completion-ring" class="completion-ring" viewBox="0 0 72 72" role="img" aria-label="Logging completeness ring">
-                    <circle data-role="track" class="completion-ring-track" fill="none"></circle>
-                    <circle data-role="fill" class="completion-ring-fill" fill="none"></circle>
-                  </svg>
-                  <span data-value="completion-ring-label" class="completion-ring-label">— of —</span>
+            <article id="cn-tile-fat" class="metric-card cn-tile cn-tile--span2">
+              <div class="cn-tile-head">
+                <div>
+                  <p class="cn-tile__question">Is fat staying under the flare ceiling?</p>
+                  <p class="metric-label">Fat per day against the ceiling</p>
                 </div>
-                <div class="status-live" aria-label="Live logging checklist">
-                  <ul class="status-checklist">
-                    <li data-live-complete="nutrition">Nutrition</li>
-                    <li data-live-complete="fitness">Fitness</li>
-                    <li data-live-complete="diary">Diary</li>
-                    <li data-live-complete="body">Body</li>
-                    <li data-live-complete="skincare">Skincare</li>
-                  </ul>
-                  <p class="status-snapshot" data-live-snapshot>—</p>
-                </div>
-                <div data-central-node="todays-status" class="prose-section status-prose"></div>
+                <span class="cn-chip cn-chip--strong" data-cn="fat-confidence" hidden></span>
               </div>
+              <p class="cn-tile__legend">Each bar is a day. The dashed line is the flare ceiling.</p>
+              <svg id="cn-fat" class="cn-chart" viewBox="0 0 630 200" role="img" aria-label="Daily fat against the ceiling"></svg>
+              <p class="cn-readout" data-cn="fat-read"></p>
+              <p class="cn-goal" data-cn="fat-goal"></p>
             </article>
 
-            <article id="cn-tile-week" class="metric-card cn-tile" aria-labelledby="central-node-week-label">
-              <p class="cn-tile__question">How is protein moving?</p>
-              <p class="metric-label" id="central-node-week-label">This Week</p>
-              <p class="cn-tile__legend">Each cell is a day. Darker is more protein.</p>
-              <svg id="central-node-week-horizon" class="cn-horizon" viewBox="0 0 320 24" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Protein grams over the last 7 days"></svg>
-              <div data-central-node="this-week" class="prose-section"></div>
+            <article id="cn-tile-weight" class="metric-card cn-tile">
+              <p class="cn-tile__question">Where is weight against target?</p>
+              <p class="metric-label">Weight on the target range</p>
+              <p class="cn-tile__legend">Shaded span is the recomposition range. Dot is the last weigh-in.</p>
+              <svg id="cn-weight" class="cn-chart" viewBox="0 0 300 90" role="img" aria-label="Weight against target"></svg>
+              <p class="cn-readout" data-cn="weight-read"></p>
+              <p class="cn-goal" data-cn="weight-goal"></p>
             </article>
 
-            <article id="cn-tile-month" class="metric-card cn-tile" aria-labelledby="central-node-month-label">
-              <p class="cn-tile__question">What's on the month?</p>
-              <p class="metric-label" id="central-node-month-label">This Month</p>
-              <div data-central-node="this-month" class="prose-section"></div>
+            <article id="cn-tile-load" class="metric-card cn-tile">
+              <p class="cn-tile__question">How heavy is the coming week?</p>
+              <p class="metric-label">Load forecast</p>
+              <p class="cn-tile__legend">Lessons, tasks due, and workouts on each day.</p>
+              <svg id="cn-load" class="cn-chart" viewBox="0 0 300 170" role="img" aria-label="Forecast load by day"></svg>
+              <ul class="cn-legend"><li><i style="background:var(--wave)"></i>Lessons</li><li><i style="background:var(--marine)"></i>Tasks due</li><li><i style="background:var(--success)"></i>Workouts</li></ul>
+              <p class="cn-readout" data-cn="load-read"></p>
             </article>
 
-            <article id="cn-tile-binding" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="central-node-binding-label">
-              <p class="cn-tile__question">Which goal is binding?</p>
-              <p class="metric-label" id="central-node-binding-label">Goal gaps</p>
-              <p class="cn-tile__legend">Swipe the goals. The first card is the one that is binding.</p>
-              <div data-central-node="binding-goal"></div>
+            <article id="cn-tile-collide" class="metric-card cn-tile cn-tile--span2">
+              <p class="cn-tile__question">Where do hubs pile onto the same day?</p>
+              <p class="metric-label">Hub load by day</p>
+              <p class="cn-tile__legend">Rows are hubs with a deposit this week. Darker means more on that day.</p>
+              <div id="cn-collide" class="cn-collide" aria-label="Hub load by day"></div>
+              <p class="cn-readout" data-cn="collide-read"></p>
+              <p class="cn-goal" data-cn="collide-goal"></p>
             </article>
 
-            <article id="cn-tile-trends" class="metric-card cn-tile" data-cn-span="2" aria-labelledby="central-node-trends-label">
-              <p class="cn-tile__question">Where is attention going?</p>
-              <p class="metric-label" id="central-node-trends-label">Long-Term Trends</p>
-              <p class="cn-tile__legend">Ribbon thickness is logging volume that week.</p>
-              <svg id="central-node-stream" class="cn-stream" viewBox="0 0 960 480" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Weekly logging volume by Life domain"></svg>
-              <div data-role="trend-scan"></div>
-              <button type="button" data-role="trend-more" hidden>More</button>
-              <div data-central-node="long-term-trends" class="prose-section" hidden></div>
+            <article id="cn-tile-mind" class="metric-card cn-tile cn-tile--span2">
+              <p class="cn-tile__question">How has mood been moving?</p>
+              <p class="metric-label">Mood and energy, last 14 days</p>
+              <p class="cn-tile__legend">Each pair is a day. Left bar is mood. Right bar is energy.</p>
+              <div id="cn-pairs" class="cn-pairs" aria-label="Mood and energy by day"></div>
+              <ul class="cn-legend"><li><i style="background:var(--wave)"></i>Mood</li><li><i style="background:var(--marine)"></i>Energy</li></ul>
+              <p class="cn-readout" data-cn="mind-read"></p>
+              <p class="cn-goal" data-cn="mind-goal"></p>
+              <div class="cn-chips"><button class="cn-chip" type="button" data-cn="about-chip">About Me</button></div>
             </article>
 
-            <article id="cn-tile-radial" class="metric-card cn-tile" aria-labelledby="central-node-radial-label">
-              <p class="cn-tile__question">Who showed up this year?</p>
-              <p class="metric-label" id="central-node-radial-label">Year consistency</p>
-              <p class="cn-tile__legend">Inner logging · mid exercise · outer eating.</p>
-              <svg id="central-node-radial-year" class="cn-radial-year" viewBox="0 0 240 240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Logging, exercise, and eating hits around the year"></svg>
+            <article id="cn-tile-train" class="metric-card cn-tile">
+              <p class="cn-tile__question">Is training holding under the flare rule?</p>
+              <p class="metric-label">Session minutes by week</p>
+              <p class="cn-tile__legend">Dashed line is the 30-minute flare ceiling.</p>
+              <svg id="cn-train" class="cn-chart" viewBox="0 0 300 170" role="img" aria-label="Weekly training minutes"></svg>
+              <p class="cn-readout" data-cn="train-read"></p>
+              <p class="cn-goal" data-cn="train-goal"></p>
+              <div class="cn-chips"><button class="cn-chip" type="button" data-cn="about-chip">About Me</button></div>
             </article>
 
-            <article id="cn-tile-governance" class="metric-card cn-tile" aria-labelledby="central-node-governance-label">
-              <p class="cn-tile__question">What's still open?</p>
-              <p class="metric-label" id="central-node-governance-label">Governance Log</p>
-              <p class="cn-tile__legend">Each row is an open item. Heat runs for every week it has already been open.</p>
-              <div id="central-node-governance-heat" class="cn-watchlist-heat" aria-label="Open governance item aging"></div>
-              <div data-central-node="governance-log" class="prose-section"></div>
+            <article id="cn-tile-knowledge" class="metric-card cn-tile cn-tile--span2">
+              <p class="cn-tile__question">What are you actually reading?</p>
+              <p class="metric-label">Note topics by week, from Knowledge</p>
+              <p class="cn-tile__legend">Rows are books you filed a note for, then Knowledge topic tags. A book note or a tidied page is enough.</p>
+              <div id="cn-know" class="cn-know" aria-label="Reading topics by week"></div>
+              <p class="cn-readout" data-cn="know-read"></p>
+              <p class="cn-goal" data-cn="know-goal"></p>
+              <div class="cn-chips"><button class="cn-chip" type="button" data-cn="about-chip">About Me</button></div>
             </article>
 
-            <article id="cn-tile-cross-agent" class="metric-card cn-tile" aria-labelledby="central-node-cross-agent-label">
-              <p class="cn-tile__question">Who is handing off to whom?</p>
-              <p class="metric-label" id="central-node-cross-agent-label">Cross-Agent Coordination</p>
-              <p class="cn-tile__legend">Arc is an agent. Ribbon is a handoff. Focus a mark to read the lines.</p>
-              <svg id="central-node-chord" class="cn-chord" viewBox="0 0 360 360" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Who hands off to whom"></svg>
-              <p class="metric-caption" data-cn="chord-detail"></p>
-              <div data-central-node="cross-agent" class="prose-section" hidden></div>
+            <article id="cn-tile-loops" class="metric-card cn-tile cn-tile--span3">
+              <p class="cn-tile__question">What has sat open longest?</p>
+              <p class="metric-label">Open loops you can shut, archive, or dismiss</p>
+              <p class="cn-tile__legend">Dismiss means stop surfacing it. Archive files it. Close marks the loop done.</p>
+              <div id="cn-loops" data-central-node="open-loops"></div>
+              <p class="cn-readout" data-cn="loop-read"></p>
+              <p class="cn-loops-empty" data-cn="loops-empty" hidden>Nothing sitting open.</p>
             </article>
 
-            <article id="cn-tile-actions" class="metric-card cn-tile" aria-labelledby="central-node-recent-actions-label">
-              <p class="cn-tile__question">What just happened?</p>
-              <p class="metric-label" id="central-node-recent-actions-label">Recent Agent Actions</p>
-              <div data-central-node="recent-actions" class="prose-section"></div>
+            <article id="cn-tile-agents" class="metric-card cn-tile cn-tile--span2">
+              <p class="cn-tile__question">What are the agents telling each other?</p>
+              <p class="metric-label">Latest deposits</p>
+              <p class="cn-tile__legend">Newest first. Each one is something an agent read and acted on.</p>
+              <div data-central-node="recent-actions" class="cn-deposits"></div>
             </article>
-            <article id="cn-tile-backlinks" class="metric-card cn-tile" aria-labelledby="central-node-backlinks-label">
-              <p class="cn-tile__question">What points here?</p>
-              <p class="metric-label" id="central-node-backlinks-label">Inverse links</p>
-              <p class="cn-tile__legend">Knowledge pages that cite a Life decision.</p>
-              <div data-central-node="backlinks" class="prose-section"></div>
-            </article>
-            <article id="cn-tile-url-watches" class="metric-card cn-tile" aria-labelledby="central-node-url-watches-label">
-              <p class="cn-tile__question">Has a source changed?</p>
-              <p class="metric-label" id="central-node-url-watches-label">External URL watch</p>
-              <p class="cn-tile__legend">Polled with ETag and a stored fingerprint — not a search guess.</p>
-              <div data-central-node="url-watches" class="prose-section"></div>
-            </article>
+          </div>
 
+          <div class="cn-foot">
             <details id="cn-tile-constraints" class="metric-card cn-tile constraints-card">
               <summary>
                 <span class="cn-tile__question">What still binds?</span>
-                <span class="metric-label">Constraints &amp; Priorities</span>
+                <span class="metric-label">Rules in force</span>
               </summary>
               <div data-central-node="constraints" class="prose-section"></div>
+            </details>
+            <details id="cn-tile-about" class="metric-card cn-tile constraints-card">
+              <summary>
+                <span class="cn-tile__question">Who is this for?</span>
+                <span class="metric-label">About Me</span>
+              </summary>
+              <p class="cn-tile__legend">Standing context. Hammond and the other agents read it. Closed unless you want it.</p>
+              <div data-central-node="about-me" class="prose-section"></div>
+            </details>
+            <details id="cn-tile-history" class="metric-card cn-tile constraints-card">
+              <summary>
+                <span class="cn-tile__question">Change history</span>
+                <span class="metric-label">Governance log</span>
+              </summary>
+              <div data-central-node="governance-log" class="prose-section"></div>
             </details>
           </div>
 

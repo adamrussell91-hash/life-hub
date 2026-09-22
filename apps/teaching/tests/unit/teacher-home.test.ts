@@ -189,7 +189,10 @@ describe('teacher home dashboard', () => {
     ].map((el) => el.textContent);
     expect(dayNumbers).toEqual(['10', '11', '12', '13', '14', '15', '16']);
 
-    expect(canvas.querySelector<HTMLElement>('[data-calendar="rail"]')?.hidden).toBe(true);
+    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
     expect(
       canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
     ).toBe('minmax(0, 1fr)');
@@ -204,7 +207,8 @@ describe('teacher home dashboard', () => {
 
     lessonLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(navigate).not.toHaveBeenCalled();
-    expect(canvas.querySelector('.class-calendar__detail-heading')?.textContent).toBe('Memory');
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
   });
 
   it('switches month and timeline views', () => {
@@ -221,6 +225,15 @@ describe('teacher home dashboard', () => {
     expect(canvas.querySelector('.class-calendar__timeline')).not.toBeNull();
     expect(canvas.textContent).toContain('Memory');
     expect(canvas.querySelector('.class-calendar__timeline-today')?.textContent).toBe('Today');
+
+    for (const view of ['day', 'week', 'month', 'timeline'] as const) {
+      canvas.querySelector<HTMLButtonElement>(`[data-calendar-view="${view}"]`)!.click();
+      expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+      expect(canvas.querySelector('.calendar-compose')).toBeNull();
+      expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
+      expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
+      expect(canvas.textContent).not.toContain('No lessons scheduled this day.');
+    }
   });
 
   it('expands class tiles from the dashboard before opening the class page', async () => {
@@ -232,7 +245,7 @@ describe('teacher home dashboard', () => {
     );
     expect(classTile).not.toBeNull();
     expect(classTile?.querySelector('.home-class-tile__title')?.textContent).toBe(
-      'Year 12 English Advanced'
+      '12ENGADV1'
     );
     expect(classTile?.querySelector('.home-class-tile__eyebrow')?.textContent).toBe('12ENGADV1');
     classTile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -249,6 +262,36 @@ describe('teacher home dashboard', () => {
     expect(() => result.dispose()).not.toThrow();
     expect(clearSpy).toHaveBeenCalled();
     clearSpy.mockRestore();
+  });
+
+  it('does not render the standing Add card even when a deleted lesson remains in the library', () => {
+    const withDeleted: CurriculumResponse = {
+      ...curriculum,
+      lessons: [
+        ...curriculum.lessons,
+        {
+          id: 'lesson_aotfw_deleted',
+          title: 'Introduction to An Artist of the Floating World',
+          slug: 'intro-deleted',
+          unit_id: 'unit_aotfw',
+          sequence: 1,
+          status: 'trashed',
+          published: false,
+          updated_at: ISO
+        }
+      ]
+    };
+    const result = renderTeacherHome(canvas, withDeleted);
+    dispose = result.dispose;
+
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.querySelector('[aria-label="Class"]')).toBeNull();
+    expect(canvas.querySelector('[aria-label="Lesson"]')).toBeNull();
+    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
+    expect(
+      [...canvas.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
+    ).toBe(false);
   });
 
   it('calendar add opens blank lesson flow instead of the home create menu', () => {

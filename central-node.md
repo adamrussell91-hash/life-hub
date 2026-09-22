@@ -15,6 +15,7 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 10. **Today's Status staleness:** Today's Status must always include a date stamp in its heading (e.g. "Today's Status (Monday 23 March 2026)"). Any Today's Status dated more than 24 hours ago is stale. Clare's Morning Sweep will rewrite it from first principles when stale. All other agents: if Today's Status appears stale, proceed from the Constraints section data rather than the potentially outdated Status flags.
 11. **History floor:** Do not keep dated events, appointments, or Cross-Agent lines older than 1 August 2026 on this page. Patterns may summarise older history without re-listing old dated events.
 12. **Upcoming Appointments:** Only booked appointments with a real date. Never list unbooked TBC challenges (including penicillin testing). Drop past-dated appointments.
+13. **About Me** is standing context: work, relationships, life events, goals and dreams. Agents and protocols read it. Do not dump medical protocols, dietary rules, or medication here — those live in Constraints. Do not treat it as a dashboard. Writes are confirm-class.
 ---
 ## 🤖 Agent Directory
 - **Chadwick Flexington (Exercise Agent):** Workout guidance, movement tracking, exercise programming, post-session Central Node directives
@@ -29,8 +30,14 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 ---
 ## 👤 About Me
 *Standing personal context. Obey it. Corey outranks every other tie-break, including health. Health outranks the degree and the HPGE review.*
+### Who this is for
+- East Ryde, Sydney: two years in, settled for now, no plans to leave.
+- Identities, in order: teacher, partner, scholar, friend. Grandson also matters. Do not treat him first as a patient.
 ### Work
 - Current role: Gifted Education Teacher at St Aloysius' College, Milsons Point, from January 2025. Coordinates gifted education and teaches English. Highly Accomplished (HALT) accredited.
+- Accreditation mentor until the end of 2026 (temporary). NESA accreditation assessor on a casual contract, just renewed for two years.
+- 2026 load: Year 11 and Year 12 English Advanced. Year 12 graduates late September. The Year 11 class becomes Year 12 in Term 4. No extra class given, so one class from then.
+- MindWorks is his program: interest-based extracurriculars that train students for competitions. He designed it and runs it. Continuation is not approved.
 - Path: English teaching from 2012, including Kooringal High School in 2014; English/HSIE at Xavier High School, Albury (2015–2018); Senior Education Project Officer at All Areas Education, Newcastle (2018–2019); HSIE and Business Studies at St Joseph's High School, Aberdeen (2019); English, HSIE and Psychology at St Pius X High School, Adamstown (2020–2024), including Gifted Education Mentor, wellbeing leadership, acting Leader of Learning English, and curriculum/transition coordination; English at Catherine McAuley Catholic College, Medowie (August–December 2024).
 - Ongoing service: NESA HALT Assessor; AERO Panel of Educators, Teachers and Leaders; AITSL HALT Advisory Group; HALT Association NSW Professional Development Committee.
 - The HPGE career direction review is not a remembered stay/leave/expand/drop/apply decision. It is about where he wants to go next in high-potential gifted education. A good outcome is a clear, concrete direction. A bad outcome is more confusion and anxiety.
@@ -49,12 +56,15 @@ This page serves as the central coordination hub for all AI agents. Each agent s
 - Time that is his: maybe one or two hours at night, and only if there is no marking or university work. Usually one weekend day.
 - Do not schedule over a class. 22:00–06:00 is sleep. Do not schedule into it.
 ### People
+- Married Corey Bubb 13 July 2026. Together about 14 years.
+- Household: dogs Leo and Maxxie; cats SJ and Hunter.
 - Corey comes first every time. He is the only person whose time Adam is trying not to lose.
 - Do not coach him to leave the marriage.
 - Family who matter: Bob (paternal grandfather); Donna and Joe (maternal aunts); Joe's children Ruby and Fletcher; Fletcher's wife Taylor.
 - His birth father, that person's wife, and his half-sister are invisible. Do not name them. Do not mention them. Do not involve them. Do not suggest contact.
 - Friends are mostly in Newcastle. He texts, and he is bad at giving them time. They are busy too. The hole is time, not the absence of friends. What he needs and does not ask for: support, and someone to listen occasionally. Not judgment. Not instructions about his life.
 ### Season
+- Life Hub succeeds if it cohesively builds the happiest, healthiest life possible, helps him hit his dreams, and helps him teach. It fails if the money and hours spent on it make him give up because it is too hard.
 - This season is comfortable, slow growth.
 - Protect capacity means stopping before he is so sick of work that he hates it.
 - A good night, the one that counts: dinner out, plus a show or a talk, and actually enjoying the dinner. At home: tea, television, books, and foot rubs from Corey.

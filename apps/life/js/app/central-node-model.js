@@ -1,5 +1,6 @@
 import { aggregateNutrition, getLoggingCompleteness, hasRecoveryBonus, resolveDayType } from '../core/aggregate.js';
 import {
+  extractAboutMe,
   extractConstraints,
   extractCrossAgentCoordination,
   extractLongTermTrends,
@@ -24,6 +25,17 @@ import {
   buildGovernanceHeatSeries,
   parseCrossAgentEdges
 } from './central-node-charts.js';
+import {
+  buildBoardLoops,
+  buildFatSeries,
+  buildHubLoad,
+  buildKnowledgeTopics,
+  buildMoodStrip,
+  buildTrainingWeeks,
+  buildWeightPoint,
+  parseDepositLines,
+  parseWeightTarget
+} from './central-node-board.js';
 
 const WEEK_DAYS = 7;
 const MONTH_DAYS = 30;
@@ -70,7 +82,9 @@ export function buildCentralNodeModel({
   date,
   governanceLogMarkdown,
   inverseLinks,
-  urlWatches
+  urlWatches,
+  hubSignals,
+  hiddenLoopIds
 }) {
   if (!date) throw new RangeError('Central Node display date is unavailable');
   const markdown = sanitizeCentralNode(centralNodeMarkdown ?? '', date);
@@ -104,11 +118,30 @@ export function buildCentralNodeModel({
 
   const nutrition = aggregateNutrition(events, date);
   const completeness = getLoggingCompleteness(events, date);
+  const constraints = extractConstraints(markdown);
+  let fatCeiling = 50;
+  try {
+    if (targetsConfig) {
+      fatCeiling = getDayTargets(targetsConfig, date, resolveDayType(events, date), hasRecoveryBonus(events, date)).fat_ceiling_g;
+    }
+  } catch {
+    fatCeiling = 50;
+  }
+  const signals = hubSignals && typeof hubSignals === 'object' ? hubSignals : {};
+  const boardLoops = buildBoardLoops({
+    today: date,
+    governanceLogMarkdown,
+    centralNodeMarkdown: markdown,
+    weekFlags: signals.weekFlags,
+    tasks: signals.tasks,
+    hiddenIds: hiddenLoopIds
+  });
 
   return {
     date,
     sections: {
-      constraints: extractConstraints(markdown),
+      aboutMe: extractAboutMe(markdown),
+      constraints,
       todaysStatus: statusProseForDisplay(markdown, events, date),
       thisWeek: extractThisWeek(markdown),
       thisMonth: extractThisMonth(markdown),
@@ -116,6 +149,26 @@ export function buildCentralNodeModel({
       crossAgentCoordination: extractCrossAgentCoordination(markdown),
       recentAgentActions: dedupeRecentActions(extractRecentAgentActions(markdown))
     },
+    fat: buildFatSeries(events, date, { fatCeiling }),
+    weight: {
+      point: buildWeightPoint(events),
+      target: parseWeightTarget(constraints)
+    },
+    trainingWeeks: buildTrainingWeeks(events, date),
+    moodStrip: buildMoodStrip(events, date),
+    hubLoad: buildHubLoad({
+      date,
+      scheduledLessons: signals.scheduledLessons,
+      tasks: signals.tasks,
+      events
+    }),
+    knowledgeTopics: buildKnowledgeTopics(signals.knowledgePages, date),
+    deposits: [
+      ...parseDepositLines(extractCrossAgentCoordination(markdown)),
+      ...parseDepositLines(dedupeRecentActions(extractRecentAgentActions(markdown)))
+    ],
+    openLoops: boardLoops.loops,
+    needsYou: boardLoops.needsYou,
     completeness,
     liveStatus: {
       completeness,

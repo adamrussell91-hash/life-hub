@@ -1,134 +1,51 @@
-import { buildWatchlistHeat } from './chart-kit/watchlist-heat.js';
-import { animateRingFill } from './chart-kit/animate.js';
-import { CLINICAL_CHART_SLOTS } from './chart-kit/clinical-slots.js';
-import { buildHorizonBands } from './chart-kit/horizon.js';
-import { packMasonry } from './chart-kit/masonry.js';
-import { buildRadialYear } from './chart-kit/radial-year.js';
-import { buildThemeTopography } from './chart-kit/stream.js';
-import { buildChordLayout } from './chart-kit/chord-layout.js';
-import { buildCompletionRing, focusCrossAgentEdges, hitMapFromSeries, scanTrendBlocks, weekHorizonMetrics } from './central-node-charts.js';
 import { renderInlineMarkdown } from './render-chat.js';
-import { createLabeledProgress } from '../../../../packages/design-kit/js/hub-surfaces.js';
-import { createCardSwipe } from '../../../../packages/design-kit/js/card-swipe.js';
 import { formatGrams } from '../core/aggregate.js';
+import { formatDisplayDate, isCalendarDate } from '../core/time.js';
+import { loopId } from './central-node-board.js';
 
-const TILE_FALLBACK_HEIGHT = 160;
-const PACK_GAP = 12;
+const LOOP_STORE_KEY = 'life-hub-cn-loop-hidden';
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const SECTION_SELECTORS = {
-  todaysStatus: '[data-central-node="todays-status"]',
-  thisWeek: '[data-central-node="this-week"]',
-  thisMonth: '[data-central-node="this-month"]',
-  longTermTrends: '[data-central-node="long-term-trends"]',
-  crossAgentCoordination: '[data-central-node="cross-agent"]',
-  recentAgentActions: '[data-central-node="recent-actions"]',
-  constraints: '[data-central-node="constraints"]',
-  backlinks: '[data-central-node="backlinks"]',
-  urlWatches: '[data-central-node="url-watches"]'
-};
-
-const EMPTY_SECTION_FALLBACK = {
-  thisMonth: 'No goals or events logged for this month yet.'
-};
-
-export function renderCentralNode(root, model, options = {}) {
-  for (const [key, selector] of Object.entries(SECTION_SELECTORS)) {
-    const container = root.querySelector(selector);
-    if (!container) continue;
-    const prose = model.sections?.[key]?.trim?.() ?? '';
-    if (key === 'todaysStatus') {
-      if (prose) renderInlineMarkdown(root, container, prose, { multiline: true });
-      else container.textContent = 'No agent notes yet.';
-      continue;
-    }
-    if (key === 'thisWeek' || key === 'thisMonth' || key === 'longTermTrends' || key === 'crossAgentCoordination') {
-      if (prose && key !== 'longTermTrends' && key !== 'crossAgentCoordination') {
-        renderInlineMarkdown(root, container, prose, { multiline: true });
-        container.removeAttribute('hidden');
-      } else if (EMPTY_SECTION_FALLBACK[key]) {
-        container.textContent = EMPTY_SECTION_FALLBACK[key];
-        container.removeAttribute('hidden');
-      } else {
-        container.textContent = '';
-        container.setAttribute('hidden', '');
-      }
-      continue;
-    }
-    if (key === 'backlinks') {
-      renderBacklinks(root, container, model.inverseLinks);
-      continue;
-    }
-    if (key === 'urlWatches') {
-      renderUrlWatches(root, container, model.urlWatches);
-      continue;
-    }
-    renderInlineMarkdown(root, container, model.sections[key], { multiline: true });
-  }
-
-  renderLiveStatus(root, model.liveStatus);
-  renderCompletionRing(root, model.completeness);
-  renderDayProgress(root, model.completeness);
-  bindCnBoard(root);
-  renderWeekHorizon(root, model);
-  renderRadialYear(root, model);
-  renderStreamTile(root, model);
-  renderTrendScan(root, model);
-  renderChordTile(root, model);
-  renderGovernanceHeat(root, model);
-  renderBindingGoal(root, model.bindingGoal, options.onOpenSection);
-  packCnBoard(root);
-  root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
+function createSvg(root, tag) {
+  return root.createElementNS?.('http://www.w3.org/2000/svg', tag) ?? root.createElement(tag);
 }
 
-export function packCnBoard(root) {
-  const board = root.querySelector('#cn-board');
-  if (!board) return;
-  const width = board.getBoundingClientRect?.()?.width ?? 0;
-  if (width <= 0) return;
-  const tiles = [...(board.children ?? [])].filter(node =>
-    String(node.className || '').split(/\s+/).includes('cn-tile')
-  );
-  if (!tiles.length) return;
-  const gap = PACK_GAP;
-  const columns = width >= 1100 ? 4 : width >= 900 ? 3 : width >= 560 ? 2 : 1;
-  const columnWidth = (width - gap * (columns - 1)) / columns;
-  for (const tile of tiles) {
-    if (!tile.style) continue;
-    const span = Math.min(Math.max(1, Number(tile.dataset?.cnSpan) || 1), columns);
-    tile.style.position = 'absolute';
-    tile.style.width = `${columnWidth * span + gap * (span - 1)}px`;
-  }
-  const items = tiles.map(tile => ({
-    id: tile.id,
-    span: Number(tile.dataset?.cnSpan) || 1,
-    height: tile.offsetHeight || TILE_FALLBACK_HEIGHT
-  }));
-  const packed = packMasonry(items, { columns, gap, columnWidth, flowOffset: 0 });
-  let bottom = 0;
-  for (const item of packed) {
-    const tile = tiles.find(node => node.id === item.id);
-    if (!tile?.style) continue;
-    tile.style.left = `${item.x}px`;
-    tile.style.top = `${item.y}px`;
-    tile.style.width = `${item.width}px`;
-    bottom = Math.max(bottom, item.y + item.height);
-  }
-  if (board.style) board.style.minHeight = `${bottom}px`;
+function setText(node, value) {
+  if (!node) return;
+  node.textContent = value ?? '';
 }
 
-function bindCnBoard(root) {
-  const constraints = root.querySelector('#cn-tile-constraints');
-  if (constraints && !constraints.dataset.boundPack) {
-    constraints.dataset.boundPack = '1';
-    constraints.addEventListener('toggle', () => packCnBoard(root));
+function weekdayLabel(dateKey) {
+  if (!isCalendarDate(dateKey)) return '';
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+export function readHiddenLoopIds(storage) {
+  try {
+    const raw = storage?.getItem?.(LOOP_STORE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(id => typeof id === 'string') : [];
+  } catch {
+    return [];
   }
+}
+
+export function hideLoopId(id, storage) {
+  if (!id || !storage?.setItem) return readHiddenLoopIds(storage);
+  const next = [...new Set([...readHiddenLoopIds(storage), id])];
+  storage.setItem(LOOP_STORE_KEY, JSON.stringify(next));
+  return next;
 }
 
 export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   const count = Number(have) || 0;
   const threshold = Number(need) || 0;
   const qualifies = count >= threshold;
-  const children = [...(host?.children ?? [])];
+  const rawChildren = host?.children;
+  const children = rawChildren && typeof rawChildren[Symbol.iterator] === 'function'
+    ? [...rawChildren]
+    : [];
   let empty = children.find(node => String(node.className || '').split(/\s+/).includes('cn-honest-empty'));
   if (svg) {
     svg.hidden = !qualifies;
@@ -153,415 +70,580 @@ export function paintChartOrEmpty(root, host, svg, { need, have, unit }) {
   return false;
 }
 
-function renderRadialYear(root, model) {
-  const svg = root.querySelector('#central-node-radial-year');
-  const tile = root.querySelector('#cn-tile-radial') ?? svg?.parentNode;
-  if (!svg || !tile) return;
-  const logging = hitMapFromSeries(model.loggingYear, day => day.complete);
-  const exercise = hitMapFromSeries(model.exerciseYear, day => day.completed);
-  const eating = hitMapFromSeries(model.eatingYear, day => day.hitEatingTargets);
-  const hits = Object.keys(logging).length + Object.keys(exercise).length + Object.keys(eating).length;
-  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: hits, unit: 'hit days this year' })) return;
-  svg.replaceChildren();
-  const year = Number(String(model.date ?? '').slice(0, 4)) || 2026;
-  const rings = [
-    { byDate: logging, inner: 36, outer: 52, colour: CLINICAL_CHART_SLOTS[0] },
-    { byDate: exercise, inner: 56, outer: 72, colour: CLINICAL_CHART_SLOTS[1] },
-    { byDate: eating, inner: 76, outer: 92, colour: CLINICAL_CHART_SLOTS[2] }
-  ];
-  const cx = 120;
-  const cy = 120;
-  for (const ring of rings) {
-    for (const tick of buildRadialYear({ year, byDate: ring.byDate })) {
-      if (tick.mood !== 'hit') continue;
-      const line = createSvg(root, 'line');
-      line.setAttribute('x1', String(cx + ring.inner * Math.cos(tick.angle)));
-      line.setAttribute('y1', String(cy + ring.inner * Math.sin(tick.angle)));
-      line.setAttribute('x2', String(cx + ring.outer * Math.cos(tick.angle)));
-      line.setAttribute('y2', String(cy + ring.outer * Math.sin(tick.angle)));
-      line.setAttribute('stroke', ring.colour);
-      line.setAttribute('stroke-width', '2');
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute('title', tick.date);
-      svg.append(line);
-    }
-  }
-  ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].forEach((month, index) => {
-    const angle = (index / 12) * Math.PI * 2 - Math.PI / 2;
-    const label = createSvg(root, 'text');
-    label.setAttribute('x', String(cx + 110 * Math.cos(angle)));
-    label.setAttribute('y', String(cy + 110 * Math.sin(angle) + 3));
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('class', 'mind-chart-label');
-    label.textContent = month;
-    svg.append(label);
-  });
+export function packCnBoard() {
+  return undefined;
 }
 
-function renderStreamTile(root, model) {
-  const svg = root.querySelector('#central-node-stream');
-  const tile = root.querySelector('#cn-tile-trends') ?? svg?.parentNode;
-  if (!svg || !tile) return;
-  const chart = buildThemeTopography(model.domainWeekly ?? { weeks: [], series: [] });
-  if (!paintChartOrEmpty(root, tile, svg, {
-    need: 1,
-    have: chart.bands.length,
-    unit: 'weekly domain bands'
-  })) return;
-  svg.replaceChildren();
-  svg.setAttribute('viewBox', `0 0 ${chart.width} ${chart.height}`);
-  const hideContours = (root.querySelector('#cn-board')?.getBoundingClientRect?.()?.width ?? 900) < 560;
-  chart.bands.forEach((band, index) => {
-    const colour = CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length];
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', band.d);
-    path.setAttribute('fill', colour);
-    path.setAttribute('fill-opacity', '0.55');
-    path.setAttribute('stroke', 'none');
-    svg.append(path);
-    if (hideContours) return;
-    for (const contour of band.contours ?? []) {
-      const line = createSvg(root, 'path');
-      line.setAttribute('d', contour.d);
-      line.setAttribute('fill', 'none');
-      line.setAttribute('stroke', colour);
-      line.setAttribute('stroke-opacity', '0.35');
-      svg.append(line);
-    }
-  });
-}
-
-function renderTrendScan(root, model) {
-  const host = root.querySelector('[data-role="trend-scan"]');
-  const more = root.querySelector('[data-role="trend-more"]');
-  if (!host) return;
-  const scan = scanTrendBlocks(model.sections?.longTermTrends ?? '');
-  const paint = (blocks) => {
-    host.replaceChildren();
-    for (const block of blocks) {
-      const row = root.createElement('p');
-      row.className = 'metric-caption';
-      const strong = root.createElement('strong');
-      strong.textContent = block.label;
-      row.append(strong, root.createTextNode ? root.createTextNode(` · ${block.line}`) : null);
-      if (!root.createTextNode) row.append(Object.assign(root.createElement('span'), { textContent: ` · ${block.line}` }));
-      host.append(row);
-    }
-  };
-  paint(scan.preview);
-  if (more) {
-    more.hidden = scan.rest.length === 0;
-    more._scan = scan;
-    if (!more.dataset.bound) {
-      more.dataset.bound = '1';
-      more.addEventListener('click', () => {
-        const latest = more._scan ?? { preview: [], rest: [] };
-        paint([...latest.preview, ...latest.rest]);
-        more.hidden = true;
-        packCnBoard(root);
-      });
-    }
-  }
-}
-
-function renderChordTile(root, model) {
-  const svg = root.querySelector('#central-node-chord');
-  const tile = root.querySelector('#cn-tile-cross-agent') ?? svg?.parentNode;
-  const caption = root.querySelector('[data-cn="chord-detail"]');
-  if (!svg || !tile) return;
-  const focused = focusCrossAgentEdges(model.crossAgent?.edges ?? []);
-  if (!paintChartOrEmpty(root, tile, svg, { need: 3, have: focused.length, unit: 'paired handoffs' })) {
-    if (caption) caption.textContent = '';
+function renderMarkdown(root, selector, prose, emptyText) {
+  const container = root.querySelector(selector);
+  if (!container) return;
+  const text = typeof prose === 'string' ? prose.trim() : '';
+  if (text) {
+    renderInlineMarkdown(root, container, text, { multiline: true });
+    container.removeAttribute?.('hidden');
     return;
   }
-  const prose = root.querySelector('[data-central-node="cross-agent"]');
-  if (prose) {
-    prose.textContent = '';
-    prose.setAttribute('hidden', '');
+  container.textContent = emptyText ?? '';
+}
+
+function renderSupporting(root, model) {
+  const deposits = model.deposits?.length ?? 0;
+  const needs = model.needsYou?.length ?? 0;
+  const loops = model.openLoops?.length ?? 0;
+  const bits = [];
+  if (deposits) bits.push(`${deposits} deposit${deposits === 1 ? '' : 's'} since the last sweep`);
+  if (needs) bits.push(`${needs} thing${needs === 1 ? '' : 's'} need you`);
+  else if (loops) bits.push(`${loops} open loop${loops === 1 ? '' : 's'}`);
+  setText(root.querySelector('[data-central-node="supporting"]'), bits.join('. ') || 'No new deposits since the last run.');
+}
+
+function renderNeedsYou(root, model) {
+  const host = root.querySelector('#cn-needs');
+  if (!host) return;
+  host.replaceChildren();
+  const items = model.needsYou ?? [];
+  if (!items.length) {
+    const empty = root.createElement('p');
+    empty.className = 'metric-caption';
+    empty.textContent = 'Nothing waiting on you.';
+    host.append(empty);
+    return;
   }
-  svg.replaceChildren();
-  const layout = buildChordLayout(focused);
-  const colourByKey = new Map(
-    (layout.arcs ?? []).map((arc, index) => [arc.key, CLINICAL_CHART_SLOTS[index % CLINICAL_CHART_SLOTS.length]])
-  );
-  const details = model.crossAgent?.details ?? [];
-  const linesFor = (sourceKey, targetKey) => details
-    .filter(row => targetKey
-      ? (row.themeA === sourceKey && row.themeB === targetKey)
-        || (row.themeA === targetKey && row.themeB === sourceKey)
-      : row.themeA === sourceKey || row.themeB === sourceKey)
-    .flatMap(row => row.lines);
-  const show = (text) => { if (caption) caption.textContent = text; };
-  show(details[0]?.lines?.[0] ?? '');
-  const cx = 180;
-  const cy = 180;
-  const radius = 120;
-  for (const arc of layout.arcs ?? []) {
-    const colour = colourByKey.get(arc.key) ?? CLINICAL_CHART_SLOTS[0];
-    const path = createSvg(root, 'path');
-    const x0 = cx + radius * Math.cos(arc.startAngle - Math.PI / 2);
-    const y0 = cy + radius * Math.sin(arc.startAngle - Math.PI / 2);
-    const x1 = cx + radius * Math.cos(arc.endAngle - Math.PI / 2);
-    const y1 = cy + radius * Math.sin(arc.endAngle - Math.PI / 2);
-    const large = arc.endAngle - arc.startAngle > Math.PI ? 1 : 0;
-    path.setAttribute('d', `M${x0},${y0} A${radius},${radius},0,${large},1,${x1},${y1}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', colour);
-    path.setAttribute('stroke-width', '10');
-    path.setAttribute('data-role', 'arc');
-    path.setAttribute('data-theme', arc.key);
-    path.setAttribute('tabindex', '0');
-    const focus = () => show(linesFor(arc.key).join(' '));
-    path.addEventListener('focus', focus);
-    path.addEventListener('mouseenter', focus);
-    svg.append(path);
-    const mid = (arc.startAngle + arc.endAngle) / 2;
-    const label = createSvg(root, 'text');
-    label.setAttribute('x', String(cx + (radius + 22) * Math.cos(mid - Math.PI / 2)));
-    label.setAttribute('y', String(cy + (radius + 22) * Math.sin(mid - Math.PI / 2) + 4));
-    label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('class', 'mind-chart-label');
-    label.textContent = arc.key;
-    svg.append(label);
-  }
-  for (const ribbon of layout.ribbons ?? []) {
-    const source = ribbon.source ?? {};
-    const target = ribbon.target ?? {};
-    const start = ((source.startAngle ?? 0) + (source.endAngle ?? 0)) / 2;
-    const end = ((target.startAngle ?? 0) + (target.endAngle ?? 0)) / 2;
-    const x0 = cx + (radius - 10) * Math.cos(start - Math.PI / 2);
-    const y0 = cy + (radius - 10) * Math.sin(start - Math.PI / 2);
-    const x1 = cx + (radius - 10) * Math.cos(end - Math.PI / 2);
-    const y1 = cy + (radius - 10) * Math.sin(end - Math.PI / 2);
-    const sourceKey = layout.themes?.[source.index] ?? layout.arcs?.[source.index]?.key;
-    const targetKey = layout.themes?.[target.index] ?? layout.arcs?.[target.index]?.key;
-    const colour = colourByKey.get(sourceKey) ?? CLINICAL_CHART_SLOTS[0];
-    const path = createSvg(root, 'path');
-    path.setAttribute('d', `M${x0},${y0} Q${cx},${cy} ${x1},${y1}`);
-    path.setAttribute('fill', 'none');
-    path.setAttribute('stroke', `color-mix(in srgb, ${colour} 55%, transparent)`);
-    path.setAttribute('stroke-width', String(Math.max(2, Math.min(14, Number(ribbon.value) || 2))));
-    path.setAttribute('data-role', 'ribbon');
-    if (sourceKey) path.setAttribute('data-theme', sourceKey);
-    path.setAttribute('tabindex', '0');
-    const focus = () => show(linesFor(sourceKey, targetKey).join(' '));
-    path.addEventListener('focus', focus);
-    path.addEventListener('mouseenter', focus);
-    svg.append(path);
+  for (const item of items) {
+    const card = root.createElement('section');
+    card.className = 'confirm-card';
+    card.setAttribute('role', 'region');
+    card.setAttribute('aria-label', 'Confirm change');
+    const eyebrow = root.createElement('p');
+    eyebrow.className = 'page-header__eyebrow';
+    eyebrow.textContent = item.owner === 'Hammond' ? 'Hammond is waiting on you' : `${item.owner} proposes`;
+    const title = root.createElement('h2');
+    title.className = 'page-header__title';
+    title.style.fontSize = 'var(--text-lg)';
+    title.textContent = item.title;
+    const support = root.createElement('p');
+    support.className = 'page-header__supporting';
+    support.textContent = typeof item.ageDays === 'number' ? `Open ${item.ageDays} days.` : 'Open loop.';
+    const actions = root.createElement('div');
+    actions.className = 'confirm-card__actions';
+    const later = root.createElement('button');
+    later.className = 'btn btn--ghost';
+    later.type = 'button';
+    later.textContent = 'Not now';
+    later.dataset.loopId = loopId(item);
+    later.dataset.act = 'dismiss';
+    const answer = root.createElement('button');
+    answer.className = 'btn btn--primary';
+    answer.type = 'button';
+    answer.textContent = 'Answer';
+    answer.dataset.act = 'answer';
+    actions.append(later, answer);
+    card.append(eyebrow, title, support, actions);
+    host.append(card);
   }
 }
 
-function renderGovernanceHeat(root, model) {
-  const host = root.querySelector('#central-node-governance-heat');
-  const tile = root.querySelector('#cn-tile-governance') ?? host;
+function renderFat(root, model) {
+  const svg = root.querySelector('#cn-fat');
+  const tile = root.querySelector('#cn-tile-fat');
+  const read = root.querySelector('[data-cn="fat-read"]');
+  const goal = root.querySelector('[data-cn="fat-goal"]');
+  if (!svg || !tile) return;
+  const series = model.fat?.days ?? [];
+  const ceiling = model.fat?.fatCeiling ?? 50;
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: series.length, unit: 'logged fat days' })) {
+    setText(read, '');
+    setText(goal, '');
+    return;
+  }
+  svg.replaceChildren();
+  const base = 170;
+  const max = Math.max(ceiling, ...series.map(day => day.fat_g), 1);
+  const k = 140 / max;
+  const w = 34;
+  const gap = 20;
+  const x0 = 36;
+  const axis = createSvg(root, 'line');
+  axis.setAttribute('x1', '28');
+  axis.setAttribute('x2', '624');
+  axis.setAttribute('y1', String(base));
+  axis.setAttribute('y2', String(base));
+  axis.setAttribute('stroke', 'var(--line)');
+  svg.append(axis);
+  series.forEach((day, index) => {
+    const h = Math.max(4, day.fat_g * k);
+    const x = x0 + index * (w + gap);
+    const bar = createSvg(root, 'rect');
+    bar.setAttribute('x', String(x));
+    bar.setAttribute('y', String(base - h));
+    bar.setAttribute('width', String(w));
+    bar.setAttribute('height', String(h));
+    bar.setAttribute('rx', '4');
+    bar.setAttribute('class', day.over ? 'cn-bar cn-bar--over' : 'cn-bar');
+    bar.setAttribute('tabindex', '0');
+    const label = `${formatDisplayDate(day.date)} · ${formatGrams(day.fat_g)} g fat${day.over ? ' · over the ceiling' : ''}`;
+    const show = () => setText(read, label);
+    bar.addEventListener?.('mouseenter', show);
+    bar.addEventListener?.('focus', show);
+    svg.append(bar);
+  });
+  const cy = base - ceiling * k;
+  const line = createSvg(root, 'line');
+  line.setAttribute('x1', '28');
+  line.setAttribute('x2', '624');
+  line.setAttribute('y1', String(cy));
+  line.setAttribute('y2', String(cy));
+  line.setAttribute('class', 'cn-ceiling');
+  svg.append(line);
+  const label = createSvg(root, 'text');
+  label.setAttribute('x', '624');
+  label.setAttribute('y', String(cy - 5));
+  label.setAttribute('text-anchor', 'end');
+  label.setAttribute('style', 'fill:var(--danger);font-weight:600');
+  label.textContent = `${ceiling} g ceiling`;
+  svg.append(label);
+  const over = series.filter(day => day.over).length;
+  setText(read, over ? `${over} of ${series.length} days over the ${ceiling} g ceiling.` : `All ${series.length} logged days under the ${ceiling} g ceiling.`);
+  setText(goal, over
+    ? 'For your goal: the 78 to 82 kg recomposition cannot move while the flare rule is being broken.'
+    : 'For your goal: fat is holding the flare rule. Keep eating-out days as the watch.');
+}
+
+function renderWeight(root, model) {
+  const svg = root.querySelector('#cn-weight');
+  const tile = root.querySelector('#cn-tile-weight');
+  const read = root.querySelector('[data-cn="weight-read"]');
+  const goal = root.querySelector('[data-cn="weight-goal"]');
+  if (!svg || !tile) return;
+  const point = model.weight?.point;
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: point ? 1 : 0, unit: 'weigh-ins' })) {
+    setText(read, '');
+    setText(goal, '');
+    return;
+  }
+  svg.replaceChildren();
+  const target = model.weight?.target ?? { low: 78, high: 82 };
+  const min = Math.min(70, target.low - 4, point.weight_kg - 4);
+  const max = Math.max(95, target.high + 4, point.weight_kg + 4);
+  const xOf = value => 20 + ((value - min) / (max - min)) * 260;
+  const track = createSvg(root, 'rect');
+  track.setAttribute('x', '20');
+  track.setAttribute('y', '34');
+  track.setAttribute('width', '260');
+  track.setAttribute('height', '10');
+  track.setAttribute('rx', '5');
+  track.setAttribute('fill', 'var(--shore)');
+  svg.append(track);
+  const band = createSvg(root, 'rect');
+  band.setAttribute('x', String(xOf(target.low)));
+  band.setAttribute('y', '34');
+  band.setAttribute('width', String(Math.max(4, xOf(target.high) - xOf(target.low))));
+  band.setAttribute('height', '10');
+  band.setAttribute('rx', '5');
+  band.setAttribute('fill', 'var(--pastel-sage)');
+  svg.append(band);
+  const dot = createSvg(root, 'circle');
+  dot.setAttribute('cx', String(xOf(point.weight_kg)));
+  dot.setAttribute('cy', '39');
+  dot.setAttribute('r', '7');
+  dot.setAttribute('fill', 'var(--wave)');
+  svg.append(dot);
+  const value = createSvg(root, 'text');
+  value.setAttribute('x', String(xOf(point.weight_kg)));
+  value.setAttribute('y', '66');
+  value.setAttribute('text-anchor', 'middle');
+  value.setAttribute('style', 'fill:var(--ink);font-weight:600');
+  value.textContent = `${point.weight_kg} kg · ${formatDisplayDate(point.date)}`;
+  svg.append(value);
+  setText(read, `${point.weight_kg} kg on ${formatDisplayDate(point.date)}. Target ${target.low} to ${target.high} kg.`);
+  const delta = point.weight_kg - target.high;
+  setText(goal, delta > 0
+    ? `For your goal: ${formatGrams(delta)} kg above the top of the range.`
+    : 'For your goal: inside or under the recomposition band.');
+}
+
+function renderLoad(root, model) {
+  const svg = root.querySelector('#cn-load');
+  const tile = root.querySelector('#cn-tile-load');
+  const read = root.querySelector('[data-cn="load-read"]');
+  if (!svg || !tile) return;
+  const load = model.hubLoad;
+  const hubs = load?.hubs ?? [];
+  const days = load?.days ?? [];
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: hubs.length, unit: 'hubs with load this week' })) {
+    setText(read, 'Teaching, Tasks and planned workouts will land here when those hubs answer.');
+    return;
+  }
+  svg.replaceChildren();
+  const teaching = hubs.find(hub => hub.name === 'Teaching')?.vals ?? days.map(() => 0);
+  const tasks = hubs.find(hub => hub.name === 'Tasks')?.vals ?? days.map(() => 0);
+  const life = hubs.find(hub => hub.name === 'Life')?.vals ?? days.map(() => 0);
+  const totals = days.map((_, index) => teaching[index] + tasks[index] + life[index]);
+  const max = Math.max(1, ...totals);
+  const base = 140;
+  const u = 100 / max;
+  const w = 28;
+  const gap = 12;
+  const x0 = 14;
+  const axis = createSvg(root, 'line');
+  axis.setAttribute('x1', '8');
+  axis.setAttribute('x2', '292');
+  axis.setAttribute('y1', String(base));
+  axis.setAttribute('y2', String(base));
+  axis.setAttribute('stroke', 'var(--line)');
+  svg.append(axis);
+  days.forEach((day, index) => {
+    let y = base;
+    const x = x0 + index * (w + gap);
+    [['var(--wave)', teaching[index]], ['var(--marine)', tasks[index]], ['var(--success)', life[index]]].forEach(([fill, value]) => {
+      if (!value) return;
+      const h = Math.max(4, value * u);
+      y -= h;
+      const rect = createSvg(root, 'rect');
+      rect.setAttribute('x', String(x));
+      rect.setAttribute('y', String(y));
+      rect.setAttribute('width', String(w));
+      rect.setAttribute('height', String(h - 1));
+      rect.setAttribute('rx', '3');
+      rect.setAttribute('fill', fill);
+      rect.setAttribute('fill-opacity', '0.82');
+      svg.append(rect);
+    });
+    const tick = createSvg(root, 'text');
+    tick.setAttribute('x', String(x + w / 2));
+    tick.setAttribute('y', '156');
+    tick.setAttribute('text-anchor', 'middle');
+    tick.textContent = weekdayLabel(day).slice(0, 2);
+    svg.append(tick);
+  });
+  const peak = totals.reduce((best, value, index) => value > totals[best] ? index : best, 0);
+  setText(read, `${formatDisplayDate(days[peak])}: ${teaching[peak]} lessons, ${tasks[peak]} tasks due, ${life[peak]} workouts.`);
+}
+
+function renderHeatGrid(root, host, { columns, rows, days, onCell }, peakIndex = -1) {
+  host.replaceChildren();
+  host.style.gridTemplateColumns = `${columns === 7 ? '7.2rem' : '9.5rem'} repeat(${columns}, minmax(0, 1fr))`;
+  host.append(root.createElement('span'));
+  days.forEach((day, index) => {
+    const head = root.createElement('div');
+    head.className = 'cn-heat-day' + (index === peakIndex ? ' is-peak' : '');
+    head.textContent = columns === 7 ? weekdayLabel(day).slice(0, 3) : formatDisplayDate(day).slice(0, 5);
+    host.append(head);
+  });
+  rows.forEach(row => {
+    const max = Math.max(1, ...row.vals);
+    const lab = root.createElement('div');
+    lab.className = 'cn-heat-lab';
+    lab.textContent = row.name;
+    host.append(lab);
+    row.vals.forEach((value, index) => {
+      const cell = root.createElement('button');
+      cell.type = 'button';
+      const empty = !(value > 0);
+      cell.className = 'cn-heat-cell' + (empty ? ' is-empty' : '') + (!empty && index === peakIndex ? ' is-peak' : '');
+      cell.style.setProperty('--h', empty ? '1' : String((0.28 + 0.72 * (value / max)).toFixed(2)));
+      if (empty) cell.tabIndex = -1;
+      const show = () => onCell?.(row, index, value);
+      cell.addEventListener('mouseenter', show);
+      cell.addEventListener('focus', show);
+      cell.addEventListener('click', show);
+      host.append(cell);
+    });
+  });
+}
+
+function renderCollide(root, model) {
+  const host = root.querySelector('#cn-collide');
+  const tile = root.querySelector('#cn-tile-collide');
+  const read = root.querySelector('[data-cn="collide-read"]');
+  const goal = root.querySelector('[data-cn="collide-goal"]');
   if (!host || !tile) return;
-  const series = model.governanceHeat ?? [];
-  host.replaceChildren();
-  if (!paintChartOrEmpty(root, host, null, { need: 1, have: series.length, unit: 'open items' })) {
+  const load = model.hubLoad;
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: load?.hubs?.length ?? 0, unit: 'hubs with a deposit this week' })) {
+    setText(read, 'Cross-hub load appears when Teaching, Tasks or workouts land on the same days.');
+    setText(goal, '');
     return;
   }
-  const chart = buildWatchlistHeat(series);
-  const ageByTerm = new Map(
-    (model.governanceOpen ?? []).map(entry => [entry.title || entry.entryType || 'Open item', entry.ageDays])
-  );
+  const peak = (load.stack ?? []).reduce((best, value, index) => value > (load.stack[best] ?? 0) ? index : best, 0);
+  renderHeatGrid(root, host, {
+    columns: load.days.length,
+    rows: load.hubs,
+    days: load.days,
+    peakIndex: (load.stack?.[peak] ?? 0) >= 2 ? peak : -1,
+    onCell: (row, index, value) => {
+      setText(read, value
+        ? `${row.name} · ${formatDisplayDate(load.days[index])} · ${value}`
+        : `${row.name} on ${formatDisplayDate(load.days[index])} is quiet.`);
+    }
+  }, (load.stack?.[peak] ?? 0) >= 2 ? peak : -1);
+  const stack = load.stack?.[peak] ?? 0;
+  setText(read, stack >= 2
+    ? `${formatDisplayDate(load.days[peak])} is the pile-up: ${stack} hubs lit.`
+    : 'No day has more than one hub lit.');
+  setText(goal, stack >= 2
+    ? 'For your goal: a life worth enjoying loses to overload first. Move one block off the peak day.'
+    : '');
+}
+
+function renderMind(root, model) {
+  const host = root.querySelector('#cn-pairs');
+  const tile = root.querySelector('#cn-tile-mind');
+  const read = root.querySelector('[data-cn="mind-read"]');
+  const goal = root.querySelector('[data-cn="mind-goal"]');
+  if (!host || !tile) return;
+  const strip = model.moodStrip ?? [];
+  const logged = strip.filter(day => day.logged);
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: logged.length, unit: 'diary days' })) {
+    setText(read, 'No diary in this window.');
+    setText(goal, '');
+    return;
+  }
   host.replaceChildren();
-  for (const row of (chart.rows ?? []).slice(0, 5)) {
-    const wrap = root.createElement('div');
-    wrap.className = 'cn-watchlist-heat__row';
-    const term = root.createElement('span');
-    term.className = 'cn-watchlist-heat__term';
-    term.textContent = row.term;
-    wrap.append(term);
-    for (const cell of row.cells ?? []) {
-      const swatch = root.createElement('span');
-      swatch.className = 'cn-watchlist-heat__cell';
-      if (swatch.style?.setProperty) swatch.style.setProperty('--heat', String(cell.mix ?? 0));
-      swatch.setAttribute('title', `${cell.date} · ${cell.count}`);
-      wrap.append(swatch);
-    }
-    const age = ageByTerm.get(row.term);
-    const caption = root.createElement('span');
-    caption.className = 'cn-watchlist-heat__age';
-    caption.textContent = Number.isFinite(age) ? `${age}d open` : '';
-    wrap.append(caption);
-    host.append(wrap);
-  }
+  strip.forEach(day => {
+    const col = root.createElement('div');
+    col.className = 'cn-pair';
+    const bars = root.createElement('div');
+    bars.className = 'cn-pair-bars';
+    [['m', day.mood], ['e', day.energy]].forEach(([cls, value]) => {
+      const button = root.createElement('button');
+      button.type = 'button';
+      button.className = cls;
+      button.style.height = `${value ? (value / 10) * 80 : 4}px`;
+      button.style.opacity = value ? '1' : '0.28';
+      const show = () => setText(read, day.logged
+        ? `${formatDisplayDate(day.date)} · mood ${day.mood} · energy ${day.energy}`
+        : `${formatDisplayDate(day.date)} · no diary`);
+      button.addEventListener('mouseenter', show);
+      button.addEventListener('focus', show);
+      bars.append(button);
+    });
+    const lab = root.createElement('div');
+    lab.className = 'cn-pair-d';
+    lab.textContent = day.date.slice(8);
+    col.append(bars, lab);
+    host.append(col);
+  });
+  const last = [...logged].at(-1);
+  const quiet = strip.filter(day => !day.logged && day.date > (last?.date ?? '')).length;
+  setText(read, last
+    ? `${formatDisplayDate(last.date)} is the last diary: mood ${last.mood}. ${quiet} quiet days after that.`
+    : '');
+  setText(goal, quiet >= 7
+    ? 'For your goal: quiet diary weeks show up when teaching takes the week and the people you want time with get the leftover.'
+    : 'For your goal: the diary is still talking. Keep the thread.');
 }
 
-function renderWeekHorizon(root, model) {
-  const svg = root.querySelector('#central-node-week-horizon');
-  const tile = root.querySelector('#cn-tile-week') ?? svg?.parentNode;
+function renderTrain(root, model) {
+  const svg = root.querySelector('#cn-train');
+  const tile = root.querySelector('#cn-tile-train');
+  const read = root.querySelector('[data-cn="train-read"]');
+  const goal = root.querySelector('[data-cn="train-goal"]');
   if (!svg || !tile) return;
-  const week = model.week ?? [];
-  const have = week.filter(day => Number(day.protein_g) > 0).length;
-  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have, unit: 'protein days' })) return;
-  const bands = buildHorizonBands(weekHorizonMetrics(week), { width: 320, height: 24 });
+  const weeks = model.trainingWeeks ?? [];
+  const withWork = weeks.filter(week => week.minutes > 0);
+  if (!paintChartOrEmpty(root, tile, svg, { need: 1, have: withWork.length, unit: 'training weeks' })) {
+    setText(read, '');
+    setText(goal, '');
+    return;
+  }
   svg.replaceChildren();
-  svg.setAttribute('viewBox', '0 0 320 24');
-  for (const band of bands) {
-    for (const rect of band.rects) {
-      const node = createSvg(root, 'rect');
-      node.setAttribute('x', String(rect.x));
-      node.setAttribute('y', String(rect.y));
-      node.setAttribute('width', String(rect.width));
-      node.setAttribute('height', String(rect.height));
-      node.setAttribute('fill', 'var(--wave)');
-      node.setAttribute('opacity', String(rect.opacity));
-      node.setAttribute('title', `${rect.date} · ${rect.value} g`);
-      svg.append(node);
+  const base = 140;
+  const max = Math.max(30, ...weeks.map(week => week.minutes), 1);
+  const k = 110 / max;
+  const w = 32;
+  const gap = 16;
+  const x0 = 18;
+  const axis = createSvg(root, 'line');
+  axis.setAttribute('x1', '10');
+  axis.setAttribute('x2', '290');
+  axis.setAttribute('y1', String(base));
+  axis.setAttribute('y2', String(base));
+  axis.setAttribute('stroke', 'var(--line)');
+  svg.append(axis);
+  const cy = base - 30 * k;
+  const cap = createSvg(root, 'line');
+  cap.setAttribute('x1', '10');
+  cap.setAttribute('x2', '290');
+  cap.setAttribute('y1', String(cy));
+  cap.setAttribute('y2', String(cy));
+  cap.setAttribute('class', 'cn-ceiling');
+  svg.append(cap);
+  weeks.forEach((week, index) => {
+    const h = Math.max(4, week.minutes * k);
+    const x = x0 + index * (w + gap);
+    const bar = createSvg(root, 'rect');
+    bar.setAttribute('x', String(x));
+    bar.setAttribute('y', String(base - h));
+    bar.setAttribute('width', String(w));
+    bar.setAttribute('height', String(h));
+    bar.setAttribute('rx', '4');
+    bar.setAttribute('class', week.over ? 'cn-bar cn-bar--over' : 'cn-bar');
+    bar.setAttribute('tabindex', '0');
+    const show = () => setText(read, `Week of ${formatDisplayDate(week.weekStart)} · ${week.minutes} min`);
+    bar.addEventListener?.('mouseenter', show);
+    bar.addEventListener?.('focus', show);
+    svg.append(bar);
+    const tick = createSvg(root, 'text');
+    tick.setAttribute('x', String(x + w / 2));
+    tick.setAttribute('y', '156');
+    tick.setAttribute('text-anchor', 'middle');
+    tick.textContent = formatDisplayDate(week.weekStart).slice(0, 5);
+    svg.append(tick);
+  });
+  const last = withWork.at(-1);
+  setText(read, last
+    ? `Latest week: ${last.minutes} min${last.over ? '. Over the 30 min flare cap.' : '.'}`
+    : '');
+  setText(goal, last?.over
+    ? 'For your goal: osteopenia still wants spine-loading work, but flare sessions stay 20 to 30 min. Cut the session, do not skip the week.'
+    : 'For your goal: training is holding the flare cap.');
+}
+
+function renderKnowledge(root, model) {
+  const host = root.querySelector('#cn-know');
+  const tile = root.querySelector('#cn-tile-knowledge');
+  const read = root.querySelector('[data-cn="know-read"]');
+  const goal = root.querySelector('[data-cn="know-goal"]');
+  if (!host || !tile) return;
+  const topics = model.knowledgeTopics?.topics ?? [];
+  const weeks = model.knowledgeTopics?.weeks ?? [];
+  if (!paintChartOrEmpty(root, tile, null, { need: 1, have: topics.length, unit: 'reading topics this window' })) {
+    setText(read, 'Knowledge notes will land here when a book note or tagged page is filed in the last six weeks.');
+    setText(goal, '');
+    return;
+  }
+  renderHeatGrid(root, host, {
+    columns: weeks.length,
+    rows: topics,
+    days: weeks,
+    onCell: (row, index, value) => {
+      setText(read, value
+        ? `${row.name} · week of ${formatDisplayDate(weeks[index])} · ${value} notes`
+        : `${row.name} · week of ${formatDisplayDate(weeks[index])} · no notes`);
     }
-  }
+  });
+  const live = topics.filter(topic => topic.vals.at(-1) > 0).map(topic => topic.name);
+  setText(read, live.length ? `${live.join(' and ')} ${live.length === 1 ? 'is' : 'are'} the live thread.` : 'No notes in the current week.');
+  setText(goal, 'For your goal: the notes you are adding show the work you still care about, not only the degree you want finished.');
 }
 
-function renderLiveStatus(root, liveStatus) {
-  if (!liveStatus) return;
-  const { completeness, snapshot } = liveStatus;
-  for (const key of ['nutrition', 'fitness', 'diary', 'body', 'skincare']) {
-    const item = root.querySelector(`[data-live-complete="${key}"]`);
-    if (item) item.dataset.checked = String(Boolean(completeness[key]));
-  }
-  const el = root.querySelector('[data-live-snapshot]');
-  if (el) {
-    el.textContent = `Protein ${formatGrams(snapshot.protein_g)} g · Energy ${snapshot.calories.toLocaleString('en-AU')} kcal · Fat ${formatGrams(snapshot.fat_g)} g`;
-  }
-}
-
-function renderCompletionRing(root, completeness) {
-  const svg = root.querySelector('#central-node-completion-ring');
-  if (!svg) return;
-  const ring = buildCompletionRing(completeness, { size: 72, strokeWidth: 8 });
-  let fill = null;
-  for (const role of ['track', 'fill']) {
-    const circle = svg.querySelector(`[data-role="${role}"]`);
-    if (!circle) continue;
-    circle.setAttribute('cx', ring.center);
-    circle.setAttribute('cy', ring.center);
-    circle.setAttribute('r', ring.radius);
-    circle.setAttribute('stroke-width', ring.strokeWidth);
-    if (role === 'fill') fill = circle;
-  }
-  if (fill) animateRingFill(fill, ring);
-  const label = root.querySelector('[data-value="completion-ring-label"]');
-  if (label) label.textContent = `${completeness.complete} of ${completeness.total}`;
-}
-
-const GOAL_SECTION = {
-  weight: 'body',
-  fat: 'body',
-  ratio: 'body',
-  lift: 'fitness'
-};
-
-let bindingSwipe = null;
-
-function renderBindingGoal(root, bindingGoal, onOpenSection) {
-  bindingSwipe?.destroy?.();
-  bindingSwipe = null;
-  const host = root.querySelector('[data-central-node="binding-goal"]');
+function renderLoops(root, model) {
+  const host = root.querySelector('#cn-loops');
+  const read = root.querySelector('[data-cn="loop-read"]');
+  const empty = root.querySelector('[data-cn="loops-empty"]');
   if (!host) return;
   host.replaceChildren();
-  if (!bindingGoal?.rows?.length) return;
-
-  const verdict = root.createElement('p');
-  verdict.className = 'cn-binding__verdict';
-  verdict.textContent = bindingGoal.verdict;
-  host.append(verdict);
-
-  const rows = bindingGoal.rows.slice();
-  if (bindingGoal.bindingId) {
-    rows.sort((left, right) => (
-      (left.id === bindingGoal.bindingId ? 0 : 1) - (right.id === bindingGoal.bindingId ? 0 : 1)
-    ));
+  const loops = model.openLoops ?? [];
+  if (empty) empty.hidden = loops.length > 0;
+  if (!loops.length) {
+    setText(read, '');
+    return;
   }
-  const deck = createCardSwipe({
-    root,
-    label: 'Goal gaps',
-    fluid: true,
-    items: rows.map(row => {
-      const section = GOAL_SECTION[row.id] ?? 'body';
-      return {
-        id: row.id,
-        title: row.id === bindingGoal.bindingId ? `${row.label} · binding` : row.label,
-        description: row.detail,
-        actionLabel: section === 'fitness' ? 'Open Fitness' : 'Open Body',
-        onAction: () => onOpenSection?.(section)
-      };
-    })
-  });
-  bindingSwipe = deck;
-  host.append(deck.el);
+  for (const loop of loops) {
+    const row = root.createElement('div');
+    row.className = 'cn-loop';
+    row.dataset.loopId = loopId(loop);
+    const copy = root.createElement('div');
+    const title = root.createElement('h3');
+    title.textContent = loop.title;
+    if (typeof loop.ageDays === 'number') {
+      const age = root.createElement('span');
+      age.className = 'cn-loop-age';
+      age.textContent = `${loop.ageDays} days`;
+      title.append(age);
+    }
+    const why = root.createElement('p');
+    why.textContent = `${loop.owner}${loop.dateKey ? ` · opened ${formatDisplayDate(loop.dateKey)}` : ''}`;
+    copy.append(title, why);
+    const actions = root.createElement('div');
+    actions.className = 'cn-loop-actions';
+    for (const [act, label, kind] of [['dismiss', 'Dismiss', 'ghost'], ['archive', 'Archive', 'ghost'], ['close', 'Close', 'primary']]) {
+      const button = root.createElement('button');
+      button.className = kind === 'primary' ? 'btn btn--primary' : 'btn btn--ghost';
+      button.type = 'button';
+      button.dataset.act = act;
+      button.dataset.loopId = loopId(loop);
+      button.textContent = label;
+      actions.append(button);
+    }
+    row.append(copy, actions);
+    host.append(row);
+  }
+  setText(read, 'Pick Dismiss, Archive or Close. The row leaves the board.');
 }
 
-function renderDayProgress(root, completeness) {
-  const host = root.querySelector('[data-central-node="progress"]');
-  if (!host || !completeness) return;
+function renderAgents(root, model) {
+  const host = root.querySelector('[data-central-node="recent-actions"]');
+  if (!host) return;
   host.replaceChildren();
-  createLabeledProgress({
-    root,
-    wrap: host,
-    label: 'Today',
-    value: completeness.complete,
-    max: completeness.total
+  const deposits = model.deposits ?? [];
+  if (!deposits.length) {
+    host.textContent = 'No agent deposits in the last 48 hours.';
+    return;
+  }
+  deposits.slice(0, 8).forEach(item => {
+    const line = root.createElement('p');
+    const who = item.from && item.to ? `${item.from} to ${item.to}` : item.from || 'Agent';
+    line.innerHTML = '';
+    const name = root.createElement('b');
+    name.textContent = who;
+    line.append(name);
+    const body = root.createElement('small');
+    body.textContent = item.text;
+    line.append(body);
+    host.append(line);
   });
 }
 
-function renderBacklinks(root, container, inverseLinks) {
-  if (!container) return;
-  const status = inverseLinks?.status;
-  if (status === 'unavailable') {
-    container.textContent = 'Inbound links are unavailable.';
-    container.removeAttribute('hidden');
-    return;
-  }
-  const groups = Array.isArray(inverseLinks?.groups) ? inverseLinks.groups : [];
-  if (!groups.length) {
-    container.textContent = 'No Knowledge pages point at a Life decision yet.';
-    container.removeAttribute('hidden');
-    return;
-  }
-  container.textContent = '';
-  const list = root.createElement('ul');
-  list.className = 'cn-backlinks';
-  for (const group of groups) {
-    const item = root.createElement('li');
-    const target = String(group.target || 'decision');
-    const sources = Array.isArray(group.sources) ? group.sources : [];
-    const names = sources.map(source => source.title || source.id).filter(Boolean).join(', ');
-    item.textContent = `${target} ← ${names || 'unknown page'}`;
-    list.append(item);
-  }
-  container.append(list);
-  container.removeAttribute('hidden');
+function bindBoard(root, { storage, onLoopsChange } = {}) {
+  const host = root.querySelector('#central-node-dashboard') ?? root;
+  if (!host?.addEventListener || host.dataset?.cnBoardBound === '1') return;
+  if (host.dataset) host.dataset.cnBoardBound = '1';
+  host.addEventListener('click', event => {
+    const about = event.target.closest?.('[data-cn="about-chip"]');
+    if (about) {
+      const tile = about.closest('article');
+      const read = tile?.querySelector('.cn-readout');
+      if (read) read.textContent = 'Hammond framed this from About Me (work, relationships, life events, goals). The file itself stays collapsed.';
+      return;
+    }
+    const answer = event.target.closest?.('[data-act="answer"]');
+    if (answer) {
+      root.querySelector('#central-node-chat-button')?.click();
+      return;
+    }
+    const act = event.target.closest?.('[data-act]');
+    if (!act?.dataset.loopId) return;
+    hideLoopId(act.dataset.loopId, storage);
+    const said = {
+      dismiss: 'Dismissed. Hammond will stop putting this on the board.',
+      archive: 'Archived. It leaves the board and sits in change history.',
+      close: 'Closed. The loop is done.'
+    };
+    const read = root.querySelector('[data-cn="loop-read"]');
+    if (read) read.textContent = said[act.dataset.act] ?? said.dismiss;
+    onLoopsChange?.(readHiddenLoopIds(storage));
+  });
 }
 
-function renderUrlWatches(root, container, urlWatches) {
-  if (!container) return;
-  const status = urlWatches?.status;
-  if (status === 'unavailable') {
-    container.textContent = 'URL watch is unavailable.';
-    container.removeAttribute('hidden');
-    return;
-  }
-  const watches = Array.isArray(urlWatches?.watches) ? urlWatches.watches : [];
-  if (!watches.length) {
-    container.textContent = 'No watched URLs yet.';
-    container.removeAttribute('hidden');
-    return;
-  }
-  container.textContent = '';
-  const list = root.createElement('ul');
-  list.className = 'cn-url-watches';
-  for (const watch of watches) {
-    const item = root.createElement('li');
-    const state = watch.status === 'changed' ? 'Changed' : watch.status === 'unchanged' ? 'Unchanged' : 'Unavailable';
-    item.textContent = `${watch.url} — ${state}`;
-    item.dataset.watchStatus = watch.status === 'changed' || watch.status === 'unchanged' ? watch.status : 'unavailable';
-    list.append(item);
-  }
-  container.append(list);
-  container.removeAttribute('hidden');
-}
-
-function createSvg(root, tag) {
-  return root.createElementNS?.('http://www.w3.org/2000/svg', tag) ?? root.createElement(tag);
+export function renderCentralNode(root, model, options = {}) {
+  if (!root || !model) return;
+  renderSupporting(root, model);
+  renderNeedsYou(root, model);
+  renderFat(root, model);
+  renderWeight(root, model);
+  renderLoad(root, model);
+  renderCollide(root, model);
+  renderMind(root, model);
+  renderTrain(root, model);
+  renderKnowledge(root, model);
+  renderLoops(root, model);
+  renderAgents(root, model);
+  renderMarkdown(root, '[data-central-node="constraints"]', model.sections?.constraints, 'No constraints on file.');
+  renderMarkdown(root, '[data-central-node="about-me"]', model.sections?.aboutMe, 'No About Me notes yet.');
+  bindBoard(root, {
+    storage: options.storage ?? globalThis.localStorage,
+    onLoopsChange: options.onLoopsChange
+  });
+  root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }

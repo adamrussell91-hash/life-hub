@@ -13,15 +13,18 @@ export function applyCalendarPresentation(
   host: HTMLElement,
   options: CalendarPresentationOptions = {}
 ): void {
-  const root = host.firstElementChild;
-  if (!(root instanceof HTMLElement)) return;
-  if (!root.classList.contains('hub-calendar') && !root.classList.contains('class-calendar')) {
-    return;
-  }
+  const root =
+    host.querySelector<HTMLElement>('.hub-calendar') ??
+    host.querySelector<HTMLElement>('.class-calendar');
+  if (!root) return;
 
   const workspace = root.querySelector<HTMLElement>('.hub-calendar__workspace');
   const rail = root.querySelector<HTMLElement>('[data-calendar="rail"]');
-  if (rail) rail.hidden = true;
+  if (rail) {
+    rail.hidden = true;
+    // `.hub-calendar__rail { display: flex }` beats the UA [hidden] rule.
+    rail.style.display = 'none';
+  }
   if (workspace) workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
 
   for (const dated of root.querySelectorAll<HTMLElement>('[data-date]')) {
@@ -34,7 +37,7 @@ export function applyCalendarPresentation(
   for (const dayAdd of root.querySelectorAll<HTMLElement>(
     '.class-calendar__week-heading > .icon-plus-btn'
   )) {
-    dayAdd.hidden = true;
+    dayAdd.remove();
   }
 
   const nav = root.querySelector<HTMLElement>('.hub-calendar__nav');
