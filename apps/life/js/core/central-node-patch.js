@@ -1,5 +1,6 @@
 import {
   CONSTRAINTS_HEADING,
+  ABOUT_ME_HEADING,
   TODAYS_STATUS_HEADING,
   THIS_WEEK_HEADING,
   THIS_MONTH_HEADING,
@@ -20,7 +21,7 @@ import {
 } from './central-node-write.js';
 
 export const CENTRAL_NODE_SECTIONS = [
-  'purpose', 'writing_rules', 'agent_directory', 'constraints',
+  'purpose', 'writing_rules', 'agent_directory', 'about_me', 'constraints',
   'todays_status', 'this_week', 'this_month', 'long_term_trends',
   'cross_agent', 'recent_actions'
 ];
@@ -29,6 +30,7 @@ const SECTION_HEADING = {
   purpose: PURPOSE_HEADING,
   writing_rules: WRITING_RULES_HEADING,
   agent_directory: AGENT_DIRECTORY_HEADING,
+  about_me: ABOUT_ME_HEADING,
   constraints: CONSTRAINTS_HEADING,
   todays_status: TODAYS_STATUS_HEADING,
   this_week: THIS_WEEK_HEADING,
@@ -65,7 +67,7 @@ export function classifyCentralNodePatchRisk(patch) {
   const { section, op } = patch;
   if (section === 'purpose' || section === 'writing_rules' || section === 'agent_directory') return 'confirm';
   if (op === 'replace_section' || op === 'delete_lines' || op === 'condense') return 'confirm';
-  if (section === 'this_month' || section === 'long_term_trends') return 'confirm';
+  if (section === 'this_month' || section === 'long_term_trends' || section === 'about_me') return 'confirm';
   if (section === 'constraints' && op !== 'append_line') return 'confirm';
   if (section === 'todays_status' && (op === 'upsert_field' || op === 'append_line')) return 'auto';
   if (section === 'cross_agent' && op === 'append_line') return 'auto';
@@ -91,6 +93,27 @@ function findSectionSpan(content, headingPrefix) {
   const hrMatch = TRAILING_SECTION_HR_RE.exec(rawBody);
   const contentEnd = hrMatch ? headingEnd + hrMatch.index : bodyEnd;
   return { heading: match[0], headingStart, headingEnd, contentEnd, bodyEnd };
+}
+
+function insertHeadingAfter(content, heading, afterHeading) {
+  const after = findSectionSpan(content, afterHeading);
+  if (!after) return null;
+  const before = content.slice(0, after.bodyEnd).replace(/\s*$/, '');
+  const rest = content.slice(after.bodyEnd);
+  return `${before}\n${heading}\n${rest.startsWith('\n') ? '' : '\n'}${rest}`;
+}
+
+function insertHeadingBefore(content, heading, beforeHeading) {
+  const before = findSectionSpan(content, beforeHeading);
+  if (!before) return null;
+  return `${content.slice(0, before.headingStart)}${heading}\n${content.slice(before.headingStart)}`;
+}
+
+function ensureAboutMeSection(content) {
+  if (findSectionSpan(content, ABOUT_ME_HEADING)) return content;
+  return insertHeadingAfter(content, ABOUT_ME_HEADING, AGENT_DIRECTORY_HEADING)
+    ?? insertHeadingBefore(content, ABOUT_ME_HEADING, CONSTRAINTS_HEADING)
+    ?? `${content.replace(/\s*$/, '')}\n${ABOUT_ME_HEADING}\n`;
 }
 
 function replaceSectionBody(content, headingPrefix, newBody) {
@@ -130,6 +153,7 @@ export function applyCentralNodePatch(content, patch) {
   const payload = patch.payload && typeof patch.payload === 'object' ? patch.payload : {};
   const heading = SECTION_HEADING[patch.section];
   if (!heading) return null;
+  if (patch.section === 'about_me') content = ensureAboutMeSection(content);
 
   if (op === 'upsert_field') {
     if (patch.section !== 'todays_status') return null;

@@ -201,6 +201,7 @@ test('a repository with no central-node.md or config/targets.yml yet renders emp
   const model = buildCentralNodeModel({ events: [], targetsConfig: null, centralNodeMarkdown: null, date: '2026-08-03' });
 
   assert.deepEqual(model.sections, {
+    aboutMe: '',
     constraints: '',
     todaysStatus: '',
     thisWeek: '',
@@ -239,6 +240,65 @@ test('domainWeekly and crossAgent are derived, not fetched', () => {
     model.crossAgent.edges.map(edge => `${edge.themeA}→${edge.themeB}`),
     ['Chadwick→Brisket']
   );
+});
+
+test('extracts About Me as standing context and builds board series from events', () => {
+  const withAbout = `${markdown.replace(
+    '## 🔴 Current Constraints & Priorities\n- Constraint line',
+    '## 👤 About Me\n- Teach English. Finish the MEd.\n---\n## 🔴 Current Constraints & Priorities\n- Constraint line\n- Body composition 78–82kg'
+  )}`;
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: withAbout,
+    date: '2026-07-30',
+    hubSignals: {
+      scheduledLessons: [{ date: '2026-07-30', delivery_status: 'scheduled' }],
+      tasks: [{ title: 'Mark Module B', due_date: '2026-07-31', status: 'open' }],
+      knowledgePages: [{ title: 'Gifted education notes', updated_at: '2026-07-28' }]
+    }
+  });
+  assert.match(model.sections.aboutMe, /Teach English/);
+  assert.equal(model.weight.point.weight_kg, 80);
+  assert.deepEqual(model.weight.target, { low: 78, high: 82 });
+  assert.ok(model.fat.days.some(day => day.date === '2026-07-30' && day.fat_g === 27));
+  assert.equal(model.moodStrip.find(day => day.date === '2026-07-30').mood, 7);
+  assert.ok(model.hubLoad.hubs.some(hub => hub.name === 'Teaching'));
+  assert.ok(model.knowledgeTopics.topics.some(topic => topic.name === 'Gifted education'));
+  assert.ok(model.deposits.some(item => item.from === 'Chadwick' && item.to === 'Brisket'));
+});
+
+test('hides dismissed loops from the board and keeps two governance needs', () => {
+  const log = [
+    '# Governance Log',
+    '',
+    formatGovernanceEntry({
+      dateKey: '2026-07-01',
+      entryType: 'Drift Detection',
+      title: 'Open loop',
+      status: 'Still Active',
+      body: 'Still open.'
+    }),
+    formatGovernanceEntry({
+      dateKey: '2026-07-10',
+      entryType: 'Major Decision',
+      title: 'Second loop',
+      status: 'Still Active',
+      body: 'Also open.'
+    })
+  ].join('\n');
+  const model = buildCentralNodeModel({
+    events,
+    targetsConfig,
+    centralNodeMarkdown: markdown,
+    date: '2026-07-30',
+    governanceLogMarkdown: log,
+    hiddenLoopIds: ['governance:2026-07-01:Open loop']
+  });
+  assert.equal(model.openLoops.some(loop => loop.title === 'Open loop'), false);
+  assert.ok(model.openLoops.some(loop => loop.title === 'Second loop'));
+  assert.equal(model.needsYou.length, 1);
+  assert.equal(model.needsYou[0].title, 'Second loop');
 });
 
 test('governanceHeat uses openGovernanceEntries and ignores resolved rows', () => {

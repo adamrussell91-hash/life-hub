@@ -36,7 +36,7 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('the Central Node tab renders its markdown sections and logging-completion ring from the fixture repository', async () => {
+test('the Central Node tab renders the synthesis board from the fixture repository', async () => {
   const context = await browser.newContext();
   const page = await context.newPage();
   try {
@@ -46,38 +46,35 @@ test('the Central Node tab renders its markdown sections and logging-completion 
     await page.locator('#central-node-dashboard').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#home-dashboard').isHidden(), true);
 
-    assert.match(await page.locator('[data-central-node="todays-status"]').textContent(), /streak 1/);
-    assert.equal(await page.locator('#central-node-chord').count(), 1);
-    assert.equal(await page.locator('#cn-tile-cross-agent').count(), 1);
-    assert.equal(await page.locator('[data-value="completion-ring-label"]').textContent(), '3 of 5');
-    assert.equal(await page.locator('[data-live-complete="nutrition"]').count(), 1);
-    assert.match(await page.locator('[data-live-snapshot]').textContent(), /Protein/);
+    assert.equal(await page.locator('#cn-needs').count(), 1);
     assert.equal(await page.locator('#cn-board').count(), 1);
-    assert.equal(await page.locator('#cn-tile-status').count(), 1);
-    assert.equal(await page.locator('#cn-tile-backlinks').count(), 1);
-    assert.match(
-      await page.locator('[data-central-node="backlinks"]').textContent(),
-      /No Knowledge pages point at a Life decision yet|Inbound links are unavailable|←/
-    );
-    assert.equal(await page.locator('#cn-tile-url-watches').count(), 1);
-    assert.match(
-      await page.locator('[data-central-node="url-watches"]').textContent(),
-      /No watched URLs yet|URL watch is unavailable|Changed|Unchanged|Unavailable/
-    );
-    assert.equal(await page.locator('#central-node-week-chart').count(), 0);
-    assert.equal(await page.locator('#central-node-logging-heatmap').count(), 0);
-    assert.equal(await page.locator('#central-node-exercise-heatmap').count(), 0);
-    assert.equal(await page.locator('#central-node-eating-heatmap').count(), 0);
-    assert.equal(await page.locator('#central-node-week-horizon').count(), 1);
-    assert.equal(await page.locator('#central-node-radial-year').count(), 1);
+    assert.equal(await page.locator('#cn-tile-fat').count(), 1);
+    assert.equal(await page.locator('#cn-tile-weight').count(), 1);
+    assert.equal(await page.locator('#cn-tile-load').count(), 1);
+    assert.equal(await page.locator('#cn-tile-collide').count(), 1);
+    assert.equal(await page.locator('#cn-tile-mind').count(), 1);
+    assert.equal(await page.locator('#cn-tile-train').count(), 1);
+    assert.equal(await page.locator('#cn-tile-knowledge').count(), 1);
+    assert.equal(await page.locator('#cn-tile-loops').count(), 1);
+    assert.equal(await page.locator('#cn-tile-agents').count(), 1);
+    assert.equal(await page.locator('#cn-tile-status').count(), 0);
+    assert.equal(await page.locator('#central-node-chord').count(), 0);
+    assert.equal(await page.locator('#central-node-week-horizon').count(), 0);
     assert.equal(await page.locator('#central-node-audit-button').count(), 1);
     assert.equal(await page.locator('#central-node-chat-button').count(), 1);
 
-    const constraintsPanel = page.locator('.constraints-card');
+    assert.match(await page.locator('[data-cn="fat-read"]').textContent(), /ceiling|Need 1 logged fat days/);
+    assert.match(await page.locator('#cn-tile-weight').textContent(), /Need 1 weigh-ins/);
+    assert.match(await page.locator('[data-central-node="recent-actions"]').textContent(), /Chadwick|No agent deposits/);
+
+    const constraintsPanel = page.locator('#cn-tile-constraints');
     assert.equal(await constraintsPanel.getAttribute('open'), null);
     assert.match(await page.locator('[data-central-node="constraints"] li').first().textContent(), /Test condition/);
 
-    // Absent governance-log.md in the shared fixture → empty-state card, not an error.
+    const aboutPanel = page.locator('#cn-tile-about');
+    assert.equal(await aboutPanel.getAttribute('open'), null);
+    assert.match(await page.locator('[data-central-node="about-me"]').textContent(), /English teaching/);
+
     assert.equal(await page.locator('[data-central-node="governance-log"]').count(), 1);
     assert.match(
       await page.locator('[data-central-node="governance-log"]').textContent(),
