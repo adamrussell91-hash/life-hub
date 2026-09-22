@@ -504,30 +504,34 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     }
 
     stage.replaceChildren(svg);
-    const fitted = applyFit();
-    viewport.querySelector('[data-part="minimap"]')?.remove();
-    const vw = viewport.clientWidth;
-    const vh = viewport.clientHeight;
-    const measured = vw >= 40 && vh >= 40;
-    const stillOverflows =
-      measured && (layout.height * scale > vh + 24 || layout.width * scale > vw + 24);
-    const userMoved =
-      Math.abs(scale - fitted.scale) > 0.02 ||
-      Math.abs(panX - fitted.panX) > 2 ||
-      Math.abs(panY - fitted.panY) > 2;
-    const overflows = stillOverflows || userMoved;
-    if (overflows) {
-      const mini = el('div', 'graph-minimap');
-      mini.dataset.part = 'minimap';
-      mini.setAttribute('aria-hidden', 'true');
-      viewport.append(mini);
-    }
+    applyFit();
+    refreshMinimap();
     void input.onWhatIf;
     void input.onApplyWhatIf;
   };
 
+  function refreshMinimap(): void {
+    viewport.querySelector('[data-part="minimap"]')?.remove();
+    const fitted = fitBranchView(layout, {
+      width: viewport.clientWidth || layout.width,
+      height: viewport.clientHeight || layout.height
+    });
+    const userMoved =
+      Math.abs(scale - fitted.scale) > 0.02 ||
+      Math.abs(panX - fitted.panX) > 2 ||
+      Math.abs(panY - fitted.panY) > 2;
+    if (!userMoved) return;
+    const mini = el('div', 'graph-minimap');
+    mini.dataset.part = 'minimap';
+    mini.setAttribute('aria-hidden', 'true');
+    viewport.append(mini);
+  }
+
   paint();
-  fit.addEventListener('click', applyFit);
+  fit.addEventListener('click', () => {
+    applyFit();
+    refreshMinimap();
+  });
   viewport.addEventListener(
     'wheel',
     (event) => {
@@ -535,6 +539,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
       event.preventDefault();
       scale = Math.min(2.2, Math.max(0.4, scale + (event.deltaY > 0 ? -0.08 : 0.08)));
       applyPan();
+      refreshMinimap();
     },
     { passive: false }
   );
@@ -548,6 +553,7 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
     panX = event.clientX - drag.x;
     panY = event.clientY - drag.y;
     applyPan();
+    refreshMinimap();
   };
   const onUp = () => {
     drag = null;
@@ -555,7 +561,13 @@ export function mountBranchView(host: HTMLElement, first: BranchInput): BranchMo
   window.addEventListener('pointermove', onMove);
   window.addEventListener('pointerup', onUp);
 
-  const resizeObserver = typeof ResizeObserver === 'function' ? new ResizeObserver(applyFit) : null;
+  const resizeObserver =
+    typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          applyFit();
+          refreshMinimap();
+        })
+      : null;
   resizeObserver?.observe(viewport);
   return {
     root,
