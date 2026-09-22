@@ -503,11 +503,15 @@ function noteComposerHtml(fileNote: boolean, placeholder: string, label: string,
   const buttonLabel = busy || researchSessionId || writeSessionId
     ? escapeHtml(waitLine)
     : escapeHtml(submitLabel);
-  return `<form class="coach__form ${fileNote ? "chat__note-form" : "glass-panel chat__composer"}" novalidate>
-    <label for="chat-input">${escapeHtml(label)}</label>
-    <textarea id="chat-input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
-    <div class="alchemist__actions">
-      <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${buttonLabel}</button>
+  return `<form class="coach__form hub-ai-bar hub-ai-bar--thread ${fileNote ? "chat__note-form" : "chat__composer"}" novalidate>
+    <label class="sr-only" for="chat-input">${escapeHtml(label)}</label>
+    <div class="hub-ai-bar__field">
+      <textarea id="chat-input" class="hub-ai-bar__input" rows="${fileNote ? 4 : 3}" placeholder="${escapeHtml(placeholder)}" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
+    </div>
+    <div class="hub-ai-bar__aside">
+      <div class="hub-ai-bar__tools alchemist__actions">
+        <button class="btn btn--primary" type="submit" ${busy || researchSessionId || writeSessionId ? "disabled" : ""}>${buttonLabel}</button>
+      </div>
     </div>
     ${error ? `<p class="alchemist__error">${escapeHtml(error)}</p>` : ""}
     ${busy || researchSessionId || writeSessionId ? `<p class="chat__status" aria-live="polite">${escapeHtml(waitLine)}</p>` : ""}

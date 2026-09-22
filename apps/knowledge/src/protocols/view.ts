@@ -334,7 +334,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
-    else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1>Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
+    else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
   };
   const poll = async () => {
     if (!currentSession?.id || USE_LOCAL_DATA) return;

@@ -84,8 +84,8 @@ describe("Knowledge Hub rail", () => {
     expect(intakeView).toContain("data-tidy-confirm");
     expect(main).toContain("startTidyIntake");
     expect(main).toContain("intakeReviewHtml");
-    expect(css).toContain("grid-template-areas:");
-    expect(css).toContain('"title title"');
+    expect(css).toContain("align-items: flex-end");
+    expect(css).toContain(".page-header__actions");
     expect(css).not.toMatch(/\.reader__tidy\s*\{[^}]*font-size:/);
   });
 
@@ -154,7 +154,7 @@ describe("Knowledge Hub rail", () => {
     expect(css).toContain(".agent-protocol-pills");
     expect(css).toContain(".hub-pills__btn");
     expect(css).toContain(".graph-preview__excerpt");
-    expect(css).toMatch(/\.floating-chat-button\s*\{[^}]*background:\s*var\(--wave\)/);
+    expect(css).toMatch(/\.floating-chat-button\s*\{[^}]*background:\s*var\(--navy\)/);
     expect(css).toMatch(
       /\.floating-chat-button\s*\{[^}]*bottom:\s*calc\(5\.5rem \+ env\(safe-area-inset-bottom,\s*0px\)\)/
     );

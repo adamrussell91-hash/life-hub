@@ -29,9 +29,10 @@ describe('teacher shell', () => {
     expect(refs.main.id).toBe('teacher-main');
   });
 
-  it('renders sign-out in page-header actions and invokes onLogout when clicked', async () => {
+  it('renders refresh and sign-out in page-header actions and invokes onLogout when clicked', async () => {
     const onLogout = vi.fn().mockResolvedValue(undefined);
-    const refs = renderTeacherShell(root, { onLogout });
+    const onRefresh = vi.fn();
+    const refs = renderTeacherShell(root, { onLogout, onRefresh });
     const host = document.createElement('div');
     renderPageHeader(host, { title: 'Classes' });
 
@@ -39,7 +40,9 @@ describe('teacher shell', () => {
     expect(refs.logoutButton?.classList.contains('hub-icon-btn')).toBe(true);
     expect(refs.logoutButton?.getAttribute('aria-label')).toBe('Sign out');
     expect(refs.logoutButton?.textContent).not.toBe('Sign out');
-    expect(host.querySelector('.page-header__actions .hub-utilities .hub-icon-btn')).toBe(
+    expect(host.querySelector('[data-hub-refresh]')?.getAttribute('aria-label')).toBe('Refresh');
+    expect(host.querySelectorAll('.page-header__actions .hub-utilities .hub-icon-btn')).toHaveLength(2);
+    expect(host.querySelector('.page-header__actions .hub-utilities [data-hub-sign-out]')).toBe(
       refs.logoutButton
     );
     expect(refs.rail.contains(refs.logoutButton!)).toBe(false);

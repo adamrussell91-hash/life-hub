@@ -18,6 +18,10 @@
   text-decoration: none;
 }
 
+.hub-rail a.hub-rail__link {
+  color: var(--on-dark-muted);
+}
+
 .hub-rail a:hover {
   color: inherit;
 }
@@ -146,12 +150,16 @@ button.hub-rail__section:focus-visible {
   cursor: pointer;
 }
 
+.hub-rail a.hub-rail__link:hover,
+.hub-rail a.hub-rail__link:focus-visible,
 .hub-rail__link:hover,
 .hub-rail__link:focus-visible {
   color: var(--on-dark);
   background: var(--on-dark-hover);
 }
 
+.hub-rail a.hub-rail__link[aria-current="page"],
+.hub-rail a.hub-rail__link.is-current,
 .hub-rail__link[aria-current="page"],
 .hub-rail__link.is-current {
   color: var(--on-dark);

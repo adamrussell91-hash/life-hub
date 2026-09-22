@@ -685,6 +685,10 @@ function shell(main: string) {
     };
   });
 
+  app.querySelector<HTMLButtonElement>("[data-hub-refresh]")?.addEventListener("click", () => {
+    void refreshVisible().then(render);
+  });
+
   app.querySelector<HTMLButtonElement>("[data-logout]")?.addEventListener("click", async () => {
     await logout();
     entries = [];
@@ -1100,10 +1104,10 @@ function renderTimeline() {
 function renderGraph() {
   if (graphMode === "stars") {
     shell(`
-      ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Stars saves on this device</p>` : ""}
+      ${USE_LOCAL_DATA ? `<p class="local-banner">Local preview · Constellations save on this device</p>` : ""}
       ${pageHeader(
         "Private archive",
-        "Stars",
+        "Constellations",
         `<div class="viewbar">
           <button class="viewbar__btn" data-jump-list type="button">List</button>
           <button class="viewbar__btn is-active" type="button">Graph</button>
@@ -1144,10 +1148,10 @@ function renderGraph() {
       <div class="graph-chrome">
         <div class="graph-toolbar glass-panel">
           <div class="graph-modes" role="group" aria-label="Graph mode">
-            <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Constellation</button>
             <button type="button" data-graph-mode="showAll" class="${graphMode === "showAll" ? "is-active" : ""}">Show All</button>
+            <button type="button" data-graph-mode="constellation" class="${graphMode === "constellation" ? "is-active" : ""}">Clusters</button>
             <button type="button" data-graph-mode="universe" class="${graphMode === "universe" ? "is-active" : ""}">Universe</button>
-            <button type="button" data-graph-mode="stars">Stars</button>
+            <button type="button" data-graph-mode="stars">Constellations</button>
           </div>
           ${
             graphMode === "showAll"

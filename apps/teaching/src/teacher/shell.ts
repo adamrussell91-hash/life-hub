@@ -16,7 +16,15 @@ export interface TeacherShellRefs {
 
 export interface TeacherShellOptions {
   onLogout?: () => void | Promise<void>;
+  onRefresh?: () => void | Promise<void>;
 }
+
+const REFRESH_ICON = `
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 12a9 9 0 1 1-2.6-6.3" />
+    <path d="M21 3v6h-6" />
+  </svg>
+`.trim();
 
 const SIGN_OUT_ICON = `
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -72,26 +80,45 @@ export function renderTeacherShell(
   canvas.className = 'teacher-layout__canvas';
 
   let logoutButton: HTMLButtonElement | null = null;
-  if (options.onLogout) {
+  if (options.onLogout || options.onRefresh) {
     const utilities = document.createElement('div');
     utilities.className = 'hub-utilities';
 
-    logoutButton = document.createElement('button');
-    logoutButton.type = 'button';
-    logoutButton.className = 'hub-icon-btn';
-    logoutButton.setAttribute('aria-label', 'Sign out');
-    logoutButton.title = 'Sign out';
-    logoutButton.dataset.hubSignOut = '';
-    logoutButton.innerHTML = SIGN_OUT_ICON;
-    logoutButton.addEventListener('click', () => {
-      if (!logoutButton) return;
-      logoutButton.disabled = true;
-      void Promise.resolve(options.onLogout?.()).finally(() => {
-        if (logoutButton) logoutButton.disabled = false;
+    if (options.onRefresh) {
+      const refreshButton = document.createElement('button');
+      refreshButton.type = 'button';
+      refreshButton.className = 'hub-icon-btn';
+      refreshButton.setAttribute('aria-label', 'Refresh');
+      refreshButton.title = 'Refresh';
+      refreshButton.dataset.hubRefresh = '';
+      refreshButton.innerHTML = REFRESH_ICON;
+      refreshButton.addEventListener('click', () => {
+        refreshButton.disabled = true;
+        void Promise.resolve(options.onRefresh?.()).finally(() => {
+          refreshButton.disabled = false;
+        });
       });
-    });
+      utilities.append(refreshButton);
+    }
 
-    utilities.append(logoutButton);
+    if (options.onLogout) {
+      logoutButton = document.createElement('button');
+      logoutButton.type = 'button';
+      logoutButton.className = 'hub-icon-btn';
+      logoutButton.setAttribute('aria-label', 'Sign out');
+      logoutButton.title = 'Sign out';
+      logoutButton.dataset.hubSignOut = '';
+      logoutButton.innerHTML = SIGN_OUT_ICON;
+      logoutButton.addEventListener('click', () => {
+        if (!logoutButton) return;
+        logoutButton.disabled = true;
+        void Promise.resolve(options.onLogout?.()).finally(() => {
+          if (logoutButton) logoutButton.disabled = false;
+        });
+      });
+      utilities.append(logoutButton);
+    }
+
     registerHubUtilities(utilities);
   } else {
     registerHubUtilities(null);

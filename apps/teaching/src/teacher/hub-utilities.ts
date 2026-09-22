@@ -1,4 +1,4 @@
-/** Shared sign-out utilities — mounted into `.page-header__actions` per design kit. */
+/** Shared refresh + sign-out utilities — mounted into `.page-header__actions` per design kit. */
 
 let utilitiesRoot: HTMLElement | null = null;
 
