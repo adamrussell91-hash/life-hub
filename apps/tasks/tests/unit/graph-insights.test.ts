@@ -94,14 +94,26 @@ describe('buildGraphInsights', () => {
   });
 
   it('blames the station with blocked_since, not an earlier unfinished child', () => {
+    const pid = 'p-tom';
     const tasks = [
-      task({ id: 't3', title: 'Permission notes', step_order: 3, status: 'in_progress' }),
-      task({ id: 't3a', title: 'Risk form', step_order: 1, parent_task_id: 't3', depends_on: ['t3'] }),
-      task({ id: 't5', title: 'Book bus', step_order: 5, depends_on: ['t4'], blocked_since: '2026-09-18T09:00:00+10:00' }),
-      task({ id: 't4', title: 'Get bus quote', step_order: 4 })
+      task({ id: 't3', title: 'Permission notes', parent_project_id: pid, step_order: 3, status: 'in_progress' }),
+      task({ id: 't3a', title: 'Risk form', parent_project_id: pid, step_order: 1, parent_task_id: 't3', depends_on: ['t3'] }),
+      task({ id: 't4', title: 'Get bus quote', parent_project_id: pid, step_order: 4 }),
+      task({
+        id: 't5',
+        title: 'Book bus',
+        parent_project_id: pid,
+        step_order: 5,
+        depends_on: ['t4'],
+        blocked_since: '2026-09-18T09:00:00+10:00'
+      })
     ];
-    const insights = buildGraphInsights(tasks, [project({ id: 'p-tom', title: 'Tournament of Minds' })], now);
-    const alert = insights.find((row) => row.id === 'lines-service-p-tom');
+    const insights = buildGraphInsights(
+      tasks,
+      [project({ id: pid, title: 'Tournament of Minds', current_end_date: '2026-12-01' })],
+      now
+    );
+    const alert = insights.find((row) => row.id === `lines-service-${pid}`);
     expect(alert?.detail).toMatch(/Book bus/);
     expect(alert?.detail).not.toMatch(/Risk form/);
   });
