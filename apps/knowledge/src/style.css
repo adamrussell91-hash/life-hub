@@ -3505,6 +3505,11 @@ body.is-universe-fullscreen .local-banner {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  gap: var(--hub-tile-gap);
+}
+
+.canvas:has(.uni-tl) .page-header {
+  margin-bottom: 0;
 }
 
 .uni-tl {
@@ -3513,7 +3518,7 @@ body.is-universe-fullscreen .local-banner {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 560px;
-  gap: var(--space-3);
+  gap: var(--hub-tile-gap);
 }
 
 .uni-tl__toolbar {
@@ -3548,10 +3553,21 @@ body.is-universe-fullscreen .local-banner {
   box-shadow: var(--hub-elev-card);
   cursor: grab;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
 }
 
-.uni-tl__viewport:active {
+.uni-tl__viewport:active,
+.uni-tl.is-panning .uni-tl__viewport {
   cursor: grabbing;
+}
+
+.uni-tl.is-panning,
+.uni-tl.is-panning * {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .uni-tl__axis {
