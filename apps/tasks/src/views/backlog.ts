@@ -22,7 +22,8 @@ import {
   snapshotFields,
   suggestionsForTask,
   triageQueue,
-  triageReducer
+  triageReducer,
+  vagueDateHint
 } from '@/domain/backlog';
 import { addDays, startOfDay, toDateKey } from '@/domain/queries';
 import { projectPageHash } from '@/domain/cards';
@@ -213,13 +214,13 @@ function domainLabel(id: string): string {
 
 function effortLabel(row: BacklogRow): string | null {
   if (!row.effort) return null;
-  if (row.effort === 'quick') return '15m';
-  if (row.effort === 'hour') return '1h';
+  if (row.effort === 'quick') return 'Quick';
+  if (row.effort === 'hour') return '1 hr';
   return 'Big';
 }
 
 function iconBtn(label: string, shortcut: string, paths: string[], onClick: () => void): HTMLButtonElement {
-  const btn = el('button', 'hub-icon-btn') as HTMLButtonElement;
+  const btn = el('button', 'backlog-row__act') as HTMLButtonElement;
   btn.type = 'button';
   btn.setAttribute('aria-label', label);
   btn.title = `${label} · ${shortcut}`;
@@ -686,11 +687,12 @@ function buildRow(state: Session, rowModel: BacklogRow, extras: { stale?: boolea
   title.setAttribute('data-hub-inline-edit', '');
   title.setAttribute('aria-label', 'Rename task');
   main.append(title);
-  if (extras.vague) main.append(el('span', 'backlog-row__flag', 'Vague date'));
+  if (extras.vague) {
+    main.append(el('span', 'backlog-row__flag', vagueDateHint(task.title) ?? '· no date'));
+  }
+  const trail = el('div', 'backlog-row__trail');
   const effort = effortLabel(rowModel);
-  if (effort) main.append(el('span', 'hub-chip backlog-row__effort', effort));
-
-  const age = el('span', 'backlog-row__age', rowModel.ageLabel);
+  if (effort) trail.append(el('span', 'backlog-row__effort', effort));
   const actions = el('div', 'backlog-row__actions');
   const today = iconBtn('Today', 'T', ['M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z'], () => undefined);
   today.dataset.act = 'today';
@@ -722,27 +724,27 @@ function buildRow(state: Session, rowModel: BacklogRow, extras: { stale?: boolea
     { id: 'delete', label: 'Delete', danger: true, onSelect: () => deleteIds(state, selectedIds(state, task.id)) }
   ]);
   menu.classList.add('backlog-row__menu');
-  actions.append(menu);
-
-  row.append(check, main, age, actions);
+  trail.append(actions, menu);
 
   if (extras.stale) {
     const extra = el('div', 'backlog-stale__row-actions');
-    const keep = el('button', 'btn btn--secondary', 'Keep');
+    const keep = el('button', 'btn btn--ghost', 'Keep');
     keep.type = 'button';
     keep.dataset.act = 'keep';
     const archive = el('button', 'btn btn--ghost', 'Archive');
     archive.type = 'button';
     archive.dataset.act = 'archive';
     extra.append(keep, archive);
-    row.append(extra);
+    trail.append(extra);
   }
   if (extras.snoozed) {
     const unsnooze = el('button', 'btn btn--ghost', 'Unsnooze');
     unsnooze.type = 'button';
     unsnooze.dataset.act = 'unsnooze';
-    row.append(unsnooze);
+    trail.append(unsnooze);
   }
+  trail.append(el('span', 'backlog-row__age', rowModel.ageLabel));
+  row.append(check, main, trail);
 
   bindRowChrome(state, row, task);
   return row;
@@ -757,6 +759,12 @@ function updateRow(row: HTMLElement, model: BacklogRow): void {
   }
   const age = row.querySelector('.backlog-row__age');
   if (age) age.textContent = model.ageLabel;
+  const effort = row.querySelector('.backlog-row__effort');
+  const nextEffort = effortLabel(model);
+  if (effort) effort.textContent = nextEffort ?? '';
+  if (effort) (effort as HTMLElement).hidden = !nextEffort;
+  const flag = row.querySelector('.backlog-row__flag');
+  if (flag) flag.textContent = vagueDateHint(model.task.title) ?? '· no date';
 }
 
 function reconcileList(
@@ -802,17 +810,20 @@ function renderGroup(state: Session, group: BacklogGroup, vagueIds: Set<string>)
   head.dataset.groupId = group.id;
   head.dataset.domain = group.domain;
   if (group.projectId) head.dataset.projectId = group.projectId;
-  const label = `${domainLabel(group.domain)} · ${group.projectTitle}`;
+  const projectTitle = group.projectId ? group.projectTitle : 'no project';
+  const name = el('span', 'backlog-group__name');
+  name.append(`${domainLabel(group.domain)} · ${projectTitle} `);
+  const count = el('span', 'hub-count', `(${group.rows.length})`);
+  count.setAttribute('data-hub-count', '');
+  name.append(count);
+  head.append(name);
   if (group.projectId) {
-    const link = el('a', '', label) as HTMLAnchorElement;
+    const link = el('a', 'backlog-group__link', 'link to event') as HTMLAnchorElement;
     link.href = projectPageHash(group.projectId);
     head.append(link);
   } else {
-    head.append(el('span', '', label));
+    head.append(el('span', 'backlog-group__link', ''));
   }
-  const count = el('span', 'hub-count', String(group.rows.length));
-  count.setAttribute('data-hub-count', '');
-  head.append(count);
   const rows = el('div', 'backlog-rows');
   reconcileList(rows, group.rows, state, { vagueIds });
   inner.append(head, rows);
@@ -840,7 +851,12 @@ function reconcileGroups(state: Session, view: BacklogView, vagueIds: Set<string
       host.insertBefore(node, host.children[index] ?? null);
     } else {
       const count = node.querySelector('.hub-count');
-      if (count) count.textContent = String(group.rows.length);
+      if (count) count.textContent = `(${group.rows.length})`;
+      const name = node.querySelector('.backlog-group__name');
+      if (name && name.firstChild) {
+        const projectTitle = group.projectId ? group.projectTitle : 'no project';
+        name.firstChild.textContent = `${domainLabel(group.domain)} · ${projectTitle} `;
+      }
       const rows = node.querySelector<HTMLElement>('.backlog-rows');
       if (rows) reconcileList(rows, group.rows, state, { vagueIds });
       if (node !== host.children[index]) host.insertBefore(node, host.children[index] ?? null);
@@ -894,7 +910,7 @@ function paintHeader(state: Session, view: BacklogView): void {
   if (titleRow) {
     let pill = titleRow.querySelector<HTMLElement>('.backlog-count');
     if (!pill) {
-      pill = el('span', 'hub-chip backlog-count');
+      pill = el('span', 'backlog-count');
       titleRow.append(pill);
     }
     pill.textContent = String(view.total);
@@ -1586,30 +1602,32 @@ function buildShell(state: Session): void {
   );
   page.append(filters.root);
   page.append(el('div', 'backlog-zones'));
-  page.append(
-    renderQuickAdd(
-      (created) => {
-        upsert(state.tasks, created);
-        if (created.due_date) {
-          showHubToast(`Added to ${formatShortWeekday(created.due_date)}`);
-        }
-        reconcile(state);
-        const row = state.page.querySelector<HTMLElement>(`[data-task-id="${created.id}"]`);
-        if (row) enterRow(row);
-      },
-      null,
-      {
-        parse: true,
-        inline: true,
-        placeholder: 'Add a task… try "email Simone re room fri #teaching"'
+  const card = el('div', 'backlog-card');
+  const quick = renderQuickAdd(
+    (created) => {
+      upsert(state.tasks, created);
+      if (created.due_date) {
+        showHubToast(`Added to ${formatShortWeekday(created.due_date)}`);
       }
-    )
+      reconcile(state);
+      const row = state.page.querySelector<HTMLElement>(`[data-task-id="${created.id}"]`);
+      if (row) enterRow(row);
+    },
+    null,
+    {
+      parse: true,
+      inline: true,
+      placeholder: 'Add a task… try "email Simone re room fri #teaching"'
+    }
   );
+  const plus = el('span', 'backlog-quick-add__plus');
+  plus.setAttribute('aria-hidden', 'true');
+  plus.append(createOutlineIcon(['M12 5v14', 'M5 12h14']));
+  quick.prepend(plus);
   const suggestions = el('div', 'backlog-suggestions');
   suggestions.hidden = true;
-  page.append(suggestions);
-  page.append(el('div', 'backlog-fresh'));
-  page.append(el('p', 'backlog-empty'));
+  card.append(quick, suggestions, el('div', 'backlog-fresh'), el('p', 'backlog-empty'));
+  page.append(card);
   const stale = el('section', 'backlog-stale');
   stale.hidden = true;
   const staleToggle = el('button', 'backlog-stale__toggle');

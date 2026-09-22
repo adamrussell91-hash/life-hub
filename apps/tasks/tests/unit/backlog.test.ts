@@ -19,6 +19,7 @@ import {
   parseQuickAdd,
   scheduleTargets,
   snapshotFields,
+  vagueDateHint,
   thisWeekDate,
   triageQueue,
   triageReducer
@@ -347,6 +348,8 @@ describe('detectSuggestions', () => {
     expect(vague.map((item) => item.taskIds[0])).toEqual(['vague']);
     expect(hasVagueDatePhrase('Daylight saving')).toBe(false);
     expect(hasVagueDatePhrase('Friday Club')).toBe(true);
+    expect(vagueDateHint('Call Sam tomorrow')).toBe('· “tomorrow” has no date');
+    expect(vagueDateHint('Daylight saving')).toBeNull();
   });
 
   it('clusters orphans that share a domain and a close created_at or noun', () => {

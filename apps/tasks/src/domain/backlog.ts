@@ -408,6 +408,14 @@ export function hasVagueDatePhrase(title: string): boolean {
   return VAGUE_PHRASES.some((pattern) => pattern.test(title));
 }
 
+export function vagueDateHint(title: string): string | null {
+  for (const pattern of VAGUE_PHRASES) {
+    const match = title.match(pattern);
+    if (match) return `· “${match[0].toLowerCase()}” has no date`;
+  }
+  return null;
+}
+
 function proposeDateFromTitle(title: string, now: Date): string {
   const lower = title.toLowerCase();
   if (/\btomorrow\b/.test(lower)) return toDateKey(addDays(startOfDay(now), 1));
