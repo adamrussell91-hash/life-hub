@@ -107,12 +107,17 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation({ nodes, edges, minEdgeCount = 2, … })`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
 | `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
 | `range-bar` | Value on a reference span, with an optional balance tick. | `rangeBarLayout(value, refLow, refHigh, { width, padding })`, `rangeBarTick(fraction, { width, padding })` | `range-bar.js` |
-| `scene` | Declarative SVG scene (nodes + hits) for interactive charts. Mount with `mountSceneChart` in `js/app/render-scene-chart.js` (hover tip, click select, arrow keys, entrance motion, resize). | `node`, `text`, `arcPath`, `wedgePath`, `legend`, `linearScale`, `monthStarts` | `scene.js` |
+| `scene` | Declarative SVG scene (nodes + hits) for interactive charts. Mount with `mountSceneChart` in `js/app/render-scene-chart.js` (hover tip, click select, arrow keys, entrance motion: draw, grow, fade, fall, drop and a SMIL motion path; per-node `dur`; resize). | `node`, `text`, `arcPath`, `wedgePath`, `legend`, `linearScale`, `monthStarts` | `scene.js` |
 | `gate-rings` | Several values each against its own threshold, thresholds aligned on one spoke (0 to 2× scale). Home Stimulus. | `buildGateRings(stimulusChart, { width })` | `gate-rings.js` |
 | `region-rose` | Area-true Nightingale rose + ranked bars against a reference. Home Stimulus → Regions. | `buildRegionRose(stimulusChart, { width })` | `region-rose.js` |
 | `glide-slope` | Measured series vs robust trend with split stalks, projected into a target band with a slope wedge and entry rail. Home Scale. | `buildGlideSlope(glideChart, { width, height })` | `glide-slope.js` |
 | `twin-clocks` | Independent one-year dials: first in-band window per condition, overlap = target date. Home Recomp. | `buildTwinClocks(recompChart, { width, lockText })` | `twin-clocks.js` |
 | `recomp-plane` | Weight vs body fat with lean-mass isolines, target box, lean corridor and scenario roads. Home Recomp. | `buildRecompPlane(recompChart, { width, height })` | `recomp-plane.js` |
+| `shed-stack` | Journey since a peak as unit blocks: today as a stack, every unit shed falls into a pile coloured by year, ghosts keep the old height. Body Weight. | `buildShedStack(chart.weight.stack, { width })` | `shed-stack.js` |
+| `stairs-down` | A series as a staircase, one step per period (down wave, up peach), dashed step still to go, ball bounces down on entrance. Body Weight. | `buildStairsDown(chart.weight.stairs, { width })` | `stairs-down.js` |
+| `carved-away` | Readings with everything below the running high carved out as a solid hatched mass; only highs actually reached count. Body fat. | `buildCarvedAway(chart.fat.carved, { width })` | `carved-away.js` |
+| `recomp-scissors` | Two measures indexed to a shared first reading on one axis; the gap between them shaded. Body Skeletal muscle. | `buildRecompScissors(chart.muscle.scissors, { width })` | `recomp-scissors.js` |
+| `hundred-squares` | One reading as 100 squares (fat, muscle, everything else), scrubbable between readings with changed squares flipping. Body Skeletal muscle. | `buildHundredSquares(chart.muscle.squares, { width })` | `hundred-squares.js` |
 | `clinical-slots` | Closed multi-series colours. | `CLINICAL_CHART_SLOTS` | `clinical-slots.js` |
 | `d3-layout` | Vendored d3-shape / sankey / chord / force. No CDN. | `d3api()`, `stack`, `sankey`, `chord`, `forceSimulation` | `d3-layout.js`, `vendor/` |
 
@@ -191,6 +196,17 @@ Agents may name catalog ids + focus/schedule payloads. They must not emit third-
 
 ---
 
+## Future charts — parked, not in the library
+
+★ **Great graphs for the future.** Finished designs kept for a later job. They are **not** library types: do not use them until promoted with a row above and a Log line. Prototypes and notes live in `packages/design-kit/future-charts/`.
+
+| Id | When it would fit | Prototype |
+|----|-------------------|-----------|
+| `weight-line` ★ | Milestone journey toward a destination (transit line, station per step, dates passed, "you are here"). | `future-charts/weight-line-and-bullseye.html` |
+| `bullseye-rings` ★ | Convergence on a target (rings per period tightening on a bullseye). | `future-charts/weight-line-and-bullseye.html` |
+
+---
+
 ## How to add or change a type
 
 1. Edit the module under the implementation root (or add one file there).
@@ -208,6 +224,8 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `shed-stack`, `stairs-down`, `carved-away`, `recomp-scissors`, `hundred-squares`, `scene` | Body page Weight, Body fat and Skeletal muscle line charts replaced. Data from `body-chart-data.js` (targets from `config/targets.yml`). Scene renderer gains `fall` and `drop` entrances, per-node `dur` and `motion` paths. Classes `bc-*` in `app.css`, tokens only. |
+| 2026-09-22 | `weight-line`, `bullseye-rings` (future) | Parked in `future-charts/` with a ★ future flag. Designed for the Body weight card, rejected there because weight must read as going down. Not library types until promoted. |
 | 2026-09-22 | `gate-rings`, `region-rose`, `glide-slope`, `twin-clocks`, `recomp-plane`, `scene` | Home forecast cards get charts. Data from `home-forecast-charts.js`; engine adds display-only `trace`/`trace_range` per body scenario (`traceBodyScenario`), never changing forecast dates. Classes `hc-*` in `app.css`, tokens only. |
 | 2026-09-11 | Stars | Added the Knowledge-only saved constellation engine: controlled symbol templates, grounded note relationships, source-mapped synthesis, and annual night-sky placement. No Universe renderer changes. |
 | 2026-09-06 | `mood-mix` | Tasks project portfolio / home Projects tile consumes Life `mood-mix` donut for lifecycle share (“What’s the mix?”). Drops the board area-line spark. Typed consumer in `apps/tasks/src/chart-kit/mood-mix.ts`. |

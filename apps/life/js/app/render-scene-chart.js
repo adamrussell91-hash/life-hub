@@ -43,10 +43,24 @@ function createNode(doc, spec, prefix, animate, state) {
   if (animate && spec.anim) {
     classes.push(`hc-anim-${spec.anim}`);
     el.style.setProperty('--hc-delay', `${spec.delay ?? 0}ms`);
-    if (spec.anim === 'grow' && spec.origin) {
+    if (spec.dur) el.style.setProperty('--hc-dur', `${spec.dur}ms`);
+    if (spec.origin) {
       el.style.transformOrigin = `${spec.origin[0]}px ${spec.origin[1]}px`;
     }
-    state.maxDelay = Math.max(state.maxDelay, spec.delay ?? 0);
+    state.maxDelay = Math.max(state.maxDelay, (spec.delay ?? 0) + Math.max(0, (spec.dur ?? 0) - 900));
+  }
+  if (animate && spec.motion?.path) {
+    // Travel along an absolute path, then rest where the node's own attrs put it.
+    el.setAttribute('cx', '0');
+    el.setAttribute('cy', '0');
+    const motion = doc.createElementNS(SVG_NS, 'animateMotion');
+    motion.setAttribute('path', spec.motion.path);
+    motion.setAttribute('dur', `${Math.max(1, spec.motion.dur)}ms`);
+    motion.setAttribute('begin', 'indefinite');
+    motion.setAttribute('fill', 'freeze');
+    el.append(motion);
+    state.motions.push(motion);
+    state.maxDelay = Math.max(state.maxDelay, spec.motion.dur);
   }
   const cls = classes.filter(Boolean).join(' ');
   if (cls) el.setAttribute('class', cls);
@@ -292,7 +306,7 @@ function paint(host, hc, scene, animate) {
   const doc = host.ownerDocument;
   clearTimeout(hc.settleTimer);
   const svg = hc.svg;
-  const state = { maxDelay: 0 };
+  const state = { maxDelay: 0, motions: [] };
   svg.replaceChildren();
   svg.setAttribute('viewBox', `0 0 ${scene.width} ${scene.height}`);
   svg.setAttribute('width', String(scene.width));
@@ -307,6 +321,7 @@ function paint(host, hc, scene, animate) {
     // Force a style flush so the animation starts from its first frame.
     void svg.getBoundingClientRect();
     svg.classList.add('hc-animate');
+    for (const motion of state.motions) motion.beginElement?.();
     hc.settleTimer = setTimeout(() => {
       svg.classList.remove('hc-animate');
       svg.classList.add('hc-settled');

@@ -78,10 +78,10 @@ function confirmedMarkdown(candidate, slug) {
   return `---\n${dump(front, { lineWidth: 120 })}---\n${candidate.notes ?? ''}\n`;
 }
 
-export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS }) {
+export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, extraFiles = [] } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
   const sessions = new Map();
-  const confirmedFiles = new Map();
+  const confirmedFiles = new Map(extraFiles.map(file => [file.path, file.content]));
   let nextSessionId = 0;
   const hubMap = { map: null, version: 0 };
 

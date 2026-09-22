@@ -1,6 +1,13 @@
 import { createMorphingValuesPopover } from '../../../../packages/design-kit/js/morphing-popover.js';
+import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
+import { buildCarvedAway } from './chart-kit/carved-away.js';
+import { buildHundredSquares, squareKinds } from './chart-kit/hundred-squares.js';
+import { buildRecompScissors } from './chart-kit/recomp-scissors.js';
+import { buildShedStack } from './chart-kit/shed-stack.js';
+import { buildStairsDown } from './chart-kit/stairs-down.js';
+import { mountSceneChart } from './render-scene-chart.js';
 import { BODY_RANGES } from './body-model.js';
 import { formatDisplayDate } from '../core/time.js';
 
@@ -33,6 +40,7 @@ export function renderBody(root, model, {
   onViewBloods,
   onViewMedical,
   forecast = null,
+  charts = null,
   quiet = false
 } = {}) {
   const dashboard = root.querySelector('#body-dashboard');
@@ -65,11 +73,13 @@ export function renderBody(root, model, {
       sectionCard(root, model.scale, {
         onLogWeight,
         kind: 'scale',
-        quiet
+        quiet,
+        charts
       }),
       ...compositionSection(root, model.composition, {
         onLogComposition,
-        quiet
+        quiet,
+        charts
       }),
       sectionCard(root, model.tape, {
         kind: 'tape',
@@ -319,7 +329,9 @@ function sectionCard(root, section, hooks) {
   } else if (section.id === 'tape') {
     article.append(tapeFigure(root, section.metrics, hooks.reuseImg));
   } else {
-    const blocks = section.metrics.filter(metric => !metric.empty).map(metric => metricBlock(root, metric, hooks.quiet));
+    const blocks = section.metrics.filter(metric => !metric.empty).map(metric => metricBlock(root, metric, hooks.quiet, {
+      chart: () => bodyChartFor(root, metric.key, hooks.charts, hooks.quiet)
+    }));
     for (const block of blocks) article.append(block);
   }
 
@@ -338,7 +350,7 @@ function compositionSection(root, section, hooks) {
   const pair = root.createElement('div');
   pair.className = 'body-composition-pair';
   for (const metric of metrics) {
-    pair.append(compositionCard(root, metric, hooks.quiet));
+    pair.append(compositionCard(root, metric, hooks.quiet, hooks.charts));
   }
 
   const wrap = root.createElement('div');
@@ -347,7 +359,7 @@ function compositionSection(root, section, hooks) {
   return [wrap];
 }
 
-function compositionCard(root, metric, quiet) {
+function compositionCard(root, metric, quiet, charts = null) {
   const article = root.createElement('article');
   article.className = 'metric-card body-section';
   article.dataset.bodySection = metric.key;
@@ -358,7 +370,10 @@ function compositionCard(root, metric, quiet) {
   title.className = 'metric-label';
   title.textContent = metric.label;
   heading.append(title);
-  article.append(heading, metricBlock(root, metric, quiet, { hideLabel: true }));
+  article.append(heading, metricBlock(root, metric, quiet, {
+    hideLabel: true,
+    chart: () => bodyChartFor(root, metric.key, charts, quiet)
+  }));
   return article;
 }
 
@@ -568,7 +583,7 @@ function formatPct(pct) {
   return `${sign}${Math.abs(pct).toFixed(1)}%`;
 }
 
-function metricBlock(root, metric, quiet = false, { hideLabel = false } = {}) {
+function metricBlock(root, metric, quiet = false, { hideLabel = false, chart = null } = {}) {
   const wrap = root.createElement('div');
   wrap.className = 'body-metric';
 
@@ -601,7 +616,10 @@ function metricBlock(root, metric, quiet = false, { hideLabel = false } = {}) {
     wrap.append(value);
   }
 
-  if (metric.series.length) {
+  const sceneChart = chart?.();
+  if (sceneChart) {
+    wrap.append(sceneChart);
+  } else if (metric.series.length) {
     const chart = root.createElementNS('http://www.w3.org/2000/svg', 'svg');
     chart.setAttribute('class', 'line-chart body-chart');
     chart.setAttribute('viewBox', '0 0 320 168');
@@ -648,6 +666,142 @@ function metricBlock(root, metric, quiet = false, { hideLabel = false } = {}) {
   }
 
   return wrap;
+}
+
+/* ── Scene charts (weight, body fat, skeletal muscle) ─────────────────── */
+
+/** Which view each multi-view card shows. Kept across re-renders and range changes. */
+const bodyChartViews = { weight: 'stack', muscle: 'scissors' };
+const BODY_CHART_MAX_WIDTH = 640;
+
+function bodyChartFor(root, key, charts, quiet) {
+  if (!charts) return null;
+  if (key === 'weight_kg' && charts.weight) {
+    return chartBlock(root, 'weight', 'Weight view', [
+      { id: 'stack', label: 'Shed stack', build: buildShedStack, data: charts.weight.stack },
+      { id: 'stairs', label: 'Stairs', build: buildStairsDown, data: charts.weight.stairs }
+    ], quiet);
+  }
+  if (key === 'body_fat_pct' && charts.fat) {
+    return chartBlock(root, 'fat', 'Body fat view', [
+      { id: 'carved', label: 'Carved away', build: buildCarvedAway, data: charts.fat.carved }
+    ], quiet);
+  }
+  if (key === 'skeletal_muscle_kg' && charts.muscle) {
+    return chartBlock(root, 'muscle', 'Muscle view', [
+      { id: 'scissors', label: 'Scissors', build: buildRecompScissors, data: charts.muscle.scissors },
+      { id: 'squares', label: '100 squares', build: buildHundredSquares, data: charts.muscle.squares }
+    ], quiet);
+  }
+  return null;
+}
+
+function resetChartHost(host) {
+  host._hc?.resize?.disconnect();
+  clearTimeout(host._hc?.settleTimer);
+  host._hc = null;
+  host.replaceChildren();
+}
+
+const nextFrame = fn => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : fn());
+
+function chartBlock(root, name, ariaLabel, views, quiet) {
+  const block = root.createElement('div');
+  block.className = 'body-chart-block';
+  block.dataset.bodyChart = name;
+  const host = root.createElement('div');
+  host.id = `body-chart-${name}`;
+  const extra = root.createElement('div');
+  extra.className = 'body-chart-extra';
+  const current = () => views.find(v => v.id === bodyChartViews[name]) ?? views[0];
+
+  let pills = null;
+  if (views.length > 1) {
+    pills = root.createElement('div');
+    pills.className = 'hub-pills';
+    pills.setAttribute('role', 'tablist');
+    pills.setAttribute('aria-label', ariaLabel);
+    for (const view of views) {
+      const button = root.createElement('button');
+      button.type = 'button';
+      button.className = 'hub-pills__btn';
+      button.textContent = view.label;
+      button.dataset.bodyView = view.id;
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-controls', host.id);
+      button.addEventListener('click', () => {
+        if (bodyChartViews[name] === view.id) return;
+        bodyChartViews[name] = view.id;
+        syncPills();
+        resetChartHost(host);
+        paint(false);
+        nextFrame(() => applyHubPillsThumb(pills));
+      });
+      pills.append(button);
+    }
+    block.append(pills);
+  }
+  block.append(host, extra);
+
+  function syncPills() {
+    for (const button of pills?.querySelectorAll?.('[data-body-view]') ?? []) {
+      const on = button.dataset.bodyView === current().id;
+      button.setAttribute('aria-selected', on ? 'true' : 'false');
+      button.setAttribute('tabindex', on ? '0' : '-1');
+    }
+  }
+
+  function paint(quietPaint) {
+    const view = current();
+    mountSceneChart(host, view.build, view.data, { quiet: quietPaint, maxWidth: BODY_CHART_MAX_WIDTH });
+    extra.replaceChildren();
+    if (view.id === 'squares') squaresScrubber(root, host, extra, view.data);
+  }
+
+  syncPills();
+  queueMicrotask(() => {
+    paint(quiet);
+    if (pills) nextFrame(() => applyHubPillsThumb(pills));
+  });
+  return block;
+}
+
+function squaresScrubber(root, host, extra, data) {
+  if (data?.status !== 'ready' || data.readings.length < 2) return;
+  const wrap = root.createElement('div');
+  wrap.className = 'body-chart-scrub';
+  const label = root.createElement('label');
+  label.htmlFor = 'body-squares-scrub';
+  label.textContent = 'Reading';
+  const input = root.createElement('input');
+  input.type = 'range';
+  input.id = 'body-squares-scrub';
+  input.min = '0';
+  input.max = String(data.readings.length - 1);
+  input.step = '1';
+  input.value = String(data.index);
+  const output = root.createElement('output');
+  output.htmlFor = 'body-squares-scrub';
+  const showDate = index => { output.textContent = formatDisplayDate(data.readings[index].date); };
+  showDate(data.index);
+  let shown = data.index;
+  input.addEventListener('input', () => {
+    const index = Number(input.value);
+    if (index === shown) return;
+    const before = squareKinds(data.readings[shown].squares);
+    const after = squareKinds(data.readings[index].squares);
+    shown = index;
+    mountSceneChart(host, buildHundredSquares, { ...data, index }, { quiet: true, maxWidth: BODY_CHART_MAX_WIDTH });
+    for (const cell of host.querySelectorAll('.bc-cell[data-cell]')) {
+      const i = Number(cell.getAttribute('data-cell'));
+      if (before[i] === after[i]) continue;
+      cell.style.setProperty('--bc-flip-delay', `${(i % 10) * 12 + Math.floor(i / 10) * 8}ms`);
+      cell.classList.add('bc-cell--flip');
+    }
+    showDate(index);
+  });
+  wrap.append(label, input, output);
+  extra.append(wrap);
 }
 
 function formatLatest(metric) {

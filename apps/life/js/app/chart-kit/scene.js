@@ -5,7 +5,11 @@
  * Each node is { tag, attrs, cls?, text?, children?, hit?, anim?, delay?, origin? }.
  * - hit: id of an entry in scene.hits (makes the node hoverable, focusable, clickable)
  * - anim: 'draw' (stroke draws on; requires a solid stroke), 'grow' (scales from origin),
- *         'fade' (fades in). delay is ms. origin is [x, y] in viewBox units.
+ *         'fade' (fades in), 'fall' (flies in from --hc-dx/--hc-dy given in attrs.style),
+ *         'drop' (unfolds downward from origin). delay and dur are ms; origin is
+ *         [x, y] in viewBox units.
+ * - motion: { path, dur } moves a circle along an absolute path on entrance, then
+ *           leaves it at its own cx/cy. Skipped when motion is quiet.
  * Geometry builders return scenes so they can be unit tested without a DOM.
  */
 
