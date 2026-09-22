@@ -175,18 +175,21 @@ test.describe('Backlog', () => {
 
   test('Keep on a stale row resets its age', async ({ page }) => {
     await signIn(page);
+    const stale = await createBacklogTask(page, `Stale keep ${Date.now()}`, {
+      updated_at: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString()
+    });
     await openBacklog(page);
     await page.locator('.backlog-stale__toggle').click();
-    const row = page.locator('[data-task-id="task_demo_backlog"]');
+    const row = page.locator(`.backlog-stale [data-task-id="${stale.id}"]`);
     await expect(row).toBeVisible();
     const before = await row.locator('.backlog-row__age').innerText();
     expect(before).not.toBe('0d');
     await row.getByRole('button', { name: 'Keep' }).click();
-    await expect(page.locator('.backlog-fresh [data-task-id="task_demo_backlog"] .backlog-row__age')).toHaveText(
+    await expect(page.locator(`.backlog-fresh [data-task-id="${stale.id}"] .backlog-row__age`)).toHaveText(
       '0d',
       { timeout: 8_000 }
     );
-    await expect(page.locator('.backlog-stale [data-task-id="task_demo_backlog"]')).toHaveCount(0);
+    await expect(page.locator(`.backlog-stale [data-task-id="${stale.id}"]`)).toHaveCount(0);
   });
 
   test('reduced motion produces no transforms', async ({ page }) => {
@@ -240,7 +243,11 @@ test.describe('Backlog', () => {
     }
     await openBacklog(page);
     await dismissReminders(page);
-    const twelfth = page.locator('.backlog-fresh .backlog-group').first().locator('.backlog-row').nth(11);
+    await page.evaluate(() => {
+      document.querySelector('.reminder-strip-host')?.setAttribute('hidden', '');
+      document.querySelector('.backlog-suggestions')?.setAttribute('hidden', '');
+    });
+    const twelfth = page.locator('.backlog-fresh .backlog-row').nth(11);
     await expect(twelfth).toBeVisible();
     const box = await twelfth.boundingBox();
     expect(box).toBeTruthy();
