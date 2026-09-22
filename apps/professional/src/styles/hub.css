@@ -1890,6 +1890,7 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 0.25rem;
+  max-width: 22rem;
 }
 
 .event-compose__cal-head,
