@@ -30,7 +30,7 @@ type LiveGraph = {
 
 let liveGraph: LiveGraph | null = null;
 let selectedId: string | null = null;
-let insightsOpen = true;
+let insightsOpen = false;
 let listMode = false;
 let lookAhead = 0;
 let orbitPaused = false;
@@ -71,7 +71,7 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
 
   liveGraph?.teardown();
   showViewLoading(canvas, 'Loading graph…', '.graph-page');
-  await loadTaskProperties();
+  await loadTaskProperties(true);
   const [tasks, projects, dismissals] = await Promise.all([
     tasksApi.listTasks(),
     tasksApi.listProjects(),
@@ -83,7 +83,8 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
   let dismissed = dismissals;
   let insights = rankInsights(buildGraphInsights(workingTasks, workingProjects, new Date(), dismissed));
   let view = graphViewFromHash();
-  let mount: LinesMount | BranchMount | OrbitMount | null = null;
+  let mount: (LinesMount | BranchMount | OrbitMount) | null = null;
+  let mountedView: GraphPageView | null = null;
 
   const page = el('div', 'graph-page');
   const pills = () =>
@@ -277,18 +278,16 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
     paintChrome();
     insights = rankInsights(buildGraphInsights(scopedTasks(), workingProjects, new Date(), dismissed));
     paintInsights();
-    if (mount && !prefersReducedMotion()) {
-      stage.classList.add('is-fading');
-      await new Promise((resolve) => window.setTimeout(resolve, 160));
-    }
-    mount?.teardown();
-    mount = null;
     const q = searchQuery.trim().toLowerCase();
     const matches = scopedTasks().filter((t) => t.title.toLowerCase().includes(q));
     matchCount.textContent = q ? `${matches.length} match${matches.length === 1 ? '' : 'es'}` : '';
-    stage.replaceChildren();
-    stage.classList.remove('is-fading');
     if (listMode) {
+      if (mount) {
+        mount.teardown();
+        mount = null;
+        mountedView = null;
+      }
+      stage.replaceChildren();
       stage.append(
         createVizNodeList(
           `${view} list`,
@@ -322,76 +321,94 @@ export async function renderGraphView(canvas: HTMLElement): Promise<void> {
       onReviewInsight: (id: string) => {
         const insight = insights.find((row) => row.id === id);
         if (insight) reviewInsight(insight);
+      },
+      onDismissInsight: (id: string) => {
+        const insight = insights.find((row) => row.id === id);
+        if (insight) void dismissInsight(insight);
       }
     };
-    if (view === 'lines') {
-      mount = mountLinesView(stage, {
-        ...common,
-        scale: scaleLines,
-        focusedProjectId,
-        onComplete: (id) => void completeTask(id),
-        onFocusProject: (id) => {
-          focusedProjectId = id;
-          void paintView();
-        },
-        onAddStation: (projectId, stepOrder) => {
-          const domain = workingProjects.find((p) => p.id === projectId)
-            ? scopedTasks().find((t) => t.parent_project_id === projectId)?.domain ?? 'other'
-            : 'other';
-          void tasksApi.createTask({
-            title: 'New station',
-            domain,
-            parent_project_id: projectId,
-            step_order: stepOrder
-          });
-        },
-        onReorder: (taskId, stepOrder) => {
-          void tasksApi.updateTask(taskId, { step_order: stepOrder });
-        },
-        onToggleScale: () => {
-          scaleLines = !scaleLines;
-          void paintView();
-        }
-      });
-    } else if (view === 'branch') {
-      mount = mountBranchView(stage, {
-        ...common,
-        hideDone,
-        onLink: (fromId, toId) => {
-          const target = workingTasks.find((t) => t.id === toId);
-          if (!target) return;
-          void tasksApi.updateTask(toId, { depends_on: [...(target.depends_on ?? []), fromId] });
-        },
-        onUnlink: (fromId, toId) => {
-          const target = workingTasks.find((t) => t.id === toId);
-          if (!target) return;
-          void tasksApi.updateTask(toId, { depends_on: (target.depends_on ?? []).filter((id) => id !== fromId) });
-        },
-        onToggleHideDone: () => {
-          hideDone = !hideDone;
-          void paintView();
-        },
-        onWhatIf: () => undefined,
-        onApplyWhatIf: () => undefined
-      });
+    const linesInput = {
+      ...common,
+      scale: scaleLines,
+      focusedProjectId,
+      onComplete: (id: string) => void completeTask(id),
+      onFocusProject: (id: string | null) => {
+        focusedProjectId = id;
+        void paintView();
+      },
+      onAddStation: (projectId: string, stepOrder: number) => {
+        const domain = workingProjects.find((p) => p.id === projectId)
+          ? scopedTasks().find((t) => t.parent_project_id === projectId)?.domain ?? 'other'
+          : 'other';
+        void tasksApi.createTask({
+          title: 'New station',
+          domain,
+          parent_project_id: projectId,
+          step_order: stepOrder
+        });
+      },
+      onReorder: (taskId: string, stepOrder: number) => {
+        void tasksApi.updateTask(taskId, { step_order: stepOrder });
+      },
+      onToggleScale: () => {
+        scaleLines = !scaleLines;
+        void paintView();
+      }
+    };
+    const branchInput = {
+      ...common,
+      hideDone,
+      onLink: (fromId: string, toId: string) => {
+        const target = workingTasks.find((t) => t.id === toId);
+        if (!target) return;
+        void tasksApi.updateTask(toId, { depends_on: [...(target.depends_on ?? []), fromId] });
+      },
+      onUnlink: (fromId: string, toId: string) => {
+        const target = workingTasks.find((t) => t.id === toId);
+        if (!target) return;
+        void tasksApi.updateTask(toId, { depends_on: (target.depends_on ?? []).filter((id) => id !== fromId) });
+      },
+      onToggleHideDone: () => {
+        hideDone = !hideDone;
+        void paintView();
+      },
+      onWhatIf: () => undefined,
+      onApplyWhatIf: () => undefined
+    };
+    const orbitInput = {
+      ...common,
+      lookAhead,
+      paused: orbitPaused || prefersReducedMotion(),
+      onPauseChange: (paused: boolean) => {
+        orbitPaused = paused;
+      },
+      onLookAhead: (days: number) => {
+        lookAhead = days;
+        if (mount && 'setLookAhead' in mount) mount.setLookAhead(days);
+      },
+      onReschedule: (taskId: string, dateKey: string) => {
+        showConfirmWrite(confirmHost, 'Move due date', `Set due date to ${dateKey}?`, async () => {
+          await tasksApi.updateTask(taskId, { due_date: dateKey });
+        });
+      }
+    };
+    if (mount && mountedView === view) {
+      if (view === 'lines' && 'update' in mount) mount.update(linesInput);
+      else if (view === 'branch' && 'update' in mount) mount.update(branchInput);
+      else if (view === 'orbit' && 'update' in mount) mount.update(orbitInput);
     } else {
-      mount = mountOrbitView(stage, {
-        ...common,
-        lookAhead,
-        paused: orbitPaused || prefersReducedMotion(),
-        onPauseChange: (paused) => {
-          orbitPaused = paused;
-        },
-        onLookAhead: (days) => {
-          lookAhead = days;
-          if (mount && 'setLookAhead' in mount) mount.setLookAhead(days);
-        },
-        onReschedule: (taskId, dateKey) => {
-          showConfirmWrite(confirmHost, 'Move due date', `Set due date to ${dateKey}?`, async () => {
-            await tasksApi.updateTask(taskId, { due_date: dateKey });
-          });
-        }
-      });
+      if (mount && !prefersReducedMotion()) {
+        stage.classList.add('is-fading');
+        await new Promise((resolve) => window.setTimeout(resolve, 160));
+      }
+      mount?.teardown();
+      mount = null;
+      stage.replaceChildren();
+      stage.classList.remove('is-fading');
+      if (view === 'lines') mount = mountLinesView(stage, linesInput);
+      else if (view === 'branch') mount = mountBranchView(stage, branchInput);
+      else mount = mountOrbitView(stage, orbitInput);
+      mountedView = view;
     }
     if (selectedId) {
       openDrawer();

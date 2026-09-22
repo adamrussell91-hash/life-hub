@@ -133,6 +133,11 @@ export function createMockApi({ seed }: MockApiOptions) {
     return { status, body };
   }
 
+  function seedFailure(error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return json(500, { ok: false, error: { code: 'seed_failed', message } });
+  }
+
   async function handle(method: string, urlPath: string, body?: unknown) {
     await ensure();
     const url = new URL(urlPath, 'http://local.test');
@@ -166,6 +171,27 @@ export function createMockApi({ seed }: MockApiOptions) {
 
     if (!authenticated && path.startsWith('/api/')) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Sign in required' } });
+    }
+
+    if (path === '/api/reset-seed' && method === 'POST') {
+      try {
+        kv.map.clear();
+        await seedIfEmpty(kv, keys, seed, { force: true });
+        seeded = true;
+        return json(200, { ok: true });
+      } catch (error) {
+        return seedFailure(error);
+      }
+    }
+
+    if (path === '/api/graph-visual-seed' && method === 'POST') {
+      try {
+        const { seedGraphVisualFixture } = await import('./seed-graph-visual');
+        const result = await seedGraphVisualFixture(kv);
+        return json(200, { ok: true, data: result });
+      } catch (error) {
+        return seedFailure(error);
+      }
     }
 
     const s = store();
