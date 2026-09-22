@@ -416,7 +416,12 @@ async function handleLogout(): Promise<void> {
 }
 
 function mountTeacherShell(): TeacherShellRefs {
-  const refs = renderTeacherShell(appRoot, { onLogout: () => handleLogout() });
+  const refs = renderTeacherShell(appRoot, {
+    onLogout: () => handleLogout(),
+    onRefresh: () => {
+      location.reload();
+    }
+  });
   teacherShellRefs = refs;
   return refs;
 }

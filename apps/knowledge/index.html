@@ -8,6 +8,7 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta name="description" content="A private archive for University and Notes." />
     <title>Knowledge Hub</title>
+    <link rel="stylesheet" href="./src/tokens.css" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
@@ -24,7 +25,20 @@
     </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="sign-in">
+        <form class="sign-in__card" method="post" action="#" novalidate>
+          <p class="sign-in__brand">Knowledge Hub</p>
+          <h1 class="sign-in__title">Sign in</h1>
+          <div class="sign-in__field">
+            <label class="sign-in__label" for="sign-in-passphrase">Passphrase</label>
+            <input class="sign-in__input" id="sign-in-passphrase" name="passphrase" type="password" required autocomplete="current-password" enterkeyhint="go" />
+          </div>
+          <p class="sign-in__error" role="alert" hidden></p>
+          <button class="btn btn--primary sign-in__submit" type="submit">Sign in</button>
+        </form>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -1975,43 +1975,12 @@ a:hover {
   border-bottom: 1px solid var(--on-dark-line);
 }
 
-/* Sits on the navy rail — must match .nav-item's on-dark treatment. */
-.primary-nav__link {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 2.75rem;
-  padding: var(--space-2) var(--space-3);
-  font-family: var(--font-ui);
-  font-size: var(--font-size-card);
-  font-weight: var(--weight-medium);
-  color: var(--on-dark);
-  text-decoration: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  transition:
-    background-color 150ms ease,
-    border-color 150ms ease,
-    color 150ms ease;
-}
-
+/* Kit `.hub-rail__link` owns row type, colour, and height. Keep the glyph
+   alias so Teaching's SVG class still sizes to the locked 18px icon. */
 .primary-nav__glyph {
-  width: var(--space-5);
-  height: var(--space-5);
+  width: 1.125rem;
+  height: 1.125rem;
   flex-shrink: 0;
-}
-
-.primary-nav__link:hover {
-  background: var(--on-dark-hover);
-  color: #fff;
-}
-
-.primary-nav__link[aria-current='page'] {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.09);
-  color: #fff;
-  font-weight: var(--weight-semibold);
 }
 
 .curriculum-nav {
@@ -6918,6 +6887,10 @@ input.scope-timeline__note-title:focus-visible {
     align-items: stretch;
     gap: var(--space-3);
     margin-bottom: var(--space-4);
+  }
+
+  .page-header__title {
+    font-size: var(--text-xl);
   }
 
   .page-header__actions {

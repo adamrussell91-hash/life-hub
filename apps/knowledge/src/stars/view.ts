@@ -22,10 +22,10 @@ type StarsScreen = "sky" | "working" | "proposal" | "detail";
 
 function graphModesHtml() {
   return `<div class="graph-modes stars-graph-modes" role="group" aria-label="Graph mode">
-    <button type="button" data-stars-exit="constellation">Constellation</button>
     <button type="button" data-stars-exit="showAll">Show All</button>
+    <button type="button" data-stars-exit="constellation">Clusters</button>
     <button type="button" data-stars-exit="universe">Universe</button>
-    <button type="button" class="is-active" aria-pressed="true">Stars</button>
+    <button type="button" class="is-active" aria-pressed="true">Constellations</button>
   </div>`;
 }
 
@@ -276,7 +276,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       : `${totalNotes} note${totalNotes === 1 ? "" : "s"} waiting to be connected`;
     renderShell(`<div class="stars-sky-wrap" data-stars-sky-wrap>
       <div class="stars-sky-toolbar glass-panel">
-        <div><p class="eyebrow">Stars</p><h2>Night sky</h2><p class="stars-sky-toolbar__meta" data-stars-meta>${escapeHtml(meta)}</p></div>
+        <div><p class="eyebrow">Graph</p><h2>Constellations</h2><p class="stars-sky-toolbar__meta" data-stars-meta>${escapeHtml(meta)}</p></div>
         <form class="stars-search" data-stars-search>
           <label class="sr-only" for="stars-query">Topic or question</label>
           <input id="stars-query" type="search" value="${escapeHtml(query)}" placeholder="What should Clementine connect?" autocomplete="off" required />
@@ -285,7 +285,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
         <button type="button" class="btn btn--ghost stars-fullscreen-btn" data-stars-fullscreen aria-pressed="false">Full screen</button>
       </div>
       ${error ? `<p class="stars-error" role="alert">${escapeHtml(error)}</p>` : ""}
-      <section class="stars-sky" data-stars-sky aria-label="Night sky: saved constellations and notes"></section>
+      <section class="stars-sky" data-stars-sky aria-label="Constellations: saved maps and notes"></section>
       <div class="stars-horizon-row">
         <div class="stars-horizon glass-panel" data-stars-horizon aria-label="Sky position, drag to travel through time"></div>
       </div>
@@ -309,7 +309,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
     canvasTeardown = () => panoramaController?.destroy();
 
     if (!saved.length && !options.entries.length) {
-      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>Your sky has no constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
+      sky.insertAdjacentHTML("beforeend", `<div class="stars-empty"><span aria-hidden="true">✦</span><h3>No constellations yet</h3><p>Search a topic. Clementine will find the strongest notes, connect them, and propose a synthesis for you to approve.</p></div>`);
     }
 
     host.querySelector<HTMLFormElement>("[data-stars-search]")!.onsubmit = event => {
@@ -376,7 +376,7 @@ export function mountStarsView(host: HTMLElement, options: StarsViewOptions) {
       if (!stopped && screen === "sky") render();
     })
     .catch(caught => {
-      error = caught instanceof Error ? caught.message : "Night sky could not load.";
+      error = caught instanceof Error ? caught.message : "Constellations could not load.";
       if (!stopped && screen === "sky") render();
     });
 

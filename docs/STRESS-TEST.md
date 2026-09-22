@@ -451,7 +451,7 @@ On an existing note:
 ### 3.4 Graph
 
 - [ ] Canvas paints nodes. It is not a white empty stage with no caption.
-- [ ] Switch Constellation / Show all / Universe. Each mode is visually distinct.
+- [ ] Switch Show All / Clusters / Universe / Constellations. Each mode is visually distinct.
 - [ ] Search / focus a topic. Unrelated nodes dim or leave.
 - [ ] Click a node. Preview card or navigation works. Close / Back returns to the graph.
 - [ ] Pan and zoom. The graph does not detach from the canvas or cover the rail.
@@ -536,7 +536,7 @@ Do all four. These break visually more than they 404.
 | `#/universe` | Solar-system scene, key/legend readable, click a body |
 | `#/orbit` | Orbit canvas, not a blank tile |
 | `#/branch` | Branch/tree geometry |
-| `#/constellation` | Sky / constellation, not the blockers graph |
+| `#/constellation` | Alias of Graph (retired Sky). Must not 404. |
 
 ### 4.9 Gantt `#/gantt` and Timeline `#/timeline`
 
@@ -702,10 +702,10 @@ Do not open a PR. Do not “just fix” a failure unless Adam’s prompt for tha
 
 If a rail item or hash exists in the product and is missing here, add it in the same report’s Notes and treat the omission as a miss in the sweep.
 
-**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Shortcuts.
+**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Shortcuts, Future map (`/#future-map`).
 
 **Teaching routes:** `/`, `/sign-in`, `/classes`, `/classes/:id`, `/scope-sequences`, `/scope-sequences/:subjectId`, `/units`, `/units/:unitId`, `/lessons`, `/lessons/:id`, `/templates`, `/resources`, `/trash`, `/s/lessons/:id`, `/s/units/:id`, `/s/classes/:id`, `/s/classes/:id/lessons/:id`.
 
-**Knowledge views:** Archive, Notebooks, Graph (constellation / show-all / universe), Timeline, Chat, Podcast, Quiz, note `#page/:id`, Compose.
+**Knowledge views:** Archive, Notebooks, Graph (show-all / clusters / universe / constellations), Timeline, Chat, Podcast, Quiz, note `#page/:id`, Compose.
 
 **Tasks hashes:** `#/board`, `#/clare`, `#/day`, `#/week`, `#/week?layout=day`, `#/month`, `#/list`, `#/graph`, `#/graph?mode=workstreams`, `#/gantt`, `#/timeline`, `#/universe`, `#/orbit`, `#/branch`, `#/constellation`, `#/goals`, `#/someday`, `#/templates`, `#/projects`, `#/excursions`, `#/excursions/new`, `#/programs`, `#/stress`, `#/corey`, `#/maps`, `#/maps/:mapId/station/:id`, `#/maps/:mapId/event/:id`, `#/search`, `#/properties`, `#/task/:id`, `#/project/:id`, `#/capacity/:token`.

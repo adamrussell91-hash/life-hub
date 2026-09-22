@@ -41,6 +41,14 @@ describe('hash routes', () => {
     expect(parseHashRoute()).toBe('maps');
   });
 
+  it('aliases retired #/constellation to Graph so old Sky links do not 404', () => {
+    location.hash = '#/constellation';
+    expect(hashViewId()).toBe('constellation');
+    expect(isKnownHashView()).toBe(true);
+    expect(parseHashRoute()).toBe('graph');
+    expect(knownHubViews()).not.toContain('constellation');
+  });
+
   it('treats unknown hashes as not-known instead of silently being maps', () => {
     location.hash = '#/definitely-missing';
     expect(isKnownHashView()).toBe(false);

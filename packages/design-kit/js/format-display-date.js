@@ -56,6 +56,40 @@ export function formatDisplayDate(value) {
  * @param {string | Date | null | undefined} end
  * @returns {string}
  */
+/**
+ * Parse a visible `dd/mm/yy` (or `dd/mm/yyyy`) day back to `YYYY-MM-DD`.
+ * Already-canonical keys pass through. Unparseable strings → `''`.
+ *
+ * @param {string | Date | null | undefined} value
+ * @returns {string}
+ */
+export function parseDisplayDate(value) {
+  if (value == null || value === '') return '';
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return '';
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat('en-CA', {
+        timeZone: SYDNEY_TZ,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+        .formatToParts(value)
+        .filter((part) => part.type !== 'literal')
+        .map((part) => [part.type, part.value])
+    );
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+  const text = String(value).trim();
+  if (!text) return '';
+  const key = DATE_KEY.exec(text);
+  if (key) return `${key[1]}-${key[2]}-${key[3]}`;
+  const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/.exec(text);
+  if (!dmy) return '';
+  const year = dmy[3].length === 2 ? 2000 + Number(dmy[3]) : Number(dmy[3]);
+  return `${year}-${pad2(dmy[2])}-${pad2(dmy[1])}`;
+}
+
 export function formatDisplayDateRange(start, end) {
   const left = formatDisplayDate(start);
   const right = formatDisplayDate(end);
