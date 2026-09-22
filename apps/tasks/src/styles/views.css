@@ -5290,10 +5290,18 @@ html.is-map-fullscreen .map-page .map-preview {
 }
 
 /* Month grid uses the full canvas — the empty 16rem rail was pinning it short. */
+.hub-layout[data-hub-view='month'] {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 .hub-layout[data-hub-view='month'] .hub-canvas {
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
@@ -5302,11 +5310,15 @@ html.is-map-fullscreen .map-page .map-preview {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .hub-layout[data-hub-view='month'] .hub-calendar--month {
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
 }
 
 .hub-calendar--month .hub-calendar__workspace {
@@ -5338,6 +5350,10 @@ html.is-map-fullscreen .map-page .map-preview {
   grid-template-rows: auto repeat(6, minmax(0, 1fr));
 }
 
+.hub-calendar--month .hub-calendar__day {
+  min-height: 0;
+}
+
 .hub-calendar--month .hub-calendar__nav {
   justify-content: flex-start;
 }
@@ -5360,6 +5376,14 @@ html.is-map-fullscreen .map-page .map-preview {
 }
 
 @media (max-width: 720px) {
+  .hub-layout[data-hub-view='month'],
+  .hub-layout[data-hub-view='month'] .hub-canvas,
+  .hub-layout[data-hub-view='month'] .hub-canvas__body {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
   .hub-calendar--workspace .hub-calendar__workspace {
     grid-template-columns: minmax(0, 1fr);
   }
