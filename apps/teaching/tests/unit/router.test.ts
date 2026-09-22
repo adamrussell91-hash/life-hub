@@ -11,6 +11,15 @@ describe('router match', () => {
     });
   });
 
+  it('matches teacher chat', () => {
+    expect(match('/chat')).toEqual({
+      name: 'teacher-chat',
+      params: {},
+      requiresAuth: true,
+      path: '/chat'
+    });
+  });
+
   it('matches teacher lesson editor', () => {
     expect(match('/lessons/lesson_aotfw_008')).toEqual({
       name: 'teacher-lesson',

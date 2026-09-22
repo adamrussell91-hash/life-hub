@@ -16,10 +16,13 @@ const cardsCss = readFileSync(
 describe('primary rail navigation', () => {
   beforeEach(() => resetRailDisclosureStateForTests());
 
-  it('places Chat in Home and removes it from Plan', () => {
+  it('sets Dashboard and Chat apart as majors', () => {
     const host = document.createElement('div');
     renderPrimaryNav(host, 'board');
-    expect(host.querySelector('[data-nav-section="home"]')?.textContent).toContain('Chat');
+    const majors = host.querySelector('.hub-rail__majors');
+    expect(majors?.textContent).toContain('Dashboard');
+    expect(majors?.textContent).toContain('Chat');
+    expect(host.querySelector('[data-nav-section="home"]')).toBeNull();
     expect(host.querySelector('[data-nav-section="plan"]')?.textContent).not.toContain('Chat');
   });
 
@@ -79,7 +82,7 @@ describe('primary rail navigation', () => {
     renderPrimaryNav(railNav, 'board');
     const bar = root.querySelector('.hub-mobile-nav');
     expect(bar).not.toBeNull();
-    expect(bar?.textContent).toContain('Home');
+    expect(bar?.textContent).toContain('Dashboard');
     expect(bar?.textContent).toContain('Chat');
     expect(bar?.textContent).toContain('Today');
     expect(bar?.textContent).toContain('More');

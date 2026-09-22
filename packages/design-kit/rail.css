@@ -91,6 +91,13 @@ a.hub-rail__brand:focus-visible {
   min-height: 0;
 }
 
+/* Home / Dashboard / Archive + Chat (+ Life Calendar) sit above the rest. */
+.hub-rail__majors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
 .hub-rail__section {
   display: flex;
   align-items: center;

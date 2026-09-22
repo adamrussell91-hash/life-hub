@@ -4,6 +4,9 @@ import { navigate } from '@/app/router';
 import type { TeacherSection } from '@/teacher/section';
 
 const HOME = ['M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'];
+const CHAT = [
+  'M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z'
+];
 const CLASSES = [
   'M8 3v4M16 3v4M5 7h14a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1zM4 11h16'
 ];
@@ -21,11 +24,19 @@ export function syncTeachingMobileChrome(host: HTMLElement, active: TeacherSecti
     primary: [
       {
         id: 'home',
-        label: 'Home',
+        label: 'Dashboard',
         paths: HOME,
         href: withAppBase('/'),
         current: active === 'home',
         onSelect: () => navigate('/')
+      },
+      {
+        id: 'chat',
+        label: 'Chat',
+        paths: CHAT,
+        href: withAppBase('/chat'),
+        current: active === 'chat',
+        onSelect: () => navigate('/chat')
       },
       {
         id: 'classes',
@@ -34,17 +45,16 @@ export function syncTeachingMobileChrome(host: HTMLElement, active: TeacherSecti
         href: withAppBase('/classes'),
         current: active === 'classes',
         onSelect: () => navigate('/classes')
-      },
+      }
+    ],
+    more: [
       {
         id: 'lessons',
         label: 'Lessons',
         paths: LESSONS,
         href: withAppBase('/lessons'),
-        current: active === 'lessons',
         onSelect: () => navigate('/lessons')
-      }
-    ],
-    more: [
+      },
       {
         id: 'scope-sequences',
         label: 'Scope & Sequences',

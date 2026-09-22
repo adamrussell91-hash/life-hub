@@ -70,18 +70,18 @@ export function syncKnowledgeMobileChrome(
         onSelect: nav.goArchive
       },
       {
-        id: "graph",
-        label: "Graph",
-        paths: GRAPH,
-        current: view === "graph",
-        onSelect: nav.goGraph
-      },
-      {
         id: "chat",
         label: "Chat",
         paths: CHAT,
         current: view === "chat",
         onSelect: nav.goChat
+      },
+      {
+        id: "graph",
+        label: "Graph",
+        paths: GRAPH,
+        current: view === "graph",
+        onSelect: nav.goGraph
       }
     ],
     more: [

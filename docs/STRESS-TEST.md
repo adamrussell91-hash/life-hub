@@ -151,7 +151,7 @@ Run this on **every** page before the page-specific list. Fail any item that is 
 ### Phone (390px) — every hub, every visit
 
 - [ ] Left rail is gone. No compact top-strip substitute.
-- [ ] Bottom bar has exactly four slots. Life: Home, Chat, Calendar, More. Teaching: Dashboard, Classes, Lessons, More. Knowledge: Archive, Graph, Chat, More. Tasks: Dashboard, Chat, Today, More.
+- [ ] Bottom bar has exactly four slots. Life: Home, Chat, Calendar, More. Teaching: Dashboard, Chat, Classes, More. Knowledge: Archive, Chat, Graph, More. Tasks: Dashboard, Chat, Today, More.
 - [ ] More opens a sheet: “In this hub” secondaries, then a Hubs list of the other three. Those links work.
 - [ ] Header utilities still reachable. Title does not collide with them.
 - [ ] Charts and cards reflow. Nothing requires sideways scrolling to read.
@@ -295,6 +295,8 @@ A floating button that opens Chat on the wrong agent is FAIL.
 ### 1.8 Calendar
 
 - [ ] A month/week schedule paints. Days are `dd/mm/yy` or weekday labels, not ISO.
+- [ ] Source strip names Life, Teaching, Knowledge, Tasks, Professional with counts, pending, or unavailable — not a silent empty.
+- [ ] Day/week/month show events from every live hub, not Life-only.
 - [ ] Click a day with events. Detail appears.
 - [ ] Click an empty day. Composer / empty state appears. **Do not create an event.**
 - [ ] Prev/next period changes the grid.
@@ -329,7 +331,8 @@ Brand click → Dashboard (`/teaching/` or `/teaching`).
 ### 2.1 Shared teacher chrome
 
 - [ ] Rail search opens the command palette. Type a known lesson word. A result appears. Escape closes. Result click opens the lesson.
-- [ ] Primary nav: Dashboard, Classes, Scope & Sequences, Units, Lessons, Templates, Resource Library, Trash. Click each list page.
+- [ ] Major tabs set apart: Dashboard, Chat. Then Classes, Scope & Sequences, Units, Lessons, Templates, Resource Library, Trash. Click each list page.
+- [ ] Chat `/teaching/chat` mounts Ann against today’s or the next lesson, or a fail-visible empty with Go to Lessons.
 - [ ] Your classes list shows active class codes. `+` New class opens a name modal. **Cancel.**
 - [ ] Hub switcher at the bottom of the rail works.
 
@@ -698,7 +701,7 @@ If a rail item or hash exists in the product and is missing here, add it in the 
 
 **Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Future map (`/#future-map`).
 
-**Teaching routes:** `/`, `/sign-in`, `/classes`, `/classes/:id`, `/scope-sequences`, `/scope-sequences/:subjectId`, `/units`, `/units/:unitId`, `/lessons`, `/lessons/:id`, `/templates`, `/resources`, `/trash`, `/s/lessons/:id`, `/s/units/:id`, `/s/classes/:id`, `/s/classes/:id/lessons/:id`.
+**Teaching routes:** `/`, `/sign-in`, `/chat`, `/classes`, `/classes/:id`, `/scope-sequences`, `/scope-sequences/:subjectId`, `/units`, `/units/:unitId`, `/lessons`, `/lessons/:id`, `/templates`, `/resources`, `/trash`, `/s/lessons/:id`, `/s/units/:id`, `/s/classes/:id`, `/s/classes/:id/lessons/:id`.
 
 **Knowledge views:** Archive, Notebooks, Graph (show-all / clusters / universe / constellations), Timeline, Chat, Podcast, Quiz, note `#page/:id`, Compose.
 

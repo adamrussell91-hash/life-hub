@@ -5,6 +5,7 @@ import { sectionFromRoute } from '@/teacher/section';
 describe('sectionFromRoute', () => {
   it('maps teacher routes to primary sections', () => {
     expect(sectionFromRoute(match('/')!)).toBe('home');
+    expect(sectionFromRoute(match('/chat')!)).toBe('chat');
     expect(sectionFromRoute(match('/classes')!)).toBe('classes');
     expect(sectionFromRoute(match('/classes/class_2026_12engadv1')!)).toBe('classes');
     expect(sectionFromRoute(match('/scope-sequences')!)).toBe('scope-sequences');

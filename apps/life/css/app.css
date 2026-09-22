@@ -8079,6 +8079,19 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .hc-hit, .hc-tip, .hc-row, .hc-obs { transition: none; }
 }
 
+.hub-calendar__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted, var(--orca));
+}
+
+.hub-calendar__sources [data-status="unavailable"] {
+  color: var(--danger);
+}
+
 /* Body page charts (chart-kit shed-stack, stairs-down, carved-away, recomp-scissors, hundred-squares). Tokens only. */
 .body-chart-block { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
 .body-chart-block .hub-pills { justify-self: start; }

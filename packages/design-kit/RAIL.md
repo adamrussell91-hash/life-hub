@@ -28,8 +28,11 @@ Read this before adding or restyling a rail destination. Snippet: `snippets/rail
 │  .hub-rail__tagline (optional)            │
 │  .hub-rail__search  (optional, Teaching)  │
 │  .hub-rail__nav                           │
-│     .hub-rail__link  [icon] Label         │
-│     .hub-rail__section  (optional)        │
+│     .hub-rail__majors                     │
+│        .hub-rail__link  Home / Dashboard  │
+│        .hub-rail__link  Chat              │
+│        .hub-rail__link  Calendar (Life)   │
+│     .hub-rail__section                    │
 │     .hub-rail__link  [icon] Label         │
 │     .hub-rail__link--plain  Shortcut      │
 │  .hub-rail__status  (optional, mt auto)   │
@@ -51,6 +54,20 @@ Copy `snippets/rail.html`. Do not invent a parallel aside.
 - No logo, concentric mark, hub tile, or stacked `<br>` wordmark beside or above the brand. The hub tile is deleted from product chrome (`ICONS.md`).
 - No collapse chevron attached to the brand. If a hub collapses the rail, that control is a separate `.hub-icon-btn`, not the wordmark.
 - Optional `.hub-rail__tagline` is not a link (e.g. Life’s “Private dashboard”).
+
+## Major destinations
+
+Every hub sets the home destination and **Chat** apart at the top of the rail, inside `.hub-rail__majors`. They use the same `.hub-rail__link` row chrome. A `.hub-rail__section` heading then starts the rest of that hub.
+
+| Hub | Majors |
+|-----|--------|
+| Life | Home, Chat, **Calendar** (master umbrella calendar) |
+| Teaching | Dashboard, Chat |
+| Knowledge | Archive, Chat |
+| Tasks | Dashboard, Chat |
+| Professional | Home |
+
+Do not bury Chat (or Life Calendar) under an accordion or a secondary section. Domain pages, class lists, and other destinations sit **after** the majors.
 
 ## Primary destinations
 

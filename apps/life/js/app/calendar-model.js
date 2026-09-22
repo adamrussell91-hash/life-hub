@@ -60,7 +60,9 @@ export function eventDetailTitle(record, body = '') {
     case 'sleep':
       return 'Sleep';
     case 'scheduled_lesson':
-      return record.title || 'Lesson';
+      return record.class_title && record.title
+        ? `${record.title} · ${record.class_title}`
+        : record.title || 'Lesson';
     case 'professional_meeting':
       return record.title || 'Meeting';
     case 'professional_event':
@@ -159,13 +161,43 @@ export function resolveCalendarDayClick(expandedDate, clickedDate) {
   return { selectedDate: clickedDate, expandedDate: clickedDate };
 }
 
+const SOURCE_BY_TYPE = {
+  scheduled_lesson: 'teaching',
+  knowledge_page: 'knowledge',
+  task: 'tasks',
+  work_block: 'tasks',
+  professional_meeting: 'professional',
+  professional_event: 'professional'
+};
+
+const SOURCE_LABELS = [
+  { id: 'life', label: 'Life' },
+  { id: 'teaching', label: 'Teaching' },
+  { id: 'knowledge', label: 'Knowledge' },
+  { id: 'tasks', label: 'Tasks' },
+  { id: 'professional', label: 'Professional' }
+];
+
 function eventDurationMin(record) {
   // Meals are a timestamp, not a sitting — short chip for grid placement.
   if (record?.type === 'meal') return 5;
-  if (record?.type === 'workout' && record.duration_min != null) return Number(record.duration_min);
-  if (record?.type === 'work_block' && record.duration_min != null) return Number(record.duration_min);
+  if (record?.duration_min != null) return Number(record.duration_min);
   if (record?.type === 'sleep' && record.duration_h != null) return Number(record.duration_h) * 60;
   return 60;
+}
+
+export function calendarSourceSummary(events, status = {}) {
+  const counts = { life: 0, teaching: 0, knowledge: 0, tasks: 0, professional: 0 };
+  for (const event of events ?? []) {
+    const source = SOURCE_BY_TYPE[event?.record?.type] ?? 'life';
+    counts[source] += 1;
+  }
+  return SOURCE_LABELS.map(item => ({
+    id: item.id,
+    label: item.label,
+    count: counts[item.id],
+    status: status[item.id] ?? (item.id === 'life' ? 'live' : 'pending')
+  }));
 }
 
 export function eventsForDate(events, date) {
@@ -200,7 +232,8 @@ export function buildCalendarModel({
   planningLens = false,
   mission = null,
   protectedWindows = [],
-  ghostPreview = false
+  ghostPreview = false,
+  sourceStatus = {}
 }) {
   if (!date) throw new RangeError('Calendar display date is unavailable');
   const selected = selectedDate && isCalendarDate(selectedDate) ? selectedDate : date;
@@ -251,6 +284,7 @@ export function buildCalendarModel({
       isSelected: day === selected
     })),
     dayEvents: eventsByDate[selected] ?? eventsForDate(events, selected),
-    eventsByDate
+    eventsByDate,
+    sources: calendarSourceSummary(events, { life: 'live', ...sourceStatus })
   };
 }

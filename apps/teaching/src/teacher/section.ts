@@ -2,6 +2,7 @@ import type { RouteMatch } from '@/app/router';
 
 export type TeacherSection =
   | 'home'
+  | 'chat'
   | 'classes'
   | 'scope-sequences'
   | 'units'
@@ -14,6 +15,8 @@ export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
   switch (match.name) {
     case 'teacher-home':
       return 'home';
+    case 'teacher-chat':
+      return 'chat';
     case 'teacher-classes':
     case 'teacher-class':
       return 'classes';

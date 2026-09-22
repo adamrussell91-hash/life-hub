@@ -230,3 +230,19 @@ test('desktop day view stays on the time-grid path', () => {
   assertKitWorkspace(calendar, 'day');
   assert.equal(calendar.querySelector('[data-calendar="now-card"]'), null);
 });
+
+test('master calendar names every hub source', () => {
+  const root = fakeRoot({ mobile: false });
+  renderCalendar(root, model([
+    { record: { type: 'scheduled_lesson', date: '2026-08-05', time: '09:15', title: 'Memory' }, body: '', path: 't' },
+    { record: { type: 'task', date: '2026-08-05', title: 'Marking' }, body: '', path: 'k' }
+  ]), { view: 'week' });
+  const strip = root._host.querySelector('.hub-calendar__sources');
+  assert.ok(strip);
+  const labels = (strip.children ?? []).map(node => node.textContent).join(' ');
+  assert.match(labels, /Life/);
+  assert.match(labels, /Teaching/);
+  assert.match(labels, /Knowledge/);
+  assert.match(labels, /Tasks/);
+  assert.match(labels, /Professional/);
+});

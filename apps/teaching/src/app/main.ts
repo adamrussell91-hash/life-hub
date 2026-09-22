@@ -11,6 +11,7 @@ import {
 import type { CurriculumResponse } from '@/teacher/nav';
 import { renderTeacherRail } from '@/teacher/rail';
 import { renderTeacherHome as renderHomeCanvas } from '@/teacher/home';
+import { renderTeacherChat } from '@/teacher/chat';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { openCreateModal } from '@/teacher/create/modal';
 import type { CreateKind, CreatedRecord } from '@/teacher/create/types';
@@ -91,6 +92,7 @@ let studentClassViewHandle: StudentClassViewHandle | null = null;
 
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
+let chatHandle: { dispose: () => void } | null = null;
 
 // Scope sequences index handle (create control), if mounted.
 let scopeIndexHandle: { dispose?: () => void } | null = null;
@@ -140,6 +142,12 @@ function teardownTeacherHome(): void {
   if (!homeHandle) return;
   homeHandle.dispose();
   homeHandle = null;
+}
+
+function teardownTeacherChat(): void {
+  if (!chatHandle) return;
+  chatHandle.dispose();
+  chatHandle = null;
 }
 
 function teardownScopeIndex(): void {
@@ -462,6 +470,17 @@ function renderTeacherHomeRoute(token: number): void {
     homeHandle = renderHomeCanvas(refs.canvas, curriculum, {
       onCreated: (kind, id, entity) => handleEntityCreated(refs, kind, id, entity)
     });
+  });
+}
+
+function renderTeacherChatRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  renderCanvasStatus(refs.canvas, 'Loading chat…');
+
+  void loadNavAndHandleErrors(refs, token, 'chat', undefined, (curriculum) => {
+    teardownTeacherChat();
+    chatHandle = renderTeacherChat(refs.canvas, curriculum);
   });
 }
 
@@ -853,6 +872,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-home':
       renderTeacherHomeRoute(token);
       break;
+    case 'teacher-chat':
+      renderTeacherChatRoute(token);
+      break;
     case 'teacher-classes':
       renderTeacherClassesRoute(token);
       break;
@@ -915,6 +937,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   // before tearing the editor down.
   await teardownLessonEditor();
   teardownTeacherHome();
+  teardownTeacherChat();
   teardownScopeIndex();
   teardownClassesIndex();
   teardownClassPage();

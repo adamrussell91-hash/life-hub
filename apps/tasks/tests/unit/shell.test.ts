@@ -108,10 +108,15 @@ describe('hub shell chrome', () => {
     const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
     renderPrimaryNav(refs.railNav, 'board');
 
+    const majors = [
+      ...refs.railNav.querySelectorAll('.hub-rail__list--desktop .hub-rail__majors .hub-rail__link')
+    ].map((el) => el.textContent);
+    expect(majors).toEqual(['Dashboard', 'Chat']);
+
     const sections = [
       ...refs.railNav.querySelectorAll('.hub-rail__list--desktop .hub-rail__section')
     ].map((el) => el.querySelector('span')?.textContent);
-    expect(sections).toEqual(['Home', 'Views', 'Plan', 'Work', 'Network', 'Tools']);
+    expect(sections).toEqual(['Views', 'Plan', 'Work', 'Network', 'Tools']);
 
     const links = [...refs.railNav.querySelectorAll('.hub-rail__list--desktop .hub-rail__link')];
     expect(links.some((link) => link.textContent === 'Orbit')).toBe(false);
@@ -161,6 +166,8 @@ describe('viewChrome', () => {
     expect(viewChrome('excursions')).toEqual({ eyebrow: 'Work', title: 'Excursions' });
     expect(viewChrome('maps')).toEqual({ eyebrow: 'Tools', title: 'Maps' });
     expect(viewChrome('orbit')).toEqual({ eyebrow: 'Views', title: 'Orbit' });
+    expect(viewChrome('board')).toEqual({ eyebrow: 'Home', title: 'Dashboard' });
+    expect(viewChrome('clare')).toEqual({ eyebrow: 'Home', title: 'Chat' });
   });
 });
 
