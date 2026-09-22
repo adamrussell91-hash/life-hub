@@ -185,10 +185,10 @@ export function buildGraphInsights(
     }
 
     const byId = new Map(tasks.map((t) => [t.id, t]));
+    const dependents = (id: string) => children.filter((item) => (item.depends_on ?? []).includes(id));
     for (const task of children) {
       if (task.status === 'done' || task.status === 'dead') continue;
-      if ((task.depends_on ?? []).length) continue;
-      if (!task.parent_task_id && path.length > 1 && !path.includes(task.id)) {
+      if (!task.parent_task_id && !(task.depends_on ?? []).length && path.length > 1 && !path.includes(task.id)) {
         const likely = path.find((id) => {
           const node = byId.get(id);
           return node && node.status !== 'done';
@@ -212,6 +212,32 @@ export function buildGraphInsights(
             ]
           });
         }
+      }
+      for (const other of children) {
+        if (other.id === task.id || other.status === 'done' || other.status === 'dead') continue;
+        if ((task.depends_on ?? []).includes(other.id) || (other.depends_on ?? []).includes(task.id)) continue;
+        if (task.step_order !== other.step_order) continue;
+        const shared = dependents(task.id).some((down) => (other.depends_on ?? []).includes(down.id) || dependents(other.id).some((item) => item.id === down.id));
+        if (!shared) continue;
+        const to = nodeState(other, tasks, now).state === 'blocked' ? other : task;
+        const from = to.id === other.id ? task : other;
+        if (insights.some((row) => row.id === `branch-link-${from.id}-${to.id}`)) continue;
+        insights.push({
+          id: `branch-link-${from.id}-${to.id}`,
+          view: 'branch',
+          severity: 'low',
+          anchor: { kind: 'link', from: from.id, to: to.id },
+          headline: 'Clare: link?',
+          detail: `${to.title} probably needs ${from.title} first.`,
+          proposal: [
+            {
+              kind: 'task_update',
+              summary: `Link ${to.title} to ${from.title}`,
+              task_id: to.id,
+              patch: { depends_on: [...(to.depends_on ?? []), from.id] }
+            }
+          ]
+        });
       }
     }
 

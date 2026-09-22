@@ -404,12 +404,11 @@ describe('unlockCount, criticalPath and doFirst', () => {
 });
 
 describe('orbitBody and collisions', () => {
-  it('puts overdue tasks in the 16–22 core', () => {
+  it('puts overdue tasks in the core (14 + min(days,4)×3)', () => {
     const late = task({ id: 'late', title: 'Late', due_date: '2026-09-01' });
     const body = orbitBody(late, now, 0);
     expect(body).not.toBeNull();
-    expect(body!.radius).toBeGreaterThanOrEqual(16);
-    expect(body!.radius).toBeLessThanOrEqual(22);
+    expect(body!.radius).toBe(14 + 4 * 3);
     expect(body!.heat).toBe(1);
   });
 
@@ -417,19 +416,31 @@ describe('orbitBody and collisions', () => {
     const today = task({ id: 't', title: 'Today', due_date: '2026-09-10' });
     const body = orbitBody(today, now, 0);
     expect(body!.effectiveDays).toBe(0);
-    expect(body!.radius).toBeLessThanOrEqual(22);
+    expect(body!.radius).toBe(14);
   });
 
   it('places day 30 at RMAX', () => {
     const later = task({ id: 't', title: 'Later', due_date: '2026-10-10' });
     const body = orbitBody(later, now, 0);
     expect(body!.effectiveDays).toBe(30);
-    expect(body!.radius).toBeCloseTo(180, 0);
+    expect(body!.radius).toBeCloseTo(262, 0);
   });
 
   it('places more than 30 days in the later belt', () => {
     const far = task({ id: 't', title: 'Far', due_date: '2026-11-20' });
-    expect(orbitBody(far, now, 0)!.radius).toBe(204);
+    expect(orbitBody(far, now, 0)!.radius).toBe(292);
+  });
+
+  it('places the ghost at a fractional mainline index', () => {
+    const tasks = [
+      task({ id: 'a', title: 'A', step_order: 0, status: 'done' }),
+      task({ id: 'b', title: 'B', step_order: 1 }),
+      task({ id: 'c', title: 'C', step_order: 2 }),
+      task({ id: 'd', title: 'D', step_order: 3 })
+    ];
+    const measured = pace(project({ created_at: '2026-08-01T00:00:00.000Z', current_end_date: '2026-09-20' }), tasks, now);
+    expect(measured!.ghostAt).not.toBe(Math.round(measured!.ghostAt));
+    expect(measured!.ghostAt).toBeGreaterThan(0);
   });
 
   it('finds a collision from capacity minutes', () => {

@@ -96,9 +96,15 @@ describe('buildGraphInsights', () => {
   it('emits a suggested station when the line is behind pace', () => {
     const tasks = [
       task({ id: 'a', title: 'A', step_order: 0, status: 'done' }),
-      task({ id: 'b', title: 'B', step_order: 1 })
+      task({ id: 'b', title: 'B', step_order: 1 }),
+      task({ id: 'c', title: 'C', step_order: 2 }),
+      task({ id: 'd', title: 'D', step_order: 3 })
     ];
-    const insights = buildGraphInsights(tasks, [project()], now);
+    const insights = buildGraphInsights(
+      tasks,
+      [project({ created_at: '2026-08-01T00:00:00.000Z', current_end_date: '2026-09-20' })],
+      now
+    );
     const suggest = insights.find((row) => row.id.startsWith('lines-suggest'));
     expect(suggest?.proposal?.[0]?.kind).toBe('task_create');
   });

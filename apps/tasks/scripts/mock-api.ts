@@ -168,6 +168,12 @@ export function createMockApi({ seed }: MockApiOptions) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Sign in required' } });
     }
 
+    if (path === '/api/graph-visual-seed' && method === 'POST') {
+      const { seedGraphVisualFixture } = await import('./seed-graph-visual');
+      const result = await seedGraphVisualFixture(kv);
+      return json(200, { ok: true, data: result });
+    }
+
     const s = store();
     const id = url.searchParams.get('id');
 

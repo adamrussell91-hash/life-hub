@@ -5,19 +5,25 @@ import { addDays, parseDue, startOfDay, toDateKey } from '@/domain/queries';
 import { projectMilestones } from '@/domain/project-milestones';
 import type { Task } from '@/schemas/task';
 import type { Milestone, Project } from '@/schemas/project';
+import {
+  ORBIT,
+  hashAngle,
+  heatForDays,
+  omegaForRadius,
+  radiusForDays
+} from '../../../life/js/app/chart-kit/orbit-radar.js';
 
 /** estimated_duration is stored in minutes. One working day when missing. */
 export const WORKING_DAY_MINUTES = 480;
 export const EFFORT_FLOOR_MINUTES = 15;
 export const DUE_SOON_DAYS = 7;
 export const MAJOR_DELAY_BEHIND = 2;
-export const ORBIT_R0 = 40;
-export const ORBIT_RMAX = 180;
-export const ORBIT_LATER_GAP = 24;
-export const ORBIT_OVERDUE_MIN = 16;
-export const ORBIT_OVERDUE_MAX = 22;
-/** Tune so an outer orbit (~RMAX) takes ~80s and an inner overdue core ~6s. */
-export const ORBIT_BASE_OMEGA = (2 * Math.PI) / 80;
+export const ORBIT_R0 = ORBIT.r0;
+export const ORBIT_RMAX = ORBIT.rMax;
+export const ORBIT_LATER_GAP = ORBIT.later - ORBIT.rMax;
+export const ORBIT_OVERDUE_MIN = 14;
+export const ORBIT_OVERDUE_MAX = 26;
+export const ORBIT_BASE_OMEGA = ORBIT.base;
 
 const DONE = new Set(['done', 'dead']);
 const WAITING = new Set(['waiting', 'follow_up_due']);
@@ -60,6 +66,8 @@ export type Pace = {
   actualDone: number;
   behind: number;
   ghostIndex: number;
+  /** Fractional mainline index — do not snap to a whole station. */
+  ghostAt: number;
   totalStations: number;
   daysRemaining: number | null;
 };
@@ -173,9 +181,7 @@ function dependentsOf(taskId: string, tasks: Task[]): Task[] {
 }
 
 function hashIdAngle(id: string): number {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) hash = (hash * 33 + id.charCodeAt(i)) >>> 0;
-  return ((hash % 3600) / 3600) * Math.PI * 2;
+  return hashAngle(id);
 }
 
 export function graphDataHash(
@@ -367,22 +373,29 @@ export function pace(project: Project, tasks: Task[], now: Date = new Date()): P
   const terminus = terminusDate(project, tasks);
   if (!terminus) return null;
   const route = projectRoute(project, tasks);
-  const totalStations = route.stations.length;
+  const seenSteps = new Set<number>();
+  const spine = route.mainline.filter((s) => {
+    if (s.kind !== 'task' || !s.task) return false;
+    const step = s.task.step_order;
+    if (seenSteps.has(step)) return false;
+    seenSteps.add(step);
+    return true;
+  });
+  const totalStations = spine.length;
   if (!totalStations) return null;
   const start = spanStart(project, tasks);
   const span = Math.max(1, daysBetween(start, terminus));
   const elapsed = Math.max(0, daysBetween(start, now));
   const expectedDone = Math.min(1, elapsed / span);
-  const ghostIndex = Math.round(expectedDone * totalStations);
-  const actualDone = route.stations.filter((s) => {
-    if (s.kind === 'milestone') return s.milestone?.status === 'done';
-    return s.task ? isDone(s.task) : false;
-  }).length;
+  const ghostAt = expectedDone * Math.max(1, totalStations - 1);
+  const ghostIndex = Math.round(ghostAt);
+  const actualDone = spine.filter((s) => (s.task ? isDone(s.task) : false)).length;
   return {
     expectedDone,
     actualDone,
     behind: ghostIndex - actualDone,
     ghostIndex,
+    ghostAt,
     totalStations,
     daysRemaining: daysBetween(now, terminus)
   };
@@ -617,23 +630,13 @@ export function orbitBody(
   const due = parseDue(task.due_date);
   if (!due) return null;
   const effectiveDays = daysBetween(now, due) - lookAheadDays;
-  let radius: number;
-  if (effectiveDays <= 0) {
-    const overdueDays = Math.min(14, Math.abs(effectiveDays));
-    radius = ORBIT_OVERDUE_MAX - (overdueDays / 14) * (ORBIT_OVERDUE_MAX - ORBIT_OVERDUE_MIN);
-  } else if (effectiveDays <= 30) {
-    radius = ORBIT_R0 + ((effectiveDays - 1) / 29) * (ORBIT_RMAX - ORBIT_R0);
-  } else {
-    radius = ORBIT_RMAX + ORBIT_LATER_GAP;
-  }
-  const angularSpeed = ORBIT_BASE_OMEGA * (ORBIT_RMAX / Math.max(radius, ORBIT_OVERDUE_MIN)) ** 1.35;
-  const heat = Math.max(0, Math.min(1, 1 - effectiveDays / 14));
+  const radius = radiusForDays(effectiveDays);
   const minutes = task.estimated_duration;
   const size: 1 | 2 | 3 = minutes == null ? 1 : minutes < 45 ? 1 : minutes < 120 ? 2 : 3;
   return {
     radius,
-    angularSpeed,
-    heat,
+    angularSpeed: omegaForRadius(radius),
+    heat: heatForDays(effectiveDays),
     size,
     effectiveDays,
     angle: hashIdAngle(task.id)
