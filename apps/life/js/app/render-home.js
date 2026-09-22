@@ -1,4 +1,5 @@
 import { applyRingTarget } from './chart-kit/apply-ring.js';
+import { renderHomeCharts } from './render-home-charts.js';
 import { formatGrams } from '../core/aggregate.js';
 import { formatDisplayDate } from '../core/time.js';
 
@@ -57,6 +58,7 @@ export function renderHome(root, model, options = {}) {
   setText(root, '[data-value="sync"]', 'Live data ready');
 
   paintForecastCards(root, model.forecastCards);
+  renderHomeCharts(root, model.forecastCards, { quiet });
 
   const hammondLine = root.querySelector('[data-value="hammond-line"]');
   if (hammondLine) {

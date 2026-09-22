@@ -282,16 +282,23 @@
           </div>
 
           <div class="support-grid">
-            <article class="metric-card" aria-labelledby="stimulus-label">
-              <div class="metric-heading">
-                <div>
-                  <p class="metric-label" id="stimulus-label">Stimulus</p>
-                  <p class="metric-context">Loaded work that counts</p>
+            <article class="metric-card home-stimulus-card" aria-labelledby="stimulus-label" data-home-card="stimulus" data-view="gate">
+              <div class="home-stimulus-card__head">
+                <div class="metric-heading">
+                  <div>
+                    <p class="metric-label" id="stimulus-label">Stimulus</p>
+                    <p class="metric-context">Loaded work that counts</p>
+                  </div>
+                </div>
+                <div class="hub-pills" role="tablist" aria-label="Stimulus view" data-home-stimulus-views>
+                  <button type="button" class="hub-pills__btn" role="tab" data-stimulus-view="gate" aria-selected="true" aria-controls="home-stimulus-chart">Gate</button>
+                  <button type="button" class="hub-pills__btn" role="tab" data-stimulus-view="regions" aria-selected="false" aria-controls="home-stimulus-chart" tabindex="-1">Regions</button>
                 </div>
               </div>
               <p class="home-pulse__value" data-home="stimulus-rate">—</p>
               <p class="metric-caption" data-home="stimulus-detail">Checking records</p>
-              <p class="home-pulse__gate" data-home="stimulus-gate"></p>
+              <p class="home-pulse__gate sr-only" data-home="stimulus-gate"></p>
+              <div id="home-stimulus-chart" role="tabpanel" aria-label="Stimulus chart" data-home-chart="stimulus"></div>
             </article>
 
             <article class="metric-card" aria-labelledby="scale-label">
@@ -303,6 +310,7 @@
               </div>
               <p class="home-pulse__value" data-home="scale-headline">—</p>
               <p class="metric-caption" data-home="scale-detail">Checking records</p>
+              <div data-home-chart="scale"></div>
             </article>
           </div>
 
@@ -315,7 +323,13 @@
               </div>
               <button type="button" class="btn btn--primary" data-home="open-body">Open Body</button>
             </div>
-            <div class="home-paths-card__scenarios">
+            <div class="home-paths-card__charts">
+              <div class="home-paths-card__charts-inner">
+                <div data-home-chart="clocks"></div>
+                <div data-home-chart="plane"></div>
+              </div>
+            </div>
+            <div class="home-paths-card__scenarios sr-only">
               <article class="home-paths-card__path" data-home-path="as_logged">
                 <div class="home-paths-card__path-top">
                   <span class="home-paths-card__path-label">As logged</span>

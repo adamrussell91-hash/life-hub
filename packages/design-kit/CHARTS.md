@@ -107,6 +107,12 @@ Use only when the data matches the type. Do not pick these for a generic count i
 | `theme-constellation` | Theme co-occurrence map. | `buildThemeConstellation({ nodes, edges, minEdgeCount = 2, … })`, `pairKey`, `neighborhood`, `arcFor` | `theme-constellation.js` |
 | `masonry` | Tile packer (Mind). | `packMasonry(items, { columns, gap, columnWidth, flowOffset })` | `masonry.js` |
 | `range-bar` | Value on a reference span, with an optional balance tick. | `rangeBarLayout(value, refLow, refHigh, { width, padding })`, `rangeBarTick(fraction, { width, padding })` | `range-bar.js` |
+| `scene` | Declarative SVG scene (nodes + hits) for interactive charts. Mount with `mountSceneChart` in `js/app/render-scene-chart.js` (hover tip, click select, arrow keys, entrance motion, resize). | `node`, `text`, `arcPath`, `wedgePath`, `legend`, `linearScale`, `monthStarts` | `scene.js` |
+| `gate-rings` | Several values each against its own threshold, thresholds aligned on one spoke (0 to 2× scale). Home Stimulus. | `buildGateRings(stimulusChart, { width })` | `gate-rings.js` |
+| `region-rose` | Area-true Nightingale rose + ranked bars against a reference. Home Stimulus → Regions. | `buildRegionRose(stimulusChart, { width })` | `region-rose.js` |
+| `glide-slope` | Measured series vs robust trend with split stalks, projected into a target band with a slope wedge and entry rail. Home Scale. | `buildGlideSlope(glideChart, { width, height })` | `glide-slope.js` |
+| `twin-clocks` | Independent one-year dials: first in-band window per condition, overlap = target date. Home Recomp. | `buildTwinClocks(recompChart, { width, lockText })` | `twin-clocks.js` |
+| `recomp-plane` | Weight vs body fat with lean-mass isolines, target box, lean corridor and scenario roads. Home Recomp. | `buildRecompPlane(recompChart, { width, height })` | `recomp-plane.js` |
 | `clinical-slots` | Closed multi-series colours. | `CLINICAL_CHART_SLOTS` | `clinical-slots.js` |
 | `d3-layout` | Vendored d3-shape / sankey / chord / force. No CDN. | `d3api()`, `stack`, `sankey`, `chord`, `forceSimulation` | `d3-layout.js`, `vendor/` |
 
@@ -202,6 +208,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-22 | `gate-rings`, `region-rose`, `glide-slope`, `twin-clocks`, `recomp-plane`, `scene` | Home forecast cards get charts. Data from `home-forecast-charts.js`; engine adds display-only `trace`/`trace_range` per body scenario (`traceBodyScenario`), never changing forecast dates. Classes `hc-*` in `app.css`, tokens only. |
 | 2026-09-11 | Stars | Added the Knowledge-only saved constellation engine: controlled symbol templates, grounded note relationships, source-mapped synthesis, and annual night-sky placement. No Universe renderer changes. |
 | 2026-09-06 | `mood-mix` | Tasks project portfolio / home Projects tile consumes Life `mood-mix` donut for lifecycle share (“What’s the mix?”). Drops the board area-line spark. Typed consumer in `apps/tasks/src/chart-kit/mood-mix.ts`. |
 | 2026-09-06 | `area-line` | Tasks dashboard completion trend consumes Life `area-line` (typed consumer + `animateAreaReveal`). No new catalog types. |
