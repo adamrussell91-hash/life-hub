@@ -3,9 +3,18 @@
 .backlog-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-height: 0;
   position: relative;
+}
+
+.backlog-page .quick-add,
+.backlog-page .board-filter {
+  margin-bottom: 0;
+}
+
+.backlog-page [hidden] {
+  display: none !important;
 }
 
 .backlog-page.is-triage > :not(.backlog-triage):not(.backlog-live):not(.backlog-confirm) {
@@ -39,10 +48,11 @@
 
 .backlog-zone {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-1);
-  min-height: 2.75rem;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-height: 0;
   padding: var(--space-1) var(--space-2);
   border: 1px dashed var(--line);
   border-radius: var(--radius-sm);
@@ -78,7 +88,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--paper);

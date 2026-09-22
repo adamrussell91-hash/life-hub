@@ -240,10 +240,6 @@ test.describe('Backlog', () => {
     }
     await openBacklog(page);
     await dismissReminders(page);
-    await page.evaluate(() => {
-      document.querySelector('.reminder-strip-host')?.setAttribute('hidden', '');
-      document.querySelector('.backlog-suggestions')?.setAttribute('hidden', '');
-    });
     const twelfth = page.locator('.backlog-fresh .backlog-group').first().locator('.backlog-row').nth(11);
     await expect(twelfth).toBeVisible();
     const box = await twelfth.boundingBox();
