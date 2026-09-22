@@ -1,6 +1,11 @@
 import { buildForecast } from '../core/forecast-engine.js';
 import { summariseTrainingBehaviour, weightTrackingPrompt } from '../core/forecast-inputs.js';
 import { formatDisplayDate } from '../core/time.js';
+import {
+  buildGlideChartData,
+  buildRecompChartData,
+  buildStimulusChartData
+} from './home-forecast-charts.js';
 
 const STIMULUS_FALLBACK_DAYS = 28;
 
@@ -100,9 +105,10 @@ function preservationGate(supported) {
   return 'Need overlapping intake and weight history to score the preservation gate.';
 }
 
-function stimulusCopy(training) {
+function stimulusCopy(training, upperSetsPerWeek) {
   const sessions = training.sessions_per_week;
-  const sets = training.upper_body_loaded_sets_per_week ?? training.loaded_sets_per_week;
+  // Fallback summaries carry no upper-body split; never label total sets as upper-body.
+  const sets = training.upper_body_loaded_sets_per_week ?? upperSetsPerWeek;
   const genuine = Number(training.genuine_loaded_sessions ?? sessions ?? 0);
   const rate = genuine <= 0 ? 'No loaded sessions' : `${sessions}/week loaded`;
   if (genuine <= 0 || sets == null) {
@@ -124,8 +130,11 @@ function stimulusCard(forecast, events, date, targetsConfig) {
       { asOf: date, days: STIMULUS_FALLBACK_DAYS },
       { targetsConfig }
     );
-  const copy = stimulusCopy(training);
+  const chart = buildStimulusChartData(training, forecast);
+  const upper = chart.keys.find(item => item.key === 'upper_sets')?.value ?? null;
+  const copy = stimulusCopy(training, upper);
   return {
+    chart,
     rate: copy.rate,
     detail: copy.detail,
     gate: preservationGate(training.lean_preservation_supported),
@@ -157,6 +166,7 @@ function scaleCard(forecast, events, date) {
     detail = `${prompt.distinct_weight_days} of ${prompt.window.days} days weighed. Need denser weigh-ins.`;
   }
   return {
+    chart: buildGlideChartData(events, date, targets),
     headline,
     detail,
     promptNeeded: prompt.weight_tracking_prompt_needed,
@@ -173,6 +183,7 @@ export function buildHomeForecastCards({ events, date, targetsConfig } = {}) {
     targetsConfig
   });
   return {
+    recomp: buildRecompChartData(forecast, date),
     paths: pathsCard(forecast),
     stimulus: stimulusCard(forecast, events, date, targetsConfig),
     scale: scaleCard(forecast, events, date)
