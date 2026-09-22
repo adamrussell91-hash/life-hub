@@ -8,6 +8,11 @@ async function signIn(page) {
     await page.getByRole('button', { name: /sign in/i }).click();
   }
   await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(async () => {
+    await fetch('/api/reset-seed', { method: 'POST' });
+  });
+  await page.goto('/#/board');
+  await expect(page.locator('.page-header')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('heading', { name: /Dashboard|Graph|Today/ })).toBeVisible();
 }
 

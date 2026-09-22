@@ -727,7 +727,8 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     const open = models.filter((m) => m.service.status !== 'arrived');
     const ordered = [...open, ...finished];
     const measured = root.clientWidth || host.clientWidth || 0;
-    const width = Math.max(measured, 280);
+    if (measured < 280) return;
+    const width = measured;
     const vertical = width < 560;
     root.classList.toggle('is-mobile', vertical);
     toggle.textContent = input.scale ? 'Schematic' : 'To scale';
@@ -831,7 +832,11 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     if (measured >= 280) entrancePlayed = true;
   };
 
-  paint();
+  const kick = () => {
+    paint();
+    if (!entrancePlayed) requestAnimationFrame(kick);
+  };
+  kick();
   if (typeof ResizeObserver === 'function') {
     ro = new ResizeObserver(() => {
       const next = root.clientWidth;

@@ -168,6 +168,13 @@ export function createMockApi({ seed }: MockApiOptions) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Sign in required' } });
     }
 
+    if (path === '/api/reset-seed' && method === 'POST') {
+      kv.map.clear();
+      await seedIfEmpty(kv, keys, seed, { force: true });
+      seeded = true;
+      return json(200, { ok: true });
+    }
+
     if (path === '/api/graph-visual-seed' && method === 'POST') {
       try {
         const { seedGraphVisualFixture } = await import('./seed-graph-visual');

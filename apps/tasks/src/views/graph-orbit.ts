@@ -384,8 +384,13 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       const r = ORBIT.rMax + 40 + (targetR - (ORBIT.rMax + 40)) * e;
       b.radius = r;
       const w = omegaForRadius(r);
-      b.angle += w * dt * easeOut;
-      const pt = bodyPoint(ORBIT.cx, ORBIT.cy, r, b.angle);
+      if (!paused && easeOut > 0) {
+        b.angle += w * dt * easeOut;
+        b.radius = r;
+      } else if (!b.circle.hasAttribute('cx')) {
+        b.radius = r;
+      }
+      const pt = bodyPoint(ORBIT.cx, ORBIT.cy, b.radius, b.angle);
       const col = heatColour(b.colour.startsWith('#') ? b.colour : '#376fb7', k);
       if (commit) {
         b.circle.setAttribute('cx', pt.x.toFixed(1));
