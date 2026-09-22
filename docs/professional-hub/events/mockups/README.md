@@ -16,8 +16,8 @@ rail language. Render:
 
 | File | Direction | Use when |
 |---|---|---|
-| `01-calendar-compose` | Calendar first | Most sessions are “put this on a day, then hang the PD bits off it” |
-| `02-pd-log-wizard` | Guided PD log | The real job is hours, type, standards — date is secondary |
-| `03-split-preview` | Live record | You want to see the event card while you fill it |
+| `01-calendar-compose` | Calendar first | Rejected — when-first only |
+| `02-pd-log-wizard` | Guided split | Chosen: B steps + C preview, full page, called an event |
+| `03-split-preview` | Live record | Folded into 02 |
 
 None of these are implemented. Pick one (or mix) before writing product code.

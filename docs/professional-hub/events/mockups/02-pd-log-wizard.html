@@ -2,28 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Option B — Guided PD log</title>
+<title>Add event — guided split</title>
 <link rel="stylesheet" href="base.css">
 <link rel="stylesheet" href="events.css">
 <style>
-  .wizard { max-width: 760px; display: flex; flex-direction: column; gap: 18px; flex: 1; min-height: 0; }
-  .panel { padding: 28px 30px; }
-  .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .type {
-    min-height: 72px;
-    padding: 14px 16px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--line);
-    background: rgba(255,255,255,0.72);
-    text-align: left;
-  }
-  .type strong { display: block; font-size: var(--text-sm); color: var(--depth); }
-  .type span { display: block; margin-top: 4px; font-size: var(--text-xs); color: var(--muted); }
-  .type.is-on { background: var(--pastel-blue); border-color: color-mix(in srgb, var(--wave) 28%, var(--line)); }
-  .hours-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 20px; border-radius: var(--radius-md); background: var(--pastel-gold); }
-  .hours-hero p { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
-  .hours-hero b { display: block; font-size: var(--text-lg); color: var(--pastel-gold-ink); margin-bottom: 4px; }
-  .standards { display: flex; gap: 8px; }
+  .canvas { gap: 18px; padding: 28px 36px 24px; }
+  .split { display: grid; grid-template-columns: minmax(22rem, 0.92fr) minmax(0, 1.18fr); gap: 22px; flex: 1; min-height: 0; }
+  .preview { padding: 28px; display: flex; flex-direction: column; gap: 20px; height: 100%; }
+  .preview h2 { margin: 0; font-size: var(--text-xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--depth); }
+  .preview-kicker { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+  .fact { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .fact:last-child { border-bottom: 0; }
+  .fact dt { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+  .fact dd { margin: 0; font-size: var(--text-base); color: var(--ink); }
+  .editor { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .panel { padding: 28px 30px; flex: 1; display: flex; flex-direction: column; gap: 22px; }
+  .hours-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 18px; border-radius: var(--radius-md); background: var(--pastel-gold); }
+  .hours-row p { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
+  .hours-row b { display: block; font-size: var(--text-base); color: var(--pastel-gold-ink); margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -48,76 +44,64 @@
     <div class="page-header">
       <div>
         <p class="page-kicker">Events</p>
-        <h1 class="page-title">Log a PD activity</h1>
-        <p class="page-subtitle">A record for your hours, not a party invite. Date and people come next.</p>
+        <h1 class="page-title">Add event</h1>
+        <p class="page-subtitle">The left side is the record. Step through the rest.</p>
       </div>
       <ol class="steps">
-        <li class="is-on"><span class="n">1</span> Activity</li>
+        <li class="is-on"><span class="n">1</span> Event</li>
         <li><span class="n">2</span> When</li>
         <li><span class="n">3</span> People</li>
         <li><span class="n">4</span> Evidence</li>
       </ol>
     </div>
 
-    <div class="wizard">
-      <div class="card panel">
-        <label class="field-label">Activity type</label>
-        <div class="type-grid">
-          <div class="type is-on"><strong>Course</strong><span>Structured learning</span></div>
-          <div class="type"><strong>Workshop</strong><span>Facilitated session</span></div>
-          <div class="type"><strong>Mentoring</strong><span>Coaching or observation</span></div>
-          <div class="type"><strong>Conference</strong><span>Talks and panels</span></div>
-          <div class="type"><strong>On Country</strong><span>Place-based learning</span></div>
-          <div class="type"><strong>Other</strong><span>Anything eligible</span></div>
-        </div>
-      </div>
-
-      <div class="card panel">
-        <label class="field-label">Activity name</label>
-        <input class="ghost-input title-input" value="Phonics 101" readonly>
-      </div>
-
-      <div class="hours-hero">
+    <div class="split">
+      <section class="card preview preview-card">
+        <p class="preview-kicker">How it will land</p>
+        <h2>Untitled event</h2>
         <div>
-          <b>Hours to log</b>
-          <p>Counts toward the 100-hour maintenance period. 36 hours logged so far.</p>
+          <p class="when">22/09/26</p>
+          <p style="margin:6px 0 0; color:var(--muted); font-size:var(--text-sm)">2:46 pm – 4:46 pm · Australia/Sydney</p>
         </div>
-        <div class="hours-stepper">
-          <button type="button">−</button>
-          <b>2.0</b>
-          <button type="button">+</button>
+        <div>
+          <p style="margin:0; font-size:var(--text-md); font-weight:600; color:var(--ink)">No location yet</p>
+          <p style="margin:4px 0 0; color:var(--muted); font-size:var(--text-sm)">Scheduled</p>
         </div>
-      </div>
+        <dl>
+          <div class="fact"><dt>Hours</dt><dd>Not set</dd></div>
+          <div class="fact"><dt>People</dt><dd>None yet</dd></div>
+          <div class="fact"><dt>Evidence</dt><dd>None yet</dd></div>
+        </dl>
+      </section>
 
-      <div class="card panel">
-        <label class="field-label">Standards addressed</label>
-        <div class="standards">
-          <div class="standard is-on">1</div>
-          <div class="standard is-on">2</div>
-          <div class="standard">3</div>
-          <div class="standard">4</div>
-          <div class="standard">5</div>
-          <div class="standard">6</div>
-          <div class="standard">7</div>
-        </div>
-        <p class="field-hint">Australian Professional Standards for Teachers. Pick the ones this activity actually covers.</p>
-        <div style="margin-top:18px">
-          <label class="field-label">Priority area</label>
-          <div class="chip-row">
-            <span class="chip-choice is-on">Curriculum &amp; assessment</span>
-            <span class="chip-choice">Students with disability</span>
-            <span class="chip-choice">Aboriginal education</span>
-            <span class="chip-choice">Wellbeing</span>
+      <div class="editor">
+        <section class="card panel">
+          <div>
+            <label class="field-label">Title</label>
+            <input class="ghost-input title-input" placeholder="Name this event" readonly>
           </div>
-        </div>
-      </div>
-
-      <div class="footer-bar">
-        <button class="btn btn-ghost">Cancel</button>
-        <div class="sticky-actions">
-          <button class="btn btn-outline">Save draft</button>
-          <button class="btn btn-primary">Continue to when</button>
-        </div>
+          <div class="hours-row">
+            <div>
+              <b>Hours</b>
+              <p>Optional. Use when the event should count as time on the record.</p>
+            </div>
+            <div class="hours-stepper">
+              <button type="button">−</button>
+              <b>0.0</b>
+              <button type="button">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Accreditation · optional</label>
+            <input class="box-input" placeholder="Category" readonly>
+          </div>
+          <div class="footer-bar" style="margin-top:auto">
+            <button class="btn btn-ghost">Cancel</button>
+            <div class="sticky-actions">
+              <button class="btn btn-primary">Continue to when</button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </main>
