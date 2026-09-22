@@ -6,14 +6,18 @@ Return only one JSON object. Do not add markdown fences or prose before or after
 
 Select between 5 and 10 genuinely useful notes. Prefer a compact set whose members contribute different but connected work. Do not fill the set with weak matches merely to reach 10. Every selected pageId must appear in the supplied archive findings.
 
-Choose one closed symbol template:
+Use the assigned symbol from the write prompt when one is given. Do not substitute `spiral` for convenience.
+
+If no assignment is present, choose the template that matches the intellectual shape of the grouping — not a generic inquiry spiral:
 
 - `eye`: perspective, interpretation, seeing, reading, literacy, attention
 - `bridge`: connection, transition, transfer, mediation
 - `cycle`: change, recurrence, development, feedback, process
-- `spiral`: iterative inquiry, deepening, return with revision
 - `tree`: growth, branching, taxonomy, differentiation, inheritance
 - `compass`: direction, leadership, judgement, strategy, orientation
+- `spiral`: only for iterative inquiry, deepening, methods, or return with revision
+
+Spiral is a last resort. A mixed archive topic is still an eye, bridge, cycle, tree, or compass when those fit better.
 
 Order the notes deliberately. The renderer places them in array order around or through the symbol. Every drawn line must have a defensible intellectual relationship. Supply one relationship for every required pair below. Positions are one based and `n` is the final note position.
 
