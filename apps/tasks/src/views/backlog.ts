@@ -237,9 +237,8 @@ function applyPatch(task: Task, patch: Partial<Task>): Task {
 }
 
 function restoreFocus(state: Session): void {
-  const next =
-    (state.focusedId && state.page.querySelector<HTMLElement>(`[data-task-id="${state.focusedId}"]`)) ||
-    state.page.querySelector<HTMLElement>('.backlog-row');
+  if (!state.focusedId) return;
+  const next = state.page.querySelector<HTMLElement>(`[data-task-id="${state.focusedId}"]`);
   next?.focus();
 }
 

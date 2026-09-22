@@ -280,9 +280,11 @@
   --backlog-accent: var(--navy-2);
 }
 
-.backlog-row:focus,
-.backlog-row:focus-visible,
-.backlog-row.is-focused {
+.backlog-row:focus {
+  outline: none;
+}
+
+.backlog-row:focus-visible {
   outline: 2px solid var(--wave);
   outline-offset: -2px;
 }
