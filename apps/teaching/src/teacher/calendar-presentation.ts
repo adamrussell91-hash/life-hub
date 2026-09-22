@@ -12,7 +12,7 @@ export function applyCalendarPresentation(
   host: HTMLElement,
   options: CalendarPresentationOptions = {}
 ): void {
-  const root = host.querySelector<HTMLElement>(':scope > .class-calendar');
+  const root = host.querySelector<HTMLElement>('.class-calendar');
   if (!root) return;
 
   const workspace = root.querySelector<HTMLElement>('.hub-calendar__workspace');

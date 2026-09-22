@@ -88,7 +88,7 @@ export function renderClassCalendar(
     subjectId
   }: RenderClassCalendarOptions
 ): void {
-  let root = host.querySelector<HTMLElement>(':scope > .class-calendar');
+  let root = host.querySelector<HTMLElement>('.class-calendar');
   if (root && !root.querySelector('[data-calendar="rail"]')) {
     root.remove();
     root = null;

@@ -235,7 +235,7 @@ describe('teacher home dashboard', () => {
     );
     expect(classTile).not.toBeNull();
     expect(classTile?.querySelector('.home-class-tile__title')?.textContent).toBe(
-      'Year 12 English Advanced'
+      '12ENGADV1'
     );
     expect(classTile?.querySelector('.home-class-tile__eyebrow')?.textContent).toBe('12ENGADV1');
     classTile?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
