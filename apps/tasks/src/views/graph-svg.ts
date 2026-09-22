@@ -62,10 +62,16 @@ export function popIn(
           ? { opacity: 0 }
           : { opacity: 0, transform: 'scale(.6)' };
   const duration = kind === 'slide' ? 260 : kind === 'pop' ? 320 : 260;
+  const node = el as HTMLElement;
+  node.style.opacity = '0';
   el.animate([from, { opacity: 1, transform: 'none' }], {
     duration,
     delay,
     easing: kind === 'pop' ? OVERSHOOT : EASE,
-    fill: 'backwards'
+    fill: 'forwards'
   });
+  window.setTimeout(() => {
+    node.style.opacity = '1';
+    node.style.transform = 'none';
+  }, delay + duration + 16);
 }
