@@ -6997,15 +6997,6 @@ input.scope-timeline__note-title:focus-visible {
     display: none;
   }
 
-  .class-calendar__week {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .class-calendar__day .event-chip,
-  .class-calendar__day .event-chip-more {
-    display: none;
-  }
-
   .class-calendar__day {
     min-height: var(--space-12);
     padding: var(--space-1);

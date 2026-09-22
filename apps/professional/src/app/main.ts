@@ -8,6 +8,7 @@ import '../../design-kit/relationship-timeline.css';
 import '../../design-kit/filters.css';
 import '../../design-kit/person-brief.css';
 import '../../design-kit/view-on-map.css';
+import '../../design-kit/calendar.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
