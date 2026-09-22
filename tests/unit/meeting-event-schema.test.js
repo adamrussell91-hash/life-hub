@@ -10,7 +10,8 @@ import {
 import {
   assertEventStateTransition,
   parseEventRecord,
-  validateEventCreateInput
+  validateEventCreateInput,
+  validateEventFieldUpdate
 } from '../../netlify/functions/_shared/event-schema.mjs';
 import {
   deriveProjectionId,
@@ -124,6 +125,23 @@ test('event PD fields validate and reject relationship ids on the record', () =>
   assert.equal(parseEventRecord({ ...record, provider_id: 'x' }), null);
   assertEventStateTransition('scheduled', 'completed');
   assert.throws(() => assertEventStateTransition('cancelled', 'scheduled'), (e) => e.code === 'invalid_state_transition');
+});
+
+test('event field update accepts When fields without a reschedule state change', () => {
+  const patch = validateEventFieldUpdate({
+    title: 'Gifted education PD',
+    start: '2026-10-02T00:00:00.000Z',
+    end: '2026-10-02T06:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    hours: 6
+  });
+  assert.equal(patch.title, 'Gifted education PD');
+  assert.equal(patch.start, '2026-10-02T00:00:00.000Z');
+  assert.equal(patch.hours, 6);
+  assert.throws(
+    () => validateEventFieldUpdate({ links: [] }),
+    (error) => error.code === 'unknown_field'
+  );
 });
 
 test('schedule projections are deterministic and dedupe on merge', () => {

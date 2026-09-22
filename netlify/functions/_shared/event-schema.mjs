@@ -281,7 +281,10 @@ const UPDATE_KEYS = new Set([
   'hours',
   'attendance_state',
   'certificate',
-  'all_day'
+  'all_day',
+  'start',
+  'end',
+  'time_zone'
 ]);
 
 export function validateEventFieldUpdate(input) {
@@ -327,6 +330,20 @@ export function validateEventFieldUpdate(input) {
       throw validationError('invalid_all_day', 'all_day must be a boolean.');
     }
     patch.all_day = input.all_day;
+  }
+  if (input.start !== undefined || input.end !== undefined || input.time_zone !== undefined) {
+    if (!isIsoTimestamp(input.start)) {
+      throw validationError('invalid_start', 'start must be a valid ISO timestamp.');
+    }
+    if (!isIsoTimestamp(input.end)) {
+      throw validationError('invalid_end', 'end must be a valid ISO timestamp.');
+    }
+    assertTimeOrder(input.start, input.end);
+    patch.start = input.start;
+    patch.end = input.end;
+    patch.time_zone = assertValidTimeZone(
+      trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
+    );
   }
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
