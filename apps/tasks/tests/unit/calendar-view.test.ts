@@ -166,6 +166,9 @@ describe('calendar views', () => {
     expect(canvas.querySelector('[data-task-id="task_lesson"]')?.textContent).toContain('Finish lesson pack');
     expect(canvas.querySelector('[data-kind="milestone"]')?.textContent).toContain('Term brief locked');
     expect(canvas.querySelector('.hub-calendar__month-label')?.textContent).toMatch(/August 2026/);
+    expect(canvas.querySelector('.hub-calendar--month')).not.toBeNull();
+    expect(canvas.querySelector('.hub-calendar__nav .calendar-shortcuts')).not.toBeNull();
+    expect(canvas.querySelector('.hub-calendar__rail .calendar-shortcuts')).toBeNull();
     expect(canvas.querySelector('[data-date="2026-08-17"][data-kind="task"]')).not.toBeNull();
     expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
     expect(canvas.querySelector('.calendar-compose')).toBeNull();

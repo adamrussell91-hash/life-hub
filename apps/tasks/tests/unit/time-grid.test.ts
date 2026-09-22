@@ -151,4 +151,16 @@ describe('mobile calendar width CSS', () => {
     expect(viewsCss).toMatch(/\.task-stack\s*\{[^}]*width:\s*100%/);
     expect(viewsCss).toMatch(/\.hub-card-slot\s*\{[^}]*width:\s*100%/);
   });
+
+  it('lets the month grid fill the remaining page instead of a reserved rail column', () => {
+    expect(viewsCss).toMatch(
+      /\.hub-calendar--month\s+\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
+    );
+    expect(viewsCss).toMatch(
+      /\.hub-calendar--month\s+\.hub-calendar__grid\s*\{[^}]*grid-template-rows:\s*auto\s+repeat\(6,\s*minmax\(0,\s*1fr\)\)/
+    );
+    expect(viewsCss).toMatch(
+      /\.hub-layout\[data-hub-view='month'\]\s+\.hub-calendar--month\s*\{[^}]*flex:\s*1 1 auto/
+    );
+  });
 });
