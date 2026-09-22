@@ -61,7 +61,7 @@ export function renderCalendar(root, model, {
   onCreateLog,
   scrollToDetail = false,
   monthDelta = 0,
-  expanded = false,
+  expandedDate = null,
   view = 'week',
   mobilePanel = 'schedule',
   composeDraft = null,
@@ -113,7 +113,7 @@ export function renderCalendar(root, model, {
   const body = root.createElement('div');
   body.className = 'hub-calendar__body';
   if (mode === 'month') {
-    body.append(renderMonth(root, model, monthDelta));
+    body.append(renderMonth(root, model, monthDelta, expandedDate));
   } else {
     body.append(renderTimeGrid(root, model, mode, now));
   }
@@ -527,12 +527,50 @@ function renderTimeGrid(root, model, view, now) {
   return grid;
 }
 
-function selectDay(fromNode, date, time, focusCompose) {
+function selectDay(fromNode, date, time, focusCompose, extras = {}) {
   const calendar = fromNode.closest?.('.hub-calendar') ?? fromNode;
-  handlersByRoot.get(calendar)?.onSelectDate?.(date, { time, focusCompose, eventId: null });
+  handlersByRoot.get(calendar)?.onSelectDate?.(date, { time, focusCompose, eventId: null, ...extras });
 }
 
-function renderMonth(root, model, monthDelta) {
+function renderBloomDrawer(root, day, fromNode) {
+  const wrap = root.createElement('div');
+  wrap.className = 'hub-calendar__bloom';
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', `${formatDisplayDate(day.date)} — full list`);
+
+  const head = root.createElement('div');
+  head.className = 'hub-calendar__bloom-head';
+  const dateLabel = root.createElement('span');
+  dateLabel.className = 'hub-calendar__bloom-date';
+  dateLabel.textContent = formatDisplayDate(day.date);
+  const close = root.createElement('button');
+  close.type = 'button';
+  close.className = 'hub-calendar__bloom-close';
+  close.textContent = 'Close';
+  close.setAttribute('aria-label', `Close ${formatDisplayDate(day.date)}`);
+  close.addEventListener('click', event => {
+    event.stopPropagation();
+    selectDay(fromNode, day.date, null, false, { bloom: true });
+  });
+  head.append(dateLabel, close);
+  wrap.append(head);
+
+  const list = root.createElement('div');
+  list.className = 'hub-calendar__bloom-list';
+  const events = day.events ?? [];
+  if (!events.length) {
+    const empty = root.createElement('p');
+    empty.className = 'hub-calendar__detail-empty';
+    empty.textContent = 'Nothing on this day.';
+    list.append(empty);
+  } else {
+    for (const event of events) list.append(renderChip(root, event, fromNode));
+  }
+  wrap.append(list);
+  return wrap;
+}
+
+function renderMonth(root, model, monthDelta, expandedDate) {
   const grid = root.createElement('div');
   grid.className = 'hub-calendar__grid';
   grid.id = 'calendar-month-grid';
@@ -546,35 +584,47 @@ function renderMonth(root, model, monthDelta) {
     cell.textContent = heading;
     grid.append(cell);
   }
-  for (const day of model.monthDays) {
-    const cell = root.createElement('div');
-    cell.className = 'hub-calendar__day calendar-day';
-    cell.setAttribute('role', 'gridcell');
-    cell.dataset.date = day.date;
-    if (!day.inMonth) cell.dataset.outside = 'true';
-    if (day.isToday) cell.dataset.today = 'true';
-    if (day.isSelected) cell.dataset.selected = 'true';
-    cell.addEventListener('click', () => selectDay(grid, day.date));
-    const num = root.createElement('span');
-    num.className = 'hub-calendar__day-num calendar-day__num';
-    num.textContent = String(day.day);
-    cell.append(num);
-    for (const event of (day.events ?? []).slice(0, 2)) {
-      cell.append(renderChip(root, event, grid));
-    }
-    const hidden = (day.events?.length ?? 0) - 2;
-    if (hidden > 0) {
-      const more = root.createElement('button');
-      more.type = 'button';
-      more.className = 'event-chip-more';
-      more.textContent = `+${hidden} more`;
-      more.addEventListener('click', event => {
-        event.stopPropagation();
-        selectDay(grid, day.date);
+  for (let weekStart = 0; weekStart < model.monthDays.length; weekStart += 7) {
+    const week = model.monthDays.slice(weekStart, weekStart + 7);
+    let bloomDay = null;
+    for (const day of week) {
+      const cell = root.createElement('div');
+      cell.className = 'hub-calendar__day calendar-day';
+      cell.setAttribute('role', 'gridcell');
+      cell.dataset.date = day.date;
+      if (!day.inMonth) cell.dataset.outside = 'true';
+      if (day.isToday) cell.dataset.today = 'true';
+      if (day.isSelected) cell.dataset.selected = 'true';
+      if (day.date === expandedDate) {
+        cell.dataset.bloom = 'true';
+        bloomDay = day;
+      }
+      cell.addEventListener('click', () => {
+        selectDay(grid, day.date, null, false, { bloom: (day.events?.length ?? 0) > 0 });
       });
-      cell.append(more);
+      const num = root.createElement('span');
+      num.className = 'hub-calendar__day-num calendar-day__num';
+      num.textContent = String(day.day);
+      cell.append(num);
+      for (const event of (day.events ?? []).slice(0, 2)) {
+        cell.append(renderChip(root, event, grid));
+      }
+      const hidden = (day.events?.length ?? 0) - 2;
+      if (hidden > 0) {
+        const more = root.createElement('button');
+        more.type = 'button';
+        more.className = 'event-chip-more';
+        more.textContent = `+${hidden} more`;
+        more.setAttribute('aria-label', `${hidden} more on ${formatDisplayDate(day.date)}`);
+        more.addEventListener('click', event => {
+          event.stopPropagation();
+          selectDay(grid, day.date, null, false, { bloom: true });
+        });
+        cell.append(more);
+      }
+      grid.append(cell);
     }
-    grid.append(cell);
+    if (bloomDay) grid.append(renderBloomDrawer(root, bloomDay, grid));
   }
   applyMonthMotion(grid, monthDelta);
   return grid;

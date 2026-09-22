@@ -221,7 +221,7 @@
   text-decoration: none;
 }
 
-.hub-calendar__day:nth-child(7n) {
+.hub-calendar__day:nth-child(7n of .hub-calendar__day) {
   border-right: 0;
 }
 

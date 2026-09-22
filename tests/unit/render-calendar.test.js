@@ -222,6 +222,46 @@ test('selected event paints rail detail; empty day omits date and sources cards'
   assert.equal(root._host.querySelector('.hub-calendar__rail'), null);
 });
 
+test('month +N more blooms the full day list under that week', () => {
+  const root = fakeRoot();
+  let selected = null;
+  const built = model([
+    { record: { type: 'meal', date: '2026-08-05', meal: 'breakfast' }, body: '', path: 'a' },
+    { record: { type: 'workout', date: '2026-08-05', title: 'Chest' }, body: '', path: 'b' },
+    { record: { type: 'diary', date: '2026-08-05', mood: 'low' }, body: 'note', path: 'c' }
+  ]);
+  renderCalendar(root, built, {
+    view: 'month',
+    onSelectDate: (date, options) => { selected = { date, ...options }; }
+  });
+  const more = root._host.querySelector('.event-chip-more');
+  assert.equal(more?.textContent, '+1 more');
+  assert.equal(root._host.querySelector('.hub-calendar__bloom'), null);
+
+  more.listeners.find(([type]) => type === 'click')[1]({ stopPropagation() {} });
+  assert.equal(selected.date, '2026-08-05');
+  assert.equal(selected.bloom, true);
+
+  renderCalendar(root, built, {
+    view: 'month',
+    expandedDate: '2026-08-05',
+    onSelectDate: (date, options) => { selected = { date, ...options }; }
+  });
+  const drawer = root._host.querySelector('.hub-calendar__bloom');
+  assert.ok(drawer);
+  assert.equal(drawer.querySelectorAll('.event-chip').length, 3);
+  assert.match(collect(drawer).map(node => node.textContent).join(' '), /Diary/);
+  assert.equal(
+    collect(root._host).find(node => node.dataset.date === '2026-08-05')?.dataset.bloom,
+    'true'
+  );
+
+  root._host.querySelector('.hub-calendar__bloom-close')
+    .listeners.find(([type]) => type === 'click')[1]({ stopPropagation() {} });
+  assert.equal(selected.date, '2026-08-05');
+  assert.equal(selected.bloom, true);
+});
+
 test('compose submit calls onCreateLog with a diary candidate', () => {
   const root = fakeRoot();
   let payload = null;

@@ -7,7 +7,7 @@ import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
-import { shiftYearMonth } from './calendar-model.js';
+import { resolveCalendarDayClick, shiftYearMonth } from './calendar-model.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
@@ -167,6 +167,7 @@ export function createAppController(dependencies) {
   let calendarMobilePanel = 'schedule';
   let calendarCompose = { date: null, time: null, type: 'diary' };
   let calendarSelectedEventId = null;
+  let calendarExpandedDate = null;
   let calendarFocusCompose = false;
   let teachingEvents = [];
   let teachingCalendarInFlight = null;
@@ -1326,7 +1327,7 @@ export function createAppController(dependencies) {
     renderCalendar(root, model, {
       scrollToDetail,
       monthDelta,
-      expanded: true,
+      expandedDate: calendarView === 'month' ? calendarExpandedDate : null,
       view: calendarView,
       mobilePanel: calendarMobilePanel,
       composeDraft: calendarCompose,
@@ -1342,7 +1343,14 @@ export function createAppController(dependencies) {
         const nextMonth = next.slice(0, 7);
         const monthChanged = nextMonth !== calendarViewMonth;
         const shift = !monthChanged ? 0 : (nextMonth > calendarViewMonth ? 1 : -1);
-        calendarSelectedDate = next;
+        if (options.bloom) {
+          const resolved = resolveCalendarDayClick(calendarExpandedDate, next);
+          calendarSelectedDate = resolved.selectedDate;
+          calendarExpandedDate = resolved.expandedDate;
+        } else {
+          calendarSelectedDate = next;
+          if (monthChanged) calendarExpandedDate = null;
+        }
         calendarViewMonth = nextMonth;
         calendarCompose = {
           ...calendarCompose,
@@ -1354,6 +1362,7 @@ export function createAppController(dependencies) {
         if (calendarFocusCompose && (calendarView === 'week' || calendarView === 'month')) {
           calendarViewExplicit = true;
           calendarView = 'day';
+          calendarExpandedDate = null;
         }
         renderCalendarSection({
           scrollToDetail: true,
@@ -1363,6 +1372,7 @@ export function createAppController(dependencies) {
       onSwitchView: next => {
         calendarViewExplicit = true;
         calendarView = next === 'day' || next === 'month' ? next : 'week';
+        if (calendarView !== 'month') calendarExpandedDate = null;
         renderCalendarSection();
       },
       onSwitchMobilePanel: panel => {
@@ -1374,6 +1384,7 @@ export function createAppController(dependencies) {
           calendarViewMonth = shiftYearMonth(calendarViewMonth, delta);
           calendarSelectedDate = clampDateToYearMonth(calendarSelectedDate, calendarViewMonth);
           calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
+          calendarExpandedDate = null;
           renderCalendarSection({ monthDelta: delta, scrollToDetail: true });
           return;
         }
