@@ -1876,12 +1876,12 @@
   gap: var(--space-3);
   flex: 1;
   min-width: 13.5rem;
+  max-width: 24rem;
 }
 
 .event-compose__time {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
 }
 
