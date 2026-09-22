@@ -36,7 +36,7 @@ New calendar? Same object. Extra product chrome (planning filters, capacity, les
 | Selected | `data-selected="true"` inset Wave ring. |
 | Outside month | `data-outside="true"`. |
 | Chips | `.event-chip` + `data-tint` (`blue` / `sage` / `peach` / `gold` / `lilac` / `sand`). Overflow `+N more` is `.event-chip-more`. |
-| Workspace | `.hub-calendar__workspace` = body + `.hub-calendar__rail`. |
+| Workspace | `.hub-calendar__workspace` = body + optional `.hub-calendar__rail`. Week/month omit the rail unless a selected event needs detail. Standing compose is Day only. |
 | Period label | Month: `September 2026`. Week: `dd/mm/yy – dd/mm/yy`. Day: `dd/mm/yy`. |
 | Visible days | `formatDisplayDate` / `formatDisplayDateRange`. Never `YYYY-MM-DD` on screen. |
 | Phone | Same object. `calendar.css` already tightens the grid under 720px. Do not add `.hub-calendar--mobile-*` shells, Now cards, or hide month chips. |
@@ -54,8 +54,9 @@ Hub-only extras after the locked three tabs are allowed (Teaching **Timeline**).
 │  .hub-calendar__workspace                                   │
 │     .hub-calendar__body                                     │
 │        timegrid (day/week)  or  month grid                  │
-│     .hub-calendar__rail                                     │
-│        compose + day detail                                 │
+│     .hub-calendar__rail   (optional)                        │
+│        Day: standing compose + shortcuts                    │
+│        Any view: selected-event detail                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -70,7 +71,7 @@ Dashboard embed (Professional Home): same card, same nav, same month grid, same 
 | Hub may | Hub must not |
 |---------|----------------|
 | Own event types and tints from the locked pastel set | Invent chip skins (`pro-home__chip`) |
-| Compose fields and confirm writes | Hide the rail by restyling the card into a single column as a new calendar |
+| Compose fields and confirm writes | Invent a standing week/month Add column |
 | Planning filters, capacity, pinch, bloom, drag | Change week to five days |
 | One extra view tab after Month | Replace Day / Week / Month |
 | Map clicks to hub routes | Show `dd/mm/yy` inside the day-number pip |
@@ -80,6 +81,7 @@ Dashboard embed (Professional Home): same card, same nav, same month grid, same 
 ## Do not
 
 - A second calendar CSS file per hub
+- A standing Add column on week/month
 - Isolated rounded day cells with gaps (`pro-home__day`)
 - `Mon Tue Wed…` month heads (use `M T W T F S S`)
 - Navy today pip
