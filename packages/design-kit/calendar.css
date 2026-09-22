@@ -461,6 +461,10 @@
   top: var(--space-3);
 }
 
+.hub-calendar__rail[hidden] {
+  display: none;
+}
+
 .hub-calendar__detail {
   display: flex;
   flex-direction: column;

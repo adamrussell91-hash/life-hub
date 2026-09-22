@@ -294,11 +294,9 @@ describe('classes section', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onCreateLesson });
 
     canvas.querySelector<HTMLButtonElement>('[data-calendar-view="week"]')?.click();
-    const weekAdd = canvas.querySelector<HTMLButtonElement>(
-      '.class-calendar__week-heading .icon-plus-btn'
-    );
-    expect(weekAdd).not.toBeNull();
-    weekAdd?.click();
+    const add = canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]');
+    expect(add).not.toBeNull();
+    add?.click();
     expect(onCreateLesson).toHaveBeenCalledTimes(1);
   });
 
@@ -439,9 +437,9 @@ describe('classes section', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onScheduleMutated });
 
     canvas
-      .querySelector<HTMLButtonElement>(
-        '.class-calendar__detail-row [aria-label="More actions"]'
-      )
+      .querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')
+      ?.parentElement
+      ?.querySelector<HTMLButtonElement>('[aria-label="More actions"]')
       ?.click();
     document.querySelector<HTMLButtonElement>('[data-schedule-action="change-date"]')?.click();
     const input = document.querySelector<HTMLInputElement>('.schedule-overflow input[type="date"]');
