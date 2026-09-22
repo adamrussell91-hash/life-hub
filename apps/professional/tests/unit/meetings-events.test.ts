@@ -311,15 +311,24 @@ describe('renderEventNewView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders a full-page hours log with type buttons and no preview', async () => {
+  it('renders a full-page hours log with stacked sections and no tabs', async () => {
     const canvas = document.createElement('div');
     await renderEventNewView(canvas);
     expect(canvas.querySelector('form.event-form.event-compose')).toBeTruthy();
     expect(canvas.querySelector('.event-compose__preview')).toBeNull();
-    expect(canvas.querySelectorAll('.event-compose__step')).toHaveLength(4);
+    expect(canvas.querySelector('.event-compose__step')).toBeNull();
+    expect(canvas.querySelectorAll('.event-compose__section')).toHaveLength(4);
+    expect([...canvas.querySelectorAll('.event-detail__section-title')].map((node) => node.textContent)).toEqual([
+      'Event',
+      'When',
+      'People',
+      'Evidence'
+    ]);
     expect(canvas.querySelectorAll('.event-compose__type')).toHaveLength(6);
     expect(canvas.querySelector('[aria-label="Hours"]')).toBeTruthy();
     expect(canvas.querySelector('[aria-label="Increase hours"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Location"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Start time"]')).toBeTruthy();
     expect(canvas.textContent).toMatch(/Hours to log/);
     const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
     expect(title.classList.contains('event-compose__title')).toBe(true);

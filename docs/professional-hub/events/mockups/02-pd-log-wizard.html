@@ -24,6 +24,11 @@
   .hours-hero p { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
   .hours-hero b { display: block; font-size: var(--text-lg); color: var(--pastel-gold-ink); margin-bottom: 4px; }
   .title-input { font-size: var(--text-2xl); }
+  .section-title { margin: 0 0 4px; font-size: var(--text-lg); font-weight: 650; letter-spacing: var(--tracking-tight); color: var(--navy); }
+  .when-row { display: flex; align-items: flex-start; gap: 24px; }
+  .cal-block { flex: 0 0 22rem; width: 22rem; }
+  .times { display: flex; flex-direction: column; gap: 10px; flex: 1; min-width: 13.5rem; }
+  .month h2 { margin: 0 0 12px; font-size: var(--text-lg); font-weight: 650; color: var(--depth); }
 </style>
 </head>
 <body>
@@ -49,18 +54,13 @@
       <div>
         <p class="page-kicker">Events</p>
         <h1 class="page-title">Add event</h1>
-        <p class="page-subtitle">A record for your hours, not a party invite. Date and people come next.</p>
+        <p class="page-subtitle">A record for your hours, not a party invite. Type, date, people, and evidence on one page.</p>
       </div>
-      <ol class="steps">
-        <li class="is-on"><span class="n">1</span> Event</li>
-        <li><span class="n">2</span> When</li>
-        <li><span class="n">3</span> People</li>
-        <li><span class="n">4</span> Evidence</li>
-      </ol>
     </div>
 
     <div class="wizard">
       <div class="card panel">
+        <h2 class="section-title">Event</h2>
         <label class="field-label">Event type</label>
         <div class="type-grid">
           <div class="type is-on"><strong>Course</strong><span>Structured learning</span></div>
@@ -99,10 +99,50 @@
         </div>
       </div>
 
+      <div class="card panel">
+        <h2 class="section-title">When</h2>
+        <div class="when-row">
+          <div class="cal-block">
+            <div class="month"><h2>September 2026</h2></div>
+            <div class="cal">
+              <div class="cal-head">M</div><div class="cal-head">T</div><div class="cal-head">W</div><div class="cal-head">T</div><div class="cal-head">F</div><div class="cal-head">S</div><div class="cal-head">S</div>
+              <div class="cal-day is-muted"></div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div><div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div>
+              <div class="cal-day">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div><div class="cal-day">11</div><div class="cal-day">12</div><div class="cal-day">13</div>
+              <div class="cal-day">14</div><div class="cal-day">15</div><div class="cal-day">16</div><div class="cal-day">17</div><div class="cal-day">18</div><div class="cal-day">19</div><div class="cal-day">20</div>
+              <div class="cal-day">21</div><div class="cal-day is-on">22</div><div class="cal-day">23</div><div class="cal-day">24</div><div class="cal-day">25</div><div class="cal-day">26</div><div class="cal-day">27</div>
+              <div class="cal-day">28</div><div class="cal-day">29</div><div class="cal-day">30</div>
+            </div>
+          </div>
+          <div class="times">
+            <div class="time-chip"><span>Starts</span><strong>2:46 pm</strong></div>
+            <div class="time-chip"><span>Ends</span><strong>4:46 pm</strong></div>
+            <div class="switch"><div class="switch-track"><div class="switch-thumb"></div></div>All day</div>
+            <label class="field-label">Time zone</label>
+            <input class="box-input" value="Australia/Sydney" readonly>
+            <label class="field-label">Location</label>
+            <input class="box-input" placeholder="Location" readonly>
+          </div>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <h2 class="section-title">People</h2>
+        <label class="field-label">Provider / venue</label>
+        <input class="box-input" placeholder="Type @ to add provider or venue" readonly>
+        <label class="field-label" style="margin-top:16px">People</label>
+        <input class="box-input" placeholder="Type @ to add a person" readonly>
+      </div>
+
+      <div class="card panel">
+        <h2 class="section-title">Evidence</h2>
+        <label class="field-label">Certificate name</label>
+        <input class="box-input" placeholder="Certificate name" readonly>
+      </div>
+
       <div class="footer-bar">
         <button class="btn btn-ghost">Cancel</button>
         <div class="sticky-actions">
-          <button class="btn btn-primary">Continue to when</button>
+          <button class="btn btn-primary">Save</button>
         </div>
       </div>
     </div>

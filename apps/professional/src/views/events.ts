@@ -116,8 +116,6 @@ export async function renderEventsView(canvas: HTMLElement): Promise<void> {
   await load();
 }
 
-const COMPOSE_STEPS = ['Event', 'When', 'People', 'Evidence'] as const;
-
 const EVENT_KINDS = [
   { id: 'course', label: 'Course', hint: 'Structured learning' },
   { id: 'workshop', label: 'Workshop', hint: 'Facilitated session' },
@@ -462,43 +460,6 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
     endTime.disabled = allDay.checked;
   });
 
-  const stepsNav = document.createElement('ol');
-  stepsNav.className = 'event-compose__steps';
-  const stepButtons: HTMLButtonElement[] = [];
-  const panels: HTMLElement[] = [];
-  let currentStep = 0;
-  const back = el('button', 'btn btn--ghost', 'Back') as HTMLButtonElement;
-  back.type = 'button';
-  const next = el('button', 'btn btn--primary', 'Continue') as HTMLButtonElement;
-  next.type = 'button';
-
-  function showStep(index: number): void {
-    currentStep = index;
-    panels.forEach((panel, i) => {
-      panel.hidden = i !== index;
-    });
-    stepButtons.forEach((button, i) => {
-      button.classList.toggle('is-current', i === index);
-    });
-    back.hidden = index === 0;
-    next.hidden = index === panels.length - 1;
-    save.textContent = index === panels.length - 1 ? 'Save event' : 'Save';
-    next.textContent =
-      index === 0 ? 'Continue to when' : index === 1 ? 'Continue to people' : 'Continue to evidence';
-  }
-
-  COMPOSE_STEPS.forEach((label, index) => {
-    const item = document.createElement('li');
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'event-compose__step';
-    button.append(el('span', 'event-compose__step-n', String(index + 1)), document.createTextNode(label));
-    button.addEventListener('click', () => showStep(index));
-    stepButtons.push(button);
-    item.append(button);
-    stepsNav.append(item);
-  });
-
   let selectedKind: (typeof EVENT_KINDS)[number] = EVENT_KINDS[0];
   const typeButtons: HTMLButtonElement[] = [];
   const typeGrid = el('div', 'event-compose__types');
@@ -577,72 +538,61 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   syncAccreditation();
   paintHours();
 
-  function block(label: string, ...nodes: HTMLElement[]): HTMLElement {
-    const card = el('section', 'event-detail__card event-compose__block');
-    card.append(el('label', 'event-compose__label', label), ...nodes);
+  function section(title: string, ...nodes: HTMLElement[]): HTMLElement {
+    const card = el('section', 'event-detail__card event-compose__section');
+    card.append(el('h2', 'event-detail__section-title', title), ...nodes);
     return card;
   }
-
-  const eventPanel = el('section', 'event-compose__panel');
-  eventPanel.append(
-    block('Event type', typeGrid),
-    block('Title', title),
-    hoursRow,
-    block('Priority area', chipRow, accreditation)
-  );
 
   const monthNav = el('div', 'event-compose__month-nav');
   monthNav.append(prevMonth, nextMonth);
   const monthRow = el('div', 'event-compose__month');
   monthRow.append(monthTitleEl, monthNav);
-  const calBlock = el('div');
+  const calBlock = el('div', 'event-compose__cal-block');
   calBlock.append(monthRow, calHost);
   const startTimeRow = el('label', 'event-compose__time');
   startTimeRow.append(el('span', 'event-compose__label', 'Starts'), startTime);
   const endTimeRow = el('label', 'event-compose__time');
   endTimeRow.append(el('span', 'event-compose__label', 'Ends'), endTime);
   const times = el('div', 'event-compose__times');
-  times.append(startTimeRow, endTimeRow, allDayLabel, field('Time zone', timeZone));
+  times.append(
+    startTimeRow,
+    endTimeRow,
+    allDayLabel,
+    field('Time zone', timeZone),
+    field('Location', locationField)
+  );
   const whenGrid = el('div', 'event-compose__when');
   whenGrid.append(calBlock, times);
-  const whenPanel = el('section', 'event-compose__panel');
-  whenPanel.append(whenGrid, field('Location', locationField), start, end);
-
-  const peoplePanel = el('section', 'event-compose__panel');
-  peoplePanel.append(
-    field('Organisation relationship', orgRel),
-    field('Provider / venue', orgInput, picker.root),
-    field('Presenter', presenterInput, presenterPicker.root),
-    field('Attendee role for next pick', attendeeRole),
-    field('People', attendeeInput, attendeePicker.root),
-    chipsHost
-  );
-
-  const evidencePanel = el('section', 'event-compose__panel');
-  evidencePanel.append(
-    field('Certificate name', certName),
-    field('Certificate reference', certReference),
-    field('Certificate issued at', certIssuedAt),
-    field('Related Knowledge page', knowledgeInput, knowledgePicker.root)
-  );
-
-  whenPanel.classList.add('event-detail__card');
-  peoplePanel.classList.add('event-detail__card');
-  evidencePanel.classList.add('event-detail__card');
-  panels.push(eventPanel, whenPanel, peoplePanel, evidencePanel);
-
-  back.addEventListener('click', () => showStep(Math.max(0, currentStep - 1)));
-  next.addEventListener('click', () => showStep(Math.min(panels.length - 1, currentStep + 1)));
 
   const actions = el('div', 'event-compose__actions');
-  actions.append(back, next, save);
+  actions.append(save);
   const footer = el('div', 'event-compose__footer');
   footer.append(cancel, status, actions);
-  form.append(stepsNav, eventPanel, whenPanel, peoplePanel, evidencePanel, footer);
+  form.append(
+    section('Event', field('Event type', typeGrid), field('Title', title), hoursRow, field('Priority area', chipRow, accreditation)),
+    section('When', whenGrid, start, end),
+    section(
+      'People',
+      field('Organisation relationship', orgRel),
+      field('Provider / venue', orgInput, picker.root),
+      field('Presenter', presenterInput, presenterPicker.root),
+      field('Attendee role for next pick', attendeeRole),
+      field('People', attendeeInput, attendeePicker.root),
+      chipsHost
+    ),
+    section(
+      'Evidence',
+      field('Certificate name', certName),
+      field('Certificate reference', certReference),
+      field('Certificate issued at', certIssuedAt),
+      field('Related Knowledge page', knowledgeInput, knowledgePicker.root)
+    ),
+    footer
+  );
 
   syncTimesFromWall();
   paintCalendar();
-  showStep(0);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

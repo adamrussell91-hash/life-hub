@@ -1,7 +1,8 @@
 # Add event — three directions
 
 The live `#/event/new` page is now direction B: type buttons, title,
-hours stepper, then date and people. Full canvas width. Called an event.
+hours stepper, date, people, and evidence as sections on one page.
+Full canvas width. Called an event.
 
 These mockups keep every current field (title, start, end, zone, location,
 all-day, hours, accreditation, certificate, provider, presenter, knowledge,
