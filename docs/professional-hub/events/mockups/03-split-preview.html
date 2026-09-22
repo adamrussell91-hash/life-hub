@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Option C — Split preview</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="events.css">
+<style>
+  .split { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 22px; flex: 1; min-height: 0; }
+  .preview { padding: 28px; display: flex; flex-direction: column; gap: 22px; }
+  .preview h2 { margin: 0; font-size: var(--text-xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--depth); }
+  .preview-kicker { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+  .fact { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .fact:last-child { border-bottom: 0; }
+  .fact dt { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+  .fact dd { margin: 0; font-size: var(--text-base); color: var(--ink); }
+  .editor { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .block { padding: 18px 20px; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .when-line { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">Professional Hub</a>
+    <nav class="hub-rail__nav" style="margin-top:28px">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z"/><path d="M14.8 14.3c.5-.13 1-.2 1.5-.2 2.4 0 4.2 1.7 4.2 4.4"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M5 20V6.5L12 4l7 2.5V20"/><path d="M9 20v-5h6v5"/><path d="M9 9h.01M12 9h.01M15 9h.01M9 12.5h.01M12 12.5h.01M15 12.5h.01"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M16 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M10.4 10.4 13.6 15.6"/></svg>Relationships</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"/></svg>Communications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4v2M17 4v2M5 9h14"/><path d="M6 7.5h12A1.5 1.5 0 0 1 19.5 9v10A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V9A1.5 1.5 0 0 1 6 7.5Z"/><path d="M9 13h2M13 13h2M9 16h6"/></svg>Meetings</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><path d="M12 4v3M8 8.5 12 12l4-3.5M6.5 18.5h11M8 14.5h8"/></svg>Events</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4.5h7l3 3V19.5H7V4.5Z"/><path d="M14 4.5v3h3M10 12h4M10 15h4"/></svg>Applications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4.5 9.5h15v9h-15v-9Z"/><path d="M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2"/><path d="M12 13v2"/></svg>Career</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M6 6.5a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M18 9a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M8 18a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+    </nav>
+  </aside>
+
+  <main class="canvas">
+    <div class="page-header">
+      <div>
+        <p class="page-kicker">Events</p>
+        <h1 class="page-title">Add event</h1>
+        <p class="page-subtitle">The left side is the record you are writing. Save whenever it looks right.</p>
+      </div>
+      <div class="sticky-actions">
+        <button class="btn btn-ghost">Cancel</button>
+        <button class="btn btn-primary">Save event</button>
+      </div>
+    </div>
+
+    <div class="split">
+      <section class="card preview preview-card">
+        <p class="preview-kicker">How it will land</p>
+        <h2>Phonics 101</h2>
+        <div>
+          <p class="when">22/09/26</p>
+          <p style="margin:6px 0 0; color:var(--muted); font-size:var(--text-sm)">2:46 pm – 4:46 pm · Australia/Sydney</p>
+        </div>
+        <div>
+          <p style="margin:0; font-size:var(--text-md); font-weight:600; color:var(--ink)">AISNSW, Sydney</p>
+          <p style="margin:4px 0 0; color:var(--muted); font-size:var(--text-sm)">Scheduled · 2 hours · Registered</p>
+        </div>
+        <div class="chip-row">
+          <span class="chip chip-blue">Course</span>
+          <span class="chip chip-gold">2.0 hours</span>
+          <span class="chip chip-sage">Standards 1, 2</span>
+        </div>
+        <dl>
+          <div class="fact"><dt>Provider</dt><dd>AISNSW</dd></div>
+          <div class="fact"><dt>Presenter</dt><dd>Jane Chen</dd></div>
+          <div class="fact"><dt>Certificate</dt><dd>None yet</dd></div>
+          <div class="fact"><dt>Knowledge</dt><dd>Not linked</dd></div>
+        </dl>
+      </section>
+
+      <div class="editor">
+        <section class="card block">
+          <label class="field-label">Session</label>
+          <input class="box-input" value="Phonics 101" readonly style="margin-bottom:12px">
+          <div class="when-line">
+            <div>
+              <label class="field-label">Date</label>
+              <input class="box-input" value="22/09/26" readonly>
+            </div>
+            <div>
+              <label class="field-label">Time</label>
+              <input class="box-input" value="2:46 – 4:46 pm" readonly>
+            </div>
+            <div class="switch" style="padding-bottom:8px"><div class="switch-track"><div class="switch-thumb"></div></div>All day</div>
+          </div>
+          <div style="margin-top:12px">
+            <label class="field-label">Location</label>
+            <input class="box-input" value="AISNSW, Sydney" readonly>
+          </div>
+        </section>
+
+        <section class="card block">
+          <label class="field-label">Hours and accreditation</label>
+          <div class="two">
+            <div>
+              <label class="field-label">PD hours</label>
+              <input class="box-input" value="2.0" readonly>
+            </div>
+            <div>
+              <label class="field-label">Category</label>
+              <input class="box-input" value="Curriculum &amp; assessment" readonly>
+            </div>
+          </div>
+        </section>
+
+        <section class="card block">
+          <label class="field-label">People</label>
+          <div class="chip-row" style="margin-bottom:10px">
+            <span class="entity-chip">AISNSW <b>provider</b> <i>×</i></span>
+            <span class="entity-chip">Jane Chen <b>presenter</b> <i>×</i></span>
+          </div>
+          <input class="box-input" value="" placeholder="Type @ to add a person or organisation" readonly>
+        </section>
+
+        <section class="card block">
+          <label class="field-label">Evidence · optional</label>
+          <div class="two">
+            <input class="box-input" placeholder="Certificate name" readonly>
+            <input class="box-input" placeholder="Reference" readonly>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

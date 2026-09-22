@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Option B — Guided PD log</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="events.css">
+<style>
+  .wizard { max-width: 760px; display: flex; flex-direction: column; gap: 18px; flex: 1; min-height: 0; }
+  .panel { padding: 28px 30px; }
+  .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .type {
+    min-height: 72px;
+    padding: 14px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--line);
+    background: rgba(255,255,255,0.72);
+    text-align: left;
+  }
+  .type strong { display: block; font-size: var(--text-sm); color: var(--depth); }
+  .type span { display: block; margin-top: 4px; font-size: var(--text-xs); color: var(--muted); }
+  .type.is-on { background: var(--pastel-blue); border-color: color-mix(in srgb, var(--wave) 28%, var(--line)); }
+  .hours-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 20px; border-radius: var(--radius-md); background: var(--pastel-gold); }
+  .hours-hero p { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
+  .hours-hero b { display: block; font-size: var(--text-lg); color: var(--pastel-gold-ink); margin-bottom: 4px; }
+  .standards { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">Professional Hub</a>
+    <nav class="hub-rail__nav" style="margin-top:28px">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z"/><path d="M14.8 14.3c.5-.13 1-.2 1.5-.2 2.4 0 4.2 1.7 4.2 4.4"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M5 20V6.5L12 4l7 2.5V20"/><path d="M9 20v-5h6v5"/><path d="M9 9h.01M12 9h.01M15 9h.01M9 12.5h.01M12 12.5h.01M15 12.5h.01"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M16 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M10.4 10.4 13.6 15.6"/></svg>Relationships</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"/></svg>Communications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4v2M17 4v2M5 9h14"/><path d="M6 7.5h12A1.5 1.5 0 0 1 19.5 9v10A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V9A1.5 1.5 0 0 1 6 7.5Z"/><path d="M9 13h2M13 13h2M9 16h6"/></svg>Meetings</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><path d="M12 4v3M8 8.5 12 12l4-3.5M6.5 18.5h11M8 14.5h8"/></svg>Events</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4.5h7l3 3V19.5H7V4.5Z"/><path d="M14 4.5v3h3M10 12h4M10 15h4"/></svg>Applications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4.5 9.5h15v9h-15v-9Z"/><path d="M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2"/><path d="M12 13v2"/></svg>Career</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M6 6.5a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M18 9a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M8 18a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+    </nav>
+  </aside>
+
+  <main class="canvas">
+    <div class="page-header">
+      <div>
+        <p class="page-kicker">Events</p>
+        <h1 class="page-title">Log a PD activity</h1>
+        <p class="page-subtitle">A record for your hours, not a party invite. Date and people come next.</p>
+      </div>
+      <ol class="steps">
+        <li class="is-on"><span class="n">1</span> Activity</li>
+        <li><span class="n">2</span> When</li>
+        <li><span class="n">3</span> People</li>
+        <li><span class="n">4</span> Evidence</li>
+      </ol>
+    </div>
+
+    <div class="wizard">
+      <div class="card panel">
+        <label class="field-label">Activity type</label>
+        <div class="type-grid">
+          <div class="type is-on"><strong>Course</strong><span>Structured learning</span></div>
+          <div class="type"><strong>Workshop</strong><span>Facilitated session</span></div>
+          <div class="type"><strong>Mentoring</strong><span>Coaching or observation</span></div>
+          <div class="type"><strong>Conference</strong><span>Talks and panels</span></div>
+          <div class="type"><strong>On Country</strong><span>Place-based learning</span></div>
+          <div class="type"><strong>Other</strong><span>Anything eligible</span></div>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <label class="field-label">Activity name</label>
+        <input class="ghost-input title-input" value="Phonics 101" readonly>
+      </div>
+
+      <div class="hours-hero">
+        <div>
+          <b>Hours to log</b>
+          <p>Counts toward the 100-hour maintenance period. 36 hours logged so far.</p>
+        </div>
+        <div class="hours-stepper">
+          <button type="button">−</button>
+          <b>2.0</b>
+          <button type="button">+</button>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <label class="field-label">Standards addressed</label>
+        <div class="standards">
+          <div class="standard is-on">1</div>
+          <div class="standard is-on">2</div>
+          <div class="standard">3</div>
+          <div class="standard">4</div>
+          <div class="standard">5</div>
+          <div class="standard">6</div>
+          <div class="standard">7</div>
+        </div>
+        <p class="field-hint">Australian Professional Standards for Teachers. Pick the ones this activity actually covers.</p>
+        <div style="margin-top:18px">
+          <label class="field-label">Priority area</label>
+          <div class="chip-row">
+            <span class="chip-choice is-on">Curriculum &amp; assessment</span>
+            <span class="chip-choice">Students with disability</span>
+            <span class="chip-choice">Aboriginal education</span>
+            <span class="chip-choice">Wellbeing</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bar">
+        <button class="btn btn-ghost">Cancel</button>
+        <div class="sticky-actions">
+          <button class="btn btn-outline">Save draft</button>
+          <button class="btn btn-primary">Continue to when</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
