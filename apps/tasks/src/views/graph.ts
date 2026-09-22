@@ -30,7 +30,7 @@ type LiveGraph = {
 
 let liveGraph: LiveGraph | null = null;
 let selectedId: string | null = null;
-let insightsOpen = true;
+let insightsOpen = false;
 let listMode = false;
 let lookAhead = 0;
 let orbitPaused = false;

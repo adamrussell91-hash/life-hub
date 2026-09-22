@@ -93,6 +93,19 @@ describe('buildGraphInsights', () => {
     expect(insights.some((row) => row.view === 'lines' && row.id.startsWith('lines-service'))).toBe(true);
   });
 
+  it('blames the station with blocked_since, not an earlier unfinished child', () => {
+    const tasks = [
+      task({ id: 't3', title: 'Permission notes', step_order: 3, status: 'in_progress' }),
+      task({ id: 't3a', title: 'Risk form', step_order: 1, parent_task_id: 't3', depends_on: ['t3'] }),
+      task({ id: 't5', title: 'Book bus', step_order: 5, depends_on: ['t4'], blocked_since: '2026-09-18T09:00:00+10:00' }),
+      task({ id: 't4', title: 'Get bus quote', step_order: 4 })
+    ];
+    const insights = buildGraphInsights(tasks, [project({ id: 'p-tom', title: 'Tournament of Minds' })], now);
+    const alert = insights.find((row) => row.id === 'lines-service-p-tom');
+    expect(alert?.detail).toMatch(/Book bus/);
+    expect(alert?.detail).not.toMatch(/Risk form/);
+  });
+
   it('emits a suggested station when the line is behind pace', () => {
     const tasks = [
       task({ id: 'a', title: 'A', step_order: 0, status: 'done' }),

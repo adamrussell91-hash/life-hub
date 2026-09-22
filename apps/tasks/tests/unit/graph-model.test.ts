@@ -317,13 +317,14 @@ describe('pace and serviceStatus', () => {
   });
 
   it('is not behind pace until the ghost fully passes a station', () => {
+    const created = '2026-09-14T00:00:00.000Z';
     const tasks = [
-      task({ id: 'a', title: 'A', step_order: 0 }),
-      task({ id: 'b', title: 'B', step_order: 1 }),
-      task({ id: 'c', title: 'C', step_order: 2 })
+      task({ id: 'a', title: 'A', step_order: 0, created_at: created }),
+      task({ id: 'b', title: 'B', step_order: 1, created_at: created }),
+      task({ id: 'c', title: 'C', step_order: 2, created_at: created })
     ];
     const measured = pace(
-      project({ created_at: '2026-09-14T00:00:00.000Z', current_end_date: '2026-10-14' }),
+      project({ created_at: created, current_end_date: '2026-10-14' }),
       tasks,
       new Date('2026-09-22T09:00:00+10:00')
     );

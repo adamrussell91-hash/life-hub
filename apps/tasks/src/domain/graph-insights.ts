@@ -69,11 +69,15 @@ function severityForService(status: ServiceStatusId): InsightSeverity | null {
 function blockedCause(project: Project, tasks: Task[], now: Date): Task | null {
   const route = projectRoute(project, tasks);
   const byId = new Map(tasks.map((t) => [t.id, t]));
+  const blocked: Task[] = [];
   for (const station of route.stations) {
     if (!station.task) continue;
     const state = nodeState(station.task, tasks, now);
-    if (state.state === 'blocked') return station.task;
+    if (state.state === 'blocked') blocked.push(station.task);
   }
+  const marked = blocked.find((task) => task.blocked_since);
+  if (marked) return marked;
+  if (blocked[0]) return blocked[0];
   const waiting = route.stations.find((s) => s.task && nodeState(s.task, tasks, now).state === 'waiting');
   return waiting?.task ?? byId.get(route.mainline.find((s) => s.task && s.task.status !== 'done')?.id ?? '') ?? null;
 }

@@ -718,6 +718,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
 
   let input = first;
   let ro: ResizeObserver | null = null;
+  let entrancePlayed = false;
 
   const paint = (): void => {
     const models = buildLines(input.projects, input.tasks, input.now, input.insights);
@@ -786,8 +787,9 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
         row.append(svgHost);
       }
       svgHost.replaceChildren();
-      if (vertical) renderVertical(line, svgHost, width, input, li);
-      else renderHorizontal(line, svgHost, width, input, li);
+      const renderInput = entrancePlayed ? { ...input, reducedMotion: true } : input;
+      if (vertical) renderVertical(line, svgHost, width, renderInput, li);
+      else renderHorizontal(line, svgHost, width, renderInput, li);
 
       const alert = input.insights.find(
         (ins) => ins.view === 'lines' && ins.anchor.kind === 'project' && ins.anchor.id === line.project.id && ins.id.startsWith('lines-service')
@@ -823,6 +825,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     }
     const loose = input.tasks.filter((t) => !t.parent_project_id && t.status !== 'done' && t.status !== 'dead');
     foot.innerHTML = loose.length ? `${loose.length} tasks without a project · <a href="#/list">Open Backlog</a>` : '';
+    entrancePlayed = true;
   };
 
   paint();
