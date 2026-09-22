@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v175';
+const CACHE_NAME = 'life-hub-shell-v176';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -38,6 +38,7 @@ const SHELL_FILES = [
   'js/app/agent-protocols.js',
   'js/app/body-controller.js',
   'js/app/body-model.js',
+  'js/app/body-chart-data.js',
   'js/app/bloods-model.js',
   'js/app/medical-model.js',
   'js/app/medical-controller.js',
@@ -82,6 +83,11 @@ const SHELL_FILES = [
   'js/app/chart-kit/glide-slope.js',
   'js/app/chart-kit/twin-clocks.js',
   'js/app/chart-kit/recomp-plane.js',
+  'js/app/chart-kit/shed-stack.js',
+  'js/app/chart-kit/stairs-down.js',
+  'js/app/chart-kit/carved-away.js',
+  'js/app/chart-kit/recomp-scissors.js',
+  'js/app/chart-kit/hundred-squares.js',
   'js/app/chart-kit/apply-ring.js',
   'js/app/chart-kit/area-line.js',
   'js/app/chart-kit/columns.js',
