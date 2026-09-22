@@ -205,13 +205,15 @@ test('renderer assigns untrusted values as text instead of HTML', async () => {
 test('responsive stylesheet contains the approved palette and mobile breakpoint', async () => {
   const css = [
     await readFile(new URL('../../apps/life/css/app.css', import.meta.url), 'utf8'),
-    await readFile(new URL('../../packages/design-kit/tokens.css', import.meta.url), 'utf8')
+    await readFile(new URL('../../packages/design-kit/tokens.css', import.meta.url), 'utf8'),
+    await readFile(new URL('../../packages/design-kit/chrome.css', import.meta.url), 'utf8')
   ].join('\n');
 
   for (const color of ['#FBF8F2', '#0A1536', '#142B51', '#376FB7', '#F68620']) {
     assert.match(css, new RegExp(color, 'i'));
   }
-  assert.match(css, /@media\s*\([^)]*max-width:\s*48rem/);
+  // Life rail and chrome hide at 720px after the shared-kit lock (#400).
+  assert.match(css, /@media\s*\([^)]*max-width:\s*720px/);
   assert.match(css, /min-height:\s*44px/);
 });
 
