@@ -55,9 +55,9 @@ async function resolvePublishedFile(rootPath, decodedPath) {
   return null;
 }
 
-export function createStaticServer({ root, apiRoot = new URL('../', import.meta.url), now, sessionMs } = {}) {
+export function createStaticServer({ root, apiRoot = new URL('../', import.meta.url), now, sessionMs, extraFiles } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
-  const handleMockApi = createMockApi({ root: apiRoot, now, sessionMs });
+  const handleMockApi = createMockApi({ root: apiRoot, now, sessionMs, extraFiles });
 
   return createServer(async (request, response) => {
     if (await handleMockApi(request, response)) return;
