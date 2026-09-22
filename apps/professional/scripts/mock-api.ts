@@ -963,7 +963,10 @@ export function createMockApi() {
             'hours',
             'attendance_state',
             'certificate',
-            'all_day'
+            'all_day',
+            'start',
+            'end',
+            'time_zone'
           ].includes(key)
         ) {
           event[key] = patch[key];

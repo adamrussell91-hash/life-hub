@@ -417,6 +417,69 @@ describe('renderEventNewView', () => {
     expect(canvas.querySelector('[aria-label="Attendee"]')).toBeTruthy();
   });
 
+  it('hands pending provider links to onSave so Edit can persist them', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const href = String(input);
+      if (href.includes('/api/entities/search')) {
+        return Response.json({
+          ok: true,
+          data: {
+            groups: {
+              person: [],
+              organisation: [
+                {
+                  ref: 'shared:organisation:org_new',
+                  kind: 'organisation',
+                  display_label: 'NESA',
+                  supporting_label: null,
+                  href: null,
+                  lifecycle_status: 'active',
+                  visibility: 'operator'
+                }
+              ],
+              task: []
+            }
+          }
+        });
+      }
+      return Response.json({ ok: true, data: { groups: { person: [], organisation: [], task: [] } } });
+    });
+
+    const canvas = document.createElement('div');
+    const saved: Array<{ pendingLinks: unknown }> = [];
+    await renderEventNewView(canvas, {
+      onSave: async (payload) => {
+        saved.push(payload);
+      }
+    });
+
+    const orgInput = canvas.querySelector('[aria-label="Organisation link"]') as HTMLInputElement;
+    orgInput.value = '@NES';
+    orgInput.setSelectionRange(orgInput.value.length, orgInput.value.length);
+    orgInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(canvas.textContent).toMatch(/NESA/);
+    });
+    const option = [...canvas.querySelectorAll('[role="option"]')].find((node) =>
+      node.textContent?.includes('NESA')
+    ) as HTMLElement | undefined;
+    option?.click();
+
+    const titleInput = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    titleInput.value = 'PD Day';
+    (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+
+    await vi.waitFor(() => {
+      expect(saved.length).toBe(1);
+    });
+    expect(saved[0]?.pendingLinks).toEqual([
+      expect.objectContaining({
+        relationship_type: 'provider',
+        target_ref: 'shared:organisation:org_new'
+      })
+    ]);
+  });
+
   it('posts a picked attendee as relationship_type "attendee", not "provider"', async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const href = String(input);
@@ -586,17 +649,75 @@ describe('renderEventDetailView session layout', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows exactly one All day control, gated behind Edit', async () => {
+  it('opens the Add event form for Edit, including provider and facilitator', async () => {
     const canvas = document.createElement('div');
     await renderEventDetailView(canvas, VALID_EVENT_ID);
-    expect(canvas.querySelectorAll('[aria-label="All day"]')).toHaveLength(1);
-    const editPanel = [...canvas.querySelectorAll('.event-detail__panel')].find((panel) =>
-      panel.querySelector('[aria-label="All day"]')
-    ) as HTMLElement;
-    expect(editPanel.hasAttribute('hidden')).toBe(true);
+    expect(canvas.querySelector('form.event-compose')).toBeNull();
+    expect(canvas.querySelectorAll('[aria-label="All day"]')).toHaveLength(0);
     const editBtn = [...canvas.querySelectorAll('button')].find((node) => node.textContent === 'Edit') as HTMLButtonElement;
     editBtn.click();
-    expect(editPanel.hasAttribute('hidden')).toBe(false);
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('form.event-form.event-compose')).toBeTruthy();
+    });
+    expect([...canvas.querySelectorAll('.event-detail__section-title')].map((node) => node.textContent)).toEqual([
+      'Event',
+      'When',
+      'People',
+      'Evidence'
+    ]);
+    expect(canvas.querySelector('[aria-label="Organisation link"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Organisation relationship"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Attendee role"]')).toBeTruthy();
+    expect(canvas.querySelector('[aria-label="Presenter"]')).toBeTruthy();
+    expect(canvas.querySelectorAll('[aria-label="All day"]')).toHaveLength(1);
+    const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    expect(title.value).toBe('Critical Study PD Day');
+    expect(canvas.textContent).toMatch(/Warlight Education/);
+    expect(canvas.textContent).toMatch(/Kate Simmons/);
+  });
+
+  it('saves edit fields on the shared compose form', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('/api/universal-links')) {
+        return Response.json({ ok: true, data: { outgoing: [], incoming: [] } });
+      }
+      if (init?.method === 'PATCH' && href.includes('/api/events')) {
+        return Response.json({
+          ok: true,
+          data: { event: { ...eventRecord, title: 'Critical Study PD Day Updated', hours: 6.5 } }
+        });
+      }
+      return Response.json({ ok: true, data: { event: eventRecord } });
+    });
+
+    const canvas = document.createElement('div');
+    await renderEventDetailView(canvas, VALID_EVENT_ID);
+    ([...canvas.querySelectorAll('button')].find((node) => node.textContent === 'Edit') as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('form.event-compose')).toBeTruthy();
+    });
+
+    const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    title.value = 'Critical Study PD Day Updated';
+    (canvas.querySelector('[aria-label="Increase hours"]') as HTMLButtonElement).click();
+    (canvas.querySelector('form.event-compose') as HTMLFormElement).requestSubmit();
+
+    await vi.waitFor(() => {
+      const patchCall = vi
+        .mocked(fetch)
+        .mock.calls.find((call) => call[1]?.method === 'PATCH' && String(call[0]).includes('/api/events'));
+      expect(patchCall).toBeTruthy();
+    });
+    const patchCall = vi
+      .mocked(fetch)
+      .mock.calls.find((call) => call[1]?.method === 'PATCH' && String(call[0]).includes('/api/events'));
+    const patchBody = JSON.parse(String(patchCall?.[1]?.body));
+    expect(patchBody.title).toBe('Critical Study PD Day Updated');
+    expect(patchBody.hours).toBe(6.5);
+    expect(patchBody.start).toBeTruthy();
+    expect(patchBody.end).toBeTruthy();
+    expect(patchBody.time_zone).toBe('Australia/Sydney');
   });
 
   it('leads with the session and splits Who from what the session is for', async () => {
