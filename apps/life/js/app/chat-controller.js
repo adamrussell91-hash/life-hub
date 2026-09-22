@@ -172,8 +172,8 @@ export function createChatController({
   }
 
   function paintRoster() {
-    // Locked agent only — section defaults route the next send, but New chat
-    // must land on the chooser, not a re-highlighted section agent.
+    // UI selection follows the locked agent only. Section defaults still route
+    // the next send via stickyAgentSlug(), but must not re-highlight the roster.
     const slug = lockedAgentSlug();
     renderAgentPicker(root, {
       selectedSlug: slug,
@@ -313,11 +313,9 @@ export function createChatController({
   }
 
   function revealAgentMenuChrome() {
-    const hides = typeof root.querySelectorAll === 'function'
-      ? [...(root.querySelectorAll('[data-hub-scroll-hide]') ?? [])]
-      : [];
-    for (const el of hides) {
-      applyHubScrollHide(el, { current: 0, previous: 0 });
+    if (typeof root.querySelectorAll !== 'function') return;
+    for (const el of root.querySelectorAll('[data-hub-scroll-hide]')) {
+      applyHubScrollHide(el, { force: false });
     }
   }
 
@@ -1089,7 +1087,7 @@ export function createChatController({
     flushVeraSession,
     startCentralNodeAudit,
     syncAccent,
-    getSelectedAgentSlug: () => lockedAgentSlug(),
+    getSelectedAgentSlug: lockedAgentSlug,
     getSelectedProtocolId: () => selectedProtocolId,
     clearUnread
   };

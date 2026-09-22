@@ -1655,10 +1655,8 @@ test('New chat clears the thread and returns to the agent menu', async () => {
   const root = new FakeDocument();
   const hide = new FakeElement('div');
   hide.classList.add('hub-scroll-hide', 'is-hidden');
-  hide.setAttribute('data-hub-scroll-hide', '');
   root.elements.set('[data-hub-scroll-hide]', hide);
   const empty = new FakeElement('div');
-  empty.id = 'chat-empty';
   root.elements.set('#chat-empty', empty);
   const sendCalls = [];
   const chatApi = {
@@ -1685,10 +1683,7 @@ test('New chat clears the thread and returns to the agent menu', async () => {
 
   assert.equal(messageBubbles(root).length, 0);
   assert.equal(controller.getSelectedAgentSlug(), null);
-  assert.equal(
-    root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
-    ''
-  );
+  assert.equal(root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'), '');
   assert.equal(hide.classList.contains('is-hidden'), false);
   assert.match(empty.children[0]?.textContent ?? '', /Tap a personality/i);
   assert.equal(root.querySelector('#chat-input').placeholder, 'Message…');
