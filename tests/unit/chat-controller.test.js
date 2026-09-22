@@ -30,6 +30,9 @@ class FakeElement extends EventTarget {
       },
       getPropertyValue(name) {
         return this.props.get(name) ?? '';
+      },
+      removeProperty(name) {
+        this.props.delete(name);
       }
     };
     this.classList = {
@@ -176,6 +179,10 @@ class FakeDocument {
   querySelectorAll(selector) {
     if (selector === '#agent-picker') {
       const host = this.elements.get('#agent-picker');
+      return host ? [host] : [];
+    }
+    if (selector === '[data-hub-scroll-hide]') {
+      const host = this.elements.get('[data-hub-scroll-hide]');
       return host ? [host] : [];
     }
     return [];
@@ -1644,8 +1651,15 @@ test('API history carries up to 30 prior messages inside the memory window', asy
   assert.equal(last.history.at(-1).content, 'Reply 19');
 });
 
-test('New chat clears the thread and history but keeps the pinned agent', async () => {
+test('New chat clears the thread and returns to the agent menu', async () => {
   const root = new FakeDocument();
+  const hide = new FakeElement('div');
+  hide.classList.add('hub-scroll-hide', 'is-hidden');
+  hide.setAttribute('data-hub-scroll-hide', '');
+  root.elements.set('[data-hub-scroll-hide]', hide);
+  const empty = new FakeElement('div');
+  empty.id = 'chat-empty';
+  root.elements.set('#chat-empty', empty);
   const sendCalls = [];
   const chatApi = {
     async *send(message, options) {
@@ -1670,15 +1684,18 @@ test('New chat clears the thread and history but keeps the pinned agent', async 
   controller.startNewChat();
 
   assert.equal(messageBubbles(root).length, 0);
-  assert.equal(controller.getSelectedAgentSlug(), 'penelope');
+  assert.equal(controller.getSelectedAgentSlug(), null);
   assert.equal(
     root.querySelector('#chat-view').style.getPropertyValue('--agent-accent'),
-    '#8F373E'
+    ''
   );
+  assert.equal(hide.classList.contains('is-hidden'), false);
+  assert.match(empty.children[0]?.textContent ?? '', /Tap a personality/i);
+  assert.equal(root.querySelector('#chat-input').placeholder, 'Message…');
 
   await controller.send('starting fresh');
   assert.deepEqual(sendCalls[1].history, []);
-  assert.equal(sendCalls[1].priorAgentSlug, 'penelope');
+  assert.equal(sendCalls[1].priorAgentSlug, 'hammond');
 });
 
 test('Hammond Central Node audit starts a triage auditSession on send', async () => {
@@ -2227,7 +2244,7 @@ test('New Chat after a Vera reply sends a hidden flush then clears the thread', 
     messageBubbles(root).some(bubble => bubbleText(bubble).includes(VERA_FLUSH)),
     false
   );
-  assert.equal(controller.getSelectedAgentSlug(), 'vera');
+  assert.equal(controller.getSelectedAgentSlug(), null);
 });
 
 test('New Chat does not flush Penelope threads', async () => {
