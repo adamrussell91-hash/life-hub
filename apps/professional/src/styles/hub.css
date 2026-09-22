@@ -564,7 +564,7 @@
 .event-detail__reschedule,
 .application-form,
 .application-detail__edit,
-.add-person-form {
+.add-person-form:not([hidden]) {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

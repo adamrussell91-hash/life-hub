@@ -90,9 +90,9 @@ describe('renderPersonPage', () => {
 
     const edit = canvas.querySelector<HTMLButtonElement>('[aria-label="Edit Seth Example"]');
     expect(edit).toBeTruthy();
-    edit!.click();
-
     const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]')!;
+    expect(form.hidden).toBe(true);
+    edit!.click();
     expect(form.hidden).toBe(false);
     const name = canvas.querySelector<HTMLInputElement>('[aria-label="Name"]')!;
     const sortName = canvas.querySelector<HTMLInputElement>('[aria-label="Sort name"]')!;
