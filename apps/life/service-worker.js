@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v174';
+const CACHE_NAME = 'life-hub-shell-v175';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -76,6 +76,12 @@ const SHELL_FILES = [
   'js/app/central-node-charts.js',
   'js/app/central-node-model.js',
   'js/app/chart-kit/animate.js',
+  'js/app/chart-kit/scene.js',
+  'js/app/chart-kit/gate-rings.js',
+  'js/app/chart-kit/region-rose.js',
+  'js/app/chart-kit/glide-slope.js',
+  'js/app/chart-kit/twin-clocks.js',
+  'js/app/chart-kit/recomp-plane.js',
   'js/app/chart-kit/apply-ring.js',
   'js/app/chart-kit/area-line.js',
   'js/app/chart-kit/columns.js',
@@ -124,6 +130,9 @@ const SHELL_FILES = [
   'js/app/hammond-audit-session-storage.js',
   'js/app/home-model.js',
   'js/app/home-forecast.js',
+  'js/app/home-forecast-charts.js',
+  'js/app/render-home-charts.js',
+  'js/app/render-scene-chart.js',
   'js/app/load-live-events.js',
   'js/app/mind-model.js',
   'js/app/muscle-maps.js',
