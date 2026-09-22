@@ -965,7 +965,7 @@ function paintStale(state: Session, view: BacklogView, vagueIds: Set<string>): v
   if (!host) return;
   host.hidden = view.stale.length === 0;
   host.classList.toggle('is-open', state.staleOpen);
-  const toggle = host.querySelector('.backlog-stale__toggle span');
+  const toggle = host.querySelector('.backlog-stale__label');
   if (toggle) toggle.textContent = 'Still want these?';
   const list = host.querySelector<HTMLElement>('.backlog-stale__list');
   if (list) reconcileList(list, view.stale, state, { stale: true, vagueIds });
@@ -1614,7 +1614,7 @@ function buildShell(state: Session): void {
   stale.hidden = true;
   const staleToggle = el('button', 'backlog-stale__toggle');
   staleToggle.type = 'button';
-  staleToggle.append(el('span', 'backlog-stale__chev', '▸'), el('span', '', 'Still want these?'));
+  staleToggle.append(el('span', 'backlog-stale__chev', '▸'), el('span', 'backlog-stale__label', 'Still want these?'));
   staleToggle.addEventListener('click', () => {
     state.staleOpen = !state.staleOpen;
     stale.classList.toggle('is-open', state.staleOpen);
@@ -1629,7 +1629,9 @@ function buildShell(state: Session): void {
     });
   });
   stalePanel.append(archiveAll, el('div', 'backlog-stale__list'));
-  stale.append(staleToggle, stalePanel);
+  const staleCollapse = el('div', 'backlog-stale__collapse');
+  staleCollapse.append(stalePanel);
+  stale.append(staleToggle, staleCollapse);
   page.append(stale);
   const snoozed = el('section', 'backlog-snoozed');
   snoozed.hidden = true;
@@ -1641,7 +1643,9 @@ function buildShell(state: Session): void {
   });
   const snoozePanel = el('div', 'backlog-snoozed__panel');
   snoozePanel.append(el('div', 'backlog-snoozed__list'));
-  snoozed.append(snoozeToggle, snoozePanel);
+  const snoozeCollapse = el('div', 'backlog-snoozed__collapse');
+  snoozeCollapse.append(snoozePanel);
+  snoozed.append(snoozeToggle, snoozeCollapse);
   page.append(snoozed);
   const bulk = el('div', 'backlog-bulk');
   bulk.hidden = true;
