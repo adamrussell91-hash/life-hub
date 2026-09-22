@@ -15,6 +15,7 @@ import '../styles/gantt.css';
 import '../styles/daily-dial.css';
 import '../styles/lesson-engine.css';
 import '../styles/graph.css';
+import '../styles/backlog.css';
 import 'katex/dist/katex.min.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';

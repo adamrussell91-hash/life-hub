@@ -181,8 +181,15 @@ export function createMockApi({ seed }: MockApiOptions) {
         return json(200, { ok: true, data: { tasks: await s.listTasks() } });
       }
       if (method === 'POST') {
+        const rawUpdated = typeof body?.updated_at === 'string' ? body.updated_at : null;
         const parsed = TaskCreateSchema.parse(body);
-        return json(201, { ok: true, data: await s.createTask(parsed) });
+        const created = await s.createTask(parsed);
+        if (rawUpdated) {
+          const next = { ...created, updated_at: rawUpdated };
+          await kv.setJSON(keys.taskKey(created.id), next);
+          return json(201, { ok: true, data: next });
+        }
+        return json(201, { ok: true, data: created });
       }
       if (method === 'PATCH' && id) {
         const parsed = TaskUpdateSchema.parse(body);

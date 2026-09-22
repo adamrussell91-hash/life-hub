@@ -1,7 +1,6 @@
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import {
-  backlogTasks,
   hubCalendarDate,
   preferredDomains,
   searchEntities,
@@ -42,14 +41,12 @@ export { renderProjectsView } from '@/views/projects';
 
 let dayDomain: TaskDomain | 'all' = 'all';
 let dayPriority: TaskPriority | 'all' = 'all';
-let backlogDomain: TaskDomain | 'all' = 'all';
-let backlogPriority: TaskPriority | 'all' = 'all';
-let backlogTag = '';
 let searchDomain: TaskDomain | 'all' = 'all';
 let searchKind: 'all' | 'tasks' | 'projects' = 'all';
 let templateKind: 'all' | 'task' | 'project' | 'excursion' = 'all';
 let teardownDay: (() => void) | null = null;
-let teardownBacklog: (() => void) | null = null;
+
+export { renderListView } from '@/views/backlog';
 
 function appendTaskCard(
   host: HTMLElement,
@@ -335,136 +332,6 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
   teardownDay = () => {
     stopDayChanged();
     stopDayDeleted();
-  };
-}
-
-export async function renderListView(canvas: HTMLElement): Promise<void> {
-  teardownBacklog?.();
-  teardownBacklog = null;
-  showViewLoading(canvas, 'Loading…', '.backlog-view');
-  let tasks: Task[];
-  let projects: Project[];
-  try {
-    [tasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
-  } catch (err) {
-    renderLoadError(canvas, err, () => void renderListView(canvas), 'Could not load Backlog');
-    return;
-  }
-
-  function paint(): void {
-    const tags = [...new Set(tasks.flatMap((t) => t.tags))].sort();
-    let list = backlogTasks(tasks);
-    if (backlogDomain !== 'all') list = list.filter((t) => t.domain === backlogDomain);
-    if (backlogPriority !== 'all') list = list.filter((t) => t.priority === backlogPriority);
-    if (backlogTag) list = list.filter((t) => t.tags.includes(backlogTag));
-    const scrollTop = canvas.scrollTop;
-
-    canvas.replaceChildren();
-    const filters = createCollapsibleFilters({
-      id: 'backlog',
-      ariaLabel: 'Filters',
-      className: 'board-filter backlog-view',
-      active: backlogDomain !== 'all' || backlogPriority !== 'all' || Boolean(backlogTag)
-    });
-    filters.panel.append(
-      createHubFilter({
-        key: 'Domain',
-        label: 'Domain',
-        defaultValue: 'all',
-        options: domainFilterOptions(),
-        value: backlogDomain,
-        onChange: (value) => {
-          backlogDomain = value as TaskDomain | 'all';
-          paint();
-        }
-      }).el,
-      createHubFilter({
-        key: 'Priority',
-        label: 'Priority',
-        defaultValue: 'all',
-        options: priorityFilterOptions(),
-        value: backlogPriority,
-        onChange: (value) => {
-          backlogPriority = value as TaskPriority | 'all';
-          paint();
-        }
-      }).el,
-      createHubFilter({
-        key: 'Tag',
-        label: 'Tag',
-        defaultValue: '',
-        options: [{ value: '', label: 'All tags' }, ...tags.map((tag) => ({ value: tag, label: tag }))],
-        value: backlogTag,
-        onChange: (value) => {
-          backlogTag = value;
-          paint();
-        }
-      }).el
-    );
-    canvas.append(filters.root);
-    const confirmHost = el('div', 'task-confirm');
-    canvas.append(
-      renderQuickAdd((created) => {
-        upsertTask(tasks, created);
-        canvas.querySelector('.empty-state')?.remove();
-        let stack = canvas.querySelector<HTMLElement>('.task-stack');
-        if (!stack) {
-          stack = el('div', 'task-stack');
-          canvas.append(stack);
-        }
-        if (!stack.querySelector(`[data-task-id="${created.id}"]`) && backlogTasks([created]).length) {
-          appendTaskCard(stack, created, confirmHost, backlogHandlers(created.id), projects);
-          return;
-        }
-        paint();
-      })
-    );
-    canvas.append(confirmHost);
-
-    function backlogHandlers(taskId: string): {
-      onRemoved: () => void;
-      onChanged: () => Promise<void>;
-    } {
-      return {
-        onRemoved: () => {
-          removeMountedTaskCard(canvas, taskId);
-          tasks = dropTask(tasks, taskId);
-          if (!canvas.querySelector('.hub-card-slot') && !canvas.querySelector('.empty-state')) {
-            canvas.append(el('p', 'empty-state', 'Backlog is clear.'));
-          }
-        },
-        onChanged: async () => {
-          tasks = await tasksApi.listTasks().catch(() => tasks);
-          paint();
-        }
-      };
-    }
-
-    if (!list.length) {
-      canvas.append(el('p', 'empty-state', 'Backlog is clear.'));
-      canvas.scrollTop = scrollTop;
-      return;
-    }
-    const stack = el('div', 'task-stack');
-    for (const task of list) {
-      appendTaskCard(stack, task, confirmHost, backlogHandlers(task.id), projects);
-    }
-    canvas.append(stack);
-    canvas.scrollTop = scrollTop;
-  }
-
-  paint();
-  const stopBacklogChanged = onTasksChanged((incoming) => {
-    for (const task of incoming) upsertTask(tasks, task);
-    paint();
-  });
-  const stopBacklogDeleted = onTasksDeleted((ids) => {
-    tasks = tasks.filter((task) => !ids.includes(task.id));
-    paint();
-  });
-  teardownBacklog = () => {
-    stopBacklogChanged();
-    stopBacklogDeleted();
   };
 }
 
