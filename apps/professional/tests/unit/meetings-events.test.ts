@@ -311,6 +311,19 @@ describe('renderEventNewView', () => {
     vi.restoreAllMocks();
   });
 
+  it('renders a full-page compose with preview and steps', async () => {
+    const canvas = document.createElement('div');
+    await renderEventNewView(canvas);
+    expect(canvas.querySelector('form.event-form.event-compose')).toBeTruthy();
+    expect(canvas.querySelector('.event-compose__preview')).toBeTruthy();
+    expect(canvas.querySelectorAll('.event-compose__step')).toHaveLength(4);
+    expect(canvas.textContent).toMatch(/Untitled event/);
+    const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    title.value = 'Staff briefing';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(canvas.querySelector('.event-compose__preview-title')?.textContent).toBe('Staff briefing');
+  });
+
   it('renders location, all-day, certificate, and knowledge picker controls', async () => {
     const canvas = document.createElement('div');
     await renderEventNewView(canvas);

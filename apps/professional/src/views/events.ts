@@ -116,25 +116,49 @@ export async function renderEventsView(canvas: HTMLElement): Promise<void> {
   await load();
 }
 
+const COMPOSE_STEPS = ['Event', 'When', 'People', 'Evidence'] as const;
+
+function splitWallLocal(value: string): { date: string; time: string } {
+  const [date = '', time = ''] = value.split('T');
+  return { date, time: time.slice(0, 5) };
+}
+
+function formatClock(hhmm: string): string {
+  const [hourRaw, minuteRaw] = hhmm.split(':');
+  const hour = Number(hourRaw);
+  const minute = Number(minuteRaw);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return '';
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${suffix}`;
+}
+
+function monthTitle(year: number, month: number): string {
+  return new Date(year, month, 1).toLocaleString('en-AU', { month: 'long', year: 'numeric' });
+}
+
 export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren();
   const form = document.createElement('form');
-  form.className = 'event-form';
+  form.className = 'event-form event-compose';
   form.noValidate = true;
+  let refreshPreview = (): void => undefined;
 
   const title = document.createElement('input');
   title.type = 'text';
   title.required = true;
-  title.placeholder = 'Title';
+  title.className = 'event-compose__title';
+  title.placeholder = 'Name this event';
   title.setAttribute('aria-label', 'Title');
 
   const start = document.createElement('input');
   start.type = 'datetime-local';
   start.required = true;
+  start.className = 'event-compose__sr';
   start.setAttribute('aria-label', 'Starts');
   const end = document.createElement('input');
   end.type = 'datetime-local';
   end.required = true;
+  end.className = 'event-compose__sr';
   end.setAttribute('aria-label', 'Ends');
   const now = new Date();
   const zone = defaultZone();
@@ -209,7 +233,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   const chipList = createEntityChipList({
     container: chipsHost,
     chips: [],
-    onRemovePending: () => undefined
+    onRemovePending: () => refreshPreview()
   });
 
   const picker = createEntityPicker({
@@ -237,6 +261,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: relationshipType,
         href: item.href ?? null
       });
+      refreshPreview();
     }
   });
 
@@ -258,6 +283,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: 'presenter',
         href: item.href ?? null
       });
+      refreshPreview();
     }
   });
 
@@ -273,6 +299,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: 'related_to',
         href: item.href
       });
+      refreshPreview();
     }
   });
 
@@ -319,6 +346,7 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
         supportingLabel: role,
         href: item.href ?? null
       });
+      refreshPreview();
     }
   });
 
@@ -329,52 +357,259 @@ export async function renderEventNewView(canvas: HTMLElement): Promise<void> {
   const cancel = el('a', 'btn btn--ghost', 'Cancel');
   cancel.href = '#/events';
 
-  const allDayLabel = el('label');
+  const allDayLabel = el('label', 'event-compose__switch');
   allDayLabel.append(allDay, document.createTextNode(' All day'));
 
-  form.append(
-    el('label', undefined, 'Title'),
-    title,
-    el('label', undefined, 'Starts'),
-    start,
-    el('label', undefined, 'Ends'),
-    end,
-    el('label', undefined, 'Time zone'),
-    timeZone,
-    el('label', undefined, 'Location'),
-    locationField,
-    allDayLabel,
-    el('label', undefined, 'Hours'),
-    hours,
-    el('label', undefined, 'Accreditation'),
-    accreditation,
-    el('label', undefined, 'Certificate name'),
-    certName,
-    el('label', undefined, 'Certificate reference'),
-    certReference,
-    el('label', undefined, 'Certificate issued at'),
-    certIssuedAt,
-    el('label', undefined, 'Organisation relationship'),
-    orgRel,
-    el('label', undefined, 'Provider / venue'),
-    orgInput,
-    picker.root,
-    el('label', undefined, 'Presenter'),
-    presenterInput,
-    presenterPicker.root,
-    el('label', undefined, 'Related Knowledge page'),
-    knowledgeInput,
-    knowledgePicker.root,
-    el('label', undefined, 'Attendee role for next pick'),
-    attendeeRole,
-    el('label', undefined, 'People'),
-    attendeeInput,
-    attendeePicker.root,
-    chipsHost,
-    status,
-    save,
-    cancel
+  const startTime = document.createElement('input');
+  startTime.type = 'time';
+  startTime.setAttribute('aria-label', 'Start time');
+  const endTime = document.createElement('input');
+  endTime.type = 'time';
+  endTime.setAttribute('aria-label', 'End time');
+
+  function field(label: string, control: HTMLElement, extra?: HTMLElement): HTMLElement {
+    const wrap = el('div', 'event-compose__field');
+    wrap.append(el('label', 'event-compose__label', label), control);
+    if (extra) wrap.append(extra);
+    return wrap;
+  }
+
+  const preview = el('aside', 'event-detail__card event-compose__preview');
+  const previewKicker = el('p', 'event-detail__kicker', 'How it will land');
+  const previewTitle = el('h2', 'event-compose__preview-title', 'Untitled event');
+  const previewDate = el('p', 'event-compose__preview-date');
+  const previewTime = el('p', 'event-compose__preview-time');
+  const previewPlace = el('p', 'event-compose__preview-place');
+  const previewMeta = el('p', 'event-compose__preview-meta');
+  const previewFacts = el('dl', 'event-compose__facts');
+  preview.append(previewKicker, previewTitle, previewDate, previewTime, previewPlace, previewMeta, previewFacts);
+
+  function factRow(label: string, value: string): HTMLElement {
+    const row = el('div', 'event-detail__fact');
+    row.append(el('dt', 'event-detail__fact-label', label), el('dd', 'event-detail__fact-value', value));
+    return row;
+  }
+
+  const calHost = el('div', 'event-compose__cal');
+  const monthTitleEl = el('h2', 'event-compose__month-title');
+  let view = splitWallLocal(start.value);
+  let viewYear = Number(view.date.slice(0, 4));
+  let viewMonth = Number(view.date.slice(5, 7)) - 1;
+
+  function selectedDate(): string {
+    return splitWallLocal(start.value).date;
+  }
+
+  function syncTimesFromWall(): void {
+    const nextStart = splitWallLocal(start.value);
+    const nextEnd = splitWallLocal(end.value);
+    startTime.value = nextStart.time;
+    endTime.value = nextEnd.time;
+  }
+
+  function writeWall(date: string, startClock: string, endClock: string): void {
+    start.value = `${date}T${startClock}`;
+    end.value = `${date}T${endClock}`;
+  }
+
+  function paintCalendar(): void {
+    monthTitleEl.textContent = monthTitle(viewYear, viewMonth);
+    calHost.replaceChildren();
+    for (const day of ['M', 'T', 'W', 'T', 'F', 'S', 'S']) {
+      calHost.append(el('span', 'event-compose__cal-head', day));
+    }
+    const first = new Date(viewYear, viewMonth, 1);
+    const startPad = (first.getDay() + 6) % 7;
+    const days = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const selected = selectedDate();
+    for (let i = 0; i < startPad; i += 1) {
+      const cell = el('span', 'event-compose__cal-day is-muted');
+      cell.textContent = '';
+      calHost.append(cell);
+    }
+    for (let day = 1; day <= days; day += 1) {
+      const ymd = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'event-compose__cal-day';
+      if (ymd === selected) cell.classList.add('is-on');
+      cell.textContent = String(day);
+      cell.addEventListener('click', () => {
+        writeWall(ymd, startTime.value || '09:00', endTime.value || '11:00');
+        paintCalendar();
+        paintPreview();
+      });
+      calHost.append(cell);
+    }
+  }
+
+  function paintPreview(): void {
+    const name = title.value.trim();
+    previewTitle.textContent = name || 'Untitled event';
+    previewTitle.classList.toggle('is-empty', !name);
+    const date = selectedDate();
+    previewDate.textContent = formatDisplayDate(date) || 'Date not set';
+    if (allDay.checked) {
+      previewTime.textContent = `All day · ${timeZone.value || 'Timezone not set'}`;
+    } else {
+      const range = [formatClock(startTime.value), formatClock(endTime.value)].filter(Boolean).join(' – ');
+      previewTime.textContent = range
+        ? `${range} · ${timeZone.value}`
+        : timeZone.value || 'Time not set';
+    }
+    previewPlace.textContent = locationField.value.trim() || 'No location yet';
+    previewMeta.textContent = hours.value ? `Scheduled · ${hours.value} hours` : 'Scheduled';
+    const people = chipList
+      .getChips()
+      .map((chip) => chip.label)
+      .join(', ');
+    const evidence = [certName.value.trim(), accreditation.value.trim()].filter(Boolean).join(' · ');
+    previewFacts.replaceChildren(
+      factRow('Hours', hours.value ? `${hours.value} hours` : 'Not set'),
+      factRow('People', people || 'None yet'),
+      factRow('Evidence', evidence || 'None yet')
+    );
+  }
+
+  const prevMonth = el('button', 'btn btn--ghost', '‹') as HTMLButtonElement;
+  prevMonth.type = 'button';
+  prevMonth.setAttribute('aria-label', 'Previous month');
+  const nextMonth = el('button', 'btn btn--ghost', '›') as HTMLButtonElement;
+  nextMonth.type = 'button';
+  nextMonth.setAttribute('aria-label', 'Next month');
+  prevMonth.addEventListener('click', () => {
+    viewMonth -= 1;
+    if (viewMonth < 0) {
+      viewMonth = 11;
+      viewYear -= 1;
+    }
+    paintCalendar();
+  });
+  nextMonth.addEventListener('click', () => {
+    viewMonth += 1;
+    if (viewMonth > 11) {
+      viewMonth = 0;
+      viewYear += 1;
+    }
+    paintCalendar();
+  });
+
+  startTime.addEventListener('input', () => {
+    writeWall(selectedDate() || splitWallLocal(start.value).date, startTime.value, endTime.value);
+    paintPreview();
+  });
+  endTime.addEventListener('input', () => {
+    writeWall(selectedDate() || splitWallLocal(end.value).date, startTime.value, endTime.value);
+    paintPreview();
+  });
+  allDay.addEventListener('change', () => {
+    startTime.disabled = allDay.checked;
+    endTime.disabled = allDay.checked;
+    paintPreview();
+  });
+
+  const stepsNav = document.createElement('ol');
+  stepsNav.className = 'event-compose__steps';
+  const stepButtons: HTMLButtonElement[] = [];
+  const panels: HTMLElement[] = [];
+  let currentStep = 0;
+  const back = el('button', 'btn btn--ghost', 'Back') as HTMLButtonElement;
+  back.type = 'button';
+  const next = el('button', 'btn btn--primary', 'Continue') as HTMLButtonElement;
+  next.type = 'button';
+
+  function showStep(index: number): void {
+    currentStep = index;
+    panels.forEach((panel, i) => {
+      panel.hidden = i !== index;
+    });
+    stepButtons.forEach((button, i) => {
+      button.classList.toggle('is-current', i === index);
+    });
+    back.hidden = index === 0;
+    next.hidden = index === panels.length - 1;
+    save.textContent = index === panels.length - 1 ? 'Save event' : 'Save';
+    next.textContent =
+      index === 0 ? 'Continue to when' : index === 1 ? 'Continue to people' : 'Continue to evidence';
+  }
+
+  COMPOSE_STEPS.forEach((label, index) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'event-compose__step';
+    button.append(el('span', 'event-compose__step-n', String(index + 1)), document.createTextNode(label));
+    button.addEventListener('click', () => showStep(index));
+    stepButtons.push(button);
+    item.append(button);
+    stepsNav.append(item);
+  });
+
+  const eventPanel = el('section', 'event-compose__panel');
+  eventPanel.append(
+    field('Title', title),
+    field('Hours', hours),
+    field('Accreditation', accreditation)
   );
+
+  const monthNav = el('div', 'event-compose__month-nav');
+  monthNav.append(prevMonth, nextMonth);
+  const monthRow = el('div', 'event-compose__month');
+  monthRow.append(monthTitleEl, monthNav);
+  const calBlock = el('div');
+  calBlock.append(monthRow, calHost);
+  const startTimeRow = el('label', 'event-compose__time');
+  startTimeRow.append(el('span', 'event-compose__label', 'Starts'), startTime);
+  const endTimeRow = el('label', 'event-compose__time');
+  endTimeRow.append(el('span', 'event-compose__label', 'Ends'), endTime);
+  const times = el('div', 'event-compose__times');
+  times.append(startTimeRow, endTimeRow, allDayLabel, field('Time zone', timeZone));
+  const whenGrid = el('div', 'event-compose__when');
+  whenGrid.append(calBlock, times);
+  const whenPanel = el('section', 'event-compose__panel');
+  whenPanel.append(whenGrid, field('Location', locationField), start, end);
+
+  const peoplePanel = el('section', 'event-compose__panel');
+  peoplePanel.append(
+    field('Organisation relationship', orgRel),
+    field('Provider / venue', orgInput, picker.root),
+    field('Presenter', presenterInput, presenterPicker.root),
+    field('Attendee role for next pick', attendeeRole),
+    field('People', attendeeInput, attendeePicker.root),
+    chipsHost
+  );
+
+  const evidencePanel = el('section', 'event-compose__panel');
+  evidencePanel.append(
+    field('Certificate name', certName),
+    field('Certificate reference', certReference),
+    field('Certificate issued at', certIssuedAt),
+    field('Related Knowledge page', knowledgeInput, knowledgePicker.root)
+  );
+
+  panels.push(eventPanel, whenPanel, peoplePanel, evidencePanel);
+  const editor = el('div', 'event-detail__card event-compose__editor');
+  editor.append(...panels);
+
+  back.addEventListener('click', () => showStep(Math.max(0, currentStep - 1)));
+  next.addEventListener('click', () => showStep(Math.min(panels.length - 1, currentStep + 1)));
+
+  const actions = el('div', 'event-compose__actions');
+  actions.append(back, next, save);
+  const footer = el('div', 'event-compose__footer');
+  footer.append(cancel, status, actions);
+  editor.append(footer);
+
+  const split = el('div', 'event-compose__split');
+  split.append(preview, editor);
+  form.append(stepsNav, split);
+
+  refreshPreview = paintPreview;
+  syncTimesFromWall();
+  paintCalendar();
+  paintPreview();
+  form.addEventListener('input', () => paintPreview());
+  showStep(0);
 
   form.addEventListener('submit', async (event) => {
     event.preventDefault();

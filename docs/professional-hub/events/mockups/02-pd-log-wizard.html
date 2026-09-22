@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Add event — guided split</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="events.css">
+<style>
+  .canvas { gap: 18px; padding: 28px 36px 24px; }
+  .split { display: grid; grid-template-columns: minmax(22rem, 0.92fr) minmax(0, 1.18fr); gap: 22px; flex: 1; min-height: 0; }
+  .preview { padding: 28px; display: flex; flex-direction: column; gap: 20px; height: 100%; }
+  .preview h2 { margin: 0; font-size: var(--text-xl); font-weight: 700; letter-spacing: var(--tracking-tight); color: var(--depth); }
+  .preview-kicker { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+  .fact { display: grid; grid-template-columns: 7.5rem 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .fact:last-child { border-bottom: 0; }
+  .fact dt { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+  .fact dd { margin: 0; font-size: var(--text-base); color: var(--ink); }
+  .editor { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+  .panel { padding: 28px 30px; flex: 1; display: flex; flex-direction: column; gap: 22px; }
+  .hours-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 16px 18px; border-radius: var(--radius-md); background: var(--pastel-gold); }
+  .hours-row p { margin: 0; font-size: var(--text-sm); color: var(--pastel-gold-ink); }
+  .hours-row b { display: block; font-size: var(--text-base); color: var(--pastel-gold-ink); margin-bottom: 2px; }
+</style>
+</head>
+<body>
+<div class="screen">
+  <aside class="hub-rail">
+    <a class="hub-rail__brand">Professional Hub</a>
+    <nav class="hub-rail__nav" style="margin-top:28px">
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5"/><path d="M16 8.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z"/><path d="M14.8 14.3c.5-.13 1-.2 1.5-.2 2.4 0 4.2 1.7 4.2 4.4"/></svg>People</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M5 20V6.5L12 4l7 2.5V20"/><path d="M9 20v-5h6v5"/><path d="M9 9h.01M12 9h.01M15 9h.01M9 12.5h.01M12 12.5h.01M15 12.5h.01"/></svg>Organisations</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M8 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M16 18a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M10.4 10.4 13.6 15.6"/></svg>Relationships</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4 3.2V16H6.5A2.5 2.5 0 0 1 4 13.5v-7Z"/></svg>Communications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4v2M17 4v2M5 9h14"/><path d="M6 7.5h12A1.5 1.5 0 0 1 19.5 9v10A1.5 1.5 0 0 1 18 20.5H6A1.5 1.5 0 0 1 4.5 19V9A1.5 1.5 0 0 1 6 7.5Z"/><path d="M9 13h2M13 13h2M9 16h6"/></svg>Meetings</a>
+      <a class="hub-rail__link is-current"><svg viewBox="0 0 24 24"><path d="M12 4v3M8 8.5 12 12l4-3.5M6.5 18.5h11M8 14.5h8"/></svg>Events</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M7 4.5h7l3 3V19.5H7V4.5Z"/><path d="M14 4.5v3h3M10 12h4M10 15h4"/></svg>Applications</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M4.5 9.5h15v9h-15v-9Z"/><path d="M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2"/><path d="M12 13v2"/></svg>Career</a>
+      <a class="hub-rail__link"><svg viewBox="0 0 24 24"><path d="M6 6.5a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M18 9a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M8 18a2.1 2.1 0 1 0 0-4.2 2.1 2.1 0 0 0 0 4.2Z"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</a>
+    </nav>
+  </aside>
+
+  <main class="canvas">
+    <div class="page-header">
+      <div>
+        <p class="page-kicker">Events</p>
+        <h1 class="page-title">Add event</h1>
+        <p class="page-subtitle">The left side is the record. Step through the rest.</p>
+      </div>
+      <ol class="steps">
+        <li class="is-on"><span class="n">1</span> Event</li>
+        <li><span class="n">2</span> When</li>
+        <li><span class="n">3</span> People</li>
+        <li><span class="n">4</span> Evidence</li>
+      </ol>
+    </div>
+
+    <div class="split">
+      <section class="card preview preview-card">
+        <p class="preview-kicker">How it will land</p>
+        <h2>Untitled event</h2>
+        <div>
+          <p class="when">22/09/26</p>
+          <p style="margin:6px 0 0; color:var(--muted); font-size:var(--text-sm)">2:46 pm – 4:46 pm · Australia/Sydney</p>
+        </div>
+        <div>
+          <p style="margin:0; font-size:var(--text-md); font-weight:600; color:var(--ink)">No location yet</p>
+          <p style="margin:4px 0 0; color:var(--muted); font-size:var(--text-sm)">Scheduled</p>
+        </div>
+        <dl>
+          <div class="fact"><dt>Hours</dt><dd>Not set</dd></div>
+          <div class="fact"><dt>People</dt><dd>None yet</dd></div>
+          <div class="fact"><dt>Evidence</dt><dd>None yet</dd></div>
+        </dl>
+      </section>
+
+      <div class="editor">
+        <section class="card panel">
+          <div>
+            <label class="field-label">Title</label>
+            <input class="ghost-input title-input" placeholder="Name this event" readonly>
+          </div>
+          <div class="hours-row">
+            <div>
+              <b>Hours</b>
+              <p>Optional. Use when the event should count as time on the record.</p>
+            </div>
+            <div class="hours-stepper">
+              <button type="button">−</button>
+              <b>0.0</b>
+              <button type="button">+</button>
+            </div>
+          </div>
+          <div>
+            <label class="field-label">Accreditation · optional</label>
+            <input class="box-input" placeholder="Category" readonly>
+          </div>
+          <div class="footer-bar" style="margin-top:auto">
+            <button class="btn btn-ghost">Cancel</button>
+            <div class="sticky-actions">
+              <button class="btn btn-primary">Continue to when</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
