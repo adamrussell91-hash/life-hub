@@ -163,7 +163,7 @@ function model(events = []) {
   });
 }
 
-test('week view paints a time grid and standing compose', () => {
+test('week view paints a time grid without a standing compose', () => {
   const root = fakeRoot();
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
@@ -171,8 +171,25 @@ test('week view paints a time grid and standing compose', () => {
   const calendar = root._host.children[0];
   assert.ok(calendar.className.includes('hub-calendar'));
   assert.ok(calendar.querySelector('.hub-calendar__timegrid'));
-  assert.ok(calendar.querySelector('[data-calendar="compose-title"]'));
+  assert.equal(calendar.querySelector('[data-calendar="compose-title"]'), null);
+  assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
   assert.equal(calendar.querySelector('[data-calendar="month-label"]')?.textContent.includes('08'), true);
+});
+
+test('week hour click asks to compose on that slot', () => {
+  const root = fakeRoot();
+  let selected = null;
+  renderCalendar(root, model(), {
+    view: 'week',
+    onSelectDate: (date, options) => { selected = { date, ...options }; }
+  });
+  const hours = collect(root._host.children[0]).find(node =>
+    node.className.split(/\s+/).includes('hub-calendar__hours') && node.dataset.date === '2026-08-05'
+  );
+  const click = hours.listeners.find(([type]) => type === 'click')[1];
+  click({ target: hours, clientY: 156 });
+  assert.equal(selected.date, '2026-08-05');
+  assert.equal(selected.focusCompose, true);
 });
 
 test('month shift applies forward/back motion on the grid', () => {
@@ -195,12 +212,14 @@ test('selected event paints rail detail; empty day omits date and sources cards'
   assert.ok(detail);
   assert.equal(detail.querySelector('.hub-calendar__detail-heading')?.textContent, 'Push');
   assert.match(collect(detail).map(node => node.textContent).join(' '), /40 min · completed/);
+  assert.equal(root._host.querySelector('[data-calendar="compose-title"]'), null);
   assert.equal(root._host.querySelector('#calendar-source-registry'), null);
 
   renderCalendar(root, model(), { view: 'week' });
   assert.equal(root._host.querySelector('#calendar-day-detail'), null);
   assert.equal(root._host.querySelector('#calendar-source-registry'), null);
-  assert.ok(root._host.querySelector('[data-calendar="compose-title"]'));
+  assert.equal(root._host.querySelector('[data-calendar="compose-title"]'), null);
+  assert.equal(root._host.querySelector('.hub-calendar__rail'), null);
 });
 
 test('compose submit calls onCreateLog with a diary candidate', () => {

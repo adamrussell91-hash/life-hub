@@ -452,6 +452,11 @@
   align-items: start;
 }
 
+.hub-calendar__workspace:not(:has(> .hub-calendar__rail)),
+.hub-calendar__workspace:has(> .hub-calendar__rail[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .hub-calendar__rail {
   display: flex;
   flex-direction: column;
