@@ -176,6 +176,12 @@ export function createAppController(dependencies) {
   let tasksCalendarInFlight = null;
   let professionalEvents = [];
   let professionalCalendarInFlight = null;
+  let hubSourceStatus = {
+    teaching: 'pending',
+    knowledge: 'pending',
+    tasks: 'pending',
+    professional: 'pending'
+  };
   let hubPulseInFlight = null;
   let latestOpenTasks = [];
   let bodyRange = 'six_month';
@@ -639,7 +645,7 @@ export function createAppController(dependencies) {
     nutrition: { eyebrow: "Today's macros", title: 'Nutrition' },
     fitness: { eyebrow: 'Training', title: 'Fitness' },
     skincare: { eyebrow: 'Consistency first', title: 'Skincare' },
-    calendar: { eyebrow: 'Day, week, month', title: 'Calendar' },
+    calendar: { eyebrow: 'Everything, every hub', title: 'Calendar' },
     body: { eyebrow: 'Scale, composition, tape', title: 'Body' },
     'body-bloods': { eyebrow: 'Labs', title: 'Bloods' },
     'body-medical': { eyebrow: 'History', title: 'Medical Overview' },
@@ -760,7 +766,7 @@ export function createAppController(dependencies) {
     if (name === 'future-map') void loadFutureMap();
     if (name === 'hub-map') void hubMap?.open();
     if (name === 'home') void loadHubPulse();
-    const lifeDomain = name !== 'home' && name !== 'chat';
+    const lifeDomain = name !== 'home' && name !== 'chat' && name !== 'calendar';
     for (const button of root.querySelectorAll?.('[data-section]') ?? []) {
       if (button.matches?.('.hub-label, .hub-toggle')) continue;
       const section = button.dataset.section;
@@ -773,7 +779,7 @@ export function createAppController(dependencies) {
       else button.removeAttribute('aria-current');
     }
     const lifeRow = root.querySelector('.hub-row[data-hub="life"]');
-    lifeRow?.classList.toggle('is-active', name !== 'chat');
+    lifeRow?.classList.toggle('is-active', lifeDomain);
     if (lifeDomain) openHubAccordion(root.querySelector('[data-hub-accordion]') ?? root, 'life');
   }
 
@@ -787,14 +793,19 @@ export function createAppController(dependencies) {
   }
 
   function loadTeachingCalendar() {
-    if (!teachingApi?.getCurriculum) return Promise.resolve();
+    if (!teachingApi?.getCurriculum) {
+      hubSourceStatus.teaching = 'unavailable';
+      return Promise.resolve();
+    }
     if (teachingCalendarInFlight) return teachingCalendarInFlight;
     teachingCalendarInFlight = teachingApi.getCurriculum()
       .then(data => {
         teachingEvents = teachingEventsFromCurriculum(data);
+        hubSourceStatus.teaching = 'live';
       })
       .catch(() => {
         teachingEvents = [];
+        hubSourceStatus.teaching = 'unavailable';
       })
       .finally(() => {
         teachingCalendarInFlight = null;
@@ -804,14 +815,19 @@ export function createAppController(dependencies) {
   }
 
   function loadKnowledgeCalendar() {
-    if (!knowledgeApi?.listPages) return Promise.resolve();
+    if (!knowledgeApi?.listPages) {
+      hubSourceStatus.knowledge = 'unavailable';
+      return Promise.resolve();
+    }
     if (knowledgeCalendarInFlight) return knowledgeCalendarInFlight;
     knowledgeCalendarInFlight = knowledgeApi.listPages()
       .then(pages => {
         knowledgeEvents = knowledgeEventsFromPages(pages);
+        hubSourceStatus.knowledge = 'live';
       })
       .catch(() => {
         knowledgeEvents = [];
+        hubSourceStatus.knowledge = 'unavailable';
       })
       .finally(() => {
         knowledgeCalendarInFlight = null;
@@ -821,7 +837,10 @@ export function createAppController(dependencies) {
   }
 
   function loadTasksCalendar() {
-    if (!tasksApi?.listTasks) return Promise.resolve();
+    if (!tasksApi?.listTasks) {
+      hubSourceStatus.tasks = 'unavailable';
+      return Promise.resolve();
+    }
     if (tasksCalendarInFlight) return tasksCalendarInFlight;
     const listBlocks = typeof tasksApi.listWorkBlocks === 'function'
       ? tasksApi.listWorkBlocks().catch(() => [])
@@ -857,9 +876,11 @@ export function createAppController(dependencies) {
         ];
         calendarPlanningProfile = profile;
         calendarWeekMission = mission;
+        hubSourceStatus.tasks = 'live';
       })
       .catch(() => {
         tasksEvents = [];
+        hubSourceStatus.tasks = 'unavailable';
       })
       .finally(() => {
         tasksCalendarInFlight = null;
@@ -869,15 +890,20 @@ export function createAppController(dependencies) {
   }
 
   function loadProfessionalCalendar() {
-    if (!scheduleApi?.listScheduleProjections) return Promise.resolve();
+    if (!scheduleApi?.listScheduleProjections) {
+      hubSourceStatus.professional = 'unavailable';
+      return Promise.resolve();
+    }
     if (professionalCalendarInFlight) return professionalCalendarInFlight;
     professionalCalendarInFlight = scheduleApi
       .listScheduleProjections()
       .then((result) => {
         professionalEvents = professionalEventsFromProjections(result?.projections ?? []);
+        hubSourceStatus.professional = 'live';
       })
       .catch(() => {
         professionalEvents = [];
+        hubSourceStatus.professional = 'unavailable';
       })
       .finally(() => {
         professionalCalendarInFlight = null;
@@ -1271,7 +1297,8 @@ export function createAppController(dependencies) {
       viewMonth: calendarViewMonth,
       planningLens: calendarPlanningLens,
       mission: calendarPlanningLens ? missionStripModel() : null,
-      protectedWindows: protectedWindowsForCalendar(calendarSelectedDate)
+      protectedWindows: protectedWindowsForCalendar(calendarSelectedDate),
+      sourceStatus: hubSourceStatus
     });
     const focusCompose = calendarFocusCompose;
     calendarFocusCompose = false;
@@ -1689,6 +1716,12 @@ export function createAppController(dependencies) {
     tasksCalendarInFlight = null;
     professionalEvents = [];
     professionalCalendarInFlight = null;
+    hubSourceStatus = {
+      teaching: 'pending',
+      knowledge: 'pending',
+      tasks: 'pending',
+      professional: 'pending'
+    };
     hubPulseInFlight = null;
     clearRefreshTimer();
     clearSessionExpiry();

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildCalendarModel,
+  calendarSourceSummary,
   eventBrief,
   eventDetailTitle,
   eventsForDate,
@@ -52,6 +53,10 @@ test('eventDetailTitle covers core types', () => {
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }), 'Skincare · PM');
   assert.equal(eventDetailTitle({ type: 'skincare', routine: 'pm' }, 'Procedure: Laser.'), 'Laser');
   assert.equal(eventDetailTitle({ type: 'scheduled_lesson', title: 'Working memory' }), 'Working memory');
+  assert.equal(
+    eventDetailTitle({ type: 'scheduled_lesson', title: 'Working memory', class_title: '12 English' }),
+    'Working memory · 12 English'
+  );
   assert.equal(eventDetailTitle({ type: 'task', title: 'Mark 12 English' }), 'Mark 12 English');
   assert.equal(eventDetailTitle({ type: 'knowledge_page', title: 'Archive note' }), 'Archive note');
 });
@@ -163,4 +168,26 @@ test('resolveCalendarDayClick toggles same day and expands other days', () => {
     selectedDate: '2026-08-06',
     expandedDate: '2026-08-06'
   });
+});
+
+test('master calendar counts every hub and respects duration_min', () => {
+  const events = [
+    { record: { type: 'workout', date: '2026-08-05', duration_min: 40 }, path: 'l' },
+    { record: { type: 'scheduled_lesson', date: '2026-08-05', time: '09:15', duration_min: 60, title: 'Memory' }, path: 't' },
+    { record: { type: 'task', date: '2026-08-05', title: 'Marking' }, path: 'k' },
+    { record: { type: 'knowledge_page', date: '2026-08-05', title: 'Note' }, path: 'n' },
+    { record: { type: 'professional_meeting', date: '2026-08-05', duration_min: 90, title: 'Interview' }, path: 'p' }
+  ];
+  const sources = calendarSourceSummary(events, { teaching: 'live', knowledge: 'unavailable', tasks: 'live', professional: 'live' });
+  assert.deepEqual(sources.map(item => [item.id, item.count, item.status]), [
+    ['life', 1, 'live'],
+    ['teaching', 1, 'live'],
+    ['knowledge', 1, 'unavailable'],
+    ['tasks', 1, 'live'],
+    ['professional', 1, 'live']
+  ]);
+  const day = eventsForDate(events, '2026-08-05');
+  assert.equal(day.find(item => item.type === 'workout').durationMin, 40);
+  assert.equal(day.find(item => item.type === 'professional_meeting').durationMin, 90);
+  assert.equal(day.find(item => item.type === 'scheduled_lesson').time, '09:15');
 });

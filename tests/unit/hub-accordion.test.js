@@ -113,7 +113,9 @@ test('desktop hub switchers stay directly with each hub navigation', async () =>
   assert.match(teachingShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'teaching'\)/);
 
   const lifeRail = lifeHtml.match(/<nav class="rail-nav"[\s\S]*?<\/nav>/)?.[0] ?? '';
-  assert.ok(lifeRail.indexOf('<p class="hub-rail__section">Hubs</p>') > lifeRail.indexOf('data-section="chat"'));
+  assert.ok(lifeRail.includes('hub-rail__majors'));
+  assert.ok(lifeRail.indexOf('data-section="calendar"') > lifeRail.indexOf('data-section="chat"'));
+  assert.ok(lifeRail.indexOf('<p class="hub-rail__section">Hubs</p>') > lifeRail.indexOf('data-section="calendar"'));
 
   assert.match(professionalShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'professional'\)/);
 });
@@ -130,6 +132,7 @@ test('Life rail puts domains inside the Life accordion, not a flat Domains list'
   assert.match(html, /data-hub-toggle="life"/);
   assert.match(html, /data-hub-panel="life"/);
   assert.match(html, /class="hub-nav-item"[^>]+data-section="nutrition"/);
+  assert.doesNotMatch(html, /class="hub-nav-item"[^>]+data-section="calendar"/);
   assert.match(html, /data-hub-toggle="teaching"/);
   assert.match(html, /href="\/teaching\/"/);
   assert.doesNotMatch(html, /<p class="nav-label">Domains<\/p>/);

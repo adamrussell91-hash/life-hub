@@ -68,15 +68,12 @@ type NavSection = {
   items: NavItem[];
 };
 
+const MAJOR_ITEMS: NavItem[] = [
+  { id: 'board', label: 'Dashboard', href: '#/board' },
+  { id: 'clare', label: 'Chat', href: '#/clare' }
+];
+
 const NAV_SECTIONS: NavSection[] = [
-  {
-    id: 'home',
-    title: 'Home',
-    items: [
-      { id: 'board', label: 'Dashboard', href: '#/board' },
-      { id: 'clare', label: 'Chat', href: '#/clare' }
-    ]
-  },
   {
     id: 'views',
     title: 'Views',
@@ -137,6 +134,7 @@ export function resetRailDisclosureStateForTests(): void {
 const STRETCH_VIEWS: HubViewId[] = ['orbit', 'universe', 'branch'];
 
 const NAV: NavItem[] = [
+  ...MAJOR_ITEMS,
   ...NAV_SECTIONS.flatMap((section) => section.items),
   { id: 'orbit', label: 'Orbit', href: '#/orbit' },
   { id: 'universe', label: 'Universe', href: '#/universe' },
@@ -149,6 +147,8 @@ export function railHighlightId(view: HubViewId): HubViewId {
 
 /** Page header is the rail group, then the tab (or stretch) name. Nothing else. */
 export function viewChrome(view: HubViewId): { eyebrow: string; title: string } {
+  const major = MAJOR_ITEMS.find((entry) => entry.id === view);
+  if (major) return { eyebrow: 'Home', title: major.label };
   for (const section of NAV_SECTIONS) {
     const item = section.items.find((entry) => entry.id === view);
     if (item) return { eyebrow: section.title, title: item.label };
@@ -365,7 +365,7 @@ function syncSectionDom(root: HTMLElement, id: RailSectionId): void {
 
 function sectionIdForView(view: HubViewId): RailSectionId {
   const highlight = railHighlightId(view);
-  return NAV_SECTIONS.find((section) => section.items.some((item) => item.id === highlight))?.id ?? 'home';
+  return NAV_SECTIONS.find((section) => section.items.some((item) => item.id === highlight))?.id ?? 'views';
 }
 
 
@@ -380,7 +380,7 @@ function syncTasksMobileChrome(host: HTMLElement, active: HubViewId): void {
     primary: [
       {
         id: 'board',
-        label: 'Home',
+        label: 'Dashboard',
         paths: HOME_ICON,
         href: '#/board',
         current: highlight === 'board',
@@ -441,6 +441,11 @@ export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void 
   desktop.className = 'hub-rail__list hub-rail__list--desktop';
   desktop.setAttribute('aria-label', 'Primary');
 
+  const majors = document.createElement('div');
+  majors.className = 'hub-rail__majors';
+  majors.append(...MAJOR_ITEMS.map((item) => buildNavLink(item, highlight)));
+  desktop.append(majors);
+
   for (const section of NAV_SECTIONS) {
     const panelId = `rail-section-${section.id}`;
     const group = document.createElement('section');
@@ -478,6 +483,11 @@ export function renderPrimaryNav(railNav: HTMLElement, active: HubViewId): void 
   const items = document.createElement('div');
   items.className = 'hub-rail__mobile-items';
   items.setAttribute('aria-label', 'Open section destinations');
+
+  const mobileMajors = document.createElement('div');
+  mobileMajors.className = 'hub-rail__majors';
+  mobileMajors.append(...MAJOR_ITEMS.map((item) => buildNavLink(item, highlight)));
+  items.append(mobileMajors);
 
   for (const section of NAV_SECTIONS) {
     const panelId = `rail-mobile-section-${section.id}`;

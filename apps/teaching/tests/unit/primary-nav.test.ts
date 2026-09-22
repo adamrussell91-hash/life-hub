@@ -23,6 +23,7 @@ describe('primary nav', () => {
     );
     expect(labels).toEqual([
       'Dashboard',
+      'Chat',
       'Classes',
       'Scope & Sequences',
       'Units',
@@ -31,8 +32,12 @@ describe('primary nav', () => {
       'Resource Library',
       'Trash'
     ]);
+    expect(container.querySelector('.hub-rail__majors')).not.toBeNull();
+    expect(
+      [...container.querySelectorAll('.hub-rail__majors .primary-nav__label')].map((el) => el.textContent)
+    ).toEqual(['Dashboard', 'Chat']);
     const links = [...container.querySelectorAll('.primary-nav__link')];
-    expect(links).toHaveLength(8);
+    expect(links).toHaveLength(9);
     for (const link of links) {
       expect(link.querySelector('svg.primary-nav__glyph')).not.toBeNull();
     }
