@@ -666,10 +666,17 @@ export function parseMapItemPage(
   return null;
 }
 
+/** Focused backlog triage: `#/backlog/triage` — same surface as Backlog. */
+export function parseBacklogTriage(hash = location.hash): boolean {
+  const path = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+  return path === 'backlog/triage';
+}
+
 export function isKnownHashView(hash = location.hash): boolean {
   const id = hashViewId(hash);
   if (id === 'capacity') return true;
   if (id === 'constellation') return true;
+  if (id === 'backlog') return true;
   if (parseEntityPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
   if (parseMapItemPage(hash)) return true;
@@ -678,9 +685,10 @@ export function isKnownHashView(hash = location.hash): boolean {
 }
 
 export function parseHashRoute(): HubViewId {
-  const id = hashViewId() as HubViewId;
+  const id = hashViewId();
   if (id === 'constellation') return 'graph';
-  return KNOWN_VIEWS.includes(id) ? id : 'board';
+  if (id === 'backlog') return 'list';
+  return KNOWN_VIEWS.includes(id as HubViewId) ? (id as HubViewId) : 'board';
 }
 
 const CALENDAR_VIEWS = new Set<HubViewId>(['week', 'month']);
