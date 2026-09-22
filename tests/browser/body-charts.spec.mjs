@@ -41,7 +41,7 @@ async function signIn(page) {
 async function openBody(page) {
   await page.locator('.desktop-rail [data-section="body"]').click();
   await page.locator('#body-dashboard').waitFor({ state: 'visible' });
-  await page.locator('#body-chart-weight .hc-chart').waitFor();
+  await page.locator('#body-chart-weight-stack .hc-chart').waitFor();
 }
 
 test('Body Weight, fat and muscle use the new scene charts, not the old line graphs', async () => {
@@ -54,11 +54,11 @@ test('Body Weight, fat and muscle use the new scene charts, not the old line gra
     assert.equal(await page.locator('#body-dashboard .line-chart.body-chart').count(), 0);
     await page.locator('#body-chart-weight .bc-shed').first().waitFor();
     assert.ok(await page.locator('#body-chart-weight .bc-block').count() > 0);
-    assert.equal(await page.locator('[data-body-chart="weight"] [role="tab"]').count(), 2);
-
-    await page.locator('[data-body-chart="weight"] [data-body-view="stairs"]').click();
+    assert.equal(await page.locator('[data-body-chart="weight"] [role="tab"]').count(), 0);
     await page.locator('#body-chart-weight .bc-ball').waitFor();
     assert.ok(await page.locator('#body-chart-weight .bc-step').count() > 0);
+    await page.locator('#body-chart-weight-stack text', { hasText: 'You · 1 kg' }).waitFor();
+    await page.locator('#body-chart-weight-stack text', { hasText: '2026' }).waitFor();
 
     await page.locator('#body-chart-fat .bc-carved').waitFor();
     await page.locator('#body-chart-fat .bc-fat-line').waitFor();
@@ -82,7 +82,6 @@ test('Body range change redraws stairs and carved away', async () => {
   try {
     await signIn(page);
     await openBody(page);
-    await page.locator('[data-body-chart="weight"] [data-body-view="stairs"]').click();
     await page.locator('#body-chart-weight .bc-ball').waitFor();
     const sixMonthSteps = await page.locator('#body-chart-weight .bc-step').count();
     await page.locator('#body-range-control [data-body-range="five_year"]').click();
