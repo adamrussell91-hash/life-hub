@@ -190,6 +190,9 @@ describe('teacher home dashboard', () => {
     expect(dayNumbers).toEqual(['10', '11', '12', '13', '14']);
 
     expect(canvas.querySelector<HTMLElement>('[data-calendar="rail"]')?.hidden).toBe(true);
+    expect(canvas.querySelector<HTMLElement>('[data-calendar="rail"]')?.style.display).toBe('none');
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
     expect(
       canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
     ).toBe('minmax(0, 1fr)');
@@ -249,6 +252,36 @@ describe('teacher home dashboard', () => {
     expect(() => result.dispose()).not.toThrow();
     expect(clearSpy).toHaveBeenCalled();
     clearSpy.mockRestore();
+  });
+
+  it('does not render the standing Add card even when a deleted lesson remains in the library', () => {
+    const withDeleted: CurriculumResponse = {
+      ...curriculum,
+      lessons: [
+        ...curriculum.lessons,
+        {
+          id: 'lesson_aotfw_deleted',
+          title: 'Introduction to An Artist of the Floating World',
+          slug: 'intro-deleted',
+          unit_id: 'unit_aotfw',
+          sequence: 1,
+          status: 'trashed',
+          published: false,
+          updated_at: ISO
+        }
+      ]
+    };
+    const result = renderTeacherHome(canvas, withDeleted);
+    dispose = result.dispose;
+
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.querySelector('[aria-label="Class"]')).toBeNull();
+    expect(canvas.querySelector('[aria-label="Lesson"]')).toBeNull();
+    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
+    expect(
+      [...canvas.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
+    ).toBe(false);
   });
 
   it('calendar add opens blank lesson flow instead of the home create menu', () => {

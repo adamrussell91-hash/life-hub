@@ -25,7 +25,7 @@ import {
   renderHomepageRegionsView,
   type HomepageEditorHandle
 } from '@/teacher/sections/homepage-editor';
-import { patchClass, patchScheduledLesson, postScheduledLesson } from '@/teacher/schedule-api';
+import { patchClass, patchScheduledLesson } from '@/teacher/schedule-api';
 import { openScheduleOverflow } from '@/teacher/schedule-overflow';
 import { confirmAndArchive, confirmAndTrash } from '@/teacher/lifecycle-api';
 import { mountPageOptionsMenu } from '@/teacher/page-options-menu';
@@ -327,7 +327,6 @@ export function renderClassPage(
     ? 'week'
     : 'month';
   let monthDelta = 0;
-  let composeDraft = { date: today, startTime: null as string | null };
   let selectedScheduledId: string | null = null;
 
   const errorBanner = document.createElement('p');
@@ -362,10 +361,6 @@ export function renderClassPage(
         selectedDate = date;
         viewMonth = yearMonthFromDate(date);
         monthDelta = 0;
-        composeDraft = {
-          date,
-          startTime: next.startTime !== undefined ? next.startTime : composeDraft.startTime
-        };
         selectedScheduledId = next.scheduledId ?? null;
         paintCalendar();
       },
@@ -381,32 +376,8 @@ export function renderClassPage(
       onLessonOverflow: (scheduledId, anchor) => {
         openLessonOverflow(cls, classScheduled, scheduledId, anchor, options, errorBanner);
       },
-      classId: cls.id,
       subjectId: cls.subject_id,
-      lessons: curriculum.lessons
-        .filter((lesson) => {
-          const unit = unitsById.get(lesson.unit_id);
-          return unit?.status === 'active' && unit.subject_id === cls.subject_id;
-        })
-        .map((lesson) => ({
-          id: lesson.id,
-          title: lesson.title,
-          unitId: lesson.unit_id,
-          classId: cls.id
-        })),
-      composeDraft,
       selectedScheduledId,
-      onComposeLesson: (draft) => {
-        void runScheduleMutation(options, errorBanner, async () => {
-          await postScheduledLesson({
-            class_id: cls.id,
-            lesson_id: draft.lessonId,
-            unit_id: draft.unitId,
-            date: draft.date,
-            start_time: draft.startTime
-          });
-        });
-      },
       onRescheduleLesson: (scheduledId, patch) => {
         void runScheduleMutation(options, errorBanner, async () => {
           await patchScheduledLesson(scheduledId, patch);

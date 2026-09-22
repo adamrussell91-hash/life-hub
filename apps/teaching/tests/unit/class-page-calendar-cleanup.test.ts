@@ -133,6 +133,10 @@ describe('class page calendar cleanup', () => {
 
     const rail = canvas.querySelector<HTMLElement>('[data-calendar="rail"]');
     expect(rail?.hidden).toBe(true);
+    expect(rail?.style.display).toBe('none');
+    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
+    expect(canvas.querySelector('.calendar-compose')).toBeNull();
+    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
     expect(
       canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
     ).toBe('minmax(0, 1fr)');

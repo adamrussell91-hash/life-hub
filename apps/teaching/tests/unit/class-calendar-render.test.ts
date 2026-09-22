@@ -365,8 +365,7 @@ describe('renderClassCalendar', () => {
     expect(host.textContent).toContain('Narrative Structure');
   });
 
-  it('renders a day time grid and schedules from standing compose', () => {
-    const onComposeLesson = vi.fn();
+  it('renders a day time grid without a standing Add compose card', () => {
     const onSelectDate = vi.fn();
     const model = modelForAugust({
       scheduled: [
@@ -384,24 +383,15 @@ describe('renderClassCalendar', () => {
     renderClassCalendar(host, model, {
       onSelectDate,
       onShiftMonth: vi.fn(),
-      view: 'day',
-      lessons: [{ id: 'l2', title: 'Close reading', unitId: 'u1', classId: 'c1' }],
-      classId: 'c1',
-      composeDraft: { date: '2026-08-12', startTime: '10:00' },
-      onComposeLesson
+      view: 'day'
     });
 
     expect(host.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
     expect(host.querySelector('.event-chip--timed')).not.toBeNull();
-    const form = host.querySelector<HTMLFormElement>('.calendar-compose');
-    expect(form).not.toBeNull();
-    form?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    expect(onComposeLesson).toHaveBeenCalledWith({
-      date: '2026-08-12',
-      startTime: '10:00',
-      lessonId: 'l2',
-      classId: 'c1',
-      unitId: 'u1'
-    });
+    expect(host.querySelector('.calendar-compose-card')).toBeNull();
+    expect(host.querySelector('.calendar-compose')).toBeNull();
+    expect(
+      [...host.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
+    ).toBe(false);
   });
 });

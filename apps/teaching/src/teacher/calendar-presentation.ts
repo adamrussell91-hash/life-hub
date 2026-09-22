@@ -17,7 +17,11 @@ export function applyCalendarPresentation(
 
   const workspace = root.querySelector<HTMLElement>('.hub-calendar__workspace');
   const rail = root.querySelector<HTMLElement>('[data-calendar="rail"]');
-  if (rail) rail.hidden = true;
+  if (rail) {
+    rail.hidden = true;
+    // `.hub-calendar__rail { display: flex }` beats the UA [hidden] rule.
+    rail.style.display = 'none';
+  }
   if (workspace) workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
 
   for (const dated of root.querySelectorAll<HTMLElement>('[data-date]')) {
