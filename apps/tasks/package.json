@@ -16,6 +16,9 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@blocksuite/blocks": "0.19.5",
+    "@blocksuite/presets": "0.19.5",
+    "@blocksuite/store": "0.19.5",
     "@netlify/blobs": "9.1.2",
     "@tiptap/core": "^3.31.3",
     "@tiptap/pm": "^3.31.3",
@@ -24,6 +27,7 @@
     "d3-force": "^3.0.0",
     "happy-dom": "^17.4.4",
     "katex": "^0.16.47",
+    "yjs": "13.6.18",
     "zod": "3.25.76"
   },
   "devDependencies": {
