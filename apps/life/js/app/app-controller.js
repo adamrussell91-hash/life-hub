@@ -1330,6 +1330,10 @@ export function createAppController(dependencies) {
         };
         calendarSelectedEventId = options.eventId ?? null;
         calendarFocusCompose = Boolean(options.focusCompose);
+        if (calendarFocusCompose && (calendarView === 'week' || calendarView === 'month')) {
+          calendarViewExplicit = true;
+          calendarView = 'day';
+        }
         renderCalendarSection({
           scrollToDetail: true,
           monthDelta: shift
