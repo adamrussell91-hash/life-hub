@@ -659,6 +659,7 @@ export function parseMapItemPage(
 export function isKnownHashView(hash = location.hash): boolean {
   const id = hashViewId(hash);
   if (id === 'capacity') return true;
+  if (id === 'constellation') return true;
   if (parseEntityPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
   if (parseMapItemPage(hash)) return true;
@@ -668,6 +669,7 @@ export function isKnownHashView(hash = location.hash): boolean {
 
 export function parseHashRoute(): HubViewId {
   const id = hashViewId() as HubViewId;
+  if (id === 'constellation') return 'graph';
   return KNOWN_VIEWS.includes(id) ? id : 'board';
 }
 

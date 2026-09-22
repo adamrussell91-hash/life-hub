@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   addCalendarDays, daysBetween, enumerateDateKeys,
-  formatDisplayDate, formatShortMonth, formatWeekday,
+  formatDisplayDate, formatShortMonth, formatWeekday, parseDisplayDate,
   getSydneyDateKey, getSydneyMinutesOfDay, getSydneyTimestamp, getSydneyWeekStart, isCalendarDate,
   sydneyLocalStamp
 } from '../../apps/life/js/core/time.js';
@@ -75,6 +75,14 @@ test('formatDisplayDate is always DD/MM/YY', () => {
   assert.equal(formatDisplayDate('2015-12-31'), '31/12/15');
   assert.equal(formatDisplayDate('not-a-date'), 'not-a-date');
   assert.equal(formatDisplayDate(''), '');
+});
+
+test('parseDisplayDate reads DD/MM/YY back to a calendar key', () => {
+  assert.equal(parseDisplayDate('15/08/26'), '2026-08-15');
+  assert.equal(parseDisplayDate('05/01/26'), '2026-01-05');
+  assert.equal(parseDisplayDate('2026-08-15'), '2026-08-15');
+  assert.equal(parseDisplayDate('not-a-date'), '');
+  assert.equal(parseDisplayDate(''), '');
 });
 
 test('formatShortMonth labels a chart tick as month and short year', () => {

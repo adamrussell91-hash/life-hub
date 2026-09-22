@@ -634,7 +634,7 @@ function overlayHtml() {
       ${saveCardHtml()}
       ${bookFieldHtml()}
       <form class="chat-form hub-ai-bar hub-ai-bar--thread">
-        <label class="chat-form__label" for="overlay-chat-input">${inputLabel}</label>
+        <label class="sr-only" for="overlay-chat-input">${inputLabel}</label>
         <div class="hub-ai-bar__field">
           <textarea id="overlay-chat-input" class="hub-ai-bar__input" rows="2" placeholder="${placeholder}" ${busy || writeSessionId || researchSessionId ? "disabled" : ""}>${escapeHtml(input)}</textarea>
         </div>

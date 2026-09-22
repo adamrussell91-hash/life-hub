@@ -685,6 +685,10 @@ function shell(main: string) {
     };
   });
 
+  app.querySelector<HTMLButtonElement>("[data-hub-refresh]")?.addEventListener("click", () => {
+    void refreshVisible().then(render);
+  });
+
   app.querySelector<HTMLButtonElement>("[data-logout]")?.addEventListener("click", async () => {
     await logout();
     entries = [];

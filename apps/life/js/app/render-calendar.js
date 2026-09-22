@@ -1,4 +1,4 @@
-import { formatDisplayDate } from '../core/time.js';
+import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import { buildRingTarget } from './chart-kit/ring.js';
 import {
@@ -664,7 +664,7 @@ function renderCompose(root, draft, view) {
     const handlers = handlersByRoot.get(calendar);
     const type = form.querySelector('[data-calendar="compose-type"]')?.value || 'diary';
     const text = form.querySelector('[data-calendar="compose-title"]')?.value?.trim() ?? '';
-    const date = form.querySelector('[data-calendar="compose-date"]')?.value ?? draft.date;
+    const date = parseDisplayDate(form.querySelector('[data-calendar="compose-date"]')?.value ?? '') || draft.date;
     const time = form.querySelector('[data-calendar="compose-time"]')?.value || null;
     if (!text) return;
     try {
@@ -697,10 +697,13 @@ function renderCompose(root, draft, view) {
 
   const dateField = root.createElement('input');
   dateField.className = 'hub-search__input';
-  dateField.type = 'date';
+  dateField.type = 'text';
+  dateField.inputMode = 'numeric';
+  dateField.autocomplete = 'off';
+  dateField.placeholder = 'dd/mm/yy';
   dateField.dataset.calendar = 'compose-date';
   dateField.setAttribute('aria-label', 'Date');
-  dateField.value = draft.date;
+  dateField.value = formatDisplayDate(draft.date);
 
   const timeField = root.createElement('input');
   timeField.className = 'hub-search__input';
