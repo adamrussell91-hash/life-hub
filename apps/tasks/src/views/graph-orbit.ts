@@ -193,9 +193,10 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       body.trail.remove();
       return false;
     });
+    const existing = new Map(bodies.map((body) => [body.task.id, body]));
     for (const task of dated) {
-      if (bodies.some((b) => b.task.id === task.id)) {
-        const row = bodies.find((b) => b.task.id === task.id)!;
+      const row = existing.get(task.id);
+      if (row) {
         row.task = task;
         continue;
       }
@@ -356,8 +357,9 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
   const frame = (now: number) => {
     const dt = Math.min(now - last, 50);
     last = now;
-    const target = paused || hover || hidden || document.hidden || pointerOver ? 0 : 1;
-    if (paused || pointerOver) easeOut = 0;
+    const frozen = paused || pointerOver;
+    const target = frozen || hover || hidden || document.hidden ? 0 : 1;
+    if (frozen) easeOut = 0;
     else {
       easeOut += (target - easeOut) * Math.min(1, dt / 120);
       if (target === 0 && easeOut < 0.04) easeOut = 0;
@@ -366,9 +368,6 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     const lt = input.reducedMotion ? 1 : Math.min(1, (now - tweenStart) / 250);
     const la = tweenFrom + (lookAhead - tweenFrom) * (1 - (1 - lt) ** 3);
     const ent = input.reducedMotion ? 1 : Math.min(1, (now - entrance) / 700);
-    let sx = 0;
-    let sy = 0;
-    let collide: BodyRuntime[] = [];
     const dayBuckets = new Map<number, BodyRuntime[]>();
     const commit = easeOut === 0 || now - lastCommit >= 180;
     if (commit) lastCommit = now;
@@ -383,7 +382,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       const e = 1 - (1 - stagger) ** 3 * (1 - 0.12 * Math.sin(stagger * Math.PI));
       const r = ORBIT.rMax + 40 + (targetR - (ORBIT.rMax + 40)) * e;
       const w = omegaForRadius(r);
-      if (!paused && !pointerOver && easeOut > 0) {
+      if (!frozen && easeOut > 0) {
         b.angle += w * dt * easeOut;
         b.radius = r;
       } else if (!b.circle.hasAttribute('cx')) {
@@ -391,7 +390,7 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       }
       const pt = bodyPoint(ORBIT.cx, ORBIT.cy, b.radius, b.angle);
       const col = heatColour(b.colour.startsWith('#') ? b.colour : '#376fb7', k);
-      if (commit && !paused && !pointerOver) {
+      if (commit && !frozen) {
         b.circle.setAttribute('cx', pt.x.toFixed(1));
         b.circle.setAttribute('cy', pt.y.toFixed(1));
       }
@@ -414,12 +413,14 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
     }
     const hit = [...dayBuckets.entries()].filter(([, list]) => list.length >= 3).sort((a, b) => b[1].length - a[1].length)[0];
     if (hit) {
-      collide = hit[1];
+      const collide = hit[1];
+      let sx = 0;
+      let sy = 0;
       const r = radiusForDays(hit[0]);
-      collide.forEach((b) => {
+      for (const b of collide) {
         sx += Math.cos(b.angle);
         sy += Math.sin(b.angle);
-      });
+      }
       const mid = Math.atan2(sy, sx);
       const span = 0.35;
       const p0 = bodyPoint(ORBIT.cx, ORBIT.cy, r, mid - span);

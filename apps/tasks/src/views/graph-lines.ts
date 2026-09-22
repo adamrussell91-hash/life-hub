@@ -141,13 +141,9 @@ function spineStations(route: ReturnType<typeof projectRoute>): RouteStation[] {
   });
 }
 
-function toStationView(station: RouteStation, tasks: Task[], now: Date): StationView {
-  const task = station.task!;
+function stationFromTask(task: Task, tasks: Task[], now: Date, branch?: StationView['branch']): StationView {
   const state = visualState(task, tasks, now);
   const copy = stationCopy(task, tasks, now, state);
-  const kids = tasks
-    .filter((item) => item.parent_task_id === task.id)
-    .sort((a, b) => a.step_order - b.step_order);
   return {
     id: task.id,
     title: task.title,
@@ -158,33 +154,38 @@ function toStationView(station: RouteStation, tasks: Task[], now: Date): Station
     stepOrder: task.step_order,
     warn: copy.tone === 'warn',
     danger: copy.tone === 'danger',
-    branch: kids.length
+    branch
+  };
+}
+
+function toStationView(station: RouteStation, tasks: Task[], now: Date): StationView {
+  const task = station.task!;
+  const kids = tasks
+    .filter((item) => item.parent_task_id === task.id)
+    .sort((a, b) => a.step_order - b.step_order);
+  return stationFromTask(
+    task,
+    tasks,
+    now,
+    kids.length
       ? {
           title: 'Excursion admin',
-          stations: kids.map((child) => {
-            const childState = visualState(child, tasks, now);
-            const childCopy = stationCopy(child, tasks, now, childState);
-            return {
-              id: child.id,
-              title: child.title,
-              state: childState,
-              sub: childCopy.sub,
-              tone: childCopy.tone,
-              kind: 'task' as const,
-              stepOrder: child.step_order,
-              warn: childCopy.tone === 'warn',
-              danger: childCopy.tone === 'danger'
-            };
-          })
+          stations: kids.map((child) => stationFromTask(child, tasks, now))
         }
       : undefined
-  };
+  );
+}
+
+function suggestedStationTitle(insight: GraphInsight): string {
+  const create = insight.proposal?.find((item) => item.kind === 'task_create');
+  const title = create && 'title' in create.patch ? String(create.patch.title) : 'Staff consult?';
+  return title.includes('Check in') ? 'Staff consult?' : title;
 }
 
 function buildLines(projects: Project[], tasks: Task[], now: Date, insights: GraphInsight[]): LineModel[] {
   const active = projects.filter((p) => !isProjectArchived(p.status));
   return active
-    .map((project, index) => {
+    .map((project) => {
       const children = tasks.filter((t) => t.parent_project_id === project.id);
       const route = projectRoute(project, tasks);
       const spine = spineStations(route);
@@ -197,17 +198,9 @@ function buildLines(projects: Project[], tasks: Task[], now: Date, insights: Gra
           ins.proposal?.some((item) => item.kind === 'task_create')
       );
       if (suggest) {
-        const title =
-          suggest.proposal?.find((item) => item.kind === 'task_create' && 'patch' in item)?.patch &&
-          'title' in (suggest.proposal.find((item) => item.kind === 'task_create') as { patch?: { title?: string } }).patch!
-            ? String(
-                (suggest.proposal.find((item) => item.kind === 'task_create') as { patch?: { title?: string } }).patch
-                  ?.title
-              )
-            : 'Staff consult?';
         stations.push({
           id: `suggest-${project.id}`,
-          title: title.includes('Check in') ? 'Staff consult?' : title,
+          title: suggestedStationTitle(suggest),
           state: 'suggested',
           sub: 'Clare suggests',
           tone: 'clare',
@@ -217,7 +210,6 @@ function buildLines(projects: Project[], tasks: Task[], now: Date, insights: Gra
       }
       const milestone = route.stations.find((s) => s.kind === 'milestone');
       const measured = pace(project, tasks, now);
-      const domain = children[0]?.domain ?? project.type;
       return {
         project,
         tasks: children,
@@ -228,9 +220,7 @@ function buildLines(projects: Project[], tasks: Task[], now: Date, insights: Gra
           label: milestone?.title ?? 'End',
           date: formatDisplayDate(milestone?.milestone?.due_date ?? project.current_end_date)
         },
-        ghostAt: measured && measured.behind > 0 ? measured.ghostAt : null,
-        colour: lineColour(domain, index % 2),
-        shade: index % 2
+        ghostAt: measured && measured.behind > 0 ? measured.ghostAt : null
       };
     })
     .filter((line) => line.stations.length)
@@ -685,7 +675,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
   popIn(tg, base + 600, 'slide', input.reducedMotion);
 }
 
-function metaHtml(line: LineModel): { html: string } {
+function metaHtml(line: LineModel): string {
   const done = line.pace?.actualDone ?? line.stations.filter((s) => s.state === 'done').length;
   const total = line.stations.filter((s) => s.kind !== 'suggested').length || line.stations.length;
   const days = line.pace?.daysRemaining;
@@ -695,9 +685,7 @@ function metaHtml(line: LineModel): { html: string } {
   if (stall) paceBit = `<span class="is-stalled">no movement in 12 days</span>`;
   else if (behind > 0) paceBit = `<span class="is-behind">${behind} station${behind === 1 ? '' : 's'} behind pace</span>`;
   else if (behind < 0) paceBit = 'ahead of pace';
-  return {
-    html: `<b>${done} of ${total}</b>${days != null ? ` · ${days} days to go` : ''} · ${paceBit}`
-  };
+  return `<b>${done} of ${total}</b>${days != null ? ` · ${days} days to go` : ''} · ${paceBit}`;
 }
 
 export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount {
@@ -780,7 +768,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
       row.classList.toggle('is-dim', Boolean(input.focusedProjectId && input.focusedProjectId !== line.project.id));
       const header = row.querySelector<HTMLButtonElement>('.graph-line__header') ?? el('button', 'graph-line__header');
       header.type = 'button';
-      header.innerHTML = `<span class="graph-line__name"><i class="graph-line__chip" style="background:${line.colour}"></i>${line.project.title}</span><span class="graph-line__metrics">${metaHtml(line).html}</span>`;
+      header.innerHTML = `<span class="graph-line__name"><i class="graph-line__chip" style="background:${line.colour}"></i>${line.project.title}</span><span class="graph-line__metrics">${metaHtml(line)}</span>`;
       header.onclick = () =>
         input.onFocusProject(input.focusedProjectId === line.project.id ? null : line.project.id);
       if (!header.isConnected) row.append(header);
@@ -829,7 +817,7 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
     const loose = input.tasks.filter((t) => !t.parent_project_id && t.status !== 'done' && t.status !== 'dead');
     foot.innerHTML = loose.length ? `${loose.length} tasks without a project · <a href="#/list">Open Backlog</a>` : '';
     lastWidth = width;
-    if (measured >= 280) entrancePlayed = true;
+    entrancePlayed = true;
   };
 
   const kick = () => {

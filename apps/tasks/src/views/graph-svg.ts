@@ -53,15 +53,21 @@ export function popIn(
     return;
   }
   if (typeof el.animate !== 'function') return;
-  const from =
-    kind === 'slide'
-      ? { opacity: 0, transform: 'translateX(-8px)' }
-      : kind === 'rise'
-        ? { opacity: 0, transform: 'translateY(8px)' }
-        : kind === 'fade'
-          ? { opacity: 0 }
-          : { opacity: 0, transform: 'scale(.6)' };
-  const duration = kind === 'slide' ? 260 : kind === 'pop' ? 320 : 260;
+  let from: Keyframe;
+  switch (kind) {
+    case 'slide':
+      from = { opacity: 0, transform: 'translateX(-8px)' };
+      break;
+    case 'rise':
+      from = { opacity: 0, transform: 'translateY(8px)' };
+      break;
+    case 'fade':
+      from = { opacity: 0 };
+      break;
+    default:
+      from = { opacity: 0, transform: 'scale(.6)' };
+  }
+  const duration = kind === 'pop' ? 320 : 260;
   const node = el as HTMLElement;
   node.style.opacity = '0';
   el.animate([from, { opacity: 1, transform: 'none' }], {

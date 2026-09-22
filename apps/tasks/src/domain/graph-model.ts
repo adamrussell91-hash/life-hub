@@ -180,10 +180,6 @@ function dependentsOf(taskId: string, tasks: Task[]): Task[] {
   return tasks.filter((task) => (task.depends_on ?? []).includes(taskId));
 }
 
-function hashIdAngle(id: string): number {
-  return hashAngle(id);
-}
-
 export function graphDataHash(
   tasks: Task[],
   projects: Project[] = [],
@@ -297,15 +293,6 @@ export function projectRoute(project: Project, tasks: Task[]): ProjectRoute {
   };
 }
 
-function firstUnfinishedId(project: Project, tasks: Task[]): string | null {
-  const route = projectRoute(project, tasks);
-  const open = route.mainline.find((s) => {
-    if (s.kind === 'milestone') return s.milestone?.status !== 'done';
-    return s.task ? !isDone(s.task) : false;
-  });
-  return open?.id ?? null;
-}
-
 export function nodeState(task: Task, allTasks: Task[], now: Date = new Date()): NodeState {
   const byId = new Map(allTasks.map((item) => [item.id, item]));
   const due = parseDue(task.due_date);
@@ -401,6 +388,15 @@ export function pace(project: Project, tasks: Task[], now: Date = new Date()): P
   };
 }
 
+function isServiceBlocker(task: Task, projectId: string, byId: Map<string, Task>): boolean {
+  if (task.blocked_since) return true;
+  if (!isBlocked(task, byId)) return false;
+  return (task.depends_on ?? []).some((id) => {
+    const dep = byId.get(id);
+    return !dep || dep.parent_project_id !== projectId;
+  });
+}
+
 const SERVICE_LABEL: Record<ServiceStatusId, string> = {
   arrived: 'Arrived',
   suspended: 'Suspended',
@@ -435,15 +431,7 @@ export function serviceStatus(
 
   const measured = pace(project, tasks, now);
   const byId = new Map(tasks.map((t) => [t.id, t]));
-  const blockedAhead = unfinished.some((s) => {
-    if (!s.task) return false;
-    if (s.task.blocked_since) return true;
-    if (!isBlocked(s.task, byId)) return false;
-    return (s.task.depends_on ?? []).some((id) => {
-      const dep = byId.get(id);
-      return !dep || dep.parent_project_id !== project.id;
-    });
-  });
+  const blockedAhead = unfinished.some((s) => s.task != null && isServiceBlocker(s.task, project.id, byId));
   const terminus = terminusDate(project, tasks);
   const terminusSoon = Boolean(terminus && daysBetween(now, terminus) < DUE_SOON_DAYS);
   const behind = measured?.behind ?? 0;
@@ -647,7 +635,7 @@ export function orbitBody(
     heat: heatForDays(effectiveDays),
     size,
     effectiveDays,
-    angle: hashIdAngle(task.id)
+    angle: hashAngle(task.id)
   };
 }
 
