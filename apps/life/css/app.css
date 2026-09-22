@@ -8070,3 +8070,16 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .hc-animate .hc-anim-draw, .hc-animate .hc-anim-grow, .hc-animate .hc-anim-fade { animation: none; opacity: 1; transform: none; stroke-dasharray: none; stroke-dashoffset: 0; }
   .hc-hit, .hc-tip, .hc-row, .hc-obs { transition: none; }
 }
+
+.hub-calendar__sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  color: var(--ink-muted, var(--orca));
+}
+
+.hub-calendar__sources [data-status="unavailable"] {
+  color: var(--danger);
+}

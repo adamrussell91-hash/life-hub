@@ -2,6 +2,7 @@ import { stripAppBase, withAppBase } from './base-path';
 
 export type RouteName =
   | 'teacher-home'
+  | 'teacher-chat'
   | 'teacher-classes'
   | 'teacher-class'
   | 'teacher-scope-sequences'
@@ -22,6 +23,7 @@ export type RouteName =
 
 export type RouteParams = {
   'teacher-home': Record<string, never>;
+  'teacher-chat': Record<string, never>;
   'teacher-classes': Record<string, never>;
   'teacher-class': { classId: string };
   'teacher-scope-sequences': Record<string, never>;
@@ -127,6 +129,15 @@ export function match(pathname: string): RouteMatch | null {
       name: 'student-class',
       params: { classId: studentClass[1] },
       requiresAuth: false,
+      path
+    };
+  }
+
+  if (path === '/chat') {
+    return {
+      name: 'teacher-chat',
+      params: {},
+      requiresAuth: true,
       path
     };
   }

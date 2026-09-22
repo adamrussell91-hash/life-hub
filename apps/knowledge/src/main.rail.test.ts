@@ -29,6 +29,15 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("data-open-chat");
   });
 
+  it("sets Archive and Chat apart as majors", () => {
+    expect(main).toContain('class="hub-rail__majors"');
+    expect(main).toContain(">Library</p>");
+    const majors = main.slice(main.indexOf("hub-rail__majors"), main.indexOf(">Library</p>"));
+    expect(majors).toContain('data-nav="all"');
+    expect(majors).toContain('data-nav="chat"');
+    expect(majors).not.toContain('data-nav="graph"');
+  });
+
   it("adds a university study Timeline next to Graph", () => {
     expect(main).toContain('data-nav="timeline"');
     expect(main).toContain("<span>Timeline</span>");

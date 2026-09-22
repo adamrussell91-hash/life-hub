@@ -5,18 +5,31 @@ export interface PrimaryNavOptions {
   activeSection: TeacherSection;
 }
 
-const SECTIONS: Array<{
+type NavEntry = {
   id: TeacherSection;
   label: string;
   path: string;
   glyph: string[];
-}> = [
+};
+
+const MAJORS: NavEntry[] = [
   {
     id: 'home',
     label: 'Dashboard',
     path: '/',
     glyph: ['M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z']
   },
+  {
+    id: 'chat',
+    label: 'Chat',
+    path: '/chat',
+    glyph: [
+      'M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z'
+    ]
+  }
+];
+
+const SECTIONS: NavEntry[] = [
   {
     id: 'classes',
     label: 'Classes',
@@ -81,6 +94,28 @@ function createGlyph(paths: string[]): SVGSVGElement {
   return svg;
 }
 
+function createLink(section: NavEntry, activeSection: TeacherSection): HTMLAnchorElement {
+  const link = document.createElement('a');
+  link.className = 'primary-nav__link hub-rail__link';
+  link.href = section.path;
+  if (section.id === activeSection) {
+    link.setAttribute('aria-current', 'page');
+  }
+
+  const label = document.createElement('span');
+  label.className = 'primary-nav__label';
+  label.textContent = section.label;
+
+  link.setAttribute('aria-label', section.label);
+  link.title = section.label;
+  link.append(createGlyph(section.glyph), label);
+  link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navigate(section.path);
+  });
+  return link;
+}
+
 export function renderPrimaryNav(container: HTMLElement, options: PrimaryNavOptions): void {
   container.replaceChildren();
 
@@ -88,26 +123,20 @@ export function renderPrimaryNav(container: HTMLElement, options: PrimaryNavOpti
   nav.className = 'primary-nav';
   nav.setAttribute('aria-label', 'Teacher sections');
 
+  const majors = document.createElement('div');
+  majors.className = 'hub-rail__majors';
+  for (const section of MAJORS) {
+    majors.append(createLink(section, options.activeSection));
+  }
+  nav.append(majors);
+
+  const rest = document.createElement('p');
+  rest.className = 'hub-rail__section';
+  rest.textContent = 'Teaching';
+  nav.append(rest);
+
   for (const section of SECTIONS) {
-    const link = document.createElement('a');
-    link.className = 'primary-nav__link hub-rail__link';
-    link.href = section.path;
-    if (section.id === options.activeSection) {
-      link.setAttribute('aria-current', 'page');
-    }
-
-    const label = document.createElement('span');
-    label.className = 'primary-nav__label';
-    label.textContent = section.label;
-
-    link.setAttribute('aria-label', section.label);
-    link.title = section.label;
-    link.append(createGlyph(section.glyph), label);
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      navigate(section.path);
-    });
-    nav.append(link);
+    nav.append(createLink(section, options.activeSection));
   }
 
   container.append(nav);

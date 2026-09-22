@@ -131,6 +131,7 @@ export function renderCalendar(root, model, {
     calendar.className = [...classes].join(' ');
   }
   calendar.append(renderNav(root, model, mode));
+  calendar.append(renderSources(root, model));
   if (model.planningLens && mode === 'week') {
     calendar.append(renderMissionStrip(root, model.mission));
   }
@@ -275,6 +276,26 @@ function renderNav(root, model, view) {
 
   nav.append(paging, tabs, lens);
   return nav;
+}
+
+function renderSources(root, model) {
+  const strip = root.createElement('div');
+  strip.className = 'hub-calendar__sources';
+  strip.setAttribute('aria-label', 'Hub sources');
+  for (const source of model.sources ?? []) {
+    const item = root.createElement('span');
+    item.dataset.source = source.id;
+    item.dataset.status = source.status;
+    if (source.status === 'unavailable') {
+      item.textContent = `${source.label} unavailable`;
+    } else if (source.status === 'pending') {
+      item.textContent = `${source.label}…`;
+    } else {
+      item.textContent = `${source.label} ${source.count}`;
+    }
+    strip.append(item);
+  }
+  return strip;
 }
 
 function labelForView(model, view) {

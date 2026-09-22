@@ -25,8 +25,11 @@ interface NavItem {
   href: string;
 }
 
-const NAV: NavItem[] = [
-  { id: 'home', label: 'Home', href: '#/home' },
+const MAJOR_ITEMS: NavItem[] = [
+  { id: 'home', label: 'Home', href: '#/home' }
+];
+
+const REST: NavItem[] = [
   { id: 'people', label: 'People', href: '#/people' },
   { id: 'organisations', label: 'Organisations', href: '#/organisations' },
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
@@ -37,6 +40,8 @@ const NAV: NavItem[] = [
   { id: 'career', label: 'Career', href: '#/career' },
   { id: 'network-ecology', label: 'Network Ecology', href: '#/network-ecology' }
 ];
+
+const NAV: NavItem[] = [...MAJOR_ITEMS, ...REST];
 
 export function viewChrome(view: RailViewId): { eyebrow: string; title: string } {
   const item = NAV.find((entry) => entry.id === view);
@@ -208,7 +213,13 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
 
 export function renderPrimaryNav(railNav: HTMLElement, active: RailViewId | null): void {
   railNav.replaceChildren();
-  railNav.append(...NAV.map((item) => buildNavLink(item, active)));
+  const majors = document.createElement('div');
+  majors.className = 'hub-rail__majors';
+  majors.append(...MAJOR_ITEMS.map((item) => buildNavLink(item, active)));
+  const restLabel = document.createElement('p');
+  restLabel.className = 'hub-rail__section';
+  restLabel.textContent = 'Network';
+  railNav.append(majors, restLabel, ...REST.map((item) => buildNavLink(item, active)));
 
   appendHubSwitcher(hubSwitcherHost(railNav), 'professional');
 

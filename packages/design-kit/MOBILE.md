@@ -35,8 +35,8 @@ Which three primary destinations, and which secondary links sit under “In this
 | Hub | Typical primary trio |
 |-----|----------------------|
 | Life | Home, Chat, Calendar |
-| Teaching | Dashboard, Classes, Lessons |
-| Knowledge | Archive, Graph, Chat |
+| Teaching | Dashboard, Chat, Classes |
+| Knowledge | Archive, Chat, Graph |
 | Tasks | Dashboard, Chat, Today |
 
 ## Adopt

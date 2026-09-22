@@ -74,7 +74,7 @@ Every hub uses `snippets/rail.html` + `rail.css`. Full rules: `RAIL.md`.
 |--------|----------------|
 | `--rail-width: 15rem` (never override, including Knowledge) | Which destinations appear |
 | Brand is `<a class="hub-rail__brand">` to that hub’s **home** | Home `href` (Dashboard / Home / Archive / Board) |
-| Primary items: 18px outline icon + title-case label | Icon paths and labels |
+| Primary items: 18px outline icon + title-case label | Icon paths and labels. Majors: home dest + Chat (+ Life Calendar) in `.hub-rail__majors` |
 | `--on-dark*` markers — **no coloured dots**, no icon stacks | Optional tagline, Teaching search, shortcut section, status line |
 
 No per-hub rail width, no stacked wordmark, no logo on the brand, no mixing dots and icons.
