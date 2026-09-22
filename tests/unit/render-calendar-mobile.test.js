@@ -188,8 +188,12 @@ function assertKitWorkspace(calendar, mode) {
   assert.equal(calendar.className.includes('hub-calendar--mobile'), false);
   assert.ok(calendar.querySelector('.hub-calendar__nav'));
   assert.ok(calendar.querySelector('.hub-calendar__workspace'));
-  assert.ok(calendar.querySelector('.hub-calendar__rail'));
-  assert.ok(calendar.querySelector('[data-calendar="compose-title"]'));
+  if (mode === 'day') {
+    assert.ok(calendar.querySelector('.hub-calendar__rail'));
+    assert.ok(calendar.querySelector('[data-calendar="compose-title"]'));
+  } else {
+    assert.equal(calendar.querySelector('[data-calendar="compose-title"]'), null);
+  }
   if (mode === 'month') {
     assert.ok(calendar.querySelector('.hub-calendar__grid'));
   } else {

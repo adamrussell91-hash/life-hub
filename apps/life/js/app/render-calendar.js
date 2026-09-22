@@ -102,6 +102,10 @@ export function renderCalendar(root, model, {
   }
 
   const draft = composeDraft ?? { date: model.selectedDate, time: null, type: 'diary' };
+  const selected = findEvent(model, selectedEventId);
+  const agenda = renderAgenda(root, selected, scrollToDetail);
+  // Week/month keep the grid. Standing Add is the Day desk — same as Tasks.
+  const standingCompose = mode === 'day';
 
   const workspace = root.createElement('div');
   workspace.className = 'hub-calendar__workspace';
@@ -114,14 +118,16 @@ export function renderCalendar(root, model, {
     body.append(renderTimeGrid(root, model, mode, now));
   }
 
-  const rail = root.createElement('div');
-  rail.className = 'hub-calendar__rail';
-  const selected = findEvent(model, selectedEventId);
-  rail.append(renderCompose(root, draft, mode));
-  const agenda = renderAgenda(root, selected, scrollToDetail);
-  if (agenda) rail.append(agenda);
-  rail.append(renderShortcutHint(root));
-  workspace.append(body, rail);
+  if (standingCompose || agenda) {
+    const rail = root.createElement('div');
+    rail.className = 'hub-calendar__rail';
+    if (standingCompose) rail.append(renderCompose(root, draft));
+    if (agenda) rail.append(agenda);
+    if (standingCompose) rail.append(renderShortcutHint(root));
+    workspace.append(body, rail);
+  } else {
+    workspace.append(body);
+  }
   calendar.append(workspace);
 
   bindNav(calendar);
@@ -607,7 +613,7 @@ function renderChip(root, event, fromNode) {
   return chip;
 }
 
-function renderCompose(root, draft, view) {
+function renderCompose(root, draft) {
   const card = root.createElement('section');
   card.className = 'hub-calendar__detail calendar-compose-card';
   const heading = root.createElement('div');
@@ -658,7 +664,7 @@ function renderCompose(root, draft, view) {
   titleField.type = 'text';
   titleField.dataset.calendar = 'compose-title';
   titleField.setAttribute('aria-label', 'Log title');
-  titleField.placeholder = view === 'month' ? 'What belongs on this day?' : 'What belongs in this slot?';
+  titleField.placeholder = 'What belongs in this slot?';
 
   const dateField = root.createElement('input');
   dateField.className = 'hub-search__input';
