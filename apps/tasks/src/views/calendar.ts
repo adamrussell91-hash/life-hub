@@ -799,8 +799,11 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       paint();
     };
 
-    const calendar = el('div', 'hub-calendar hub-calendar--workspace');
-    calendar.append(renderCalendarNav(session.mode, anchor, shiftRange, goTo, today, switchMode));
+    const calendar = el('div', `hub-calendar hub-calendar--workspace hub-calendar--${session.mode}`);
+    const nav = renderCalendarNav(session.mode, anchor, shiftRange, goTo, today, switchMode);
+    // Month keeps shortcuts in the nav so the grid can use the full canvas.
+    if (session.mode === 'month') nav.append(renderShortcutHint());
+    calendar.append(nav);
     const workspace = el('div', 'hub-calendar__workspace');
     const body = el('div', 'hub-calendar__body');
     if (session.mode === 'month') {
@@ -860,7 +863,7 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
       rail.append(renderDumpWidget(onCreated));
       rail.append(renderQuickLinksWidget(tasks));
     } else if (session.mode === 'month') {
-      rail.append(preview, renderShortcutHint());
+      rail.append(preview);
     } else {
       agenda = renderAgenda(
         items,
