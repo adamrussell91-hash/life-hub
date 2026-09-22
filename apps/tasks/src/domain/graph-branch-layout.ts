@@ -148,6 +148,22 @@ export function layoutBranchFlow(
   return { boxes, edges, lanes, width: maxX + 24, height: yCursor + 8 };
 }
 
+/** Fit branch width to the page. Tall maps stay readable and pan vertically. */
+export function fitBranchView(
+  layout: Pick<BranchLayout, 'width' | 'height'>,
+  viewport: { width: number; height: number }
+): { scale: number; panX: number; panY: number } {
+  const viewportWidth = Math.max(viewport.width, 1);
+  const viewportHeight = Math.max(viewport.height, 1);
+  const scale = Math.min(1, viewportWidth / Math.max(layout.width, 1));
+  const fittedHeight = layout.height * scale;
+  return {
+    scale,
+    panX: Math.max(0, (viewportWidth - layout.width * scale) / 2),
+    panY: fittedHeight < viewportHeight ? Math.max(0, (viewportHeight - fittedHeight) / 2) : 0
+  };
+}
+
 export function canLink(fromId: string, toId: string, tasks: Task[]): boolean {
   return !wouldCreateCycle(fromId, toId, tasks);
 }

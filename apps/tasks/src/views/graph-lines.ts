@@ -39,6 +39,20 @@ function lineColour(domain: string | undefined, step: number): string {
   return step % 2 === 0 ? base : `color-mix(in srgb, ${base} 72%, var(--depth))`;
 }
 
+/** Keep terminus / ghost copy inside the painted SVG, not hanging off the page. */
+export function lineLabelX(x: number, viewWidth: number): { x: number; anchor: 'start' | 'end' } {
+  const pad = 8;
+  const maxX = Math.max(pad, viewWidth - pad);
+  const clamped = Math.min(Math.max(x, pad), maxX);
+  const anchor = clamped > viewWidth / 2 ? 'end' : 'start';
+  return { x: clamped, anchor };
+}
+
+export function lineViewWidth(clientWidth: number): number {
+  const measured = Math.floor(clientWidth);
+  return Math.max(measured || 720, 320);
+}
+
 function buildLines(projects: Project[], tasks: Task[], now: Date): LineModel[] {
   const active = projects.filter((p) => !isProjectArchived(p.status));
   return active
@@ -144,7 +158,7 @@ export function mountLinesView(
 
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'graph-line__svg');
-    const width = Math.max(host.clientWidth || 720, 320);
+    const width = lineViewWidth(host.clientWidth);
     const rawStations = line.stations.map((s) => ({
       id: s.id,
       title: s.title,
@@ -284,8 +298,10 @@ export function mountLinesView(
       ghostMark.setAttribute('class', 'graph-ghost');
       svg.append(ghostMark);
       const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      label.setAttribute('x', String(ghost.x + 14));
+      const ghostLabel = lineLabelX(ghost.x + 14, width);
+      label.setAttribute('x', String(ghostLabel.x));
       label.setAttribute('y', String(ghost.y - 12));
+      label.setAttribute('text-anchor', ghostLabel.anchor);
       label.setAttribute('class', 'graph-ghost__label');
       label.textContent = (line.pace?.behind ?? 0) < 0 ? 'ahead of pace' : 'pace says be here by today';
       svg.append(label);
@@ -295,8 +311,10 @@ export function mountLinesView(
     if (terminus && wrapped.length) {
       const last = wrapped[wrapped.length - 1]!;
       const pill = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      pill.setAttribute('x', String(last.x + 16));
-      pill.setAttribute('y', String(last.y + 20));
+      const dateLabel = lineLabelX(last.x, width);
+      pill.setAttribute('x', String(dateLabel.x));
+      pill.setAttribute('y', String(last.y + 22));
+      pill.setAttribute('text-anchor', dateLabel.anchor);
       pill.setAttribute('class', 'graph-terminus');
       pill.textContent = formatDisplayDate(terminus);
       svg.append(pill);
