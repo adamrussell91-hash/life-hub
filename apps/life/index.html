@@ -82,7 +82,6 @@
               <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span><span>Skincare</span></button>
               <button class="hub-nav-item" type="button" data-section="calendar"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg></span><span>Calendar</span></button>
               <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span><span>Central Node</span></button>
-              <button class="hub-nav-item" type="button" data-section="shortcuts"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span><span>Shortcuts</span></button>
               <button class="hub-nav-item" type="button" data-section="future-map"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span><span>Future map</span></button>
             </div>
           </div>
@@ -1180,20 +1179,6 @@
           </div>
         </section>
 
-        <section id="shortcuts-dashboard" class="dashboard" aria-label="Shortcuts" hidden>
-          <article class="metric-card" aria-labelledby="shortcuts-promoted-label">
-            <p class="metric-label" id="shortcuts-promoted-label">Promoted</p>
-            <p class="metric-context">Confirmed drafts. Run still shows a Confirm card before anything writes.</p>
-            <div data-shortcuts="promoted"></div>
-          </article>
-          <article class="metric-card" aria-labelledby="shortcuts-catalog-label">
-            <p class="metric-label" id="shortcuts-catalog-label">Catalog</p>
-            <p class="metric-context">Named shortcuts agents already have. Ask in chat to use one.</p>
-            <div data-shortcuts="catalog"></div>
-          </article>
-          <div data-shortcuts="confirm"></div>
-        </section>
-
         <section id="future-map-dashboard" class="dashboard" aria-label="Future map" hidden>
           <article class="metric-card" aria-labelledby="future-map-label">
             <p class="metric-label" id="future-map-label">Bucket list and dreams jar</p>
@@ -1382,7 +1367,6 @@
           <button type="button" data-section="mind"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.2 6.2l2.5 2.5M15.3 15.3l2.5 2.5M17.8 6.2l-2.5 2.5M8.7 15.3l-2.5 2.5"/></svg></span>Mind</button>
           <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span>Central Node</button>
-          <button type="button" data-section="shortcuts"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3 6 14h6l-1 7 7-11h-6l1-7Z"/></svg></span>Shortcuts</button>
           <button type="button" data-section="future-map"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span>Future map</button>
           <p class="hub-more-sheet__section">Hubs</p>
           <a href="/teaching/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>Teaching</a>

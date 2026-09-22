@@ -216,8 +216,7 @@ test('the Life Hub tile is deleted from favicon, sign-in, and every page title',
       ['mind', 'Mind'],
       ['skincare', 'Skincare'],
       ['calendar', 'Calendar'],
-      ['central-node', 'Central Node'],
-      ['shortcuts', 'Shortcuts']
+      ['central-node', 'Central Node']
     ];
     for (const [section, title] of sections) {
       await page.locator(`.desktop-rail button[data-section="${section}"]`).first().click();

@@ -36,43 +36,32 @@ async function signIn(page) {
   await page.locator('#app[data-state="ready"]').waitFor();
 }
 
-test('Shortcuts lists promoted drafts and opens a Confirm card before writing', async () => {
-  const context = await browser.newContext();
+test('Life Hub no longer exposes a Shortcuts page', async () => {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const page = await context.newPage();
   try {
     await signIn(page);
-    await page.locator('.desktop-rail [data-section="shortcuts"]').click();
-    await page.locator('#shortcuts-dashboard:not([hidden])').waitFor();
-    await page.locator('#page-title', { hasText: 'Shortcuts' }).waitFor();
-    assert.equal(await page.locator('.page-header__title-row .hub-mark').count(), 0);
+    assert.equal(await page.locator('[data-section="shortcuts"]').count(), 0);
+    assert.equal(await page.locator('#shortcuts-dashboard').count(), 0);
 
-    await page.locator('[data-shortcuts="promoted"] .shortcuts-item', { hasText: 'track.morning-weigh-in' }).waitFor();
-    assert.match(await page.locator('[data-shortcuts="catalog"]').textContent(), /remember\.set-week-flag/);
-    assert.equal(await page.locator('[data-shortcuts="confirm"] .confirm-card').count(), 0);
-
-    await page.locator('[data-shortcuts="promoted"] button', { hasText: 'Run' }).click();
-    await page.locator('[data-shortcuts="confirm"] .confirm-card').waitFor();
-    assert.match(await page.locator('[data-shortcuts="confirm"]').textContent(), /data\/challenges\/2026-08-31-weigh-in\.json/);
-
-    await page.locator('[data-shortcuts="confirm"] button', { hasText: 'Confirm' }).click();
-    await page.locator('[data-shortcuts="confirm"] .confirm-card').waitFor({ state: 'detached' });
-    await page.locator('[data-shortcuts="promoted"] .shortcuts-item', { hasText: 'track.morning-weigh-in' }).waitFor();
+    await page.goto(`${baseUrl}/#shortcuts`);
+    await page.locator('#app[data-state="ready"]').waitFor();
+    await page.locator('#page-title', { hasText: 'Home' }).waitFor();
+    assert.equal(await page.locator('#home-dashboard:not([hidden])').count(), 1);
   } finally {
     await context.close();
   }
 });
 
-test('Shortcuts is reachable from the More sheet at 390 px', async () => {
+test('More sheet no longer lists Shortcuts at 390 px', async () => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
   try {
     await signIn(page);
     await page.locator('#more-nav-button').click();
-    await page.locator('.hub-more-sheet [data-section="shortcuts"]').click();
-    await page.locator('#shortcuts-dashboard:not([hidden])').waitFor();
-    await page.locator('#page-title', { hasText: 'Shortcuts' }).waitFor();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
-    assert.equal(overflow, false);
+    await page.locator('.hub-more-sheet[open], #more-sheet[open]').waitFor();
+    assert.equal(await page.locator('.hub-more-sheet [data-section="shortcuts"]').count(), 0);
+    assert.equal(await page.locator('.hub-more-sheet', { hasText: 'Shortcuts' }).count(), 0);
   } finally {
     await context.close();
   }

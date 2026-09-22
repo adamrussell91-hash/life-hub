@@ -60,10 +60,6 @@ export function buildHubMapSeed() {
       'Hub map button'
     ]
   });
-  add('life-shortcuts', 'Shortcuts', 'life', 'page', 'hub-life', {
-    route: '#shortcuts',
-    features: ['Promoted shortcuts list', 'Shortcut catalog', 'Confirm card before any write']
-  });
   add('life-hub-map', 'Hub map', 'life', 'page', 'hub-life', {
     route: '#hub-map',
     status: 'partial',

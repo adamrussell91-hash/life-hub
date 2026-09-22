@@ -315,12 +315,7 @@ A floating button that opens Chat on the wrong agent is FAIL.
 - [ ] Run audit is visible. Click only if it is clearly read-only; otherwise note SKIP. Do not leave an audit write behind.
 - [ ] 💬 opens Hammond.
 
-### 1.10 Shortcuts
-
-- [ ] Promoted list and Catalog list render named shortcuts, or labelled empty.
-- [ ] Opening a shortcut shows a confirm card. **Discard it.** Nothing writes.
-
-### 1.11 Life rail previews
+### 1.10 Life rail previews
 
 - [ ] Expand Teaching / Knowledge / Tasks in the Life rail. Previews show real class / note / task lines or a fail-visible “could not load”, not “Checking …” forever.
 - [ ] Those preview rows navigate to the right hub page.
@@ -617,7 +612,6 @@ This is **not** the agent-context-integrity suite. Do not run long protocols. Do
 | Teaching AI panel | Lesson editor | Ann / Clementine / Hammond / Clare |
 | Knowledge Chat | Rail Chat | Clementine shell |
 | Tasks Chat | `#/clare` | Clare / Hammond / Penelope / Vera + protocol pills |
-| Life Shortcuts | Catalog | Named shortcuts listed |
 | Life Home Clare dump | Composer | Date chip + Dump/Schedule present; do not submit |
 
 If a picker is empty, an avatar 404s, or the panel is the previous agent’s colour/name, FAIL.
@@ -702,7 +696,7 @@ Do not open a PR. Do not “just fix” a failure unless Adam’s prompt for tha
 
 If a rail item or hash exists in the product and is missing here, add it in the same report’s Notes and treat the omission as a miss in the sweep.
 
-**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Shortcuts, Future map (`/#future-map`).
+**Life sections:** Home, Chat, Nutrition, Fitness, Body, Bloods, Medical Overview, Mind, Skincare, Calendar, Central Node, Future map (`/#future-map`).
 
 **Teaching routes:** `/`, `/sign-in`, `/classes`, `/classes/:id`, `/scope-sequences`, `/scope-sequences/:subjectId`, `/units`, `/units/:unitId`, `/lessons`, `/lessons/:id`, `/templates`, `/resources`, `/trash`, `/s/lessons/:id`, `/s/units/:id`, `/s/classes/:id`, `/s/classes/:id/lessons/:id`.
 
