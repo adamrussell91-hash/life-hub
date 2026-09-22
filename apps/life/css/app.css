@@ -4637,17 +4637,6 @@ main { max-width: 76rem; margin: 0 auto; }
   background: var(--warm-white);
   color: var(--ink);
 }
-.body-quick-log__button {
-  border: 0;
-  border-radius: 0.85rem;
-  padding: 0.75rem 1rem;
-  background: #BBD9B4;
-  color: #1a2418;
-  font: inherit;
-  font-weight: var(--weight-bold);
-  cursor: pointer;
-  min-height: 44px;
-}
 #body-chat-button { --agent-accent: #BED3BC; }
 
 .agent-picker {
@@ -7150,7 +7139,8 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 @media (max-width: 720px) {
   .trend-pair,
   .body-metrics--pair,
-  .body-composition-pair { grid-template-columns: 1fr; }
+  .body-composition-pair,
+  .body-chart-pair { grid-template-columns: 1fr; }
 }
 
 #mind-waffle {
@@ -8096,6 +8086,18 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .body-chart-block { display: grid; gap: var(--space-3); margin-top: var(--space-3); }
 .body-chart-block .hub-pills { justify-self: start; }
 .body-chart-block .hc-host { margin-top: 0; }
+.body-chart-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-grid);
+  align-items: start;
+}
+.body-chart-pair__item {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+.body-chart-pair__item .metric-label { margin: 0; }
 .body-chart-scrub { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-xs); color: var(--muted); }
 .body-chart-scrub input[type="range"] { flex: 1; min-width: 0; accent-color: var(--navy); }
 .body-chart-scrub output { min-width: 4.5em; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }

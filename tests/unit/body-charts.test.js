@@ -13,7 +13,7 @@ import { buildShedStack } from '../../apps/life/js/app/chart-kit/shed-stack.js';
 import { buildStairsDown } from '../../apps/life/js/app/chart-kit/stairs-down.js';
 import { buildCarvedAway } from '../../apps/life/js/app/chart-kit/carved-away.js';
 import { buildRecompScissors } from '../../apps/life/js/app/chart-kit/recomp-scissors.js';
-import { buildHundredSquares, squareKinds } from '../../apps/life/js/app/chart-kit/hundred-squares.js';
+import { buildHundredSquares, squareKinds, SQUARE_COLS } from '../../apps/life/js/app/chart-kit/hundred-squares.js';
 
 const AS_OF = '2026-09-22';
 const TARGETS_CONFIG = {
@@ -170,6 +170,26 @@ test('stairs ball rests on today and carries an entrance path', () => {
   const ball = scene.nodes.find(n => n.cls === 'bc-ball');
   assert.ok(ball.motion.path.startsWith('M'));
   assert.equal((ball.motion.path.match(/Q/g) ?? []).length, charts.weight.stairs.steps.length - 1);
+});
+
+test('shed stack colour key names the stack tones and years', () => {
+  const charts = buildBodyChartData({ events: events(), date: AS_OF, targetsConfig: TARGETS_CONFIG });
+  const labels = buildShedStack(charts.weight.stack, { width: 520 }).nodes.filter(n => n.text).map(n => n.text);
+  assert.ok(labels.includes('You · 1 kg'));
+  assert.ok(labels.some(t => String(t).includes('78–82')));
+  assert.ok(labels.includes('Above the band'));
+  assert.ok(labels.includes('2024') && labels.includes('2025') && labels.includes('2026'));
+});
+
+test('100 squares lays twenty cells on the first row', () => {
+  const charts = buildBodyChartData({ events: events(), date: AS_OF, targetsConfig: TARGETS_CONFIG });
+  const scene = buildHundredSquares(charts.muscle.squares, { width: 400 });
+  const cells = scene.nodes.filter(n => n.attrs?.['data-cell'] != null);
+  assert.equal(SQUARE_COLS, 20);
+  assert.equal(cells.length, 100);
+  assert.equal(cells[SQUARE_COLS / 2].attrs.y, cells[0].attrs.y);
+  assert.ok(Number(cells[SQUARE_COLS].attrs.y) > Number(cells[0].attrs.y));
+  assert.ok(scene.height < 176, `wide grid stays shorter than the old 10×10 floor (${scene.height})`);
 });
 
 test('shed stack blocks fall from where they sat in the stack', () => {

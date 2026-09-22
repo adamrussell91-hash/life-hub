@@ -3,7 +3,7 @@ import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motio
 import { animateAreaReveal } from './chart-kit/animate.js';
 import { buildAreaLine } from './chart-kit/area-line.js';
 import { buildCarvedAway } from './chart-kit/carved-away.js';
-import { buildHundredSquares, squareKinds } from './chart-kit/hundred-squares.js';
+import { buildHundredSquares, squareKinds, SQUARE_COLS } from './chart-kit/hundred-squares.js';
 import { buildRecompScissors } from './chart-kit/recomp-scissors.js';
 import { buildShedStack } from './chart-kit/shed-stack.js';
 import { buildStairsDown } from './chart-kit/stairs-down.js';
@@ -670,8 +670,8 @@ function metricBlock(root, metric, quiet = false, { hideLabel = false, chart = n
 
 /* ── Scene charts (weight, body fat, skeletal muscle) ─────────────────── */
 
-/** Which view each multi-view card shows. Kept across re-renders and range changes. */
-const bodyChartViews = { weight: 'stack', muscle: 'scissors' };
+/** Which view each toggled card shows. Kept across re-renders and range changes. */
+const bodyChartViews = { muscle: 'scissors' };
 const BODY_CHART_MAX_WIDTH = 640;
 
 function bodyChartFor(root, key, charts, quiet) {
@@ -680,7 +680,7 @@ function bodyChartFor(root, key, charts, quiet) {
     return chartBlock(root, 'weight', 'Weight view', [
       { id: 'stack', label: 'Shed stack', build: buildShedStack, data: charts.weight.stack },
       { id: 'stairs', label: 'Stairs', build: buildStairsDown, data: charts.weight.stairs }
-    ], quiet);
+    ], quiet, { together: true });
   }
   if (key === 'body_fat_pct' && charts.fat) {
     return chartBlock(root, 'fat', 'Body fat view', [
@@ -705,10 +705,32 @@ function resetChartHost(host) {
 
 const nextFrame = fn => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : fn());
 
-function chartBlock(root, name, ariaLabel, views, quiet) {
+function chartBlock(root, name, ariaLabel, views, quiet, { together = false } = {}) {
   const block = root.createElement('div');
-  block.className = 'body-chart-block';
+  block.className = together ? 'body-chart-block body-chart-block--pair' : 'body-chart-block';
   block.dataset.bodyChart = name;
+
+  if (together && views.length > 1) {
+    const row = root.createElement('div');
+    row.className = 'body-chart-pair';
+    row.id = `body-chart-${name}`;
+    for (const view of views) {
+      const cell = root.createElement('section');
+      cell.className = 'body-chart-pair__item';
+      const title = root.createElement('p');
+      title.className = 'metric-label';
+      title.textContent = view.label;
+      const host = root.createElement('div');
+      host.id = `body-chart-${name}-${view.id}`;
+      cell.append(title, host);
+      row.append(cell);
+      queueMicrotask(() => {
+        mountSceneChart(host, view.build, view.data, { quiet, maxWidth: 520 });
+      });
+    }
+    block.append(row);
+    return block;
+  }
   const host = root.createElement('div');
   host.id = `body-chart-${name}`;
   const extra = root.createElement('div');
@@ -795,7 +817,7 @@ function squaresScrubber(root, host, extra, data) {
     for (const cell of host.querySelectorAll('.bc-cell[data-cell]')) {
       const i = Number(cell.getAttribute('data-cell'));
       if (before[i] === after[i]) continue;
-      cell.style.setProperty('--bc-flip-delay', `${(i % 10) * 12 + Math.floor(i / 10) * 8}ms`);
+      cell.style.setProperty('--bc-flip-delay', `${(i % SQUARE_COLS) * 12 + Math.floor(i / SQUARE_COLS) * 8}ms`);
       cell.classList.add('bc-cell--flip');
     }
     showDate(index);
@@ -835,7 +857,6 @@ function quickLog(root, sectionId, hooks) {
       title: 'Weight',
       supporting: 'Today’s scale reading.',
       layoutId: 'body-log-weight',
-      triggerClass: 'body-quick-log__button',
       className: 'body-quick-log',
       submitLabel: 'Log weight',
       fields: [{
@@ -865,7 +886,6 @@ function quickLog(root, sectionId, hooks) {
     title: 'Composition',
     supporting: 'Body fat and skeletal muscle.',
     layoutId: 'body-log-composition',
-    triggerClass: 'body-quick-log__button',
     className: 'body-quick-log',
     submitLabel: 'Log composition',
     fields: [

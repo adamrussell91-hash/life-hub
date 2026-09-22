@@ -5,7 +5,7 @@
  * the stack used to reach. Blocks still above the target band are tinted.
  */
 import { formatDisplayDate } from '../../core/time.js';
-import { formatNumber, fx, monthShort, node, text } from './scene.js';
+import { formatNumber, fx, legend, monthShort, node, text } from './scene.js';
 
 const LABEL_W = 92;
 const MAX_ROWS = 14;
@@ -40,7 +40,6 @@ export function buildShedStack(chart, { width = 520 } = {}) {
   const heapX = stackX + cols * step + LABEL_W;
   const padTop = 10;
   const base = padTop + rows * step;
-  const height = base + 36;
   const pos = (index, x0) => [x0 + (index % cols) * step, base - (Math.floor(index / cols) + 1) * step + 2];
   const band = chart.band;
   const nodes = [];
@@ -108,22 +107,23 @@ export function buildShedStack(chart, { width = 520 } = {}) {
   if (band && band.low < now - 2) {
     nodes.push(text(lx, rowY(band.low) + 4, `${band.low}–${band.high} band`, { size: 10, weight: 600, cls: 'hc-text hc-text--band' }));
   }
-  nodes.push(text(stackX, base + 16, 'You · 1 block = 1 kg', { size: 10, cls: 'hc-text hc-text--muted' }));
-
   const heapRows = Math.ceil(chart.blocks.length / cols);
   const heapTop = base - heapRows * step;
   const settle = Math.round(chart.blocks.length * per + FALL_MS);
   nodes.push(text(heapX, heapTop - 22, `${formatNumber(chart.shedKg, 1)} kg shed`, { size: 14, weight: 700, anim: 'fade', delay: settle }));
   nodes.push(text(heapX, heapTop - 8, `since ${monthYear(chart.peak.date)}`, { size: 10, cls: 'hc-text hc-text--muted', anim: 'fade', delay: settle }));
-  let legendX = heapX;
-  const legendStep = Math.min(46, (width - heapX - 4) / Math.max(1, chart.years.length));
-  for (const year of chart.years) {
-    nodes.push(node('rect', { x: fx(legendX), y: fx(base + 8), width: 9, height: 9, rx: 2 }, {
-      cls: `bc-shed ${YEAR_CLASSES[Math.min(3, yearIndex.get(year))]}`
-    }));
-    nodes.push(text(legendX + 12, base + 16, year, { size: 10, cls: 'hc-text hc-text--muted' }));
-    legendX += legendStep;
+
+  const keyItems = [['bc-block', 'You · 1 kg']];
+  if (band) {
+    keyItems.push(['bc-block--band', `${band.low}–${band.high} kg`]);
+    if (chart.aboveBandKg > 0) keyItems.push(['bc-block--above', 'Above the band']);
   }
+  for (const year of chart.years) {
+    keyItems.push([`bc-shed ${YEAR_CLASSES[Math.min(3, yearIndex.get(year))]}`, year]);
+  }
+  const key = legend(keyItems, { x: stackX, y: base + 20, width: width - stackX - 8, swatch: [10, 10] });
+  nodes.push(...key.nodes);
+  const height = base + 20 + key.height + 6;
 
   return {
     width,
