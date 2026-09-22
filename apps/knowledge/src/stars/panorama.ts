@@ -57,7 +57,7 @@ function noteY(pageId: string): number {
 
 function drawGlyph(context: CanvasRenderingContext2D, item: SavedConstellation, cx: number, cy: number, goldColor: string) {
   const layout = buildStarsLayout(item.symbol.templateId, item.notes.length);
-  const radius = 26 * item.sky.scale;
+  const radius = 42 * item.sky.scale;
   const cos = Math.cos(item.sky.rotation);
   const sin = Math.sin(item.sky.rotation);
   const point = (index: number) => {
