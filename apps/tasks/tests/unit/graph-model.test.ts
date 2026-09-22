@@ -298,6 +298,41 @@ describe('pace and serviceStatus', () => {
     expect(status.status).toBe('minor_delays');
   });
 
+  it('does not treat same-line unfinished deps as a service delay', () => {
+    const a = task({ id: 'a', title: 'A', step_order: 0, status: 'in_progress', updated_at: '2026-09-09T00:00:00.000Z' });
+    const b = task({
+      id: 'b',
+      title: 'B',
+      step_order: 1,
+      depends_on: ['a'],
+      updated_at: '2026-09-09T00:00:00.000Z'
+    });
+    expect(
+      serviceStatus(
+        project({ created_at: '2026-09-01T00:00:00.000Z', current_end_date: '2026-12-01', updated_at: '2026-09-09T00:00:00.000Z' }),
+        [a, b],
+        now
+      ).status
+    ).toBe('good_service');
+  });
+
+  it('is not behind pace until the ghost fully passes a station', () => {
+    const tasks = [
+      task({ id: 'a', title: 'A', step_order: 0 }),
+      task({ id: 'b', title: 'B', step_order: 1 }),
+      task({ id: 'c', title: 'C', step_order: 2 })
+    ];
+    const measured = pace(
+      project({ created_at: '2026-09-14T00:00:00.000Z', current_end_date: '2026-10-14' }),
+      tasks,
+      new Date('2026-09-22T09:00:00+10:00')
+    );
+    expect(measured).not.toBeNull();
+    expect(measured!.ghostAt).toBeGreaterThan(0);
+    expect(measured!.ghostAt).toBeLessThan(1);
+    expect(measured!.behind).toBeLessThanOrEqual(0);
+  });
+
   it('returns good_service when none of the delay rules fire', () => {
     const a = task({
       id: 'a',
