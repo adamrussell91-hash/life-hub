@@ -1,5 +1,7 @@
 import {
   aggregateNutrition,
+  calculateWorkoutStreak,
+  getLoggingCompleteness,
   hasRecoveryBonus,
   resolveDayType
 } from '../core/aggregate.js';
@@ -41,6 +43,9 @@ export function buildHomeModel({
   const dayType = resolveDayType(events, date);
   const recovery = hasRecoveryBonus(events, date);
   const targets = targetsConfig ? getDayTargets(targetsConfig, date, dayType, recovery) : EMPTY_TARGETS;
+  // Completeness and streak still feed the agent digest even though Home no longer shows them.
+  const completeness = getLoggingCompleteness(events, date);
+  const workoutStreak = calculateWorkoutStreak(events, date);
   const hammondLine = formatHammondReviewLine(latestHammondReview(governanceLogMarkdown, date));
   const forecastCards = buildHomeForecastCards({ events, date, targetsConfig });
 
@@ -50,6 +55,8 @@ export function buildHomeModel({
     targets,
     dayType,
     recovery,
+    workoutStreak,
+    completeness,
     hammondLine,
     forecastCards,
     overFatCeiling: targets.fat_ceiling_g > 0 && nutrition.fat_g > targets.fat_ceiling_g,
