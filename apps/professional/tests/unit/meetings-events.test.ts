@@ -410,16 +410,16 @@ describe('renderEventNewView', () => {
     expect(body.event_type).toBe('professional_development');
   });
 
-  it('keeps priority optional and posts a chosen area only when one is on', async () => {
+  it('keeps priority optional and posts a chosen area separately from the event type', async () => {
     const canvas = document.createElement('div');
-    const saved: Array<{ accreditation: string | null }> = [];
+    const saved: Array<{ accreditation: string | null; priorityArea: string | null }> = [];
     await renderEventNewView(canvas, {
       onSave: async (payload) => {
-        saved.push({ accreditation: payload.accreditation });
+        saved.push({ accreditation: payload.accreditation, priorityArea: payload.priorityArea });
       }
     });
 
-    expect(canvas.textContent).toMatch(/Choose No priority when this event is not in one of these areas/);
+    expect(canvas.textContent).toMatch(/Add an area when none of these fit/);
     const none = [...canvas.querySelectorAll('.event-compose__chip')].find(
       (node) => node.textContent === 'No priority'
     ) as HTMLButtonElement;
@@ -435,16 +435,20 @@ describe('renderEventNewView', () => {
     wellbeing.click();
     expect(none.getAttribute('aria-pressed')).toBe('false');
     expect(wellbeing.getAttribute('aria-pressed')).toBe('true');
-    expect(category.value).toBe('Course · Wellbeing');
-
-    none.click();
     expect(category.value).toBe('Course');
 
     const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
     title.value = 'Staff meeting';
-    (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+    const form = canvas.querySelector('form.event-form') as HTMLFormElement;
+    form.requestSubmit();
     await vi.waitFor(() => expect(saved).toHaveLength(1));
-    expect(saved[0]?.accreditation).toBe('Course');
+    expect(saved[0]).toEqual({ accreditation: 'Course', priorityArea: 'Wellbeing' });
+
+    (canvas.querySelector('button.btn--primary') as HTMLButtonElement).disabled = false;
+    none.click();
+    form.requestSubmit();
+    await vi.waitFor(() => expect(saved).toHaveLength(2));
+    expect(saved[1]).toEqual({ accreditation: 'Course', priorityArea: null });
 
     const edited = document.createElement('div');
     await renderEventNewView(edited, {
@@ -460,8 +464,40 @@ describe('renderEventNewView', () => {
     expect(editedNone.getAttribute('aria-pressed')).toBe('false');
     expect(editedWellbeing.getAttribute('aria-pressed')).toBe('true');
     expect((edited.querySelector('[aria-label="Accreditation category"]') as HTMLInputElement).value).toBe(
-      'Workshop · Wellbeing'
+      'Workshop'
     );
+
+    const added = document.createElement('div');
+    const addedSaved: Array<{ accreditation: string | null; priorityArea: string | null }> = [];
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        data: { events: [{ accreditation_category: 'Course', priority_area: 'Literacy' }] }
+      })
+    );
+    await renderEventNewView(added, {
+      onSave: async (payload) => {
+        addedSaved.push({ accreditation: payload.accreditation, priorityArea: payload.priorityArea });
+      }
+    });
+    const literacy = [...added.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'Literacy'
+    ) as HTMLButtonElement;
+    expect(literacy.getAttribute('aria-pressed')).toBe('false');
+    (added.querySelector('[aria-label="Add priority area"]') as HTMLButtonElement).click();
+    const areaInput = added.querySelector('[aria-label="New priority area"]') as HTMLInputElement;
+    areaInput.value = 'Gifted education';
+    areaInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(areaInput.isConnected).toBe(false);
+    expect((added.querySelector('[aria-label="Add priority area"]') as HTMLButtonElement).hidden).toBe(false);
+    const gifted = [...added.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'Gifted education'
+    ) as HTMLButtonElement;
+    expect(gifted.getAttribute('aria-pressed')).toBe('true');
+    (added.querySelector('[aria-label="Title"]') as HTMLInputElement).value = 'Extension group';
+    (added.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+    await vi.waitFor(() => expect(addedSaved).toHaveLength(1));
+    expect(addedSaved[0]).toEqual({ accreditation: 'Course', priorityArea: 'Gifted education' });
   });
 
   it('renders an attendee picker with a role control', async () => {
