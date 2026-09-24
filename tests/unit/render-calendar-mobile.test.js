@@ -186,6 +186,12 @@ function model(events = []) {
 function assertKitWorkspace(calendar, mode) {
   assert.ok(calendar.className.includes('hub-calendar--workspace'));
   assert.equal(calendar.className.includes('hub-calendar--mobile'), false);
+  if (mode === 'week') {
+    assert.ok(calendar.querySelector('.cal'));
+    assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
+    assert.equal(calendar.querySelector('[data-calendar="compose-title"]'), null);
+    return;
+  }
   assert.ok(calendar.querySelector('.hub-calendar__nav'));
   assert.ok(calendar.querySelector('.hub-calendar__workspace'));
   if (mode === 'day') {
@@ -237,16 +243,15 @@ test('desktop day view stays on the time-grid path', () => {
 
 test('master calendar names every hub source', () => {
   const root = fakeRoot({ mobile: false });
-  renderCalendar(root, model([
+  const events = [
     { record: { type: 'scheduled_lesson', date: '2026-08-05', time: '09:15', title: 'Memory' }, body: '', path: 't' },
     { record: { type: 'task', date: '2026-08-05', title: 'Marking' }, body: '', path: 'k' }
-  ]), { view: 'week' });
-  const strip = root._host.querySelector('.hub-calendar__sources');
+  ];
+  renderCalendar(root, model(events), { view: 'week', events });
+  const strip = root._host.querySelector('.cal__sources');
   assert.ok(strip);
-  const labels = (strip.children ?? []).map(node => node.textContent).join(' ');
-  assert.match(labels, /Life/);
-  assert.match(labels, /Teaching/);
-  assert.match(labels, /Knowledge/);
-  assert.match(labels, /Tasks/);
-  assert.match(labels, /Professional/);
+  const labels = collect(strip).map(node => node.textContent).join(' ');
+  assert.match(labels, /Teaching 1/);
+  assert.match(labels, /Tasks 1/);
+  assert.equal(labels.includes('2037'), false);
 });

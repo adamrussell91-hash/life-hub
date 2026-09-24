@@ -103,7 +103,17 @@ export async function loadCalendarVisualSeed() {
     DUE: fixture.DUE ?? [],
     GHOSTS: fixture.GHOSTS ?? [],
     WALLS: fixture.WALLS ?? [],
-    FREE: fixture.FREE ?? []
+    FREE: fixture.FREE ?? [],
+    TRAY: fixture.TRAY ?? null,
+    // Term dates drive "T3 W10 · last week of term" and the holiday forecast lift.
+    // They are not on the planning-profile API during the visual seed (that route is 503).
+    school_terms: [
+      { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
+      { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
+    ],
+    // Knowledge pages are not in the fixture logs, and /api/knowledge is 503 here.
+    // The ambient line counts notes touched this week; the reference week has 12.
+    NOTES: Array.from({ length: 12 }, (_, index) => ({ id: `visual-note-${index + 1}` }))
   }, null, 2));
 
   return {

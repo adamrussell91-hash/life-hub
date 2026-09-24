@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v177';
+const CACHE_NAME = 'life-hub-shell-v178';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -29,6 +29,9 @@ const SHELL_FILES = [
   'packages/design-kit/rail.css',
   'packages/design-kit/mobile.css',
   'packages/design-kit/calendar.css',
+  'packages/design-kit/calendar-tideline.css',
+  'packages/design-kit/js/hub-motion-engine.js',
+  'packages/design-kit/js/calendar-tideline-geometry.js',
   'packages/design-kit/js/time-grid.js',
   'js/app/main.js',
   'js/app/api-session.js',
@@ -150,6 +153,8 @@ const SHELL_FILES = [
   'js/app/render-bloods.js',
   'js/app/render-medical.js',
   'js/app/render-calendar.js',
+  'js/app/render-tideline.js',
+  'js/app/tideline-model.js',
   'js/app/render-central-node.js',
   'js/app/render-chat.js',
   'js/app/render-fitness.js',

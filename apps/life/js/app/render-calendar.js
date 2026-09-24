@@ -1,4 +1,5 @@
 import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
+import { renderTideline } from './render-tideline.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -67,7 +68,10 @@ export function renderCalendar(root, model, {
   composeDraft = null,
   selectedEventId = null,
   focusCompose = false,
-  now = new Date()
+  now = new Date(),
+  events = [],
+  calendarVisual = null,
+  planningProfile = null
 } = {}) {
   const dashboard = root.querySelector('#calendar-dashboard');
   if (!dashboard || !model) return;
@@ -81,6 +85,24 @@ export function renderCalendar(root, model, {
   }
 
   const mode = VIEWS.some(item => item.id === view) ? view : 'week';
+  if (mode === 'week') {
+    calendar.replaceChildren();
+    calendar.className = 'hub-calendar hub-calendar--workspace';
+    renderTideline(root, calendar, {
+      events,
+      visual: calendarVisual,
+      week: (model.weekDays ?? []).map(day => day.date),
+      today: model.date,
+      now,
+      dayProfile: planningProfile?.day_profile ?? null,
+      terms: calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null,
+      onShiftRange,
+      onSelectDate,
+      onSwitchView
+    });
+    dashboard.removeAttribute('hidden');
+    return;
+  }
   handlersByRoot.set(calendar, {
     onSelectDate,
     onShiftRange,

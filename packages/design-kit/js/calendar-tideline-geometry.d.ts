@@ -1,0 +1,21 @@
+export const CAL: {
+  bandMs: number;
+  acceptMs: number;
+  exitMs: number;
+  enterMs: number;
+  enterStagger: number;
+  enterRise: number;
+  toastInMs: number;
+  toastRise: number;
+  toastHoldMs: number;
+  applyAllStagger: number;
+  saveLatencyMs: number;
+  fade: { title: [number, number]; meta: [number, number]; actions: [number, number] };
+  lineBox: number;
+  cardAt: number;
+  twoLinesAt: number;
+  popMs: number;
+  popRise: number;
+  popWidth: number;
+  popGap: number;
+};

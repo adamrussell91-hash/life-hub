@@ -11,6 +11,7 @@ const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
 const CENTRAL_NODE_PATH = 'central-node.md';
 const EVENT_PATH = /^data\/.+\.md$/;
+const CALENDAR_VISUAL_PATH = 'calendar-visual.json';
 const INITIAL_LOOKBACK_DAYS = 6;
 const FIRST_EXTENSION_DAYS = 30;
 // The manifest endpoint rejects a span of 366 days or more, so windows stay
@@ -100,6 +101,7 @@ export async function loadLiveEvents({
       weekFlags: parsedFiles.weekFlags,
       nutritionChallenges: parsedFiles.nutritionChallenges,
       researchBriefs: parsedFiles.researchBriefs,
+      calendarVisual: parsedFiles.calendarVisual,
       warnings: [...warnings, ...parsedFiles.warnings],
       commitSha,
       changed,
@@ -156,6 +158,8 @@ function createValidator(loadYaml) {
         parseWeekFlags(file.content);
       } else if (file.path.startsWith('data/research/') && file.path.endsWith('.json')) {
         JSON.parse(file.content);
+      } else if (file.path === CALENDAR_VISUAL_PATH) {
+        JSON.parse(file.content);
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
       } else {
@@ -186,6 +190,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   let weekFlags = null;
   let nutritionChallenges = null;
   const researchBriefs = [];
+  let calendarVisual = null;
 
   for (const file of files) {
     const key = `${file.path}\0${file.sha}`;
@@ -205,6 +210,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     else if (entry.kind === 'week_flags') weekFlags = entry.value;
     else if (entry.kind === 'nutrition_challenges') nutritionChallenges = entry.value;
     else if (entry.kind === 'research_brief') researchBriefs.push(entry.value);
+    else if (entry.kind === 'calendar_visual') calendarVisual = entry.value;
     else if (entry.kind === 'event') events.push(entry.value);
   }
 
@@ -220,6 +226,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     weekFlags,
     nutritionChallenges,
     researchBriefs,
+    calendarVisual,
     warnings
   };
 }
@@ -233,6 +240,11 @@ function parseFile(file, loadYaml) {
     if (file.path === WEEK_FLAGS_PATH) return { kind: 'week_flags', value: parseWeekFlags(file.content) };
     if (file.path === NUTRITION_CHALLENGES_PATH) {
       return { kind: 'nutrition_challenges', value: parseNutritionChallenges(file.content) };
+    }
+    if (file.path === CALENDAR_VISUAL_PATH) {
+      const parsed = JSON.parse(file.content);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { kind: 'ignored' };
+      return { kind: 'calendar_visual', value: parsed };
     }
     if (file.path.startsWith('data/research/') && file.path.endsWith('.json')) {
       const parsed = JSON.parse(file.content);

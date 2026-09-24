@@ -248,8 +248,9 @@ test('uses mobile navigation without overflow at 390 px after sign-in', async ()
 
   await page.locator('.mobile-nav [data-section="calendar"]').click();
   await page.locator('#calendar-dashboard:not([hidden])').waitFor();
-  assert.equal(await page.locator('.hub-calendar__timegrid').count(), 1);
-  assert.ok((await page.locator('[data-calendar="compose-title"]').count()) >= 1);
+  await page.locator('[data-part="tideline"]').waitFor();
+  assert.equal(await page.locator('[data-part="day-body"]').count(), 1);
+  assert.equal(await page.locator('[data-calendar="compose-title"]').count(), 0);
   await assertNoSecretResponses();
   await context.close();
 });
