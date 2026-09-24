@@ -21,6 +21,13 @@ import { renderMarkdown } from './_shared/persist-log.mjs';
 import { validateRecord } from '../../apps/life/js/core/validate.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { acceptPlan, dismissPlan } from '../../apps/life/js/app/ghost-writes.js';
+import {
+  ghostsForAlmanacAction,
+  loadProfessionalEventsFromBlobs,
+  loadTeachingLessonsFromBlobs,
+  readAlmanac,
+  readSchoolTerms
+} from './almanac.mjs';
 import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
@@ -188,7 +195,12 @@ async function applyLifeStep(opened, step, { nowIso, ghostId }) {
   return fail(400, 'invalid_record', 'Unknown life record write.');
 }
 
-async function applyTaskStep(store, step) {
+/** Stable task id for a ghost accept, so a retry finds the row it already wrote. */
+export function ghostTaskId(ghostId) {
+  return `ghost-${ghostId}`;
+}
+
+async function applyTaskStep(store, step, { ghostId } = {}) {
   if (step.method === 'PATCH') {
     const existing = await getJSON(store, taskKey(step.id));
     if (!existing || typeof existing !== 'object') {
@@ -208,7 +220,15 @@ async function applyTaskStep(store, step) {
       throw Object.assign(new Error('title and a valid domain are required'), { code: 'validation_error' });
     }
     const timestamp = new Date().toISOString();
-    const id = newTaskId();
+    const id = ghostId ? ghostTaskId(ghostId) : newTaskId();
+    if (ghostId) {
+      const existing = await getJSON(store, taskKey(id));
+      if (existing && typeof existing === 'object') {
+        const ids = await readTaskIndex(store);
+        if (!ids.includes(id)) await writeTaskIndex(store, [...ids, id]);
+        return;
+      }
+    }
     const task = normalizeTaskRecord({
       schema_version: 1,
       id,
@@ -333,6 +353,118 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
   };
 }
 
+/** Almanac ghosts are recomputed, not queued. Same writes as settle, with no queue file. */
+async function settleAlmanac(opened, plans, { nowIso }) {
+  const changed = new Map();
+  const drafts = [];
+  const taskSteps = [];
+  let central = await opened.readFile(CENTRAL_NODE_PATH);
+  let centralTouched = false;
+
+  for (const plan of plans) {
+    for (const step of plan.steps) {
+      if (step.target === 'draft') {
+        drafts.push({ to: step.to ?? null, text: typeof step.text === 'string' ? step.text : '' });
+        continue;
+      }
+      if (step.target === 'tasks') {
+        taskSteps.push({ ...step, ghostId: plan.ghostId });
+        continue;
+      }
+      if (step.target === 'central_node') {
+        if (typeof central !== 'string') return fail(404, 'central_node_missing', 'Central Node is not available.');
+        const patch = validateCentralNodePatchInput(step.patch);
+        if (!patch) return fail(400, 'invalid_patch', 'This Central Node patch could not be validated.');
+        const next = applyCentralNodePatch(central, patch);
+        if (!next) return fail(400, 'apply_failed', 'This Central Node patch could not be applied.');
+        central = next;
+        centralTouched = true;
+        continue;
+      }
+      if (step.target === 'life_record') {
+        const written = await applyLifeStep(opened, step, { nowIso, ghostId: plan.ghostId });
+        if (written.status) return written;
+        changed.set(written.path, written.content);
+        continue;
+      }
+      return fail(400, 'unknown_step', 'This ghost plan has a step the server cannot run.');
+    }
+  }
+
+  if (centralTouched) changed.set(CENTRAL_NODE_PATH, central);
+  return {
+    kind: 'accept',
+    changed,
+    plan: { receipt: plans.map(plan => plan.receipt).join(' ') },
+    taskSteps,
+    drafts,
+    message: `chore(calendar): accept ${plans[0].ghostId}`
+  };
+}
+
+async function runAlmanacGhostDecision({
+  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = []
+}) {
+  if (decision.decision === 'dismiss') return applied({ receipt: 'Dismissed. Nothing written.' });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const opened = await open();
+    const terms = await readSchoolTerms(tasksStore);
+    const view = await readAlmanac({
+      readFile: path => opened.readFile(path),
+      listPaths: () => (typeof opened.listPaths === 'function' ? opened.listPaths() : []),
+      today,
+      terms,
+      lessons,
+      professionalEvents
+    });
+    const ghosts = ghostsForAlmanacAction(decision.id, view);
+    if (!ghosts) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
+
+    const plans = [];
+    for (const ghost of ghosts) {
+      try {
+        plans.push(acceptPlan(ghost, { today }));
+      } catch (error) {
+        const message = error instanceof TypeError ? error.message : 'This ghost could not be validated.';
+        return fail(400, 'invalid_ghost', message);
+      }
+    }
+
+    if (plans.every(plan => plan.steps.every(step => step.target === 'draft'))) {
+      const drafts = plans.flatMap(plan => plan.steps
+        .filter(step => step.target === 'draft')
+        .map(step => ({ to: step.to ?? null, text: typeof step.text === 'string' ? step.text : '' })));
+      return applied({ receipt: plans.map(plan => plan.receipt).join(' ') }, { drafts });
+    }
+
+    // A successful create already stored ghost-<id>. A retry must not write the line again.
+    if (plans.every(plan => plan.steps.some(step => step.target === 'tasks' && step.method === 'POST'))) {
+      const store = await tasksStore();
+      let allExist = true;
+      for (const plan of plans) {
+        const existing = await getJSON(store, taskKey(ghostTaskId(plan.ghostId)));
+        if (!existing || typeof existing !== 'object') {
+          allExist = false;
+          break;
+        }
+      }
+      if (allExist) return applied({ receipt: plans.map(plan => plan.receipt).join(' ') });
+    }
+
+    const settlement = await settleAlmanac(opened, plans, { nowIso });
+    if (settlement.status) return settlement;
+    try {
+      if (settlement.changed.size) await commit(settlement.changed, opened.base, settlement.message);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict' && attempt === 0) continue;
+      throw error;
+    }
+    return finishTasks({ open, commit, tasksStore, id: decision.id, settlement });
+  }
+  return fail(409, 'write_conflict', 'The repository changed while accepting. Try again.');
+}
+
 async function clearTasksPending(open, commit, id) {
   const opened = await open();
   const queue = parsePendingCalendarGhosts(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
@@ -349,7 +481,14 @@ async function clearTasksPending(open, commit, id) {
  * Execute one stored ghost. `open` reads a snapshot, `commit` writes one
  * GitHub commit (or the mock equivalent). Tasks run only after that commit.
  */
-export async function runGhostDecision({ open, commit, tasksStore, decision, today, nowIso }) {
+export async function runGhostDecision({
+  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = []
+}) {
+  if (typeof decision.id === 'string' && decision.id.startsWith('alm-')) {
+    return runAlmanacGhostDecision({
+      open, commit, tasksStore, decision, today, nowIso, lessons, professionalEvents
+    });
+  }
   // ponytail: one stale-SHA retry. On write_conflict, re-read and rebuild from
   // the current tree. A second conflict is returned to the client.
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -374,7 +513,9 @@ async function finishTasks({ open, commit, tasksStore, id, settlement }) {
   if (!settlement.taskSteps.length) return applied(settlement.plan, { drafts: settlement.drafts ?? [] });
   try {
     const store = await tasksStore();
-    for (const step of settlement.taskSteps) await applyTaskStep(store, step);
+    for (const step of settlement.taskSteps) {
+      await applyTaskStep(store, step, { ghostId: step.ghostId ?? id });
+    }
     try {
       await clearTasksPending(open, commit, id);
     } catch {
@@ -399,7 +540,9 @@ export function createCalendarGhostsHandler({
   serializeExpiredSessionCookie: clearCookie = serializeExpiredSessionCookie,
   createGitHubClient: createClient = createGitHubClient,
   now = Date.now,
-  getTasksStore = defaultGetTasksStore
+  getTasksStore = defaultGetTasksStore,
+  loadLessons = loadTeachingLessonsFromBlobs,
+  loadProfessionalEvents = loadProfessionalEventsFromBlobs
 } = {}) {
   return async function calendarGhostsHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -444,6 +587,7 @@ export function createCalendarGhostsHandler({
       );
       return {
         base: { commitSha: resolved.commitSha, treeSha: resolved.treeSha },
+        listPaths() { return [...blobs.keys()]; },
         async readFile(path) {
           const sha = blobs.get(path);
           if (!sha) return null;
@@ -492,13 +636,23 @@ export function createCalendarGhostsHandler({
       }
 
       const instant = new Date(now());
+      let lessons = [];
+      let professionalEvents = [];
+      if (decision.id.startsWith('alm-')) {
+        [lessons, professionalEvents] = await Promise.all([
+          loadLessons(env),
+          loadProfessionalEvents(env)
+        ]);
+      }
       const result = await runGhostDecision({
         open,
         commit,
         tasksStore: () => getTasksStore(env),
         decision,
         today: getSydneyDateKey(instant),
-        nowIso: getSydneyTimestamp(instant)
+        nowIso: getSydneyTimestamp(instant),
+        lessons,
+        professionalEvents
       });
       return jsonResponse(result.status, result.payload, PRIVATE_CACHE);
     } catch (error) {
