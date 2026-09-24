@@ -57,6 +57,52 @@ for (const status of [409, 422]) {
   });
 }
 
+test('commitFiles sends one commit for every path', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url: String(url), method: options.method, body: options.body });
+    const sha = calls.length.toString(16).padStart(40, 'b');
+    if (String(url).includes('/git/refs/')) return Response.json({ object: { sha } });
+    return Response.json({ sha });
+  };
+  const client = createGitHubClient({ env, fetchImpl });
+  const result = await client.commitFiles({
+    files: [
+      { path: 'central-node.md', content: '# Purpose\n' },
+      { path: 'pending-calendar-ghosts.json', content: '[]\n' }
+    ],
+    message: 'chore(calendar): accept g-skip',
+    parentSha: 'a'.repeat(40),
+    baseTreeSha: 'c'.repeat(40)
+  });
+  assert.equal(result.commitSha.length, 40);
+  const blobs = calls.filter(call => call.method === 'POST' && call.url.includes('/git/blobs'));
+  assert.equal(blobs.length, 2);
+  const commit = calls.find(call => call.method === 'POST' && call.url.includes('/git/commits'));
+  assert.deepEqual(JSON.parse(commit.body).parents, ['a'.repeat(40)]);
+  assert.equal(JSON.parse(commit.body).message, 'chore(calendar): accept g-skip');
+  assert.ok(calls.some(call => call.method === 'PATCH' && call.url.includes('/git/refs/heads/main')));
+});
+
+test('commitFiles maps a stale ref to write_conflict', async () => {
+  const fetchImpl = async (url, options = {}) => {
+    if (String(url).includes('/git/refs/') && options.method === 'PATCH') {
+      return Response.json({ message: 'stale' }, { status: 422 });
+    }
+    return Response.json({ sha: 'd'.repeat(40) });
+  };
+  const client = createGitHubClient({ env, fetchImpl });
+  await assert.rejects(
+    client.commitFiles({
+      files: [{ path: 'central-node.md', content: '# x\n' }],
+      message: 'chore(calendar): accept g-skip',
+      parentSha: 'a'.repeat(40),
+      baseTreeSha: 'c'.repeat(40)
+    }),
+    error => error instanceof GitHubClientError && error.code === 'write_conflict' && error.retryable === true
+  );
+});
+
 test('writeFile rejects an invalid path, content, sha, or missing message', async () => {
   const { fetchImpl } = fetchStub();
   const client = createGitHubClient({ env, fetchImpl });

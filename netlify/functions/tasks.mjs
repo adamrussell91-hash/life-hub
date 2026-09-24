@@ -40,7 +40,7 @@ function isTaskDomainRecord(item) {
   return !kind || kind === 'task' || kind === 'step';
 }
 
-function mergeTask(existing, patch) {
+export function mergeTask(existing, patch) {
   const next = { ...existing };
   for (const [key, value] of Object.entries(patch)) {
     if (key === 'id' || key === 'schema_version' || key === 'created_at') continue;
