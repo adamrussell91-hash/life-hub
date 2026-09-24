@@ -32,6 +32,7 @@ const LIGHTING_BY_PROTOCOL: Record<string, readonly string[]> = {
   mirror: MIRROR_LIGHTING_STAGES,
   witness: WITNESS_LIGHTING_STAGES,
   tribunal: TRIBUNAL_LIGHTING_STAGES,
+  consilium: MIRROR_LIGHTING_STAGES,
 };
 export function lightingStage(viewingIndex: number, totalTurns: number, protocolId?: string): string {
   const stages = (protocolId && LIGHTING_BY_PROTOCOL[protocolId]) || LIGHTING_STAGES;

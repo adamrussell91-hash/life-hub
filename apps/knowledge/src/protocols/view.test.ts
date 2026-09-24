@@ -173,6 +173,12 @@ describe("lightingStage", () => {
     expect(lightingStage(8, 9, "tribunal")).toBe("blue-hour");
   });
 
+  it("uses six sunrise-to-night stages for Consilium", () => {
+    expect(lightingStage(0, 12, "consilium")).toBe("sunrise");
+    expect(lightingStage(4, 12, "consilium")).toBe("midday");
+    expect(lightingStage(11, 12, "consilium")).toBe("night");
+  });
+
   it("uses five sunrise-to-night stages for Witness", () => {
     expect(lightingStage(0, 10, "witness")).toBe("sunrise");
     expect(lightingStage(2, 10, "witness")).toBe("morning");
