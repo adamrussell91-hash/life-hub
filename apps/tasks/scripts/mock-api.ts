@@ -194,6 +194,23 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
+    if (path === '/api/timeline-visual-seed' && method === 'POST') {
+      try {
+        const { seedTimelineVisualFixture } = await import('./seed-timeline-visual');
+        const result = await seedTimelineVisualFixture(kv);
+        return json(200, { ok: true, data: result });
+      } catch (error) {
+        return seedFailure(error);
+      }
+    }
+
+    const taskItem = path.match(/^\/api\/tasks\/([^/]+)$/);
+    if (taskItem && method === 'PATCH') {
+      const taskId = decodeURIComponent(taskItem[1] ?? '');
+      const parsed = TaskUpdateSchema.parse(body);
+      return json(200, { ok: true, data: await store().updateTask(taskId, parsed) });
+    }
+
     const s = store();
     const id = url.searchParams.get('id');
 

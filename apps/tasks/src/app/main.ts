@@ -12,6 +12,7 @@ import '../styles/hub.css';
 import '../styles/views.css';
 import '../styles/cards.css';
 import '../styles/gantt.css';
+import '../styles/timeline.css';
 import '../styles/daily-dial.css';
 import '../styles/lesson-engine.css';
 import '../styles/graph.css';
@@ -22,6 +23,7 @@ import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { openHubCommandSearch } from '../../design-kit/js/hub-command-search.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import {
+  canonicalizeGanttHash,
   canonicalizeGraphHash,
   isKnownHashView,
   isSoftViewChange,
@@ -41,7 +43,6 @@ import { renderLoadError } from '@/views/feedback';
 import { renderBoardView } from '@/views/board';
 import { renderGraphView } from '@/views/graph';
 import { renderMapsView } from '@/views/maps';
-import { renderGanttView } from '@/views/gantt';
 import { renderTimelineView } from '@/views/timeline';
 import { renderClareView } from '@/views/clare';
 import { installClareSession } from '@/chat/clare-session';
@@ -103,7 +104,7 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
     case 'maps':
       return renderMapsView(canvas);
     case 'gantt':
-      return renderGanttView(canvas);
+      return renderTimelineView(canvas);
     case 'timeline':
       return renderTimelineView(canvas);
     case 'orbit':
@@ -172,7 +173,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
   }
 
   async function paint(opts?: { force?: boolean }) {
-    const redirected = canonicalizeGraphHash();
+    const redirected = canonicalizeGraphHash() ?? canonicalizeGanttHash();
     if (redirected && redirected !== location.hash) {
       history.replaceState(null, '', redirected);
     }
