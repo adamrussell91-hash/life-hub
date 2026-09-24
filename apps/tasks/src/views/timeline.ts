@@ -44,7 +44,9 @@ import { DEFAULT_TASK_PROPERTY_CONFIG } from '@/domain/task-properties-defaults'
 import { loadTaskProperties } from '@/services/task-properties';
 import { hashQuery } from '@/shell/shell';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { mountLinesView, type LinesInput, type LinesMount } from '@/views/graph-lines';
 import { createMotion, EASE, MOTION, OVERSHOOT, reconcile, type Props } from '@/views/timeline-motion';
+import { startMorph, type MorphController } from '@/views/timeline-morph';
 
 const NS = 'http://www.w3.org/2000/svg';
 const PAD_R = 220;
@@ -66,10 +68,12 @@ type Spec = {
 type ViewMode = 'bars' | 'lines';
 
 let teardown: (() => void) | null = null;
+let timelineView: ViewMode = 'bars';
 
 export function resetTimelineSession(): void {
   teardown?.();
   teardown = null;
+  timelineView = 'bars';
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -331,7 +335,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     expanded: new Map<string, boolean>(),
     critical: false,
     holidaysCompressed: true,
-    view: 'bars' as ViewMode,
+    view: timelineView,
     selected: null as string | null,
     tasks: model.tasks,
     drag: null as null | {
@@ -1087,11 +1091,88 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     announce(`Zoom ${TL.zooms[index]!.label}`);
   }
 
+  let morph: MorphController | null = null;
+  let linesMount: LinesMount | null = null;
+  let linesScale = false;
+
+  function linesInput(): LinesInput {
+    const dated = new Set(
+      tasks
+        .filter((task) => task.due_date && !task.parent_task_id && task.parent_project_id)
+        .map((task) => task.parent_project_id as string)
+    );
+    return {
+      tasks,
+      projects: projects.filter((project) => dated.has(project.id)),
+      now: new Date(`${today}T09:00:00`),
+      selectedId: state.selected,
+      search: '',
+      insights: [],
+      scale: linesScale,
+      focusedProjectId: null,
+      reducedMotion: reduced,
+      onSelect: (id) => select(id),
+      onComplete: () => undefined,
+      onFocusProject: () => undefined,
+      onAddStation: () => undefined,
+      onReviewInsight: () => undefined,
+      onToggleScale: () => {
+        linesScale = !linesScale;
+        linesMount?.update(linesInput());
+      }
+    };
+  }
+
+  function ensureLines(): void {
+    linesHost.hidden = false;
+    Object.assign(linesHost.style, {
+      position: 'absolute',
+      top: '0',
+      left: '0',
+      right: '0',
+      width: '',
+      opacity: '0',
+      visibility: 'visible',
+      pointerEvents: 'none'
+    });
+    if (linesHost.clientWidth < 280) linesHost.style.width = `${Math.max(320, card.clientWidth)}px`;
+    if (!linesMount) linesMount = mountLinesView(linesHost, linesInput());
+    else linesMount.update(linesInput());
+  }
+
   function setView(next: ViewMode): void {
+    if (morph) {
+      morph.reverse();
+      state.view = state.view === 'bars' ? 'lines' : 'bars';
+      timelineView = state.view;
+      card.dataset.view = state.view;
+      paintView();
+      return;
+    }
+    if (next === state.view) return;
+    const fromRoot = state.view === 'bars' ? barsHost : linesHost;
+    const toRoot = next === 'bars' ? barsHost : linesHost;
+    if (next === 'lines') ensureLines();
     state.view = next;
+    timelineView = next;
     card.dataset.view = next;
     paintView();
-    announce(next === 'lines' ? 'Lines' : 'Bars');
+    morph = startMorph({
+      host: card,
+      fromRoot,
+      toRoot,
+      reducedMotion: reduced
+    });
+    void morph.finished.then((result) => {
+      morph = null;
+      if (result === 'reversed') {
+        card.dataset.view = state.view;
+        timelineView = state.view;
+        paintView();
+      }
+      linesHost.style.width = '';
+      announce(state.view === 'lines' ? 'Lines' : 'Bars');
+    });
   }
 
   function showHammond(on: boolean): void {
@@ -1491,6 +1572,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
 
   teardown = () => {
+    morph?.cancel();
+    linesMount?.teardown();
     abort.abort();
     window.clearTimeout(zoomSettle);
     stopChanged();

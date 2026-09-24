@@ -14,6 +14,10 @@
 
 .tl-card { position: relative; background: var(--hub-glass-fill); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--hub-elev-card); backdrop-filter: blur(var(--hub-glass-blur)); overflow: hidden; }
 .tl-view[hidden] { display: none; }
+.tl-lines { min-width: 0; max-width: 100%; }
+.tl-lines .graph-lines,
+.tl-lines .graph-service-board,
+.tl-lines .graph-lines__stage { min-width: 0; max-width: 100%; }
 .tl-frame { display: grid; grid-template-columns: var(--tl-label-w, 208px) minmax(0, 1fr); }
 .tl-labels { position: relative; border-right: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 55%, transparent); z-index: 2; }
 .tl-labels__head { position: absolute; top: 0; left: 0; right: 0; height: 64px; display: flex; align-items: flex-end; padding: 0 var(--space-4) 10px; font-size: var(--text-2xs); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); font-weight: var(--weight-semibold); border-bottom: 1px solid var(--line); }
