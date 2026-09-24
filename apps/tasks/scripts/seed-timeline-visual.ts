@@ -213,7 +213,29 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       updated_at: fixture.now
     });
   });
-  const allTasks = [...dreams, ...tasks];
+  const forecastHistory: Array<[string, number[]]> = [
+    ['teaching', [1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.85, 1.95, 2.2]],
+    ['professional', [1.05, 1.15, 1.25, 1.35, 1.45, 1.6, 1.8, 2.1]],
+    ['life', [1.0, 1.1, 1.2, 1.3, 1.4, 1.7]]
+  ];
+  const history = forecastHistory.flatMap(([domain, ratios]) =>
+    ratios.map((ratio, index) =>
+      TaskSchema.parse({
+        schema_version: 1,
+        id: `hist-${domain}-${index}`,
+        title: `${domain} history ${index + 1}`,
+        domain,
+        kind: 'task',
+        bucket: 'active',
+        status: 'done',
+        estimated_duration: 100,
+        actual_duration: Math.round(ratio * 100),
+        created_at: fixture.now,
+        updated_at: fixture.now
+      })
+    )
+  );
+  const allTasks = [...dreams, ...tasks, ...history];
   for (const task of allTasks) await kv.setJSON(keys.taskKey(task.id), task);
   await kv.setJSON(keys.tasksIndexKey(), { ids: allTasks.map((task) => task.id) });
   return { tasks: allTasks.length, projects: projects.length, goals: goals.length };

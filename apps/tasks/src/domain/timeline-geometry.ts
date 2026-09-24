@@ -17,6 +17,7 @@ export const TL = {
   ribbon: { h: 16, gap: 3, rx: 4 },
   load: { h: 104, top: 30, colGap: 8, rx: 4 },
   today: { pillH: 20, pillW: 52 },
+  lens: { days: 14, shoulder: 21, pillH: 20 },
   ghost: { dash: '4 3' },
   mobileBreak: 720,
   zooms: [
