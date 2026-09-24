@@ -103,3 +103,17 @@ test('bad proposals are rejected before any write exists', () => {
   assert.throws(() => validateGhost({ ...MOVE, to: '13/10/26' }), /from and to/);
   assert.throws(() => acceptPlan({ ...SKIP, kind: 'book_flight' }), /Unknown ghost kind/);
 });
+
+test('Almanac: a lead-line step becomes a task due on its last safe day', () => {
+  const plan = acceptPlan({ id: 'g-pet', agent: 'hammond', kind: 'create_task', title: 'Pet sitter for Leo, Maxxie, SJ & Hunter', due: '2026-10-28', source: 'almanac:korea:pet-sitter' }, { today: '2026-09-24' });
+  assert.deepEqual(plan.steps[0], { target: 'tasks', method: 'POST', body: { title: 'Pet sitter for Leo, Maxxie, SJ & Hunter', due_date: '2026-10-28', status: 'open', source: 'almanac:korea:pet-sitter' } });
+  assert.match(plan.receipt, /due 28\/10\/26 \(the last safe day\)/);
+});
+
+test('Almanac: a draft message is only ever a draft', () => {
+  const plan = acceptPlan({ id: 'g-bob', agent: 'hammond', kind: 'draft_message', to: 'Bob', text: 'Lunch on Monday 28 September?' });
+  assert.deepEqual(plan.steps, [{ target: 'draft', to: 'Bob', text: 'Lunch on Monday 28 September?' }]);
+  assert.equal(plan.steps.some(s => s.target === 'central_node' || s.target === 'tasks'), false);
+  assert.equal(plan.receipt, 'Draft ready for Bob. Nothing sent.');
+  assert.throws(() => validateGhost({ id: 'x', agent: 'hammond', kind: 'draft_message', to: 'Bob', text: '' }), /needs to and text/);
+});

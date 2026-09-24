@@ -141,7 +141,13 @@ Behaviour as in the signed-off mockups. Each gets its own reference folder (`doc
 
 - **B** reuses the Unified Timeline modules (`school-time.ts` for axis labels and holiday compression, the load strip, walls). Build it after the Unified Timeline merges. Lanes are identities from About Me in their order (teacher, Corey, scholar, friends and family), plus Body.
 - **C** is the Day stop. The dial uses the same band profile (school arc, yours arc, sleep wall), `capacity-model.js` for the centre, and `ghost-writes.js` for the Tonight and Tomorrow actions. It keeps a Linear toggle.
-- **D** lead lines come from anchors (fixed events) plus lead-time rules, as a new `lead-lines.js` module: `{ anchor, steps: [{ title, leadDays, lastSafe }] }`. Seed the rules from Central Node Constraints and About Me: Vitamin D recheck 3–4 months after 19/06, passport 6 weeks, pet sitter at Christmas 8 weeks, leave approval before solo travel during term. World feeds (BOM, NSW public holidays and daylight saving, NESA HSC timetable, listings) come last, as Netlify Functions with caching.
+- **D · The Almanac** is ready to build: reference in `docs/proposals/calendar-reference/almanac/`, prompts in `docs/superpowers/plans/2026-09-24-almanac-prompts.md`. Its data and server contract:
+  - **Anchors** live in `almanac-anchors.yml` in the data repo: `{ id, title, kind, date | window, returns?, tags[], sub }`. Hammond seeds it from About Me and Constraints, and new anchors are confirm-class. Term dates (hub prefs) add `term` anchors automatically. Any `calendar_block` or Professional event with `anchor: true` becomes one too.
+  - **Rules and wants** are `apps/life/js/app/almanac-rules.js`. Step titles and reasons are data; the math is `lead-lines.js` and `openings.js`.
+  - **Done steps** are `almanac-done.json` in the data repo (`[{ stepId, at }]`), passed as `ctx.done`.
+  - **`GET /api/almanac?from=&to=`** computes everything server-side with the same modules: lead lines, summary, forecast series (from the capacity model over Life logs plus the term pattern), openings, and world entries. Each action carries an id (`alm-<stepId>`, `alm-hold-<wantId>`, `alm-draft-<wantId>`).
+  - **`POST /api/calendar-ghosts { id, decision }`** resolves `alm-…` ids by recomputing the Almanac and building the ghost (`create_task`, `protect_block`, `draft_message`) with `acceptPlan`. Nothing is stored in the ghost queue for these. "Already done" is `POST /api/almanac/done { stepId }`.
+  - **World feeds** come last, as cached Netlify Functions: BOM forecast (7 days), NSW public holidays and daylight saving (a static yearly table is fine), the NESA HSC timetable (yearly), then listings. Until a feed is live, its entries say "example".
 
 ## Phases (Tideline)
 

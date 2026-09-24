@@ -1,0 +1,1670 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Almanac reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real kit files. Open from the repo (docs/proposals/calendar-reference/almanac/) so the paths resolve. -->
+<link rel="stylesheet" href="../../../../packages/design-kit/tokens.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/overlays.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/actions.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/filters.css">
+<style>
+/*
+ * Almanac reference styles. PORT VERBATIM (from `.alm{` down) to packages/design-kit/calendar-almanac.css.
+ * Every colour is a kit token or a color-mix() of tokens. Derived surfaces are named once on .alm.
+ */
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+.page{max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
+.page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
+.ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
+
+.alm{
+  --alm-holiday:color-mix(in srgb,var(--pastel-sage) 40%,transparent);
+  --alm-hatch-line:color-mix(in srgb,var(--navy) 13%,transparent);
+  --alm-rule:color-mix(in srgb,var(--navy) 9%,transparent);
+  --alm-rail:color-mix(in srgb,var(--navy) 28%,transparent);
+  --alm-band:color-mix(in srgb,var(--wave) 8%,transparent);
+  --alm-area-top:color-mix(in srgb,var(--wave) 24%,transparent);
+  --alm-window:color-mix(in srgb,var(--sand) 34%,#fff);
+  --alm-window-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
+  --alm-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
+  position:relative;font-family:var(--font-ui);color:var(--ink)
+}
+/* nav */
+.alm__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
+.alm__round{width:2.25rem;height:2.25rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);display:inline-grid;place-items:center;color:var(--navy);cursor:pointer}
+.alm__round svg{width:1rem;height:1rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.alm__period{display:grid;line-height:1.2;padding:0 var(--space-1)}
+.alm__period b{font-size:var(--text-md);font-weight:var(--weight-semibold);color:var(--navy);letter-spacing:var(--tracking-tight)}
+.alm__period span{font-size:var(--text-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.alm__spacer{flex:1}
+.alm__ask{display:flex;align-items:center;gap:var(--space-2);background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:6px 12px;color:var(--muted);font-size:var(--text-sm);min-width:15rem}
+.alm-av{width:1.375rem;height:1.375rem;border-radius:var(--radius-full);background:var(--navy);color:#fff;font-size:0.6875rem;font-weight:var(--weight-semibold);display:inline-grid;place-items:center}
+/* card + summary */
+.alm__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
+.alm-top{display:grid;grid-template-columns:1.4fr repeat(3,1fr);border-bottom:1px solid var(--line)}
+.alm-top > div{padding:var(--space-4) var(--space-5);border-left:1px solid var(--line)}
+.alm-top > div:first-child{border-left:0}
+.alm-top__thesis{font-size:var(--text-md);font-weight:var(--weight-semibold);color:var(--navy);letter-spacing:var(--tracking-tight);line-height:1.3;text-wrap:balance}
+.alm-top__n{font-size:1.75rem;font-weight:var(--weight-bold);letter-spacing:-0.02em;color:var(--navy);font-variant-numeric:tabular-nums;line-height:1.1}
+.alm-top__n.is-warn{color:var(--high-sea-ink)}
+.alm-top__n.is-ok{color:var(--pastel-sage-ink)}
+.alm-top small{display:block;font-size:var(--text-xs);color:var(--muted);margin-top:2px}
+/* chart */
+.alm-chart{display:block;width:100%;height:auto;font-family:var(--font-ui)}
+.alm-holiday{fill:var(--alm-holiday)}
+.alm-wall{fill:url(#alm-hatch)}
+.alm-month,.alm-labelrule{stroke:var(--alm-rule)}
+.alm-labelrule{stroke:var(--line)}
+.alm-t-month{font-size:11.5px;font-weight:600;fill:var(--muted)}
+.alm-tier.is-hol{fill:color-mix(in srgb,var(--navy) 6%,transparent)}
+.alm-tier.is-term{fill:var(--pastel-sage)}
+.alm-t-tier{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--muted)}
+.alm-t-tier.is-term{fill:var(--pastel-sage-ink)}
+.alm-t-lab{font-size:12.5px;font-weight:600;fill:var(--navy)}
+.alm-t-sub{font-size:11px;fill:var(--muted)}
+.alm-t-caps{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--muted)}
+.alm-world-dot{fill:#fff;stroke:var(--wave);stroke-width:1.5}
+.alm-t-world{font-size:11.5px;font-weight:500;fill:var(--ink)}
+.alm-flag{fill:var(--navy);stroke:var(--navy);stroke-width:1.2;stroke-linejoin:round}
+.alm-t-anchor{font-size:11.5px;font-weight:600;fill:var(--ink)}
+.alm-pill{fill:var(--navy)}
+.alm-t-pill{font-size:11.5px;font-weight:600;fill:#fff;text-anchor:middle}
+.alm-wave-area{fill:url(#alm-area)}
+.alm-wave-band{fill:var(--alm-band)}
+.alm-wave-line{fill:none;stroke:var(--wave);stroke-width:2.25;stroke-linejoin:round}
+.alm-wave-base{stroke:color-mix(in srgb,var(--navy) 12%,transparent)}
+.alm-wave-soften{stroke:var(--high-sea-ink);stroke-dasharray:3 4;opacity:.55}
+.alm-t-soften{font-size:10.5px;fill:var(--high-sea-ink);text-anchor:end}
+.alm-t-wave{font-size:11px;fill:var(--pastel-blue-ink);text-anchor:middle}
+.alm-open-dot{fill:var(--pastel-sage);stroke:var(--pastel-sage-ink);stroke-width:1.5}
+.alm-divider{stroke:var(--line)}
+.alm-lane-rule{stroke:color-mix(in srgb,var(--navy) 5%,transparent)}
+.alm-rail{stroke:var(--alm-rail);stroke-width:2}
+.alm-anchor{fill:var(--navy);stroke:#fff;stroke-width:2}
+.alm-window{fill:var(--alm-window);stroke:var(--alm-window-line);stroke-width:1}
+.alm-dream{stroke:var(--alm-gold-line);stroke-width:2;stroke-dasharray:1 6;stroke-linecap:round}
+.alm-t-dream{font-size:11px;font-weight:600;fill:var(--pastel-gold-ink);text-anchor:end}
+.alm-lane.is-dream .alm-t-lab{fill:var(--pastel-gold-ink)}
+.alm-t-bead{font-size:11.5px;font-weight:500;fill:var(--ink)}
+.alm-t-bead.is-end{text-anchor:end}
+/* beads: one shape per status */
+.alm-bead{cursor:pointer;outline:none}
+.alm-bead__shape{transform-box:fill-box;transform-origin:center}
+.alm-bead__halo,.alm-bead__diamond,.alm-bead__dot,.alm-bead__tick{display:none}
+.alm-bead.is-later .alm-bead__dot,.alm-bead.is-soon .alm-bead__dot{display:inline;fill:#fff;stroke:var(--navy);stroke-width:1.6}
+.alm-bead.is-soon .alm-bead__dot{stroke-width:2.2}
+.alm-bead.is-now .alm-bead__dot{display:inline;fill:var(--high-sea);stroke:#fff;stroke-width:2}
+.alm-bead.is-now .alm-bead__halo{display:inline;fill:none;stroke:var(--high-sea);stroke-opacity:.35;stroke-width:2}
+.alm-bead.is-overdue .alm-bead__diamond{display:inline;fill:var(--danger);stroke:#fff;stroke-width:2}
+.alm-bead.is-done .alm-bead__dot{display:inline;fill:var(--pastel-sage);stroke:var(--pastel-sage-ink);stroke-width:1.6}
+.alm-bead.is-done .alm-bead__tick{display:inline;fill:none;stroke:var(--pastel-sage-ink);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.alm-bead.is-tasked .alm-bead__halo{display:inline;fill:none;stroke:var(--navy);stroke-width:1.2;stroke-dasharray:2 2}
+.alm-bead.is-dream-bead .alm-bead__dot{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink)}
+.alm-lane.is-dream .alm-bead .alm-bead__dot{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink)}
+.alm-bead:focus-visible .alm-bead__halo{display:inline;fill:none;stroke:var(--wave);stroke-width:2}
+.alm-lane:has(.alm-bead.is-now) .alm-t-bead,.alm-t-bead.is-now{font-weight:600}
+.alm-today line{stroke:var(--wave);stroke-width:1.5;stroke-dasharray:3 3}
+.alm-today rect{fill:var(--wave)}
+.alm-today text{font-size:11px;font-weight:600;fill:#fff;text-anchor:middle}
+/* openings */
+.alm-opens{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:var(--space-3);padding:var(--space-4) var(--space-5) var(--space-5);border-top:1px solid var(--line);background:color-mix(in srgb,#fff 40%,transparent)}
+.alm-opens h4{grid-column:1/-1;margin:0;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold)}
+.alm-open{--held:0;background:#fff;border:1px solid color-mix(in srgb,var(--pastel-sage-ink) calc(var(--held) * 35%),var(--line));border-radius:var(--radius-sm);padding:var(--space-3);display:grid;gap:6px;align-content:start;box-shadow:var(--elev-1)}
+.alm-open__when{display:flex;justify-content:space-between;gap:6px;font-size:var(--text-xs);color:var(--muted);font-weight:var(--weight-medium);font-variant-numeric:tabular-nums}
+.alm-open__when b{color:var(--pastel-sage-ink);font-weight:var(--weight-semibold)}
+.alm-open.is-held{background:color-mix(in srgb,var(--pastel-sage) calc(var(--held) * 35%),#fff)}
+.alm-open h5{margin:0;font-size:var(--text-sm);font-weight:var(--weight-semibold);line-height:1.3}
+.alm-open.is-corey h5{color:var(--pastel-peach-ink)}
+.alm-open.is-corey{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
+.alm-open p{margin:0;font-size:var(--text-xs);color:var(--muted);line-height:1.45}
+.alm-open__btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
+.alm-open__btns .btn{min-height:1.875rem;padding:var(--space-1) var(--space-3);font-size:var(--text-xs)}
+.alm-draft{border:1.5px dashed color-mix(in srgb,var(--navy) 40%,transparent);background:color-mix(in srgb,var(--wave) 5%,transparent);border-radius:10px;padding:var(--space-2);display:grid;gap:6px}
+.alm-draft p{color:var(--ink);font-size:var(--text-xs);user-select:all}
+.alm-draft .btn{justify-self:start;min-height:1.75rem;padding:2px var(--space-3);font-size:var(--text-xs)}
+.alm-mark{display:inline-block;width:14px;height:9px;position:relative;margin-right:3px}
+.alm-mark::before,.alm-mark::after{content:"";position:absolute;top:0;width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
+.alm-mark::before{left:0}.alm-mark::after{left:5px}
+/* popover, toast */
+.alm-pop{position:absolute;z-index:30;width:300px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--elev-2);padding:var(--space-3) var(--space-4) var(--space-4);font-size:var(--text-sm)}
+.alm-pop[hidden]{display:none}
+.alm-pop__head b{font-weight:var(--weight-semibold)}
+.alm-pop__meta{margin:4px 0 0;font-size:var(--text-xs);color:var(--muted)}
+.alm-pop__meta b{color:var(--ink);font-variant-numeric:tabular-nums}
+.alm-pop__why{margin:6px 0 0;font-size:var(--text-xs);color:var(--ink);line-height:1.45}
+.alm-pop__label{margin:var(--space-3) 0 4px;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold);color:var(--muted)}
+.alm-pop__writes{margin:0;padding:var(--space-2) var(--space-3);border-radius:10px;background:color-mix(in srgb,var(--wave) 6%,transparent);border:1.5px dashed color-mix(in srgb,var(--navy) 55%,transparent);font-size:var(--text-xs);line-height:1.45}
+.alm-pop__acts{display:flex;gap:var(--space-2);margin-top:var(--space-3)}
+.alm-pop__acts .btn{min-height:2rem;padding:var(--space-1) var(--space-3);font-size:var(--text-sm)}
+.alm-toast{position:absolute;right:var(--space-6);bottom:var(--space-6);max-width:32rem;background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-3) 2.5rem;font-size:var(--text-sm);line-height:1.45;box-shadow:0 12px 32px color-mix(in srgb,var(--depth) 28%,transparent);opacity:0;pointer-events:none;z-index:20}
+.alm-toast::before{content:"✓";position:absolute;left:14px;top:12px;width:18px;height:18px;border-radius:50%;background:var(--pastel-sage);color:var(--pastel-sage-ink);font-weight:var(--weight-bold);font-size:0.6875rem;display:grid;place-items:center}
+.alm-toast b{font-weight:var(--weight-semibold)}
+.alm-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* phone */
+.alm-list{padding:var(--space-3) var(--space-4) var(--space-4);display:grid;gap:var(--space-3)}
+.alm-list__caps{margin:0;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold)}
+.alm-list__line{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:var(--space-3)}
+.alm-list__line h3{margin:0;font-size:var(--text-sm);color:var(--navy)}
+.alm-list__line > p{margin:2px 0 6px;font-size:var(--text-xs);color:var(--muted)}
+.alm-list__step{display:grid;grid-template-columns:14px 1fr auto;gap:8px;align-items:center;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:8px 0 6px;font:inherit;font-size:var(--text-xs);text-align:left;color:var(--ink);cursor:pointer}
+.alm-list__dot{width:10px;height:10px;border-radius:50%;border:1.6px solid var(--navy);background:#fff}
+.alm-list__step.is-now .alm-list__dot{background:var(--high-sea);border-color:var(--high-sea)}
+.alm-list__step.is-done .alm-list__dot{background:var(--pastel-sage);border-color:var(--pastel-sage-ink)}
+.alm-list__step.is-now .alm-list__d{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+.alm-list__d{color:var(--muted);font-variant-numeric:tabular-nums}
+@media (max-width:719px){
+  .page{padding:var(--space-4) var(--space-4) var(--space-12)}
+  .alm__nav{flex-wrap:nowrap;gap:var(--space-2)}
+  .alm__nav .hub-pills,.alm__ask,.alm__nav .btn,.alm__spacer{display:none}
+  .alm__period{flex:1;min-width:0;order:-1}
+  .alm__period b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--text-base)}
+  .alm-top{grid-template-columns:repeat(3,1fr)}
+  .alm-top > div:first-child{grid-column:1/-1;border-bottom:1px solid var(--line)}
+  .alm-top > div:nth-child(2){border-left:0}
+  .alm-top > div{padding:var(--space-3)}
+  .alm-top__n{font-size:1.375rem}
+  .alm-opens{grid-template-columns:1fr;padding:var(--space-3) var(--space-4) var(--space-4)}
+  .alm-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
+  .alm-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="alm-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/><rect width="2" height="7" fill="color-mix(in srgb, var(--navy) 13%, transparent)"/></pattern>
+    <linearGradient id="alm-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--wave)" stop-opacity=".24"/><stop offset="1" stop-color="var(--wave)" stop-opacity="0"/></linearGradient>
+  </defs>
+</svg>
+<main class="page">
+  <p class="page-header__eyebrow">Calendar reference · D · The Almanac</p>
+  <h1 class="page-header__title">What nobody has booked yet</h1>
+  <div class="ref-controls" data-part="ref-controls">
+    <span>Reference controls (not product):</span>
+    <button class="btn btn--secondary" type="button" id="ref-reset">Reset</button>
+    <button class="btn btn--secondary" type="button" id="ref-slow" aria-pressed="false">Slow motion ×5</button>
+    <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
+    <span>Clock frozen at Thu 24/09/26. World entries marked “example” stand in for live feeds.</span>
+  </div>
+  <div id="app"></div>
+</main>
+<script>/* Generated from src/almanac-ref.ts. Do not edit almanac.html; edit src/ and rebuild. */
+(() => {
+  // apps/tasks/src/views/timeline-motion.ts
+  var MOTION = {
+    settle: 420,
+    // live update: an entity moves because data changed elsewhere
+    zoom: 280,
+    // day width changes (zoom pills, wheel, pinch)
+    release: 220,
+    // a dragged bar settles onto its snapped day
+    cascadeStagger: 30,
+    // dependants follow a released bar, one after another
+    enter: 320,
+    // a new bar, curve or chip appears
+    exit: 160,
+    // an entity leaves
+    expand: 300,
+    // a group opens or closes; rows slide
+    rowStagger: 24,
+    // rows revealed by expand, top to bottom
+    hover: 120,
+    // hover and focus emphasis
+    morph: 620,
+    // Bars <-> Lines flight: the kit spring settles in ~618 ms (see springEasing)
+    crossfade: 160,
+    // real views swap during the morph
+    reducedFade: 120
+    // the only motion left under prefers-reduced-motion
+  };
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    const solve = (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const err = sampleX(t) - x;
+        if (Math.abs(err) < 1e-6) return t;
+        const d = slopeX(t);
+        if (Math.abs(d) < 1e-6) break;
+        t -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      t = x;
+      while (hi - lo > 1e-6) {
+        const v = sampleX(t);
+        if (v < x) lo = t;
+        else hi = t;
+        t = (lo + hi) / 2;
+      }
+      return t;
+    };
+    return (p) => {
+      if (p <= 0) return 0;
+      if (p >= 1) return 1;
+      return sampleY(solve(p));
+    };
+  }
+  var EASE = cubicBezier(0.2, 0.8, 0.2, 1);
+  var OVERSHOOT = cubicBezier(0.34, 1.3, 0.64, 1);
+  var LINEAR = (t) => t;
+  var EPS = 1e-6;
+  function browserClock() {
+    return {
+      now: () => performance.now(),
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id)
+    };
+  }
+  function prefersReduced() {
+    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function createMotion(options) {
+    const clock2 = options.clock ?? browserClock();
+    const reduced2 = options.reducedMotion ?? prefersReduced;
+    const entities = /* @__PURE__ */ new Map();
+    const frameCosts = [];
+    let frameId = null;
+    let disposed = false;
+    function entity(id) {
+      let e = entities.get(id);
+      if (!e) {
+        e = { props: {}, tweens: /* @__PURE__ */ new Map(), exiting: null, dirty: false };
+        entities.set(id, e);
+      }
+      return e;
+    }
+    function schedule() {
+      if (frameId !== null || disposed) return;
+      frameId = clock2.request(frame);
+    }
+    function valueAt(tween, now) {
+      if (tween.duration <= 0) return tween.to;
+      const p = (now - tween.start) / tween.duration;
+      if (p <= 0) return tween.from;
+      if (p >= 1) return tween.to;
+      return tween.from + (tween.to - tween.from) * tween.easing(p);
+    }
+    function step(now) {
+      let active = false;
+      const finishedExits = [];
+      for (const [id, e] of entities) {
+        for (const [prop, tween] of e.tweens) {
+          const v = valueAt(tween, now);
+          if (e.props[prop] !== v) {
+            e.props[prop] = v;
+            e.dirty = true;
+          }
+          if (now >= tween.start + tween.duration) e.tweens.delete(prop);
+          else active = true;
+        }
+        if (e.dirty) {
+          e.dirty = false;
+          options.apply(id, e.props);
+        }
+        if (e.exiting && e.tweens.size === 0) finishedExits.push([id, e.exiting]);
+      }
+      for (const [id, done] of finishedExits) {
+        entities.delete(id);
+        done();
+      }
+      return active;
+    }
+    function frame() {
+      frameId = null;
+      if (disposed) return;
+      const t0 = clock2.now();
+      const active = step(t0);
+      const cost = clock2.now() - t0;
+      frameCosts.push(cost);
+      if (frameCosts.length > 600) frameCosts.shift();
+      if (active) schedule();
+      else options.onIdle?.();
+    }
+    function startTween(e, prop, to, opts, now) {
+      const running = e.tweens.get(prop);
+      if (running && Math.abs(running.to - to) < EPS) return;
+      const current = running ? valueAt(running, now) : e.props[prop];
+      if (current === void 0) {
+        e.props[prop] = to;
+        e.dirty = true;
+        return;
+      }
+      if (!running && Math.abs(current - to) < EPS) return;
+      const duration = opts.duration ?? MOTION.settle;
+      e.tweens.set(prop, {
+        from: current,
+        to,
+        start: now + (opts.delay ?? 0),
+        duration,
+        easing: running && opts.easing === OVERSHOOT ? EASE : opts.easing ?? EASE
+      });
+    }
+    function flushDirty(id, e) {
+      if (e.dirty) {
+        e.dirty = false;
+        options.apply(id, e.props);
+      }
+    }
+    const engine2 = {
+      place(id, props) {
+        const e = entity(id);
+        for (const [prop, value] of Object.entries(props)) {
+          e.tweens.delete(prop);
+          if (e.props[prop] !== value) {
+            e.props[prop] = value;
+            e.dirty = true;
+          }
+        }
+        flushDirty(id, e);
+      },
+      to(id, props, opts = {}) {
+        const e = entity(id);
+        e.exiting = null;
+        const now = clock2.now();
+        if (reduced2()) {
+          const { opacity, ...geometry } = props;
+          engine2.place(id, geometry);
+          if (opacity !== void 0) {
+            startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
+          }
+        } else {
+          for (const [prop, value] of Object.entries(props)) startTween(e, prop, value, opts, now);
+        }
+        flushDirty(id, e);
+        if (e.tweens.size) schedule();
+      },
+      enter(id, props, opts = {}) {
+        const from = opts.from ?? { opacity: 0, scale: 0.6 };
+        const start = { ...props, ...from };
+        const target = { opacity: 1, scale: 1, ...props };
+        if (reduced2()) {
+          engine2.place(id, { ...target, opacity: 0 });
+          engine2.to(id, { opacity: target.opacity ?? 1 });
+          return;
+        }
+        engine2.place(id, start);
+        engine2.to(id, target, { duration: MOTION.enter, easing: OVERSHOOT, ...opts });
+      },
+      exit(id, done, opts = {}) {
+        const e = entities.get(id);
+        if (!e) {
+          done();
+          return;
+        }
+        if (e.exiting) {
+          e.exiting = done;
+          return;
+        }
+        for (const prop of [...e.tweens.keys()]) if (prop !== "opacity") e.tweens.delete(prop);
+        e.exiting = done;
+        const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
+        startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock2.now());
+        if (!e.tweens.size) {
+          entities.delete(id);
+          done();
+          return;
+        }
+        schedule();
+      },
+      get: (id) => entities.get(id)?.props,
+      forget: (id) => {
+        entities.delete(id);
+      },
+      has: (id) => entities.has(id),
+      target: (id, prop) => {
+        const e = entities.get(id);
+        if (!e) return void 0;
+        return e.tweens.get(prop)?.to ?? e.props[prop];
+      },
+      busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
+      finish() {
+        step(Number.POSITIVE_INFINITY);
+        if (frameId !== null) {
+          clock2.cancel(frameId);
+          frameId = null;
+        }
+      },
+      stats() {
+        const sorted = [...frameCosts].sort((a, b) => a - b);
+        const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+        return { frames: frameCosts.length, p95, max: sorted.length ? sorted[sorted.length - 1] : 0 };
+      },
+      dispose() {
+        disposed = true;
+        if (frameId !== null) clock2.cancel(frameId);
+        frameId = null;
+        entities.clear();
+      }
+    };
+    return engine2;
+  }
+
+  // packages/design-kit/js/lead-lines.js
+  var DAY_MS = 864e5;
+  var KEY = /^\d{4}-\d{2}-\d{2}$/;
+  var LEAD = Object.freeze({ now: 7, soon: 35 });
+  function ms(key2) {
+    if (!KEY.test(key2 ?? "")) throw new TypeError(`Invalid date key: ${key2}`);
+    const [y, m, d] = key2.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  }
+  function key(t) {
+    const d = new Date(t);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
+  function addDays(dateKey, days) {
+    return key(ms(dateKey) + days * DAY_MS);
+  }
+  function daysBetween(fromKey, toKey) {
+    return Math.round((ms(toKey) - ms(fromKey)) / DAY_MS);
+  }
+  function applies(rule, anchor, ctx) {
+    const a = rule.appliesTo ?? {};
+    if (a.ids && !a.ids.includes(anchor.id)) return false;
+    if (a.kinds && !a.kinds.includes(anchor.kind)) return false;
+    if (a.tags && !a.tags.some((t) => (anchor.tags ?? []).includes(t))) return false;
+    if (!a.ids && !a.kinds && !a.tags) return false;
+    return typeof rule.when === "function" ? Boolean(rule.when(anchor, ctx)) : true;
+  }
+  function anchorEnd(anchor) {
+    if (anchor.date) return anchor.date;
+    if (anchor.window) return anchor.window.closes;
+    return null;
+  }
+  function stepStatus(lastSafe, today, { done = false, windowOpen = false } = {}) {
+    if (done) return "done";
+    const left = daysBetween(today, lastSafe);
+    if (left < 0) return "overdue";
+    if (windowOpen || left <= LEAD.now) return "now";
+    if (left <= LEAD.soon) return "soon";
+    return "later";
+  }
+  function leadLine(anchor, rules, ctx) {
+    const today = ctx.today;
+    const done = ctx.done ?? /* @__PURE__ */ new Set();
+    const end = anchorEnd(anchor);
+    const windowOpen = Boolean(anchor.window) && today >= anchor.window.opens && today <= anchor.window.closes;
+    const steps = [];
+    for (const rule of rules) {
+      if (!applies(rule, anchor, ctx)) continue;
+      let lastSafe;
+      if (rule.by) lastSafe = rule.by;
+      else if (end && Number.isFinite(rule.leadDays)) lastSafe = addDays(end, -rule.leadDays);
+      else continue;
+      const id = `${anchor.id}:${rule.id}`;
+      steps.push({
+        id,
+        ruleId: rule.id,
+        title: typeof rule.title === "function" ? rule.title(anchor, ctx) : rule.title,
+        lastSafe,
+        daysLeft: daysBetween(today, lastSafe),
+        status: stepStatus(lastSafe, today, { done: done.has(id), windowOpen: windowOpen && !done.has(id) }),
+        why: rule.why ?? null
+      });
+    }
+    steps.sort((a, b) => a.lastSafe < b.lastSafe ? -1 : a.lastSafe > b.lastSafe ? 1 : 0);
+    const order = ["overdue", "now", "soon", "later", "done"];
+    const status = steps.length ? steps.map((s2) => s2.status).sort((a, b) => order.indexOf(a) - order.indexOf(b))[0] : "later";
+    return { anchor, end, from: steps[0]?.lastSafe ?? end, steps, status, windowOpen };
+  }
+  function leadLines(anchors, rules, ctx) {
+    const order = ["overdue", "now", "soon", "later", "done"];
+    return anchors.filter((a) => {
+      const e = anchorEnd(a);
+      return !e || e >= ctx.today;
+    }).map((a) => leadLine(a, rules, ctx)).sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) || String(a.end ?? "9999").localeCompare(String(b.end ?? "9999")));
+  }
+  function overlapsTerm(from, to, terms = []) {
+    return terms.some((t) => from <= t.ends_on && to >= t.starts_on);
+  }
+  function almanacSummary(lines2, { horizonDays = 35 } = {}) {
+    const steps = lines2.flatMap((l) => l.steps);
+    return {
+      unbooked: steps.filter((s2) => s2.status === "now" || s2.status === "overdue").length,
+      lastSafeSoon: steps.filter((s2) => s2.status !== "done" && s2.daysLeft >= 0 && s2.daysLeft <= horizonDays).length
+    };
+  }
+
+  // packages/design-kit/js/openings.js
+  var OPENING = Object.freeze({ eveningHours: 4, lunchDayHours: 3, wholeDayHours: 8, defaultMinPct: 60 });
+  function fits(day, want) {
+    if (day.walled && want.span !== "protect") return false;
+    if ((day.pct ?? 0) < (want.minPct ?? OPENING.defaultMinPct)) return false;
+    if (want.weekdays && !want.weekdays.includes(day.weekday)) return false;
+    if (want.holidayOnly && !day.holiday) return false;
+    if (want.requireTag && !(day.tags ?? []).includes(want.requireTag)) return false;
+    switch (want.span) {
+      case "evening":
+        return (day.freeEvening ?? 0) >= (want.minHours ?? OPENING.eveningHours);
+      case "lunch":
+        return day.weekday >= 1 && day.weekday <= 5 && (day.freeDay ?? 0) >= OPENING.lunchDayHours;
+      case "day":
+      case "protect":
+        return (day.freeDay ?? 0) >= OPENING.wholeDayHours && (day.freeEvening ?? 0) >= OPENING.eveningHours;
+      default:
+        return false;
+    }
+  }
+  function parts(span) {
+    if (span === "evening") return ["evening"];
+    if (span === "lunch") return ["lunch"];
+    return ["evening", "lunch", "day"];
+  }
+  function findOpenings(days, wants) {
+    const sorted = [...days].sort((a, b) => a.date < b.date ? -1 : 1);
+    const claimed = /* @__PURE__ */ new Map();
+    const free = (date, span) => {
+      const used = claimed.get(date) ?? /* @__PURE__ */ new Set();
+      return parts(span).every((p) => !used.has(p) && !used.has("day"));
+    };
+    const claim = (date, span) => {
+      const used = claimed.get(date) ?? /* @__PURE__ */ new Set();
+      parts(span).forEach((p) => used.add(p));
+      claimed.set(date, used);
+    };
+    return wants.map((want) => {
+      const candidates = [];
+      if (want.span === "days2") {
+        for (let i = 0; i + 1 < sorted.length; i++) {
+          const a = sorted[i];
+          const b = sorted[i + 1];
+          const oneWant = { ...want, span: "day" };
+          if (fits(a, oneWant) && fits(b, oneWant) && free(a.date, "day") && free(b.date, "day")) {
+            candidates.push({ dates: [a.date, b.date], pct: Math.min(a.pct, b.pct) });
+          }
+        }
+      } else {
+        for (const d of sorted) {
+          if (fits(d, want) && free(d.date, want.span)) candidates.push({ dates: [d.date], pct: d.pct });
+        }
+      }
+      candidates.sort((x, y) => x.dates[0] < y.dates[0] ? -1 : x.dates[0] > y.dates[0] ? 1 : y.pct - x.pct);
+      const best = candidates[0];
+      if (!best) return { wantId: want.id, title: want.title, span: want.span, with: want.with ?? null, dates: [], pct: null };
+      best.dates.forEach((d) => claim(d, want.span === "days2" ? "day" : want.span));
+      return { wantId: want.id, title: want.title, span: want.span, with: want.with ?? null, dates: best.dates, pct: best.pct };
+    });
+  }
+
+  // apps/life/js/app/almanac-rules.js
+  var ALMANAC_RULES = Object.freeze([
+    // Trips
+    {
+      id: "passport",
+      title: "Passport valid 6 months past return?",
+      leadDays: 61,
+      appliesTo: { tags: ["international"] },
+      why: "Renewals take about 6 weeks; many countries want 6 months of validity."
+    },
+    {
+      id: "pet-sitter",
+      title: "Pet sitter for Leo, Maxxie, SJ & Hunter",
+      leadDays: 56,
+      appliesTo: { tags: ["pets-home-alone"] },
+      why: "Sitters over Christmas book out about 8 weeks ahead."
+    },
+    {
+      id: "medication-plan",
+      title: "Stelara timing \xD7 trip \xB7 ask Dr Keily",
+      leadDays: 35,
+      appliesTo: { tags: ["on-biologic"] },
+      why: "Constraints: Stelara maintenance is 8-weekly; a long trip needs the dose and cold chain planned."
+    },
+    {
+      id: "insurance",
+      title: "Travel insurance \xB7 declare Crohn\u2019s",
+      leadDays: 21,
+      appliesTo: { kinds: ["trip"] },
+      why: "Pre-existing conditions need declaring before you buy."
+    },
+    {
+      id: "leave",
+      title: "Leave approval (term runs to 17/12)",
+      leadDays: 32,
+      appliesTo: { kinds: ["trip"] },
+      when: (anchor, ctx) => overlapsTerm(anchor.date, anchor.returns ?? anchor.date, ctx.terms ?? []),
+      why: "The trip starts before term ends."
+    },
+    {
+      id: "decide-where",
+      title: "Decide where",
+      leadDays: 46,
+      appliesTo: { tags: ["undecided"] },
+      why: "Fares and rooms climb inside about six weeks."
+    },
+    // Medical
+    {
+      id: "book-recheck",
+      title: "Book the recheck",
+      leadDays: 7,
+      appliesTo: { tags: ["bloods"] },
+      why: "Constraints: Vitamin D recheck 3\u20134 months after the 19/06 dose change."
+    },
+    // Events
+    {
+      id: "gown",
+      title: "Gown + Corey\u2019s guest ticket",
+      leadDays: 3,
+      appliesTo: { tags: ["graduation"] },
+      why: "Registration and guest tickets close before the ceremony."
+    },
+    // School
+    {
+      id: "program",
+      title: "T4 program for the new Year 12",
+      leadDays: 7,
+      appliesTo: { tags: ["new-class"] },
+      why: "About Me: the Year 11 class becomes Year 12 in Term 4."
+    },
+    {
+      id: "good-luck",
+      title: "Good-luck note to your graduating Y12s",
+      by: "2026-10-09",
+      appliesTo: { ids: ["term-4"] },
+      why: "Before HSC English Paper 1 (NESA timetable, estimate)."
+    },
+    // Dreams
+    {
+      id: "dream-windows",
+      title: "Hammond maps the 2027\u201328 application windows",
+      by: "2026-11-02",
+      appliesTo: { tags: ["dream"] },
+      why: "About Me: study at Harvard, Cambridge, Oxford or Yale. A dream needs a runway."
+    }
+  ]);
+  var ALMANAC_WANTS = Object.freeze([
+    {
+      id: "good-night",
+      title: "Good night with Corey",
+      span: "evening",
+      weekdays: [5, 6],
+      minPct: 65,
+      with: "corey",
+      why: "About Me: dinner out plus a show or a talk."
+    },
+    {
+      id: "keep-empty",
+      title: "Keep this one empty",
+      span: "protect",
+      requireTag: "dst-start",
+      minPct: 0,
+      why: "Daylight saving costs an hour, and Monday is a public holiday."
+    },
+    {
+      id: "bob",
+      title: "Lunch with Bob",
+      span: "lunch",
+      holidayOnly: true,
+      minPct: 70,
+      why: "About Me: family who matter."
+    },
+    {
+      id: "newcastle",
+      title: "Newcastle \xB7 friends",
+      span: "days2",
+      holidayOnly: true,
+      minPct: 70,
+      why: "About Me: the hole is time, not the absence of friends."
+    }
+  ]);
+
+  // apps/life/js/app/capacity-model.js
+  var CAPACITY = Object.freeze({
+    baseline: 80,
+    floor: 10,
+    ceiling: 95,
+    sleepTarget: 7,
+    // hours; below this costs capacity
+    sleepPoor: 6,
+    // below this the note says "poor sleep", else "short sleep"
+    sleepPerHour: 8,
+    sleepMaxPenalty: 30,
+    energy: Object.freeze({ low: -15, medium: 0, high: 8 }),
+    lowMoodScore: 3,
+    // mood_score (1-10) at or below this costs capacity
+    lowMoodPenalty: 8,
+    symptomPenalty: 15,
+    symptomMaxPenalty: 25,
+    belowParPct: 60,
+    // a day under this counts toward a streak
+    streakPenalty: 4,
+    streakMax: 8,
+    softenPct: 40,
+    // under this the day is flagged and agents may propose softening it
+    budgetHours: 6,
+    // discretionary commitment hours a 100% day can carry
+    recovery: 0.6,
+    // forecast: share of the gap to baseline still open after each day
+    holidayLift: 5
+  });
+  function clamp(pct) {
+    return Math.round(Math.min(CAPACITY.ceiling, Math.max(CAPACITY.floor, pct)));
+  }
+  function forecastCapacity(lastPct, daysAhead, { holiday = false } = {}) {
+    const gap = CAPACITY.baseline - lastPct;
+    const recovered = lastPct + gap * (1 - CAPACITY.recovery ** Math.max(0, daysAhead));
+    const pct = clamp(recovered + (holiday ? CAPACITY.holidayLift : 0));
+    return { pct, note: "forecast", factors: [], soften: pct < CAPACITY.softenPct, forecast: true };
+  }
+  function forecastSeries(dateKeys, { lastPct, lastDate, isHoliday = () => false, pattern: pattern2 = () => 0 }) {
+    const DAY = 864e5;
+    const at = (d) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
+    return dateKeys.map((date) => {
+      const ahead = Math.max(0, Math.round((at(date) - at(lastDate)) / DAY));
+      if (ahead === 0) return { date, pct: lastPct, low: lastPct, high: lastPct };
+      const base = forecastCapacity(lastPct, ahead, { holiday: isHoliday(date) }).pct;
+      const pct = clamp(base + pattern2(date));
+      const spread = 3 + 1.2 * Math.sqrt(ahead);
+      return { date, pct, low: Math.max(CAPACITY.floor, Math.round(pct - spread)), high: Math.min(CAPACITY.ceiling, Math.round(pct + spread)) };
+    });
+  }
+
+  // packages/design-kit/js/format-display-date.js
+  var SYDNEY_TZ = "Australia/Sydney";
+  var DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+  function fromYmd(year, month, day) {
+    return `${pad2(day)}/${pad2(month)}/${String(year).slice(-2)}`;
+  }
+  function fromInstant(instant) {
+    const parts2 = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: SYDNEY_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(instant).filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+    );
+    return fromYmd(Number(parts2.year), Number(parts2.month), Number(parts2.day));
+  }
+  function formatDisplayDate(value) {
+    if (value == null || value === "") return "";
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? "" : fromInstant(value);
+    }
+    const text = String(value).trim();
+    if (!text) return "";
+    const key2 = DATE_KEY.exec(text);
+    if (key2) return fromYmd(Number(key2[1]), Number(key2[2]), Number(key2[3]));
+    const ms2 = Date.parse(text);
+    if (!Number.isNaN(ms2)) return fromInstant(new Date(ms2));
+    return text;
+  }
+
+  // apps/life/js/core/central-node-write.js
+  var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function formatLogDate(dateKey) {
+    const [, month, day] = dateKey.split("-").map(Number);
+    return `${day} ${SHORT_MONTHS[month - 1]}`;
+  }
+
+  // apps/life/js/app/ghost-writes.js
+  var GHOST_AGENTS = Object.freeze({
+    sara: "Sara",
+    hammond: "Hammond",
+    clare: "Clare",
+    chadwick: "Chadwick",
+    brisket: "Brisket",
+    penelope: "Penelope",
+    vera: "Vera"
+  });
+  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
+  var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
+  var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  function short(dateKey) {
+    return formatDisplayDate(dateKey).slice(0, 5);
+  }
+  function weekday(dateKey) {
+    return new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${dateKey}T00:00:00Z`));
+  }
+  function clock12(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h >= 12 ? "pm" : "am";
+    const hour = (h + 11) % 12 + 1;
+    return m ? `${hour}:${String(m).padStart(2, "0")} ${suffix}` : `${hour}:00 ${suffix}`;
+  }
+  function windDownStart(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.max(0, h * 60 + m - 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  }
+  function oneLine(text) {
+    return String(text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function cn(section, op, payload) {
+    return { target: "central_node", patch: { section, op, payload } };
+  }
+  function recentAction(dateKey, agentName, text) {
+    return cn("recent_actions", "append_line", {
+      summary: `${agentName}: ${text}`,
+      text: `- ${formatLogDate(dateKey)} \u2014 ${agentName}: ${text}`
+    });
+  }
+  function validateGhost(ghost) {
+    if (!ghost || typeof ghost !== "object") throw new TypeError("Ghost must be an object");
+    if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
+    if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
+    if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
+    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    if (ghost.kind === "create_task") {
+      if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
+      if (!DATE_KEY2.test(ghost.due ?? "")) throw new TypeError("create_task needs due (YYYY-MM-DD)");
+    }
+    if (ghost.kind === "draft_message") {
+      if (!oneLine(ghost.to) || !String(ghost.text ?? "").trim()) throw new TypeError("draft_message needs to and text");
+    }
+    if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
+    if (ghost.kind === "protect_block") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("protect_block needs start < end (HH:MM)");
+      }
+      if (!oneLine(ghost.title)) throw new TypeError("protect_block needs a title");
+    }
+    if (ghost.kind === "move_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
+      if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    return ghost;
+  }
+  function acceptPlan(ghost, { today = null } = {}) {
+    validateGhost(ghost);
+    const actedOn = today ?? ghost.date ?? ghost.from;
+    const who = GHOST_AGENTS[ghost.agent];
+    const reason = oneLine(ghost.reason);
+    const why = reason ? ` (${reason})` : "";
+    const steps = [];
+    let receipt;
+    switch (ghost.kind) {
+      case "skip_workout": {
+        const line = `- ${who}\u2192Chadwick: skip ${weekday(ghost.date)} ${short(ghost.date)} workout${why}.`;
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Chadwick: skip workout ${short(ghost.date)}`, text: line }));
+        if (ghost.workoutPath) {
+          steps.push({ target: "life_record", mode: "update", path: ghost.workoutPath, fields: { status: "skipped" } });
+        }
+        steps.push(recentAction(actedOn, who, `skip workout accepted${why}`));
+        receipt = `${who} \u2192 Central Node: \u201C${line.slice(2)}\u201D${ghost.workoutPath ? " Chadwick\u2019s session is marked skipped." : ""}`;
+        break;
+      }
+      case "bedtime": {
+        const text = `lights out ${clock12(ghost.time)}${why}`;
+        steps.push(cn("todays_status", "upsert_field", { summary: `${who}: protect sleep ${short(ghost.date)}`, field: "Sleep", text: `**Sleep:** ${text}` }));
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: { type: "calendar_block", date: ghost.date, time: windDownStart(ghost.time), end_time: ghost.time, kind: "rest", status: "confirmed", protected: true, title: `Wind down \xB7 lights out ${clock12(ghost.time)}`, source_agent: ghost.agent }
+        });
+        steps.push(recentAction(actedOn, who, `bedtime ${clock12(ghost.time)} accepted`));
+        receipt = `${who} \u2192 Today\u2019s Status: Sleep \u201C${text}\u201D. A protected wind-down is on the calendar.`;
+        break;
+      }
+      case "protect_block": {
+        const withCorey = ghost.with === "corey";
+        const title = oneLine(ghost.title);
+        const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: {
+            type: "calendar_block",
+            date: ghost.date,
+            time: ghost.start,
+            end_time: ghost.end,
+            kind: withCorey ? "corey" : "protected",
+            status: "tentative",
+            protected: true,
+            title,
+            source_agent: ghost.agent
+          }
+        });
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Corey" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Corey)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Corey" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        break;
+      }
+      case "move_task": {
+        steps.push({ target: "tasks", method: "PATCH", id: ghost.taskId, body: { due_date: ghost.to } });
+        steps.push(recentAction(actedOn, who, `moved \u201C${oneLine(ghost.title) || ghost.taskId}\u201D ${short(ghost.from)} \u2192 ${short(ghost.to)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${oneLine(ghost.title) || ghost.taskId}\u201D due ${formatDisplayDate(ghost.from)} \u2192 ${formatDisplayDate(ghost.to)}.`;
+        break;
+      }
+      case "create_task": {
+        const title = oneLine(ghost.title);
+        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        steps.push({ target: "tasks", method: "POST", body });
+        steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
+        break;
+      }
+      case "draft_message": {
+        steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
+        receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
+        break;
+      }
+      default:
+        throw new TypeError(`Unhandled ghost kind: ${ghost.kind}`);
+    }
+    return { ghostId: ghost.id, steps, receipt };
+  }
+
+  // packages/design-kit/js/hub-motion.js
+  var CARD_SELECTOR = [
+    ".metric-card",
+    ".week-card",
+    ".hub-card",
+    ".glass-panel",
+    ".glass-tile",
+    ".card",
+    ".sign-in__card",
+    ".mind-tile",
+    ".alchemist-card",
+    ".podcast-card",
+    ".wiki-card",
+    ".uni-tl__card",
+    ".quiz-card",
+    ".pcard"
+  ].join(",");
+  var MAGNET_SELECTOR = [
+    ".hub-pulse-card",
+    ".home-class-tile",
+    ".dashboard-overview__tile"
+  ].join(",");
+  var LIST_SELECTOR = [
+    ".logging-list",
+    ".meal-log",
+    ".cards",
+    ".nutrition-challenge-list",
+    "[data-hub-list]"
+  ].join(",");
+  var COUNT_SELECTOR = [
+    "[data-value]",
+    "[data-hub-count]",
+    "[data-percent]",
+    ".hub-pulse-card__count"
+  ].join(",");
+  function prefersReducedMotion(root2 = document) {
+    const view = root2.defaultView ?? globalThis;
+    return Boolean(view.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+  function isActiveHubPill(btn) {
+    if (!btn) return false;
+    return btn.classList.contains("is-active") || btn.classList.contains("is-selected") || btn.getAttribute("aria-selected") === "true" || btn.getAttribute("aria-checked") === "true" || btn.getAttribute("aria-pressed") === "true";
+  }
+  function isLoosePills(group) {
+    return group.classList.contains("hub-pills--loose") || group.getAttribute("data-hub-pills") === "loose";
+  }
+  function directChild(group, className) {
+    return [...group.children ?? []].find((node) => node.classList?.contains(className)) ?? null;
+  }
+  function hubPillsButtons(group) {
+    return [...group.children ?? []].filter((node) => node.classList?.contains("hub-pills__btn"));
+  }
+  function ensurePillThumb(group) {
+    let thumb = directChild(group, "hub-pills__thumb");
+    if (thumb) return thumb;
+    const doc = group.ownerDocument ?? document;
+    thumb = doc.createElement("span");
+    thumb.className = "hub-pills__thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    group.insertBefore(thumb, group.firstChild);
+    return thumb;
+  }
+  function applyHubPillsThumb(group, options = {}) {
+    if (!group?.style?.setProperty) return null;
+    if (isLoosePills(group)) {
+      group.classList.remove("is-ready", "is-animated");
+      directChild(group, "hub-pills__thumb")?.remove();
+      return null;
+    }
+    const buttons = hubPillsButtons(group);
+    if (buttons.length < 2) {
+      group.classList.remove("is-ready", "is-animated");
+      return null;
+    }
+    const active = buttons.find(isActiveHubPill);
+    if (!active) {
+      group.classList.remove("is-ready");
+      return null;
+    }
+    const missingThumb = !directChild(group, "hub-pills__thumb");
+    ensurePillThumb(group);
+    const box = {
+      x: `${active.offsetLeft}px`,
+      y: `${active.offsetTop}px`,
+      w: `${active.offsetWidth}px`,
+      h: `${active.offsetHeight}px`
+    };
+    group.style.setProperty("--hub-pill-x", box.x);
+    group.style.setProperty("--hub-pill-y", box.y);
+    group.style.setProperty("--hub-pill-w", box.w);
+    group.style.setProperty("--hub-pill-h", box.h);
+    group.classList.add("is-ready");
+    const reduced2 = options.reduced ?? prefersReducedMotion(group);
+    const animate = options.animate !== false && !reduced2 && !missingThumb;
+    group.classList.toggle("is-animated", animate);
+    return box;
+  }
+
+  // docs/proposals/calendar-reference/almanac/src/fixture.ts
+  var TODAY = "2026-09-24";
+  var RANGE = { from: "2026-09-24", to: "2027-01-10" };
+  var LAST_LOG = { date: "2026-09-24", pct: 34 };
+  var TERMS = [
+    { term: 3, starts_on: "2026-07-21", ends_on: "2026-09-25" },
+    { term: 4, starts_on: "2026-10-13", ends_on: "2026-12-17" }
+  ];
+  var ANCHORS = [
+    {
+      id: "korea",
+      title: "Korea honeymoon",
+      kind: "trip",
+      date: "2026-12-23",
+      returns: "2027-01-10",
+      tags: ["international", "pets-home-alone", "on-biologic", "with-corey"],
+      sub: "23/12 \u2013 10/01 \xB7 4 animals home"
+    },
+    {
+      id: "solo-travel",
+      title: "Solo travel",
+      kind: "trip",
+      date: "2026-12-01",
+      returns: "2026-12-15",
+      tags: ["undecided"],
+      sub: "from 01/12 \xB7 term runs to 17/12"
+    },
+    {
+      id: "vitamin-d",
+      title: "Vitamin D recheck",
+      kind: "medical",
+      window: { opens: "2026-09-19", closes: "2026-10-19" },
+      tags: ["bloods"],
+      sub: "3\u20134 months after the 19/06 change"
+    },
+    { id: "unsw-conferral", title: "UNSW conferral", kind: "event", date: "2026-09-30", tags: ["graduation"], sub: "Master of Gifted Education" },
+    { id: "term-4", title: "Term 4 \xB7 new Year 12", kind: "term", date: "2026-10-13", tags: ["new-class"], sub: "one class from 13/10" },
+    { id: "dream-study", title: "Dream \xB7 Harvard, Oxford\u2026", kind: "dream", tags: ["dream"], sub: "study at one of the four" }
+  ];
+  var WORLD = [
+    { date: "2026-09-26", title: "Sat 26 \xB7 24\xB0 clear", sub: "BOM", example: true, row: 0 },
+    { date: "2026-10-04", title: "Daylight saving starts + Labour Day", sub: "you lose an hour \xB7 long weekend", example: false, row: 1 },
+    { date: "2026-10-14", title: "HSC begins \xB7 English Paper 1", sub: "NESA timetable (est.)", example: true, row: 0 },
+    { date: "2026-11-27", title: "Reports due", sub: "school calendar (est.)", example: true, row: 0 },
+    { date: "2026-12-25", title: "Christmas", sub: "", example: false, row: 1 }
+  ];
+  var PATTERN = [
+    { from: "2026-10-13", to: "2026-12-17", delta: -12, label: "term time" },
+    { from: "2026-10-13", to: "2026-10-18", delta: -6, label: "first week back" },
+    { from: "2026-11-16", to: "2026-11-29", delta: -16, label: "report-writing dip (your T2 pattern)" },
+    { from: "2026-12-01", to: "2026-12-15", delta: 4 }
+  ];
+  var WALLS = [{ from: "2026-12-23", to: "2027-01-10", title: "Korea \xB7 23/12 \u2013 10/01" }];
+  var BUSY = [
+    { date: "2026-09-30", day: true, title: "Conferral" },
+    { date: "2026-10-03", day: true, title: "ToM finals" }
+  ];
+  var DAY_TAGS = { "2026-10-04": ["dst-start"] };
+  var TAKEN_EVENINGS = ["2026-09-26"];
+  var HABIT = {
+    id: "korean",
+    title: "Korean for travellers",
+    minutes: 20,
+    perWeek: 3,
+    from: "2026-09-28",
+    until: "2026-12-23",
+    why: "Enough to order, ask directions and get home: comforting adventure."
+  };
+  var DRAFTS = {
+    bob: { to: "Bob", text: "Hi Bob, I\u2019m on school holidays. Are you free for lunch on {when}? My shout." },
+    newcastle: { to: "Newcastle friends", text: "I\u2019m in Newcastle on {when}. Anyone free for a coffee, a walk or dinner?" }
+  };
+
+  // docs/proposals/calendar-reference/almanac/src/almanac-ref.ts
+  var ALM = {
+    width: 1198,
+    // SVG user units (card inner width)
+    labelX: 18,
+    x0: 222,
+    // first day centre
+    rightPad: 30,
+    months: { y: 20 },
+    tiers: { y: 30, h: 18 },
+    world: { rows: [66, 92] },
+    anchors: { rows: [122, 142] },
+    wave: { base: 262, h: 96, softenPct: 40 },
+    lanes: { divider: 284, label: 304, top: 318, rowH: 52 },
+    bead: { r: 5.5, nowR: 6.5, haloR: 11, diamond: 6 },
+    labelRoom: 240,
+    // a bead label flips to the left of its bead inside this many units of the right edge
+    enterDrawMs: 520,
+    // lead lines draw back from their anchor
+    enterStagger: 60,
+    // per lead line
+    beadPopMs: MOTION.enter,
+    beadStagger: 40,
+    waveRevealMs: 700,
+    countMs: 420,
+    // headline numbers count to their new value
+    toastInMs: 220,
+    toastRise: 6,
+    toastHoldMs: 5200,
+    popMs: 180,
+    popRise: 4,
+    popWidth: 300,
+    popGap: 10,
+    saveLatencyMs: 350
+    // PROTOTYPE ONLY: stands in for POST /api/calendar-ghosts
+  };
+  var DATES = [];
+  for (let d = RANGE.from; d <= RANGE.to; d = addDays(d, 1)) DATES.push(d);
+  var N = DATES.length;
+  var DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+  var idx = (d) => daysBetween(RANGE.from, d);
+  var X = (d) => ALM.x0 + Math.max(0, Math.min(N - 1, idx(d))) * DX;
+  var inTerm = (d) => TERMS.some((t) => d >= t.starts_on && d <= t.ends_on);
+  var pattern = (d) => PATTERN.filter((p) => d >= p.from && d <= p.to).reduce((a, p) => a + p.delta, 0);
+  var SERIES = forecastSeries(DATES, { lastPct: LAST_LOG.pct, lastDate: LAST_LOG.date, isHoliday: (d) => !inTerm(d), pattern });
+  var WD = (d) => (/* @__PURE__ */ new Date(`${d}T00:00:00Z`)).getUTCDay();
+  var DOW = (d) => ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][WD(d)];
+  var dd = (d) => formatDisplayDate(d).slice(0, 5);
+  function openingDays() {
+    return SERIES.map((s2) => {
+      const wd = WD(s2.date);
+      const school = inTerm(s2.date) && wd >= 1 && wd <= 5;
+      const busy = BUSY.some((b) => b.date === s2.date);
+      return {
+        date: s2.date,
+        pct: s2.pct,
+        weekday: wd,
+        holiday: !inTerm(s2.date),
+        walled: wd === 0 || WALLS.some((w) => s2.date >= w.from && s2.date <= w.to),
+        freeDay: school || busy ? 0 : 12,
+        freeEvening: TAKEN_EVENINGS.includes(s2.date) ? 0 : school && wd !== 5 ? 3 : 4.5,
+        tags: DAY_TAGS[s2.date] ?? []
+      };
+    });
+  }
+  var OPENINGS = findOpenings(openingDays(), ALMANAC_WANTS);
+  var WANT_WHY = Object.fromEntries(ALMANAC_WANTS.map((w) => [w.id, w.why]));
+  var state = { done: /* @__PURE__ */ new Set(), tasked: /* @__PURE__ */ new Set(), held: /* @__PURE__ */ new Set(), phone: false };
+  var lines = () => leadLines(ANCHORS, ALMANAC_RULES, { today: TODAY, terms: TERMS, done: state.done });
+  var summary = () => ({ ...almanacSummary(lines()), openings: OPENINGS.filter((o) => o.dates.length).length });
+  function whenText(o) {
+    const [a, b] = o.dates;
+    if (b) return `${DOW(a)} ${dd(a).slice(0, 2)} \u2013 ${DOW(b)} ${dd(b)}`;
+    if (o.span === "evening") return `${DOW(a)} ${dd(a)} \xB7 6\u201310 pm`;
+    if (o.span === "lunch") return `${DOW(a)} ${dd(a)} \xB7 lunch`;
+    return `${DOW(a)} ${dd(a)} \xB7 all day`;
+  }
+  function longDate(d) {
+    return new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${d}T00:00:00Z`));
+  }
+  var NS = "http://www.w3.org/2000/svg";
+  var nodes = /* @__PURE__ */ new Map();
+  var engine;
+  var root;
+  var svg;
+  var toastTimer = 0;
+  var popFor = null;
+  var mountOptions = {};
+  function el(tag, cls, html, parent, attrs = {}) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    parent?.appendChild(n);
+    return n;
+  }
+  function s(tag, attrs, parent, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    if (text != null) n.textContent = text;
+    parent.appendChild(n);
+    return n;
+  }
+  function mount(host, options = mountOptions) {
+    mountOptions = options;
+    engine?.dispose();
+    nodes.clear();
+    host.replaceChildren();
+    state.phone = matchMedia("(max-width: 719px)").matches;
+    root = el("section", "alm", void 0, host, { "data-part": "almanac", "aria-label": "Almanac" });
+    const nav = el("header", "alm__nav", void 0, root, { "data-part": "nav" });
+    el("button", "alm__round", '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>', nav, { type: "button", "aria-label": "Earlier" });
+    el("div", "alm__period", "<b>The Almanac \xB7 until you\u2019re home from Korea</b><span>24/09/26 \u2192 10/01/27 \xB7 15 weeks</span>", nav, { "data-part": "period" });
+    el("button", "alm__round", '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>', nav, { type: "button", "aria-label": "Later" });
+    el("button", "btn btn--secondary", "Today", nav, { type: "button" });
+    const zoom = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', nav, { role: "group", "aria-label": "Zoom", "data-part": "zoom-pills" });
+    for (const z of ["Day", "Week", "Term", "Year", "Almanac"]) el("button", `hub-pills__btn${z === "Almanac" ? " is-active" : ""}`, z, zoom, { type: "button", "aria-pressed": String(z === "Almanac") });
+    el("div", "alm__spacer", void 0, nav);
+    el("div", "alm__ask", '<span class="alm-av">H</span>What am I forgetting?', nav);
+    const card = el("div", "alm__card", void 0, root, { "data-part": "card" });
+    const top = el("div", "alm-top", void 0, card, { "data-part": "summary" });
+    el("div", "alm-top__thesis", "Every calendar remembers what you booked. This one remembers what you\u2019ll wish you had.", top);
+    const sum = summary();
+    for (const [id, n, label, tone] of [
+      ["unbooked", sum.unbooked, "due now that nobody booked", "warn"],
+      ["soon", sum.lastSafeSoon, "last safe days in the next 5 weeks", ""],
+      ["openings", sum.openings, "openings that fit you", "ok"]
+    ]) {
+      const cell = el("div", "alm-top__stat", void 0, top, { "data-part": `stat-${id}` });
+      nodes.set(`stat:${id}`, el("div", `alm-top__n${tone ? ` is-${tone}` : ""}`, String(n), cell));
+      el("small", "", label, cell);
+    }
+    if (state.phone) mountList(card);
+    else {
+      svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("viewBox", `0 0 ${ALM.width} ${ALM.lanes.top + ANCHORS.length * ALM.lanes.rowH + 8}`);
+      svg.setAttribute("class", "alm-chart");
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "Almanac chart: world, anchors, capacity forecast and last safe days to 10/01/27");
+      svg.setAttribute("data-part", "chart");
+      card.appendChild(svg);
+      mountChart();
+    }
+    mountOpenings(card);
+    nodes.set("__toast", el("div", "alm-toast", "", root, { role: "status", "aria-live": "polite", "data-part": "toast" }));
+    nodes.set("__pop", el("div", "alm-pop", "", root, { role: "dialog", "data-part": "popover", hidden: "" }));
+    nodes.set("__live", el("div", "alm-sr", "", root, { "aria-live": "polite", "data-part": "announcer" }));
+    engine = createMotion({ apply, clock: options.clock, reducedMotion: options.reducedMotion });
+    engine.place("__toast", { opacity: 0, y: ALM.toastRise });
+    engine.place("__pop", { opacity: 0, y: ALM.popRise });
+    for (const id of ["unbooked", "soon", "openings"]) engine.place(`stat:${id}`, { n: Number(nodes.get(`stat:${id}`).textContent) });
+    entrance();
+    requestAnimationFrame(() => applyHubPillsThumb(zoom));
+    wire(root);
+  }
+  function mountChart() {
+    const g = (cls) => s("g", { class: cls }, svg);
+    const back = g("alm-layer-back");
+    s("rect", { class: "alm-holiday", x: X("2026-09-26"), y: 30, width: X("2026-10-13") - X("2026-09-26"), height: 610 }, back);
+    s("rect", { class: "alm-holiday", x: X("2026-12-18"), y: 30, width: X("2026-12-23") - X("2026-12-18"), height: 610 }, back);
+    for (const w of WALLS) s("rect", { class: "alm-wall", x: X(w.from), y: 98, width: X(w.to) + 6 - X(w.from), height: 542, "data-part": "wall" }, back);
+    for (const [d, l] of [["2026-10-01", "Oct"], ["2026-11-01", "Nov"], ["2026-12-01", "Dec"], ["2027-01-01", "Jan"]]) {
+      s("line", { class: "alm-month", x1: X(d), x2: X(d), y1: 8, y2: 640 }, back);
+      s("text", { class: "alm-t-month", x: X(d) + 6, y: ALM.months.y }, back, l);
+    }
+    s("text", { class: "alm-t-month", x: ALM.x0 + 30, y: ALM.months.y }, back, "Sep");
+    const tier = (a, b, label, cls) => {
+      const x = X(a), w = X(b) - X(a);
+      s("rect", { class: `alm-tier ${cls}`, x: x + 2, y: ALM.tiers.y, width: w - 4, height: ALM.tiers.h, rx: 6 }, back);
+      if (w > 60) s("text", { class: `alm-t-tier ${cls}`, x: x + 10, y: ALM.tiers.y + 13 }, back, label);
+    };
+    tier("2026-09-26", "2026-10-13", "HOLIDAYS", "is-hol");
+    tier("2026-10-13", "2026-12-18", "TERM 4 \xB7 ONE CLASS", "is-term");
+    tier("2026-12-18", RANGE.to, "SUMMER", "is-hol");
+    s("line", { class: "alm-labelrule", x1: ALM.x0 - 12, x2: ALM.x0 - 12, y1: 0, y2: 640 }, back);
+    const lab = (y, t2, sub) => {
+      s("text", { class: "alm-t-lab", x: ALM.labelX, y }, back, t2);
+      s("text", { class: "alm-t-sub", x: ALM.labelX, y: y + 16 }, back, sub);
+    };
+    lab(72, "The world", "BOM \xB7 NSW \xB7 NESA \xB7 listings");
+    lab(118, "Anchors", "things already fixed");
+    lab(186, "Forecast you", "capacity from your logs");
+    const world = g("alm-layer-world");
+    WORLD.forEach((w) => {
+      const y = ALM.world.rows[w.row];
+      s("circle", { class: "alm-world-dot", cx: X(w.date), cy: y - 4, r: 3.5 }, world);
+      s("text", { class: "alm-t-world", x: X(w.date) + 8, y }, world, w.title);
+      if (w.sub) s("text", { class: "alm-t-sub", x: X(w.date) + 8, y: y + 13 }, world, `${w.sub}${w.example ? " \xB7 example" : ""}`);
+    });
+    const anc = g("alm-layer-anchors");
+    const flag = (d, row, t2, sub) => {
+      const x = X(d), y = ALM.anchors.rows[row];
+      s("path", { class: "alm-flag", d: `M${x} ${y + 6} V${y - 12} l9 4 -9 4` }, anc);
+      s("text", { class: "alm-t-anchor", x: x + 13, y: y - 2 }, anc, t2);
+      s("text", { class: "alm-t-sub", x: x + 13, y: y + 11 }, anc, sub);
+    };
+    flag("2026-09-30", 0, "UNSW conferral", "30/09");
+    flag("2026-10-13", 1, "T4 starts", "13/10");
+    flag("2026-12-01", 0, "Solo travel", "from 01/12");
+    flag("2026-12-17", 1, "T4 ends", "17/12");
+    const pill = s("g", { transform: `translate(${X("2026-12-23") + 6} 106)` }, anc);
+    s("rect", { class: "alm-pill", width: 150, height: 20, rx: 10 }, pill);
+    s("text", { class: "alm-t-pill", x: 75, y: 14 }, pill, "Korea \xB7 23/12 \u2013 10/01");
+    const clip = s("clipPath", { id: "alm-reveal" }, s("defs", {}, svg));
+    nodes.set("wave-clip", s("rect", { x: 0, y: 0, width: 0, height: 640 }, clip));
+    const wave = s("g", { class: "alm-layer-wave", "clip-path": "url(#alm-reveal)", "data-part": "forecast" }, svg);
+    const Y = (v) => ALM.wave.base - v / 100 * ALM.wave.h;
+    const pt = (i, v) => `${(ALM.x0 + i * DX).toFixed(1)} ${Y(v).toFixed(1)}`;
+    const up = SERIES.map((p, i) => `${i ? "L" : "M"}${pt(i, p.high)}`).join(" ");
+    const dn = SERIES.map((p, i) => [i, p]).reverse().map(([i, p]) => `L${pt(i, p.low)}`).join(" ");
+    const ln = SERIES.map((p, i) => `${i ? "L" : "M"}${pt(i, p.pct)}`).join(" ");
+    s("path", { class: "alm-wave-area", d: `${ln} L${pt(N - 1, 0)} L${pt(0, 0)} Z` }, wave);
+    s("path", { class: "alm-wave-band", d: `${up} ${dn} Z` }, wave);
+    s("line", { class: "alm-wave-soften", x1: ALM.x0, x2: X(RANGE.to), y1: Y(ALM.wave.softenPct), y2: Y(ALM.wave.softenPct) }, wave);
+    s("text", { class: "alm-t-soften", x: X(RANGE.to), y: Y(ALM.wave.softenPct) + 14 }, wave, "40%");
+    s("path", { class: "alm-wave-line", d: ln }, wave);
+    s("line", { class: "alm-wave-base", x1: ALM.x0, x2: X(RANGE.to), y1: ALM.wave.base, y2: ALM.wave.base }, wave);
+    const note = (d, t2, dy = -10) => s("text", { class: "alm-t-wave", x: X(d), y: Y(SERIES[idx(d)].pct) + dy }, wave, t2);
+    note("2026-10-03", "holidays refill you");
+    note("2026-11-22", "report-writing dip (your T2 pattern)", 20);
+    note("2026-12-31", "Korea");
+    for (const o of OPENINGS) for (const d of o.dates) s("circle", { class: "alm-open-dot", cx: X(d), cy: Y(SERIES[idx(d)].pct), r: 4.5, "data-part": "opening-dot" }, wave);
+    s("line", { class: "alm-divider", x1: 0, x2: ALM.width, y1: ALM.lanes.divider, y2: ALM.lanes.divider }, svg);
+    s("text", { class: "alm-t-caps", x: ALM.labelX, y: ALM.lanes.label }, svg, "LAST SAFE DAYS");
+    const lanes = s("g", { class: "alm-layer-lanes" }, svg);
+    const anchorsById = Object.fromEntries(ANCHORS.map((a) => [a.id, a]));
+    lines().forEach((line, row) => {
+      const a = anchorsById[line.anchor.id];
+      const y = ALM.lanes.top + row * ALM.lanes.rowH;
+      const cy = y + 22;
+      const lane = s("g", { class: `alm-lane is-${a.kind}`, "data-part": "lead-line", "data-anchor": a.id }, lanes);
+      s("line", { class: "alm-lane-rule", x1: 0, x2: ALM.width, y1: y + ALM.lanes.rowH - 2, y2: y + ALM.lanes.rowH - 2 }, lane);
+      s("text", { class: "alm-t-lab", x: ALM.labelX, y: cy - 2 }, lane, a.title);
+      s("text", { class: "alm-t-sub", x: ALM.labelX, y: cy + 13 }, lane, a.sub);
+      if (a.window) {
+        s("rect", { class: "alm-window", x: X(a.window.opens), y: cy - 7, width: X(a.window.closes) - X(a.window.opens), height: 14, rx: 7 }, lane);
+        s("text", { class: "alm-t-sub", x: X(a.window.closes) + 8, y: cy + 4 }, lane, `window closes ${dd(a.window.closes)}`);
+      } else if (a.kind === "dream") {
+        s("line", { class: "alm-dream", x1: X(line.from), x2: X(RANGE.to), y1: cy, y2: cy }, lane);
+        s("text", { class: "alm-t-dream", x: X(RANGE.to), y: cy + 18 }, lane, "\u2192 2027");
+      } else {
+        nodes.set(`rail:${a.id}`, s("line", { class: "alm-rail", x1: X(a.date), x2: X(a.date), y1: cy, y2: cy, "data-from": X(line.from), "data-to": X(a.date) }, lane));
+        const dx = X(a.date);
+        s("rect", { class: "alm-anchor", x: dx - 6, y: cy - 6, width: 12, height: 12, rx: 2, transform: `rotate(45 ${dx} ${cy})` }, lane);
+      }
+      line.steps.forEach((st, k) => {
+        const x = X(st.lastSafe);
+        const bead = s("g", { class: `alm-bead is-${st.status}`, transform: `translate(${x} ${cy})`, tabindex: 0, role: "button", "data-part": "bead", "data-step": st.id, "data-status": st.status, "aria-label": `${st.title}. Last safe day ${formatDisplayDate(st.lastSafe)}.` }, lane);
+        const inner = s("g", { class: "alm-bead__shape" }, bead);
+        s("circle", { class: "alm-bead__halo", r: ALM.bead.haloR }, inner);
+        s("rect", { class: "alm-bead__diamond", x: -ALM.bead.diamond, y: -ALM.bead.diamond, width: ALM.bead.diamond * 2, height: ALM.bead.diamond * 2, rx: 2, transform: "rotate(45)" }, inner);
+        s("circle", { class: "alm-bead__dot", r: st.status === "now" ? ALM.bead.nowR : ALM.bead.r }, inner);
+        s("path", { class: "alm-bead__tick", d: "M-3 0.2 -1 2.2 3.2 -2" }, inner);
+        const above = k % 2 === 0;
+        const right = x > ALM.width - ALM.rightPad - ALM.labelRoom;
+        const lx = right ? x - 10 : x + (st.lastSafe === TODAY ? 12 : -4);
+        s("text", { class: `alm-t-bead${right ? " is-end" : ""}`, x: lx, y: above ? cy - 12 : cy + 21 }, lane, st.title);
+        nodes.set(`bead:${st.id}`, inner);
+        nodes.set(`beadg:${st.id}`, bead);
+      });
+    });
+    const t = s("g", { class: "alm-today", "data-part": "today" }, svg);
+    s("line", { x1: X(TODAY), x2: X(TODAY), y1: 16, y2: 640 }, t);
+    s("rect", { x: X(TODAY) - 26, y: 0, width: 52, height: 18, rx: 9 }, t);
+    s("text", { x: X(TODAY), y: 13 }, t, "Today");
+  }
+  function mountList(card) {
+    const list = el("div", "alm-list", void 0, card, { "data-part": "lead-list" });
+    el("p", "alm-list__caps", "Last safe days", list);
+    for (const line of lines()) {
+      const a = ANCHORS.find((x) => x.id === line.anchor.id);
+      const item = el("section", `alm-list__line is-${line.status}`, `<h3>${a.title}</h3><p>${a.sub}</p>`, list, { "data-part": "lead-line", "data-anchor": a.id });
+      for (const st of line.steps) {
+        el("button", `alm-list__step is-${st.status}`, `<span class="alm-list__dot"></span><span class="alm-list__t">${st.title}</span><span class="alm-list__d">${st.status === "now" ? "now" : dd(st.lastSafe)}</span>`, item, { type: "button", "data-part": "bead", "data-step": st.id, "data-status": st.status });
+      }
+    }
+  }
+  function mountOpenings(card) {
+    const wrap = el("div", "alm-opens", "<h4>Openings \xB7 free, high-capacity windows held for you</h4>", card, { "data-part": "openings" });
+    for (const o of OPENINGS) {
+      if (!o.dates.length) continue;
+      const corey = o.with === "corey";
+      const c2 = el("article", `alm-open${corey ? " is-corey" : ""}`, void 0, wrap, { "data-part": "opening", "data-want": o.wantId });
+      el("div", "alm-open__when", `<span>${whenText(o)}</span><b>${o.pct}%</b>`, c2);
+      el("h5", "", `${corey ? '<span class="alm-mark"></span>' : ""}${o.title}`, c2);
+      el("p", "", WANT_WHY[o.wantId] ?? "", c2);
+      const btns = el("div", "alm-open__btns", void 0, c2);
+      if (o.wantId === "good-night") el("button", "btn btn--primary", "Hold it", btns, { type: "button", "data-open": o.wantId, "data-act": "hold" });
+      if (o.wantId === "keep-empty") el("button", "btn btn--primary", "Wall it", btns, { type: "button", "data-open": o.wantId, "data-act": "hold" });
+      if (o.wantId === "newcastle") el("button", "btn btn--primary", "Hold both days", btns, { type: "button", "data-open": o.wantId, "data-act": "hold" });
+      if (DRAFTS[o.wantId]) el("button", `btn ${o.wantId === "bob" ? "btn--primary" : "btn--secondary"}`, "Draft a message", btns, { type: "button", "data-open": o.wantId, "data-act": "draft" });
+      nodes.set(`open:${o.wantId}`, c2);
+    }
+    const weeks = daysBetween(HABIT.from, HABIT.until) / 7;
+    const c = el("article", "alm-open is-habit", void 0, wrap, { "data-part": "opening", "data-want": HABIT.id });
+    el("div", "alm-open__when", `<span>Hol W1 \u2192 ${dd(HABIT.until)}</span><b>habit</b>`, c);
+    el("h5", "", HABIT.title, c);
+    el("p", "", `${HABIT.minutes} min, ${HABIT.perWeek} times a week is about ${Math.round(weeks * HABIT.perWeek)} sessions before Seoul. ${HABIT.why}`, c);
+    el("div", "alm-open__btns", '<button class="btn btn--secondary" type="button" data-open="korean" data-act="plan">Plan it with Hammond</button>', c);
+  }
+  function apply(id, p) {
+    const n = nodes.get(id);
+    if (id === "__toast" || id === "__pop") {
+      n.style.opacity = String(p.opacity);
+      n.style.transform = `translateY(${p.y}px)`;
+      return;
+    }
+    if (id === "wave") {
+      nodes.get("wave-clip")?.setAttribute("width", String(p.w));
+      return;
+    }
+    if (id.startsWith("stat:")) {
+      n.textContent = String(Math.round(p.n));
+      return;
+    }
+    if (id.startsWith("rail:")) {
+      const r = n;
+      const from = Number(r.dataset.from), to = Number(r.dataset.to);
+      r.setAttribute("x1", String(to + (from - to) * p.draw));
+      return;
+    }
+    if (id.startsWith("bead:")) {
+      n.setAttribute("transform", `scale(${p.scale})`);
+      n.style.opacity = String(p.opacity);
+    }
+    if (id.startsWith("open:")) {
+      n.style.setProperty("--held", String(p.held));
+    }
+  }
+  function entrance() {
+    if (!state.phone) {
+      engine.place("wave", { w: 0 });
+      engine.to("wave", { w: ALM.width }, { duration: ALM.waveRevealMs, easing: EASE });
+      lines().forEach((line, row) => {
+        if (nodes.has(`rail:${line.anchor.id}`)) {
+          engine.place(`rail:${line.anchor.id}`, { draw: 0 });
+          engine.to(`rail:${line.anchor.id}`, { draw: 1 }, { duration: ALM.enterDrawMs, delay: row * ALM.enterStagger, easing: EASE });
+        }
+        line.steps.forEach((st, k) => {
+          engine.enter(`bead:${st.id}`, { opacity: 1, scale: 1 }, { from: { opacity: 0, scale: 0.4 }, delay: row * ALM.enterStagger + ALM.enterDrawMs * 0.5 + k * ALM.beadStagger, duration: ALM.beadPopMs, easing: OVERSHOOT });
+        });
+      });
+    } else {
+      engine.place("wave", { w: ALM.width });
+    }
+    for (const o of OPENINGS) if (nodes.has(`open:${o.wantId}`)) engine.place(`open:${o.wantId}`, { held: 0 });
+  }
+  function showToast(html) {
+    const t = nodes.get("__toast");
+    t.innerHTML = html;
+    engine.to("__toast", { opacity: 1, y: 0 }, { duration: ALM.toastInMs });
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => engine.to("__toast", { opacity: 0, y: ALM.toastRise }, { duration: ALM.toastInMs }), ALM.toastHoldMs);
+  }
+  function refreshStats() {
+    const sum = summary();
+    engine.to("stat:unbooked", { n: sum.unbooked }, { duration: ALM.countMs });
+    engine.to("stat:soon", { n: sum.lastSafeSoon }, { duration: ALM.countMs });
+  }
+  var wait = (ms2) => new Promise((r) => setTimeout(r, ms2));
+  var findStep = (id) => lines().flatMap((l) => l.steps.map((st) => ({ st, line: l }))).find((x) => x.st.id === id);
+  function taskGhost(stepId) {
+    const { st } = findStep(stepId);
+    return { id: `alm-${stepId}`, agent: "hammond", kind: "create_task", title: st.title, due: st.lastSafe, source: `almanac:${stepId}` };
+  }
+  function openPop(stepId) {
+    const hit = findStep(stepId);
+    const pop = nodes.get("__pop");
+    if (!hit) return;
+    const { st } = hit;
+    const rule = ALMANAC_RULES.find((r2) => r2.id === st.ruleId);
+    const left = st.daysLeft < 0 ? `${-st.daysLeft} days late` : st.daysLeft === 0 ? "today" : `${st.daysLeft} days left`;
+    let html = `<div class="alm-pop__head"><b>${st.title}</b></div><p class="alm-pop__meta">Last safe day <b>${formatDisplayDate(st.lastSafe)}</b> \xB7 ${left}</p><p class="alm-pop__why">${rule.why ?? ""}</p>`;
+    if (st.status !== "done") {
+      const receipt = state.tasked.has(stepId) ? "Already on your task list." : acceptPlan(taskGhost(stepId), { today: TODAY }).receipt;
+      html += `<p class="alm-pop__label">Add as task writes</p><p class="alm-pop__writes" data-part="write-preview">${receipt}</p>`;
+      html += `<div class="alm-pop__acts">${state.tasked.has(stepId) ? "" : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
+    }
+    pop.innerHTML = html;
+    pop.hidden = false;
+    const r = root.getBoundingClientRect();
+    const b = (nodes.get(`beadg:${stepId}`) ?? root.querySelector(`[data-step="${stepId}"]`)).getBoundingClientRect();
+    const x = b.right - r.left + ALM.popGap;
+    pop.style.left = `${Math.min(x, r.width - ALM.popWidth - 8)}px`;
+    pop.style.top = `${b.bottom - r.top + 6}px`;
+    popFor = stepId;
+    engine.place("__pop", { opacity: 0, y: ALM.popRise });
+    engine.to("__pop", { opacity: 1, y: 0 }, { duration: ALM.popMs });
+  }
+  function closePop() {
+    if (!popFor) return;
+    popFor = null;
+    engine.to("__pop", { opacity: 0, y: ALM.popRise }, { duration: ALM.popMs });
+    window.setTimeout(() => {
+      if (!popFor) nodes.get("__pop").hidden = true;
+    }, ALM.popMs);
+  }
+  function setBeadStatus(stepId, status) {
+    root.querySelectorAll(`[data-step="${stepId}"]`).forEach((b) => {
+      b.setAttribute("class", (b.getAttribute("class") ?? "").replace(/is-(overdue|now|soon|later|done)/, `is-${status}`));
+      b.setAttribute("data-status", status);
+    });
+    engine.place(`bead:${stepId}`, { scale: 1.25 });
+    engine.to(`bead:${stepId}`, { scale: 1 }, { duration: 320, easing: OVERSHOOT });
+  }
+  async function addTask(stepId) {
+    const plan = acceptPlan(taskGhost(stepId), { today: TODAY });
+    closePop();
+    await wait(ALM.saveLatencyMs);
+    state.tasked.add(stepId);
+    root.querySelectorAll(`[data-step="${stepId}"]`).forEach((b) => b.classList.add("is-tasked"));
+    showToast(`<b>Written.</b> ${plan.receipt}`);
+    nodes.get("__live").textContent = plan.receipt;
+  }
+  function markDone(stepId) {
+    closePop();
+    state.done.add(stepId);
+    setBeadStatus(stepId, "done");
+    refreshStats();
+    showToast("<b>Marked done.</b> The Almanac stops asking about it.");
+  }
+  async function openingAction(wantId, act, btn) {
+    const o = OPENINGS.find((x) => x.wantId === wantId);
+    const card = nodes.get(`open:${wantId}`);
+    if (act === "plan") return showToast("<b>Nothing written yet.</b> Hammond will propose the slots as ghosts in your week, only on days forecast at 50% or more.");
+    if (!o || !card) return;
+    btn.disabled = true;
+    if (act === "draft") {
+      const d = DRAFTS[wantId];
+      const when = o.dates.length === 2 ? `${longDate(o.dates[0])} and ${longDate(o.dates[1])}` : longDate(o.dates[0]);
+      const plan = acceptPlan({ id: `alm-draft-${wantId}`, agent: "hammond", kind: "draft_message", to: d.to, text: d.text.replace("{when}", when) });
+      const draft = plan.steps[0];
+      const box = el("div", "alm-draft", `<p>${draft.text}</p><button class="btn btn--secondary" type="button" data-copy>Copy</button>`, card, { "data-part": "draft" });
+      box.querySelector("[data-copy]").addEventListener("click", async (e) => {
+        const b = e.currentTarget;
+        try {
+          await navigator.clipboard.writeText(draft.text);
+          b.textContent = "Copied";
+        } catch {
+          const r = document.createRange();
+          r.selectNodeContents(box.querySelector("p"));
+          getSelection()?.removeAllRanges();
+          getSelection()?.addRange(r);
+          b.textContent = "Selected";
+        }
+      });
+      showToast(`<b>${plan.receipt}</b>`);
+      return;
+    }
+    const blocks = wantId === "good-night" ? [{ date: o.dates[0], start: "18:00", end: "22:00", title: "Good night: dinner out + a show", with: "corey" }] : wantId === "keep-empty" ? [{ date: o.dates[0], start: "06:00", end: "22:00", title: "Keep empty (daylight saving)" }] : o.dates.map((date) => ({ date, start: "08:00", end: "21:00", title: "Newcastle \xB7 friends" }));
+    const plans = blocks.map((b, i) => acceptPlan({ id: `alm-hold-${wantId}-${i}`, agent: "hammond", kind: "protect_block", ...b }, { today: TODAY }));
+    btn.textContent = "Saving\u2026";
+    await wait(ALM.saveLatencyMs);
+    state.held.add(wantId);
+    card.classList.add("is-held");
+    btn.textContent = wantId === "good-night" ? "Held for you both" : wantId === "keep-empty" ? "Walled" : "Held";
+    engine.to(`open:${wantId}`, { held: 1 }, { duration: 320 });
+    showToast(`<b>Written.</b> ${plans.map((p) => p.receipt).join(" ")}`);
+  }
+  function wire(r) {
+    r.addEventListener("click", (e) => {
+      const t = e.target;
+      const task = t.closest("[data-task]");
+      if (task) return void addTask(task.dataset.task);
+      const done = t.closest("[data-done]");
+      if (done) return markDone(done.dataset.done);
+      const act = t.closest("[data-open]");
+      if (act) return void openingAction(act.dataset.open, act.dataset.act, act);
+      const bead = t.closest('[data-part="bead"]');
+      if (bead) {
+        const id = bead.getAttribute("data-step");
+        return id === popFor ? closePop() : openPop(id);
+      }
+      if (!t.closest('[data-part="popover"]')) closePop();
+    });
+    r.addEventListener("keydown", (e) => {
+      const t = e.target;
+      if (e.key === "Escape") closePop();
+      if ((e.key === "Enter" || e.key === " ") && t.getAttribute("data-part") === "bead" && t.tagName !== "BUTTON") {
+        openPop(t.getAttribute("data-step"));
+        e.preventDefault();
+      }
+    });
+  }
+  var slow = 1;
+  var reduced = false;
+  var clock = { now: () => performance.now() / slow, request: (cb) => requestAnimationFrame(cb), cancel: (id) => cancelAnimationFrame(id) };
+  function boot() {
+    const host = document.getElementById("app");
+    const start = () => mount(host, { clock, reducedMotion: () => reduced || matchMedia("(prefers-reduced-motion: reduce)").matches });
+    (document.fonts?.ready ?? Promise.resolve()).then(start);
+    document.getElementById("ref-reset")?.addEventListener("click", () => {
+      state.done.clear();
+      state.tasked.clear();
+      state.held.clear();
+      start();
+    });
+    document.getElementById("ref-slow")?.addEventListener("click", (e) => {
+      slow = slow === 1 ? 5 : 1;
+      e.currentTarget.setAttribute("aria-pressed", String(slow === 5));
+    });
+    document.getElementById("ref-reduced")?.addEventListener("click", (e) => {
+      reduced = !reduced;
+      e.currentTarget.setAttribute("aria-pressed", String(reduced));
+    });
+    let wasPhone = matchMedia("(max-width: 719px)").matches;
+    matchMedia("(max-width: 719px)").addEventListener("change", (ev) => {
+      if (ev.matches !== wasPhone) {
+        wasPhone = ev.matches;
+        start();
+      }
+    });
+    window.__almanac = {
+      state,
+      ALM,
+      lines,
+      summary,
+      openings: OPENINGS,
+      series: SERIES,
+      openPop,
+      closePop,
+      addTask,
+      markDone,
+      finish: () => engine.finish(),
+      stats: () => engine.stats()
+    };
+  }
+  boot();
+})();
+</script>
+</body>
+</html>

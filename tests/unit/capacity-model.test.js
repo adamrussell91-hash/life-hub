@@ -85,3 +85,17 @@ test('load ignores classes, Corey time, protected walls, logs and ghosts', () =>
   assert.equal(isOverCapacity(30, load), true);
   assert.equal(isOverCapacity(79, load), false);
 });
+
+test('forecastSeries: recovers, follows the term pattern, and widens with distance', async () => {
+  const { forecastSeries } = await import('../../apps/life/js/app/capacity-model.js');
+  const dates = ['2026-09-24', '2026-10-01', '2026-10-20', '2026-11-20', '2026-12-28'];
+  const term = d => (d >= '2026-10-13' && d <= '2026-12-17');
+  const s = forecastSeries(dates, {
+    lastPct: 34, lastDate: '2026-09-24', isHoliday: d => !term(d),
+    pattern: d => (term(d) ? -12 : 0) + (d >= '2026-11-16' && d <= '2026-11-29' ? -16 : 0)
+  });
+  assert.deepEqual(s.map(p => p.pct), [34, 84, 68, 52, 85]);
+  assert.equal(s[0].low, s[0].high, 'today has no spread');
+  const spread = p => p.high - p.low;
+  assert.ok(spread(s[1]) < spread(s[2]) && spread(s[2]) < spread(s[3]), 'the band widens with distance');
+});
