@@ -6,6 +6,7 @@ import {
 } from './http.mjs';
 import { createOperatorHandler } from './operator-gate.mjs';
 import { readJsonObject } from './teaching-record-get.mjs';
+import { applyLifeWall } from './life-wall.mjs';
 import {
   defaultGetTasksStore,
   deleteKey,
@@ -58,6 +59,10 @@ export function createTasksCollectionHandler({
       if (request.method === 'POST') {
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
+        const wall = applyLifeWall(parsed.value);
+        if (!wall.ok) {
+          return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
+        }
         const built = create(parsed.value, newRecordId(idPrefix), new Date().toISOString());
         if (built.error) {
           return withCors(
@@ -88,6 +93,10 @@ export function createTasksCollectionHandler({
         }
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
+        const wall = applyLifeWall(parsed.value);
+        if (!wall.ok) {
+          return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
+        }
         const next = mergeRecord(existing, parsed.value);
         await setJSON(store, recordKey(prefix, id), next);
         return withCors(okResponse(200, next), request, env);

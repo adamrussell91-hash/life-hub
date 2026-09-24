@@ -25,6 +25,7 @@ type Fixture = {
     baselineEnd?: string;
   }>;
   milestones: Array<{ id: string; project: string; title: string; due: string; deps?: string[] }>;
+  walls?: Array<{ id: string; label: string; start: string; end: string; source: string }>;
   tasks: Array<{
     id: string;
     title: string;
@@ -94,6 +95,26 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       }))
     })
   );
+  for (const wall of fixture.walls ?? []) {
+    if (projects.some((project) => project.id === wall.source)) {
+      const host = projects.find((project) => project.id === wall.source);
+      if (host) host.life_wall = { starts_on: wall.start, ends_on: wall.end, label: wall.label };
+      continue;
+    }
+    projects.push(
+      ProjectSchema.parse({
+        schema_version: 1,
+        id: wall.source,
+        title: wall.label,
+        status: 'active',
+        type: 'standard',
+        current_end_date: wall.end,
+        created_at: `${wall.start}T12:00:00.000Z`,
+        updated_at: fixture.now,
+        life_wall: { starts_on: wall.start, ends_on: wall.end, label: wall.label }
+      })
+    );
+  }
   for (const project of projects) await kv.setJSON(keys.projectKey(project.id), project);
   await kv.setJSON(keys.projectsIndexKey(), { ids: projects.map((project) => project.id) });
 

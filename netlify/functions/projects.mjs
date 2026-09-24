@@ -26,7 +26,8 @@ export function createProjectsHandler(deps = {}) {
           parent_someday_id: typeof body.parent_someday_id === 'string' ? body.parent_someday_id : null,
           milestones: Array.isArray(body.milestones) ? body.milestones : [],
           created_at: timestamp,
-          updated_at: timestamp
+          updated_at: timestamp,
+          ...(Object.prototype.hasOwnProperty.call(body, 'life_wall') ? { life_wall: body.life_wall } : {})
         }
       };
     }

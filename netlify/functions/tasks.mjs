@@ -6,6 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { applyLifeWall } from './_shared/life-wall.mjs';
 import { coerceOriginDate, coerceSomedayKind, coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
 import {
@@ -94,6 +95,10 @@ export function createTasksHandler(deps = {}) {
             env
           );
         }
+        const wall = applyLifeWall(parsed.value);
+        if (!wall.ok) {
+          return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
+        }
         const timestamp = new Date().toISOString();
         const id = newTaskId();
         const task = {
@@ -124,7 +129,10 @@ export function createTasksHandler(deps = {}) {
           origin_date: coerceOriginDate(parsed.value.origin_date),
           linked_project_ids: coerceStringArray(parsed.value.linked_project_ids),
           linked_goal_ids: coerceStringArray(parsed.value.linked_goal_ids),
-          odyssey_paths: Array.isArray(parsed.value.odyssey_paths) ? parsed.value.odyssey_paths : []
+          odyssey_paths: Array.isArray(parsed.value.odyssey_paths) ? parsed.value.odyssey_paths : [],
+          ...(Object.prototype.hasOwnProperty.call(parsed.value, 'life_wall')
+            ? { life_wall: parsed.value.life_wall }
+            : {})
         };
         await setJSON(store, taskKey(id), task);
         const ids = await readTaskIndex(store);
@@ -149,6 +157,10 @@ export function createTasksHandler(deps = {}) {
         }
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
+        const wall = applyLifeWall(parsed.value);
+        if (!wall.ok) {
+          return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
+        }
         const next = normalizeTaskRecord(
           applyDueDatePriorityFloor(mergeTask(existing, parsed.value), parsed.value)
         );

@@ -194,7 +194,8 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'waiting_status',
     'contexts',
     'cognitive_load',
-    'depth'
+    'depth',
+    'life_wall'
   ] as const;
   for (const key of allow) {
     if (key in patch) {
@@ -219,7 +220,8 @@ export function sanitizeProjectPatch(patch: Record<string, unknown>): Partial<Pr
     'desired_outcome',
     'quality_bar',
     'review_at',
-    'milestones'
+    'milestones',
+    'life_wall'
   ] as const;
   for (const key of allow) {
     if (key in patch) out[key] = patch[key];

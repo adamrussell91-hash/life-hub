@@ -23,6 +23,7 @@ import {
   type SchoolTerm,
   type TimeScale
 } from '@/domain/school-time';
+import { beforeWallChip, collectLifeWalls, wallContaining, type CollectedWall } from '@/domain/life-wall';
 import { TL, SURF, domainColour, formatKey, tint } from '@/domain/timeline-geometry';
 import {
   buildTimelineRows,
@@ -54,7 +55,7 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
-  | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle';
+  | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall';
 
 type Spec = {
   kind: Kind;
@@ -62,7 +63,7 @@ type Spec = {
   sub?: string;
   colour?: string;
   data?: Record<string, string>;
-  flags?: { critical?: boolean; holiday?: boolean };
+  flags?: { critical?: boolean; holiday?: boolean; inside?: boolean };
 };
 
 type ViewMode = 'bars' | 'lines';
@@ -296,7 +297,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   card.append(barsHost, linesHost);
   const live = el('p', 'tl-live');
   live.setAttribute('aria-live', 'polite');
-  page.append(toolbar, card, live);
+  const toast = el('p', 'tl-toast');
+  toast.dataset.part = 'wall-toast';
+  toast.hidden = true;
+  page.append(toolbar, card, toast, live);
   canvas.replaceChildren(page);
 
   const layers: Record<string, SVGGElement> = {};
@@ -306,6 +310,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
   const defs = svgEl('defs');
   defs.innerHTML = `
+    <pattern id="tl-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="color-mix(in srgb, var(--navy) 16%, transparent)" stroke-width="2"/>
+    </pattern>
     <marker id="tl-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
       <path d="M1 1 L9 5 L1 9 Z" fill="var(--shallow)"/>
     </marker>
@@ -382,7 +390,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     live.textContent = message;
   }
 
+  let liveWalls: CollectedWall[] = [];
+
   function layerFor(kind: Kind): SVGGElement {
+    if (kind === 'wall') return layers.walls!;
     if (kind === 'hol' || kind === 'grid') return layers.grid!;
     if (kind === 'term' || kind === 'week') return layers.axis!;
     if (kind === 'band' || kind === 'bracket') return layers.bands!;
@@ -413,7 +424,13 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const sub = svgEl('text', { class: 'tl-bar__sub', 'data-part': 'bar-sub' });
       sub.textContent = spec.sub ?? '';
       const link = svgEl('circle', { class: 'tl-bar__link', r: 5 });
-      g.append(title, sub, link);
+      const badge = svgEl('g', { class: 'tl-wall-badge', 'data-part': 'wall-badge', opacity: 0 });
+      badge.append(
+        svgEl('rect', { width: 16, height: 16, rx: 8 }),
+        svgEl('path', { class: 'tl-wall__lock', d: 'M-3.5 -1 v-2 a3.5 3.5 0 0 1 7 0 v2 M-5 -1 h10 v7 h-10 z' })
+      );
+      const before = svgEl('text', { class: 'tl-before', 'data-part': 'before-chip' });
+      g.append(title, sub, link, badge, before);
       return;
     }
     if (kind === 'ms' || kind === 'dream') {
@@ -432,6 +449,15 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const text = svgEl('text', { class: kind === 'ms' ? 'tl-ms__label' : 'tl-dream__label' });
       text.textContent = spec.text ?? '';
       g.append(mark, text);
+      if (kind === 'ms') {
+        g.append(svgEl('text', { class: 'tl-before', 'data-part': 'before-chip' }));
+        const badge = svgEl('g', { class: 'tl-wall-badge', 'data-part': 'wall-badge', opacity: 0 });
+        badge.append(
+          svgEl('rect', { width: 16, height: 16, rx: 8 }),
+          svgEl('path', { class: 'tl-wall__lock', d: 'M-3.5 -1 v-2 a3.5 3.5 0 0 1 7 0 v2 M-5 -1 h10 v7 h-10 z' })
+        );
+        g.append(badge);
+      }
       if (kind === 'dream') g.append(svgEl('line', { class: 'tl-dream__line' }));
       return;
     }
@@ -503,6 +529,24 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const date = svgEl('text', { class: 'tl-week__date' });
       date.textContent = spec.sub ?? '';
       g.append(label, date);
+      return;
+    }
+    if (kind === 'wall') {
+      g.setAttribute('data-part', 'wall');
+      const pill = svgEl('g', { class: 'tl-wall__pill' });
+      pill.append(
+        svgEl('rect', { rx: 10, height: 20 }),
+        svgEl('path', { class: 'tl-wall__lock', d: 'M-3.5 -1 v-2 a3.5 3.5 0 0 1 7 0 v2 M-5 -1 h10 v7 h-10 z' }),
+        svgEl('text')
+      );
+      g.append(
+        svgEl('rect', { class: 'tl-wall', fill: 'url(#tl-hatch)' }),
+        svgEl('line', { class: 'tl-wall__edge' }),
+        svgEl('line', { class: 'tl-wall__edge tl-wall__edge--end' }),
+        pill
+      );
+      const label = pill.querySelector('text');
+      if (label) label.textContent = spec.text ?? '';
       return;
     }
     if (kind === 'today') {
@@ -590,6 +634,18 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       setAttrs(sub!, { x: subX, y: bh / 2 + 4.5 });
       const link = inner.querySelector('.tl-bar__link');
       if (link) setAttrs(link, { cx: w, cy: bh / 2 });
+      const badge = inner.querySelector('[data-part="wall-badge"]');
+      if (badge) {
+        badge.setAttribute('opacity', spec.flags?.inside ? '1' : '0');
+        badge.setAttribute('transform', 'translate(-6 -8)');
+      }
+      const before = inner.querySelector('[data-part="before-chip"]');
+      if (before) {
+        const chip = spec.data?.before ?? '';
+        if (before.textContent !== chip) before.textContent = chip;
+        setAttrs(before, { x: subX + textW(spec.sub ?? '', font) + 10, y: bh / 2 + 4.5 });
+      }
+      inner.classList.toggle('is-wall-warn', false);
       return;
     }
     if (spec.kind === 'ms') {
@@ -597,6 +653,18 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const [mark, text] = [...inner.children] as SVGElement[];
       setAttrs(mark!, { x: -TL.diamond / 2, y: -TL.diamond / 2, transform: 'rotate(45)' });
       setAttrs(text!, { x: TL.diamond / 2 + 8, y: 4.5 });
+      const before = inner.querySelector('[data-part="before-chip"]');
+      if (before) {
+        const chip = spec.data?.before ?? '';
+        if (before.textContent !== chip) before.textContent = chip;
+        const labelW = textW(spec.text ?? '', `500 12px ${FONT}`);
+        setAttrs(before, { x: TL.diamond / 2 + 8 + labelW + 10, y: 4.5 });
+      }
+      const badge = inner.querySelector('[data-part="wall-badge"]');
+      if (badge) {
+        badge.setAttribute('opacity', spec.flags?.inside ? '1' : '0');
+        badge.setAttribute('transform', 'translate(8 -16)');
+      }
       return;
     }
     if (spec.kind === 'dream') {
@@ -691,6 +759,23 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       setAttrs(date!, { x: 6, y: TL.axis.dateY });
       return;
     }
+    if (spec.kind === 'wall') {
+      const [rect, edgeStart, edgeEnd, pill] = [...inner.children] as SVGElement[];
+      const top = TL.axis.h;
+      const bottom = Math.max(top, props.h ?? 0);
+      setAttrs(rect!, { x, y: top, width: w, height: Math.max(0, bottom - top) });
+      setAttrs(edgeStart!, { x1: x, x2: x, y1: top, y2: bottom });
+      setAttrs(edgeEnd!, { x1: x + w, x2: x + w, y1: top, y2: bottom });
+      const text = spec.text ?? '';
+      const tw = textW(text, `600 12px ${FONT}`) + 36;
+      pill?.setAttribute('transform', `translate(${x + 8} ${top + 8})`);
+      const [pillRect, lock, pillText] = [...(pill?.children ?? [])] as SVGElement[];
+      setAttrs(pillRect!, { width: tw });
+      lock?.setAttribute('transform', 'translate(14 9)');
+      if (pillText && pillText.textContent !== text) pillText.textContent = text;
+      setAttrs(pillText!, { x: 26, y: 14 });
+      return;
+    }
     if (spec.kind === 'today') {
       const [line, pill, text] = [...inner.children] as SVGElement[];
       setAttrs(line!, { x1: x, x2: x, y1: TL.axis.h - 2, y2: props.h ?? 0 });
@@ -727,6 +812,16 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     };
     const compact = card.clientWidth > 0 && card.clientWidth < TL.mobileBreak;
     card.classList.toggle('is-compact', compact);
+    liveWalls = collectLifeWalls({ tasks, projects, goals });
+    for (const wall of liveWalls) {
+      const id = `wall:${wall.id}`;
+      specs.set(id, { kind: 'wall', text: `${wall.label} · wall` });
+      entities.set(id, {
+        x: X(wall.starts_on),
+        w: Math.max(8, X(addDaysKey(wall.ends_on, 1)) - X(wall.starts_on)),
+        h: rowsBottom + 4
+      });
+    }
 
     for (const term of school) {
       const id = `term:T${term.term}`;
@@ -825,12 +920,19 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         const box = barBox(span);
         const id = `${row.kind === 'step' ? 'step' : 'bar'}:${task.id}`;
         const sub = task.blocked ? blockedLabel(task.blockedSince, today) : task.status === 'done' ? 'done' : `due ${formatKey(task.due!)}`;
+        const chip = beforeWallChip(task.due, task.status, liveWalls);
+        const inside = Boolean(task.due && wallContaining(task.due, liveWalls));
         specs.set(id, {
           kind: row.kind === 'step' ? 'step' : 'bar',
           text: task.title,
           sub,
           colour: taskColour(task),
-          data: { state: task.status === 'done' ? 'done' : task.blocked ? 'blocked' : task.status, ...(task.blocked ? { blocked: 'true' } : {}) }
+          flags: inside ? { inside: true } : undefined,
+          data: {
+            state: task.status === 'done' ? 'done' : task.blocked ? 'blocked' : task.status,
+            ...(task.blocked ? { blocked: 'true' } : {}),
+            ...(chip ? { before: chip } : {})
+          }
         });
         entities.set(id, { x: box.x, y: y + (row.h - (row.kind === 'step' ? TL.bar.h - 6 : TL.bar.h)) / 2, w: box.w });
       }
@@ -838,7 +940,14 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         const milestone = model.milestones.find((item) => item.id === row.ref);
         const project = milestone ? projectById(milestone.project) : undefined;
         if (!milestone || !project) continue;
-        specs.set(`ms:${milestone.id}`, { kind: 'ms', text: `${milestone.title} · ${formatKey(milestone.due)}`, colour: project.colour });
+        const chip = beforeWallChip(milestone.due, 'open', liveWalls);
+        specs.set(`ms:${milestone.id}`, {
+          kind: 'ms',
+          text: `${milestone.title} · ${formatKey(milestone.due)}`,
+          colour: project.colour,
+          flags: wallContaining(milestone.due, liveWalls) ? { inside: true } : undefined,
+          data: chip ? { before: chip } : undefined
+        });
         entities.set(`ms:${milestone.id}`, { x: X(milestone.due) + state.dayWidth / 2, y: y + row.h / 2 });
       }
     }
@@ -1104,6 +1213,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     return {
       tasks,
       projects: projects.filter((project) => dated.has(project.id)),
+      lifeWalls: collectLifeWalls({ tasks, projects, goals }),
       now: new Date(`${today}T09:00:00`),
       selectedId: state.selected,
       search: '',
@@ -1264,14 +1374,24 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     for (const [sid, due] of shifted) void persistDue(sid, due).catch(() => undefined);
   }
 
+  function showWallToast(due: string): void {
+    const hit = wallContaining(due, liveWalls);
+    toast.hidden = !hit;
+    toast.textContent = hit ? `Lands inside ${hit.label}` : '';
+  }
+
   function shiftTask(id: string, days: number): void {
     const task = state.tasks.find((item) => item.id === id);
-    if (!task?.due || !days) return;
-    const due = addDaysKey(task.due, days);
+    const milestone = model.milestones.find((item) => item.id === id);
+    const due0 = task?.due ?? milestone?.due;
+    if (!due0 || !days) return;
+    const due = addDaysKey(due0, days);
     applyDue(id, due);
     cascadeFrom(id);
     relayout(reduced ? 'settle' : 'release');
-    announce(`Moved ${task.title} by ${days} ${Math.abs(days) === 1 ? 'day' : 'days'}`);
+    showWallToast(due);
+    const title = task?.title ?? milestone?.title ?? id;
+    announce(`Moved ${title} by ${days} ${Math.abs(days) === 1 ? 'day' : 'days'}`);
     void persistDue(id, due).catch(() => undefined);
   }
 
@@ -1288,6 +1408,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     applyDue(id, due);
     cascadeFrom(id);
     relayout(reduced ? 'settle' : 'release');
+    showWallToast(due);
     announce(`Resized ${task.title}`);
     void persistDue(id, due, est).catch(() => undefined);
   }
@@ -1370,15 +1491,16 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
 
   function onPointerDown(event: PointerEvent): void {
-    const mark = (event.target as Element).closest('[data-part="bar"], [data-part="step-bar"]') as SVGGElement | null;
+    const mark = (event.target as Element).closest('[data-part="bar"], [data-part="step-bar"], [data-part="milestone"]') as SVGGElement | null;
     if (!mark || state.view !== 'bars') return;
-    const id = mark.getAttribute('data-task-id');
+    const id = mark.getAttribute('data-task-id') ?? mark.getAttribute('data-milestone-id');
     if (!id) return;
-    const entityId = engine.has(`bar:${id}`) ? `bar:${id}` : `step:${id}`;
+    const entityId = engine.has(`bar:${id}`) ? `bar:${id}` : engine.has(`step:${id}`) ? `step:${id}` : `ms:${id}`;
     const props = engine.get(entityId);
     if (!props) return;
     const target = event.target as Element;
-    const mode = target.closest('.tl-bar__link') ? 'link' : target.closest('.tl-bar__grip') ? 'resize' : 'move';
+    const milestoneDrag = mark.getAttribute('data-part') === 'milestone';
+    const mode = milestoneDrag ? 'move' : target.closest('.tl-bar__link') ? 'link' : target.closest('.tl-bar__grip') ? 'resize' : 'move';
     const start = () => {
       event.preventDefault();
       mark.classList.add('is-dragging');
@@ -1428,6 +1550,15 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (drag.mode === 'resize') engine.place(drag.entityId, { w: Math.max(TL.bar.minW, drag.originW + dx) });
     else engine.place(drag.entityId, { x: drag.originX + dx });
     followCurves(drag.id, dx, drag.mode === 'resize' ? 'resize' : 'move', drag.curves);
+    const task = state.tasks.find((item) => item.id === drag.id);
+    const milestone = model.milestones.find((item) => item.id === drag.id);
+    const due0 = task?.due ?? milestone?.due ?? null;
+    const preview = due0 ? addDaysKey(due0, drag.days) : null;
+    const hit = preview ? wallContaining(preview, liveWalls) : null;
+    const dragging = svg.querySelector(`[data-task-id="${CSS.escape(drag.id)}"], [data-milestone-id="${CSS.escape(drag.id)}"]`);
+    dragging?.classList.toggle('is-wall-warn', Boolean(hit));
+    toast.hidden = !hit;
+    toast.textContent = hit ? `Lands inside ${hit.label}` : '';
   }
 
   function onPointerUp(event: PointerEvent): void {
@@ -1445,6 +1576,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       return;
     }
     if (!drag.days) {
+      toast.hidden = true;
+      svg.querySelector(`[data-task-id="${CSS.escape(drag.id)}"], [data-milestone-id="${CSS.escape(drag.id)}"]`)?.classList.remove('is-wall-warn');
       relayout('settle');
       return;
     }

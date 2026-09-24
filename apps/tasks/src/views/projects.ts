@@ -40,7 +40,9 @@ import {
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
 import { inspectProjectHealth } from '@/domain/project-health';
+import { projectSpan } from '@/domain/chronology';
 import { projectMilestones } from '@/domain/project-milestones';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { DEFAULT_PLANNING_PROFILE } from '@/schemas/planning-profile';
 
 /** Quiet when healthy; a real control when the project has no next action. */
@@ -315,6 +317,25 @@ function renderProjectBoardCard(
     );
     article.append(due);
   }
+
+  article.append(
+    mountLifeWallEditor({
+      title: card.project.title,
+      wall: card.project.life_wall,
+      suggest: () => {
+        const span = projectSpan(card.project, tasks);
+        if (span) return { starts_on: span.startKey, ends_on: span.endKey };
+        const end = card.project.current_end_date || card.project.baseline_end_date;
+        return end ? { starts_on: card.project.created_at.slice(0, 10), ends_on: end } : null;
+      },
+      onCommit: (wall) => {
+        void tasksApi
+          .updateProject(card.project.id, { life_wall: wall })
+          .then(() => boardActions.onReload())
+          .catch((err) => article.append(el('p', 'empty-state', errorMessage(err))));
+      }
+    }).el
+  );
 
   const milestones = projectMilestones(card.project).slice(0, 3);
   if (milestones.length) {

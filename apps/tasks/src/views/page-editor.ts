@@ -10,6 +10,7 @@ import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
 import { openPlusAdd } from '@/views/plus-add';
 import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
@@ -379,7 +380,8 @@ function paintProjectPage(
           quality_bar: current.quality_bar,
           purpose: current.purpose,
           desired_outcome: current.desired_outcome,
-          page_blocks: current.page_blocks
+          page_blocks: current.page_blocks,
+          life_wall: current.life_wall ?? null
         })
         .then(
           (next) => {
@@ -421,7 +423,17 @@ function paintProjectPage(
     className: 'page-card__due',
     onChange: (value) => persist({ current_end_date: value || null })
   });
-  fields.append(status.el, due.el);
+  const lifeWall = mountLifeWallEditor({
+    title: project.title,
+    wall: project.life_wall,
+    suggest: () => {
+      const end = due.input.value || project.current_end_date || project.baseline_end_date;
+      const start = project.created_at.slice(0, 10);
+      return end ? { starts_on: start, ends_on: end } : null;
+    },
+    onCommit: (wall) => persist({ life_wall: wall })
+  });
+  fields.append(status.el, due.el, lifeWall.el);
 
   let qualityValue = (project.quality_bar ?? 'good_enough') as QualityBar;
   const qualityHost = el('div', 'page-card__quality');

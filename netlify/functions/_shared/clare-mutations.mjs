@@ -2,11 +2,12 @@ const MAX_MUTATIONS = 12;
 const TASK_ALLOW = new Set([
   'title', 'description', 'status', 'priority', 'domain', 'due_date', 'due_time',
   'estimated_duration', 'parent_project_id', 'parent_task_id', 'depends_on', 'step_order',
-  'tags', 'page_blocks', 'bucket', 'kind', 'waiting_on', 'waiting_status', 'source'
+  'tags', 'page_blocks', 'bucket', 'kind', 'waiting_on', 'waiting_status', 'source',
+  'life_wall'
 ]);
 const PROJECT_ALLOW = new Set([
   'title', 'description', 'status', 'type', 'current_end_date', 'page_blocks', 'tags', 'arc_summary',
-  'milestones'
+  'milestones', 'life_wall'
 ]);
 const MAP_ALLOW = new Set(['title', 'status', 'nodes', 'edges', 'notes']);
 
