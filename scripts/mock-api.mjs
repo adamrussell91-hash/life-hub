@@ -10,7 +10,16 @@ import { buildHubMapSeed } from '../apps/life/js/app/hub-map-seed.js';
 import { validateMap } from '../apps/life/js/app/hub-map-model.js';
 
 import { SESSION_MS } from '../netlify/functions/_shared/auth-security.mjs';
-import { getSydneyTimestamp } from '../apps/life/js/core/time.js';
+import { getSydneyDateKey, getSydneyTimestamp } from '../apps/life/js/core/time.js';
+import {
+  PENDING_CALENDAR_GHOSTS_PATH,
+  pendingGhostsInRange,
+  readGhostDecision,
+  runGhostDecision
+} from '../netlify/functions/calendar-ghosts.mjs';
+import { CALENDAR_VISUAL_PATH, loadCalendarVisualSeed } from './calendar-visual-seed.mjs';
+import { GitHubClientError } from '../netlify/functions/_shared/github-client.mjs';
+import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blobs.mjs';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
@@ -80,15 +89,30 @@ function confirmedMarkdown(candidate, slug) {
 
 export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, extraFiles = [] } = {}) {
   const rootPath = resolve(root instanceof URL ? fileURLToPath(root) : root);
+  const clock = { now };
   const sessions = new Map();
   const confirmedFiles = new Map(extraFiles.map(file => [file.path, file.content]));
+  const taskData = new Map();
   let nextSessionId = 0;
   const hubMap = { map: null, version: 0 };
+  const taskStore = {
+    async get(key, options) {
+      const value = taskData.get(key);
+      if (value == null) return null;
+      return options?.type === 'json' ? structuredClone(value) : value;
+    },
+    async setJSON(key, value) {
+      taskData.set(key, structuredClone(value));
+    },
+    async set(key, value) {
+      taskData.set(key, typeof value === 'string' ? JSON.parse(value) : value);
+    }
+  };
 
   const readSession = request => {
     const id = readCookie(request, 'life_hub_mock');
     const session = sessions.get(id);
-    if (!session || now() >= session.expiresAt) {
+    if (!session || clock.now() >= session.expiresAt) {
       if (id) sessions.delete(id);
       return null;
     }
@@ -113,7 +137,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         error(response, 401, 'invalid_credentials', 'That passphrase was not accepted.', true);
       } else {
         const id = String(++nextSessionId);
-        const expiresAt = now() + sessionMs;
+        const expiresAt = clock.now() + sessionMs;
         sessions.set(id, { expiresAt });
         json(response, 200, {
           ok: true,
@@ -347,6 +371,82 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/calendar-visual-seed') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      try {
+        const seeded = await loadCalendarVisualSeed();
+        clock.now = () => Date.parse(seeded.now);
+        for (const [path, content] of seeded.files) confirmedFiles.set(path, content);
+        for (const task of seeded.tasks) taskData.set(taskKey(task.id), task);
+        taskData.set(TASKS_INDEX_KEY, seeded.tasks.map(task => task.id));
+        json(response, 200, { ok: true, data: { now: seeded.now, ...seeded.counts } });
+      } catch (seedError) {
+        error(response, 500, 'seed_failed', seedError instanceof Error ? seedError.message : 'Calendar visual seed failed.', true);
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/calendar-ghosts') {
+      if (request.method !== 'GET' && request.method !== 'POST') return methodNotAllowed(response, 'GET, POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const instant = new Date(clock.now());
+      const open = async () => {
+        const repository = await readFixtureRepository(rootPath, confirmedFiles);
+        const files = new Map(repository.files.map(file => [file.path, file.content]));
+        for (const [path, content] of confirmedFiles) files.set(path, content);
+        return {
+          base: { commitSha: repository.commitSha, treeSha: repository.treeSha },
+          async readFile(path) {
+            return files.has(path) ? files.get(path) : null;
+          }
+        };
+      };
+      if (request.method === 'GET') {
+        try {
+          const { parseDateRange } = await import('../netlify/functions/_shared/repo-policy.mjs');
+          parseDateRange(url);
+        } catch {
+          error(response, 400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.', false);
+          return true;
+        }
+        const opened = await open();
+        const ghosts = pendingGhostsInRange(
+          await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH),
+          url.searchParams.get('from'),
+          url.searchParams.get('to')
+        );
+        json(response, 200, { ok: true, ghosts });
+        return true;
+      }
+      const decision = readGhostDecision(await readJson(request));
+      if (decision.error === 'client_write_rejected') {
+        error(response, 400, 'client_write_rejected', 'The client cannot send writes.', false);
+        return true;
+      }
+      if (decision.error) {
+        error(response, 400, 'invalid_request', 'Provide id and decision.', false);
+        return true;
+      }
+      try {
+        const result = await runGhostDecision({
+          open,
+          commit: async (changed) => {
+            for (const [path, content] of changed) confirmedFiles.set(path, content);
+          },
+          tasksStore: async () => taskStore,
+          decision,
+          today: getSydneyDateKey(instant),
+          nowIso: getSydneyTimestamp(instant)
+        });
+        json(response, result.status, result.payload);
+      } catch (ghostError) {
+        const conflict = ghostError instanceof GitHubClientError && ghostError.code === 'write_conflict';
+        error(response, conflict ? 409 : 503, conflict ? 'write_conflict' : 'github_unavailable', 'The repository is temporarily unavailable.', !conflict);
+      }
+      return true;
+    }
+
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
         url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {
@@ -388,6 +488,7 @@ async function readFixtureRepository(rootPath, confirmedFiles = new Map()) {
 }
 
 function isInRange(path, { from, to }) {
+  if (path === CALENDAR_VISUAL_PATH) return true;
   if (CONFIG_PATHS.has(path) || RESEARCH_PATH.test(path)) return true;
   const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1];
   return date >= from && date <= to;
