@@ -901,6 +901,7 @@ export function createMockApi() {
         all_day?: boolean;
         location_text?: string | null;
         accreditation_category?: string | null;
+        priority_area?: string | null;
         hours?: number | null;
         attendance_state?: string | null;
         certificate?: unknown;
@@ -920,6 +921,7 @@ export function createMockApi() {
         occurrence_state: 'scheduled',
         location_text: input.location_text ?? null,
         accreditation_category: input.accreditation_category ?? null,
+        priority_area: input.priority_area ?? null,
         hours: input.hours ?? null,
         attendance_state: input.attendance_state ?? null,
         certificate: input.certificate ?? null,
@@ -960,6 +962,7 @@ export function createMockApi() {
             'title',
             'location_text',
             'accreditation_category',
+            'priority_area',
             'hours',
             'attendance_state',
             'certificate',

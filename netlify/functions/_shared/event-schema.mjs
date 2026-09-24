@@ -25,6 +25,8 @@ export const EVENT_STATE_TRANSITIONS = Object.freeze({
 
 export const ATTENDANCE_STATES = new Set(['registered', 'attended', 'partial', 'absent']);
 
+export const PRIORITY_AREA_MAX_LENGTH = 80;
+
 export const TITLE_MAX_LENGTH = 500;
 export const LOCATION_MAX_LENGTH = 500;
 export const ACCREDITATION_MAX_LENGTH = 200;
@@ -144,6 +146,7 @@ const STORED_KEYS = new Set([
   'occurrence_state',
   'location_text',
   'accreditation_category',
+  'priority_area',
   'hours',
   'attendance_state',
   'certificate',
@@ -166,6 +169,10 @@ export function parseEventRecord(raw) {
   if (!EVENT_OCCURRENCE_STATES.has(raw.occurrence_state)) return null;
   if (raw.location_text != null && typeof raw.location_text !== 'string') return null;
   if (raw.accreditation_category != null && typeof raw.accreditation_category !== 'string') return null;
+  if (raw.priority_area != null && typeof raw.priority_area !== 'string') return null;
+  if (typeof raw.priority_area === 'string' && raw.priority_area.trim().length > PRIORITY_AREA_MAX_LENGTH) {
+    return null;
+  }
   if (raw.hours != null && (typeof raw.hours !== 'number' || !Number.isFinite(raw.hours) || raw.hours < 0)) {
     return null;
   }
@@ -185,6 +192,7 @@ export function parseEventRecord(raw) {
     occurrence_state: raw.occurrence_state,
     location_text: raw.location_text ?? null,
     accreditation_category: raw.accreditation_category ?? null,
+    priority_area: typeof raw.priority_area === 'string' ? raw.priority_area.trim() || null : null,
     hours: raw.hours ?? null,
     attendance_state: raw.attendance_state ?? null,
     certificate: certificate,
@@ -202,11 +210,17 @@ const CREATE_KEYS = new Set([
   'all_day',
   'location_text',
   'accreditation_category',
+  'priority_area',
   'hours',
   'attendance_state',
   'certificate',
   'links'
 ]);
+
+function parsePriorityArea(value) {
+  if (value === undefined || value === null) return null;
+  return trimBounded(value, 'priority_area', PRIORITY_AREA_MAX_LENGTH);
+}
 
 export function validateEventCreateInput(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -267,6 +281,7 @@ export function validateEventCreateInput(input) {
       'accreditation_category',
       ACCREDITATION_MAX_LENGTH
     ),
+    priority_area: parsePriorityArea(input.priority_area),
     hours,
     attendance_state,
     certificate: validateCertificateInput(input.certificate),
@@ -278,6 +293,7 @@ const UPDATE_KEYS = new Set([
   'title',
   'location_text',
   'accreditation_category',
+  'priority_area',
   'hours',
   'attendance_state',
   'certificate',
@@ -309,6 +325,9 @@ export function validateEventFieldUpdate(input) {
       'accreditation_category',
       ACCREDITATION_MAX_LENGTH
     );
+  }
+  if (input.priority_area !== undefined) {
+    patch.priority_area = parsePriorityArea(input.priority_area);
   }
   if (input.hours !== undefined) {
     if (input.hours === null) patch.hours = null;
@@ -409,6 +428,7 @@ export function projectEvent(record, incompleteLinks = null) {
     occurrence_state: record.occurrence_state,
     location_text: record.location_text ?? null,
     accreditation_category: record.accreditation_category ?? null,
+    priority_area: record.priority_area ?? null,
     hours: record.hours ?? null,
     attendance_state: record.attendance_state ?? null,
     certificate: record.certificate ?? null,

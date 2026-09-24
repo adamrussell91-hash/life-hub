@@ -159,6 +159,7 @@ export function createEventRepository(deps = {}) {
       occurrence_state: 'scheduled',
       location_text: validated.location_text,
       accreditation_category: validated.accreditation_category,
+      priority_area: validated.priority_area,
       hours: validated.hours,
       attendance_state: validated.attendance_state,
       certificate: validated.certificate,
