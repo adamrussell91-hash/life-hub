@@ -61,12 +61,13 @@ Implement phase 2:
 - Move ALM verbatim to packages/design-kit/js/almanac-geometry.js. Move the .alm styles verbatim to packages/design-kit/calendar-almanac.css, and render the alm-hatch / alm-area defs once in the Life shell.
 - In the Life calendar, the Almanac zoom pill (the fifth stop) renders the Almanac from GET /api/almanac: summary, chart (world, anchors, tide, lead lines, today), openings. On phone (< 720px), the list layout. Structure as in almanac-ref.ts: mount once, apply() is the only function writing geometry.
 - data-part attributes exactly as tests/browser/almanac-visual.spec.mjs expects. Expose window.__almanac in dev builds.
+- The chart is LAID OUT at the card's real width, never scaled: port setWidth, the SVG width attribute and the ResizeObserver re-layout from almanac-ref.ts, plus .alm { min-width:0; contain:inline-size }. Port textW/fitText and the label budgets (VISUAL-SPEC rule 5) verbatim.
 
 Guard rails:
 - Every number is computed (VISUAL-SPEC rule 2). Bead looks per status exactly as rule 5 says. "example" stays on non-live world data.
 - Tokens and the named --alm-* surfaces only. Dates dd/mm/yy.
 - No new failing tests or tsc errors against BASELINE.md.
-- Loop: `npm run build && ALMANAC_APP=1 node --test --test-name-pattern="almanac phase 2" tests/browser/almanac-visual.spec.mjs`. Check almanac-1280 and almanac-390 in compare.html. Attach both.
+- First copy docs/proposals/calendar-reference/almanac/almanac-visual.spec.mjs over tests/browser/almanac-visual.spec.mjs unchanged (it gained a real-width test). Loop: `npm run build && ALMANAC_APP=1 node --test --test-name-pattern="almanac phase 2" tests/browser/almanac-visual.spec.mjs`. Check almanac-1280 and almanac-390 in compare.html (the goldens include the rail, so they should match your build closely). Attach both.
 
 PR: "Almanac: phase 2 layout".
 ```
