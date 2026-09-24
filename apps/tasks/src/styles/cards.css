@@ -217,6 +217,7 @@
   color: var(--ink);
   gap: 0.3rem;
   max-width: 100%;
+  min-width: 0;
   cursor: default;
 }
 
@@ -234,6 +235,7 @@ a.hub-chip--attach {
 }
 
 .hub-chip__name {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -628,7 +630,7 @@ a.hub-chip--attach {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   padding-right: 2.75rem;
   background: var(--hub-glass-fill);
   border: 1px solid var(--line);
@@ -646,10 +648,10 @@ a.hub-chip--attach {
 
 .hub-row__title {
   margin: 0;
-  font-size: var(--text-md);
+  font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
-  line-height: var(--leading-snug);
+  line-height: var(--leading-tight);
   color: var(--ink);
 }
 
@@ -1053,6 +1055,58 @@ button.hub-chip {
   color: inherit;
   letter-spacing: inherit;
   line-height: inherit;
+}
+
+/* Board tiles were inheriting body type, so the task name and the project
+   chip read as two headings. Page titles stay on the rule above. */
+.hub-canvas .hub-row__title.card-title,
+.hub-canvas .hub-card:not(.page-card) .hub-card__title.card-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.hub-canvas .hub-card:not(.page-card) .hub-card__eyebrow {
+  font-size: var(--text-2xs);
+}
+
+.hub-canvas .hub-row .hub-chips,
+.hub-canvas .hub-card:not(.page-card) .hub-chips {
+  gap: var(--space-1);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hub-canvas .hub-row .hub-chip--attach,
+.hub-canvas .hub-card:not(.page-card) .hub-chip--attach {
+  flex: 1 1 100%;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0;
+  gap: var(--space-1);
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-normal);
+  overflow: hidden;
+}
+
+.hub-canvas .hub-row .hub-chip--attach .hub-chip__kind,
+.hub-canvas .hub-card:not(.page-card) .hub-chip--attach .hub-chip__kind {
+  flex: none;
+  font-size: inherit;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-wide);
+}
+
+.hub-canvas .hub-row .hub-chip--attach .hub-chip__name,
+.hub-canvas .hub-card:not(.page-card) .hub-chip--attach .hub-chip__name {
+  color: var(--orca);
+  font-weight: var(--weight-medium);
 }
 
 @media (max-width: 959px) {
