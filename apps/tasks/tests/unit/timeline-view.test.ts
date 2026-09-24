@@ -16,6 +16,7 @@ vi.mock('@/services/client-api', () => ({
     listPrograms: vi.fn(),
     getHubPrefs: vi.fn(),
     getPlanningProfile: vi.fn(),
+    listWorkSessions: vi.fn(),
     updateTask: vi.fn()
   }
 }));
@@ -49,6 +50,7 @@ describe('timeline view', () => {
     vi.mocked(tasksApi.listGoals).mockResolvedValue([]);
     vi.mocked(tasksApi.getHubPrefs).mockResolvedValue(null as never);
     vi.mocked(tasksApi.getPlanningProfile).mockResolvedValue(null);
+    vi.mocked(tasksApi.listWorkSessions).mockResolvedValue([]);
   });
 
   it('renders the five zoom stops and a task bar', async () => {

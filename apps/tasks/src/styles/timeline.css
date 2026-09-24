@@ -49,6 +49,15 @@
 .tl-today__line { stroke: var(--wave); stroke-width: 1.5; stroke-dasharray: 3 3; }
 .tl-today__pill { fill: var(--wave); }
 .tl-today__text { font: var(--weight-semibold) var(--text-xs)/1 var(--font-ui); fill: #fff; }
+.tl-toggle:disabled { opacity: .45; cursor: not-allowed; }
+.hub-pills.is-dim { opacity: .45; pointer-events: none; }
+.tl-lens__wash { fill: color-mix(in srgb, var(--wave) 8%, transparent); pointer-events: none; }
+.tl-lens__edge { stroke: var(--wave); stroke-width: 1.5; pointer-events: none; }
+.tl-lens__pill rect { fill: var(--paper); stroke: var(--line); stroke-width: 1; }
+.tl-lens__pill text { font: var(--weight-semibold) var(--text-xs)/1 var(--font-ui); fill: var(--navy); pointer-events: none; }
+[data-part="lens-grab"] { cursor: grab; }
+[data-part="lens-grab"]:active { cursor: grabbing; }
+.tl-tail { stroke-width: 1; }
 
 .tl-bar__face { stroke: color-mix(in srgb, var(--navy) 12%, transparent); stroke-width: 1; transition: stroke .12s; }
 .tl-bar__title { font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); fill: var(--ink); pointer-events: none; }

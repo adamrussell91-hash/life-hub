@@ -16,6 +16,7 @@ export type TlTask = {
   domain: string;
   due: string | null;
   est: number | null;
+  actual?: number | null;
   status: string;
   blocked: boolean;
   blockedSince: string | null;

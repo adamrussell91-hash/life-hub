@@ -20,6 +20,7 @@ import {
   buildTimeScale,
   holidayRuns,
   mondayOf,
+  toKey,
   toMs,
   weekLabel,
   type SchoolTerm,
@@ -32,6 +33,16 @@ import { buildWeekLoad, learningTermRhythm, termRhythmFactor, type TermWeekSampl
 import { focusArea, focusAreaLabel, ribbonSegmentText, standardsCoverage, standardsRibbonAlert } from '@/domain/apst';
 import { ghostsFromMutations } from '@/domain/timeline-digest';
 import { TL, SURF, domainColour, formatKey, tint } from '@/domain/timeline-geometry';
+import { buildLensScale, clampLensStart, LENS_FOCUS_PX } from '@/domain/timeline-lens';
+import {
+  domainP85,
+  forecastReady,
+  forecastSamples,
+  milestoneTailDays,
+  overrunDays,
+  type ForecastSample
+} from '@/domain/timeline-forecast';
+import type { WorkSession } from '@/schemas/work-session';
 import {
   buildTimelineRows,
   isTimelineExpanded,
@@ -63,7 +74,8 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
   | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
-  | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow' | 'ribbon';
+  | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow' | 'ribbon'
+  | 'lens' | 'lensgrab' | 'tail';
 
 type Spec = {
   kind: Kind;
@@ -158,6 +170,7 @@ function toModel(tasks: Task[], projects: Project[], goals: Goal[], colours: Map
     domain: task.domain,
     due: task.due_date,
     est: task.estimated_duration,
+    actual: task.actual_duration,
     status: task.status,
     blocked: Boolean(task.blocked_since),
     blockedSince: task.blocked_since,
@@ -236,9 +249,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   let prefs: ReturnType<typeof parseHubPrefs>;
   let colours: Map<string, string>;
   let profile: PlanningProfile | null = null;
+  let sessions: WorkSession[] = [];
   try {
     resetTaskCache();
-    const [listedTasks, listedProjects, listedGoals, rawPrefs, properties, listedProfile] = await Promise.all([
+    const [listedTasks, listedProjects, listedGoals, rawPrefs, properties, listedProfile, listedSessions] = await Promise.all([
       tasksApi.listTasks(),
       tasksApi.listProjects(),
       tasksApi.listGoals().catch(() => [] as Goal[]),
@@ -246,9 +260,11 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       Promise.resolve()
         .then(() => loadTaskProperties(true))
         .catch(() => DEFAULT_TASK_PROPERTY_CONFIG),
-      tasksApi.getPlanningProfile().catch(() => null)
+      tasksApi.getPlanningProfile().catch(() => null),
+      tasksApi.listWorkSessions().catch(() => [] as WorkSession[])
     ]);
     profile = listedProfile;
+    sessions = listedSessions;
     tasks = listedTasks;
     projects = listedProjects;
     goals = listedGoals;
@@ -295,13 +311,19 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   holBtn.type = 'button';
   const todayBtn = el('button', 'tl-toggle', 'Today');
   todayBtn.type = 'button';
+  const focusBtn = el('button', 'tl-toggle', 'Focus');
+  focusBtn.type = 'button';
+  focusBtn.setAttribute('aria-pressed', 'false');
+  const forecastBtn = el('button', 'tl-toggle', 'Forecast');
+  forecastBtn.type = 'button';
+  forecastBtn.setAttribute('aria-pressed', 'false');
   const hammondBtn = el('button', 'btn btn--secondary', 'Ask Hammond');
   hammondBtn.type = 'button';
   const addBtn = el('button', 'tl-plus');
   addBtn.type = 'button';
   addBtn.setAttribute('aria-label', 'Add');
   addBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-  right.append(critBtn, loadBtn, holBtn, todayBtn, hammondBtn, addBtn);
+  right.append(critBtn, loadBtn, holBtn, todayBtn, focusBtn, forecastBtn, hammondBtn, addBtn);
   toolbar.append(left, right);
 
   const card = el('section', 'tl-card');
@@ -375,7 +397,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren(page);
 
   const layers: Record<string, SVGGElement> = {};
-  for (const name of ['grid', 'holidays', 'walls', 'axis', 'today', 'bands', 'curves', 'shadows', 'bars', 'ghosts', 'load']) {
+  for (const name of ['grid', 'holidays', 'walls', 'axis', 'lens', 'today', 'bands', 'curves', 'shadows', 'tails', 'bars', 'chrome', 'ghosts', 'load']) {
     layers[name] = svgEl('g', { 'data-layer': name });
     svg.append(layers[name]);
   }
@@ -418,6 +440,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     critical: false,
     load: true,
     holidaysCompressed: true,
+    lens: false,
+    lensStart: mondayOf(today),
+    forecast: false,
     view: timelineView,
     selected: null as string | null,
     tasks: model.tasks,
@@ -477,6 +502,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   function layerFor(kind: Kind): SVGGElement {
     if (kind === 'wall') return layers.walls!;
     if (kind === 'hol' || kind === 'grid') return layers.grid!;
+    if (kind === 'lens') return layers.lens!;
+    if (kind === 'lensgrab') return layers.chrome!;
+    if (kind === 'tail') return layers.tails!;
     if (kind === 'term' || kind === 'week') return layers.axis!;
     if (kind === 'band' || kind === 'bracket') return layers.bands!;
     if (kind === 'curve') return layers.curves!;
@@ -742,7 +770,52 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const text = svgEl('text', { class: `tl-rowtitle tl-rowtitle--${data.kind ?? 'goal'}` });
       text.textContent = spec.text ?? '';
       g.append(text);
+      return;
     }
+    if (kind === 'lens') {
+      g.setAttribute('data-part', 'lens');
+      g.setAttribute('data-start', data.start ?? '');
+      g.setAttribute('data-end', data.end ?? '');
+      g.append(svgEl('rect', { class: 'tl-lens__wash' }), svgEl('line', { class: 'tl-lens__edge' }), svgEl('line', { class: 'tl-lens__edge tl-lens__edge--end' }));
+      return;
+    }
+    if (kind === 'lensgrab') {
+      g.setAttribute('class', 'tl-lens__pill');
+      g.setAttribute('data-part', 'lens-grab');
+      g.setAttribute('role', 'slider');
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('aria-label', `Focus ${spec.text ?? ''}. Drag to move.`);
+      const text = svgEl('text', { 'text-anchor': 'middle' });
+      text.textContent = spec.text ?? '';
+      g.append(svgEl('rect', { rx: TL.lens.pillH / 2, height: TL.lens.pillH }), text);
+      return;
+    }
+    if (kind === 'tail') {
+      g.setAttribute('data-part', 'forecast-tail');
+      if (data.task) g.setAttribute('data-task-id', data.task);
+      if (data.milestone) g.setAttribute('data-milestone-id', data.milestone);
+      g.setAttribute('data-domain', data.domain ?? '');
+      g.setAttribute('data-days', data.days ?? '');
+      g.setAttribute('aria-label', spec.text ?? 'Forecast tail');
+      const face = svgEl('rect', { class: 'tl-tail', rx: 4 });
+      face.style.fill = tailPattern(colour);
+      face.style.stroke = `color-mix(in srgb, ${colour} 40%, transparent)`;
+      g.append(face);
+    }
+  }
+
+  function tailPattern(hex: string): string {
+    const id = `tl-tail-${hex.replace(/[^a-fA-F0-9]/g, '') || 'wave'}`;
+    if (!defs.querySelector(`#${id}`)) {
+      const pattern = svgEl('pattern', { id, width: 7, height: 7, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(-30)' });
+      const rect = svgEl('rect', { width: 7, height: 7 });
+      rect.setAttribute('fill', `color-mix(in srgb, ${hex} 12%, transparent)`);
+      const line = svgEl('line', { x1: 0, y1: 0, x2: 0, y2: 7, 'stroke-width': 1.5 });
+      line.setAttribute('stroke', `color-mix(in srgb, ${hex} 50%, transparent)`);
+      pattern.append(rect, line);
+      defs.append(pattern);
+    }
+    return `url(#${id})`;
   }
 
   function createNode(id: string): void {
@@ -1077,18 +1150,67 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       return;
     }
     if (spec.kind === 'rowtitle') host.setAttribute('transform', `translate(${viewLeft + 12} ${y})`);
+    if (spec.kind === 'lens') {
+      host.setAttribute('transform', `translate(${x} 0)`);
+      const h = props.h ?? 0;
+      const [wash, edgeL, edgeR] = [...inner.children] as SVGElement[];
+      setAttrs(wash!, { width: w, height: h });
+      setAttrs(edgeL!, { x1: 0, x2: 0, y1: 0, y2: h });
+      setAttrs(edgeR!, { x1: w, x2: w, y1: 0, y2: h });
+      inner.setAttribute('data-start', spec.data?.start ?? '');
+      inner.setAttribute('data-end', spec.data?.end ?? '');
+      return;
+    }
+    if (spec.kind === 'lensgrab') {
+      const label = spec.text ?? '';
+      const pw = textW(label, `600 12px ${FONT}`) + 28;
+      const px = stickyX(x, w, pw);
+      host.setAttribute('transform', `translate(${x + px} ${TL.axis.h + 4})`);
+      inner.setAttribute('aria-label', `Focus ${label}. Drag to move.`);
+      const [pill, text] = [...inner.children] as SVGElement[];
+      setAttrs(pill!, { width: pw });
+      if (text!.textContent !== label) text!.textContent = label;
+      setAttrs(text!, { x: pw / 2, y: TL.lens.pillH / 2 + 4 });
+      return;
+    }
+    if (spec.kind === 'tail') {
+      host.setAttribute('transform', `translate(${x} ${y})`);
+      inner.classList.toggle('is-dim', Boolean(props.dim));
+      setAttrs(inner.firstElementChild!, { width: w, height: props.h ?? TL.bar.h - 6 });
+    }
   }
 
   const engine = createMotion({ apply });
 
-  function layout(): { entities: Map<string, Props>; width: number; height: number } {
-    scale = buildTimeScale({
+  function currentScale(): TimeScale {
+    const holidayFactor = state.holidaysCompressed ? 0.25 : 1;
+    if (!state.lens) {
+      return buildTimeScale({ start: range.start, end: range.end, terms: school, dayWidth: state.dayWidth, holidayFactor });
+    }
+    return buildLensScale({
       start: range.start,
       end: range.end,
       terms: school,
-      dayWidth: state.dayWidth,
-      holidayFactor: state.holidaysCompressed ? 0.25 : 1
+      lensStart: state.lensStart,
+      holidayFactor
     });
+  }
+
+  function samplesNow(): ForecastSample[] {
+    return forecastSamples(
+      state.tasks.map((task) => ({
+        id: task.id,
+        domain: task.domain,
+        status: task.status,
+        estimated_duration: task.est,
+        actual_duration: task.actual ?? null
+      })),
+      sessions
+    );
+  }
+
+  function layout(): { entities: Map<string, Props>; width: number; height: number } {
+    scale = currentScale();
     rows = buildTimelineRows(model, { zoom: state.zoom, expanded: state.expanded, today });
     const entities = new Map<string, Props>();
     const top = TL.axis.h + 8;
@@ -1098,6 +1220,14 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     const height = state.load ? loadTop + TL.load.h : rowsBottom + 12;
     const width = scale.width + PAD_R;
     const X = (key: string) => scale.x(key);
+    const DAY_MS = 86_400_000;
+    const putTail = (id: string, domain: string, colour: string, x0: number, endMs: number, y: number, h: number, label: string, data: Record<string, string>) => {
+      if (!state.forecast) return;
+      const tw = scale.x(endMs) - x0;
+      if (tw <= 0.5) return;
+      specs.set(id, { kind: 'tail', text: label, colour, data });
+      entities.set(id, { x: x0, y, w: tw, h });
+    };
     const barBox = (span: { start: string; end: string }) => {
       const x0 = X(span.start);
       const x1 = X(addDaysKey(span.end, 1));
@@ -1262,7 +1392,21 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
             ...(chip ? { before: chip } : {})
           }
         });
-        entities.set(id, { x: box.x, y: y + (row.h - (row.kind === 'step' ? TL.bar.h - 6 : TL.bar.h)) / 2, w: box.w });
+        const bh = row.kind === 'step' ? TL.bar.h - 6 : TL.bar.h;
+        const by = y + (row.h - bh) / 2;
+        entities.set(id, { x: box.x, y: by, w: box.w });
+        if (state.forecast && task.status !== 'done' && task.est && task.due) {
+          const ratio = domainP85(samplesNow(), task.domain);
+          if (ratio && ratio > 1) {
+            const days = overrunDays(task.est, ratio);
+            const endMs = toMs(addDaysKey(task.due, 1)) + days * DAY_MS;
+            putTail(`tail:${task.id}`, task.domain, taskColour(task), box.x + box.w - 2, endMs, by + 3, bh - 6, `Forecast ${formatKey(toKey(endMs))}`, {
+              domain: task.domain,
+              task: task.id,
+              days: days.toFixed(2)
+            });
+          }
+        }
       }
       if (row.kind === 'milestone') {
         const milestone = model.milestones.find((item) => item.id === row.ref);
@@ -1276,7 +1420,21 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
           flags: wallContaining(milestone.due, liveWalls) ? { inside: true } : undefined,
           data: chip ? { before: chip } : undefined
         });
-        entities.set(`ms:${milestone.id}`, { x: X(milestone.due) + state.dayWidth / 2, y: y + row.h / 2 });
+        const localW = state.lens ? X(addDaysKey(milestone.due, 1)) - X(milestone.due) : state.dayWidth;
+        const cx = X(milestone.due) + localW / 2;
+        entities.set(`ms:${milestone.id}`, { x: cx, y: y + row.h / 2 });
+        if (state.forecast) {
+          const ratio = domainP85(samplesNow(), project.domain);
+          if (ratio && ratio > 1) {
+            const days = milestoneTailDays(ratio);
+            const endMs = toMs(milestone.due) + days * DAY_MS;
+            putTail(`tail:${milestone.id}`, project.domain, project.colour, cx + TL.diamond / 2 + 4, endMs, y + row.h / 2 - 4, 8, `Forecast ${formatKey(toKey(endMs))}`, {
+              domain: project.domain,
+              milestone: milestone.id,
+              days: days.toFixed(2)
+            });
+          }
+        }
       }
       if (row.kind === 'marking') {
         const task = state.tasks.find((item) => item.id === row.ref);
@@ -1308,6 +1466,18 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
           days: paint.days,
           cap: dayCapacity(today, profile).available_minutes || 120
         });
+        if (state.forecast && task.status !== 'done' && task.est) {
+          const ratio = domainP85(samplesNow(), task.domain);
+          if (ratio && ratio > 1) {
+            const days = overrunDays(task.est, ratio);
+            const endMs = toMs(addDaysKey(marking.return_by, 1)) + days * DAY_MS;
+            putTail(`tail:${task.id}`, task.domain, taskColour(task), x1 - 2, endMs, y + (row.h - 10) / 2, 10, `Forecast ${formatKey(toKey(endMs))}`, {
+              domain: task.domain,
+              task: task.id,
+              days: days.toFixed(2)
+            });
+          }
+        }
       }
     }
 
@@ -1344,7 +1514,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     });
     const critical = state.critical ? timelineCritical({ rangeStart: range.start, spans, links: visible }) : { nodes: new Set<string>(), edges: new Set<string>() };
     for (const [id, props] of entities) {
-      if (!id.startsWith('bar:') && !id.startsWith('step:') && !id.startsWith('ms:')) continue;
+      if (!id.startsWith('bar:') && !id.startsWith('step:') && !id.startsWith('ms:') && !id.startsWith('tail:')) continue;
       const ref = id.split(':').slice(1).join(':');
       const onPath = critical.nodes.has(ref);
       if (state.critical) entities.set(id, { ...props, crit: onPath ? 1 : 0, dim: onPath ? 0 : 1 });
@@ -1360,7 +1530,19 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     }
 
     specs.set('today', { kind: 'today' });
-    entities.set('today', { x: X(today) + state.dayWidth * frac, h: rowsBottom + 4 });
+    const todayW = state.lens ? X(addDaysKey(today, 1)) - X(today) : state.dayWidth;
+    entities.set('today', { x: X(today) + todayW * frac, h: rowsBottom + 4 });
+    if (state.lens) {
+      const start = state.lensStart;
+      const end = addDaysKey(start, TL.lens.days - 1);
+      const x0 = X(start);
+      const label = `${formatKey(start)} – ${formatKey(end)}`;
+      const lw = X(addDaysKey(end, 1)) - x0;
+      specs.set('lens', { kind: 'lens', text: label, data: { start, end } });
+      entities.set('lens', { x: x0, w: lw, h: rowsBottom + 4 });
+      specs.set('lensgrab', { kind: 'lensgrab', text: label });
+      entities.set('lensgrab', { x: x0, w: lw });
+    }
 
     const gesture = state.drag && state.drag.mode !== 'link' ? state.drag : state.preview;
     const shift = new Map<string, string>();
@@ -1552,7 +1734,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     }
   }
 
-  function relayout(reason: 'zoom' | 'settle' | 'expand' | 'first' | 'drag' | 'release'): void {
+  function relayout(reason: 'zoom' | 'settle' | 'expand' | 'first' | 'drag' | 'release' | 'place'): void {
     const anchorX = zoomAnchor ? zoomAnchor.screenX : 0;
     const next = layout();
     geometry = { width: next.width, height: next.height };
@@ -1566,7 +1748,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     labels.style.setProperty('--tl-top', `${TL.axis.h + 8}px`);
     legend.hidden = !state.load;
     legend.style.top = `${next.height - TL.load.h + 8}px`;
-    if (reason === 'zoom') {
+    if (reason === 'zoom' || reason === 'place') {
       for (const [id, props] of next.entities) {
         if (!nodes.has(id)) createNode(id);
         engine.place(id, { opacity: 1, scale: 1, ...props });
@@ -1578,7 +1760,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         }
       }
       lastIds = [...next.entities.keys()];
-      if (zoomAnchor) scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
+      if (reason === 'zoom' && zoomAnchor) scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
       return;
     }
     if (reason === 'release' && state.release) {
@@ -1705,6 +1887,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
 
   function setZoom(index: number, anchorClientX?: number): void {
+    if (state.lens) return;
     index = Math.max(0, Math.min(TL.zooms.length - 1, index));
     if (index === state.zoom && anchorClientX === undefined) return;
     const box = scroller.getBoundingClientRect();
@@ -2109,7 +2292,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   function onScroll(): void {
     viewLeft = scroller.scrollLeft;
     for (const [id, spec] of specs) {
-      if (spec.kind !== 'proj' && spec.kind !== 'band' && spec.kind !== 'dream' && spec.kind !== 'rowtitle') continue;
+      if (spec.kind !== 'proj' && spec.kind !== 'band' && spec.kind !== 'dream' && spec.kind !== 'rowtitle' && spec.kind !== 'ribbon' && spec.kind !== 'lensgrab') continue;
       const props = engine.get(id);
       if (props && nodes.has(id)) apply(id, props);
     }
@@ -2219,7 +2402,34 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     lastIds = [...new Set([...lastIds.filter((id) => !id.startsWith('ripple:')), ...ripples])];
   }
 
+  function dragLens(event: PointerEvent): void {
+    event.preventDefault();
+    const originStart = state.lensStart;
+    const originClient = event.clientX;
+    const originScroll = scroller.scrollLeft;
+    const originScreen = scale.x(originStart) - originScroll;
+    const move = (ev: PointerEvent) => {
+      const days = Math.round((ev.clientX - originClient) / LENS_FOCUS_PX);
+      const next = clampLensStart(addDaysKey(originStart, days), range.start, range.end);
+      if (next === state.lensStart) return;
+      state.lensStart = next;
+      relayout('place');
+      scroller.scrollLeft = scale.x(state.lensStart) - (originScreen + (ev.clientX - originClient));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }
+
   function onPointerDown(event: PointerEvent): void {
+    const grab = (event.target as Element).closest('[data-part="lens-grab"]');
+    if (grab) {
+      dragLens(event);
+      return;
+    }
     const mark = (event.target as Element).closest('[data-part="bar"], [data-part="step-bar"], [data-part="milestone"]') as SVGGElement | null;
     if (!mark || state.view !== 'bars') return;
     const id = mark.getAttribute('data-task-id') ?? mark.getAttribute('data-milestone-id');
@@ -2348,6 +2558,26 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     relayout('settle');
   });
   todayBtn.addEventListener('click', () => scrollToToday(true));
+  const forecastCount = samplesNow().length;
+  const ready = forecastReady(samplesNow());
+  forecastBtn.disabled = !ready;
+  forecastBtn.title = ready
+    ? `P85 from ${forecastCount} finished tasks with an estimate and an actual`
+    : 'Needs 20 finished tasks with an estimate and an actual';
+  focusBtn.addEventListener('click', () => {
+    state.lens = !state.lens;
+    if (state.lens) state.lensStart = mondayOf(today);
+    focusBtn.setAttribute('aria-pressed', String(state.lens));
+    zoomPills.classList.toggle('is-dim', state.lens);
+    relayout('settle');
+    if (state.lens) scroller.scrollTo({ left: Math.max(0, scale.x(state.lensStart) - 36), behavior: reduced ? 'auto' : 'smooth' });
+  });
+  forecastBtn.addEventListener('click', () => {
+    if (!forecastReady(samplesNow())) return;
+    state.forecast = !state.forecast;
+    forecastBtn.setAttribute('aria-pressed', String(state.forecast));
+    relayout('settle');
+  });
   hammondBtn.addEventListener('click', () => showHammond(true));
   applyBtn.addEventListener('click', () => {
     if (!hammond) return;
@@ -2541,6 +2771,14 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const abort = new AbortController();
   scroller.addEventListener('scroll', onScroll, { passive: true, signal: abort.signal });
   svg.addEventListener('pointerdown', onPointerDown, { signal: abort.signal });
+  svg.addEventListener('keydown', (event) => {
+    if (!(event.target as Element).closest?.('[data-part="lens-grab"]') || !state.lens) return;
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' || event.shiftKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    state.lensStart = clampLensStart(addDaysKey(state.lensStart, event.key === 'ArrowRight' ? 1 : -1), range.start, range.end);
+    relayout('settle');
+  }, { signal: abort.signal });
   svg.addEventListener('pointermove', onPointerMove, { signal: abort.signal });
   svg.addEventListener('pointerup', onPointerUp, { signal: abort.signal });
   svg.addEventListener('pointercancel', onPointerUp, { signal: abort.signal });
