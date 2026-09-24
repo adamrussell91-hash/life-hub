@@ -289,7 +289,7 @@ function mountBody(grid: HTMLElement, d: string) {
   for (const w of F.WALLS.filter(x => x.date === d)) {
     const [first, ...rest] = w.label.split(' · ');
     const more = rest.length ? `<span class="cal-wall__more"> · ${rest.join(' · ')}</span>` : '';
-    const wall = el('div', 'cal-wall', `<span class="cal-wall__pill">${ICON.lock}${first}${more}</span>`, body, { 'data-part': 'wall' });
+    const wall = el('div', 'cal-wall', `<span class="cal-wall__pill" title="${w.label}" aria-label="${w.label}">${ICON.lock}<span class="cal-wall__first">${first}</span>${more}</span>`, body, { 'data-part': 'wall' });
     wall.style.height = `${TOTAL}px`;
   }
 }

@@ -163,6 +163,10 @@ test('phase 2: nothing spills out of a narrow day column (the app beside its rai
           c.querySelectorAll('.cal-chip__acts button').forEach(x => { if (getComputedStyle(x.parentElement).display !== 'none') inside(x, b, `${c.dataset.id} button`); });
         });
         document.querySelectorAll('[data-part="tray"] .btn').forEach(x => { if (x.getBoundingClientRect().height > 40) out.push(`tray button wraps: ${x.textContent}`); });
+        if (document.documentElement.scrollWidth > innerWidth) out.push(`page scrolls sideways: ${document.documentElement.scrollWidth} > ${innerWidth}`);
+        const cal = document.querySelector('[data-part="tideline"]').getBoundingClientRect();
+        const last = [...document.querySelectorAll('[data-part="day-head"]')].at(-1).getBoundingClientRect();
+        if (last.right > cal.right + 0.5) out.push('the last day is cut off');
         return out;
       });
       assert.deepEqual(bad, [], `at ${width}px`);
