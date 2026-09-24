@@ -21,11 +21,21 @@ export function backgroundAsset(id: string, stage?: string) { return `${ASSET_RO
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-/** 5 named lighting stages across the transcript so far, opening to closing. */
+/** Named lighting stages across the transcript so far, opening to closing. */
 export const LIGHTING_STAGES = ["sunrise", "morning", "golden-hour", "blue-hour", "just-after-dusk"] as const;
 export const CARTOGRAPHERS_LIGHTING_STAGES = ["dawn", "sunrise", "midday", "golden-hour", "twilight", "night"] as const;
+export const MIRROR_LIGHTING_STAGES = ["sunrise", "morning", "midday", "golden-hour", "twilight", "night"] as const;
+export const WITNESS_LIGHTING_STAGES = ["sunrise", "morning", "midday", "golden-hour", "night"] as const;
+export const TRIBUNAL_LIGHTING_STAGES = ["midday", "golden-hour", "blue-hour"] as const;
+const LIGHTING_BY_PROTOCOL: Record<string, readonly string[]> = {
+  cartographers: CARTOGRAPHERS_LIGHTING_STAGES,
+  mirror: MIRROR_LIGHTING_STAGES,
+  witness: WITNESS_LIGHTING_STAGES,
+  tribunal: TRIBUNAL_LIGHTING_STAGES,
+  consilium: MIRROR_LIGHTING_STAGES,
+};
 export function lightingStage(viewingIndex: number, totalTurns: number, protocolId?: string): string {
-  const stages = protocolId === "cartographers" ? CARTOGRAPHERS_LIGHTING_STAGES : LIGHTING_STAGES;
+  const stages = (protocolId && LIGHTING_BY_PROTOCOL[protocolId]) || LIGHTING_STAGES;
   if (totalTurns <= 1) return stages[0];
   const fraction = clamp(viewingIndex, 0, totalTurns - 1) / (totalTurns - 1);
   return stages[clamp(Math.floor(fraction * stages.length), 0, stages.length - 1)];
