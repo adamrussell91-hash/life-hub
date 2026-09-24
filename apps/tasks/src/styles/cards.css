@@ -212,6 +212,32 @@
   color: var(--muted);
 }
 
+.hub-chip--attach {
+  background: var(--shore);
+  color: var(--ink);
+  gap: 0.3rem;
+  max-width: 100%;
+  cursor: default;
+}
+
+a.hub-chip--attach {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.hub-chip__kind {
+  color: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.hub-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .date-badge {
   display: inline-flex;
   align-items: center;

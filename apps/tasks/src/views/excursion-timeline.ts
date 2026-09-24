@@ -226,6 +226,7 @@ function renderMissingCard(
 function renderStop(
   stop: LaidTimelineStop,
   project: Project,
+  tasks: Task[],
   confirmHost: HTMLElement,
   reload: () => Promise<void>,
   join: { up: boolean; down: boolean },
@@ -245,6 +246,7 @@ function renderStop(
   const body = el('div', 'excursion-timeline__card');
   if (stop.task) {
     mountTaskCard(body, stop.task, {
+      scope: { projects: [project], tasks },
       onToggle: (task) => requestToggleDone(confirmHost, task, reload),
       onEdit: (task) =>
         void renderTaskEditor(confirmHost, task, [project], (saved) =>
@@ -378,6 +380,7 @@ function renderTimeline(
         renderStop(
           stop,
           project,
+          tasks,
           confirmHost,
           reload,
           {

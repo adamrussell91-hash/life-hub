@@ -1,4 +1,5 @@
 import { stringList } from '@/domain/task-shape';
+import { taskAttachments, type TaskAttachmentScope } from '@/domain/task-attachments';
 import type { Task, TaskDomain, TaskPriority, TaskStatus } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import type { BoardColumnId } from '@/domain/board';
@@ -17,6 +18,7 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { formatTaskTimeRange } from '@/domain/time-grid';
 import { cardTransitionName, runContainerTransform } from '@/views/container-transform';
+import { attachmentChip, hydrateTaskLinkPills } from '@/views/attachment-chips';
 import { closeCardMenu, renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { domainFilterOptions, priorityFilterOptions, statusFilterOptions } from '@/views/hub-kit';
 import { getFocus, isFocusedTaskId, setFocus } from '@/domain/focus';
@@ -146,6 +148,10 @@ function statusChip(status: string, onSave?: (value: string) => void): HTMLEleme
   });
 }
 
+function appendAttachmentChips(host: HTMLElement, task: Task, scope?: TaskAttachmentScope): void {
+  for (const item of taskAttachments(task, scope)) host.append(attachmentChip(item));
+}
+
 function dateBadge(due: string | null, prefix = '', timeLabel = ''): HTMLElement | null {
   if (!due && !timeLabel) return null;
   const badge = el('span', 'date-badge');
@@ -166,6 +172,8 @@ export type TaskCardHandlers = {
   onExpand?: (task: Task) => void;
   onCollapse?: (task: Task) => void;
   boardColumn?: BoardColumnId;
+  /** Projects and tasks already loaded by the view, so pills can name them. */
+  scope?: TaskAttachmentScope;
 };
 
 export type ProjectCardHandlers = {
@@ -281,6 +289,7 @@ export function renderTaskMicroCard(task: Task, handlers: TaskCardHandlers = {})
       handlers.onPatch ? (value) => void handlers.onPatch?.(task, { priority: value as TaskPriority }) : undefined
     )
   );
+  appendAttachmentChips(chips, task, handlers.scope);
   const foot = el('div', 'hub-row__foot');
   const meta = el('div', 'hub-row__foot-meta');
   const due = dateBadge(task.due_date, '', formatTaskTimeRange(task));
@@ -317,6 +326,7 @@ export function renderTaskExpandedCard(task: Task, handlers: TaskCardHandlers = 
       handlers.onPatch ? (value) => void handlers.onPatch?.(task, { priority: value as TaskPriority }) : undefined
     )
   );
+  appendAttachmentChips(chips, task, handlers.scope);
   for (const tag of stringList(task.tags)) chips.append(el('span', 'hub-chip', tag));
   tags.append(chips);
   const due = dateBadge(task.due_date, 'Due ', formatTaskTimeRange(task));
@@ -507,6 +517,7 @@ export function mountTaskCard(
     );
     slot.dataset.state = expanded ? 'expanded' : 'compact';
     slot.classList.toggle('is-focused', isFocusedTaskId(task.id));
+    hydrateTaskLinkPills(slot, task.id);
     if (asListItem) {
       slot.setAttribute('aria-expanded', expanded ? 'true' : 'false');
       slot.setAttribute('aria-label', `${task.title} task card`);

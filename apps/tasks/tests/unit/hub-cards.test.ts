@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { closeCardMenu } from '@/views/card-menu';
+import { applyLinkAttachments } from '@/views/attachment-chips';
 import { mountProjectCard, mountTaskCard, renderTaskMicroCard } from '@/views/hub-cards';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
@@ -304,6 +305,63 @@ describe('hub cards', () => {
     expect(slot.querySelector('.priority-chip')?.tagName).toBe('SPAN');
     expect(slot.querySelector('.hub-chip')?.tagName).toBe('SPAN');
     expect(slot.querySelector('.morphing-popover')).toBeNull();
+  });
+
+  it('shows a project pill on compact and expanded cards, and a task with no attachment does not', () => {
+    reduceMotion();
+    const host = document.createElement('div');
+    const attached = task({ id: 'task_linked', title: 'Finish lesson pack' });
+    const slot = mountTaskCard(host, attached, {
+      scope: { projects: [{ ...project, type: 'standard' }] }
+    });
+    const pill = slot.querySelector<HTMLElement>('.hub-chip--attach');
+    expect(pill?.dataset.attach).toBe('project');
+    expect(pill?.querySelector('.hub-chip__kind')?.textContent).toBe('Project');
+    expect(pill?.querySelector('.hub-chip__name')?.textContent).toBe('MindWorks');
+    expect(pill?.getAttribute('href')).toBe('#/project/proj_mw');
+
+    pill?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(slot.dataset.state).toBe('compact');
+
+    slot.querySelector('.hub-row')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(slot.dataset.state).toBe('expanded');
+    expect(slot.querySelector('.hub-chip--attach .hub-chip__name')?.textContent).toBe('MindWorks');
+
+    const loose = document.createElement('div');
+    const bare = mountTaskCard(
+      loose,
+      task({ id: 'task_loose', title: 'Loose task', parent_project_id: null }),
+      { scope: { projects: [project] } }
+    );
+    expect(bare.querySelector('.hub-chip--attach')).toBeNull();
+  });
+
+  it('names an excursion and a parent task, and keeps an event pill from a link', () => {
+    reduceMotion();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const parent = task({ id: 'task_parent', title: 'Pack the bus', parent_project_id: null });
+    const step = task({
+      id: 'task_step',
+      title: 'Count students',
+      parent_project_id: 'proj_mw',
+      parent_task_id: 'task_parent',
+      contexts: [{ kind: 'person', value: 'Samira' }]
+    });
+    const slot = mountTaskCard(host, step, {
+      scope: { projects: [{ ...project, type: 'excursion' }], tasks: [parent, step] }
+    });
+    const kinds = [...slot.querySelectorAll<HTMLElement>('.hub-chip--attach')].map(
+      (node) => `${node.dataset.attach}:${node.querySelector('.hub-chip__name')?.textContent}`
+    );
+    expect(kinds).toEqual(['excursion:MindWorks', 'task:Pack the bus', 'person:Samira']);
+
+    applyLinkAttachments(slot, [{ kind: 'event', label: 'Regional heat', href: '#/calendar' }]);
+    expect(slot.querySelector('[data-attach="event"] .hub-chip__name')?.textContent).toBe('Regional heat');
+    expect(slot.querySelector('[data-attach="event"]')?.getAttribute('href')).toBe('#/calendar');
+    applyLinkAttachments(slot, [{ kind: 'event', label: 'Regional heat' }]);
+    expect(slot.querySelectorAll('[data-attach="event"]')).toHaveLength(1);
+    host.remove();
   });
 
   it('opens via onActivate instead of expanding when that handler is set', () => {
