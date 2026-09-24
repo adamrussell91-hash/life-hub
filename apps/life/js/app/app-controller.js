@@ -54,6 +54,15 @@ const HASH_SECTIONS = new Set([
   'hub-map'
 ]);
 
+function calendarZoomFromHash(hash) {
+  if (typeof hash !== 'string') return null;
+  const parts = (hash.startsWith('#') ? hash.slice(1) : hash).replace(/^\/+/, '').split(/[/?#]/);
+  if (parts[0] !== 'calendar') return null;
+  const zoom = parts[1];
+  if (zoom === 'day' || zoom === 'week' || zoom === 'month' || zoom === 'almanac') return zoom;
+  return null;
+}
+
 export function sectionFromHash(hash) {
   if (typeof hash !== 'string') return null;
   const trimmed = hash.trim();
@@ -757,6 +766,8 @@ export function createAppController(dependencies) {
       void refreshSkincareShelf();
     }
     if (name === 'calendar') {
+      const zoom = calendarZoomFromHash(windowTarget.location?.hash);
+      if (zoom) calendarView = zoom;
       // The visual seed lands after the first snapshot. One forced refresh on the
       // first open picks it up; paint waits so the week is not drawn from stale files.
       if (!calendarWeekSynced) {
@@ -1353,7 +1364,10 @@ export function createAppController(dependencies) {
       },
       onSwitchView: next => {
         calendarViewExplicit = true;
-        calendarView = next === 'day' || next === 'month' ? next : 'week';
+        calendarView = next === 'day' || next === 'month' || next === 'almanac' ? next : 'week';
+        const hash = calendarView === 'week' ? '#/calendar' : `#/calendar/${calendarView}`;
+        const location = windowTarget.location;
+        if (location && location.hash !== hash) location.hash = hash;
         renderCalendarSection();
       },
       onSwitchMobilePanel: panel => {

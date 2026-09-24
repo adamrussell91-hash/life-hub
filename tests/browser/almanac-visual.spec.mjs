@@ -110,12 +110,32 @@ test('almanac phase 2: no two labels collide and nothing leaves its column', asy
       return out;
     });
     assert.deepEqual(clashes, []);
+    const outside = await page.evaluate(() => {
+      const box = document.querySelector('[data-part="chart"]').getBoundingClientRect();
+      return [...document.querySelectorAll('.alm-chart text, .alm-pill')].filter(t => { const r = t.getBoundingClientRect(); return r.width && (r.right > box.right + 0.5 || r.left < box.left - 0.5); }).map(t => t.textContent || t.getAttribute('class'));
+    });
+    assert.deepEqual(outside, [], 'chart text leaves the chart');
     const spill = await page.evaluate(() => {
       const rule = document.querySelector('.alm-labelrule').getBoundingClientRect().left;
       return [...document.querySelectorAll('.alm-t-lab, .alm-t-sub')].filter(t => Number(t.getAttribute('x')) < 100 && t.getBoundingClientRect().right > rule).map(t => t.textContent);
     });
     assert.deepEqual(spill, [], 'label column text crosses into the chart');
   } finally { await context.close(); }
+});
+
+test('almanac phase 2: the chart is laid out at its real width, never scaled', async () => {
+  for (const width of [960, 1280, 1600]) {
+    const { context, page } = await open({ width, settle: 900 });
+    try {
+      const r = await page.evaluate(() => {
+        const svg = document.querySelector('[data-part="chart"]');
+        const t = svg.querySelector('.alm-t-bead');
+        return { attr: Number(svg.getAttribute('width')), css: svg.getBoundingClientRect().width, font: t.getBoundingClientRect().height, scroll: document.documentElement.scrollWidth, inner: innerWidth };
+      });
+      assert.ok(Math.abs(r.attr - r.css) < 1, `at ${width}px the chart is scaled (${r.attr} drawn, ${r.css} shown)`);
+      assert.ok(r.scroll <= r.inner, `at ${width}px the page scrolls sideways`);
+    } finally { await context.close(); }
+  }
 });
 
 /* ------------------------------------------------------------------ phase 3: motion */
@@ -134,7 +154,8 @@ test('almanac phase 3: lead lines draw back from their anchors, beads pop, the t
     const rails = frames.map(f => f.rail);
     for (let i = 1; i < rails.length; i++) assert.ok(rails[i] <= rails[i - 1] + 0.01, 'the Korea line only grows backwards');
     assert.ok(new Set(rails.map(v => v.toFixed(1))).size >= 8, 'a drawn line, not a jump');
-    assert.ok(frames.at(-1).clip >= 1198 - 1, 'the tide chart is fully revealed');
+    const chartW = await page.locator('[data-part="chart"]').evaluate(n => Number(n.getAttribute('width')));
+    assert.ok(frames.at(-1).clip >= chartW - 1, 'the tide chart is fully revealed');
     assert.ok(new Set(frames.map(f => f.clip.toFixed(0))).size >= 8, 'the tide reveals over frames');
   } finally { await context.close(); }
 });

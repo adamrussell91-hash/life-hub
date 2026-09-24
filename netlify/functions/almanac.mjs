@@ -446,7 +446,8 @@ export function buildAlmanac({
   }));
   const summary = { ...almanacSummary(lines), openings: openings.filter(opening => opening.dates.length).length };
   const world = EXAMPLE_WORLD.filter(entry => entry.date >= from && entry.date <= to);
-  return { lines, summary, series, openings, world };
+  const horizon = horizonEnd(today, merged);
+  return { lines, summary, series, openings, world, terms, today, from, to, horizon };
 }
 
 function pathDate(path, pattern) {
