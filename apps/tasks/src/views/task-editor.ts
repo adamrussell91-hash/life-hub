@@ -30,6 +30,7 @@ import {
 import { createPlusAdd } from '@/views/plus-add';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { forgetTaskLinkCache } from '@/views/attachment-chips';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { renderTaskRelationshipsSection } from '@/views/task-relationships';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -395,6 +396,15 @@ export async function renderTaskEditor(
   });
 
   const relationships = renderTaskRelationshipsSection(task.id);
+  const lifeWall = mountLifeWallEditor({
+    title: task.title,
+    wall: task.life_wall,
+    suggest: () => {
+      const starts_on = target.input.value || due.input.value;
+      const ends_on = due.input.value || target.input.value;
+      return starts_on && ends_on ? { starts_on, ends_on } : null;
+    }
+  });
 
   const actions = el('div', 'confirm-card__actions');
   const discard = el('button', 'btn btn--ghost', 'Discard');
@@ -406,6 +416,11 @@ export async function renderTaskEditor(
     const nextTitle = title.input.value.trim();
     if (!nextTitle) {
       host.append(el('p', 'empty-state', 'Add a title.'));
+      return;
+    }
+    const wall = lifeWall.read();
+    if (!wall.ok) {
+      host.append(el('p', 'empty-state', wall.message));
       return;
     }
     save.disabled = true;
@@ -440,7 +455,8 @@ export async function renderTaskEditor(
         tags: parseTagsInput(tags.input.value),
         recurrence_rule: recurrence.read(),
         remind_at: reminder.remind_at,
-        remind_dismissed_at: reminder.remind_dismissed_at
+        remind_dismissed_at: reminder.remind_dismissed_at,
+        life_wall: wall.wall
       });
       forgetTaskLinkCache(updated.id);
       const linkResult = await relationships.savePendingLinks(updated.id);
@@ -467,7 +483,8 @@ export async function renderTaskEditor(
     priority.el,
     project.el,
     tags.el,
-    notes.el
+    notes.el,
+    lifeWall.el
   );
   if (task.kind !== 'step' && !task.parent_task_id) {
     card.append(recurrence.section, remind.section);

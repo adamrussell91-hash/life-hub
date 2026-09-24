@@ -106,3 +106,23 @@
   .tl-toolbar__group:last-child > * { flex: 0 0 auto; }
   .tl-page { overflow-x: hidden; }
 }
+
+.tl-wall__edge { stroke: color-mix(in srgb, var(--navy) 30%, transparent); stroke-width: 1.5; }
+.tl-wall__pill rect { fill: var(--navy); }
+.tl-wall__pill text { font: var(--weight-semibold) var(--text-xs)/1 var(--font-ui); fill: #fff; }
+.tl-wall__lock { fill: none; stroke: #fff; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round; }
+.tl-wall-badge rect { fill: var(--navy); }
+.tl-wall-badge .tl-wall__lock { transform: translate(8px, 8px) scale(0.7); }
+[data-part="bar"].is-wall-warn [data-part="bar-face"],
+[data-part="step-bar"].is-wall-warn [data-part="bar-face"],
+[data-part="milestone"].is-wall-warn [data-morph-shape="milestone"] { stroke: var(--high-sea-ink); stroke-width: 1.5px; }
+.tl-before { font: var(--weight-medium) var(--text-xs)/1 var(--font-ui); fill: var(--high-sea-ink); }
+.tl-toast { margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-full); background: color-mix(in srgb, var(--high-sea) 18%, var(--paper)); color: var(--high-sea-ink); font: var(--weight-medium) var(--text-sm)/1.3 var(--font-ui); }
+.tl-toast[hidden] { display: none; }
+.tl-noservice-list { display: grid; gap: var(--space-2); padding: var(--space-3) var(--space-4) 0; }
+.tl-noservice-list[hidden] { display: none; }
+.tl-noservice { height: 28px; display: flex; align-items: center; padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1.5px solid color-mix(in srgb, var(--navy) 30%, transparent); color: var(--navy); font: var(--weight-semibold) var(--text-xs)/1 var(--font-ui); background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--navy) 4%, transparent), color-mix(in srgb, var(--navy) 4%, transparent) 6px, color-mix(in srgb, var(--navy) 16%, transparent) 6px, color-mix(in srgb, var(--navy) 16%, transparent) 8px); }
+.life-wall { display: grid; gap: var(--space-2); margin-top: var(--space-3); }
+.life-wall__toggle { display: flex; align-items: center; gap: var(--space-2); font: var(--weight-medium) var(--text-sm)/1.3 var(--font-ui); color: var(--ink); }
+.life-wall__dates { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.life-wall__dates[hidden] { display: none; }

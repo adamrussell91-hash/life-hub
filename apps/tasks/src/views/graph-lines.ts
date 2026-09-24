@@ -52,6 +52,7 @@ export type LinesInput = {
   onReviewInsight: (id: string) => void;
   onDismissInsight?: (id: string) => void;
   onToggleScale: () => void;
+  lifeWalls?: Array<{ id: string; label: string }>;
 };
 
 type VisualState = 'done' | 'current' | 'open' | 'waiting' | 'blocked' | 'suggested' | 'milestone';
@@ -761,7 +762,9 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
   toggle.type = 'button';
   tools.append(toggle);
   const foot = el('p', 'graph-loose-footer');
-  root.append(board, tools, stage, foot, live);
+  const wallsHost = el('div', 'tl-noservice-list');
+  wallsHost.hidden = true;
+  root.append(board, wallsHost, tools, stage, foot, live);
   host.append(root);
 
   let input = first;
@@ -771,6 +774,15 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
 
   const paint = (): void => {
     const models = buildLines(input.projects, input.tasks, input.now, input.insights);
+    const bands = input.lifeWalls ?? [];
+    wallsHost.replaceChildren();
+    wallsHost.hidden = bands.length === 0;
+    for (const wall of bands) {
+      const band = el('div', 'tl-noservice');
+      band.dataset.part = 'no-service';
+      band.textContent = `no service · ${wall.label}`;
+      wallsHost.append(band);
+    }
     const finished = models.filter((m) => m.service.status === 'arrived');
     const open = models.filter((m) => m.service.status !== 'arrived');
     const ordered = [...open, ...finished];

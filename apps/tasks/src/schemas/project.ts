@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LifeWallFieldSchema } from './life-wall';
 import { schemaVersion } from './task';
 import { PageBlockSchema } from './page-block';
 
@@ -10,7 +11,8 @@ export const MilestoneSchema = z.object({
   title: z.string().min(1),
   due_date: z.string().nullable().default(null),
   status: MilestoneStatusSchema.default('open'),
-  depends_on: z.array(z.string()).optional()
+  depends_on: z.array(z.string()).optional(),
+  life_wall: LifeWallFieldSchema
 });
 
 export const PermissionNoteSchema = z.object({
@@ -148,7 +150,8 @@ export const ProjectSchema = z.object({
   /** Post — the excursion folder checklist (excursion only). */
   folder_items: z.array(FolderItemSchema).optional(),
   // Catalogue link — which Program (competition/program catalogue entry) this excursion is for.
-  linked_program_id: z.string().nullable().default(null)
+  linked_program_id: z.string().nullable().default(null),
+  life_wall: LifeWallFieldSchema
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -202,7 +205,8 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   active_escalation: true,
   muster_log: true,
   folder_items: true,
-  linked_program_id: true
+  linked_program_id: true,
+  life_wall: true
 }).extend({
   title: z.string().min(1)
 });

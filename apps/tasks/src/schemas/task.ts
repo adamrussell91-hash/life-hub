@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LifeWallFieldSchema } from './life-wall';
 import { PageBlockSchema } from './page-block';
 
 export const schemaVersion = z.literal(1);
@@ -123,7 +124,9 @@ export const TaskSchema = z.object({
   /** Goals spawned by promoting this Someday idea. The idea stays. */
   linked_goal_ids: z.array(z.string()).optional(),
   /** Someday / Maybe only — branching daydream tree ("Odyssey mode"). */
-  odyssey_paths: z.array(OdysseyNodeSchema).optional()
+  odyssey_paths: z.array(OdysseyNodeSchema).optional(),
+  /** Dates that cannot move. Null clears a wall; omitted leaves old records unchanged. */
+  life_wall: LifeWallFieldSchema
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -183,7 +186,8 @@ export const TaskCreateSchema = TaskSchema.omit({
   origin_date: true,
   linked_project_ids: true,
   linked_goal_ids: true,
-  odyssey_paths: true
+  odyssey_paths: true,
+  life_wall: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

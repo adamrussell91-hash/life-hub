@@ -342,7 +342,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         cognitive_load: input.cognitive_load ?? null,
         depth: input.depth ?? null,
         someday_kind: input.someday_kind ?? null,
-        origin_date: input.origin_date ?? null
+        origin_date: input.origin_date ?? null,
+        life_wall: input.life_wall ?? null
       });
       await kv.setJSON(keys.taskKey(task.id), task);
       const ids = await readIndex(kv, keys.tasksIndexKey());
@@ -455,7 +456,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         permission_notes: input.permission_notes ?? [],
         generated_admin_tasks: input.generated_admin_tasks ?? [],
         drafted_documents: input.drafted_documents ?? null,
-        page_blocks: input.page_blocks ?? []
+        page_blocks: input.page_blocks ?? [],
+        life_wall: input.life_wall ?? null
       });
       await kv.setJSON(keys.projectKey(project.id), project);
       const ids = await readIndex(kv, keys.projectsIndexKey());
@@ -561,7 +563,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         status: input.status ?? 'active',
         tags: input.tags ?? [],
         created_at: stamp,
-        updated_at: stamp
+        updated_at: stamp,
+        life_wall: input.life_wall ?? null
       });
       await kv.setJSON(keys.goalKey(goal.id), goal);
       const ids = await readIndex(kv, keys.goalsIndexKey());
