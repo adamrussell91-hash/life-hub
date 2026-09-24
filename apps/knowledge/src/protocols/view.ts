@@ -23,10 +23,12 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 /** 5 named lighting stages across the transcript so far, opening to closing. */
 export const LIGHTING_STAGES = ["sunrise", "morning", "golden-hour", "blue-hour", "just-after-dusk"] as const;
-export function lightingStage(viewingIndex: number, totalTurns: number): string {
-  if (totalTurns <= 1) return LIGHTING_STAGES[0];
+export const CARTOGRAPHERS_LIGHTING_STAGES = ["dawn", "sunrise", "midday", "golden-hour", "twilight", "night"] as const;
+export function lightingStage(viewingIndex: number, totalTurns: number, protocolId?: string): string {
+  const stages = protocolId === "cartographers" ? CARTOGRAPHERS_LIGHTING_STAGES : LIGHTING_STAGES;
+  if (totalTurns <= 1) return stages[0];
   const fraction = clamp(viewingIndex, 0, totalTurns - 1) / (totalTurns - 1);
-  return LIGHTING_STAGES[clamp(Math.floor(fraction * LIGHTING_STAGES.length), 0, LIGHTING_STAGES.length - 1)];
+  return stages[clamp(Math.floor(fraction * stages.length), 0, stages.length - 1)];
 }
 
 const lightingArtCache = new Map<string, boolean>();
@@ -317,7 +319,7 @@ export function applySession(root: HTMLElement, session: Session, definition: De
   root.dataset.protocolRenderKey = key;
   root.innerHTML = sessionView(session, definition, index);
   const section = root.querySelector<HTMLElement>(".protocol-session");
-  if (section) applyStagedBackground(section, definition.id, lightingStage(index, total));
+  if (section) applyStagedBackground(section, definition.id, lightingStage(index, total, definition.id));
 }
 
 export function renderProtocols({ host }: { host: HTMLElement }) {
