@@ -142,6 +142,37 @@ test('phase 2: no chip ever clips its title', async () => {
   }
 });
 
+test('phase 2: nothing spills out of a narrow day column (the app beside its rail)', async () => {
+  // At 1280px the Life shell leaves each day ~115px. A 960px viewport gives the reference the same.
+  for (const width of [960, 1280]) {
+    const { context, page } = await open({ width });
+    try {
+      const bad = await page.evaluate(() => {
+        const out = [];
+        const inside = (el, box, label) => { const r = el.getBoundingClientRect(); if (r.width && (r.right > box.right + 0.5 || r.left < box.left - 0.5)) out.push(label); };
+        document.querySelectorAll('[data-part="day-head"]').forEach(h => {
+          const b = h.getBoundingClientRect();
+          h.querySelectorAll('.cal-tag, .cal-over, .cal-head__num, .cal-vit > span').forEach(x => inside(x, b, `${h.dataset.date} ${x.className || x.textContent}`));
+        });
+        document.querySelectorAll('[data-part="wall"] .cal-wall__pill').forEach(p => {
+          if (p.scrollWidth > p.clientWidth + 1 || p.getBoundingClientRect().height > 22) out.push('wall pill overflows');
+          inside(p, p.closest('[data-part="day-body"]').getBoundingClientRect(), 'wall pill leaves its day');
+        });
+        document.querySelectorAll('.cal-chip').forEach(c => {
+          const b = c.getBoundingClientRect();
+          c.querySelectorAll('.cal-chip__acts button').forEach(x => { if (getComputedStyle(x.parentElement).display !== 'none') inside(x, b, `${c.dataset.id} button`); });
+        });
+        document.querySelectorAll('[data-part="tray"] .btn').forEach(x => { if (x.getBoundingClientRect().height > 40) out.push(`tray button wraps: ${x.textContent}`); });
+        return out;
+      });
+      assert.deepEqual(bad, [], `at ${width}px`);
+      if (width === 960) await shot(page, 'tideline-960');
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 /* ------------------------------------------------------------------ phase 3: band motion */
 
 test('phase 3: a band springs open in one smooth tween and the stack never changes height', async () => {
@@ -245,7 +276,9 @@ test('phase 4: a proposal previews exactly what Accept writes, then writes it', 
 test('phase 4: dismiss writes nothing; Apply all writes every pending ghost once', async () => {
   const { context, page } = await open();
   try {
-    await page.locator('[data-id="g-good"] [data-dismiss="g-good"]').click();
+    // Inline buttons only exist in wide columns; the popover always has them.
+    await page.locator('[data-id="g-good"]').click();
+    await page.locator('[data-part="chip-popover"] [data-dismiss="g-good"]').click();
     await page.waitForTimeout(400);
     assert.equal(await page.locator('[data-id="g-good"]').count(), 0);
     assert.match(await page.locator('[data-part="toast"]').textContent(), /Dismissed\. Nothing written\./);

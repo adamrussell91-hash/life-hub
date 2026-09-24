@@ -18,7 +18,7 @@ img{width:100%;display:block}
 <button id="mode">Switch to difference overlay</button></header>
 <main id="main"></main>
 <script>
-const shots=['tideline-1280','school-1280','yours-1280','popover-1280','accepted-1280','tideline-390'];
+const shots=['tideline-1280','tideline-960','school-1280','yours-1280','popover-1280','accepted-1280','tideline-390'];
 let overlay=false;
 function draw(){document.getElementById('main').innerHTML=shots.map(s=>overlay
  ?`<section class="row"><h2>${s}</h2><figure style="grid-column:1/-1" class="overlay"><img src="golden/${s}.png"><img src="compare/${s}.png"></figure></section>`
