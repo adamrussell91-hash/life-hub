@@ -304,7 +304,9 @@ function mountBody(grid, date) {
   for (const chip of day.chips) mountChip(body, chip);
   if (date === model.today) nodes.set('now', el('div', 'cal-now', `<span>${nowLabel(nowHour)}</span>`, body, { 'data-part': 'now-line' }));
   for (const wall of day.walls) {
-    const node = el('div', 'cal-wall', `<span>${ICON.lock}${wall.label}</span>`, body, { 'data-part': 'wall' });
+    const [first, ...rest] = wall.label.split(' · ');
+    const more = rest.length ? `<span class="cal-wall__more"> · ${rest.join(' · ')}</span>` : '';
+    const node = el('div', 'cal-wall', `<span class="cal-wall__pill">${ICON.lock}${first}${more}</span>`, body, { 'data-part': 'wall' });
     node.style.height = `${model.total}px`;
   }
 }
