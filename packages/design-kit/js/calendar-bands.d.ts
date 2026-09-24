@@ -1,0 +1,17 @@
+export type Band = { id: string; label: string; from: number; to: number; px: number };
+export type HourInput = number | string;
+export type PlanningDayProfile = { day_start?: string; school_start?: string; bell?: string; home?: string; sleep?: string };
+export type ChipDensity = 'sliver' | 'line' | 'card' | 'card-actions';
+export declare const DEFAULT_BANDS: readonly Readonly<Band>[];
+export declare const BAND_MIN_PX: number;
+export declare const SLEEP_STRIP_PX: number;
+export declare const DENSITY: Readonly<{ sliver: number; line: number; actions: number }>;
+export declare function bandsFromProfile(profile?: PlanningDayProfile, options?: { school?: boolean }): Band[];
+export declare function baseHeights(bands: readonly Band[]): number[];
+export declare function totalHeight(heights: readonly number[]): number;
+export declare function bandTargets(bands: readonly Band[], expandedIndex?: number | null, options?: { minPx?: number }): number[];
+export declare function bandIndexAt(bands: readonly Band[], hour: HourInput): number;
+export declare function yForHour(bands: readonly Band[], heights: readonly number[], hour: HourInput): number;
+export declare function hourForY(bands: readonly Band[], heights: readonly number[], y: number): number;
+export declare function blockGeometry(bands: readonly Band[], heights: readonly number[], start: HourInput, end: HourInput): { top: number; height: number };
+export declare function chipDensity(height: number, options?: { hasActions?: boolean }): ChipDensity;
