@@ -17,7 +17,8 @@
   --cal-lilac-stripe:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff);
   --cal-sage-stripe:color-mix(in srgb,var(--pastel-sage-ink) 70%,#fff);
   --cal-over:var(--warning-surface);
-  font-family:var(--font-ui);color:var(--ink);position:relative
+  font-family:var(--font-ui);color:var(--ink);position:relative;
+  min-width:0;contain:inline-size /* the calendar takes its container's width; nowrap text inside can never widen the page */
 }
 
 /* ---------- nav ---------- */
@@ -202,6 +203,10 @@
   .cal-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
 }
 /* ---------- narrow day columns (the Life shell at 1280px gives each day ~115px) ---------- */
+@container (max-width:96px){
+  .cal-wall__first{display:none}
+  .cal-wall__pill{padding:0 6px}
+}
 @container (max-width:150px){
   .cal-wall__more{display:none}
   /* Two buttons don't fit: proposals are accepted from the chip popover instead. */
