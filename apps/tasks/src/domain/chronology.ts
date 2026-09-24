@@ -51,7 +51,7 @@ function projectEnd(project: Project, extras: Date[]): Date | null {
   return new Date(Math.max(...extras.map((date) => date.getTime())));
 }
 
-function projectSpan(project: Project, tasks: Task[]): { startKey: string; endKey: string } | null {
+export function projectSpan(project: Project, tasks: Task[]): { startKey: string; endKey: string } | null {
   const extras: Date[] = [];
   for (const milestone of projectMilestones(project)) pushDate(extras, milestone.due_date);
   if (project.type === 'excursion' && project.key_dates) {
