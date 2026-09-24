@@ -1,0 +1,1702 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tideline reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real kit files. Open this page from the repo (docs/proposals/calendar-reference/) so the paths resolve. -->
+<link rel="stylesheet" href="../../../packages/design-kit/tokens.css">
+<link rel="stylesheet" href="../../../packages/design-kit/overlays.css">
+<link rel="stylesheet" href="../../../packages/design-kit/actions.css">
+<link rel="stylesheet" href="../../../packages/design-kit/filters.css">
+<style>
+/*
+ * Tideline reference styles. PORT VERBATIM to packages/design-kit/calendar-tideline.css,
+ * same class names (cal-*). Every colour is a kit token or a color-mix() of tokens.
+ * The named surfaces below are the only derived colours; keep them named.
+ */
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+.page{max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
+.page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
+.ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
+
+/* ---------- named surfaces (derived; do not add kit tokens) ---------- */
+.cal{
+  --cal-label:104px;
+  --cal-school-wash:color-mix(in srgb,var(--pastel-blue) 45%,transparent);
+  --cal-yours-wash:color-mix(in srgb,var(--pastel-peach) 32%,transparent);
+  --cal-hatch:repeating-linear-gradient(45deg,color-mix(in srgb,var(--navy) 10%,transparent) 0 2px,color-mix(in srgb,var(--navy) 3.5%,transparent) 2px 8px);
+  --cal-wall-hatch:repeating-linear-gradient(45deg,color-mix(in srgb,var(--navy) 9%,transparent) 0 2px,color-mix(in srgb,var(--navy) 3%,transparent) 2px 9px);
+  --cal-ghost-fill:color-mix(in srgb,var(--wave) 6%,transparent);
+  --cal-ghost-line:color-mix(in srgb,var(--navy) 55%,transparent);
+  --cal-health:color-mix(in srgb,var(--sand) 34%,#fff);
+  --cal-health-stripe:color-mix(in srgb,var(--sand),var(--ink) 38%);
+  --cal-lilac-stripe:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff);
+  --cal-sage-stripe:color-mix(in srgb,var(--pastel-sage-ink) 70%,#fff);
+  --cal-over:var(--warning-surface);
+  font-family:var(--font-ui);color:var(--ink);position:relative
+}
+
+/* ---------- nav ---------- */
+.cal__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
+.cal__round{width:2.25rem;height:2.25rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);display:inline-grid;place-items:center;color:var(--navy);cursor:pointer}
+.cal__round svg{width:1rem;height:1rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.cal__period{display:grid;line-height:1.2;padding:0 var(--space-1)}
+.cal__period b{font-size:var(--text-md);font-weight:var(--weight-semibold);color:var(--navy);letter-spacing:var(--tracking-tight)}
+.cal__period span{font-size:var(--text-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.cal__spacer{flex:1}
+.cal__focus{display:flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--muted)}
+
+/* ---------- agent tray ---------- */
+.cal__tray{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);margin-bottom:var(--space-3);background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--elev-2);font-size:var(--text-sm)}
+.cal__tray b{font-weight:var(--weight-semibold)}
+.cal__tray span.cal__tray-detail{color:var(--muted)}
+.cal__tray .btn{min-height:2rem;padding:var(--space-1) var(--space-3);font-size:var(--text-sm)}
+.cal-av{width:1.75rem;height:1.75rem;border-radius:var(--radius-full);background:var(--navy);color:#fff;font-size:var(--text-xs);font-weight:var(--weight-semibold);display:inline-grid;place-items:center;flex:none}
+.cal-av--sara{background:var(--pastel-sage-ink)}
+.cal-av--clare{background:var(--pastel-lilac-ink)}
+.cal-av--sm{width:1.125rem;height:1.125rem;font-size:0.625rem}
+
+/* ---------- sources ---------- */
+.cal__sources{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)}
+.cal-src{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:var(--weight-medium);padding:3px 10px 3px 8px;border-radius:var(--radius-full);background:var(--glass);border:1px solid var(--line);color:var(--ink)}
+.cal-src i{width:8px;height:8px;border-radius:3px;background:var(--k-stripe)}
+.cal-src--ambient{background:transparent;border-style:dashed;color:var(--muted)}
+.cal-src--corey{color:var(--pastel-peach-ink)}
+
+/* ---------- card + grid ---------- */
+.cal__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
+.cal__grid{display:grid;grid-template-columns:var(--cal-label) repeat(var(--cal-days),minmax(0,1fr))}
+.cal-head{padding:var(--space-3) var(--space-2) var(--space-2) var(--space-3);border-left:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;gap:6px;min-height:108px;align-content:start}
+.cal-head.is-over{background:var(--cal-over)}
+.cal-corner{border-bottom:1px solid var(--line);padding:var(--space-3);font-size:var(--text-2xs);color:var(--muted);line-height:1.35;display:flex;align-items:flex-end}
+.cal-head__name{display:flex;align-items:center;gap:var(--space-2)}
+.cal-head__dow{font-size:var(--text-2xs);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-caps);color:var(--muted)}
+.cal-head__num{font-size:var(--text-base);font-weight:var(--weight-semibold);width:1.875rem;height:1.875rem;display:grid;place-items:center;border-radius:var(--radius-full);font-variant-numeric:tabular-nums}
+.cal-head.is-today .cal-head__num{background:var(--danger);color:#fff}
+.cal-tag{margin-left:auto;font-size:var(--text-2xs);font-weight:var(--weight-semibold);padding:1px 7px;border-radius:6px;background:var(--pastel-sage);color:var(--pastel-sage-ink);white-space:nowrap}
+.cal-tag--term{background:var(--pastel-gold);color:var(--pastel-gold-ink)}
+.cal-cap{display:grid;gap:3px}
+.cal-cap__bar{height:6px;border-radius:3px;background:color-mix(in srgb,var(--navy) 8%,transparent);position:relative;overflow:hidden}
+.cal-cap__fill{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--cap)}
+.cal-cap.is-forecast .cal-cap__fill{background:repeating-linear-gradient(90deg,var(--cap) 0 4px,transparent 4px 7px);opacity:.6}
+.cal-cap__text{font-size:var(--text-xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-cap__text b{color:var(--ink);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
+.is-over .cal-cap__text b{color:var(--high-sea-ink)}
+.cal-over{margin-left:auto;font-size:var(--text-2xs);font-weight:var(--weight-semibold);color:var(--high-sea-ink);background:color-mix(in srgb,var(--high-sea) 22%,#fff);border-radius:6px;padding:1px 7px}
+.cal-over + .cal-tag{margin-left:4px}
+.cal-vit{display:flex;gap:var(--space-2);font-size:var(--text-2xs);color:var(--muted);align-items:center;white-space:nowrap;overflow:hidden}
+.cal-vit span{display:inline-flex;gap:3px;align-items:center}
+.cal-vit svg{width:12px;height:12px;flex:none;stroke:currentColor;fill:none;stroke-width:1.2;stroke-linecap:round;stroke-linejoin:round}
+.cal-vit .is-low{color:var(--high-sea-ink)}
+.cal-vit .is-symptom{color:var(--high-sea-ink);font-weight:var(--weight-medium)}
+.cal-allday{border-left:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px;min-height:56px;display:grid;gap:4px;align-content:start}
+.cal-allday.cal-corner{border-left:0;align-items:flex-start;padding-top:10px}
+.cal-due{font-size:var(--text-xs);border-radius:8px;padding:5px 8px;background:color-mix(in srgb,var(--pastel-sage) 80%,#fff);border:1px solid color-mix(in srgb,var(--pastel-sage-ink) 18%,transparent);display:grid;gap:3px;line-height:1.3}
+.cal-due b{font-weight:var(--weight-semibold);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cal-due__move{display:flex;align-items:center;gap:4px;white-space:nowrap;color:var(--navy);font-weight:var(--weight-semibold);font-size:var(--text-2xs)}
+.cal-due__move button{margin-left:auto}
+.cal-due.is-moved{opacity:.55}
+
+/* ---------- band labels ---------- */
+.cal-bands{position:relative}
+.cal-band{position:absolute;left:0;right:0;display:block;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:6px 10px;cursor:pointer;font:inherit;overflow:hidden;color:inherit}
+.cal-band:hover{background:color-mix(in srgb,var(--wave) 6%,transparent)}
+.cal-band:focus-visible{outline:2px solid var(--wave);outline-offset:-2px}
+.cal-band b{display:flex;align-items:center;gap:4px;font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--navy)}
+.cal-band span{display:block;font-size:var(--text-2xs);color:var(--muted);line-height:1.3;opacity:var(--sub,1)}
+.cal-band svg{width:10px;height:10px;opacity:.6;stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.cal-band[aria-expanded="true"]{background:color-mix(in srgb,var(--wave) 8%,transparent)}
+.cal-band[aria-expanded="true"] b{color:var(--wave)}
+.cal-band[aria-expanded="true"] svg{transform:rotate(180deg)}
+.cal-sleeplab{position:absolute;left:0;right:0;padding:6px 10px;border-top:1px solid var(--line);background:var(--cal-hatch);font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--navy)}
+
+/* ---------- day body ---------- */
+.cal-body{position:relative;border-left:1px solid var(--line)}
+.cal-bg{position:absolute;left:0;right:0}
+.cal-bg--school{background:var(--cal-school-wash);cursor:zoom-in}
+.cal-bg--yours{background:var(--cal-yours-wash);cursor:zoom-in}
+.cal-line{position:absolute;left:0;right:0;border-top:1px solid var(--line)}
+.cal-sleep{position:absolute;left:0;right:0;background:var(--cal-hatch);border-top:1px solid color-mix(in srgb,var(--navy) 25%,transparent);display:flex;align-items:center;justify-content:center;gap:4px;font-size:var(--text-2xs);color:var(--navy);font-weight:var(--weight-medium)}
+.cal-sleep svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.2}
+.cal-free{position:absolute;left:6px;right:6px;border:1px dashed color-mix(in srgb,var(--navy) 18%,transparent);border-radius:9px;display:grid;place-items:center;color:var(--muted);font-size:var(--text-2xs);text-align:center;line-height:1.35;padding:var(--space-2)}
+.cal-free b{color:var(--pastel-sage-ink);font-weight:var(--weight-semibold);display:block;font-size:var(--text-xs)}
+.cal-now{position:absolute;left:-5px;right:0;height:0;border-top:2px solid var(--danger);z-index:4;pointer-events:none}
+.cal-now::before{content:"";position:absolute;left:0;top:-5px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.cal-now span{position:absolute;right:4px;top:-18px;font-size:var(--text-2xs);font-weight:var(--weight-semibold);color:var(--danger);background:color-mix(in srgb,#fff 90%,transparent);padding:0 4px;border-radius:4px;font-variant-numeric:tabular-nums}
+.cal-wall{position:absolute;left:0;right:0;top:0;background:var(--cal-wall-hatch);z-index:1;display:flex;justify-content:center;padding-top:14px;pointer-events:none}
+.cal-wall span{display:inline-flex;align-items:center;gap:5px;height:20px;background:var(--navy);color:#fff;font-size:var(--text-2xs);font-weight:var(--weight-semibold);padding:0 9px;border-radius:10px}
+.cal-wall svg{width:10px;height:10px;stroke:#fff;fill:none;stroke-width:1.3}
+.cal-body.is-past .cal-chip:not(.is-ghost){--past:.72}
+
+/* ---------- chips ---------- */
+.cal-chip{
+  --chip-bg:color-mix(in srgb,var(--k-bg) 70%,#fff);
+  position:absolute;left:6px;right:6px;z-index:2;border-radius:9px;overflow:hidden;
+  padding:var(--py,5px) 8px var(--py,5px) 10px;
+  background:color-mix(in srgb,var(--k-stripe) calc((1 - var(--t,1)) * 60%),var(--chip-bg));
+  border:1px solid color-mix(in srgb,var(--navy) calc(var(--t,1) * 10%),transparent);
+  box-shadow:0 1px 2px color-mix(in srgb,var(--navy) 5%,transparent);
+  display:grid;align-content:start;gap:1px;opacity:calc(var(--o,1) * var(--past,1));
+  transform:translateY(calc(var(--y,0) * 1px)) scale(var(--s,1));transform-origin:center top
+}
+.cal-chip{grid-auto-rows:min-content}
+/* Below 38px the meta/proposal/action rows are already at opacity 0 (see CAL.fade); remove them from layout so the title keeps its line. */
+.cal-chip[data-density="line"] > :is(.cal-chip__meta,.cal-chip__proposal,.cal-chip__acts),
+.cal-chip[data-density="sliver"] > :is(.cal-chip__title,.cal-chip__meta,.cal-chip__proposal,.cal-chip__acts){display:none}
+.cal-chip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--k-stripe);opacity:var(--solid,1)}
+.cal-chip__title{font-size:var(--text-xs);font-weight:var(--weight-semibold);line-height:1.25;color:var(--k-ink,var(--ink));display:-webkit-box;-webkit-line-clamp:var(--lines,2);-webkit-box-orient:vertical;overflow:hidden;opacity:var(--t,1);padding-right:var(--chip-pad-r,0px)}
+.cal-chip__meta{font-size:var(--text-2xs);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:var(--m,1)}
+.cal-chip__acts{display:flex;gap:4px;margin-top:4px;opacity:var(--a,1)}
+.cal-chip__acts[data-off]{visibility:hidden}
+.cal-chip__acts button,.cal-due__move button{font:var(--weight-semibold) 0.65625rem/1 var(--font-ui);padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:#fff;color:var(--navy);cursor:pointer}
+.cal-chip__acts button.is-yes,.cal-due__move button{background:var(--navy);color:#fff;border-color:var(--navy)}
+.cal-chip__acts button:disabled{opacity:.6;cursor:progress}
+.cal-chip__agent{position:absolute;right:5px;top:5px;opacity:calc(var(--t,1) * (1 - var(--solid,0)))}
+.cal-chip.has-proposal{--chip-pad-r:20px;outline:1.5px dashed var(--cal-ghost-line);outline-offset:2px}
+.cal-chip.has-proposal .cal-chip__agent{opacity:var(--t,1)}
+.cal-chip__proposal{font-size:var(--text-2xs);font-weight:var(--weight-semibold);color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:var(--m,1);margin-top:2px}
+.cal-chip.is-ghost{--chip-pad-r:20px;background:color-mix(in srgb,var(--chip-bg) calc(var(--solid,0) * 100%),var(--cal-ghost-fill));border-color:color-mix(in srgb,var(--navy) calc(var(--solid,0) * 10%),transparent);box-shadow:none;z-index:3}
+.cal-chip.is-ghost::after{content:"";position:absolute;inset:0;border:1.5px dashed var(--cal-ghost-line);border-radius:inherit;opacity:calc(1 - var(--solid,0));pointer-events:none}
+.cal-chip.is-ghost:not(.is-accepted)::before{opacity:var(--solid,0)}
+.cal-chip.is-over-item{background:color-mix(in srgb,var(--warm-white) 88%,transparent)}
+.cal-chip.is-skipped .cal-chip__title{text-decoration:line-through;color:var(--muted)}
+.cal-chip.is-class{box-shadow:none;--chip-bg:color-mix(in srgb,#fff 80%,transparent);border-color:color-mix(in srgb,var(--wave) calc(var(--t,1) * 18%),transparent)}
+.cal-chip.is-corey{--chip-bg:color-mix(in srgb,var(--pastel-peach) 80%,#fff);background:linear-gradient(135deg,color-mix(in srgb,var(--pastel-peach) 62%,#fff),var(--pastel-peach));border-color:color-mix(in srgb,var(--pastel-peach-ink) 22%,transparent)}
+.cal-chip.is-corey.is-ghost{background:color-mix(in srgb,var(--pastel-peach) calc(35% + var(--solid,0) * 45%),transparent)}
+.cal-chip.is-corey.is-ghost::after{border-color:color-mix(in srgb,var(--pastel-peach-ink) 60%,transparent)}
+.cal-mark{display:inline-block;width:14px;height:9px;position:relative;margin-right:3px;vertical-align:0}
+.cal-mark::before,.cal-mark::after{content:"";position:absolute;top:0;width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
+.cal-mark::before{left:0}.cal-mark::after{left:5px}
+
+/* chip kinds */
+.k-teaching,.k-fitness{--k-bg:var(--pastel-blue);--k-stripe:var(--wave)}
+.k-professional{--k-bg:var(--pastel-lilac);--k-stripe:var(--cal-lilac-stripe)}
+.k-task{--k-bg:var(--pastel-sage);--k-stripe:var(--cal-sage-stripe)}
+.k-health{--k-bg:var(--cal-health);--k-stripe:var(--cal-health-stripe)}
+.k-study{--k-bg:var(--pastel-gold);--k-stripe:var(--pastel-gold-ink)}
+.k-corey{--k-bg:var(--pastel-peach);--k-stripe:var(--pastel-peach-ink);--k-ink:var(--pastel-peach-ink)}
+
+/* ---------- chip popover ---------- */
+.cal-chip{cursor:pointer}
+.cal-chip:focus-visible{outline:2px solid var(--wave);outline-offset:1px}
+.cal-pop{position:absolute;z-index:30;width:288px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--elev-2);padding:var(--space-3) var(--space-4) var(--space-4);font-size:var(--text-sm)}
+.cal-pop[hidden]{display:none}
+.cal-pop__head{display:flex;align-items:center;gap:var(--space-2)}
+.cal-pop__head b{font-weight:var(--weight-semibold);line-height:1.3}
+.cal-pop__dot{width:10px;height:10px;border-radius:3px;background:var(--k-stripe);flex:none}
+.cal-pop__meta{margin:4px 0 0;color:var(--muted);font-size:var(--text-xs)}
+.cal-pop__meta--strong{color:var(--ink);font-weight:var(--weight-medium)}
+.cal-pop__label{margin:var(--space-3) 0 4px;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold);color:var(--muted)}
+.cal-pop__writes{margin:0;padding:var(--space-2) var(--space-3);border-radius:10px;background:color-mix(in srgb,var(--wave) 6%,transparent);border:1.5px dashed var(--cal-ghost-line);font-size:var(--text-xs);line-height:1.45}
+.cal-pop__acts{display:flex;gap:var(--space-2);margin-top:var(--space-3)}
+.cal-pop__acts .btn{min-height:2rem;padding:var(--space-1) var(--space-3);font-size:var(--text-sm)}
+
+/* ---------- toast (receipt) ---------- */
+.cal-toast{position:absolute;right:var(--space-6);bottom:var(--space-6);max-width:30rem;background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-3) 2.5rem;font-size:var(--text-sm);line-height:1.45;box-shadow:0 12px 32px color-mix(in srgb,var(--depth) 28%,transparent);opacity:var(--o,0);transform:translateY(calc(var(--y,6) * 1px));pointer-events:none;z-index:20}
+.cal-toast::before{content:"✓";position:absolute;left:14px;top:12px;width:18px;height:18px;border-radius:50%;background:var(--pastel-sage);color:var(--pastel-sage-ink);font-weight:var(--weight-bold);font-size:0.6875rem;display:grid;place-items:center}
+.cal-toast b{font-weight:var(--weight-semibold)}
+.cal-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ---------- phone (< 720px): one day, week strip on top ---------- */
+.cal-strip{display:none}
+@media (max-width:719px){
+  .page{padding:var(--space-4) var(--space-4) var(--space-12)}
+  .cal{--cal-label:72px}
+  .cal__nav .cal__focus,.cal__nav .hub-pills[data-part="zoom-pills"]{display:none}
+  .cal__tray{flex-wrap:wrap}
+  .cal__tray .cal__tray-detail{display:none}
+  .cal-strip{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:var(--space-3)}
+  .cal-strip button{border:1px solid var(--line);background:var(--glass);border-radius:10px;padding:6px 2px;font:inherit;display:grid;justify-items:center;gap:3px;cursor:pointer;color:var(--ink)}
+  .cal-strip button[aria-pressed="true"]{border-color:color-mix(in srgb,var(--wave) 45%,transparent);background:color-mix(in srgb,var(--pastel-blue) 55%,#fff)}
+  .cal-strip small{font-size:0.625rem;letter-spacing:var(--tracking-caps);color:var(--muted);font-weight:var(--weight-semibold)}
+  .cal-strip b{font-size:var(--text-sm);font-variant-numeric:tabular-nums}
+  .cal-strip i{width:70%;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--cap) var(--pct),color-mix(in srgb,var(--navy) 8%,transparent) var(--pct))}
+  .cal-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
+}
+@media (prefers-reduced-motion:reduce){.cal-band svg{transition:none}}
+</style>
+</head>
+<body>
+<main class="page">
+  <p class="page-header__eyebrow">Calendar reference · A · Tideline</p>
+  <h1 class="page-header__title">Life calendar, week of T3 W10</h1>
+  <div class="ref-controls" data-part="ref-controls">
+    <span>Reference controls (not product):</span>
+    <button class="btn btn--secondary" type="button" id="ref-reset">Reset</button>
+    <button class="btn btn--secondary" type="button" id="ref-slow" aria-pressed="false">Slow motion ×5</button>
+    <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
+    <span>Clock frozen at Thu 24/09/26 6:05 pm.</span>
+  </div>
+  <div id="app"></div>
+</main>
+<script>/* Generated from src/tideline-ref.ts. Do not edit tideline.html; edit src/ and rebuild. */
+(() => {
+  // apps/tasks/src/views/timeline-motion.ts
+  var MOTION = {
+    settle: 420,
+    // live update: an entity moves because data changed elsewhere
+    zoom: 280,
+    // day width changes (zoom pills, wheel, pinch)
+    release: 220,
+    // a dragged bar settles onto its snapped day
+    cascadeStagger: 30,
+    // dependants follow a released bar, one after another
+    enter: 320,
+    // a new bar, curve or chip appears
+    exit: 160,
+    // an entity leaves
+    expand: 300,
+    // a group opens or closes; rows slide
+    rowStagger: 24,
+    // rows revealed by expand, top to bottom
+    hover: 120,
+    // hover and focus emphasis
+    morph: 620,
+    // Bars <-> Lines flight: the kit spring settles in ~618 ms (see springEasing)
+    crossfade: 160,
+    // real views swap during the morph
+    reducedFade: 120
+    // the only motion left under prefers-reduced-motion
+  };
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    const solve = (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const err = sampleX(t) - x;
+        if (Math.abs(err) < 1e-6) return t;
+        const d = slopeX(t);
+        if (Math.abs(d) < 1e-6) break;
+        t -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      t = x;
+      while (hi - lo > 1e-6) {
+        const v = sampleX(t);
+        if (v < x) lo = t;
+        else hi = t;
+        t = (lo + hi) / 2;
+      }
+      return t;
+    };
+    return (p) => {
+      if (p <= 0) return 0;
+      if (p >= 1) return 1;
+      return sampleY(solve(p));
+    };
+  }
+  var EASE = cubicBezier(0.2, 0.8, 0.2, 1);
+  var OVERSHOOT = cubicBezier(0.34, 1.3, 0.64, 1);
+  var LINEAR = (t) => t;
+  var EPS = 1e-6;
+  function browserClock() {
+    return {
+      now: () => performance.now(),
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id)
+    };
+  }
+  function prefersReduced() {
+    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function createMotion(options) {
+    const clock2 = options.clock ?? browserClock();
+    const reduced2 = options.reducedMotion ?? prefersReduced;
+    const entities = /* @__PURE__ */ new Map();
+    const frameCosts = [];
+    let frameId = null;
+    let disposed = false;
+    function entity(id) {
+      let e = entities.get(id);
+      if (!e) {
+        e = { props: {}, tweens: /* @__PURE__ */ new Map(), exiting: null, dirty: false };
+        entities.set(id, e);
+      }
+      return e;
+    }
+    function schedule() {
+      if (frameId !== null || disposed) return;
+      frameId = clock2.request(frame);
+    }
+    function valueAt(tween, now) {
+      if (tween.duration <= 0) return tween.to;
+      const p = (now - tween.start) / tween.duration;
+      if (p <= 0) return tween.from;
+      if (p >= 1) return tween.to;
+      return tween.from + (tween.to - tween.from) * tween.easing(p);
+    }
+    function step(now) {
+      let active = false;
+      const finishedExits = [];
+      for (const [id, e] of entities) {
+        for (const [prop, tween] of e.tweens) {
+          const v = valueAt(tween, now);
+          if (e.props[prop] !== v) {
+            e.props[prop] = v;
+            e.dirty = true;
+          }
+          if (now >= tween.start + tween.duration) e.tweens.delete(prop);
+          else active = true;
+        }
+        if (e.dirty) {
+          e.dirty = false;
+          options.apply(id, e.props);
+        }
+        if (e.exiting && e.tweens.size === 0) finishedExits.push([id, e.exiting]);
+      }
+      for (const [id, done] of finishedExits) {
+        entities.delete(id);
+        done();
+      }
+      return active;
+    }
+    function frame() {
+      frameId = null;
+      if (disposed) return;
+      const t0 = clock2.now();
+      const active = step(t0);
+      const cost = clock2.now() - t0;
+      frameCosts.push(cost);
+      if (frameCosts.length > 600) frameCosts.shift();
+      if (active) schedule();
+      else options.onIdle?.();
+    }
+    function startTween(e, prop, to, opts, now) {
+      const running = e.tweens.get(prop);
+      if (running && Math.abs(running.to - to) < EPS) return;
+      const current = running ? valueAt(running, now) : e.props[prop];
+      if (current === void 0) {
+        e.props[prop] = to;
+        e.dirty = true;
+        return;
+      }
+      if (!running && Math.abs(current - to) < EPS) return;
+      const duration = opts.duration ?? MOTION.settle;
+      e.tweens.set(prop, {
+        from: current,
+        to,
+        start: now + (opts.delay ?? 0),
+        duration,
+        easing: running && opts.easing === OVERSHOOT ? EASE : opts.easing ?? EASE
+      });
+    }
+    function flushDirty(id, e) {
+      if (e.dirty) {
+        e.dirty = false;
+        options.apply(id, e.props);
+      }
+    }
+    const engine2 = {
+      place(id, props) {
+        const e = entity(id);
+        for (const [prop, value] of Object.entries(props)) {
+          e.tweens.delete(prop);
+          if (e.props[prop] !== value) {
+            e.props[prop] = value;
+            e.dirty = true;
+          }
+        }
+        flushDirty(id, e);
+      },
+      to(id, props, opts = {}) {
+        const e = entity(id);
+        e.exiting = null;
+        const now = clock2.now();
+        if (reduced2()) {
+          const { opacity, ...geometry } = props;
+          engine2.place(id, geometry);
+          if (opacity !== void 0) {
+            startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
+          }
+        } else {
+          for (const [prop, value] of Object.entries(props)) startTween(e, prop, value, opts, now);
+        }
+        flushDirty(id, e);
+        if (e.tweens.size) schedule();
+      },
+      enter(id, props, opts = {}) {
+        const from = opts.from ?? { opacity: 0, scale: 0.6 };
+        const start = { ...props, ...from };
+        const target = { opacity: 1, scale: 1, ...props };
+        if (reduced2()) {
+          engine2.place(id, { ...target, opacity: 0 });
+          engine2.to(id, { opacity: target.opacity ?? 1 });
+          return;
+        }
+        engine2.place(id, start);
+        engine2.to(id, target, { duration: MOTION.enter, easing: OVERSHOOT, ...opts });
+      },
+      exit(id, done, opts = {}) {
+        const e = entities.get(id);
+        if (!e) {
+          done();
+          return;
+        }
+        if (e.exiting) {
+          e.exiting = done;
+          return;
+        }
+        for (const prop of [...e.tweens.keys()]) if (prop !== "opacity") e.tweens.delete(prop);
+        e.exiting = done;
+        const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
+        startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock2.now());
+        if (!e.tweens.size) {
+          entities.delete(id);
+          done();
+          return;
+        }
+        schedule();
+      },
+      get: (id) => entities.get(id)?.props,
+      forget: (id) => {
+        entities.delete(id);
+      },
+      has: (id) => entities.has(id),
+      target: (id, prop) => {
+        const e = entities.get(id);
+        if (!e) return void 0;
+        return e.tweens.get(prop)?.to ?? e.props[prop];
+      },
+      busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
+      finish() {
+        step(Number.POSITIVE_INFINITY);
+        if (frameId !== null) {
+          clock2.cancel(frameId);
+          frameId = null;
+        }
+      },
+      stats() {
+        const sorted = [...frameCosts].sort((a, b) => a - b);
+        const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+        return { frames: frameCosts.length, p95, max: sorted.length ? sorted[sorted.length - 1] : 0 };
+      },
+      dispose() {
+        disposed = true;
+        if (frameId !== null) clock2.cancel(frameId);
+        frameId = null;
+        entities.clear();
+      }
+    };
+    return engine2;
+  }
+
+  // packages/design-kit/js/calendar-bands.js
+  var DEFAULT_BANDS = Object.freeze([
+    Object.freeze({ id: "morning", label: "Morning", from: 6, to: 8.25, px: 58 }),
+    Object.freeze({ id: "school", label: "School", from: 8.25, to: 15 + 10 / 60, px: 158 }),
+    Object.freeze({ id: "after", label: "After bell", from: 15 + 10 / 60, to: 17.5, px: 104 }),
+    Object.freeze({ id: "yours", label: "Yours", from: 17.5, to: 22, px: 232 })
+  ]);
+  var BAND_MIN_PX = 30;
+  var SLEEP_STRIP_PX = 30;
+  var DENSITY = Object.freeze({ sliver: 14, line: 38, actions: 62 });
+  var HOUR_RE = /^(\d{1,2}):(\d{2})$/;
+  function hourOf(value) {
+    if (typeof value === "number") return value;
+    const m = HOUR_RE.exec(String(value ?? "").trim());
+    if (!m) throw new TypeError(`Invalid time: ${value}`);
+    return Number(m[1]) + Number(m[2]) / 60;
+  }
+  function bandsFromProfile(profile = {}, { school = true } = {}) {
+    const d = DEFAULT_BANDS;
+    const start = profile.day_start ? hourOf(profile.day_start) : d[0].from;
+    const schoolStart = profile.school_start ? hourOf(profile.school_start) : d[1].from;
+    const bell = profile.bell ? hourOf(profile.bell) : d[2].from;
+    const home = profile.home ? hourOf(profile.home) : d[3].from;
+    const sleep = profile.sleep ? hourOf(profile.sleep) : d[3].to;
+    if (!(start < schoolStart && schoolStart < bell && bell < home && home < sleep)) {
+      throw new RangeError("Planning profile times must increase: day_start < school_start < bell < home < sleep");
+    }
+    if (!school) {
+      return [
+        { id: "morning", label: "Morning", from: start, to: schoolStart, px: d[0].px },
+        { id: "day", label: "Day", from: schoolStart, to: home, px: d[1].px + d[2].px },
+        { id: "yours", label: "Yours", from: home, to: sleep, px: d[3].px }
+      ];
+    }
+    return [
+      { id: "morning", label: "Morning", from: start, to: schoolStart, px: d[0].px },
+      { id: "school", label: "School", from: schoolStart, to: bell, px: d[1].px },
+      { id: "after", label: "After bell", from: bell, to: home, px: d[2].px },
+      { id: "yours", label: "Yours", from: home, to: sleep, px: d[3].px }
+    ];
+  }
+  function baseHeights(bands) {
+    return bands.map((b) => b.px);
+  }
+  function totalHeight(heights2) {
+    return heights2.reduce((sum, h) => sum + h, 0);
+  }
+  function bandTargets(bands, expandedIndex = null, { minPx = BAND_MIN_PX } = {}) {
+    const base = baseHeights(bands);
+    if (expandedIndex == null) return base;
+    if (!Number.isInteger(expandedIndex) || expandedIndex < 0 || expandedIndex >= bands.length) {
+      throw new RangeError(`No band at index ${expandedIndex}`);
+    }
+    const total = totalHeight(base);
+    return bands.map((_, i) => i === expandedIndex ? total - minPx * (bands.length - 1) : minPx);
+  }
+  function yForHour(bands, heights2, hour) {
+    const h = hourOf(hour);
+    let y = 0;
+    for (let i = 0; i < bands.length; i++) {
+      const b = bands[i];
+      if (h <= b.from) return y;
+      if (h <= b.to) return y + (h - b.from) / (b.to - b.from) * heights2[i];
+      y += heights2[i];
+    }
+    return y;
+  }
+  function blockGeometry(bands, heights2, start, end) {
+    const y0 = yForHour(bands, heights2, start);
+    const y1 = yForHour(bands, heights2, end);
+    return { top: y0 + 1, height: Math.max(4, y1 - y0 - 2) };
+  }
+
+  // apps/life/js/app/capacity-model.js
+  var CAPACITY = Object.freeze({
+    baseline: 80,
+    floor: 10,
+    ceiling: 95,
+    sleepTarget: 7,
+    // hours; below this costs capacity
+    sleepPoor: 6,
+    // below this the note says "poor sleep", else "short sleep"
+    sleepPerHour: 8,
+    sleepMaxPenalty: 30,
+    energy: Object.freeze({ low: -15, medium: 0, high: 8 }),
+    lowMoodScore: 3,
+    // mood_score (1-10) at or below this costs capacity
+    lowMoodPenalty: 8,
+    symptomPenalty: 15,
+    symptomMaxPenalty: 25,
+    belowParPct: 60,
+    // a day under this counts toward a streak
+    streakPenalty: 4,
+    streakMax: 8,
+    softenPct: 40,
+    // under this the day is flagged and agents may propose softening it
+    budgetHours: 6,
+    // discretionary commitment hours a 100% day can carry
+    recovery: 0.6,
+    // forecast: share of the gap to baseline still open after each day
+    holidayLift: 5
+  });
+  var SYMPTOM_PATTERNS = [
+    ["sore throat", /\bsore throat\b/i],
+    ["sniffles", /\bsniffl(?:es|y)\b|\brunny nose\b/i],
+    ["run down", /\brun[- ]down\b/i],
+    ["viral", /\bviral\b|\bvirus\b|\bflu\b/i],
+    ["headache", /\bheadache\b|\bmigraine\b/i],
+    ["nausea", /\bnause(?:a|ous)\b/i],
+    ["flare", /\bflare(?:[- ]up)?\b/i],
+    ["cramps", /\bcramp(?:s|ing)?\b/i],
+    ["fatigue", /\bfatigue\b|\bexhausted\b|\bwiped out\b/i],
+    ["fever", /\bfever\b|\btemperature\b/i]
+  ];
+  function symptomsIn(record, body = "") {
+    if (Array.isArray(record?.symptoms)) {
+      return record.symptoms.map((s) => String(s).trim()).filter(Boolean);
+    }
+    const text = `${record?.title ?? ""}
+${record?.notes ?? ""}
+${body ?? ""}`;
+    return SYMPTOM_PATTERNS.filter(([, re]) => re.test(text)).map(([name]) => name);
+  }
+  function clamp(pct) {
+    return Math.round(Math.min(CAPACITY.ceiling, Math.max(CAPACITY.floor, pct)));
+  }
+  function dayCapacity({ sleepHours = null, diaries = [], priorBelowPar = 0 } = {}) {
+    const factors = [];
+    if (sleepHours != null && Number.isFinite(sleepHours) && sleepHours < CAPACITY.sleepTarget) {
+      const delta = -Math.min(CAPACITY.sleepMaxPenalty, (CAPACITY.sleepTarget - sleepHours) * CAPACITY.sleepPerHour);
+      factors.push({ id: "sleep", label: sleepHours < CAPACITY.sleepPoor ? "poor sleep" : "short sleep", delta });
+    }
+    const energies = diaries.map((d) => d.record?.energy).filter((e) => e in CAPACITY.energy);
+    if (energies.length) {
+      const worst = energies.reduce((a, b) => CAPACITY.energy[a] <= CAPACITY.energy[b] ? a : b);
+      const delta = CAPACITY.energy[worst];
+      if (delta !== 0) factors.push({ id: "energy", label: `${worst} energy`, delta });
+    }
+    const scores = diaries.map((d) => d.record?.mood_score).filter(Number.isFinite);
+    if (scores.length && Math.min(...scores) <= CAPACITY.lowMoodScore) {
+      factors.push({ id: "mood", label: "low mood", delta: -CAPACITY.lowMoodPenalty });
+    }
+    const symptoms = [...new Set(diaries.flatMap((d) => symptomsIn(d.record, d.body)))];
+    if (symptoms.length) {
+      const delta = -Math.min(CAPACITY.symptomMaxPenalty, symptoms.length * CAPACITY.symptomPenalty);
+      factors.push({ id: "symptoms", label: symptoms.slice(0, 2).join(", "), delta, symptoms });
+    }
+    if (priorBelowPar > 0) {
+      const delta = -Math.min(CAPACITY.streakMax, priorBelowPar * CAPACITY.streakPenalty);
+      factors.push({ id: "streak", label: `${ordinal(priorBelowPar + 1)} low day in a row`, delta });
+    }
+    const pct = clamp(CAPACITY.baseline + factors.reduce((sum, f) => sum + f.delta, 0));
+    return { pct, note: noteFor(factors), factors, soften: pct < CAPACITY.softenPct, forecast: false };
+  }
+  function ordinal(n) {
+    const s = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`;
+  }
+  function noteFor(factors) {
+    const order = { symptoms: 0, sleep: 1, energy: 2, mood: 3, streak: 4 };
+    const drains = factors.filter((f) => f.delta < 0).sort((a, b) => a.delta - b.delta || order[a.id] - order[b.id]);
+    if (!drains.length) return factors.some((f) => f.delta > 0) ? "good energy" : "steady";
+    const main = drains.find((f) => f.id !== "streak") ?? drains[0];
+    const second = drains.find((f) => f !== main && f.id !== "streak");
+    const firstLabel = main.id === "symptoms" ? main.symptoms[0] : main.label;
+    return second ? `${firstLabel}, ${second.id === "symptoms" ? second.symptoms[0] : second.label}` : firstLabel;
+  }
+  function forecastCapacity(lastPct, daysAhead, { holiday = false } = {}) {
+    const gap = CAPACITY.baseline - lastPct;
+    const recovered = lastPct + gap * (1 - CAPACITY.recovery ** Math.max(0, daysAhead));
+    const pct = clamp(recovered + (holiday ? CAPACITY.holidayLift : 0));
+    return { pct, note: "forecast", factors: [], soften: pct < CAPACITY.softenPct, forecast: true };
+  }
+  function capacityForDates(events, dateKeys, { isHoliday: isHoliday2 = () => false } = {}) {
+    const byDate = new Map(dateKeys.map((d) => [d, { sleepHours: null, diaries: [] }]));
+    for (const event of events ?? []) {
+      const rec = event?.record;
+      const slot = rec && byDate.get(rec.date);
+      if (!slot) continue;
+      if (rec.type === "sleep" && Number.isFinite(rec.duration_h)) slot.sleepHours = rec.duration_h;
+      if (rec.type === "diary") slot.diaries.push(event);
+    }
+    const out = /* @__PURE__ */ new Map();
+    let streak = 0;
+    let last = null;
+    let lastIndex = -1;
+    dateKeys.forEach((date, i) => {
+      const slot = byDate.get(date);
+      const logged = slot.sleepHours != null || slot.diaries.length > 0;
+      if (logged) {
+        const result = dayCapacity({ ...slot, priorBelowPar: streak });
+        out.set(date, result);
+        streak = result.pct < CAPACITY.belowParPct ? streak + 1 : 0;
+        last = result.pct;
+        lastIndex = i;
+      } else if (last != null) {
+        out.set(date, forecastCapacity(last, i - lastIndex, { holiday: isHoliday2(date) }));
+      } else {
+        out.set(date, { pct: CAPACITY.baseline, note: "no logs", factors: [], soften: false, forecast: true });
+      }
+    });
+    return out;
+  }
+  function dayLoadHours(items) {
+    return (items ?? []).filter((i) => !i.isClass && !i.protected && !i.ghost && i.kind !== "corey" && i.kind !== "log").reduce((sum, i) => sum + Math.max(0, i.end - i.start), 0);
+  }
+  function isOverCapacity(pct, loadHours) {
+    return loadHours > pct / 100 * CAPACITY.budgetHours;
+  }
+
+  // packages/design-kit/js/format-display-date.js
+  var SYDNEY_TZ = "Australia/Sydney";
+  var DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+  function fromYmd(year, month, day) {
+    return `${pad2(day)}/${pad2(month)}/${String(year).slice(-2)}`;
+  }
+  function fromInstant(instant) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: SYDNEY_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(instant).filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+    );
+    return fromYmd(Number(parts.year), Number(parts.month), Number(parts.day));
+  }
+  function formatDisplayDate(value) {
+    if (value == null || value === "") return "";
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? "" : fromInstant(value);
+    }
+    const text = String(value).trim();
+    if (!text) return "";
+    const key = DATE_KEY.exec(text);
+    if (key) return fromYmd(Number(key[1]), Number(key[2]), Number(key[3]));
+    const ms = Date.parse(text);
+    if (!Number.isNaN(ms)) return fromInstant(new Date(ms));
+    return text;
+  }
+
+  // apps/life/js/core/central-node-write.js
+  var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function formatLogDate(dateKey) {
+    const [, month, day] = dateKey.split("-").map(Number);
+    return `${day} ${SHORT_MONTHS[month - 1]}`;
+  }
+
+  // apps/life/js/app/ghost-writes.js
+  var GHOST_AGENTS = Object.freeze({
+    sara: "Sara",
+    hammond: "Hammond",
+    clare: "Clare",
+    chadwick: "Chadwick",
+    brisket: "Brisket",
+    penelope: "Penelope",
+    vera: "Vera"
+  });
+  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task"]);
+  var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
+  var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  function short(dateKey) {
+    return formatDisplayDate(dateKey).slice(0, 5);
+  }
+  function weekday(dateKey) {
+    return new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${dateKey}T00:00:00Z`));
+  }
+  function clock12(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h >= 12 ? "pm" : "am";
+    const hour = (h + 11) % 12 + 1;
+    return m ? `${hour}:${String(m).padStart(2, "0")} ${suffix}` : `${hour}:00 ${suffix}`;
+  }
+  function windDownStart(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.max(0, h * 60 + m - 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  }
+  function oneLine(text) {
+    return String(text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function cn(section, op, payload) {
+    return { target: "central_node", patch: { section, op, payload } };
+  }
+  function recentAction(dateKey, agentName, text) {
+    return cn("recent_actions", "append_line", {
+      summary: `${agentName}: ${text}`,
+      text: `- ${formatLogDate(dateKey)} \u2014 ${agentName}: ${text}`
+    });
+  }
+  function validateGhost(ghost) {
+    if (!ghost || typeof ghost !== "object") throw new TypeError("Ghost must be an object");
+    if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
+    if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
+    if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
+    if (ghost.kind !== "move_task" && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
+    if (ghost.kind === "protect_block") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("protect_block needs start < end (HH:MM)");
+      }
+      if (!oneLine(ghost.title)) throw new TypeError("protect_block needs a title");
+    }
+    if (ghost.kind === "move_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
+      if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    return ghost;
+  }
+  function acceptPlan(ghost, { today = null } = {}) {
+    validateGhost(ghost);
+    const actedOn = today ?? ghost.date ?? ghost.from;
+    const who = GHOST_AGENTS[ghost.agent];
+    const reason = oneLine(ghost.reason);
+    const why = reason ? ` (${reason})` : "";
+    const steps = [];
+    let receipt;
+    switch (ghost.kind) {
+      case "skip_workout": {
+        const line = `- ${who}\u2192Chadwick: skip ${weekday(ghost.date)} ${short(ghost.date)} workout${why}.`;
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Chadwick: skip workout ${short(ghost.date)}`, text: line }));
+        if (ghost.workoutPath) {
+          steps.push({ target: "life_record", mode: "update", path: ghost.workoutPath, fields: { status: "skipped" } });
+        }
+        steps.push(recentAction(actedOn, who, `skip workout accepted${why}`));
+        receipt = `${who} \u2192 Central Node: \u201C${line.slice(2)}\u201D${ghost.workoutPath ? " Chadwick\u2019s session is marked skipped." : ""}`;
+        break;
+      }
+      case "bedtime": {
+        const text = `lights out ${clock12(ghost.time)}${why}`;
+        steps.push(cn("todays_status", "upsert_field", { summary: `${who}: protect sleep ${short(ghost.date)}`, field: "Sleep", text: `**Sleep:** ${text}` }));
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: { type: "calendar_block", date: ghost.date, time: windDownStart(ghost.time), end_time: ghost.time, kind: "rest", status: "confirmed", protected: true, title: `Wind down \xB7 lights out ${clock12(ghost.time)}`, source_agent: ghost.agent }
+        });
+        steps.push(recentAction(actedOn, who, `bedtime ${clock12(ghost.time)} accepted`));
+        receipt = `${who} \u2192 Today\u2019s Status: Sleep \u201C${text}\u201D. A protected wind-down is on the calendar.`;
+        break;
+      }
+      case "protect_block": {
+        const withCorey = ghost.with === "corey";
+        const title = oneLine(ghost.title);
+        const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: {
+            type: "calendar_block",
+            date: ghost.date,
+            time: ghost.start,
+            end_time: ghost.end,
+            kind: withCorey ? "corey" : "protected",
+            status: "tentative",
+            protected: true,
+            title,
+            source_agent: ghost.agent
+          }
+        });
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Corey" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Corey)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Corey" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        break;
+      }
+      case "move_task": {
+        steps.push({ target: "tasks", method: "PATCH", id: ghost.taskId, body: { due_date: ghost.to } });
+        steps.push(recentAction(actedOn, who, `moved \u201C${oneLine(ghost.title) || ghost.taskId}\u201D ${short(ghost.from)} \u2192 ${short(ghost.to)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${oneLine(ghost.title) || ghost.taskId}\u201D due ${formatDisplayDate(ghost.from)} \u2192 ${formatDisplayDate(ghost.to)}.`;
+        break;
+      }
+      default:
+        throw new TypeError(`Unhandled ghost kind: ${ghost.kind}`);
+    }
+    return { ghostId: ghost.id, steps, receipt };
+  }
+  function dismissPlan(ghost, { reason = null } = {}) {
+    validateGhost(ghost);
+    return {
+      ghostId: ghost.id,
+      steps: [],
+      decision: { agent: ghost.agent, kind: ghost.kind, outcome: "dismissed", reason: reason ? oneLine(reason) : null },
+      receipt: "Dismissed. Nothing written."
+    };
+  }
+
+  // packages/design-kit/js/hub-motion.js
+  var CARD_SELECTOR = [
+    ".metric-card",
+    ".week-card",
+    ".hub-card",
+    ".glass-panel",
+    ".glass-tile",
+    ".card",
+    ".sign-in__card",
+    ".mind-tile",
+    ".alchemist-card",
+    ".podcast-card",
+    ".wiki-card",
+    ".uni-tl__card",
+    ".quiz-card",
+    ".pcard"
+  ].join(",");
+  var MAGNET_SELECTOR = [
+    ".hub-pulse-card",
+    ".home-class-tile",
+    ".dashboard-overview__tile"
+  ].join(",");
+  var LIST_SELECTOR = [
+    ".logging-list",
+    ".meal-log",
+    ".cards",
+    ".nutrition-challenge-list",
+    "[data-hub-list]"
+  ].join(",");
+  var COUNT_SELECTOR = [
+    "[data-value]",
+    "[data-hub-count]",
+    "[data-percent]",
+    ".hub-pulse-card__count"
+  ].join(",");
+  function prefersReducedMotion(root2 = document) {
+    const view = root2.defaultView ?? globalThis;
+    return Boolean(view.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+  function isActiveHubPill(btn) {
+    if (!btn) return false;
+    return btn.classList.contains("is-active") || btn.classList.contains("is-selected") || btn.getAttribute("aria-selected") === "true" || btn.getAttribute("aria-checked") === "true" || btn.getAttribute("aria-pressed") === "true";
+  }
+  function isLoosePills(group) {
+    return group.classList.contains("hub-pills--loose") || group.getAttribute("data-hub-pills") === "loose";
+  }
+  function directChild(group, className) {
+    return [...group.children ?? []].find((node) => node.classList?.contains(className)) ?? null;
+  }
+  function hubPillsButtons(group) {
+    return [...group.children ?? []].filter((node) => node.classList?.contains("hub-pills__btn"));
+  }
+  function ensurePillThumb(group) {
+    let thumb = directChild(group, "hub-pills__thumb");
+    if (thumb) return thumb;
+    const doc = group.ownerDocument ?? document;
+    thumb = doc.createElement("span");
+    thumb.className = "hub-pills__thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    group.insertBefore(thumb, group.firstChild);
+    return thumb;
+  }
+  function applyHubPillsThumb(group, options = {}) {
+    if (!group?.style?.setProperty) return null;
+    if (isLoosePills(group)) {
+      group.classList.remove("is-ready", "is-animated");
+      directChild(group, "hub-pills__thumb")?.remove();
+      return null;
+    }
+    const buttons = hubPillsButtons(group);
+    if (buttons.length < 2) {
+      group.classList.remove("is-ready", "is-animated");
+      return null;
+    }
+    const active = buttons.find(isActiveHubPill);
+    if (!active) {
+      group.classList.remove("is-ready");
+      return null;
+    }
+    const missingThumb = !directChild(group, "hub-pills__thumb");
+    ensurePillThumb(group);
+    const box = {
+      x: `${active.offsetLeft}px`,
+      y: `${active.offsetTop}px`,
+      w: `${active.offsetWidth}px`,
+      h: `${active.offsetHeight}px`
+    };
+    group.style.setProperty("--hub-pill-x", box.x);
+    group.style.setProperty("--hub-pill-y", box.y);
+    group.style.setProperty("--hub-pill-w", box.w);
+    group.style.setProperty("--hub-pill-h", box.h);
+    group.classList.add("is-ready");
+    const reduced2 = options.reduced ?? prefersReducedMotion(group);
+    const animate = options.animate !== false && !reduced2 && !missingThumb;
+    group.classList.toggle("is-animated", animate);
+    return box;
+  }
+
+  // docs/proposals/calendar-reference/src/fixture.ts
+  var NOW = { date: "2026-09-24", time: "18:05" };
+  var WEEK = ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27"];
+  var SCHOOL_DAYS = /* @__PURE__ */ new Set(["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"]);
+  var HOLIDAY_FROM = "2026-09-26";
+  var WEEK_LABEL = { title: "T3 W10 \xB7 last week of term", range: "21/09/26 \u2013 27/09/26" };
+  var DAY_TAGS = {
+    "2026-09-25": { text: "Last day T3", tone: "term" },
+    "2026-09-26": { text: "Holidays", tone: "holiday" },
+    "2026-09-27": { text: "Holidays", tone: "holiday" }
+  };
+  var LOGS = [
+    { record: { type: "sleep", date: "2026-09-21", duration_h: 6.9 } },
+    { record: { type: "meal", date: "2026-09-21", meal: "breakfast", time: "07:30" } },
+    { record: { type: "meal", date: "2026-09-21", meal: "lunch", time: "12:43" } },
+    { record: { type: "sleep", date: "2026-09-22", duration_h: 6.2 } },
+    { record: { type: "meal", date: "2026-09-22", meal: "breakfast", time: "07:00" } },
+    { record: { type: "diary", date: "2026-09-22", mood: "low", energy: "low", mood_score: 3 }, body: "" },
+    { record: { type: "sleep", date: "2026-09-23", duration_h: 5.9 } },
+    { record: { type: "meal", date: "2026-09-23", meal: "snack", time: "10:30", protein_g: 17, calories: 452 } },
+    { record: { type: "diary", date: "2026-09-23", time: "08:00" }, body: "Feeling run down, possible viral illness" },
+    { record: { type: "sleep", date: "2026-09-24", duration_h: 5.4 } },
+    { record: { type: "meal", date: "2026-09-24", meal: "breakfast", time: "07:10" } },
+    { record: { type: "diary", date: "2026-09-24", time: "07:40" }, body: "Sore throat, sniffles, poor sleep" }
+  ];
+  var P = {
+    1: ["08:40", "09:35"],
+    2: ["09:35", "10:30"],
+    3: ["10:50", "11:45"],
+    4: ["11:45", "12:40"],
+    5: ["13:20", "14:15"],
+    6: ["14:15", "15:10"]
+  };
+  function cls(date, p, title, focus) {
+    return { id: `class-${date}-p${p}`, date, start: P[p][0], end: P[p][1], kind: "teaching", title, meta: `P${p} \xB7 ${focus}`, isClass: true, sample: true };
+  }
+  var ITEMS = [
+    cls("2026-09-21", 1, "Y12 English Adv", "Common Module revision"),
+    cls("2026-09-21", 2, "Y11 English Adv", "Module C drafts"),
+    { id: "resource-day", date: "2026-09-21", start: "10:51", end: "14:50", kind: "professional", title: "Focus Area: Texts and human experience \xB7 resource day", meta: "10:51 am \u2013 2:50 pm" },
+    { id: "mon-corey", date: "2026-09-21", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    cls("2026-09-22", 1, "Y11 English Adv", "Module C"),
+    cls("2026-09-22", 3, "Y12 English Adv", "HSC practice paper"),
+    cls("2026-09-22", 5, "HPGE planning", "with Leader of Learning"),
+    { id: "tue-workout", date: "2026-09-22", start: "17:45", end: "18:15", kind: "fitness", title: "Workout \xB7 30 min", meta: "5:45 pm", sample: true },
+    { id: "tue-corey", date: "2026-09-22", start: "19:15", end: "21:15", kind: "corey", title: "Dinner at home", meta: "7:15 \u2013 9:15 pm", protected: true, sample: true },
+    cls("2026-09-23", 2, "Y12 English Adv", "Paper 1 timing"),
+    cls("2026-09-23", 4, "Y11 English Adv", "peer feedback"),
+    cls("2026-09-23", 6, "MindWorks", "UN Voice coaching"),
+    { id: "wed-marking", date: "2026-09-23", start: "15:40", end: "17:20", kind: "teaching", title: "Mark Y11 Module C drafts", meta: "3:40 \u2013 5:20 pm", sample: true },
+    { id: "wed-corey", date: "2026-09-23", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    cls("2026-09-24", 1, "Y12 English Adv", "last full lesson"),
+    cls("2026-09-24", 3, "Y11 English Adv", "drafts returned"),
+    { id: "gastro", date: "2026-09-24", start: "13:15", end: "14:15", kind: "health", title: "Gastroenterologist follow-up \xB7 Dr Chris Keily", meta: "1:15 pm \xB7 2 records merged", mergedRecords: 2 },
+    { id: "thu-workout", date: "2026-09-24", start: "18:15", end: "19:25", kind: "fitness", title: "Workout \xB7 upper body", meta: "Chadwick\u2019s plan", sample: true },
+    { id: "thu-corey", date: "2026-09-24", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV with Corey", meta: "Protected \xB7 7:30 \u2013 9:30 pm", protected: true, sample: true },
+    { id: "pd-hard-conversations", date: "2026-09-25", start: "08:30", end: "10:30", kind: "professional", title: "Courageously Navigating Hard Conversations", meta: "8:30 \u2013 10:30 am \xB7 PD" },
+    cls("2026-09-25", 3, "Y11 English Adv", "end of term"),
+    cls("2026-09-25", 5, "Y12 English Adv", "farewell lesson"),
+    { id: "sat-gym", date: "2026-09-26", start: "09:00", end: "10:00", kind: "fitness", title: "Gym \xB7 lower body", meta: "9 \u2013 10 am \xB7 Chadwick", sample: true }
+  ];
+  var DUE = [
+    { id: "task-josh-y10", date: "2026-09-25", title: "Find out about Year 10 leadership opportunities for Josh Lizzio", kind: "task", ghostId: "g-move" }
+  ];
+  var WALLS = [{ date: "2026-09-27", label: "Your day \xB7 protected" }];
+  var FREE = [{ date: "2026-09-25", start: "17:30", end: "22:00", title: "4\xBD h free", sub: "End of term. Nothing booked. Keep it that way?" }];
+  var GHOSTS = [
+    {
+      id: "g-skip",
+      agent: "sara",
+      kind: "skip_workout",
+      date: "2026-09-24",
+      reason: "capacity 34%, sore throat",
+      workoutPath: "records/2026/09/24/workout-1815.md",
+      label: "Skip workout",
+      meta: "Sara \xB7 you\u2019re at 34%",
+      overItem: "thu-workout",
+      chip: { date: "2026-09-24", start: "18:15", end: "19:25", kind: "fitness" }
+    },
+    {
+      id: "g-bed",
+      agent: "sara",
+      kind: "bedtime",
+      date: "2026-09-24",
+      time: "22:00",
+      reason: "5.4 h last night",
+      label: "Lights out 10:00",
+      meta: "Sara",
+      chip: { date: "2026-09-24", start: "21:30", end: "22:00", kind: "health" }
+    },
+    {
+      id: "g-good",
+      agent: "hammond",
+      kind: "protect_block",
+      date: "2026-09-26",
+      start: "18:00",
+      end: "22:00",
+      title: "Dinner out + a show",
+      with: "corey",
+      label: "Good night: dinner out + a show",
+      meta: "Hammond \xB7 your definition of a good night",
+      chip: { date: "2026-09-26", start: "18:00", end: "22:00", kind: "corey" }
+    },
+    {
+      id: "g-move",
+      agent: "hammond",
+      kind: "move_task",
+      taskId: "task-josh-y10",
+      title: "Year 10 leadership opportunities for Josh Lizzio",
+      from: "2026-09-25",
+      to: "2026-10-13",
+      label: "\u2192 T4 W1",
+      meta: "Hammond"
+    }
+  ];
+  var TRAY = {
+    agent: "hammond",
+    headline: "4 changes for the rest of this week",
+    detail: "protects tonight \xB7 moves 1 task into T4 W1 \xB7 books your good night \xB7 nothing crosses a wall"
+  };
+  var SOURCES = [
+    { id: "teaching", label: "Teaching", count: 11 },
+    { id: "professional", label: "Professional", count: 3 },
+    { id: "task", label: "Tasks", count: 1 },
+    { id: "health", label: "Health", count: 2 },
+    { id: "corey", label: "Corey", count: 4 }
+  ];
+  var AMBIENT = "9 meals \xB7 3 diary \xB7 2 symptoms \xB7 12 notes touched";
+
+  // docs/proposals/calendar-reference/src/tideline-ref.ts
+  var CAL = {
+    bandMs: 420,
+    // band expand / fold. One tween of the band heights, EASE.
+    acceptMs: 320,
+    // ghost dashed -> solid
+    exitMs: MOTION.exit,
+    // dismissed ghost fades out
+    enterMs: MOTION.enter,
+    // first mount: columns rise in
+    enterStagger: 30,
+    // per column
+    enterRise: 8,
+    // px
+    toastInMs: 220,
+    toastRise: 6,
+    toastHoldMs: 5200,
+    applyAllStagger: 90,
+    // ms between ghosts on Apply all
+    saveLatencyMs: 350,
+    // PROTOTYPE ONLY: stands in for POST /api/calendar-ghosts
+    fade: { title: [14, 20], meta: [38, 46], actions: [62, 70] },
+    lineBox: 15,
+    // one title line: 12px text x 1.25 line height
+    cardAt: 38,
+    // at or above: card padding and a meta line
+    twoLinesAt: 56,
+    // at or above: title may take 2 lines (2 x 15 + meta 13 + padding 12 + border 2 = 57)
+    popMs: 180,
+    // chip popover in / out
+    popRise: 4,
+    popWidth: 288,
+    popGap: 8
+  };
+  var BANDS = bandsFromProfile();
+  var SUBS = {
+    morning: "up 6:15",
+    school: "8:15 \u2013 bell 3:10",
+    after: "work window to 5:30",
+    yours: "home ~5:30 \xB7 the hours that count"
+  };
+  var TOTAL = totalHeight(baseHeights(BANDS));
+  var BODY_H = TOTAL + SLEEP_STRIP_PX;
+  var AGENT_INITIAL = { sara: "S", hammond: "H", clare: "C", chadwick: "Ch" };
+  var toH = (hhmm) => Number(hhmm.slice(0, 2)) + Number(hhmm.slice(3, 5)) / 60;
+  var isHoliday = (d) => d >= HOLIDAY_FROM;
+  var CAP = capacityForDates(LOGS, WEEK, { isHoliday });
+  function chipsFor(date) {
+    const items = ITEMS.filter((i) => i.date === date).map((i) => ({ ...i, start: toH(i.start), end: toH(i.end) }));
+    for (const g of GHOSTS) {
+      if (!g.chip || g.chip.date !== date || g.overItem) continue;
+      items.push({ id: g.id, date, start: toH(g.chip.start), end: toH(g.chip.end), kind: g.chip.kind, title: g.label, meta: g.meta, ghost: g, overItem: g.overItem });
+    }
+    return items;
+  }
+  function dayInfo(date) {
+    const cap = CAP.get(date);
+    const load = dayLoadHours(chipsFor(date).map((c) => ({ start: c.start, end: c.end, kind: c.kind, isClass: c.isClass, protected: c.protected, ghost: !!c.ghost })));
+    const over = !cap.forecast && isOverCapacity(cap.pct, load);
+    const logs = LOGS.filter((l) => l.record.date === date);
+    const sleep = logs.find((l) => l.record.type === "sleep")?.record.duration_h;
+    const energy = logs.find((l) => l.record.type === "diary" && l.record.energy)?.record.energy;
+    const meals = logs.filter((l) => l.record.type === "meal").length;
+    const symptom = cap.factors.find((f) => f.id === "symptoms")?.symptoms?.[0];
+    return { cap, over, sleep, energy, meals, symptom };
+  }
+  function capColour(pct) {
+    return pct >= 60 ? "var(--pastel-sage-ink)" : pct >= 40 ? "var(--pastel-gold-ink)" : "var(--high-sea)";
+  }
+  function ghostInput(g) {
+    const { label, meta, chip, overItem, ...rest } = g;
+    return rest;
+  }
+  var state = { expanded: null, accepted: /* @__PURE__ */ new Set(), dismissed: /* @__PURE__ */ new Set(), busy: /* @__PURE__ */ new Set(), phone: false, phoneDay: NOW.date };
+  var nodes = /* @__PURE__ */ new Map();
+  var engine;
+  var heights = baseHeights(BANDS);
+  var root;
+  var toastTimer = 0;
+  var mountOptions = {};
+  function el(tag, cls2, html, parent, attrs = {}) {
+    const n = document.createElement(tag);
+    if (cls2) n.className = cls2;
+    if (html != null) n.innerHTML = html;
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    parent?.appendChild(n);
+    return n;
+  }
+  var ICON = {
+    prev: '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>',
+    next: '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>',
+    moon: '<svg viewBox="0 0 12 12"><path d="M8.8 8.3A4.3 4.3 0 0 1 4 2.1a4.3 4.3 0 1 0 4.8 6.2z"/></svg>',
+    bolt: '<svg viewBox="0 0 12 12"><path d="M6.8 1 3 7h3l-.8 4L9 5H6z"/></svg>',
+    fork: '<svg viewBox="0 0 12 12"><path d="M3.5 1v4a1.5 1.5 0 0 0 3 0V1M5 5.5V11M9 1c-1 .5-1.5 2-1.5 3.5S8 6.5 9 6.5V11"/></svg>',
+    lock: '<svg viewBox="0 0 10 10"><rect x="1.5" y="4.5" width="7" height="5" rx="1"/><path d="M3 4.5V3a2 2 0 0 1 4 0v1.5"/></svg>',
+    chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>'
+  };
+  var DOW = (d) => new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${d}T00:00:00Z`)).toUpperCase();
+  var DOM_NUM = (d) => String(Number(d.slice(8, 10)));
+  function mount(host, options = mountOptions) {
+    mountOptions = options;
+    engine?.dispose();
+    nodes.clear();
+    host.replaceChildren();
+    root = el("section", "cal", void 0, host, { "data-part": "tideline", "aria-label": "Week calendar" });
+    state.phone = matchMedia("(max-width: 719px)").matches;
+    const days = state.phone ? [state.phoneDay] : WEEK;
+    root.style.setProperty("--cal-days", String(days.length));
+    const nav = el("header", "cal__nav", void 0, root, { "data-part": "nav" });
+    el("button", "cal__round", ICON.prev, nav, { type: "button", "aria-label": "Previous week" });
+    el("div", "cal__period", `<b>${WEEK_LABEL.title}</b><span>${WEEK_LABEL.range}</span>`, nav, { "data-part": "period" });
+    el("button", "cal__round", ICON.next, nav, { type: "button", "aria-label": "Next week" });
+    el("button", "btn btn--secondary", "Today", nav, { type: "button" });
+    const zoom = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', nav, { role: "group", "aria-label": "Zoom", "data-part": "zoom-pills" });
+    for (const z of ["Day", "Week", "Term", "Year", "Almanac"]) {
+      el("button", `hub-pills__btn${z === "Week" ? " is-active" : ""}`, z, zoom, { type: "button", "aria-pressed": String(z === "Week") });
+    }
+    el("div", "cal__spacer", void 0, nav);
+    const focusWrap = el("div", "cal__focus", "Focus", nav);
+    const focus = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', focusWrap, { role: "group", "aria-label": "Focus band", "data-part": "focus-pills" });
+    el("button", "hub-pills__btn is-active", "Balanced", focus, { type: "button", "data-band": "none", "aria-pressed": "true" });
+    BANDS.forEach((b, i) => el("button", "hub-pills__btn", b.label, focus, { type: "button", "data-band": String(i), "aria-pressed": "false" }));
+    const tray = el("div", "cal__tray", void 0, root, { "data-part": "tray" });
+    el("span", "cal-av", "H", tray, { "aria-hidden": "true" });
+    el("span", "", `<b>${TRAY.headline}</b> <span class="cal__tray-detail">\xB7 ${TRAY.detail}</span>`, tray);
+    el("span", "cal__spacer", void 0, tray);
+    el("button", "btn btn--primary", "Apply all", tray, { type: "button", "data-action": "apply-all", "data-part": "apply-all" });
+    el("button", "btn btn--secondary", "Review", tray, { type: "button" });
+    el("button", "btn btn--ghost", "Dismiss", tray, { type: "button" });
+    const strip = el("div", "cal-strip", void 0, root, { "data-part": "day-strip", role: "group", "aria-label": "Day" });
+    for (const d of WEEK) {
+      const c = CAP.get(d);
+      const b = el("button", "", `<small>${DOW(d)}</small><b>${DOM_NUM(d)}</b><i></i>`, strip, { type: "button", "data-day": d, "aria-pressed": String(d === state.phoneDay), "aria-label": `${DOW(d)} ${DOM_NUM(d)}, ${c.pct}%` });
+      b.style.setProperty("--cap", capColour(c.pct));
+      b.style.setProperty("--pct", `${c.pct}%`);
+    }
+    const src = el("div", "cal__sources", void 0, root, { "data-part": "sources" });
+    for (const s of SOURCES) {
+      el("span", `cal-src k-${s.id}${s.id === "corey" ? " cal-src--corey" : ""}`, `${s.id === "corey" ? '<span class="cal-mark"></span>' : "<i></i>"}${s.label} ${s.count}`, src);
+    }
+    el("span", "cal-src cal-src--ambient", `Ambient: ${AMBIENT}`, src, { "data-part": "ambient" });
+    const card = el("div", "cal__card", void 0, root, { "data-part": "card" });
+    const grid = el("div", "cal__grid", void 0, card);
+    el("div", "cal-corner", "Capacity from your logs", grid);
+    days.forEach((d) => mountHead(grid, d));
+    el("div", "cal-allday cal-corner", "Due", grid);
+    days.forEach((d) => mountAllDay(grid, d));
+    mountBandLabels(grid);
+    days.forEach((d) => mountBody(grid, d));
+    const toast = el("div", "cal-toast", "", root, { role: "status", "aria-live": "polite", "data-part": "toast" });
+    nodes.set("__toast", toast);
+    const pop = el("div", "cal-pop", "", root, { role: "dialog", "aria-modal": "false", "data-part": "chip-popover", hidden: "" });
+    nodes.set("__pop", pop);
+    const live = el("div", "cal-sr", "", root, { "aria-live": "polite", "data-part": "announcer" });
+    nodes.set("__live", live);
+    engine = createMotion({ apply, clock: options.clock, reducedMotion: options.reducedMotion });
+    heights = state.expanded == null ? baseHeights(BANDS) : bandTargets(BANDS, state.expanded);
+    engine.place("__bands", Object.fromEntries(heights.map((h, i) => [`h${i}`, h])));
+    engine.place("__toast", { opacity: 0, y: CAL.toastRise });
+    engine.place("__pop", { opacity: 0, y: CAL.popRise });
+    for (const [id, n] of nodes) {
+      if (id.startsWith("chip:")) engine.place(id, { opacity: 1, scale: 1, solid: n.classList.contains("is-ghost") ? 0 : 1 });
+    }
+    days.forEach((d, i) => engine.enter(`col:${d}`, { opacity: 1, y: 0 }, { from: { opacity: 0, y: CAL.enterRise }, delay: i * CAL.enterStagger, duration: CAL.enterMs }));
+    requestAnimationFrame(() => {
+      applyHubPillsThumb(zoom);
+      applyHubPillsThumb(focus);
+    });
+    wire(root);
+  }
+  function mountHead(grid, d) {
+    const info = dayInfo(d);
+    const tag = DAY_TAGS[d];
+    const head = el("div", `cal-head${d === NOW.date ? " is-today" : ""}${info.over ? " is-over" : ""}`, void 0, grid, { "data-part": "day-head", "data-date": d });
+    el("div", "cal-head__name", `<span class="cal-head__dow">${DOW(d)}</span><span class="cal-head__num">${DOM_NUM(d)}</span>${info.over ? '<span class="cal-over" data-part="over-flag">over</span>' : ""}${tag ? `<span class="cal-tag${tag.tone === "term" ? " cal-tag--term" : ""}">${tag.text}</span>` : ""}`, head);
+    const cap = el("div", `cal-cap${info.cap.forecast ? " is-forecast" : ""}`, void 0, head, { "data-part": "capacity", "data-pct": String(info.cap.pct) });
+    cap.style.setProperty("--cap", capColour(info.cap.pct));
+    el("div", "cal-cap__bar", `<span class="cal-cap__fill" style="width:${info.cap.pct}%"></span>`, cap);
+    el("div", "cal-cap__text", `<b>${info.cap.pct}%</b> \xB7 ${info.cap.note}`, cap);
+    const vit = [];
+    if (info.sleep != null) vit.push(`<span>${ICON.moon}${info.sleep}h</span>`);
+    if (info.energy) vit.push(`<span class="${info.energy === "low" ? "is-low" : ""}">${ICON.bolt}${info.energy}</span>`);
+    if (info.meals) vit.push(`<span>${ICON.fork}${info.meals}</span>`);
+    if (info.symptom) vit.push(`<span class="is-symptom">\u25CF ${info.symptom}</span>`);
+    el("div", "cal-vit", vit.join("") || "<span>nothing logged yet</span>", head, { "data-part": "vitals" });
+    nodes.set(`colhead:${d}`, head);
+  }
+  function mountAllDay(grid, d) {
+    const cell = el("div", "cal-allday", void 0, grid, { "data-part": "all-day", "data-date": d });
+    for (const t of DUE.filter((x) => x.date === d)) {
+      const g = GHOSTS.find((x) => x.id === t.ghostId);
+      const chip = el("div", "cal-due", `<b>${t.title}</b>`, cell, { "data-part": "due", "data-id": t.id });
+      if (g) {
+        el("span", "cal-due__move", `<span class="cal-av cal-av--sm">${AGENT_INITIAL[g.agent]}</span>${g.label}<button type="button" data-accept="${g.id}">Move</button>`, chip, { "data-ghost": g.id });
+      }
+      nodes.set(`due:${t.id}`, chip);
+    }
+    nodes.set(`colallday:${d}`, cell);
+  }
+  function mountBandLabels(grid) {
+    const col = el("div", "cal-bands", void 0, grid, { "data-part": "band-labels" });
+    col.style.height = `${BODY_H}px`;
+    BANDS.forEach((b, i) => {
+      const btn = el("button", "cal-band", `<b>${b.label}${ICON.chev}</b><span>${SUBS[b.id] ?? ""}</span>`, col, {
+        type: "button",
+        "data-band": String(i),
+        "aria-expanded": "false",
+        "data-part": `band-${b.id}`,
+        "aria-label": `${b.label} band. Press to ${"expand"}.`
+      });
+      nodes.set(`band:${i}`, btn);
+    });
+    const sleep = el("div", "cal-sleeplab", "Sleep", col);
+    sleep.style.top = `${TOTAL}px`;
+    sleep.style.height = `${SLEEP_STRIP_PX}px`;
+  }
+  function mountBody(grid, d) {
+    const past = d < NOW.date;
+    const body = el("div", `cal-body${past ? " is-past" : ""}`, void 0, grid, { "data-part": "day-body", "data-date": d });
+    body.style.height = `${BODY_H}px`;
+    nodes.set(`colbody:${d}`, body);
+    const school = SCHOOL_DAYS.has(d);
+    BANDS.forEach((b, i) => {
+      if (b.id === "school" && school) nodes.set(`bg:${d}:${i}`, el("div", "cal-bg cal-bg--school", void 0, body, { "data-band": String(i) }));
+      if (b.id === "yours") nodes.set(`bg:${d}:${i}`, el("div", "cal-bg cal-bg--yours", void 0, body, { "data-band": String(i) }));
+      nodes.set(`line:${d}:${i}`, el("div", "cal-line", void 0, body));
+    });
+    const sleep = el("div", "cal-sleep", `${ICON.moon}${sleepLabel(d)}`, body, { "data-part": "sleep-strip" });
+    sleep.style.top = `${TOTAL}px`;
+    sleep.style.height = `${SLEEP_STRIP_PX}px`;
+    for (const f of FREE.filter((x) => x.date === d)) {
+      nodes.set(`free:${d}`, el("div", "cal-free", `<div><b>${f.title}</b>${f.sub}</div>`, body, { "data-part": "free" }));
+    }
+    for (const c of chipsFor(d)) mountChip(body, c);
+    if (d === NOW.date) nodes.set("now", el("div", "cal-now", "<span>6:05 pm</span>", body, { "data-part": "now-line" }));
+    for (const w of WALLS.filter((x) => x.date === d)) {
+      const wall = el("div", "cal-wall", `<span>${ICON.lock}${w.label}</span>`, body, { "data-part": "wall" });
+      wall.style.height = `${TOTAL}px`;
+    }
+  }
+  function sleepLabel(d) {
+    const next = WEEK[WEEK.indexOf(d) + 1];
+    const slept = LOGS.find((l) => l.record.type === "sleep" && l.record.date === next)?.record.duration_h;
+    if (slept != null) return `slept ${slept} h`;
+    return d === NOW.date ? "aim 10:00 tonight" : isHoliday(d) ? "aim 11:00" : "aim 10:30";
+  }
+  function mountChip(body, c) {
+    const g = c.ghost;
+    const classes = ["cal-chip", `k-${c.kind}`];
+    if (c.isClass) classes.push("is-class");
+    if (c.kind === "corey") classes.push("is-corey");
+    if (g) classes.push("is-ghost");
+    const title = `${c.kind === "corey" ? '<span class="cal-mark"></span>' : ""}${c.title}`;
+    const agent = g ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${g.agent === "sara" ? "cal-av--sara" : ""}">${AGENT_INITIAL[g.agent]}</span></span>` : "";
+    const acts = g && g.kind !== "bedtime" ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${g.id}">Accept</button><button type="button" data-dismiss="${g.id}">Dismiss</button></div>` : g ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${g.id}">Accept</button></div>` : "";
+    const chip = el("div", classes.join(" "), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${c.meta}</div>${acts}`, body, {
+      "data-part": g ? "ghost" : c.isClass ? "class" : "chip",
+      "data-id": c.id,
+      "data-kind": c.kind,
+      title: c.title,
+      tabindex: "0",
+      role: "button",
+      "aria-label": `${c.title}. ${c.meta}`
+    });
+    const proposal = GHOSTS.find((x) => x.overItem === c.id);
+    if (proposal) {
+      chip.classList.add("has-proposal");
+      chip.dataset.ghost = proposal.id;
+      chip.insertAdjacentHTML("afterbegin", `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${proposal.agent === "sara" ? "cal-av--sara" : ""}">${AGENT_INITIAL[proposal.agent]}</span></span>`);
+      chip.insertAdjacentHTML("beforeend", `<div class="cal-chip__proposal" data-part="proposal">${proposal.agent === "sara" ? "Sara" : "Hammond"} suggests: ${proposal.label.toLowerCase()}</div>`);
+      chip.setAttribute("aria-label", `${c.title}. ${c.meta}. Proposal: ${proposal.label}. Open for details.`);
+    }
+    chip.dataset.start = String(c.start);
+    chip.dataset.end = String(c.end);
+    chip.dataset.hasActions = acts ? "1" : "";
+    nodes.set(`chip:${c.id}`, chip);
+  }
+  function layout(h) {
+    const out = /* @__PURE__ */ new Map();
+    BANDS.forEach((b, i) => {
+      const top = yForHour(BANDS, h, b.from);
+      const height = yForHour(BANDS, h, b.to) - top;
+      out.set(`band:${i}`, { top, height });
+    });
+    for (const [id, node] of nodes) {
+      const [type, a, b] = id.split(":");
+      if (type === "bg" || type === "line") {
+        const band = BANDS[Number(b)];
+        const top = yForHour(BANDS, h, band.from);
+        out.set(id, type === "bg" ? { top, height: yForHour(BANDS, h, band.to) - top } : { top });
+      } else if (type === "chip") {
+        out.set(id, blockGeometry(BANDS, h, Number(node.dataset.start), Number(node.dataset.end)));
+      } else if (type === "free") {
+        const f = FREE.find((x) => x.date === a);
+        const top = yForHour(BANDS, h, toH(f.start));
+        const raw = yForHour(BANDS, h, toH(f.end)) - top;
+        out.set(id, { top: top + 8, height: Math.max(0, raw - 16), fade: clamp01((raw - 90) / 40) });
+      } else if (id === "now") {
+        out.set(id, { top: yForHour(BANDS, h, toH(NOW.time)) });
+      }
+    }
+    return out;
+  }
+  var clamp01 = (v) => Math.min(1, Math.max(0, v));
+  var fadeIn = (h, [a, b]) => clamp01((h - a) / (b - a));
+  function apply(id, p) {
+    if (id === "__bands") {
+      heights = BANDS.map((_, i) => p[`h${i}`]);
+      for (const [eid, props] of layout(heights)) engine.place(eid, props);
+      return;
+    }
+    if (id === "__toast") {
+      const t = nodes.get("__toast");
+      t.style.setProperty("--o", String(p.opacity));
+      t.style.setProperty("--y", String(p.y));
+      return;
+    }
+    if (id === "__pop") {
+      const n2 = nodes.get("__pop");
+      n2.style.opacity = String(p.opacity);
+      n2.style.transform = `translateY(${p.y}px)`;
+      return;
+    }
+    if (id.startsWith("col:")) {
+      const d = id.slice(4);
+      for (const part of ["colhead", "colallday", "colbody"]) {
+        const n2 = nodes.get(`${part}:${d}`);
+        if (!n2) continue;
+        n2.style.opacity = String(p.opacity);
+        n2.style.transform = p.y ? `translateY(${p.y}px)` : "";
+      }
+      return;
+    }
+    const n = nodes.get(id);
+    if (!n) return;
+    if (p.top != null) n.style.top = `${p.top}px`;
+    if (p.height != null) n.style.height = `${p.height}px`;
+    if (id.startsWith("band:")) {
+      n.style.setProperty("--sub", String(fadeIn(p.height, [38, 48])));
+      return;
+    }
+    if (id.startsWith("free:")) {
+      n.style.opacity = String(p.fade);
+      return;
+    }
+    if (id.startsWith("chip:")) {
+      const h = p.height;
+      n.style.setProperty("--t", String(fadeIn(h, CAL.fade.title)));
+      n.style.setProperty("--m", String(fadeIn(h, CAL.fade.meta)));
+      n.style.setProperty("--lines", h >= CAL.twoLinesAt ? "2" : "1");
+      n.style.setProperty("--py", `${h >= CAL.cardAt ? 5 : Math.max(0, (h - 2 - CAL.lineBox) / 2)}px`);
+      const acts = n.querySelector(".cal-chip__acts");
+      if (acts) {
+        const a = fadeIn(h, CAL.fade.actions);
+        acts.style.setProperty("--a", String(a));
+        acts.toggleAttribute("data-off", a < 0.5);
+      }
+      if (p.solid != null) n.style.setProperty("--solid", String(p.solid));
+      if (p.opacity != null) n.style.setProperty("--o", String(p.opacity));
+      if (p.scale != null) n.style.setProperty("--s", String(p.scale));
+      n.dataset.density = h < 14 ? "sliver" : h < 38 ? "line" : "card";
+    }
+  }
+  function setBand(next) {
+    state.expanded = next;
+    const target = bandTargets(BANDS, next);
+    engine.to("__bands", Object.fromEntries(target.map((h, i) => [`h${i}`, h])), { duration: CAL.bandMs, easing: EASE });
+    root.querySelectorAll(".cal-band").forEach((b) => b.setAttribute("aria-expanded", String(Number(b.dataset.band) === next)));
+    const focus = root.querySelector('[data-part="focus-pills"]');
+    focus.querySelectorAll(".hub-pills__btn").forEach((b) => {
+      const on = b.dataset.band === "none" && next == null || Number(b.dataset.band) === next;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    focus.classList.add("is-animated");
+    applyHubPillsThumb(focus);
+    nodes.get("__live").textContent = next == null ? "All bands balanced." : `${BANDS[next].label} expanded.`;
+  }
+  function toggleBand(i) {
+    setBand(state.expanded === i ? null : i);
+  }
+  function showToast(html) {
+    const t = nodes.get("__toast");
+    t.innerHTML = html;
+    engine.to("__toast", { opacity: 1, y: 0 }, { duration: CAL.toastInMs });
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => engine.to("__toast", { opacity: 0, y: CAL.toastRise }, { duration: CAL.toastInMs }), CAL.toastHoldMs);
+  }
+  var wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function accept(ghostId, { quiet = false } = {}) {
+    const g = GHOSTS.find((x) => x.id === ghostId);
+    if (!g || state.accepted.has(ghostId) || state.dismissed.has(ghostId) || state.busy.has(ghostId)) return null;
+    const plan = acceptPlan(ghostInput(g), { today: NOW.date });
+    state.busy.add(ghostId);
+    const buttons = root.querySelectorAll(`[data-accept="${ghostId}"],[data-dismiss="${ghostId}"]`);
+    buttons.forEach((b) => {
+      b.disabled = true;
+      if (b.dataset.accept) b.textContent = "Saving\u2026";
+    });
+    await wait(CAL.saveLatencyMs);
+    state.busy.delete(ghostId);
+    state.accepted.add(ghostId);
+    if (g.kind === "move_task") {
+      const due = nodes.get(`due:${g.taskId}`);
+      due.classList.add("is-moved");
+      due.querySelector(".cal-due__move").innerHTML = "Moved to T4 W1 Tue";
+    } else if (g.overItem) {
+      const item = nodes.get(`chip:${g.overItem}`);
+      item.classList.remove("has-proposal");
+      item.classList.add("is-skipped");
+      item.querySelector(".cal-chip__agent")?.remove();
+      item.querySelector(".cal-chip__proposal")?.remove();
+      item.querySelector(".cal-chip__meta").textContent = "Skipped \xB7 Sara";
+    } else {
+      const chip = nodes.get(`chip:${ghostId}`);
+      chip.classList.add("is-accepted");
+      chip.querySelector(".cal-chip__acts")?.remove();
+      chip.dataset.part = "chip";
+      engine.to(`chip:${ghostId}`, { solid: 1 }, { duration: CAL.acceptMs });
+    }
+    if (!quiet) showToast(`<b>Written.</b> ${plan.receipt}`);
+    nodes.get("__live").textContent = plan.receipt;
+    return plan;
+  }
+  function dismiss(ghostId) {
+    const g = GHOSTS.find((x) => x.id === ghostId);
+    if (!g || state.accepted.has(ghostId) || state.dismissed.has(ghostId)) return;
+    const plan = dismissPlan(ghostInput(g));
+    state.dismissed.add(ghostId);
+    if (g.overItem) {
+      const item = nodes.get(`chip:${g.overItem}`);
+      item.classList.remove("has-proposal");
+      item.querySelector(".cal-chip__agent")?.remove();
+      item.querySelector(".cal-chip__proposal")?.remove();
+      showToast(`<b>${plan.receipt}</b> Sara notes the \u201Cno\u201D, so she asks less often.`);
+      return;
+    }
+    engine.to(`chip:${ghostId}`, { scale: 0.96 }, { duration: CAL.exitMs });
+    engine.exit(`chip:${ghostId}`, () => {
+      nodes.get(`chip:${ghostId}`)?.remove();
+      nodes.delete(`chip:${ghostId}`);
+    }, { duration: CAL.exitMs });
+    showToast(`<b>${plan.receipt}</b> ${g.agent === "sara" ? "Sara" : "Hammond"} notes the \u201Cno\u201D, so it asks less often.`);
+  }
+  async function applyAll() {
+    const pending = GHOSTS.filter((g) => !state.accepted.has(g.id) && !state.dismissed.has(g.id));
+    const plans = await Promise.all(pending.map(async (g, i) => {
+      await wait(i * CAL.applyAllStagger);
+      return accept(g.id, { quiet: true });
+    }));
+    const done = plans.filter(Boolean);
+    if (done.length) showToast(`<b>${done.length} change${done.length === 1 ? "" : "s"} written.</b> Receipts are in Central Node \u203A Recent Agent Actions.`);
+  }
+  var popFor = null;
+  function openPop(chipId) {
+    const chip = nodes.get(`chip:${chipId}`);
+    const pop = nodes.get("__pop");
+    if (!chip) return;
+    const g = GHOSTS.find((x) => (x.id === chipId || x.overItem === chipId) && !state.accepted.has(x.id) && !state.dismissed.has(x.id));
+    const item = ITEMS.find((x) => x.id === chipId);
+    const title = g && !g.overItem ? g.label : item?.title ?? chip.title;
+    const meta = g && !g.overItem ? g.meta : item?.meta ?? "";
+    let html = `<div class="cal-pop__head">${g ? `<span class="cal-av cal-av--sm ${g.agent === "sara" ? "cal-av--sara" : ""}">${AGENT_INITIAL[g.agent]}</span>` : `<i class="cal-pop__dot k-${chip.dataset.kind}"></i>`}<b>${title}</b></div><p class="cal-pop__meta">${meta}</p>`;
+    if (g) {
+      if (g.overItem) html += `<p class="cal-pop__label">${g.agent === "sara" ? "Sara" : "Hammond"} suggests</p><p class="cal-pop__meta cal-pop__meta--strong">${g.label} \xB7 ${g.meta}</p>`;
+      html += `<p class="cal-pop__label">Accept writes</p><p class="cal-pop__writes" data-part="write-preview">${acceptPlan(ghostInput(g), { today: NOW.date }).receipt}</p>`;
+      html += `<div class="cal-pop__acts"><button type="button" class="btn btn--primary" data-accept="${g.id}">Accept</button>${g.kind === "bedtime" ? "" : `<button type="button" class="btn btn--ghost" data-dismiss="${g.id}">Dismiss</button>`}</div>`;
+    }
+    pop.innerHTML = html;
+    pop.hidden = false;
+    const r = root.getBoundingClientRect();
+    const c = chip.getBoundingClientRect();
+    const roomRight = r.right - c.right;
+    const left = roomRight >= CAL.popWidth + CAL.popGap ? c.right - r.left + CAL.popGap : c.left - r.left - CAL.popWidth - CAL.popGap;
+    pop.style.left = `${Math.max(0, left)}px`;
+    pop.style.top = `${c.top - r.top}px`;
+    popFor = chipId;
+    engine.place("__pop", { opacity: 0, y: CAL.popRise });
+    engine.to("__pop", { opacity: 1, y: 0 }, { duration: CAL.popMs });
+    pop.querySelector("button")?.focus({ preventScroll: true });
+  }
+  function closePop() {
+    if (!popFor) return;
+    popFor = null;
+    engine.to("__pop", { opacity: 0, y: CAL.popRise }, { duration: CAL.popMs });
+    window.setTimeout(() => {
+      if (!popFor) nodes.get("__pop").hidden = true;
+    }, CAL.popMs);
+  }
+  function wire(r) {
+    r.addEventListener("click", (e) => {
+      const t = e.target;
+      const acc = t.closest("[data-accept]");
+      if (acc) {
+        closePop();
+        return void accept(acc.dataset.accept);
+      }
+      const dis = t.closest("[data-dismiss]");
+      if (dis) {
+        closePop();
+        return dismiss(dis.dataset.dismiss);
+      }
+      const chip = t.closest(".cal-chip");
+      if (chip) return chip.dataset.id === popFor ? closePop() : openPop(chip.dataset.id);
+      if (!t.closest('[data-part="chip-popover"]')) closePop();
+      if (t.closest('[data-action="apply-all"]')) return void applyAll();
+      const day = t.closest("[data-day]");
+      if (day) {
+        state.phoneDay = day.dataset.day;
+        return mount(r.parentElement);
+      }
+      const band = t.closest("[data-band]");
+      if (band && !t.closest(".cal-chip")) {
+        if (band.dataset.band === "none") return setBand(null);
+        return band.closest('[data-part="focus-pills"]') ? setBand(Number(band.dataset.band)) : toggleBand(Number(band.dataset.band));
+      }
+    });
+    r.addEventListener("keydown", (e) => {
+      if (e.target.closest("input,textarea")) return;
+      if (/^[1-4]$/.test(e.key)) {
+        toggleBand(Number(e.key) - 1);
+        e.preventDefault();
+      }
+      if (e.key === "Escape" && popFor) {
+        closePop();
+        return;
+      }
+      if (e.key === "0" || e.key === "Escape") {
+        setBand(null);
+      }
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList.contains("cal-chip")) {
+        openPop(e.target.dataset.id);
+        e.preventDefault();
+      }
+    });
+  }
+  var slow = 1;
+  var reduced = false;
+  var clock = {
+    now: () => performance.now() / slow,
+    request: (cb) => requestAnimationFrame(cb),
+    cancel: (id) => cancelAnimationFrame(id)
+  };
+  function boot() {
+    const host = document.getElementById("app");
+    const start = () => mount(host, { clock, reducedMotion: () => reduced || matchMedia("(prefers-reduced-motion: reduce)").matches });
+    (document.fonts?.ready ?? Promise.resolve()).then(start);
+    document.getElementById("ref-reset")?.addEventListener("click", () => {
+      state.expanded = null;
+      state.accepted.clear();
+      state.dismissed.clear();
+      state.phoneDay = NOW.date;
+      start();
+    });
+    document.getElementById("ref-slow")?.addEventListener("click", (e) => {
+      slow = slow === 1 ? 5 : 1;
+      e.currentTarget.setAttribute("aria-pressed", String(slow === 5));
+    });
+    document.getElementById("ref-reduced")?.addEventListener("click", (e) => {
+      reduced = !reduced;
+      e.currentTarget.setAttribute("aria-pressed", String(reduced));
+    });
+    let wasPhone = matchMedia("(max-width: 719px)").matches;
+    matchMedia("(max-width: 719px)").addEventListener("change", (ev) => {
+      if (ev.matches !== wasPhone) {
+        wasPhone = ev.matches;
+        start();
+      }
+    });
+    window.__tideline = {
+      state,
+      CAL,
+      heights: () => heights.slice(),
+      total: TOTAL,
+      capacity: Object.fromEntries([...CAP].map(([d, c]) => [d, c.pct])),
+      setBand,
+      accept,
+      dismiss,
+      openPop,
+      closePop,
+      finish: () => engine.finish(),
+      stats: () => engine.stats()
+    };
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
