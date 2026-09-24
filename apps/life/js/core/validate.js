@@ -304,6 +304,7 @@ function validateDiary(record, errors) {
   enumeration(record, 'mood', MOODS, errors);
   enumeration(record, 'energy', ENERGY_LEVELS, errors);
   stringArray(record, 'tags', errors);
+  stringArray(record, 'symptoms', errors);
   optionalString(record, 'highlights', errors);
   optionalString(record, 'challenges', errors);
   optionalString(record, 'system_note', errors);
@@ -443,6 +444,23 @@ function validateMedical(record, errors) {
   }
 }
 
+const CALENDAR_BLOCK_KINDS = ['corey', 'rest', 'protected', 'wall', 'focus'];
+const CALENDAR_BLOCK_STATUSES = ['tentative', 'confirmed'];
+const CALENDAR_BLOCK_AGENTS = ['sara', 'hammond', 'clare', 'chadwick', 'brisket', 'penelope', 'vera'];
+
+function validateCalendarBlock(record, errors) {
+  requireString(record, 'title', errors);
+  enumeration(record, 'kind', CALENDAR_BLOCK_KINDS, errors, true);
+  enumeration(record, 'status', CALENDAR_BLOCK_STATUSES, errors, true);
+  booleanField(record, 'protected', errors, true);
+  if (!isTime(record.time)) errors.push('time must be HH:MM');
+  if (!isTime(record.end_time)) errors.push('end_time must be HH:MM');
+  else if (isTime(record.time) && record.end_time <= record.time) {
+    errors.push('end_time must be after time');
+  }
+  enumeration(record, 'source_agent', CALENDAR_BLOCK_AGENTS, errors);
+}
+
 function validateBloods(record, errors) {
   const markers = record.markers;
   if (!Array.isArray(markers)) {
@@ -481,7 +499,8 @@ const VALIDATORS = {
   skincare: validateSkincare,
   fragrance: validateFragrance,
   bloods: validateBloods,
-  medical: validateMedical
+  medical: validateMedical,
+  calendar_block: validateCalendarBlock
 };
 
 export function validateUniqueIds(eventsOrRecords) {

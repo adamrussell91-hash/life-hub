@@ -125,6 +125,7 @@ const DOMAIN_PROPERTIES = {
     mood: { type: 'string', enum: ['great', 'good', 'neutral', 'low', 'bad'] },
     energy: { type: 'string', enum: ['high', 'medium', 'low'] },
     tags: { type: 'array', items: { type: 'string' } },
+    symptoms: { type: 'array', items: { type: 'string' } },
     highlights: { type: 'string' },
     challenges: { type: 'string' },
     dayone_sent: { type: 'boolean' },

@@ -1,7 +1,7 @@
 import { isCalendarDate } from './time.js';
 import { validateRecord } from './validate.js';
 
-const PATH = /^data\/(nutrition|fitness|mind|sleep|heart|skincare|fragrance|body)\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
+const PATH = /^data\/(nutrition|fitness|mind|sleep|heart|skincare|fragrance|body|calendar)\/(\d{4})\/(\d{2})\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 
 export const TYPE_DOMAINS = {
   meal: 'nutrition',
@@ -16,7 +16,8 @@ export const TYPE_DOMAINS = {
   sleep: 'sleep',
   heart: 'heart',
   skincare: 'skincare',
-  fragrance: 'fragrance'
+  fragrance: 'fragrance',
+  calendar_block: 'calendar'
 };
 
 function rawScalar(yaml, key) {

@@ -182,7 +182,7 @@ test('accepts every canonical domain record and nullable observations', () => {
     },
     {
       ...common, type: 'diary', mood_score: null, mood: null, energy: null,
-      tags: [], highlights: '', challenges: '', dayone_sent: false
+      tags: [], symptoms: ['sore throat'], highlights: '', challenges: '', dayone_sent: false
     },
     { ...common, type: 'weight', weight_kg: null },
     {
@@ -204,12 +204,27 @@ test('accepts every canonical domain record and nullable observations', () => {
     {
       ...common, type: 'medical', title: 'GP review', record_type: 'Appointment',
       lane: 'appointment', location_kind: 'unknown', episode: null
+    },
+    {
+      ...common, type: 'calendar_block', title: 'Dinner out + a show', kind: 'corey',
+      status: 'tentative', protected: true, time: '18:00', end_time: '22:00', source_agent: 'hammond'
     }
   ];
 
   for (const record of records) {
     assert.deepEqual(validateRecord(record), [], `${record.type} should be valid`);
   }
+});
+
+test('calendar_block span must end after it starts, and diary symptoms are strings', () => {
+  const block = {
+    ...common, type: 'calendar_block', title: 'Wall', kind: 'wall',
+    status: 'confirmed', protected: true, time: '18:00', end_time: '22:00'
+  };
+  assert.match(validateRecord({ ...block, end_time: '18:00' }).join('; '), /end_time must be after time/);
+  assert.match(validateRecord({ ...block, kind: 'party' }).join('; '), /kind/);
+  assert.match(validateRecord({ ...block, protected: 'yes' }).join('; '), /protected/);
+  assert.match(validateRecord({ ...common, type: 'diary', symptoms: 'sore throat' }).join('; '), /symptoms/);
 });
 
 test('accepts bloods records with a markers array', () => {

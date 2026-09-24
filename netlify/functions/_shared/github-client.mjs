@@ -318,8 +318,74 @@ export function createGitHubClient({ env = process.env, fetchImpl = fetch } = {}
         throw new GitHubClientError('github_invalid_response', true);
       }
       return { commitSha: payload.commit.sha };
+    },
+
+    // One commit, many paths. parentSha + baseTreeSha are the snapshot the
+    // caller read; a moved branch is write_conflict so the caller can re-read.
+    async commitFiles({ files, message, parentSha, baseTreeSha }) {
+      if (!Array.isArray(files) || files.length === 0) throw new TypeError('At least one file is required.');
+      if (typeof message !== 'string' || message.length === 0) throw new TypeError('A commit message is required.');
+      if (!SHA.test(parentSha) || !SHA.test(baseTreeSha)) throw new TypeError('Invalid commit SHA.');
+
+      const tree = [];
+      for (const file of files) {
+        if (!file || typeof file.path !== 'string' || file.path.length === 0 || typeof file.content !== 'string') {
+          throw new TypeError('Each file needs a path and string content.');
+        }
+        const blob = await githubJson(fetchImpl, config.token, `${repositoryPath}/git/blobs`, {
+          method: 'POST',
+          body: { content: file.content, encoding: 'utf-8' }
+        });
+        if (!SHA.test(blob?.sha)) throw new GitHubClientError('github_invalid_response', true);
+        tree.push({ path: file.path, mode: '100644', type: 'blob', sha: blob.sha });
+      }
+
+      const nextTree = await githubJson(fetchImpl, config.token, `${repositoryPath}/git/trees`, {
+        method: 'POST',
+        body: { base_tree: baseTreeSha, tree }
+      });
+      if (!SHA.test(nextTree?.sha)) throw new GitHubClientError('github_invalid_response', true);
+
+      const commit = await githubJson(fetchImpl, config.token, `${repositoryPath}/git/commits`, {
+        method: 'POST',
+        body: { message, tree: nextTree.sha, parents: [parentSha] }
+      });
+      if (!SHA.test(commit?.sha)) throw new GitHubClientError('github_invalid_response', true);
+
+      const ref = config.branch.split('/').map(encodeURIComponent).join('/');
+      await githubJson(fetchImpl, config.token, `${repositoryPath}/git/refs/heads/${ref}`, {
+        method: 'PATCH',
+        body: { sha: commit.sha, force: false }
+      });
+      return { commitSha: commit.sha };
     }
   };
+}
+
+async function githubJson(fetchImpl, token, path, { method, body }) {
+  let response;
+  try {
+    response = await fetchImpl(`${GITHUB_ORIGIN}${path}`, {
+      method,
+      headers: {
+        accept: 'application/vnd.github+json',
+        authorization: `Bearer ${token}`,
+        'content-type': 'application/json',
+        'user-agent': 'life-hub',
+        'x-github-api-version': API_VERSION
+      },
+      body: JSON.stringify(body)
+    });
+  } catch {
+    throw new GitHubClientError('github_unavailable', true);
+  }
+  if (response.status === 409 || response.status === 422) throw new GitHubClientError('write_conflict', true);
+  if (!response.ok) throw mapGitHubFailure(response);
+  try {
+    return await response.json();
+  } catch {
+    throw new GitHubClientError('github_invalid_response', true);
+  }
 }
 
 function parseConfiguration(env) {
