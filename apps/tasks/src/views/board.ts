@@ -52,6 +52,7 @@ function appendBoardCard(
   task: Task,
   column: BoardColumnId,
   projects: Project[],
+  tasks: Task[],
   editorHost: HTMLElement,
   cardHandlers: TaskCardHandlers,
   onDelete: (task: Task) => void,
@@ -64,6 +65,7 @@ function appendBoardCard(
       onEdit: (current) => void renderTaskEditor(editorHost, current, projects, onReload),
       onDelete,
       ...cardHandlers,
+      scope: { projects, tasks },
       boardColumn: column
     },
     true
@@ -362,6 +364,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
       task,
       column,
       projects,
+      tasks,
       confirmHost,
       boardCardHandlers(() => void renderBoardView(canvas)),
       (current) => removeTask(current),
@@ -454,6 +457,7 @@ export async function renderBoardView(canvas: HTMLElement): Promise<void> {
         task,
         col.id,
         projects,
+        tasks,
         confirmHost,
         handlers,
         (current) => removeTask(current),

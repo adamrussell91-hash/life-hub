@@ -873,7 +873,9 @@ export async function renderCalendarView(canvas: HTMLElement, mode: CalendarMode
         onCreated,
         switchMode,
         false,
-        () => void reload()
+        () => void reload(),
+        projects,
+        tasks
       );
       rail.append(renderStandingCompose(composeDraft, onCreated), agenda, preview, renderShortcutHint());
     }
@@ -1248,7 +1250,9 @@ function renderAgenda(
   onCreated: (task: Task) => void,
   onSwitch: (mode: CalendarMode, date?: Date) => void,
   includeAdd = true,
-  onReload?: () => void
+  onReload?: () => void,
+  projects: Project[] = [],
+  tasks: Task[] = []
 ): HTMLElement {
   const dayItems = itemsForDay(items, dateKey);
   const agenda = el('section', 'hub-calendar__detail');
@@ -1293,6 +1297,7 @@ function renderAgenda(
   for (const item of dayItems) {
     if (item.task) {
       mountTaskCard(stack, item.task, {
+        scope: { projects, tasks },
         onEdit: () => onOpen(item),
         onPatch: onReload
           ? (task, patch) => {

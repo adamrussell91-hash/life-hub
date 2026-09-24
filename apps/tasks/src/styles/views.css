@@ -7202,6 +7202,7 @@ button.projects-mix__legend-row:focus-visible {
 .dashboard-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
@@ -7307,6 +7308,13 @@ button.projects-mix__legend-row:focus-visible {
 
 .dashboard-row__meta .chip {
   font-size: var(--text-2xs);
+}
+
+.dashboard-row__attach {
+  flex: 1 0 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding-inline-start: calc(3rem + 2 * var(--space-2));
 }
 
 /* Today/Overdue agenda rows read as one continuous list card (calendar-style),
@@ -7834,6 +7842,10 @@ button.column-bar--row.is-active {
   .dashboard-row {
     padding: var(--space-1) var(--space-2);
     gap: var(--space-1);
+  }
+
+  .dashboard-row__attach {
+    padding-inline-start: calc(3rem + 2 * var(--space-1));
   }
 
   .dashboard-row__title {

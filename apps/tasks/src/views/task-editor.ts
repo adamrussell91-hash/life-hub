@@ -29,6 +29,7 @@ import {
 } from '@/views/hub-kit';
 import { createPlusAdd } from '@/views/plus-add';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
+import { forgetTaskLinkCache } from '@/views/attachment-chips';
 import { renderTaskRelationshipsSection } from '@/views/task-relationships';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -441,6 +442,7 @@ export async function renderTaskEditor(
         remind_at: reminder.remind_at,
         remind_dismissed_at: reminder.remind_dismissed_at
       });
+      forgetTaskLinkCache(updated.id);
       const linkResult = await relationships.savePendingLinks(updated.id);
       if (linkResult.incomplete) {
         save.disabled = false;

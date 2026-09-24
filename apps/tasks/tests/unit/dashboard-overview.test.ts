@@ -13,6 +13,7 @@ import {
   upcomingExcursionDates,
   weeklyCompletionTrend
 } from '@/domain/dashboard-overview';
+import { applyLinkAttachments } from '@/views/attachment-chips';
 import { renderDashboardOverview } from '@/views/dashboard-overview';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
 
@@ -323,9 +324,82 @@ describe('renderDashboardOverview', () => {
       '#/week?date='
     );
     expect(host.querySelector('.dashboard-timeline')?.textContent).toContain('Mark essays');
+    expect(host.querySelector('.hub-chip--attach')).toBeNull();
     // One week card only — not a separate timeline/agenda card beside the strip.
     expect(host.querySelectorAll('.dashboard-overview__tile--week')).toHaveLength(1);
     expect(host.querySelector('.dashboard-overview__tile--timeline')).toBeNull();
+  });
+
+  it('shows project and event pills on the dashboard row and next action', () => {
+    const host = document.createElement('div');
+    const mindworks = project({ id: 'p1', title: 'MindWorks', status: 'active' });
+    const heat = project({
+      id: 'ex1',
+      title: 'Ethics Olympiad',
+      type: 'excursion',
+      status: 'active'
+    });
+    renderDashboardOverview(host, {
+      now,
+      tasks: [
+        task({
+          id: 't1',
+          title: 'Mark essays',
+          due_date: '2026-08-27',
+          parent_project_id: 'p1',
+          contexts: [{ kind: 'place', value: 'Staff room' }]
+        }),
+        task({
+          id: 't2',
+          title: 'Print heat packs',
+          due_date: '2026-08-28',
+          parent_project_id: 'ex1'
+        })
+      ],
+      projects: [mindworks, heat]
+    });
+
+    const today = host.querySelector('#timeline-today .dashboard-row');
+    const pill = today?.querySelector<HTMLAnchorElement>('[data-attach="project"]');
+    expect(pill?.querySelector('.hub-chip__name')?.textContent).toBe('MindWorks');
+    expect(today?.querySelector('[data-attach="place"] .hub-chip__name')?.textContent).toBe('Staff room');
+    expect(pill?.tagName).toBe('A');
+    expect(pill?.getAttribute('href')).toBe('#/project/p1');
+    expect(pill?.closest('.dashboard-row__body')).toBeNull();
+    const nextPill = host.querySelector<HTMLAnchorElement>('.dashboard-next [data-attach="project"]');
+    expect(nextPill?.querySelector('.hub-chip__name')?.textContent).toBe('MindWorks');
+    expect(nextPill?.tagName).toBe('A');
+    expect(nextPill?.getAttribute('href')).toBe('#/project/p1');
+
+    const cell = [...host.querySelectorAll('.dashboard-heat__cell')].find((node) =>
+      node.textContent?.includes('28')
+    );
+    cell?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const later = host.querySelector('.dashboard-row');
+    const excursion = later?.querySelector<HTMLAnchorElement>('[data-attach="excursion"]');
+    expect(excursion?.querySelector('.hub-chip__name')?.textContent).toBe('Ethics Olympiad');
+    expect(excursion?.tagName).toBe('A');
+    expect(excursion?.getAttribute('href')).toBe('#/project/ex1');
+    expect(excursion?.closest('.dashboard-row__body')).toBeNull();
+  });
+
+  it('places a linked event pill outside the dashboard row link', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    renderDashboardOverview(host, {
+      now,
+      tasks: [task({ id: 't1', title: 'Reply to florist', due_date: '2026-08-27' })],
+      projects: []
+    });
+    const row = host.querySelector<HTMLElement>('.dashboard-row');
+    expect(row?.querySelector('.hub-chip--attach')).toBeNull();
+    applyLinkAttachments(row!, [{ kind: 'event', label: 'Parent evening', href: '#/calendar' }]);
+    const eventPill = row?.querySelector('[data-attach="event"]');
+    expect(eventPill?.tagName).toBe('A');
+    expect(eventPill?.getAttribute('href')).toBe('#/calendar');
+    expect(eventPill?.closest('.dashboard-row__body')).toBeNull();
+    expect(eventPill?.closest('.dashboard-row__attach')).not.toBeNull();
+    host.remove();
   });
 
   it('makes every focus tile and the next-action card activate on click', () => {

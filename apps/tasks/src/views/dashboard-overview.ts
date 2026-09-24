@@ -18,7 +18,9 @@ import {
   projectLifecycleMix,
   runningProjectCount
 } from '@/domain/projects-pulse';
+import { taskAttachments } from '@/domain/task-attachments';
 import { formatTaskTimeRange } from '@/domain/time-grid';
+import { attachmentChip, hydrateTaskLinkPills } from '@/views/attachment-chips';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { renderPressureStrips } from '@/views/pinch-strip';
 import { renderProjectPortfolioChart } from '@/views/project-portfolio-chart';
@@ -204,12 +206,12 @@ function renderNextAction(
     location.hash = action.href.replace(/^#/, '') ? action.href : '#/board';
   };
   card.addEventListener('click', (event) => {
-    if ((event.target as HTMLElement | null)?.closest('button')) return;
+    if ((event.target as HTMLElement | null)?.closest('button, a')) return;
     openAction();
   });
   card.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    if ((event.target as HTMLElement | null)?.closest('button')) return;
+    if ((event.target as HTMLElement | null)?.closest('button, a')) return;
     event.preventDefault();
     openAction();
   });
@@ -227,6 +229,16 @@ function renderNextAction(
   if (action.task) {
     const when = formatTaskTimeRange(action.task);
     if (when) body.append(el('p', 'dashboard-next__time', when));
+    const attachments = taskAttachments(action.task, {
+      projects: options.projects,
+      tasks: options.tasks
+    });
+    if (attachments.length) {
+      const chips = el('div', 'hub-chips dashboard-next__attach');
+      for (const item of attachments) chips.append(attachmentChip(item));
+      body.append(chips);
+    }
+    hydrateTaskLinkPills(card, action.task.id);
   }
 
   const go = el(
@@ -308,12 +320,25 @@ function renderTimelineRow(
   if (item.task) {
     const time = formatTaskTimeRange(item.task);
     if (time) meta.append(el('span', 'dashboard-row__time', time));
+    row.dataset.taskId = item.task.id;
   }
   if (item.source === 'task' && item.meta && item.meta !== when) {
     meta.append(el('span', 'dashboard-row__date', item.meta));
   }
   body.append(meta);
   row.append(body);
+  if (item.task) {
+    const attachments = taskAttachments(item.task, {
+      projects: options.projects,
+      tasks: options.tasks
+    });
+    if (attachments.length) {
+      const chips = el('div', 'hub-chips dashboard-row__attach');
+      for (const attachment of attachments) chips.append(attachmentChip(attachment));
+      row.append(chips);
+    }
+    hydrateTaskLinkPills(row, item.task.id);
+  }
   return row;
 }
 

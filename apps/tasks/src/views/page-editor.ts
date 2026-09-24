@@ -517,7 +517,12 @@ function paintProjectPage(
       return;
     }
     taskList.replaceChildren();
-    for (const child of children) mountTaskCard(taskList, child, childHandlers);
+    for (const child of children) {
+      mountTaskCard(taskList, child, {
+        ...childHandlers,
+        scope: { projects: [current], tasks: liveTasks }
+      });
+    }
   };
 
   paintProjectTasks();
