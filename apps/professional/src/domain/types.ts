@@ -298,6 +298,7 @@ export interface EventRecord {
   occurrence_state: EventOccurrenceState;
   location_text: string | null;
   accreditation_category: string | null;
+  priority_area?: string | null;
   hours: number | null;
   attendance_state: AttendanceState | null;
   certificate: EventCertificate | null;

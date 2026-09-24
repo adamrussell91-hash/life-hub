@@ -1778,6 +1778,22 @@
   color: #fff;
 }
 
+.event-compose__chip-add {
+  border-style: dashed;
+  background: transparent;
+  color: var(--muted);
+}
+
+.event-form .event-compose__chip-input {
+  width: 11rem;
+  min-width: 11rem;
+  max-width: 11rem;
+  min-height: 2.25rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+}
+
 .event-compose__field {
   display: flex;
   flex-direction: column;

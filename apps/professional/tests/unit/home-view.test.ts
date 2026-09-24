@@ -128,6 +128,81 @@ describe('renderHomeView', () => {
     expect(canvas.textContent).toMatch(/Elective PD/);
     const fill = canvas.querySelector('.pro-home__progress-fill') as HTMLElement;
     expect(fill.style.width).toBe('6%');
+    expect(canvas.textContent).not.toMatch(/Priority areas/);
+  });
+
+  it('totals priority-area hours separately from the event type', async () => {
+    const completed = {
+      schema_version: 1,
+      event_type: 'professional_development',
+      start: '2026-09-18T00:00:00.000Z',
+      end: '2026-09-18T05:00:00.000Z',
+      time_zone: 'Australia/Sydney',
+      all_day: false,
+      occurrence_state: 'completed',
+      location_text: null,
+      attendance_state: 'attended',
+      certificate: null,
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-18T05:00:00.000Z'
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/meetings')) return Response.json({ ok: true, data: { meetings: [] } });
+      return Response.json({
+        ok: true,
+        data: {
+          events: [
+            {
+              ...completed,
+              id: 'event_00000000-0000-4000-8000-000000000011',
+              title: 'Wellbeing workshop',
+              accreditation_category: 'Workshop',
+              priority_area: 'Wellbeing',
+              hours: 2
+            },
+            {
+              ...completed,
+              id: 'event_00000000-0000-4000-8000-000000000012',
+              title: 'Legacy wellbeing course',
+              accreditation_category: 'Course · Wellbeing',
+              priority_area: null,
+              hours: 3
+            },
+            {
+              ...completed,
+              id: 'event_00000000-0000-4000-8000-000000000013',
+              title: 'Curriculum course',
+              accreditation_category: 'Course',
+              priority_area: 'Curriculum & assessment',
+              hours: 1
+            },
+            {
+              ...completed,
+              id: 'event_00000000-0000-4000-8000-000000000014',
+              title: 'Gifted group',
+              accreditation_category: 'Workshop',
+              priority_area: 'Gifted education',
+              hours: 4
+            }
+          ]
+        }
+      });
+    });
+
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    expect(canvas.textContent).toMatch(/10 hrs/);
+    const chips = [...canvas.querySelectorAll('.pro-home__chip-tag')].map((node) => node.textContent);
+    expect(chips).toContain('Workshop · 6 hrs');
+    expect(chips).toContain('Course · 4 hrs');
+    expect(chips).toContain('Wellbeing · 5 hrs');
+    expect(chips).toContain('Curriculum & assessment · 1 hrs');
+    expect(chips).toContain('Gifted education · 4 hrs');
+    expect(chips.some((text) => text?.includes('Course · Wellbeing'))).toBe(false);
+    const priority = canvas.querySelector('.pro-home__progress-caption:last-of-type');
+    expect(canvas.textContent).toMatch(/Priority areas/);
+    expect(priority).toBeTruthy();
   });
 
   it('lists both events in the compact timeline, ordered upcoming-then-past', async () => {
