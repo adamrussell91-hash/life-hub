@@ -23,7 +23,7 @@ export type ClareProductivityId =
   | 'waiting'
   | 'shutdown';
 
-export type ClareProtocolId = ClareSprintId | ClareToolkitId | ClareProductivityId;
+export type ClareProtocolId = ClareSprintId | ClareToolkitId | ClareProductivityId | 'timeline_rebalance';
 
 export type ClareProtocol = {
   id: ClareProtocolId;
