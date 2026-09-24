@@ -20,6 +20,14 @@ export type TlTask = {
   blocked: boolean;
   blockedSince: string | null;
   deps: string[];
+  marking?: {
+    class_label: string;
+    scripts: number;
+    minutes_per_script: number | null;
+    collected_on: string;
+    return_by: string;
+    scripts_marked: number;
+  } | null;
 };
 
 export type TlProject = {
@@ -46,7 +54,7 @@ export type TlModel = {
   milestones: TlMilestone[];
 };
 
-export type TlRowKind = 'dream' | 'goal' | 'project' | 'task' | 'step' | 'milestone' | 'group';
+export type TlRowKind = 'dream' | 'goal' | 'project' | 'task' | 'step' | 'milestone' | 'group' | 'marking';
 
 export type TlRow = {
   id: string;
@@ -103,7 +111,7 @@ export function isTimelineExpanded(
   if (user !== undefined) return user;
   if (kind === 'goal') return true;
   if (kind === 'task') return zoom >= 3;
-  if (kind === 'group') return false;
+  if (kind === 'group') return id === 'grp-marking';
   if (zoom < 2) return false;
   const next = tasks
     .filter((task) => task.project === id && !task.parent && task.status !== 'done' && task.due)
@@ -136,7 +144,7 @@ export function buildTimelineRows(
     });
     if (!open) return;
     const items: Array<{ due: string; row: Omit<TlRow, 'y'> }> = [];
-    for (const task of model.tasks.filter((item) => item.project === project.id && !item.parent && item.due)) {
+    for (const task of model.tasks.filter((item) => item.project === project.id && !item.parent && item.due && !item.marking)) {
       items.push({
         due: task.due!,
         row: { id: `row:${task.id}`, kind: 'task', depth: depth + 1, label: task.title, h: TL.row.task, ref: task.id }
@@ -196,7 +204,31 @@ export function buildTimelineRows(
     y += TL.groupGap;
   }
 
-  const loose = model.tasks.filter((task) => !task.project && task.due);
+  const markingOpen = isTimelineExpanded('grp-marking', 'group', options.zoom, options.expanded, model.tasks, options.today);
+  push({
+    id: 'row:grp-marking',
+    kind: 'group',
+    depth: 0,
+    label: 'Marking shadows',
+    h: TL.row.group,
+    ref: 'grp-marking',
+    open: markingOpen
+  });
+  if (markingOpen) {
+    for (const task of model.tasks.filter((item) => item.marking)) {
+      push({
+        id: `row:${task.id}`,
+        kind: 'marking',
+        depth: 1,
+        label: task.title,
+        h: TL.row.marking,
+        ref: task.id
+      });
+    }
+  }
+  y += TL.groupGap;
+
+  const loose = model.tasks.filter((task) => !task.project && task.due && !task.marking);
   push({
     id: 'row:grp-loose',
     kind: 'group',

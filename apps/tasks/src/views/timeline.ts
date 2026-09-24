@@ -1,4 +1,5 @@
 import type { Goal } from '@/schemas/goal';
+import type { PlanningProfile } from '@/schemas/planning-profile';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { isProjectArchived } from '@/schemas/project';
@@ -19,11 +20,15 @@ import {
   buildTimeScale,
   holidayRuns,
   mondayOf,
+  toMs,
   weekLabel,
   type SchoolTerm,
   type TimeScale
 } from '@/domain/school-time';
+import { dayCapacity } from '@/domain/hammond-capacity';
 import { beforeWallChip, collectLifeWalls, wallContaining, type CollectedWall } from '@/domain/life-wall';
+import { bumpScriptsMarked, markingShadowPaint } from '@/domain/marking-shadow';
+import { buildWeekLoad, learningTermRhythm, termRhythmFactor, type TermWeekSample } from '@/domain/term-rhythm';
 import { TL, SURF, domainColour, formatKey, tint } from '@/domain/timeline-geometry';
 import {
   buildTimelineRows,
@@ -55,7 +60,8 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
-  | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall';
+  | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
+  | 'shadow' | 'load' | 'cap' | 'ripple';
 
 type Spec = {
   kind: Kind;
@@ -63,7 +69,15 @@ type Spec = {
   sub?: string;
   colour?: string;
   data?: Record<string, string>;
-  flags?: { critical?: boolean; holiday?: boolean; inside?: boolean };
+  flags?: {
+    critical?: boolean;
+    holiday?: boolean;
+    inside?: boolean;
+    warn?: boolean;
+    over?: boolean;
+    wall?: boolean;
+    slip?: boolean;
+  };
 };
 
 type ViewMode = 'bars' | 'lines';
@@ -143,7 +157,8 @@ function toModel(tasks: Task[], projects: Project[], goals: Goal[], colours: Map
     status: task.status,
     blocked: Boolean(task.blocked_since),
     blockedSince: task.blocked_since,
-    deps: (task.dependency_links?.length ? task.dependency_links.map((link) => link.from_id) : task.depends_on) ?? []
+    deps: (task.dependency_links?.length ? task.dependency_links.map((link) => link.from_id) : task.depends_on) ?? [],
+    marking: task.marking ?? null
   }));
 
   const seenShade = new Set<string>();
@@ -213,17 +228,20 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   let goals: Goal[];
   let prefs: ReturnType<typeof parseHubPrefs>;
   let colours: Map<string, string>;
+  let profile: PlanningProfile | null = null;
   try {
     resetTaskCache();
-    const [listedTasks, listedProjects, listedGoals, rawPrefs, properties] = await Promise.all([
+    const [listedTasks, listedProjects, listedGoals, rawPrefs, properties, listedProfile] = await Promise.all([
       tasksApi.listTasks(),
       tasksApi.listProjects(),
       tasksApi.listGoals().catch(() => [] as Goal[]),
       tasksApi.getHubPrefs().catch(() => null),
       Promise.resolve()
         .then(() => loadTaskProperties(true))
-        .catch(() => DEFAULT_TASK_PROPERTY_CONFIG)
+        .catch(() => DEFAULT_TASK_PROPERTY_CONFIG),
+      tasksApi.getPlanningProfile().catch(() => null)
     ]);
+    profile = listedProfile;
     tasks = listedTasks;
     projects = listedProjects;
     goals = listedGoals;
@@ -265,7 +283,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   critBtn.setAttribute('aria-pressed', 'false');
   const loadBtn = el('button', 'tl-toggle', 'Load');
   loadBtn.type = 'button';
-  loadBtn.setAttribute('aria-pressed', 'false');
+  loadBtn.setAttribute('aria-pressed', 'true');
   const holBtn = el('button', 'tl-toggle', 'Holidays: compressed');
   holBtn.type = 'button';
   const todayBtn = el('button', 'tl-toggle', 'Today');
@@ -287,6 +305,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const frame = el('div', 'tl-frame');
   const labels = el('div', 'tl-labels');
   labels.append(el('div', 'tl-labels__head', 'Plan'));
+  const legend = el('div', 'tl-labels__load');
+  legend.dataset.part = 'load-legend';
+  legend.innerHTML = '<b>Load</b><span><i></i>Committed</span><span><i class="is-cap"></i>Free time</span><span><i class="is-over"></i>Over</span><small>Learning your term rhythm</small>';
+  labels.append(legend);
   const scroller = el('div', 'tl-scroller');
   const svg = svgEl('svg', { class: 'tl-svg', role: 'group', 'aria-label': 'Timeline' });
   scroller.append(svg);
@@ -300,7 +322,27 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const toast = el('p', 'tl-toast');
   toast.dataset.part = 'wall-toast';
   toast.hidden = true;
-  page.append(toolbar, card, toast, live);
+  const banner = el('div', 'tl-banner');
+  banner.dataset.part = 'ripple-banner';
+  banner.hidden = true;
+  const bannerText = el('span');
+  const bannerTitle = el('b');
+  const bannerDetail = el('span');
+  bannerText.append(bannerTitle, bannerDetail);
+  const dropBtn = el('button', 'btn btn--ghost', 'Drop anyway');
+  dropBtn.type = 'button';
+  const fixBtn = el('button', 'btn btn--primary', 'Suggest a fix');
+  fixBtn.type = 'button';
+  banner.append(bannerText, dropBtn, fixBtn);
+  const menu = el('div', 'tl-menu');
+  menu.hidden = true;
+  const menuMarking = el('button', 'tl-menu__item', 'Marking shadow');
+  menuMarking.type = 'button';
+  menu.append(menuMarking);
+  const composer = el('form', 'tl-composer');
+  composer.hidden = true;
+  composer.dataset.part = 'marking-composer';
+  page.append(toolbar, banner, card, menu, composer, toast, live);
   canvas.replaceChildren(page);
 
   const layers: Record<string, SVGGElement> = {};
@@ -342,6 +384,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     dayWidth: TL.zooms[2].dayWidth as number,
     expanded: new Map<string, boolean>(),
     critical: false,
+    load: true,
     holidaysCompressed: true,
     view: timelineView,
     selected: null as string | null,
@@ -357,7 +400,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       mode: 'move' | 'resize' | 'link';
       curves: Map<string, Props>;
       linkLine: SVGLineElement | null;
-    }
+    },
+    preview: null as null | { id: string; days: number; mode: 'move' | 'resize' },
+    release: null as null | { id: string; deps: Set<string> }
   };
   const specs = new Map<string, Spec>();
   const nodes = new Map<string, Element>();
@@ -371,6 +416,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   });
   let lastIds: string[] = [];
   let geometry = { width: 0, height: 0 };
+  let capPath = '';
   let viewLeft = 0;
   let zoomAnchor: null | { date: string; frac: number; screenX: number } = null;
   let zoomCanvasWidth = 0;
@@ -399,7 +445,16 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (kind === 'band' || kind === 'bracket') return layers.bands!;
     if (kind === 'curve') return layers.curves!;
     if (kind === 'today') return layers.today!;
+    if (kind === 'shadow') return layers.shadows!;
+    if (kind === 'load' || kind === 'cap') return layers.load!;
+    if (kind === 'ripple') return layers.ghosts!;
     return layers.bars!;
+  }
+
+  function pool(parent: Element, count: number): SVGRectElement[] {
+    while (parent.children.length > count) parent.lastElementChild?.remove();
+    while (parent.children.length < count) parent.append(svgEl('rect'));
+    return [...parent.children] as SVGRectElement[];
   }
 
   function buildShape(kind: Kind, g: SVGGElement, spec: Spec, id: string): void {
@@ -554,6 +609,55 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       const text = svgEl('text', { class: 'tl-today__text', 'text-anchor': 'middle' });
       text.textContent = 'Today';
       g.append(svgEl('line', { class: 'tl-today__line' }), svgEl('rect', { class: 'tl-today__pill', rx: TL.today.pillH / 2, height: TL.today.pillH, width: TL.today.pillW }), text);
+      return;
+    }
+    if (kind === 'shadow') {
+      g.setAttribute('data-part', 'shadow');
+      g.setAttribute('data-task-id', ref);
+      if (spec.flags?.warn) g.setAttribute('data-warn', 'true');
+      const face = svgEl('rect', { class: 'tl-shadow', rx: TL.shadow.rx, height: TL.shadow.h });
+      face.style.fill = SURF.shadowFill;
+      const done = svgEl('rect', { class: 'tl-shadow__done', rx: TL.shadow.rx, height: TL.shadow.h, 'data-part': 'shadow-progress' });
+      done.style.fill = tint(colour, 34);
+      const edge = svgEl('rect', { class: 'tl-shadow__edge', width: 3, rx: 1.5, height: TL.shadow.h });
+      const label = svgEl('text', { class: 'tl-shadow__label', 'data-part': 'shadow-label' });
+      label.textContent = spec.text ?? '';
+      const warn = svgEl('text', { class: 'tl-shadow__warn', 'data-part': 'shadow-warn' });
+      warn.textContent = spec.sub ?? '';
+      g.append(face, svgEl('g', { class: 'tl-shadow__density' }), done, edge, label, warn);
+      return;
+    }
+    if (kind === 'load') {
+      g.setAttribute('data-part', 'load-col');
+      if (spec.flags?.over) g.setAttribute('data-over', 'true');
+      if (spec.flags?.wall) g.setAttribute('data-wall', 'true');
+      const rect = svgEl('rect', {
+        class: `tl-load${spec.flags?.over ? ' tl-load--over' : ''}${spec.flags?.wall ? ' tl-load--wall' : ''}`,
+        rx: TL.load.rx
+      });
+      const text = svgEl('text', {
+        class: `tl-load__val${spec.flags?.over ? ' tl-load__val--over' : ''}`,
+        'text-anchor': 'middle'
+      });
+      text.textContent = spec.text ?? '';
+      g.append(rect, text);
+      return;
+    }
+    if (kind === 'cap') {
+      g.setAttribute('data-part', 'capacity-line');
+      g.append(svgEl('path', { class: 'tl-cap', fill: 'none' }), svgEl('line', { class: 'tl-load-divider' }));
+      return;
+    }
+    if (kind === 'ripple') {
+      g.setAttribute('data-part', 'ripple');
+      const rect = svgEl('rect', {
+        class: `tl-ripple${spec.flags?.slip ? ' tl-ripple--slip' : ''}`,
+        rx: TL.bar.rx,
+        height: TL.bar.h
+      });
+      const text = svgEl('text', { class: 'tl-ripple__label' });
+      text.textContent = spec.text ?? '';
+      g.append(rect, text);
       return;
     }
     if (kind === 'rowtitle') {
@@ -783,6 +887,70 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       setAttrs(text!, { x, y: TL.axis.termY + 14 });
       return;
     }
+    if (spec.kind === 'shadow') {
+      host.setAttribute('transform', `translate(${x} ${y})`);
+      if (spec.flags?.warn) inner.setAttribute('data-warn', 'true');
+      else inner.removeAttribute('data-warn');
+      const [face, density, done, edge, label, warn] = [...inner.children] as SVGElement[];
+      setAttrs(face!, { width: w });
+      setAttrs(done!, { width: Math.max(0, w * (props.progress ?? 0)) });
+      setAttrs(edge!, { x: -1.5 });
+      const perDay = props.perDay ?? 0;
+      const dayCount = state.dayWidth >= 8 ? Math.round(props.days ?? 0) : 0;
+      const column = dayCount ? w / dayCount : 0;
+      const columnH = Math.min(TL.shadow.h - 8, (TL.shadow.h - 8) * Math.min(1, perDay / Math.max(1, props.cap ?? 120)));
+      pool(density!, dayCount).forEach((columnNode, index) => {
+        columnNode.setAttribute('data-part', 'density-col');
+        setAttrs(columnNode, {
+          x: index * column + 2,
+          y: TL.shadow.h - 4 - columnH,
+          width: Math.max(1, column - 4),
+          height: columnH,
+          rx: 2
+        });
+        columnNode.style.fill = spec.flags?.warn
+          ? 'color-mix(in srgb, var(--high-sea-ink) 22%, transparent)'
+          : 'color-mix(in srgb, var(--navy) 9%, transparent)';
+      });
+      const labelW = textW(spec.text ?? '', `500 13px ${FONT}`);
+      const inside = labelW + 24 <= w;
+      if (label!.textContent !== (spec.text ?? '')) label!.textContent = spec.text ?? '';
+      if (warn!.textContent !== (spec.sub ?? '')) warn!.textContent = spec.sub ?? '';
+      setAttrs(label!, { x: inside ? 12 : w + 10, y: TL.shadow.h / 2 + 4.5 });
+      setAttrs(warn!, { x: (inside ? w + 10 : w + 10 + labelW + 12), y: TL.shadow.h / 2 + 4.5 });
+      return;
+    }
+    if (spec.kind === 'load') {
+      const [rect, text] = [...inner.children] as SVGElement[];
+      const columnH = props.h ?? 0;
+      const base = props.base ?? 0;
+      setAttrs(rect!, { x, y: base - columnH, width: w, height: columnH });
+      setAttrs(text!, { x: x + w / 2, y: base - columnH - 6 });
+      text!.setAttribute('opacity', w > 26 && columnH > 0 ? '1' : '0');
+      if (text!.textContent !== (spec.text ?? '')) text!.textContent = spec.text ?? '';
+      rect!.classList.toggle('tl-load--over', Boolean(spec.flags?.over));
+      rect!.classList.toggle('tl-load--wall', Boolean(spec.flags?.wall));
+      text!.classList.toggle('tl-load__val--over', Boolean(spec.flags?.over));
+      if (spec.flags?.over) inner.setAttribute('data-over', 'true');
+      else inner.removeAttribute('data-over');
+      if (spec.flags?.wall) inner.setAttribute('data-wall', 'true');
+      else inner.removeAttribute('data-wall');
+      return;
+    }
+    if (spec.kind === 'cap') {
+      (inner.firstElementChild as SVGPathElement | null)?.setAttribute('d', capPath);
+      setAttrs(inner.children[1]!, { x1: 0, x2: props.w ?? geometry.width, y1: props.top ?? 0, y2: props.top ?? 0 });
+      return;
+    }
+    if (spec.kind === 'ripple') {
+      host.setAttribute('transform', `translate(${x} ${y})`);
+      const [rect, text] = [...inner.children] as SVGElement[];
+      setAttrs(rect!, { width: w });
+      rect!.classList.toggle('tl-ripple--slip', Boolean(spec.flags?.slip));
+      if (text!.textContent !== (spec.text ?? '')) text!.textContent = spec.text ?? '';
+      setAttrs(text!, { x: props.lx ?? w + 8, y: TL.bar.h / 2 + 4.5 });
+      return;
+    }
     if (spec.kind === 'rowtitle') host.setAttribute('transform', `translate(${viewLeft + 12} ${y})`);
   }
 
@@ -801,7 +969,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     const top = TL.axis.h + 8;
     const last = rows.at(-1);
     const rowsBottom = top + (last ? last.y + last.h : 0);
-    const height = rowsBottom + 12;
+    const loadTop = rowsBottom + 16;
+    const height = state.load ? loadTop + TL.load.h : rowsBottom + 12;
     const width = scale.width + PAD_R;
     const X = (key: string) => scale.x(key);
     const barBox = (span: { start: string; end: string }) => {
@@ -950,6 +1119,37 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         });
         entities.set(`ms:${milestone.id}`, { x: X(milestone.due) + state.dayWidth / 2, y: y + row.h / 2 });
       }
+      if (row.kind === 'marking') {
+        const task = state.tasks.find((item) => item.id === row.ref);
+        const marking = task?.marking;
+        if (!task || !marking) continue;
+        const paint = markingShadowPaint({
+          marking,
+          rate:
+            marking.minutes_per_script ??
+            (task.est && marking.scripts ? task.est / marking.scripts : prefs.marking_default_minutes_per_script),
+          today,
+          capacityOf: (date) => (wallContaining(date, liveWalls) ? 0 : dayCapacity(date, profile).available_minutes)
+        });
+        const x0 = X(marking.collected_on);
+        const x1 = X(addDaysKey(marking.return_by, 1));
+        specs.set(`shadow:${task.id}`, {
+          kind: 'shadow',
+          text: paint.label,
+          sub: paint.warnText,
+          colour: taskColour(task),
+          flags: paint.warn ? { warn: true } : undefined
+        });
+        entities.set(`shadow:${task.id}`, {
+          x: x0,
+          y: y + (row.h - TL.shadow.h) / 2,
+          w: Math.max(TL.shadow.h, x1 - x0),
+          progress: paint.progress,
+          perDay: paint.perDay,
+          days: paint.days,
+          cap: dayCapacity(today, profile).available_minutes || 120
+        });
+      }
     }
 
     const anchor = (id: string, end: 'start' | 'finish'): { x: number; y: number } | null => {
@@ -1002,7 +1202,123 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
 
     specs.set('today', { kind: 'today' });
     entities.set('today', { x: X(today) + state.dayWidth * frac, h: rowsBottom + 4 });
+
+    const gesture = state.drag && state.drag.mode !== 'link' ? state.drag : state.preview;
+    const shift = new Map<string, string>();
+    if (gesture && gesture.days) {
+      const items = schedulables().map((item) =>
+        item.id === gesture.id && item.due_date ? { ...item, due_date: addDaysKey(item.due_date, gesture.days) } : item
+      );
+      for (const [id, due] of cascadeForward(items, collectDependencies(tasks, projects), gesture.id)) shift.set(id, due);
+      const self = items.find((item) => item.id === gesture.id)?.due_date;
+      if (self) shift.set(gesture.id, self);
+    }
+    const shiftedTask = (task: TlTask) => {
+      const due = shift.get(task.id);
+      if (!due || !task.due || due === task.due) return task;
+      const delta = Math.round((toMs(due) - toMs(task.due)) / 86_400_000);
+      return {
+        ...task,
+        due,
+        marking: task.marking
+          ? { ...task.marking, return_by: due, collected_on: addDaysKey(task.marking.collected_on, delta) }
+          : task.marking
+      };
+    };
+    capPath = '';
+    if (state.load) {
+      const samples = termSamples();
+      const legendNote = legend.querySelector('small');
+      if (legendNote) legendNote.textContent = learningTermRhythm(samples) ? 'Learning your term rhythm' : 'Term rhythm applied';
+      const weeks = buildWeekLoad({
+        today,
+        rangeEnd: range.end,
+        tasks: state.tasks.map((task) => {
+          const next = shiftedTask(task);
+          return { status: next.status, due: next.due, est: next.est, marking: next.marking ?? null };
+        }),
+        capacityOf: (date) => dayCapacity(date, profile).available_minutes,
+        wallOn: (date) => Boolean(wallContaining(date, liveWalls)),
+        factorFor: (monday) => termRhythmFactor(samples, weekIndex(monday, school))
+      });
+      const maxMin = Math.max(...weeks.map((week) => Math.max(week.minutes, week.capacity)), 1);
+      const base = loadTop + TL.load.h - 10;
+      const scaleH = (minutes: number) => ((TL.load.h - TL.load.top - 10) * minutes) / maxMin;
+      const cap: string[] = [];
+      for (const week of weeks) {
+        const x0 = X(week.key);
+        const x1 = X(addDaysKey(week.key, 7));
+        specs.set(`load:${week.key}`, {
+          kind: 'load',
+          text: `${Math.round(week.minutes / 60)} h`,
+          flags: { over: week.over, wall: week.wall }
+        });
+        entities.set(`load:${week.key}`, {
+          x: x0 + TL.load.colGap / 2,
+          w: Math.max(2, x1 - x0 - TL.load.colGap),
+          h: Math.max(week.minutes ? 3 : 0, scaleH(week.minutes)),
+          base
+        });
+        const cy = base - scaleH(week.capacity);
+        cap.push(`${cap.length ? 'L' : 'M'}${x0} ${cy} L${x1} ${cy}`);
+      }
+      capPath = cap.join(' ');
+      specs.set('cap', { kind: 'cap' });
+      entities.set('cap', { x: 0, w: width, top: loadTop - 8 });
+    }
+    if (gesture?.days) {
+      for (const [id, due] of shift) {
+        if (id === gesture.id) continue;
+        const milestone = model.milestones.find((item) => item.id === id);
+        const task = state.tasks.find((item) => item.id === id);
+        const current = entities.get(`bar:${id}`) ?? entities.get(`step:${id}`) ?? entities.get(`ms:${id}`);
+        if (!current) continue;
+        if (milestone) {
+          const slip = due > milestone.due;
+          specs.set(`ripple:${id}`, {
+            kind: 'ripple',
+            text: slip ? `would slip to ${formatKey(due)}` : '',
+            flags: slip ? { slip: true } : undefined
+          });
+          const rx = X(due) + state.dayWidth / 2 - TL.bar.h / 2;
+          const labelEnd = (current.x ?? 0) + TL.diamond / 2 + 8 + textW(`${milestone.title} · ${formatKey(milestone.due)}`, `600 12px ${FONT}`);
+          entities.set(`ripple:${id}`, {
+            x: rx,
+            y: (current.y ?? 0) - TL.bar.h / 2,
+            w: TL.bar.h,
+            lx: Math.max(TL.bar.h + 8, labelEnd - rx + 12)
+          });
+        } else if (task) {
+          const span = timelineTaskSpan({ due, est: task.est });
+          if (!span) continue;
+          const box = barBox(span);
+          specs.set(`ripple:${id}`, { kind: 'ripple', text: '' });
+          entities.set(`ripple:${id}`, { x: box.x, y: current.y ?? 0, w: box.w });
+        }
+      }
+    }
     return { entities, width, height };
+  }
+
+  function weekIndex(monday: string, terms: SchoolTerm[]): number {
+    const term = terms.find((item) => monday >= mondayOf(item.starts_on) && monday <= item.ends_on);
+    if (!term) return 0;
+    return Math.max(0, Math.round((toMs(monday) - toMs(mondayOf(term.starts_on))) / (7 * 86_400_000)));
+  }
+
+  function termSamples(): TermWeekSample[] {
+    const samples: TermWeekSample[] = [];
+    for (const task of state.tasks) {
+      if (task.status !== 'done' || !task.due || !task.est) continue;
+      const term = school.find((item) => task.due! >= item.starts_on && task.due! <= item.ends_on);
+      if (!term) continue;
+      samples.push({
+        termKey: `${term.starts_on}:${term.term}`,
+        weekIndex: weekIndex(mondayOf(task.due), school),
+        minutes: task.est
+      });
+    }
+    return samples;
   }
 
   function paintLabels(): void {
@@ -1052,6 +1368,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (svg.getAttribute('height') !== String(next.height)) svg.setAttribute('height', String(next.height));
     labels.style.height = `${next.height}px`;
     labels.style.setProperty('--tl-top', `${TL.axis.h + 8}px`);
+    legend.hidden = !state.load;
+    legend.style.top = `${next.height - TL.load.h + 8}px`;
     if (reason === 'zoom') {
       for (const [id, props] of next.entities) {
         if (!nodes.has(id)) createNode(id);
@@ -1065,6 +1383,31 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       }
       lastIds = [...next.entities.keys()];
       if (zoomAnchor) scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
+      return;
+    }
+    if (reason === 'release' && state.release) {
+      const release = state.release;
+      state.release = null;
+      let stagger = 0;
+      for (const [id, props] of next.entities) {
+        if (!nodes.has(id)) createNode(id);
+        const ref = id.split(':').slice(1).join(':');
+        const primary = ref === release.id && (id.startsWith('bar:') || id.startsWith('step:') || id.startsWith('ms:'));
+        const dependant = release.deps.has(ref) && !primary;
+        engine.to(id, { opacity: 1, scale: 1, ...props }, {
+          duration: primary ? MOTION.release : dependant ? MOTION.settle : MOTION.release,
+          easing: primary ? OVERSHOOT : EASE,
+          delay: dependant ? MOTION.cascadeStagger * ++stagger : 0
+        });
+      }
+      for (const id of lastIds) {
+        if (!next.entities.has(id)) {
+          engine.forget(id);
+          removeNode(id);
+        }
+      }
+      lastIds = [...next.entities.keys()];
+      paintLabels();
       return;
     }
     const options =
@@ -1347,13 +1690,27 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     row.blockedSince = task.blocked_since;
     row.title = task.title;
     row.deps = (task.dependency_links?.length ? task.dependency_links.map((link) => link.from_id) : task.depends_on) ?? [];
+    row.marking = task.marking ?? null;
   }
 
   async function persistDue(id: string, due: string, est?: number): Promise<void> {
     const raw = tasks.find((task) => task.id === id);
     if (raw) {
       if (est !== undefined) raw.estimated_duration = est;
-      const saved = await tasksApi.updateTask(id, est !== undefined ? { due_date: due, estimated_duration: est } : { due_date: due });
+      const patch: { due_date: string; estimated_duration?: number; marking?: Task['marking'] } = { due_date: due };
+      if (est !== undefined) patch.estimated_duration = est;
+      if (raw.marking) {
+        const delta = Math.round((toMs(due) - toMs(raw.marking.return_by)) / 86_400_000);
+        raw.marking = {
+          ...raw.marking,
+          return_by: due,
+          collected_on: addDaysKey(raw.marking.collected_on, delta)
+        };
+        const row = state.tasks.find((item) => item.id === id);
+        if (row) row.marking = raw.marking;
+        patch.marking = raw.marking;
+      }
+      const saved = await tasksApi.updateTask(id, patch);
       Object.assign(raw, saved);
       notifyTasksChanged([saved]);
       return;
@@ -1368,10 +1725,11 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     }
   }
 
-  function cascadeFrom(id: string): void {
+  function cascadeFrom(id: string): Set<string> {
     const shifted = cascadeForward(schedulables(), collectDependencies(tasks, projects), id);
     for (const [sid, due] of shifted) applyDue(sid, due);
     for (const [sid, due] of shifted) void persistDue(sid, due).catch(() => undefined);
+    return new Set(shifted.keys());
   }
 
   function showWallToast(due: string): void {
@@ -1387,7 +1745,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (!due0 || !days) return;
     const due = addDaysKey(due0, days);
     applyDue(id, due);
-    cascadeFrom(id);
+    const deps = cascadeFrom(id);
+    state.release = reduced ? null : { id, deps };
     relayout(reduced ? 'settle' : 'release');
     showWallToast(due);
     const title = task?.title ?? milestone?.title ?? id;
@@ -1484,10 +1843,89 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
 
   function cancelDrag(): void {
     state.drag?.linkLine?.remove();
-    const id = state.drag?.id;
+    const id = state.drag?.id ?? state.preview?.id;
     state.drag = null;
-    if (id) svg.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.classList.remove('is-dragging');
+    state.preview = null;
+    banner.hidden = true;
+    if (id) svg.querySelector(`[data-task-id="${CSS.escape(id)}"], [data-milestone-id="${CSS.escape(id)}"]`)?.classList.remove('is-dragging', 'is-wall-warn');
+    toast.hidden = true;
     relayout('settle');
+  }
+
+  function shiftedLoads(id: string, days: number) {
+    const shift = new Map<string, string>();
+    if (days) {
+      const due0 = state.tasks.find((item) => item.id === id)?.due ?? model.milestones.find((item) => item.id === id)?.due;
+      const items = schedulables().map((item) =>
+        item.id === id && item.due_date && due0 ? { ...item, due_date: addDaysKey(due0, days) } : item
+      );
+      for (const [sid, due] of cascadeForward(items, collectDependencies(tasks, projects), id)) shift.set(sid, due);
+      if (due0) shift.set(id, addDaysKey(due0, days));
+    }
+    const samples = termSamples();
+    return buildWeekLoad({
+      today,
+      rangeEnd: range.end,
+      tasks: state.tasks.map((task) => {
+        const due = shift.get(task.id) ?? task.due;
+        const delta = task.due && due ? Math.round((toMs(due) - toMs(task.due)) / 86_400_000) : 0;
+        const marking = task.marking && delta
+          ? { ...task.marking, return_by: due ?? task.marking.return_by, collected_on: addDaysKey(task.marking.collected_on, delta) }
+          : task.marking ?? null;
+        return { status: task.status, due, est: task.est, marking };
+      }),
+      capacityOf: (date) => dayCapacity(date, profile).available_minutes,
+      wallOn: (date) => Boolean(wallContaining(date, liveWalls)),
+      factorFor: (monday) => termRhythmFactor(samples, weekIndex(monday, school))
+    });
+  }
+
+  function gestureProblem(id: string, days: number): string | null {
+    const task = state.tasks.find((item) => item.id === id);
+    const milestone = model.milestones.find((item) => item.id === id);
+    const due0 = task?.due ?? milestone?.due;
+    if (!due0 || !days) return null;
+    const due = addDaysKey(due0, days);
+    const direct = wallContaining(due, liveWalls);
+    if (direct) return `Lands inside ${direct.label}.`;
+    const items = schedulables().map((item) =>
+      item.id === id && item.due_date ? { ...item, due_date: due } : item
+    );
+    for (const [sid, nextDue] of cascadeForward(items, collectDependencies(tasks, projects), id)) {
+      const hit = wallContaining(nextDue, liveWalls);
+      if (hit) {
+        const name = state.tasks.find((item) => item.id === sid)?.title ?? model.milestones.find((item) => item.id === sid)?.title ?? sid;
+        return `${name} lands inside ${hit.label}.`;
+      }
+    }
+    const before = shiftedLoads(id, 0);
+    const after = shiftedLoads(id, days);
+    const pushed = after.some((week) => week.over && !before.find((item) => item.key === week.key)?.over);
+    if (pushed) return 'This pushes a week over capacity.';
+    return null;
+  }
+
+  let previewFrame = 0;
+  function paintDragPreview(): void {
+    window.cancelAnimationFrame(previewFrame);
+    previewFrame = window.requestAnimationFrame(() => {
+      const next = layout();
+      for (const [id, props] of next.entities) {
+        if (!id.startsWith('ripple:') && !id.startsWith('load:') && id !== 'cap') continue;
+        if (!nodes.has(id)) {
+          createNode(id);
+          engine.place(id, { opacity: 1, scale: 1, ...props });
+        } else engine.to(id, { opacity: 1, scale: 1, ...props }, { duration: MOTION.hover, easing: EASE });
+      }
+      for (const id of lastIds) {
+        if (id.startsWith('ripple:') && !next.entities.has(id)) {
+          engine.forget(id);
+          removeNode(id);
+        }
+      }
+      const ripples = [...next.entities.keys()].filter((id) => id.startsWith('ripple:'));
+      lastIds = [...new Set([...lastIds.filter((id) => !id.startsWith('ripple:')), ...ripples])];
+    });
   }
 
   function onPointerDown(event: PointerEvent): void {
@@ -1540,7 +1978,11 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     const drag = state.drag;
     if (!drag || event.pointerId !== drag.pointer) return;
     const dx = event.clientX - drag.startX;
-    drag.days = Math.round(dx / state.dayWidth);
+    const days = Math.round(dx / state.dayWidth);
+    if (days !== drag.days && drag.mode !== 'link') {
+      drag.days = days;
+      paintDragPreview();
+    } else drag.days = days;
     if (drag.mode === 'link' && drag.linkLine) {
       const rect = svg.getBoundingClientRect();
       drag.linkLine.setAttribute('x2', String(event.clientX - rect.left));
@@ -1578,9 +2020,22 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (!drag.days) {
       toast.hidden = true;
       svg.querySelector(`[data-task-id="${CSS.escape(drag.id)}"], [data-milestone-id="${CSS.escape(drag.id)}"]`)?.classList.remove('is-wall-warn');
+      state.drag = null;
       relayout('settle');
       return;
     }
+    const problem = gestureProblem(drag.id, drag.days);
+    if (problem) {
+      state.preview = { id: drag.id, days: drag.days, mode: drag.mode };
+      state.drag = null;
+      bannerTitle.textContent = problem;
+      bannerDetail.textContent = ' Drop anyway keeps the move. Suggest a fix waits for Hammond.';
+      banner.hidden = false;
+      paintDragPreview();
+      return;
+    }
+    banner.hidden = true;
+    state.preview = null;
     if (drag.mode === 'resize') resizeTask(drag.id, drag.days);
     else shiftTask(drag.id, drag.days);
   }
@@ -1592,8 +2047,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     announce(state.critical ? 'Critical path on' : 'Critical path off');
   });
   loadBtn.addEventListener('click', () => {
-    const pressed = loadBtn.getAttribute('aria-pressed') !== 'true';
-    loadBtn.setAttribute('aria-pressed', String(pressed));
+    state.load = !state.load;
+    loadBtn.setAttribute('aria-pressed', String(state.load));
+    relayout('settle');
   });
   holBtn.addEventListener('click', () => {
     state.holidaysCompressed = !state.holidaysCompressed;
@@ -1602,6 +2058,157 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   });
   todayBtn.addEventListener('click', () => scrollToToday(true));
   hammondBtn.addEventListener('click', () => showHammond(true));
+  addBtn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    menu.hidden = !menu.hidden;
+  });
+  menuMarking.addEventListener('click', () => {
+    menu.hidden = true;
+    openShadowForm(null);
+  });
+  dropBtn.addEventListener('click', () => {
+    const pending = state.preview;
+    if (!pending) return;
+    banner.hidden = true;
+    state.preview = null;
+    if (pending.mode === 'resize') resizeTask(pending.id, pending.days);
+    else shiftTask(pending.id, pending.days);
+  });
+  fixBtn.addEventListener('click', () => announce('Suggest a fix waits for Hammond'));
+
+  function inputRow(label: string, type: string, value = ''): HTMLInputElement {
+    const row = el('label', 'tl-field');
+    row.append(el('span', 'tl-field__label', label));
+    const input = document.createElement('input');
+    input.className = 'tl-field__input';
+    input.type = type;
+    input.value = value;
+    row.append(input);
+    composer.append(row);
+    return input;
+  }
+
+  function openShadowForm(source: Task | null): void {
+    composer.replaceChildren();
+    composer.hidden = false;
+    composer.append(el('p', 'tl-composer__title', source ? `Marking shadow for ${source.title}` : 'Marking shadow'));
+    const classLabel = inputRow('Class', 'text', '');
+    const scripts = inputRow('Scripts', 'number', '28');
+    const collected = inputRow('Collected on', 'date', source?.due_date ?? today);
+    const returnBy = inputRow('Return by', 'date', source?.due_date ? addDaysKey(source.due_date, 7) : addDaysKey(today, 7));
+    const rate = inputRow('Minutes per script', 'number', String(prefs.marking_default_minutes_per_script));
+    rate.placeholder = 'starting guess';
+    const save = el('button', 'btn btn--primary', 'Create marking shadow');
+    save.type = 'button';
+    const cancel = el('button', 'btn btn--ghost', 'Cancel');
+    cancel.type = 'button';
+    const actions = el('div', 'tl-composer__actions');
+    actions.append(cancel, save);
+    composer.append(actions);
+    cancel.addEventListener('click', () => {
+      composer.hidden = true;
+    });
+    save.addEventListener('click', () => {
+      const scriptsCount = Number(scripts.value);
+      const minutes = rate.value.trim() ? Number(rate.value) : null;
+      if (!classLabel.value.trim() || !Number.isInteger(scriptsCount) || scriptsCount < 1 || !collected.value || !returnBy.value) {
+        announce('A marking shadow needs a class, a script count, and both dates');
+        return;
+      }
+      void createShadow({
+        classLabel: classLabel.value.trim(),
+        scripts: scriptsCount,
+        collected: collected.value,
+        returnBy: returnBy.value,
+        rate: minutes && minutes > 0 ? minutes : null,
+        source
+      });
+    });
+  }
+
+  async function createShadow(input: {
+    classLabel: string;
+    scripts: number;
+    collected: string;
+    returnBy: string;
+    rate: number | null;
+    source: Task | null;
+  }): Promise<void> {
+    const marking = {
+      class_label: input.classLabel,
+      scripts: input.scripts,
+      minutes_per_script: input.rate,
+      collected_on: input.collected,
+      return_by: input.returnBy,
+      scripts_marked: 0
+    };
+    const created = await tasksApi.createTask({
+      title: `${input.classLabel} marking`,
+      domain: input.source?.domain ?? 'teaching',
+      kind: 'marking_shadow',
+      marking,
+      depends_on: input.source ? [input.source.id] : [],
+      dependency_links: input.source ? [{ from_id: input.source.id, type: 'FS' as const, offset_days: 0 }] : []
+    });
+    tasks.push(created);
+    const row = toModel([created], projects, goals, colours, { project: null, goal: null }).tasks[0];
+    if (row) state.tasks.push(row);
+    composer.hidden = true;
+    notifyTasksChanged([created]);
+    relayout('settle');
+    announce(`Created marking shadow ${created.title}`);
+  }
+
+  function openLog(task: Task): void {
+    if (!task.marking) return;
+    composer.replaceChildren();
+    composer.hidden = false;
+    composer.append(el('p', 'tl-composer__title', `Log marking · ${task.marking.class_label}`));
+    const scripts = inputRow('Scripts marked', 'number', '10');
+    const minutes = inputRow('Minutes', 'number', String(Math.round((task.marking.minutes_per_script ?? prefs.marking_default_minutes_per_script) * 10)));
+    const save = el('button', 'btn btn--primary', 'Log marking');
+    save.type = 'button';
+    const cancel = el('button', 'btn btn--ghost', 'Cancel');
+    cancel.type = 'button';
+    const actions = el('div', 'tl-composer__actions');
+    actions.append(cancel, save);
+    composer.append(actions);
+    cancel.addEventListener('click', () => {
+      composer.hidden = true;
+    });
+    save.addEventListener('click', () => {
+      const count = Number(scripts.value);
+      const spent = Number(minutes.value);
+      if (!Number.isInteger(count) || count < 1 || !(spent > 0)) {
+        announce('Log how many scripts you marked and how long it took');
+        return;
+      }
+      void logMarking(task, count, spent);
+    });
+  }
+
+  async function logMarking(task: Task, scripts: number, minutes: number): Promise<void> {
+    if (!task.marking) return;
+    const now = new Date().toISOString();
+    await tasksApi.createWorkSession({
+      task_id: task.id,
+      started_at: now,
+      finished_at: now,
+      actual_duration_minutes: minutes,
+      result: 'done',
+      source: 'manual',
+      scripts_marked: scripts
+    });
+    const marking = bumpScriptsMarked(task.marking, scripts);
+    const saved = await tasksApi.updateTask(task.id, { marking });
+    const index = tasks.findIndex((item) => item.id === task.id);
+    if (index >= 0) tasks[index] = saved;
+    syncTask(saved);
+    composer.hidden = true;
+    notifyTasksChanged([saved]);
+    relayout('settle');
+    announce(`Logged ${scripts} scripts on ${saved.marking?.class_label ?? task.title}`);
+  }
 
   const abort = new AbortController();
   scroller.addEventListener('scroll', onScroll, { passive: true, signal: abort.signal });
@@ -1610,13 +2217,16 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   svg.addEventListener('pointerup', onPointerUp, { signal: abort.signal });
   svg.addEventListener('pointercancel', onPointerUp, { signal: abort.signal });
   svg.addEventListener('click', (event) => {
-    const mark = (event.target as Element).closest('[data-part="bar"], [data-part="milestone"]');
-    select(mark?.getAttribute('data-task-id') ?? mark?.getAttribute('data-milestone-id') ?? null);
+    const mark = (event.target as Element).closest('[data-part="bar"], [data-part="milestone"], [data-part="shadow"]');
+    const id = mark?.getAttribute('data-task-id') ?? mark?.getAttribute('data-milestone-id') ?? null;
+    select(id);
+    const task = id ? tasks.find((item) => item.id === id && item.marking) : undefined;
+    if (task?.marking) openLog(task);
   }, { signal: abort.signal });
   window.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select')) return;
-    if (event.key === 'Escape' && state.drag) {
+    if (event.key === 'Escape' && (state.drag || state.preview)) {
       event.preventDefault();
       cancelDrag();
       return;

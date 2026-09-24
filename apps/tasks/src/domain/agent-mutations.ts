@@ -195,7 +195,8 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'contexts',
     'cognitive_load',
     'depth',
-    'life_wall'
+    'life_wall',
+    'marking'
   ] as const;
   for (const key of allow) {
     if (key in patch) {
