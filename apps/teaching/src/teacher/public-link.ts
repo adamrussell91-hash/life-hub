@@ -1,4 +1,5 @@
 import { withAppBase } from '@/app/base-path';
+import { CLASS_SITE_ORIGIN } from '@/app/class-site';
 
 /**
  * Shared student public-path helpers and a discreet Copy/Open control.
@@ -7,24 +8,24 @@ import { withAppBase } from '@/app/base-path';
 
 export type PublicEntityKind = 'lesson' | 'unit' | 'class';
 
-export function publicStudentPath(kind: PublicEntityKind, id: string): string {
-  let path: string;
+export function bareStudentPath(kind: PublicEntityKind, id: string): string {
   switch (kind) {
     case 'lesson':
-      path = `/s/lessons/${id}`;
-      break;
+      return `/s/lessons/${id}`;
     case 'unit':
-      path = `/s/units/${id}`;
-      break;
+      return `/s/units/${id}`;
     case 'class':
-      path = `/s/classes/${id}`;
-      break;
+      return `/s/classes/${id}`;
   }
-  return withAppBase(path);
 }
 
-export function absolutePublicUrl(kind: PublicEntityKind, id: string, origin = location.origin): string {
-  return `${origin}${publicStudentPath(kind, id)}`;
+export function publicStudentPath(kind: PublicEntityKind, id: string): string {
+  return withAppBase(bareStudentPath(kind, id));
+}
+
+/** URL handed to students. Never the umbrella host. */
+export function absolutePublicUrl(kind: PublicEntityKind, id: string): string {
+  return `${CLASS_SITE_ORIGIN}${bareStudentPath(kind, id)}`;
 }
 
 export interface PublicLinkControlOptions {
@@ -107,7 +108,6 @@ export function mountPublicLinkControl(
     popover.replaceChildren();
     if (!options.published) return;
 
-    const path = publicStudentPath(options.kind, options.id);
     const absolute = absolutePublicUrl(options.kind, options.id);
     if (options.lead) {
       const lead = document.createElement('p');
@@ -149,7 +149,7 @@ export function mountPublicLinkControl(
 
     const openBtn = document.createElement('a');
     openBtn.className = 'btn btn--secondary';
-    openBtn.href = path;
+    openBtn.href = absolute;
     openBtn.target = '_blank';
     openBtn.rel = 'noopener noreferrer';
     openBtn.textContent = options.openLabel ?? 'Open';

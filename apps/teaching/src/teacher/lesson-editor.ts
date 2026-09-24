@@ -22,7 +22,7 @@ import {
   mountHistoryPanel,
   type HistoryPanelHandle
 } from '@/teacher/history-panel';
-import { mountPublicLinkControl, publicStudentPath } from '@/teacher/public-link';
+import { absolutePublicUrl, mountPublicLinkControl } from '@/teacher/public-link';
 import {
   buildLinkedPreview,
   ensureCompositionCached,
@@ -710,7 +710,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
       refreshPublicLink();
       const preview = refs.contextBar.querySelector<HTMLAnchorElement>('.context-bar__preview');
       if (preview) {
-        preview.href = publicStudentPath('lesson', lesson.id);
+        preview.href = absolutePublicUrl('lesson', lesson.id);
         preview.setAttribute('aria-disabled', 'false');
         preview.tabIndex = 0;
         preview.classList.remove('is-disabled');
@@ -809,7 +809,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     const historyHost = document.createElement('div');
     historyHost.className = 'history-panel-host context-bar__history';
     const actions = refs.contextBar.querySelector('.context-bar__actions');
-    const studentPath = publicStudentPath('lesson', lesson.id);
+    const studentPath = absolutePublicUrl('lesson', lesson.id);
     const optionsMenu = mountPageOptionsMenu(
       [
         {
@@ -834,7 +834,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
           target: '_blank',
           onSelect: () => {
             if (!lesson.published_at) return;
-            window.open(publicStudentPath('lesson', lesson.id), '_blank', 'noopener,noreferrer');
+            window.open(absolutePublicUrl('lesson', lesson.id), '_blank', 'noopener,noreferrer');
           }
         },
         {
@@ -859,7 +859,7 @@ export function mountLessonEditor(options: MountLessonEditorOptions): LessonEdit
     function syncPreviewLink(): void {
       const preview = optionsMenu.el.querySelector<HTMLAnchorElement>('.context-bar__preview');
       if (!preview) return;
-      preview.href = publicStudentPath('lesson', lesson.id);
+      preview.href = absolutePublicUrl('lesson', lesson.id);
       const published = Boolean(lesson.published_at);
       preview.setAttribute('aria-disabled', published ? 'false' : 'true');
       preview.classList.toggle('is-disabled', !published);
