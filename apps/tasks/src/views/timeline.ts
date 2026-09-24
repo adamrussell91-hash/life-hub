@@ -3,7 +3,15 @@ import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import { isProjectArchived } from '@/schemas/project';
 import { projectSpan } from '@/domain/chronology';
+import {
+  cascadeForward,
+  collectDependencies,
+  linksPatchForTask,
+  wouldCreateCycle,
+  type GanttSchedulable
+} from '@/domain/gantt';
 import { hydrateFocusFromHash } from '@/domain/focus';
+import { projectMilestones } from '@/domain/project-milestones';
 import { parseHubPrefs } from '@/domain/hub-prefs';
 import { toHubDateKey } from '@/domain/queries';
 import {
@@ -326,7 +334,18 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     view: 'bars' as ViewMode,
     selected: null as string | null,
     tasks: model.tasks,
-    drag: null as null | { id: string; startX: number; originX: number; days: number; pointer: number }
+    drag: null as null | {
+      id: string;
+      entityId: string;
+      startX: number;
+      originX: number;
+      originW: number;
+      days: number;
+      pointer: number;
+      mode: 'move' | 'resize' | 'link';
+      curves: Map<string, Props>;
+      linkLine: SVGLineElement | null;
+    }
   };
   const specs = new Map<string, Spec>();
   const nodes = new Map<string, Element>();
@@ -389,7 +408,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       title.textContent = spec.text ?? '';
       const sub = svgEl('text', { class: 'tl-bar__sub', 'data-part': 'bar-sub' });
       sub.textContent = spec.sub ?? '';
-      g.append(title, sub);
+      const link = svgEl('circle', { class: 'tl-bar__link', r: 5 });
+      g.append(title, sub, link);
       return;
     }
     if (kind === 'ms' || kind === 'dream') {
@@ -559,9 +579,13 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       setAttrs(grip!, { x: w - 7, y: 7, height: bh - 14 });
       const font = `500 13px ${FONT}`;
       const inside = textW(spec.text ?? '', font) + TL.bar.textPad + 10 <= w;
+      if (title!.textContent !== (spec.text ?? '')) title!.textContent = spec.text ?? '';
+      if (sub!.textContent !== (spec.sub ?? '')) sub!.textContent = spec.sub ?? '';
       setAttrs(title!, { x: inside ? TL.bar.textPad : w + TL.bar.outsideGap, y: bh / 2 + 4.5 });
       const subX = (inside ? w : w + TL.bar.outsideGap + textW(spec.text ?? '', font)) + 12;
       setAttrs(sub!, { x: subX, y: bh / 2 + 4.5 });
+      const link = inner.querySelector('.tl-bar__link');
+      if (link) setAttrs(link, { cx: w, cy: bh / 2 });
       return;
     }
     if (spec.kind === 'ms') {
@@ -1085,15 +1109,145 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   function select(id: string | null): void {
     state.selected = id;
     svg.querySelectorAll('.is-selected').forEach((node) => node.classList.remove('is-selected'));
-    if (id) svg.querySelector(`[data-part="bar"][data-task-id="${CSS.escape(id)}"]`)?.classList.add('is-selected');
+    if (id) {
+      svg.querySelector(`[data-task-id="${CSS.escape(id)}"], [data-milestone-id="${CSS.escape(id)}"]`)?.classList.add('is-selected');
+    }
+  }
+
+  function schedulables(): GanttSchedulable[] {
+    return [
+      ...tasks.map((task) => ({
+        id: task.id,
+        kind: 'task' as const,
+        due_date: task.due_date,
+        estimated_duration: task.estimated_duration
+      })),
+      ...projects.flatMap((project) =>
+        projectMilestones(project).map((milestone) => ({
+          id: milestone.id,
+          kind: 'milestone' as const,
+          due_date: milestone.due_date,
+          estimated_duration: null
+        }))
+      )
+    ];
+  }
+
+  function applyDue(id: string, due: string): void {
+    const raw = tasks.find((task) => task.id === id);
+    if (raw) raw.due_date = due;
+    const row = state.tasks.find((task) => task.id === id);
+    if (row) row.due = due;
+    const milestone = model.milestones.find((item) => item.id === id);
+    if (milestone) milestone.due = due;
+    for (const project of projects) {
+      const hit = projectMilestones(project).find((item) => item.id === id);
+      if (hit) hit.due_date = due;
+    }
+  }
+
+  function syncTask(task: Task): void {
+    const row = state.tasks.find((item) => item.id === task.id);
+    if (!row) return;
+    row.due = task.due_date;
+    row.est = task.estimated_duration;
+    row.status = task.status;
+    row.blocked = Boolean(task.blocked_since);
+    row.blockedSince = task.blocked_since;
+    row.title = task.title;
+    row.deps = (task.dependency_links?.length ? task.dependency_links.map((link) => link.from_id) : task.depends_on) ?? [];
+  }
+
+  async function persistDue(id: string, due: string, est?: number): Promise<void> {
+    const raw = tasks.find((task) => task.id === id);
+    if (raw) {
+      if (est !== undefined) raw.estimated_duration = est;
+      const saved = await tasksApi.updateTask(id, est !== undefined ? { due_date: due, estimated_duration: est } : { due_date: due });
+      Object.assign(raw, saved);
+      notifyTasksChanged([saved]);
+      return;
+    }
+    for (const project of projects) {
+      const hit = projectMilestones(project).find((item) => item.id === id);
+      if (!hit) continue;
+      hit.due_date = due;
+      const saved = await tasksApi.updateProject(project.id, { milestones: projectMilestones(project) });
+      const index = projects.findIndex((item) => item.id === project.id);
+      if (index >= 0) projects[index] = saved;
+    }
+  }
+
+  function cascadeFrom(id: string): void {
+    const shifted = cascadeForward(schedulables(), collectDependencies(tasks, projects), id);
+    for (const [sid, due] of shifted) applyDue(sid, due);
+    for (const [sid, due] of shifted) void persistDue(sid, due).catch(() => undefined);
   }
 
   function shiftTask(id: string, days: number): void {
     const task = state.tasks.find((item) => item.id === id);
     if (!task?.due || !days) return;
-    task.due = addDaysKey(task.due, days);
+    const due = addDaysKey(task.due, days);
+    applyDue(id, due);
+    cascadeFrom(id);
     relayout(reduced ? 'settle' : 'release');
-    void tasksApi.updateTask(id, { due_date: task.due }).then((saved) => notifyTasksChanged([saved])).catch(() => undefined);
+    announce(`Moved ${task.title} by ${days} ${Math.abs(days) === 1 ? 'day' : 'days'}`);
+    void persistDue(id, due).catch(() => undefined);
+  }
+
+  function resizeTask(id: string, days: number): void {
+    const task = state.tasks.find((item) => item.id === id);
+    if (!task?.due || !days) return;
+    const current = Math.max(1, Math.ceil((task.est ?? 60) / 120));
+    const nextDays = Math.max(1, current + days);
+    const due = addDaysKey(task.due, days);
+    const est = nextDays * 120;
+    task.est = est;
+    const raw = tasks.find((item) => item.id === id);
+    if (raw) raw.estimated_duration = est;
+    applyDue(id, due);
+    cascadeFrom(id);
+    relayout(reduced ? 'settle' : 'release');
+    announce(`Resized ${task.title}`);
+    void persistDue(id, due, est).catch(() => undefined);
+  }
+
+  async function addLink(fromId: string, toId: string): Promise<void> {
+    const deps = collectDependencies(tasks, projects);
+    if (deps.some((dep) => dep.fromId === fromId && dep.toId === toId)) return;
+    if (wouldCreateCycle(deps, fromId, toId)) {
+      announce('That link would loop');
+      return;
+    }
+    const all = [...deps, { fromId, toId, type: 'FS' as const, offsetDays: 0 }];
+    const raw = tasks.find((task) => task.id === toId);
+    if (raw) {
+      const patch = linksPatchForTask(toId, all);
+      raw.depends_on = patch.depends_on;
+      raw.dependency_links = patch.dependency_links;
+      const row = state.tasks.find((task) => task.id === toId);
+      if (row) row.deps = patch.depends_on;
+      cascadeFrom(fromId);
+      relayout('settle');
+      const saved = await tasksApi.updateTask(toId, patch);
+      Object.assign(raw, saved);
+      notifyTasksChanged([saved]);
+      announce('Linked');
+      return;
+    }
+    for (const project of projects) {
+      const hit = projectMilestones(project).find((item) => item.id === toId);
+      if (!hit) continue;
+      hit.depends_on = [...(hit.depends_on ?? []), fromId];
+      const milestone = model.milestones.find((item) => item.id === toId);
+      if (milestone) milestone.deps = hit.depends_on ?? [];
+      cascadeFrom(fromId);
+      relayout('settle');
+      const saved = await tasksApi.updateProject(project.id, { milestones: projectMilestones(project) });
+      const index = projects.findIndex((item) => item.id === project.id);
+      if (index >= 0) projects[index] = saved;
+      announce('Linked');
+      return;
+    }
   }
 
   function onScroll(): void {
@@ -1105,21 +1259,71 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     }
   }
 
+  function curveSnap(id: string): Map<string, Props> {
+    const snap = new Map<string, Props>();
+    for (const eid of lastIds) {
+      if (!eid.startsWith('curve:')) continue;
+      const [from, to] = eid.slice('curve:'.length).split('>');
+      if (from !== id && to !== id) continue;
+      const props = engine.get(eid);
+      if (props) snap.set(eid, { ...props });
+    }
+    return snap;
+  }
+
+  function followCurves(id: string, dx: number, mode: 'move' | 'resize', snap: Map<string, Props>): void {
+    for (const [eid, props] of snap) {
+      const [from, to] = eid.slice('curve:'.length).split('>');
+      const fromShift = from === id ? dx : 0;
+      const toShift = to === id && mode === 'move' ? dx : 0;
+      engine.place(eid, { x1: (props.x1 ?? 0) + fromShift, x2: (props.x2 ?? 0) + toShift });
+    }
+  }
+
+  function cancelDrag(): void {
+    state.drag?.linkLine?.remove();
+    const id = state.drag?.id;
+    state.drag = null;
+    if (id) svg.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.classList.remove('is-dragging');
+    relayout('settle');
+  }
+
   function onPointerDown(event: PointerEvent): void {
-    const mark = (event.target as Element).closest('[data-part="bar"]') as SVGGElement | null;
-    if (!mark) return;
+    const mark = (event.target as Element).closest('[data-part="bar"], [data-part="step-bar"]') as SVGGElement | null;
+    if (!mark || state.view !== 'bars') return;
     const id = mark.getAttribute('data-task-id');
     if (!id) return;
-    const props = engine.get(`bar:${id}`);
+    const entityId = engine.has(`bar:${id}`) ? `bar:${id}` : `step:${id}`;
+    const props = engine.get(entityId);
     if (!props) return;
+    const target = event.target as Element;
+    const mode = target.closest('.tl-bar__link') ? 'link' : target.closest('.tl-bar__grip') ? 'resize' : 'move';
     const start = () => {
       event.preventDefault();
       mark.classList.add('is-dragging');
       select(id);
-      state.drag = { id, startX: event.clientX, originX: props.x ?? 0, days: 0, pointer: event.pointerId };
+      let linkLine: SVGLineElement | null = null;
+      if (mode === 'link') {
+        const x = (props.x ?? 0) + (props.w ?? 0);
+        const y = (props.y ?? 0) + TL.bar.h / 2;
+        linkLine = svgEl('line', { class: 'tl-drag-link', x1: x, y1: y, x2: x, y2: y });
+        svg.append(linkLine);
+      }
+      state.drag = {
+        id,
+        entityId,
+        startX: event.clientX,
+        originX: props.x ?? 0,
+        originW: props.w ?? TL.bar.minW,
+        days: 0,
+        pointer: event.pointerId,
+        mode,
+        curves: curveSnap(id),
+        linkLine
+      };
       mark.setPointerCapture(event.pointerId);
     };
-    if (card.classList.contains('is-compact')) {
+    if (mode === 'move' && card.classList.contains('is-compact')) {
       const timer = window.setTimeout(start, 300);
       const cancel = () => window.clearTimeout(timer);
       mark.addEventListener('pointerup', cancel, { once: true });
@@ -1130,19 +1334,41 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
 
   function onPointerMove(event: PointerEvent): void {
-    if (!state.drag || event.pointerId !== state.drag.pointer) return;
-    const dx = event.clientX - state.drag.startX;
-    state.drag.days = Math.round(dx / state.dayWidth);
-    engine.place(`bar:${state.drag.id}`, { x: state.drag.originX + dx });
+    const drag = state.drag;
+    if (!drag || event.pointerId !== drag.pointer) return;
+    const dx = event.clientX - drag.startX;
+    drag.days = Math.round(dx / state.dayWidth);
+    if (drag.mode === 'link' && drag.linkLine) {
+      const rect = svg.getBoundingClientRect();
+      drag.linkLine.setAttribute('x2', String(event.clientX - rect.left));
+      drag.linkLine.setAttribute('y2', String(event.clientY - rect.top));
+      return;
+    }
+    if (drag.mode === 'resize') engine.place(drag.entityId, { w: Math.max(TL.bar.minW, drag.originW + dx) });
+    else engine.place(drag.entityId, { x: drag.originX + dx });
+    followCurves(drag.id, dx, drag.mode === 'resize' ? 'resize' : 'move', drag.curves);
   }
 
   function onPointerUp(event: PointerEvent): void {
-    if (!state.drag || event.pointerId !== state.drag.pointer) return;
-    const { id, days } = state.drag;
-    svg.querySelector(`[data-task-id="${CSS.escape(id)}"]`)?.classList.remove('is-dragging');
+    const drag = state.drag;
+    if (!drag || event.pointerId !== drag.pointer) return;
+    drag.linkLine?.remove();
+    svg.querySelector(`[data-task-id="${CSS.escape(drag.id)}"]`)?.classList.remove('is-dragging');
     state.drag = null;
-    if (days) shiftTask(id, days);
-    else relayout('settle');
+    if (drag.mode === 'link') {
+      const hit = document.elementFromPoint(event.clientX, event.clientY);
+      const target = hit?.closest('[data-part="bar"], [data-part="step-bar"], [data-part="milestone"]');
+      const toId = target?.getAttribute('data-task-id') ?? target?.getAttribute('data-milestone-id');
+      if (toId && toId !== drag.id) void addLink(drag.id, toId);
+      else relayout('settle');
+      return;
+    }
+    if (!drag.days) {
+      relayout('settle');
+      return;
+    }
+    if (drag.mode === 'resize') resizeTask(drag.id, drag.days);
+    else shiftTask(drag.id, drag.days);
   }
 
   critBtn.addEventListener('click', () => {
@@ -1176,9 +1402,23 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   window.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select')) return;
+    if (event.key === 'Escape' && state.drag) {
+      event.preventDefault();
+      cancelDrag();
+      return;
+    }
     if (event.key === '+' || event.key === '=') setZoom(state.zoom + 1);
     else if (event.key === '-' || event.key === '_') setZoom(state.zoom - 1);
     else if (event.key.toLowerCase() === 'l') setView(state.view === 'bars' ? 'lines' : 'bars');
+    else if ((event.key === 'ArrowUp' || event.key === 'ArrowDown') && !event.shiftKey) {
+      const ids = rows.filter((row) => row.kind === 'task' || row.kind === 'step' || row.kind === 'milestone').map((row) => row.ref);
+      if (!ids.length) return;
+      event.preventDefault();
+      const index = state.selected ? ids.indexOf(state.selected) : -1;
+      const next = ids[(index + (event.key === 'ArrowDown' ? 1 : -1) + ids.length) % ids.length] ?? null;
+      select(next);
+      if (next) announce(rows.find((row) => row.ref === next)?.label ?? next);
+    }
     else if (event.key === ' ' && state.selected) {
       event.preventDefault();
       const row = rows.find((item) => item.ref === state.selected);
@@ -1197,14 +1437,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const stopChanged = onTasksChanged((incoming) => {
     let moved = false;
     for (const task of incoming) {
-      const row = state.tasks.find((item) => item.id === task.id);
-      if (!row) continue;
-      row.due = task.due_date;
-      row.est = task.estimated_duration;
-      row.status = task.status;
-      row.blocked = Boolean(task.blocked_since);
-      row.blockedSince = task.blocked_since;
-      row.title = task.title;
+      const raw = tasks.find((item) => item.id === task.id);
+      if (raw) Object.assign(raw, task);
+      if (!state.tasks.some((item) => item.id === task.id)) continue;
+      syncTask(task);
       moved = true;
     }
     if (moved) relayout('settle');

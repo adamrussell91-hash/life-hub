@@ -50,7 +50,10 @@
 .tl-bar__title { font: var(--weight-medium) var(--text-sm)/1 var(--font-ui); fill: var(--ink); pointer-events: none; }
 .tl-bar__sub { font: var(--weight-regular) var(--text-xs)/1 var(--font-ui); fill: var(--muted); pointer-events: none; }
 [data-state="blocked"] .tl-bar__sub { fill: var(--danger); font-weight: var(--weight-medium); }
-.tl-bar__grip { fill: color-mix(in srgb, var(--navy) 22%, transparent); opacity: 0; transition: opacity .12s; }
+.tl-bar__grip { fill: color-mix(in srgb, var(--navy) 22%, transparent); opacity: 0; cursor: ew-resize; transition: opacity .12s; }
+.tl-bar__link { fill: var(--warm-white); stroke: var(--wave); stroke-width: 1.5; opacity: 0; cursor: crosshair; }
+[data-part="bar"]:hover .tl-bar__link, [data-part="step-bar"]:hover .tl-bar__link { opacity: 1; }
+.tl-drag-link { stroke: var(--wave); stroke-width: 2; stroke-dasharray: 3 3; fill: none; pointer-events: none; }
 .tl-halo { fill: none; stroke: none; }
 [data-part="bar"], [data-part="step-bar"] { cursor: grab; outline: none; }
 [data-part="bar"]:hover .tl-bar__face { stroke: color-mix(in srgb, var(--navy) 28%, transparent); }
