@@ -19,10 +19,15 @@
  */
 *{box-sizing:border-box}
 body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
-.page{max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page{width:100%;max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
 .page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
 .page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
 .ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.page-shell{display:grid;grid-template-columns:1fr} /* reference harness: sized like the Life shell's content column */
+/* Harness only: a stand-in for the Life rail (330px), so every width here matches the app at that width. */
+body{display:grid;grid-template-columns:330px minmax(0,1fr)}
+.shell-rail{background:var(--navy);color:color-mix(in srgb,#fff 75%,transparent);padding:var(--space-8) var(--space-6);font-size:var(--text-xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold)}
+@media (max-width:719px){body{display:block}.shell-rail{display:none}}
 .ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
 
 /* ---------- named surfaces (derived; do not add kit tokens) ---------- */
@@ -39,7 +44,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   --cal-lilac-stripe:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff);
   --cal-sage-stripe:color-mix(in srgb,var(--pastel-sage-ink) 70%,#fff);
   --cal-over:var(--warning-surface);
-  font-family:var(--font-ui);color:var(--ink);position:relative
+  font-family:var(--font-ui);color:var(--ink);position:relative;
+  min-width:0;contain:inline-size /* the calendar takes its container's width; nowrap text inside can never widen the page */
 }
 
 /* ---------- nav ---------- */
@@ -225,6 +231,10 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   .cal-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
 }
 /* ---------- narrow day columns (the Life shell at 1280px gives each day ~115px) ---------- */
+@container (max-width:96px){
+  .cal-wall__first{display:none}
+  .cal-wall__pill{padding:0 6px}
+}
 @container (max-width:150px){
   .cal-wall__more{display:none}
   /* Two buttons don't fit: proposals are accepted from the chip popover instead. */
@@ -236,6 +246,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 </style>
 </head>
 <body>
+<aside class="shell-rail" aria-hidden="true">Life Hub · rail stand-in</aside>
 <main class="page">
   <p class="page-header__eyebrow">Calendar reference · A · Tideline</p>
   <h1 class="page-header__title">Life calendar, week of T3 W10</h1>
@@ -246,7 +257,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
     <span>Clock frozen at Thu 24/09/26 6:05 pm.</span>
   </div>
-  <div id="app"></div>
+  <div class="page-shell"><div id="app"></div></div>
 </main>
 <script>/*__BUNDLE__*/</script>
 </body>

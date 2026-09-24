@@ -18,6 +18,15 @@ import {
   runGhostDecision
 } from '../netlify/functions/calendar-ghosts.mjs';
 import { CALENDAR_VISUAL_PATH, loadCalendarVisualSeed } from './calendar-visual-seed.mjs';
+import { loadAlmanacVisualSeed } from './almanac-visual-seed.mjs';
+import {
+  ALMANAC_DONE_PATH,
+  HUB_PREFS_KEY,
+  appendAlmanacDone,
+  readAlmanac,
+  readDoneRequest,
+  readSchoolTerms
+} from '../netlify/functions/almanac.mjs';
 import { GitHubClientError } from '../netlify/functions/_shared/github-client.mjs';
 import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blobs.mjs';
 
@@ -108,6 +117,19 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       taskData.set(key, typeof value === 'string' ? JSON.parse(value) : value);
     }
   };
+
+  async function openRepo() {
+    const repository = await readFixtureRepository(rootPath, confirmedFiles);
+    const files = new Map(repository.files.map(file => [file.path, file.content]));
+    for (const [path, content] of confirmedFiles) files.set(path, content);
+    return {
+      base: { commitSha: repository.commitSha, treeSha: repository.treeSha },
+      listPaths() { return [...files.keys()]; },
+      async readFile(path) {
+        return files.has(path) ? files.get(path) : null;
+      }
+    };
+  }
 
   const readSession = request => {
     const id = readCookie(request, 'life_hub_mock');
@@ -371,6 +393,73 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/almanac-visual-seed') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      try {
+        const seeded = await loadAlmanacVisualSeed();
+        clock.now = () => Date.parse(seeded.now);
+        for (const [path, content] of seeded.files) confirmedFiles.set(path, content);
+        const current = taskData.get(HUB_PREFS_KEY);
+        const prefs = current && typeof current === 'object' && !Array.isArray(current) ? { ...current } : {};
+        prefs.school_terms = seeded.terms;
+        taskData.set(HUB_PREFS_KEY, prefs);
+        json(response, 200, { ok: true, data: { now: seeded.now } });
+      } catch (seedError) {
+        error(response, 500, 'seed_failed', seedError instanceof Error ? seedError.message : 'Almanac visual seed failed.', true);
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/almanac/done') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const body = readDoneRequest(await readJson(request));
+      if (body.error === 'client_write_rejected') {
+        error(response, 400, 'client_write_rejected', 'The client cannot send writes.', false);
+        return true;
+      }
+      if (body.error) {
+        error(response, 400, 'invalid_request', 'Provide stepId.', false);
+        return true;
+      }
+      const opened = await openRepo();
+      const at = getSydneyTimestamp(new Date(clock.now()));
+      const next = appendAlmanacDone(await opened.readFile(ALMANAC_DONE_PATH) ?? '', body.stepId, at);
+      confirmedFiles.set(ALMANAC_DONE_PATH, next);
+      json(response, 200, { ok: true, stepId: body.stepId, at });
+      return true;
+    }
+
+    if (url.pathname === '/api/almanac') {
+      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
+      if (!readSession(request)) return unauthenticated(response);
+      try {
+        parseDateRange(url);
+      } catch {
+        error(response, 400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.', false);
+        return true;
+      }
+      try {
+        const opened = await openRepo();
+        const terms = await readSchoolTerms(async () => taskStore);
+        const view = await readAlmanac({
+          readFile: path => opened.readFile(path),
+          listPaths: () => opened.listPaths(),
+          today: getSydneyDateKey(new Date(clock.now())),
+          from: url.searchParams.get('from'),
+          to: url.searchParams.get('to'),
+          terms,
+          lessons: [],
+          professionalEvents: []
+        });
+        json(response, 200, { ok: true, ...view });
+      } catch (almanacError) {
+        error(response, 500, 'almanac_failed', almanacError instanceof Error ? almanacError.message : 'Almanac could not be built.', true);
+      }
+      return true;
+    }
+
     if (url.pathname === '/api/calendar-visual-seed') {
       if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
       if (!readSession(request)) return unauthenticated(response);
@@ -391,17 +480,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       if (request.method !== 'GET' && request.method !== 'POST') return methodNotAllowed(response, 'GET, POST');
       if (!readSession(request)) return unauthenticated(response);
       const instant = new Date(clock.now());
-      const open = async () => {
-        const repository = await readFixtureRepository(rootPath, confirmedFiles);
-        const files = new Map(repository.files.map(file => [file.path, file.content]));
-        for (const [path, content] of confirmedFiles) files.set(path, content);
-        return {
-          base: { commitSha: repository.commitSha, treeSha: repository.treeSha },
-          async readFile(path) {
-            return files.has(path) ? files.get(path) : null;
-          }
-        };
-      };
+      const open = openRepo;
       if (request.method === 'GET') {
         try {
           const { parseDateRange } = await import('../netlify/functions/_shared/repo-policy.mjs');
@@ -437,7 +516,9 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           tasksStore: async () => taskStore,
           decision,
           today: getSydneyDateKey(instant),
-          nowIso: getSydneyTimestamp(instant)
+          nowIso: getSydneyTimestamp(instant),
+          lessons: [],
+          professionalEvents: []
         });
         json(response, result.status, result.payload);
       } catch (ghostError) {
