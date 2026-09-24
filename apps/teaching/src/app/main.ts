@@ -57,7 +57,8 @@ import {
   replaceCurriculum
 } from './curriculum-state';
 import { withCreatedEntity } from '@/curriculum/with-created-entity';
-import { currentAppPath, withAppBase } from './base-path';
+import { currentAppPath } from './base-path';
+import { isClassSiteHost, isClassSiteStudentRoute, renderClassSiteDeadEnd } from './class-site';
 import { navigate, start, type RouteMatch } from './router';
 import { renderPageHeader } from '@/teacher/page-header';
 
@@ -264,12 +265,12 @@ function railCreateClassHandler(
   };
 }
 
-import { publicStudentPath, type PublicEntityKind } from '@/teacher/public-link';
+import { absolutePublicUrl, type PublicEntityKind } from '@/teacher/public-link';
 
-function studentPathForTeacherPath(pathname: string): string | null {
+function studentShareForTeacherPath(pathname: string): string | null {
   const match = pathname.match(/^\/(lessons|units|classes)\/([^/]+)\/?$/);
   if (!match) return null;
-  return publicStudentPath(match[1] as PublicEntityKind, match[2]!);
+  return absolutePublicUrl(match[1] as PublicEntityKind, match[2]!);
 }
 
 function createKindForSearchAction(actionId: string): CreateKind | null {
@@ -349,8 +350,8 @@ function openTeacherSearch(): void {
             if (todayClassId) navigate(`/classes/${todayClassId}`);
             break;
           case 'open-student-view': {
-            const studentPath = studentPathForTeacherPath(currentAppPath());
-            if (studentPath) window.open(withAppBase(studentPath), '_blank', 'noopener,noreferrer');
+            const studentPath = studentShareForTeacherPath(currentAppPath());
+            if (studentPath) window.open(studentPath, '_blank', 'noopener,noreferrer');
             break;
           }
           case 'open-a4':
@@ -948,6 +949,11 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   teardownStudentLessonView();
   teardownStudentUnitView();
   teardownStudentClassView();
+
+  if (isClassSiteHost() && !isClassSiteStudentRoute(match.name)) {
+    renderClassSiteDeadEnd(appRoot);
+    return;
+  }
 
   if (match.requiresAuth && !session.authenticated) {
     navigate('/sign-in', { replace: true });

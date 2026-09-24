@@ -10,8 +10,8 @@ describe('public link helpers', () => {
     expect(publicStudentPath('lesson', 'lesson_1')).toBe('/s/lessons/lesson_1');
     expect(publicStudentPath('unit', 'unit_1')).toBe('/s/units/unit_1');
     expect(publicStudentPath('class', 'class_1')).toBe('/s/classes/class_1');
-    expect(absolutePublicUrl('lesson', 'lesson_1', 'https://hub.example')).toBe(
-      'https://hub.example/s/lessons/lesson_1'
+    expect(absolutePublicUrl('lesson', 'lesson_1')).toBe(
+      'https://class.adam-russell.com/s/lessons/lesson_1'
     );
   });
 });
@@ -117,7 +117,9 @@ describe('mountPublicLinkControl', () => {
     expect(copy).toBeTruthy();
     copy!.click();
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
-    expect(host.querySelector('a')?.getAttribute('href')).toBe('/s/lessons/lesson_1');
+    expect(host.querySelector('a')?.getAttribute('href')).toBe(
+      'https://class.adam-russell.com/s/lessons/lesson_1'
+    );
     handle.dispose();
   });
 });
