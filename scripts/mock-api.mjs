@@ -528,6 +528,35 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if ((url.pathname === '/api/tasks' || url.pathname === '/api/projects') && request.method === 'GET') {
+      if (!readSession(request)) return unauthenticated(response);
+      const index = await taskStore.get(TASKS_INDEX_KEY, { type: 'json' });
+      if (Array.isArray(index)) {
+        if (url.pathname === '/api/projects') {
+          json(response, 200, { ok: true, data: { projects: [] } });
+          return true;
+        }
+        const id = url.searchParams.get('id');
+        if (id) {
+          const task = await taskStore.get(taskKey(id), { type: 'json' });
+          if (!task || typeof task !== 'object') {
+            error(response, 404, 'not_found', 'Task not found.', false);
+            return true;
+          }
+          json(response, 200, { ok: true, data: task });
+          return true;
+        }
+        const tasks = [];
+        for (const taskId of index) {
+          if (typeof taskId !== 'string') continue;
+          const task = await taskStore.get(taskKey(taskId), { type: 'json' });
+          if (task && typeof task === 'object') tasks.push(task);
+        }
+        json(response, 200, { ok: true, data: { tasks } });
+        return true;
+      }
+    }
+
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
         url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {

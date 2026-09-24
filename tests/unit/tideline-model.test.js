@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildTidelineModel } from '../../apps/life/js/app/tideline-model.js';
+import { buildTidelineModel, movedCaption } from '../../apps/life/js/app/tideline-model.js';
 
 const fixture = JSON.parse(readFileSync(new URL('../../docs/proposals/calendar-reference/fixture.json', import.meta.url), 'utf8'));
 const WEEK = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
@@ -36,4 +36,23 @@ test('tideline capacity, period and grid come from the fixture logs', () => {
   assert.match(built.days[4].free[0].title, /4½ h free/);
   assert.match(built.ambient, /12 notes touched/);
   assert.equal(built.total, 552);
+});
+
+test('an explicit ghost list replaces the visual queue', () => {
+  const built = buildTidelineModel({
+    events: fixture.LOGS,
+    visual: { ...fixture, school_terms: TERMS, NOTES: [] },
+    ghosts: [],
+    week: WEEK,
+    today: '2026-09-24',
+    nowHour: 18,
+    terms: TERMS
+  });
+  assert.equal(built.days[3].chips.some(chip => chip.id === 'g-bed'), false);
+  assert.equal(built.days[3].chips.some(chip => chip.id === 'thu-workout'), true);
+  assert.equal(built.ghosts.length, 0);
+});
+
+test('a moved task is captioned with the destination week', () => {
+  assert.equal(movedCaption('2026-10-13', TERMS), 'Moved to T4 W1 Tue');
 });

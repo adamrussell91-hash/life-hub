@@ -185,6 +185,8 @@
 .cal-toast{position:absolute;right:var(--space-6);bottom:var(--space-6);max-width:30rem;background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-3) 2.5rem;font-size:var(--text-sm);line-height:1.45;box-shadow:0 12px 32px color-mix(in srgb,var(--depth) 28%,transparent);opacity:var(--o,0);transform:translateY(calc(var(--y,6) * 1px));pointer-events:none;z-index:20}
 .cal-toast::before{content:"✓";position:absolute;left:14px;top:12px;width:18px;height:18px;border-radius:50%;background:var(--pastel-sage);color:var(--pastel-sage-ink);font-weight:var(--weight-bold);font-size:0.6875rem;display:grid;place-items:center}
 .cal-toast b{font-weight:var(--weight-semibold)}
+.cal-toast:has(button){pointer-events:auto}
+.cal-toast button{margin-left:var(--space-2);font:var(--weight-semibold) 0.65625rem/1 var(--font-ui);padding:4px 8px;border-radius:6px;border:1px solid #fff;background:#fff;color:var(--navy);cursor:pointer}
 .cal-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ---------- phone (< 720px): one day, week strip on top ---------- */
