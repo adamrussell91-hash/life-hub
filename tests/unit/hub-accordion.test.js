@@ -118,6 +118,13 @@ test('desktop hub switchers stay directly with each hub navigation', async () =>
   assert.ok(lifeRail.indexOf('<p class="hub-rail__section">Hubs</p>') > lifeRail.indexOf('data-section="calendar"'));
 
   assert.match(professionalShell, /appendHubSwitcher\(hubSwitcherHost\(railNav\), 'professional'\)/);
+
+  const professionalCss = await readFile(new URL('../../apps/professional/src/styles/hub.css', import.meta.url), 'utf8');
+  assert.match(professionalCss, /\.hub-rail\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(
+    professionalCss,
+    /\.hub-rail__nav\s*\{[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s
+  );
 });
 
 test('Knowledge protocol ambience is clipped to the canvas and cannot wash over the rail', async () => {
