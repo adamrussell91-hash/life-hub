@@ -72,7 +72,10 @@ Inside the Life shell, the rail takes about 330px, so at a 1280px window each da
 - Under 150px: the wall pill shows its first part only ("Your day"). Inline Accept/Dismiss are hidden, so proposals are accepted from the chip popover. The date circle shrinks to 26px.
 - Tray buttons never wrap; the tray detail ellipsizes.
 
-The spec checks this at a 960px viewport (the same column width as the app at 1280): "phase 2: nothing spills out of a narrow day column". Golden: `tideline-960`.
+- Under 96px (the app at about 960px wide): the wall pill shows only its lock (full label in `title`/`aria-label`).
+- **`.cal` has `min-width:0; contain:inline-size`.** The Life shell's content column sizes itself from its content (`1fr`), so without this, one line of `nowrap` text (the tray summary) widens the whole page. This happened in phase 2b.
+
+The reference page includes a 330px **rail stand-in** and the same grid sizing as the Life shell, so the reference at any window width matches the app at that width (day columns about 115px at 1280, about 70px at 960). The spec checks 960 and 1280 in "phase 2: nothing spills out of a narrow day column", including that the page never scrolls sideways and Sunday is never cut off. Goldens `tideline-1280` and `tideline-960` are captured with the rail.
 
 ### Phone (< 720px)
 
@@ -112,7 +115,7 @@ Use **Slow motion ×5** in the reference to study every one of these.
 14. `YYYY-MM-DD` on screen. Dates display as `dd/mm/yy` (and `24/09` in Central Node lines).
 15. Measuring text inside the frame loop. Layout never reads the DOM.
 16. The phone view as a separate "mobile calendar". It's the same object with one column.
-17. Designing only for the full-width reference page. In the app, the rail makes columns about 115px, so tags, vitals and pills must fit there too.
+17. Designing only for the full-width page, or letting nowrap content size the calendar (`.cal` must keep `contain:inline-size`). In the app, the rail makes columns about 115px, so tags, vitals and pills must fit there too.
 
 ## Test hooks
 
