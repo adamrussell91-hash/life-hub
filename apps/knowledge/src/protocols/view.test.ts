@@ -159,6 +159,13 @@ describe("lightingStage", () => {
     expect(lightingStage(9, 10)).toBe("just-after-dusk");
     expect(lightingStage(4, 10)).toBe("golden-hour");
   });
+
+  it("uses six dawn-to-night stages for Cartographers", () => {
+    expect(lightingStage(0, 12, "cartographers")).toBe("dawn");
+    expect(lightingStage(2, 12, "cartographers")).toBe("sunrise");
+    expect(lightingStage(4, 12, "cartographers")).toBe("midday");
+    expect(lightingStage(11, 12, "cartographers")).toBe("night");
+  });
 });
 
 describe("backgroundAsset", () => {
