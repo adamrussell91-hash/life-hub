@@ -306,7 +306,7 @@ function mountBody(grid, date) {
   for (const wall of day.walls) {
     const [first, ...rest] = wall.label.split(' · ');
     const more = rest.length ? `<span class="cal-wall__more"> · ${rest.join(' · ')}</span>` : '';
-    const node = el('div', 'cal-wall', `<span class="cal-wall__pill">${ICON.lock}${first}${more}</span>`, body, { 'data-part': 'wall' });
+    const node = el('div', 'cal-wall', `<span class="cal-wall__pill" title="${wall.label}" aria-label="${wall.label}">${ICON.lock}<span class="cal-wall__first">${first}</span>${more}</span>`, body, { 'data-part': 'wall' });
     node.style.height = `${model.total}px`;
   }
 }
