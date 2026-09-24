@@ -38,6 +38,16 @@
   overflow: hidden;
 }
 
+/* Network is long enough to push Tasks off a laptop viewport. The rail is
+   height-locked, so this nav has to scroll or the hub switcher is clipped. */
+.hub-rail__nav {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .hub-canvas,
 .hub-canvas__body {
   min-width: 0;
