@@ -1,11 +1,20 @@
+import { CLASS_SITE_HOST } from './class-site';
+
 /** Vite `base` without a trailing slash. Empty when the app is mounted at `/`. */
+export function appBaseFor(baseUrl: string, hostname: string): string {
+  if (hostname === CLASS_SITE_HOST) return '';
+  const raw = baseUrl || '/';
+  if (raw === '/') return '';
+  return raw.replace(/\/$/, '');
+}
+
 export function appBasePath(): string {
   const raw =
     typeof import.meta !== 'undefined' && import.meta.env?.BASE_URL
       ? String(import.meta.env.BASE_URL)
       : '/';
-  if (raw === '/') return '';
-  return raw.replace(/\/$/, '');
+  const hostname = typeof location !== 'undefined' ? location.hostname : '';
+  return appBaseFor(raw, hostname);
 }
 
 export function stripAppBase(pathname: string): string {

@@ -530,6 +530,8 @@ APIs stay on `life-hub2`. Functions stay in repo-root `netlify/functions/` — n
 
 Old custom domains (`teaching-hub`, `knowledge-hub`, `tasks-hub`) can keep serving their existing Pages deploys until DNS points here. Student lessons on this site are `/teaching/s/…` and stay unauthenticated.
 
+Published lesson, unit, and class links use `https://class.adam-russell.com/s/…` (Worker `workers/class-site`). That host serves the Teaching shell and `/teaching/assets/*` only. `/`, `/sign-in`, and every teacher route return a dead page. The API allow-list includes `https://class.adam-russell.com` so those pages can read published content.
+
 ### Slice 31 — Leftover Teaching APIs, smoke, DNS, retire sites (shipped, PR #89)
 
 Teacher UI leftovers now on `life-hub2` (Life session, Teaching Blobs):
