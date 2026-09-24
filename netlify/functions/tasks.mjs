@@ -6,6 +6,7 @@ import {
 } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import { sanitizeApstFocus } from './_shared/apst-focus.mjs';
 import { applyLifeWall } from './_shared/life-wall.mjs';
 import { coerceOriginDate, coerceSomedayKind, coerceStringArray, normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
@@ -156,6 +157,9 @@ export function createTasksHandler(deps = {}) {
           ...(Object.prototype.hasOwnProperty.call(parsed.value, 'life_wall')
             ? { life_wall: parsed.value.life_wall }
             : {}),
+          ...(Object.prototype.hasOwnProperty.call(parsed.value, 'apst_focus')
+            ? { apst_focus: sanitizeApstFocus(parsed.value.apst_focus) }
+            : {}),
           ...(marking
             ? {
                 kind: 'marking_shadow',
@@ -197,6 +201,9 @@ export function createTasksHandler(deps = {}) {
           return withCors(errorResponse(400, 'validation_error', 'marking shadow needs a class, script count, and dates', false), request, env);
         }
         const merged = mergeTask(existing, parsed.value);
+        if (Object.prototype.hasOwnProperty.call(parsed.value, 'apst_focus')) {
+          merged.apst_focus = sanitizeApstFocus(parsed.value.apst_focus);
+        }
         if (marking) {
           merged.marking = marking;
           merged.kind = merged.kind === 'step' ? 'step' : 'marking_shadow';

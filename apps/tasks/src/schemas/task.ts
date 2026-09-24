@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sanitizeApstFocus } from '@/domain/apst';
 import { LifeWallFieldSchema } from './life-wall';
 import { PageBlockSchema } from './page-block';
 
@@ -140,7 +141,12 @@ export const TaskSchema = z.object({
   /** Dates that cannot move. Null clears a wall; omitted leaves old records unchanged. */
   life_wall: LifeWallFieldSchema,
   /** Marking shadow workload. Null clears it; omitted leaves old records unchanged. */
-  marking: MarkingSchema.optional()
+  marking: MarkingSchema.optional(),
+  /** APST focus-area codes. Unknown codes are dropped. Omitted leaves old records unchanged. */
+  apst_focus: z.preprocess(
+    (value) => (value == null ? undefined : sanitizeApstFocus(value)),
+    z.array(z.string()).optional()
+  )
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -202,7 +208,8 @@ export const TaskCreateSchema = TaskSchema.omit({
   linked_goal_ids: true,
   odyssey_paths: true,
   life_wall: true,
-  marking: true
+  marking: true,
+  apst_focus: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

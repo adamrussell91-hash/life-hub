@@ -29,6 +29,7 @@ import { dayCapacity } from '@/domain/hammond-capacity';
 import { beforeWallChip, collectLifeWalls, wallContaining, type CollectedWall } from '@/domain/life-wall';
 import { bumpScriptsMarked, markingShadowPaint } from '@/domain/marking-shadow';
 import { buildWeekLoad, learningTermRhythm, termRhythmFactor, type TermWeekSample } from '@/domain/term-rhythm';
+import { focusArea, focusAreaLabel, ribbonSegmentText, standardsCoverage, standardsRibbonAlert } from '@/domain/apst';
 import { ghostsFromMutations } from '@/domain/timeline-digest';
 import { TL, SURF, domainColour, formatKey, tint } from '@/domain/timeline-geometry';
 import {
@@ -62,7 +63,7 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
   | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
-  | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow';
+  | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow' | 'ribbon';
 
 type Spec = {
   kind: Kind;
@@ -77,6 +78,7 @@ type Spec = {
     warn?: boolean;
     over?: boolean;
     wall?: boolean;
+    standards?: boolean;
     slip?: boolean;
     review?: boolean;
   };
@@ -160,7 +162,8 @@ function toModel(tasks: Task[], projects: Project[], goals: Goal[], colours: Map
     blocked: Boolean(task.blocked_since),
     blockedSince: task.blocked_since,
     deps: (task.dependency_links?.length ? task.dependency_links.map((link) => link.from_id) : task.depends_on) ?? [],
-    marking: task.marking ?? null
+    marking: task.marking ?? null,
+    apst_focus: task.apst_focus ?? []
   }));
 
   const seenShade = new Set<string>();
@@ -180,7 +183,9 @@ function toModel(tasks: Task[], projects: Project[], goals: Goal[], colours: Map
       end: span?.endKey ?? project.current_end_date ?? project.baseline_end_date ?? '2026-12-31',
       baselineEnd: project.baseline_end_date && project.baseline_end_date !== project.current_end_date ? project.baseline_end_date : null,
       shade,
-      colour: domainColour(base, shade)
+      colour: domainColour(base, shade),
+      ribbon: Boolean(project.standards_ribbon),
+      submission: project.standards_ribbon ? project.submission_date ?? project.current_end_date : null
     };
   });
 
@@ -708,6 +713,30 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       g.append(rect, text);
       return;
     }
+    if (kind === 'ribbon') {
+      g.setAttribute('data-part', 'ribbon');
+      g.setAttribute('data-project-id', ref);
+      for (let index = 1; index <= 7; index += 1) {
+        const stateName = data[`s${index}`] ?? 'none';
+        const seg = svgEl('g', {
+          'data-part': 'ribbon-seg',
+          'data-standard': String(index),
+          'data-state': stateName,
+          tabindex: '0'
+        });
+        if (data[`w${index}`] === 'true') seg.setAttribute('data-warn', 'true');
+        seg.setAttribute('aria-label', data[`a${index}`] ?? `Standard ${index}: ${stateName}`);
+        const title = svgEl('title');
+        title.textContent = data[`t${index}`] ?? '';
+        const rect = svgEl('rect', { rx: TL.ribbon.rx, height: TL.ribbon.h, class: `tl-rib tl-rib--${stateName}` });
+        const text = svgEl('text', { class: `tl-rib__n tl-rib__n--${stateName}`, 'text-anchor': 'middle' });
+        text.textContent = String(index);
+        const dot = svgEl('circle', { class: 'tl-rib__dot', r: 2.5 });
+        seg.append(title, rect, text, dot);
+        g.append(seg);
+      }
+      return;
+    }
     if (kind === 'rowtitle') {
       g.setAttribute('data-part', 'row-title');
       const text = svgEl('text', { class: `tl-rowtitle tl-rowtitle--${data.kind ?? 'goal'}` });
@@ -983,6 +1012,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       else inner.removeAttribute('data-over');
       if (spec.flags?.wall) inner.setAttribute('data-wall', 'true');
       else inner.removeAttribute('data-wall');
+      rect!.classList.toggle('tl-load--standards', Boolean(spec.flags?.standards));
+      if (spec.flags?.standards) inner.setAttribute('data-standards', 'true');
+      else inner.removeAttribute('data-standards');
       return;
     }
     if (spec.kind === 'cap') {
@@ -1018,6 +1050,30 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       rect!.classList.toggle('tl-ripple--slip', Boolean(spec.flags?.slip));
       if (text!.textContent !== (spec.text ?? '')) text!.textContent = spec.text ?? '';
       setAttrs(text!, { x: props.lx ?? w + 8, y: TL.bar.h / 2 + 4.5 });
+      return;
+    }
+    if (spec.kind === 'ribbon') {
+      const segW = 26;
+      const total = segW * 7 + TL.ribbon.gap * 6;
+      host.setAttribute('transform', `translate(${x + stickyX(x, w, total) - 12} ${y})`);
+      [...inner.children].forEach((seg, index) => {
+        const standard = index + 1;
+        const stateName = spec.data?.[`s${standard}`] ?? 'none';
+        seg.setAttribute('data-state', stateName);
+        if (spec.data?.[`w${standard}`] === 'true') seg.setAttribute('data-warn', 'true');
+        else seg.removeAttribute('data-warn');
+        const aria = spec.data?.[`a${standard}`];
+        if (aria) seg.setAttribute('aria-label', aria);
+        const [title, rect, text, dot] = [...seg.children] as SVGElement[];
+        const detail = spec.data?.[`t${standard}`] ?? '';
+        if (title && title.textContent !== detail) title.textContent = detail;
+        setAttrs(rect!, { x: index * (segW + TL.ribbon.gap), width: segW });
+        rect!.setAttribute('class', `tl-rib tl-rib--${stateName}`);
+        setAttrs(text!, { x: index * (segW + TL.ribbon.gap) + segW / 2, y: TL.ribbon.h / 2 + 4 });
+        text!.setAttribute('class', `tl-rib__n tl-rib__n--${stateName}`);
+        setAttrs(dot!, { cx: index * (segW + TL.ribbon.gap) + segW - 5, cy: 4 });
+        dot!.setAttribute('opacity', spec.data?.[`w${standard}`] === 'true' ? '1' : '0');
+      });
       return;
     }
     if (spec.kind === 'rowtitle') host.setAttribute('transform', `translate(${viewLeft + 12} ${y})`);
@@ -1084,6 +1140,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     }
 
     const rowY = new Map<string, number>();
+    const standardsWeeks = new Set<string>();
     for (const row of rows) {
       const y = top + row.y;
       rowY.set(row.ref, y);
@@ -1124,7 +1181,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         const all = state.tasks.filter((task) => task.project === project.id);
         const done = all.filter((task) => task.status === 'done').length;
         const barH = row.open ? TL.project.bracketH : TL.project.h;
-        const by = y + (row.h - barH) / 2;
+        const ribbonH = project.ribbon ? TL.row.ribbon : 0;
+        const mainH = row.h - ribbonH;
+        const by = y + (mainH - barH) / 2;
         if (row.open) {
           specs.set(`bracket:${project.id}`, { kind: 'bracket', colour: project.colour });
           entities.set(`bracket:${project.id}`, { x: x0, y: by, w: Math.max(TL.project.bracketH, x1 - x0) });
@@ -1146,9 +1205,40 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
           specs.set(`undated:${project.id}`, { kind: 'undated', text });
           entities.set(`undated:${project.id}`, {
             x: titleOutside ? x1 + 10 + titleW + 12 : x1 + 8,
-            y: y + (row.h - TL.undated.h) / 2,
+            y: y + (mainH - TL.undated.h) / 2,
             w: textW(text, `500 12px ${FONT}`) + TL.undated.padX * 2
           });
+        }
+        if (project.ribbon) {
+          const mine = state.tasks.filter((task) => task.project === project.id);
+          const coverage = standardsCoverage(mine.map((task) => ({ status: task.status, apst_focus: task.apst_focus })));
+          const alert = standardsRibbonAlert({
+            today,
+            submission: project.submission ?? null,
+            terms: school,
+            coverage
+          });
+          const warned = new Set(alert.standards);
+          if (alert.loadWeek) standardsWeeks.add(alert.loadWeek);
+          const data: Record<string, string> = {};
+          for (let standard = 1; standard <= 7; standard += 1) {
+            const stateName = coverage[standard as 1 | 2 | 3 | 4 | 5 | 6 | 7];
+            const lines: string[] = [];
+            for (const task of mine) {
+              for (const code of task.apst_focus ?? []) {
+                const area = focusArea(code);
+                if (!area || area.standard !== standard) continue;
+                lines.push(`${focusAreaLabel(code)} — ${task.title}`);
+              }
+            }
+            const copy = ribbonSegmentText(standard as 1 | 2 | 3 | 4 | 5 | 6 | 7, stateName, lines);
+            data[`s${standard}`] = stateName;
+            data[`a${standard}`] = copy.aria;
+            data[`t${standard}`] = copy.title;
+            if (warned.has(standard as 1 | 2 | 3 | 4 | 5 | 6 | 7)) data[`w${standard}`] = 'true';
+          }
+          specs.set(`ribbon:${project.id}`, { kind: 'ribbon', data });
+          entities.set(`ribbon:${project.id}`, { x: x0, y: y + mainH - 2, w: Math.max(7 * 18, x1 - x0) });
         }
       }
       if (row.kind === 'task' || row.kind === 'step') {
@@ -1320,7 +1410,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         specs.set(`load:${week.key}`, {
           kind: 'load',
           text: `${Math.round(week.minutes / 60)} h`,
-          flags: { over: week.over, wall: week.wall }
+          flags: { over: week.over, wall: week.wall, standards: standardsWeeks.has(week.key) }
         });
         entities.set(`load:${week.key}`, {
           x: x0 + TL.load.colGap / 2,
@@ -1550,7 +1640,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
           [{ strokeDasharray: `${length}`, strokeDashoffset: length }, { strokeDasharray: `${length}`, strokeDashoffset: 0 }],
           { duration: 420, delay: 380, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }
         );
-      } else if (kind === 'bar' || kind === 'ms' || kind === 'proj' || kind === 'bracket' || kind === 'band' || kind === 'dream' || kind === 'undated' || kind === 'step' || kind === 'label') {
+      } else if (kind === 'bar' || kind === 'ms' || kind === 'proj' || kind === 'bracket' || kind === 'band' || kind === 'dream' || kind === 'undated' || kind === 'step' || kind === 'label' || kind === 'ribbon') {
         const props = engine.get(id);
         const delay = Math.min(360, ((props?.y ?? 0) / 12) | 0);
         if (typeof node.animate !== 'function') continue;

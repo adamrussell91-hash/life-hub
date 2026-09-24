@@ -28,6 +28,7 @@ export type TlTask = {
     return_by: string;
     scripts_marked: number;
   } | null;
+  apst_focus?: string[] | null;
 };
 
 export type TlProject = {
@@ -40,6 +41,8 @@ export type TlProject = {
   baselineEnd: string | null;
   shade: boolean;
   colour: string;
+  ribbon?: boolean;
+  submission?: string | null;
 };
 
 export type TlGoal = { id: string; title: string; dream: string | null };
@@ -137,7 +140,7 @@ export function buildTimelineRows(
       kind: 'project',
       depth,
       label: project.title,
-      h: open ? TL.row.projectOpen : TL.row.project,
+      h: (open ? TL.row.projectOpen : TL.row.project) + (project.ribbon ? TL.row.ribbon : 0),
       ref: project.id,
       open,
       colour: project.colour

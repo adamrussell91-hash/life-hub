@@ -381,7 +381,9 @@ function paintProjectPage(
           purpose: current.purpose,
           desired_outcome: current.desired_outcome,
           page_blocks: current.page_blocks,
-          life_wall: current.life_wall ?? null
+          life_wall: current.life_wall ?? null,
+          standards_ribbon: Boolean(current.standards_ribbon),
+          submission_date: current.submission_date ?? null
         })
         .then(
           (next) => {
@@ -433,7 +435,24 @@ function paintProjectPage(
     },
     onCommit: (wall) => persist({ life_wall: wall })
   });
-  fields.append(status.el, due.el, lifeWall.el);
+  const ribbonLabel = el('label', 'task-editor__check-label', 'Standards ribbon');
+  const ribbonInput = el('input') as HTMLInputElement;
+  ribbonInput.type = 'checkbox';
+  ribbonInput.checked = Boolean(project.standards_ribbon);
+  ribbonLabel.prepend(ribbonInput);
+  const submission = createHubField({
+    type: 'date',
+    ariaLabel: 'Submission date',
+    value: project.submission_date ?? '',
+    className: 'page-card__due',
+    onChange: (value) => persist({ submission_date: value || null })
+  });
+  submission.el.hidden = !ribbonInput.checked;
+  ribbonInput.addEventListener('change', () => {
+    persist({ standards_ribbon: ribbonInput.checked });
+    submission.el.hidden = !ribbonInput.checked;
+  });
+  fields.append(status.el, due.el, lifeWall.el, ribbonLabel, submission.el);
 
   let qualityValue = (project.quality_bar ?? 'good_enough') as QualityBar;
   const qualityHost = el('div', 'page-card__quality');

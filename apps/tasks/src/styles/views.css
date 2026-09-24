@@ -1587,6 +1587,12 @@
   letter-spacing: var(--tracking-wide);
 }
 
+.task-editor__focus { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.task-editor__focus-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.morphing-popover--focus { --morphing-popover-width: 36rem; }
+.morphing-popover--focus .morphing-popover__panel.is-floating { max-height: min(70vh, 36rem); overflow: auto; }
+.morphing-popover__group { margin: var(--space-3) 0 0; font: var(--weight-semibold) var(--text-xs)/var(--leading-snug) var(--font-ui); color: var(--navy); }
+
 .task-editor__check-label {
   display: inline-flex;
   align-items: center;

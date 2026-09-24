@@ -4,6 +4,7 @@ import type { RecurrenceFrequency } from '@/schemas/recurrence';
 import { tasksApi } from '@/services/client-api';
 import { errorMessage } from '@/views/feedback';
 import { formatTagsInput, parseTagsInput, stepsForTask } from '@/domain/hierarchy';
+import { focusAreaLabel, focusAreasByStandard, sanitizeApstFocus } from '@/domain/apst';
 import { bumpScriptsMarked } from '@/domain/marking-shadow';
 import { addDaysKey } from '@/domain/school-time';
 import {
@@ -33,6 +34,7 @@ import { createPlusAdd } from '@/views/plus-add';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { forgetTaskLinkCache } from '@/views/attachment-chips';
 import { mountLifeWallEditor } from '@/views/life-wall-editor';
+import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { renderTaskRelationshipsSection } from '@/views/task-relationships';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -287,6 +289,46 @@ function renderSteps(
   host.append(section);
 }
 
+function mountFocusAreas(task: Task): { el: HTMLElement; read: () => string[] } {
+  let selected = sanitizeApstFocus(task.apst_focus);
+  const host = el('div', 'task-editor__focus');
+  const chips = el('div', 'task-editor__focus-chips');
+  const paint = () => {
+    chips.replaceChildren(
+      ...selected.map((code) => {
+        const chip = el('span', 'hub-chip', code);
+        const label = focusAreaLabel(code);
+        chip.title = label;
+        chip.setAttribute('aria-label', label);
+        return chip;
+      })
+    );
+  };
+  paint();
+  const trigger = el('button', 'btn btn--ghost', 'Focus areas') as HTMLButtonElement;
+  trigger.type = 'button';
+  createMorphingClosedFieldPopover({
+    root: document,
+    trigger,
+    label: 'Focus areas',
+    title: 'APST focus areas',
+    supporting: 'Closed list. Save writes it.',
+    className: 'morphing-popover--focus',
+    multiple: true,
+    groups: focusAreasByStandard().map((group) => ({
+      label: `${group.standard.number}. ${group.standard.title}`,
+      options: group.areas.map((area) => ({ value: area.code, label: focusAreaLabel(area.code) }))
+    })),
+    value: selected.join(','),
+    onSave(value) {
+      selected = sanitizeApstFocus(String(value).split(','));
+      paint();
+    }
+  });
+  host.append(chips, trigger);
+  return { el: host, read: () => selected };
+}
+
 /** Inline edit panel — title, due, domain, project, tags, notes, steps. */
 export async function renderTaskEditor(
   host: HTMLElement,
@@ -385,6 +427,8 @@ export async function renderTaskEditor(
     value: task.parent_project_id ?? ''
   });
 
+  const focus = mountFocusAreas(task);
+
   const tags = createHubField({
     ariaLabel: 'Tags',
     placeholder: 'Tags — urgent, waiting, marking',
@@ -464,7 +508,8 @@ export async function renderTaskEditor(
         recurrence_rule: recurrence.read(),
         remind_at: reminder.remind_at,
         remind_dismissed_at: reminder.remind_dismissed_at,
-        life_wall: wall.wall
+        life_wall: wall.wall,
+        apst_focus: focus.read()
       });
       forgetTaskLinkCache(updated.id);
       const linkResult = await relationships.savePendingLinks(updated.id);
@@ -492,6 +537,7 @@ export async function renderTaskEditor(
     domain.el,
     priority.el,
     project.el,
+    focus.el,
     tags.el,
     notes.el,
     lifeWall.el,
