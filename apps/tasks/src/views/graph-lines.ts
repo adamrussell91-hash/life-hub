@@ -257,6 +257,11 @@ function subClass(tone: StationView['tone']): string {
   return 'sub';
 }
 
+function terminusEntityId(project: Project, tasks: Task[]): string {
+  const milestone = projectRoute(project, tasks).stations.find((station) => station.kind === 'milestone');
+  return milestone?.id ?? `${project.id}-end`;
+}
+
 function paintStation(
   parent: SVGElement,
   st: StationView,
@@ -362,6 +367,12 @@ function paintStation(
       );
     }
   }
+  const mark = pop.querySelector('[data-part="station-mark"]');
+  if (mark) {
+    mark.setAttribute('data-entity-id', st.id);
+    mark.setAttribute('data-morph-shape', 'station');
+    mark.setAttribute('data-morph-color', col);
+  }
   if (st.state === 'blocked') {
     svgEl(
       'rect',
@@ -412,6 +423,11 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
   );
   const cur = line.stations.findIndex((st) => st.state === 'current');
   const cx = cur >= 0 ? xs[cur]! : g.padL;
+  const track = svgEl(
+    'g',
+    { 'data-entity-id': line.project.id, 'data-morph-shape': 'track', 'data-morph-color': col },
+    svg
+  );
   const travelled = svgEl(
     'path',
     {
@@ -424,7 +440,7 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       'data-part': 'track-travelled',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const ahead = svgEl(
     'path',
@@ -437,7 +453,7 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       'data-part': 'track-ahead',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const base = lineIndex * 90;
   drawIn(travelled, base, 350, input.reducedMotion);
@@ -584,7 +600,17 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     }
   });
 
-  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
+  const tg = svgEl(
+    'g',
+    {
+      class: 'pop graph-terminus',
+      'data-part': 'terminus',
+      'data-entity-id': terminusEntityId(line.project, input.tasks),
+      'data-morph-shape': 'terminus',
+      'data-morph-color': col
+    },
+    svg
+  );
   const termRight = lineLabelX(termX + termW, width).x;
   const termLeft = Math.max(4, termRight - termW);
   svgEl('rect', { x: termLeft, y: y - g.termH / 2, width: termW, height: g.termH, rx: g.termH / 2, fill: col }, tg);
@@ -613,6 +639,11 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
   });
   const endY = yy;
   const cur = line.stations.findIndex((st) => st.state === 'current');
+  const track = svgEl(
+    'g',
+    { 'data-entity-id': line.project.id, 'data-morph-shape': 'track', 'data-morph-color': col },
+    svg
+  );
   const travelled = svgEl(
     'path',
     {
@@ -624,7 +655,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       'data-part': 'track-travelled',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const ahead = svgEl(
     'path',
@@ -637,7 +668,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       'data-part': 'track-ahead',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const base = lineIndex * 90;
   drawIn(travelled, base, 300, input.reducedMotion);
@@ -686,7 +717,17 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       });
     }
   });
-  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
+  const tg = svgEl(
+    'g',
+    {
+      class: 'pop graph-terminus',
+      'data-part': 'terminus',
+      'data-entity-id': terminusEntityId(line.project, input.tasks),
+      'data-morph-shape': 'terminus',
+      'data-morph-color': col
+    },
+    svg
+  );
   const tw = terminusWidth(line.terminus.label, line.terminus.date);
   svgEl('rect', { x: x0 - 12, y: endY, width: tw, height: 30, rx: 15, fill: col }, tg);
   const tt = svgEl('text', { class: 'term', x: x0 - 12 + tw / 2, y: endY + 19.5, 'text-anchor': 'middle' }, tg);
