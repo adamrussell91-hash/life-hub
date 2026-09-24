@@ -13,7 +13,7 @@ export const CONFIG_PATHS = new Set([
   'data/nutrition/challenges.json',
   WEEK_FLAGS_PATH
 ]);
-const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare|calendar)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 const BLOB_SHA = /^[0-9a-f]{40}$/;
 const MAX_FILE_BYTES = 256 * 1024;
 

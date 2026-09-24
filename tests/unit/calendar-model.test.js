@@ -116,6 +116,22 @@ test('eventBrief summarises each domain in one line', () => {
   );
 });
 
+test('calendar_block is a Life event with its title and span', () => {
+  const record = {
+    type: 'calendar_block',
+    title: 'Dinner out + a show',
+    kind: 'corey',
+    time: '18:00',
+    end_time: '22:00',
+    protected: true,
+    status: 'tentative'
+  };
+  assert.equal(eventDetailTitle(record), 'Dinner out + a show');
+  assert.equal(eventBrief({ record }), 'corey · 18:00–22:00 · protected · tentative');
+  const life = calendarSourceSummary([{ record }]).find(source => source.id === 'life');
+  assert.equal(life.count, 1);
+});
+
 test('bloods events title as Body with a marker count brief', () => {
   const record = { type: 'bloods', markers: [{ key: 'alt' }, { key: 'crp' }] };
   assert.equal(eventDetailTitle(record), 'Body');

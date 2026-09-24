@@ -71,6 +71,8 @@ export function eventDetailTitle(record, body = '') {
       return record.title || 'Task';
     case 'work_block':
       return record.title || 'Work block';
+    case 'calendar_block':
+      return record.title || 'Calendar block';
     case 'knowledge_page':
       return record.title || 'Page';
     default:
@@ -145,6 +147,14 @@ export function eventBrief(event) {
       if (record.ghost) parts.push('ghost');
       return parts.join(' · ');
     }
+    case 'calendar_block': {
+      const parts = [];
+      if (record.kind) parts.push(String(record.kind));
+      if (record.time && record.end_time) parts.push(`${record.time}–${record.end_time}`);
+      if (record.protected) parts.push('protected');
+      if (record.status) parts.push(String(record.status));
+      return parts.join(' · ');
+    }
     case 'knowledge_page':
       return record.area ? `Knowledge · ${record.area}` : 'Knowledge';
     case 'heart':
@@ -167,7 +177,8 @@ const SOURCE_BY_TYPE = {
   task: 'tasks',
   work_block: 'tasks',
   professional_meeting: 'professional',
-  professional_event: 'professional'
+  professional_event: 'professional',
+  calendar_block: 'life'
 };
 
 const SOURCE_LABELS = [

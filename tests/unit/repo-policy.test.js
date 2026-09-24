@@ -58,6 +58,7 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/body/2026/08/2026-08-01-weight.md',
     'data/mind/2026/08/2026-08-01-diary.md',
     'data/skincare/2026/08/2026-08-01-morning.md',
+    'data/calendar/2026/09/2026-09-26-dinner-out-a-show-1800.md',
     'data/fitness/templates/chest-and-curls.md',
     'data/remember/week-flags.json',
     'data/research/2026-08-01-knee-load.json'
