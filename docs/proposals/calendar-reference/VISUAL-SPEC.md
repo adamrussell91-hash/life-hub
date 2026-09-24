@@ -9,9 +9,9 @@ Adam signed off the mockups. Past builds (Graph: see `docs/proposals/graph-refer
 | File | What it is |
 |---|---|
 | `tideline.html` | Working reference, built from `src/`. Open it from the repo so it loads the real kit CSS (`../../../packages/design-kit/`). It expands bands, opens chip popovers, accepts and dismisses ghosts, shows receipts, and switches to one day at 390px. The "Reference controls" row (Reset, Slow motion ×5, Reduced motion) is not product. |
-| `golden/*.png` | Target screenshots at 2×: `tideline-1280`, `school-1280`, `yours-1280`, `popover-1280`, `accepted-1280`, `tideline-390`. |
+| `golden/*.png` | Target screenshots at 2×: `tideline-1280`, `tideline-960` (app column width), `school-1280`, `yours-1280`, `popover-1280`, `accepted-1280`, `tideline-390`. |
 | `fixture.json` | The data behind the goldens, generated from `src/fixture.ts`. Clock frozen at Thu 24/09/26 18:05 Sydney. |
-| `tideline-visual.spec.mjs` | The contract: 9 browser tests named by phase. The reference passes all 9. Copy it unchanged to `tests/browser/`. |
+| `tideline-visual.spec.mjs` | The contract: 10 browser tests named by phase. The reference passes all 10. Copy it unchanged to `tests/browser/`. |
 | `compare.html` | Golden (left) vs your build (right), side by side or as a difference overlay. Build images come from the spec's `compare/` output. |
 | `src/` | Prototype source: `tideline-ref.ts`, `fixture.ts`, `tideline.template.html`, `build-ref.mjs`. Rebuild with `node docs/proposals/calendar-reference/src/build-ref.mjs`. |
 
@@ -63,6 +63,17 @@ If one is wrong, fix it in place, keep its tests passing, and say why in the PR.
 | Wall | Hatch over the day body (not the sleep strip), navy pill with a lock: "Your day · protected". |
 | Toast | Navy, white, `--radius-sm`, bottom right 24px, sage check circle. `Written.` + receipt. |
 
+### Narrow columns (the real app)
+
+Inside the Life shell, the rail takes about 330px, so at a 1280px window each day column is **about 115px**, not the 157px of the reference page. The reference handles it with container queries on `.cal-head` and `.cal-body`, so port those rules verbatim:
+
+- The name row wraps. The "over" pill and the day tag drop under the date instead of running into the next column. Tags ellipsize.
+- Vitals wrap onto a second line instead of clipping mid-word.
+- Under 150px: the wall pill shows its first part only ("Your day"). Inline Accept/Dismiss are hidden, so proposals are accepted from the chip popover. The date circle shrinks to 26px.
+- Tray buttons never wrap; the tray detail ellipsizes.
+
+The spec checks this at a 960px viewport (the same column width as the app at 1280): "phase 2: nothing spills out of a narrow day column". Golden: `tideline-960`.
+
 ### Phone (< 720px)
 
 One day. The zoom and focus pills hide; bands expand by tapping their labels. A 7-button week strip sits above the card (DOW 10px caps, date 13px, a capacity bar in the capacity colour). The tray wraps and hides its detail. The toast spans the width. The page never scrolls sideways. Label column 72px.
@@ -101,6 +112,7 @@ Use **Slow motion ×5** in the reference to study every one of these.
 14. `YYYY-MM-DD` on screen. Dates display as `dd/mm/yy` (and `24/09` in Central Node lines).
 15. Measuring text inside the frame loop. Layout never reads the DOM.
 16. The phone view as a separate "mobile calendar". It's the same object with one column.
+17. Designing only for the full-width reference page. In the app, the rail makes columns about 115px, so tags, vitals and pills must fit there too.
 
 ## Test hooks
 
