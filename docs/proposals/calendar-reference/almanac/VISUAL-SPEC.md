@@ -13,10 +13,10 @@ Behaviour and data: `docs/superpowers/specs/2026-09-24-calendar-design.md`, "D �
 
 | File | What it is |
 |---|---|
-| `almanac.html` | Working reference, built from `src/`. Open it from the repo so the kit CSS resolves. Reference controls: Reset, Slow motion ×5, Reduced motion. |
+| `almanac.html` | Working reference, built from `src/`. Includes a 330px **rail stand-in**, so the reference at any window width matches the app at that width. Open it from the repo so the kit CSS resolves. Reference controls: Reset, Slow motion ×5, Reduced motion. |
 | `golden/*.png` | 2× targets: `almanac-1280`, `almanac-popover-1280`, `almanac-held-1280`, `almanac-390`. |
 | `fixture.json` | Generated from `src/fixture.ts`. Anchors are real (central-node.md); world entries marked `example` stand in for live feeds. |
-| `almanac-visual.spec.mjs` | 7 browser tests named `almanac phase N`. The reference passes all 7. |
+| `almanac-visual.spec.mjs` | 8 browser tests named `almanac phase N`. The reference passes all 8. |
 | `compare.html` | Goldens vs your build. |
 | `src/` | `almanac-ref.ts`, `fixture.ts`, `almanac.template.html`, `build-ref.mjs` (`node docs/proposals/calendar-reference/almanac/src/build-ref.mjs`). |
 
@@ -34,13 +34,15 @@ Finished modules, with tests. Use them; don't write your own:
 
 1. **One motion engine** (`createMotion`). The tide reveal, line draw, bead pop, count-down, popover, toast and held tint all go through it. No CSS transitions on geometry. Timers only for how long the toast stays.
 2. **Every number is computed.** The summary (2 · 7 · 4), bead statuses, last safe dates and opening windows all come from the modules over the fixture. If yours differ, your inputs are wrong. Don't type them in.
-3. **Port the constants.** The `ALM` block goes to `packages/design-kit/js/almanac-geometry.js`. The chart is SVG in user units (`viewBox` width 1198), so its font sizes are px in user units on purpose.
-4. **Classes are the contract.** `alm-*` rules move verbatim (from `.alm{` down) to `packages/design-kit/calendar-almanac.css`. The `alm-hatch` pattern and `alm-area` gradient defs move with them (render them once in the shell).
-5. **Status has one look each.** `now` is a High Sea dot with a halo. `overdue` is a danger diamond. `soon` is a navy ring (2.2px). `later` is a navy ring (1.6px). `done` is a sage dot with a tick. `tasked` adds a dashed navy halo. Dream beads are gold. Never colour a bead any other way.
-6. **Example data says so.** Any world entry that isn't from a live feed ends its sub-label with "· example". When a live feed replaces one, the word goes.
-7. **Nothing is sent.** A draft is shown to copy. "Plan it with Hammond" writes nothing yet (phase 5 of the calendar work).
-8. **The server resolves actions.** Buttons send `{ id, decision }` to `POST /api/calendar-ghosts`. For `alm-…` ids, the server recomputes the Almanac with the same modules and builds the ghost itself. The client never builds writes.
-9. **Phone is lists.** Under 720px there is no chart: summary, then one card per lead line with its steps (dot, title, last safe date or "now"), then openings stacked. Never sideways scroll.
+3. **Port the constants.** The `ALM` block goes to `packages/design-kit/js/almanac-geometry.js`.
+4. **Laid out, never scaled.** At mount the chart is laid out at its card's real width (`setWidth(card.clientWidth)`), and the SVG's `width` equals its `viewBox` width, so 1 unit is 1 CSS px and 11.5px text stays 11.5px. A `ResizeObserver` on the host re-lays it out when the width changes by more than 2px. Never `width:100%` on the SVG. (Scaled into the app's 900px column, every label would shrink to about 9px. The spec checks 960, 1280 and 1600.) `.alm` has `min-width:0; contain:inline-size`.
+5. **Labels have budgets.** A bead label may run up to the next label on the same side of its lead line (minus `labelGap`). Two labels facing each other split the gap at the midpoint. Longer text ends in "…" via `fitText` (measured once through the `textW` cache, never in the frame loop). The full title is always in the popover and `aria-label`. No chart text or pill may leave the chart (the Korea pill clamps to the right edge).
+6. **Classes are the contract.** `alm-*` rules move verbatim (from `.alm{` down) to `packages/design-kit/calendar-almanac.css`. The `alm-hatch` pattern and `alm-area` gradient defs move with them (render them once in the shell).
+7. **Status has one look each.** `now` is a High Sea dot with a halo. `overdue` is a danger diamond. `soon` is a navy ring (2.2px). `later` is a navy ring (1.6px). `done` is a sage dot with a tick. `tasked` adds a dashed navy halo. Dream beads are gold. Never colour a bead any other way.
+8. **Example data says so.** Any world entry that isn't from a live feed ends its sub-label with "· example". When a live feed replaces one, the word goes.
+9. **Nothing is sent.** A draft is shown to copy. "Plan it with Hammond" writes nothing yet (phase 5 of the calendar work).
+10. **The server resolves actions.** Buttons send `{ id, decision }` to `POST /api/calendar-ghosts`. For `alm-…` ids, the server recomputes the Almanac with the same modules and builds the ghost itself. The client never builds writes.
+11. **Phone is lists.** Under 720px there is no chart: summary, then one card per lead line with its steps (dot, title, last safe date or "now"), then openings stacked. Never sideways scroll.
 
 ## Layout contract (desktop)
 
@@ -95,7 +97,8 @@ Finished modules, with tests. Use them; don't write your own:
 7. Building the write in the browser.
 8. Rendering the chart on phone and letting it scroll sideways.
 9. CSS `transition` on SVG attributes, or `setTimeout` chains for the entrance.
-10. Openings chosen by "best capacity" instead of the earliest window that clears the bar. Something else would take the early one.
+10. Scaling the chart to fit instead of laying it out at its width. The text shrinks.
+11. Openings chosen by "best capacity" instead of the earliest window that clears the bar. Something else would take the early one.
 
 ## Test hooks
 
@@ -103,4 +106,4 @@ In dev builds only: `window.__almanac = { state, ALM, lines(), summary(), openin
 
 ## Loop until it matches
 
-`npm run build && ALMANAC_APP=1 node --test tests/browser/almanac-visual.spec.mjs`, then check `compare.html`, then run the motion contract side by side with the reference at ×5. You're done when all 7 pass, the goldens differ only in anti-aliasing, and the PR has a recording of the entrance plus Add as task → Already done → Hold.
+`npm run build && ALMANAC_APP=1 node --test tests/browser/almanac-visual.spec.mjs`, then check `compare.html`, then run the motion contract side by side with the reference at ×5. You're done when all 8 pass, the goldens differ only in anti-aliasing, and the PR has a recording of the entrance plus Add as task → Already done → Hold.
