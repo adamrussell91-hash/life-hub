@@ -75,9 +75,13 @@ export function mountRichTextTiptap(options: {
 
   const surface = editor.view.dom as HTMLElement;
 
-  // Keep compatibility with callers/tests that mutate the DOM then fire `input`.
-  surface.addEventListener('input', () => {
+  // Callers and tests mutate the DOM, then fire a plain `input` event.
+  // Real keystrokes are InputEvents. ProseMirror already applied those, and
+  // reading innerHTML back collapses spaces — a second space deletes the one
+  // just typed, which shows up inside a tabs panel.
+  surface.addEventListener('input', (event) => {
     if (quiet) return;
+    if (typeof InputEvent !== 'undefined' && event instanceof InputEvent) return;
     const html = sanitizeRichTextHtml(surface.innerHTML);
     quiet = true;
     editor.commands.setContent(html || '<p></p>', { emitUpdate: false });
