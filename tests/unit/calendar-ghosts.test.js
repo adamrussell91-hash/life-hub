@@ -125,10 +125,12 @@ function memoryGitHub(initial) {
   let head = 'a'.repeat(40);
   const commits = [];
   let failCommits = 0;
+  let rejectCommit = null;
   return {
     files,
     commits,
     failNext(count) { failCommits = count; },
+    rejectOn(fn) { rejectCommit = fn; },
     async resolveTree() {
       return {
         commitSha: head,
@@ -159,6 +161,10 @@ function memoryGitHub(initial) {
       if (failCommits > 0) {
         failCommits -= 1;
         throw new GitHubClientError('write_conflict', true);
+      }
+      if (typeof rejectCommit === 'function') {
+        const rejected = rejectCommit(commits.length);
+        if (rejected) throw rejected;
       }
       for (const file of next) files.set(file.path, file.content);
       head = sha(`${head}\0${message}`);
@@ -415,6 +421,24 @@ test('a stale commit is retried once from the current tree', async () => {
   const lines = github.files.get('central-node.md').match(/Sara→Chadwick: skip Thu 24\/09 workout/g);
   assert.equal(lines.length, 1);
   assert.equal(github.commits.length, 1);
+});
+
+test('a create_task retry after the task landed does not create a second task', async () => {
+  const create = { id: 'g-task', agent: 'hammond', kind: 'create_task', title: 'Book the pet sitter', due: '2026-10-28' };
+  const { handler, github, store } = harness({ ghosts: [create] });
+  github.rejectOn(n => (n === 1 ? new Error('clear pending failed') : null));
+  const partial = await decide(handler, 'g-task', 'accept');
+  assert.equal(partial.status, 207);
+  assert.equal(partial.payload.writes, 'partial');
+  assert.equal(partial.payload.retry, 'tasks');
+  github.rejectOn(() => null);
+  const retry = await decide(handler, 'g-task', 'accept');
+  assert.equal(retry.status, 200);
+  assert.equal(retry.payload.writes, 'applied');
+  const taskIds = [...store.data.keys()].filter(key => key.startsWith('tasks/') && key !== TASKS_INDEX_KEY);
+  assert.deepEqual(taskIds, [taskKey('ghost-g-task')]);
+  assert.equal(store.data.get(taskKey('ghost-g-task')).due_date, '2026-10-28');
+  assert.deepEqual(store.data.get(TASKS_INDEX_KEY), ['ghost-g-task']);
 });
 
 test('GET returns only pending ghosts inside the range', async () => {
