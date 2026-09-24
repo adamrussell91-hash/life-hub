@@ -29,6 +29,7 @@ import { dayCapacity } from '@/domain/hammond-capacity';
 import { beforeWallChip, collectLifeWalls, wallContaining, type CollectedWall } from '@/domain/life-wall';
 import { bumpScriptsMarked, markingShadowPaint } from '@/domain/marking-shadow';
 import { buildWeekLoad, learningTermRhythm, termRhythmFactor, type TermWeekSample } from '@/domain/term-rhythm';
+import { ghostsFromMutations } from '@/domain/timeline-digest';
 import { TL, SURF, domainColour, formatKey, tint } from '@/domain/timeline-geometry';
 import {
   buildTimelineRows,
@@ -61,7 +62,7 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
   | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
-  | 'shadow' | 'load' | 'cap' | 'ripple';
+  | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow';
 
 type Spec = {
   kind: Kind;
@@ -77,6 +78,7 @@ type Spec = {
     over?: boolean;
     wall?: boolean;
     slip?: boolean;
+    review?: boolean;
   };
 };
 
@@ -342,7 +344,29 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const composer = el('form', 'tl-composer');
   composer.hidden = true;
   composer.dataset.part = 'marking-composer';
-  page.append(toolbar, banner, card, menu, composer, toast, live);
+  const tray = el('div', 'tl-tray');
+  tray.dataset.part = 'ghost-tray';
+  tray.hidden = true;
+  const avatar = el('div', 'tl-avatar', 'H');
+  avatar.setAttribute('aria-hidden', 'true');
+  const trayText = el('div', 'tl-tray__text');
+  const trayTitle = el('b');
+  const trayDetail = el('span');
+  trayText.append(trayTitle, document.createTextNode(' '), trayDetail);
+  const applyBtn = el('button', 'btn btn--primary', 'Apply all');
+  applyBtn.type = 'button';
+  const reviewBtn = el('button', 'btn btn--secondary', 'Review');
+  reviewBtn.type = 'button';
+  const acceptBtn = el('button', 'btn btn--primary', 'Accept');
+  acceptBtn.type = 'button';
+  acceptBtn.hidden = true;
+  const skipBtn = el('button', 'btn btn--secondary', 'Skip');
+  skipBtn.type = 'button';
+  skipBtn.hidden = true;
+  const dismissBtn = el('button', 'btn btn--ghost', 'Dismiss');
+  dismissBtn.type = 'button';
+  tray.append(avatar, trayText, applyBtn, reviewBtn, acceptBtn, skipBtn, dismissBtn);
+  page.append(toolbar, banner, tray, card, menu, composer, toast, live);
   canvas.replaceChildren(page);
 
   const layers: Record<string, SVGGElement> = {};
@@ -361,6 +385,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     </marker>
     <marker id="tl-arrow-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
       <path d="M1 1 L9 5 L1 9 Z" fill="var(--high-sea-ink)"/>
+    </marker>
+    <marker id="tl-arrow-ghost" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+      <path d="M1 1 L9 5 L1 9 Z" fill="var(--navy)"/>
     </marker>`;
   svg.append(defs);
 
@@ -404,6 +431,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     preview: null as null | { id: string; days: number; mode: 'move' | 'resize' },
     release: null as null | { id: string; deps: Set<string> }
   };
+  let hammond: null | {
+    changes: Array<{ id: string; due: string; why: string }>;
+    reviewId: string | null;
+  } = null;
   const specs = new Map<string, Spec>();
   const nodes = new Map<string, Element>();
   let rows: TlRow[] = [];
@@ -447,7 +478,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (kind === 'today') return layers.today!;
     if (kind === 'shadow') return layers.shadows!;
     if (kind === 'load' || kind === 'cap') return layers.load!;
-    if (kind === 'ripple') return layers.ghosts!;
+    if (kind === 'ripple' || kind === 'ghost' || kind === 'garrow') return layers.ghosts!;
     return layers.bars!;
   }
 
@@ -646,6 +677,23 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (kind === 'cap') {
       g.setAttribute('data-part', 'capacity-line');
       g.append(svgEl('path', { class: 'tl-cap', fill: 'none' }), svgEl('line', { class: 'tl-load-divider' }));
+      return;
+    }
+    if (kind === 'ghost') {
+      g.setAttribute('data-part', 'ghost');
+      g.setAttribute('data-task-id', ref);
+      if (spec.flags?.review) g.setAttribute('data-review', 'true');
+      const rect = svgEl('rect', { class: 'tl-ghost', rx: TL.bar.rx, height: TL.bar.h });
+      rect.style.fill = 'color-mix(in srgb, var(--wave) 6%, transparent)';
+      const chip = svgEl('g', { class: 'tl-ghost__chip' });
+      chip.append(svgEl('circle', { r: 8 }), svgEl('text', { 'text-anchor': 'middle', y: 3.5 }));
+      (chip.lastElementChild as SVGTextElement).textContent = 'H';
+      g.append(rect, chip);
+      return;
+    }
+    if (kind === 'garrow') {
+      g.setAttribute('data-part', 'ghost-arrow');
+      g.append(svgEl('path', { class: 'tl-garrow', fill: 'none', 'marker-end': 'url(#tl-arrow-ghost)' }));
       return;
     }
     if (kind === 'ripple') {
@@ -940,6 +988,27 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (spec.kind === 'cap') {
       (inner.firstElementChild as SVGPathElement | null)?.setAttribute('d', capPath);
       setAttrs(inner.children[1]!, { x1: 0, x2: props.w ?? geometry.width, y1: props.top ?? 0, y2: props.top ?? 0 });
+      return;
+    }
+    if (spec.kind === 'ghost') {
+      host.setAttribute('transform', `translate(${x} ${y})`);
+      if (spec.flags?.review) inner.setAttribute('data-review', 'true');
+      else inner.removeAttribute('data-review');
+      const [rect, chip] = [...inner.children] as SVGElement[];
+      setAttrs(rect!, { width: w });
+      chip?.setAttribute('transform', `translate(${w} 0)`);
+      return;
+    }
+    if (spec.kind === 'garrow') {
+      const x1 = props.x1 ?? 0;
+      const y1 = props.y1 ?? 0;
+      const x2 = props.x2 ?? 0;
+      const y2 = props.y2 ?? 0;
+      const lift = 18;
+      (inner.firstElementChild as SVGPathElement | null)?.setAttribute(
+        'd',
+        `M${x1} ${y1} C${x1} ${y1 - lift} ${x2} ${y2 - lift} ${x2} ${y2}`
+      );
       return;
     }
     if (spec.kind === 'ripple') {
@@ -1312,6 +1381,28 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         }
       }
     }
+    if (hammond) {
+      for (const change of hammond.changes) {
+        const task = state.tasks.find((item) => item.id === change.id);
+        const current = task ? entities.get(`bar:${task.id}`) ?? entities.get(`step:${task.id}`) : undefined;
+        if (!task || !current) continue;
+        const span = timelineTaskSpan({ due: change.due, est: task.est });
+        if (!span) continue;
+        const box = barBox(span);
+        specs.set(`ghost:${task.id}`, { kind: 'ghost', flags: hammond.reviewId === task.id ? { review: true } : undefined });
+        entities.set(`ghost:${task.id}`, { x: box.x, y: current.y ?? 0, w: box.w });
+        const fromX = (current.x ?? 0) + (current.w ?? 0) / 2;
+        const toX = box.x + box.w / 2;
+        specs.set(`garrow:${task.id}`, { kind: 'garrow' });
+        entities.set(`garrow:${task.id}`, {
+          x1: fromX,
+          y1: (current.y ?? 0) - 2,
+          x2: toX + (toX > fromX ? -2 : 2),
+          y2: (current.y ?? 0) - 2
+        });
+      }
+    }
+
     return { entities, width, height };
   }
 
@@ -1643,8 +1734,107 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     });
   }
 
+  function paintTray(voice: string, count: number): void {
+    const [head, ...rest] = voice.split('. ');
+    trayTitle.textContent = head?.endsWith('.') ? head : `${head ?? `Hammond suggests ${count} changes`}.`;
+    trayDetail.textContent = rest.join('. ');
+    tray.hidden = false;
+    tray.classList.remove('is-in');
+    requestAnimationFrame(() => tray.classList.add('is-in'));
+  }
+
+  function openProposalRows(changes: Array<{ id: string }>): void {
+    for (const change of changes) {
+      const task = state.tasks.find((item) => item.id === change.id);
+      state.expanded.set(task?.project ?? 'grp-loose', true);
+      if (task?.parent) state.expanded.set(task.parent, true);
+    }
+  }
+
+  function dismissHammond(): void {
+    hammond = null;
+    tray.hidden = true;
+    tray.classList.remove('is-in');
+    acceptBtn.hidden = true;
+    skipBtn.hidden = true;
+    relayout('settle');
+    announce('Hammond dismissed');
+  }
+
+  async function applyChanges(picked: Array<{ id: string; due: string; why: string }>, close: boolean): Promise<void> {
+    if (!picked.length) return;
+    await tasksApi.applyAgentMutations(
+      picked.map((change) => ({
+        kind: 'task_update' as const,
+        task_id: change.id,
+        patch: { due_date: change.due },
+        summary: change.why
+      }))
+    );
+    for (const change of picked) {
+      const raw = tasks.find((task) => task.id === change.id);
+      if (raw) raw.due_date = change.due;
+      const row = state.tasks.find((task) => task.id === change.id);
+      if (row) row.due = change.due;
+    }
+    const drop = new Set(picked.map((change) => change.id));
+    const rest = (hammond?.changes ?? []).filter((change) => !drop.has(change.id));
+    if (close || !rest.length) {
+      hammond = null;
+      tray.hidden = true;
+      tray.classList.remove('is-in');
+      acceptBtn.hidden = true;
+      skipBtn.hidden = true;
+      banner.hidden = true;
+      state.preview = null;
+    } else {
+      hammond = { changes: rest, reviewId: rest[0]?.id ?? null };
+      paintTray(`Hammond suggests ${rest.length} change${rest.length === 1 ? '' : 's'}. ${trayDetail.textContent}`, rest.length);
+    }
+    relayout('settle');
+    announce(`Applied ${picked.length} change${picked.length === 1 ? '' : 's'} from Hammond`);
+  }
+
+  let asking = false;
+  async function askHammond(drag: { id: string; days: number } | null): Promise<void> {
+    if (asking) return;
+    asking = true;
+    hammondBtn.disabled = true;
+    announce('Asking Hammond');
+    try {
+      const result = await tasksApi.processDumpWithClare({
+        text: 'Rebalance the visible timeline.',
+        protocol_id: 'timeline_rebalance',
+        agent_slug: 'hammond',
+        timeline_window: { start: range.start, end: range.end },
+        timeline_drag: drag ? { task_id: drag.id, days: drag.days } : null
+      });
+      const changes = ghostsFromMutations(result.mutations);
+      if (!changes.length) {
+        announce(result.voice || 'Hammond has no schedule changes');
+        return;
+      }
+      hammond = { changes, reviewId: null };
+      acceptBtn.hidden = true;
+      skipBtn.hidden = true;
+      openProposalRows(changes);
+      paintTray(result.voice || `Hammond suggests ${changes.length} changes`, changes.length);
+      banner.hidden = true;
+      relayout('settle');
+    } catch (error) {
+      announce(error instanceof Error ? error.message : 'Hammond could not answer');
+    } finally {
+      asking = false;
+      hammondBtn.disabled = false;
+    }
+  }
+
   function showHammond(on: boolean): void {
-    announce(on ? 'Ask Hammond' : 'Hammond dismissed');
+    if (!on) {
+      dismissHammond();
+      return;
+    }
+    void askHammond(state.preview && state.preview.mode !== 'resize' ? state.preview : null);
   }
 
   function toggle(ref: string, kind: TlRowKind): void {
@@ -2040,7 +2230,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       state.preview = { id: drag.id, days: drag.days, mode: drag.mode };
       state.drag = null;
       bannerTitle.textContent = problem;
-      bannerDetail.textContent = ' Drop anyway keeps the move. Suggest a fix waits for Hammond.';
+      bannerDetail.textContent = ' Drop anyway keeps the move. Suggest a fix asks Hammond.';
       banner.hidden = false;
       paintDragPreview();
       return;
@@ -2069,6 +2259,43 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   });
   todayBtn.addEventListener('click', () => scrollToToday(true));
   hammondBtn.addEventListener('click', () => showHammond(true));
+  applyBtn.addEventListener('click', () => {
+    if (!hammond) return;
+    void applyChanges(hammond.changes, true).catch((error: unknown) => {
+      announce(error instanceof Error ? error.message : 'Could not apply Hammond’s changes');
+    });
+  });
+  reviewBtn.addEventListener('click', () => {
+    if (!hammond?.changes.length) return;
+    const index = hammond.reviewId ? hammond.changes.findIndex((change) => change.id === hammond?.reviewId) : -1;
+    const next = hammond.changes[(index + 1) % hammond.changes.length];
+    if (!next) return;
+    hammond = { ...hammond, reviewId: next.id };
+    acceptBtn.hidden = false;
+    skipBtn.hidden = false;
+    relayout('settle');
+    announce(next.why);
+  });
+  acceptBtn.addEventListener('click', () => {
+    const change = hammond?.changes.find((item) => item.id === hammond?.reviewId);
+    if (!change) return;
+    void applyChanges([change], false).catch((error: unknown) => {
+      announce(error instanceof Error ? error.message : 'Could not apply that change');
+    });
+  });
+  skipBtn.addEventListener('click', () => {
+    if (!hammond?.reviewId) return;
+    const rest = hammond.changes.filter((change) => change.id !== hammond?.reviewId);
+    if (!rest.length) {
+      dismissHammond();
+      return;
+    }
+    hammond = { changes: rest, reviewId: rest[0]?.id ?? null };
+    paintTray(`Hammond suggests ${rest.length} change${rest.length === 1 ? '' : 's'}. ${trayDetail.textContent}`, rest.length);
+    relayout('settle');
+    announce('Skipped that change');
+  });
+  dismissBtn.addEventListener('click', () => dismissHammond());
   addBtn.addEventListener('click', (event) => {
     event.stopPropagation();
     menu.hidden = !menu.hidden;
@@ -2085,7 +2312,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (pending.mode === 'resize') resizeTask(pending.id, pending.days);
     else shiftTask(pending.id, pending.days);
   });
-  fixBtn.addEventListener('click', () => announce('Suggest a fix waits for Hammond'));
+  fixBtn.addEventListener('click', () => showHammond(true));
 
   function inputRow(label: string, type: string, value = ''): HTMLInputElement {
     const row = el('label', 'tl-field');
@@ -2237,6 +2464,11 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   window.addEventListener('keydown', (event) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest('input, textarea, select')) return;
+    if (event.key === 'Escape' && hammond) {
+      event.preventDefault();
+      dismissHammond();
+      return;
+    }
     if (event.key === 'Escape' && (state.drag || state.preview)) {
       event.preventDefault();
       cancelDrag();

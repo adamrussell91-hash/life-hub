@@ -76,7 +76,8 @@ export const CLARE_PRODUCTIVITY_PROTOCOLS = [
 export const CLARE_PROTOCOL_IDS = new Set([
   ...CLARE_PROTOCOLS.map(item => item.id),
   ...CLARE_ADHD_PROTOCOLS.map(item => item.id),
-  ...CLARE_PRODUCTIVITY_PROTOCOLS.map(item => item.id)
+  ...CLARE_PRODUCTIVITY_PROTOCOLS.map(item => item.id),
+  'timeline_rebalance'
 ]);
 
 export function isBriefingProtocol(id) {

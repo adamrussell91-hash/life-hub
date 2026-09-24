@@ -6,6 +6,7 @@ import type { ClareProtocolId } from '@/domain/clare-protocols';
 import type { DumpItem } from '@/domain/clare-dump';
 import { HUB_TZ, hubWeekdayLong, toHubDateKey } from '@/domain/queries';
 import { lifeContextToPromptBlock, type LifeContextDigest } from '@/domain/life-context';
+import type { TimelineDigest } from '@/domain/timeline-digest';
 
 export type ClareDumpDigestItem = {
   index: number;
@@ -50,6 +51,11 @@ export type ClareDumpDigest = {
   recent_thread: Array<{ role: 'user' | 'assistant'; text: string }>;
   /** Board focus when Adam says “this task” from the overlay. */
   focused_task: { id: string; title: string; due_date: string | null; due_time: string | null } | null;
+  /**
+   * Present only for timeline_rebalance. Null means the digest failed to load.
+   * Omitted for every other protocol.
+   */
+  timeline?: TimelineDigest | null;
 };
 
 function typicalDelta(cal: ClareCalibration): number | null {
@@ -68,6 +74,7 @@ export function buildClareDumpDigest(input: {
   calibrations: ClareCalibration[];
   preferredDomain: TaskDomain;
   protocolId?: ClareProtocolId;
+  timeline?: TimelineDigest | null;
   now?: Date;
   timezone?: string;
   lifeContext?: LifeContextDigest | null;
@@ -135,6 +142,7 @@ export function buildClareDumpDigest(input: {
         due_date: hit.due_date,
         due_time: hit.due_time ?? null
       };
-    })()
+    })(),
+    ...(input.protocolId === 'timeline_rebalance' ? { timeline: input.timeline ?? null } : {})
   };
 }

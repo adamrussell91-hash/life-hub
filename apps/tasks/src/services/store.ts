@@ -53,7 +53,7 @@ import {
   catalogExcursionTemplates,
   resolveExcursionTemplateId
 } from '@/domain/excursion-catalog';
-import { addDays, backlogTasks, hubCalendarDate, toDateKey } from '@/domain/queries';
+import { addDays, backlogTasks, hubCalendarDate, toDateKey, toHubDateKey } from '@/domain/queries';
 import { applyDueDatePriorityFloor, assessOpenTaskPriorities } from '@/domain/priority-assess';
 import { DEFAULT_HUB_PREFS, parseHubPrefs, resolveTimeZoneInput, type HubPrefs } from '@/domain/hub-prefs';
 import {
@@ -78,6 +78,7 @@ import {
   type ClareProposalInput
 } from '@/domain/clare';
 import { buildClareDumpDigest } from '@/domain/clare-digest';
+import { buildStoredTimelineDigest } from '@/domain/timeline-digest';
 import {
   parseBrainDump,
   resolveDuplicateFollowUp,
@@ -1031,7 +1032,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
             ? wording.correctedTitles.join('\n')
             : input.text;
       const forceNewTitles = followUp?.action === 'make_new';
-      if (!forceNewTitles && !wording) {
+      if (!forceNewTitles && !wording && input.protocol_id !== 'timeline_rebalance') {
         const direction = resolveTaskDirection(dumpText, {
           focus: input.focus,
           tasks,
@@ -1087,6 +1088,23 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           input.lifeContext === undefined
             ? await (defaultLifeContextProvider()?.() ?? Promise.resolve(null))
             : input.lifeContext;
+        const todayKey = toHubDateKey(input.now ?? new Date(), timezone);
+        const timeline =
+          input.protocol_id === 'timeline_rebalance' && agentSlug === 'hammond'
+            ? buildStoredTimelineDigest({
+                tasks,
+                projects,
+                goals: await this.listGoals(),
+                profile: await this.getPlanningProfile(),
+                terms:
+                  prefs.school_terms.find((row) => row.year === Number(todayKey.slice(0, 4)))?.terms ??
+                  prefs.school_terms[0]?.terms ??
+                  [],
+                today: todayKey,
+                window: input.timeline_window ?? null,
+                drag: input.timeline_drag ?? null
+              })
+            : null;
         const digest = buildClareDumpDigest({
           text: dumpText,
           items,
@@ -1096,6 +1114,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           calibrations,
           preferredDomain: input.domain ?? 'teaching',
           protocolId: input.protocol_id,
+          timeline,
           now: input.now ?? new Date(),
           timezone,
           lifeContext,
