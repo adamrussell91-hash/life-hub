@@ -26,7 +26,8 @@ import * as F from './fixture';
 
 /** Port exactly into packages/design-kit/js/almanac-geometry.js. */
 export const ALM = {
-  width: 1198, // SVG user units (card inner width)
+  width: 1198, // chart width in CSS px. Set at mount from the card's real width: the chart is laid out, never scaled.
+  minWidth: 720, // below this the phone list layout is used instead
   labelX: 18,
   x0: 222, // first day centre
   rightPad: 30,
@@ -38,6 +39,8 @@ export const ALM = {
   lanes: { divider: 284, label: 304, top: 318, rowH: 52 },
   bead: { r: 5.5, nowR: 6.5, haloR: 11, diamond: 6 },
   labelRoom: 240, // a bead label flips to the left of its bead inside this many units of the right edge
+  labelGap: 14, // minimum gap between two labels on the same side of a lead line
+  beadFont: '500 11.5px Inter, ui-sans-serif, sans-serif',
   enterDrawMs: 520, // lead lines draw back from their anchor
   enterStagger: 60, // per lead line
   beadPopMs: MOTION.enter,
@@ -54,7 +57,12 @@ export const ALM = {
 const DATES: string[] = [];
 for (let d = F.RANGE.from; d <= F.RANGE.to; d = addDays(d, 1)) DATES.push(d);
 const N = DATES.length;
-const DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+let DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+/** Lay the chart out for a real width (1 SVG unit = 1 CSS px, so text never shrinks). */
+function setWidth(w: number) {
+  ALM.width = Math.round(w);
+  DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+}
 const idx = (d: string) => daysBetween(F.RANGE.from, d);
 const X = (d: string) => ALM.x0 + Math.max(0, Math.min(N - 1, idx(d))) * DX;
 const inTerm = (d: string) => F.TERMS.some(t => d >= t.starts_on && d <= t.ends_on);
@@ -95,6 +103,22 @@ function whenText(o: { dates: string[]; span: string }) {
 }
 function longDate(d: string) {
   return new Intl.DateTimeFormat('en-AU', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${d}T00:00:00Z`));
+}
+
+/** Text is measured once, through a cache, never in the frame loop. */
+const measureCtx = document.createElement('canvas').getContext('2d')!;
+const measured = new Map<string, number>();
+function textW(t: string) {
+  let w = measured.get(t);
+  if (w == null) { measureCtx.font = ALM.beadFont; w = measureCtx.measureText(t).width; measured.set(t, w); }
+  return w;
+}
+/** Longest prefix of `t` (ending in …) that fits `max` px. The full text stays in the popover and aria-label. */
+function fitText(t: string, max: number) {
+  if (textW(t) <= max) return t;
+  let lo = 0, hi = t.length;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (textW(t.slice(0, mid).trimEnd() + '…') <= max) lo = mid; else hi = mid - 1; }
+  return lo > 0 ? t.slice(0, lo).trimEnd() + '…' : '';
 }
 
 /* ======================================================================== 3. Mount */
@@ -158,8 +182,12 @@ export function mount(host: HTMLElement, options = mountOptions) {
 
   if (state.phone) mountList(card);
   else {
+    setWidth(card.clientWidth);
     svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', `0 0 ${ALM.width} ${ALM.lanes.top + F.ANCHORS.length * ALM.lanes.rowH + 8}`);
+    const chartH = ALM.lanes.top + F.ANCHORS.length * ALM.lanes.rowH + 8;
+    svg.setAttribute('viewBox', `0 0 ${ALM.width} ${chartH}`);
+    svg.setAttribute('width', String(ALM.width));
+    svg.setAttribute('height', String(chartH));
     svg.setAttribute('class', 'alm-chart');
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', 'Almanac chart: world, anchors, capacity forecast and last safe days to 10/01/27');
@@ -194,7 +222,7 @@ function mountChart() {
     s('line', { class: 'alm-month', x1: X(d), x2: X(d), y1: 8, y2: 640 }, back);
     s('text', { class: 'alm-t-month', x: X(d) + 6, y: ALM.months.y }, back, l);
   }
-  s('text', { class: 'alm-t-month', x: ALM.x0 + 30, y: ALM.months.y }, back, 'Sep');
+  if (X('2026-10-01') - ALM.x0 >= 60) s('text', { class: 'alm-t-month', x: ALM.x0 + 30, y: ALM.months.y }, back, 'Sep'); // only when there's room before Oct
   // tiers
   const tier = (a: string, b: string, label: string, cls: string) => {
     const x = X(a), w = X(b) - X(a);
@@ -233,7 +261,8 @@ function mountChart() {
   flag('2026-10-13', 1, 'T4 starts', '13/10');
   flag('2026-12-01', 0, 'Solo travel', 'from 01/12');
   flag('2026-12-17', 1, 'T4 ends', '17/12');
-  const pill = s('g', { transform: `translate(${X('2026-12-23') + 6} 106)` }, anc);
+  // The wall pill starts at the wall but never runs past the chart's right edge.
+  const pill = s('g', { transform: `translate(${Math.min(X('2026-12-23') + 6, ALM.width - ALM.rightPad - 150)} 106)` }, anc);
   s('rect', { class: 'alm-pill', width: 150, height: 20, rx: 10 }, pill);
   s('text', { class: 'alm-t-pill', x: 75, y: 14 }, pill, 'Korea · 23/12 – 10/01');
   // forecast wave (revealed by a clip that grows left to right)
@@ -280,6 +309,22 @@ function mountChart() {
       const dx = X(a.date!);
       s('rect', { class: 'alm-anchor', x: dx - 6, y: cy - 6, width: 12, height: 12, rx: 2, transform: `rotate(45 ${dx} ${cy})` }, lane);
     }
+    // Label budgets: each label may run up to the next label on the same side (or the edge).
+    const xs = line.steps.map(st => X(st.lastSafe));
+    // Left-aligned labels run right; labels near the right edge run left. Two labels facing each
+    // other split the gap between their beads at the midpoint.
+    const isRight = (x: number) => x > ALM.width - ALM.rightPad - ALM.labelRoom;
+    const budget = (k: number, right: boolean) => {
+      const same = xs.filter((_, j) => j % 2 === k % 2 && j !== k);
+      if (right) {
+        const prev = same.filter(v => v < xs[k]).pop();
+        const limit = prev == null ? ALM.x0 : isRight(prev) ? prev + ALM.labelGap : (prev + xs[k]) / 2 + ALM.labelGap / 2;
+        return xs[k] - 10 - limit;
+      }
+      const next = same.find(v => v > xs[k]);
+      const limit = next == null ? ALM.width - ALM.rightPad : isRight(next) ? (xs[k] + next) / 2 - ALM.labelGap / 2 : next - ALM.labelGap;
+      return limit - (xs[k] - 4);
+    };
     line.steps.forEach((st, k) => {
       const x = X(st.lastSafe);
       const bead = s('g', { class: `alm-bead is-${st.status}`, transform: `translate(${x} ${cy})`, tabindex: 0, role: 'button', 'data-part': 'bead', 'data-step': st.id, 'data-status': st.status, 'aria-label': `${st.title}. Last safe day ${formatDisplayDate(st.lastSafe)}.` }, lane);
@@ -291,7 +336,7 @@ function mountChart() {
       const above = k % 2 === 0;
       const right = x > ALM.width - ALM.rightPad - ALM.labelRoom;
       const lx = right ? x - 10 : x + (st.lastSafe === F.TODAY ? 12 : -4);
-      s('text', { class: `alm-t-bead${right ? ' is-end' : ''}`, x: lx, y: above ? cy - 12 : cy + 21 }, lane, st.title);
+      s('text', { class: `alm-t-bead${right ? ' is-end' : ''}`, x: lx, y: above ? cy - 12 : cy + 21 }, lane, fitText(st.title, budget(k, right)));
       nodes.set(`bead:${st.id}`, inner);
       nodes.set(`beadg:${st.id}`, bead);
     });
@@ -538,6 +583,13 @@ function boot() {
   document.getElementById('ref-reset')?.addEventListener('click', () => { state.done.clear(); state.tasked.clear(); state.held.clear(); start(); });
   document.getElementById('ref-slow')?.addEventListener('click', e => { slow = slow === 1 ? 5 : 1; (e.currentTarget as HTMLElement).setAttribute('aria-pressed', String(slow === 5)); });
   document.getElementById('ref-reduced')?.addEventListener('click', e => { reduced = !reduced; (e.currentTarget as HTMLElement).setAttribute('aria-pressed', String(reduced)); });
+  // Re-lay out when the column width changes (window resize, rail collapse). Never scale.
+  let lastW = 0;
+  new ResizeObserver(entries => {
+    const w = Math.round(entries[0].contentRect.width);
+    if (lastW && Math.abs(w - lastW) > 2 && !state.phone) requestAnimationFrame(start);
+    lastW = w;
+  }).observe(host);
   let wasPhone = matchMedia('(max-width: 719px)').matches;
   matchMedia('(max-width: 719px)').addEventListener('change', ev => { if (ev.matches !== wasPhone) { wasPhone = ev.matches; start(); } });
   (window as any).__almanac = {
