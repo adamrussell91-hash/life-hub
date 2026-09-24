@@ -601,21 +601,30 @@ export async function renderEventNewView(
   hoursRow.append(hoursCopy, stepper);
 
   const draftPriority = draft?.accreditation?.split(' · ')[1] ?? '';
+  const draftHasKnownPriority = (PRIORITY_AREAS as readonly string[]).includes(draftPriority);
+  const draftHasCustomPriority = draftPriority.length > 0 && !draftHasKnownPriority;
   const chipButtons: HTMLButtonElement[] = [];
   const chipRow = el('div', 'event-compose__chips');
-  for (const area of PRIORITY_AREAS) {
+  chipRow.setAttribute('role', 'group');
+  chipRow.setAttribute('aria-label', 'Priority area');
+  for (const area of ['No priority', ...PRIORITY_AREAS]) {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'event-compose__chip';
     chip.textContent = area;
-    const selected = area === draftPriority;
+    chip.dataset.priority = area === 'No priority' ? '' : area;
+    const selected = draftHasCustomPriority
+      ? false
+      : area === 'No priority'
+        ? !draftHasKnownPriority
+        : area === draftPriority;
     chip.classList.toggle('is-on', selected);
     chip.setAttribute('aria-pressed', selected ? 'true' : 'false');
     chip.addEventListener('click', () => {
-      const on = !chip.classList.contains('is-on');
       chipButtons.forEach((node) => {
-        node.classList.toggle('is-on', node === chip && on);
-        node.setAttribute('aria-pressed', node === chip && on ? 'true' : 'false');
+        const on = node === chip;
+        node.classList.toggle('is-on', on);
+        node.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
       syncAccreditation();
     });
@@ -624,7 +633,7 @@ export async function renderEventNewView(
   }
   accreditation.classList.add('event-compose__sr');
   function syncAccreditation(): void {
-    const priority = chipButtons.find((node) => node.classList.contains('is-on'))?.textContent ?? '';
+    const priority = chipButtons.find((node) => node.classList.contains('is-on'))?.dataset.priority ?? '';
     accreditation.value = [selectedKind.label, priority].filter(Boolean).join(' · ');
   }
   if (!draft?.accreditation) syncAccreditation();
@@ -659,12 +668,24 @@ export async function renderEventNewView(
   const whenGrid = el('div', 'event-compose__when');
   whenGrid.append(calBlock, times);
 
+  const priorityField = el('div', 'event-compose__field');
+  priorityField.append(
+    el('label', 'event-compose__label', 'Priority area'),
+    el(
+      'p',
+      'event-compose__hint',
+      'Optional. Choose No priority when this event is not in one of these areas.'
+    ),
+    chipRow,
+    accreditation
+  );
+
   const actions = el('div', 'event-compose__actions');
   actions.append(save);
   const footer = el('div', 'event-compose__footer');
   footer.append(cancel, status, actions);
   form.append(
-    section('Event', field('Event type', typeGrid), field('Title', title), hoursRow, field('Priority area', chipRow, accreditation)),
+    section('Event', field('Event type', typeGrid), field('Title', title), hoursRow, priorityField),
     section('When', whenGrid, start, end),
     section(
       'People',

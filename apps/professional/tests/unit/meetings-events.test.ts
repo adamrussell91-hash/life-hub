@@ -410,6 +410,60 @@ describe('renderEventNewView', () => {
     expect(body.event_type).toBe('professional_development');
   });
 
+  it('keeps priority optional and posts a chosen area only when one is on', async () => {
+    const canvas = document.createElement('div');
+    const saved: Array<{ accreditation: string | null }> = [];
+    await renderEventNewView(canvas, {
+      onSave: async (payload) => {
+        saved.push({ accreditation: payload.accreditation });
+      }
+    });
+
+    expect(canvas.textContent).toMatch(/Choose No priority when this event is not in one of these areas/);
+    const none = [...canvas.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'No priority'
+    ) as HTMLButtonElement;
+    const wellbeing = [...canvas.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'Wellbeing'
+    ) as HTMLButtonElement;
+    expect(none.getAttribute('aria-pressed')).toBe('true');
+    expect(wellbeing.getAttribute('aria-pressed')).toBe('false');
+
+    const category = canvas.querySelector('[aria-label="Accreditation category"]') as HTMLInputElement;
+    expect(category.value).toBe('Course');
+
+    wellbeing.click();
+    expect(none.getAttribute('aria-pressed')).toBe('false');
+    expect(wellbeing.getAttribute('aria-pressed')).toBe('true');
+    expect(category.value).toBe('Course · Wellbeing');
+
+    none.click();
+    expect(category.value).toBe('Course');
+
+    const title = canvas.querySelector('[aria-label="Title"]') as HTMLInputElement;
+    title.value = 'Staff meeting';
+    (canvas.querySelector('form.event-form') as HTMLFormElement).requestSubmit();
+    await vi.waitFor(() => expect(saved).toHaveLength(1));
+    expect(saved[0]?.accreditation).toBe('Course');
+
+    const edited = document.createElement('div');
+    await renderEventNewView(edited, {
+      draft: { accreditation: 'Workshop · Wellbeing' },
+      onSave: async () => {}
+    });
+    const editedNone = [...edited.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'No priority'
+    ) as HTMLButtonElement;
+    const editedWellbeing = [...edited.querySelectorAll('.event-compose__chip')].find(
+      (node) => node.textContent === 'Wellbeing'
+    ) as HTMLButtonElement;
+    expect(editedNone.getAttribute('aria-pressed')).toBe('false');
+    expect(editedWellbeing.getAttribute('aria-pressed')).toBe('true');
+    expect((edited.querySelector('[aria-label="Accreditation category"]') as HTMLInputElement).value).toBe(
+      'Workshop · Wellbeing'
+    );
+  });
+
   it('renders an attendee picker with a role control', async () => {
     const canvas = document.createElement('div');
     await renderEventNewView(canvas);
