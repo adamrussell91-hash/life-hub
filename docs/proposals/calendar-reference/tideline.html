@@ -757,7 +757,7 @@ ${body ?? ""}`;
     penelope: "Penelope",
     vera: "Vera"
   });
-  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task"]);
+  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
   var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
   var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   function short(dateKey) {
@@ -794,7 +794,15 @@ ${body ?? ""}`;
     if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
     if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
     if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
-    if (ghost.kind !== "move_task" && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    if (ghost.kind === "create_task") {
+      if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
+      if (!DATE_KEY2.test(ghost.due ?? "")) throw new TypeError("create_task needs due (YYYY-MM-DD)");
+    }
+    if (ghost.kind === "draft_message") {
+      if (!oneLine(ghost.to) || !String(ghost.text ?? "").trim()) throw new TypeError("draft_message needs to and text");
+    }
     if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
     if (ghost.kind === "protect_block") {
       if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
@@ -867,6 +875,19 @@ ${body ?? ""}`;
         steps.push({ target: "tasks", method: "PATCH", id: ghost.taskId, body: { due_date: ghost.to } });
         steps.push(recentAction(actedOn, who, `moved \u201C${oneLine(ghost.title) || ghost.taskId}\u201D ${short(ghost.from)} \u2192 ${short(ghost.to)}`));
         receipt = `${who} \u2192 Tasks: \u201C${oneLine(ghost.title) || ghost.taskId}\u201D due ${formatDisplayDate(ghost.from)} \u2192 ${formatDisplayDate(ghost.to)}.`;
+        break;
+      }
+      case "create_task": {
+        const title = oneLine(ghost.title);
+        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        steps.push({ target: "tasks", method: "POST", body });
+        steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
+        break;
+      }
+      case "draft_message": {
+        steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
+        receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
         break;
       }
       default:

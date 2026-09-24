@@ -1,0 +1,212 @@
+{
+  "ANCHORS": [
+    {
+      "id": "korea",
+      "title": "Korea honeymoon",
+      "kind": "trip",
+      "date": "2026-12-23",
+      "returns": "2027-01-10",
+      "tags": [
+        "international",
+        "pets-home-alone",
+        "on-biologic",
+        "with-corey"
+      ],
+      "sub": "23/12 – 10/01 · 4 animals home"
+    },
+    {
+      "id": "solo-travel",
+      "title": "Solo travel",
+      "kind": "trip",
+      "date": "2026-12-01",
+      "returns": "2026-12-15",
+      "tags": [
+        "undecided"
+      ],
+      "sub": "from 01/12 · term runs to 17/12"
+    },
+    {
+      "id": "vitamin-d",
+      "title": "Vitamin D recheck",
+      "kind": "medical",
+      "window": {
+        "opens": "2026-09-19",
+        "closes": "2026-10-19"
+      },
+      "tags": [
+        "bloods"
+      ],
+      "sub": "3–4 months after the 19/06 change"
+    },
+    {
+      "id": "unsw-conferral",
+      "title": "UNSW conferral",
+      "kind": "event",
+      "date": "2026-09-30",
+      "tags": [
+        "graduation"
+      ],
+      "sub": "Master of Gifted Education"
+    },
+    {
+      "id": "term-4",
+      "title": "Term 4 · new Year 12",
+      "kind": "term",
+      "date": "2026-10-13",
+      "tags": [
+        "new-class"
+      ],
+      "sub": "one class from 13/10"
+    },
+    {
+      "id": "dream-study",
+      "title": "Dream · Harvard, Oxford…",
+      "kind": "dream",
+      "tags": [
+        "dream"
+      ],
+      "sub": "study at one of the four"
+    }
+  ],
+  "BUSY": [
+    {
+      "date": "2026-09-30",
+      "day": true,
+      "title": "Conferral"
+    },
+    {
+      "date": "2026-10-03",
+      "day": true,
+      "title": "ToM finals"
+    }
+  ],
+  "DAY_TAGS": {
+    "2026-10-04": [
+      "dst-start"
+    ]
+  },
+  "DRAFTS": {
+    "bob": {
+      "to": "Bob",
+      "text": "Hi Bob, I’m on school holidays. Are you free for lunch on {when}? My shout."
+    },
+    "newcastle": {
+      "to": "Newcastle friends",
+      "text": "I’m in Newcastle on {when}. Anyone free for a coffee, a walk or dinner?"
+    }
+  },
+  "FIXED": [
+    {
+      "date": "2026-10-03",
+      "title": "ToM finals",
+      "sub": "03/10"
+    },
+    {
+      "date": "2026-12-17",
+      "title": "T4 ends",
+      "sub": "17/12"
+    }
+  ],
+  "HABIT": {
+    "id": "korean",
+    "title": "Korean for travellers",
+    "minutes": 20,
+    "perWeek": 3,
+    "from": "2026-09-28",
+    "until": "2026-12-23",
+    "why": "Enough to order, ask directions and get home: comforting adventure."
+  },
+  "LAST_LOG": {
+    "date": "2026-09-24",
+    "pct": 34
+  },
+  "PATTERN": [
+    {
+      "from": "2026-10-13",
+      "to": "2026-12-17",
+      "delta": -12,
+      "label": "term time"
+    },
+    {
+      "from": "2026-10-13",
+      "to": "2026-10-18",
+      "delta": -6,
+      "label": "first week back"
+    },
+    {
+      "from": "2026-11-16",
+      "to": "2026-11-29",
+      "delta": -16,
+      "label": "report-writing dip (your T2 pattern)"
+    },
+    {
+      "from": "2026-12-01",
+      "to": "2026-12-15",
+      "delta": 4
+    }
+  ],
+  "RANGE": {
+    "from": "2026-09-24",
+    "to": "2027-01-10"
+  },
+  "TAKEN_EVENINGS": [
+    "2026-09-26"
+  ],
+  "TERMS": [
+    {
+      "term": 3,
+      "starts_on": "2026-07-21",
+      "ends_on": "2026-09-25"
+    },
+    {
+      "term": 4,
+      "starts_on": "2026-10-13",
+      "ends_on": "2026-12-17"
+    }
+  ],
+  "TODAY": "2026-09-24",
+  "WALLS": [
+    {
+      "from": "2026-12-23",
+      "to": "2027-01-10",
+      "title": "Korea · 23/12 – 10/01"
+    }
+  ],
+  "WORLD": [
+    {
+      "date": "2026-09-26",
+      "title": "Sat 26 · 24° clear",
+      "sub": "BOM",
+      "example": true,
+      "row": 0
+    },
+    {
+      "date": "2026-10-04",
+      "title": "Daylight saving starts + Labour Day",
+      "sub": "you lose an hour · long weekend",
+      "example": false,
+      "row": 1
+    },
+    {
+      "date": "2026-10-14",
+      "title": "HSC begins · English Paper 1",
+      "sub": "NESA timetable (est.)",
+      "example": true,
+      "row": 0
+    },
+    {
+      "date": "2026-11-27",
+      "title": "Reports due",
+      "sub": "school calendar (est.)",
+      "example": true,
+      "row": 0
+    },
+    {
+      "date": "2026-12-25",
+      "title": "Christmas",
+      "sub": "",
+      "example": false,
+      "row": 1
+    }
+  ]
+}

@@ -11,7 +11,8 @@
  * - central_node: a Central Node patch ({ section, op, payload }) for applyCentralNodePatch
  * - life_record: create or update a Life record. New blocks use type `calendar_block` (see the
  *   design spec); a block with time + end_time is a busy span for Clare (lifeEventToBusySpan).
- * - tasks: PATCH /api/tasks?id=... with a partial task
+ * - tasks: PATCH /api/tasks?id=... with a partial task, or POST /api/tasks with a new task
+ * - draft: text shown to Adam to copy. Never sent, never stored as a message.
  *
  * Reference: docs/superpowers/specs/2026-09-24-calendar-design.md ("Ghosts and wiring").
  */
@@ -29,7 +30,7 @@ export const GHOST_AGENTS = Object.freeze({
   vera: 'Vera'
 });
 
-export const GHOST_KINDS = Object.freeze(['skip_workout', 'bedtime', 'protect_block', 'move_task']);
+export const GHOST_KINDS = Object.freeze(['skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message']);
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -78,7 +79,15 @@ export function validateGhost(ghost) {
   if (typeof ghost.id !== 'string' || !ghost.id) throw new TypeError('Ghost needs an id');
   if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
   if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
-  if (ghost.kind !== 'move_task' && !DATE_KEY.test(ghost.date ?? '')) throw new TypeError('Ghost needs a date (YYYY-MM-DD)');
+  const dated = !['move_task', 'create_task', 'draft_message'].includes(ghost.kind);
+  if (dated && !DATE_KEY.test(ghost.date ?? '')) throw new TypeError('Ghost needs a date (YYYY-MM-DD)');
+  if (ghost.kind === 'create_task') {
+    if (!oneLine(ghost.title)) throw new TypeError('create_task needs a title');
+    if (!DATE_KEY.test(ghost.due ?? '')) throw new TypeError('create_task needs due (YYYY-MM-DD)');
+  }
+  if (ghost.kind === 'draft_message') {
+    if (!oneLine(ghost.to) || !String(ghost.text ?? '').trim()) throw new TypeError('draft_message needs to and text');
+  }
   if (ghost.kind === 'bedtime' && !HHMM.test(ghost.time ?? '')) throw new TypeError('bedtime needs time HH:MM');
   if (ghost.kind === 'protect_block') {
     if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
@@ -159,6 +168,20 @@ export function acceptPlan(ghost, { today = null } = {}) {
       steps.push({ target: 'tasks', method: 'PATCH', id: ghost.taskId, body: { due_date: ghost.to } });
       steps.push(recentAction(actedOn, who, `moved “${oneLine(ghost.title) || ghost.taskId}” ${short(ghost.from)} → ${short(ghost.to)}`));
       receipt = `${who} → Tasks: “${oneLine(ghost.title) || ghost.taskId}” due ${formatDisplayDate(ghost.from)} → ${formatDisplayDate(ghost.to)}.`;
+      break;
+    }
+    case 'create_task': {
+      const title = oneLine(ghost.title);
+      const body = { title, due_date: ghost.due, status: 'open', ...(ghost.notes ? { notes: oneLine(ghost.notes) } : {}), ...(ghost.source ? { source: ghost.source } : {}) };
+      steps.push({ target: 'tasks', method: 'POST', body });
+      steps.push(recentAction(actedOn, who, `added “${title}” due ${short(ghost.due)}`));
+      receipt = `${who} → Tasks: “${title}”, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
+      break;
+    }
+    case 'draft_message': {
+      // A draft is shown to copy. Nothing is sent and nothing is written to Central Node.
+      steps.push({ target: 'draft', to: oneLine(ghost.to), text: String(ghost.text).trim() });
+      receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
       break;
     }
     default:
