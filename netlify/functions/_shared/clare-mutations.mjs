@@ -1,13 +1,15 @@
+import { sanitizeApstFocus } from './apst-focus.mjs';
+
 const MAX_MUTATIONS = 12;
 const TASK_ALLOW = new Set([
   'title', 'description', 'status', 'priority', 'domain', 'due_date', 'due_time',
   'estimated_duration', 'parent_project_id', 'parent_task_id', 'depends_on', 'step_order',
   'tags', 'page_blocks', 'bucket', 'kind', 'waiting_on', 'waiting_status', 'source',
-  'life_wall', 'marking'
+  'life_wall', 'marking', 'apst_focus'
 ]);
 const PROJECT_ALLOW = new Set([
   'title', 'description', 'status', 'type', 'current_end_date', 'page_blocks', 'tags', 'arc_summary',
-  'milestones', 'life_wall'
+  'milestones', 'life_wall', 'standards_ribbon', 'submission_date'
 ]);
 const MAP_ALLOW = new Set(['title', 'status', 'nodes', 'edges', 'notes']);
 
@@ -23,7 +25,8 @@ function cleanSummary(value) {
 function pickAllowed(patch, allow) {
   const out = {};
   for (const [key, value] of Object.entries(patch)) {
-    if (allow.has(key)) out[key] = value;
+    if (!allow.has(key)) continue;
+    out[key] = key === 'apst_focus' ? sanitizeApstFocus(value) : value;
   }
   return out;
 }

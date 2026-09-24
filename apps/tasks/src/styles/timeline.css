@@ -176,5 +176,14 @@
 .tl-ghost__chip text { font: var(--weight-semibold) var(--text-2xs)/1 var(--font-ui); fill: #fff; }
 .tl-garrow { stroke: var(--navy); stroke-width: 1.25; }
 [data-part="ghost"][data-review="true"] .tl-ghost { stroke-width: 2.5; }
+.tl-rib--none { fill: color-mix(in srgb, var(--navy) 6%, transparent); }
+.tl-rib--some { fill: var(--pastel-gold); }
+.tl-rib--evidenced { fill: var(--pastel-sage); }
+.tl-rib__n { font: var(--weight-semibold) var(--text-2xs)/1 var(--font-ui); }
+.tl-rib__n--none { fill: var(--muted); }
+.tl-rib__n--some { fill: var(--pastel-gold-ink); }
+.tl-rib__n--evidenced { fill: var(--pastel-sage-ink); }
+.tl-rib__dot { fill: var(--high-sea-ink); }
+.tl-load--standards { stroke: var(--high-sea-ink); stroke-width: 1.5; }
 @media (prefers-reduced-motion: reduce) { .tl-tray { transition: none; } }
 @media (max-width: 720px) { .tl-tray { flex-wrap: wrap; } .tl-tray .btn--primary { margin-left: 40px; } }

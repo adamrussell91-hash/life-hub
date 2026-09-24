@@ -1,5 +1,6 @@
 import type { PageBlock } from '@/schemas/page-block';
 import type { Task } from '@/schemas/task';
+import { sanitizeApstFocus } from '@/domain/apst';
 import type { Project } from '@/schemas/project';
 
 export type AgentMutation =
@@ -196,11 +197,17 @@ export function sanitizeTaskPatch(patch: Record<string, unknown>): Partial<Task>
     'cognitive_load',
     'depth',
     'life_wall',
-    'marking'
+    'marking',
+    'apst_focus'
   ] as const;
   for (const key of allow) {
     if (key in patch) {
-      out[key] = NULLABLE_DATE_LIKE_KEYS.has(key) ? sanitizeDateLikeValue(patch[key]) : patch[key];
+      out[key] =
+        key === 'apst_focus'
+          ? sanitizeApstFocus(patch[key])
+          : NULLABLE_DATE_LIKE_KEYS.has(key)
+            ? sanitizeDateLikeValue(patch[key])
+            : patch[key];
     }
   }
   return out as Partial<Task>;
@@ -222,7 +229,9 @@ export function sanitizeProjectPatch(patch: Record<string, unknown>): Partial<Pr
     'quality_bar',
     'review_at',
     'milestones',
-    'life_wall'
+    'life_wall',
+    'standards_ribbon',
+    'submission_date'
   ] as const;
   for (const key of allow) {
     if (key in patch) out[key] = patch[key];

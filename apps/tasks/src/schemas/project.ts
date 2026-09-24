@@ -151,7 +151,11 @@ export const ProjectSchema = z.object({
   folder_items: z.array(FolderItemSchema).optional(),
   // Catalogue link — which Program (competition/program catalogue entry) this excursion is for.
   linked_program_id: z.string().nullable().default(null),
-  life_wall: LifeWallFieldSchema
+  life_wall: LifeWallFieldSchema,
+  /** APST coverage ribbon under the project bar. Off unless switched on. */
+  standards_ribbon: z.boolean().optional().default(false),
+  /** Accreditation submission. Falls back to current_end_date when the ribbon is on. */
+  submission_date: z.string().nullable().optional().default(null)
 });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -206,7 +210,9 @@ export const ProjectCreateSchema = ProjectSchema.omit({
   muster_log: true,
   folder_items: true,
   linked_program_id: true,
-  life_wall: true
+  life_wall: true,
+  standards_ribbon: true,
+  submission_date: true
 }).extend({
   title: z.string().min(1)
 });

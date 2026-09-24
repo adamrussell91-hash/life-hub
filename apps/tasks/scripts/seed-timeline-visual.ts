@@ -24,6 +24,8 @@ type Fixture = {
     start: string;
     end: string;
     baselineEnd?: string;
+    ribbon?: boolean;
+    submission?: string;
   }>;
   milestones: Array<{ id: string; project: string; title: string; due: string; deps?: string[] }>;
   walls?: Array<{ id: string; label: string; start: string; end: string; source: string }>;
@@ -39,6 +41,7 @@ type Fixture = {
     blocked?: boolean;
     deps?: string[];
     step?: number;
+    apst?: string[];
     marking?: {
       cls: string;
       scripts: number;
@@ -112,6 +115,8 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       type: 'standard',
       current_end_date: project.end,
       baseline_end_date: project.baselineEnd ?? null,
+      standards_ribbon: Boolean(project.ribbon),
+      submission_date: project.submission ?? null,
       created_at: `${project.start}T12:00:00.000Z`,
       updated_at: fixture.now,
       milestones: (milestonesByProject.get(project.id) ?? []).map((milestone) => ({
@@ -202,6 +207,7 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       depends_on: raw.deps ?? [],
       dependency_links: (raw.deps ?? []).map((from) => ({ from_id: from, type: 'FS', offset_days: 0 })),
       blocked_since: raw.blocked ? '2026-09-18' : null,
+      apst_focus: raw.apst,
       marking,
       created_at: fixture.now,
       updated_at: fixture.now

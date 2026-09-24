@@ -497,7 +497,9 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         generated_admin_tasks: input.generated_admin_tasks ?? [],
         drafted_documents: input.drafted_documents ?? null,
         page_blocks: input.page_blocks ?? [],
-        life_wall: input.life_wall ?? null
+        life_wall: input.life_wall ?? null,
+        standards_ribbon: input.standards_ribbon ?? false,
+        submission_date: input.submission_date ?? null
       });
       await kv.setJSON(keys.projectKey(project.id), project);
       const ids = await readIndex(kv, keys.projectsIndexKey());
