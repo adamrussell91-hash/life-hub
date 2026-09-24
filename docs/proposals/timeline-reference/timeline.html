@@ -1,0 +1,2400 @@
+<!doctype html>
+<html lang="en" data-hub="tasks">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timeline reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real kit files. Open this page from the repo (docs/proposals/timeline-reference/) so the paths resolve. -->
+<link rel="stylesheet" href="../../../packages/design-kit/tokens.css">
+<link rel="stylesheet" href="../../../packages/design-kit/overlays.css">
+<link rel="stylesheet" href="../../../packages/design-kit/actions.css">
+<link rel="stylesheet" href="../../../packages/design-kit/filters.css">
+<style>
+/*
+ * Timeline reference styles. Every value is a kit token or derives from one with color-mix().
+ * In the hub these rules move to apps/tasks/src/styles/timeline.css unchanged (class names too).
+ */
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+.page{max-width:1180px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
+.page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
+.ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
+
+/* Toolbar */
+.tl-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-3);margin-bottom:var(--space-3)}
+.tl-toolbar__group{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.tl-toggle{border:1px solid var(--line);background:var(--glass);border-radius:var(--radius-full);min-height:2.2rem;padding:0 var(--space-3);font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);color:var(--muted);cursor:pointer;transition:background-color .12s,color .12s,border-color .12s}
+.tl-toggle:hover{color:var(--ink)}
+.tl-toggle[aria-pressed="true"]{border-color:color-mix(in srgb,var(--wave) 45%,transparent);background:color-mix(in srgb,var(--pastel-blue) 55%,#fff);color:var(--pastel-blue-ink);font-weight:var(--weight-semibold)}
+.tl-toggle--critical[aria-pressed="true"]{color:var(--high-sea-ink);background:color-mix(in srgb,var(--high-sea) 14%,transparent);border-color:color-mix(in srgb,var(--high-sea) 30%,transparent)}
+.tl-plus{width:2.5rem;height:2.5rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);color:var(--navy);display:inline-grid;place-items:center;cursor:pointer;box-shadow:var(--elev-1)}
+.tl-plus svg{width:1.125rem;height:1.125rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
+
+/* Banner and Hammond tray */
+.tl-banner{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-sm);background:var(--warning-surface);border:1px solid color-mix(in srgb,var(--high-sea-ink) 18%,transparent);font-size:var(--text-sm);color:var(--ink)}
+.tl-banner b{font-weight:var(--weight-semibold)}
+.tl-banner span{flex:1;min-width:12rem}
+.tl-banner .btn{min-height:2.25rem;font-size:var(--text-sm)}
+.tl-tray{display:flex;align-items:center;gap:var(--space-3);margin:0 0 var(--space-3);padding:var(--space-3) var(--space-4);border-radius:var(--radius-sm);background:var(--paper);border:1px solid var(--line);box-shadow:var(--elev-2);opacity:0;transform:translateY(-6px);transition:opacity .22s cubic-bezier(.2,.8,.2,1),transform .22s cubic-bezier(.2,.8,.2,1)}
+.tl-tray.is-in{opacity:1;transform:none}
+.tl-avatar{width:28px;height:28px;flex:0 0 28px;border-radius:50%;background:var(--navy);color:#fff;font:var(--weight-semibold) var(--text-xs)/28px var(--font-ui);text-align:center}
+.tl-tray__text{flex:1;min-width:12rem;font-size:var(--text-sm);line-height:var(--leading-snug)}
+.tl-tray__text b{font-weight:var(--weight-semibold)}
+.tl-tray__text span{color:var(--muted)}
+.tl-tray .btn{min-height:2.25rem;font-size:var(--text-sm)}
+
+/* Card and frame */
+.tl-card{position:relative;background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
+.tl-view[hidden],.tl-banner[hidden],.tl-tray[hidden]{display:none}
+.tl-frame{display:grid;grid-template-columns:var(--tl-label-w,208px) minmax(0,1fr)}
+.tl-labels{position:relative;border-right:1px solid var(--line);background:color-mix(in srgb,var(--paper) 55%,transparent);z-index:2}
+.tl-labels__head{position:absolute;top:0;left:0;right:0;height:64px;display:flex;align-items:flex-end;padding:0 var(--space-4) 10px;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);border-bottom:1px solid var(--line)}
+.tl-label{position:absolute;left:0;right:0;top:var(--tl-top,72px);display:flex;align-items:center;gap:6px;padding:0 var(--space-3) 0 calc(var(--space-2) + var(--depth,0) * 14px);font-size:var(--text-sm);color:var(--ink);white-space:nowrap;will-change:transform}
+.tl-label__text{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tl-label--goal .tl-label__text,.tl-label--group .tl-label__text{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold);color:var(--navy)}
+.tl-label--project .tl-label__text{font-weight:var(--weight-semibold)}
+.tl-label--step .tl-label__text,.tl-label--milestone .tl-label__text{color:var(--muted)}
+.tl-label--dream .tl-label__text{color:var(--pastel-gold-ink);font-weight:var(--weight-medium)}
+.tl-label__dot{width:8px;height:8px;border-radius:3px;flex:0 0 8px}
+.tl-label__tag{font-size:var(--text-2xs);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-caps);text-transform:uppercase;background:var(--pastel-gold);color:var(--pastel-gold-ink);border-radius:var(--radius-xs);padding:2px 6px}
+.tl-label__count{margin-left:auto;font-size:var(--text-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.tl-chev,.tl-chev-space{width:20px;height:20px;flex:0 0 20px}
+.tl-chev{border:0;background:none;padding:0;border-radius:6px;color:var(--shallow);cursor:pointer;display:grid;place-items:center}
+.tl-chev:hover{color:var(--muted);background:color-mix(in srgb,var(--navy) 5%,transparent)}
+.tl-chev svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;transition:transform .3s cubic-bezier(.2,.8,.2,1)}
+.tl-chev.is-open svg{transform:rotate(90deg)}
+.tl-scroller{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin;position:relative}
+.tl-svg{display:block;font-family:var(--font-ui);touch-action:pan-y}
+
+/* SVG parts. transform-box is REQUIRED so scale pivots on the mark, not the SVG origin. */
+.tl-pop{transform-box:fill-box;transform-origin:center}
+.tl-grid{stroke:var(--line);stroke-width:1}
+.tl-term{fill:var(--pastel-sage)}
+.tl-term--hol{fill:none}
+.tl-term__label{font:var(--weight-semibold) var(--text-2xs)/1 var(--font-ui);letter-spacing:var(--tracking-caps);text-transform:uppercase;fill:var(--pastel-sage-ink)}
+.tl-term__label--hol{fill:var(--muted)}
+.tl-week__label{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:var(--ink)}
+.tl-week__date{font:var(--weight-regular) var(--text-xs)/1 var(--font-ui);fill:var(--muted);font-variant-numeric:tabular-nums}
+.tl-today__line{stroke:var(--wave);stroke-width:1.5;stroke-dasharray:3 3}
+.tl-today__pill{fill:var(--wave)}
+.tl-today__text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:#fff}
+
+.tl-bar__face{stroke:color-mix(in srgb,var(--navy) 12%,transparent);stroke-width:1;transition:stroke .12s}
+.tl-bar__title{font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);fill:var(--ink);pointer-events:none}
+.tl-bar__sub{font:var(--weight-regular) var(--text-xs)/1 var(--font-ui);fill:var(--muted);pointer-events:none}
+[data-state="blocked"] .tl-bar__sub{fill:var(--danger);font-weight:var(--weight-medium)}
+.tl-bar__grip{fill:color-mix(in srgb,var(--navy) 22%,transparent);opacity:0;transition:opacity .12s}
+.tl-halo{fill:none;stroke:none}
+[data-part="bar"],[data-part="step-bar"]{cursor:grab;outline:none}
+[data-part="bar"]:hover .tl-bar__face{stroke:color-mix(in srgb,var(--navy) 28%,transparent)}
+[data-part="bar"]:hover .tl-bar__grip{opacity:1}
+[data-part="bar"][data-state="done"] .tl-pop{opacity:.45}
+[data-part="bar"].is-selected .tl-halo,[data-part="bar"]:focus-visible .tl-halo{fill:color-mix(in srgb,var(--wave) 16%,transparent)}
+[data-part="bar"].is-selected .tl-bar__face,[data-part="bar"]:focus-visible .tl-bar__face{stroke:var(--wave);stroke-width:2}
+[data-part="bar"].is-dragging{cursor:grabbing}
+[data-part="bar"].is-dragging .tl-bar__face{stroke:var(--wave);stroke-width:2}
+.tl-pop.is-critical .tl-bar__face{stroke:var(--high-sea-ink);stroke-width:2}
+.tl-pop.is-dim{opacity:.35}
+.tl-ms{stroke:#fff;stroke-width:2}
+.tl-ms__label{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:var(--ink)}
+.tl-dream{fill:#fff;stroke:var(--pastel-gold-ink);stroke-width:2}
+.tl-dream__line{stroke:var(--pastel-gold-ink);stroke-width:2;stroke-dasharray:1 5;stroke-linecap:round;opacity:.7}
+.tl-dream__label{font:var(--weight-medium) var(--text-xs)/1 var(--font-ui);fill:var(--pastel-gold-ink)}
+.tl-proj__title{font:var(--weight-semibold) var(--text-sm)/1 var(--font-ui);fill:var(--ink);pointer-events:none}
+.tl-proj__baseline{fill:var(--muted)}
+.tl-band__label{font:var(--weight-medium) var(--text-xs)/1 var(--font-ui);fill:var(--muted)}
+.tl-undated{fill:color-mix(in srgb,var(--paper) 70%,transparent);stroke:var(--shallow);stroke-width:1;stroke-dasharray:3 3}
+.tl-undated__label{font:var(--weight-medium) var(--text-xs)/1 var(--font-ui);fill:var(--muted)}
+[data-part="undated"]{cursor:pointer}
+[data-part="undated"]:hover .tl-undated{stroke:var(--muted)}
+.tl-curve{stroke:var(--shallow);stroke-width:1.5}
+.tl-curve--critical{stroke:var(--high-sea-ink);stroke-width:2.5}
+[data-part="curve"].is-dim{opacity:.35}
+
+.tl-wall__edge{stroke:color-mix(in srgb,var(--navy) 30%,transparent);stroke-width:1.5}
+.tl-wall__pill rect{fill:var(--navy)}
+.tl-wall__pill text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:#fff}
+.tl-wall__lock{fill:none;stroke:#fff;stroke-width:1.4;stroke-linejoin:round;stroke-linecap:round}
+
+.tl-shadow__edge{fill:color-mix(in srgb,var(--navy) 40%,transparent)}
+[data-part="shadow"][data-warn="true"] .tl-shadow{stroke:var(--high-sea-ink);stroke-width:1.5}
+[data-part="shadow"][data-warn="true"] .tl-shadow__edge{fill:var(--high-sea-ink)}
+.tl-shadow__label{font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);fill:var(--ink)}
+.tl-shadow__warn{font:var(--weight-medium) var(--text-xs)/1 var(--font-ui);fill:var(--high-sea-ink)}
+
+.tl-rib--none{fill:color-mix(in srgb,var(--navy) 6%,transparent)}
+.tl-rib--some{fill:var(--pastel-gold)}
+.tl-rib--evidenced{fill:var(--pastel-sage)}
+.tl-rib__n{font:var(--weight-semibold) var(--text-2xs)/1 var(--font-ui)}
+.tl-rib__n--none{fill:var(--muted)}
+.tl-rib__n--some{fill:var(--pastel-gold-ink)}
+.tl-rib__n--evidenced{fill:var(--pastel-sage-ink)}
+
+.tl-load{fill:var(--pastel-blue)}
+.tl-load--over{fill:var(--warning-surface);stroke:var(--high-sea-ink);stroke-width:1.5}
+.tl-load--wall{fill:url(#tl-hatch)}
+.tl-load__val{font:var(--weight-medium) var(--text-xs)/1 var(--font-ui);fill:var(--muted);font-variant-numeric:tabular-nums}
+.tl-load__val--over{fill:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+.tl-rowtitle{font:var(--weight-semibold) var(--text-2xs)/1 var(--font-ui);letter-spacing:var(--tracking-caps);text-transform:uppercase;fill:var(--navy);paint-order:stroke;stroke:var(--warm-white);stroke-width:4px;stroke-linejoin:round}
+.tl-rowtitle--project{font-size:var(--text-sm);letter-spacing:0;text-transform:none;fill:var(--ink)}
+.tl-rowtitle--dream{fill:var(--pastel-gold-ink);letter-spacing:0;text-transform:none;font-size:var(--text-xs)}
+.tl-card.is-compact .tl-band__label,.tl-card.is-compact .tl-dream__label{opacity:0}
+.tl-load-divider{stroke:var(--line);stroke-width:1}
+.tl-cap{stroke:var(--navy);stroke-width:1.5;stroke-dasharray:4 3}
+[data-part="load-col"]{transform-box:fill-box;transform-origin:50% 100%}
+.tl-labels__load{position:absolute;left:0;right:0;padding:0 var(--space-4);display:grid;gap:4px;align-content:start}
+.tl-labels__load b{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--navy);font-weight:var(--weight-semibold)}
+.tl-labels__load span{display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--muted)}
+.tl-labels__load i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--pastel-blue)}
+.tl-labels__load i.is-cap{height:0;width:14px;border-top:1.5px dashed var(--navy);border-radius:0}
+.tl-labels__load i.is-over{background:var(--warning-surface);outline:1.5px solid var(--high-sea-ink);outline-offset:-1.5px}
+.tl-labels__load small{font-size:var(--text-xs);color:var(--muted);margin-top:2px}
+.tl-load-head{position:absolute;left:0;right:0;display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-4);font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold)}
+.tl-load-head small{font-size:var(--text-xs);letter-spacing:0;text-transform:none;font-weight:var(--weight-regular)}
+
+.tl-ghost{stroke:var(--navy);stroke-width:1.5;stroke-dasharray:4 3}
+.tl-ghost__chip circle{fill:var(--navy)}
+.tl-ghost__chip text{font:var(--weight-semibold) var(--text-2xs)/1 var(--font-ui);fill:#fff}
+.tl-garrow{stroke:var(--navy);stroke-width:1.25}
+.tl-ripple{fill:none;stroke:var(--muted);stroke-width:1.5;stroke-dasharray:4 3}
+.tl-ripple--slip{stroke:var(--danger);transform:rotate(45deg);transform-box:fill-box;transform-origin:center}
+.tl-ripple__label{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:var(--danger)}
+
+/* Lines view inside the card (port of graph-reference/lines.html) */
+.tl-lines{padding:var(--space-2) var(--space-6) var(--space-6)}
+.tl-line{padding:22px 0 4px;border-top:1px solid var(--line)}
+.tl-line:first-child{border-top:0}
+.tl-line__name{font:var(--weight-semibold) var(--text-md)/1.2 var(--font-ui);color:var(--ink);margin:0;display:flex;align-items:center;gap:8px}
+.tl-line__name i{width:10px;height:10px;border-radius:3px;display:block}
+.tl-line__svg{display:block;overflow:visible;margin-top:6px}
+.tl-line__lbl{font:var(--weight-medium) 13px/1 var(--font-ui);fill:var(--ink)}
+.tl-line__sub{font:var(--weight-regular) 12px/1 var(--font-ui);fill:var(--muted)}
+.tl-line__sub.is-here{fill:var(--wave);font-weight:var(--weight-semibold)}
+.tl-line__sub.is-danger{fill:var(--danger);font-weight:var(--weight-medium)}
+.tl-line__term{font:var(--weight-semibold) 13px/1 var(--font-ui);fill:#fff}
+
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+@media (prefers-reduced-motion:reduce){.tl-tray,.tl-chev svg,.tl-toggle{transition:none}}
+@media (max-width:720px){
+  .page{padding:var(--space-5) var(--space-4) var(--space-12)}
+  .tl-frame{grid-template-columns:0 minmax(0,1fr)}
+  .tl-labels{overflow:hidden;border-right:0}
+  .tl-toolbar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:var(--space-2)}
+  .tl-toolbar__group{flex-wrap:nowrap;min-width:0}
+  .tl-toolbar__group:first-child{flex-wrap:wrap}
+  .tl-toolbar__group:first-child #tl-zoom{flex:1 1 100%;width:100%;min-width:0}
+  #tl-zoom .hub-pills__btn{min-width:0;padding-inline:var(--space-1)}
+  .tl-toolbar{min-width:0;max-width:100%}
+  .tl-toolbar__group:last-child{overflow-x:auto;margin:0 calc(var(--space-4) * -1);padding:0 var(--space-4) var(--space-1);scrollbar-width:none}
+  .tl-toolbar__group:last-child>*{flex:0 0 auto}
+  .tl-toolbar__group:last-child .tl-plus{margin-left:auto}
+  .ref-controls{flex-direction:column;align-items:stretch}
+  .tl-banner,.tl-tray{flex-wrap:wrap}
+  .tl-tray .btn--primary{margin-left:40px}
+  .tl-lines{padding:var(--space-2) var(--space-4) var(--space-4)}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="page-header__eyebrow">Views</p>
+  <h1 class="page-header__title">Timeline</h1>
+
+  <div class="ref-controls">Reference controls (not part of the product):
+    <button class="btn btn--secondary" id="ref-live" type="button">Simulate an edit on the Board</button>
+    <button class="btn btn--secondary" id="ref-drag" type="button">Simulate dragging Book bus +6 days</button>
+  </div>
+
+  <div class="tl-toolbar" data-part="toolbar">
+    <div class="tl-toolbar__group">
+      <div class="hub-pills" id="tl-zoom" role="group" aria-label="Zoom" data-part="zoom-pills"></div>
+      <div class="hub-pills" id="tl-view" role="group" aria-label="View" data-part="view-toggle">
+        <span class="hub-pills__thumb"></span>
+        <button class="hub-pills__btn" type="button" data-view="bars">Bars</button>
+        <button class="hub-pills__btn" type="button" data-view="lines">Lines</button>
+      </div>
+    </div>
+    <div class="tl-toolbar__group">
+      <button class="tl-toggle tl-toggle--critical" id="tl-critical" type="button" aria-pressed="false">Critical path</button>
+      <button class="tl-toggle" id="tl-load" type="button" aria-pressed="true">Load</button>
+      <button class="tl-toggle" id="tl-holidays" type="button">Holidays: compressed</button>
+      <button class="tl-toggle" id="tl-today-btn" type="button">Today</button>
+      <button class="btn btn--secondary" id="tl-hammond" type="button" style="min-height:2.2rem;font-size:var(--text-sm)">Ask Hammond</button>
+      <button class="tl-plus" type="button" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
+  </div>
+
+  <div class="tl-banner" id="tl-banner" data-part="ripple-banner" hidden>
+    <span><b>Finals would slip to 09/10/26.</b> Book bus pushes Excursion form past the milestone.</span>
+    <button class="btn btn--ghost" type="button">Drop anyway</button>
+    <button class="btn btn--primary" type="button">Suggest a fix</button>
+  </div>
+
+  <div class="tl-tray" id="tl-tray" data-part="ghost-tray" hidden>
+    <div class="tl-avatar" aria-hidden="true">H</div>
+    <div class="tl-tray__text"><b>Hammond suggests 3 changes.</b> <span>Clears T4 W2 · nothing moves into a wall · no hard deadlines move</span></div>
+    <button class="btn btn--primary" id="tl-apply" type="button">Apply all</button>
+    <button class="btn btn--secondary" type="button">Review</button>
+    <button class="btn btn--ghost" id="tl-dismiss" type="button">Dismiss</button>
+  </div>
+
+  <section class="tl-card" id="tl-card" data-view="bars" data-part="timeline-card">
+    <div class="tl-view" id="tl-bars">
+      <div class="tl-frame">
+        <div class="tl-labels" id="tl-labels"><div class="tl-labels__head">Plan</div>
+          <div class="tl-labels__load" id="tl-load-label" data-part="load-legend"><b>Load</b><span><i></i>Committed</span><span><i class="is-cap"></i>Free time</span><span><i class="is-over"></i>Over</span><small>Learning your term rhythm</small></div></div>
+        <div class="tl-scroller" id="tl-scroller">
+          <svg class="tl-svg" id="tl-svg" role="group" aria-label="Timeline"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="tl-view tl-lines" id="tl-lines" hidden></div>
+  </section>
+  <p class="visually-hidden" id="tl-live" aria-live="polite"></p>
+</div>
+<script>
+/* Generated from ref-src/timeline-ref.ts + apps/tasks/src/views/timeline-motion.ts, timeline-morph.ts and src/domain/school-time.ts. */
+(() => {
+  // apps/tasks/src/views/timeline-motion.ts
+  var MOTION = {
+    settle: 420,
+    // live update: an entity moves because data changed elsewhere
+    zoom: 280,
+    // day width changes (zoom pills, wheel, pinch)
+    release: 220,
+    // a dragged bar settles onto its snapped day
+    cascadeStagger: 30,
+    // dependants follow a released bar, one after another
+    enter: 320,
+    // a new bar, curve or chip appears
+    exit: 160,
+    // an entity leaves
+    expand: 300,
+    // a group opens or closes; rows slide
+    rowStagger: 24,
+    // rows revealed by expand, top to bottom
+    hover: 120,
+    // hover and focus emphasis
+    morph: 620,
+    // Bars <-> Lines flight: the kit spring settles in ~618 ms (see springEasing)
+    crossfade: 160,
+    // real views swap during the morph
+    reducedFade: 120
+    // the only motion left under prefers-reduced-motion
+  };
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    const solve = (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const err = sampleX(t) - x;
+        if (Math.abs(err) < 1e-6) return t;
+        const d = slopeX(t);
+        if (Math.abs(d) < 1e-6) break;
+        t -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      t = x;
+      while (hi - lo > 1e-6) {
+        const v = sampleX(t);
+        if (v < x) lo = t;
+        else hi = t;
+        t = (lo + hi) / 2;
+      }
+      return t;
+    };
+    return (p) => {
+      if (p <= 0) return 0;
+      if (p >= 1) return 1;
+      return sampleY(solve(p));
+    };
+  }
+  var EASE = cubicBezier(0.2, 0.8, 0.2, 1);
+  var OVERSHOOT = cubicBezier(0.34, 1.3, 0.64, 1);
+  var LINEAR = (t) => t;
+  var EPS = 1e-6;
+  function browserClock() {
+    return {
+      now: () => performance.now(),
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id)
+    };
+  }
+  function prefersReduced() {
+    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function createMotion(options) {
+    const clock = options.clock ?? browserClock();
+    const reduced2 = options.reducedMotion ?? prefersReduced;
+    const entities = /* @__PURE__ */ new Map();
+    const frameCosts = [];
+    let frameId = null;
+    let disposed = false;
+    function entity(id) {
+      let e = entities.get(id);
+      if (!e) {
+        e = { props: {}, tweens: /* @__PURE__ */ new Map(), exiting: null, dirty: false };
+        entities.set(id, e);
+      }
+      return e;
+    }
+    function schedule() {
+      if (frameId !== null || disposed) return;
+      frameId = clock.request(frame);
+    }
+    function valueAt(tween, now) {
+      if (tween.duration <= 0) return tween.to;
+      const p = (now - tween.start) / tween.duration;
+      if (p <= 0) return tween.from;
+      if (p >= 1) return tween.to;
+      return tween.from + (tween.to - tween.from) * tween.easing(p);
+    }
+    function step(now) {
+      let active = false;
+      const finishedExits = [];
+      for (const [id, e] of entities) {
+        for (const [prop, tween] of e.tweens) {
+          const v = valueAt(tween, now);
+          if (e.props[prop] !== v) {
+            e.props[prop] = v;
+            e.dirty = true;
+          }
+          if (now >= tween.start + tween.duration) e.tweens.delete(prop);
+          else active = true;
+        }
+        if (e.dirty) {
+          e.dirty = false;
+          options.apply(id, e.props);
+        }
+        if (e.exiting && e.tweens.size === 0) finishedExits.push([id, e.exiting]);
+      }
+      for (const [id, done] of finishedExits) {
+        entities.delete(id);
+        done();
+      }
+      return active;
+    }
+    function frame() {
+      frameId = null;
+      if (disposed) return;
+      const t0 = clock.now();
+      const active = step(t0);
+      const cost = clock.now() - t0;
+      frameCosts.push(cost);
+      if (frameCosts.length > 600) frameCosts.shift();
+      if (active) schedule();
+      else options.onIdle?.();
+    }
+    function startTween(e, prop, to, opts, now) {
+      const running = e.tweens.get(prop);
+      if (running && Math.abs(running.to - to) < EPS) return;
+      const current = running ? valueAt(running, now) : e.props[prop];
+      if (current === void 0) {
+        e.props[prop] = to;
+        e.dirty = true;
+        return;
+      }
+      if (!running && Math.abs(current - to) < EPS) return;
+      const duration = opts.duration ?? MOTION.settle;
+      e.tweens.set(prop, {
+        from: current,
+        to,
+        start: now + (opts.delay ?? 0),
+        duration,
+        easing: running && opts.easing === OVERSHOOT ? EASE : opts.easing ?? EASE
+      });
+    }
+    function flushDirty(id, e) {
+      if (e.dirty) {
+        e.dirty = false;
+        options.apply(id, e.props);
+      }
+    }
+    const engine2 = {
+      place(id, props) {
+        const e = entity(id);
+        for (const [prop, value] of Object.entries(props)) {
+          e.tweens.delete(prop);
+          if (e.props[prop] !== value) {
+            e.props[prop] = value;
+            e.dirty = true;
+          }
+        }
+        flushDirty(id, e);
+      },
+      to(id, props, opts = {}) {
+        const e = entity(id);
+        e.exiting = null;
+        const now = clock.now();
+        if (reduced2()) {
+          const { opacity, ...geometry2 } = props;
+          engine2.place(id, geometry2);
+          if (opacity !== void 0) {
+            startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
+          }
+        } else {
+          for (const [prop, value] of Object.entries(props)) startTween(e, prop, value, opts, now);
+        }
+        flushDirty(id, e);
+        if (e.tweens.size) schedule();
+      },
+      enter(id, props, opts = {}) {
+        const from = opts.from ?? { opacity: 0, scale: 0.6 };
+        const start = { ...props, ...from };
+        const target = { opacity: 1, scale: 1, ...props };
+        if (reduced2()) {
+          engine2.place(id, { ...target, opacity: 0 });
+          engine2.to(id, { opacity: target.opacity ?? 1 });
+          return;
+        }
+        engine2.place(id, start);
+        engine2.to(id, target, { duration: MOTION.enter, easing: OVERSHOOT, ...opts });
+      },
+      exit(id, done, opts = {}) {
+        const e = entities.get(id);
+        if (!e) {
+          done();
+          return;
+        }
+        if (e.exiting) {
+          e.exiting = done;
+          return;
+        }
+        for (const prop of [...e.tweens.keys()]) if (prop !== "opacity") e.tweens.delete(prop);
+        e.exiting = done;
+        const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
+        startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock.now());
+        if (!e.tweens.size) {
+          entities.delete(id);
+          done();
+          return;
+        }
+        schedule();
+      },
+      get: (id) => entities.get(id)?.props,
+      forget: (id) => {
+        entities.delete(id);
+      },
+      has: (id) => entities.has(id),
+      target: (id, prop) => {
+        const e = entities.get(id);
+        if (!e) return void 0;
+        return e.tweens.get(prop)?.to ?? e.props[prop];
+      },
+      busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
+      finish() {
+        step(Number.POSITIVE_INFINITY);
+        if (frameId !== null) {
+          clock.cancel(frameId);
+          frameId = null;
+        }
+      },
+      stats() {
+        const sorted = [...frameCosts].sort((a, b) => a - b);
+        const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+        return { frames: frameCosts.length, p95, max: sorted.length ? sorted[sorted.length - 1] : 0 };
+      },
+      dispose() {
+        disposed = true;
+        if (frameId !== null) clock.cancel(frameId);
+        frameId = null;
+        entities.clear();
+      }
+    };
+    return engine2;
+  }
+  function reconcile(engine2, next, hooks) {
+    const seen = /* @__PURE__ */ new Set();
+    let i = 0;
+    for (const [id, props] of next) {
+      seen.add(id);
+      const delay = (hooks.options?.delay ?? 0) + (hooks.stagger ? i * hooks.stagger : 0);
+      if (!engine2.has(id)) {
+        hooks.create(id);
+        engine2.enter(id, props, { ...hooks.enterOptions, delay });
+      } else {
+        engine2.to(id, props, { ...hooks.options, delay });
+      }
+      i++;
+    }
+    for (const id of hooks.previous) {
+      if (!seen.has(id) && engine2.has(id)) engine2.exit(id, () => hooks.remove(id));
+    }
+  }
+
+  // apps/tasks/src/views/timeline-morph.ts
+  var KIT_SPRING = { stiffness: 200, damping: 24, mass: 1 };
+  var OUT_END = 0.35;
+  var IN_START = 0.6;
+  function springEasing(spring = KIT_SPRING, samples = 40) {
+    const w0 = Math.sqrt(spring.stiffness / spring.mass);
+    const zeta = spring.damping / (2 * Math.sqrt(spring.stiffness * spring.mass));
+    const x = (t) => {
+      if (zeta < 1) {
+        const wd = w0 * Math.sqrt(1 - zeta * zeta);
+        return 1 - Math.exp(-zeta * w0 * t) * (Math.cos(wd * t) + zeta * w0 / wd * Math.sin(wd * t));
+      }
+      return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+    };
+    let settle = 0;
+    for (let t = 0; t < 3; t += 1e-3) if (Math.abs(1 - x(t)) > 1e-3) settle = t;
+    const duration = Math.round(settle * 1e3);
+    const points = [];
+    let peak = 0;
+    for (let i = 0; i <= samples; i++) {
+      const v = i === samples ? 1 : x(settle * i / samples);
+      peak = Math.max(peak, v);
+      points.push(String(Math.round(v * 1e4) / 1e4));
+    }
+    return { easing: `linear(${points.join(", ")})`, duration, peak };
+  }
+  function radiusFor(shape, box) {
+    const short = Math.min(box.width, box.height);
+    switch (shape) {
+      case "station":
+      case "terminus":
+      case "track":
+        return short / 2;
+      case "milestone":
+        return 2;
+      case "project":
+        return 8;
+      default:
+        return 6;
+    }
+  }
+  function pairEntities(from, to) {
+    const pairs = [];
+    for (const [id, end] of from) pairs.push({ id, from: end, to: to.get(id) ?? null });
+    for (const [id, end] of to) if (!from.has(id)) pairs.push({ id, from: null, to: end });
+    return pairs;
+  }
+  function cloneKeyframes(pair, origin) {
+    const a = pair.from ?? pair.to;
+    const b = pair.to ?? pair.from;
+    const frame = (end, opacity) => ({
+      transform: `translate(${round(end.box.x - origin.x)}px, ${round(end.box.y - origin.y)}px)`,
+      width: `${round(end.box.width)}px`,
+      height: `${round(end.box.height)}px`,
+      borderRadius: `${round(end.radius)}px`,
+      backgroundColor: end.color,
+      opacity
+    });
+    if (pair.from && pair.to) return [frame(a, 1), frame(b, 1)];
+    if (pair.from) return [frame(a, 1), { ...frame(a, 0), offset: 1 }];
+    return [frame(b, 0), frame(b, 1)];
+  }
+  function round(n) {
+    return Math.round(n * 100) / 100;
+  }
+  function measureEntities(root) {
+    const out = /* @__PURE__ */ new Map();
+    root.querySelectorAll("[data-entity-id]").forEach((el) => {
+      const id = el.getAttribute("data-entity-id");
+      if (!id || out.has(id)) return;
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      const shape = el.getAttribute("data-morph-shape") ?? "bar";
+      const minH = shape === "track" ? 7 : 1;
+      const hgt = Math.max(r.height, minH);
+      const box = { x: r.left, y: r.top + (r.height - hgt) / 2, width: Math.max(r.width, 1), height: hgt };
+      const color = el.getAttribute("data-morph-color") || getComputedStyle(el).getPropertyValue(el instanceof SVGElement ? "fill" : "background-color") || "transparent";
+      out.set(id, { box, radius: radiusFor(shape, box), color, shape });
+    });
+    return out;
+  }
+  function startMorph(options) {
+    const { host, fromRoot, toRoot } = options;
+    const spring = springEasing();
+    const duration = options.duration ?? spring.duration;
+    const reduced2 = options.reducedMotion ?? (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    const fromHeight = host.getBoundingClientRect().height;
+    const hostOverflow = host.style.overflow;
+    toRoot.removeAttribute("hidden");
+    Object.assign(toRoot.style, {
+      visibility: "visible",
+      opacity: "0",
+      pointerEvents: "none",
+      position: "absolute",
+      top: "0",
+      left: "0",
+      right: "0"
+    });
+    fromRoot.style.pointerEvents = "none";
+    const toHeight = toRoot.getBoundingClientRect().height;
+    const animations = [];
+    const hidden = [];
+    let overlay = null;
+    let dir = 1;
+    let settled = false;
+    let resolve;
+    const finished = new Promise((r) => resolve = r);
+    const fadeDuration = MOTION.crossfade;
+    const total = reduced2 ? fadeDuration : duration;
+    const outDur = reduced2 ? fadeDuration : duration * OUT_END;
+    const inDelay = reduced2 ? 0 : duration * IN_START;
+    const inDur = reduced2 ? fadeDuration : duration - inDelay;
+    animations.push(
+      fromRoot.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: outDur,
+        endDelay: total - outDur,
+        fill: "both",
+        easing: "cubic-bezier(.2,.8,.2,1)"
+      }),
+      toRoot.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: inDur,
+        delay: inDelay,
+        fill: "both",
+        easing: "cubic-bezier(.2,.8,.2,1)"
+      })
+    );
+    if (Math.abs(toHeight - fromHeight) > 1) {
+      host.style.overflow = "hidden";
+      animations.push(
+        host.animate([{ height: `${fromHeight}px` }, { height: `${toHeight}px` }], {
+          duration: reduced2 ? fadeDuration : duration,
+          easing: reduced2 ? "linear" : spring.easing,
+          fill: "both"
+        })
+      );
+    }
+    if (!reduced2) {
+      const pairs = pairEntities(measureEntities(fromRoot), measureEntities(toRoot));
+      const hostBox = host.getBoundingClientRect();
+      overlay = document.createElement("div");
+      overlay.className = "timeline-morph-overlay";
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.setAttribute("data-part", "morph-overlay");
+      Object.assign(overlay.style, {
+        position: "absolute",
+        inset: "0",
+        pointerEvents: "none",
+        contain: "strict",
+        zIndex: "3"
+      });
+      const origin = { x: hostBox.left - host.scrollLeft, y: hostBox.top - host.scrollTop };
+      for (const pair of pairs) {
+        const clone = document.createElement("div");
+        clone.setAttribute("data-morph-clone", pair.id);
+        Object.assign(clone.style, {
+          position: "absolute",
+          left: "0",
+          top: "0",
+          willChange: "transform, width, height, opacity"
+        });
+        overlay.append(clone);
+        const flies = Boolean(pair.from && pair.to);
+        animations.push(
+          clone.animate(cloneKeyframes(pair, origin), {
+            duration: flies ? duration : duration * 0.5,
+            delay: flies ? 0 : pair.from ? 0 : duration * 0.5,
+            endDelay: flies ? 0 : pair.from ? duration * 0.5 : 0,
+            fill: "both",
+            easing: flies ? spring.easing : "linear"
+          })
+        );
+      }
+      host.append(overlay);
+      for (const root of [fromRoot, toRoot]) {
+        root.querySelectorAll("[data-entity-id]").forEach((el) => {
+          hidden.push([el, el.style.visibility]);
+          el.style.visibility = "hidden";
+        });
+      }
+    }
+    function progress() {
+      const a = animations[0];
+      if (!a || !a.effect) return 1;
+      const t = Number(a.currentTime ?? 0);
+      return Math.min(1, Math.max(0, t / total));
+    }
+    function cleanup(result) {
+      if (settled) return;
+      settled = true;
+      overlay?.remove();
+      overlay = null;
+      for (const [el, value] of hidden) el.style.visibility = value;
+      hidden.length = 0;
+      const showing = result === "done" ? "to" : "from";
+      for (const a of animations) a.cancel();
+      const show = showing === "to" ? toRoot : fromRoot;
+      const hide = showing === "to" ? fromRoot : toRoot;
+      show.style.opacity = "";
+      show.style.visibility = "";
+      show.style.pointerEvents = "";
+      show.style.position = "";
+      show.style.top = "";
+      show.style.left = "";
+      show.style.right = "";
+      hide.style.position = "";
+      hide.style.top = "";
+      hide.style.left = "";
+      hide.style.right = "";
+      host.style.overflow = hostOverflow;
+      hide.style.opacity = "";
+      hide.style.pointerEvents = "";
+      hide.setAttribute("hidden", "");
+      options.onSettled?.(showing);
+      resolve(result);
+    }
+    const onFinish = () => cleanup(dir === 1 ? "done" : "reversed");
+    function watch() {
+      Promise.all(animations.map((a) => a.finished)).then(() => {
+        if (!settled) onFinish();
+      }).catch(() => {
+      });
+    }
+    watch();
+    return {
+      reverse() {
+        if (settled) return;
+        dir = dir === 1 ? -1 : 1;
+        for (const a of animations) a.reverse();
+        watch();
+      },
+      finish() {
+        if (settled) return;
+        for (const a of animations) a.finish();
+        cleanup(dir === 1 ? "done" : "reversed");
+      },
+      cancel() {
+        cleanup("cancelled");
+      },
+      progress: () => dir === 1 ? progress() : 1 - progress(),
+      direction: () => dir,
+      finished
+    };
+  }
+
+  // apps/tasks/src/domain/school-time.ts
+  var DAY_MS = 864e5;
+  function toMs(key) {
+    return Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
+  }
+  function toKey(ms) {
+    return new Date(ms).toISOString().slice(0, 10);
+  }
+  function addDaysKey(key, days) {
+    return toKey(toMs(key) + days * DAY_MS);
+  }
+  function mondayOf(key) {
+    const ms = toMs(key);
+    const dow = (new Date(ms).getUTCDay() + 6) % 7;
+    return toKey(ms - dow * DAY_MS);
+  }
+  function termAt(key, terms) {
+    return terms.find((t) => key >= t.starts_on && key <= t.ends_on) ?? null;
+  }
+  function isHoliday(key, terms) {
+    if (!terms.length) return false;
+    return termAt(key, terms) === null;
+  }
+  function weekLabel(key, terms) {
+    const term = termAt(key, terms);
+    if (!term) return null;
+    const week = Math.floor((toMs(mondayOf(key)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
+    return `T${term.term} W${week}`;
+  }
+  function buildTimeScale(options) {
+    const factor = options.holidayFactor ?? 0.25;
+    const days = [];
+    let x = 0;
+    for (let ms = toMs(options.start); ms <= toMs(options.end); ms += DAY_MS) {
+      const key = toKey(ms);
+      const holiday = isHoliday(key, options.terms);
+      const w = options.dayWidth * (holiday ? factor : 1);
+      days.push({ key, x, w, holiday });
+      x += w;
+    }
+    const startMs = toMs(options.start);
+    const width = x;
+    function xAtMs(ms) {
+      const i = Math.floor((ms - startMs) / DAY_MS);
+      if (i < 0) return 0;
+      if (i >= days.length) return width;
+      const day = days[i];
+      const frac = (ms - (startMs + i * DAY_MS)) / DAY_MS;
+      return day.x + day.w * frac;
+    }
+    return {
+      start: options.start,
+      end: options.end,
+      width,
+      days,
+      x: (v) => xAtMs(typeof v === "number" ? v : toMs(v)),
+      dateAt(px) {
+        if (px <= 0) return days[0]?.key ?? options.start;
+        let lo = 0;
+        let hi = days.length - 1;
+        while (lo < hi) {
+          const mid = lo + hi + 1 >> 1;
+          if (days[mid].x <= px) lo = mid;
+          else hi = mid - 1;
+        }
+        return days[lo].key;
+      }
+    };
+  }
+  function holidayRuns(scale2) {
+    const runs = [];
+    for (const d of scale2.days) {
+      const last = runs[runs.length - 1];
+      if (d.holiday) {
+        if (last && addDaysKey(last.end, 1) === d.key) {
+          last.end = d.key;
+          last.w += d.w;
+        } else runs.push({ start: d.key, end: d.key, x: d.x, w: d.w });
+      }
+    }
+    return runs;
+  }
+
+  // docs/proposals/timeline-reference/src/fixture.ts
+  var DOMAIN_COLOUR = {
+    teaching: "#376fb7",
+    professional: "#5d4e70",
+    life: "#2f7a4f"
+  };
+  var TODAY = "2026-09-22";
+  var TERMS = [
+    { term: 3, start: "2026-07-21", end: "2026-09-25" },
+    { term: 4, start: "2026-10-13", end: "2026-12-17" }
+  ];
+  var RANGE = { start: "2026-07-20", end: "2027-01-31" };
+  var WINDOW_MINUTES = [120, 120, 120, 120, 120, 120, 0];
+  var DREAMS = [
+    { id: "d-publish", title: "Publish HPGE research", target: "2027-03-01", origin: "2025-11-01" }
+  ];
+  var GOALS = [
+    { id: "g-gifted", title: "Gifted programs", dream: null },
+    { id: "g-lead", title: "Leadership", dream: "d-publish" }
+  ];
+  var PROJECTS = [
+    { id: "p-tom", title: "Tournament of Minds", goal: "g-gifted", domain: "teaching", start: "2026-09-01", end: "2026-10-03" },
+    { id: "p-un", title: "UN Voice Competition 2026", goal: "g-gifted", domain: "teaching", start: "2026-09-14", end: "2026-11-06", shade: 1 },
+    { id: "p-hpge", title: "HPGE policy", goal: "g-lead", domain: "professional", start: "2026-07-20", end: "2026-11-20", baselineEnd: "2026-11-06" },
+    { id: "p-mentor", title: "Accreditation mentoring", goal: "g-lead", domain: "professional", start: "2026-09-07", end: "2026-12-11", ribbon: true, submission: "2026-12-11", shade: 1 },
+    { id: "p-seat", title: "Seating change", goal: null, domain: "teaching", start: "2026-09-14", end: "2026-10-14" }
+  ];
+  var MILESTONES = [
+    { id: "m-finals", project: "p-tom", title: "Finals", due: "2026-10-03", deps: ["t6"] },
+    { id: "m-heat", project: "p-un", title: "School heat", due: "2026-10-28", deps: ["u3"] },
+    { id: "m-regional", project: "p-un", title: "Regional final", due: "2026-11-06", deps: ["m-heat"] },
+    { id: "m-board", project: "p-hpge", title: "Board", due: "2026-11-20", deps: ["h4"] },
+    { id: "m-submit", project: "p-mentor", title: "Submission", due: "2026-12-11", deps: ["r5"] },
+    { id: "m-room", project: "p-seat", title: "Room swap", due: "2026-10-14" }
+  ];
+  var TASKS = [
+    { id: "t1", title: "Register team", project: "p-tom", domain: "teaching", due: "2026-09-03", est: 30, status: "done", step: 1 },
+    { id: "t2", title: "Student list", project: "p-tom", domain: "teaching", due: "2026-09-10", est: 60, status: "done", step: 2, deps: ["t1"] },
+    { id: "t3", title: "Permission notes", project: "p-tom", domain: "teaching", due: "2026-09-24", est: 90, status: "in_progress", step: 3, deps: ["t2"] },
+    { id: "t3a", title: "Risk form", project: "p-tom", parent: "t3", domain: "teaching", due: "2026-09-26", est: 30, status: "open", deps: ["t3"] },
+    { id: "t3b", title: "Medical forms", project: "p-tom", parent: "t3", domain: "teaching", due: null, est: null, status: "open" },
+    { id: "t4", title: "Get bus quote", project: "p-tom", domain: "teaching", due: "2026-09-23", est: 15, status: "open", step: 4 },
+    { id: "t5", title: "Book bus", project: "p-tom", domain: "teaching", due: "2026-09-25", est: 30, status: "open", blocked: true, step: 5, deps: ["t4"] },
+    { id: "t6", title: "Excursion form", project: "p-tom", domain: "teaching", due: "2026-09-29", est: 60, status: "open", step: 6, deps: ["t5", "t3a"] },
+    { id: "u1", title: "Heats schedule", project: "p-un", domain: "teaching", due: "2026-09-18", est: 60, status: "done", step: 1 },
+    { id: "u2", title: "Speech drafts", project: "p-un", domain: "teaching", due: "2026-10-16", est: 180, status: "open", step: 2, deps: ["u1"] },
+    { id: "u3", title: "Coaching sessions", project: "p-un", domain: "teaching", due: "2026-10-23", est: 240, status: "open", step: 3, deps: ["u2"] },
+    { id: "u4", title: "Book room", project: "p-un", domain: "teaching", due: null, est: 10, status: "open", step: 4 },
+    { id: "u5", title: "Confirm judges", project: "p-un", domain: "teaching", due: null, est: 20, status: "open", step: 5 },
+    { id: "h1", title: "Review findings", project: "p-hpge", domain: "professional", due: "2026-08-20", est: 120, status: "done", step: 1 },
+    { id: "h2", title: "Collate data", project: "p-hpge", domain: "professional", due: "2026-09-10", est: 180, status: "done", step: 2, deps: ["h1"] },
+    { id: "h3", title: "Draft procedures", project: "p-hpge", domain: "professional", due: "2026-10-23", est: 240, status: "in_progress", step: 3, deps: ["h2"] },
+    { id: "h4", title: "Exec feedback", project: "p-hpge", domain: "professional", due: "2026-11-06", est: 60, status: "open", step: 4, deps: ["h3"] },
+    { id: "r1", title: "Observation 1", project: "p-mentor", domain: "professional", due: "2026-09-11", est: 90, status: "done", step: 1, apst: ["3.2", "4.1"] },
+    { id: "r2", title: "Annotate evidence", project: "p-mentor", domain: "professional", due: "2026-09-18", est: 120, status: "done", step: 2, apst: ["1.2", "2.1"] },
+    { id: "r3", title: "Observation debrief", project: "p-mentor", domain: "professional", due: "2026-09-25", est: 45, status: "open", step: 3, apst: ["6.4"] },
+    { id: "r4", title: "Referee statements", project: "p-mentor", domain: "professional", due: "2026-11-13", est: 90, status: "open", step: 4, apst: ["7.4"] },
+    { id: "r5", title: "Evidence map", project: "p-mentor", domain: "professional", due: "2026-11-27", est: 180, status: "open", step: 5, deps: ["r4"] },
+    { id: "s1", title: "Email Simone", project: "p-seat", domain: "teaching", due: null, est: 5, status: "open", step: 1 },
+    { id: "s2", title: "Book maintenance", project: "p-seat", domain: "teaching", due: null, est: null, status: "open", step: 2 },
+    { id: "s3", title: "Confirm room", project: "p-seat", domain: "teaching", due: null, est: null, status: "open", step: 3 },
+    {
+      id: "k1",
+      title: "9B essays",
+      project: null,
+      domain: "teaching",
+      due: "2026-10-02",
+      est: 168,
+      status: "in_progress",
+      marking: { cls: "9B", scripts: 28, marked: 18, rate: 6, collected: "2026-09-21", returnBy: "2026-10-02", learned: true }
+    },
+    {
+      id: "k2",
+      title: "10ENG2 essays",
+      project: null,
+      domain: "teaching",
+      due: "2026-10-19",
+      est: 252,
+      status: "open",
+      marking: { cls: "10ENG2", scripts: 28, marked: 0, rate: 9, collected: "2026-10-16", returnBy: "2026-10-19", learned: true }
+    },
+    { id: "x1", title: "Year 10 reports", project: null, domain: "teaching", due: "2026-10-20", est: 240, status: "open" },
+    { id: "x2", title: "NESA assessor report", project: null, domain: "professional", due: "2026-09-30", est: 180, status: "open" },
+    { id: "x3", title: "Term 4 unit plan", project: null, domain: "teaching", due: "2026-10-12", est: 240, status: "open" },
+    { id: "x4", title: "HALT advisory prep", project: null, domain: "professional", due: "2026-10-22", est: 90, status: "open" }
+  ];
+  var WALLS = [
+    { id: "w-trip", label: "Overseas trip", start: "2026-12-12", end: "2027-01-06", source: "p-trip" }
+  ];
+  var CRITICAL = /* @__PURE__ */ new Set(["t4", "t5", "t6", "m-finals", "t4>t5", "t5>t6", "t6>m-finals"]);
+  var HAMMOND = {
+    headline: "Hammond suggests 3 changes",
+    detail: "clears T4 W2 \xB7 nothing moves into a wall \xB7 no hard deadlines move",
+    changes: [
+      { id: "h3", due: "2026-10-30", why: "Draft procedures after marking is back" },
+      { id: "u3", due: "2026-10-27", why: "Coaching still lands before the heat" },
+      { id: "x4", due: "2026-10-29", why: "Advisory prep after the heat" }
+    ]
+  };
+
+  // docs/proposals/timeline-reference/src/timeline-ref.ts
+  var TL = {
+    labelW: 208,
+    axis: { h: 64, termY: 8, termH: 20, weekY: 42, dateY: 56 },
+    row: { dream: 36, goal: 36, project: 44, projectOpen: 34, task: 36, step: 30, milestone: 36, marking: 48, group: 36, ribbon: 24 },
+    groupGap: 12,
+    bar: { h: 24, rx: 6, stripeW: 3, stripeInset: 6, minW: 28, textPad: 16, outsideGap: 8 },
+    project: { h: 28, rx: 8, bracketH: 6, bracketRx: 3 },
+    band: { h: 24, rx: 12 },
+    diamond: 14,
+    undated: { h: 22, rx: 11, padX: 10 },
+    shadow: { h: 32, rx: 8 },
+    ribbon: { h: 16, gap: 3, rx: 4 },
+    load: { h: 104, top: 30, colGap: 8, rx: 4 },
+    today: { pillH: 20, pillW: 52 },
+    ghost: { dash: "4 3" },
+    mobileBreak: 720,
+    zooms: [
+      { id: "year", label: "Year", dayWidth: 1.6 },
+      { id: "term", label: "Term", dayWidth: 4.4 },
+      { id: "month", label: "Month", dayWidth: 10 },
+      { id: "week", label: "Week", dayWidth: 34 },
+      { id: "day", label: "Day", dayWidth: 96 }
+    ]
+  };
+  var SURF = {
+    goalBand: "color-mix(in srgb, var(--navy) 5%, transparent)",
+    // from --line family
+    holiday: "color-mix(in srgb, var(--navy) 3.5%, transparent)",
+    selectedHalo: "color-mix(in srgb, var(--wave) 16%, transparent)",
+    ghostFill: "color-mix(in srgb, var(--wave) 6%, transparent)",
+    shadowFill: "color-mix(in srgb, var(--navy) 7%, transparent)"
+  };
+  function tint(hex, pct) {
+    return `color-mix(in srgb, ${hex} ${pct}%, #fff)`;
+  }
+  function mix(a, b, t) {
+    const p = (h2) => [1, 3, 5].map((i) => parseInt(h2.slice(i, i + 2), 16));
+    const A = p(a);
+    const B = p(b);
+    return `#${A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
+  }
+  function colourOf(p) {
+    const base = DOMAIN_COLOUR[p.domain];
+    return p.shade ? mix(base, "#0a1536", 0.3) : base;
+  }
+  var TODAY_FRAC = 0.375;
+  var fmt = (key) => `${key.slice(8, 10)}/${key.slice(5, 7)}/${key.slice(2, 4)}`;
+  var SCHOOL = TERMS.map((t) => ({ term: t.term, starts_on: t.start, ends_on: t.end }));
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var state = {
+    zoom: 2,
+    dayWidth: TL.zooms[2].dayWidth,
+    expanded: /* @__PURE__ */ new Map(),
+    critical: false,
+    load: true,
+    holidaysCompressed: true,
+    view: "bars",
+    selected: null,
+    hammond: false,
+    tasks: TASKS.map((t) => ({ ...t })),
+    drag: null
+  };
+  function isExpanded(id, kind) {
+    const user = state.expanded.get(id);
+    if (user !== void 0) return user;
+    if (kind === "goal") return true;
+    if (kind === "task") return state.zoom >= 3;
+    if (kind === "group") return id === "grp-marking";
+    if (state.zoom < 2) return false;
+    const next = state.tasks.filter((t) => t.project === id && t.status !== "done" && t.due).map((t) => t.due).sort()[0];
+    return Boolean(next && toMs(next) - toMs(TODAY) <= 14 * 864e5);
+  }
+  function tasksOf(pid) {
+    return state.tasks.filter((t) => t.project === pid && !t.parent);
+  }
+  function buildRows() {
+    const rows2 = [];
+    let y = 0;
+    const push = (r) => {
+      rows2.push({ ...r, y });
+      y += r.h;
+    };
+    const projectRows = (p, depth) => {
+      const open = isExpanded(p.id, "project");
+      const h2 = (open ? TL.row.projectOpen : TL.row.project) + (p.ribbon ? TL.row.ribbon : 0);
+      push({ id: `row:${p.id}`, kind: "project", depth, label: p.title, h: h2, ref: p.id, open, colour: colourOf(p) });
+      if (!open) return;
+      const items = [];
+      for (const t of tasksOf(p.id)) {
+        if (!t.due) continue;
+        items.push({ due: t.due, row: { id: `row:${t.id}`, kind: "task", depth: depth + 1, label: t.title, h: TL.row.task, ref: t.id } });
+      }
+      for (const m of MILESTONES.filter((m2) => m2.project === p.id))
+        items.push({ due: m.due, row: { id: `row:${m.id}`, kind: "milestone", depth: depth + 1, label: m.title, h: TL.row.milestone, ref: m.id } });
+      items.sort((a, b) => a.due < b.due ? -1 : a.due > b.due ? 1 : 0);
+      for (const it of items) {
+        push(it.row);
+        if (it.row.kind === "task" && isExpanded(it.row.ref, "task")) {
+          for (const s2 of state.tasks.filter((c) => c.parent === it.row.ref && c.due))
+            push({ id: `row:${s2.id}`, kind: "step", depth: depth + 2, label: s2.title, h: TL.row.step, ref: s2.id });
+        }
+      }
+    };
+    for (const g of GOALS) {
+      const dream = g.dream ? DREAMS.find((d) => d.id === g.dream) : null;
+      let depth = 0;
+      if (dream) {
+        push({ id: `row:${dream.id}`, kind: "dream", depth: 0, label: dream.title, h: TL.row.dream, ref: dream.id });
+        depth = 1;
+      }
+      const open = isExpanded(g.id, "goal");
+      push({ id: `row:${g.id}`, kind: "goal", depth, label: g.title, h: TL.row.goal, ref: g.id, open });
+      if (open) for (const p of PROJECTS.filter((p2) => p2.goal === g.id)) projectRows(p, depth + 1);
+      y += TL.groupGap;
+    }
+    push({ id: "row:grp-nogoal", kind: "group", depth: 0, label: "No goal", h: TL.row.group, ref: "grp-nogoal", open: isExpanded("grp-nogoal", "goal") });
+    if (isExpanded("grp-nogoal", "goal")) for (const p of PROJECTS.filter((p2) => !p2.goal)) projectRows(p, 1);
+    y += TL.groupGap;
+    const markingOpen = isExpanded("grp-marking", "group");
+    push({ id: "row:grp-marking", kind: "group", depth: 0, label: "Marking shadows", h: TL.row.group, ref: "grp-marking", open: markingOpen });
+    if (markingOpen)
+      for (const k of state.tasks.filter((t) => t.marking))
+        push({ id: `row:${k.id}`, kind: "marking", depth: 1, label: k.title, h: TL.row.marking, ref: k.id });
+    y += TL.groupGap;
+    push({ id: "row:grp-loose", kind: "group", depth: 0, label: "Tasks without a project", h: TL.row.group, ref: "grp-loose", open: isExpanded("grp-loose", "group") });
+    if (isExpanded("grp-loose", "group"))
+      for (const t of state.tasks.filter((t2) => !t2.project && !t2.marking && t2.due))
+        push({ id: `row:${t.id}`, kind: "task", depth: 1, label: t.title, h: TL.row.task, ref: t.id });
+    return rows2;
+  }
+  function taskSpan(t) {
+    if (!t.due) return null;
+    const days = Math.max(1, Math.ceil((t.est ?? 60) / 120));
+    return { start: addDaysKey(t.due, -(days - 1)), end: t.due };
+  }
+  function projectSpan(p) {
+    return { start: p.start, end: p.end };
+  }
+  function weekLoad() {
+    const weeks = /* @__PURE__ */ new Map();
+    const ensure = (k) => {
+      const m = mondayOf(k);
+      if (!weeks.has(m)) {
+        let cap = 0;
+        let wall = false;
+        for (let i = 0; i < 7; i++) {
+          const d = addDaysKey(m, i);
+          const inWall = WALLS.some((w) => d >= w.start && d <= w.end);
+          if (inWall) wall = true;
+          else cap += WINDOW_MINUTES[i];
+        }
+        weeks.set(m, { key: m, label: weekLabel(m, SCHOOL) ?? weekLabel(addDaysKey(m, 1), SCHOOL), minutes: 0, capacity: cap, wall });
+      }
+      return weeks.get(m);
+    };
+    for (let k = mondayOf(TODAY); k <= RANGE.end; k = addDaysKey(k, 7)) ensure(k);
+    for (const t of state.tasks) {
+      if (t.status === "done" || !t.due || !t.est || t.due < TODAY) continue;
+      if (t.marking) {
+        const remaining = (t.marking.scripts - t.marking.marked) * t.marking.rate;
+        const from = t.marking.collected > TODAY ? t.marking.collected : TODAY;
+        const days = [];
+        for (let d = from; d <= t.marking.returnBy; d = addDaysKey(d, 1)) if (WINDOW_MINUTES[(new Date(toMs(d)).getUTCDay() + 6) % 7]) days.push(d);
+        for (const d of days) ensure(d).minutes += remaining / Math.max(1, days.length);
+      } else ensure(t.due).minutes += t.est;
+    }
+    return [...weeks.values()].sort((a, b) => a.key < b.key ? -1 : 1);
+  }
+  var NS = "http://www.w3.org/2000/svg";
+  function s(tag, attrs = {}, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, String(attrs[k]));
+    parent?.appendChild(e);
+    return e;
+  }
+  function h(tag, cls, text, parent) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== void 0) e.textContent = text;
+    parent?.appendChild(e);
+    return e;
+  }
+  var measureCtx = document.createElement("canvas").getContext("2d");
+  var widthCache = /* @__PURE__ */ new Map();
+  var FONT_STACK = "Inter, ui-sans-serif, sans-serif";
+  function textW(text, font) {
+    const key = `${font}|${text}`;
+    let w = widthCache.get(key);
+    if (w === void 0) {
+      measureCtx.font = font.replace(/Inter$/, FONT_STACK);
+      w = measureCtx.measureText(text).width;
+      widthCache.set(key, w);
+    }
+    return w;
+  }
+  function pool(parent, count, tag) {
+    while (parent.children.length > count) parent.lastElementChild.remove();
+    while (parent.children.length < count) s(tag, {}, parent);
+    return [...parent.children];
+  }
+  function fit(text, font, max) {
+    if (textW(text, font) <= max) return text;
+    let t = text;
+    while (t.length > 1 && textW(`${t}\u2026`, font) > max) t = t.slice(0, -1);
+    return `${t}\u2026`;
+  }
+  var els = {
+    card: document.getElementById("tl-card"),
+    labels: document.getElementById("tl-labels"),
+    scroller: document.getElementById("tl-scroller"),
+    svg: document.getElementById("tl-svg"),
+    bars: document.getElementById("tl-bars"),
+    lines: document.getElementById("tl-lines"),
+    tray: document.getElementById("tl-tray"),
+    banner: document.getElementById("tl-banner"),
+    live: document.getElementById("tl-live")
+  };
+  var layers = {};
+  for (const name of ["grid", "holidays", "walls", "axis", "today", "bands", "curves", "shadows", "bars", "ghosts", "load"])
+    layers[name] = s("g", { "data-layer": name }, els.svg);
+  s("defs", {}, els.svg).innerHTML = `
+  <pattern id="tl-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+    <rect width="8" height="8" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/>
+    <line x1="0" y1="0" x2="0" y2="8" stroke="color-mix(in srgb, var(--navy) 16%, transparent)" stroke-width="2"/>
+  </pattern>
+  <marker id="tl-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+    <path d="M1 1 L9 5 L1 9 Z" fill="var(--shallow)"/>
+  </marker>
+  <marker id="tl-arrow-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+    <path d="M1 1 L9 5 L1 9 Z" fill="var(--high-sea-ink)"/>
+  </marker>
+  <marker id="tl-arrow-ghost" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+    <path d="M1 1 L9 5 L1 9 Z" fill="var(--navy)"/>
+  </marker>`;
+  var specs = /* @__PURE__ */ new Map();
+  var nodes = /* @__PURE__ */ new Map();
+  function create(id) {
+    const spec = specs.get(id);
+    const kind = spec.kind;
+    let g;
+    if (kind === "label") {
+      g = h("div", "tl-label");
+      els.labels.append(g);
+    } else {
+      const layer = kind === "wall" ? layers.walls : kind === "hol" || kind === "grid" ? layers.grid : kind === "term" || kind === "week" ? layers.axis : kind === "band" || kind === "bracket" ? layers.bands : kind === "curve" || kind === "edge" ? layers.curves : kind === "shadow" ? layers.shadows : kind === "ghost" || kind === "garrow" || kind === "ripple" ? layers.ghosts : kind === "today" ? layers.today : kind === "load" || kind === "cap" ? layers.load : layers.bars;
+      g = s("g", { "data-id": id }, layer);
+      const inner = s("g", { class: "tl-pop" }, g);
+      buildShape(kind, inner, spec, id);
+    }
+    nodes.set(id, g);
+  }
+  function remove(id) {
+    nodes.get(id)?.remove();
+    nodes.delete(id);
+  }
+  function buildShape(kind, g, spec, id) {
+    const ref = id.split(":")[1] ?? id;
+    const colour = spec.colour ?? "var(--wave)";
+    const d = spec.data ?? {};
+    switch (kind) {
+      case "bar":
+      case "step": {
+        g.setAttribute("data-part", kind === "bar" ? "bar" : "step-bar");
+        g.setAttribute("data-task-id", ref);
+        for (const [k, v] of Object.entries(d)) g.setAttribute(`data-${k}`, v);
+        g.setAttribute("tabindex", "0");
+        g.setAttribute("role", "button");
+        g.setAttribute("aria-label", spec.text ?? "");
+        s("rect", { class: "tl-halo", rx: TL.bar.rx + 4 }, g);
+        const face = s("rect", { class: "tl-bar__face", rx: TL.bar.rx, "data-part": "bar-face", "data-entity-id": ref, "data-morph-shape": "bar", "data-morph-color": colour }, g);
+        face.style.fill = tint(colour, 16);
+        s("rect", { class: "tl-bar__stripe", rx: 1.5, width: TL.bar.stripeW, "data-part": "bar-stripe" }, g).style.fill = d.blocked ? "var(--danger)" : colour;
+        s("rect", { class: "tl-bar__grip", rx: 1.5, width: 3 }, g);
+        s("text", { class: "tl-bar__title", "data-part": "bar-title" }, g).textContent = spec.text ?? "";
+        s("text", { class: "tl-bar__sub", "data-part": "bar-sub" }, g).textContent = spec.sub ?? "";
+        break;
+      }
+      case "ms":
+      case "dream": {
+        g.setAttribute("data-part", kind === "ms" ? "milestone" : "dream");
+        g.setAttribute(kind === "ms" ? "data-milestone-id" : "data-dream-id", ref);
+        g.setAttribute("tabindex", "0");
+        const r = s("rect", { class: kind === "ms" ? "tl-ms" : "tl-dream", width: TL.diamond, height: TL.diamond, rx: 2, "data-entity-id": ref, "data-morph-shape": "milestone", "data-morph-color": colour }, g);
+        if (kind === "ms") r.style.fill = colour;
+        s("text", { class: kind === "ms" ? "tl-ms__label" : "tl-dream__label", "data-part": `${kind === "ms" ? "milestone" : "dream"}-label` }, g).textContent = spec.text ?? "";
+        if (kind === "dream") s("line", { class: "tl-dream__line" }, g);
+        break;
+      }
+      case "proj": {
+        g.setAttribute("data-part", "project-bar");
+        g.setAttribute("data-project-id", ref);
+        const face = s("rect", { class: "tl-proj__face", rx: TL.project.rx, height: TL.project.h, "data-entity-id": ref, "data-morph-shape": "project", "data-morph-color": colour }, g);
+        face.style.fill = tint(colour, 18);
+        s("rect", { class: "tl-proj__progress", rx: TL.project.rx, height: TL.project.h, "data-part": "project-progress" }, g).style.fill = tint(colour, 38);
+        s("text", { class: "tl-proj__title", "data-part": "project-title" }, g).textContent = spec.text ?? "";
+        s("g", { class: "tl-proj__dots" }, g);
+        s("rect", { class: "tl-proj__baseline", width: 2, rx: 1, height: TL.project.h + 8, "data-part": "baseline-tick" }, g);
+        break;
+      }
+      case "bracket": {
+        g.setAttribute("data-part", "project-bracket");
+        const r = s("rect", { class: "tl-bracket", rx: TL.project.bracketRx, height: TL.project.bracketH, "data-entity-id": ref, "data-morph-shape": "track", "data-morph-color": colour }, g);
+        r.style.fill = colour;
+        break;
+      }
+      case "band": {
+        g.setAttribute("data-part", "goal-band");
+        s("rect", { class: "tl-band", rx: TL.band.rx, height: TL.band.h }, g).style.fill = SURF.goalBand;
+        s("text", { class: "tl-band__label" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "undated": {
+        g.setAttribute("data-part", "undated");
+        g.setAttribute("role", "button");
+        g.setAttribute("tabindex", "0");
+        s("rect", { class: "tl-undated", rx: TL.undated.rx, height: TL.undated.h }, g);
+        s("text", { class: "tl-undated__label" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "curve":
+      case "edge": {
+        g.setAttribute("data-part", "curve");
+        g.setAttribute("data-kind", spec.flags?.critical ? "critical" : "normal");
+        s("path", { class: `tl-curve${spec.flags?.critical ? " tl-curve--critical" : ""}`, fill: "none", "marker-end": spec.flags?.critical ? "url(#tl-arrow-critical)" : "url(#tl-arrow)" }, g);
+        break;
+      }
+      case "hol": {
+        g.setAttribute("data-part", "holiday");
+        s("rect", { class: "tl-hol" }, g).style.fill = SURF.holiday;
+        break;
+      }
+      case "grid": {
+        s("line", { class: "tl-grid" }, g);
+        break;
+      }
+      case "term": {
+        g.setAttribute("data-part", "axis-term");
+        s("rect", { class: spec.flags?.holiday ? "tl-term tl-term--hol" : "tl-term", rx: 6, height: TL.axis.termH }, g);
+        s("text", { class: spec.flags?.holiday ? "tl-term__label tl-term__label--hol" : "tl-term__label" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "week": {
+        g.setAttribute("data-part", "axis-week");
+        s("text", { class: "tl-week__label" }, g).textContent = spec.text ?? "";
+        s("text", { class: "tl-week__date" }, g).textContent = spec.sub ?? "";
+        break;
+      }
+      case "today": {
+        g.setAttribute("data-part", "today");
+        s("line", { class: "tl-today__line" }, g);
+        s("rect", { class: "tl-today__pill", rx: TL.today.pillH / 2, height: TL.today.pillH, width: TL.today.pillW }, g);
+        s("text", { class: "tl-today__text", "text-anchor": "middle" }, g).textContent = "Today";
+        break;
+      }
+      case "wall": {
+        g.setAttribute("data-part", "wall");
+        s("rect", { class: "tl-wall", fill: "url(#tl-hatch)" }, g);
+        s("line", { class: "tl-wall__edge" }, g);
+        s("line", { class: "tl-wall__edge tl-wall__edge--end" }, g);
+        const pill = s("g", { class: "tl-wall__pill" }, g);
+        s("rect", { rx: 10, height: 20 }, pill);
+        s("path", { class: "tl-wall__lock", d: "M-3.5 -1 v-2 a3.5 3.5 0 0 1 7 0 v2 M-5 -1 h10 v7 h-10 z" }, pill);
+        s("text", {}, pill).textContent = spec.text ?? "";
+        break;
+      }
+      case "shadow": {
+        g.setAttribute("data-part", "shadow");
+        g.setAttribute("data-task-id", ref);
+        if (spec.flags?.warn) g.setAttribute("data-warn", "true");
+        s("rect", { class: "tl-shadow", rx: TL.shadow.rx, height: TL.shadow.h }, g).style.fill = SURF.shadowFill;
+        s("g", { class: "tl-shadow__density" }, g);
+        s("rect", { class: "tl-shadow__done", rx: TL.shadow.rx, height: TL.shadow.h, "data-part": "shadow-progress" }, g).style.fill = tint(colour, 34);
+        s("rect", { class: "tl-shadow__edge", width: 3, rx: 1.5, height: TL.shadow.h }, g);
+        s("text", { class: "tl-shadow__label", "data-part": "shadow-label" }, g).textContent = spec.text ?? "";
+        s("text", { class: "tl-shadow__warn", "data-part": "shadow-warn" }, g).textContent = spec.sub ?? "";
+        break;
+      }
+      case "ribbon": {
+        g.setAttribute("data-part", "ribbon");
+        for (let i = 1; i <= 7; i++) {
+          const seg = s("g", { "data-part": "ribbon-seg", "data-standard": i, "data-state": d[`s${i}`] ?? "none" }, g);
+          s("rect", { rx: TL.ribbon.rx, height: TL.ribbon.h, class: `tl-rib tl-rib--${d[`s${i}`] ?? "none"}` }, seg);
+          s("text", { class: `tl-rib__n tl-rib__n--${d[`s${i}`] ?? "none"}`, "text-anchor": "middle" }, seg).textContent = String(i);
+        }
+        break;
+      }
+      case "load": {
+        g.setAttribute("data-part", "load-col");
+        if (spec.flags?.over) g.setAttribute("data-over", "true");
+        if (spec.flags?.wall) g.setAttribute("data-wall", "true");
+        s("rect", { class: `tl-load${spec.flags?.over ? " tl-load--over" : ""}${spec.flags?.wall ? " tl-load--wall" : ""}`, rx: TL.load.rx }, g);
+        s("text", { class: `tl-load__val${spec.flags?.over ? " tl-load__val--over" : ""}`, "text-anchor": "middle" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "cap": {
+        g.setAttribute("data-part", "capacity-line");
+        s("path", { class: "tl-cap", fill: "none" }, g);
+        s("line", { class: "tl-load-divider" }, g);
+        break;
+      }
+      case "ghost": {
+        g.setAttribute("data-part", "ghost");
+        g.setAttribute("data-task-id", ref);
+        s("rect", { class: "tl-ghost", rx: TL.bar.rx, height: TL.bar.h }, g).style.fill = SURF.ghostFill;
+        const chip = s("g", { class: "tl-ghost__chip" }, g);
+        s("circle", { r: 8 }, chip);
+        s("text", { "text-anchor": "middle", y: 3.5 }, chip).textContent = "H";
+        break;
+      }
+      case "garrow": {
+        g.setAttribute("data-part", "ghost-arrow");
+        s("path", { class: "tl-garrow", fill: "none", "marker-end": "url(#tl-arrow-ghost)" }, g);
+        break;
+      }
+      case "rowtitle": {
+        g.setAttribute("data-part", "row-title");
+        s("text", { class: `tl-rowtitle tl-rowtitle--${d.kind ?? "goal"}` }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "ripple": {
+        g.setAttribute("data-part", "ripple");
+        s("rect", { class: `tl-ripple${spec.flags?.slip ? " tl-ripple--slip" : ""}`, rx: TL.bar.rx, height: TL.bar.h }, g);
+        s("text", { class: "tl-ripple__label" }, g).textContent = spec.text ?? "";
+        break;
+      }
+    }
+  }
+  function apply(id, p) {
+    if (id === "__view") {
+      state.dayWidth = p.dayWidth;
+      relayout("zoom");
+      return;
+    }
+    const node = nodes.get(id);
+    const spec = specs.get(id);
+    if (!node || !spec) return;
+    const op = String(p.opacity ?? 1);
+    if (spec.kind === "label") {
+      const el = node;
+      el.style.transform = `translate3d(0, ${p.y}px, 0)`;
+      el.style.height = `${p.h}px`;
+      el.style.opacity = op;
+      return;
+    }
+    const g = node;
+    g.setAttribute("opacity", op);
+    const inner = g.firstElementChild;
+    if (p.scale !== void 0 && p.scale !== 1) inner.style.transform = `scale(${p.scale})`;
+    else inner.style.transform = "";
+    const x = p.x ?? 0;
+    const y = p.y ?? 0;
+    const w = Math.max(0, p.w ?? 0);
+    switch (spec.kind) {
+      case "bar":
+      case "step": {
+        const bh = spec.kind === "step" ? TL.bar.h - 6 : TL.bar.h;
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        inner.classList.toggle("is-critical", Boolean(p.crit));
+        inner.classList.toggle("is-dim", Boolean(p.dim));
+        const [halo, face, stripe, grip, title, sub] = inner.children;
+        set(halo, { x: -4, y: -4, width: w + 8, height: bh + 8 });
+        set(face, { width: w, height: bh });
+        set(stripe, { x: TL.bar.stripeInset, y: 5, height: bh - 10 });
+        set(grip, { x: w - 7, y: 7, height: bh - 14 });
+        const font = "500 13px Inter";
+        const inside = textW(spec.text ?? "", font) + TL.bar.textPad + 10 <= w;
+        set(title, { x: inside ? TL.bar.textPad : w + TL.bar.outsideGap, y: bh / 2 + 4.5 });
+        title.classList.toggle("is-outside", !inside);
+        const subX = (inside ? w : w + TL.bar.outsideGap + textW(spec.text ?? "", font)) + 12;
+        set(sub, { x: subX, y: bh / 2 + 4.5 });
+        break;
+      }
+      case "ms": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, t] = inner.children;
+        set(r, { x: -TL.diamond / 2, y: -TL.diamond / 2, transform: "rotate(45)" });
+        set(t, { x: TL.diamond / 2 + 8, y: 4.5 });
+        break;
+      }
+      case "dream": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, t, line] = inner.children;
+        set(line, { x1: 0, x2: w, y1: 0, y2: 0 });
+        const tw = textW(spec.text ?? "", "500 12px Inter");
+        const inRange = Boolean(p.inRange);
+        set(r, { x: -TL.diamond / 2, y: -TL.diamond / 2, transform: `translate(${inRange ? w : w - 10} 0) rotate(45)`, opacity: inRange ? 1 : 0 });
+        set(t, { x: stickyX(x, w, tw + 24), y: -9 });
+        break;
+      }
+      case "proj": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [face, prog, title, dots, base] = inner.children;
+        set(face, { width: w });
+        set(prog, { width: Math.max(0, w * (p.progress ?? 0)) });
+        const tw = textW(spec.text ?? "", "600 13px Inter");
+        const inside = tw + 28 <= w;
+        set(title, { x: inside ? stickyX(x, w, tw) : w + 10, y: TL.project.h / 2 + 4.5 });
+        title.classList.toggle("is-outside", !inside);
+        const ms = MILESTONES.filter((m) => m.project === (id.split(":")[1] ?? ""));
+        pool(dots, ms.length, "rect").forEach((r, i) => {
+          const mx = scale.x(ms[i].due) + state.dayWidth / 2 - x;
+          set(r, { x: -4.5, y: -4.5, width: 9, height: 9, rx: 1.5, stroke: "#fff", "stroke-width": 2, transform: `translate(${mx} ${TL.project.h / 2}) rotate(45)`, opacity: mx < 0 || mx > w + 1 ? 0 : 1 });
+          r.style.fill = spec.colour ?? "var(--wave)";
+        });
+        const baseX = p.baseline ?? -1;
+        set(base, { x: baseX - x - 1, y: -4, opacity: baseX >= 0 ? 1 : 0 });
+        break;
+      }
+      case "bracket": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        set(inner.firstElementChild, { width: w });
+        break;
+      }
+      case "band": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, t] = inner.children;
+        set(r, { width: w });
+        set(t, { x: stickyX(x, w, textW(spec.text ?? "", "500 12px Inter")), y: TL.band.h / 2 + 4 });
+        break;
+      }
+      case "undated": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, t] = inner.children;
+        set(r, { width: w });
+        set(t, { x: TL.undated.padX, y: TL.undated.h / 2 + 4 });
+        break;
+      }
+      case "curve":
+      case "edge": {
+        const path = inner.firstElementChild;
+        const x1 = p.x1, y1 = p.y1, x2 = p.x2, y2 = p.y2;
+        const dx = Math.max(24, Math.abs(x2 - x1) * 0.5);
+        path.setAttribute("d", `M${x1} ${y1} C${x1 + dx} ${y1} ${x2 - dx} ${y2} ${x2} ${y2}`);
+        const crit = Boolean(p.crit);
+        inner.setAttribute("data-kind", crit ? "critical" : "normal");
+        path.setAttribute("class", `tl-curve${crit ? " tl-curve--critical" : ""}`);
+        path.setAttribute("marker-end", crit ? "url(#tl-arrow-critical)" : "url(#tl-arrow)");
+        inner.classList.toggle("is-dim", Boolean(p.dim));
+        break;
+      }
+      case "hol": {
+        set(inner.firstElementChild, { x, y: 0, width: w, height: p.h ?? 0 });
+        break;
+      }
+      case "grid": {
+        set(inner.firstElementChild, { x1: x, x2: x, y1: TL.axis.h - 6, y2: p.h ?? 0 });
+        break;
+      }
+      case "term": {
+        g.setAttribute("transform", `translate(${x} ${TL.axis.termY})`);
+        const [r, t] = inner.children;
+        set(r, { width: w });
+        const label = w > textW(spec.text ?? "", "600 11px Inter") + 20 ? spec.text ?? "" : "";
+        t.textContent = label;
+        set(t, { x: 10, y: TL.axis.termH / 2 + 4 });
+        break;
+      }
+      case "week": {
+        g.setAttribute("transform", `translate(${x} 0)`);
+        const [a, b] = inner.children;
+        const room = w - 8;
+        a.textContent = room > 40 ? spec.text ?? "" : room > 18 ? (spec.text ?? "").split(" ")[1] ?? "" : "";
+        b.textContent = room > 52 ? spec.sub ?? "" : "";
+        set(a, { x: 6, y: TL.axis.weekY });
+        set(b, { x: 6, y: TL.axis.dateY });
+        break;
+      }
+      case "today": {
+        const [line, pill, text] = inner.children;
+        set(line, { x1: x, x2: x, y1: TL.axis.h - 2, y2: p.h ?? 0 });
+        set(pill, { x: x - TL.today.pillW / 2, y: TL.axis.termY });
+        set(text, { x, y: TL.axis.termY + 14 });
+        break;
+      }
+      case "wall": {
+        const [r, e1, e2, pill] = inner.children;
+        set(r, { x, y: TL.axis.h, width: w, height: Math.max(0, (p.h ?? 0) - TL.axis.h) });
+        set(e1, { x1: x, x2: x, y1: TL.axis.h, y2: p.h ?? 0 });
+        set(e2, { x1: x + w, x2: x + w, y1: TL.axis.h, y2: p.h ?? 0 });
+        const text = spec.text ?? "";
+        const tw = textW(text, "600 12px Inter") + 36;
+        pill.setAttribute("transform", `translate(${x + 8} ${TL.axis.h + 8})`);
+        const [pr, lock, pt] = pill.children;
+        set(pr, { width: tw });
+        lock.setAttribute("transform", "translate(14 9)");
+        set(pt, { x: 26, y: 14 });
+        break;
+      }
+      case "shadow": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, density, done, edge, label, warn] = inner.children;
+        set(r, { width: w });
+        set(done, { width: Math.max(0, w * (p.progress ?? 0)) });
+        set(edge, { x: -1.5 });
+        const per = p.perDay ?? 0;
+        const days = state.dayWidth >= 8 ? Math.round(p.days ?? 0) : 0;
+        const dw = days ? w / days : 0;
+        const hh = Math.min(TL.shadow.h - 8, (TL.shadow.h - 8) * Math.min(1, per / 120));
+        pool(density, days, "rect").forEach((c, i) => {
+          set(c, { x: i * dw + 2, y: TL.shadow.h - 4 - hh, width: Math.max(1, dw - 4), height: hh, rx: 2 });
+          c.style.fill = spec.flags?.warn ? "color-mix(in srgb, var(--high-sea-ink) 22%, transparent)" : "color-mix(in srgb, var(--navy) 9%, transparent)";
+        });
+        const lw = textW(spec.text ?? "", "500 13px Inter");
+        const inside = lw + 24 <= w;
+        set(label, { x: inside ? 12 : w + 10, y: TL.shadow.h / 2 + 4.5 });
+        set(warn, { x: inside ? w + 10 : w + 10 + lw + 12, y: TL.shadow.h / 2 + 4.5 });
+        break;
+      }
+      case "ribbon": {
+        const segW = 26;
+        const total = segW * 7 + TL.ribbon.gap * 6;
+        g.setAttribute("transform", `translate(${x + stickyX(x, w, total) - 12} ${y})`);
+        [...inner.children].forEach((seg, i) => {
+          const [r, t] = seg.children;
+          set(r, { x: i * (segW + TL.ribbon.gap), width: segW });
+          set(t, { x: i * (segW + TL.ribbon.gap) + segW / 2, y: TL.ribbon.h / 2 + 4 });
+        });
+        break;
+      }
+      case "load": {
+        const [r, t] = inner.children;
+        const hh = p.h ?? 0;
+        set(r, { x, y: (p.base ?? 0) - hh, width: w, height: hh });
+        set(t, { x: x + w / 2, y: (p.base ?? 0) - hh - 6 });
+        t.setAttribute("opacity", w > 26 && hh > 0 ? "1" : "0");
+        break;
+      }
+      case "cap": {
+        inner.firstElementChild.setAttribute("d", capPath);
+        set(inner.children[1], { x1: 0, x2: geometry.width, y1: p.top ?? 0, y2: p.top ?? 0 });
+        break;
+      }
+      case "ghost": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, chip] = inner.children;
+        set(r, { width: w });
+        chip.setAttribute("transform", `translate(${w} 0)`);
+        break;
+      }
+      case "garrow": {
+        const x1 = p.x1, y1 = p.y1, x2 = p.x2, y2 = p.y2;
+        const lift = 18;
+        inner.firstElementChild.setAttribute("d", `M${x1} ${y1} C${x1} ${y1 - lift} ${x2} ${y2 - lift} ${x2} ${y2}`);
+        break;
+      }
+      case "rowtitle": {
+        g.setAttribute("transform", `translate(${viewLeft + 12} ${y})`);
+        break;
+      }
+      case "ripple": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        const [r, t] = inner.children;
+        set(r, { width: w });
+        set(t, { x: p.lx ?? w + 8, y: TL.bar.h / 2 + 4.5 });
+        break;
+      }
+    }
+  }
+  function set(el, attrs) {
+    for (const k in attrs) el.setAttribute(k, String(attrs[k]));
+  }
+  var viewLeft = 0;
+  var STICKY = /* @__PURE__ */ new Set(["proj", "band", "ribbon", "dream", "rowtitle"]);
+  function stickyX(barX, barW, textWidth) {
+    const min = viewLeft + 12 - barX;
+    return Math.max(12, Math.min(min, barW - textWidth - 12));
+  }
+  function onScroll() {
+    viewLeft = els.scroller.scrollLeft;
+    for (const [id, spec] of specs) {
+      if (!STICKY.has(spec.kind)) continue;
+      const p = engine.get(id);
+      if (p && nodes.has(id)) apply(id, p);
+    }
+  }
+  var scrollRaf = 0;
+  els.scroller.addEventListener("scroll", () => {
+    cancelAnimationFrame(scrollRaf);
+    scrollRaf = requestAnimationFrame(onScroll);
+  }, { passive: true });
+  var scale;
+  var rows = [];
+  var capPath = "";
+  var PAD_R = 220;
+  function computeScale() {
+    return buildTimeScale({
+      start: RANGE.start,
+      end: RANGE.end,
+      terms: SCHOOL,
+      dayWidth: state.dayWidth,
+      holidayFactor: state.holidaysCompressed ? 0.25 : 1
+    });
+  }
+  function layout() {
+    scale = computeScale();
+    rows = buildRows();
+    const E = /* @__PURE__ */ new Map();
+    const top = TL.axis.h + 8;
+    const rowsBottom = top + (rows.length ? rows[rows.length - 1].y + rows[rows.length - 1].h : 0);
+    const loadTop = rowsBottom + 16;
+    const height = state.load ? loadTop + TL.load.h : rowsBottom + 12;
+    const width = scale.width + PAD_R;
+    const dw = state.dayWidth;
+    const X = (k) => scale.x(k);
+    const barX = (span) => {
+      const x0 = X(span.start);
+      const x1 = X(addDaysKey(span.end, 1));
+      const w = Math.max(TL.bar.minW, x1 - x0);
+      return { x: x1 - w, w };
+    };
+    for (const t of TERMS) {
+      const id = `term:T${t.term}`;
+      specs.set(id, { kind: "term", text: `Term ${t.term}` });
+      E.set(id, { x: X(t.start), w: X(addDaysKey(t.end, 1)) - X(t.start) - 4 });
+    }
+    for (const run of holidayRuns(scale)) {
+      const hid = `hol:${run.start}`;
+      specs.set(hid, { kind: "hol" });
+      E.set(hid, { x: run.x, w: run.w, h: height });
+      const tid = `term:hol-${run.start}`;
+      specs.set(tid, { kind: "term", text: "Holidays", flags: { holiday: true } });
+      E.set(tid, { x: run.x + 2, w: run.w - 4 });
+    }
+    for (let k = mondayOf(RANGE.start); k <= RANGE.end; k = addDaysKey(k, 7)) {
+      const x = X(k);
+      const next = X(addDaysKey(k, 7));
+      const label = weekLabel(k, SCHOOL) ?? weekLabel(addDaysKey(k, 1), SCHOOL);
+      const gid = `grid:${k}`;
+      specs.set(gid, { kind: "grid" });
+      E.set(gid, { x, h: height });
+      if (!label) continue;
+      const wid = `week:${k}`;
+      specs.set(wid, { kind: "week", text: label, sub: fmt(k) });
+      E.set(wid, { x, w: next - x });
+    }
+    for (const w of WALLS) {
+      const id = `wall:${w.id}`;
+      specs.set(id, { kind: "wall", text: `${w.label} \xB7 wall` });
+      E.set(id, { x: X(w.start), w: X(addDaysKey(w.end, 1)) - X(w.start), h: rowsBottom + 4 });
+    }
+    const compact = els.card.clientWidth < TL.mobileBreak;
+    els.card.classList.toggle("is-compact", compact);
+    const rowY = /* @__PURE__ */ new Map();
+    for (const r of rows) {
+      const y = top + r.y;
+      if (compact && (r.kind === "goal" || r.kind === "group" || r.kind === "dream" || r.kind === "project" && r.open)) {
+        const id = `rowtitle:${r.ref}`;
+        specs.set(id, { kind: "rowtitle", text: r.kind === "dream" ? `Dream \xB7 ${r.label} \xB7 target ${fmt(DREAMS.find((d) => d.id === r.ref).target)}` : r.label, data: { kind: r.kind } });
+        E.set(id, { x: 0, y: r.kind === "project" ? y + 10 : r.kind === "dream" ? y + 10 : y + r.h / 2 + 4 });
+      }
+      rowY.set(r.ref, y);
+      const lid = `label:${r.id}`;
+      specs.set(lid, { kind: "label", text: r.label });
+      E.set(lid, { y: r.y, h: r.h });
+      if (r.kind === "goal") {
+        const ps = PROJECTS.filter((p) => p.goal === r.ref);
+        const x0 = Math.min(...ps.map((p) => X(p.start)));
+        const x1 = Math.max(...ps.map((p) => X(addDaysKey(p.end, 1))));
+        const id = `band:${r.ref}`;
+        specs.set(id, { kind: "band", text: `${ps.length} projects` });
+        E.set(id, { x: x0, y: y + (r.h - TL.band.h) / 2, w: x1 - x0 });
+      }
+      if (r.kind === "dream") {
+        const d = DREAMS.find((d2) => d2.id === r.ref);
+        const id = `dream:${d.id}`;
+        const inRange = d.target <= RANGE.end;
+        specs.set(id, { kind: "dream", text: `Target ${fmt(d.target)}${inRange ? "" : " \u2192"}`, colour: "var(--pastel-gold-ink)" });
+        const x0 = d.origin && d.origin > RANGE.start ? X(d.origin) : 0;
+        const x1 = inRange ? X(d.target) : scale.width;
+        E.set(id, { x: x0, y: y + r.h / 2 + 6, w: x1 - x0, inRange: inRange ? 1 : 0 });
+      }
+      if (r.kind === "project") {
+        const p = PROJECTS.find((p2) => p2.id === r.ref);
+        const span = projectSpan(p);
+        const x0 = X(span.start);
+        const x1 = X(addDaysKey(span.end, 1));
+        const all = state.tasks.filter((t) => t.project === p.id);
+        const done = all.filter((t) => t.status === "done").length;
+        const barH = r.open ? TL.project.bracketH : TL.project.h;
+        const mainH = r.h - (p.ribbon ? TL.row.ribbon : 0);
+        const by = y + (mainH - barH) / 2;
+        if (r.open) {
+          const id = `bracket:${p.id}`;
+          specs.set(id, { kind: "bracket", colour: colourOf(p) });
+          E.set(id, { x: x0, y: by, w: x1 - x0 });
+        } else {
+          const id = `proj:${p.id}`;
+          specs.set(id, { kind: "proj", text: p.title, colour: colourOf(p) });
+          E.set(id, { x: x0, y: by, w: x1 - x0, progress: all.length ? done / all.length : 0, baseline: p.baselineEnd ? X(addDaysKey(p.baselineEnd, 1)) : -1 });
+        }
+        const undated = all.filter((t) => !t.due).length;
+        if (undated) {
+          const id = `undated:${p.id}`;
+          const text = `+${undated} undated`;
+          specs.set(id, { kind: "undated", text });
+          const tw = textW(p.title, "600 13px Inter");
+          const titleOutside = !r.open && tw + 28 > x1 - x0;
+          E.set(id, { x: titleOutside ? x1 + 10 + tw + 12 : x1 + 8, y: y + (mainH - TL.undated.h) / 2, w: textW(text, "500 12px Inter") + TL.undated.padX * 2 });
+        }
+        if (p.ribbon) {
+          const covered = /* @__PURE__ */ new Map();
+          for (const t of all)
+            for (const a of t.apst ?? []) {
+              const n = Number(a[0]);
+              if (t.status === "done") covered.set(n, "evidenced");
+              else if (covered.get(n) !== "evidenced") covered.set(n, "some");
+            }
+          const data = {};
+          for (let i = 1; i <= 7; i++) data[`s${i}`] = covered.get(i) ?? "none";
+          const id = `ribbon:${p.id}`;
+          specs.set(id, { kind: "ribbon", data });
+          E.set(id, { x: x0, y: y + mainH - 2, w: Math.max(7 * 18, x1 - x0) });
+        }
+      }
+      if (r.kind === "task" || r.kind === "step") {
+        const t = state.tasks.find((t2) => t2.id === r.ref);
+        const span = taskSpan(t);
+        const b = barX(span);
+        const id = `${r.kind === "step" ? "step" : "bar"}:${t.id}`;
+        const sub = t.blocked ? "blocked 4 days" : t.status === "done" ? "done" : `due ${fmt(t.due)}`;
+        const flags = { state: t.status === "done" ? "done" : t.blocked ? "blocked" : t.status };
+        if (t.blocked) flags.blocked = "true";
+        specs.set(id, { kind: r.kind === "step" ? "step" : "bar", text: t.title, sub, colour: colourOf(PROJECTS.find((p) => p.id === t.project) ?? { domain: t.domain }), data: flags });
+        const bh = r.kind === "step" ? TL.bar.h - 6 : TL.bar.h;
+        const crit = state.critical && CRITICAL.has(t.id);
+        E.set(id, { x: b.x, y: y + (r.h - bh) / 2, w: b.w, crit: crit ? 1 : 0, dim: state.critical && !crit ? 1 : 0 });
+      }
+      if (r.kind === "milestone") {
+        const m = MILESTONES.find((m2) => m2.id === r.ref);
+        const p = PROJECTS.find((p2) => p2.id === m.project);
+        const id = `ms:${m.id}`;
+        specs.set(id, { kind: "ms", text: `${m.title} \xB7 ${fmt(m.due)}`, colour: colourOf(p) });
+        E.set(id, { x: X(m.due) + dw / 2, y: y + r.h / 2 });
+      }
+      if (r.kind === "marking") {
+        const t = state.tasks.find((t2) => t2.id === r.ref);
+        const mk = t.marking;
+        const x0 = X(mk.collected);
+        const x1 = X(addDaysKey(mk.returnBy, 1));
+        const left = mk.scripts - mk.marked;
+        const minutes = left * mk.rate;
+        let days = 0;
+        for (let d = mk.collected; d <= mk.returnBy; d = addDaysKey(d, 1)) if (WINDOW_MINUTES[(new Date(toMs(d)).getUTCDay() + 6) % 7]) days++;
+        const from = mk.collected > TODAY ? mk.collected : TODAY;
+        let daysLeft = 0;
+        for (let d = from; d <= mk.returnBy; d = addDaysKey(d, 1)) if (WINDOW_MINUTES[(new Date(toMs(d)).getUTCDay() + 6) % 7]) daysLeft++;
+        const perDay = minutes / Math.max(1, daysLeft);
+        const cap = 120;
+        const warn = perDay > cap * 0.6;
+        const hrs = minutes >= 60 ? `~${Math.round(minutes / 60)} h left` : `~${Math.round(minutes)} min left`;
+        const id = `shadow:${t.id}`;
+        specs.set(id, {
+          kind: "shadow",
+          text: `${mk.cls} \xB7 ${mk.marked} of ${mk.scripts} \xB7 ${hrs}`,
+          sub: warn ? `needs ${Math.round(perDay)} min a day` : "",
+          colour: colourOf({ domain: t.domain }),
+          flags: { warn }
+        });
+        E.set(id, { x: x0, y: y + (r.h - TL.shadow.h) / 2, w: x1 - x0, progress: mk.marked / mk.scripts, perDay, days });
+      }
+      if (r.kind === "group" && !r.open && r.ref === "grp-loose") {
+      }
+    }
+    const anchor = (tid, end) => {
+      const bar = E.get(`bar:${tid}`) ?? E.get(`step:${tid}`);
+      if (bar) return { x: end === "finish" ? bar.x + bar.w : bar.x, y: bar.y + TL.bar.h / 2 };
+      const ms = E.get(`ms:${tid}`);
+      if (ms) return { x: ms.x + (end === "finish" ? 8 : -8), y: ms.y };
+      return null;
+    };
+    const links = [];
+    for (const t of state.tasks) for (const d of t.deps ?? []) links.push([d, t.id]);
+    for (const m of MILESTONES) for (const d of m.deps ?? []) links.push([d, m.id]);
+    for (const [from, to] of links) {
+      const a = anchor(from, "finish");
+      const b = anchor(to, "start");
+      if (!a || !b) continue;
+      const key = `${from}>${to}`;
+      const id = `curve:${key}`;
+      const critical = state.critical && CRITICAL.has(key);
+      specs.set(id, { kind: "curve", flags: { critical } });
+      E.set(id, { x1: a.x, y1: a.y, x2: b.x - 2, y2: b.y, dim: state.critical && !critical ? 1 : 0, crit: critical ? 1 : 0 });
+    }
+    specs.set("today", { kind: "today" });
+    E.set("today", { x: X(TODAY) + dw * TODAY_FRAC, h: rowsBottom + 4 });
+    capPath = "";
+    if (state.load) {
+      const weeks = weekLoad();
+      const maxMin = Math.max(...weeks.map((w) => Math.max(w.minutes, w.capacity)), 1);
+      const base = loadTop + TL.load.h - 10;
+      const scaleH = (m) => (TL.load.h - TL.load.top - 10) * m / maxMin;
+      const cap = [];
+      for (const w of weeks) {
+        const x0 = X(w.key);
+        const x1 = X(addDaysKey(w.key, 7));
+        const over = w.minutes > w.capacity && w.capacity > 0;
+        const id = `load:${w.key}`;
+        specs.set(id, { kind: "load", text: `${Math.round(w.minutes / 60)} h`, flags: { over, wall: w.wall } });
+        E.set(id, { x: x0 + TL.load.colGap / 2, w: Math.max(2, x1 - x0 - TL.load.colGap), h: Math.max(w.minutes ? 3 : 0, scaleH(w.minutes)), base });
+        const cy = base - scaleH(w.capacity);
+        cap.push(`${cap.length ? "L" : "M"}${x0} ${cy} L${x1} ${cy}`);
+      }
+      capPath = cap.join(" ");
+      if (compact) {
+        specs.set("rowtitle:load", { kind: "rowtitle", text: "Load", data: { kind: "group" } });
+        E.set("rowtitle:load", { x: 0, y: loadTop + 8 });
+      }
+      specs.set("cap", { kind: "cap" });
+      E.set("cap", { x: 0, top: loadTop - 8 });
+    }
+    if (state.hammond) {
+      for (const c of HAMMOND.changes) {
+        const t = state.tasks.find((t2) => t2.id === c.id);
+        const cur = E.get(`bar:${t.id}`);
+        if (!cur) continue;
+        const span = taskSpan({ ...t, due: c.due });
+        const b = barX(span);
+        const gid = `ghost:${t.id}`;
+        specs.set(gid, { kind: "ghost" });
+        E.set(gid, { x: b.x, y: cur.y, w: b.w });
+        const aid = `garrow:${t.id}`;
+        specs.set(aid, { kind: "garrow" });
+        const fromX = cur.x + cur.w / 2;
+        const toX = b.x + b.w / 2;
+        E.set(aid, { x1: fromX, y1: cur.y - 2, x2: toX + (toX > fromX ? -2 : 2), y2: cur.y - 2 });
+      }
+    }
+    if (state.drag && state.drag.days) {
+      const moved = /* @__PURE__ */ new Map([[state.drag.id, state.drag.days]]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [from, to] of links) {
+          if (!moved.has(from) || moved.has(to)) continue;
+          moved.set(to, moved.get(from));
+          changed = true;
+        }
+      }
+      for (const [id, days] of moved) {
+        if (id === state.drag.id) continue;
+        const m = MILESTONES.find((m2) => m2.id === id);
+        const t = state.tasks.find((t2) => t2.id === id);
+        const cur = E.get(`bar:${id}`) ?? E.get(`ms:${id}`);
+        if (!cur) continue;
+        const rid = `ripple:${id}`;
+        if (m && days > 0) {
+          const due = addDaysKey(m.due, days);
+          specs.set(rid, { kind: "ripple", text: `would slip to ${fmt(due)}`, flags: { slip: true } });
+          const rx = X(due) + dw / 2 - TL.bar.h / 2;
+          const labelEnd = cur.x + TL.diamond / 2 + 8 + textW(`${m.title} \xB7 ${fmt(m.due)}`, "600 12px Inter");
+          E.set(rid, { x: rx, y: cur.y - TL.bar.h / 2, w: TL.bar.h, lx: Math.max(TL.bar.h + 8, labelEnd - rx + 12) });
+        } else if (m) {
+          specs.set(rid, { kind: "ripple", text: "" });
+          E.set(rid, { x: X(addDaysKey(m.due, days)) + dw / 2 - TL.bar.h / 2, y: cur.y - TL.bar.h / 2, w: TL.bar.h });
+        } else if (t) {
+          const span = taskSpan({ ...t, due: addDaysKey(t.due, days) });
+          const b = barX(span);
+          specs.set(rid, { kind: "ripple", text: "" });
+          E.set(rid, { x: b.x, y: cur.y, w: b.w });
+        }
+      }
+    }
+    return { entities: E, width, height };
+  }
+  var engine = createMotion({ apply });
+  var lastIds = [];
+  var geometry = { width: 0, height: 0 };
+  function relayout(reason) {
+    const anchorX = zoomAnchor ? zoomAnchor.screenX : 0;
+    const L = layout();
+    geometry = { width: L.width, height: L.height };
+    const w = reason === "zoom" && zoomCanvasWidth ? zoomCanvasWidth : L.width;
+    if (els.svg.getAttribute("width") !== String(w)) {
+      els.svg.setAttribute("width", String(w));
+      els.svg.style.width = `${w}px`;
+    }
+    if (els.svg.getAttribute("height") !== String(L.height)) els.svg.setAttribute("height", String(L.height));
+    els.labels.style.height = `${L.height}px`;
+    els.labels.style.setProperty("--tl-top", `${TL.axis.h + 8}px`);
+    const legend = document.getElementById("tl-load-label");
+    legend.hidden = !state.load;
+    legend.style.top = `${L.height - TL.load.h + 8}px`;
+    if (reason === "zoom") {
+      for (const [id, props] of L.entities) {
+        if (!nodes.has(id)) create(id);
+        engine.place(id, { opacity: 1, scale: 1, ...props });
+      }
+      for (const id of lastIds) if (!L.entities.has(id)) {
+        engine.forget(id);
+        remove(id);
+      }
+      lastIds = [...L.entities.keys()];
+      if (zoomAnchor) els.scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
+      return;
+    }
+    const opts = reason === "release" ? { duration: MOTION.release, easing: OVERSHOOT } : reason === "expand" ? { duration: MOTION.expand, easing: EASE } : reason === "drag" ? { duration: MOTION.hover, easing: EASE } : { duration: MOTION.settle, easing: EASE };
+    if (reason === "first") {
+      for (const [id, props] of L.entities) {
+        create(id);
+        engine.place(id, { opacity: 1, scale: 1, ...props });
+      }
+      lastIds = [...L.entities.keys()];
+      playEntrance();
+      return;
+    }
+    reconcile(engine, L.entities, {
+      previous: lastIds,
+      create,
+      remove,
+      options: opts,
+      stagger: reason === "expand" ? 0 : 0
+    });
+    lastIds = [...L.entities.keys()];
+    paintLabels();
+  }
+  function paintLabels() {
+    for (const r of rows) {
+      const node = nodes.get(`label:${r.id}`);
+      if (!node || node.dataset.painted === `${r.open}-${r.label}`) continue;
+      node.dataset.painted = `${r.open}-${r.label}`;
+      node.className = `tl-label tl-label--${r.kind}`;
+      node.setAttribute("data-part", "label");
+      node.setAttribute("data-row", r.ref);
+      node.style.setProperty("--depth", String(r.depth));
+      node.innerHTML = "";
+      const expandable = r.kind === "goal" || r.kind === "project" || r.kind === "group" || r.kind === "task" && state.tasks.some((c) => c.parent === r.ref);
+      if (expandable) {
+        const b = h("button", `tl-chev${r.open || r.kind === "task" && isExpanded(r.ref, "task") ? " is-open" : ""}`, void 0, node);
+        b.type = "button";
+        b.setAttribute("aria-expanded", String(Boolean(r.open)));
+        b.setAttribute("aria-label", `${r.open ? "Collapse" : "Expand"} ${r.label}`);
+        b.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>';
+        b.onclick = () => toggle(r.ref, r.kind);
+      } else h("span", "tl-chev-space", void 0, node);
+      if (r.kind === "project") {
+        const dot = h("i", "tl-label__dot", void 0, node);
+        dot.style.background = r.colour ?? "var(--wave)";
+      }
+      if (r.kind === "dream") h("span", "tl-label__tag", "Dream", node);
+      h("span", "tl-label__text", r.label, node);
+      if (r.kind === "group" && r.ref === "grp-loose" && !r.open) h("span", "tl-label__count", String(state.tasks.filter((t) => !t.project && !t.marking).length), node);
+    }
+  }
+  function toggle(ref, kind) {
+    const k = kind === "task" ? "task" : kind === "group" ? "group" : kind === "goal" ? "goal" : "project";
+    state.expanded.set(ref, !isExpanded(ref, k));
+    announce(`${state.expanded.get(ref) ? "Expanded" : "Collapsed"} ${ref}`);
+    relayout("expand");
+  }
+  function playEntrance() {
+    paintLabels();
+    if (reduced) return;
+    let i = 0;
+    for (const id of lastIds) {
+      const kind = specs.get(id).kind;
+      const node = nodes.get(id);
+      if (!node) continue;
+      if (kind === "curve") {
+        const path = node.querySelector("path");
+        const L = path.getTotalLength();
+        path.animate([{ strokeDasharray: `${L}`, strokeDashoffset: L }, { strokeDasharray: `${L}`, strokeDashoffset: 0 }], { duration: 420, delay: 380, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards" });
+      } else if (kind === "bar" || kind === "ms" || kind === "proj" || kind === "bracket" || kind === "band" || kind === "shadow" || kind === "dream" || kind === "undated" || kind === "ribbon" || kind === "step" || kind === "label") {
+        const p = engine.get(id);
+        const delay = Math.min(360, (p?.y ?? 0) / 12 | 0);
+        node.animate([{ opacity: 0, transform: `${kind === "label" ? `translate3d(0, ${p?.y ?? 0}px, 0) ` : ""}translateY(6px)` }, { opacity: 1, transform: `${kind === "label" ? `translate3d(0, ${p?.y ?? 0}px, 0) ` : ""}translateY(0)` }], { duration: 260, delay, easing: "cubic-bezier(.2,.8,.2,1)", fill: "backwards", composite: kind === "label" ? "replace" : "add" });
+      } else if (kind === "load") {
+        node.firstElementChild.animate([{ transform: "scaleY(0)" }, { transform: "scaleY(1)" }], { duration: 320, delay: 300 + i++ % 30 * 12, easing: "cubic-bezier(.34,1.3,.64,1)", fill: "backwards" });
+      }
+    }
+  }
+  var zoomAnchor = null;
+  var zoomCanvasWidth = 0;
+  var zoomSettle = 0;
+  function setZoom(index, anchorClientX) {
+    index = Math.max(0, Math.min(TL.zooms.length - 1, index));
+    if (index === state.zoom && anchorClientX === void 0) return;
+    const box = els.scroller.getBoundingClientRect();
+    const screenX = anchorClientX !== void 0 ? anchorClientX - box.left : scale.x(TODAY) + state.dayWidth * TODAY_FRAC - els.scroller.scrollLeft;
+    const contentX = els.scroller.scrollLeft + screenX;
+    const date = scale.dateAt(contentX);
+    zoomAnchor = { date, frac: (contentX - scale.x(date)) / state.dayWidth, screenX };
+    const prevZoom = state.zoom;
+    state.zoom = index;
+    paintZoomPills();
+    const semantic = TL.zooms[prevZoom].id !== TL.zooms[index].id;
+    const target = buildTimeScale({ start: RANGE.start, end: RANGE.end, terms: SCHOOL, dayWidth: TL.zooms[index].dayWidth, holidayFactor: state.holidaysCompressed ? 0.25 : 1 });
+    zoomCanvasWidth = Math.max(scale.width, target.width) + PAD_R;
+    engine.place("__view", { dayWidth: state.dayWidth });
+    engine.to("__view", { dayWidth: TL.zooms[index].dayWidth }, { duration: MOTION.zoom, easing: EASE });
+    window.clearTimeout(zoomSettle);
+    zoomSettle = window.setTimeout(() => {
+      zoomCanvasWidth = 0;
+      relayout(semantic ? "expand" : "settle");
+    }, reduced ? 0 : MOTION.zoom + 20);
+    announce(`Zoom ${TL.zooms[index].label}`);
+  }
+  var zoomPills = document.getElementById("tl-zoom");
+  function paintZoomPills() {
+    if (!zoomPills.children.length) {
+      h("span", "hub-pills__thumb", void 0, zoomPills);
+      TL.zooms.forEach((z, i) => {
+        const b = h("button", "hub-pills__btn", z.label, zoomPills);
+        b.type = "button";
+        b.onclick = () => setZoom(i);
+      });
+    }
+    [...zoomPills.querySelectorAll("button")].forEach((b, i) => {
+      b.classList.toggle("is-active", i === state.zoom);
+      b.setAttribute("aria-pressed", String(i === state.zoom));
+    });
+    moveThumb(zoomPills);
+  }
+  function moveThumb(group) {
+    const active = group.querySelector(".is-active");
+    const thumb = group.querySelector(".hub-pills__thumb");
+    if (!active || !thumb) return;
+    group.style.setProperty("--hub-pill-x", `${active.offsetLeft}px`);
+    group.style.setProperty("--hub-pill-y", `${active.offsetTop}px`);
+    group.style.setProperty("--hub-pill-w", `${active.offsetWidth}px`);
+    group.style.setProperty("--hub-pill-h", `${active.offsetHeight}px`);
+    group.classList.add("is-ready");
+    requestAnimationFrame(() => group.classList.add("is-animated"));
+  }
+  var viewPills = document.getElementById("tl-view");
+  function paintViewPills() {
+    [...viewPills.querySelectorAll("button")].forEach((b) => {
+      const on = b.dataset.view === state.view;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    moveThumb(viewPills);
+  }
+  viewPills.querySelectorAll("button").forEach((b) => b.onclick = () => setView(b.dataset.view));
+  var critBtn = document.getElementById("tl-critical");
+  critBtn.onclick = () => {
+    state.critical = !state.critical;
+    critBtn.setAttribute("aria-pressed", String(state.critical));
+    relayout("settle");
+  };
+  var loadBtn = document.getElementById("tl-load");
+  loadBtn.onclick = () => {
+    state.load = !state.load;
+    loadBtn.setAttribute("aria-pressed", String(state.load));
+    relayout("expand");
+  };
+  var holBtn = document.getElementById("tl-holidays");
+  holBtn.onclick = () => {
+    state.holidaysCompressed = !state.holidaysCompressed;
+    holBtn.textContent = state.holidaysCompressed ? "Holidays: compressed" : "Holidays: full";
+    relayout("settle");
+  };
+  document.getElementById("tl-today-btn").onclick = () => scrollToToday(true);
+  document.getElementById("tl-hammond").onclick = () => showHammond(true);
+  function scrollToToday(smooth) {
+    const target = Math.max(0, scale.x(addDaysKey(mondayOf(TODAY), -21)) - 1);
+    els.scroller.scrollTo({ left: target, behavior: smooth && !reduced ? "smooth" : "auto" });
+  }
+  function showHammond(on) {
+    state.hammond = on;
+    els.tray.hidden = !on;
+    if (on) {
+      els.tray.classList.remove("is-in");
+      requestAnimationFrame(() => els.tray.classList.add("is-in"));
+    }
+    if (on) {
+      for (const c of HAMMOND.changes) {
+        const t = state.tasks.find((t2) => t2.id === c.id);
+        state.expanded.set(t?.project ?? "grp-loose", true);
+      }
+    }
+    relayout("settle");
+  }
+  document.getElementById("tl-apply").onclick = () => {
+    for (const c of HAMMOND.changes) {
+      const t = state.tasks.find((t2) => t2.id === c.id);
+      if (t) t.due = c.due;
+    }
+    state.hammond = false;
+    els.tray.hidden = true;
+    relayout("settle");
+    announce("Applied 3 changes from Hammond");
+  };
+  document.getElementById("tl-dismiss").onclick = () => showHammond(false);
+  function curveSnapshot(tid) {
+    const snap = /* @__PURE__ */ new Map();
+    for (const id of lastIds) {
+      if (!id.startsWith("curve:")) continue;
+      const [a, b] = id.slice(6).split(">");
+      if (a === tid || b === tid) snap.set(id, { ...engine.get(id) });
+    }
+    return snap;
+  }
+  function followCurves(tid, snap, dx) {
+    for (const [id, p] of snap) {
+      const [a, b] = id.slice(6).split(">");
+      engine.place(id, { x1: p.x1 + (a === tid ? dx : 0), x2: p.x2 + (b === tid ? dx : 0) });
+    }
+  }
+  function onPointerDown(ev) {
+    const g = ev.target.closest('[data-part="bar"]');
+    if (!g || state.view !== "bars") return;
+    const tid = g.getAttribute("data-task-id");
+    const id = `bar:${tid}`;
+    const p = engine.get(id);
+    if (!p) return;
+    ev.preventDefault();
+    g.setPointerCapture(ev.pointerId);
+    g.classList.add("is-dragging");
+    select(tid);
+    state.drag = { id: tid, dx: 0, startX: ev.clientX, days: 0 };
+    const startX = p.x;
+    const snap = curveSnapshot(tid);
+    const move = (e) => {
+      if (!state.drag) return;
+      const dx = e.clientX - state.drag.startX;
+      engine.place(id, { x: startX + dx });
+      followCurves(tid, snap, dx);
+      const days = Math.round(dx / state.dayWidth);
+      if (days !== state.drag.days) {
+        state.drag.days = days;
+        relayoutDragPreview();
+      }
+    };
+    const up = () => {
+      g.removeEventListener("pointermove", move);
+      g.classList.remove("is-dragging");
+      const days = state.drag?.days ?? 0;
+      const moved = /* @__PURE__ */ new Set();
+      if (days) {
+        const queue = [tid];
+        while (queue.length) {
+          const cur = queue.shift();
+          if (moved.has(cur)) continue;
+          moved.add(cur);
+          for (const t of state.tasks) if ((t.deps ?? []).includes(cur)) queue.push(t.id);
+        }
+        for (const t of state.tasks) if (moved.has(t.id) && t.due) t.due = addDaysKey(t.due, days);
+      }
+      state.drag = null;
+      const L = layout();
+      let i = 0;
+      for (const [eid, props] of L.entities) {
+        if (!nodes.has(eid)) create(eid);
+        const ref = eid.split(":")[1] ?? "";
+        const isDep = moved.has(ref) && ref !== tid;
+        engine.to(eid, { opacity: 1, scale: 1, ...props }, {
+          duration: eid === id ? MOTION.release : MOTION.settle,
+          easing: eid === id ? OVERSHOOT : EASE,
+          delay: isDep ? MOTION.cascadeStagger * ++i : 0
+        });
+      }
+      for (const eid of lastIds) if (!L.entities.has(eid)) engine.exit(eid, () => remove(eid));
+      lastIds = [...L.entities.keys()];
+      els.banner.hidden = true;
+      if (days) announce(`Moved ${tid} by ${days} days`);
+    };
+    g.addEventListener("pointermove", move);
+    g.addEventListener("pointerup", up, { once: true });
+    g.addEventListener("pointercancel", up, { once: true });
+  }
+  function relayoutDragPreview() {
+    const L = layout();
+    for (const [eid, props] of L.entities) {
+      if (!eid.startsWith("ripple:") && !eid.startsWith("load:")) continue;
+      if (!nodes.has(eid)) {
+        create(eid);
+        engine.enter(eid, props, { duration: MOTION.hover });
+      } else engine.to(eid, props, { duration: MOTION.hover });
+    }
+    for (const eid of lastIds) if (eid.startsWith("ripple:") && !L.entities.has(eid)) engine.exit(eid, () => remove(eid));
+    lastIds = [.../* @__PURE__ */ new Set([...lastIds.filter((i) => !i.startsWith("ripple:")), ...[...L.entities.keys()].filter((i) => i.startsWith("ripple:"))])];
+    const slips = [...L.entities.keys()].some((k) => k.startsWith("ripple:m-"));
+    els.banner.hidden = !slips;
+  }
+  els.svg.addEventListener("pointerdown", onPointerDown);
+  function select(tid) {
+    state.selected = tid;
+    document.querySelectorAll(".is-selected").forEach((n) => n.classList.remove("is-selected"));
+    if (tid) document.querySelector(`[data-part="bar"][data-task-id="${tid}"]`)?.classList.add("is-selected");
+  }
+  els.svg.addEventListener("click", (e) => {
+    const g = e.target.closest('[data-part="bar"]');
+    select(g ? g.getAttribute("data-task-id") : null);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.closest("input, textarea")) return;
+    if (e.key === "+" || e.key === "=") setZoom(state.zoom + 1);
+    else if (e.key === "-") setZoom(state.zoom - 1);
+    else if (e.key.toLowerCase() === "l") setView(state.view === "bars" ? "lines" : "bars");
+    else if (e.key === "Escape" && state.hammond) showHammond(false);
+  });
+  els.scroller.addEventListener(
+    "wheel",
+    (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      wheelAccum += e.deltaY;
+      if (Math.abs(wheelAccum) > 60) {
+        setZoom(state.zoom + (wheelAccum < 0 ? 1 : -1), e.clientX);
+        wheelAccum = 0;
+      }
+    },
+    { passive: false }
+  );
+  var wheelAccum = 0;
+  function announce(msg) {
+    els.live.textContent = msg;
+  }
+  var G = { padL: 44, termGap: 22, trackW: 7, labelY: -24, subY: 30, termH: 30, termPadX: 14, r: { done: 8, open: 8, current: 11 } };
+  function renderLines() {
+    const host = els.lines;
+    host.innerHTML = "";
+    const width = host.clientWidth || els.card.clientWidth - 32;
+    const vertical = width < 560;
+    for (const p of PROJECTS.filter((p2) => p2.id !== "p-seat")) {
+      const col = colourOf(p);
+      const art = h("article", "tl-line", void 0, host);
+      art.setAttribute("data-part", "line");
+      art.innerHTML = `<div class="tl-line__head"><h3 class="tl-line__name"><i style="background:${col}"></i>${p.title}</h3></div>`;
+      const stations = state.tasks.filter((t) => t.project === p.id && !t.parent).sort((a, b) => (a.step ?? 0) - (b.step ?? 0));
+      const ms = MILESTONES.filter((m) => m.project === p.id).slice(-1)[0];
+      const termText = ms ? `${ms.title} \xB7 ${fmt(ms.due)}` : fmt(p.end);
+      const cur = Math.max(0, stations.findIndex((t) => t.status !== "done"));
+      const stateOf = (t, i) => t.status === "done" ? "done" : i === cur ? "current" : "open";
+      const subOf = (t, st) => st === "current" ? "you are here" : t.blocked ? "blocked" : t.status === "done" ? "done" : t.due ? `due ${fmt(t.due).slice(0, 5)}` : "no date";
+      const paintStation = (svg2, t, st, x, y2) => {
+        const c = s("circle", { cx: x, cy: y2, r: G.r[st], "data-entity-id": t.id, "data-morph-shape": "station", "data-morph-color": col }, svg2);
+        if (st === "done") set(c, { fill: col, stroke: "#fff", "stroke-width": 2.5 });
+        else set(c, { fill: "#fff", stroke: col, "stroke-width": st === "current" ? 4.5 : 3.5 });
+      };
+      if (vertical) {
+        const x0 = 22;
+        const ys = stations.map((_, i) => 22 + i * 64);
+        const endY = 22 + stations.length * 64;
+        const H = endY + 44;
+        const svg2 = s("svg", { class: "tl-line__svg", viewBox: `0 0 ${width} ${H}`, height: H, width: "100%" }, art);
+        const track2 = s("g", { "data-entity-id": p.id, "data-morph-shape": "track", "data-morph-color": col }, svg2);
+        s("path", { d: `M${x0} ${ys[0]}V${ys[cur]}`, stroke: col, "stroke-width": 6, "stroke-linecap": "round", fill: "none", opacity: 0.32 }, track2);
+        s("path", { d: `M${x0} ${ys[cur]}V${endY}`, stroke: col, "stroke-width": 6, "stroke-linecap": "round", fill: "none" }, track2);
+        stations.forEach((t, i) => {
+          const st = stateOf(t, i);
+          paintStation(svg2, t, st, x0, ys[i]);
+          s("text", { class: "tl-line__lbl", x: x0 + 26, y: ys[i] + 1 }, svg2).textContent = fit(t.title, "500 13px Inter", width - x0 - 40);
+          s("text", { class: `tl-line__sub${st === "current" ? " is-here" : ""}${t.blocked ? " is-danger" : ""}`, x: x0 + 26, y: ys[i] + 18 }, svg2).textContent = subOf(t, st);
+        });
+        const tw = Math.ceil(textW(termText, "600 13px Inter")) + 28;
+        const tg2 = s("g", { "data-entity-id": ms?.id ?? `${p.id}-end`, "data-morph-shape": "terminus", "data-morph-color": col }, svg2);
+        s("rect", { x: x0 - 12, y: endY, width: tw, height: 30, rx: 15, fill: col }, tg2);
+        s("text", { class: "tl-line__term", x: x0 - 12 + tw / 2, y: endY + 19.5, "text-anchor": "middle" }, tg2).textContent = termText;
+        continue;
+      }
+      const termW = Math.ceil(textW(termText, "600 13px Inter")) + G.termPadX * 2;
+      const n = stations.length;
+      const step = (width - termW - 4 - G.termGap - G.padL) / Math.max(0.5, n - 0.5);
+      const xs = stations.map((_, i) => G.padL + i * step);
+      const termX = (xs[n - 1] ?? G.padL) + step * 0.5 + G.termGap;
+      const y = 40;
+      const svg = s("svg", { class: "tl-line__svg", viewBox: `0 0 ${width} 84`, height: 84, width: "100%" }, art);
+      const track = s("g", { "data-entity-id": p.id, "data-morph-shape": "track", "data-morph-color": col }, svg);
+      s("path", { d: `M${G.padL} ${y}H${xs[cur] ?? G.padL}`, stroke: col, "stroke-width": G.trackW, "stroke-linecap": "round", fill: "none", opacity: 0.32 }, track);
+      s("path", { d: `M${xs[cur] ?? G.padL} ${y}H${termX}`, stroke: col, "stroke-width": G.trackW, "stroke-linecap": "round", fill: "none" }, track);
+      stations.forEach((t, i) => {
+        const x = xs[i];
+        const st = stateOf(t, i);
+        paintStation(svg, t, st, x, y);
+        s("text", { class: "tl-line__lbl", x, y: y + G.labelY, "text-anchor": "middle" }, svg).textContent = fit(t.title, "500 13px Inter", step - 14);
+        s("text", { class: `tl-line__sub${st === "current" ? " is-here" : ""}${t.blocked ? " is-danger" : ""}`, x, y: y + G.subY, "text-anchor": "middle" }, svg).textContent = subOf(t, st);
+      });
+      const tg = s("g", { "data-entity-id": ms?.id ?? `${p.id}-end`, "data-morph-shape": "terminus", "data-morph-color": col }, svg);
+      s("rect", { x: termX, y: y - G.termH / 2, width: termW, height: G.termH, rx: G.termH / 2, fill: col }, tg);
+      const tt = s("text", { class: "tl-line__term", x: termX + termW / 2, y: y + 4.5, "text-anchor": "middle" }, tg);
+      tt.textContent = termText;
+    }
+  }
+  var morph = null;
+  function setView(next) {
+    if (morph) {
+      morph.reverse();
+      state.view = state.view === "bars" ? "lines" : "bars";
+      paintViewPills();
+      return;
+    }
+    if (next === state.view) return;
+    const fromRoot = state.view === "bars" ? els.bars : els.lines;
+    const toRoot = next === "bars" ? els.bars : els.lines;
+    if (next === "lines") renderLines();
+    state.view = next;
+    paintViewPills();
+    els.card.dataset.view = next;
+    morph = startMorph({ host: els.card, fromRoot, toRoot, reducedMotion: reduced });
+    morph.finished.then((result) => {
+      morph = null;
+      if (result === "reversed") {
+        els.card.dataset.view = state.view;
+      }
+      announce(`${state.view === "bars" ? "Bars" : "Lines"} view`);
+    });
+  }
+  void document.fonts.ready.then(() => {
+    paintZoomPills();
+    paintViewPills();
+    relayout("first");
+    scrollToToday(false);
+    onScroll();
+  });
+  var resizeTimer = 0;
+  window.addEventListener("resize", () => {
+    moveThumb(zoomPills);
+    moveThumb(viewPills);
+    clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => relayout("settle"), 150);
+  });
+  document.getElementById("ref-live").onclick = () => {
+    const t = state.tasks.find((t2) => t2.id === "t6");
+    t.due = t.due === "2026-09-29" ? "2026-10-01" : "2026-09-29";
+    relayout("settle");
+    announce("Excursion form moved on the Board");
+  };
+  document.getElementById("ref-drag").onclick = () => {
+    state.drag = { id: "t5", dx: 0, startX: 0, days: 6 };
+    const p = engine.get("bar:t5");
+    const snap = curveSnapshot("t5");
+    const dx = scale.x(addDaysKey("2026-09-25", 6)) - scale.x("2026-09-25");
+    engine.place("bar:t5", { x: p.x + dx });
+    followCurves("t5", snap, dx);
+    document.querySelector('[data-part="bar"][data-task-id="t5"]')?.classList.add("is-dragging");
+    relayoutDragPreview();
+  };
+  window.__timeline = { engine, state, setZoom, setView, showHammond, relayout, morphBusy: () => morph !== null };
+})();
+
+</script>
+</body>
+</html>
