@@ -163,24 +163,31 @@ function model(events = []) {
   });
 }
 
-test('week view paints a time grid without a standing compose', () => {
+test('week view paints the tideline without a standing compose', () => {
   const root = fakeRoot();
   renderCalendar(root, model([
-    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
-  ]), { view: 'week' });
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
+    { record: { type: 'meal', date: '2026-08-05', time: '07:30', title: 'breakfast', meal: 'breakfast' }, body: '', path: 'm' }
+  ]), { view: 'week', events: [
+    { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' },
+    { record: { type: 'meal', date: '2026-08-05', time: '07:30', title: 'breakfast', meal: 'breakfast' }, body: '', path: 'm' }
+  ] });
   const calendar = root._host.children[0];
   assert.ok(calendar.className.includes('hub-calendar'));
-  assert.ok(calendar.querySelector('.hub-calendar__timegrid'));
+  assert.ok(calendar.querySelector('.cal'));
+  assert.equal(calendar.querySelector('.hub-calendar__timegrid'), null);
   assert.equal(calendar.querySelector('[data-calendar="compose-title"]'), null);
   assert.equal(calendar.querySelector('.hub-calendar__rail'), null);
-  assert.equal(calendar.querySelector('[data-calendar="month-label"]')?.textContent.includes('08'), true);
+  const text = collect(calendar).map(node => node.textContent).join(' ');
+  assert.match(text, /Push/);
+  assert.equal(text.includes('breakfast'), false);
 });
 
-test('week hour click asks to compose on that slot', () => {
+test('day hour click asks to compose on that slot', () => {
   const root = fakeRoot();
   let selected = null;
   renderCalendar(root, model(), {
-    view: 'week',
+    view: 'day',
     onSelectDate: (date, options) => { selected = { date, ...options }; }
   });
   const hours = collect(root._host.children[0]).find(node =>
@@ -203,23 +210,22 @@ test('month shift applies forward/back motion on the grid', () => {
   assert.equal(root._host.querySelector('#calendar-month-grid')?.dataset.motion, undefined);
 });
 
-test('selected event paints rail detail; empty day omits date and sources cards', () => {
+test('selected event paints rail detail; week view has no standing compose', () => {
   const root = fakeRoot();
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', title: 'Push', duration_min: 40, status: 'completed' }, body: 'Bench focus', path: 'w' }
-  ]), { view: 'week', selectedEventId: 'w', scrollToDetail: true });
+  ]), { view: 'day', selectedEventId: 'w', scrollToDetail: true });
   const detail = root._host.querySelector('#calendar-day-detail');
   assert.ok(detail);
   assert.equal(detail.querySelector('.hub-calendar__detail-heading')?.textContent, 'Push');
   assert.match(collect(detail).map(node => node.textContent).join(' '), /40 min · completed/);
-  assert.equal(root._host.querySelector('[data-calendar="compose-title"]'), null);
-  assert.equal(root._host.querySelector('#calendar-source-registry'), null);
 
   renderCalendar(root, model(), { view: 'week' });
   assert.equal(root._host.querySelector('#calendar-day-detail'), null);
   assert.equal(root._host.querySelector('#calendar-source-registry'), null);
   assert.equal(root._host.querySelector('[data-calendar="compose-title"]'), null);
   assert.equal(root._host.querySelector('.hub-calendar__rail'), null);
+  assert.ok(root._host.querySelector('.cal'));
 });
 
 test('compose submit calls onCreateLog with a diary candidate', () => {

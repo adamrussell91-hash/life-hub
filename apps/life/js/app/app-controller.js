@@ -59,7 +59,7 @@ export function sectionFromHash(hash) {
   const trimmed = hash.trim();
   if (!trimmed) return null;
   const withoutHash = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
-  const section = withoutHash.split(/[/?#]/)[0].trim();
+  const section = withoutHash.replace(/^\/+/, '').split(/[/?#]/)[0].trim();
   if (!section) return null;
   if (section === 'central-node-dashboard') return 'central-node';
   if (section === 'shortcuts') return 'home';
@@ -159,6 +159,8 @@ export function createAppController(dependencies) {
   let calendarViewMonth = null;
   let calendarView = 'week';
   let calendarViewExplicit = false;
+  let calendarWeekSynced = false;
+  let holdCalendarPaint = false;
   let calendarPlanningLens = false;
   let calendarPlanningProfile = null;
   let calendarWeekMission = null;
@@ -755,7 +757,19 @@ export function createAppController(dependencies) {
       void refreshSkincareShelf();
     }
     if (name === 'calendar') {
-      renderCalendarSection();
+      // The visual seed lands after the first snapshot. One forced refresh on the
+      // first open picks it up; paint waits so the week is not drawn from stale files.
+      if (!calendarWeekSynced) {
+        calendarWeekSynced = true;
+        holdCalendarPaint = true;
+        root.querySelector('#calendar-dashboard')?.removeAttribute('hidden');
+        void refresh({ force: true }).finally(() => {
+          holdCalendarPaint = false;
+          if (currentSection === 'calendar') renderCalendarSection();
+        });
+      } else {
+        renderCalendarSection();
+      }
       void loadHubCalendars();
     }
     if (name === 'body') renderBodySection();
@@ -1273,17 +1287,12 @@ export function createAppController(dependencies) {
   }
 
   function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {
+    if (holdCalendarPaint) return;
     if (!latestResult || !buildCalendarModel || !renderCalendar) return;
     const date = latestResult.date;
     if (!calendarSelectedDate) calendarSelectedDate = date;
     if (!calendarViewMonth) calendarViewMonth = calendarSelectedDate.slice(0, 7);
     if (!calendarCompose.date) calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
-    if (
-      !calendarViewExplicit
-      && root.defaultView?.matchMedia?.('(max-width: 720px)')?.matches === true
-    ) {
-      calendarView = 'day';
-    }
     const model = buildCalendarModel({
       events: [
         ...(latestResult.events ?? []),
@@ -1312,6 +1321,9 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
+      events: latestResult.events ?? [],
+      calendarVisual: latestResult.calendarVisual ?? null,
+      planningProfile: calendarPlanningProfile,
       onTogglePlanningLens: () => {
         calendarPlanningLens = !calendarPlanningLens;
         renderCalendarSection();
