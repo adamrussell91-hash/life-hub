@@ -18,6 +18,8 @@ import { buildTidelineModel, toHour } from './tideline-model.js';
 import { getSydneyMinutesOfDay } from '../core/time.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
+/** Design spec: expanded band remembered per session. */
+const BAND_SESSION_KEY = 'life.calendar.band';
 const ICON = {
   prev: '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>',
   next: '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>',
@@ -28,8 +30,33 @@ const ICON = {
   chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>'
 };
 
+function readBandSession() {
+  try {
+    const raw = globalThis.sessionStorage?.getItem?.(BAND_SESSION_KEY);
+    if (raw == null || raw === '' || raw === 'none') return null;
+    const index = Number(raw);
+    return Number.isInteger(index) && index >= 0 ? index : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeBandSession(next) {
+  try {
+    const store = globalThis.sessionStorage;
+    if (!store) return;
+    if (next == null) store.removeItem(BAND_SESSION_KEY);
+    else store.setItem(BAND_SESSION_KEY, String(next));
+  } catch {
+    /* private mode / unavailable */
+  }
+}
+
+/** Test hooks for session band memory (design key life.calendar.band). */
+export { BAND_SESSION_KEY, readBandSession, writeBandSession };
+
 const state = {
-  expanded: null,
+  expanded: readBandSession(),
   accepted: new Set(),
   dismissed: new Set(),
   busy: new Set(),
@@ -154,8 +181,20 @@ function mount() {
   el('div', 'cal__spacer', undefined, nav);
   const focusWrap = el('div', 'cal__focus', 'Focus', nav);
   const focus = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', focusWrap, { role: 'group', 'aria-label': 'Focus band', 'data-part': 'focus-pills' });
-  el('button', 'hub-pills__btn is-active', 'Balanced', focus, { type: 'button', 'data-band': 'none', 'aria-pressed': 'true' });
-  bands.forEach((band, index) => el('button', 'hub-pills__btn', band.label, focus, { type: 'button', 'data-band': String(index), 'aria-pressed': 'false' }));
+  if (state.expanded != null && (state.expanded < 0 || state.expanded >= bands.length)) {
+    state.expanded = null;
+    writeBandSession(null);
+  }
+  el('button', `hub-pills__btn${state.expanded == null ? ' is-active' : ''}`, 'Balanced', focus, {
+    type: 'button',
+    'data-band': 'none',
+    'aria-pressed': String(state.expanded == null)
+  });
+  bands.forEach((band, index) => el('button', `hub-pills__btn${state.expanded === index ? ' is-active' : ''}`, band.label, focus, {
+    type: 'button',
+    'data-band': String(index),
+    'aria-pressed': String(state.expanded === index)
+  }));
 
   if (model.tray) {
     const tray = el('div', 'cal__tray', undefined, section, { 'data-part': 'tray' });
@@ -433,6 +472,7 @@ function apply(id, props) {
 
 function setBand(next) {
   state.expanded = next;
+  writeBandSession(next);
   const target = bandTargets(bands, next);
   engine.to('__bands', Object.fromEntries(target.map((height, index) => [`h${index}`, height])), { duration: CAL.bandMs, easing: EASE });
   host.querySelectorAll?.('.cal-band')?.forEach(button => {
