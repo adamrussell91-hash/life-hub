@@ -21,6 +21,7 @@ export interface CreateEventInput {
   all_day?: boolean;
   location_text?: string | null;
   accreditation_category?: string | null;
+  priority_area?: string | null;
   hours?: number | null;
   attendance_state?: string | null;
   certificate?: EventRecord['certificate'];

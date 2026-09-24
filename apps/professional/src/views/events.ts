@@ -22,6 +22,7 @@ import { eventRoute } from '@/app/router';
 import type { EventCertificate, EventOccurrenceState, EventRecord } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
+import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
 import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
 
@@ -99,6 +100,7 @@ export async function renderEventsView(canvas: HTMLElement): Promise<void> {
         'events__meta',
         [
           record.event_type.replace(/_/g, ' '),
+          splitEventLabels(record).priority,
           record.occurrence_state,
           formatDisplayDate(record.start) ?? record.start.slice(0, 16),
           record.incomplete_links ? 'incomplete links' : null
@@ -124,13 +126,6 @@ const EVENT_KINDS = [
   { id: 'other', label: 'Other', hint: 'Anything else' }
 ] as const;
 
-const PRIORITY_AREAS = [
-  'Curriculum & assessment',
-  'Students with disability',
-  'Aboriginal education',
-  'Wellbeing'
-] as const;
-
 function splitWallLocal(value: string): { date: string; time: string } {
   const [date = '', time = ''] = value.split('T');
   return { date, time: time.slice(0, 5) };
@@ -149,6 +144,7 @@ interface EventComposeDraft {
   allDay?: boolean;
   hours?: number | null;
   accreditation?: string | null;
+  priorityArea?: string | null;
   certificate?: EventCertificate | null;
   chips?: Array<{
     id: string;
@@ -170,6 +166,7 @@ interface EventComposePayload {
   location: string | null;
   hours: number | null;
   accreditation: string | null;
+  priorityArea: string | null;
   certificate: EventCertificate | null;
   pendingLinks: EventLinkInput[];
 }
@@ -547,7 +544,11 @@ export async function renderEventNewView(
     endTime.disabled = allDay.checked;
   });
 
-  const draftKindLabel = draft?.accreditation?.split(' · ')[0] ?? '';
+  const openedLabels = splitEventLabels({
+    accreditation_category: draft?.accreditation,
+    priority_area: draft?.priorityArea
+  });
+  const draftKindLabel = openedLabels.category ?? '';
   let selectedKind: (typeof EVENT_KINDS)[number] =
     EVENT_KINDS.find((kind) => kind.label === draftKindLabel) ?? EVENT_KINDS[0];
   const typeButtons: HTMLButtonElement[] = [];
@@ -600,41 +601,95 @@ export async function renderEventNewView(
   const hoursRow = el('div', 'event-compose__hours');
   hoursRow.append(hoursCopy, stepper);
 
-  const draftPriority = draft?.accreditation?.split(' · ')[1] ?? '';
-  const draftHasKnownPriority = (PRIORITY_AREAS as readonly string[]).includes(draftPriority);
-  const draftHasCustomPriority = draftPriority.length > 0 && !draftHasKnownPriority;
+  const draftPriority = openedLabels.priority ?? '';
+  const areaNames = new Set<string>(PRIORITY_AREAS);
+  if (draftPriority) areaNames.add(draftPriority);
+  try {
+    const listed = await listEvents();
+    for (const event of listed.events ?? []) {
+      const name = splitEventLabels(event).priority;
+      if (name) areaNames.add(name);
+    }
+  } catch {
+    // The built-in areas still show when the event list cannot be loaded.
+  }
+  const customAreas = [...areaNames]
+    .filter((name) => !isPriorityArea(name))
+    .sort((a, b) => a.localeCompare(b));
   const chipButtons: HTMLButtonElement[] = [];
   const chipRow = el('div', 'event-compose__chips');
   chipRow.setAttribute('role', 'group');
   chipRow.setAttribute('aria-label', 'Priority area');
-  for (const area of ['No priority', ...PRIORITY_AREAS]) {
+  function selectPriorityChip(chip: HTMLButtonElement): void {
+    chipButtons.forEach((node) => {
+      const on = node === chip;
+      node.classList.toggle('is-on', on);
+      node.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+  function addPriorityChip(area: string, priority: string): HTMLButtonElement {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'event-compose__chip';
     chip.textContent = area;
-    chip.dataset.priority = area === 'No priority' ? '' : area;
-    const selected = draftHasCustomPriority
-      ? false
-      : area === 'No priority'
-        ? !draftHasKnownPriority
-        : area === draftPriority;
+    chip.dataset.priority = priority;
+    const selected = priority ? priority === draftPriority : !draftPriority;
     chip.classList.toggle('is-on', selected);
     chip.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    chip.addEventListener('click', () => {
-      chipButtons.forEach((node) => {
-        const on = node === chip;
-        node.classList.toggle('is-on', on);
-        node.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      syncAccreditation();
-    });
+    chip.addEventListener('click', () => selectPriorityChip(chip));
     chipButtons.push(chip);
     chipRow.append(chip);
+    return chip;
   }
+  addPriorityChip('No priority', '');
+  for (const area of [...PRIORITY_AREAS, ...customAreas]) addPriorityChip(area, area);
+  const addArea = el('button', 'event-compose__chip event-compose__chip-add', 'Add area') as HTMLButtonElement;
+  addArea.type = 'button';
+  addArea.setAttribute('aria-label', 'Add priority area');
+  addArea.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'event-compose__chip-input';
+    input.placeholder = 'Area name';
+    input.maxLength = 80;
+    input.setAttribute('aria-label', 'New priority area');
+    addArea.hidden = true;
+    chipRow.insertBefore(input, addArea);
+    input.focus();
+    let settled = false;
+    const finish = (commit: boolean): void => {
+      if (settled) return;
+      settled = true;
+      const name = priorityAreaName(input.value);
+      input.remove();
+      addArea.hidden = false;
+      if (!commit || !name) return;
+      const existing = chipButtons.find(
+        (node) => (node.dataset.priority ?? '').toLocaleLowerCase() === name.toLocaleLowerCase()
+      );
+      const chip = existing ?? addPriorityChip(name, name);
+      chipRow.insertBefore(chip, addArea);
+      selectPriorityChip(chip);
+    };
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        finish(true);
+      }
+      if (event.key === 'Escape') finish(false);
+    });
+    input.addEventListener('blur', () => finish(true));
+  });
+  chipRow.append(addArea);
   accreditation.classList.add('event-compose__sr');
+  if (openedLabels.category && EVENT_KINDS.some((kind) => kind.label === openedLabels.category)) {
+    accreditation.value = openedLabels.category;
+  }
   function syncAccreditation(): void {
-    const priority = chipButtons.find((node) => node.classList.contains('is-on'))?.dataset.priority ?? '';
-    accreditation.value = [selectedKind.label, priority].filter(Boolean).join(' · ');
+    accreditation.value = selectedKind.label;
+  }
+  function selectedPriority(): string | null {
+    return priorityAreaName(chipButtons.find((node) => node.classList.contains('is-on'))?.dataset.priority);
   }
   if (!draft?.accreditation) syncAccreditation();
   paintHours();
@@ -674,7 +729,7 @@ export async function renderEventNewView(
     el(
       'p',
       'event-compose__hint',
-      'Optional. Choose No priority when this event is not in one of these areas.'
+      'Optional. Completed hours in a chosen area are totalled on Home, separate from the event type. Add an area when none of these fit.'
     ),
     chipRow,
     accreditation
@@ -750,6 +805,7 @@ export async function renderEventNewView(
       location: locationField.value || null,
       hours: hours.value ? Number(hours.value) : null,
       accreditation: accreditation.value || null,
+      priorityArea: selectedPriority(),
       certificate: certificateFromFields(certName.value, certReference.value, certIssuedAt.value),
       pendingLinks: links
     };
@@ -768,6 +824,7 @@ export async function renderEventNewView(
         location_text: payload.location,
         hours: payload.hours,
         accreditation_category: payload.accreditation,
+        priority_area: payload.priorityArea,
         attendance_state: 'registered',
         certificate: payload.certificate,
         links: payload.pendingLinks
@@ -924,6 +981,7 @@ export async function renderEventDetailView(
             allDay: record.all_day,
             hours: record.hours,
             accreditation: record.accreditation_category,
+            priorityArea: record.priority_area,
             certificate: record.certificate,
             chips: chipsFromLinks(entries)
           },
@@ -935,6 +993,7 @@ export async function renderEventDetailView(
               all_day: payload.allDay,
               hours: payload.hours,
               accreditation_category: payload.accreditation,
+              priority_area: payload.priorityArea,
               certificate: payload.certificate,
               start: payload.startIso,
               end: payload.endIso,
@@ -1085,7 +1144,8 @@ export async function renderEventDetailView(
     evidence.append(
       el('p', 'event-detail__kicker', 'Evidence'),
       factRow('Certificate', certificateSummary(record.certificate)),
-      factRow('Accreditation', record.accreditation_category || 'Not specified')
+      factRow('Accreditation', splitEventLabels(record).category || 'Not specified'),
+      factRow('Priority area', splitEventLabels(record).priority || 'No priority')
     );
     whoCard.append(peopleHost, evidence);
 

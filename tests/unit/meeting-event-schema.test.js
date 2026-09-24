@@ -91,6 +91,36 @@ test('event PD fields validate and reject relationship ids on the record', () =>
   });
   assert.equal(validated.event_type, 'professional_development');
   assert.equal(validated.hours, 5);
+  assert.equal(validated.priority_area, null);
+  const withPriority = validateEventCreateInput({
+    title: 'Gifted education PD',
+    start: '2026-10-01T00:00:00.000Z',
+    end: '2026-10-01T06:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    accreditation_category: 'Course',
+    priority_area: 'Wellbeing'
+  });
+  assert.equal(withPriority.accreditation_category, 'Course');
+  assert.equal(withPriority.priority_area, 'Wellbeing');
+  const custom = validateEventCreateInput({
+    title: 'Gifted education PD',
+    start: '2026-10-01T00:00:00.000Z',
+    end: '2026-10-01T06:00:00.000Z',
+    time_zone: 'Australia/Sydney',
+    priority_area: '  Gifted education  '
+  });
+  assert.equal(custom.priority_area, 'Gifted education');
+  assert.throws(
+    () =>
+      validateEventCreateInput({
+        title: 'Gifted education PD',
+        start: '2026-10-01T00:00:00.000Z',
+        end: '2026-10-01T06:00:00.000Z',
+        time_zone: 'Australia/Sydney',
+        priority_area: 'x'.repeat(81)
+      }),
+    (error) => error.code === 'priority_area_too_long'
+  );
   assert.throws(
     () =>
       validateEventCreateInput({
@@ -121,7 +151,9 @@ test('event PD fields validate and reject relationship ids on the record', () =>
     created_at: '2026-09-12T00:00:00.000Z',
     updated_at: '2026-09-12T00:00:00.000Z'
   };
-  assert.ok(parseEventRecord(record));
+  assert.equal(parseEventRecord(record).priority_area, null);
+  assert.equal(parseEventRecord({ ...record, priority_area: 'Gifted education' }).priority_area, 'Gifted education');
+  assert.equal(parseEventRecord({ ...record, priority_area: 'x'.repeat(81) }), null);
   assert.equal(parseEventRecord({ ...record, provider_id: 'x' }), null);
   assertEventStateTransition('scheduled', 'completed');
   assert.throws(() => assertEventStateTransition('cancelled', 'scheduled'), (e) => e.code === 'invalid_state_transition');

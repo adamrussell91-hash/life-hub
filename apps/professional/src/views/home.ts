@@ -3,6 +3,7 @@ import { listEvents } from '@/api/events';
 import { listMeetings } from '@/api/meetings';
 import { eventRoute, meetingRoute } from '@/app/router';
 import type { EventOccurrenceState, EventRecord, MeetingRecord, MeetingState } from '@/domain/types';
+import { splitEventLabels } from '@/domain/priority-area';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -254,14 +255,19 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
 
   let hoursThisYear = 0;
   const categoryTotals = new Map<string, number>();
+  const priorityTotals = new Map<string, number>();
   for (const event of events) {
     if (event.occurrence_state !== 'completed') continue;
     if (event.hours == null) continue;
     const key = sydneyDateKey(event.start);
     if (Number(key.slice(0, 4)) !== today.year) continue;
     hoursThisYear += event.hours;
-    const category = event.accreditation_category?.trim() || 'Uncategorised';
+    const labels = splitEventLabels(event);
+    const category = labels.category || 'Uncategorised';
     categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + event.hours);
+    if (labels.priority) {
+      priorityTotals.set(labels.priority, (priorityTotals.get(labels.priority) ?? 0) + event.hours);
+    }
   }
 
   const top = el('div', 'pro-home__progress-top');
@@ -278,13 +284,20 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
   barTrack.append(fill);
   card.append(barTrack);
 
-  if (categoryTotals.size) {
+  function hourChips(totals: Map<string, number>, tone: string, limit?: number): HTMLElement {
     const chips = el('div', 'pro-home__progress-chips');
-    const sorted = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
-    for (const [category, hours] of sorted) {
-      chips.append(el('span', 'pro-home__chip-tag pro-home__chip-tag--blue', `${category} · ${hours} hrs`));
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const shown = limit == null ? sorted : sorted.slice(0, limit);
+    for (const [label, hours] of shown) {
+      chips.append(el('span', `pro-home__chip-tag pro-home__chip-tag--${tone}`, `${label} · ${hours} hrs`));
     }
-    card.append(chips);
+    return chips;
+  }
+
+  if (categoryTotals.size) card.append(hourChips(categoryTotals, 'blue', 4));
+  if (priorityTotals.size) {
+    card.append(el('p', 'pro-home__progress-caption', 'Priority areas'));
+    card.append(hourChips(priorityTotals, 'sage'));
   }
 
   return card;
