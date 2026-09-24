@@ -1,4 +1,5 @@
 import type { MapColorToken, MapLine, MapStation, MapTick, Point, TransitMap, YearTrack } from '@/schemas/map';
+import type { SchoolYearTerms } from '@/domain/hub-prefs';
 import { parseDue, toDateKey } from '@/domain/queries';
 
 export function lineX(line: { points: Point[] }): number {
@@ -157,7 +158,26 @@ const KNOWN_TERMS: Record<number, { t1: string; t2: string; t3: string; t4: stri
   }
 };
 
-export function schoolTerms(year: number): { t1: string; t2: string; t3: string; t4: string; e: string } {
+export type TermMarks = { t1: string; t2: string; t3: string; t4: string; e: string };
+
+function termMarksFrom(terms: SchoolYearTerms['terms']): TermMarks | null {
+  const by = new Map(terms.map((term) => [term.term, term]));
+  const t1 = by.get(1)?.starts_on;
+  const t2 = by.get(2)?.starts_on;
+  const t3 = by.get(3)?.starts_on;
+  const t4 = by.get(4)?.starts_on;
+  const end = by.get(4)?.ends_on;
+  if (!t1 || !t2 || !t3 || !t4 || !end) return null;
+  return { t1, t2, t3, t4, e: end };
+}
+
+/**
+ * Term boundary dates for a map year. Prefs win when that year has all four terms.
+ * KNOWN_TERMS is only the empty-prefs fallback.
+ */
+export function schoolTerms(year: number, years?: readonly SchoolYearTerms[] | null): TermMarks {
+  const fromPrefs = years ? termMarksFrom(years.find((row) => row.year === year)?.terms ?? []) : null;
+  if (fromPrefs) return fromPrefs;
   return (
     KNOWN_TERMS[year] ?? {
       t1: `${year}-01-27`,
@@ -1046,11 +1066,11 @@ function applyTrackCuts(lines: LaidLine[], stations: LaidStation[]): void {
   }
 }
 
-export function layoutMap(map: TransitMap): MapCanvasLayout {
+export function layoutMap(map: TransitMap, years?: readonly SchoolYearTerms[] | null): MapCanvasLayout {
   const year = map.year ?? new Date().getFullYear();
   const yearTop = MAP_YEAR_TOP;
   const yearBottom = MAP_YEAR_BOTTOM;
-  const termsRaw = schoolTerms(year);
+  const termsRaw = schoolTerms(year, years);
   const terms: TermBand[] = [
     { id: 'T1', label: 'T1', date: termsRaw.t1, y: dateToY(termsRaw.t1, year) },
     { id: 'T2', label: 'T2', date: termsRaw.t2, y: dateToY(termsRaw.t2, year) },

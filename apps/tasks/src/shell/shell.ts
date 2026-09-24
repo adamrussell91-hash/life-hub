@@ -58,7 +58,8 @@ export type HubViewId =
   | 'programs'
   | 'stress'
   | 'corey'
-  | 'properties';
+  | 'properties'
+  | 'term-dates';
 
 type NavItem = { id: HubViewId; label: string; href: string };
 
@@ -120,7 +121,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
       { id: 'search', label: 'Search', href: '#/search' },
-      { id: 'properties', label: 'Properties', href: '#/properties' }
+      { id: 'properties', label: 'Properties', href: '#/properties' },
+      { id: 'term-dates', label: 'Term dates', href: '#/term-dates' }
     ]
   }
 ];
