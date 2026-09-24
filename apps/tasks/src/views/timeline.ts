@@ -1267,14 +1267,29 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       entities.set('cap', { x: 0, w: width, top: loadTop - 8 });
     }
     if (gesture?.days) {
-      for (const [id, due] of shift) {
+      const hops = new Map<string, number>([[gesture.id, gesture.days]]);
+      const hopLinks: Array<[string, string]> = [];
+      for (const task of state.tasks) for (const dep of task.deps) hopLinks.push([dep, task.id]);
+      for (const milestone of model.milestones) for (const dep of milestone.deps) hopLinks.push([dep, milestone.id]);
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const [from, to] of hopLinks) {
+          if (!hops.has(from) || hops.has(to)) continue;
+          hops.set(to, hops.get(from)!);
+          changed = true;
+        }
+      }
+      const dragged = entities.get(`bar:${gesture.id}`) ?? entities.get(`step:${gesture.id}`) ?? entities.get(`ms:${gesture.id}`);
+      for (const [id, days] of hops) {
         if (id === gesture.id) continue;
         const milestone = model.milestones.find((item) => item.id === id);
         const task = state.tasks.find((item) => item.id === id);
-        const current = entities.get(`bar:${id}`) ?? entities.get(`step:${id}`) ?? entities.get(`ms:${id}`);
+        const current = entities.get(`bar:${id}`) ?? entities.get(`step:${id}`) ?? entities.get(`ms:${id}`) ?? dragged;
         if (!current) continue;
         if (milestone) {
-          const slip = due > milestone.due;
+          const due = addDaysKey(milestone.due, days);
+          const slip = days > 0;
           specs.set(`ripple:${id}`, {
             kind: 'ripple',
             text: slip ? `would slip to ${formatKey(due)}` : '',
@@ -1288,8 +1303,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
             w: TL.bar.h,
             lx: Math.max(TL.bar.h + 8, labelEnd - rx + 12)
           });
-        } else if (task) {
-          const span = timelineTaskSpan({ due, est: task.est });
+        } else if (task?.due) {
+          const span = timelineTaskSpan({ due: addDaysKey(task.due, days), est: task.est });
           if (!span) continue;
           const box = barBox(span);
           specs.set(`ripple:${id}`, { kind: 'ripple', text: '' });
@@ -1905,27 +1920,23 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     return null;
   }
 
-  let previewFrame = 0;
   function paintDragPreview(): void {
-    window.cancelAnimationFrame(previewFrame);
-    previewFrame = window.requestAnimationFrame(() => {
-      const next = layout();
-      for (const [id, props] of next.entities) {
-        if (!id.startsWith('ripple:') && !id.startsWith('load:') && id !== 'cap') continue;
-        if (!nodes.has(id)) {
-          createNode(id);
-          engine.place(id, { opacity: 1, scale: 1, ...props });
-        } else engine.to(id, { opacity: 1, scale: 1, ...props }, { duration: MOTION.hover, easing: EASE });
+    const next = layout();
+    for (const [id, props] of next.entities) {
+      if (!id.startsWith('ripple:') && !id.startsWith('load:') && id !== 'cap') continue;
+      if (!nodes.has(id)) {
+        createNode(id);
+        engine.place(id, { opacity: 1, scale: 1, ...props });
+      } else engine.place(id, { opacity: 1, scale: 1, ...props });
+    }
+    for (const id of lastIds) {
+      if (id.startsWith('ripple:') && !next.entities.has(id)) {
+        engine.forget(id);
+        removeNode(id);
       }
-      for (const id of lastIds) {
-        if (id.startsWith('ripple:') && !next.entities.has(id)) {
-          engine.forget(id);
-          removeNode(id);
-        }
-      }
-      const ripples = [...next.entities.keys()].filter((id) => id.startsWith('ripple:'));
-      lastIds = [...new Set([...lastIds.filter((id) => !id.startsWith('ripple:')), ...ripples])];
-    });
+    }
+    const ripples = [...next.entities.keys()].filter((id) => id.startsWith('ripple:'));
+    lastIds = [...new Set([...lastIds.filter((id) => !id.startsWith('ripple:')), ...ripples])];
   }
 
   function onPointerDown(event: PointerEvent): void {
