@@ -574,9 +574,7 @@ function paintAccepted(ghost) {
   const chip = nodes.get(`chip:${ghost.id}`);
   if (!chip) return;
   chip.classList?.add?.('is-accepted');
-  chip.classList?.remove?.('is-ghost');
   chip.querySelector?.('.cal-chip__acts')?.remove();
-  chip.querySelector?.('.cal-chip__agent')?.remove();
   chip.dataset.part = 'chip';
   engine.to(`chip:${ghost.id}`, { solid: 1 }, { duration: CAL.acceptMs });
 }
