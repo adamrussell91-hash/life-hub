@@ -56,9 +56,11 @@ function appendTaskCard(
     onRemoved: () => void | Promise<void>;
     onChanged: () => void | Promise<void>;
   },
-  projects: Project[] = []
+  projects: Project[] = [],
+  tasks: Task[] = []
 ): void {
   mountTaskCard(host, task, {
+    scope: { projects, tasks },
     onToggle: (current) => requestToggleDone(confirmHost, current, async () => {
       await handlers.onChanged();
     }),
@@ -313,7 +315,8 @@ export async function renderDayView(canvas: HTMLElement): Promise<void> {
             paint();
           }
         },
-        projects
+        projects,
+        tasks
       );
     }
     canvas.append(stack);
@@ -466,7 +469,8 @@ function paintSearch(host: HTMLElement, tasks: Task[], projects: Project[]): voi
           },
           onChanged: () => refreshSearch(host)
         },
-        projects
+        projects,
+        tasks
       );
     }
   }
