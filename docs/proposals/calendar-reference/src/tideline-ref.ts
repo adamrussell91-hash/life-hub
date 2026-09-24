@@ -287,7 +287,9 @@ function mountBody(grid: HTMLElement, d: string) {
   for (const c of chipsFor(d)) mountChip(body, c);
   if (d === F.NOW.date) nodes.set('now', el('div', 'cal-now', '<span>6:05 pm</span>', body, { 'data-part': 'now-line' }));
   for (const w of F.WALLS.filter(x => x.date === d)) {
-    const wall = el('div', 'cal-wall', `<span>${ICON.lock}${w.label}</span>`, body, { 'data-part': 'wall' });
+    const [first, ...rest] = w.label.split(' · ');
+    const more = rest.length ? `<span class="cal-wall__more"> · ${rest.join(' · ')}</span>` : '';
+    const wall = el('div', 'cal-wall', `<span class="cal-wall__pill">${ICON.lock}${first}${more}</span>`, body, { 'data-part': 'wall' });
     wall.style.height = `${TOTAL}px`;
   }
 }
