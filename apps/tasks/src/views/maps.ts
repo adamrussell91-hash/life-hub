@@ -9,6 +9,7 @@ import {
   planningOf,
   planMapItem
 } from '@/domain/maps-planning';
+import { parseHubPrefs, type SchoolYearTerms } from '@/domain/hub-prefs';
 import { tasksApi } from '@/services/client-api';
 import { exportMapHtml, mapsOrSeed, pickCurrentYearMap } from '@/domain/maps';
 import { createFilteredPicker, type MapIndexItem, type PickerGroup } from '@/views/map-nav';
@@ -727,8 +728,8 @@ function hitOwnerId(hit: MapHit): string | null {
   return hit.id;
 }
 
-function downloadHtml(map: TransitMap): void {
-  const blob = new Blob([exportMapHtml(map)], { type: 'text/html' });
+function downloadHtml(map: TransitMap, years: readonly SchoolYearTerms[] | null): void {
+  const blob = new Blob([exportMapHtml(map, years)], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -776,10 +777,12 @@ function trackPicker(selected: string[], available: TrackDef[]): { root: HTMLEle
 
 export async function renderMapsView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading maps…', '.map-body');
-  const [listed, projects] = await Promise.all([
+  const [listed, projects, prefs] = await Promise.all([
     tasksApi.listMaps().catch(() => [] as TransitMap[]),
-    tasksApi.listProjects().catch(() => [] as Project[])
+    tasksApi.listProjects().catch(() => [] as Project[]),
+    tasksApi.getHubPrefs().then(parseHubPrefs).catch(() => null)
   ]);
+  const termYears: readonly SchoolYearTerms[] | null = prefs?.school_terms ?? null;
   const maps = mapsOrSeed(listed);
   const yearNow = new Date().getFullYear();
   let current = pickCurrentYearMap(maps, yearNow) ?? maps[0]!;
@@ -858,8 +861,8 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
     canvas.classList.toggle('map-page--fullscreen', fullscreen);
     setMapFullscreenChrome(fullscreen);
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year);
-    const layout = layoutMap(current);
+    const terms = schoolTerms(year, termYears);
+    const layout = layoutMap(current, termYears);
     canvas.replaceChildren();
     const toolbar = createMapToolbar({
       maps,
@@ -882,7 +885,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
           if (next === 'view') joining = false;
           paint();
         },
-        onExport: () => downloadHtml(current),
+        onExport: () => downloadHtml(current, termYears),
         onNewMap: () => {
           void tasksApi.createMap({ title: 'Untitled map', year }).then((created) => {
             maps.push(created);
@@ -1420,7 +1423,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   function addStationNow(): void {
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year);
+    const terms = schoolTerms(year, termYears);
     if (!current.lines.length) {
       toast = 'Add a line first.';
       paint();
@@ -1448,7 +1451,7 @@ export async function renderMapsView(canvas: HTMLElement): Promise<void> {
 
   function addEventNow(): void {
     const year = current.year ?? yearNow;
-    const terms = schoolTerms(year);
+    const terms = schoolTerms(year, termYears);
     if (!current.lines.length) {
       toast = 'Add a line first.';
       paint();

@@ -66,6 +66,7 @@ import { renderMapItemPage } from '@/views/map-page';
 import { renderGoalsView } from '@/views/goals';
 import { renderSomedayView } from '@/views/someday';
 import { renderPropertiesView } from '@/views/properties';
+import { renderTermDatesView } from '@/views/term-dates';
 import { renderReminderStrip } from '@/views/reminder-strip';
 import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
@@ -135,6 +136,8 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderCoreyView(canvas);
     case 'properties':
       return renderPropertiesView(canvas);
+    case 'term-dates':
+      return renderTermDatesView(canvas);
   }
 }
 

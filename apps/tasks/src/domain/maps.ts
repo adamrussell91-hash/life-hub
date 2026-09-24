@@ -1,4 +1,5 @@
 import type { MapStation, Point, TickAttach, TransitMap } from '@/schemas/map';
+import type { SchoolYearTerms } from '@/domain/hub-prefs';
 import { layoutMap, MAP_LEFT, normalizeLineColors, wrapEventLines } from '@/domain/maps-layout';
 import { swatch } from '@/domain/maps-colors';
 import { mindWorks2026Map } from '@/domain/maps-seed';
@@ -123,8 +124,8 @@ function escapeHtml(value: string): string {
     .replaceAll('"', '&quot;');
 }
 
-function renderExportSvg(map: TransitMap): string {
-  const layout = layoutMap(map);
+function renderExportSvg(map: TransitMap, years?: readonly SchoolYearTerms[] | null): string {
+  const layout = layoutMap(map, years);
   const parts: string[] = [];
   for (const term of layout.terms) {
     parts.push(
@@ -184,7 +185,7 @@ function renderExportSvg(map: TransitMap): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${layout.width} ${layout.height}" width="100%" height="100%">${parts.join('')}</svg>`;
 }
 
-export function exportMapHtml(map: TransitMap): string {
+export function exportMapHtml(map: TransitMap, years?: readonly SchoolYearTerms[] | null): string {
   return `<!DOCTYPE html>
 <html lang="en" data-hub="tasks">
 <head>
@@ -204,7 +205,7 @@ export function exportMapHtml(map: TransitMap): string {
   <div class="wrap">
     <p class="eyebrow">MindWorks Pathways</p>
     <h1>${escapeHtml(map.title)}</h1>
-    <div class="canvas">${renderExportSvg(map)}</div>
+    <div class="canvas">${renderExportSvg(map, years)}</div>
   </div>
 </body>
 </html>`;
