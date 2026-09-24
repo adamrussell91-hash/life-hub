@@ -22,16 +22,9 @@ const ASSET_PATH =
 const REDIRECT_SCRIPT =
   /<script>\s*\(function \(\) \{\s*var key = 'life-hub-spa-redirect';[\s\S]*?\}\)\(\);\s*<\/script>\s*/;
 
-const PASS_HEADERS = [
-  'content-type',
-  'cache-control',
-  'etag',
-  'last-modified',
-  'accept-ranges',
-  'content-range',
-  'content-length',
-  'content-encoding'
-];
+// fetch() already decoded the body. Forwarding content-encoding or
+// content-length makes the browser try to gunzip plain bytes.
+const PASS_HEADERS = ['content-type', 'cache-control', 'etag', 'last-modified'];
 
 export function deadPageHtml() {
   return `<!DOCTYPE html>

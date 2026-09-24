@@ -116,3 +116,21 @@ test('teaching assets proxy and other files do not', async () => {
   );
   assert.equal(shell.status, 404);
 });
+
+test('decoded assets are not labelled as compressed', async () => {
+  const response = await handleClassSiteRequest(
+    new Request('https://class.adam-russell.com/teaching/assets/index-abc.js'),
+    async () =>
+      new Response('console.log(1)', {
+        status: 200,
+        headers: {
+          'content-type': 'text/javascript',
+          'content-encoding': 'gzip',
+          'content-length': '99'
+        }
+      })
+  );
+  assert.equal(response.headers.get('content-encoding'), null);
+  assert.equal(response.headers.get('content-length'), null);
+  assert.equal(await response.text(), 'console.log(1)');
+});
