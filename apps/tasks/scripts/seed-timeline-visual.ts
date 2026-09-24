@@ -4,6 +4,7 @@ import { parseHubPrefs } from '../src/domain/hub-prefs';
 import { DEFAULT_TASK_PROPERTY_CONFIG } from '../src/domain/task-properties-defaults';
 import { GoalSchema } from '../src/schemas/goal';
 import { ProjectSchema } from '../src/schemas/project';
+import { PlanningProfileSchema } from '../src/schemas/planning-profile';
 import { TaskSchema } from '../src/schemas/task';
 import type { KvAdapter } from '../src/services/store';
 import * as keys from '../src/storage/keys';
@@ -38,6 +39,14 @@ type Fixture = {
     blocked?: boolean;
     deps?: string[];
     step?: number;
+    marking?: {
+      cls: string;
+      scripts: number;
+      marked: number;
+      rate: number;
+      collected: string;
+      returnBy: string;
+    } | null;
   }>;
 };
 
@@ -65,6 +74,26 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
     timezone: 'Australia/Sydney'
   });
   await kv.setJSON(keys.hubPrefsKey(), prefs);
+
+  const twoHours = [{ start: '09:00', end: '11:00' }];
+  const closed = [{ start: '00:00', end: '00:00' }];
+  await kv.setJSON(
+    keys.planningProfileKey(),
+    PlanningProfileSchema.parse({
+      schema_version: 1,
+      id: 'default',
+      work_windows: {
+        mon: twoHours,
+        tue: twoHours,
+        wed: twoHours,
+        thu: twoHours,
+        fri: twoHours,
+        sat: twoHours,
+        sun: closed
+      },
+      updated_at: fixture.now
+    })
+  );
 
   const milestonesByProject = new Map<string, Fixture['milestones']>();
   for (const milestone of fixture.milestones) {
@@ -147,8 +176,18 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       updated_at: fixture.now
     })
   );
-  const tasks = fixture.tasks.map((raw) =>
-    TaskSchema.parse({
+  const tasks = fixture.tasks.map((raw) => {
+    const marking = raw.marking
+      ? {
+          class_label: raw.marking.cls,
+          scripts: raw.marking.scripts,
+          minutes_per_script: raw.marking.rate,
+          collected_on: raw.marking.collected,
+          return_by: raw.marking.returnBy,
+          scripts_marked: raw.marking.marked
+        }
+      : null;
+    return TaskSchema.parse({
       schema_version: 1,
       id: raw.id,
       title: raw.title,
@@ -156,17 +195,18 @@ export async function seedTimelineVisualFixture(kv: KvAdapter): Promise<{ tasks:
       parent_project_id: raw.project,
       parent_task_id: raw.parent ?? null,
       step_order: raw.step ?? 0,
-      kind: raw.parent ? 'step' : 'task',
+      kind: marking ? 'marking_shadow' : raw.parent ? 'step' : 'task',
       status: raw.status,
-      due_date: raw.due,
-      estimated_duration: raw.est,
+      due_date: marking?.return_by ?? raw.due,
+      estimated_duration: marking ? marking.scripts * (marking.minutes_per_script ?? 0) : raw.est,
       depends_on: raw.deps ?? [],
       dependency_links: (raw.deps ?? []).map((from) => ({ from_id: from, type: 'FS', offset_days: 0 })),
       blocked_since: raw.blocked ? '2026-09-18' : null,
+      marking,
       created_at: fixture.now,
       updated_at: fixture.now
-    })
-  );
+    });
+  });
   const allTasks = [...dreams, ...tasks];
   for (const task of allTasks) await kv.setJSON(keys.taskKey(task.id), task);
   await kv.setJSON(keys.tasksIndexKey(), { ids: allTasks.map((task) => task.id) });

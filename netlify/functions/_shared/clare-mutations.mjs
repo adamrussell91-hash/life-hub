@@ -3,7 +3,7 @@ const TASK_ALLOW = new Set([
   'title', 'description', 'status', 'priority', 'domain', 'due_date', 'due_time',
   'estimated_duration', 'parent_project_id', 'parent_task_id', 'depends_on', 'step_order',
   'tags', 'page_blocks', 'bucket', 'kind', 'waiting_on', 'waiting_status', 'source',
-  'life_wall'
+  'life_wall', 'marking'
 ]);
 const PROJECT_ALLOW = new Set([
   'title', 'description', 'status', 'type', 'current_end_date', 'page_blocks', 'tags', 'arc_summary',

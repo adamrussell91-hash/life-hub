@@ -39,6 +39,18 @@ export const SomedayHorizonSchema = z.enum(['area', 'goal', 'project']);
 export const SomedayKindSchema = z.enum(['bucket_list', 'dreams_jar', 'career']);
 const OriginDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
+/** Workload that appears when scripts are collected. Null clears it. */
+export const MarkingSchema = z
+  .object({
+    class_label: z.string().min(1),
+    scripts: z.number().int().positive(),
+    minutes_per_script: z.number().positive().nullable(),
+    collected_on: OriginDateSchema,
+    return_by: OriginDateSchema,
+    scripts_marked: z.number().int().nonnegative().default(0)
+  })
+  .nullable();
+
 export type OdysseyNode = {
   id: string;
   title: string;
@@ -126,7 +138,9 @@ export const TaskSchema = z.object({
   /** Someday / Maybe only — branching daydream tree ("Odyssey mode"). */
   odyssey_paths: z.array(OdysseyNodeSchema).optional(),
   /** Dates that cannot move. Null clears a wall; omitted leaves old records unchanged. */
-  life_wall: LifeWallFieldSchema
+  life_wall: LifeWallFieldSchema,
+  /** Marking shadow workload. Null clears it; omitted leaves old records unchanged. */
+  marking: MarkingSchema.optional()
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -187,7 +201,8 @@ export const TaskCreateSchema = TaskSchema.omit({
   linked_project_ids: true,
   linked_goal_ids: true,
   odyssey_paths: true,
-  life_wall: true
+  life_wall: true,
+  marking: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

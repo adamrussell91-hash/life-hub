@@ -31,6 +31,25 @@ function readTaskId(request) {
   return new URL(request.url).searchParams.get('id') ?? '';
 }
 
+const MARKING_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Null when absent. Undefined when the payload is present but not a marking shadow. */
+function readMarking(value) {
+  if (value == null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const class_label = String(value.class_label ?? '').trim();
+  const scripts = Number(value.scripts);
+  const collected_on = String(value.collected_on ?? '');
+  const return_by = String(value.return_by ?? '');
+  const rate = value.minutes_per_script == null ? null : Number(value.minutes_per_script);
+  const scripts_marked = value.scripts_marked == null ? 0 : Number(value.scripts_marked);
+  if (!class_label || !Number.isInteger(scripts) || scripts < 1) return undefined;
+  if (!MARKING_DATE.test(collected_on) || !MARKING_DATE.test(return_by) || collected_on > return_by) return undefined;
+  if (rate != null && !(rate > 0)) return undefined;
+  if (!Number.isInteger(scripts_marked) || scripts_marked < 0) return undefined;
+  return { class_label, scripts, minutes_per_script: rate, collected_on, return_by, scripts_marked };
+}
+
 function isTaskDomainRecord(item) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
   if (typeof item.id !== 'string' || typeof item.title !== 'string') return false;
@@ -99,6 +118,10 @@ export function createTasksHandler(deps = {}) {
         if (!wall.ok) {
           return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
         }
+        const marking = readMarking(parsed.value.marking);
+        if (marking === undefined) {
+          return withCors(errorResponse(400, 'validation_error', 'marking shadow needs a class, script count, and dates', false), request, env);
+        }
         const timestamp = new Date().toISOString();
         const id = newTaskId();
         const task = {
@@ -132,6 +155,14 @@ export function createTasksHandler(deps = {}) {
           odyssey_paths: Array.isArray(parsed.value.odyssey_paths) ? parsed.value.odyssey_paths : [],
           ...(Object.prototype.hasOwnProperty.call(parsed.value, 'life_wall')
             ? { life_wall: parsed.value.life_wall }
+            : {}),
+          ...(marking
+            ? {
+                kind: 'marking_shadow',
+                marking,
+                due_date: marking.return_by,
+                estimated_duration: marking.scripts * (marking.minutes_per_script ?? 10)
+              }
             : {})
         };
         await setJSON(store, taskKey(id), task);
@@ -161,9 +192,18 @@ export function createTasksHandler(deps = {}) {
         if (!wall.ok) {
           return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
         }
-        const next = normalizeTaskRecord(
-          applyDueDatePriorityFloor(mergeTask(existing, parsed.value), parsed.value)
-        );
+        const marking = readMarking(parsed.value.marking);
+        if (marking === undefined) {
+          return withCors(errorResponse(400, 'validation_error', 'marking shadow needs a class, script count, and dates', false), request, env);
+        }
+        const merged = mergeTask(existing, parsed.value);
+        if (marking) {
+          merged.marking = marking;
+          merged.kind = merged.kind === 'step' ? 'step' : 'marking_shadow';
+          merged.due_date = marking.return_by;
+          merged.estimated_duration = marking.scripts * (marking.minutes_per_script ?? 10);
+        }
+        const next = normalizeTaskRecord(applyDueDatePriorityFloor(merged, parsed.value));
         await setJSON(store, taskKey(id), next);
         return withCors(okResponse(200, next), request, env);
       }

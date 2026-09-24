@@ -26,7 +26,8 @@ import { ProgramSchema } from '@/schemas/program';
 import { AreaSchema } from '@/schemas/area';
 import { GoalSchema } from '@/schemas/goal';
 import { WorkBlockSchema } from '@/schemas/work-block';
-import { WorkSessionSchema } from '@/schemas/work-session';
+import { WorkSessionSchema, type WorkSession } from '@/schemas/work-session';
+import { resolveMarkingRate, syncedMarkingFields } from '@/domain/marking-shadow';
 import {
   DEFAULT_PLANNING_PROFILE,
   PlanningProfileSchema
@@ -255,6 +256,21 @@ async function readTaskProperties(
   return defaults;
 }
 
+function minutesPerScript(
+  marking: NonNullable<Task['marking']>,
+  sessions: WorkSession[],
+  shadowIds: Set<string>,
+  defaultMinutes: number
+): number {
+  return resolveMarkingRate({
+    minutesPerScript: marking.minutes_per_script,
+    sessions: sessions
+      .filter((session) => session.task_id && shadowIds.has(session.task_id) && session.result !== 'open')
+      .map((session) => ({ minutes: session.actual_duration_minutes ?? 0, scriptsMarked: session.scripts_marked ?? 0 })),
+    defaultMinutes
+  }).rate;
+}
+
 function classifierDefault(
   options: { id: string }[],
   preferredId: string,
@@ -306,7 +322,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         id: newId('task'),
         title: input.title,
         description: input.description ?? '',
-        kind: input.kind ?? classifierDefault(props.kinds, 'task'),
+        kind: input.marking ? 'marking_shadow' : (input.kind ?? classifierDefault(props.kinds, 'task')),
         bucket: input.bucket ?? classifierDefault(props.buckets, 'active'),
         step_order: input.step_order ?? 0,
         domain: input.domain,
@@ -343,8 +359,20 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         depth: input.depth ?? null,
         someday_kind: input.someday_kind ?? null,
         origin_date: input.origin_date ?? null,
-        life_wall: input.life_wall ?? null
+        life_wall: input.life_wall ?? null,
+        marking: input.marking ?? null
       });
+      if (task.marking) {
+        const [sessions, all, prefs] = await Promise.all([
+          this.listWorkSessions(),
+          this.listTasks(),
+          this.getHubPrefs()
+        ]);
+        const ids = new Set(all.filter((item) => item.marking || item.kind === 'marking_shadow').map((item) => item.id));
+        ids.add(task.id);
+        const rate = minutesPerScript(task.marking, sessions, ids, prefs.marking_default_minutes_per_script);
+        Object.assign(task, syncedMarkingFields(task.marking, rate));
+      }
       await kv.setJSON(keys.taskKey(task.id), task);
       const ids = await readIndex(kv, keys.tasksIndexKey());
       ids.push(task.id);
@@ -376,6 +404,17 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
               : (patch.completed_at ?? existing.completed_at)
       });
       next = applyDueDatePriorityFloor(next, patch);
+      if (next.marking) {
+        const [sessions, all, prefs] = await Promise.all([
+          this.listWorkSessions(),
+          this.listTasks(),
+          this.getHubPrefs()
+        ]);
+        const ids = new Set(all.filter((item) => item.marking || item.kind === 'marking_shadow').map((item) => item.id));
+        ids.add(next.id);
+        const rate = minutesPerScript(next.marking, sessions, ids, prefs.marking_default_minutes_per_script);
+        next = { ...next, ...syncedMarkingFields(next.marking, rate), kind: next.kind === 'step' ? 'step' : 'marking_shadow' };
+      }
       await kv.setJSON(keys.taskKey(id), next);
       if (patch.status === 'done' && existing.status !== 'done') {
         await spawnRecurringSuccessor(this, next);
@@ -1878,6 +1917,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         result: input.result ?? 'open',
         source: input.source ?? 'manual',
         notes: input.notes ?? '',
+        scripts_marked: input.scripts_marked ?? null,
         created_at: stamp,
         updated_at: stamp
       });
