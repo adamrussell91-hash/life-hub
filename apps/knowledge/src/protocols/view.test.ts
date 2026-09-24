@@ -167,6 +167,12 @@ describe("lightingStage", () => {
     expect(lightingStage(11, 12, "cartographers")).toBe("night");
   });
 
+  it("uses three day-to-blue-hour stages for Tribunal", () => {
+    expect(lightingStage(0, 9, "tribunal")).toBe("midday");
+    expect(lightingStage(3, 9, "tribunal")).toBe("golden-hour");
+    expect(lightingStage(8, 9, "tribunal")).toBe("blue-hour");
+  });
+
   it("uses five sunrise-to-night stages for Witness", () => {
     expect(lightingStage(0, 10, "witness")).toBe("sunrise");
     expect(lightingStage(2, 10, "witness")).toBe("morning");
