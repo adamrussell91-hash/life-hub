@@ -710,27 +710,38 @@ export function createCalendarGhostsHandler({
         const nowIso = getSydneyTimestamp(instant);
 
         // Calendar open: refresh proposals when the range covers today and
-        // the last run is stale or Life records for today changed.
+        // the last run is stale or Life records for today changed. Load school
+        // terms / lessons / professional events only when a refresh will run.
         if (from <= today && to >= today) {
           try {
-            const { runCalendarGhostsPropose } = await import('./_shared/calendar-ghosts-propose.mjs');
-            const tasksStoreFn = () => getTasksStore(env);
-            const terms = await readSchoolTerms(tasksStoreFn);
-            const [lessons, professionalEvents] = await Promise.all([
-              loadLessons(env),
-              loadProfessionalEvents(env)
-            ]);
-            await runCalendarGhostsPropose({
+            const {
+              runCalendarGhostsPropose,
+              peekRefreshDue
+            } = await import('./_shared/calendar-ghosts-propose.mjs');
+            const due = await peekRefreshDue({
               open,
-              commit,
               today,
-              nowIso,
-              nowMs: instant.getTime(),
-              terms,
-              lessons,
-              professionalEvents,
-              trigger: 'refresh'
+              nowMs: instant.getTime()
             });
+            if (due) {
+              const tasksStoreFn = () => getTasksStore(env);
+              const terms = await readSchoolTerms(tasksStoreFn);
+              const [lessons, professionalEvents] = await Promise.all([
+                loadLessons(env),
+                loadProfessionalEvents(env)
+              ]);
+              await runCalendarGhostsPropose({
+                open,
+                commit,
+                today,
+                nowIso,
+                nowMs: instant.getTime(),
+                terms,
+                lessons,
+                professionalEvents,
+                trigger: 'refresh'
+              });
+            }
           } catch (error) {
             console.warn('calendar-ghosts GET refresh propose failed', error);
           }

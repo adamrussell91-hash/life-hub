@@ -120,6 +120,10 @@ function matches(node, selector) {
     const value = selector.slice('[data-calendar="'.length, -2);
     return node.dataset.calendar === value;
   }
+  if (selector.startsWith('[data-part="')) {
+    const value = selector.slice('[data-part="'.length, -2);
+    return node.dataset.part === value || node.attributes['data-part'] === value || node.getAttribute?.('data-part') === value;
+  }
   if (selector.startsWith('[data-calendar-view')) {
     return Boolean(node.dataset.calendarView);
   }
@@ -207,12 +211,15 @@ function assertKitWorkspace(calendar, mode) {
   }
 }
 
-test('phone day view uses the kit workspace, not a second mobile skin', () => {
+test('phone day view uses the Day Dial, not a second mobile skin', () => {
   const root = fakeRoot({ mobile: true });
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'day', now: new Date('2026-08-05T08:00:00') });
-  assertKitWorkspace(root._host.children[0], 'day');
+  const dial = root._host.querySelector('[data-part="day-dial"]');
+  assert.ok(dial, 'Day mounts the Day Dial');
+  assert.equal(root._host.querySelector('.hub-calendar--mobile'), null);
+  assert.equal(root._host.querySelector('[data-calendar="now-card"]'), null);
 });
 
 test('phone week view uses the kit workspace, not a second mobile skin', () => {
@@ -231,14 +238,14 @@ test('phone month view uses the kit workspace, not a second mobile skin', () => 
   assertKitWorkspace(root._host.children[0], 'month');
 });
 
-test('desktop day view stays on the time-grid path', () => {
+test('desktop day view mounts the Day Dial', () => {
   const root = fakeRoot({ mobile: false });
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', time: '09:00', title: 'Push', duration_min: 40 }, body: '', path: 'w' }
   ]), { view: 'day' });
-  const calendar = root._host.children[0];
-  assertKitWorkspace(calendar, 'day');
-  assert.equal(calendar.querySelector('[data-calendar="now-card"]'), null);
+  assert.ok(root._host.querySelector('[data-part="day-dial"]'));
+  assert.equal(root._host.querySelector('.hub-calendar__timegrid'), null);
+  assert.equal(root._host.querySelector('[data-calendar="now-card"]'), null);
 });
 
 test('master calendar names every hub source', () => {
