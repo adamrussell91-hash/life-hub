@@ -24,6 +24,7 @@ import {
   HUB_PREFS_KEY,
   appendAlmanacDone,
   readAlmanac,
+  readAlmanacTasked,
   readDoneRequest,
   readSchoolTerms
 } from '../netlify/functions/almanac.mjs';
@@ -453,7 +454,8 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           lessons: [],
           professionalEvents: []
         });
-        json(response, 200, { ok: true, ...view });
+        const tasked = await readAlmanacTasked(async () => taskStore);
+        json(response, 200, { ok: true, ...view, tasked });
       } catch (almanacError) {
         error(response, 500, 'almanac_failed', almanacError instanceof Error ? almanacError.message : 'Almanac could not be built.', true);
       }

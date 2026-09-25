@@ -77,7 +77,10 @@
 .alm-t-bead.is-end{text-anchor:end}
 /* beads: one shape per status */
 .alm-bead{cursor:pointer;outline:none}
+/* Geometry is engine-driven — never CSS-transition SVG attributes or bead scale. */
+.alm-chart .alm-rail,.alm-chart #alm-reveal rect,.alm-bead__shape{transition:none}
 .alm-bead__shape{transform-box:fill-box;transform-origin:center}
+.alm-pop,.alm-toast{transition:none}
 .alm-bead__halo,.alm-bead__diamond,.alm-bead__dot,.alm-bead__tick{display:none}
 .alm-bead.is-later .alm-bead__dot,.alm-bead.is-soon .alm-bead__dot{display:inline;fill:#fff;stroke:var(--navy);stroke-width:1.6}
 .alm-bead.is-soon .alm-bead__dot{stroke-width:2.2}
