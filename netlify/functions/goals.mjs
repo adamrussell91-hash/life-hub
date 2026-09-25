@@ -1,6 +1,15 @@
-import { createTasksCollectionHandler, normalizeTags } from './_shared/tasks-collection.mjs';
+import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
+import { GOAL_INPUT_KEYS, normalizeGoalRecord } from './_shared/goal-record.mjs';
 
 export const config = { path: '/api/goals' };
+
+function pickGoalInput(body) {
+  const out = {};
+  for (const key of GOAL_INPUT_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) out[key] = body[key];
+  }
+  return out;
+}
 
 export function createGoalsHandler(deps = {}) {
   return createTasksCollectionHandler({
@@ -9,6 +18,8 @@ export function createGoalsHandler(deps = {}) {
     listKey: 'goals',
     idPrefix: 'goal',
     notFound: 'Goal not found',
+    normalize: normalizeGoalRecord,
+    pickPatch: pickGoalInput,
     create(body, id, timestamp) {
       const title = typeof body.title === 'string' ? body.title.trim() : '';
       if (!title) {
@@ -16,17 +27,14 @@ export function createGoalsHandler(deps = {}) {
       }
       return {
         record: {
+          ...pickGoalInput(body),
           schema_version: 1,
           id,
           title,
-          description: typeof body.description === 'string' ? body.description : '',
           parent_area_id: typeof body.parent_area_id === 'string' ? body.parent_area_id : null,
           parent_someday_id: typeof body.parent_someday_id === 'string' ? body.parent_someday_id : null,
-          status: 'active',
-          tags: normalizeTags(body.tags),
           created_at: timestamp,
-          updated_at: timestamp,
-          ...(Object.prototype.hasOwnProperty.call(body, 'life_wall') ? { life_wall: body.life_wall } : {})
+          updated_at: timestamp
         }
       };
     }

@@ -47,8 +47,11 @@ export function createTasksCollectionHandler({
   listKey,
   idPrefix,
   notFound,
-  create
+  create,
+  normalize = null,
+  pickPatch = null
 }, deps = {}) {
+  const shape = record => (normalize ? normalize(record) : record);
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
     try {
@@ -59,9 +62,9 @@ export function createTasksCollectionHandler({
           if (!record || typeof record !== 'object' || Array.isArray(record)) {
             return withCors(errorResponse(404, 'not_found', notFound, false), request, env);
           }
-          return withCors(okResponse(200, record), request, env);
+          return withCors(okResponse(200, shape(record)), request, env);
         }
-        const items = await listJSON(store, prefix);
+        const items = (await listJSON(store, prefix)).map(item => (item && typeof item === 'object' && !Array.isArray(item) ? shape(item) : item));
         return withCors(okResponse(200, { [listKey]: items }), request, env);
       }
 
@@ -80,10 +83,11 @@ export function createTasksCollectionHandler({
             env
           );
         }
-        await setJSON(store, recordKey(prefix, built.record.id), built.record);
+        const record = shape(built.record);
+        await setJSON(store, recordKey(prefix, record.id), record);
         const ids = await readIndex(store, indexKey);
-        await writeIndex(store, indexKey, [...ids, built.record.id]);
-        return withCors(okResponse(201, built.record), request, env);
+        await writeIndex(store, indexKey, [...ids, record.id]);
+        return withCors(okResponse(201, record), request, env);
       }
 
       if (request.method === 'PATCH' || request.method === 'DELETE') {
@@ -106,7 +110,8 @@ export function createTasksCollectionHandler({
         if (!wall.ok) {
           return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
         }
-        const next = mergeRecord(existing, parsed.value);
+        const patch = pickPatch ? pickPatch(parsed.value) : parsed.value;
+        const next = shape(mergeRecord(existing, patch));
         await setJSON(store, recordKey(prefix, id), next);
         return withCors(okResponse(200, next), request, env);
       }

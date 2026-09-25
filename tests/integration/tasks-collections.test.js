@@ -223,3 +223,44 @@ test('Projects list returns stored records including milestones', async () => {
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.projects, [stored]);
 });
+
+test('goals keep v2 fields on create and patch, and legacy goals list with defaults', async () => {
+  const store = memoryStore({
+    'goals/goal_legacy': {
+      schema_version: 1, id: 'goal_legacy', title: 'Old', status: 'active',
+      created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-01T00:00:00.000Z'
+    },
+    'goals/_index': ['goal_legacy']
+  });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+
+  const created = await createGoalsHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/goals',
+    body: {
+      title: 'HA evidence', sphere: 'professional', structure: 'floor_target_stretch',
+      frame: { floor_target_stretch: { unit: 'standards', floor: 3, target: 5, stretch: 7, current: 3 } },
+      lead_measure: { label: '1 write-up', per_week: 1 }, secret: 'dropped'
+    }
+  }));
+  assert.equal(created.status, 201);
+  const goal = (await created.json()).data;
+  assert.equal(goal.sphere, 'professional');
+  assert.equal(goal.frame.floor_target_stretch.target, 5);
+  assert.deepEqual(goal.lead_measure, { label: '1 write-up', per_week: 1 });
+  assert.equal('secret' in goal, false);
+
+  const patched = await createGoalsHandler(deps)(request({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/goals?id=${goal.id}`,
+    body: { rest_weeks: ['2026-11-09', 'bad'], sphere: 'nope' }
+  }));
+  const next = (await patched.json()).data;
+  assert.deepEqual(next.rest_weeks, ['2026-11-09']);
+  assert.equal(next.sphere, 'life');
+
+  const listed = await createGoalsHandler(deps)(request({ url: 'https://api.adam-russell.com/api/goals' }));
+  const legacy = (await listed.json()).data.goals.find(item => item.id === 'goal_legacy');
+  assert.deepEqual(legacy.tags, []);
+  assert.equal(legacy.structure, 'woop');
+});
