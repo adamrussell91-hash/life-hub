@@ -455,17 +455,57 @@ export function buildAlmanac({
     ...line,
     steps: line.steps.map(step => ({ ...step, actionId: `alm-${step.id}` }))
   }));
-  const openings = findOpenings(openingDays({ dates, series, terms, busy, takenEvenings: taken, walls, tags }), ALMANAC_WANTS).map(opening => ({
-    ...opening,
-    ids: {
-      hold: HOLD_TITLES[opening.wantId] ? `alm-hold-${opening.wantId}` : null,
-      draft: DRAFTS[opening.wantId] ? `alm-draft-${opening.wantId}` : null
+  const computed = findOpenings(openingDays({ dates, series, terms, busy, takenEvenings: taken, walls, tags }), ALMANAC_WANTS);
+  const openings = ALMANAC_WANTS.map(want => {
+    const heldDates = heldDatesForWant(want.id, blocks, today);
+    if (heldDates) {
+      const pct = Math.min(...heldDates.map(date => series.find(point => point.date === date)?.pct ?? 0));
+      return {
+        wantId: want.id,
+        title: want.title,
+        span: want.span,
+        with: want.with ?? null,
+        dates: heldDates,
+        pct,
+        held: true,
+        ids: {
+          hold: null,
+          draft: DRAFTS[want.id] ? `alm-draft-${want.id}` : null
+        }
+      };
     }
-  }));
+    const opening = computed.find(item => item.wantId === want.id) ?? {
+      wantId: want.id, title: want.title, span: want.span, with: want.with ?? null, dates: [], pct: null
+    };
+    return {
+      ...opening,
+      held: false,
+      ids: {
+        hold: HOLD_TITLES[opening.wantId] ? `alm-hold-${opening.wantId}` : null,
+        draft: DRAFTS[opening.wantId] ? `alm-draft-${opening.wantId}` : null
+      }
+    };
+  });
   const summary = { ...almanacSummary(lines), openings: openings.filter(opening => opening.dates.length).length };
   const world = EXAMPLE_WORLD.filter(entry => entry.date >= from && entry.date <= to);
   const horizon = horizonEnd(today, merged);
   return { lines, summary, series, openings, world, terms, today, from, to, horizon };
+}
+
+/** Future calendar_block from an Almanac hold — keeps that opening until its date passes. */
+function heldDatesForWant(wantId, blocks, today) {
+  const spec = HOLD_TITLES[wantId];
+  if (!spec) return null;
+  const matched = (blocks ?? []).filter(block => {
+    if (!block || !DATE.test(block.date ?? '') || block.date < today) return false;
+    const id = typeof block.id === 'string' ? block.id : '';
+    if (id === `cb-alm-hold-${wantId}` || id.startsWith(`cb-alm-hold-${wantId}:`)) return true;
+    if (block.title !== spec.title) return false;
+    if (spec.with === 'corey') return block.kind === 'corey';
+    return block.type === 'calendar_block' || block.kind === 'protected' || block.kind === 'corey';
+  });
+  if (!matched.length) return null;
+  return [...new Set(matched.map(block => block.date))].sort();
 }
 
 function pathDate(path, pattern) {

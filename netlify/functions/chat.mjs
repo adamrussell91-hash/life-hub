@@ -199,6 +199,11 @@ import {
   purgeStalePendingCnPatches,
   formatPendingCnPatchesForPrompt
 } from './_shared/cn-patch-queue.mjs';
+import {
+  PENDING_CALENDAR_GHOSTS_PATH,
+  calendarGhostFromToolInput,
+  appendPendingCalendarGhost
+} from './calendar-ghosts.mjs';
 import { buildAgentTools } from './_shared/capabilities/registry.mjs';
 import {
   buildPromotedShortcutToolSchemas,
@@ -2408,6 +2413,49 @@ export function createChatHandler({
                     ok: true,
                     status: 'applied',
                     summary: patch.payload.summary
+                  });
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'write_failed' });
+                }
+              }
+
+              if (event.name === 'propose_calendar_ghost') {
+                let entry;
+                try {
+                  entry = calendarGhostFromToolInput(event.input, {
+                    agent: slug,
+                    nowIso: getSydneyTimestamp(nowInstant)
+                  });
+                } catch (error) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: 'invalid_ghost',
+                    detail: error instanceof Error ? error.message : 'invalid ghost'
+                  });
+                }
+                try {
+                  const tree = await client.resolveTree();
+                  const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
+                  const prior = blob ? decodeBlob(await client.readBlob(blob.sha)) : '[]';
+                  const { content, added } = appendPendingCalendarGhost(prior, entry);
+                  if (added) {
+                    await client.writeFile({
+                      path: PENDING_CALENDAR_GHOSTS_PATH,
+                      content,
+                      ...(blob?.sha ? { sha: blob.sha } : {}),
+                      message: `chore(calendar): propose ${entry.id}`
+                    });
+                  }
+                  send({
+                    type: 'calendar_ghost_proposed',
+                    id: entry.id,
+                    reply: 'Proposed on your calendar. Accept or dismiss it there.'
+                  });
+                  return JSON.stringify({
+                    ok: true,
+                    status: added ? 'queued' : 'already_queued',
+                    id: entry.id,
+                    reply: 'Proposed on your calendar. Accept or dismiss it there.'
                   });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

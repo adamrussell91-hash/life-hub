@@ -63,6 +63,20 @@
       "tool_name": "propose_central_node_patch",
       "legacy_tool": "propose_central_node_patch"
     },
+    "publish.calendar-ghost": {
+      "file": "publish/calendar-ghost.json",
+      "agents": [
+        "hammond",
+        "sara",
+        "clare"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "calendar"
+      ],
+      "tool_name": "propose_calendar_ghost",
+      "legacy_tool": "propose_calendar_ghost"
+    },
     "publish.governance-log-entry": {
       "file": "publish/governance-log-entry.json",
       "agents": [
