@@ -152,6 +152,36 @@ test('rerunning is idempotent — known ids are skipped', () => {
   assert.deepEqual(dismissed, []);
 });
 
+test('fixture ghosts g-skip and g-good block duplicates by meaning, not id', () => {
+  const ghosts = proposeGhosts(baseInput({
+    pending: [
+      {
+        id: 'g-skip',
+        agent: 'sara',
+        kind: 'skip_workout',
+        date: '2026-09-24',
+        workoutPath: 'records/2026/09/24/workout-1815.md',
+        status: 'pending'
+      },
+      {
+        id: 'g-good',
+        agent: 'hammond',
+        kind: 'protect_block',
+        date: '2026-09-26',
+        start: '18:00',
+        end: '22:00',
+        title: 'Dinner out + a show',
+        with: 'corey',
+        status: 'pending'
+      }
+    ]
+  }));
+  assert.equal(ghosts.some(g => g.kind === 'skip_workout'), false);
+  assert.equal(ghosts.some(g => g.kind === 'protect_block' && g.with === 'corey'), false);
+  // Bedtime still proposed — different meaning.
+  assert.ok(ghosts.some(g => g.kind === 'bedtime'));
+});
+
 test('three recent dismissals throttle that agent+kind to once a week', () => {
   assert.equal(isThrottled([
     { agent: 'sara', kind: 'skip_workout', outcome: 'dismissed', at: '2026-09-20T10:00:00+10:00' },

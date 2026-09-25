@@ -282,7 +282,9 @@ test('accept skip workout writes the Cross-Agent line, the skipped session, and 
   }));
   const listed = await again.json();
   assert.equal(again.status, 200);
-  assert.deepEqual(listed.ghosts, []);
+  // Accepted ghosts stay out of the pending list (refresh may append new ones).
+  assert.ok(!listed.ghosts.some(ghost => ghost.id === 'g-skip'));
+  assert.ok(listed.ghosts.every(ghost => ghost.status === 'pending' || ghost.status == null));
 });
 
 test('accept bedtime writes Today’s Status and one protected rest block', async () => {
