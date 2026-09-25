@@ -611,8 +611,9 @@ session_kind: strength
 exercises: []
 ---
 `);
-  const sync = async ({ validateFile, to }) => {
-    if (to !== '2026-09-24') {
+  // The first sync starts INITIAL_LOOKBACK_DAYS before today (and now looks ahead too); later ones are backfill.
+  const sync = async ({ validateFile, from }) => {
+    if (from !== '2026-09-18') {
       return { files: [], warnings: [], commitSha: SHA, changed: false, freshness: 'confirmed' };
     }
     assert.deepEqual(validateFile(file), { valid: true });
