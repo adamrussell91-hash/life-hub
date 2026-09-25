@@ -14,6 +14,8 @@ export const CONFIG_PATHS = new Set([
   WEEK_FLAGS_PATH
 ]);
 const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare|calendar)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
+// Ghost workout updates live at records/YYYY/MM/DD/<slug>.md, not under data/.
+const LINKED_RECORD_PATH = /^records\/(?<year>\d{4})\/(?<month>\d{2})\/(?<day>\d{2})\/(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 const BLOB_SHA = /^[0-9a-f]{40}$/;
 const MAX_FILE_BYTES = 256 * 1024;
 
@@ -36,6 +38,13 @@ export function parseDateRange(url, { maxDays = 366 } = {}) {
   return { from, to };
 }
 
+export function linkedRecordDate(path) {
+  const match = typeof path === 'string' ? LINKED_RECORD_PATH.exec(path) : null;
+  if (!match) return null;
+  const date = `${match.groups.year}-${match.groups.month}-${match.groups.day}`;
+  return isCalendarDate(date) ? date : null;
+}
+
 export function isAllowedRepositoryPath(path) {
   if (typeof path !== 'string' || path.length === 0 || /[\\\u0000-\u001f\u007f]/.test(path) ||
       path.includes('//') || path.split('/').some(segment => segment === '.' || segment === '..')) {
@@ -44,6 +53,7 @@ export function isAllowedRepositoryPath(path) {
   if (CONFIG_PATHS.has(path)) return true;
   if (RESEARCH_PATH.test(path)) return true;
   if (isTemplatePath(path)) return true;
+  if (linkedRecordDate(path)) return true;
 
   const match = EVENT_PATH.exec(path);
   if (!match || !isCalendarDate(match.groups.date)) return false;
@@ -74,7 +84,9 @@ function isAllowedBlob(entry) {
 
 function isEventInRange(path, range) {
   const match = EVENT_PATH.exec(path);
-  return match && match.groups.date >= range.from && match.groups.date <= range.to;
+  if (match && match.groups.date >= range.from && match.groups.date <= range.to) return true;
+  const linked = linkedRecordDate(path);
+  return linked != null && linked >= range.from && linked <= range.to;
 }
 
 export function isClientFileInRange(path, range) {

@@ -4,7 +4,7 @@
  * become grid chips.
  */
 import { bandsFromProfile, baseHeights, totalHeight } from '../../../../packages/design-kit/js/calendar-bands.js';
-import { formatDisplayDateRange } from '../../../../packages/design-kit/js/format-display-date.js';
+import { formatDisplayDate, formatDisplayDateRange } from '../../../../packages/design-kit/js/format-display-date.js';
 import { capacityForDates, dayLoadHours, isOverCapacity, symptomsIn } from './capacity-model.js';
 
 const DAY_MS = 86_400_000;
@@ -50,6 +50,13 @@ function weekLabel(key, terms) {
 export function isSchoolHoliday(key, terms) {
   if (!terms?.length) return false;
   return termAt(key, terms) == null;
+}
+
+export function movedCaption(date, terms) {
+  const label = weekLabel(date, terms);
+  const day = new Intl.DateTimeFormat('en-AU', { weekday: 'short', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`));
+  if (label) return `Moved to ${label} ${day}`;
+  return `Moved to ${formatDisplayDate(date)}`;
 }
 
 function periodTitle(week, terms) {
@@ -104,11 +111,27 @@ function eventKind(record) {
   return 'task';
 }
 
+function skippedBySara(record) {
+  return [record.updated_by, record.source].some(value => typeof value === 'string' && /\bsara\b/i.test(value));
+}
+
+/** Completed workouts leave the grid. Skipped ones stay, struck through. Planned (or no status) is unchanged. */
+function workoutOnGrid(record) {
+  if (record.type !== 'workout') return null;
+  if (record.status === 'completed') return 'omit';
+  if (record.status === 'skipped') {
+    return { skipped: true, meta: skippedBySara(record) ? 'Skipped · Sara' : 'Skipped' };
+  }
+  return null;
+}
+
 function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
   if (record.type === 'task' && !record.end_time) return null;
+  const workout = workoutOnGrid(record);
+  if (workout === 'omit') return null;
   const start = toHour(record.time);
   const end = record.end_time
     ? toHour(record.end_time)
@@ -122,11 +145,12 @@ function chipFromEvent(event) {
     end,
     kind,
     title: isClass ? (record.class_title || record.title || 'Class') : (record.title || kind),
-    meta: isClass && record.period ? `P${record.period} · ${record.focus || record.title || ''}`.trim() : clockMeta(start, end),
+    meta: workout?.meta ?? (isClass && record.period ? `P${record.period} · ${record.focus || record.title || ''}`.trim() : clockMeta(start, end)),
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
-    source: record.type
+    source: record.type,
+    ...(workout?.skipped ? { skipped: true } : {})
   };
 }
 
@@ -162,14 +186,32 @@ function mergeMedical(chips) {
   return [...rest, ...merged];
 }
 
-function chipsFromVisual(visual, date) {
-  const chips = (visual.ITEMS ?? []).filter(item => item.date === date).map(item => ({
-    ...item,
-    start: toHour(item.start),
-    end: toHour(item.end)
-  }));
-  for (const ghost of visual.GHOSTS ?? []) {
+function recordForItem(events, item) {
+  const path = typeof item.recordPath === 'string' ? item.recordPath : '';
+  if (!path) return null;
+  return (events ?? []).find(event => event.path === path)?.record ?? null;
+}
+
+function chipsFromVisual(visual, date, events) {
+  const chips = [];
+  for (const item of visual.ITEMS ?? []) {
+    if (item.date !== date) continue;
+    const workout = workoutOnGrid(recordForItem(events, item) ?? {});
+    if (workout === 'omit') continue;
+    chips.push({
+      ...item,
+      start: toHour(item.start),
+      end: toHour(item.end),
+      ...(workout?.skipped ? { skipped: true, meta: workout.meta } : {})
+    });
+  }
+  return chips;
+}
+
+function appendGhostChips(chips, ghosts, date) {
+  for (const ghost of ghosts) {
     if (!ghost.chip || ghost.chip.date !== date || ghost.overItem) continue;
+    if (chips.some(chip => chip.id === ghost.id)) continue;
     chips.push({
       id: ghost.id,
       date,
@@ -178,15 +220,21 @@ function chipsFromVisual(visual, date) {
       kind: ghost.chip.kind,
       title: ghost.label,
       meta: ghost.meta,
-      ghost,
-      overItem: ghost.overItem
+      ghost
     });
   }
   return chips;
 }
 
 function dueFor(visual, events, date, useVisual) {
-  if (useVisual) return (visual.DUE ?? []).filter(item => item.date === date);
+  if (useVisual) {
+    return (visual.DUE ?? []).filter(item => item.date === date).map(item => {
+      const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
+      const actual = task?.record?.date;
+      if (typeof actual === 'string' && actual !== item.date) return { ...item, moved: true, movedTo: actual };
+      return item;
+    });
+  }
   return (events ?? [])
     .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
     .map(event => ({
@@ -288,11 +336,14 @@ function visualCovers(visual, week) {
 }
 
 /**
- * @param {{ events?: Array<{record: object, body?: string}>, visual?: object|null, week: string[], today: string, nowHour: number, dayProfile?: object|null, terms?: object[]|null }} input
+ * @param {{ events?: Array<{record: object, body?: string}>, visual?: object|null, ghosts?: object[]|null, week: string[], today: string, nowHour: number, dayProfile?: object|null, terms?: object[]|null }} input
+ * `ghosts`, when an array, is the pending queue from GET /api/calendar-ghosts.
+ * It replaces visual.GHOSTS. Omit it and a covering visual file supplies the queue.
  */
 export function buildTidelineModel({
   events = [],
   visual = null,
+  ghosts = null,
   week,
   today,
   nowHour,
@@ -302,12 +353,13 @@ export function buildTidelineModel({
   const schoolTerms = terms ?? visual?.school_terms ?? [];
   const bands = bandsFromProfile(dayProfile ?? visual?.day_profile ?? {});
   const useVisual = visualCovers(visual, week);
+  const ghostList = Array.isArray(ghosts) ? ghosts : (useVisual ? (visual?.GHOSTS ?? []) : []);
   const holiday = date => isSchoolHoliday(date, schoolTerms);
   const capacity = capacityForDates(events, week, { isHoliday: holiday });
   const days = week.map(date => {
-    const chips = useVisual ? chipsFromVisual(visual, date) : mergeMedical(
+    const chips = appendGhostChips(useVisual ? chipsFromVisual(visual, date, events) : mergeMedical(
       (events ?? []).map(chipFromEvent).filter(chip => chip && chip.date === date)
-    );
+    ), ghostList, date);
     const cap = capacity.get(date);
     const load = dayLoadHours(chips.map(chip => ({
       start: chip.start,
@@ -352,8 +404,20 @@ export function buildTidelineModel({
     days,
     sources: sourceCounts(days),
     ambient: ambientLine(events, week, visual?.NOTES),
-    tray: visual?.TRAY ?? null,
-    ghosts: useVisual ? (visual.GHOSTS ?? []) : [],
+    tray: visual?.TRAY ?? trayFor(ghostList),
+    ghosts: ghostList,
+    terms: schoolTerms,
     visual: useVisual ? visual : null
+  };
+}
+
+function trayFor(ghosts) {
+  const pending = ghosts.filter(ghost => ghost.settled !== 'accepted');
+  if (!pending.length) return null;
+  const count = pending.length;
+  return {
+    agent: pending[0].agent || 'hammond',
+    headline: `${count} change${count === 1 ? '' : 's'} waiting`,
+    detail: 'nothing is written until you accept'
   };
 }
