@@ -15,6 +15,8 @@ const EVENT_PATH = /^data\/.+\.md$/;
 const LINKED_RECORD_PATH = /^records\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 const CALENDAR_VISUAL_PATH = 'calendar-visual.json';
 const INITIAL_LOOKBACK_DAYS = 6;
+/** Days ahead of today in the first sync so week Tideline can show held Almanac blocks. */
+export const INITIAL_LOOKAHEAD_DAYS = 14;
 const FIRST_EXTENSION_DAYS = 30;
 // The manifest endpoint rejects a span of 366 days or more, so windows stay
 // well under that even as they widen.
@@ -67,6 +69,7 @@ export async function loadLiveEvents({
     : MAX_LOOKBACK_DAYS;
 
   const from = addCalendarDays(date, -INITIAL_LOOKBACK_DAYS);
+  const to = addCalendarDays(date, INITIAL_LOOKAHEAD_DAYS);
   const lane = `live-${date}-${++laneCounter}`;
   let commitSha = null;
   let changed = false;
@@ -112,7 +115,7 @@ export async function loadLiveEvents({
   };
 
   const validateFile = createValidator(loadYaml);
-  const first = await sync({ from, to: date, lane, validateFile });
+  const first = await sync({ from, to, lane, validateFile });
   ingest(first);
   await onPartial?.(snapshot());
 

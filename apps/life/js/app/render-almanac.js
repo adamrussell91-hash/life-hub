@@ -1,13 +1,15 @@
 /**
  * Almanac, the fifth calendar zoom. Mounts once from GET /api/almanac.
  * apply() is the only function that writes geometry. Numbers stay on the server.
+ * All motion goes through createMotion — no CSS transitions on SVG attributes.
  */
 import { createMotion, EASE, OVERSHOOT } from '../../../../packages/design-kit/js/hub-motion-engine.js';
 import { ALM } from '../../../../packages/design-kit/js/almanac-geometry.js';
-import { addDays, addMonths, daysBetween } from '../../../../packages/design-kit/js/lead-lines.js';
+import { addDays, addMonths, almanacSummary, daysBetween } from '../../../../packages/design-kit/js/lead-lines.js';
 import { formatDisplayDate } from '../../../../packages/design-kit/js/format-display-date.js';
 import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
-import { ALMANAC_WANTS } from './almanac-rules.js';
+import { acceptPlan } from './ghost-writes.js';
+import { ALMANAC_RULES, ALMANAC_WANTS } from './almanac-rules.js';
 import { getSydneyDateKey } from '../core/time.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -45,6 +47,19 @@ let generation = 0;
 let current = null;
 let measureCtx = null;
 const measured = new Map();
+/** Only the first mount of a generation plays the entrance. Resize re-lays out settled. */
+let playedEntrance = false;
+/** Swallow ResizeObserver notifications caused by paint itself, and during the entrance. */
+let skipResize = false;
+let entranceGuardUntil = 0;
+let lastHostW = 0;
+let toastTimer = 0;
+let popFor = null;
+let rootEl = null;
+/** The host currently owned by the Almanac. Survives app re-renders of the calendar. */
+let mountedFor = null;
+/** Active mount session so writes can refetch without remounting. */
+let session = null;
 
 const WD = date => new Date(`${date}T00:00:00Z`).getUTCDay();
 const DOW = date => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][WD(date)];
@@ -126,6 +141,16 @@ function whenText(opening) {
 function present(body) {
   const from = body.from;
   const horizon = typeof body.horizon === 'string' && body.to && body.horizon < body.to ? body.horizon : body.to;
+  const doneIds = new Set();
+  for (const line of body.lines ?? []) {
+    for (const step of line.steps ?? []) {
+      if (step.status === 'done') doneIds.add(step.id);
+    }
+  }
+  for (const id of doneIds) state.done.add(id);
+  for (const id of body.tasked ?? []) {
+    if (typeof id === 'string' && id) state.tasked.add(id);
+  }
   return {
     today: body.today || from,
     from,
@@ -135,7 +160,8 @@ function present(body) {
     summary: body.summary ?? { unbooked: 0, lastSafeSoon: 0, openings: 0 },
     series: (body.series ?? []).filter(point => point.date >= from && point.date <= horizon),
     openings: body.openings ?? [],
-    world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon)
+    world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon),
+    tasked: body.tasked ?? []
   };
 }
 
@@ -167,14 +193,353 @@ function apply(id, props) {
     if (!node) return;
     node.setAttribute('transform', `scale(${props.scale})`);
     node.style.opacity = String(props.opacity);
+    return;
   }
   if (id.startsWith('open:')) node?.style.setProperty('--held', String(props.held));
 }
 
-function openPop() {}
-function closePop() {}
-function addTask() {}
-function markDone() {}
+function findStep(stepId) {
+  return (current?.lines ?? []).flatMap(line => line.steps.map(st => ({ st, line }))).find(x => x.st.id === stepId);
+}
+
+/** Lines with local done applied — summary and beads stay consistent before a refetch. */
+function liveLines() {
+  return (current?.lines ?? []).map(line => ({
+    ...line,
+    steps: line.steps.map(st => (state.done.has(st.id) ? { ...st, status: 'done' } : st))
+  }));
+}
+
+function liveSummary() {
+  const openings = current?.summary?.openings ?? (current?.openings ?? []).filter(o => o.dates?.length).length;
+  return { ...almanacSummary(liveLines()), openings };
+}
+
+function taskGhost(stepId) {
+  const hit = findStep(stepId);
+  if (!hit) return null;
+  // Same shape the server builds in ghostsForAlmanacAction — preview only.
+  return {
+    id: hit.st.actionId ?? `alm-${stepId}`,
+    agent: 'hammond',
+    kind: 'create_task',
+    title: hit.st.title,
+    due: hit.st.lastSafe,
+    source: `almanac:${stepId}`
+  };
+}
+
+function errorMessage(payload, fallback) {
+  const msg = payload?.error?.message;
+  return typeof msg === 'string' && msg ? msg : fallback;
+}
+
+async function postJson(path, body) {
+  const { API_BASE_URL } = await import('./config.js');
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => null);
+  return { response, payload };
+}
+
+async function refetchView() {
+  if (!session) return null;
+  const today = getSydneyDateKey(session.options.now ?? new Date());
+  const { API_BASE_URL } = await import('./config.js');
+  const response = await fetch(`${API_BASE_URL}/api/almanac?from=${today}&to=${addDays(today, 365)}`, {
+    credentials: 'include'
+  });
+  if (!response.ok) throw new Error('almanac');
+  const body = await response.json();
+  if (!body?.ok || !Array.isArray(body.lines) || !Array.isArray(body.series)) throw new Error('almanac');
+  return body;
+}
+
+/** Re-lay out from the server after a write. Keeps entrance from replaying. */
+async function afterWrite(paintExtras) {
+  if (!session || session.token !== generation) return;
+  const prevUnbooked = engine?.get?.('stat:unbooked')?.n;
+  const body = await refetchView();
+  if (session.token !== generation) return;
+  current = present(body);
+  paint(session.doc, session.host, current, session.options);
+  paintExtras?.({ prevUnbooked });
+}
+
+function showToast(html) {
+  const toast = nodes.get('__toast');
+  if (!toast || !engine) return;
+  toast.innerHTML = html;
+  engine.to('__toast', { opacity: 1, y: 0 }, { duration: ALM.toastInMs });
+  clearTimeout(toastTimer);
+  // Timer only for how long the toast stays — not for motion itself.
+  toastTimer = globalThis.setTimeout?.(
+    () => engine?.to('__toast', { opacity: 0, y: ALM.toastRise }, { duration: ALM.toastInMs }),
+    ALM.toastHoldMs
+  ) ?? 0;
+}
+
+function refreshStats() {
+  if (!engine || !current) return;
+  const sum = liveSummary();
+  engine.to('stat:unbooked', { n: sum.unbooked }, { duration: ALM.countMs });
+  engine.to('stat:soon', { n: sum.lastSafeSoon }, { duration: ALM.countMs });
+}
+
+function setBeadStatus(stepId, status) {
+  rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => {
+    bead.setAttribute('class', (bead.getAttribute('class') ?? '').replace(/is-(overdue|now|soon|later|done)/, `is-${status}`));
+    bead.setAttribute('data-status', status);
+  });
+  if (!engine?.has(`bead:${stepId}`)) return;
+  // Pulse: place at 1.25, OVERSHOOT back to 1. One tween, no timers.
+  engine.place(`bead:${stepId}`, { scale: 1.25 });
+  engine.to(`bead:${stepId}`, { scale: 1 }, { duration: 320, easing: OVERSHOOT });
+}
+
+function openPop(stepId) {
+  const hit = findStep(stepId);
+  const pop = nodes.get('__pop');
+  if (!hit || !pop || !engine || !rootEl) return;
+  const { st } = hit;
+  const rule = ALMANAC_RULES.find(r => r.id === st.ruleId);
+  let left;
+  if (st.daysLeft < 0) left = `${-st.daysLeft} days late`;
+  else if (st.daysLeft === 0) left = 'today';
+  else left = `${st.daysLeft} days left`;
+  let html = `<div class="alm-pop__head"><b>${st.title}</b></div><p class="alm-pop__meta">Last safe day <b>${formatDisplayDate(st.lastSafe)}</b> · ${left}</p>`;
+  if (rule?.why) html += `<p class="alm-pop__why">${rule.why}</p>`;
+  if (st.status !== 'done') {
+    let receipt = '';
+    if (state.tasked.has(stepId)) receipt = 'Already on your task list.';
+    else {
+      const ghost = taskGhost(stepId);
+      if (ghost) receipt = acceptPlan(ghost, { today: current.today }).receipt;
+    }
+    html += `<p class="alm-pop__label">Add as task writes</p><p class="alm-pop__writes" data-part="write-preview">${receipt}</p>`;
+    const taskBtn = state.tasked.has(stepId) ? '' : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`;
+    html += `<div class="alm-pop__acts">${taskBtn}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
+  }
+  pop.innerHTML = html;
+  pop.hidden = false;
+  const r = rootEl.getBoundingClientRect();
+  const bead = nodes.get(`beadg:${stepId}`) ?? rootEl.querySelector(`[data-step="${stepId}"]`);
+  const b = bead.getBoundingClientRect();
+  const x = b.right - r.left + ALM.popGap;
+  pop.style.left = `${Math.min(x, r.width - ALM.popWidth - 8)}px`;
+  pop.style.top = `${b.bottom - r.top + 6}px`;
+  popFor = stepId;
+  engine.place('__pop', { opacity: 0, y: ALM.popRise });
+  engine.to('__pop', { opacity: 1, y: 0 }, { duration: ALM.popMs });
+}
+
+function closePop() {
+  if (!popFor || !engine) return;
+  popFor = null;
+  engine.to('__pop', { opacity: 0, y: ALM.popRise }, { duration: ALM.popMs });
+  // Hide after the fade — not a motion chain; just when the toast-style pop may leave the tree.
+  globalThis.setTimeout?.(() => {
+    if (!popFor) {
+      const pop = nodes.get('__pop');
+      if (pop) pop.hidden = true;
+    }
+  }, ALM.popMs);
+}
+
+async function addTask(stepId) {
+  const pop = nodes.get('__pop');
+  const buttons = [...(pop?.querySelectorAll('button') ?? [])];
+  const labels = buttons.map(btn => btn.textContent);
+  for (const btn of buttons) btn.disabled = true;
+  const taskBtn = pop?.querySelector(`[data-task="${stepId}"]`);
+  if (taskBtn) taskBtn.textContent = 'Saving…';
+  try {
+    const { response, payload } = await postJson('/api/calendar-ghosts', {
+      id: `alm-${stepId}`,
+      decision: 'accept'
+    });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not add the task.'));
+    }
+    closePop();
+    state.tasked.add(stepId);
+    const receipt = typeof payload.receipt === 'string' ? payload.receipt : '';
+    await afterWrite();
+    rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => bead.classList.add('is-tasked'));
+    showToast(`<b>Written.</b> ${receipt}`);
+    const live = nodes.get('__live');
+    if (live) live.textContent = receipt;
+  } catch (error) {
+    buttons.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.textContent = labels[i];
+    });
+    showToast(`<b>Not written.</b> ${error instanceof Error ? error.message : 'Could not add the task.'}`);
+  }
+}
+
+async function markDone(stepId) {
+  const pop = nodes.get('__pop');
+  const buttons = [...(pop?.querySelectorAll('button') ?? [])];
+  const labels = buttons.map(btn => btn.textContent);
+  for (const btn of buttons) btn.disabled = true;
+  const doneBtn = pop?.querySelector(`[data-done="${stepId}"]`);
+  if (doneBtn) doneBtn.textContent = 'Saving…';
+  try {
+    const { response, payload } = await postJson('/api/almanac/done', { stepId });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not mark this done.'));
+    }
+    closePop();
+    state.done.add(stepId);
+    const prevUnbooked = engine?.get?.('stat:unbooked')?.n;
+    await afterWrite();
+    setBeadStatus(stepId, 'done');
+    if (prevUnbooked != null && engine) {
+      const next = liveSummary().unbooked;
+      engine.place('stat:unbooked', { n: prevUnbooked });
+      engine.to('stat:unbooked', { n: next }, { duration: ALM.countMs });
+      engine.to('stat:soon', { n: liveSummary().lastSafeSoon }, { duration: ALM.countMs });
+    }
+    showToast('<b>Marked done.</b> The Almanac stops asking about it.');
+  } catch (error) {
+    buttons.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.textContent = labels[i];
+    });
+    showToast(`<b>Not saved.</b> ${error instanceof Error ? error.message : 'Could not mark this done.'}`);
+  }
+}
+
+function heldLabel(wantId) {
+  if (wantId === 'good-night') return 'Held for you both';
+  if (wantId === 'keep-empty') return 'Walled';
+  return 'Held';
+}
+
+function showDraft(wantId, text) {
+  const card = nodes.get(`open:${wantId}`);
+  if (!card || text == null) return;
+  card.querySelector('[data-part="draft"]')?.remove();
+  const box = document.createElement('div');
+  box.className = 'alm-draft';
+  box.setAttribute('data-part', 'draft');
+  const para = document.createElement('p');
+  para.textContent = text;
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn--secondary';
+  copy.dataset.copy = '';
+  copy.textContent = 'Copy';
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      copy.textContent = 'Copied';
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(para);
+      getSelection()?.removeAllRanges();
+      getSelection()?.addRange(range);
+      copy.textContent = 'Selected';
+    }
+  });
+  box.append(para, copy);
+  card.append(box);
+}
+
+async function openingAction(wantId, act, btn) {
+  const opening = current?.openings?.find(o => o.wantId === wantId);
+  const card = nodes.get(`open:${wantId}`);
+  if (act === 'plan') {
+    showToast('<b>Nothing written yet.</b> Hammond will propose the slots as ghosts in your week, only on days forecast at 50% or more.');
+    return;
+  }
+  if (act === 'draft') {
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const id = opening?.ids?.draft ?? `alm-draft-${wantId}`;
+      const { response, payload } = await postJson('/api/calendar-ghosts', { id, decision: 'accept' });
+      if (!response.ok || payload?.ok !== true) {
+        throw new Error(errorMessage(payload, 'Could not draft the message.'));
+      }
+      const draft = payload.draft;
+      const text = Array.isArray(draft) ? draft[0]?.text : draft?.text;
+      showDraft(wantId, text ?? '');
+      showToast(`<b>${typeof payload.receipt === 'string' ? payload.receipt : 'Draft ready. Nothing sent.'}</b>`);
+      btn.disabled = false;
+      btn.textContent = label;
+    } catch (error) {
+      btn.disabled = false;
+      btn.textContent = label;
+      showToast(`<b>Not drafted.</b> ${error instanceof Error ? error.message : 'Could not draft the message.'}`);
+    }
+    return;
+  }
+  if (!opening || !card || !engine) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    const id = opening.ids?.hold ?? `alm-hold-${wantId}`;
+    const { response, payload } = await postJson('/api/calendar-ghosts', { id, decision: 'accept' });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not hold this opening.'));
+    }
+    state.held.add(wantId);
+    const receipt = typeof payload.receipt === 'string' ? payload.receipt : '';
+    await afterWrite();
+    const heldCard = nodes.get(`open:${wantId}`);
+    const heldBtn = heldCard?.querySelector(`[data-open="${wantId}"][data-act="hold"]`);
+    heldCard?.classList.add('is-held');
+    if (heldBtn) {
+      heldBtn.disabled = true;
+      heldBtn.textContent = heldLabel(wantId);
+    }
+    if (engine?.has(`open:${wantId}`)) engine.to(`open:${wantId}`, { held: 1 }, { duration: 320 });
+    showToast(`<b>Written.</b> ${receipt}`);
+  } catch (error) {
+    btn.disabled = false;
+    btn.textContent = label;
+    showToast(`<b>Not written.</b> ${error instanceof Error ? error.message : 'Could not hold this opening.'}`);
+  }
+}
+
+function wire(root) {
+  root.addEventListener('click', event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const task = target.closest('[data-task]');
+    if (task) return void addTask(task.getAttribute('data-task'));
+    const done = target.closest('[data-done]');
+    if (done) return void markDone(done.getAttribute('data-done'));
+    const act = target.closest('[data-open]');
+    if (act instanceof HTMLButtonElement) {
+      return void openingAction(act.getAttribute('data-open'), act.getAttribute('data-act'), act);
+    }
+    const bead = target.closest('[data-part="bead"]');
+    if (bead) {
+      const id = bead.getAttribute('data-step');
+      if (!id) return;
+      return id === popFor ? closePop() : openPop(id);
+    }
+    if (!target.closest('[data-part="popover"]')) closePop();
+  });
+  root.addEventListener('keydown', event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (event.key === 'Escape') closePop();
+    if ((event.key === 'Enter' || event.key === ' ') && target.getAttribute('data-part') === 'bead' && target.tagName !== 'BUTTON') {
+      openPop(target.getAttribute('data-step'));
+      event.preventDefault();
+    }
+  });
+}
 
 function publish(win) {
   const hostname = win?.location?.hostname;
@@ -182,8 +547,8 @@ function publish(win) {
   win.__almanac = {
     state,
     ALM,
-    lines: () => current?.lines ?? [],
-    summary: () => current?.summary ?? { unbooked: 0, lastSafeSoon: 0, openings: 0 },
+    lines: () => liveLines(),
+    summary: () => liveSummary(),
     openings: current?.openings ?? [],
     series: current?.series ?? [],
     openPop,
@@ -198,10 +563,14 @@ function publish(win) {
 function paint(doc, host, view, options) {
   engine?.dispose();
   engine = null;
+  clearTimeout(toastTimer);
+  toastTimer = 0;
+  popFor = null;
   nodes.clear();
   const win = doc.defaultView;
   state.phone = win?.matchMedia?.('(max-width: 719px)')?.matches === true;
   current = view;
+  skipResize = true;
   host.replaceChildren();
 
   const dates = view.series.map(point => point.date);
@@ -232,6 +601,7 @@ function paint(doc, host, view, options) {
 
   const period = periodCopy(view);
   const root = el('section', 'alm', host, { 'data-part': 'almanac', 'aria-label': 'Almanac' });
+  rootEl = root;
   const nav = el('header', 'alm__nav', root, { 'data-part': 'nav' });
   const earlier = el('button', 'alm__round', nav, { type: 'button', 'aria-label': 'Earlier' });
   earlier.innerHTML = '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>';
@@ -265,7 +635,7 @@ function paint(doc, host, view, options) {
   const top = el('div', 'alm-top', card, { 'data-part': 'summary' });
   const thesis = el('div', 'alm-top__thesis', top);
   thesis.textContent = 'Every calendar remembers what you booked. This one remembers what you’ll wish you had.';
-  const sum = view.summary;
+  const sum = liveSummary();
   for (const [id, n, label, tone] of [
     ['unbooked', sum.unbooked, 'due now that nobody booked', 'warn'],
     ['soon', sum.lastSafeSoon, 'last safe days in the next 5 weeks', ''],
@@ -293,14 +663,26 @@ function paint(doc, host, view, options) {
   for (const id of ['unbooked', 'soon', 'openings']) {
     engine.place(`stat:${id}`, { n: Number(nodes.get(`stat:${id}`)?.textContent) });
   }
-  entrance();
-  win?.requestAnimationFrame?.(() => applyHubPillsThumb(zoom));
+  if (playedEntrance) settleMotion();
+  else {
+    entrance();
+    playedEntrance = true;
+    // Absorb ResizeObserver noise from the mount itself; do not tear down mid-entrance.
+    entranceGuardUntil = (win?.performance?.now?.() ?? Date.now()) + 1800;
+  }
+  lastHostW = Math.round(host.getBoundingClientRect?.().width || card.clientWidth || 0);
+  win?.requestAnimationFrame?.(() => {
+    skipResize = false;
+    lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
+    applyHubPillsThumb(zoom);
+  });
   root.addEventListener('click', event => {
     const button = event.target.closest?.('[data-zoom]');
     if (!button) return;
     const name = button.getAttribute('data-zoom');
     if (name === 'day' || name === 'week') options.onSwitchView?.(name);
   });
+  wire(root);
   publish(win);
 
   function mountChart() {
@@ -472,15 +854,17 @@ function paint(doc, host, view, options) {
         return limit - (xs[k] - 4);
       };
       lead.steps.forEach((step, k) => {
+        const status = state.done.has(step.id) ? 'done' : step.status;
+        const tasked = state.tasked.has(step.id);
         const x = X(step.lastSafe);
         const bead = s('g', {
-          class: `alm-bead is-${step.status}`,
+          class: `alm-bead is-${status}${tasked ? ' is-tasked' : ''}`,
           transform: `translate(${x} ${cy})`,
           tabindex: 0,
           role: 'button',
           'data-part': 'bead',
           'data-step': step.id,
-          'data-status': step.status,
+          'data-status': status,
           'aria-label': `${step.title}. Last safe day ${formatDisplayDate(step.lastSafe)}.`
         }, lane);
         const inner = s('g', { class: 'alm-bead__shape' }, bead);
@@ -494,7 +878,7 @@ function paint(doc, host, view, options) {
           rx: 2,
           transform: 'rotate(45)'
         }, inner);
-        s('circle', { class: 'alm-bead__dot', r: step.status === 'now' ? ALM.bead.nowR : ALM.bead.r }, inner);
+        s('circle', { class: 'alm-bead__dot', r: status === 'now' ? ALM.bead.nowR : ALM.bead.r }, inner);
         s('path', { class: 'alm-bead__tick', d: 'M-3 0.2 -1 2.2 3.2 -2' }, inner);
         const above = k % 2 === 0;
         const right = isRight(x);
@@ -523,17 +907,18 @@ function paint(doc, host, view, options) {
       const sub = el('p', '', item);
       sub.textContent = anchor.sub ?? '';
       for (const step of lead.steps) {
-        const button = el('button', `alm-list__step is-${step.status}`, item, {
+        const status = state.done.has(step.id) ? 'done' : step.status;
+        const button = el('button', `alm-list__step is-${status}`, item, {
           type: 'button',
           'data-part': 'bead',
           'data-step': step.id,
-          'data-status': step.status
+          'data-status': status
         });
         el('span', 'alm-list__dot', button);
         const title = el('span', 'alm-list__t', button);
         title.textContent = step.title;
         const when = el('span', 'alm-list__d', button);
-        when.textContent = step.status === 'now' ? 'now' : dd(step.lastSafe);
+        when.textContent = status === 'now' ? 'now' : dd(step.lastSafe);
       }
     }
   }
@@ -545,7 +930,8 @@ function paint(doc, host, view, options) {
     for (const opening of view.openings) {
       if (!opening.dates?.length) continue;
       const corey = opening.with === 'corey';
-      const article = el('article', `alm-open${corey ? ' is-corey' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
+      const held = state.held.has(opening.wantId);
+      const article = el('article', `alm-open${corey ? ' is-corey' : ''}${held ? ' is-held' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
       const when = el('div', 'alm-open__when', article);
       const whenLabel = el('span', '', when);
       whenLabel.textContent = whenText(opening);
@@ -560,7 +946,8 @@ function paint(doc, host, view, options) {
       const hold = HOLD_LABEL[opening.wantId];
       if (hold && opening.ids?.hold) {
         const button = el('button', 'btn btn--primary', buttons, { type: 'button', 'data-open': opening.wantId, 'data-act': 'hold' });
-        button.textContent = hold;
+        button.textContent = held ? heldLabel(opening.wantId) : hold;
+        if (held) button.disabled = true;
       }
       if (opening.ids?.draft) {
         const button = el('button', `btn ${opening.wantId === 'bob' ? 'btn--primary' : 'btn--secondary'}`, buttons, {
@@ -588,6 +975,13 @@ function paint(doc, host, view, options) {
     plan.textContent = 'Plan it with Hammond';
   }
 
+  function placeHeld() {
+    for (const opening of view.openings) {
+      if (!nodes.has(`open:${opening.wantId}`)) continue;
+      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
+    }
+  }
+
   function entrance() {
     if (!state.phone && nodes.has('wave-clip')) {
       engine.place('wave', { w: 0 });
@@ -610,9 +1004,20 @@ function paint(doc, host, view, options) {
     } else {
       engine.place('wave', { w: ALM.width });
     }
-    for (const opening of view.openings) {
-      if (nodes.has(`open:${opening.wantId}`)) engine.place(`open:${opening.wantId}`, { held: 0 });
+    placeHeld();
+  }
+
+  /** Resize / re-layout: final geometry, no entrance replay. */
+  function settleMotion() {
+    engine.place('wave', { w: ALM.width });
+    if (!state.phone && nodes.has('wave-clip')) {
+      for (const lead of view.lines) {
+        const id = lead.anchor?.id;
+        if (id && nodes.has(`rail:${id}`)) engine.place(`rail:${id}`, { draw: 1 });
+        for (const step of lead.steps) engine.place(`bead:${step.id}`, { opacity: 1, scale: 1 });
+      }
     }
+    placeHeld();
   }
 }
 
@@ -683,23 +1088,37 @@ function collectFlags(lines, terms, range, tripId) {
 function teardown() {
   engine?.dispose();
   engine = null;
+  clearTimeout(toastTimer);
+  toastTimer = 0;
+  popFor = null;
+  rootEl = null;
   observer?.disconnect();
   observer = null;
   if (phoneQuery && phoneListener) phoneQuery.removeEventListener('change', phoneListener);
   phoneQuery = null;
   phoneListener = null;
   nodes.clear();
+  skipResize = false;
+  lastHostW = 0;
 }
 
 function bindWatchers(doc, host, isCurrent, repaint) {
   if (!observer && typeof ResizeObserver === 'function') {
-    let lastW = 0;
     observer = new ResizeObserver(entries => {
       const width = Math.round(entries[0].contentRect.width);
-      if (lastW && Math.abs(width - lastW) > 2 && isCurrent() && !state.phone) {
-        requestAnimationFrame(() => { if (isCurrent()) repaint(); });
+      const now = doc.defaultView?.performance?.now?.() ?? Date.now();
+      // Never tear down mid-entrance (paint noise or a real resize during the reveal).
+      if (skipResize || now < entranceGuardUntil || engine?.busy()) {
+        lastHostW = width;
+        return;
       }
-      lastW = width;
+      if (lastHostW && Math.abs(width - lastHostW) > 2 && isCurrent() && !state.phone) {
+        lastHostW = width;
+        // Re-layout settled — never replay the entrance.
+        requestAnimationFrame(() => { if (isCurrent()) repaint(); });
+        return;
+      }
+      lastHostW = width;
     });
     observer.observe(host);
   }
@@ -731,11 +1150,13 @@ async function load(token, doc, host, options) {
     if (!body?.ok || !Array.isArray(body.lines) || !Array.isArray(body.series)) throw new Error('almanac');
     await (doc.fonts?.ready ?? Promise.resolve());
     if (token !== generation) return;
+    session = { token, doc, host, options };
     const view = present(body);
     const repaint = () => {
       if (token !== generation) return;
-      paint(doc, host, view, options);
+      paint(doc, host, current ?? view, options);
     };
+    current = view;
     bindWatchers(doc, host, () => token === generation, repaint);
     repaint();
   } catch {
@@ -745,7 +1166,20 @@ async function load(token, doc, host, options) {
 }
 
 export function renderAlmanac(doc, host, options = {}) {
+  // App re-renders the calendar often (data refresh). Keep the mounted Almanac
+  // and its entrance — only the first mount of a visit animates.
+  if (mountedFor === host) {
+    publish(doc.defaultView);
+    return;
+  }
   teardown();
+  mountedFor = host;
+  session = null;
+  playedEntrance = false;
+  entranceGuardUntil = 0;
+  state.done.clear();
+  state.tasked.clear();
+  state.held.clear();
   const token = ++generation;
   host.style.minWidth = '0';
   if (host.parentElement) host.parentElement.style.minWidth = '0';
@@ -754,6 +1188,10 @@ export function renderAlmanac(doc, host, options = {}) {
 }
 
 export function unmountAlmanac() {
+  mountedFor = null;
+  session = null;
   generation += 1;
+  playedEntrance = false;
+  entranceGuardUntil = 0;
   teardown();
 }
