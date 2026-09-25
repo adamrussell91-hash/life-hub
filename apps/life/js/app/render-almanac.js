@@ -1,13 +1,15 @@
 /**
  * Almanac, the fifth calendar zoom. Mounts once from GET /api/almanac.
  * apply() is the only function that writes geometry. Numbers stay on the server.
+ * All motion goes through createMotion — no CSS transitions on SVG attributes.
  */
 import { createMotion, EASE, OVERSHOOT } from '../../../../packages/design-kit/js/hub-motion-engine.js';
 import { ALM } from '../../../../packages/design-kit/js/almanac-geometry.js';
-import { addDays, addMonths, daysBetween } from '../../../../packages/design-kit/js/lead-lines.js';
+import { addDays, addMonths, almanacSummary, daysBetween } from '../../../../packages/design-kit/js/lead-lines.js';
 import { formatDisplayDate } from '../../../../packages/design-kit/js/format-display-date.js';
 import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
-import { ALMANAC_WANTS } from './almanac-rules.js';
+import { acceptPlan } from './ghost-writes.js';
+import { ALMANAC_RULES, ALMANAC_WANTS } from './almanac-rules.js';
 import { getSydneyDateKey } from '../core/time.js';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -45,6 +47,17 @@ let generation = 0;
 let current = null;
 let measureCtx = null;
 const measured = new Map();
+/** Only the first mount of a generation plays the entrance. Resize re-lays out settled. */
+let playedEntrance = false;
+/** Swallow ResizeObserver notifications caused by paint itself, and during the entrance. */
+let skipResize = false;
+let entranceGuardUntil = 0;
+let lastHostW = 0;
+let toastTimer = 0;
+let popFor = null;
+let rootEl = null;
+/** The host currently owned by the Almanac. Survives app re-renders of the calendar. */
+let mountedFor = null;
 
 const WD = date => new Date(`${date}T00:00:00Z`).getUTCDay();
 const DOW = date => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][WD(date)];
@@ -171,10 +184,190 @@ function apply(id, props) {
   if (id.startsWith('open:')) node?.style.setProperty('--held', String(props.held));
 }
 
-function openPop() {}
-function closePop() {}
-function addTask() {}
-function markDone() {}
+function findStep(stepId) {
+  return (current?.lines ?? []).flatMap(line => line.steps.map(st => ({ st, line }))).find(x => x.st.id === stepId);
+}
+
+/** Lines with local done applied — summary and beads stay consistent before a refetch. */
+function liveLines() {
+  return (current?.lines ?? []).map(line => ({
+    ...line,
+    steps: line.steps.map(st => (state.done.has(st.id) ? { ...st, status: 'done' } : st))
+  }));
+}
+
+function liveSummary() {
+  const openings = current?.summary?.openings ?? (current?.openings ?? []).filter(o => o.dates?.length).length;
+  return { ...almanacSummary(liveLines()), openings };
+}
+
+function taskGhost(stepId) {
+  const hit = findStep(stepId);
+  if (!hit) return null;
+  return {
+    id: `alm-${stepId}`,
+    agent: 'hammond',
+    kind: 'create_task',
+    title: hit.st.title,
+    due: hit.st.lastSafe,
+    source: `almanac:${stepId}`
+  };
+}
+
+function showToast(html) {
+  const toast = nodes.get('__toast');
+  if (!toast || !engine) return;
+  toast.innerHTML = html;
+  engine.to('__toast', { opacity: 1, y: 0 }, { duration: ALM.toastInMs });
+  clearTimeout(toastTimer);
+  // Timer only for how long the toast stays — not for motion itself.
+  toastTimer = globalThis.setTimeout?.(
+    () => engine?.to('__toast', { opacity: 0, y: ALM.toastRise }, { duration: ALM.toastInMs }),
+    ALM.toastHoldMs
+  ) ?? 0;
+}
+
+function refreshStats() {
+  if (!engine || !current) return;
+  const sum = liveSummary();
+  engine.to('stat:unbooked', { n: sum.unbooked }, { duration: ALM.countMs });
+  engine.to('stat:soon', { n: sum.lastSafeSoon }, { duration: ALM.countMs });
+}
+
+function setBeadStatus(stepId, status) {
+  rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => {
+    bead.setAttribute('class', (bead.getAttribute('class') ?? '').replace(/is-(overdue|now|soon|later|done)/, `is-${status}`));
+    bead.setAttribute('data-status', status);
+  });
+  if (!engine?.has(`bead:${stepId}`)) return;
+  // Pulse: place at 1.25, OVERSHOOT back to 1. One tween, no timers.
+  engine.place(`bead:${stepId}`, { scale: 1.25 });
+  engine.to(`bead:${stepId}`, { scale: 1 }, { duration: 320, easing: OVERSHOOT });
+}
+
+function openPop(stepId) {
+  const hit = findStep(stepId);
+  const pop = nodes.get('__pop');
+  if (!hit || !pop || !engine || !rootEl) return;
+  const { st } = hit;
+  const rule = ALMANAC_RULES.find(r => r.id === st.ruleId);
+  const left = st.daysLeft < 0 ? `${-st.daysLeft} days late` : st.daysLeft === 0 ? 'today' : `${st.daysLeft} days left`;
+  let html = `<div class="alm-pop__head"><b>${st.title}</b></div><p class="alm-pop__meta">Last safe day <b>${formatDisplayDate(st.lastSafe)}</b> · ${left}</p>`;
+  if (rule?.why) html += `<p class="alm-pop__why">${rule.why}</p>`;
+  if (st.status !== 'done') {
+    const ghost = taskGhost(stepId);
+    const receipt = state.tasked.has(stepId)
+      ? 'Already on your task list.'
+      : ghost
+        ? acceptPlan(ghost, { today: current.today }).receipt
+        : '';
+    html += `<p class="alm-pop__label">Add as task writes</p><p class="alm-pop__writes" data-part="write-preview">${receipt}</p>`;
+    html += `<div class="alm-pop__acts">${state.tasked.has(stepId) ? '' : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
+  }
+  pop.innerHTML = html;
+  pop.hidden = false;
+  const r = rootEl.getBoundingClientRect();
+  const bead = nodes.get(`beadg:${stepId}`) ?? rootEl.querySelector(`[data-step="${stepId}"]`);
+  const b = bead.getBoundingClientRect();
+  const x = b.right - r.left + ALM.popGap;
+  pop.style.left = `${Math.min(x, r.width - ALM.popWidth - 8)}px`;
+  pop.style.top = `${b.bottom - r.top + 6}px`;
+  popFor = stepId;
+  engine.place('__pop', { opacity: 0, y: ALM.popRise });
+  engine.to('__pop', { opacity: 1, y: 0 }, { duration: ALM.popMs });
+}
+
+function closePop() {
+  if (!popFor || !engine) return;
+  popFor = null;
+  engine.to('__pop', { opacity: 0, y: ALM.popRise }, { duration: ALM.popMs });
+  // Hide after the fade — not a motion chain; just when the toast-style pop may leave the tree.
+  globalThis.setTimeout?.(() => {
+    if (!popFor) {
+      const pop = nodes.get('__pop');
+      if (pop) pop.hidden = true;
+    }
+  }, ALM.popMs);
+}
+
+function addTask(stepId) {
+  closePop();
+  state.tasked.add(stepId);
+  rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => bead.classList.add('is-tasked'));
+  const ghost = taskGhost(stepId);
+  const receipt = ghost ? acceptPlan(ghost, { today: current?.today }).receipt : '';
+  showToast(`<b>Written.</b> ${receipt}`);
+  const live = nodes.get('__live');
+  if (live) live.textContent = receipt;
+}
+
+function markDone(stepId) {
+  closePop();
+  state.done.add(stepId);
+  setBeadStatus(stepId, 'done');
+  refreshStats();
+  showToast('<b>Marked done.</b> The Almanac stops asking about it.');
+}
+
+function heldLabel(wantId) {
+  if (wantId === 'good-night') return 'Held for you both';
+  if (wantId === 'keep-empty') return 'Walled';
+  return 'Held';
+}
+
+async function openingAction(wantId, act, btn) {
+  const opening = current?.openings?.find(o => o.wantId === wantId);
+  const card = nodes.get(`open:${wantId}`);
+  if (act === 'plan') {
+    showToast('<b>Nothing written yet.</b> Hammond will propose the slots as ghosts in your week, only on days forecast at 50% or more.');
+    return;
+  }
+  if (act === 'draft') {
+    showToast(`<b>Draft ready for ${opening?.title ?? wantId}. Nothing sent.</b>`);
+    return;
+  }
+  if (!opening || !card || !engine) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  // Latency stand-in until phase 4 wires POST /api/calendar-ghosts.
+  await new Promise(r => globalThis.setTimeout?.(r, ALM.saveLatencyMs));
+  state.held.add(wantId);
+  card.classList.add('is-held');
+  btn.textContent = heldLabel(wantId);
+  engine.to(`open:${wantId}`, { held: 1 }, { duration: 320 });
+  showToast(`<b>Written.</b> Held ${opening.title}.`);
+}
+
+function wire(root) {
+  root.addEventListener('click', event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const task = target.closest('[data-task]');
+    if (task) return void addTask(task.getAttribute('data-task'));
+    const done = target.closest('[data-done]');
+    if (done) return markDone(done.getAttribute('data-done'));
+    const act = target.closest('[data-open]');
+    if (act instanceof HTMLButtonElement) {
+      return void openingAction(act.getAttribute('data-open'), act.getAttribute('data-act'), act);
+    }
+    const bead = target.closest('[data-part="bead"]');
+    if (bead) {
+      const id = bead.getAttribute('data-step');
+      if (!id) return;
+      return id === popFor ? closePop() : openPop(id);
+    }
+    if (!target.closest('[data-part="popover"]')) closePop();
+  });
+  root.addEventListener('keydown', event => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    if (event.key === 'Escape') closePop();
+    if ((event.key === 'Enter' || event.key === ' ') && target.getAttribute('data-part') === 'bead' && target.tagName !== 'BUTTON') {
+      openPop(target.getAttribute('data-step'));
+      event.preventDefault();
+    }
+  });
+}
 
 function publish(win) {
   const hostname = win?.location?.hostname;
@@ -182,8 +375,8 @@ function publish(win) {
   win.__almanac = {
     state,
     ALM,
-    lines: () => current?.lines ?? [],
-    summary: () => current?.summary ?? { unbooked: 0, lastSafeSoon: 0, openings: 0 },
+    lines: () => liveLines(),
+    summary: () => liveSummary(),
     openings: current?.openings ?? [],
     series: current?.series ?? [],
     openPop,
@@ -198,10 +391,14 @@ function publish(win) {
 function paint(doc, host, view, options) {
   engine?.dispose();
   engine = null;
+  clearTimeout(toastTimer);
+  toastTimer = 0;
+  popFor = null;
   nodes.clear();
   const win = doc.defaultView;
   state.phone = win?.matchMedia?.('(max-width: 719px)')?.matches === true;
   current = view;
+  skipResize = true;
   host.replaceChildren();
 
   const dates = view.series.map(point => point.date);
@@ -232,6 +429,7 @@ function paint(doc, host, view, options) {
 
   const period = periodCopy(view);
   const root = el('section', 'alm', host, { 'data-part': 'almanac', 'aria-label': 'Almanac' });
+  rootEl = root;
   const nav = el('header', 'alm__nav', root, { 'data-part': 'nav' });
   const earlier = el('button', 'alm__round', nav, { type: 'button', 'aria-label': 'Earlier' });
   earlier.innerHTML = '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>';
@@ -265,7 +463,7 @@ function paint(doc, host, view, options) {
   const top = el('div', 'alm-top', card, { 'data-part': 'summary' });
   const thesis = el('div', 'alm-top__thesis', top);
   thesis.textContent = 'Every calendar remembers what you booked. This one remembers what you’ll wish you had.';
-  const sum = view.summary;
+  const sum = liveSummary();
   for (const [id, n, label, tone] of [
     ['unbooked', sum.unbooked, 'due now that nobody booked', 'warn'],
     ['soon', sum.lastSafeSoon, 'last safe days in the next 5 weeks', ''],
@@ -293,14 +491,26 @@ function paint(doc, host, view, options) {
   for (const id of ['unbooked', 'soon', 'openings']) {
     engine.place(`stat:${id}`, { n: Number(nodes.get(`stat:${id}`)?.textContent) });
   }
-  entrance();
-  win?.requestAnimationFrame?.(() => applyHubPillsThumb(zoom));
+  if (playedEntrance) settleMotion();
+  else {
+    entrance();
+    playedEntrance = true;
+    // Absorb ResizeObserver noise from the mount itself; do not tear down mid-entrance.
+    entranceGuardUntil = (win?.performance?.now?.() ?? Date.now()) + 1800;
+  }
+  lastHostW = Math.round(host.getBoundingClientRect?.().width || card.clientWidth || 0);
+  win?.requestAnimationFrame?.(() => {
+    skipResize = false;
+    lastHostW = Math.round(host.getBoundingClientRect?.().width || lastHostW);
+    applyHubPillsThumb(zoom);
+  });
   root.addEventListener('click', event => {
     const button = event.target.closest?.('[data-zoom]');
     if (!button) return;
     const name = button.getAttribute('data-zoom');
     if (name === 'day' || name === 'week') options.onSwitchView?.(name);
   });
+  wire(root);
   publish(win);
 
   function mountChart() {
@@ -472,15 +682,17 @@ function paint(doc, host, view, options) {
         return limit - (xs[k] - 4);
       };
       lead.steps.forEach((step, k) => {
+        const status = state.done.has(step.id) ? 'done' : step.status;
+        const tasked = state.tasked.has(step.id);
         const x = X(step.lastSafe);
         const bead = s('g', {
-          class: `alm-bead is-${step.status}`,
+          class: `alm-bead is-${status}${tasked ? ' is-tasked' : ''}`,
           transform: `translate(${x} ${cy})`,
           tabindex: 0,
           role: 'button',
           'data-part': 'bead',
           'data-step': step.id,
-          'data-status': step.status,
+          'data-status': status,
           'aria-label': `${step.title}. Last safe day ${formatDisplayDate(step.lastSafe)}.`
         }, lane);
         const inner = s('g', { class: 'alm-bead__shape' }, bead);
@@ -494,7 +706,7 @@ function paint(doc, host, view, options) {
           rx: 2,
           transform: 'rotate(45)'
         }, inner);
-        s('circle', { class: 'alm-bead__dot', r: step.status === 'now' ? ALM.bead.nowR : ALM.bead.r }, inner);
+        s('circle', { class: 'alm-bead__dot', r: status === 'now' ? ALM.bead.nowR : ALM.bead.r }, inner);
         s('path', { class: 'alm-bead__tick', d: 'M-3 0.2 -1 2.2 3.2 -2' }, inner);
         const above = k % 2 === 0;
         const right = isRight(x);
@@ -523,17 +735,18 @@ function paint(doc, host, view, options) {
       const sub = el('p', '', item);
       sub.textContent = anchor.sub ?? '';
       for (const step of lead.steps) {
-        const button = el('button', `alm-list__step is-${step.status}`, item, {
+        const status = state.done.has(step.id) ? 'done' : step.status;
+        const button = el('button', `alm-list__step is-${status}`, item, {
           type: 'button',
           'data-part': 'bead',
           'data-step': step.id,
-          'data-status': step.status
+          'data-status': status
         });
         el('span', 'alm-list__dot', button);
         const title = el('span', 'alm-list__t', button);
         title.textContent = step.title;
         const when = el('span', 'alm-list__d', button);
-        when.textContent = step.status === 'now' ? 'now' : dd(step.lastSafe);
+        when.textContent = status === 'now' ? 'now' : dd(step.lastSafe);
       }
     }
   }
@@ -545,7 +758,8 @@ function paint(doc, host, view, options) {
     for (const opening of view.openings) {
       if (!opening.dates?.length) continue;
       const corey = opening.with === 'corey';
-      const article = el('article', `alm-open${corey ? ' is-corey' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
+      const held = state.held.has(opening.wantId);
+      const article = el('article', `alm-open${corey ? ' is-corey' : ''}${held ? ' is-held' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
       const when = el('div', 'alm-open__when', article);
       const whenLabel = el('span', '', when);
       whenLabel.textContent = whenText(opening);
@@ -560,7 +774,8 @@ function paint(doc, host, view, options) {
       const hold = HOLD_LABEL[opening.wantId];
       if (hold && opening.ids?.hold) {
         const button = el('button', 'btn btn--primary', buttons, { type: 'button', 'data-open': opening.wantId, 'data-act': 'hold' });
-        button.textContent = hold;
+        button.textContent = held ? heldLabel(opening.wantId) : hold;
+        if (held) button.disabled = true;
       }
       if (opening.ids?.draft) {
         const button = el('button', `btn ${opening.wantId === 'bob' ? 'btn--primary' : 'btn--secondary'}`, buttons, {
@@ -611,7 +826,26 @@ function paint(doc, host, view, options) {
       engine.place('wave', { w: ALM.width });
     }
     for (const opening of view.openings) {
-      if (nodes.has(`open:${opening.wantId}`)) engine.place(`open:${opening.wantId}`, { held: 0 });
+      if (!nodes.has(`open:${opening.wantId}`)) continue;
+      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
+    }
+  }
+
+  /** Resize / re-layout: final geometry, no entrance replay. */
+  function settleMotion() {
+    if (!state.phone && nodes.has('wave-clip')) {
+      engine.place('wave', { w: ALM.width });
+      for (const lead of view.lines) {
+        const id = lead.anchor?.id;
+        if (id && nodes.has(`rail:${id}`)) engine.place(`rail:${id}`, { draw: 1 });
+        for (const step of lead.steps) engine.place(`bead:${step.id}`, { opacity: 1, scale: 1 });
+      }
+    } else {
+      engine.place('wave', { w: ALM.width });
+    }
+    for (const opening of view.openings) {
+      if (!nodes.has(`open:${opening.wantId}`)) continue;
+      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
     }
   }
 }
@@ -683,23 +917,37 @@ function collectFlags(lines, terms, range, tripId) {
 function teardown() {
   engine?.dispose();
   engine = null;
+  clearTimeout(toastTimer);
+  toastTimer = 0;
+  popFor = null;
+  rootEl = null;
   observer?.disconnect();
   observer = null;
   if (phoneQuery && phoneListener) phoneQuery.removeEventListener('change', phoneListener);
   phoneQuery = null;
   phoneListener = null;
   nodes.clear();
+  skipResize = false;
+  lastHostW = 0;
 }
 
 function bindWatchers(doc, host, isCurrent, repaint) {
   if (!observer && typeof ResizeObserver === 'function') {
-    let lastW = 0;
     observer = new ResizeObserver(entries => {
       const width = Math.round(entries[0].contentRect.width);
-      if (lastW && Math.abs(width - lastW) > 2 && isCurrent() && !state.phone) {
-        requestAnimationFrame(() => { if (isCurrent()) repaint(); });
+      const now = doc.defaultView?.performance?.now?.() ?? Date.now();
+      // Never tear down mid-entrance (paint noise or a real resize during the reveal).
+      if (skipResize || now < entranceGuardUntil || engine?.busy()) {
+        lastHostW = width;
+        return;
       }
-      lastW = width;
+      if (lastHostW && Math.abs(width - lastHostW) > 2 && isCurrent() && !state.phone) {
+        lastHostW = width;
+        // Re-layout settled — never replay the entrance.
+        requestAnimationFrame(() => { if (isCurrent()) repaint(); });
+        return;
+      }
+      lastHostW = width;
     });
     observer.observe(host);
   }
@@ -745,7 +993,19 @@ async function load(token, doc, host, options) {
 }
 
 export function renderAlmanac(doc, host, options = {}) {
+  // App re-renders the calendar often (data refresh). Keep the mounted Almanac
+  // and its entrance — only the first mount of a visit animates.
+  if (mountedFor === host) {
+    publish(doc.defaultView);
+    return;
+  }
   teardown();
+  mountedFor = host;
+  playedEntrance = false;
+  entranceGuardUntil = 0;
+  state.done.clear();
+  state.tasked.clear();
+  state.held.clear();
   const token = ++generation;
   host.style.minWidth = '0';
   if (host.parentElement) host.parentElement.style.minWidth = '0';
@@ -754,6 +1014,9 @@ export function renderAlmanac(doc, host, options = {}) {
 }
 
 export function unmountAlmanac() {
+  mountedFor = null;
   generation += 1;
+  playedEntrance = false;
+  entranceGuardUntil = 0;
   teardown();
 }
