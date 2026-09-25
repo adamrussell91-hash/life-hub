@@ -77,6 +77,13 @@ async function readEvents(paths, readFile, from, to, warn) {
     }
     if (typeof text !== 'string') continue;
     try {
+      if (legacy) {
+        const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/.exec(text.trim());
+        if (!match) continue;
+        const record = loadYaml(match[1]);
+        if (record && typeof record === 'object') events.push({ path, record, body: match[2]?.trim() ?? '' });
+        continue;
+      }
       events.push(parseEventDocument(text, path, loadYaml));
     } catch (error) {
       warn?.(`calendar-ghosts-propose: ignoring ${path} (${error instanceof Error ? error.message : 'invalid'})`);
