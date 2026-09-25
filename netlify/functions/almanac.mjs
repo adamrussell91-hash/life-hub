@@ -15,7 +15,7 @@ import {
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { parseDateRange } from './_shared/repo-policy.mjs';
-import { defaultGetTasksStore, getJSON } from './_shared/tasks-blobs.mjs';
+import { defaultGetTasksStore, getJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { addDays, almanacSummary, leadLines } from '../../packages/design-kit/js/lead-lines.js';
@@ -183,6 +183,24 @@ export function parseSchoolTerms(value, { warn = console.warn } = {}) {
     });
   });
   return terms;
+}
+
+export async function readAlmanacTasked(tasksStore, { warn = console.warn } = {}) {
+  if (typeof tasksStore !== 'function') return [];
+  try {
+    const store = await tasksStore();
+    const index = await readTaskIndex(store);
+    const out = [];
+    for (const id of index) {
+      const task = await getJSON(store, taskKey(id));
+      const source = typeof task?.source === 'string' ? task.source : '';
+      if (source.startsWith('almanac:')) out.push(source.slice('almanac:'.length));
+    }
+    return [...new Set(out)];
+  } catch (error) {
+    warn(`almanac: tasked steps unavailable (${error instanceof Error ? error.message : 'error'})`);
+    return [];
+  }
 }
 
 export async function readSchoolTerms(tasksStore, { warn = console.warn } = {}) {
@@ -708,10 +726,11 @@ export function createAlmanacHandler({
           return jsonResponse(400, fail(400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.').payload, PRIVATE_CACHE);
         }
         const opened = await open();
-        const [terms, lessons, professionalEvents] = await Promise.all([
+        const [terms, lessons, professionalEvents, tasked] = await Promise.all([
           readSchoolTerms(tasksStore),
           loadLessons(env),
-          loadProfessionalEvents(env)
+          loadProfessionalEvents(env),
+          readAlmanacTasked(tasksStore)
         ]);
         const view = await readAlmanac({
           readFile: path => opened.readFile(path),
@@ -723,7 +742,7 @@ export function createAlmanacHandler({
           lessons,
           professionalEvents
         });
-        return jsonResponse(200, { ok: true, ...view }, PRIVATE_CACHE);
+        return jsonResponse(200, { ok: true, ...view, tasked }, PRIVATE_CACHE);
       }
 
       const text = await request.text();

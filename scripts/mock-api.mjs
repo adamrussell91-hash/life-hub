@@ -24,6 +24,7 @@ import {
   HUB_PREFS_KEY,
   appendAlmanacDone,
   readAlmanac,
+  readAlmanacTasked,
   readDoneRequest,
   readSchoolTerms
 } from '../netlify/functions/almanac.mjs';
@@ -453,7 +454,8 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           lessons: [],
           professionalEvents: []
         });
-        json(response, 200, { ok: true, ...view });
+        const tasked = await readAlmanacTasked(async () => taskStore);
+        json(response, 200, { ok: true, ...view, tasked });
       } catch (almanacError) {
         error(response, 500, 'almanac_failed', almanacError instanceof Error ? almanacError.message : 'Almanac could not be built.', true);
       }
@@ -528,7 +530,26 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
-    if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||
+    if (url.pathname === '/api/tasks') {
+      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
+      if (!readSession(request)) return unauthenticated(response);
+      const id = url.searchParams.get('id');
+      if (id) {
+        const task = taskData.get(taskKey(id));
+        if (!task || typeof task !== 'object') {
+          error(response, 404, 'not_found', 'Task not found', false);
+          return true;
+        }
+        json(response, 200, { ok: true, data: task });
+        return true;
+      }
+      const index = Array.isArray(taskData.get(TASKS_INDEX_KEY)) ? taskData.get(TASKS_INDEX_KEY) : [];
+      const tasks = index.map(taskId => taskData.get(taskKey(taskId))).filter(task => task && typeof task === 'object');
+      json(response, 200, { ok: true, data: { tasks } });
+      return true;
+    }
+
+    if (url.pathname.startsWith('/api/tasks/') ||
         url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);

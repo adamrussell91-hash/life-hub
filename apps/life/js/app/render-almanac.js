@@ -58,6 +58,8 @@ let popFor = null;
 let rootEl = null;
 /** The host currently owned by the Almanac. Survives app re-renders of the calendar. */
 let mountedFor = null;
+/** Active mount session so writes can refetch without remounting. */
+let session = null;
 
 const WD = date => new Date(`${date}T00:00:00Z`).getUTCDay();
 const DOW = date => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][WD(date)];
@@ -139,6 +141,16 @@ function whenText(opening) {
 function present(body) {
   const from = body.from;
   const horizon = typeof body.horizon === 'string' && body.to && body.horizon < body.to ? body.horizon : body.to;
+  const doneIds = new Set();
+  for (const line of body.lines ?? []) {
+    for (const step of line.steps ?? []) {
+      if (step.status === 'done') doneIds.add(step.id);
+    }
+  }
+  for (const id of doneIds) state.done.add(id);
+  for (const id of body.tasked ?? []) {
+    if (typeof id === 'string' && id) state.tasked.add(id);
+  }
   return {
     today: body.today || from,
     from,
@@ -148,7 +160,8 @@ function present(body) {
     summary: body.summary ?? { unbooked: 0, lastSafeSoon: 0, openings: 0 },
     series: (body.series ?? []).filter(point => point.date >= from && point.date <= horizon),
     openings: body.openings ?? [],
-    world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon)
+    world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon),
+    tasked: body.tasked ?? []
   };
 }
 
@@ -205,14 +218,56 @@ function liveSummary() {
 function taskGhost(stepId) {
   const hit = findStep(stepId);
   if (!hit) return null;
+  // Same shape the server builds in ghostsForAlmanacAction — preview only.
   return {
-    id: `alm-${stepId}`,
+    id: hit.st.actionId ?? `alm-${stepId}`,
     agent: 'hammond',
     kind: 'create_task',
     title: hit.st.title,
     due: hit.st.lastSafe,
     source: `almanac:${stepId}`
   };
+}
+
+function errorMessage(payload, fallback) {
+  const msg = payload?.error?.message;
+  return typeof msg === 'string' && msg ? msg : fallback;
+}
+
+async function postJson(path, body) {
+  const { API_BASE_URL } = await import('./config.js');
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const payload = await response.json().catch(() => null);
+  return { response, payload };
+}
+
+async function refetchView() {
+  if (!session) return null;
+  const today = getSydneyDateKey(session.options.now ?? new Date());
+  const { API_BASE_URL } = await import('./config.js');
+  const response = await fetch(`${API_BASE_URL}/api/almanac?from=${today}&to=${addDays(today, 365)}`, {
+    credentials: 'include'
+  });
+  if (!response.ok) throw new Error('almanac');
+  const body = await response.json();
+  if (!body?.ok || !Array.isArray(body.lines) || !Array.isArray(body.series)) throw new Error('almanac');
+  return body;
+}
+
+/** Re-lay out from the server after a write. Keeps entrance from replaying. */
+async function afterWrite(paintExtras) {
+  if (!session || session.token !== generation) return;
+  const prevUnbooked = engine?.get?.('stat:unbooked')?.n;
+  const body = await refetchView();
+  if (session.token !== generation) return;
+  current = present(body);
+  paint(session.doc, session.host, current, session.options);
+  paintExtras?.({ prevUnbooked });
 }
 
 function showToast(html) {
@@ -295,29 +350,105 @@ function closePop() {
   }, ALM.popMs);
 }
 
-function addTask(stepId) {
-  closePop();
-  state.tasked.add(stepId);
-  rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => bead.classList.add('is-tasked'));
-  const ghost = taskGhost(stepId);
-  const receipt = ghost ? acceptPlan(ghost, { today: current?.today }).receipt : '';
-  showToast(`<b>Written.</b> ${receipt}`);
-  const live = nodes.get('__live');
-  if (live) live.textContent = receipt;
+async function addTask(stepId) {
+  const pop = nodes.get('__pop');
+  const buttons = [...(pop?.querySelectorAll('button') ?? [])];
+  const labels = buttons.map(btn => btn.textContent);
+  for (const btn of buttons) btn.disabled = true;
+  const taskBtn = pop?.querySelector(`[data-task="${stepId}"]`);
+  if (taskBtn) taskBtn.textContent = 'Saving…';
+  try {
+    const { response, payload } = await postJson('/api/calendar-ghosts', {
+      id: `alm-${stepId}`,
+      decision: 'accept'
+    });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not add the task.'));
+    }
+    closePop();
+    state.tasked.add(stepId);
+    const receipt = typeof payload.receipt === 'string' ? payload.receipt : '';
+    await afterWrite();
+    rootEl?.querySelectorAll(`[data-step="${stepId}"]`).forEach(bead => bead.classList.add('is-tasked'));
+    showToast(`<b>Written.</b> ${receipt}`);
+    const live = nodes.get('__live');
+    if (live) live.textContent = receipt;
+  } catch (error) {
+    buttons.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.textContent = labels[i];
+    });
+    showToast(`<b>Not written.</b> ${error instanceof Error ? error.message : 'Could not add the task.'}`);
+  }
 }
 
-function markDone(stepId) {
-  closePop();
-  state.done.add(stepId);
-  setBeadStatus(stepId, 'done');
-  refreshStats();
-  showToast('<b>Marked done.</b> The Almanac stops asking about it.');
+async function markDone(stepId) {
+  const pop = nodes.get('__pop');
+  const buttons = [...(pop?.querySelectorAll('button') ?? [])];
+  const labels = buttons.map(btn => btn.textContent);
+  for (const btn of buttons) btn.disabled = true;
+  const doneBtn = pop?.querySelector(`[data-done="${stepId}"]`);
+  if (doneBtn) doneBtn.textContent = 'Saving…';
+  try {
+    const { response, payload } = await postJson('/api/almanac/done', { stepId });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not mark this done.'));
+    }
+    closePop();
+    state.done.add(stepId);
+    const prevUnbooked = engine?.get?.('stat:unbooked')?.n;
+    await afterWrite();
+    setBeadStatus(stepId, 'done');
+    if (prevUnbooked != null && engine) {
+      const next = liveSummary().unbooked;
+      engine.place('stat:unbooked', { n: prevUnbooked });
+      engine.to('stat:unbooked', { n: next }, { duration: ALM.countMs });
+      engine.to('stat:soon', { n: liveSummary().lastSafeSoon }, { duration: ALM.countMs });
+    }
+    showToast('<b>Marked done.</b> The Almanac stops asking about it.');
+  } catch (error) {
+    buttons.forEach((btn, i) => {
+      btn.disabled = false;
+      btn.textContent = labels[i];
+    });
+    showToast(`<b>Not saved.</b> ${error instanceof Error ? error.message : 'Could not mark this done.'}`);
+  }
 }
 
 function heldLabel(wantId) {
   if (wantId === 'good-night') return 'Held for you both';
   if (wantId === 'keep-empty') return 'Walled';
   return 'Held';
+}
+
+function showDraft(wantId, text) {
+  const card = nodes.get(`open:${wantId}`);
+  if (!card || text == null) return;
+  card.querySelector('[data-part="draft"]')?.remove();
+  const box = document.createElement('div');
+  box.className = 'alm-draft';
+  box.setAttribute('data-part', 'draft');
+  const para = document.createElement('p');
+  para.textContent = text;
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.className = 'btn btn--secondary';
+  copy.dataset.copy = '';
+  copy.textContent = 'Copy';
+  copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      copy.textContent = 'Copied';
+    } catch {
+      const range = document.createRange();
+      range.selectNodeContents(para);
+      getSelection()?.removeAllRanges();
+      getSelection()?.addRange(range);
+      copy.textContent = 'Selected';
+    }
+  });
+  box.append(para, copy);
+  card.append(box);
 }
 
 async function openingAction(wantId, act, btn) {
@@ -328,19 +459,55 @@ async function openingAction(wantId, act, btn) {
     return;
   }
   if (act === 'draft') {
-    showToast(`<b>Draft ready for ${opening?.title ?? wantId}. Nothing sent.</b>`);
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const id = opening?.ids?.draft ?? `alm-draft-${wantId}`;
+      const { response, payload } = await postJson('/api/calendar-ghosts', { id, decision: 'accept' });
+      if (!response.ok || payload?.ok !== true) {
+        throw new Error(errorMessage(payload, 'Could not draft the message.'));
+      }
+      const draft = payload.draft;
+      const text = Array.isArray(draft) ? draft[0]?.text : draft?.text;
+      showDraft(wantId, text ?? '');
+      showToast(`<b>${typeof payload.receipt === 'string' ? payload.receipt : 'Draft ready. Nothing sent.'}</b>`);
+      btn.disabled = false;
+      btn.textContent = label;
+    } catch (error) {
+      btn.disabled = false;
+      btn.textContent = label;
+      showToast(`<b>Not drafted.</b> ${error instanceof Error ? error.message : 'Could not draft the message.'}`);
+    }
     return;
   }
   if (!opening || !card || !engine) return;
+  const label = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Saving…';
-  // Latency stand-in until phase 4 wires POST /api/calendar-ghosts.
-  await new Promise(r => globalThis.setTimeout?.(r, ALM.saveLatencyMs));
-  state.held.add(wantId);
-  card.classList.add('is-held');
-  btn.textContent = heldLabel(wantId);
-  engine.to(`open:${wantId}`, { held: 1 }, { duration: 320 });
-  showToast(`<b>Written.</b> Held ${opening.title}.`);
+  try {
+    const id = opening.ids?.hold ?? `alm-hold-${wantId}`;
+    const { response, payload } = await postJson('/api/calendar-ghosts', { id, decision: 'accept' });
+    if (!response.ok || payload?.ok !== true) {
+      throw new Error(errorMessage(payload, 'Could not hold this opening.'));
+    }
+    state.held.add(wantId);
+    const receipt = typeof payload.receipt === 'string' ? payload.receipt : '';
+    await afterWrite();
+    const heldCard = nodes.get(`open:${wantId}`);
+    const heldBtn = heldCard?.querySelector(`[data-open="${wantId}"][data-act="hold"]`);
+    heldCard?.classList.add('is-held');
+    if (heldBtn) {
+      heldBtn.disabled = true;
+      heldBtn.textContent = heldLabel(wantId);
+    }
+    if (engine?.has(`open:${wantId}`)) engine.to(`open:${wantId}`, { held: 1 }, { duration: 320 });
+    showToast(`<b>Written.</b> ${receipt}`);
+  } catch (error) {
+    btn.disabled = false;
+    btn.textContent = label;
+    showToast(`<b>Not written.</b> ${error instanceof Error ? error.message : 'Could not hold this opening.'}`);
+  }
 }
 
 function wire(root) {
@@ -350,7 +517,7 @@ function wire(root) {
     const task = target.closest('[data-task]');
     if (task) return void addTask(task.getAttribute('data-task'));
     const done = target.closest('[data-done]');
-    if (done) return markDone(done.getAttribute('data-done'));
+    if (done) return void markDone(done.getAttribute('data-done'));
     const act = target.closest('[data-open]');
     if (act instanceof HTMLButtonElement) {
       return void openingAction(act.getAttribute('data-open'), act.getAttribute('data-act'), act);
@@ -983,11 +1150,13 @@ async function load(token, doc, host, options) {
     if (!body?.ok || !Array.isArray(body.lines) || !Array.isArray(body.series)) throw new Error('almanac');
     await (doc.fonts?.ready ?? Promise.resolve());
     if (token !== generation) return;
+    session = { token, doc, host, options };
     const view = present(body);
     const repaint = () => {
       if (token !== generation) return;
-      paint(doc, host, view, options);
+      paint(doc, host, current ?? view, options);
     };
+    current = view;
     bindWatchers(doc, host, () => token === generation, repaint);
     repaint();
   } catch {
@@ -1005,6 +1174,7 @@ export function renderAlmanac(doc, host, options = {}) {
   }
   teardown();
   mountedFor = host;
+  session = null;
   playedEntrance = false;
   entranceGuardUntil = 0;
   state.done.clear();
@@ -1019,6 +1189,7 @@ export function renderAlmanac(doc, host, options = {}) {
 
 export function unmountAlmanac() {
   mountedFor = null;
+  session = null;
   generation += 1;
   playedEntrance = false;
   entranceGuardUntil = 0;
