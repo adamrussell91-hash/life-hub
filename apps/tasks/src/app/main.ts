@@ -17,6 +17,7 @@ import '../styles/daily-dial.css';
 import '../styles/lesson-engine.css';
 import '../styles/graph.css';
 import '../styles/backlog.css';
+import '../styles/goals.css';
 import 'katex/dist/katex.min.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
