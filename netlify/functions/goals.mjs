@@ -1,4 +1,4 @@
-import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
+import { createTasksCollectionHandler, normalizeTags } from './_shared/tasks-collection.mjs';
 
 export const config = { path: '/api/goals' };
 
@@ -23,6 +23,7 @@ export function createGoalsHandler(deps = {}) {
           parent_area_id: typeof body.parent_area_id === 'string' ? body.parent_area_id : null,
           parent_someday_id: typeof body.parent_someday_id === 'string' ? body.parent_someday_id : null,
           status: 'active',
+          tags: normalizeTags(body.tags),
           created_at: timestamp,
           updated_at: timestamp,
           ...(Object.prototype.hasOwnProperty.call(body, 'life_wall') ? { life_wall: body.life_wall } : {})

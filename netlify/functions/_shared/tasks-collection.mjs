@@ -18,6 +18,15 @@ import {
   writeIndex
 } from './tasks-blobs.mjs';
 
+/** Non-empty trimmed strings only — views read `tags.length` without guarding. */
+export function normalizeTags(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(tag => typeof tag === 'string')
+    .map(tag => tag.trim())
+    .filter(Boolean);
+}
+
 function recordKey(prefix, id) {
   return `${prefix}${id}`;
 }

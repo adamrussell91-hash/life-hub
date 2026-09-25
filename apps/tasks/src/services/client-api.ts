@@ -89,6 +89,15 @@ async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerat
   }
 }
 
+/** Goals stored before the API wrote `tags` / `description` arrive without them. */
+function withGoalDefaults(goal: import('@/schemas/goal').Goal): import('@/schemas/goal').Goal {
+  return {
+    ...goal,
+    description: goal.description ?? '',
+    tags: Array.isArray(goal.tags) ? goal.tags : []
+  };
+}
+
 export const tasksApi = {
   listTasks: () => apiGet<{ tasks: Task[] }>('/api/tasks').then((r) => mergeListedTasks(r.tasks)),
   getTask: (id: string) =>
@@ -429,8 +438,10 @@ export const tasksApi = {
     apiPatch<import('@/schemas/area').Area>(`/api/areas?id=${encodeURIComponent(id)}`, body),
   deleteArea: (id: string) => apiDelete<{ deleted: boolean }>(`/api/areas?id=${encodeURIComponent(id)}`),
 
-  listGoals: () => apiGet<{ goals: import('@/schemas/goal').Goal[] }>('/api/goals').then((r) => r.goals),
-  getGoal: (id: string) => apiGet<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`),
+  listGoals: () =>
+    apiGet<{ goals: import('@/schemas/goal').Goal[] }>('/api/goals').then((r) => r.goals.map(withGoalDefaults)),
+  getGoal: (id: string) =>
+    apiGet<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`).then(withGoalDefaults),
   createGoal: (body: unknown) => apiPost<import('@/schemas/goal').Goal>('/api/goals', body),
   updateGoal: (id: string, body: unknown) =>
     apiPatch<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`, body),

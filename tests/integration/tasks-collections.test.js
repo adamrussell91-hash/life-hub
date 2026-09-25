@@ -72,6 +72,7 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
   assert.equal(createdArea.status, 201);
   const area = (await createdArea.json()).data;
   assert.match(area.id, /^area_/);
+  assert.deepEqual(area.tags, []);
 
   const createdGoal = await createGoalsHandler(deps)(
     request({
@@ -83,6 +84,17 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
   assert.equal(createdGoal.status, 201);
   const goal = (await createdGoal.json()).data;
   assert.equal(goal.parent_area_id, area.id);
+  // The Goals page reads goal.tags.length; a missing array crashes the whole view.
+  assert.deepEqual(goal.tags, []);
+
+  const taggedGoal = await createGoalsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/goals',
+      body: { title: 'Tagged', tags: ['term-3', 42, ' ', 'marking'] }
+    })
+  );
+  assert.deepEqual((await taggedGoal.json()).data.tags, ['term-3', 'marking']);
 
   const createdProject = await createProjectsHandler(deps)(
     request({
