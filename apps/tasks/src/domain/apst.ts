@@ -1,3 +1,5 @@
+import { addDaysKey, mondayOf, termAt, type SchoolTerm } from '@/domain/school-time';
+
 /**
  * Australian Professional Standards for Teachers: the 7 standards and 37 focus areas.
  * Titles are exactly as published by AITSL in "Australian Professional Standards for Teachers"
@@ -112,4 +114,48 @@ export function standardsCoverage(
     }
   }
   return out;
+}
+
+/** School weeks from today through the submission week. Holiday weeks do not count. Past dates are 0. */
+export function schoolWeeksUntil(today: string, target: string, terms: readonly SchoolTerm[]): number {
+  if (target < today) return 0;
+  let count = 0;
+  for (let monday = mondayOf(today); monday <= mondayOf(target); monday = addDaysKey(monday, 7)) {
+    const school =
+      terms.length === 0 ||
+      [0, 1, 2, 3, 4].some((offset) => termAt(addDaysKey(monday, offset), terms as SchoolTerm[]) !== null);
+    if (school) count += 1;
+  }
+  return count;
+}
+
+/**
+ * Uncovered standards inside four school weeks of submission.
+ * `loadWeek` is the Monday of the week before submission, and only when a warning is due.
+ */
+export function standardsRibbonAlert(input: {
+  today: string;
+  submission: string | null;
+  terms: readonly SchoolTerm[];
+  coverage: Record<ApstStandard['number'], StandardCoverage>;
+}): { standards: ApstStandard['number'][]; loadWeek: string | null } {
+  if (!input.submission || schoolWeeksUntil(input.today, input.submission, input.terms) > 4) {
+    return { standards: [], loadWeek: null };
+  }
+  const standards = APST_STANDARDS.map((standard) => standard.number).filter(
+    (number) => input.coverage[number] === 'none'
+  );
+  if (!standards.length) return { standards: [], loadWeek: null };
+  return { standards, loadWeek: mondayOf(addDaysKey(input.submission, -7)) };
+}
+
+/** Hover and aria copy for one ribbon segment. Titles come from APST_STANDARDS. */
+export function ribbonSegmentText(
+  standard: ApstStandard['number'],
+  state: StandardCoverage,
+  lines: readonly string[]
+): { aria: string; title: string } {
+  const meta = APST_STANDARDS.find((item) => item.number === standard);
+  const aria = `Standard ${standard}, ${meta?.title ?? ''}: ${state}`;
+  return { aria, title: lines.length ? `${aria}\n${lines.join('\n')}` : aria };
 }

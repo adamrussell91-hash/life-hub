@@ -52,6 +52,7 @@ export type LinesInput = {
   onReviewInsight: (id: string) => void;
   onDismissInsight?: (id: string) => void;
   onToggleScale: () => void;
+  lifeWalls?: Array<{ id: string; label: string }>;
 };
 
 type VisualState = 'done' | 'current' | 'open' | 'waiting' | 'blocked' | 'suggested' | 'milestone';
@@ -257,6 +258,11 @@ function subClass(tone: StationView['tone']): string {
   return 'sub';
 }
 
+function terminusEntityId(project: Project, tasks: Task[]): string {
+  const milestone = projectRoute(project, tasks).stations.find((station) => station.kind === 'milestone');
+  return milestone?.id ?? `${project.id}-end`;
+}
+
 function paintStation(
   parent: SVGElement,
   st: StationView,
@@ -362,6 +368,12 @@ function paintStation(
       );
     }
   }
+  const mark = pop.querySelector('[data-part="station-mark"]');
+  if (mark) {
+    mark.setAttribute('data-entity-id', st.id);
+    mark.setAttribute('data-morph-shape', 'station');
+    mark.setAttribute('data-morph-color', col);
+  }
   if (st.state === 'blocked') {
     svgEl(
       'rect',
@@ -412,6 +424,11 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
   );
   const cur = line.stations.findIndex((st) => st.state === 'current');
   const cx = cur >= 0 ? xs[cur]! : g.padL;
+  const track = svgEl(
+    'g',
+    { 'data-entity-id': line.project.id, 'data-morph-shape': 'track', 'data-morph-color': col },
+    svg
+  );
   const travelled = svgEl(
     'path',
     {
@@ -424,7 +441,7 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       'data-part': 'track-travelled',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const ahead = svgEl(
     'path',
@@ -437,7 +454,7 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
       'data-part': 'track-ahead',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const base = lineIndex * 90;
   drawIn(travelled, base, 350, input.reducedMotion);
@@ -584,7 +601,17 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     }
   });
 
-  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
+  const tg = svgEl(
+    'g',
+    {
+      class: 'pop graph-terminus',
+      'data-part': 'terminus',
+      'data-entity-id': terminusEntityId(line.project, input.tasks),
+      'data-morph-shape': 'terminus',
+      'data-morph-color': col
+    },
+    svg
+  );
   const termRight = lineLabelX(termX + termW, width).x;
   const termLeft = Math.max(4, termRight - termW);
   svgEl('rect', { x: termLeft, y: y - g.termH / 2, width: termW, height: g.termH, rx: g.termH / 2, fill: col }, tg);
@@ -613,6 +640,11 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
   });
   const endY = yy;
   const cur = line.stations.findIndex((st) => st.state === 'current');
+  const track = svgEl(
+    'g',
+    { 'data-entity-id': line.project.id, 'data-morph-shape': 'track', 'data-morph-color': col },
+    svg
+  );
   const travelled = svgEl(
     'path',
     {
@@ -624,7 +656,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       'data-part': 'track-travelled',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const ahead = svgEl(
     'path',
@@ -637,7 +669,7 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       'data-part': 'track-ahead',
       class: 'graph-line__track'
     },
-    svg
+    track
   );
   const base = lineIndex * 90;
   drawIn(travelled, base, 300, input.reducedMotion);
@@ -686,7 +718,17 @@ function renderVertical(line: LineModel, host: HTMLElement, width: number, input
       });
     }
   });
-  const tg = svgEl('g', { class: 'pop graph-terminus', 'data-part': 'terminus' }, svg);
+  const tg = svgEl(
+    'g',
+    {
+      class: 'pop graph-terminus',
+      'data-part': 'terminus',
+      'data-entity-id': terminusEntityId(line.project, input.tasks),
+      'data-morph-shape': 'terminus',
+      'data-morph-color': col
+    },
+    svg
+  );
   const tw = terminusWidth(line.terminus.label, line.terminus.date);
   svgEl('rect', { x: x0 - 12, y: endY, width: tw, height: 30, rx: 15, fill: col }, tg);
   const tt = svgEl('text', { class: 'term', x: x0 - 12 + tw / 2, y: endY + 19.5, 'text-anchor': 'middle' }, tg);
@@ -720,7 +762,9 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
   toggle.type = 'button';
   tools.append(toggle);
   const foot = el('p', 'graph-loose-footer');
-  root.append(board, tools, stage, foot, live);
+  const wallsHost = el('div', 'tl-noservice-list');
+  wallsHost.hidden = true;
+  root.append(board, wallsHost, tools, stage, foot, live);
   host.append(root);
 
   let input = first;
@@ -730,6 +774,15 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
 
   const paint = (): void => {
     const models = buildLines(input.projects, input.tasks, input.now, input.insights);
+    const bands = input.lifeWalls ?? [];
+    wallsHost.replaceChildren();
+    wallsHost.hidden = bands.length === 0;
+    for (const wall of bands) {
+      const band = el('div', 'tl-noservice');
+      band.dataset.part = 'no-service';
+      band.textContent = `no service · ${wall.label}`;
+      wallsHost.append(band);
+    }
     const finished = models.filter((m) => m.service.status === 'arrived');
     const open = models.filter((m) => m.service.status !== 'arrived');
     const ordered = [...open, ...finished];

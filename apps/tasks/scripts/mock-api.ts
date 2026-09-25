@@ -13,6 +13,7 @@ import { WorkBlockCreateSchema, WorkBlockUpdateSchema } from '../src/schemas/wor
 import { WorkSessionCreateSchema, WorkSessionUpdateSchema } from '../src/schemas/work-session';
 import { PlanningProfileUpdateSchema } from '../src/schemas/planning-profile';
 import { PlanningDirectionUpdateSchema } from '../src/schemas/planning-direction';
+import { localStubClareJudge } from '../src/ai/clare-proposal-judge';
 
 export function createMemoryKv(): KvAdapter & { map: Map<string, unknown> } {
   const map = new Map<string, unknown>();
@@ -192,6 +193,23 @@ export function createMockApi({ seed }: MockApiOptions) {
       } catch (error) {
         return seedFailure(error);
       }
+    }
+
+    if (path === '/api/timeline-visual-seed' && method === 'POST') {
+      try {
+        const { seedTimelineVisualFixture } = await import('./seed-timeline-visual');
+        const result = await seedTimelineVisualFixture(kv);
+        return json(200, { ok: true, data: result });
+      } catch (error) {
+        return seedFailure(error);
+      }
+    }
+
+    const taskItem = path.match(/^\/api\/tasks\/([^/]+)$/);
+    if (taskItem && method === 'PATCH') {
+      const taskId = decodeURIComponent(taskItem[1] ?? '');
+      const parsed = TaskUpdateSchema.parse(body);
+      return json(200, { ok: true, data: await store().updateTask(taskId, parsed) });
     }
 
     const s = store();
@@ -483,6 +501,18 @@ export function createMockApi({ seed }: MockApiOptions) {
             focus:
               b.focus && typeof b.focus === 'object'
                 ? (b.focus as { type?: string; id?: string })
+                : undefined,
+            timeline_window:
+              b.timeline_window && typeof b.timeline_window === 'object'
+                ? (b.timeline_window as { start: string; end: string })
+                : undefined,
+            timeline_drag:
+              b.timeline_drag && typeof b.timeline_drag === 'object'
+                ? (b.timeline_drag as { task_id: string; days: number })
+                : undefined,
+            judge:
+              b.protocol_id === 'timeline_rebalance'
+                ? localStubClareJudge(b.agent_slug === 'hammond' ? 'hammond' : 'clare')
                 : undefined
           });
           if (b.action === 'dump') {

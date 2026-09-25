@@ -132,6 +132,8 @@ export interface TasksStore {
     recent_thread?: Array<{ role: 'user' | 'assistant'; text: string }>;
     agent_slug?: import('@/domain/agent-protocol').AgentProtocolSlug;
     focus?: { type?: string; id?: string } | null;
+    timeline_window?: { start: string; end: string } | null;
+    timeline_drag?: { task_id: string; days: number } | null;
   }): Promise<ClareDumpResult>;
   applyAgentMutations(
     mutations: import('@/domain/agent-mutations').AgentMutation[]

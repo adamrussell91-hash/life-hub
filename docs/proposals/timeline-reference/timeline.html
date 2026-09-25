@@ -30,6 +30,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 .tl-toggle{border:1px solid var(--line);background:var(--glass);border-radius:var(--radius-full);min-height:2.2rem;padding:0 var(--space-3);font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);color:var(--muted);cursor:pointer;transition:background-color .12s,color .12s,border-color .12s}
 .tl-toggle:hover{color:var(--ink)}
 .tl-toggle[aria-pressed="true"]{border-color:color-mix(in srgb,var(--wave) 45%,transparent);background:color-mix(in srgb,var(--pastel-blue) 55%,#fff);color:var(--pastel-blue-ink);font-weight:var(--weight-semibold)}
+.tl-toggle:disabled{opacity:.45;cursor:not-allowed}
+.hub-pills.is-dim{opacity:.45;pointer-events:none}
 .tl-toggle--critical[aria-pressed="true"]{color:var(--high-sea-ink);background:color-mix(in srgb,var(--high-sea) 14%,transparent);border-color:color-mix(in srgb,var(--high-sea) 30%,transparent)}
 .tl-plus{width:2.5rem;height:2.5rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);color:var(--navy);display:inline-grid;place-items:center;cursor:pointer;box-shadow:var(--elev-1)}
 .tl-plus svg{width:1.125rem;height:1.125rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
@@ -82,6 +84,13 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 .tl-today__line{stroke:var(--wave);stroke-width:1.5;stroke-dasharray:3 3}
 .tl-today__pill{fill:var(--wave)}
 .tl-today__text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:#fff}
+.tl-lens__wash{fill:color-mix(in srgb,var(--wave) 8%,transparent);pointer-events:none}
+.tl-lens__edge{stroke:var(--wave);stroke-width:1.5;pointer-events:none}
+.tl-lens__pill rect{fill:var(--paper);stroke:var(--line);stroke-width:1}
+.tl-lens__pill text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:var(--navy);pointer-events:none}
+[data-part="lens-grab"]{cursor:grab}
+[data-part="lens-grab"]:active{cursor:grabbing}
+.tl-tail{stroke-width:1}
 
 .tl-bar__face{stroke:color-mix(in srgb,var(--navy) 12%,transparent);stroke-width:1;transition:stroke .12s}
 .tl-bar__title{font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);fill:var(--ink);pointer-events:none}
@@ -224,6 +233,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       <button class="tl-toggle" id="tl-load" type="button" aria-pressed="true">Load</button>
       <button class="tl-toggle" id="tl-holidays" type="button">Holidays: compressed</button>
       <button class="tl-toggle" id="tl-today-btn" type="button">Today</button>
+      <button class="tl-toggle" id="tl-focus" type="button" aria-pressed="false">Focus</button>
+      <button class="tl-toggle" id="tl-forecast" type="button" aria-pressed="false" disabled title="Needs 20 finished tasks with an estimate and an actual">Forecast</button>
       <button class="btn btn--secondary" id="tl-hammond" type="button" style="min-height:2.2rem;font-size:var(--text-sm)">Ask Hammond</button>
       <button class="tl-plus" type="button" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>
@@ -978,6 +989,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     ribbon: { h: 16, gap: 3, rx: 4 },
     load: { h: 104, top: 30, colGap: 8, rx: 4 },
     today: { pillH: 20, pillW: 52 },
+    lens: { days: 14, shoulder: 21, pillH: 20 },
     ghost: { dash: "4 3" },
     mobileBreak: 720,
     zooms: [
@@ -1023,6 +1035,10 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     view: "bars",
     selected: null,
     hammond: false,
+    lens: false,
+    /** First day of the 14-day focus window. Snaps to the Monday of today when Focus turns on. */
+    lensStart: mondayOf(TODAY),
+    forecast: false,
     tasks: TASKS.map((t) => ({ ...t })),
     drag: null
   };
@@ -1035,6 +1051,54 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     if (state.zoom < 2) return false;
     const next = state.tasks.filter((t) => t.project === id && t.status !== "done" && t.due).map((t) => t.due).sort()[0];
     return Boolean(next && toMs(next) - toMs(TODAY) <= 14 * 864e5);
+  }
+  var DAY_MS2 = 864e5;
+  var SCHOOL_DAY_MIN = 120;
+  var MILESTONE_WEEK = 5;
+  var FORECAST_MIN = 20;
+  var FORECAST_HISTORY = [
+    { domain: "teaching", ratio: 1.1 },
+    { domain: "teaching", ratio: 1.2 },
+    { domain: "teaching", ratio: 1.3 },
+    { domain: "teaching", ratio: 1.4 },
+    { domain: "teaching", ratio: 1.5 },
+    { domain: "teaching", ratio: 1.6 },
+    { domain: "teaching", ratio: 1.7 },
+    { domain: "teaching", ratio: 1.85 },
+    { domain: "teaching", ratio: 1.95 },
+    { domain: "teaching", ratio: 2.2 },
+    { domain: "professional", ratio: 1.05 },
+    { domain: "professional", ratio: 1.15 },
+    { domain: "professional", ratio: 1.25 },
+    { domain: "professional", ratio: 1.35 },
+    { domain: "professional", ratio: 1.45 },
+    { domain: "professional", ratio: 1.6 },
+    { domain: "professional", ratio: 1.8 },
+    { domain: "professional", ratio: 2.1 },
+    { domain: "life", ratio: 1 },
+    { domain: "life", ratio: 1.1 },
+    { domain: "life", ratio: 1.2 },
+    { domain: "life", ratio: 1.3 },
+    { domain: "life", ratio: 1.4 },
+    { domain: "life", ratio: 1.7 }
+  ];
+  function p85Ratio(domain) {
+    const ratios = FORECAST_HISTORY.filter((h2) => h2.domain === domain).map((h2) => h2.ratio).sort((a, b) => a - b);
+    const index = Math.ceil(0.85 * ratios.length) - 1;
+    return ratios[Math.min(ratios.length - 1, Math.max(0, index))] ?? 1;
+  }
+  function overrunDays(estimateMin, ratio) {
+    return estimateMin * (ratio - 1) / SCHOOL_DAY_MIN;
+  }
+  function forecastReady() {
+    return FORECAST_HISTORY.length >= FORECAST_MIN;
+  }
+  function clampLens(start) {
+    const min = RANGE.start;
+    const max = addDaysKey(RANGE.end, -(TL.lens.days - 1));
+    if (start < min) return min;
+    if (start > max) return max;
+    return start;
   }
   function tasksOf(pid) {
     return state.tasks.filter((t) => t.project === pid && !t.parent);
@@ -1182,13 +1246,19 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     live: document.getElementById("tl-live")
   };
   var layers = {};
-  for (const name of ["grid", "holidays", "walls", "axis", "today", "bands", "curves", "shadows", "bars", "ghosts", "load"])
+  for (const name of ["grid", "holidays", "walls", "axis", "lens", "today", "bands", "curves", "shadows", "tails", "bars", "chrome", "ghosts", "load"])
     layers[name] = s("g", { "data-layer": name }, els.svg);
+  var tailPatterns = Object.entries(DOMAIN_COLOUR).map(([domain, hex]) => `
+  <pattern id="tl-tail-${domain}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+    <rect width="7" height="7" fill="color-mix(in srgb, ${hex} 12%, transparent)"/>
+    <line x1="0" y1="0" x2="0" y2="7" stroke="color-mix(in srgb, ${hex} 50%, transparent)" stroke-width="1.5"/>
+  </pattern>`).join("");
   s("defs", {}, els.svg).innerHTML = `
   <pattern id="tl-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
     <rect width="8" height="8" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/>
     <line x1="0" y1="0" x2="0" y2="8" stroke="color-mix(in srgb, var(--navy) 16%, transparent)" stroke-width="2"/>
   </pattern>
+  ${tailPatterns}
   <marker id="tl-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
     <path d="M1 1 L9 5 L1 9 Z" fill="var(--shallow)"/>
   </marker>
@@ -1208,7 +1278,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       g = h("div", "tl-label");
       els.labels.append(g);
     } else {
-      const layer = kind === "wall" ? layers.walls : kind === "hol" || kind === "grid" ? layers.grid : kind === "term" || kind === "week" ? layers.axis : kind === "band" || kind === "bracket" ? layers.bands : kind === "curve" || kind === "edge" ? layers.curves : kind === "shadow" ? layers.shadows : kind === "ghost" || kind === "garrow" || kind === "ripple" ? layers.ghosts : kind === "today" ? layers.today : kind === "load" || kind === "cap" ? layers.load : layers.bars;
+      const layer = kind === "wall" ? layers.walls : kind === "hol" || kind === "grid" ? layers.grid : kind === "term" || kind === "week" ? layers.axis : kind === "lens" ? layers.lens : kind === "lensgrab" ? layers.chrome : kind === "band" || kind === "bracket" ? layers.bands : kind === "curve" || kind === "edge" ? layers.curves : kind === "shadow" ? layers.shadows : kind === "tail" ? layers.tails : kind === "ghost" || kind === "garrow" || kind === "ripple" ? layers.ghosts : kind === "today" ? layers.today : kind === "load" || kind === "cap" ? layers.load : layers.bars;
       g = s("g", { "data-id": id }, layer);
       const inner = s("g", { class: "tl-pop" }, g);
       buildShape(kind, inner, spec, id);
@@ -1387,6 +1457,37 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         g.setAttribute("data-part", "ripple");
         s("rect", { class: `tl-ripple${spec.flags?.slip ? " tl-ripple--slip" : ""}`, rx: TL.bar.rx, height: TL.bar.h }, g);
         s("text", { class: "tl-ripple__label" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "lens": {
+        g.setAttribute("data-part", "lens");
+        g.setAttribute("data-start", d.start ?? "");
+        g.setAttribute("data-end", d.end ?? "");
+        s("rect", { class: "tl-lens__wash" }, g);
+        s("line", { class: "tl-lens__edge" }, g);
+        s("line", { class: "tl-lens__edge tl-lens__edge--end" }, g);
+        break;
+      }
+      case "lensgrab": {
+        g.setAttribute("class", "tl-lens__pill");
+        g.setAttribute("data-part", "lens-grab");
+        g.setAttribute("role", "slider");
+        g.setAttribute("tabindex", "0");
+        g.setAttribute("aria-label", `Focus ${spec.text ?? ""}. Drag to move.`);
+        s("rect", { rx: TL.lens.pillH / 2, height: TL.lens.pillH }, g);
+        s("text", { "text-anchor": "middle" }, g).textContent = spec.text ?? "";
+        break;
+      }
+      case "tail": {
+        g.setAttribute("data-part", "forecast-tail");
+        if (d.task) g.setAttribute("data-task-id", d.task);
+        if (d.milestone) g.setAttribute("data-milestone-id", d.milestone);
+        g.setAttribute("data-domain", d.domain ?? "");
+        g.setAttribute("data-days", d.days ?? "");
+        g.setAttribute("aria-label", spec.text ?? "Forecast tail");
+        const face = s("rect", { class: "tl-tail", rx: 4 }, g);
+        face.style.fill = `url(#tl-tail-${d.domain ?? "teaching"})`;
+        face.style.stroke = `color-mix(in srgb, ${colour} 40%, transparent)`;
         break;
       }
     }
@@ -1620,13 +1721,42 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         set(t, { x: p.lx ?? w + 8, y: TL.bar.h / 2 + 4.5 });
         break;
       }
+      case "lens": {
+        g.setAttribute("transform", `translate(${x} 0)`);
+        const h2 = p.h ?? 0;
+        const [wash, edgeL, edgeR] = inner.children;
+        set(wash, { width: w, height: h2 });
+        set(edgeL, { x1: 0, x2: 0, y1: 0, y2: h2 });
+        set(edgeR, { x1: w, x2: w, y1: 0, y2: h2 });
+        inner.setAttribute("data-start", spec.data?.start ?? "");
+        inner.setAttribute("data-end", spec.data?.end ?? "");
+        break;
+      }
+      case "lensgrab": {
+        const label = spec.text ?? "";
+        const pw = textW(label, "600 12px Inter") + 28;
+        const px = stickyX(x, w, pw);
+        g.setAttribute("transform", `translate(${x + px} ${TL.axis.h + 4})`);
+        inner.setAttribute("aria-label", `Focus ${label}. Drag to move.`);
+        const [pr, pt] = inner.children;
+        set(pr, { width: pw });
+        pt.textContent = label;
+        set(pt, { x: pw / 2, y: TL.lens.pillH / 2 + 4 });
+        break;
+      }
+      case "tail": {
+        g.setAttribute("transform", `translate(${x} ${y})`);
+        inner.classList.toggle("is-dim", Boolean(p.dim));
+        set(inner.firstElementChild, { width: w, height: p.h ?? TL.bar.h - 6 });
+        break;
+      }
     }
   }
   function set(el, attrs) {
     for (const k in attrs) el.setAttribute(k, String(attrs[k]));
   }
   var viewLeft = 0;
-  var STICKY = /* @__PURE__ */ new Set(["proj", "band", "ribbon", "dream", "rowtitle"]);
+  var STICKY = /* @__PURE__ */ new Set(["proj", "band", "ribbon", "dream", "rowtitle", "lensgrab"]);
   function stickyX(barX, barW, textWidth) {
     const min = viewLeft + 12 - barX;
     return Math.max(12, Math.min(min, barW - textWidth - 12));
@@ -1648,14 +1778,67 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   var rows = [];
   var capPath = "";
   var PAD_R = 220;
-  function computeScale() {
+  function uniformScale(dayWidth) {
     return buildTimeScale({
       start: RANGE.start,
       end: RANGE.end,
       terms: SCHOOL,
-      dayWidth: state.dayWidth,
+      dayWidth,
       holidayFactor: state.holidaysCompressed ? 0.25 : 1
     });
+  }
+  function buildLensScale() {
+    const focusStart = state.lensStart;
+    const focusEnd = addDaysKey(focusStart, TL.lens.days);
+    const shoulderStart = addDaysKey(focusStart, -TL.lens.shoulder);
+    const shoulderEnd = addDaysKey(focusEnd, TL.lens.shoulder);
+    const factor = state.holidaysCompressed ? 0.25 : 1;
+    const focusPx = TL.zooms[4].dayWidth;
+    const shoulderPx = TL.zooms[3].dayWidth;
+    const outerPx = TL.zooms[1].dayWidth;
+    const days = [];
+    let x = 0;
+    for (let ms = toMs(RANGE.start); ms <= toMs(RANGE.end); ms += DAY_MS2) {
+      const key = toKey(ms);
+      const holiday = isHoliday(key, SCHOOL);
+      const inFocus = key >= focusStart && key < focusEnd;
+      const inShoulder = !inFocus && key >= shoulderStart && key < shoulderEnd;
+      let w = inFocus ? focusPx : inShoulder ? shoulderPx : outerPx;
+      if (holiday && !inFocus) w *= factor;
+      days.push({ key, x, w, holiday });
+      x += w;
+    }
+    const startMs = toMs(RANGE.start);
+    const width = x;
+    function xAtMs(ms) {
+      const i = Math.floor((ms - startMs) / DAY_MS2);
+      if (i < 0) return 0;
+      if (i >= days.length) return width;
+      const day = days[i];
+      const frac = (ms - (startMs + i * DAY_MS2)) / DAY_MS2;
+      return day.x + day.w * frac;
+    }
+    return {
+      start: RANGE.start,
+      end: RANGE.end,
+      width,
+      days,
+      x: (v) => xAtMs(typeof v === "number" ? v : toMs(v)),
+      dateAt(px) {
+        if (px <= 0) return days[0]?.key ?? RANGE.start;
+        let lo = 0;
+        let hi = days.length - 1;
+        while (lo < hi) {
+          const mid = lo + hi + 1 >> 1;
+          if (days[mid].x <= px) lo = mid;
+          else hi = mid - 1;
+        }
+        return days[lo].key;
+      }
+    };
+  }
+  function computeScale() {
+    return state.lens ? buildLensScale() : uniformScale(state.dayWidth);
   }
   function layout() {
     scale = computeScale();
@@ -1668,6 +1851,13 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     const width = scale.width + PAD_R;
     const dw = state.dayWidth;
     const X = (k) => scale.x(k);
+    const putTail = (id, domain, colour, x0, endMs, y, h2, label, data, dim) => {
+      if (!state.forecast) return;
+      const tw = scale.x(endMs) - x0;
+      if (tw <= 0.5) return;
+      specs.set(id, { kind: "tail", text: label, colour, data });
+      E.set(id, { x: x0, y, w: tw, h: h2, dim: dim ? 1 : 0 });
+    };
     const barX = (span) => {
       const x0 = X(span.start);
       const x1 = X(addDaysKey(span.end, 1));
@@ -1786,17 +1976,30 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         const sub = t.blocked ? "blocked 4 days" : t.status === "done" ? "done" : `due ${fmt(t.due)}`;
         const flags = { state: t.status === "done" ? "done" : t.blocked ? "blocked" : t.status };
         if (t.blocked) flags.blocked = "true";
-        specs.set(id, { kind: r.kind === "step" ? "step" : "bar", text: t.title, sub, colour: colourOf(PROJECTS.find((p) => p.id === t.project) ?? { domain: t.domain }), data: flags });
+        const colour = colourOf(PROJECTS.find((p) => p.id === t.project) ?? { domain: t.domain });
+        specs.set(id, { kind: r.kind === "step" ? "step" : "bar", text: t.title, sub, colour, data: flags });
         const bh = r.kind === "step" ? TL.bar.h - 6 : TL.bar.h;
         const crit = state.critical && CRITICAL.has(t.id);
-        E.set(id, { x: b.x, y: y + (r.h - bh) / 2, w: b.w, crit: crit ? 1 : 0, dim: state.critical && !crit ? 1 : 0 });
+        const by = y + (r.h - bh) / 2;
+        E.set(id, { x: b.x, y: by, w: b.w, crit: crit ? 1 : 0, dim: state.critical && !crit ? 1 : 0 });
+        if (t.status !== "done" && t.est && t.due) {
+          const days = overrunDays(t.est, p85Ratio(t.domain));
+          const endMs = toMs(addDaysKey(t.due, 1)) + days * DAY_MS2;
+          putTail(`tail:${t.id}`, t.domain, colour, b.x + b.w - 2, endMs, by + 3, bh - 6, `Forecast ${fmt(toKey(endMs))}`, { domain: t.domain, task: t.id, days: days.toFixed(2) }, state.critical && !crit);
+        }
       }
       if (r.kind === "milestone") {
         const m = MILESTONES.find((m2) => m2.id === r.ref);
         const p = PROJECTS.find((p2) => p2.id === m.project);
         const id = `ms:${m.id}`;
-        specs.set(id, { kind: "ms", text: `${m.title} \xB7 ${fmt(m.due)}`, colour: colourOf(p) });
-        E.set(id, { x: X(m.due) + dw / 2, y: y + r.h / 2 });
+        const colour = colourOf(p);
+        specs.set(id, { kind: "ms", text: `${m.title} \xB7 ${fmt(m.due)}`, colour });
+        const localW = state.lens ? X(addDaysKey(m.due, 1)) - X(m.due) : dw;
+        const cx = X(m.due) + localW / 2;
+        E.set(id, { x: cx, y: y + r.h / 2 });
+        const days = (p85Ratio(p.domain) - 1) * MILESTONE_WEEK;
+        const endMs = toMs(m.due) + days * DAY_MS2;
+        putTail(`tail:${m.id}`, p.domain, colour, cx + TL.diamond / 2 + 4, endMs, y + r.h / 2 - 4, 8, `Forecast ${fmt(toKey(endMs))}`, { domain: p.domain, milestone: m.id, days: days.toFixed(2) }, false);
       }
       if (r.kind === "marking") {
         const t = state.tasks.find((t2) => t2.id === r.ref);
@@ -1823,6 +2026,11 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
           flags: { warn }
         });
         E.set(id, { x: x0, y: y + (r.h - TL.shadow.h) / 2, w: x1 - x0, progress: mk.marked / mk.scripts, perDay, days });
+        if (t.status !== "done" && t.est) {
+          const extra = overrunDays(t.est, p85Ratio(t.domain));
+          const endMs = toMs(addDaysKey(mk.returnBy, 1)) + extra * DAY_MS2;
+          putTail(`tail:${t.id}`, t.domain, colourOf({ domain: t.domain }), x1 - 2, endMs, y + (r.h - 10) / 2, 10, `Forecast ${fmt(toKey(endMs))}`, { domain: t.domain, task: t.id, days: extra.toFixed(2) }, false);
+        }
       }
       if (r.kind === "group" && !r.open && r.ref === "grp-loose") {
       }
@@ -1848,7 +2056,19 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       E.set(id, { x1: a.x, y1: a.y, x2: b.x - 2, y2: b.y, dim: state.critical && !critical ? 1 : 0, crit: critical ? 1 : 0 });
     }
     specs.set("today", { kind: "today" });
-    E.set("today", { x: X(TODAY) + dw * TODAY_FRAC, h: rowsBottom + 4 });
+    const todayW = state.lens ? X(addDaysKey(TODAY, 1)) - X(TODAY) : dw;
+    E.set("today", { x: X(TODAY) + todayW * TODAY_FRAC, h: rowsBottom + 4 });
+    if (state.lens) {
+      const start = state.lensStart;
+      const end = addDaysKey(start, TL.lens.days - 1);
+      const x0 = X(start);
+      const label = `${fmt(start)} \u2013 ${fmt(end)}`;
+      const lw = X(addDaysKey(end, 1)) - x0;
+      specs.set("lens", { kind: "lens", text: label, data: { start, end } });
+      E.set("lens", { x: x0, w: lw, h: rowsBottom + 4 });
+      specs.set("lensgrab", { kind: "lensgrab", text: label });
+      E.set("lensgrab", { x: x0, w: lw });
+    }
     capPath = "";
     if (state.load) {
       const weeks = weekLoad();
@@ -1946,7 +2166,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     const legend = document.getElementById("tl-load-label");
     legend.hidden = !state.load;
     legend.style.top = `${L.height - TL.load.h + 8}px`;
-    if (reason === "zoom") {
+    if (reason === "zoom" || reason === "place") {
       for (const [id, props] of L.entities) {
         if (!nodes.has(id)) create(id);
         engine.place(id, { opacity: 1, scale: 1, ...props });
@@ -1956,7 +2176,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         remove(id);
       }
       lastIds = [...L.entities.keys()];
-      if (zoomAnchor) els.scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
+      if (reason === "zoom" && zoomAnchor) els.scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
       return;
     }
     const opts = reason === "release" ? { duration: MOTION.release, easing: OVERSHOOT } : reason === "expand" ? { duration: MOTION.expand, easing: EASE } : reason === "drag" ? { duration: MOTION.hover, easing: EASE } : { duration: MOTION.settle, easing: EASE };
@@ -2038,6 +2258,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   var zoomCanvasWidth = 0;
   var zoomSettle = 0;
   function setZoom(index, anchorClientX) {
+    if (state.lens) return;
     index = Math.max(0, Math.min(TL.zooms.length - 1, index));
     if (index === state.zoom && anchorClientX === void 0) return;
     const box = els.scroller.getBoundingClientRect();
@@ -2116,6 +2337,27 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     relayout("settle");
   };
   document.getElementById("tl-today-btn").onclick = () => scrollToToday(true);
+  var focusBtn = document.getElementById("tl-focus");
+  var forecastBtn = document.getElementById("tl-forecast");
+  forecastBtn.disabled = !forecastReady();
+  forecastBtn.title = forecastReady() ? `P85 from ${FORECAST_HISTORY.length} finished tasks with an estimate and an actual` : "Needs 20 finished tasks with an estimate and an actual";
+  focusBtn.onclick = () => {
+    state.lens = !state.lens;
+    if (state.lens) state.lensStart = mondayOf(TODAY);
+    focusBtn.setAttribute("aria-pressed", String(state.lens));
+    zoomPills.classList.toggle("is-dim", state.lens);
+    relayout("settle");
+    if (state.lens) {
+      const left = Math.max(0, scale.x(state.lensStart) - 36);
+      els.scroller.scrollTo({ left, behavior: reduced ? "auto" : "smooth" });
+    }
+  };
+  forecastBtn.onclick = () => {
+    if (!forecastReady()) return;
+    state.forecast = !state.forecast;
+    forecastBtn.setAttribute("aria-pressed", String(state.forecast));
+    relayout("settle");
+  };
   document.getElementById("tl-hammond").onclick = () => showHammond(true);
   function scrollToToday(smooth) {
     const target = Math.max(0, scale.x(addDaysKey(mondayOf(TODAY), -21)) - 1);
@@ -2162,7 +2404,35 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       engine.place(id, { x1: p.x1 + (a === tid ? dx : 0), x2: p.x2 + (b === tid ? dx : 0) });
     }
   }
+  function dragLens(ev) {
+    ev.preventDefault();
+    const originStart = state.lensStart;
+    const originClient = ev.clientX;
+    const originScroll = els.scroller.scrollLeft;
+    const originLensX = scale.x(originStart);
+    const originScreen = originLensX - originScroll;
+    const move = (e) => {
+      const days = Math.round((e.clientX - originClient) / TL.zooms[4].dayWidth);
+      const next = clampLens(addDaysKey(originStart, days));
+      if (next === state.lensStart) return;
+      state.lensStart = next;
+      relayout("place");
+      const desired = originScreen + (e.clientX - originClient);
+      els.scroller.scrollLeft = scale.x(state.lensStart) - desired;
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
   function onPointerDown(ev) {
+    const grab = ev.target.closest('[data-part="lens-grab"]');
+    if (grab) {
+      dragLens(ev);
+      return;
+    }
     const g = ev.target.closest('[data-part="bar"]');
     if (!g || state.view !== "bars") return;
     const tid = g.getAttribute("data-task-id");
@@ -2239,6 +2509,13 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     els.banner.hidden = !slips;
   }
   els.svg.addEventListener("pointerdown", onPointerDown);
+  els.svg.addEventListener("keydown", (e) => {
+    if (!e.target.closest?.('[data-part="lens-grab"]') || !state.lens) return;
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    state.lensStart = clampLens(addDaysKey(state.lensStart, e.key === "ArrowRight" ? 1 : -1));
+    relayout("settle");
+  });
   function select(tid) {
     state.selected = tid;
     document.querySelectorAll(".is-selected").forEach((n) => n.classList.remove("is-selected"));

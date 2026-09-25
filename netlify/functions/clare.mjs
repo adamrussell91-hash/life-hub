@@ -33,6 +33,7 @@ import {
   CLARE_PROTOCOLS,
   readProtocolId
 } from './_shared/clare-protocols.mjs';
+import { hammondRebalanceResult } from './_shared/timeline-rebalance.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import {
   defaultGetTasksStore,
@@ -178,6 +179,9 @@ async function computeDumpResult(store, body, nowIso) {
       : wording
         ? wording.correctedTitles.join('\n')
         : text;
+  if (protocolId === 'timeline_rebalance') {
+    return hammondRebalanceResult(tasks, projects, agent);
+  }
   if (followUp?.action !== 'make_new' && !wording) {
     const direction = resolveTaskDirection(dumpText, {
       focus: body.focus && typeof body.focus === 'object' ? body.focus : null,
