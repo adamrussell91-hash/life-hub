@@ -18,10 +18,15 @@
  */
 *{box-sizing:border-box}
 body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
-.page{max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page{width:100%;max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
 .page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
 .page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
 .ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.page-shell{display:grid;grid-template-columns:1fr} /* reference harness: sized like the Life shell's content column */
+/* Harness only: a stand-in for the Life rail (330px), so every width here matches the app at that width. */
+body{display:grid;grid-template-columns:330px minmax(0,1fr)}
+.shell-rail{background:var(--navy);color:color-mix(in srgb,#fff 75%,transparent);padding:var(--space-8) var(--space-6);font-size:var(--text-xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold)}
+@media (max-width:719px){body{display:block}.shell-rail{display:none}}
 .ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
 
 .alm{
@@ -34,7 +39,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   --alm-window:color-mix(in srgb,var(--sand) 34%,#fff);
   --alm-window-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
   --alm-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
-  position:relative;font-family:var(--font-ui);color:var(--ink)
+  position:relative;font-family:var(--font-ui);color:var(--ink);
+  min-width:0;contain:inline-size /* the Almanac takes its container's width; its content can never widen the page */
 }
 /* nav */
 .alm__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
@@ -57,7 +63,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 .alm-top__n.is-ok{color:var(--pastel-sage-ink)}
 .alm-top small{display:block;font-size:var(--text-xs);color:var(--muted);margin-top:2px}
 /* chart */
-.alm-chart{display:block;width:100%;height:auto;font-family:var(--font-ui)}
+.alm-chart{display:block;font-family:var(--font-ui)} /* width/height set in px at mount: laid out, never scaled */
 .alm-holiday{fill:var(--alm-holiday)}
 .alm-wall{fill:url(#alm-hatch)}
 .alm-month,.alm-labelrule{stroke:var(--alm-rule)}
@@ -183,6 +189,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     <linearGradient id="alm-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--wave)" stop-opacity=".24"/><stop offset="1" stop-color="var(--wave)" stop-opacity="0"/></linearGradient>
   </defs>
 </svg>
+<aside class="shell-rail" aria-hidden="true">Life Hub · rail stand-in</aside>
 <main class="page">
   <p class="page-header__eyebrow">Calendar reference · D · The Almanac</p>
   <h1 class="page-header__title">What nobody has booked yet</h1>
@@ -193,11 +200,11 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
     <span>Clock frozen at Thu 24/09/26. World entries marked “example” stand in for live feeds.</span>
   </div>
-  <div id="app"></div>
+  <div class="page-shell"><div id="app"></div></div>
 </main>
 <script>/* Generated from src/almanac-ref.ts. Do not edit almanac.html; edit src/ and rebuild. */
 (() => {
-  // apps/tasks/src/views/timeline-motion.ts
+  // packages/design-kit/js/hub-motion-engine.js
   var MOTION = {
     settle: 420,
     // live update: an entity moves because data changed elsewhere
@@ -238,9 +245,11 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       let t = x;
       for (let i = 0; i < 8; i++) {
         const err = sampleX(t) - x;
-        if (Math.abs(err) < 1e-6) return t;
+        if (Math.abs(err) < 1e-6)
+          return t;
         const d = slopeX(t);
-        if (Math.abs(d) < 1e-6) break;
+        if (Math.abs(d) < 1e-6)
+          break;
         t -= err / d;
       }
       let lo = 0;
@@ -248,15 +257,19 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       t = x;
       while (hi - lo > 1e-6) {
         const v = sampleX(t);
-        if (v < x) lo = t;
-        else hi = t;
+        if (v < x)
+          lo = t;
+        else
+          hi = t;
         t = (lo + hi) / 2;
       }
       return t;
     };
     return (p) => {
-      if (p <= 0) return 0;
-      if (p >= 1) return 1;
+      if (p <= 0)
+        return 0;
+      if (p >= 1)
+        return 1;
       return sampleY(solve(p));
     };
   }
@@ -290,14 +303,18 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       return e;
     }
     function schedule() {
-      if (frameId !== null || disposed) return;
+      if (frameId !== null || disposed)
+        return;
       frameId = clock2.request(frame);
     }
     function valueAt(tween, now) {
-      if (tween.duration <= 0) return tween.to;
+      if (tween.duration <= 0)
+        return tween.to;
       const p = (now - tween.start) / tween.duration;
-      if (p <= 0) return tween.from;
-      if (p >= 1) return tween.to;
+      if (p <= 0)
+        return tween.from;
+      if (p >= 1)
+        return tween.to;
       return tween.from + (tween.to - tween.from) * tween.easing(p);
     }
     function step(now) {
@@ -310,14 +327,17 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
             e.props[prop] = v;
             e.dirty = true;
           }
-          if (now >= tween.start + tween.duration) e.tweens.delete(prop);
-          else active = true;
+          if (now >= tween.start + tween.duration)
+            e.tweens.delete(prop);
+          else
+            active = true;
         }
         if (e.dirty) {
           e.dirty = false;
           options.apply(id, e.props);
         }
-        if (e.exiting && e.tweens.size === 0) finishedExits.push([id, e.exiting]);
+        if (e.exiting && e.tweens.size === 0)
+          finishedExits.push([id, e.exiting]);
       }
       for (const [id, done] of finishedExits) {
         entities.delete(id);
@@ -327,25 +347,31 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     }
     function frame() {
       frameId = null;
-      if (disposed) return;
+      if (disposed)
+        return;
       const t0 = clock2.now();
       const active = step(t0);
       const cost = clock2.now() - t0;
       frameCosts.push(cost);
-      if (frameCosts.length > 600) frameCosts.shift();
-      if (active) schedule();
-      else options.onIdle?.();
+      if (frameCosts.length > 600)
+        frameCosts.shift();
+      if (active)
+        schedule();
+      else
+        options.onIdle?.();
     }
     function startTween(e, prop, to, opts, now) {
       const running = e.tweens.get(prop);
-      if (running && Math.abs(running.to - to) < EPS) return;
+      if (running && Math.abs(running.to - to) < EPS)
+        return;
       const current = running ? valueAt(running, now) : e.props[prop];
       if (current === void 0) {
         e.props[prop] = to;
         e.dirty = true;
         return;
       }
-      if (!running && Math.abs(current - to) < EPS) return;
+      if (!running && Math.abs(current - to) < EPS)
+        return;
       const duration = opts.duration ?? MOTION.settle;
       e.tweens.set(prop, {
         from: current,
@@ -384,10 +410,12 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
             startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
           }
         } else {
-          for (const [prop, value] of Object.entries(props)) startTween(e, prop, value, opts, now);
+          for (const [prop, value] of Object.entries(props))
+            startTween(e, prop, value, opts, now);
         }
         flushDirty(id, e);
-        if (e.tweens.size) schedule();
+        if (e.tweens.size)
+          schedule();
       },
       enter(id, props, opts = {}) {
         const from = opts.from ?? { opacity: 0, scale: 0.6 };
@@ -411,7 +439,9 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
           e.exiting = done;
           return;
         }
-        for (const prop of [...e.tweens.keys()]) if (prop !== "opacity") e.tweens.delete(prop);
+        for (const prop of [...e.tweens.keys()])
+          if (prop !== "opacity")
+            e.tweens.delete(prop);
         e.exiting = done;
         const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
         startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock2.now());
@@ -429,7 +459,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       has: (id) => entities.has(id),
       target: (id, prop) => {
         const e = entities.get(id);
-        if (!e) return void 0;
+        if (!e)
+          return void 0;
         return e.tweens.get(prop)?.to ?? e.props[prop];
       },
       busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
@@ -447,7 +478,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       },
       dispose() {
         disposed = true;
-        if (frameId !== null) clock2.cancel(frameId);
+        if (frameId !== null)
+          clock2.cancel(frameId);
         frameId = null;
         entities.clear();
       }
@@ -1139,7 +1171,9 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   // docs/proposals/calendar-reference/almanac/src/almanac-ref.ts
   var ALM = {
     width: 1198,
-    // SVG user units (card inner width)
+    // chart width in CSS px. Set at mount from the card's real width: the chart is laid out, never scaled.
+    minWidth: 720,
+    // below this the phone list layout is used instead
     labelX: 18,
     x0: 222,
     // first day centre
@@ -1153,6 +1187,9 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     bead: { r: 5.5, nowR: 6.5, haloR: 11, diamond: 6 },
     labelRoom: 240,
     // a bead label flips to the left of its bead inside this many units of the right edge
+    labelGap: 14,
+    // minimum gap between two labels on the same side of a lead line
+    beadFont: "500 11.5px Inter, ui-sans-serif, sans-serif",
     enterDrawMs: 520,
     // lead lines draw back from their anchor
     enterStagger: 60,
@@ -1176,6 +1213,10 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   for (let d = RANGE.from; d <= RANGE.to; d = addDays(d, 1)) DATES.push(d);
   var N = DATES.length;
   var DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+  function setWidth(w) {
+    ALM.width = Math.round(w);
+    DX = (ALM.width - ALM.rightPad - ALM.x0) / (N - 1);
+  }
   var idx = (d) => daysBetween(RANGE.from, d);
   var X = (d) => ALM.x0 + Math.max(0, Math.min(N - 1, idx(d))) * DX;
   var inTerm = (d) => TERMS.some((t) => d >= t.starts_on && d <= t.ends_on);
@@ -1215,6 +1256,27 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
   }
   function longDate(d) {
     return new Intl.DateTimeFormat("en-AU", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${d}T00:00:00Z`));
+  }
+  var measureCtx = document.createElement("canvas").getContext("2d");
+  var measured = /* @__PURE__ */ new Map();
+  function textW(t) {
+    let w = measured.get(t);
+    if (w == null) {
+      measureCtx.font = ALM.beadFont;
+      w = measureCtx.measureText(t).width;
+      measured.set(t, w);
+    }
+    return w;
+  }
+  function fitText(t, max) {
+    if (textW(t) <= max) return t;
+    let lo = 0, hi = t.length;
+    while (lo < hi) {
+      const mid = lo + hi + 1 >> 1;
+      if (textW(t.slice(0, mid).trimEnd() + "\u2026") <= max) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo > 0 ? t.slice(0, lo).trimEnd() + "\u2026" : "";
   }
   var NS = "http://www.w3.org/2000/svg";
   var nodes = /* @__PURE__ */ new Map();
@@ -1270,8 +1332,12 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     }
     if (state.phone) mountList(card);
     else {
+      setWidth(card.clientWidth);
       svg = document.createElementNS(NS, "svg");
-      svg.setAttribute("viewBox", `0 0 ${ALM.width} ${ALM.lanes.top + ANCHORS.length * ALM.lanes.rowH + 8}`);
+      const chartH = ALM.lanes.top + ANCHORS.length * ALM.lanes.rowH + 8;
+      svg.setAttribute("viewBox", `0 0 ${ALM.width} ${chartH}`);
+      svg.setAttribute("width", String(ALM.width));
+      svg.setAttribute("height", String(chartH));
       svg.setAttribute("class", "alm-chart");
       svg.setAttribute("role", "img");
       svg.setAttribute("aria-label", "Almanac chart: world, anchors, capacity forecast and last safe days to 10/01/27");
@@ -1301,7 +1367,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       s("line", { class: "alm-month", x1: X(d), x2: X(d), y1: 8, y2: 640 }, back);
       s("text", { class: "alm-t-month", x: X(d) + 6, y: ALM.months.y }, back, l);
     }
-    s("text", { class: "alm-t-month", x: ALM.x0 + 30, y: ALM.months.y }, back, "Sep");
+    if (X("2026-10-01") - ALM.x0 >= 60) s("text", { class: "alm-t-month", x: ALM.x0 + 30, y: ALM.months.y }, back, "Sep");
     const tier = (a, b, label, cls) => {
       const x = X(a), w = X(b) - X(a);
       s("rect", { class: `alm-tier ${cls}`, x: x + 2, y: ALM.tiers.y, width: w - 4, height: ALM.tiers.h, rx: 6 }, back);
@@ -1336,7 +1402,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
     flag("2026-10-13", 1, "T4 starts", "13/10");
     flag("2026-12-01", 0, "Solo travel", "from 01/12");
     flag("2026-12-17", 1, "T4 ends", "17/12");
-    const pill = s("g", { transform: `translate(${X("2026-12-23") + 6} 106)` }, anc);
+    const pill = s("g", { transform: `translate(${Math.min(X("2026-12-23") + 6, ALM.width - ALM.rightPad - 150)} 106)` }, anc);
     s("rect", { class: "alm-pill", width: 150, height: 20, rx: 10 }, pill);
     s("text", { class: "alm-t-pill", x: 75, y: 14 }, pill, "Korea \xB7 23/12 \u2013 10/01");
     const clip = s("clipPath", { id: "alm-reveal" }, s("defs", {}, svg));
@@ -1381,6 +1447,19 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         const dx = X(a.date);
         s("rect", { class: "alm-anchor", x: dx - 6, y: cy - 6, width: 12, height: 12, rx: 2, transform: `rotate(45 ${dx} ${cy})` }, lane);
       }
+      const xs = line.steps.map((st) => X(st.lastSafe));
+      const isRight = (x) => x > ALM.width - ALM.rightPad - ALM.labelRoom;
+      const budget = (k, right) => {
+        const same = xs.filter((_, j) => j % 2 === k % 2 && j !== k);
+        if (right) {
+          const prev = same.filter((v) => v < xs[k]).pop();
+          const limit2 = prev == null ? ALM.x0 : isRight(prev) ? prev + ALM.labelGap : (prev + xs[k]) / 2 + ALM.labelGap / 2;
+          return xs[k] - 10 - limit2;
+        }
+        const next = same.find((v) => v > xs[k]);
+        const limit = next == null ? ALM.width - ALM.rightPad : isRight(next) ? (xs[k] + next) / 2 - ALM.labelGap / 2 : next - ALM.labelGap;
+        return limit - (xs[k] - 4);
+      };
       line.steps.forEach((st, k) => {
         const x = X(st.lastSafe);
         const bead = s("g", { class: `alm-bead is-${st.status}`, transform: `translate(${x} ${cy})`, tabindex: 0, role: "button", "data-part": "bead", "data-step": st.id, "data-status": st.status, "aria-label": `${st.title}. Last safe day ${formatDisplayDate(st.lastSafe)}.` }, lane);
@@ -1392,7 +1471,7 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
         const above = k % 2 === 0;
         const right = x > ALM.width - ALM.rightPad - ALM.labelRoom;
         const lx = right ? x - 10 : x + (st.lastSafe === TODAY ? 12 : -4);
-        s("text", { class: `alm-t-bead${right ? " is-end" : ""}`, x: lx, y: above ? cy - 12 : cy + 21 }, lane, st.title);
+        s("text", { class: `alm-t-bead${right ? " is-end" : ""}`, x: lx, y: above ? cy - 12 : cy + 21 }, lane, fitText(st.title, budget(k, right)));
         nodes.set(`bead:${st.id}`, inner);
         nodes.set(`beadg:${st.id}`, bead);
       });
@@ -1641,6 +1720,12 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       reduced = !reduced;
       e.currentTarget.setAttribute("aria-pressed", String(reduced));
     });
+    let lastW = 0;
+    new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (lastW && Math.abs(w - lastW) > 2 && !state.phone) requestAnimationFrame(start);
+      lastW = w;
+    }).observe(host);
     let wasPhone = matchMedia("(max-width: 719px)").matches;
     matchMedia("(max-width: 719px)").addEventListener("change", (ev) => {
       if (ev.matches !== wasPhone) {

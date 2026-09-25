@@ -86,6 +86,7 @@
 
 /* ---------- band labels ---------- */
 .cal-bands{position:relative}
+/* transition:none kills Life's global button { transform… } — geometry is engine-only (VISUAL-SPEC rule 1). Chevron keeps its own transform on svg. */
 .cal-band{position:absolute;left:0;right:0;display:block;text-align:left;border:0;border-top:1px solid var(--line);background:transparent;padding:6px 10px;cursor:pointer;font:inherit;overflow:hidden;color:inherit;transition:none}
 .cal-band:hover{background:color-mix(in srgb,var(--wave) 6%,transparent)}
 .cal-band:focus-visible{outline:2px solid var(--wave);outline-offset:-2px}
