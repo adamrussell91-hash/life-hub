@@ -169,11 +169,11 @@ export function parseSchoolTerms(value, { warn = console.warn } = {}) {
     return [];
   }
   const terms = [];
-  value.forEach((row, index) => {
+  const addTerm = (row, label) => {
     const starts_on = asDate(row?.starts_on);
     const ends_on = asDate(row?.ends_on);
     if (!starts_on || !ends_on || starts_on > ends_on) {
-      warn(`almanac: ignoring school term at index ${index}`);
+      warn(`almanac: ignoring school term at index ${label}`);
       return;
     }
     terms.push({
@@ -181,8 +181,13 @@ export function parseSchoolTerms(value, { warn = console.warn } = {}) {
       starts_on,
       ends_on
     });
+  };
+  // hub-prefs stores terms nested by year ({ year, terms: [...] }); older seeds use flat rows.
+  value.forEach((row, index) => {
+    if (Array.isArray(row?.terms)) row.terms.forEach((term, inner) => addTerm(term, `${index}.${inner}`));
+    else addTerm(row, index);
   });
-  return terms;
+  return terms.sort((a, b) => a.starts_on.localeCompare(b.starts_on));
 }
 
 export async function readAlmanacTasked(tasksStore, { warn = console.warn } = {}) {
