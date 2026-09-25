@@ -33,6 +33,8 @@ import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
 import { normalizeGoalRecord } from './_shared/goal-record.mjs';
+import { buildGoalRead, goalIdFromGhostId } from './_shared/goal-read.mjs';
+import { goalReadKey, loadGoalInputs } from './goal-reads.mjs';
 import {
   defaultGetTasksStore,
   getJSON,
@@ -584,6 +586,53 @@ async function clearTasksPending(open, commit, id) {
   await commit(changed, opened.base, `chore(calendar): tasks applied ${id}`);
 }
 
+/** Goal ghosts are recomputed from Hammond's goal read, not queued (spec: Goals redesign). */
+async function runGoalGhostDecision({ open, commit, tasksStore, decision, today, nowIso }) {
+  const goalId = goalIdFromGhostId(decision.id);
+  if (!goalId) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
+  const store = await tasksStore();
+
+  if (decision.decision === 'dismiss') {
+    const cached = (await getJSON(store, goalReadKey(goalId))) ?? {};
+    const dismissed = [...new Set([...(Array.isArray(cached.dismissed) ? cached.dismissed : []), decision.id])];
+    const read = cached.read ? { ...cached.read, ghosts: (cached.read.ghosts ?? []).filter(g => g.id !== decision.id) } : null;
+    await setJSON(store, goalReadKey(goalId), { ...cached, read, dismissed });
+    return applied({ receipt: 'Dismissed. Nothing written.' });
+  }
+
+  const inputs = await loadGoalInputs(store);
+  const goal = inputs.goals.find(item => item.id === goalId);
+  if (!goal) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
+  const read = buildGoalRead({ goal, projects: inputs.projects, tasks: inputs.tasks, terms: inputs.terms, today });
+  const ghost = read.ghosts.find(item => item.id === decision.id);
+  if (!ghost) return fail(404, 'ghost_not_found', 'This proposal no longer applies.');
+
+  let plan;
+  try {
+    plan = acceptPlan(ghost, { today });
+  } catch (error) {
+    return fail(400, 'invalid_ghost', error instanceof TypeError ? error.message : 'This ghost could not be validated.');
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const opened = await open();
+    const settlement = await settleAlmanac(opened, [plan], { nowIso });
+    if (settlement.status) return settlement;
+    try {
+      if (settlement.changed.size) await commit(settlement.changed, opened.base, settlement.message);
+    } catch (error) {
+      if (error instanceof GitHubClientError && error.code === 'write_conflict' && attempt === 0) continue;
+      throw error;
+    }
+    const result = await finishTasks({ open, commit, tasksStore, id: decision.id, settlement });
+    // The goal changed; drop the saved read so the next GET recomputes it.
+    const cached = (await getJSON(store, goalReadKey(goalId))) ?? {};
+    await setJSON(store, goalReadKey(goalId), { ...cached, read: null });
+    return result;
+  }
+  return fail(409, 'write_conflict', 'The repository changed while accepting. Try again.');
+}
+
 /**
  * Execute one stored ghost. `open` reads a snapshot, `commit` writes one
  * GitHub commit (or the mock equivalent). Tasks run only after that commit.
@@ -595,6 +644,9 @@ export async function runGhostDecision({
     return runAlmanacGhostDecision({
       open, commit, tasksStore, decision, today, nowIso, lessons, professionalEvents
     });
+  }
+  if (typeof decision.id === 'string' && decision.id.startsWith('goal-')) {
+    return runGoalGhostDecision({ open, commit, tasksStore, decision, today, nowIso });
   }
   // ponytail: one stale-SHA retry. On write_conflict, re-read and rebuild from
   // the current tree. A second conflict is returned to the client.
