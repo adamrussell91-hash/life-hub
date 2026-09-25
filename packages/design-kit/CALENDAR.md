@@ -4,7 +4,7 @@
 
 The calendar is one object across hubs. Zoom stops, chrome, and shared modules are locked here. Life’s Tideline week is the reference paint for Week; Almanac is the fifth stop. Do not invent a postcard, a five-day week, or a second phone skin.
 
-CSS: `calendar.css`, `calendar-tideline.css`, `calendar-almanac.css`. Dates: `js/format-display-date.js`. Geometry: `js/calendar-bands.js`, `js/calendar-tideline-geometry.js`, `js/almanac-geometry.js`. Motion: `js/hub-motion-engine.js`.
+CSS: `calendar.css`, `calendar-tideline.css`, `calendar-almanac.css`, `calendar-day-dial.css`. Dates: `js/format-display-date.js`. Geometry: `js/calendar-bands.js`, `js/calendar-tideline-geometry.js`, `js/almanac-geometry.js`, `js/dial-geometry.js`, `js/day-dial-geometry.js`. Motion: `js/hub-motion-engine.js`.
 
 Visual contracts (how it looks and moves):
 
@@ -30,13 +30,13 @@ New calendar surface? Same zoom language. Extra product chrome (planning filters
 
 | Stop | Job |
 |------|-----|
-| **Day** | One day, time grid, compose |
+| **Day** | **Day Dial** — one 24-hour circle; Linear is the Tideline one-day view |
 | **Week** | **Tideline** — elastic bands, capacity, ghosts, walls |
 | **Term** | Term river (reference folder before build) |
 | **Year** | Year scale (reference folder before build) |
 | **Almanac** | Lead lines, forecast tide, openings |
 
-Nav pills: Day · Week · Term · Year · Almanac (`.hub-pills`). Selected tab is `.is-active`. Week pressed shows the Tideline. Almanac pressed shows the Almanac chart.
+Nav pills: Day · Week · Term · Year · Almanac (`.hub-pills`). Selected tab is `.is-active`. Day pressed shows the Day Dial (Dial · Linear). Week pressed shows the Tideline. Almanac pressed shows the Almanac chart.
 
 Do not replace these five with Day / Week / Month. Month is not a zoom stop in this lock.
 
@@ -124,7 +124,9 @@ Teaching, Tasks, and Professional are **not** migrated to Tideline/Almanac in th
 | **Look (classic)** | `packages/design-kit/calendar.css` |
 | **Tideline CSS** | `packages/design-kit/calendar-tideline.css` |
 | **Almanac CSS** | `packages/design-kit/calendar-almanac.css` |
+| **Day Dial CSS** | `packages/design-kit/calendar-day-dial.css` |
 | **Life Week** | `apps/life/js/app/render-tideline.js` |
+| **Life Day** | `apps/life/js/app/render-day-dial.js` |
 | **Life Almanac** | `apps/life/js/app/render-almanac.js` |
 | **Ghosts API** | `netlify/functions/calendar-ghosts.mjs` |
 | **Morning propose** | `netlify/functions/calendar-ghosts-propose-scheduled.mjs` |

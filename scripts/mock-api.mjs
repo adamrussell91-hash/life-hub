@@ -527,20 +527,28 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         const today = getSydneyDateKey(instant);
         if (from <= today && to >= today) {
           try {
-            const terms = await readSchoolTerms(async () => taskStore);
-            await runCalendarGhostsPropose({
+            const { peekRefreshDue } = await import('../netlify/functions/_shared/calendar-ghosts-propose.mjs');
+            const due = await peekRefreshDue({
               open: openRepo,
-              commit: async (changed) => {
-                for (const [path, content] of changed) confirmedFiles.set(path, content);
-              },
               today,
-              nowIso: getSydneyTimestamp(instant),
-              nowMs: instant.getTime(),
-              terms,
-              lessons: [],
-              professionalEvents: [],
-              trigger: 'refresh'
+              nowMs: instant.getTime()
             });
+            if (due) {
+              const terms = await readSchoolTerms(async () => taskStore);
+              await runCalendarGhostsPropose({
+                open: openRepo,
+                commit: async (changed) => {
+                  for (const [path, content] of changed) confirmedFiles.set(path, content);
+                },
+                today,
+                nowIso: getSydneyTimestamp(instant),
+                nowMs: instant.getTime(),
+                terms,
+                lessons: [],
+                professionalEvents: [],
+                trigger: 'refresh'
+              });
+            }
           } catch (refreshError) {
             console.warn('mock calendar-ghosts GET refresh failed', refreshError);
           }

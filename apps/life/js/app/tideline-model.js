@@ -222,6 +222,18 @@ function chipsFromVisual(visual, date, events) {
       ...(workout?.skipped ? { skipped: true, meta: workout.meta } : {})
     });
   }
+  // Accept writes (bedtime wind-down, protect blocks) land as Life calendar_block
+  // records. The visual ITEMS file does not grow; merge those in so an accepted
+  // proposal stays a solid arc and a plain row after reload.
+  for (const event of events ?? []) {
+    const chip = chipFromEvent(event);
+    if (!chip || chip.date !== date || chip.source !== 'calendar_block') continue;
+    if (chips.some(existing =>
+      existing.id === chip.id
+      || (Math.abs(existing.start - chip.start) < 1e-6 && Math.abs(existing.end - chip.end) < 1e-6)
+    )) continue;
+    chips.push(chip);
+  }
   return chips;
 }
 

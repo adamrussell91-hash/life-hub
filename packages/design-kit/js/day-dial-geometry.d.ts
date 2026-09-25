@@ -1,0 +1,23 @@
+export declare const DD: {
+  maxSize: number;
+  sidePanel: number;
+  sweepMs: number;
+  handMs: number;
+  handDelay: number;
+  gaugeMs: number;
+  daySwitchMs: number;
+  weekStagger: number;
+  toastInMs: number;
+  toastRise: number;
+  toastHoldMs: number;
+  popMs: number;
+  popRise: number;
+  popWidth: number;
+  popGap: number;
+  acceptMs: number;
+  saveLatencyMs: number;
+  calloutGap: number;
+  miniSize: number;
+  callFont: string;
+  subFont: string;
+};
