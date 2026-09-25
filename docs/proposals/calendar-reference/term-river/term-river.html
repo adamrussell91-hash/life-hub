@@ -1,0 +1,1550 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term River reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real kit files. Open from the repo (docs/proposals/calendar-reference/term-river/) so the paths resolve. -->
+<link rel="stylesheet" href="../../../../packages/design-kit/tokens.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/overlays.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/actions.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/filters.css">
+<style>
+/* Term River reference styles. PORT VERBATIM (from `.tr{` down) to packages/design-kit/calendar-term-river.css. Tokens only. */
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+/* Harness only: a stand-in for the Life rail (330px), so every width here matches the app at that width. */
+body{display:grid;grid-template-columns:330px minmax(0,1fr)}
+.shell-rail{background:var(--navy);color:color-mix(in srgb,#fff 75%,transparent);padding:var(--space-8) var(--space-6);font-size:var(--text-xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold)}
+.page{width:100%;max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page-shell{display:grid;grid-template-columns:1fr}
+.page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
+.page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
+.ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
+@media (max-width:719px){body{display:block}.shell-rail{display:none}.page{padding:var(--space-4) var(--space-4) var(--space-12)}}
+
+.tr{
+  --tr-holiday:color-mix(in srgb,var(--pastel-sage) 38%,transparent);
+  --tr-rule:color-mix(in srgb,var(--navy) 9%,transparent);
+  --tr-hatch-a:color-mix(in srgb,var(--navy) 4%,transparent);
+  --tr-hatch-b:color-mix(in srgb,var(--navy) 13%,transparent);
+  --tr-ghost-fill:color-mix(in srgb,var(--wave) 6%,transparent);
+  --tr-ghost-line:color-mix(in srgb,var(--navy) 55%,transparent);
+  --tr-corey-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
+  --tr-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
+  --tr-health-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
+  position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size
+}
+.tr__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
+.tr__round{width:2.25rem;height:2.25rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);display:inline-grid;place-items:center;color:var(--navy);cursor:pointer}
+.tr__round svg{width:1rem;height:1rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tr__period{display:grid;line-height:1.2;padding:0 var(--space-1);min-width:0}
+.tr__period b{font-size:var(--text-md);font-weight:var(--weight-semibold);color:var(--navy);letter-spacing:var(--tracking-tight);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr__period span{font-size:var(--text-xs);color:var(--muted);font-variant-numeric:tabular-nums}
+.tr__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
+.tr-chart{display:block;font-family:var(--font-ui)} /* laid out at the card's width, never scaled */
+.tr-holiday{fill:var(--tr-holiday)}
+.tr-wall{fill:url(#tr-hatch)}
+.tr-lane-wash{fill:var(--tr-corey-wash)}
+.tr-rule{stroke:var(--line)}
+.tr-weekline{stroke:var(--tr-rule)}
+.tr-tier.is-term{fill:var(--pastel-sage)}
+.tr-tier.is-hol{fill:color-mix(in srgb,var(--navy) 6%,transparent)}
+.tr-t-tier{font-size:10.5px;font-weight:600;letter-spacing:.08em;fill:var(--muted)}
+.tr-t-tier.is-term{fill:var(--pastel-sage-ink)}
+.tr-t-week{font-size:12px;font-weight:600;fill:var(--ink)}
+.tr-t-sub{font-size:11px;fill:var(--muted)}
+.tr-t-lane{font-size:13px;font-weight:600;fill:var(--navy)}
+.tr-t-lane.is-corey{fill:var(--pastel-peach-ink)}
+.tr-bar{cursor:pointer}
+.tr-bar.k-teacher{fill:var(--pastel-blue)}
+.tr-bar:focus-visible,.tr-point:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5}
+.tr-t-bar{font-size:12px;font-weight:600;fill:var(--pastel-blue-ink);pointer-events:none}
+.tr-point{cursor:pointer;stroke:#fff;stroke-width:2}
+.tr-point.k-teacher{fill:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff)}
+.tr-point.k-corey{fill:var(--pastel-peach-ink)}
+.tr-point.k-corey.is-sample{fill:color-mix(in srgb,var(--pastel-peach-ink) 55%,#fff);stroke-width:1;cursor:default}
+.tr-point.k-corey.is-held{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:2}
+.tr-point.k-scholar{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.6}
+.tr-point.k-friends{fill:var(--pastel-sage);stroke:var(--pastel-sage-ink);stroke-width:1.6}
+.tr-point.k-body{fill:#fff;stroke:var(--tr-health-line);stroke-width:1.8}
+.tr-point.is-marker{stroke:var(--pastel-blue-ink);stroke-width:1.5}
+.tr-point.k-body.is-marker{stroke:var(--high-sea-ink)}
+.tr-point.is-ghost{fill:var(--tr-ghost-fill);stroke:var(--tr-ghost-line);stroke-width:1.5;stroke-dasharray:3 2}
+.tr-agent circle{fill:var(--navy)}
+.tr-agent text{font-size:9px;font-weight:600;fill:#fff;text-anchor:middle}
+.tr-t-point,.tr-t-load,.tr-t-hum{paint-order:stroke;stroke:var(--paper);stroke-width:3px;stroke-linejoin:round}
+.tr-t-point{font-size:11.5px;font-weight:500;fill:var(--ink);pointer-events:none}
+.tr-t-point.is-gold{fill:var(--pastel-gold-ink);font-weight:600}
+.tr-t-point.is-corey{fill:var(--pastel-peach-ink);font-weight:600}
+.tr-hum{stroke:var(--tr-gold-line);stroke-width:2;stroke-dasharray:1 6;stroke-linecap:round}
+.tr-t-hum{font-size:11px;fill:var(--pastel-gold-ink)}
+.tr-line{fill:none;stroke:var(--wave);stroke-width:2.25;stroke-linejoin:round}
+.tr-line.is-forecast{stroke-width:1.75;stroke-dasharray:4 4;opacity:.75}
+.tr-band{fill:color-mix(in srgb,var(--wave) 9%,transparent)}
+.tr-soften{stroke:var(--high-sea-ink);stroke-dasharray:3 4;opacity:.55}
+.tr-t-soften{font-size:10.5px;fill:var(--high-sea-ink)}
+.tr-load{fill:var(--pastel-blue)}
+.tr-load.is-hol{fill:color-mix(in srgb,var(--pastel-sage) 80%,#fff)}
+.tr-load.is-over{fill:var(--warning-surface);stroke:var(--high-sea-ink);stroke-width:1.5}
+.tr-cap{stroke:var(--navy);stroke-width:1.5;stroke-dasharray:4 3;opacity:.7}
+.tr-t-load{font-size:11.5px;font-weight:500;fill:var(--muted);text-anchor:middle}
+.tr-t-load.is-over{fill:var(--high-sea-ink);font-weight:600}
+.tr-today line{stroke:var(--wave);stroke-width:1.5;stroke-dasharray:3 3}
+.tr-today rect{fill:var(--wave)}
+.tr-today text{font-size:11px;font-weight:600;fill:#fff;text-anchor:middle}
+.tr-legend{display:flex;flex-wrap:wrap;gap:var(--space-4);align-items:center;padding:var(--space-3) var(--space-4);border-top:1px solid var(--line);font-size:var(--text-xs);color:var(--muted)}
+.tr-legend span{display:inline-flex;gap:6px;align-items:center}
+.tr-legend i{width:12px;height:8px;border-radius:3px;display:inline-block}
+.lg-school{background:var(--pastel-blue)}
+.lg-wall{background:repeating-linear-gradient(45deg,var(--tr-hatch-b) 0 2px,var(--tr-hatch-a) 2px 6px)}
+.lg-ghost{border:1.5px dashed var(--navy)}
+.lg-over{background:var(--warning-surface);border:1.5px solid var(--high-sea-ink)}
+.tr-legend__note{margin-left:auto}
+.tr-pop{position:absolute;z-index:30;width:300px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--elev-2);padding:var(--space-3) var(--space-4) var(--space-4);font-size:var(--text-sm)}
+.tr-pop[hidden]{display:none}
+.tr-pop b{font-weight:var(--weight-semibold)}
+.tr-pop__meta{margin:4px 0 0;font-size:var(--text-xs);color:var(--muted)}
+.tr-pop__label{margin:var(--space-3) 0 4px;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold);color:var(--muted)}
+.tr-pop__label + .tr-pop__label{margin-top:0}
+.tr-pop__writes{margin:0;padding:var(--space-2) var(--space-3);border-radius:10px;background:var(--tr-ghost-fill);border:1.5px dashed var(--tr-ghost-line);font-size:var(--text-xs);line-height:1.45}
+.tr-pop__acts{display:flex;gap:var(--space-2);margin-top:var(--space-3)}
+.tr-pop__acts .btn{min-height:2rem;padding:var(--space-1) var(--space-3);font-size:var(--text-sm)}
+.tr-toast{position:absolute;right:var(--space-6);bottom:var(--space-6);max-width:30rem;background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-3) 2.5rem;font-size:var(--text-sm);line-height:1.45;box-shadow:0 12px 32px color-mix(in srgb,var(--depth) 28%,transparent);opacity:0;pointer-events:none;z-index:20}
+.tr-toast::before{content:"✓";position:absolute;left:14px;top:12px;width:18px;height:18px;border-radius:50%;background:var(--pastel-sage);color:var(--pastel-sage-ink);font-weight:var(--weight-bold);font-size:0.6875rem;display:grid;place-items:center}
+.tr-toast b{font-weight:var(--weight-semibold)}
+.tr-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.tr-list{padding:var(--space-3) var(--space-4) var(--space-4);display:grid;gap:var(--space-3)}
+.tr-list__lane{background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);padding:var(--space-3)}
+.tr-list__lane.is-corey{background:linear-gradient(160deg,#fff 55%,color-mix(in srgb,var(--pastel-peach) 45%,#fff))}
+.tr-list__lane h3{margin:0;font-size:var(--text-sm);color:var(--navy)}
+.tr-list__lane.is-corey h3{color:var(--pastel-peach-ink)}
+.tr-list__lane > p{margin:2px 0 6px;font-size:var(--text-xs);color:var(--muted)}
+.tr-list__body{font-size:var(--text-xs);color:var(--ink)!important}
+.tr-list__item{display:flex;justify-content:space-between;gap:8px;width:100%;border:0;border-top:1px solid var(--line);background:none;padding:8px 0 6px;font:inherit;font-size:var(--text-xs);text-align:left;color:var(--ink);cursor:pointer}
+.tr-list__item.is-ghost .tr-list__t::before{content:"H";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--navy);color:#fff;font-size:9px;font-weight:600;margin-right:6px;vertical-align:1px}
+.tr-list__d{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+@media (max-width:719px){
+  .tr__nav{gap:var(--space-2)}
+  .tr__nav .btn,.tr__round{display:none}
+  .tr__period{flex:1 0 100%}
+  .tr__nav .hub-pills{width:100%;justify-content:space-between}
+  .tr-legend{display:none}
+  .tr-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
+  .tr-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="tr-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/><rect width="2" height="7" fill="color-mix(in srgb, var(--navy) 13%, transparent)"/></pattern>
+</defs></svg>
+<aside class="shell-rail" aria-hidden="true">Life Hub · rail stand-in</aside>
+<main class="page">
+  <p class="page-header__eyebrow">Calendar reference · B · Term River</p>
+  <h1 class="page-header__title">Your term, as the people you are</h1>
+  <div class="ref-controls" data-part="ref-controls">
+    <span>Reference controls (not product):</span>
+    <button class="btn btn--secondary" type="button" id="ref-reset">Reset</button>
+    <button class="btn btn--secondary" type="button" id="ref-slow" aria-pressed="false">Slow motion ×5</button>
+    <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
+    <span>Today is Thu 24/09/26. Past Corey evenings are examples.</span>
+  </div>
+  <div class="page-shell"><div id="app"></div></div>
+</main>
+<script>/* Generated from src/river-ref.ts. Do not edit term-river.html; edit src/ and rebuild. */
+(() => {
+  // packages/design-kit/js/hub-motion-engine.js
+  var MOTION = {
+    settle: 420,
+    // live update: an entity moves because data changed elsewhere
+    zoom: 280,
+    // day width changes (zoom pills, wheel, pinch)
+    release: 220,
+    // a dragged bar settles onto its snapped day
+    cascadeStagger: 30,
+    // dependants follow a released bar, one after another
+    enter: 320,
+    // a new bar, curve or chip appears
+    exit: 160,
+    // an entity leaves
+    expand: 300,
+    // a group opens or closes; rows slide
+    rowStagger: 24,
+    // rows revealed by expand, top to bottom
+    hover: 120,
+    // hover and focus emphasis
+    morph: 620,
+    // Bars <-> Lines flight: the kit spring settles in ~618 ms (see springEasing)
+    crossfade: 160,
+    // real views swap during the morph
+    reducedFade: 120
+    // the only motion left under prefers-reduced-motion
+  };
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    const solve = (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const err = sampleX(t) - x;
+        if (Math.abs(err) < 1e-6)
+          return t;
+        const d = slopeX(t);
+        if (Math.abs(d) < 1e-6)
+          break;
+        t -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      t = x;
+      while (hi - lo > 1e-6) {
+        const v = sampleX(t);
+        if (v < x)
+          lo = t;
+        else
+          hi = t;
+        t = (lo + hi) / 2;
+      }
+      return t;
+    };
+    return (p) => {
+      if (p <= 0)
+        return 0;
+      if (p >= 1)
+        return 1;
+      return sampleY(solve(p));
+    };
+  }
+  var EASE = cubicBezier(0.2, 0.8, 0.2, 1);
+  var OVERSHOOT = cubicBezier(0.34, 1.3, 0.64, 1);
+  var LINEAR = (t) => t;
+  var EPS = 1e-6;
+  function browserClock() {
+    return {
+      now: () => performance.now(),
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id)
+    };
+  }
+  function prefersReduced() {
+    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function createMotion(options) {
+    const clock2 = options.clock ?? browserClock();
+    const reduced2 = options.reducedMotion ?? prefersReduced;
+    const entities = /* @__PURE__ */ new Map();
+    const frameCosts = [];
+    let frameId = null;
+    let disposed = false;
+    function entity(id) {
+      let e = entities.get(id);
+      if (!e) {
+        e = { props: {}, tweens: /* @__PURE__ */ new Map(), exiting: null, dirty: false };
+        entities.set(id, e);
+      }
+      return e;
+    }
+    function schedule() {
+      if (frameId !== null || disposed)
+        return;
+      frameId = clock2.request(frame);
+    }
+    function valueAt(tween, now) {
+      if (tween.duration <= 0)
+        return tween.to;
+      const p = (now - tween.start) / tween.duration;
+      if (p <= 0)
+        return tween.from;
+      if (p >= 1)
+        return tween.to;
+      return tween.from + (tween.to - tween.from) * tween.easing(p);
+    }
+    function step(now) {
+      let active = false;
+      const finishedExits = [];
+      for (const [id, e] of entities) {
+        for (const [prop, tween] of e.tweens) {
+          const v = valueAt(tween, now);
+          if (e.props[prop] !== v) {
+            e.props[prop] = v;
+            e.dirty = true;
+          }
+          if (now >= tween.start + tween.duration)
+            e.tweens.delete(prop);
+          else
+            active = true;
+        }
+        if (e.dirty) {
+          e.dirty = false;
+          options.apply(id, e.props);
+        }
+        if (e.exiting && e.tweens.size === 0)
+          finishedExits.push([id, e.exiting]);
+      }
+      for (const [id, done] of finishedExits) {
+        entities.delete(id);
+        done();
+      }
+      return active;
+    }
+    function frame() {
+      frameId = null;
+      if (disposed)
+        return;
+      const t0 = clock2.now();
+      const active = step(t0);
+      const cost = clock2.now() - t0;
+      frameCosts.push(cost);
+      if (frameCosts.length > 600)
+        frameCosts.shift();
+      if (active)
+        schedule();
+      else
+        options.onIdle?.();
+    }
+    function startTween(e, prop, to, opts, now) {
+      const running = e.tweens.get(prop);
+      if (running && Math.abs(running.to - to) < EPS)
+        return;
+      const current = running ? valueAt(running, now) : e.props[prop];
+      if (current === void 0) {
+        e.props[prop] = to;
+        e.dirty = true;
+        return;
+      }
+      if (!running && Math.abs(current - to) < EPS)
+        return;
+      const duration = opts.duration ?? MOTION.settle;
+      e.tweens.set(prop, {
+        from: current,
+        to,
+        start: now + (opts.delay ?? 0),
+        duration,
+        easing: running && opts.easing === OVERSHOOT ? EASE : opts.easing ?? EASE
+      });
+    }
+    function flushDirty(id, e) {
+      if (e.dirty) {
+        e.dirty = false;
+        options.apply(id, e.props);
+      }
+    }
+    const engine2 = {
+      place(id, props) {
+        const e = entity(id);
+        for (const [prop, value] of Object.entries(props)) {
+          e.tweens.delete(prop);
+          if (e.props[prop] !== value) {
+            e.props[prop] = value;
+            e.dirty = true;
+          }
+        }
+        flushDirty(id, e);
+      },
+      to(id, props, opts = {}) {
+        const e = entity(id);
+        e.exiting = null;
+        const now = clock2.now();
+        if (reduced2()) {
+          const { opacity, ...geometry } = props;
+          engine2.place(id, geometry);
+          if (opacity !== void 0) {
+            startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
+          }
+        } else {
+          for (const [prop, value] of Object.entries(props))
+            startTween(e, prop, value, opts, now);
+        }
+        flushDirty(id, e);
+        if (e.tweens.size)
+          schedule();
+      },
+      enter(id, props, opts = {}) {
+        const from = opts.from ?? { opacity: 0, scale: 0.6 };
+        const start = { ...props, ...from };
+        const target = { opacity: 1, scale: 1, ...props };
+        if (reduced2()) {
+          engine2.place(id, { ...target, opacity: 0 });
+          engine2.to(id, { opacity: target.opacity ?? 1 });
+          return;
+        }
+        engine2.place(id, start);
+        engine2.to(id, target, { duration: MOTION.enter, easing: OVERSHOOT, ...opts });
+      },
+      exit(id, done, opts = {}) {
+        const e = entities.get(id);
+        if (!e) {
+          done();
+          return;
+        }
+        if (e.exiting) {
+          e.exiting = done;
+          return;
+        }
+        for (const prop of [...e.tweens.keys()])
+          if (prop !== "opacity")
+            e.tweens.delete(prop);
+        e.exiting = done;
+        const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
+        startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock2.now());
+        if (!e.tweens.size) {
+          entities.delete(id);
+          done();
+          return;
+        }
+        schedule();
+      },
+      get: (id) => entities.get(id)?.props,
+      forget: (id) => {
+        entities.delete(id);
+      },
+      has: (id) => entities.has(id),
+      target: (id, prop) => {
+        const e = entities.get(id);
+        if (!e)
+          return void 0;
+        return e.tweens.get(prop)?.to ?? e.props[prop];
+      },
+      busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
+      finish() {
+        step(Number.POSITIVE_INFINITY);
+        if (frameId !== null) {
+          clock2.cancel(frameId);
+          frameId = null;
+        }
+      },
+      stats() {
+        const sorted = [...frameCosts].sort((a, b) => a - b);
+        const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+        return { frames: frameCosts.length, p95, max: sorted.length ? sorted[sorted.length - 1] : 0 };
+      },
+      dispose() {
+        disposed = true;
+        if (frameId !== null)
+          clock2.cancel(frameId);
+        frameId = null;
+        entities.clear();
+      }
+    };
+    return engine2;
+  }
+
+  // apps/tasks/src/domain/school-time.ts
+  var DAY_MS = 864e5;
+  function toMs(key3) {
+    return Date.UTC(Number(key3.slice(0, 4)), Number(key3.slice(5, 7)) - 1, Number(key3.slice(8, 10)));
+  }
+  function toKey(ms3) {
+    return new Date(ms3).toISOString().slice(0, 10);
+  }
+  function termAt(key3, terms) {
+    return terms.find((t) => key3 >= t.starts_on && key3 <= t.ends_on) ?? null;
+  }
+  function isHoliday(key3, terms) {
+    if (!terms.length) return false;
+    return termAt(key3, terms) === null;
+  }
+  function buildTimeScale(options) {
+    const factor = options.holidayFactor ?? 0.25;
+    const days = [];
+    let x = 0;
+    for (let ms3 = toMs(options.start); ms3 <= toMs(options.end); ms3 += DAY_MS) {
+      const key3 = toKey(ms3);
+      const holiday = isHoliday(key3, options.terms);
+      const w = options.dayWidth * (holiday ? factor : 1);
+      days.push({ key: key3, x, w, holiday });
+      x += w;
+    }
+    const startMs = toMs(options.start);
+    const width = x;
+    function xAtMs(ms3) {
+      const i = Math.floor((ms3 - startMs) / DAY_MS);
+      if (i < 0) return 0;
+      if (i >= days.length) return width;
+      const day = days[i];
+      const frac = (ms3 - (startMs + i * DAY_MS)) / DAY_MS;
+      return day.x + day.w * frac;
+    }
+    return {
+      start: options.start,
+      end: options.end,
+      width,
+      days,
+      x: (v) => xAtMs(typeof v === "number" ? v : toMs(v)),
+      dateAt(px) {
+        if (px <= 0) return days[0]?.key ?? options.start;
+        let lo = 0;
+        let hi = days.length - 1;
+        while (lo < hi) {
+          const mid = lo + hi + 1 >> 1;
+          if (days[mid].x <= px) lo = mid;
+          else hi = mid - 1;
+        }
+        return days[lo].key;
+      }
+    };
+  }
+
+  // apps/life/js/app/capacity-model.js
+  var CAPACITY = Object.freeze({
+    baseline: 80,
+    floor: 10,
+    ceiling: 95,
+    sleepTarget: 7,
+    // hours; below this costs capacity
+    sleepPoor: 6,
+    // below this the note says "poor sleep", else "short sleep"
+    sleepPerHour: 8,
+    sleepMaxPenalty: 30,
+    energy: Object.freeze({ low: -15, medium: 0, high: 8 }),
+    lowMoodScore: 3,
+    // mood_score (1-10) at or below this costs capacity
+    lowMoodPenalty: 8,
+    symptomPenalty: 15,
+    symptomMaxPenalty: 25,
+    belowParPct: 60,
+    // a day under this counts toward a streak
+    streakPenalty: 4,
+    streakMax: 8,
+    softenPct: 40,
+    // under this the day is flagged and agents may propose softening it
+    budgetHours: 6,
+    // discretionary commitment hours a 100% day can carry
+    recovery: 0.6,
+    // forecast: share of the gap to baseline still open after each day
+    holidayLift: 5
+  });
+  function clamp(pct) {
+    return Math.round(Math.min(CAPACITY.ceiling, Math.max(CAPACITY.floor, pct)));
+  }
+  function forecastCapacity(lastPct, daysAhead, { holiday = false } = {}) {
+    const gap = CAPACITY.baseline - lastPct;
+    const recovered = lastPct + gap * (1 - CAPACITY.recovery ** Math.max(0, daysAhead));
+    const pct = clamp(recovered + (holiday ? CAPACITY.holidayLift : 0));
+    return { pct, note: "forecast", factors: [], soften: pct < CAPACITY.softenPct, forecast: true };
+  }
+  function forecastSeries(dateKeys, { lastPct, lastDate, isHoliday: isHoliday2 = () => false, pattern: pattern2 = () => 0 }) {
+    const DAY3 = 864e5;
+    const at = (d) => Date.UTC(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1, Number(d.slice(8, 10)));
+    return dateKeys.map((date) => {
+      const ahead = Math.max(0, Math.round((at(date) - at(lastDate)) / DAY3));
+      if (ahead === 0) return { date, pct: lastPct, low: lastPct, high: lastPct };
+      const base = forecastCapacity(lastPct, ahead, { holiday: isHoliday2(date) }).pct;
+      const pct = clamp(base + pattern2(date));
+      const spread = 3 + 1.2 * Math.sqrt(ahead);
+      return { date, pct, low: Math.max(CAPACITY.floor, Math.round(pct - spread)), high: Math.min(CAPACITY.ceiling, Math.round(pct + spread)) };
+    });
+  }
+
+  // apps/life/js/app/term-river.js
+  var LANES = Object.freeze([
+    Object.freeze({ id: "teacher", label: "Teacher", sub: "classes \xB7 HPGE \xB7 MindWorks" }),
+    Object.freeze({ id: "corey", label: "Corey", sub: "comes first" }),
+    Object.freeze({ id: "scholar", label: "Scholar", sub: "UNSW done \xB7 UOW hum" }),
+    Object.freeze({ id: "friends", label: "Friends & family", sub: "Newcastle \xB7 Bob" }),
+    Object.freeze({ id: "body", label: "Body", sub: "capacity from your logs" })
+  ]);
+  var STUDY = /\b(uow|unsw|master|thesis|essay|assessment|elective|lecture|reading|conferral|graduation|university)\b/i;
+  var FRIENDS = /\b(bob|ruby|fletcher|taylor|donna|joe|newcastle|friends?|family|mate|mates)\b/i;
+  function laneFor(item) {
+    if (item?.lane && LANES.some((l) => l.id === item.lane)) return item.lane;
+    const type = item?.type ?? "";
+    const text = `${item?.title ?? ""} ${item?.sub ?? ""}`;
+    if (type === "calendar_block" && item.kind === "corey" || item?.with === "corey" || item?.kind === "corey") return "corey";
+    if (type === "medical" || type === "sleep" || item?.kind === "rest" || item?.kind === "health" || item?.symptom) return "body";
+    const tags = item?.tags ?? [];
+    if (item?.kind === "dream" || tags.includes("graduation") || tags.includes("study") || STUDY.test(text)) return "scholar";
+    if (FRIENDS.test(text) || tags.includes("friends") || tags.includes("family")) return "friends";
+    return "teacher";
+  }
+  function byLane(items) {
+    const out = Object.fromEntries(LANES.map((l) => [l.id, []]));
+    for (const it of items ?? []) out[laneFor(it)].push(it);
+    return out;
+  }
+  var DAY = 864e5;
+  var ms = (k) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10));
+  var key = (t) => new Date(t).toISOString().slice(0, 10);
+  var inTerm = (d, terms) => terms.some((t) => d >= t.starts_on && d <= t.ends_on);
+  var weekday = (d) => (/* @__PURE__ */ new Date(`${d}T00:00:00Z`)).getUTCDay();
+  function weeksBetween(from, to) {
+    const out = [];
+    let m = ms(from) - (weekday(from) + 6) % 7 * DAY;
+    while (m <= ms(to)) {
+      out.push(key(m));
+      m += 7 * DAY;
+    }
+    return out;
+  }
+  function weeklyLoad({ from, to, terms, commitments = [], capacityFor }) {
+    const half = (v) => Math.round(v * 2) / 2;
+    return weeksBetween(from, to).map((week) => {
+      let capacity = 0;
+      let schoolDays = 0;
+      for (let i = 0; i < 7; i++) {
+        const d = key(ms(week) + i * DAY);
+        if (inTerm(d, terms) && weekday(d) >= 1 && weekday(d) <= 5) schoolDays++;
+        capacity += (capacityFor(d) ?? 0) / 100 * CAPACITY.budgetHours;
+      }
+      const last = key(ms(week) + 6 * DAY);
+      const booked = commitments.filter((c) => !c.protected && !c.isClass && !c.ghost && c.date >= week && c.date <= last).reduce((sum, c) => sum + Math.max(0, (c.end ?? 0) - (c.start ?? 0)), 0);
+      return { week, booked: half(booked), capacity: half(capacity), over: booked > capacity + 0.25, holiday: schoolDays === 0 };
+    });
+  }
+  function riverWeekLabel(week, terms) {
+    const t = terms.find((x) => week <= x.ends_on && key(ms(week) + 6 * DAY) >= x.starts_on);
+    if (t) {
+      const n2 = Math.floor((ms(week) - (ms(t.starts_on) - (weekday(t.starts_on) + 6) % 7 * DAY)) / (7 * DAY)) + 1;
+      return `T${t.term} W${n2}`;
+    }
+    const prev = [...terms].filter((x) => x.ends_on < week).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
+    if (!prev) return `${week.slice(8)}/${week.slice(5, 7)}`;
+    const firstHolMonday = ms(prev.ends_on) + DAY + (8 - weekday(key(ms(prev.ends_on) + DAY))) % 7 * DAY;
+    const n = Math.floor((ms(week) - firstHolMonday) / (7 * DAY)) + 1;
+    return n >= 1 ? `Hol W${n}` : `${week.slice(8)}/${week.slice(5, 7)}`;
+  }
+
+  // packages/design-kit/js/format-display-date.js
+  var SYDNEY_TZ = "Australia/Sydney";
+  var DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+  function fromYmd(year, month, day) {
+    return `${pad2(day)}/${pad2(month)}/${String(year).slice(-2)}`;
+  }
+  function fromInstant(instant) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: SYDNEY_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(instant).filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+    );
+    return fromYmd(Number(parts.year), Number(parts.month), Number(parts.day));
+  }
+  function formatDisplayDate(value) {
+    if (value == null || value === "") return "";
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? "" : fromInstant(value);
+    }
+    const text = String(value).trim();
+    if (!text) return "";
+    const key3 = DATE_KEY.exec(text);
+    if (key3) return fromYmd(Number(key3[1]), Number(key3[2]), Number(key3[3]));
+    const ms3 = Date.parse(text);
+    if (!Number.isNaN(ms3)) return fromInstant(new Date(ms3));
+    return text;
+  }
+
+  // apps/life/js/core/central-node-write.js
+  var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function formatLogDate(dateKey) {
+    const [, month, day] = dateKey.split("-").map(Number);
+    return `${day} ${SHORT_MONTHS[month - 1]}`;
+  }
+
+  // apps/life/js/app/ghost-writes.js
+  var GHOST_AGENTS = Object.freeze({
+    sara: "Sara",
+    hammond: "Hammond",
+    clare: "Clare",
+    chadwick: "Chadwick",
+    brisket: "Brisket",
+    penelope: "Penelope",
+    vera: "Vera"
+  });
+  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
+  var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
+  var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  function short(dateKey) {
+    return formatDisplayDate(dateKey).slice(0, 5);
+  }
+  function weekday2(dateKey) {
+    return new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${dateKey}T00:00:00Z`));
+  }
+  function clock12(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h >= 12 ? "pm" : "am";
+    const hour = (h + 11) % 12 + 1;
+    return m ? `${hour}:${String(m).padStart(2, "0")} ${suffix}` : `${hour}:00 ${suffix}`;
+  }
+  function windDownStart(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.max(0, h * 60 + m - 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  }
+  function oneLine(text) {
+    return String(text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function cn(section, op, payload) {
+    return { target: "central_node", patch: { section, op, payload } };
+  }
+  function recentAction(dateKey, agentName, text) {
+    return cn("recent_actions", "append_line", {
+      summary: `${agentName}: ${text}`,
+      text: `- ${formatLogDate(dateKey)} \u2014 ${agentName}: ${text}`
+    });
+  }
+  function validateGhost(ghost) {
+    if (!ghost || typeof ghost !== "object") throw new TypeError("Ghost must be an object");
+    if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
+    if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
+    if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
+    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    if (ghost.kind === "create_task") {
+      if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
+      if (!DATE_KEY2.test(ghost.due ?? "")) throw new TypeError("create_task needs due (YYYY-MM-DD)");
+    }
+    if (ghost.kind === "draft_message") {
+      if (!oneLine(ghost.to) || !String(ghost.text ?? "").trim()) throw new TypeError("draft_message needs to and text");
+    }
+    if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
+    if (ghost.kind === "protect_block") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("protect_block needs start < end (HH:MM)");
+      }
+      if (!oneLine(ghost.title)) throw new TypeError("protect_block needs a title");
+    }
+    if (ghost.kind === "move_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
+      if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    return ghost;
+  }
+  function acceptPlan(ghost, { today = null } = {}) {
+    validateGhost(ghost);
+    const actedOn = today ?? ghost.date ?? ghost.from;
+    const who = GHOST_AGENTS[ghost.agent];
+    const reason = oneLine(ghost.reason);
+    const why = reason ? ` (${reason})` : "";
+    const steps = [];
+    let receipt;
+    switch (ghost.kind) {
+      case "skip_workout": {
+        const line = `- ${who}\u2192Chadwick: skip ${weekday2(ghost.date)} ${short(ghost.date)} workout${why}.`;
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Chadwick: skip workout ${short(ghost.date)}`, text: line }));
+        if (ghost.workoutPath) {
+          steps.push({ target: "life_record", mode: "update", path: ghost.workoutPath, fields: { status: "skipped" } });
+        }
+        steps.push(recentAction(actedOn, who, `skip workout accepted${why}`));
+        receipt = `${who} \u2192 Central Node: \u201C${line.slice(2)}\u201D${ghost.workoutPath ? " Chadwick\u2019s session is marked skipped." : ""}`;
+        break;
+      }
+      case "bedtime": {
+        const text = `lights out ${clock12(ghost.time)}${why}`;
+        steps.push(cn("todays_status", "upsert_field", { summary: `${who}: protect sleep ${short(ghost.date)}`, field: "Sleep", text: `**Sleep:** ${text}` }));
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: { type: "calendar_block", date: ghost.date, time: windDownStart(ghost.time), end_time: ghost.time, kind: "rest", status: "confirmed", protected: true, title: `Wind down \xB7 lights out ${clock12(ghost.time)}`, source_agent: ghost.agent }
+        });
+        steps.push(recentAction(actedOn, who, `bedtime ${clock12(ghost.time)} accepted`));
+        receipt = `${who} \u2192 Today\u2019s Status: Sleep \u201C${text}\u201D. A protected wind-down is on the calendar.`;
+        break;
+      }
+      case "protect_block": {
+        const withCorey = ghost.with === "corey";
+        const title = oneLine(ghost.title);
+        const span = `${weekday2(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}\u2013${clock12(ghost.end)}`;
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: {
+            type: "calendar_block",
+            date: ghost.date,
+            time: ghost.start,
+            end_time: ghost.end,
+            kind: withCorey ? "corey" : "protected",
+            status: "tentative",
+            protected: true,
+            title,
+            source_agent: ghost.agent
+          }
+        });
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Corey" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Corey)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Corey" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        break;
+      }
+      case "move_task": {
+        steps.push({ target: "tasks", method: "PATCH", id: ghost.taskId, body: { due_date: ghost.to } });
+        steps.push(recentAction(actedOn, who, `moved \u201C${oneLine(ghost.title) || ghost.taskId}\u201D ${short(ghost.from)} \u2192 ${short(ghost.to)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${oneLine(ghost.title) || ghost.taskId}\u201D due ${formatDisplayDate(ghost.from)} \u2192 ${formatDisplayDate(ghost.to)}.`;
+        break;
+      }
+      case "create_task": {
+        const title = oneLine(ghost.title);
+        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        steps.push({ target: "tasks", method: "POST", body });
+        steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
+        break;
+      }
+      case "draft_message": {
+        steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
+        receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
+        break;
+      }
+      default:
+        throw new TypeError(`Unhandled ghost kind: ${ghost.kind}`);
+    }
+    return { ghostId: ghost.id, steps, receipt };
+  }
+
+  // packages/design-kit/js/hub-motion.js
+  var CARD_SELECTOR = [
+    ".metric-card",
+    ".week-card",
+    ".hub-card",
+    ".glass-panel",
+    ".glass-tile",
+    ".card",
+    ".sign-in__card",
+    ".mind-tile",
+    ".alchemist-card",
+    ".podcast-card",
+    ".wiki-card",
+    ".uni-tl__card",
+    ".quiz-card",
+    ".pcard"
+  ].join(",");
+  var MAGNET_SELECTOR = [
+    ".hub-pulse-card",
+    ".home-class-tile",
+    ".dashboard-overview__tile"
+  ].join(",");
+  var LIST_SELECTOR = [
+    ".logging-list",
+    ".meal-log",
+    ".cards",
+    ".nutrition-challenge-list",
+    "[data-hub-list]"
+  ].join(",");
+  var COUNT_SELECTOR = [
+    "[data-value]",
+    "[data-hub-count]",
+    "[data-percent]",
+    ".hub-pulse-card__count"
+  ].join(",");
+  function prefersReducedMotion(root2 = document) {
+    const view = root2.defaultView ?? globalThis;
+    return Boolean(view.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+  function isActiveHubPill(btn) {
+    if (!btn) return false;
+    return btn.classList.contains("is-active") || btn.classList.contains("is-selected") || btn.getAttribute("aria-selected") === "true" || btn.getAttribute("aria-checked") === "true" || btn.getAttribute("aria-pressed") === "true";
+  }
+  function isLoosePills(group) {
+    return group.classList.contains("hub-pills--loose") || group.getAttribute("data-hub-pills") === "loose";
+  }
+  function directChild(group, className) {
+    return [...group.children ?? []].find((node) => node.classList?.contains(className)) ?? null;
+  }
+  function hubPillsButtons(group) {
+    return [...group.children ?? []].filter((node) => node.classList?.contains("hub-pills__btn"));
+  }
+  function ensurePillThumb(group) {
+    let thumb = directChild(group, "hub-pills__thumb");
+    if (thumb) return thumb;
+    const doc = group.ownerDocument ?? document;
+    thumb = doc.createElement("span");
+    thumb.className = "hub-pills__thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    group.insertBefore(thumb, group.firstChild);
+    return thumb;
+  }
+  function applyHubPillsThumb(group, options = {}) {
+    if (!group?.style?.setProperty) return null;
+    if (isLoosePills(group)) {
+      group.classList.remove("is-ready", "is-animated");
+      directChild(group, "hub-pills__thumb")?.remove();
+      return null;
+    }
+    const buttons = hubPillsButtons(group);
+    if (buttons.length < 2) {
+      group.classList.remove("is-ready", "is-animated");
+      return null;
+    }
+    const active = buttons.find(isActiveHubPill);
+    if (!active) {
+      group.classList.remove("is-ready");
+      return null;
+    }
+    const missingThumb = !directChild(group, "hub-pills__thumb");
+    ensurePillThumb(group);
+    const box = {
+      x: `${active.offsetLeft}px`,
+      y: `${active.offsetTop}px`,
+      w: `${active.offsetWidth}px`,
+      h: `${active.offsetHeight}px`
+    };
+    group.style.setProperty("--hub-pill-x", box.x);
+    group.style.setProperty("--hub-pill-y", box.y);
+    group.style.setProperty("--hub-pill-w", box.w);
+    group.style.setProperty("--hub-pill-h", box.h);
+    group.classList.add("is-ready");
+    const reduced2 = options.reduced ?? prefersReducedMotion(group);
+    const animate = options.animate !== false && !reduced2 && !missingThumb;
+    group.classList.toggle("is-animated", animate);
+    return box;
+  }
+
+  // docs/proposals/calendar-reference/term-river/src/fixture.ts
+  var TODAY = "2026-09-24";
+  var TERMS = [
+    { term: 3, starts_on: "2026-07-21", ends_on: "2026-09-25" },
+    { term: 4, starts_on: "2026-10-13", ends_on: "2026-12-17" }
+  ];
+  var ZOOMS = {
+    term: { from: "2026-09-14", to: "2026-11-01", holidayFactor: 0.65 },
+    year: { from: "2026-07-20", to: "2027-01-10", holidayFactor: 0.5 }
+  };
+  var coreyEvenings = ["2026-09-14", "2026-09-16", "2026-09-17", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24"].map((d) => ({
+    id: `corey-${d}`,
+    title: "Tea + TV",
+    type: "calendar_block",
+    kind: "corey",
+    date: d,
+    start: "19:30",
+    end: "21:30",
+    shape: "point",
+    protected: true,
+    sample: true
+  }));
+  var ITEMS = [
+    // Teacher
+    { id: "accreditation", title: "Accreditation mentoring", type: "project", from: "2026-09-07", to: "2026-12-11", shape: "bar" },
+    { id: "un-voice", title: "UN Voice Competition 2026", type: "project", from: "2026-09-14", to: "2026-11-06", shape: "bar" },
+    { id: "tom", title: "Tournament of Minds", type: "project", from: "2026-09-01", to: "2026-10-03", shape: "bar", sub: "Finals 03/10" },
+    { id: "hpge", title: "HPGE policy", type: "project", from: "2026-07-20", to: "2026-11-20", shape: "bar" },
+    { id: "resource-day", title: "Resource day", type: "professional_event", date: "2026-09-21", start: "10:51", end: "14:50", shape: "point" },
+    { id: "pd", title: "PD \xB7 Hard conversations", type: "professional_event", date: "2026-09-25", start: "08:30", end: "10:30", shape: "point" },
+    { id: "t4-class", title: "Y11 becomes Y12 \xB7 one class", type: "marker", date: "2026-10-13", shape: "marker" },
+    { id: "reports", title: "Reports due", type: "task", date: "2026-11-27", shape: "point" },
+    // Corey
+    ...coreyEvenings,
+    { id: "good-night", title: "Good night: dinner out + a show", type: "calendar_block", kind: "corey", date: "2026-10-02", start: "18:00", end: "22:00", shape: "point", protected: true, sub: "held" },
+    {
+      id: "g-day-trip",
+      title: "Blue Mountains day trip",
+      kind: "corey",
+      with: "corey",
+      date: "2026-10-08",
+      start: "09:00",
+      end: "18:00",
+      shape: "point",
+      ghost: { agent: "hammond", kind: "protect_block", date: "2026-10-08", start: "09:00", end: "18:00", title: "Blue Mountains day trip", with: "corey" },
+      sub: "comforting adventure"
+    },
+    // Scholar
+    { id: "conferral", title: "UNSW conferral", kind: "event", tags: ["graduation"], date: "2026-09-30", shape: "diamond", sub: "Master of Gifted Education" },
+    { id: "uow", title: "UOW literacy elective", sub: "background hum, no alarms", from: "2026-07-20", to: "2027-01-10", shape: "hum" },
+    { id: "dream", title: "Hammond maps 2027\u201328 applications", kind: "dream", date: "2026-11-02", shape: "point" },
+    // Friends & family
+    {
+      id: "g-bob",
+      title: "Lunch with Bob",
+      date: "2026-09-28",
+      start: "12:00",
+      end: "14:00",
+      shape: "point",
+      ghost: { agent: "hammond", kind: "protect_block", date: "2026-09-28", start: "12:00", end: "14:00", title: "Lunch with Bob" }
+    },
+    {
+      id: "g-newcastle",
+      title: "Newcastle \xB7 friends",
+      date: "2026-10-05",
+      start: "08:00",
+      end: "21:00",
+      shape: "point",
+      ghost: { agent: "hammond", kind: "protect_block", date: "2026-10-05", start: "08:00", end: "21:00", title: "Newcastle \xB7 friends" }
+    },
+    // Body
+    { id: "gastro", title: "Gastro follow-up", type: "medical", date: "2026-09-24", start: "13:15", end: "14:15", shape: "point" },
+    { id: "symptom", title: "sore throat", symptom: true, kind: "health", date: "2026-09-24", shape: "marker" }
+  ];
+  var WALLS = [
+    { id: "korea", title: "Korea \xB7 23/12 \u2013 10/01", from: "2026-12-23", to: "2027-01-10" }
+  ];
+  var LOGGED = {
+    "2026-09-14": 62,
+    "2026-09-15": 60,
+    "2026-09-16": 58,
+    "2026-09-17": 55,
+    "2026-09-18": 52,
+    "2026-09-19": 65,
+    "2026-09-20": 68,
+    "2026-09-21": 79,
+    "2026-09-22": 51,
+    "2026-09-23": 42,
+    "2026-09-24": 34
+  };
+  var PATTERN = [
+    { from: "2026-10-13", to: "2026-12-17", delta: -12 },
+    { from: "2026-10-13", to: "2026-10-18", delta: -6 },
+    { from: "2026-11-16", to: "2026-11-29", delta: -16, label: "report-writing dip" },
+    { from: "2026-12-01", to: "2026-12-15", delta: 4 }
+  ];
+  var COMMITMENTS = [
+    { date: "2026-09-16", start: 15.5, end: 18, title: "Marking" },
+    { date: "2026-09-17", start: 15.5, end: 17.5, title: "UN Voice coaching" },
+    { date: "2026-09-21", start: 10.85, end: 14.83, title: "Resource day" },
+    { date: "2026-09-23", start: 15.67, end: 17.33, title: "Mark Y11 drafts" },
+    { date: "2026-09-24", start: 13.25, end: 14.25, title: "Gastro" },
+    { date: "2026-09-25", start: 8.5, end: 10.5, title: "PD" },
+    { date: "2026-10-03", start: 8, end: 16, title: "ToM finals" },
+    ...[13, 14, 15, 16, 20, 21, 22, 27, 28, 29].map((d) => ({ date: `2026-10-${d}`, start: 15.5, end: 18, title: "Y12 program" })),
+    ...[16, 17, 18, 19, 20, 23, 24, 25, 26].map((d) => ({ date: `2026-11-${d}`, start: 15.5, end: 20, title: "Reports" }))
+  ];
+
+  // docs/proposals/calendar-reference/term-river/src/river-ref.ts
+  var TR = {
+    labelW: 196,
+    // label column
+    padR: 24,
+    axis: { tiers: 30, weekLabel: 50, weekDate: 63, h: 76 },
+    lanes: { teacher: 160, corey: 76, scholar: 64, friends: 72, body: 104 },
+    load: 104,
+    bar: { h: 18, rx: 7, gap: 6 },
+    point: 5,
+    minWeekLabel: 46,
+    // below this week width, the axis shows months instead of weeks
+    zoomMs: 520,
+    // Term <-> Year: one tween of the zoom blend, EASE
+    revealMs: 700,
+    toastInMs: 220,
+    toastRise: 6,
+    toastHoldMs: 5200,
+    popMs: 180,
+    popRise: 4,
+    popWidth: 300,
+    popGap: 10,
+    saveLatencyMs: 350,
+    // PROTOTYPE ONLY: stands in for POST /api/calendar-ghosts
+    font: "500 11.5px Inter, ui-sans-serif, sans-serif",
+    barFont: "600 12px Inter, ui-sans-serif, sans-serif"
+  };
+  var DAY2 = 864e5;
+  var ms2 = (k) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10));
+  var key2 = (t) => new Date(t).toISOString().slice(0, 10);
+  var addDays = (k, n) => key2(ms2(k) + n * DAY2);
+  var inTerm2 = (d) => TERMS.some((t) => d >= t.starts_on && d <= t.ends_on);
+  var dd = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  var YEAR = ZOOMS.year;
+  var ALL_DAYS = [];
+  for (let d = YEAR.from; d <= YEAR.to; d = addDays(d, 1)) ALL_DAYS.push(d);
+  var lastLogged = Object.keys(LOGGED).sort().at(-1);
+  var pattern = (d) => PATTERN.filter((p) => d >= p.from && d <= p.to).reduce((a, p) => a + p.delta, 0);
+  var FUTURE = forecastSeries(ALL_DAYS.filter((d) => d > lastLogged), { lastPct: LOGGED[lastLogged], lastDate: lastLogged, isHoliday: (d) => !inTerm2(d), pattern });
+  var CAP = /* @__PURE__ */ new Map();
+  for (const d of ALL_DAYS) if (LOGGED[d] != null) CAP.set(d, { pct: LOGGED[d], forecast: false });
+  for (const p of FUTURE) CAP.set(p.date, { pct: p.pct, low: p.low, high: p.high, forecast: true });
+  var capFor = (d) => CAP.get(d)?.pct ?? 70;
+  var LOADS = weeklyLoad({ from: YEAR.from, to: YEAR.to, terms: TERMS, commitments: COMMITMENTS, capacityFor: capFor });
+  var GROUPED = byLane(ITEMS);
+  var WEEK_FONT = "600 12px Inter, ui-sans-serif, sans-serif";
+  var DATE_FONT = "400 11px Inter, ui-sans-serif, sans-serif";
+  var SCHOOL_WEEK = weeksBetween(TERMS[0].starts_on, TERMS[0].starts_on)[0];
+  var state = { zoom: "term", accepted: /* @__PURE__ */ new Set(), dismissed: /* @__PURE__ */ new Set(), phone: false };
+  var NS = "http://www.w3.org/2000/svg";
+  var engine;
+  var root;
+  var svg;
+  var W = 1e3;
+  var H = 600;
+  var toastTimer = 0;
+  var popFor = null;
+  var mountOptions = {};
+  var nodes = /* @__PURE__ */ new Map();
+  var placers = [];
+  var measureCtx = document.createElement("canvas").getContext("2d");
+  var measured = /* @__PURE__ */ new Map();
+  function textW(t, font) {
+    const k = `${font}|${t}`;
+    let w = measured.get(k);
+    if (w == null) {
+      measureCtx.font = font;
+      w = measureCtx.measureText(t).width;
+      measured.set(k, w);
+    }
+    return w;
+  }
+  function fitText(t, max, font = TR.font) {
+    if (max <= 12) return "";
+    if (textW(t, font) <= max) return t;
+    let lo = 0, hi = t.length;
+    while (lo < hi) {
+      const mid = lo + hi + 1 >> 1;
+      if (textW(t.slice(0, mid).trimEnd() + "\u2026", font) <= max) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo > 0 ? t.slice(0, lo).trimEnd() + "\u2026" : "";
+  }
+  function el(tag, cls, html, parent, attrs = {}) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    parent?.appendChild(n);
+    return n;
+  }
+  function s(tag, attrs, parent, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    if (text != null) n.textContent = text;
+    parent.appendChild(n);
+    return n;
+  }
+  var set = (n, a) => {
+    for (const [k, v] of Object.entries(a)) n.setAttribute(k, typeof v === "number" ? v.toFixed(1) : v);
+  };
+  function scaleFor(zoom) {
+    const z = ZOOMS[zoom];
+    const unit = buildTimeScale({ start: YEAR.from, end: addDays(YEAR.to, 1), terms: TERMS, dayWidth: 1, holidayFactor: z.holidayFactor });
+    const x0 = unit.x(z.from);
+    const span = unit.x(addDays(z.to, 1)) - x0;
+    const plot = W - TR.labelW - TR.padR;
+    return (d) => TR.labelW + (unit.x(d) - x0) / span * plot;
+  }
+  function mount(host, options = mountOptions, { entrance = true } = {}) {
+    mountOptions = options;
+    engine?.dispose();
+    nodes.clear();
+    placers = [];
+    host.replaceChildren();
+    state.phone = matchMedia("(max-width: 719px)").matches;
+    root = el("section", "tr", void 0, host, { "data-part": "term-river", "aria-label": "Term" });
+    const nav = el("header", "tr__nav", void 0, root, { "data-part": "nav" });
+    el("button", "tr__round", '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>', nav, { type: "button", "aria-label": "Earlier" });
+    const period = el("div", "tr__period", "", nav, { "data-part": "period" });
+    nodes.set("period", period);
+    el("button", "tr__round", '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>', nav, { type: "button", "aria-label": "Later" });
+    el("button", "btn btn--secondary", "Today", nav, { type: "button" });
+    const zoom = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', nav, { role: "group", "aria-label": "Zoom", "data-part": "zoom-pills" });
+    for (const z of ["Day", "Week", "Term", "Year", "Almanac"]) {
+      const on = z.toLowerCase() === state.zoom;
+      el("button", `hub-pills__btn${on ? " is-active" : ""}`, z, zoom, { type: "button", "aria-pressed": String(on), ...z === "Term" || z === "Year" ? { "data-zoom": z.toLowerCase() } : {} });
+    }
+    nodes.set("zoom", zoom);
+    const card = el("div", "tr__card", void 0, root, { "data-part": "card" });
+    if (state.phone) mountList(card);
+    else mountChart(card);
+    mountLegend(card);
+    nodes.set("__toast", el("div", "tr-toast", "", root, { role: "status", "aria-live": "polite", "data-part": "toast" }));
+    nodes.set("__pop", el("div", "tr-pop", "", root, { role: "dialog", "data-part": "popover", hidden: "" }));
+    nodes.set("__live", el("div", "tr-sr", "", root, { "aria-live": "polite", "data-part": "announcer" }));
+    engine = createMotion({ apply, clock: options.clock, reducedMotion: options.reducedMotion });
+    engine.place("__toast", { opacity: 0, y: TR.toastRise });
+    engine.place("__pop", { opacity: 0, y: TR.popRise });
+    engine.place("__zoom", { t: state.zoom === "year" ? 1 : 0 });
+    if (!state.phone) {
+      if (entrance) {
+        engine.place("__reveal", { w: 0 });
+        engine.to("__reveal", { w: W }, { duration: TR.revealMs, easing: EASE });
+      } else engine.place("__reveal", { w: W });
+    }
+    updatePeriod();
+    requestAnimationFrame(() => applyHubPillsThumb(zoom));
+    wire(root);
+  }
+  function mountChart(card) {
+    W = Math.round(card.clientWidth);
+    const laneTops = {};
+    let y = TR.axis.h;
+    for (const l of LANES) {
+      laneTops[l.id] = y;
+      y += TR.lanes[l.id];
+    }
+    const loadTop = y + 8;
+    H = loadTop + TR.load;
+    svg = document.createElementNS(NS, "svg");
+    set(svg, { class: "tr-chart", viewBox: `0 0 ${W} ${H}`, width: String(W), height: String(H), role: "img", "data-part": "chart", "aria-label": "Term River: your identities as lanes across the term, with capacity and weekly load" });
+    card.appendChild(svg);
+    const defs = s("defs", {}, svg);
+    const clip = s("clipPath", { id: "tr-plot" }, defs);
+    nodes.set("plotclip", s("rect", { x: TR.labelW, y: 0, width: 0, height: H }, clip));
+    const plot = s("g", { "clip-path": "url(#tr-plot)" }, svg);
+    const labels = s("g", {}, svg);
+    const back = s("g", { class: "tr-back" }, plot);
+    const runs = [];
+    let run = null;
+    for (const d of ALL_DAYS) {
+      if (!inTerm2(d) && run == null) run = d;
+      if (inTerm2(d) && run != null) {
+        runs.push({ from: run, to: addDays(d, -1) });
+        run = null;
+      }
+    }
+    if (run) runs.push({ from: run, to: YEAR.to });
+    for (const r of runs) {
+      const n = s("rect", { class: "tr-holiday", y: TR.axis.tiers - 2, height: H - TR.axis.tiers + 2 }, back);
+      placers.push((X) => set(n, { x: X(r.from), width: Math.max(0, X(addDays(r.to, 1)) - X(r.from)) }));
+    }
+    for (const w of WALLS) {
+      const n = s("rect", { class: "tr-wall", y: TR.axis.h, height: loadTop - TR.axis.h, "data-part": "wall" }, back);
+      placers.push((X) => set(n, { x: X(w.from), width: Math.max(0, X(addDays(w.to, 1)) - X(w.from)) }));
+    }
+    const tiers = [
+      { from: "2026-07-21", to: "2026-09-25", label: "TERM 3", cls: "is-term" },
+      { from: "2026-09-26", to: "2026-10-12", label: "HOLIDAYS", cls: "is-hol" },
+      { from: "2026-10-13", to: "2026-12-17", label: "TERM 4 \xB7 ONE CLASS", cls: "is-term" },
+      { from: "2026-12-18", to: YEAR.to, label: "SUMMER", cls: "is-hol" }
+    ];
+    for (const t of tiers) {
+      const r = s("rect", { class: `tr-tier ${t.cls}`, y: TR.axis.tiers - 22, height: 18, rx: 6 }, plot);
+      const tx = s("text", { class: `tr-t-tier ${t.cls}`, y: TR.axis.tiers - 9 }, plot);
+      placers.push((X) => {
+        const a = X(t.from), b = X(addDays(t.to, 1));
+        set(r, { x: a + 2, width: Math.max(0, b - a - 4) });
+        const vis = Math.max(a, TR.labelW) + 10;
+        set(tx, { x: vis });
+        tx.textContent = fitText(t.label, Math.min(b, W - TR.padR) - vis - 8, "600 10.5px Inter, sans-serif");
+      });
+    }
+    const weeks = weeksBetween(YEAR.from, YEAR.to);
+    for (const wk of weeks) {
+      const line = s("line", { class: "tr-weekline", y1: TR.axis.tiers + 4, y2: H }, plot);
+      const lab = s("text", { class: "tr-t-week", y: TR.axis.weekLabel }, plot, riverWeekLabel(wk, TERMS));
+      const date = s("text", { class: "tr-t-sub", y: TR.axis.weekDate }, plot, dd(wk));
+      placers.push((X, weekW) => {
+        const x = X(wk);
+        set(line, { x1: x, x2: x });
+        const own = X(addDays(wk, 7)) - x;
+        const room = own - 8;
+        const full = riverWeekLabel(wk, TERMS);
+        const short2 = full.replace(/^Hol W/, "H").replace(/^T\d /, "");
+        const fits = (t, font) => textW(t, font) <= room;
+        lab.textContent = fits(full, WEEK_FONT) ? full : short2;
+        const inPlot = weekW >= TR.minWeekLabel && x >= TR.labelW && x + own <= W - TR.padR + 1;
+        const show = inPlot && fits(lab.textContent, WEEK_FONT);
+        set(lab, { x: x + 6, opacity: show ? 1 : 0 });
+        set(date, { x: x + 6, opacity: show && fits(date.textContent, DATE_FONT) ? 1 : 0 });
+      });
+    }
+    const months = ["2026-08-01", "2026-09-01", "2026-10-01", "2026-11-01", "2026-12-01", "2027-01-01"];
+    for (const m of months) {
+      const name = new Intl.DateTimeFormat("en-AU", { month: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${m}T00:00:00Z`));
+      const lab = s("text", { class: "tr-t-week", y: TR.axis.weekLabel + 6 }, plot, name);
+      placers.push((X, weekW) => set(lab, { x: X(m) + 4, opacity: weekW < TR.minWeekLabel && X(m) >= TR.labelW && X(m) + 30 <= W - TR.padR ? 1 : 0 }));
+    }
+    s("line", { class: "tr-rule", x1: 0, x2: W, y1: TR.axis.h, y2: TR.axis.h }, svg);
+    for (const lane of LANES) {
+      const top = laneTops[lane.id];
+      const h = TR.lanes[lane.id];
+      if (lane.id === "corey") s("rect", { class: "tr-lane-wash", x: 0, y: top, width: W, height: h }, svg).parentNode.insertBefore(svg.lastChild, svg.firstChild);
+      s("line", { class: "tr-rule", x1: 0, x2: W, y1: top + h, y2: top + h }, svg);
+      s("text", { class: `tr-t-lane${lane.id === "corey" ? " is-corey" : ""}`, x: 18, y: top + 24 }, labels, lane.label);
+      s("text", { class: "tr-t-sub", x: 18, y: top + 40 }, labels, lane.sub);
+      const g = s("g", { "data-part": "lane", "data-lane": lane.id }, plot);
+      if (lane.id === "body") mountBody(g, top, h);
+      mountLaneItems(g, lane.id, top, h);
+    }
+    s("text", { class: "tr-t-lane", x: 18, y: loadTop + 24 }, labels, "Load");
+    s("text", { class: "tr-t-sub", x: 18, y: loadTop + 40 }, labels, "booked h vs capacity");
+    const lg = s("g", { "data-part": "load" }, plot);
+    const base = loadTop + TR.load - 14;
+    const maxH = TR.load - 34;
+    const peak = Math.max(...LOADS.map((l) => Math.max(l.booked, l.capacity)), 1);
+    for (const l of LOADS) {
+      const bar = s("rect", { class: `tr-load${l.over ? " is-over" : ""}${l.holiday ? " is-hol" : ""}`, rx: 4, "data-part": "load-week", "data-week": l.week, "data-over": String(l.over) }, lg);
+      const cap = s("line", { class: "tr-cap" }, lg);
+      const val = s("text", { class: `tr-t-load${l.over ? " is-over" : ""}` }, lg);
+      placers.push((X, weekW) => {
+        const a = X(l.week) + 4, b = X(addDays(l.week, 7)) - 4;
+        const hB = l.booked / peak * maxH, hC = l.capacity / peak * maxH;
+        set(bar, { x: a, width: Math.max(0, b - a), y: base - hB, height: hB });
+        set(cap, { x1: a - 2, x2: b + 2, y1: base - hC, y2: base - hC });
+        set(val, { x: (a + b) / 2, y: base - Math.max(hB, hC) - 6 });
+        const inside = a >= TR.labelW && b <= W - TR.padR;
+        val.textContent = inside && weekW >= 40 && l.booked > 0 ? `${l.booked} h${l.over ? " \xB7 over" : ""}` : "";
+      });
+    }
+    const today = s("g", { class: "tr-today", "data-part": "today" }, plot);
+    const tl = s("line", { y1: TR.axis.tiers + 4, y2: H }, today);
+    const tr = s("rect", { y: TR.axis.h - 9, width: 52, height: 18, rx: 9 }, today);
+    const tt = s("text", { y: TR.axis.h + 4 }, today, "Today");
+    placers.push((X) => {
+      const x = X(TODAY) + 0.5 * (X(addDays(TODAY, 1)) - X(TODAY));
+      set(tl, { x1: x, x2: x });
+      set(tr, { x: x - 26 });
+      set(tt, { x });
+    });
+  }
+  function mountLaneItems(g, laneId, top, h) {
+    const items = GROUPED[laneId].filter((i) => !(i.ghost && state.dismissed.has(i.id)));
+    const bars = items.filter((i) => i.shape === "bar");
+    bars.forEach((it, row) => {
+      const y = top + 12 + row * (TR.bar.h + TR.bar.gap);
+      const r = s("rect", { class: `tr-bar k-${laneId}`, y, height: TR.bar.h, rx: TR.bar.rx, tabindex: 0, role: "button", "data-part": "item", "data-id": it.id, "aria-label": `${it.title}, ${dd(it.from)} \u2013 ${dd(it.to)}` }, g);
+      const t = s("text", { class: "tr-t-bar", y: y + 13 }, g);
+      placers.push((X) => {
+        const a = X(it.from), b = X(addDays(it.to, 1));
+        set(r, { x: a, width: Math.max(0, b - a) });
+        const vis = Math.max(a, TR.labelW) + 8;
+        set(t, { x: vis });
+        t.textContent = fitText(it.title, Math.min(b, W - TR.padR) - vis - 8, TR.barFont);
+      });
+    });
+    const points = items.filter((i) => i.shape !== "bar").sort((a, b) => (a.date ?? a.from ?? "").localeCompare(b.date ?? b.from ?? ""));
+    const cy = top + (bars.length ? 12 + bars.length * (TR.bar.h + TR.bar.gap) + 22 : h / 2 + 2);
+    const labelled = points.filter((p) => !p.sample && p.shape !== "hum");
+    points.forEach((it) => {
+      if (it.shape === "hum") {
+        const line = s("line", { class: "tr-hum", y1: cy, y2: cy }, g);
+        const t = s("text", { class: "tr-t-hum", y: cy + 18 }, g);
+        const below = labelled.filter((_, k2) => k2 % 2 === 1);
+        placers.push((X) => {
+          const a = Math.max(X(it.from), TR.labelW);
+          set(line, { x1: a, x2: X(addDays(it.to, 1)) });
+          set(t, { x: a + 8 });
+          const limit = Math.min(W - TR.padR, ...below.map((p) => X(p.date)).filter((x) => x > a + 8).map((x) => x - 10));
+          t.textContent = fitText(`${it.title} \xB7 ${it.sub}`, limit - (a + 8), "400 11px Inter, ui-sans-serif, sans-serif");
+        });
+        return;
+      }
+      const ghost = it.ghost && !state.accepted.has(it.id);
+      const cls = ["tr-point", `k-${laneId}`, it.shape === "diamond" ? "is-diamond" : "", it.shape === "marker" ? "is-marker" : "", ghost ? "is-ghost" : "", it.sample ? "is-sample" : "", it.sub === "held" || it.ghost && state.accepted.has(it.id) ? "is-held" : ""].join(" ");
+      const n = it.shape === "marker" ? s("line", { class: cls, y1: cy - 10, y2: cy + 10, "data-part": "item", "data-id": it.id }, g) : it.shape === "diamond" ? s("rect", { class: cls, width: 12, height: 12, rx: 2, tabindex: 0, role: "button", "data-part": "item", "data-id": it.id, "aria-label": it.title }, g) : s("circle", { class: cls, r: it.sample ? 3.5 : TR.point + (ghost ? 1 : 0), cy, tabindex: it.sample ? -1 : 0, role: "button", "data-part": it.ghost && ghost ? "ghost" : "item", "data-id": it.id, "aria-label": `${it.title}${it.date ? `, ${dd(it.date)}` : ""}${ghost ? ". Proposal from Hammond." : ""}` }, g);
+      const chip = ghost ? s("g", { class: "tr-agent" }, g) : null;
+      if (chip) {
+        s("circle", { r: 7 }, chip);
+        s("text", { y: 3.5 }, chip, "H");
+      }
+      let label = null;
+      const k = labelled.indexOf(it);
+      const above = k % 2 === 0;
+      if (k >= 0) label = s("text", { class: `tr-t-point${it.shape === "diamond" ? " is-gold" : ""}${laneId === "corey" ? " is-corey" : ""}`, y: above ? cy - 19 : cy + 20 }, g);
+      placers.push((X) => {
+        const x = X(it.date) + 0.5 * (X(addDays(it.date, 1)) - X(it.date));
+        if (it.shape === "marker") set(n, { x1: x, x2: x });
+        else if (it.shape === "diamond") set(n, { x: x - 6, y: cy - 6, transform: `rotate(45 ${x.toFixed(1)} ${cy})` });
+        else set(n, { cx: x });
+        if (chip) {
+          const prev = points.slice(0, points.indexOf(it)).reverse().find((p) => p.ghost && !state.accepted.has(p.id) && p.date);
+          const crowded = prev && x - X(prev.date) < 18;
+          set(chip, { transform: `translate(${(x + 9).toFixed(1)} ${(cy - 8).toFixed(1)})`, opacity: crowded ? 0 : 1 });
+        }
+        if (label) {
+          const next = labelled.slice(k + 2).find(Boolean);
+          const limit = next ? X(next.date) - 10 : W - TR.padR;
+          set(label, { x: x + (it.shape === "marker" ? 5 : 9) });
+          label.textContent = fitText(it.title, limit - (x + 9));
+        }
+      });
+    });
+  }
+  function mountBody(g, top, h) {
+    const base = top + h - 12;
+    const Y = (v) => base - v / 100 * (h - 26);
+    const band = s("path", { class: "tr-band" }, g);
+    const past = s("path", { class: "tr-line" }, g);
+    const future = s("path", { class: "tr-line is-forecast" }, g);
+    const soften = s("line", { class: "tr-soften", y1: Y(40), y2: Y(40) }, g);
+    const lab = s("text", { class: "tr-t-soften", y: Y(40) - 4, "text-anchor": "end" }, g, "40%");
+    placers.push((X) => {
+      const mid = (d) => X(d) + 0.5 * (X(addDays(d, 1)) - X(d));
+      const pts = ALL_DAYS.map((d) => [mid(d), Y(capFor(d)), CAP.get(d)]);
+      const p = pts.filter((_, i) => ALL_DAYS[i] <= lastLogged).map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+      const fIdx = ALL_DAYS.findIndex((d) => d >= lastLogged);
+      const f = pts.slice(fIdx).map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+      const fut = pts.slice(fIdx + 1);
+      const up = fut.map(([x, , c], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${Y(c?.high ?? 0).toFixed(1)}`).join(" ");
+      const dn = [...fut].reverse().map(([x, , c]) => `L${x.toFixed(1)} ${Y(c?.low ?? 0).toFixed(1)}`).join(" ");
+      set(past, { d: p });
+      set(future, { d: f });
+      set(band, { d: fut.length ? `${up} ${dn} Z` : "" });
+      set(soften, { x1: TR.labelW, x2: W - TR.padR });
+      set(lab, { x: W - TR.padR - 2 });
+    });
+  }
+  function mountLegend(card) {
+    el("div", "tr-legend", `<span><i class="lg-school"></i>School day</span><span><i class="lg-wall"></i>Wall (trips)</span><span><i class="lg-ghost"></i>Agent proposal</span><span><i class="lg-over"></i>Over capacity</span><span class="tr-legend__note">Holidays are shown narrower, not squashed: they're where your life happens.</span>`, card, { "data-part": "legend" });
+  }
+  function mountList(card) {
+    const list = el("div", "tr-list", void 0, card, { "data-part": "lane-list" });
+    const z = ZOOMS[state.zoom];
+    for (const lane of LANES) {
+      const items = GROUPED[lane.id].filter((i) => !i.sample && i.shape !== "hum" && (i.date && i.date >= z.from && i.date <= z.to || i.from && i.to && i.to >= z.from && i.from <= z.to));
+      const sec = el("section", `tr-list__lane is-${lane.id}`, `<h3>${lane.label}</h3><p>${lane.sub}</p>`, list, { "data-part": "lane", "data-lane": lane.id });
+      if (lane.id === "body") {
+        const now = capFor(TODAY);
+        el("p", "tr-list__body", `Today ${now}% \xB7 forecast ${capFor(addDays(TODAY, 7))}% next week`, sec);
+      }
+      for (const it of items) {
+        const ghost = it.ghost && !state.accepted.has(it.id) && !state.dismissed.has(it.id);
+        el("button", `tr-list__item${ghost ? " is-ghost" : ""}`, `<span class="tr-list__t">${it.title}</span><span class="tr-list__d">${it.date ? dd(it.date) : `${dd(it.from)} \u2013 ${dd(it.to)}`}</span>`, sec, { type: "button", "data-part": ghost ? "ghost" : "item", "data-id": it.id });
+      }
+    }
+  }
+  var blendT = 0;
+  function apply(id, p) {
+    if (id === "__zoom") {
+      blendT = p.t;
+      if (state.phone) return;
+      const A = scaleFor("term"), B = scaleFor("year");
+      const X = (d) => A(d) + (B(d) - A(d)) * blendT;
+      const weekW = X(addDays(SCHOOL_WEEK, 7)) - X(SCHOOL_WEEK);
+      for (const place of placers) place(X, weekW);
+      return;
+    }
+    if (id === "__reveal") {
+      const r = nodes.get("plotclip");
+      if (r) set(r, { width: Math.max(0, Math.min(p.w, W - TR.padR) - TR.labelW) });
+      return;
+    }
+    if (id === "__toast" || id === "__pop") {
+      const n = nodes.get(id);
+      n.style.opacity = String(p.opacity);
+      n.style.transform = `translateY(${p.y}px)`;
+    }
+  }
+  function updatePeriod() {
+    const z = ZOOMS[state.zoom];
+    const title = state.zoom === "term" ? "Term 3 \u2192 Term 4" : "2026 \xB7 Term 3 to home from Korea";
+    nodes.get("period").innerHTML = `<b>${title}</b><span>${riverWeekLabel(weeksBetween(z.from, z.from)[0], TERMS)} \u2013 ${riverWeekLabel(weeksBetween(z.to, z.to)[0], TERMS)} \xB7 ${dd(z.from)}/${z.from.slice(2, 4)} \u2013 ${dd(z.to)}/${z.to.slice(2, 4)}</span>`;
+  }
+  function setZoom(z) {
+    if (z === state.zoom) return;
+    state.zoom = z;
+    const zoom = nodes.get("zoom");
+    zoom.querySelectorAll(".hub-pills__btn").forEach((b) => {
+      const on = b.dataset.zoom === z;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+    zoom.classList.add("is-animated");
+    applyHubPillsThumb(zoom);
+    if (state.phone) {
+      mount(root.parentElement, mountOptions, { entrance: false });
+      return;
+    }
+    engine.to("__zoom", { t: z === "year" ? 1 : 0 }, { duration: TR.zoomMs, easing: EASE });
+    updatePeriod();
+    nodes.get("__live").textContent = z === "year" ? "Year view." : "Term view.";
+  }
+  function showToast(html) {
+    const t = nodes.get("__toast");
+    t.innerHTML = html;
+    engine.to("__toast", { opacity: 1, y: 0 }, { duration: TR.toastInMs });
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => engine.to("__toast", { opacity: 0, y: TR.toastRise }, { duration: TR.toastInMs }), TR.toastHoldMs);
+  }
+  var ghostFor = (it) => it.ghost ? { id: it.id, ...it.ghost } : null;
+  function openPop(itemId) {
+    const it = ITEMS.find((i) => i.id === itemId);
+    const pop = nodes.get("__pop");
+    if (!it) return;
+    const when = it.date ? dd(it.date) : `${dd(it.from)} \u2013 ${dd(it.to)}`;
+    const lane = LANES.find((l) => GROUPED[l.id].includes(it));
+    let html = `<b>${it.title}</b><p class="tr-pop__meta">${when} \xB7 ${lane.label}${it.sub && it.sub !== "held" ? ` \xB7 ${it.sub}` : ""}</p>`;
+    const g = ghostFor(it);
+    if (g && !state.accepted.has(it.id)) {
+      html += `<p class="tr-pop__label">Hammond suggests \xB7 Accept writes</p><p class="tr-pop__writes" data-part="write-preview">${acceptPlan(g, { today: TODAY }).receipt}</p>`;
+      html += `<div class="tr-pop__acts"><button type="button" class="btn btn--primary" data-accept="${it.id}">Accept</button><button type="button" class="btn btn--ghost" data-dismiss="${it.id}">Dismiss</button></div>`;
+    }
+    pop.innerHTML = html;
+    pop.hidden = false;
+    const r = root.getBoundingClientRect();
+    const b = root.querySelector(`[data-id="${itemId}"]`).getBoundingClientRect();
+    const left = r.right - b.right > TR.popWidth + TR.popGap ? b.right - r.left + TR.popGap : b.left - r.left - TR.popWidth - TR.popGap;
+    pop.style.left = `${Math.max(0, left)}px`;
+    pop.style.top = `${b.bottom - r.top + 6}px`;
+    popFor = itemId;
+    engine.place("__pop", { opacity: 0, y: TR.popRise });
+    engine.to("__pop", { opacity: 1, y: 0 }, { duration: TR.popMs });
+  }
+  function closePop() {
+    if (!popFor) return;
+    popFor = null;
+    engine.to("__pop", { opacity: 0, y: TR.popRise }, { duration: TR.popMs });
+    window.setTimeout(() => {
+      if (!popFor) nodes.get("__pop").hidden = true;
+    }, TR.popMs);
+  }
+  var wait = (n) => new Promise((r) => setTimeout(r, n));
+  async function decide(itemId, decision) {
+    const it = ITEMS.find((i) => i.id === itemId);
+    const g = it && ghostFor(it);
+    if (!g || state.accepted.has(itemId) || state.dismissed.has(itemId)) return;
+    closePop();
+    const plan = decision === "accept" ? acceptPlan(g, { today: TODAY }) : null;
+    await wait(TR.saveLatencyMs);
+    (decision === "accept" ? state.accepted : state.dismissed).add(itemId);
+    mount(root.parentElement, mountOptions, { entrance: false });
+    showToast(plan ? `<b>Written.</b> ${plan.receipt}` : "<b>Dismissed.</b> Nothing written.");
+  }
+  function wire(r) {
+    r.addEventListener("click", (e) => {
+      const t = e.target;
+      const acc = t.closest("[data-accept]");
+      if (acc) return void decide(acc.dataset.accept, "accept");
+      const dis = t.closest("[data-dismiss]");
+      if (dis) return void decide(dis.dataset.dismiss, "dismiss");
+      const z = t.closest("[data-zoom]");
+      if (z) return setZoom(z.dataset.zoom);
+      const item = t.closest('[data-part="item"],[data-part="ghost"]');
+      if (item && !item.classList.contains("is-sample")) {
+        const id = item.getAttribute("data-id");
+        return id === popFor ? closePop() : openPop(id);
+      }
+      if (!t.closest('[data-part="popover"]')) closePop();
+    });
+    r.addEventListener("keydown", (e) => {
+      const t = e.target;
+      if (e.key === "Escape") closePop();
+      if ((e.key === "Enter" || e.key === " ") && t.getAttribute?.("data-part") && ["item", "ghost"].includes(t.getAttribute("data-part"))) {
+        openPop(t.getAttribute("data-id"));
+        e.preventDefault();
+      }
+      if (e.key === "+") setZoom("term");
+      if (e.key === "-") setZoom("year");
+    });
+  }
+  var slow = 1;
+  var reduced = false;
+  var clock = { now: () => performance.now() / slow, request: (cb) => requestAnimationFrame(cb), cancel: (id) => cancelAnimationFrame(id) };
+  function boot() {
+    const host = document.getElementById("app");
+    const start = (entrance = true) => mount(host, { clock, reducedMotion: () => reduced || matchMedia("(prefers-reduced-motion: reduce)").matches }, { entrance });
+    (document.fonts?.ready ?? Promise.resolve()).then(() => start(true));
+    document.getElementById("ref-reset")?.addEventListener("click", () => {
+      state.accepted.clear();
+      state.dismissed.clear();
+      state.zoom = "term";
+      start(true);
+    });
+    document.getElementById("ref-slow")?.addEventListener("click", (e) => {
+      slow = slow === 1 ? 5 : 1;
+      e.currentTarget.setAttribute("aria-pressed", String(slow === 5));
+    });
+    document.getElementById("ref-reduced")?.addEventListener("click", (e) => {
+      reduced = !reduced;
+      e.currentTarget.setAttribute("aria-pressed", String(reduced));
+    });
+    let lastW = 0;
+    new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (lastW && Math.abs(w - lastW) > 2) requestAnimationFrame(() => start(false));
+      lastW = w;
+    }).observe(host);
+    window.__termRiver = { state, TR, loads: LOADS, lanes: () => Object.fromEntries(Object.entries(GROUPED).map(([k, v]) => [k, v.map((i) => i.id)])), setZoom, decide, openPop, closePop, finish: () => engine.finish(), stats: () => engine.stats(), blend: () => blendT };
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
