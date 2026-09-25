@@ -5,6 +5,7 @@ import { load } from 'js-yaml';
 import { buildHomeModel } from '../../apps/life/js/app/home-model.js';
 import {
   MAX_LOOKBACK_DAYS,
+  INITIAL_LOOKAHEAD_DAYS,
   loadLiveEvents as loadLiveEventsRaw,
   planBackfillWindows
 } from '../../apps/life/js/app/load-live-events.js';
@@ -13,6 +14,8 @@ function loadLiveEvents(opts) {
   return loadLiveEventsRaw({ maxLookbackDays: 40, ...opts });
 }
 import { addCalendarDays, daysBetween } from '../../apps/life/js/core/time.js';
+
+const firstTo = date => addCalendarDays(date, INITIAL_LOOKAHEAD_DAYS);
 
 const SHA = 'a'.repeat(40);
 const raw = (path, content) => ({ path, sha: SHA, content });
@@ -61,7 +64,7 @@ test('loads the current Sydney date window through existing parsers and exact Ho
     calls.push(options);
     for (const candidate of files) assert.deepEqual(options.validateFile(candidate), { valid: true });
     return {
-      files: options.to === date ? files : [],
+      files: options.to === firstTo(date) ? files : [],
       warnings: [],
       commitSha: 'c'.repeat(40),
       manifestId: 'range',
@@ -75,7 +78,7 @@ test('loads the current Sydney date window through existing parsers and exact Ho
 
   assert.equal(calls.length, 3);
   assert.equal(calls[0].from, '2026-07-24');
-  assert.equal(calls[0].to, '2026-07-30');
+  assert.equal(calls[0].to, firstTo('2026-07-30'));
   assert.equal(calls[1].from, '2026-06-24');
   assert.equal(calls[1].to, '2026-07-23');
   // The last window is clamped to the 40-day cap rather than skipped.
@@ -145,7 +148,7 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
   const olderFiles = [bodyWeight('2026-07-01', 83)];
   const sync = async options => {
     calls.push({ from: options.from, to: options.to });
-    const files = options.to === date ? weekFiles
+    const files = options.to === firstTo(date) ? weekFiles
       : calls.length === 2 ? olderFiles
       : [];
     return {
@@ -159,9 +162,9 @@ test('first sync is seven inclusive days and the next slice does not overlap', a
   });
 
   assert.equal(calls.length, 3);
-  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
-  assert.ok(calls.every(call => call.to < calls[0].from || call === calls[0] || call.to === date));
+  assert.ok(calls.every(call => call.to < calls[0].from || call === calls[0] || call.to === firstTo(date)));
   assert.equal(calls[1].to, '2026-07-25');
   assert.ok(partials.length >= 1);
   assert.equal(partials[0].events.every(event => event.record.date >= '2026-07-26'), true);
@@ -174,7 +177,7 @@ test('onPartial fires after the first window before older files exist', async ()
   const gate = new Promise(resolve => { release = resolve; });
   let olderCalls = 0;
   const sync = async ({ from, to }) => {
-    if (to !== date) {
+    if (to !== firstTo(date)) {
       olderCalls += 1;
       if (olderCalls === 1) await gate;
       if (olderCalls > 1) {
@@ -185,7 +188,7 @@ test('onPartial fires after the first window before older files exist', async ()
       }
     }
     return {
-      files: [bodyWeight(to === date ? date : '2026-07-01', 80)],
+      files: [bodyWeight(to === firstTo(date) ? date : '2026-07-01', 80)],
       warnings: [], commitSha: 'c'.repeat(40), manifestId: `${from}`,
       changed: true, freshness: 'confirmed'
     };
@@ -207,7 +210,7 @@ test('a config-only older slice still extends until the lookback cap', async () 
   const calls = [];
   const sync = async options => {
     calls.push(options);
-    const files = options.to === date
+    const files = options.to === firstTo(date)
       ? [bodyWeight(date, 80)]
       : [raw('config/targets.yml', 'target_sets: []\n')];
     return {
@@ -243,7 +246,7 @@ test('repeated boundary expansion never sends an individual range over 366 days'
   await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', maxLookbackDays: 160 });
 
   assert.ok(calls.every(call => daysBetween(call.from, call.to) < 366));
-  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
   assert.deepEqual(calls[1], { from: '2026-06-26', to: '2026-07-25' });
   // Windows widen as they go back, and the oldest one lands exactly on the cap.
   assert.ok(daysBetween(calls[2].from, calls[2].to) > daysBetween(calls[1].from, calls[1].to));
@@ -278,7 +281,7 @@ test('older windows are fetched concurrently but ingested oldest-last', async ()
     started.push(from);
     live += 1;
     peak = Math.max(peak, live);
-    if (to !== date) await new Promise(resolve => finish.set(from, resolve));
+    if (to !== firstTo(date)) await new Promise(resolve => finish.set(from, resolve));
     live -= 1;
     return {
       files: [bodyWeight(to, 80)], warnings: [], commitSha: 'c'.repeat(40),
@@ -309,7 +312,7 @@ test('a failing window waits for its concurrent siblings before rejecting', asyn
   const release = [];
   let settled = 0;
   const sync = async ({ to }) => {
-    if (to === date) {
+    if (to === firstTo(date)) {
       return {
         files: [bodyWeight(date, 80)], warnings: [], commitSha: 'c'.repeat(40),
         manifestId: to, changed: true, freshness: 'confirmed'
@@ -340,7 +343,7 @@ test('a window that adds nothing does not trigger another parse and repaint', as
     return load(content);
   };
   const sync = async ({ to }) => ({
-    files: to === date ? [bodyWeight(date, 80)] : [],
+    files: to === firstTo(date) ? [bodyWeight(date, 80)] : [],
     warnings: [], commitSha: 'c'.repeat(40), manifestId: to, changed: false, freshness: 'confirmed'
   });
 
@@ -419,7 +422,7 @@ test('backfill: false syncs only the first seven-day window', async () => {
   await loadLiveEvents({ sync, loadYaml: load, date, backfill: false });
 
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0], { from: '2026-07-26', to: '2026-08-01' });
+  assert.deepEqual(calls[0], { from: '2026-07-26', to: firstTo('2026-08-01') });
 });
 
 test('rejects invalid dates before starting repository sync', async () => {
