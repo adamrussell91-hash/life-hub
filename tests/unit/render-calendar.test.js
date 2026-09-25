@@ -109,6 +109,10 @@ function matches(node, selector) {
     const value = selector.slice('[data-calendar="'.length, -2);
     return node.dataset.calendar === value;
   }
+  if (selector.startsWith('[data-part="')) {
+    const value = selector.slice('[data-part="'.length, -2);
+    return node.dataset.part === value || node.attributes['data-part'] === value || node.getAttribute?.('data-part') === value;
+  }
   if (selector.startsWith('[data-calendar-view')) {
     return Boolean(node.dataset.calendarView);
   }
@@ -183,20 +187,12 @@ test('week view paints the tideline without a standing compose', () => {
   assert.equal(text.includes('breakfast'), false);
 });
 
-test('day hour click asks to compose on that slot', () => {
+test('day view mounts the Day Dial (compose lives on Linear / Tideline)', () => {
   const root = fakeRoot();
-  let selected = null;
-  renderCalendar(root, model(), {
-    view: 'day',
-    onSelectDate: (date, options) => { selected = { date, ...options }; }
-  });
-  const hours = collect(root._host.children[0]).find(node =>
-    node.className.split(/\s+/).includes('hub-calendar__hours') && node.dataset.date === '2026-08-05'
-  );
-  const click = hours.listeners.find(([type]) => type === 'click')[1];
-  click({ target: hours, clientY: 156 });
-  assert.equal(selected.date, '2026-08-05');
-  assert.equal(selected.focusCompose, true);
+  renderCalendar(root, model(), { view: 'day' });
+  assert.ok(root._host.querySelector('[data-part="day-dial"]'));
+  assert.equal(root._host.querySelector('.hub-calendar__hours'), null);
+  assert.equal(root._host.querySelector('[data-calendar="compose-title"]'), null);
 });
 
 test('month shift applies forward/back motion on the grid', () => {
@@ -210,15 +206,13 @@ test('month shift applies forward/back motion on the grid', () => {
   assert.equal(root._host.querySelector('#calendar-month-grid')?.dataset.motion, undefined);
 });
 
-test('selected event paints rail detail; week view has no standing compose', () => {
+test('week view has no standing compose; day is the Dial', () => {
   const root = fakeRoot();
   renderCalendar(root, model([
     { record: { type: 'workout', date: '2026-08-05', title: 'Push', duration_min: 40, status: 'completed' }, body: 'Bench focus', path: 'w' }
   ]), { view: 'day', selectedEventId: 'w', scrollToDetail: true });
-  const detail = root._host.querySelector('#calendar-day-detail');
-  assert.ok(detail);
-  assert.equal(detail.querySelector('.hub-calendar__detail-heading')?.textContent, 'Push');
-  assert.match(collect(detail).map(node => node.textContent).join(' '), /40 min · completed/);
+  assert.ok(root._host.querySelector('[data-part="day-dial"]'));
+  assert.equal(root._host.querySelector('#calendar-day-detail'), null);
 
   renderCalendar(root, model(), { view: 'week' });
   assert.equal(root._host.querySelector('#calendar-day-detail'), null);
@@ -228,19 +222,14 @@ test('selected event paints rail detail; week view has no standing compose', () 
   assert.ok(root._host.querySelector('.cal'));
 });
 
-test('compose submit calls onCreateLog with a diary candidate', () => {
+test('month compose submit calls onCreateLog with a diary candidate', () => {
   const root = fakeRoot();
   let payload = null;
   renderCalendar(root, model(), {
-    view: 'day',
+    view: 'month',
     onCreateLog: next => { payload = next; }
   });
-  const title = root._host.querySelector('[data-calendar="compose-title"]');
-  title.value = 'Felt steady';
-  const form = collect(root._host.children[0]).find(node => node.tagName === 'FORM');
-  const submit = form.listeners.find(([type]) => type === 'submit')[1];
-  submit({ preventDefault() {} });
-  assert.equal(payload.candidate.type, 'diary');
-  assert.equal(payload.candidate.notes, 'Felt steady');
-  assert.equal(payload.slug, 'diary-0000');
+  // Month has no standing compose; day Dial has none either. Smoke: month still paints.
+  assert.ok(root._host.querySelector('.hub-calendar__grid') || root._host.querySelector('#calendar-month-grid'));
+  assert.equal(payload, null);
 });

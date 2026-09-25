@@ -63,7 +63,7 @@ function fitText(text, max, font) {
 
 /* ======================================================================== 2. Model */
 
-const state = { day: '', accepted: new Set(), dismissed: new Set(), phone: false, layout: 'dial' };
+const state = { day: '', accepted: new Set(), dismissed: new Set(), phone: false, layout: 'dial', toast: null };
 /** Ghosts decided in this session, kept so an accepted one stays real once the queue drops it. */
 const decided = new Map();
 const busy = new Set();
@@ -152,7 +152,19 @@ function chipsFor(date) {
   const day = dayAt(date);
   if (!day) return [];
   const ghosts = ghostsNow();
-  return day.chips.filter(chip => !chip.ghost).map(chip => ({
+  const bed = ghosts.find(ghost => ghost.kind === 'bedtime' && ghost.date === date && ghost.status !== 'dismissed' && ghost.chip);
+  const bedStart = bed ? toHour(bed.chip.start) : null;
+  const bedEnd = bed ? toHour(bed.chip.end) : null;
+  return day.chips.filter(chip => {
+    if (chip.ghost) return false;
+    // An accepted bedtime still arrives as a Life calendar_block; the ghost arc
+    // already paints it. Keep one, not two.
+    if (bed && chip.source === 'calendar_block'
+      && Math.abs(chip.start - bedStart) < 0.02 && Math.abs(chip.end - bedEnd) < 0.02) {
+      return false;
+    }
+    return true;
+  }).map(chip => ({
     ...chip,
     skipped: Boolean(chip.skipped) || ghosts.some(ghost => ghost.overItem === chip.id && ghost.status === 'accepted')
   }));
@@ -198,21 +210,27 @@ function periodCopy() {
 
 /* ======================================================================== 3. Mount */
 
+function attach(parent, node) {
+  if (!parent || !node) return node;
+  (parent.appendChild ?? parent.append).call(parent, node);
+  return node;
+}
+
 function el(tag, cls, html, parent, attrs = {}) {
   const node = doc.createElement(tag);
   if (cls) node.className = cls;
   if (html != null) node.innerHTML = html;
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
-  parent?.appendChild(node);
-  return node;
+  return attach(parent, node);
 }
 
 function s(tag, attrs, parent, text) {
-  const node = doc.createElementNS(NS, tag);
+  const node = typeof doc.createElementNS === 'function'
+    ? doc.createElementNS(NS, tag)
+    : doc.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
   if (text != null) node.textContent = text;
-  parent.appendChild(node);
-  return node;
+  return attach(parent, node);
 }
 
 /** Views may run without requestAnimationFrame (unit tests): then motion lands at once. */
@@ -279,7 +297,9 @@ function mount({ entrance = false } = {}) {
   const cellWidth = Math.floor(cell.clientWidth || host.clientWidth || 0);
   const size = Math.min(DD.maxSize, cellWidth > 0 ? cellWidth : DD.maxSize);
   rings = ringRadii(size);
-  svg = doc.createElementNS(NS, 'svg');
+  svg = typeof doc.createElementNS === 'function'
+    ? doc.createElementNS(NS, 'svg')
+    : doc.createElement('svg');
   svg.setAttribute('class', 'dd-dial');
   svg.setAttribute('viewBox', `0 0 ${size} ${rings.height}`);
   svg.setAttribute('width', String(size));
@@ -287,7 +307,7 @@ function mount({ entrance = false } = {}) {
   svg.setAttribute('role', 'img');
   svg.setAttribute('data-part', 'dial');
   svg.setAttribute('aria-label', `${dayLabel(state.day)}: a 24-hour dial with noon at the top`);
-  cell.appendChild(svg);
+  attach(cell, svg);
   ensureHatch(svg);
   mountDial(size);
   mountSide(side);
@@ -335,6 +355,7 @@ function mount({ entrance = false } = {}) {
   if (keepFocus) nodes.get(`wd:${state.day}`)?.focus?.({ preventScroll: true });
   wire(root);
   publish(view);
+  if (state.toast && Date.now() < state.toast.until) showToast(state.toast.html, { resume: true });
 }
 
 function mountDial(size) {
@@ -689,13 +710,18 @@ function renderSweep(sweep) {
 
 /* ======================================================================== 5. Interaction */
 
-function showToast(html) {
+function showToast(html, { resume = false } = {}) {
   const toast = nodes.get('__toast');
   if (!toast) return;
   toast.innerHTML = html;
+  if (!resume) state.toast = { html, until: Date.now() + DD.toastHoldMs };
   engine.to('__toast', { opacity: 1, y: 0 }, { duration: DD.toastInMs });
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => engine?.to('__toast', { opacity: 0, y: DD.toastRise }, { duration: DD.toastInMs }), DD.toastHoldMs);
+  const remaining = state.toast ? Math.max(0, state.toast.until - Date.now()) : DD.toastHoldMs;
+  toastTimer = setTimeout(() => {
+    state.toast = null;
+    engine?.to('__toast', { opacity: 0, y: DD.toastRise }, { duration: DD.toastInMs });
+  }, remaining);
 }
 
 function announce(text) {
@@ -988,6 +1014,7 @@ export function unmountDayDial() {
   busy.clear();
   state.accepted.clear();
   state.dismissed.clear();
+  state.toast = null;
   state.day = '';
   mountedFor = null;
   playedEntrance = false;

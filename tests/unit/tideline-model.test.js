@@ -162,3 +162,30 @@ test('a linked visual workout follows the record after it is skipped', () => {
   assert.equal(chip.skipped, true);
   assert.equal(chip.meta, 'Skipped · Sara');
 });
+
+test('an accepted bedtime Life block still paints when the visual file is covering', () => {
+  const built = buildTidelineModel({
+    events: [{
+      path: 'data/calendar/2026/09/2026-09-24-wind-down.md',
+      record: {
+        type: 'calendar_block',
+        id: 'cb-g-bed',
+        date: '2026-09-24',
+        time: '21:30',
+        end_time: '22:00',
+        kind: 'rest',
+        protected: true,
+        title: 'Wind down · lights out 10:00 pm'
+      }
+    }],
+    visual: fixture,
+    week: WEEK,
+    today: '2026-09-24',
+    nowHour: 18.05,
+    terms: TERMS
+  });
+  const chip = built.days[3].chips.find(item => item.id === 'cb-g-bed');
+  assert.ok(chip, 'accepted wind-down is a chip');
+  assert.equal(chip.kind, 'health');
+  assert.equal(chip.title, 'Wind down · lights out 10:00 pm');
+});

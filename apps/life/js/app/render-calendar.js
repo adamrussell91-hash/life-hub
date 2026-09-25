@@ -124,10 +124,9 @@ export function renderCalendar(root, model, {
       unmountDayDial();
       let calendar = host.querySelector(':scope > .hub-calendar');
       if (!calendar) {
-        host.replaceChildren();
         calendar = root.createElement('div');
         calendar.className = 'hub-calendar hub-calendar--workspace';
-        host.appendChild(calendar);
+        host.replaceChildren(calendar);
       }
       calendar.replaceChildren();
       calendar.className = 'hub-calendar hub-calendar--workspace';
@@ -141,16 +140,8 @@ export function renderCalendar(root, model, {
       });
       return;
     }
-    host.querySelectorAll(':scope > .hub-calendar').forEach(node => node.remove());
-    let dialHost = host.querySelector(':scope > .life-day-dial-host');
-    if (!dialHost) {
-      host.replaceChildren();
-      dialHost = root.createElement('div');
-      dialHost.className = 'life-day-dial-host';
-      dialHost.style.minWidth = '0';
-      host.appendChild(dialHost);
-    }
-    renderDayDial(root, dialHost, {
+    // Day Dial mounts on the calendar host (same pattern as Almanac).
+    renderDayDial(root, host, {
       ...tidelineInput,
       week: weekDates,
       selectedDate: model.selectedDate || model.date,
