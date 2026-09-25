@@ -38,6 +38,37 @@ test('tideline capacity, period and grid come from the fixture logs', () => {
   assert.equal(built.total, 552);
 });
 
+test('holiday weeks label Hol Wn · holidays; term weeks stay T4 Wn', () => {
+  const holWeek = ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04'];
+  const hol = buildTidelineModel({
+    events: fixture.LOGS,
+    week: holWeek,
+    today: '2026-09-28',
+    nowHour: 12,
+    terms: TERMS
+  });
+  assert.equal(hol.period.title, 'Hol W1 · holidays');
+
+  const hol2Week = ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'];
+  const hol2 = buildTidelineModel({
+    events: [],
+    week: hol2Week,
+    today: '2026-10-05',
+    nowHour: 12,
+    terms: TERMS
+  });
+  assert.equal(hol2.period.title, 'Hol W2 · holidays');
+
+  const t4 = buildTidelineModel({
+    events: [],
+    week: ['2026-10-26', '2026-10-27', '2026-10-28', '2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01'],
+    today: '2026-10-26',
+    nowHour: 12,
+    terms: TERMS
+  });
+  assert.equal(t4.period.title, 'T4 W3');
+});
+
 test('an explicit ghost list replaces the visual queue', () => {
   const built = buildTidelineModel({
     events: fixture.LOGS,

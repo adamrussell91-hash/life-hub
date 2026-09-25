@@ -24,7 +24,7 @@ import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
 } from '../medical-overview-read.mjs';
-import { proposeCentralNodePatchSchema, appendGovernanceLogSchema } from '../hammond-tools.mjs';
+import { proposeCentralNodePatchSchema, appendGovernanceLogSchema, proposeCalendarGhostSchema } from '../hammond-tools.mjs';
 import { proposeActionToolSchema } from './propose-action.mjs';
 import { shortcutSchemas } from './shortcuts.mjs';
 import { selectCapabilityIdsForTurn } from './intent-router.mjs';
@@ -314,6 +314,9 @@ export function buildAgentTools({
 
   if (has('publish.cn-patch') && (needsHammondTools || slug === 'clare' || slug === 'ann')) {
     tools.push(proposeCentralNodePatchSchema());
+  }
+  if (has('publish.calendar-ghost') && (slug === 'hammond' || slug === 'sara' || slug === 'clare' || needsHammondTools)) {
+    tools.push(proposeCalendarGhostSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());

@@ -27,7 +27,9 @@ describe('school weeks', () => {
     expect(isHoliday('2026-09-28', TERMS)).toBe(true);
     expect(isHoliday('2026-10-12', TERMS)).toBe(true);
     expect(isHoliday('2026-10-13', TERMS)).toBe(false);
-    expect(weekLabel('2026-10-01', TERMS)).toBeNull();
+    expect(weekLabel('2026-09-28', TERMS)).toBe('Hol W1');
+    expect(weekLabel('2026-10-01', TERMS)).toBe('Hol W1');
+    expect(weekLabel('2026-10-05', TERMS)).toBe('Hol W2');
     expect(termAt('2026-12-20', TERMS)).toBeNull();
   });
 

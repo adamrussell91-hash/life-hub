@@ -1,0 +1,21 @@
+{
+  "id": "publish.calendar-ghost",
+  "tool_name": "propose_calendar_ghost",
+  "verb": "Publish",
+  "agents": ["hammond", "sara", "clare"],
+  "risk": "auto",
+  "kind": "capacity",
+  "legacy_tool": "propose_calendar_ghost",
+  "inputs": {
+    "kind": "string",
+    "date": "string",
+    "reason": "string"
+  },
+  "side_effects": [
+    "Appends a validated ghost to pending-calendar-ghosts.json",
+    "Never writes Life, Central Node or Tasks"
+  ],
+  "surfaces": ["calendar"],
+  "prompt_one_liner": "Propose a dashed ghost on the calendar. Adam Accepts or dismisses it there — nothing else is written yet.",
+  "reads": ["pending-calendar-ghosts.json", "calendar-ghost-decisions.jsonl"]
+}
