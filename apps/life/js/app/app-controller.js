@@ -59,7 +59,7 @@ function calendarZoomFromHash(hash) {
   const parts = (hash.startsWith('#') ? hash.slice(1) : hash).replace(/^\/+/, '').split(/[/?#]/);
   if (parts[0] !== 'calendar') return null;
   const zoom = parts[1];
-  if (zoom === 'day' || zoom === 'week' || zoom === 'month' || zoom === 'almanac') return zoom;
+  if (zoom === 'day' || zoom === 'week' || zoom === 'month' || zoom === 'term' || zoom === 'year' || zoom === 'almanac') return zoom;
   return null;
 }
 
@@ -1337,8 +1337,19 @@ export function createAppController(dependencies) {
     return { from: days[0], to: days[days.length - 1] };
   }
 
+  /** Ghosts for Term/Year: the year zoom window (or the river payload's year range). */
+  function calendarGhostRange() {
+    if (calendarView === 'term' || calendarView === 'year') {
+      const river = latestResult?.calendarVisual?.RIVER;
+      const year = river?.ZOOMS?.year;
+      if (year?.from && year?.to) return { from: year.from, to: year.to };
+      return { from: '2026-07-20', to: '2027-01-10' };
+    }
+    return visibleWeekRange();
+  }
+
   async function loadCalendarGhostsForView() {
-    const range = visibleWeekRange();
+    const range = calendarGhostRange();
     if (!range) {
       calendarGhosts = [];
       calendarGhostsKey = '';
@@ -1448,7 +1459,9 @@ export function createAppController(dependencies) {
       },
       onSwitchView: next => {
         calendarViewExplicit = true;
-        calendarView = next === 'day' || next === 'month' || next === 'almanac' ? next : 'week';
+        calendarView = next === 'day' || next === 'month' || next === 'term' || next === 'year' || next === 'almanac'
+          ? next
+          : 'week';
         const hash = calendarView === 'week' ? '#/calendar' : `#/calendar/${calendarView}`;
         const location = windowTarget.location;
         if (location && location.hash !== hash) location.hash = hash;

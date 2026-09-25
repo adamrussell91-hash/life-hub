@@ -32,6 +32,7 @@ const SHELL_FILES = [
   'packages/design-kit/calendar-tideline.css',
   'packages/design-kit/calendar-almanac.css',
   'packages/design-kit/calendar-day-dial.css',
+  'packages/design-kit/calendar-term-river.css',
   'packages/design-kit/js/hub-motion-engine.js',
   'packages/design-kit/js/calendar-tideline-geometry.js',
   'packages/design-kit/js/almanac-geometry.js',

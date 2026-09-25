@@ -246,10 +246,15 @@ async function decide(handler, id, decision, reason) {
 
 test('visual seed freezes now and loads the reference week', () => {
   assert.equal(SEEDED.now, '2026-09-24T18:05:00+10:00');
-  assert.equal(SEEDED.counts.ghosts, 4);
+  // Tideline's four ghosts plus the Term River's three (g-bob, g-newcastle, g-day-trip).
+  assert.equal(SEEDED.counts.ghosts, 7);
+  assert.equal(SEEDED.counts.riverGhosts, 3);
   assert.equal(SEEDED.counts.logs, 12);
   assert.ok(SEEDED.files.has(PENDING_CALENDAR_GHOSTS_PATH));
   assert.ok(SEEDED.files.has('calendar-visual.json'));
+  const visual = JSON.parse(SEEDED.files.get('calendar-visual.json'));
+  assert.equal(visual.GHOSTS.length, 4, 'Tideline ghosts stay on the visual file');
+  assert.ok(visual.RIVER?.ITEMS?.some(item => item.id === 'g-bob'), 'Term River fixture is on RIVER');
   assert.equal(SEEDED.tasks[0].id, 'task-josh-y10');
   assert.equal(SEEDED.tasks[0].due_date, '2026-09-25');
 });
