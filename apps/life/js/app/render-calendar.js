@@ -1,5 +1,6 @@
 import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
 import { renderTideline } from './render-tideline.js';
+import { renderAlmanac, unmountAlmanac } from './render-almanac.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -77,6 +78,15 @@ export function renderCalendar(root, model, {
   if (!dashboard || !model) return;
 
   const host = root.querySelector('#life-calendar-host') ?? dashboard;
+  if (view === 'almanac') {
+    host.style.minWidth = '0';
+    if (host.parentElement) host.parentElement.style.minWidth = '0';
+    dashboard.removeAttribute('hidden');
+    renderAlmanac(root, host, { now, onSwitchView });
+    return;
+  }
+  unmountAlmanac();
+
   let calendar = host.querySelector(':scope > .hub-calendar');
   if (!calendar) {
     calendar = root.createElement('div');
