@@ -6,6 +6,7 @@ import { createGoalsHandler } from '../../netlify/functions/goals.mjs';
 import { createMapsHandler } from '../../netlify/functions/maps.mjs';
 import { createProgramsHandler } from '../../netlify/functions/programs.mjs';
 import { createProjectsHandler } from '../../netlify/functions/projects.mjs';
+import { createTasksHandler } from '../../netlify/functions/tasks.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -263,4 +264,34 @@ test('goals keep v2 fields on create and patch, and legacy goals list with defau
   const legacy = (await listed.json()).data.goals.find(item => item.id === 'goal_legacy');
   assert.deepEqual(legacy.tags, []);
   assert.equal(legacy.structure, 'woop');
+});
+
+test('tasks POST keeps parent_goal_id, steps and tags', async () => {
+  const store = memoryStore();
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+  const parent = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'Write up 6.3', domain: 'other', parent_goal_id: 'goal_ha', tags: ['apst', 4] }
+  }))).json()).data;
+  assert.equal(parent.parent_goal_id, 'goal_ha');
+  assert.deepEqual(parent.tags, ['apst']);
+  assert.equal(parent.kind, 'task');
+
+  const step = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'Pull 3 examples', domain: 'other', kind: 'step', parent_task_id: parent.id, step_order: 1, parent_goal_id: 'goal_ha' }
+  }))).json()).data;
+  assert.equal(step.kind, 'step');
+  assert.equal(step.parent_task_id, parent.id);
+  assert.equal(step.step_order, 1);
+
+  const orphan = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'No parent', domain: 'life', kind: 'step' }
+  }))).json()).data;
+  assert.equal(orphan.kind, 'task');
+  assert.equal(orphan.parent_goal_id, null);
 });
