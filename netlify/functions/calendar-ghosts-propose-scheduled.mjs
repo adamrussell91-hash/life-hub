@@ -11,7 +11,8 @@ import { createCalendarGhostsProposeHandler } from './_shared/calendar-ghosts-pr
 
 /**
  * 05:30 Australia/Sydney. AEST = 19:30 UTC, AEDT = 18:30 UTC.
- * Fire both UTC slots; the runner skips if it already ran for today's Sydney date.
+ * Fire both UTC slots; the runner keeps only the tick whose Sydney wall
+ * clock is inside 05:25–06:35 (and skips if last_run.date is already today).
  */
 export const config = {
   schedule: '30 18,19 * * *'
