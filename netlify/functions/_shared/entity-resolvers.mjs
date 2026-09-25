@@ -25,6 +25,7 @@ import {
   resolveKnowledgePage,
   resolveTeachingUnit,
   resolveTasksProject,
+  resolveTasksGoal,
   resolveTasksProgram,
   resolveTeachingLesson,
   resolveLifeDecision
@@ -34,6 +35,7 @@ export {
   resolveKnowledgePage,
   resolveTeachingUnit,
   resolveTasksProject,
+  resolveTasksGoal,
   resolveTasksProgram,
   resolveTeachingLesson,
   resolveLifeDecision
@@ -284,6 +286,7 @@ export const RESOLVER_SLOTS = Object.freeze({
   'shared:organisation': resolveOrganisation,
   'tasks:task': resolveTask,
   'tasks:project': resolveTasksProject,
+  'tasks:goal': resolveTasksGoal,
   'tasks:program': resolveTasksProgram,
   'professional:communication': resolveCommunication,
   'professional:meeting': resolveMeeting,

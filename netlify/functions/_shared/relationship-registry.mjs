@@ -55,6 +55,7 @@ const ALL_TAGGABLE_KINDS = [
   'tasks:task',
   'tasks:project',
   'tasks:program',
+  'tasks:goal',
   'professional:communication',
   'professional:meeting',
   'professional:event',
