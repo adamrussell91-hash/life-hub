@@ -6,11 +6,12 @@ import { load as loadYaml } from 'js-yaml';
 import { parseEventDocument } from '../../../apps/life/js/core/records.js';
 import { getSydneyDateKey, getSydneyMinutesOfDay, getSydneyTimestamp } from '../../../apps/life/js/core/time.js';
 import { capacityForDates } from '../../../apps/life/js/app/capacity-model.js';
-import { proposeGhosts, ghostSemanticKey } from '../../../apps/life/js/app/ghost-proposer.js';
+import { proposeGhosts } from '../../../apps/life/js/app/ghost-proposer.js';
 import { addDays } from '../../../packages/design-kit/js/lead-lines.js';
 import {
   CALENDAR_GHOST_DECISIONS_PATH,
   PENDING_CALENDAR_GHOSTS_PATH,
+  alreadyQueued,
   parsePendingCalendarGhostsDoc,
   serializePendingCalendarGhosts
 } from '../calendar-ghosts.mjs';
@@ -70,8 +71,9 @@ export function shouldRefreshPropose(last_run, { today, nowMs, newestRecordAt })
   if (Number.isFinite(lastAt) && Number.isFinite(nowMs) && (nowMs - lastAt) > TWO_HOURS_MS) {
     return true;
   }
-  if (typeof newestRecordAt === 'string' && newestRecordAt) {
-    if (!last_run.newest_record_at || newestRecordAt > last_run.newest_record_at) return true;
+  if (typeof newestRecordAt === 'string' && newestRecordAt
+    && (!last_run.newest_record_at || newestRecordAt > last_run.newest_record_at)) {
+    return true;
   }
   return false;
 }
@@ -148,12 +150,6 @@ function readProfile(visual, planning) {
   return { day_profile: { sleep: '22:30' } };
 }
 
-function alreadyQueued(queue, ghost) {
-  const key = ghostSemanticKey(ghost);
-  return (queue ?? []).some(entry =>
-    entry.id === ghost.id || (key && ghostSemanticKey(entry) === key));
-}
-
 /**
  * Core propose run. `open` / `commit` match calendar-ghosts.mjs.
  * trigger: 'scheduled' | 'refresh' | 'manual'
@@ -177,11 +173,8 @@ export async function runCalendarGhostsPropose({
     throw new TypeError('runCalendarGhostsPropose needs today (YYYY-MM-DD)');
   }
 
-  if (trigger === 'scheduled') {
-    const when = instant instanceof Date ? instant : (instant != null ? new Date(instant) : new Date());
-    if (!inSydneyProposeWindow(when)) {
-      return { ok: true, proposed: 0, skipped: 'outside_window', ghosts: [] };
-    }
+  if (trigger === 'scheduled' && !inSydneyProposeWindow(instant ?? new Date())) {
+    return { ok: true, proposed: 0, skipped: 'outside_window', ghosts: [] };
   }
 
   const opened = await open();
@@ -249,7 +242,7 @@ export async function runCalendarGhostsPropose({
     profile: readProfile(visual, planningProfile)
   }).filter(ghost => !alreadyQueued(queue, ghost));
 
-  const via = trigger === 'refresh' ? 'refresh' : (trigger === 'manual' ? 'manual' : 'scheduled');
+  const via = trigger === 'refresh' || trigger === 'manual' ? trigger : 'scheduled';
   const stamped = proposed.map(ghost => ({
     ...ghost,
     created_at: nowIso,

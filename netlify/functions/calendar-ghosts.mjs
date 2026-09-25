@@ -66,6 +66,15 @@ function isLastRun(value) {
     && typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date);
 }
 
+function normalizeLastRun(value) {
+  if (!isLastRun(value)) return null;
+  return {
+    date: value.date,
+    at: typeof value.at === 'string' ? value.at : null,
+    newest_record_at: typeof value.newest_record_at === 'string' ? value.newest_record_at : null
+  };
+}
+
 /**
  * Queue file: legacy `[]` or `{ ghosts, last_run }`.
  * last_run = { date, at, newest_record_at } — set by propose even when nothing is queued.
@@ -80,15 +89,7 @@ export function parsePendingCalendarGhostsDoc(text) {
     if (parsed && typeof parsed === 'object' && Array.isArray(parsed.ghosts)) {
       return {
         ghosts: parsed.ghosts.filter(isQueueEntry),
-        last_run: isLastRun(parsed.last_run)
-          ? {
-            date: parsed.last_run.date,
-            at: typeof parsed.last_run.at === 'string' ? parsed.last_run.at : null,
-            newest_record_at: typeof parsed.last_run.newest_record_at === 'string'
-              ? parsed.last_run.newest_record_at
-              : null
-          }
-          : null
+        last_run: normalizeLastRun(parsed.last_run)
       };
     }
     return { ghosts: [], last_run: null };
@@ -142,9 +143,10 @@ export function calendarGhostFromToolInput(input, { agent, nowIso }) {
   };
 }
 
-function alreadyQueued(list, entry) {
+/** True if id or semantic key (agent+kind+date+target) already appears in the list. */
+export function alreadyQueued(list, entry) {
   const key = ghostSemanticKey(entry);
-  return list.some(item =>
+  return (list ?? []).some(item =>
     item.id === entry.id || (key && ghostSemanticKey(item) === key));
 }
 
@@ -153,14 +155,14 @@ export function appendPendingCalendarGhost(queueText, entry) {
   const doc = parsePendingCalendarGhostsDoc(queueText);
   if (alreadyQueued(doc.ghosts, entry)) {
     return {
-      content: serializePendingCalendarGhosts(doc.ghosts, doc.last_run ?? undefined),
+      content: serializePendingCalendarGhosts(doc.ghosts, doc.last_run),
       added: false,
       list: doc.ghosts
     };
   }
   const next = [...doc.ghosts, entry];
   return {
-    content: serializePendingCalendarGhosts(next, doc.last_run ?? undefined),
+    content: serializePendingCalendarGhosts(next, doc.last_run),
     added: true,
     list: next
   };
@@ -379,7 +381,7 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
     changed.set(PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(markGhost(queue, id, {
       status: 'dismissed',
       decided_at: nowIso
-    }), doc.last_run ?? undefined));
+    }), doc.last_run));
     const prior = await opened.readFile(CALENDAR_GHOST_DECISIONS_PATH);
     const line = JSON.stringify({ ...plan.decision, at: nowIso });
     const base = typeof prior === 'string' ? prior : '';
@@ -433,7 +435,7 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
     decided_at: nowIso,
     // Set before the tasks call so a failure in step 2 still has a retry marker.
     ...(taskSteps.length ? { tasks_pending: true } : {})
-  }), doc.last_run ?? undefined));
+  }), doc.last_run));
   return {
     kind: 'accept',
     changed,
@@ -563,7 +565,7 @@ async function clearTasksPending(open, commit, id) {
   if (!entry || entry.tasks_pending !== true) return;
   const changed = new Map([[
     PENDING_CALENDAR_GHOSTS_PATH,
-    serializePendingCalendarGhosts(markGhost(doc.ghosts, id, { tasks_pending: false }), doc.last_run ?? undefined)
+    serializePendingCalendarGhosts(markGhost(doc.ghosts, id, { tasks_pending: false }), doc.last_run)
   ]]);
   await commit(changed, opened.base, `chore(calendar): tasks applied ${id}`);
 }

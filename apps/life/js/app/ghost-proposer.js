@@ -55,19 +55,19 @@ export function ghostId(agent, kind, date) {
  */
 export function ghostTarget(ghost) {
   if (!ghost || typeof ghost !== 'object') return '';
-  if (typeof ghost.workoutPath === 'string' && ghost.workoutPath) return ghost.workoutPath;
-  if (typeof ghost.taskId === 'string' && ghost.taskId) return ghost.taskId;
-  if (typeof ghost.start === 'string' && ghost.start) return ghost.start;
-  if (typeof ghost.time === 'string' && ghost.time) return ghost.time;
+  for (const key of ['workoutPath', 'taskId', 'start', 'time']) {
+    const value = ghost[key];
+    if (typeof value === 'string' && value) return value;
+  }
   return '';
 }
 
 /** Stable key: agent + kind + date + target. */
 export function ghostSemanticKey(ghost) {
   if (!ghost || typeof ghost !== 'object') return '';
-  const date = typeof ghost.date === 'string' && ghost.date
-    ? ghost.date
-    : (typeof ghost.from === 'string' ? ghost.from : '');
+  const date = (typeof ghost.date === 'string' && ghost.date)
+    || (typeof ghost.from === 'string' && ghost.from)
+    || '';
   return `${ghost.agent ?? ''}\0${ghost.kind ?? ''}\0${date}\0${ghostTarget(ghost)}`;
 }
 
@@ -81,8 +81,7 @@ function knownSemanticKeys(pending) {
   for (const entry of pending ?? []) {
     if (!entry || typeof entry.agent !== 'string' || typeof entry.kind !== 'string') continue;
     if (!['pending', 'accepted', 'dismissed'].includes(statusOf(entry))) continue;
-    const key = ghostSemanticKey(entry);
-    if (key) keys.add(key);
+    keys.add(ghostSemanticKey(entry));
   }
   return keys;
 }
@@ -229,7 +228,7 @@ export function proposeGhosts({
 
   const take = ghost => {
     const key = ghostSemanticKey(ghost);
-    if (known.has(key) || out.some(g => ghostSemanticKey(g) === key)) return;
+    if (known.has(key)) return;
     if (walls.has(ghost.date)) return;
     if (ghost.kind === 'bedtime' && ghost.time > LIGHTS_OUT_CAP) return;
     if (ghost.kind === 'protect_block' && (ghost.start >= LIGHTS_OUT_CAP || ghost.end > LIGHTS_OUT_CAP)) return;
