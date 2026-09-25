@@ -1,427 +1,226 @@
-import type { Area } from '@/schemas/area';
-import type { Goal } from '@/schemas/goal';
-import { isProjectArchived, type Project } from '@/schemas/project';
+import type { Goal, GoalSphere } from '@/schemas/goal';
+import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
-import type { PlanningDirection } from '@/schemas/planning-direction';
-import type { PlanningProfile } from '@/schemas/planning-profile';
+import type { SchoolTerm } from '@/domain/school-time';
 import { tasksApi } from '@/services/client-api';
-import { deleteProjectNow } from '@/views/card-actions';
-import { renderCardMenu } from '@/views/card-menu';
 import { errorMessage, showViewLoading } from '@/views/feedback';
-import { renderTaskEditor } from '@/views/task-editor';
-import { projectPageHash } from '@/domain/cards';
-import { formatTagsInput, parseTagsInput } from '@/domain/hierarchy';
-import { createCollapsibleFilters } from '@/views/collapsible-filters';
-import { createHubFilter, createHubPills, createHubSearch, createHubToolbar, el } from '@/views/hub-kit';
-import { createPlusAdd } from '@/views/plus-add';
-import { createHierarchyTraceCard, createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
-import { activeProjectMeter } from '@/domain/hammond-portfolio';
-import { projectMilestones } from '@/domain/project-milestones';
-import { mountLifeWallEditor } from '@/views/life-wall-editor';
+import { createHubPills, el } from '@/views/hub-kit';
+import { goalPageHash } from '@/domain/cards';
+import { LANE_CAP, SPHERES, SPHERE_LABEL } from '@/domain/goal-hosting';
+import {
+  buildRunway, currentTerm, flattenTerms, sydneyToday,
+  type Runway, type RunwayLane, type RunwayRow
+} from '@/domain/goal-runway';
 
-let goalArea = 'all';
-let goalQuery = '';
-let horizonsMode = false;
-let horizonsFocusProjectId: string | null = null;
+export const STRUCTURE_CHIP: Record<Goal['structure'], string> = {
+  woop: 'WOOP',
+  smarter: 'SMARTER',
+  okr: 'OKR',
+  lead_lag: 'LEAD/LAG',
+  floor_target_stretch: 'FLOOR·TARGET'
+};
 
-function tagRow(tags: string[]): HTMLElement {
-  const row = el('div', 'hierarchy-tags');
-  for (const tag of tags) row.append(el('span', 'chip', tag));
-  return row;
-}
+export type GoalsData = { goals: Goal[]; projects: Project[]; tasks: Task[]; terms: SchoolTerm[]; today: string };
+export type RunwayOverlay = { crunchWeeks: string[]; proposedRest: Record<string, string[]>; proposalGoalIds: Set<string> };
 
-function renderMilestones(project: Project, onReload: () => void): HTMLElement {
-  const wrap = el('div', 'hierarchy-milestones');
-  const milestones = projectMilestones(project);
-  if (milestones.length === 0) {
-    wrap.append(el('p', 'hierarchy-meta', 'No milestones yet.'));
-    return wrap;
-  }
-  const list = el('ul', 'hierarchy-milestone-list');
-  for (const milestone of milestones) {
-    const item = el('li', 'hierarchy-milestone');
-    item.append(
-      el('span', 'hierarchy-milestone__title', milestone.title),
-      el('span', 'chip chip--muted', milestone.status)
-    );
-    item.append(
-      mountLifeWallEditor({
-        title: milestone.title,
-        wall: milestone.life_wall,
-        suggest: () => (milestone.due_date ? { starts_on: milestone.due_date, ends_on: milestone.due_date } : null),
-        onCommit: (wall) => {
-          const next = projectMilestones(project).map((item) =>
-            item.id === milestone.id ? { ...item, life_wall: wall } : item
-          );
-          void tasksApi.updateProject(project.id, { milestones: next }).then(onReload, (err) => {
-            item.append(el('p', 'empty-state', errorMessage(err)));
-          });
-        }
-      }).el
-    );
-    list.append(item);
-  }
-  wrap.append(list);
-  return wrap;
-}
+let selectedTermStart: string | null = null;
 
-function renderProjectCard(
-  project: Project,
-  tasks: Task[],
-  editorHost: HTMLElement,
-  onReload: () => void
-): HTMLElement {
-  const card = el('article', 'glass-tile hierarchy-card hierarchy-card--project');
-  card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  const projectTasks = tasks.filter((t) => t.parent_project_id === project.id && t.kind !== 'step');
-  const openCount = projectTasks.filter((t) => t.status !== 'done' && t.status !== 'dead').length;
-
-  const title = el('h3', 'hierarchy-card__title', project.title);
-  const head = el('div', 'hierarchy-card__head');
-  head.append(title);
-  head.append(
-    renderCardMenu(`${project.title} card menu`, [
-      {
-        id: 'page',
-        label: 'Full page',
-        onSelect: () => {
-          location.hash = projectPageHash(project.id);
-        }
-      },
-      {
-        id: 'delete',
-        label: 'Delete',
-        danger: true,
-        onSelect: () => deleteProjectNow(project, onReload, editorHost)
-      }
-    ])
-  );
-  const meta = el(
-    'p',
-    'hierarchy-meta',
-    `${openCount} open task${openCount === 1 ? '' : 's'} · ${projectMilestones(project).length} milestone${
-      projectMilestones(project).length === 1 ? '' : 's'
-    }`
-  );
-  card.append(head, meta);
-  if (project.tags.length) card.append(tagRow(project.tags));
-
-  const detail = el('div', 'hierarchy-card__detail');
-  detail.hidden = true;
-  detail.append(renderMilestones(project, onReload));
-
-  const taskList = el('ul', 'hierarchy-task-list');
-  for (const task of projectTasks.slice(0, 6)) {
-    const row = el('li', 'hierarchy-task-row');
-    const btn = el('button', 'btn btn--ghost hierarchy-task-row__open', task.title);
-    btn.type = 'button';
-    btn.addEventListener('click', (event) => {
-      event.stopPropagation();
-      renderTaskEditor(editorHost, task, [project], onReload);
-    });
-    row.append(btn, el('span', 'chip chip--muted', task.status));
-    taskList.append(row);
-  }
-  if (projectTasks.length > 6) {
-    taskList.append(el('li', 'hierarchy-meta', `+${projectTasks.length - 6} more`));
-  }
-  detail.append(taskList);
-  card.append(detail);
-
-  card.addEventListener('click', (event) => {
-    if ((event.target as HTMLElement).closest('button')) return;
-    detail.hidden = !detail.hidden;
-    card.classList.toggle('hierarchy-card--open', !detail.hidden);
-  });
-
-  return card;
-}
-
-function renderGoalSection(
-  goal: Goal,
-  areaTitle: string | undefined,
-  projects: Project[],
-  tasks: Task[],
-  editorHost: HTMLElement,
-  onReload: () => void
-): HTMLElement {
-  const section = el('section', 'hierarchy-goal');
-  const head = el('div', 'hierarchy-goal__head');
-  head.append(
-    el('p', 'page-header__eyebrow', areaTitle ?? 'Goal'),
-    el('h2', 'hierarchy-goal__title', goal.title)
-  );
-  if (goal.description) head.append(el('p', 'hierarchy-meta', goal.description));
-  if (goal.tags.length) head.append(tagRow(goal.tags));
-  head.append(
-    mountLifeWallEditor({
-      title: goal.title,
-      wall: goal.life_wall,
-      suggest: () => null,
-      onCommit: (wall) => {
-        void tasksApi.updateGoal(goal.id, { life_wall: wall }).then(onReload, (err) => {
-          head.append(el('p', 'empty-state', errorMessage(err)));
-        });
-      }
-    }).el
-  );
-  section.append(head);
-
-  const grid = el('div', 'hierarchy-grid');
-  const goalProjects = projects.filter((p) => p.parent_goal_id === goal.id && !isProjectArchived(p.status));
-  if (goalProjects.length === 0) {
-    grid.append(el('p', 'empty-state', 'No projects under this goal yet.'));
-  } else {
-    for (const project of goalProjects) {
-      grid.append(renderProjectCard(project, tasks, editorHost, onReload));
-    }
-  }
-  section.append(grid);
-  return section;
-}
-
-/** Area → Goal → Project hierarchy with expandable project cards. */
-export async function renderGoalsView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading hierarchy…', '.hierarchy-toolbar');
+/** Term Runway (spec: docs/superpowers/specs/2026-09-26-goals-redesign-design.md). */
+export async function renderGoalsView(canvas: HTMLElement, today = sydneyToday()): Promise<void> {
+  showViewLoading(canvas, 'Loading goals…', '.runway');
   try {
-    const [areas, goals, projects, tasks, direction, profile] = await Promise.all([
-      tasksApi.listAreas(),
+    const [goals, projects, tasks, prefs] = await Promise.all([
       tasksApi.listGoals(),
       tasksApi.listProjects(),
       tasksApi.listTasks(),
-      tasksApi.getPlanningDirection().catch(() => null),
-      tasksApi.getPlanningProfile().catch(() => null)
+      tasksApi.getHubPrefs()
     ]);
-    paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
+    paintGoals(canvas, { goals, projects, tasks, terms: flattenTerms(prefs), today });
   } catch (err) {
-    canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load hierarchy.')));
+    canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load goals.')));
   }
 }
 
-function paintGoals(
+export function paintGoals(
   canvas: HTMLElement,
-  areas: Area[],
-  goals: Goal[],
-  projects: Project[],
-  tasks: Task[],
-  direction: PlanningDirection | null,
-  profile: PlanningProfile | null
-): void {
-  const restoreSearch =
-    document.activeElement instanceof HTMLInputElement &&
-    document.activeElement.getAttribute('aria-label') === 'Filter goals';
-  const searchPos = restoreSearch
-    ? (document.activeElement as HTMLInputElement).selectionStart
-    : null;
-
+  data: GoalsData,
+  overlay: RunwayOverlay = { crunchWeeks: [], proposedRest: {}, proposalGoalIds: new Set() }
+): Runway | null {
+  const term = data.terms.find((t) => t.starts_on === selectedTermStart) ?? currentTerm(data.terms, data.today);
   canvas.replaceChildren();
-  const editorHost = el('div', 'hierarchy-editor-host');
-  const reload = () => {
-    void renderGoalsView(canvas);
-  };
+  const reload = () => void renderGoalsView(canvas, data.today);
 
-  const toolbar = createHubToolbar('hierarchy-toolbar');
-  const search = createHubSearch({
-    placeholder: 'Filter goals…',
-    ariaLabel: 'Filter goals',
-    value: goalQuery,
-    onInput: (value) => {
-      goalQuery = value;
-      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
-    }
-  });
-  const areaFilter = createHubFilter({
-    key: 'Area',
-    label: 'Area',
-    defaultValue: 'all',
-    options: [
-      { value: 'all', label: 'All areas' },
-      ...areas.map((area) => ({ value: area.id, label: area.title }))
-    ],
-    value: goalArea,
-    onChange: (value) => {
-      goalArea = value;
-      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
-    }
-  });
-  const addGoal = el('button', 'btn btn--secondary', 'New goal');
-  addGoal.type = 'button';
-  addGoal.addEventListener('click', () => {
-    const title = window.prompt('Goal title');
-    if (!title?.trim()) return;
-    const areaId = areas[0]?.id ?? null;
-    void tasksApi
-      .createGoal({ title: title.trim(), parent_area_id: areaId })
-      .then(reload)
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  const addProject = el('button', 'btn btn--secondary', 'New project');
-  addProject.type = 'button';
-  addProject.addEventListener('click', () => {
-    const title = window.prompt('Project title');
-    if (!title?.trim()) return;
-    const goalId = goals.find((g) => g.status === 'active')?.id ?? null;
-    void tasksApi
-      .createProject({ title: title.trim(), parent_goal_id: goalId })
-      .then(reload)
-      .catch((err) => window.alert(errorMessage(err)));
-  });
-  const addPanel = el('div', 'plus-add__choices');
-  addPanel.append(addGoal, addProject);
-  const filters = createCollapsibleFilters({
-    id: 'goals',
-    ariaLabel: 'Filters',
-    className: 'hub-filters--inline',
-    active: goalArea !== 'all' || Boolean(goalQuery.trim())
-  });
-  filters.panel.append(search.el, areaFilter.el);
-  toolbar.append(
-    filters.root,
-    createHubPills({
-      label: 'Horizons',
-      items: [{ id: 'horizons', label: 'Horizons mode' }],
-      value: horizonsMode ? (['horizons'] as const) : [],
-      onSelect: () => {
-        horizonsMode = !horizonsMode;
-        paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
-      }
-    }),
-    createPlusAdd({
-      ariaLabel: 'Add a goal or project',
-      panel: addPanel,
-      className: 'plus-add--inline'
-    }).root
-  );
-  canvas.append(toolbar, editorHost);
-
-  const areasById = new Map(areas.map((area) => [area.id, area]));
-  const query = goalQuery.trim().toLowerCase();
-  const activeGoals = goals.filter((g) => {
-    if (g.status !== 'active') return false;
-    if (goalArea !== 'all' && g.parent_area_id !== goalArea) return false;
-    if (
-      query &&
-      !g.title.toLowerCase().includes(query) &&
-      !g.description.toLowerCase().includes(query)
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  const meterHost = el('div', 'goals-meter-host');
-  meterHost.append(
-    createActiveProjectsMeter(document, {
-      meter: activeProjectMeter(projects, profile)
-    })
-  );
-  canvas.append(meterHost);
-
-  if (horizonsMode) {
-    const lens = el('div', 'horizons-lens');
-    lens.append(
-      el('p', 'page-header__eyebrow', 'Horizons'),
-      el(
-        'p',
-        'hierarchy-meta',
-        'Purpose → Vision → Area → Goal → Project → Next Action'
-      )
-    );
-    const activeProjects = projects.filter((p) => p.status === 'active');
-    const focusSelect = el('select', 'hub-filter__select') as HTMLSelectElement;
-    focusSelect.setAttribute('aria-label', 'Focus project for horizons');
-    const placeholder = el('option', '', 'Select a project…') as HTMLOptionElement;
-    placeholder.value = '';
-    focusSelect.append(placeholder);
-    for (const project of activeProjects) {
-      const opt = el('option', '', project.title) as HTMLOptionElement;
-      opt.value = project.id;
-      if (horizonsFocusProjectId === project.id) opt.selected = true;
-      focusSelect.append(opt);
-    }
-    focusSelect.addEventListener('change', () => {
-      horizonsFocusProjectId = focusSelect.value || null;
-      paintGoals(canvas, areas, goals, projects, tasks, direction, profile);
-    });
-    lens.append(focusSelect);
-
-    const focusProject = horizonsFocusProjectId
-      ? activeProjects.find((p) => p.id === horizonsFocusProjectId) ?? null
-      : null;
-    const focusGoal = focusProject
-      ? goals.find((g) => g.id === focusProject.parent_goal_id) ?? null
-      : null;
-    const focusArea = focusGoal?.parent_area_id
-      ? areasById.get(focusGoal.parent_area_id)
-      : undefined;
-    const next = focusProject
-      ? tasks.find(
-          (t) =>
-            t.parent_project_id === focusProject.id &&
-            (t.status === 'open' || t.status === 'in_progress') &&
-            !t.waiting_on
-        )
-      : null;
-    const purpose = direction?.purpose?.trim() || 'Purpose not set';
-    const vision = direction?.vision?.trim() || 'Vision not set';
-    const principles = (direction?.principles ?? []).filter(Boolean);
-    if (principles.length) {
-      lens.append(el('p', 'hierarchy-meta', `Principles: ${principles.join(' · ')}`));
-    }
-    lens.append(
-      createHierarchyTraceCard(document, {
-        purpose,
-        vision,
-        area: focusArea?.title,
-        goal: focusGoal?.title,
-        project: focusProject?.title ?? (horizonsFocusProjectId ? undefined : 'Select a project'),
-        nextAction: focusProject
-          ? (next?.title ?? 'Add next action')
-          : 'Select a project to see next action'
+  const top = el('div', 'goals-top');
+  const summary = el('p', 'goals-summary');
+  const actions = el('div', 'goals-top__actions');
+  if (term) {
+    const year = term.starts_on.slice(0, 4);
+    actions.append(
+      createHubPills({
+        label: 'Term',
+        items: data.terms.filter((t) => t.starts_on.startsWith(year)).map((t) => ({ id: t.starts_on, label: `Term ${t.term}` })),
+        value: term.starts_on,
+        onSelect: (id) => {
+          selectedTermStart = id;
+          paintGoals(canvas, data, overlay);
+        }
       })
     );
-    canvas.append(lens);
   }
+  const add = el('button', 'btn btn--primary', 'New goal');
+  add.type = 'button';
+  add.dataset.action = 'new-goal';
+  actions.append(add);
+  top.append(summary, actions);
+  const hammondHost = el('div', 'goals-hammond-host');
+  canvas.append(top, hammondHost);
+  add.addEventListener('click', () => {
+    if (canvas.querySelector('.goals-new')) return;
+    hammondHost.before(newGoalForm(data.goals, reload));
+  });
 
-  const grouped = new Map<string, Goal[]>();
-  for (const goal of activeGoals) {
-    const key = goal.parent_area_id ?? 'ungrouped';
-    const list = grouped.get(key) ?? [];
-    list.push(goal);
-    grouped.set(key, list);
+  if (!term) {
+    canvas.append(el('p', 'empty-state', 'Add your school terms in Tools → Term dates to see the runway.'));
+    return null;
   }
+  const runway = buildRunway({
+    goals: data.goals,
+    projects: data.projects,
+    tasks: data.tasks,
+    term,
+    today: data.today,
+    crunchWeeks: overlay.crunchWeeks,
+    proposedRest: overlay.proposedRest
+  });
+  const when = runway.nowWeek !== null
+    ? `week ${runway.nowWeek} of ${runway.weeks.length}`
+    : data.today < term.starts_on ? 'starts soon' : 'finished';
+  summary.textContent = `Term ${term.term} · ${when} · this week ${runway.weekSummary.done} of ${runway.weekSummary.total} moves done`;
+  canvas.append(renderRunway(runway, data, overlay));
+  return runway;
+}
 
-  for (const area of areas) {
-    const areaGoals = grouped.get(area.id) ?? [];
-    if (areaGoals.length === 0) continue;
-    const block = el('section', 'hierarchy-area');
-    block.append(el('h2', 'hierarchy-area__title', area.title));
-    for (const goal of areaGoals) {
-      block.append(renderGoalSection(goal, area.title, projects, tasks, editorHost, reload));
+function newGoalForm(goals: Goal[], reload: () => void): HTMLFormElement {
+  const form = el('form', 'glass-tile goals-new');
+  const title = el('input', 'goal-field');
+  title.name = 'title';
+  title.placeholder = 'What do you want to be true by the end of term?';
+  title.setAttribute('aria-label', 'Goal title');
+  const sphere = el('select', 'goal-field') as HTMLSelectElement;
+  sphere.name = 'sphere';
+  sphere.setAttribute('aria-label', 'Lane');
+  for (const id of SPHERES) {
+    const option = el('option', '', SPHERE_LABEL[id]) as HTMLOptionElement;
+    option.value = id;
+    sphere.append(option);
+  }
+  const submit = el('button', 'btn btn--primary', 'Create');
+  submit.type = 'submit';
+  const cancel = el('button', 'btn btn--ghost', 'Cancel');
+  cancel.type = 'button';
+  cancel.addEventListener('click', () => form.remove());
+  form.append(title, sphere, submit, cancel);
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const text = title.value.trim();
+    if (!text) return;
+    const lane = sphere.value as GoalSphere;
+    const activeInLane = goals.filter((g) => g.sphere === lane && g.status === 'active').length;
+    let status: Goal['status'] = 'active';
+    if (activeInLane >= LANE_CAP) {
+      const park = window.confirm(`${SPHERE_LABEL[lane]} already has ${LANE_CAP} active goals. Park one first? OK adds this goal as parked.`);
+      if (!park) return;
+      status = 'parked';
     }
-    canvas.append(block);
-  }
+    void tasksApi
+      .createGoal({ title: text, sphere: lane, ...(status === 'parked' ? { status } : {}) })
+      .then(reload)
+      .catch((err) => window.alert(errorMessage(err)));
+  });
+  queueMicrotask(() => title.focus());
+  return form;
+}
 
-  const ungrouped = grouped.get('ungrouped') ?? [];
-  if (ungrouped.length > 0) {
-    const block = el('section', 'hierarchy-area');
-    block.append(el('h2', 'hierarchy-area__title', 'Other goals'));
-    for (const goal of ungrouped) {
-      block.append(renderGoalSection(goal, undefined, projects, tasks, editorHost, reload));
+function renderRunway(runway: Runway, data: GoalsData, overlay: RunwayOverlay): HTMLElement {
+  const wrap = el('section', 'glass-tile runway');
+  const grid = el('div', 'runway__grid');
+  grid.style.setProperty('--weeks', String(runway.weeks.length));
+  const head = el('div', 'runway__head');
+  head.append(el('span', '', 'Goal · lead measure'));
+  for (const week of runway.weeks) {
+    head.append(el('span', `${week.isNow ? 'is-now' : ''}${week.isCrunch ? ' is-crunch' : ''}`.trim(), week.label));
+  }
+  head.append(el('span', '', "This week's one move"));
+  grid.append(head);
+  for (const lane of runway.lanes) grid.append(...renderLane(lane, data, overlay));
+  wrap.append(grid, legend());
+  return wrap;
+}
+
+function renderLane(lane: RunwayLane, data: GoalsData, overlay: RunwayOverlay): HTMLElement[] {
+  const label = el('div', `runway__lane runway__lane--${lane.sphere}`);
+  label.append(el('span', 'runway__dot'), el('span', '', lane.label), el('small', '', `${lane.slotsUsed} of ${LANE_CAP} slots`));
+  const nodes: HTMLElement[] = [label];
+  if (lane.rows.length === 0) nodes.push(el('p', 'runway__empty', 'No active goals in this lane.'));
+  for (const row of lane.rows) nodes.push(renderRow(row, lane.sphere, data, overlay));
+  if (lane.parked.length) {
+    const parked = el('details', 'runway__parked');
+    parked.append(el('summary', '', `Not this term (${lane.parked.length})`));
+    for (const goal of lane.parked) {
+      const link = el('a', '', `${goal.title} · ${goal.status}`);
+      link.href = goalPageHash(goal.id);
+      const item = el('div');
+      item.append(link);
+      parked.append(item);
     }
-    canvas.append(block);
+    nodes.push(parked);
   }
+  return nodes;
+}
 
-  if (areas.length === 0 && activeGoals.length === 0) {
-    canvas.append(el('p', 'empty-state', 'Create your first goal to start building the hierarchy.'));
+function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay: RunwayOverlay): HTMLElement {
+  const link = el('a', `runway__row runway__row--${sphere}`);
+  link.href = goalPageHash(row.goal.id);
+  const info = el('div', 'runway__goal');
+  const title = el('p', 'runway__goal-title', row.goal.title);
+  title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
+  const dream = row.goal.parent_someday_id ? data.tasks.find((t) => t.id === row.goal.parent_someday_id) : undefined;
+  const lead = row.goal.lead_measure
+    ? `${row.goal.lead_measure.label} · ${row.thisWeek.count}/${row.goal.lead_measure.per_week} this week`
+    : 'No lead measure yet';
+  info.append(title, el('p', 'runway__goal-meta', dream ? `${lead} · ✦ ${dream.title}` : lead));
+  link.append(info);
+  for (const cell of row.cells) {
+    const box = el('span', 'runway__cell');
+    if (cell.isNow) box.classList.add('is-now');
+    const mark = el('i', `cell cell--${cell.state}`);
+    mark.classList.toggle('is-now', cell.isNow);
+    mark.classList.toggle('is-proposed', cell.proposed);
+    mark.classList.toggle('has-milestone', cell.milestone);
+    mark.title = `${cell.monday}: ${cell.state}${cell.count ? ` (${cell.count})` : ''}`;
+    box.append(mark);
+    link.append(box);
   }
+  const move = el('p', 'runway__move');
+  move.append(el('b', '', 'Move'), document.createTextNode(row.move?.title ?? 'Add a next start'));
+  if (overlay.proposalGoalIds.has(row.goal.id)) move.append(el('span', 'is-proposal', ' · Hammond has a proposal'));
+  link.append(move);
+  return link;
+}
 
-  if (restoreSearch) {
-    const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter goals"]');
-    if (field) {
-      field.focus();
-      if (searchPos != null) field.setSelectionRange(searchPos, searchPos);
-    }
-  }
+function legend(): HTMLElement {
+  const wrap = el('div', 'runway__legend');
+  const item = (cls: string, label: string) => {
+    const span = el('span');
+    span.append(el('i', `cell ${cls}`), document.createTextNode(label));
+    return span;
+  };
+  wrap.append(
+    item('cell--done', 'Lead measure hit'),
+    item('cell--part', 'Partial'),
+    item('cell--rest', 'Rest week (not a fail)'),
+    item('is-proposed', 'Hammond proposal, waiting for you'),
+    item('has-milestone', 'Milestone')
+  );
+  return wrap;
 }
