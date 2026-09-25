@@ -1,6 +1,7 @@
 import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
 import { renderTideline } from './render-tideline.js';
 import { renderAlmanac, unmountAlmanac } from './render-almanac.js';
+import { renderDayDial, unmountDayDial } from './render-day-dial.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -15,6 +16,9 @@ import {
   timeGridHours,
   hourCaption
 } from '../../../../packages/design-kit/js/time-grid.js';
+
+/** Dial is the Day stop; Linear is the Tideline one-day view. */
+let dayLayout = 'dial';
 
 const TINT = {
   nutrition: 'gold',
@@ -82,6 +86,8 @@ export function renderCalendar(root, model, {
 
   const host = root.querySelector('#life-calendar-host') ?? dashboard;
   if (view === 'almanac') {
+    unmountDayDial();
+    dayLayout = 'dial';
     host.style.minWidth = '0';
     if (host.parentElement) host.parentElement.style.minWidth = '0';
     dashboard.removeAttribute('hidden');
@@ -89,6 +95,76 @@ export function renderCalendar(root, model, {
     return;
   }
   unmountAlmanac();
+
+  const weekDates = (model.weekDays ?? []).map(day => day.date);
+  const tidelineInput = {
+    events,
+    visual: calendarVisual,
+    ghosts: calendarGhosts,
+    apiFetch,
+    onSourcesChanged,
+    week: weekDates,
+    today: model.date,
+    now,
+    dayProfile: planningProfile?.day_profile ?? null,
+    terms: calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null,
+    onShiftRange,
+    onSelectDate,
+    onSwitchView: next => {
+      if (next === 'day') dayLayout = 'dial';
+      onSwitchView?.(next);
+    }
+  };
+
+  if (view === 'day') {
+    host.style.minWidth = '0';
+    if (host.parentElement) host.parentElement.style.minWidth = '0';
+    dashboard.removeAttribute('hidden');
+    if (dayLayout === 'linear') {
+      unmountDayDial();
+      let calendar = host.querySelector(':scope > .hub-calendar');
+      if (!calendar) {
+        host.replaceChildren();
+        calendar = root.createElement('div');
+        calendar.className = 'hub-calendar hub-calendar--workspace';
+        host.appendChild(calendar);
+      }
+      calendar.replaceChildren();
+      calendar.className = 'hub-calendar hub-calendar--workspace';
+      // Linear: the Tideline one-day view (same object as the phone week).
+      const selected = model.selectedDate && weekDates.includes(model.selectedDate)
+        ? model.selectedDate
+        : (weekDates.includes(model.date) ? model.date : weekDates[0]);
+      renderTideline(root, calendar, {
+        ...tidelineInput,
+        week: selected ? [selected] : weekDates.slice(0, 1)
+      });
+      return;
+    }
+    host.querySelectorAll(':scope > .hub-calendar').forEach(node => node.remove());
+    let dialHost = host.querySelector(':scope > .life-day-dial-host');
+    if (!dialHost) {
+      host.replaceChildren();
+      dialHost = root.createElement('div');
+      dialHost.className = 'life-day-dial-host';
+      dialHost.style.minWidth = '0';
+      host.appendChild(dialHost);
+    }
+    renderDayDial(root, dialHost, {
+      ...tidelineInput,
+      week: weekDates,
+      selectedDate: model.selectedDate || model.date,
+      onLinear: () => {
+        dayLayout = 'linear';
+        onSwitchView?.('day');
+      },
+      onSelectDate: next => onSelectDate?.(next)
+    });
+    return;
+  }
+
+  unmountDayDial();
+  dayLayout = 'dial';
 
   let calendar = host.querySelector(':scope > .hub-calendar');
   if (!calendar) {
@@ -101,21 +177,7 @@ export function renderCalendar(root, model, {
   if (mode === 'week') {
     calendar.replaceChildren();
     calendar.className = 'hub-calendar hub-calendar--workspace';
-    renderTideline(root, calendar, {
-      events,
-      visual: calendarVisual,
-      ghosts: calendarGhosts,
-      apiFetch,
-      onSourcesChanged,
-      week: (model.weekDays ?? []).map(day => day.date),
-      today: model.date,
-      now,
-      dayProfile: planningProfile?.day_profile ?? null,
-      terms: calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null,
-      onShiftRange,
-      onSelectDate,
-      onSwitchView
-    });
+    renderTideline(root, calendar, tidelineInput);
     dashboard.removeAttribute('hidden');
     return;
   }

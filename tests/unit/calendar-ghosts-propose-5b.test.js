@@ -287,6 +287,52 @@ test('opening again at 08:05 with nothing new proposes nothing', async () => {
   assert.equal(github.commits.length, commitsAfterFirst);
 });
 
+test('a fresh GET does not call school / lesson / professional loaders', async () => {
+  const files = emptyQueueSeed();
+  const diary = stampDiary('2026-09-24T07:40:00+10:00');
+  files.set(diary.path, diary.content);
+  const github = memoryGitHub(files);
+  const { open, commit } = openCommit(github);
+  await runCalendarGhostsPropose({
+    open,
+    commit,
+    today: TODAY,
+    nowIso: '2026-09-24T08:00:00+10:00',
+    nowMs: Date.parse('2026-09-24T08:00:00+10:00'),
+    terms: TERMS,
+    lessons: [],
+    professionalEvents: [],
+    trigger: 'refresh'
+  });
+
+  let lessonsCalls = 0;
+  let professionalCalls = 0;
+  const session = createSessionToken({
+    now: Date.parse('2026-09-24T08:05:00+10:00'),
+    randomBytes: () => Buffer.alloc(16, 4)
+  }, SECRET).token;
+  const handler = createCalendarGhostsHandler({
+    env: ENV,
+    now: () => Date.parse('2026-09-24T08:05:00+10:00'),
+    createGitHubClient: () => github,
+    getTasksStore: async () => ({
+      async get() { return null; },
+      async set() {},
+      async setJSON() {}
+    }),
+    loadLessons: async () => { lessonsCalls += 1; return []; },
+    loadProfessionalEvents: async () => { professionalCalls += 1; return []; }
+  });
+
+  const response = await handler(new Request(
+    `https://life.example/api/calendar-ghosts?from=2026-09-21&to=2026-09-27`,
+    { headers: { cookie: `life_hub_session=${session}` } }
+  ));
+  assert.equal(response.status, 200);
+  assert.equal(lessonsCalls, 0, 'fresh GET must not load teaching lessons');
+  assert.equal(professionalCalls, 0, 'fresh GET must not load professional events');
+});
+
 test('a run that proposes nothing still records last_run metadata', async () => {
   const files = new Map([
     ['central-node.md', '# CN\n'],

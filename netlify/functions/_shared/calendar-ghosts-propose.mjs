@@ -101,6 +101,20 @@ export function newestRecordAtForDate(events, today) {
   return newest;
 }
 
+/**
+ * Calendar GET: decide whether a refresh propose is due before loading school
+ * terms, lessons or professional events. Peeks last_run + today's newest record.
+ */
+export async function peekRefreshDue({ open, today, nowMs, warn = console.warn } = {}) {
+  if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return true;
+  const opened = await open();
+  const doc = parsePendingCalendarGhostsDoc(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
+  const paths = typeof opened.listPaths === 'function' ? opened.listPaths() : [];
+  const events = await readEvents(paths, path => opened.readFile(path), addDays(today, -1), today, warn);
+  const newestRecordAt = newestRecordAtForDate(events, today);
+  return shouldRefreshPropose(doc.last_run, { today, nowMs, newestRecordAt });
+}
+
 async function readEvents(paths, readFile, from, to, warn) {
   const events = [];
   for (const path of paths) {
