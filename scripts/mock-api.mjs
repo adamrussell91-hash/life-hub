@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { dump } from 'js-yaml';
-import { parseDateRange, CONFIG_PATHS, RESEARCH_PATH } from '../netlify/functions/_shared/repo-policy.mjs';
+import { parseDateRange, CONFIG_PATHS, RESEARCH_PATH, linkedRecordDate } from '../netlify/functions/_shared/repo-policy.mjs';
 import { TYPE_DOMAINS } from '../apps/life/js/core/records.js';
 import { listNamedShortcuts } from '../netlify/functions/_shared/capabilities/registry.mjs';
 import { buildHubMapSeed } from '../apps/life/js/app/hub-map-seed.js';
@@ -600,7 +600,7 @@ async function readFixtureRepository(rootPath, confirmedFiles = new Map()) {
 function isInRange(path, { from, to }) {
   if (path === CALENDAR_VISUAL_PATH) return true;
   if (CONFIG_PATHS.has(path) || RESEARCH_PATH.test(path)) return true;
-  const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1];
+  const date = /\/(\d{4}-\d{2}-\d{2})-[^/]+\.md$/.exec(path)?.[1] ?? linkedRecordDate(path);
   return date >= from && date <= to;
 }
 

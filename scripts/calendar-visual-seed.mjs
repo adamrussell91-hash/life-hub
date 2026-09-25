@@ -96,10 +96,15 @@ export async function loadCalendarVisualSeed() {
     source: 'calendar-visual-seed'
   }));
 
+  const items = (Array.isArray(fixture.ITEMS) ? fixture.ITEMS : []).map(item => {
+    if (item?.id === 'thu-workout' && skip?.workoutPath) return { ...item, recordPath: skip.workoutPath };
+    return item;
+  });
+
   files.set(CALENDAR_VISUAL_PATH, JSON.stringify({
     now: CALENDAR_VISUAL_NOW,
     LOGS: fixture.LOGS ?? [],
-    ITEMS: fixture.ITEMS ?? [],
+    ITEMS: items,
     DUE: fixture.DUE ?? [],
     GHOSTS: fixture.GHOSTS ?? [],
     WALLS: fixture.WALLS ?? [],

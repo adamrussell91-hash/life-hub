@@ -333,11 +333,12 @@ function mountAllDay(grid, date) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
     const chip = el('div', 'cal-due', `<b>${due.title}</b>`, cell, { 'data-part': 'due', 'data-id': due.id });
-    if (ghost && ghost.kind === 'move_task') {
+    const movedTo = due.movedTo || (moved?.outcome === 'accepted' && moved.ghost.kind === 'move_task' ? moved.ghost.to : null);
+    if (ghost && ghost.kind === 'move_task' && !due.moved) {
       el('span', 'cal-due__move', `<span class="cal-av cal-av--sm">${AGENT_INITIAL[ghost.agent] || ''}</span>${escapeHtml(ghost.label)}<button type="button" data-accept="${ghost.id}" data-label="Move">Move</button>`, chip, { 'data-ghost': ghost.id });
-    } else if (moved?.outcome === 'accepted' && moved.ghost.kind === 'move_task') {
+    } else if (movedTo) {
       chip.classList?.add?.('is-moved');
-      el('span', 'cal-due__move', movedCaption(moved.ghost.to, model.terms), chip);
+      el('span', 'cal-due__move', movedCaption(movedTo, model.terms), chip);
     }
     nodes.set(`due:${due.id}`, chip);
   }
@@ -397,6 +398,7 @@ function mountChip(body, chip) {
   const ghost = chip.ghost?.settled === 'accepted' ? null : chip.ghost;
   const classes = ['cal-chip', `k-${chip.kind}`];
   if (chip.isClass) classes.push('is-class');
+  if (chip.skipped) classes.push('is-skipped');
   if (chip.kind === 'corey') classes.push('is-corey');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');

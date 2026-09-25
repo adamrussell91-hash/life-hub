@@ -111,11 +111,27 @@ function eventKind(record) {
   return 'task';
 }
 
+function skippedBySara(record) {
+  return [record.updated_by, record.source].some(value => typeof value === 'string' && /\bsara\b/i.test(value));
+}
+
+/** Completed workouts leave the grid. Skipped ones stay, struck through. Planned (or no status) is unchanged. */
+function workoutOnGrid(record) {
+  if (record.type !== 'workout') return null;
+  if (record.status === 'completed') return 'omit';
+  if (record.status === 'skipped') {
+    return { skipped: true, meta: skippedBySara(record) ? 'Skipped · Sara' : 'Skipped' };
+  }
+  return null;
+}
+
 function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
   if (record.type === 'task' && !record.end_time) return null;
+  const workout = workoutOnGrid(record);
+  if (workout === 'omit') return null;
   const start = toHour(record.time);
   const end = record.end_time
     ? toHour(record.end_time)
@@ -129,11 +145,12 @@ function chipFromEvent(event) {
     end,
     kind,
     title: isClass ? (record.class_title || record.title || 'Class') : (record.title || kind),
-    meta: isClass && record.period ? `P${record.period} · ${record.focus || record.title || ''}`.trim() : clockMeta(start, end),
+    meta: workout?.meta ?? (isClass && record.period ? `P${record.period} · ${record.focus || record.title || ''}`.trim() : clockMeta(start, end)),
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
-    source: record.type
+    source: record.type,
+    ...(workout?.skipped ? { skipped: true } : {})
   };
 }
 
@@ -169,12 +186,26 @@ function mergeMedical(chips) {
   return [...rest, ...merged];
 }
 
-function chipsFromVisual(visual, date) {
-  return (visual.ITEMS ?? []).filter(item => item.date === date).map(item => ({
-    ...item,
-    start: toHour(item.start),
-    end: toHour(item.end)
-  }));
+function recordForItem(events, item) {
+  const path = typeof item.recordPath === 'string' ? item.recordPath : '';
+  if (!path) return null;
+  return (events ?? []).find(event => event.path === path)?.record ?? null;
+}
+
+function chipsFromVisual(visual, date, events) {
+  const chips = [];
+  for (const item of visual.ITEMS ?? []) {
+    if (item.date !== date) continue;
+    const workout = workoutOnGrid(recordForItem(events, item) ?? {});
+    if (workout === 'omit') continue;
+    chips.push({
+      ...item,
+      start: toHour(item.start),
+      end: toHour(item.end),
+      ...(workout?.skipped ? { skipped: true, meta: workout.meta } : {})
+    });
+  }
+  return chips;
 }
 
 function appendGhostChips(chips, ghosts, date) {
@@ -196,7 +227,14 @@ function appendGhostChips(chips, ghosts, date) {
 }
 
 function dueFor(visual, events, date, useVisual) {
-  if (useVisual) return (visual.DUE ?? []).filter(item => item.date === date);
+  if (useVisual) {
+    return (visual.DUE ?? []).filter(item => item.date === date).map(item => {
+      const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
+      const actual = task?.record?.date;
+      if (typeof actual === 'string' && actual !== item.date) return { ...item, moved: true, movedTo: actual };
+      return item;
+    });
+  }
   return (events ?? [])
     .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
     .map(event => ({
@@ -319,7 +357,7 @@ export function buildTidelineModel({
   const holiday = date => isSchoolHoliday(date, schoolTerms);
   const capacity = capacityForDates(events, week, { isHoliday: holiday });
   const days = week.map(date => {
-    const chips = appendGhostChips(useVisual ? chipsFromVisual(visual, date) : mergeMedical(
+    const chips = appendGhostChips(useVisual ? chipsFromVisual(visual, date, events) : mergeMedical(
       (events ?? []).map(chipFromEvent).filter(chip => chip && chip.date === date)
     ), ghostList, date);
     const cap = capacity.get(date);

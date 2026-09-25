@@ -1410,7 +1410,10 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
-      events: latestResult.events ?? [],
+      events: [
+        ...(latestResult.events ?? []),
+        ...tasksEvents
+      ],
       calendarVisual: latestResult.calendarVisual ?? null,
       calendarGhosts,
       apiFetch,
