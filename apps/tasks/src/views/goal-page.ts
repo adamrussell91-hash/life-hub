@@ -12,6 +12,7 @@ import { startFocusStrip } from '@/views/focus-strip';
 import { directTasks, hostedProjects, hostedTasks, isOpenTask, projectProgress, SPHERE_DOMAIN, SPHERE_LABEL } from '@/domain/goal-hosting';
 import { cellState, currentTerm, flattenTerms, sydneyToday, termWeeks, weekCount } from '@/domain/goal-runway';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { mountHammondPanel } from '@/views/hammond-goal';
 
 const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
   { id: 'woop', label: 'WOOP' },
@@ -28,14 +29,14 @@ const STATUSES: Array<{ id: Goal['status']; label: string }> = [
 ];
 
 export type GoalPageState = { goal: Goal; projects: Project[]; tasks: Task[]; terms: SchoolTerm[]; today: string };
-/** Hook for Task 17: fills the Hammond column. Defaults to nothing. */
+/** Hook for Hammond's column. Defaults to the live panel. */
 export type HammondMount = (host: HTMLElement, state: GoalPageState, reload: () => void) => void;
 
 export async function renderGoalPage(
   canvas: HTMLElement,
   goalId: string,
   today = sydneyToday(),
-  mountHammond: HammondMount = () => {}
+  mountHammond: HammondMount = (host, state, reload) => mountHammondPanel(host, state.goal, reload)
 ): Promise<void> {
   showViewLoading(canvas, 'Loading goal…', '.goal-page');
   try {
@@ -106,7 +107,7 @@ function paint(canvas: HTMLElement, state: GoalPageState, mountHammond: HammondM
 
   // 2. If-then + 3. next start
   const pair = el('div', 'goal-page__pair');
-  pair.append(ifThen(goal, save), nextStart(goal, canvas, save));
+  pair.append(ifThen(goal, save), nextStart(goal, canvas, save, reload));
   main.append(pair);
 
   // 4. Projects + milestones, 5. tasks
@@ -195,7 +196,7 @@ function ifThen(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
   return root;
 }
 
-function nextStart(goal: Goal, canvas: HTMLElement, save: (p: GoalPatch) => void): HTMLElement {
+function nextStart(goal: Goal, canvas: HTMLElement, save: (p: GoalPatch) => void, reload: () => void): HTMLElement {
   const root = el('section', 'goal-start');
   const input = el('input', 'goal-field');
   input.value = goal.next_start ?? '';
@@ -210,7 +211,10 @@ function nextStart(goal: Goal, canvas: HTMLElement, save: (p: GoalPatch) => void
   const body = el('button', 'btn btn--secondary', 'Body-double');
   body.type = 'button';
   body.addEventListener('click', () => startFocusStrip(canvas, { minutes: 15, label: "Hammond's with you" }));
-  row.append(start, body);
+  const split = el('button', 'btn btn--secondary', 'Split it');
+  split.type = 'button';
+  split.addEventListener('click', () => void tasksApi.rescanGoalRead(goal.id).then(reload));
+  row.append(start, body, split);
   row.dataset.slot = 'start-actions';
   root.append(el('p', 'goal-card__eyebrow', 'Smallest next start · 2 min'), input, row);
   return root;

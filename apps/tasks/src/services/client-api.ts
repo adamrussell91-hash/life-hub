@@ -439,6 +439,29 @@ export const tasksApi = {
     apiPatch<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`, body),
   deleteGoal: (id: string) => apiDelete<{ deleted: boolean }>(`/api/goals?id=${encodeURIComponent(id)}`),
 
+  getGoalReads: () =>
+    apiGet<{ reads: import('@/domain/goal-reads').GoalReadEnvelope[] }>('/api/goal-reads'),
+  getGoalRead: (goalId: string) =>
+    apiGet<import('@/domain/goal-reads').GoalReadEnvelope>(`/api/goal-reads?goal_id=${encodeURIComponent(goalId)}`),
+  rescanGoalRead: (goalId: string) =>
+    apiPost<import('@/domain/goal-reads').GoalReadEnvelope>('/api/goal-reads', { goal_id: goalId }),
+  decideGhost: async (id: string, decision: 'accept' | 'dismiss'): Promise<{ receipt: string; writes: string }> => {
+    const response = await fetch(`${getApiBaseUrl()}/api/calendar-ghosts`, {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, decision })
+    });
+    const body = (await response.json().catch(() => null)) as
+      | { ok?: boolean; receipt?: string; writes?: string; error?: { code: string; message: string } }
+      | null;
+    if (!response.ok || !body?.ok) {
+      throw new ApiClientError(body?.error ?? { code: 'ghost_failed', message: `Proposal failed (HTTP ${response.status})` }, response.status);
+    }
+    return { receipt: body.receipt ?? '', writes: body.writes ?? 'applied' };
+  },
+
   getTaskProperties: () => apiGet<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties'),
   updateTaskProperties: (body: import('@/schemas/task-properties').TaskPropertyConfig) =>
     apiPut<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties', body),

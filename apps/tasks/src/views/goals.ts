@@ -11,6 +11,8 @@ import {
   buildRunway, currentTerm, flattenTerms, sydneyToday,
   type Runway, type RunwayLane, type RunwayRow
 } from '@/domain/goal-runway';
+import { overlayFromReads, type GoalReadEnvelope } from '@/domain/goal-reads';
+import { renderHammondStrip } from '@/views/hammond-goal';
 
 export const STRUCTURE_CHIP: Record<Goal['structure'], string> = {
   woop: 'WOOP',
@@ -29,13 +31,16 @@ let selectedTermStart: string | null = null;
 export async function renderGoalsView(canvas: HTMLElement, today = sydneyToday()): Promise<void> {
   showViewLoading(canvas, 'Loading goals…', '.runway');
   try {
-    const [goals, projects, tasks, prefs] = await Promise.all([
+    const [goals, projects, tasks, prefs, readsResult] = await Promise.all([
       tasksApi.listGoals(),
       tasksApi.listProjects(),
       tasksApi.listTasks(),
-      tasksApi.getHubPrefs()
+      tasksApi.getHubPrefs(),
+      tasksApi.getGoalReads().catch(() => ({ reads: [] as GoalReadEnvelope[] }))
     ]);
-    paintGoals(canvas, { goals, projects, tasks, terms: flattenTerms(prefs), today });
+    const envelopes = readsResult.reads;
+    const overlay = overlayFromReads(envelopes.flatMap((e) => (e.read ? [e.read] : [])));
+    paintGoals(canvas, { goals, projects, tasks, terms: flattenTerms(prefs), today }, overlay, envelopes);
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load goals.')));
   }
@@ -44,7 +49,8 @@ export async function renderGoalsView(canvas: HTMLElement, today = sydneyToday()
 export function paintGoals(
   canvas: HTMLElement,
   data: GoalsData,
-  overlay: RunwayOverlay = { crunchWeeks: [], proposedRest: {}, proposalGoalIds: new Set() }
+  overlay: RunwayOverlay = { crunchWeeks: [], proposedRest: {}, proposalGoalIds: new Set() },
+  envelopes: GoalReadEnvelope[] = []
 ): Runway | null {
   const term = data.terms.find((t) => t.starts_on === selectedTermStart) ?? currentTerm(data.terms, data.today);
   canvas.replaceChildren();
@@ -62,7 +68,7 @@ export function paintGoals(
         value: term.starts_on,
         onSelect: (id) => {
           selectedTermStart = id;
-          paintGoals(canvas, data, overlay);
+          paintGoals(canvas, data, overlay, envelopes);
         }
       })
     );
@@ -74,6 +80,7 @@ export function paintGoals(
   top.append(summary, actions);
   const hammondHost = el('div', 'goals-hammond-host');
   canvas.append(top, hammondHost);
+  renderHammondStrip(hammondHost, envelopes, data.goals, reload);
   add.addEventListener('click', () => {
     if (canvas.querySelector('.goals-new')) return;
     hammondHost.before(newGoalForm(data.goals, reload));
