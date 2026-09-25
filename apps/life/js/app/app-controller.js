@@ -149,7 +149,8 @@ export function createAppController(dependencies) {
     setIntervalImpl = setInterval,
     clearIntervalImpl = clearInterval,
     setTimeoutImpl = setTimeout,
-    clearTimeoutImpl = clearTimeout
+    clearTimeoutImpl = clearTimeout,
+    apiFetch = (path, init) => fetch(path, { credentials: 'include', ...(init ?? {}) })
   } = dependencies ?? {};
 
   if (!root || !sessionApi || !cache || typeof loadLive !== 'function' ||
@@ -177,6 +178,8 @@ export function createAppController(dependencies) {
   let calendarCompose = { date: null, time: null, type: 'diary' };
   let calendarSelectedEventId = null;
   let calendarFocusCompose = false;
+  let calendarGhosts = [];
+  let calendarGhostsKey = '';
   let teachingEvents = [];
   let teachingCalendarInFlight = null;
   let knowledgeEvents = [];
@@ -306,6 +309,16 @@ export function createAppController(dependencies) {
   bind(root.querySelector('[data-task-add-form]'), 'submit', event => void submitTaskAdd(event));
   bind(windowTarget, 'online', () => void handleOnline());
   bind(windowTarget, 'offline', () => handleOffline());
+  bind(windowTarget, 'tasks-hub:tasks-changed', event => {
+    const tasks = event?.detail;
+    if (!Array.isArray(tasks) || !tasks.length) return;
+    const incoming = tasksEventsFromTasks(tasks);
+    const ids = new Set(incoming.map(item => item.record?.id).filter(Boolean));
+    tasksEvents = [
+      ...tasksEvents.filter(item => item.record?.type !== 'task' || !ids.has(item.record.id)),
+      ...incoming
+    ];
+  });
   bind(windowTarget, 'hashchange', () => {
     if (!authenticated) return;
     const next = sectionFromHash(windowTarget.location?.hash);
@@ -770,16 +783,29 @@ export function createAppController(dependencies) {
       if (zoom) calendarView = zoom;
       // The visual seed lands after the first snapshot. One forced refresh on the
       // first open picks it up; paint waits so the week is not drawn from stale files.
+      // Ghosts are drawn from GET /api/calendar-ghosts, so that read finishes first too.
       if (!calendarWeekSynced) {
         calendarWeekSynced = true;
         holdCalendarPaint = true;
         root.querySelector('#calendar-dashboard')?.removeAttribute('hidden');
-        void refresh({ force: true }).finally(() => {
-          holdCalendarPaint = false;
-          if (currentSection === 'calendar') renderCalendarSection();
-        });
+        void refresh({ force: true })
+          .then(() => loadCalendarGhostsForView())
+          .finally(() => {
+            holdCalendarPaint = false;
+            if (currentSection === 'calendar') renderCalendarSection();
+          });
       } else {
-        renderCalendarSection();
+        const range = visibleWeekRange();
+        const key = range ? `${range.from}|${range.to}` : '';
+        if (key && key !== calendarGhostsKey) {
+          holdCalendarPaint = true;
+          void loadCalendarGhostsForView().finally(() => {
+            holdCalendarPaint = false;
+            if (currentSection === 'calendar') renderCalendarSection();
+          });
+        } else {
+          renderCalendarSection();
+        }
       }
       void loadHubCalendars();
     }
@@ -1297,6 +1323,58 @@ export function createAppController(dependencies) {
     if (currentSection === 'skincare') renderSkincareSection();
   }
 
+  function visibleWeekRange() {
+    if (!latestResult || typeof buildCalendarModel !== 'function') return null;
+    const date = calendarSelectedDate || latestResult.date;
+    const model = buildCalendarModel({
+      events: [],
+      date: latestResult.date,
+      selectedDate: date,
+      viewMonth: (calendarViewMonth || String(date).slice(0, 7))
+    });
+    const days = (model.weekDays ?? []).map(day => day.date).filter(Boolean);
+    if (!days.length) return null;
+    return { from: days[0], to: days[days.length - 1] };
+  }
+
+  async function loadCalendarGhostsForView() {
+    const range = visibleWeekRange();
+    if (!range) {
+      calendarGhosts = [];
+      calendarGhostsKey = '';
+      return;
+    }
+    const key = `${range.from}|${range.to}`;
+    try {
+      const response = await apiFetch(`/api/calendar-ghosts?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`);
+      const payload = await response.json().catch(() => null);
+      calendarGhosts = response.ok && Array.isArray(payload?.ghosts) ? payload.ghosts : [];
+    } catch {
+      calendarGhosts = [];
+    }
+    calendarGhostsKey = key;
+  }
+
+  async function refreshGhostSources() {
+    // Keep the week painted. A remount would restart the column entrance under
+    // the receipt. Life records and tasks still reload for the other surfaces.
+    holdCalendarPaint = true;
+    try {
+      await refresh({ force: true });
+      await loadTasksCalendar();
+      if (tasksApi?.listTasks) {
+        const tasks = await tasksApi.listTasks().catch(() => []);
+        if (Array.isArray(tasks) && tasks.length) {
+          windowTarget.dispatchEvent(new CustomEvent('tasks-hub:tasks-changed', { detail: tasks }));
+        }
+      }
+    } catch {
+      // The toast already reported the write. The next open reads the repo again.
+    } finally {
+      holdCalendarPaint = false;
+    }
+  }
+
   function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {
     if (holdCalendarPaint) return;
     if (!latestResult || !buildCalendarModel || !renderCalendar) return;
@@ -1332,8 +1410,14 @@ export function createAppController(dependencies) {
       selectedEventId: calendarSelectedEventId,
       focusCompose,
       now: now(),
-      events: latestResult.events ?? [],
+      events: [
+        ...(latestResult.events ?? []),
+        ...tasksEvents
+      ],
       calendarVisual: latestResult.calendarVisual ?? null,
+      calendarGhosts,
+      apiFetch,
+      onSourcesChanged: () => refreshGhostSources(),
       planningProfile: calendarPlanningProfile,
       onTogglePlanningLens: () => {
         calendarPlanningLens = !calendarPlanningLens;
@@ -1386,7 +1470,9 @@ export function createAppController(dependencies) {
         calendarSelectedDate = addCalendarDays(calendarSelectedDate, step);
         calendarViewMonth = calendarSelectedDate.slice(0, 7);
         calendarCompose = { ...calendarCompose, date: calendarSelectedDate };
-        renderCalendarSection({ scrollToDetail: true });
+        void loadCalendarGhostsForView().finally(() => {
+          if (currentSection === 'calendar') renderCalendarSection({ scrollToDetail: true });
+        });
       },
       onCreateLog: payload => {
         void createCalendarLog(payload);

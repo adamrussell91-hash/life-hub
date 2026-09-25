@@ -1,4 +1,5 @@
 import { parseEventDocument } from '../core/records.js';
+import { validateRecord } from '../core/validate.js';
 import { addCalendarDays, daysBetween, isCalendarDate } from '../core/time.js';
 import { GOVERNANCE_LOG_PATH } from '../core/governance-log.js';
 import { WEEK_FLAGS_PATH, parseWeekFlags } from '../core/open-loops.js';
@@ -11,6 +12,7 @@ const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
 const CENTRAL_NODE_PATH = 'central-node.md';
 const EVENT_PATH = /^data\/.+\.md$/;
+const LINKED_RECORD_PATH = /^records\/\d{4}\/\d{2}\/\d{2}\/[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 const CALENDAR_VISUAL_PATH = 'calendar-visual.json';
 const INITIAL_LOOKBACK_DAYS = 6;
 /** Days ahead of today in the first sync so week Tideline can show held Almanac blocks. */
@@ -165,6 +167,8 @@ function createValidator(loadYaml) {
         JSON.parse(file.content);
       } else if (EVENT_PATH.test(file.path)) {
         parseEventDocument(file.content, file.path, loadYaml);
+      } else if (LINKED_RECORD_PATH.test(file.path)) {
+        parseLinkedRecord(file.content, file.path, loadYaml);
       } else {
         return { valid: false, code: 'invalid_file' };
       }
@@ -234,6 +238,19 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   };
 }
 
+function parseLinkedRecord(text, path, loadYaml) {
+  if (typeof text !== 'string') throw new TypeError(`Event document must be text: ${path}`);
+  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n)?([\s\S]*)$/.exec(text.trim());
+  if (!match) throw new TypeError(`Missing YAML frontmatter: ${path}`);
+  const record = loadYaml(match[1]);
+  if (record === null || typeof record !== 'object' || Array.isArray(record)) {
+    throw new TypeError(`Invalid record: ${path}`);
+  }
+  const errors = validateRecord(record);
+  if (errors.length) throw new TypeError(`${path}: ${errors.join('; ')}`);
+  return { record, body: match[2].trim(), path };
+}
+
 function parseFile(file, loadYaml) {
   try {
     if (file.path === TARGETS_PATH) return { kind: 'targets', value: loadYaml(file.content) };
@@ -258,6 +275,9 @@ function parseFile(file, loadYaml) {
     }
     if (EVENT_PATH.test(file.path)) {
       return { kind: 'event', value: parseEventDocument(file.content, file.path, loadYaml) };
+    }
+    if (LINKED_RECORD_PATH.test(file.path)) {
+      return { kind: 'event', value: parseLinkedRecord(file.content, file.path, loadYaml) };
     }
     return { kind: 'ignored' };
   } catch {

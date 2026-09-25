@@ -592,3 +592,36 @@ Labs`);
     event.record.type === 'bloods' && event.record.date === '2023-03-21'
   )));
 });
+
+test('a linked workout record is an event the week can read', async () => {
+  const path = 'records/2026/09/24/workout-1815.md';
+  const file = raw(path, `---
+schema_version: 1
+id: workout-1815
+type: workout
+date: "2026-09-24"
+time: "18:15"
+created_at: "2026-09-24T18:15:00+10:00"
+updated_at: "2026-09-24T18:20:00+10:00"
+source: calendar-visual-seed
+title: Gym
+day_type: workout_45_60
+status: skipped
+session_kind: strength
+exercises: []
+---
+`);
+  const sync = async ({ validateFile, to }) => {
+    if (to !== '2026-09-24') {
+      return { files: [], warnings: [], commitSha: SHA, changed: false, freshness: 'confirmed' };
+    }
+    assert.deepEqual(validateFile(file), { valid: true });
+    return { files: [file], warnings: [], commitSha: SHA, changed: true, freshness: 'confirmed' };
+  };
+  const result = await loadLiveEvents({
+    sync, loadYaml: load, date: '2026-09-24', backfill: false
+  });
+  const event = result.events.find(item => item.path === path);
+  assert.equal(event.record.type, 'workout');
+  assert.equal(event.record.status, 'skipped');
+});

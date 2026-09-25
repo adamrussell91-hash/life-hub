@@ -13,8 +13,8 @@ import {
   SLEEP_STRIP_PX,
   yForHour
 } from '../../../../packages/design-kit/js/calendar-bands.js';
-import { acceptPlan, dismissPlan } from './ghost-writes.js';
-import { buildTidelineModel, toHour } from './tideline-model.js';
+import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
+import { buildTidelineModel, movedCaption, toHour } from './tideline-model.js';
 import { getSydneyMinutesOfDay } from '../core/time.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
@@ -57,11 +57,11 @@ export { BAND_SESSION_KEY, readBandSession, writeBandSession };
 
 const state = {
   expanded: readBandSession(),
-  accepted: new Set(),
-  dismissed: new Set(),
+  settled: new Map(),
   busy: new Set(),
   phone: false,
-  phoneDay: ''
+  phoneDay: '',
+  toast: null
 };
 const nodes = new Map();
 let engine = null;
@@ -131,8 +131,45 @@ function clockFor(view) {
 }
 
 function ghostInput(ghost) {
-  const { label, meta, chip, overItem, ...rest } = ghost;
+  const { label, meta, chip, overItem, settled, created_at, status, tasks_pending, ...rest } = ghost;
   return rest;
+}
+
+function agentName(agent) {
+  return GHOST_AGENTS[agent] || 'Hammond';
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** The only body that leaves the browser. The server loads the ghost and builds the writes. */
+export function ghostDecisionBody(id, decision, reason) {
+  const body = { id, decision };
+  if (typeof reason === 'string' && reason) body.reason = reason;
+  return body;
+}
+
+function ghostsForPaint(list) {
+  const source = Array.isArray(list) ? list : null;
+  if (!source) return null;
+  const out = [];
+  for (const ghost of source) {
+    const decision = state.settled.get(ghost.id);
+    if (decision?.outcome === 'dismissed') continue;
+    if (decision?.outcome === 'accepted' && (ghost.overItem || ghost.kind === 'move_task')) continue;
+    out.push(decision?.outcome === 'accepted' ? { ...ghost, settled: 'accepted' } : ghost);
+  }
+  for (const entry of state.settled.values()) {
+    if (entry.outcome !== 'accepted' || entry.ghost.overItem || entry.ghost.kind === 'move_task') continue;
+    if (out.some(ghost => ghost.id === entry.ghost.id)) continue;
+    out.push({ ...entry.ghost, settled: 'accepted' });
+  }
+  return out;
 }
 
 export function renderTideline(doc, calendarHost, nextInput) {
@@ -152,6 +189,7 @@ function mount() {
   model = buildTidelineModel({
     events: input.events ?? [],
     visual: input.visual ?? null,
+    ghosts: ghostsForPaint(input.ghosts),
     week: input.week,
     today: input.today,
     nowHour,
@@ -259,6 +297,7 @@ function mount() {
   } else {
     wire(section);
   }
+  applySettled();
   publish(view);
   watchPhone(view);
 }
@@ -292,9 +331,14 @@ function mountAllDay(grid, date) {
   const cell = el('div', 'cal-allday', undefined, grid, { 'data-part': 'all-day', 'data-date': date });
   for (const due of day.due) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
+    const moved = state.settled.get(due.ghostId);
     const chip = el('div', 'cal-due', `<b>${due.title}</b>`, cell, { 'data-part': 'due', 'data-id': due.id });
-    if (ghost) {
-      el('span', 'cal-due__move', `<span class="cal-av cal-av--sm">${AGENT_INITIAL[ghost.agent]}</span>${ghost.label}<button type="button" data-accept="${ghost.id}">Move</button>`, chip, { 'data-ghost': ghost.id });
+    const movedTo = due.movedTo || (moved?.outcome === 'accepted' && moved.ghost.kind === 'move_task' ? moved.ghost.to : null);
+    if (ghost && ghost.kind === 'move_task' && !due.moved) {
+      el('span', 'cal-due__move', `<span class="cal-av cal-av--sm">${AGENT_INITIAL[ghost.agent] || ''}</span>${escapeHtml(ghost.label)}<button type="button" data-accept="${ghost.id}" data-label="Move">Move</button>`, chip, { 'data-ghost': ghost.id });
+    } else if (movedTo) {
+      chip.classList?.add?.('is-moved');
+      el('span', 'cal-due__move', movedCaption(movedTo, model.terms), chip);
     }
     nodes.set(`due:${due.id}`, chip);
   }
@@ -351,16 +395,18 @@ function mountBody(grid, date) {
 }
 
 function mountChip(body, chip) {
-  const ghost = chip.ghost;
+  const ghost = chip.ghost?.settled === 'accepted' ? null : chip.ghost;
   const classes = ['cal-chip', `k-${chip.kind}`];
   if (chip.isClass) classes.push('is-class');
+  if (chip.skipped) classes.push('is-skipped');
   if (chip.kind === 'corey') classes.push('is-corey');
   if (ghost) classes.push('is-ghost');
+  if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
   const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
   const agent = ghost ? `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span></span>` : '';
   const acts = ghost && ghost.kind !== 'bedtime'
-    ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
-    : ghost ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}">Accept</button></div>` : '';
+    ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
+    : ghost ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button></div>` : '';
   const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${chip.meta}</div>${acts}`, body, {
     'data-part': ghost ? 'ghost' : chip.isClass ? 'class' : 'chip',
     'data-id': chip.id,
@@ -373,12 +419,12 @@ function mountChip(body, chip) {
     'data-end': String(chip.end),
     'data-has-actions': acts ? '1' : ''
   });
-  const proposal = model.ghosts.find(item => item.overItem === chip.id && !state.dismissed.has(item.id) && !state.accepted.has(item.id));
+  const proposal = model.ghosts.find(item => item.overItem === chip.id && !state.settled.has(item.id));
   if (proposal && typeof node.insertAdjacentHTML === 'function') {
     node.classList.add('has-proposal');
     node.dataset.ghost = proposal.id;
     node.insertAdjacentHTML('afterbegin', `<span class="cal-chip__agent"><span class="cal-av cal-av--sm ${proposal.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[proposal.agent]}</span></span>`);
-    node.insertAdjacentHTML('beforeend', `<div class="cal-chip__proposal" data-part="proposal">${proposal.agent === 'sara' ? 'Sara' : 'Hammond'} suggests: ${proposal.label.toLowerCase()}</div>`);
+    node.insertAdjacentHTML('beforeend', `<div class="cal-chip__proposal" data-part="proposal">${agentName(proposal.agent)} suggests: ${escapeHtml(proposal.label).toLowerCase()}</div>`);
     node.setAttribute('aria-label', `${chip.title}. ${chip.meta}. Proposal: ${proposal.label}. Open for details.`);
   }
   nodes.set(`chip:${chip.id}`, node);
@@ -499,6 +545,7 @@ function toggleBand(index) {
 function showToast(html) {
   const toast = nodes.get('__toast');
   if (!toast) return;
+  state.toast = { html, until: Date.now() + CAL.toastHoldMs };
   markup(toast, html);
   engine.to('__toast', { opacity: 1, y: 0 }, { duration: CAL.toastInMs });
   clearTimeout(toastTimer);
@@ -507,89 +554,192 @@ function showToast(html) {
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-async function accept(ghostId, { quiet = false } = {}) {
-  const ghost = model.ghosts.find(item => item.id === ghostId);
-  if (!ghost || state.accepted.has(ghostId) || state.dismissed.has(ghostId) || state.busy.has(ghostId)) return null;
-  const plan = acceptPlan(ghostInput(ghost), { today: model.today });
-  state.busy.add(ghostId);
-  host.querySelectorAll?.(`[data-accept="${ghostId}"],[data-dismiss="${ghostId}"]`)?.forEach(button => {
-    button.disabled = true;
-    if (button.dataset.accept) button.textContent = 'Saving…';
-  });
-  await wait(CAL.saveLatencyMs);
-  state.busy.delete(ghostId);
-  state.accepted.add(ghostId);
-  if (ghost.kind === 'move_task') {
-    const due = nodes.get(`due:${ghost.taskId}`);
-    due?.classList?.add?.('is-moved');
-    const move = due?.querySelector?.('.cal-due__move');
-    if (move) markup(move, 'Moved to T4 W1 Tue');
-  } else if (ghost.overItem) {
-    const item = nodes.get(`chip:${ghost.overItem}`);
-    item?.classList?.remove?.('has-proposal');
-    item?.classList?.add?.('is-skipped');
-    item?.querySelector?.('.cal-chip__agent')?.remove();
-    item?.querySelector?.('.cal-chip__proposal')?.remove();
-    const meta = item?.querySelector?.('.cal-chip__meta');
-    if (meta) meta.textContent = 'Skipped · Sara';
-  } else {
-    const chip = nodes.get(`chip:${ghostId}`);
-    chip?.classList?.add?.('is-accepted');
-    chip?.querySelector?.('.cal-chip__acts')?.remove();
-    if (chip) chip.dataset.part = 'chip';
-    engine.to(`chip:${ghostId}`, { solid: 1 }, { duration: CAL.acceptMs });
-  }
-  if (!quiet) showToast(`<b>Written.</b> ${plan.receipt}`);
-  const live = nodes.get('__live');
-  if (live) live.textContent = plan.receipt;
-  return plan;
+function decisionButtons(ghostId) {
+  return [...(host?.querySelectorAll?.(`[data-accept="${ghostId}"],[data-dismiss="${ghostId}"]`) ?? [])];
 }
 
-function dismiss(ghostId) {
-  const ghost = model.ghosts.find(item => item.id === ghostId);
-  if (!ghost || state.accepted.has(ghostId) || state.dismissed.has(ghostId)) return;
-  const plan = dismissPlan(ghostInput(ghost));
-  state.dismissed.add(ghostId);
+function armButtons(ghostId, busy, { saving = false } = {}) {
+  for (const button of decisionButtons(ghostId)) {
+    if (button.dataset.accept && !button.dataset.label) button.dataset.label = button.textContent;
+    button.disabled = busy;
+    if (!button.dataset.accept) continue;
+    button.textContent = saving ? 'Saving…' : button.dataset.label;
+  }
+}
+
+function markRetry(ghostId) {
+  for (const button of decisionButtons(ghostId)) {
+    button.disabled = false;
+    if (!button.dataset.accept) continue;
+    button.dataset.label = 'Retry';
+    button.textContent = 'Retry';
+  }
+}
+
+async function postDecision(id, decision, reason) {
+  const request = input?.apiFetch ?? globalThis.fetch;
+  const response = await request('/api/calendar-ghosts', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(ghostDecisionBody(id, decision, reason))
+  });
+  const payload = await response.json().catch(() => null);
+  return { status: response.status, payload };
+}
+
+function errorText(payload, fallback) {
+  const message = payload?.error?.message;
+  return typeof message === 'string' && message ? message : fallback;
+}
+
+function paintAccepted(ghost) {
+  if (ghost.kind === 'move_task') {
+    const due = nodes.get(`due:${ghost.taskId}`);
+    if (!due) return;
+    due.classList?.add?.('is-moved');
+    let move = due.querySelector?.('.cal-due__move');
+    if (!move) move = el('span', 'cal-due__move', '', due);
+    markup(move, movedCaption(ghost.to, model.terms));
+    return;
+  }
+  if (ghost.overItem) {
+    const item = nodes.get(`chip:${ghost.overItem}`);
+    if (!item) return;
+    item.classList?.remove?.('has-proposal');
+    item.classList?.add?.('is-skipped');
+    item.querySelector?.('.cal-chip__agent')?.remove();
+    item.querySelector?.('.cal-chip__proposal')?.remove();
+    const meta = item.querySelector?.('.cal-chip__meta');
+    if (meta) meta.textContent = `Skipped · ${agentName(ghost.agent)}`;
+    return;
+  }
+  const chip = nodes.get(`chip:${ghost.id}`);
+  if (!chip) return;
+  chip.classList?.add?.('is-accepted');
+  chip.querySelector?.('.cal-chip__acts')?.remove();
+  chip.dataset.part = 'chip';
+  engine.to(`chip:${ghost.id}`, { solid: 1 }, { duration: CAL.acceptMs });
+}
+
+function paintDismissed(ghost) {
   if (ghost.overItem) {
     const item = nodes.get(`chip:${ghost.overItem}`);
     item?.classList?.remove?.('has-proposal');
     item?.querySelector?.('.cal-chip__agent')?.remove();
     item?.querySelector?.('.cal-chip__proposal')?.remove();
-    showToast(`<b>${plan.receipt}</b> Sara notes the “no”, so she asks less often.`);
     return;
   }
-  engine.to(`chip:${ghostId}`, { scale: 0.96 }, { duration: CAL.exitMs });
-  engine.exit(`chip:${ghostId}`, () => {
-    nodes.get(`chip:${ghostId}`)?.remove();
-    nodes.delete(`chip:${ghostId}`);
+  engine.to(`chip:${ghost.id}`, { scale: 0.96 }, { duration: CAL.exitMs });
+  engine.exit(`chip:${ghost.id}`, () => {
+    nodes.get(`chip:${ghost.id}`)?.remove();
+    nodes.delete(`chip:${ghost.id}`);
   }, { duration: CAL.exitMs });
-  const who = ghost.agent === 'sara' ? 'Sara' : 'Hammond';
-  showToast(`<b>${plan.receipt}</b> ${who} notes the “no”, so it asks less often.`);
+}
+
+function applySettled() {
+  for (const entry of state.settled.values()) {
+    if (entry.outcome === 'accepted') paintAccepted(entry.ghost);
+  }
+  if (state.toast && Date.now() < state.toast.until) showToast(state.toast.html);
+}
+
+function pendingGhost(ghostId) {
+  if (state.settled.has(ghostId) || state.busy.has(ghostId)) return null;
+  return model?.ghosts?.find(item => item.id === ghostId && item.settled !== 'accepted') ?? null;
+}
+
+async function accept(ghostId, { quiet = false } = {}) {
+  const ghost = pendingGhost(ghostId);
+  if (!ghost) return null;
+  state.busy.add(ghostId);
+  armButtons(ghostId, true, { saving: true });
+  let result;
+  try {
+    result = await postDecision(ghostId, 'accept');
+  } catch (error) {
+    state.busy.delete(ghostId);
+    armButtons(ghostId, false);
+    if (!quiet) showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+    return null;
+  }
+  state.busy.delete(ghostId);
+  const receipt = typeof result.payload?.receipt === 'string' ? result.payload.receipt : '';
+  if (result.status === 207 || result.payload?.writes === 'partial' || result.payload?.retry === 'tasks') {
+    markRetry(ghostId);
+    if (!quiet) showToast(`<b>Tasks will retry.</b> ${escapeHtml(receipt)} <button type="button" data-accept="${ghostId}" data-label="Retry">Retry</button>`);
+    return null;
+  }
+  if (result.status !== 200 || result.payload?.ok === false) {
+    armButtons(ghostId, false);
+    if (!quiet) showToast(`<b>Not saved.</b> ${escapeHtml(errorText(result.payload, 'Could not save that change.'))}`);
+    return null;
+  }
+  state.settled.set(ghostId, { outcome: 'accepted', ghost });
+  paintAccepted(ghost);
+  if (!quiet) showToast(`<b>Written.</b> ${escapeHtml(receipt)}`);
+  const live = nodes.get('__live');
+  if (live) live.textContent = receipt;
+  if (!quiet) void input?.onSourcesChanged?.();
+  return { receipt };
+}
+
+async function dismiss(ghostId) {
+  const ghost = pendingGhost(ghostId);
+  if (!ghost) return;
+  state.busy.add(ghostId);
+  armButtons(ghostId, true);
+  let result;
+  try {
+    result = await postDecision(ghostId, 'dismiss');
+  } catch (error) {
+    state.busy.delete(ghostId);
+    armButtons(ghostId, false);
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+    return;
+  }
+  state.busy.delete(ghostId);
+  if (result.status !== 200 || result.payload?.ok === false) {
+    armButtons(ghostId, false);
+    showToast(`<b>Not saved.</b> ${escapeHtml(errorText(result.payload, 'Could not dismiss that change.'))}`);
+    return;
+  }
+  state.settled.set(ghostId, { outcome: 'dismissed', ghost });
+  paintDismissed(ghost);
+  const receipt = typeof result.payload?.receipt === 'string' ? result.payload.receipt : 'Dismissed. Nothing written.';
+  const who = agentName(ghost.agent);
+  const note = ghost.overItem && ghost.agent === 'sara'
+    ? 'Sara notes the “no”, so she asks less often.'
+    : `${who} notes the “no”, so it asks less often.`;
+  showToast(`<b>${escapeHtml(receipt)}</b> ${note}`);
+  const live = nodes.get('__live');
+  if (live) live.textContent = receipt;
 }
 
 async function applyAll() {
-  const pending = model.ghosts.filter(ghost => !state.accepted.has(ghost.id) && !state.dismissed.has(ghost.id));
+  const pending = model.ghosts.filter(ghost => !state.settled.has(ghost.id) && ghost.settled !== 'accepted');
   const plans = await Promise.all(pending.map(async (ghost, index) => {
     await wait(index * CAL.applyAllStagger);
     return accept(ghost.id, { quiet: true });
   }));
   const done = plans.filter(Boolean);
   if (done.length) showToast(`<b>${done.length} change${done.length === 1 ? '' : 's'} written.</b> Receipts are in Central Node › Recent Agent Actions.`);
+  if (done.length) void input?.onSourcesChanged?.();
 }
 
 function openPop(chipId) {
   const chip = nodes.get(`chip:${chipId}`);
   const pop = nodes.get('__pop');
   if (!chip || !pop) return;
-  const ghost = model.ghosts.find(item => (item.id === chipId || item.overItem === chipId) && !state.accepted.has(item.id) && !state.dismissed.has(item.id));
+  const ghost = model.ghosts.find(item => (item.id === chipId || item.overItem === chipId) && !state.settled.has(item.id) && item.settled !== 'accepted');
   const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chipId);
   const title = ghost && !ghost.overItem ? ghost.label : item?.title ?? chip.title;
   const meta = ghost && !ghost.overItem ? ghost.meta : item?.meta ?? '';
-  let html = `<div class="cal-pop__head">${ghost ? `<span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent]}</span>` : `<i class="cal-pop__dot k-${chip.dataset.kind}"></i>`}<b>${title}</b></div><p class="cal-pop__meta">${meta}</p>`;
+  let html = `<div class="cal-pop__head">${ghost ? `<span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent] || ''}</span>` : `<i class="cal-pop__dot k-${chip.dataset.kind}"></i>`}<b>${escapeHtml(title)}</b></div><p class="cal-pop__meta">${escapeHtml(meta)}</p>`;
   if (ghost) {
-    if (ghost.overItem) html += `<p class="cal-pop__label">${ghost.agent === 'sara' ? 'Sara' : 'Hammond'} suggests</p><p class="cal-pop__meta cal-pop__meta--strong">${ghost.label} · ${ghost.meta}</p>`;
-    html += `<p class="cal-pop__label">Accept writes</p><p class="cal-pop__writes" data-part="write-preview">${acceptPlan(ghostInput(ghost), { today: model.today }).receipt}</p>`;
-    html += `<div class="cal-pop__acts"><button type="button" class="btn btn--primary" data-accept="${ghost.id}">Accept</button>${ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${ghost.id}">Dismiss</button>`}</div>`;
+    const preview = acceptPlan(ghostInput(ghost), { today: model.today }).receipt;
+    if (ghost.overItem) html += `<p class="cal-pop__label">${agentName(ghost.agent)} suggests</p><p class="cal-pop__meta cal-pop__meta--strong">${escapeHtml(ghost.label)} · ${escapeHtml(ghost.meta)}</p>`;
+    html += `<p class="cal-pop__label">Accept writes</p><p class="cal-pop__writes" data-part="write-preview">${escapeHtml(preview)}</p>`;
+    html += `<div class="cal-pop__acts"><button type="button" class="btn btn--primary" data-accept="${ghost.id}" data-label="Accept">Accept</button>${ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${ghost.id}">Dismiss</button>`}</div>`;
   }
   markup(pop, html);
   pop.hidden = false;
@@ -604,6 +754,7 @@ function openPop(chipId) {
   popFor = chipId;
   engine.place('__pop', { opacity: 0, y: CAL.popRise });
   engine.to('__pop', { opacity: 1, y: 0 }, { duration: CAL.popMs });
+  pop.querySelector?.('button')?.focus?.({ preventScroll: true });
 }
 
 function closePop() {
@@ -635,7 +786,7 @@ function wire(section) {
     const dismissButton = target.closest?.('[data-dismiss]');
     if (dismissButton) {
       closePop();
-      dismiss(dismissButton.dataset.dismiss);
+      void dismiss(dismissButton.dataset.dismiss);
       return;
     }
     const chip = target.closest?.('.cal-chip');

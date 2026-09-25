@@ -297,6 +297,29 @@ test('phase 4: dismiss writes nothing; Apply all writes every pending ghost once
   }
 });
 
+test('phase 4: what Accept wrote is what the calendar shows after a reload (app only)', { skip: !APP && 'the reference has no server' }, async () => {
+  const { context, page } = await open();
+  try {
+    await page.locator('[data-id="thu-workout"]').click();
+    await page.locator('[data-part="chip-popover"] [data-accept="g-skip"]').click();
+    await page.locator('[data-part="due"] [data-accept="g-move"]').click();
+    await page.waitForTimeout(1500);
+    await page.reload();
+    await page.locator('#app[data-state="ready"]').waitFor();
+    await page.evaluate(() => { location.hash = '#/calendar'; });
+    await page.locator('[data-part="tideline"]').waitFor();
+    await page.waitForTimeout(900);
+    const workout = page.locator('[data-id="thu-workout"]');
+    assert.match(await workout.getAttribute('class'), /is-skipped/, 'the skipped workout record renders as skipped');
+    assert.doesNotMatch(await workout.getAttribute('class'), /has-proposal/);
+    assert.match(await workout.locator('.cal-chip__meta').textContent(), /^Skipped/);
+    assert.match(await page.locator('[data-part="due"][data-id="task-josh-y10"]').getAttribute('class') ?? '', /is-moved/, 'or the task is gone from 25/09');
+    assert.deepEqual(await page.locator('[data-part="ghost"]').evaluateAll(n => n.map(x => x.dataset.id).sort()), ['g-bed', 'g-good']);
+  } finally {
+    await context.close();
+  }
+});
+
 /* ------------------------------------------------------------------ phase 2 (phone) */
 
 test('phase 2: phone shows one day with the week strip and never scrolls sideways', async () => {
