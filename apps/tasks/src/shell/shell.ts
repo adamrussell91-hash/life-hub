@@ -58,7 +58,8 @@ export type HubViewId =
   | 'programs'
   | 'stress'
   | 'corey'
-  | 'properties';
+  | 'properties'
+  | 'term-dates';
 
 type NavItem = { id: HubViewId; label: string; href: string };
 
@@ -83,7 +84,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'month', label: 'Month', href: '#/month' },
       { id: 'list', label: 'Backlog', href: '#/list' },
       { id: 'graph', label: 'Graph', href: '#/graph' },
-      { id: 'gantt', label: 'Gantt', href: '#/gantt' },
       { id: 'timeline', label: 'Timeline', href: '#/timeline' }
     ]
   },
@@ -120,7 +120,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'maps', label: 'Maps', href: '#/maps' },
       { id: 'search', label: 'Search', href: '#/search' },
-      { id: 'properties', label: 'Properties', href: '#/properties' }
+      { id: 'properties', label: 'Properties', href: '#/properties' },
+      { id: 'term-dates', label: 'Term dates', href: '#/term-dates' }
     ]
   }
 ];
@@ -717,8 +718,16 @@ export function parseBacklogTriage(hash = location.hash): boolean {
   return path === 'backlog/triage';
 }
 
+/** Old Gantt links land on Timeline with the same query. */
+export function canonicalizeGanttHash(hash = location.hash): string | null {
+  if (hashViewId(hash) !== 'gantt') return null;
+  const query = hash.split('?')[1] ?? '';
+  return query ? `#/timeline?${query}` : '#/timeline';
+}
+
 export function isKnownHashView(hash = location.hash): boolean {
   const id = hashViewId(hash);
+  if (id === 'gantt') return true;
   if (id === 'capacity') return true;
   if (id === 'constellation') return true;
   if (id === 'backlog') return true;
@@ -732,6 +741,7 @@ export function isKnownHashView(hash = location.hash): boolean {
 export function parseHashRoute(): HubViewId {
   const id = hashViewId() as HubViewId;
   if (id === 'constellation' || id === 'orbit' || id === 'branch' || id === 'universe') return 'graph';
+  if (id === 'gantt') return 'timeline';
   if (id === 'backlog') return 'list';
   return KNOWN_VIEWS.includes(id) ? id : 'board';
 }

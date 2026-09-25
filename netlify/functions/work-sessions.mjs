@@ -75,6 +75,12 @@ function validateSessionFields(value) {
   ) {
     return 'actual_duration_minutes must be a non-negative number';
   }
+  if (
+    value.scripts_marked != null &&
+    (!Number.isInteger(Number(value.scripts_marked)) || Number(value.scripts_marked) < 0)
+  ) {
+    return 'scripts_marked must be a non-negative integer';
+  }
   return null;
 }
 
@@ -131,6 +137,8 @@ export function createWorkSessionsHandler(deps = {}) {
           result: parsed.value.result ?? 'open',
           source: parsed.value.source ?? 'manual',
           notes: typeof parsed.value.notes === 'string' ? parsed.value.notes : '',
+          scripts_marked:
+            parsed.value.scripts_marked == null ? null : Number(parsed.value.scripts_marked),
           created_at: stamp,
           updated_at: stamp
         });

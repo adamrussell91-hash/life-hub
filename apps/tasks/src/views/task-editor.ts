@@ -4,6 +4,9 @@ import type { RecurrenceFrequency } from '@/schemas/recurrence';
 import { tasksApi } from '@/services/client-api';
 import { errorMessage } from '@/views/feedback';
 import { formatTagsInput, parseTagsInput, stepsForTask } from '@/domain/hierarchy';
+import { focusAreaLabel, focusAreasByStandard, sanitizeApstFocus } from '@/domain/apst';
+import { bumpScriptsMarked } from '@/domain/marking-shadow';
+import { addDaysKey } from '@/domain/school-time';
 import {
   defaultRecurrenceRule,
   formatRecurrenceLabel,
@@ -30,6 +33,8 @@ import {
 import { createPlusAdd } from '@/views/plus-add';
 import { durationMinutesBetween, endTimeFromStart } from '@/domain/time-grid';
 import { forgetTaskLinkCache } from '@/views/attachment-chips';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
+import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { renderTaskRelationshipsSection } from '@/views/task-relationships';
 
 const FREQUENCIES: RecurrenceFrequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
@@ -284,6 +289,46 @@ function renderSteps(
   host.append(section);
 }
 
+function mountFocusAreas(task: Task): { el: HTMLElement; read: () => string[] } {
+  let selected = sanitizeApstFocus(task.apst_focus);
+  const host = el('div', 'task-editor__focus');
+  const chips = el('div', 'task-editor__focus-chips');
+  const paint = () => {
+    chips.replaceChildren(
+      ...selected.map((code) => {
+        const chip = el('span', 'hub-chip', code);
+        const label = focusAreaLabel(code);
+        chip.title = label;
+        chip.setAttribute('aria-label', label);
+        return chip;
+      })
+    );
+  };
+  paint();
+  const trigger = el('button', 'btn btn--ghost', 'Focus areas') as HTMLButtonElement;
+  trigger.type = 'button';
+  createMorphingClosedFieldPopover({
+    root: document,
+    trigger,
+    label: 'Focus areas',
+    title: 'APST focus areas',
+    supporting: 'Closed list. Save writes it.',
+    className: 'morphing-popover--focus',
+    multiple: true,
+    groups: focusAreasByStandard().map((group) => ({
+      label: `${group.standard.number}. ${group.standard.title}`,
+      options: group.areas.map((area) => ({ value: area.code, label: focusAreaLabel(area.code) }))
+    })),
+    value: selected.join(','),
+    onSave(value) {
+      selected = sanitizeApstFocus(String(value).split(','));
+      paint();
+    }
+  });
+  host.append(chips, trigger);
+  return { el: host, read: () => selected };
+}
+
 /** Inline edit panel — title, due, domain, project, tags, notes, steps. */
 export async function renderTaskEditor(
   host: HTMLElement,
@@ -382,6 +427,8 @@ export async function renderTaskEditor(
     value: task.parent_project_id ?? ''
   });
 
+  const focus = mountFocusAreas(task);
+
   const tags = createHubField({
     ariaLabel: 'Tags',
     placeholder: 'Tags — urgent, waiting, marking',
@@ -395,6 +442,21 @@ export async function renderTaskEditor(
   });
 
   const relationships = renderTaskRelationshipsSection(task.id);
+  const lifeWall = mountLifeWallEditor({
+    title: task.title,
+    wall: task.life_wall,
+    suggest: () => {
+      const starts_on = target.input.value || due.input.value;
+      const ends_on = due.input.value || target.input.value;
+      return starts_on && ends_on ? { starts_on, ends_on } : null;
+    }
+  });
+
+  const collectLabel = el('label', 'task-editor__check-label', 'Collect scripts on due date');
+  const collectInput = el('input') as HTMLInputElement;
+  collectInput.type = 'checkbox';
+  collectInput.checked = Boolean(task.marking);
+  collectLabel.prepend(collectInput);
 
   const actions = el('div', 'confirm-card__actions');
   const discard = el('button', 'btn btn--ghost', 'Discard');
@@ -406,6 +468,11 @@ export async function renderTaskEditor(
     const nextTitle = title.input.value.trim();
     if (!nextTitle) {
       host.append(el('p', 'empty-state', 'Add a title.'));
+      return;
+    }
+    const wall = lifeWall.read();
+    if (!wall.ok) {
+      host.append(el('p', 'empty-state', wall.message));
       return;
     }
     save.disabled = true;
@@ -440,7 +507,9 @@ export async function renderTaskEditor(
         tags: parseTagsInput(tags.input.value),
         recurrence_rule: recurrence.read(),
         remind_at: reminder.remind_at,
-        remind_dismissed_at: reminder.remind_dismissed_at
+        remind_dismissed_at: reminder.remind_dismissed_at,
+        life_wall: wall.wall,
+        apst_focus: focus.read()
       });
       forgetTaskLinkCache(updated.id);
       const linkResult = await relationships.savePendingLinks(updated.id);
@@ -451,6 +520,8 @@ export async function renderTaskEditor(
         return;
       }
       await onSaved(updated);
+      if (collectInput.checked && !updated.marking && updated.due_date) offerShadow(host, updated);
+      if (task.marking && updated.marking) host.append(logMarkingForm(updated));
     } catch (err) {
       save.disabled = false;
       discard.disabled = false;
@@ -466,8 +537,11 @@ export async function renderTaskEditor(
     domain.el,
     priority.el,
     project.el,
+    focus.el,
     tags.el,
-    notes.el
+    notes.el,
+    lifeWall.el,
+    collectLabel
   );
   if (task.kind !== 'step' && !task.parent_task_id) {
     card.append(recurrence.section, remind.section);
@@ -482,6 +556,81 @@ export async function renderTaskEditor(
   if (!host.closest('.hub-calendar__rail')) {
     card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
+}
+
+function offerShadow(host: HTMLElement, task: Task): void {
+  if (!task.due_date) return;
+  const card = el('section', 'confirm-card');
+  card.append(el('p', 'hierarchy-meta', `Create a marking shadow collected on ${task.due_date}?`));
+  const scripts = el('input') as HTMLInputElement;
+  scripts.type = 'number';
+  scripts.value = '28';
+  scripts.setAttribute('aria-label', 'Scripts');
+  const create = el('button', 'btn btn--primary', 'Create marking shadow');
+  create.type = 'button';
+  create.addEventListener('click', () => {
+    const count = Number(scripts.value);
+    if (!Number.isInteger(count) || count < 1 || !task.due_date) return;
+    void tasksApi
+      .createTask({
+        title: `${task.title} marking`,
+        domain: task.domain,
+        kind: 'marking_shadow',
+        marking: {
+          class_label: task.title,
+          scripts: count,
+          minutes_per_script: null,
+          collected_on: task.due_date,
+          return_by: addDaysKey(task.due_date, 7),
+          scripts_marked: 0
+        },
+        depends_on: [task.id],
+        dependency_links: [{ from_id: task.id, type: 'FS', offset_days: 0 }]
+      })
+      .then(() => {
+        card.replaceChildren(el('p', 'hierarchy-meta', 'Marking shadow created. Moving this task moves the shadow.'));
+      })
+      .catch((err) => card.append(el('p', 'empty-state', errorMessage(err))));
+  });
+  card.append(scripts, create);
+  host.append(card);
+}
+
+function logMarkingForm(task: Task): HTMLElement {
+  const card = el('section', 'confirm-card');
+  card.append(el('h3', 'task-editor__steps-title', 'Log marking'));
+  const scripts = el('input') as HTMLInputElement;
+  scripts.type = 'number';
+  scripts.value = '1';
+  scripts.setAttribute('aria-label', 'Scripts marked');
+  const minutes = el('input') as HTMLInputElement;
+  minutes.type = 'number';
+  minutes.value = '10';
+  minutes.setAttribute('aria-label', 'Minutes');
+  const save = el('button', 'btn btn--primary', 'Log marking');
+  save.type = 'button';
+  save.addEventListener('click', () => {
+    if (!task.marking) return;
+    const count = Number(scripts.value);
+    const spent = Number(minutes.value);
+    if (!Number.isInteger(count) || count < 1 || !(spent > 0)) return;
+    const now = new Date().toISOString();
+    void tasksApi
+      .createWorkSession({
+        task_id: task.id,
+        started_at: now,
+        finished_at: now,
+        actual_duration_minutes: spent,
+        result: 'done',
+        source: 'manual',
+        scripts_marked: count
+      })
+      .then(() => tasksApi.updateTask(task.id, { marking: bumpScriptsMarked(task.marking!, count) }))
+      .then(() => card.append(el('p', 'hierarchy-meta', `Logged ${count} scripts.`)))
+      .catch((err) => card.append(el('p', 'empty-state', errorMessage(err))));
+  });
+  card.append(scripts, minutes, save);
+  return card;
 }
 
 export function renderQuickAdd(

@@ -26,6 +26,8 @@ export const WorkSessionSchema = z.object({
   result: z.enum(['done', 'partial', 'stopped', 'open']).default('open'),
   source: WorkSessionSourceSchema.default('manual'),
   notes: z.string().default(''),
+  /** Scripts marked in this session. Used to learn a marking rate. */
+  scripts_marked: z.number().int().nonnegative().nullable().default(null),
   created_at: z.string(),
   updated_at: z.string()
 });
@@ -49,7 +51,8 @@ export const WorkSessionCreateSchema = WorkSessionSchema.omit({
   work_mode_confidence: true,
   result: true,
   source: true,
-  notes: true
+  notes: true,
+  scripts_marked: true
 }).extend({
   started_at: z.string().min(1)
 });

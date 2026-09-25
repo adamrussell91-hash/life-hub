@@ -40,7 +40,8 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   corey: ['M16 8a3 3 0 1 1-2.8 4', 'M8 12H4m0 0 2.5-2.5M4 12l2.5 2.5'],
   templates: ['M9 4h10v16H9z', 'M5 8h4', 'M5 8v12h8'],
   search: ['M11 11a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z', 'M14.5 14.5 19 19'],
-  properties: ['M5 7h14v3H5z', 'M7 11h10v8H7z', 'M9 14h2', 'M13 14h2']
+  properties: ['M5 7h14v3H5z', 'M7 11h10v8H7z', 'M9 14h2', 'M13 14h2'],
+  'term-dates': ['M4 6h16', 'M4 10h12', 'M4 14h16', 'M4 18h8']
 };
 
 export function createOutlineIcon(paths: string[]): SVGSVGElement {

@@ -56,8 +56,9 @@ export function weekLabel(key: string, terms: SchoolTerm[]): string | null {
 
 /** Week number within the term (1-based), or null in holidays. */
 export function termWeek(key: string, terms: SchoolTerm[]): number | null {
-  const label = weekLabel(key, terms);
-  return label ? Number(label.split('W')[1]) : null;
+  const term = termAt(key, terms);
+  if (!term) return null;
+  return Math.floor((toMs(mondayOf(key)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
 }
 
 export type ScaleDay = { key: string; x: number; w: number; holiday: boolean };
