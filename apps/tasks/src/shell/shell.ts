@@ -676,6 +676,13 @@ export function parseEntityPage(hash = location.hash): { kind: 'task' | 'project
   return null;
 }
 
+/** Goal page: `#/goal/:id` — not a rail destination (the rail stays on Goals). */
+export function parseGoalPage(hash = location.hash): { id: string } | null {
+  const path = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+  const parts = path.split('/');
+  return parts[0] === 'goal' && parts[1] ? { id: decodeURIComponent(parts[1]) } : null;
+}
+
 /** New excursion page: `#/excursions/new` — not the list. */
 export function parseNewExcursionPage(hash = location.hash): boolean {
   const path = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
@@ -732,6 +739,7 @@ export function isKnownHashView(hash = location.hash): boolean {
   if (id === 'constellation') return true;
   if (id === 'backlog') return true;
   if (parseEntityPage(hash)) return true;
+  if (parseGoalPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
   if (parseMapItemPage(hash)) return true;
   if (parseSomedaySubPage(hash)) return true;
