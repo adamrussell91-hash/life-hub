@@ -17,6 +17,7 @@ import { createPlusAdd } from '@/views/plus-add';
 import { createHierarchyTraceCard, createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { activeProjectMeter } from '@/domain/hammond-portfolio';
 import { projectMilestones } from '@/domain/project-milestones';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 
 let goalArea = 'all';
 let goalQuery = '';
@@ -29,18 +30,34 @@ function tagRow(tags: string[]): HTMLElement {
   return row;
 }
 
-function renderMilestones(project: Project): HTMLElement {
+function renderMilestones(project: Project, onReload: () => void): HTMLElement {
   const wrap = el('div', 'hierarchy-milestones');
-  if (projectMilestones(project).length === 0) {
+  const milestones = projectMilestones(project);
+  if (milestones.length === 0) {
     wrap.append(el('p', 'hierarchy-meta', 'No milestones yet.'));
     return wrap;
   }
   const list = el('ul', 'hierarchy-milestone-list');
-  for (const milestone of projectMilestones(project)) {
+  for (const milestone of milestones) {
     const item = el('li', 'hierarchy-milestone');
     item.append(
       el('span', 'hierarchy-milestone__title', milestone.title),
       el('span', 'chip chip--muted', milestone.status)
+    );
+    item.append(
+      mountLifeWallEditor({
+        title: milestone.title,
+        wall: milestone.life_wall,
+        suggest: () => (milestone.due_date ? { starts_on: milestone.due_date, ends_on: milestone.due_date } : null),
+        onCommit: (wall) => {
+          const next = projectMilestones(project).map((item) =>
+            item.id === milestone.id ? { ...item, life_wall: wall } : item
+          );
+          void tasksApi.updateProject(project.id, { milestones: next }).then(onReload, (err) => {
+            item.append(el('p', 'empty-state', errorMessage(err)));
+          });
+        }
+      }).el
     );
     list.append(item);
   }
@@ -92,7 +109,7 @@ function renderProjectCard(
 
   const detail = el('div', 'hierarchy-card__detail');
   detail.hidden = true;
-  detail.append(renderMilestones(project));
+  detail.append(renderMilestones(project, onReload));
 
   const taskList = el('ul', 'hierarchy-task-list');
   for (const task of projectTasks.slice(0, 6)) {
@@ -137,6 +154,18 @@ function renderGoalSection(
   );
   if (goal.description) head.append(el('p', 'hierarchy-meta', goal.description));
   if (goal.tags.length) head.append(tagRow(goal.tags));
+  head.append(
+    mountLifeWallEditor({
+      title: goal.title,
+      wall: goal.life_wall,
+      suggest: () => null,
+      onCommit: (wall) => {
+        void tasksApi.updateGoal(goal.id, { life_wall: wall }).then(onReload, (err) => {
+          head.append(el('p', 'empty-state', errorMessage(err)));
+        });
+      }
+    }).el
+  );
   section.append(head);
 
   const grid = el('div', 'hierarchy-grid');

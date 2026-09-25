@@ -181,6 +181,12 @@ Consumers are not a second catalog. Open them only to wire data, not to restyle.
 
 Tasks Graph is a rail page, not home. Charts on Tasks are board blocks (counts, trends).
 
+### `plan-timeline` — unified Timeline
+
+- **When:** The Tasks Timeline rail page (`#/timeline`). Hierarchy Dream → Goal → Project → Milestone and Task → Step, five-stop zoom, school-week axis.
+- **Look:** `docs/proposals/timeline-reference/` (`VISUAL-SPEC.md`, `timeline.html`, golden images). That folder wins on look and motion.
+- **Root:** `apps/tasks/src/views/timeline.ts`. Geometry constants `TL` live in `apps/tasks/src/domain/timeline-geometry.ts`. Classes `tl-*` in `apps/tasks/src/styles/timeline.css`. Motion is `createMotion()` in `apps/tasks/src/views/timeline-motion.ts`.
+
 ---
 
 ## Visual grammar (multi-representation)
@@ -226,6 +232,7 @@ Newest first. This is the running record of the library.
 
 | Date | Id | Change |
 |------|----|--------|
+| 2026-09-24 | `plan-timeline` | Tasks Timeline look is `docs/proposals/timeline-reference/`. Geometry `TL` in `apps/tasks/src/domain/timeline-geometry.ts`. Classes `tl-*`. Motion through `timeline-motion.ts`. |
 | 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Visual contract ported from `docs/proposals/graph-reference/` (`lines.html`, `branch.html`, `orbit.html`). Geometry constants `TRANSIT_G` / `FLOW_G` / `ORBIT` live in the scene builders. |
 | 2026-09-22 | `transit-lines`, `flowchart-lanes`, `orbit-radar` | Tasks Graph rebuilt as Lines / Branch / Orbit. `weight-line` promoted to `transit-lines`. Branch uses `flowchart-lanes`. Orbit uses `orbit-radar` plus `polar-clock` helpers. |
 | 2026-09-22 | `shed-stack`, `stairs-down`, `hundred-squares` | Body Weight shows shed stack and stairs side by side (no pill toggle). Shed stack gets a token colour key (you / band / year). 100 squares uses 20 columns so the grid is as short as Carved away. |

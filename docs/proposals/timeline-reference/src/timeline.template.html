@@ -30,6 +30,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 .tl-toggle{border:1px solid var(--line);background:var(--glass);border-radius:var(--radius-full);min-height:2.2rem;padding:0 var(--space-3);font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);color:var(--muted);cursor:pointer;transition:background-color .12s,color .12s,border-color .12s}
 .tl-toggle:hover{color:var(--ink)}
 .tl-toggle[aria-pressed="true"]{border-color:color-mix(in srgb,var(--wave) 45%,transparent);background:color-mix(in srgb,var(--pastel-blue) 55%,#fff);color:var(--pastel-blue-ink);font-weight:var(--weight-semibold)}
+.tl-toggle:disabled{opacity:.45;cursor:not-allowed}
+.hub-pills.is-dim{opacity:.45;pointer-events:none}
 .tl-toggle--critical[aria-pressed="true"]{color:var(--high-sea-ink);background:color-mix(in srgb,var(--high-sea) 14%,transparent);border-color:color-mix(in srgb,var(--high-sea) 30%,transparent)}
 .tl-plus{width:2.5rem;height:2.5rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);color:var(--navy);display:inline-grid;place-items:center;cursor:pointer;box-shadow:var(--elev-1)}
 .tl-plus svg{width:1.125rem;height:1.125rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round}
@@ -82,6 +84,13 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
 .tl-today__line{stroke:var(--wave);stroke-width:1.5;stroke-dasharray:3 3}
 .tl-today__pill{fill:var(--wave)}
 .tl-today__text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:#fff}
+.tl-lens__wash{fill:color-mix(in srgb,var(--wave) 8%,transparent);pointer-events:none}
+.tl-lens__edge{stroke:var(--wave);stroke-width:1.5;pointer-events:none}
+.tl-lens__pill rect{fill:var(--paper);stroke:var(--line);stroke-width:1}
+.tl-lens__pill text{font:var(--weight-semibold) var(--text-xs)/1 var(--font-ui);fill:var(--navy);pointer-events:none}
+[data-part="lens-grab"]{cursor:grab}
+[data-part="lens-grab"]:active{cursor:grabbing}
+.tl-tail{stroke-width:1}
 
 .tl-bar__face{stroke:color-mix(in srgb,var(--navy) 12%,transparent);stroke-width:1;transition:stroke .12s}
 .tl-bar__title{font:var(--weight-medium) var(--text-sm)/1 var(--font-ui);fill:var(--ink);pointer-events:none}
@@ -224,6 +233,8 @@ body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);back
       <button class="tl-toggle" id="tl-load" type="button" aria-pressed="true">Load</button>
       <button class="tl-toggle" id="tl-holidays" type="button">Holidays: compressed</button>
       <button class="tl-toggle" id="tl-today-btn" type="button">Today</button>
+      <button class="tl-toggle" id="tl-focus" type="button" aria-pressed="false">Focus</button>
+      <button class="tl-toggle" id="tl-forecast" type="button" aria-pressed="false" disabled title="Needs 20 finished tasks with an estimate and an actual">Forecast</button>
       <button class="btn btn--secondary" id="tl-hammond" type="button" style="min-height:2.2rem;font-size:var(--text-sm)">Ask Hammond</button>
       <button class="tl-plus" type="button" aria-label="Add"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
     </div>

@@ -21,6 +21,7 @@ import {
   type SomedayKindFilter
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
   createHubField,
@@ -360,6 +361,17 @@ function renderSomedayCard(
     });
     fieldsRow.append(labeledField('Review', review.el, 'hub-field hub-field--compact'));
     card.append(fieldsRow);
+    card.append(
+      mountLifeWallEditor({
+        title: task.title,
+        wall: task.life_wall,
+        suggest: () => {
+          const date = task.target_date || task.review_at || task.origin_date;
+          return date ? { starts_on: date, ends_on: date } : null;
+        },
+        onCommit: (wall) => persistSomeday(task, { life_wall: wall }, handlers.onChange)
+      }).el
+    );
   }
 
   const toggle = () => handlers.onToggle();

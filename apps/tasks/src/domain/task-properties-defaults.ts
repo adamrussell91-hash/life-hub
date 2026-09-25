@@ -34,7 +34,8 @@ export const DEFAULT_TASK_PROPERTY_CONFIG: TaskPropertyConfig = {
   ],
   kinds: [
     { id: 'task', label: 'task' },
-    { id: 'step', label: 'step' }
+    { id: 'step', label: 'step' },
+    { id: 'marking_shadow', label: 'marking shadow' }
   ],
   buckets: [
     { id: 'active', label: 'active' },

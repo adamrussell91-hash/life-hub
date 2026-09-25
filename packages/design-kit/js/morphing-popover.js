@@ -662,12 +662,33 @@ function labelForClosedField(options, value, fallback = '') {
  * keep the committed value. No free text, colours, or custom icons — options
  * are a closed vocabulary rendered as `.hub-pills`.
  */
+function closedFieldSections(options, groups) {
+  if (Array.isArray(groups) && groups.length) {
+    return groups
+      .map((group) => ({
+        label: textOf(group?.label, ''),
+        options: parseClosedFieldOptions(group?.options)
+      }))
+      .filter((group) => group.options.length);
+  }
+  return [{ label: '', options: parseClosedFieldOptions(options) }];
+}
+
+function codesFrom(value) {
+  return String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function createMorphingClosedFieldPopover({
   root,
   label,
   title = 'Edit',
   supporting = 'Closed list. Save writes it.',
   options = [],
+  groups = null,
+  multiple = false,
   value = '',
   submitLabel = 'Save',
   discardLabel = 'Discard',
@@ -680,24 +701,34 @@ export function createMorphingClosedFieldPopover({
   onSave,
   onDiscard
 } = {}) {
-  const list = parseClosedFieldOptions(options);
-  let committed = value != null && String(value) !== '' ? String(value) : String(list[0]?.value ?? '');
+  const sections = closedFieldSections(options, groups);
+  const list = sections.flatMap((section) => section.options);
+  const loose = multiple || sections.some((section) => section.label) || list.length > 4;
+  let committed = value != null && String(value) !== '' ? String(value) : multiple ? '' : String(list[0]?.value ?? '');
   let draft = committed;
+  let committedMany = new Set(codesFrom(multiple ? value : ''));
+  let draftMany = new Set(committedMany);
   let buttons = [];
   let group = null;
   /** @type {ReturnType<typeof createMorphingPopover> | null} */
   let popover = null;
 
-  const triggerText = textOf(label, labelForClosedField(list, committed, title));
+  const triggerText = multiple
+    ? textOf(label, title)
+    : textOf(label, labelForClosedField(list, committed, title));
+
+  function selectedMany() {
+    return list.filter((option) => draftMany.has(option.value)).map((option) => option.value);
+  }
 
   function paintSelection() {
     for (const btn of buttons) {
-      const selected = btn.dataset?.value === draft;
+      const selected = multiple ? draftMany.has(btn.dataset?.value) : btn.dataset?.value === draft;
       if (selected) addClass(btn, 'is-active');
       else removeClass(btn, 'is-active');
       btn.setAttribute?.('aria-checked', selected ? 'true' : 'false');
     }
-    applyHubPillsThumb(group);
+    if (!multiple) applyHubPillsThumb(group);
   }
 
   popover = createMorphingPopover({
@@ -712,36 +743,53 @@ export function createMorphingClosedFieldPopover({
     className: ['morphing-popover--closed-field', className].filter(Boolean).join(' '),
     onOpen() {
       draft = committed;
+      draftMany = new Set(committedMany);
       paintSelection();
     },
     onClose() {
       draft = committed;
+      draftMany = new Set(committedMany);
     },
     renderContent(body, api) {
-      group = root.createElement('div');
-      group.className =
-        list.length > 4
-          ? 'hub-pills hub-pills--loose morphing-popover__choices'
-          : 'hub-pills morphing-popover__choices';
-      group.setAttribute?.('role', 'radiogroup');
-      group.setAttribute?.('aria-label', title);
-      buttons = list.map(option => {
-        const btn = root.createElement('button');
-        btn.type = 'button';
-        btn.className = 'hub-pills__btn';
-        btn.dataset.value = option.value;
-        btn.textContent = option.label;
-        btn.setAttribute?.('role', 'radio');
-        btn.setAttribute?.('aria-checked', 'false');
-        btn.addEventListener?.('click', () => {
-          draft = option.value;
-          paintSelection();
-          onChange?.(draft);
-        });
-        group.append(btn);
-        return btn;
-      });
-      body.append(group);
+      buttons = [];
+      const choiceClass = loose
+        ? 'hub-pills hub-pills--loose morphing-popover__choices'
+        : 'hub-pills morphing-popover__choices';
+      for (const section of sections) {
+        if (section.label) {
+          const heading = root.createElement('p');
+          heading.className = 'morphing-popover__group';
+          heading.textContent = section.label;
+          body.append(heading);
+        }
+        group = root.createElement('div');
+        group.className = choiceClass;
+        group.setAttribute?.('role', multiple ? 'group' : 'radiogroup');
+        group.setAttribute?.('aria-label', section.label || title);
+        for (const option of section.options) {
+          const btn = root.createElement('button');
+          btn.type = 'button';
+          btn.className = 'hub-pills__btn';
+          btn.dataset.value = option.value;
+          btn.textContent = option.label;
+          btn.setAttribute?.('role', multiple ? 'checkbox' : 'radio');
+          btn.setAttribute?.('aria-checked', 'false');
+          btn.addEventListener?.('click', () => {
+            if (multiple) {
+              if (draftMany.has(option.value)) draftMany.delete(option.value);
+              else draftMany.add(option.value);
+              onChange?.(selectedMany().join(','));
+            } else {
+              draft = option.value;
+              onChange?.(draft);
+            }
+            paintSelection();
+          });
+          group.append(btn);
+          buttons.push(btn);
+        }
+        body.append(group);
+      }
 
       const actions = root.createElement('div');
       actions.className = 'morphing-popover__actions';
@@ -751,8 +799,9 @@ export function createMorphingClosedFieldPopover({
       discard.textContent = discardLabel;
       discard.addEventListener?.('click', () => {
         draft = committed;
+        draftMany = new Set(committedMany);
         paintSelection();
-        onDiscard?.(committed);
+        onDiscard?.(multiple ? list.filter((option) => committedMany.has(option.value)).map((option) => option.value).join(',') : committed);
         api.close();
       });
       const save = root.createElement('button');
@@ -760,9 +809,16 @@ export function createMorphingClosedFieldPopover({
       save.className = 'btn btn--primary';
       save.textContent = submitLabel;
       save.addEventListener?.('click', () => {
-        committed = draft;
-        popover?.setTriggerLabel(labelForClosedField(list, committed, triggerText));
-        onSave?.(committed, api);
+        if (multiple) {
+          const ordered = selectedMany();
+          committedMany = new Set(ordered);
+          draftMany = new Set(ordered);
+          onSave?.(ordered.join(','), api);
+        } else {
+          committed = draft;
+          popover?.setTriggerLabel(labelForClosedField(list, committed, triggerText));
+          onSave?.(committed, api);
+        }
         api.close();
       });
       actions.append(discard, save);
@@ -773,9 +829,15 @@ export function createMorphingClosedFieldPopover({
 
   return {
     ...popover,
-    getValue: () => committed,
-    getDraft: () => draft,
+    getValue: () => (multiple ? list.filter((option) => committedMany.has(option.value)).map((option) => option.value).join(',') : committed),
+    getDraft: () => (multiple ? selectedMany().join(',') : draft),
     setValue(next) {
+      if (multiple) {
+        committedMany = new Set(codesFrom(next));
+        draftMany = new Set(committedMany);
+        paintSelection();
+        return;
+      }
       committed = String(next ?? '');
       draft = committed;
       popover?.setTriggerLabel(labelForClosedField(list, committed, triggerText));

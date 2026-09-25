@@ -5,6 +5,7 @@ import {
   isHoliday,
   mondayOf,
   termAt,
+  termWeek,
   weekLabel,
   type SchoolTerm
 } from '@/domain/school-time';
@@ -20,6 +21,7 @@ describe('school weeks', () => {
     expect(weekLabel('2026-09-22', TERMS)).toBe('T3 W10');
     expect(weekLabel('2026-10-13', TERMS)).toBe('T4 W1');
     expect(weekLabel('2026-10-26', TERMS)).toBe('T4 W3');
+    expect(termWeek('2026-10-26', TERMS)).toBe(3);
     expect(weekLabel('2026-12-17', TERMS)).toBe('T4 W10');
   });
 
@@ -30,6 +32,7 @@ describe('school weeks', () => {
     expect(weekLabel('2026-09-28', TERMS)).toBe('Hol W1');
     expect(weekLabel('2026-10-01', TERMS)).toBe('Hol W1');
     expect(weekLabel('2026-10-05', TERMS)).toBe('Hol W2');
+    expect(termWeek('2026-10-05', TERMS)).toBeNull();
     expect(termAt('2026-12-20', TERMS)).toBeNull();
   });
 

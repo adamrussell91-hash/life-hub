@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LifeWallFieldSchema } from './life-wall';
 import { schemaVersion } from './task';
 
 export const GoalStatusSchema = z.enum(['active', 'archived']);
@@ -14,7 +15,8 @@ export const GoalSchema = z.object({
   status: GoalStatusSchema.default('active'),
   tags: z.array(z.string()).default([]),
   created_at: z.string(),
-  updated_at: z.string()
+  updated_at: z.string(),
+  life_wall: LifeWallFieldSchema
 });
 
 export type Goal = z.infer<typeof GoalSchema>;
@@ -29,7 +31,8 @@ export const GoalCreateSchema = GoalSchema.omit({
   parent_area_id: true,
   parent_someday_id: true,
   status: true,
-  tags: true
+  tags: true,
+  life_wall: true
 }).extend({
   title: z.string().min(1)
 });

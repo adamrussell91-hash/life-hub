@@ -5,6 +5,7 @@ import { explodeCompoundDumpTitle, type DumpKind } from '@/domain/clare-dump';
 import { CLARE_AGENT_TOOLS, createClareToolHandler, type ClareToolRuntime } from '@/domain/clare-tools';
 import { parseAgentMutations, type AgentMutation } from '@/domain/agent-mutations';
 import type { AgentProtocolSlug } from '@/domain/agent-protocol';
+import { buildHammondRebalanceSystem, proposalForDigest } from '@/domain/timeline-digest';
 import type { TaskDomain, TaskPriority } from '@/schemas/task';
 import { createEmbedBlock } from '@/blocks/create-block';
 
@@ -59,8 +60,11 @@ export function buildClareSystemPrompt(
   digest: ClareDumpDigest,
   slug: AgentProtocolSlug = 'clare'
 ): string {
-  const protocol = digest.operating_protocol?.trim();
   const shell = buildAgentSystemShell(slug);
+  if (digest.protocol_id === 'timeline_rebalance' && slug === 'hammond') {
+    return buildHammondRebalanceSystem(shell);
+  }
+  const protocol = digest.operating_protocol?.trim();
   if (!protocol) return shell;
   return `${shell}
 
@@ -299,6 +303,25 @@ export function localStubClareJudge(
   tools?: ClareToolRuntime
 ): ClareProposalJudge {
   return async (digest) => {
+    if (digest.protocol_id === 'timeline_rebalance') {
+      if (agentSlug !== 'hammond') {
+        return {
+          ok: true,
+          model: 'local-stub',
+          voice: 'Timeline rebalance belongs to Hammond. I am not moving dates.',
+          items: [],
+          mutations: []
+        };
+      }
+      const proposal = proposalForDigest(digest.timeline);
+      return {
+        ok: true,
+        model: 'local-stub',
+        voice: proposal.voice,
+        items: [],
+        mutations: proposal.mutations
+      };
+    }
     const text = digest.dump_text.trim();
     const lower = text.toLowerCase();
     const urlMatch = text.match(/https?:\/\/[^\s)\]]+/i);

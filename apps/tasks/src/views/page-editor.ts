@@ -10,6 +10,7 @@ import type { ExcursionTemplate } from '@/schemas/templates';
 import { errorMessage, renderLoadError } from '@/views/feedback';
 import { deleteProjectNow, deleteTaskNow } from '@/views/card-actions';
 import { renderCardMenu } from '@/views/card-menu';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { renderQuickAdd, renderTaskEditor } from '@/views/task-editor';
 import { openPlusAdd } from '@/views/plus-add';
 import { mountTaskCard, type TaskCardHandlers } from '@/views/hub-cards';
@@ -379,7 +380,10 @@ function paintProjectPage(
           quality_bar: current.quality_bar,
           purpose: current.purpose,
           desired_outcome: current.desired_outcome,
-          page_blocks: current.page_blocks
+          page_blocks: current.page_blocks,
+          life_wall: current.life_wall ?? null,
+          standards_ribbon: Boolean(current.standards_ribbon),
+          submission_date: current.submission_date ?? null
         })
         .then(
           (next) => {
@@ -421,7 +425,34 @@ function paintProjectPage(
     className: 'page-card__due',
     onChange: (value) => persist({ current_end_date: value || null })
   });
-  fields.append(status.el, due.el);
+  const lifeWall = mountLifeWallEditor({
+    title: project.title,
+    wall: project.life_wall,
+    suggest: () => {
+      const end = due.input.value || project.current_end_date || project.baseline_end_date;
+      const start = project.created_at.slice(0, 10);
+      return end ? { starts_on: start, ends_on: end } : null;
+    },
+    onCommit: (wall) => persist({ life_wall: wall })
+  });
+  const ribbonLabel = el('label', 'task-editor__check-label', 'Standards ribbon');
+  const ribbonInput = el('input') as HTMLInputElement;
+  ribbonInput.type = 'checkbox';
+  ribbonInput.checked = Boolean(project.standards_ribbon);
+  ribbonLabel.prepend(ribbonInput);
+  const submission = createHubField({
+    type: 'date',
+    ariaLabel: 'Submission date',
+    value: project.submission_date ?? '',
+    className: 'page-card__due',
+    onChange: (value) => persist({ submission_date: value || null })
+  });
+  submission.el.hidden = !ribbonInput.checked;
+  ribbonInput.addEventListener('change', () => {
+    persist({ standards_ribbon: ribbonInput.checked });
+    submission.el.hidden = !ribbonInput.checked;
+  });
+  fields.append(status.el, due.el, lifeWall.el, ribbonLabel, submission.el);
 
   let qualityValue = (project.quality_bar ?? 'good_enough') as QualityBar;
   const qualityHost = el('div', 'page-card__quality');

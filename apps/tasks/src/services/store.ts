@@ -26,7 +26,8 @@ import { ProgramSchema } from '@/schemas/program';
 import { AreaSchema } from '@/schemas/area';
 import { GoalSchema } from '@/schemas/goal';
 import { WorkBlockSchema } from '@/schemas/work-block';
-import { WorkSessionSchema } from '@/schemas/work-session';
+import { WorkSessionSchema, type WorkSession } from '@/schemas/work-session';
+import { resolveMarkingRate, syncedMarkingFields } from '@/domain/marking-shadow';
 import {
   DEFAULT_PLANNING_PROFILE,
   PlanningProfileSchema
@@ -52,7 +53,7 @@ import {
   catalogExcursionTemplates,
   resolveExcursionTemplateId
 } from '@/domain/excursion-catalog';
-import { addDays, backlogTasks, hubCalendarDate, toDateKey } from '@/domain/queries';
+import { addDays, backlogTasks, hubCalendarDate, toDateKey, toHubDateKey } from '@/domain/queries';
 import { applyDueDatePriorityFloor, assessOpenTaskPriorities } from '@/domain/priority-assess';
 import { DEFAULT_HUB_PREFS, parseHubPrefs, resolveTimeZoneInput, type HubPrefs } from '@/domain/hub-prefs';
 import {
@@ -77,6 +78,7 @@ import {
   type ClareProposalInput
 } from '@/domain/clare';
 import { buildClareDumpDigest } from '@/domain/clare-digest';
+import { buildStoredTimelineDigest } from '@/domain/timeline-digest';
 import {
   parseBrainDump,
   resolveDuplicateFollowUp,
@@ -255,6 +257,21 @@ async function readTaskProperties(
   return defaults;
 }
 
+function minutesPerScript(
+  marking: NonNullable<Task['marking']>,
+  sessions: WorkSession[],
+  shadowIds: Set<string>,
+  defaultMinutes: number
+): number {
+  return resolveMarkingRate({
+    minutesPerScript: marking.minutes_per_script,
+    sessions: sessions
+      .filter((session) => session.task_id && shadowIds.has(session.task_id) && session.result !== 'open')
+      .map((session) => ({ minutes: session.actual_duration_minutes ?? 0, scriptsMarked: session.scripts_marked ?? 0 })),
+    defaultMinutes
+  }).rate;
+}
+
 function classifierDefault(
   options: { id: string }[],
   preferredId: string,
@@ -306,7 +323,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         id: newId('task'),
         title: input.title,
         description: input.description ?? '',
-        kind: input.kind ?? classifierDefault(props.kinds, 'task'),
+        kind: input.marking ? 'marking_shadow' : (input.kind ?? classifierDefault(props.kinds, 'task')),
         bucket: input.bucket ?? classifierDefault(props.buckets, 'active'),
         step_order: input.step_order ?? 0,
         domain: input.domain,
@@ -342,8 +359,21 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         cognitive_load: input.cognitive_load ?? null,
         depth: input.depth ?? null,
         someday_kind: input.someday_kind ?? null,
-        origin_date: input.origin_date ?? null
+        origin_date: input.origin_date ?? null,
+        life_wall: input.life_wall ?? null,
+        marking: input.marking ?? null
       });
+      if (task.marking) {
+        const [sessions, all, prefs] = await Promise.all([
+          this.listWorkSessions(),
+          this.listTasks(),
+          this.getHubPrefs()
+        ]);
+        const ids = new Set(all.filter((item) => item.marking || item.kind === 'marking_shadow').map((item) => item.id));
+        ids.add(task.id);
+        const rate = minutesPerScript(task.marking, sessions, ids, prefs.marking_default_minutes_per_script);
+        Object.assign(task, syncedMarkingFields(task.marking, rate));
+      }
       await kv.setJSON(keys.taskKey(task.id), task);
       const ids = await readIndex(kv, keys.tasksIndexKey());
       ids.push(task.id);
@@ -375,6 +405,17 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
               : (patch.completed_at ?? existing.completed_at)
       });
       next = applyDueDatePriorityFloor(next, patch);
+      if (next.marking) {
+        const [sessions, all, prefs] = await Promise.all([
+          this.listWorkSessions(),
+          this.listTasks(),
+          this.getHubPrefs()
+        ]);
+        const ids = new Set(all.filter((item) => item.marking || item.kind === 'marking_shadow').map((item) => item.id));
+        ids.add(next.id);
+        const rate = minutesPerScript(next.marking, sessions, ids, prefs.marking_default_minutes_per_script);
+        next = { ...next, ...syncedMarkingFields(next.marking, rate), kind: next.kind === 'step' ? 'step' : 'marking_shadow' };
+      }
       await kv.setJSON(keys.taskKey(id), next);
       if (patch.status === 'done' && existing.status !== 'done') {
         await spawnRecurringSuccessor(this, next);
@@ -455,7 +496,10 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         permission_notes: input.permission_notes ?? [],
         generated_admin_tasks: input.generated_admin_tasks ?? [],
         drafted_documents: input.drafted_documents ?? null,
-        page_blocks: input.page_blocks ?? []
+        page_blocks: input.page_blocks ?? [],
+        life_wall: input.life_wall ?? null,
+        standards_ribbon: input.standards_ribbon ?? false,
+        submission_date: input.submission_date ?? null
       });
       await kv.setJSON(keys.projectKey(project.id), project);
       const ids = await readIndex(kv, keys.projectsIndexKey());
@@ -561,7 +605,8 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         status: input.status ?? 'active',
         tags: input.tags ?? [],
         created_at: stamp,
-        updated_at: stamp
+        updated_at: stamp,
+        life_wall: input.life_wall ?? null
       });
       await kv.setJSON(keys.goalKey(goal.id), goal);
       const ids = await readIndex(kv, keys.goalsIndexKey());
@@ -989,7 +1034,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
             ? wording.correctedTitles.join('\n')
             : input.text;
       const forceNewTitles = followUp?.action === 'make_new';
-      if (!forceNewTitles && !wording) {
+      if (!forceNewTitles && !wording && input.protocol_id !== 'timeline_rebalance') {
         const direction = resolveTaskDirection(dumpText, {
           focus: input.focus,
           tasks,
@@ -1045,6 +1090,23 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           input.lifeContext === undefined
             ? await (defaultLifeContextProvider()?.() ?? Promise.resolve(null))
             : input.lifeContext;
+        const todayKey = toHubDateKey(input.now ?? new Date(), timezone);
+        const timeline =
+          input.protocol_id === 'timeline_rebalance' && agentSlug === 'hammond'
+            ? buildStoredTimelineDigest({
+                tasks,
+                projects,
+                goals: await this.listGoals(),
+                profile: await this.getPlanningProfile(),
+                terms:
+                  prefs.school_terms.find((row) => row.year === Number(todayKey.slice(0, 4)))?.terms ??
+                  prefs.school_terms[0]?.terms ??
+                  [],
+                today: todayKey,
+                window: input.timeline_window ?? null,
+                drag: input.timeline_drag ?? null
+              })
+            : null;
         const digest = buildClareDumpDigest({
           text: dumpText,
           items,
@@ -1054,6 +1116,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
           calibrations,
           preferredDomain: input.domain ?? 'teaching',
           protocolId: input.protocol_id,
+          timeline,
           now: input.now ?? new Date(),
           timezone,
           lifeContext,
@@ -1875,6 +1938,7 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         result: input.result ?? 'open',
         source: input.source ?? 'manual',
         notes: input.notes ?? '',
+        scripts_marked: input.scripts_marked ?? null,
         created_at: stamp,
         updated_at: stamp
       });

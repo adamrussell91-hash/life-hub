@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { sanitizeApstFocus } from '@/domain/apst';
+import { LifeWallFieldSchema } from './life-wall';
 import { PageBlockSchema } from './page-block';
 
 export const schemaVersion = z.literal(1);
@@ -37,6 +39,18 @@ export const SomedayHorizonSchema = z.enum(['area', 'goal', 'project']);
 /** Which Someday bucket an idea belongs to. Career stays in Tasks; the other two also feed Life Hub Future Map. */
 export const SomedayKindSchema = z.enum(['bucket_list', 'dreams_jar', 'career']);
 const OriginDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+/** Workload that appears when scripts are collected. Null clears it. */
+export const MarkingSchema = z
+  .object({
+    class_label: z.string().min(1),
+    scripts: z.number().int().positive(),
+    minutes_per_script: z.number().positive().nullable(),
+    collected_on: OriginDateSchema,
+    return_by: OriginDateSchema,
+    scripts_marked: z.number().int().nonnegative().default(0)
+  })
+  .nullable();
 
 export type OdysseyNode = {
   id: string;
@@ -123,7 +137,16 @@ export const TaskSchema = z.object({
   /** Goals spawned by promoting this Someday idea. The idea stays. */
   linked_goal_ids: z.array(z.string()).optional(),
   /** Someday / Maybe only — branching daydream tree ("Odyssey mode"). */
-  odyssey_paths: z.array(OdysseyNodeSchema).optional()
+  odyssey_paths: z.array(OdysseyNodeSchema).optional(),
+  /** Dates that cannot move. Null clears a wall; omitted leaves old records unchanged. */
+  life_wall: LifeWallFieldSchema,
+  /** Marking shadow workload. Null clears it; omitted leaves old records unchanged. */
+  marking: MarkingSchema.optional(),
+  /** APST focus-area codes. Unknown codes are dropped. Omitted leaves old records unchanged. */
+  apst_focus: z.preprocess(
+    (value) => (value == null ? undefined : sanitizeApstFocus(value)),
+    z.array(z.string()).optional()
+  )
 });
 
 export type Task = z.infer<typeof TaskSchema>;
@@ -183,7 +206,10 @@ export const TaskCreateSchema = TaskSchema.omit({
   origin_date: true,
   linked_project_ids: true,
   linked_goal_ids: true,
-  odyssey_paths: true
+  odyssey_paths: true,
+  life_wall: true,
+  marking: true,
+  apst_focus: true
 }).extend({
   title: z.string().min(1),
   domain: TaskDomainSchema

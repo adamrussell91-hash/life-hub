@@ -315,6 +315,53 @@ test.describe('Timeline: reduced motion', () => {
   });
 });
 
+test.describe('Timeline: focus lens and forecast', () => {
+  test('phase 8: lens snaps to this week and tails use the domain P85', async ({ page }) => {
+    test.skip(!REF, 'Reference only until the look is approved and the app is built');
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openTimeline(page);
+    await expect(page.getByRole('button', { name: 'Focus' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.getByRole('button', { name: 'Forecast' })).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('[data-part="lens"]')).toHaveCount(0);
+    await expect(page.locator('[data-part="forecast-tail"]')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Focus' }).click();
+    await settle(page);
+    const lens = page.locator('[data-part="lens"]');
+    await expect(lens).toHaveCount(1);
+    await expect(lens).toHaveAttribute('data-start', '2026-09-21');
+    await expect(lens).toHaveAttribute('data-end', '2026-10-04');
+    await expect(page.locator('[data-part="lens-grab"]')).toContainText('21/09/26');
+    const focused = page.locator('[data-part="bar"][data-task-id="t3"] [data-part="bar-face"]');
+    expect(parseFloat(await attr(focused, 'width'))).toBeGreaterThan(80);
+
+    await page.getByRole('button', { name: 'Forecast' }).click();
+    await settle(page);
+    const tail = page.locator('[data-part="forecast-tail"][data-task-id="t3"]');
+    await expect(tail).toHaveCount(1);
+    await expect(tail).toHaveAttribute('data-days', '0.71');
+    await expect(tail).toHaveAttribute('data-domain', 'teaching');
+    const barBox = await box(page.locator('[data-part="bar"][data-task-id="t3"]'));
+    const tailBox = await box(tail);
+    expect(tailBox.left).toBeGreaterThan(barBox.left + 40);
+    await expect(page.locator('[data-part="forecast-tail"][data-milestone-id="m-finals"]')).toHaveAttribute('data-days', '4.75');
+    const doneTail = page.locator('[data-part="forecast-tail"][data-task-id="t1"]');
+    await expect(doneTail).toHaveCount(0);
+
+    await page.screenshot({ path: path.join(OUT, 'focus-forecast-1280.png'), fullPage: true });
+
+    const grab = page.locator('[data-part="lens-grab"]');
+    const handle = await grab.boundingBox();
+    await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handle.x + handle.width / 2 + 96 * 4, handle.y + handle.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await settle(page, 200);
+    const moved = await lens.getAttribute('data-start');
+    expect(moved > '2026-09-21').toBe(true);
+  });
+});
+
 test.describe('Timeline: phone', () => {
   test('phase 3: 390px, no sideways page scroll, rows still named, vertical Lines', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });

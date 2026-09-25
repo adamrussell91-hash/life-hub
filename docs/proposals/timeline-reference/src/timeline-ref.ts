@@ -16,10 +16,13 @@ import {
   addDaysKey,
   buildTimeScale,
   holidayRuns,
+  isHoliday,
   mondayOf,
   termAt,
+  toKey,
   toMs,
   weekLabel,
+  type ScaleDay,
   type SchoolTerm,
   type TimeScale
 } from '@/domain/school-time';
@@ -56,6 +59,7 @@ export const TL = {
   ribbon: { h: 16, gap: 3, rx: 4 },
   load: { h: 104, top: 30, colGap: 8, rx: 4 },
   today: { pillH: 20, pillW: 52 },
+  lens: { days: 14, shoulder: 21, pillH: 20 },
   ghost: { dash: '4 3' },
   mobileBreak: 720,
   zooms: [
@@ -108,6 +112,10 @@ const state = {
   view: 'bars' as ViewMode,
   selected: null as string | null,
   hammond: false,
+  lens: false,
+  /** First day of the 14-day focus window. Snaps to the Monday of today when Focus turns on. */
+  lensStart: mondayOf(TODAY),
+  forecast: false,
   tasks: TASKS.map((t) => ({ ...t })),
   drag: null as null | { id: string; dx: number; startX: number; days: number }
 };
@@ -125,6 +133,51 @@ function isExpanded(id: string, kind: 'goal' | 'project' | 'group' | 'task'): bo
     .map((t) => t.due!)
     .sort()[0];
   return Boolean(next && toMs(next) - toMs(TODAY) <= 14 * 86_400_000);
+}
+
+/* ───────────── Forecast (prototype history only; not fixture.json) ───────────── */
+const DAY_MS = 86_400_000;
+const SCHOOL_DAY_MIN = 120;
+/** One school week. A milestone has no estimate, so its tail is the domain overrun applied to this. */
+const MILESTONE_WEEK = 5;
+const FORECAST_MIN = 20;
+/**
+ * Finished tasks with both an estimate and an actual, stored as actual ÷ estimate.
+ * Twenty-four samples so the reference can show the tails. The app uses real history.
+ */
+const FORECAST_HISTORY: Array<{ domain: FxTask['domain']; ratio: number }> = [
+  { domain: 'teaching', ratio: 1.1 }, { domain: 'teaching', ratio: 1.2 }, { domain: 'teaching', ratio: 1.3 },
+  { domain: 'teaching', ratio: 1.4 }, { domain: 'teaching', ratio: 1.5 }, { domain: 'teaching', ratio: 1.6 },
+  { domain: 'teaching', ratio: 1.7 }, { domain: 'teaching', ratio: 1.85 }, { domain: 'teaching', ratio: 1.95 },
+  { domain: 'teaching', ratio: 2.2 },
+  { domain: 'professional', ratio: 1.05 }, { domain: 'professional', ratio: 1.15 }, { domain: 'professional', ratio: 1.25 },
+  { domain: 'professional', ratio: 1.35 }, { domain: 'professional', ratio: 1.45 }, { domain: 'professional', ratio: 1.6 },
+  { domain: 'professional', ratio: 1.8 }, { domain: 'professional', ratio: 2.1 },
+  { domain: 'life', ratio: 1.0 }, { domain: 'life', ratio: 1.1 }, { domain: 'life', ratio: 1.2 },
+  { domain: 'life', ratio: 1.3 }, { domain: 'life', ratio: 1.4 }, { domain: 'life', ratio: 1.7 }
+];
+
+function p85Ratio(domain: FxTask['domain']): number {
+  const ratios = FORECAST_HISTORY.filter((h) => h.domain === domain).map((h) => h.ratio).sort((a, b) => a - b);
+  const index = Math.ceil(0.85 * ratios.length) - 1;
+  return ratios[Math.min(ratios.length - 1, Math.max(0, index))] ?? 1;
+}
+
+/** Extra calendar days after the planned end. Under a day stays fractional; nothing is forced to 1. */
+function overrunDays(estimateMin: number, ratio: number): number {
+  return (estimateMin * (ratio - 1)) / SCHOOL_DAY_MIN;
+}
+
+function forecastReady(): boolean {
+  return FORECAST_HISTORY.length >= FORECAST_MIN;
+}
+
+function clampLens(start: string): string {
+  const min = RANGE.start;
+  const max = addDaysKey(RANGE.end, -(TL.lens.days - 1));
+  if (start < min) return min;
+  if (start > max) return max;
+  return start;
 }
 
 /* ───────────── Rows ───────────── */
@@ -291,14 +344,21 @@ const els = {
 };
 
 const layers: Record<string, SVGGElement> = {};
-for (const name of ['grid', 'holidays', 'walls', 'axis', 'today', 'bands', 'curves', 'shadows', 'bars', 'ghosts', 'load'])
+for (const name of ['grid', 'holidays', 'walls', 'axis', 'lens', 'today', 'bands', 'curves', 'shadows', 'tails', 'bars', 'chrome', 'ghosts', 'load'])
   layers[name] = s('g', { 'data-layer': name }, els.svg);
+
+const tailPatterns = Object.entries(DOMAIN_COLOUR).map(([domain, hex]) => `
+  <pattern id="tl-tail-${domain}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-30)">
+    <rect width="7" height="7" fill="color-mix(in srgb, ${hex} 12%, transparent)"/>
+    <line x1="0" y1="0" x2="0" y2="7" stroke="color-mix(in srgb, ${hex} 50%, transparent)" stroke-width="1.5"/>
+  </pattern>`).join('');
 
 s('defs', {}, els.svg).innerHTML = `
   <pattern id="tl-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
     <rect width="8" height="8" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/>
     <line x1="0" y1="0" x2="0" y2="8" stroke="color-mix(in srgb, var(--navy) 16%, transparent)" stroke-width="2"/>
   </pattern>
+  ${tailPatterns}
   <marker id="tl-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
     <path d="M1 1 L9 5 L1 9 Z" fill="var(--shallow)"/>
   </marker>
@@ -312,7 +372,8 @@ s('defs', {}, els.svg).innerHTML = `
 /* ───────────── Entities ───────────── */
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve' | 'label' | 'wall' | 'hol'
-  | 'term' | 'week' | 'grid' | 'today' | 'shadow' | 'ribbon' | 'load' | 'cap' | 'ghost' | 'garrow' | 'ripple' | 'edge' | 'rowtitle';
+  | 'term' | 'week' | 'grid' | 'today' | 'shadow' | 'ribbon' | 'load' | 'cap' | 'ghost' | 'garrow' | 'ripple' | 'edge' | 'rowtitle'
+  | 'lens' | 'lensgrab' | 'tail';
 
 type Spec = { kind: Kind; text?: string; sub?: string; colour?: string; data?: Record<string, string>; flags?: Record<string, boolean> };
 const specs = new Map<string, Spec>();
@@ -328,8 +389,10 @@ function create(id: string): void {
   } else {
     const layer =
       kind === 'wall' ? layers.walls : kind === 'hol' || kind === 'grid' ? layers.grid : kind === 'term' || kind === 'week' ? layers.axis
+      : kind === 'lens' ? layers.lens : kind === 'lensgrab' ? layers.chrome
       : kind === 'band' || kind === 'bracket' ? layers.bands : kind === 'curve' || kind === 'edge' ? layers.curves
-      : kind === 'shadow' ? layers.shadows : kind === 'ghost' || kind === 'garrow' || kind === 'ripple' ? layers.ghosts
+      : kind === 'shadow' ? layers.shadows : kind === 'tail' ? layers.tails
+      : kind === 'ghost' || kind === 'garrow' || kind === 'ripple' ? layers.ghosts
       : kind === 'today' ? layers.today : kind === 'load' || kind === 'cap' ? layers.load : layers.bars;
     g = s('g', { 'data-id': id }, layer);
     const inner = s('g', { class: 'tl-pop' }, g);
@@ -511,6 +574,37 @@ function buildShape(kind: Kind, g: SVGGElement, spec: Spec, id: string): void {
       g.setAttribute('data-part', 'ripple');
       s('rect', { class: `tl-ripple${spec.flags?.slip ? ' tl-ripple--slip' : ''}`, rx: TL.bar.rx, height: TL.bar.h }, g);
       s('text', { class: 'tl-ripple__label' }, g).textContent = spec.text ?? '';
+      break;
+    }
+    case 'lens': {
+      g.setAttribute('data-part', 'lens');
+      g.setAttribute('data-start', d.start ?? '');
+      g.setAttribute('data-end', d.end ?? '');
+      s('rect', { class: 'tl-lens__wash' }, g);
+      s('line', { class: 'tl-lens__edge' }, g);
+      s('line', { class: 'tl-lens__edge tl-lens__edge--end' }, g);
+      break;
+    }
+    case 'lensgrab': {
+      g.setAttribute('class', 'tl-lens__pill');
+      g.setAttribute('data-part', 'lens-grab');
+      g.setAttribute('role', 'slider');
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('aria-label', `Focus ${spec.text ?? ''}. Drag to move.`);
+      s('rect', { rx: TL.lens.pillH / 2, height: TL.lens.pillH }, g);
+      s('text', { 'text-anchor': 'middle' }, g).textContent = spec.text ?? '';
+      break;
+    }
+    case 'tail': {
+      g.setAttribute('data-part', 'forecast-tail');
+      if (d.task) g.setAttribute('data-task-id', d.task);
+      if (d.milestone) g.setAttribute('data-milestone-id', d.milestone);
+      g.setAttribute('data-domain', d.domain ?? '');
+      g.setAttribute('data-days', d.days ?? '');
+      g.setAttribute('aria-label', spec.text ?? 'Forecast tail');
+      const face = s('rect', { class: 'tl-tail', rx: 4 }, g);
+      face.style.fill = `url(#tl-tail-${d.domain ?? 'teaching'})`;
+      face.style.stroke = `color-mix(in srgb, ${colour} 40%, transparent)`;
       break;
     }
   }
@@ -747,6 +841,35 @@ function apply(id: string, p: Readonly<Props>): void {
       set(t!, { x: p.lx ?? w + 8, y: TL.bar.h / 2 + 4.5 });
       break;
     }
+    case 'lens': {
+      g.setAttribute('transform', `translate(${x} 0)`);
+      const h = p.h ?? 0;
+      const [wash, edgeL, edgeR] = inner.children as unknown as SVGElement[];
+      set(wash!, { width: w, height: h });
+      set(edgeL!, { x1: 0, x2: 0, y1: 0, y2: h });
+      set(edgeR!, { x1: w, x2: w, y1: 0, y2: h });
+      inner.setAttribute('data-start', spec.data?.start ?? '');
+      inner.setAttribute('data-end', spec.data?.end ?? '');
+      break;
+    }
+    case 'lensgrab': {
+      const label = spec.text ?? '';
+      const pw = textW(label, '600 12px Inter') + 28;
+      const px = stickyX(x, w, pw);
+      g.setAttribute('transform', `translate(${x + px} ${TL.axis.h + 4})`);
+      inner.setAttribute('aria-label', `Focus ${label}. Drag to move.`);
+      const [pr, pt] = inner.children as unknown as SVGElement[];
+      set(pr!, { width: pw });
+      pt!.textContent = label;
+      set(pt!, { x: pw / 2, y: TL.lens.pillH / 2 + 4 });
+      break;
+    }
+    case 'tail': {
+      g.setAttribute('transform', `translate(${x} ${y})`);
+      inner.classList.toggle('is-dim', Boolean(p.dim));
+      set(inner.firstElementChild!, { width: w, height: p.h ?? TL.bar.h - 6 });
+      break;
+    }
   }
 }
 function set(el: Element, attrs: Record<string, string | number>): void {
@@ -755,7 +878,7 @@ function set(el: Element, attrs: Record<string, string | number>): void {
 
 /* Sticky text: long bars keep their title readable while scrolled. */
 let viewLeft = 0;
-const STICKY = new Set<Kind>(['proj', 'band', 'ribbon', 'dream', 'rowtitle']);
+const STICKY = new Set<Kind>(['proj', 'band', 'ribbon', 'dream', 'rowtitle', 'lensgrab']);
 function stickyX(barX: number, barW: number, textWidth: number): number {
   const min = viewLeft + 12 - barX;
   return Math.max(12, Math.min(min, barW - textWidth - 12));
@@ -780,14 +903,70 @@ let rows: Row[] = [];
 let capPath = '';
 const PAD_R = 220;
 
-function computeScale(): TimeScale {
+function uniformScale(dayWidth: number): TimeScale {
   return buildTimeScale({
     start: RANGE.start,
     end: RANGE.end,
     terms: SCHOOL,
-    dayWidth: state.dayWidth,
+    dayWidth,
     holidayFactor: state.holidaysCompressed ? 0.25 : 1
   });
+}
+
+/** Piecewise scale: 14 days at Day width, 3 weeks either side at Week width, the rest at Term width. */
+function buildLensScale(): TimeScale {
+  const focusStart = state.lensStart;
+  const focusEnd = addDaysKey(focusStart, TL.lens.days);
+  const shoulderStart = addDaysKey(focusStart, -TL.lens.shoulder);
+  const shoulderEnd = addDaysKey(focusEnd, TL.lens.shoulder);
+  const factor = state.holidaysCompressed ? 0.25 : 1;
+  const focusPx = TL.zooms[4]!.dayWidth;
+  const shoulderPx = TL.zooms[3]!.dayWidth;
+  const outerPx = TL.zooms[1]!.dayWidth;
+  const days: ScaleDay[] = [];
+  let x = 0;
+  for (let ms = toMs(RANGE.start); ms <= toMs(RANGE.end); ms += DAY_MS) {
+    const key = toKey(ms);
+    const holiday = isHoliday(key, SCHOOL);
+    const inFocus = key >= focusStart && key < focusEnd;
+    const inShoulder = !inFocus && key >= shoulderStart && key < shoulderEnd;
+    let w = inFocus ? focusPx : inShoulder ? shoulderPx : outerPx;
+    if (holiday && !inFocus) w *= factor;
+    days.push({ key, x, w, holiday });
+    x += w;
+  }
+  const startMs = toMs(RANGE.start);
+  const width = x;
+  function xAtMs(ms: number): number {
+    const i = Math.floor((ms - startMs) / DAY_MS);
+    if (i < 0) return 0;
+    if (i >= days.length) return width;
+    const day = days[i]!;
+    const frac = (ms - (startMs + i * DAY_MS)) / DAY_MS;
+    return day.x + day.w * frac;
+  }
+  return {
+    start: RANGE.start,
+    end: RANGE.end,
+    width,
+    days,
+    x: (v) => xAtMs(typeof v === 'number' ? v : toMs(v)),
+    dateAt(px) {
+      if (px <= 0) return days[0]?.key ?? RANGE.start;
+      let lo = 0;
+      let hi = days.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1;
+        if (days[mid]!.x <= px) lo = mid;
+        else hi = mid - 1;
+      }
+      return days[lo]!.key;
+    }
+  };
+}
+
+function computeScale(): TimeScale {
+  return state.lens ? buildLensScale() : uniformScale(state.dayWidth);
 }
 
 type Layout = { entities: Map<string, Props>; width: number; height: number };
@@ -803,6 +982,13 @@ function layout(): Layout {
   const width = scale.width + PAD_R;
   const dw = state.dayWidth;
   const X = (k: string) => scale.x(k);
+  const putTail = (id: string, domain: FxTask['domain'], colour: string, x0: number, endMs: number, y: number, h: number, label: string, data: Record<string, string>, dim: boolean) => {
+    if (!state.forecast) return;
+    const tw = scale.x(endMs) - x0;
+    if (tw <= 0.5) return;
+    specs.set(id, { kind: 'tail', text: label, colour, data });
+    E.set(id, { x: x0, y, w: tw, h, dim: dim ? 1 : 0 });
+  };
   const barX = (span: { start: string; end: string }) => {
     const x0 = X(span.start);
     const x1 = X(addDaysKey(span.end, 1));
@@ -928,17 +1114,30 @@ function layout(): Layout {
       const sub = t.blocked ? 'blocked 4 days' : t.status === 'done' ? 'done' : `due ${fmt(t.due!)}`;
       const flags: Record<string, string> = { state: t.status === 'done' ? 'done' : t.blocked ? 'blocked' : t.status };
       if (t.blocked) flags.blocked = 'true';
-      specs.set(id, { kind: r.kind === 'step' ? 'step' : 'bar', text: t.title, sub, colour: colourOf(PROJECTS.find((p) => p.id === t.project) ?? { domain: t.domain }), data: flags });
+      const colour = colourOf(PROJECTS.find((p) => p.id === t.project) ?? { domain: t.domain });
+      specs.set(id, { kind: r.kind === 'step' ? 'step' : 'bar', text: t.title, sub, colour, data: flags });
       const bh = r.kind === 'step' ? TL.bar.h - 6 : TL.bar.h;
       const crit = state.critical && CRITICAL.has(t.id);
-      E.set(id, { x: b.x, y: y + (r.h - bh) / 2, w: b.w, crit: crit ? 1 : 0, dim: state.critical && !crit ? 1 : 0 });
+      const by = y + (r.h - bh) / 2;
+      E.set(id, { x: b.x, y: by, w: b.w, crit: crit ? 1 : 0, dim: state.critical && !crit ? 1 : 0 });
+      if (t.status !== 'done' && t.est && t.due) {
+        const days = overrunDays(t.est, p85Ratio(t.domain));
+        const endMs = toMs(addDaysKey(t.due, 1)) + days * DAY_MS;
+        putTail(`tail:${t.id}`, t.domain, colour, b.x + b.w - 2, endMs, by + 3, bh - 6, `Forecast ${fmt(toKey(endMs))}`, { domain: t.domain, task: t.id, days: days.toFixed(2) }, state.critical && !crit);
+      }
     }
     if (r.kind === 'milestone') {
       const m = MILESTONES.find((m) => m.id === r.ref)!;
       const p = PROJECTS.find((p) => p.id === m.project)!;
       const id = `ms:${m.id}`;
-      specs.set(id, { kind: 'ms', text: `${m.title} · ${fmt(m.due)}`, colour: colourOf(p) });
-      E.set(id, { x: X(m.due) + dw / 2, y: y + r.h / 2 });
+      const colour = colourOf(p);
+      specs.set(id, { kind: 'ms', text: `${m.title} · ${fmt(m.due)}`, colour });
+      const localW = state.lens ? X(addDaysKey(m.due, 1)) - X(m.due) : dw;
+      const cx = X(m.due) + localW / 2;
+      E.set(id, { x: cx, y: y + r.h / 2 });
+      const days = (p85Ratio(p.domain) - 1) * MILESTONE_WEEK;
+      const endMs = toMs(m.due) + days * DAY_MS;
+      putTail(`tail:${m.id}`, p.domain, colour, cx + TL.diamond / 2 + 4, endMs, y + r.h / 2 - 4, 8, `Forecast ${fmt(toKey(endMs))}`, { domain: p.domain, milestone: m.id, days: days.toFixed(2) }, false);
     }
     if (r.kind === 'marking') {
       const t = state.tasks.find((t) => t.id === r.ref)!;
@@ -965,6 +1164,11 @@ function layout(): Layout {
         flags: { warn }
       });
       E.set(id, { x: x0, y: y + (r.h - TL.shadow.h) / 2, w: x1 - x0, progress: mk.marked / mk.scripts, perDay, days });
+      if (t.status !== 'done' && t.est) {
+        const extra = overrunDays(t.est, p85Ratio(t.domain));
+        const endMs = toMs(addDaysKey(mk.returnBy, 1)) + extra * DAY_MS;
+        putTail(`tail:${t.id}`, t.domain, colourOf({ domain: t.domain }), x1 - 2, endMs, y + (r.h - 10) / 2, 10, `Forecast ${fmt(toKey(endMs))}`, { domain: t.domain, task: t.id, days: extra.toFixed(2) }, false);
+      }
     }
     if (r.kind === 'group' && !r.open && r.ref === 'grp-loose') {
       // collapsed group shows nothing on the canvas; the label carries the count
@@ -993,9 +1197,22 @@ function layout(): Layout {
     E.set(id, { x1: a.x, y1: a.y, x2: b.x - 2, y2: b.y, dim: state.critical && !critical ? 1 : 0, crit: critical ? 1 : 0 });
   }
 
-  // Today.
+  // Today. Inside the lens, use that day's real width so 09:00 stays at 0.375 of the magnified day.
   specs.set('today', { kind: 'today' });
-  E.set('today', { x: X(TODAY) + dw * TODAY_FRAC, h: rowsBottom + 4 });
+  const todayW = state.lens ? X(addDaysKey(TODAY, 1)) - X(TODAY) : dw;
+  E.set('today', { x: X(TODAY) + todayW * TODAY_FRAC, h: rowsBottom + 4 });
+
+  if (state.lens) {
+    const start = state.lensStart;
+    const end = addDaysKey(start, TL.lens.days - 1);
+    const x0 = X(start);
+    const label = `${fmt(start)} – ${fmt(end)}`;
+    const lw = X(addDaysKey(end, 1)) - x0;
+    specs.set('lens', { kind: 'lens', text: label, data: { start, end } });
+    E.set('lens', { x: x0, w: lw, h: rowsBottom + 4 });
+    specs.set('lensgrab', { kind: 'lensgrab', text: label });
+    E.set('lensgrab', { x: x0, w: lw });
+  }
 
   // Load strip.
   capPath = '';
@@ -1088,7 +1305,7 @@ const engine = createMotion({ apply });
 let lastIds: string[] = [];
 let geometry = { width: 0, height: 0 };
 
-function relayout(reason: 'zoom' | 'settle' | 'expand' | 'first' | 'drag' | 'release'): void {
+function relayout(reason: 'zoom' | 'settle' | 'expand' | 'first' | 'drag' | 'release' | 'place'): void {
   const anchorX = zoomAnchor ? zoomAnchor.screenX : 0;
   const L = layout();
   geometry = { width: L.width, height: L.height };
@@ -1105,15 +1322,15 @@ function relayout(reason: 'zoom' | 'settle' | 'expand' | 'first' | 'drag' | 'rel
   const legend = document.getElementById('tl-load-label') as HTMLElement;
   legend.hidden = !state.load;
   legend.style.top = `${L.height - TL.load.h + 8}px`;
-  if (reason === 'zoom') {
-    // One value tweens; everything else is placed at that value. No per-entity zoom tweens.
+  if (reason === 'zoom' || reason === 'place') {
+    // Zoom tweens one value. A lens drag places every entity 1:1, same path, no scroll anchor.
     for (const [id, props] of L.entities) {
       if (!nodes.has(id)) create(id);
       engine.place(id, { opacity: 1, scale: 1, ...props });
     }
     for (const id of lastIds) if (!L.entities.has(id)) { engine.forget(id); remove(id); }
     lastIds = [...L.entities.keys()];
-    if (zoomAnchor) els.scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
+    if (reason === 'zoom' && zoomAnchor) els.scroller.scrollLeft = scale.x(zoomAnchor.date) + zoomAnchor.frac * state.dayWidth - anchorX;
     return;
   }
   const opts =
@@ -1206,6 +1423,7 @@ let zoomAnchor: null | { date: string; frac: number; screenX: number } = null;
 let zoomCanvasWidth = 0;
 let zoomSettle = 0;
 function setZoom(index: number, anchorClientX?: number): void {
+  if (state.lens) return;
   index = Math.max(0, Math.min(TL.zooms.length - 1, index));
   if (index === state.zoom && anchorClientX === undefined) return;
   const box = els.scroller.getBoundingClientRect();
@@ -1288,6 +1506,30 @@ holBtn.onclick = () => {
   relayout('settle');
 };
 (document.getElementById('tl-today-btn') as HTMLButtonElement).onclick = () => scrollToToday(true);
+
+const focusBtn = document.getElementById('tl-focus') as HTMLButtonElement;
+const forecastBtn = document.getElementById('tl-forecast') as HTMLButtonElement;
+forecastBtn.disabled = !forecastReady();
+forecastBtn.title = forecastReady()
+  ? `P85 from ${FORECAST_HISTORY.length} finished tasks with an estimate and an actual`
+  : 'Needs 20 finished tasks with an estimate and an actual';
+focusBtn.onclick = () => {
+  state.lens = !state.lens;
+  if (state.lens) state.lensStart = mondayOf(TODAY);
+  focusBtn.setAttribute('aria-pressed', String(state.lens));
+  zoomPills.classList.toggle('is-dim', state.lens);
+  relayout('settle');
+  if (state.lens) {
+    const left = Math.max(0, scale.x(state.lensStart) - 36);
+    els.scroller.scrollTo({ left, behavior: reduced ? 'auto' : 'smooth' });
+  }
+};
+forecastBtn.onclick = () => {
+  if (!forecastReady()) return;
+  state.forecast = !state.forecast;
+  forecastBtn.setAttribute('aria-pressed', String(state.forecast));
+  relayout('settle');
+};
 (document.getElementById('tl-hammond') as HTMLButtonElement).onclick = () => showHammond(true);
 
 function scrollToToday(smooth: boolean): void {
@@ -1341,7 +1583,35 @@ function followCurves(tid: string, snap: Map<string, Props>, dx: number): void {
     engine.place(id, { x1: p.x1! + (a === tid ? dx : 0), x2: p.x2! + (b === tid ? dx : 0) });
   }
 }
+function dragLens(ev: PointerEvent): void {
+  ev.preventDefault();
+  const originStart = state.lensStart;
+  const originClient = ev.clientX;
+  const originScroll = els.scroller.scrollLeft;
+  const originLensX = scale.x(originStart);
+  const originScreen = originLensX - originScroll;
+  const move = (e: PointerEvent) => {
+    const days = Math.round((e.clientX - originClient) / TL.zooms[4]!.dayWidth);
+    const next = clampLens(addDaysKey(originStart, days));
+    if (next === state.lensStart) return;
+    state.lensStart = next;
+    relayout('place');
+    const desired = originScreen + (e.clientX - originClient);
+    els.scroller.scrollLeft = scale.x(state.lensStart) - desired;
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
 function onPointerDown(ev: PointerEvent): void {
+  const grab = (ev.target as Element).closest('[data-part="lens-grab"]');
+  if (grab) {
+    dragLens(ev);
+    return;
+  }
   const g = (ev.target as Element).closest('[data-part="bar"]') as SVGGElement | null;
   if (!g || state.view !== 'bars') return;
   const tid = g.getAttribute('data-task-id')!;
@@ -1420,6 +1690,13 @@ function relayoutDragPreview(): void {
   els.banner.hidden = !slips;
 }
 els.svg.addEventListener('pointerdown', onPointerDown);
+els.svg.addEventListener('keydown', (e) => {
+  if (!(e.target as Element).closest?.('[data-part="lens-grab"]') || !state.lens) return;
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  state.lensStart = clampLens(addDaysKey(state.lensStart, e.key === 'ArrowRight' ? 1 : -1));
+  relayout('settle');
+});
 
 /* ───────────── Selection and keyboard ───────────── */
 function select(tid: string | null): void {

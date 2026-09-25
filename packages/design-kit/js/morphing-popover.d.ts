@@ -108,6 +108,8 @@ export function createMorphingClosedFieldPopover(options?: {
   title?: string;
   supporting?: string;
   options?: ClosedFieldOption[] | string;
+  groups?: Array<{ label?: string; options?: ClosedFieldOption[] | string }>;
+  multiple?: boolean;
   value?: string;
   submitLabel?: string;
   discardLabel?: string;
