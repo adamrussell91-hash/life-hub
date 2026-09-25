@@ -21,7 +21,7 @@ import { renderMarkdown } from './_shared/persist-log.mjs';
 import { validateRecord } from '../../apps/life/js/core/validate.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { acceptPlan, dismissPlan, validateGhost, GHOST_AGENTS } from '../../apps/life/js/app/ghost-writes.js';
-import { ghostId } from '../../apps/life/js/app/ghost-proposer.js';
+import { ghostId, ghostSemanticKey } from '../../apps/life/js/app/ghost-proposer.js';
 import {
   ghostsForAlmanacAction,
   loadProfessionalEventsFromBlobs,
@@ -61,20 +61,57 @@ function isQueueEntry(value) {
     && typeof value.kind === 'string' && value.kind.trim() !== '';
 }
 
-/** Tolerant parse — missing or corrupt content is an empty queue, never a throw. */
-export function parsePendingCalendarGhosts(text) {
-  if (typeof text !== 'string' || text.trim() === '') return [];
+function isLastRun(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    && typeof value.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.date);
+}
+
+/**
+ * Queue file: legacy `[]` or `{ ghosts, last_run }`.
+ * last_run = { date, at, newest_record_at } — set by propose even when nothing is queued.
+ */
+export function parsePendingCalendarGhostsDoc(text) {
+  if (typeof text !== 'string' || text.trim() === '') return { ghosts: [], last_run: null };
   try {
     const parsed = JSON.parse(text);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isQueueEntry);
+    if (Array.isArray(parsed)) {
+      return { ghosts: parsed.filter(isQueueEntry), last_run: null };
+    }
+    if (parsed && typeof parsed === 'object' && Array.isArray(parsed.ghosts)) {
+      return {
+        ghosts: parsed.ghosts.filter(isQueueEntry),
+        last_run: isLastRun(parsed.last_run)
+          ? {
+            date: parsed.last_run.date,
+            at: typeof parsed.last_run.at === 'string' ? parsed.last_run.at : null,
+            newest_record_at: typeof parsed.last_run.newest_record_at === 'string'
+              ? parsed.last_run.newest_record_at
+              : null
+          }
+          : null
+      };
+    }
+    return { ghosts: [], last_run: null };
   } catch {
-    return [];
+    return { ghosts: [], last_run: null };
   }
 }
 
-export function serializePendingCalendarGhosts(list) {
-  return JSON.stringify(Array.isArray(list) ? list : [], null, 2);
+/** Tolerant parse — missing or corrupt content is an empty queue, never a throw. */
+export function parsePendingCalendarGhosts(text) {
+  return parsePendingCalendarGhostsDoc(text).ghosts;
+}
+
+/**
+ * Serialize the queue. Pass last_run to write `{ ghosts, last_run }`; omit it to
+ * keep the legacy array form (accept/dismiss seeds and visual fixtures).
+ */
+export function serializePendingCalendarGhosts(list, last_run) {
+  const ghosts = Array.isArray(list) ? list : [];
+  if (last_run && typeof last_run === 'object') {
+    return JSON.stringify({ ghosts, last_run }, null, 2);
+  }
+  return JSON.stringify(ghosts, null, 2);
 }
 
 /**
@@ -105,14 +142,28 @@ export function calendarGhostFromToolInput(input, { agent, nowIso }) {
   };
 }
 
+function alreadyQueued(list, entry) {
+  const key = ghostSemanticKey(entry);
+  return list.some(item =>
+    item.id === entry.id || (key && ghostSemanticKey(item) === key));
+}
+
 /** Append one ghost to the queue text. Returns the next serialized queue. */
 export function appendPendingCalendarGhost(queueText, entry) {
-  const list = parsePendingCalendarGhosts(queueText);
-  if (list.some(item => item.id === entry.id)) {
-    return { content: serializePendingCalendarGhosts(list), added: false, list };
+  const doc = parsePendingCalendarGhostsDoc(queueText);
+  if (alreadyQueued(doc.ghosts, entry)) {
+    return {
+      content: serializePendingCalendarGhosts(doc.ghosts, doc.last_run ?? undefined),
+      added: false,
+      list: doc.ghosts
+    };
   }
-  const next = [...list, entry];
-  return { content: serializePendingCalendarGhosts(next), added: true, list: next };
+  const next = [...doc.ghosts, entry];
+  return {
+    content: serializePendingCalendarGhosts(next, doc.last_run ?? undefined),
+    added: true,
+    list: next
+  };
 }
 
 function findGhost(list, id) {
@@ -297,7 +348,8 @@ async function applyTaskStep(store, step, { ghostId } = {}) {
 }
 
 async function settle(opened, { id, decision, reason, today, nowIso }) {
-  const queue = parsePendingCalendarGhosts(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
+  const doc = parsePendingCalendarGhostsDoc(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
+  const queue = doc.ghosts;
   const entry = findGhost(queue, id);
   if (!entry) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
   const status = statusOf(entry);
@@ -327,7 +379,7 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
     changed.set(PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(markGhost(queue, id, {
       status: 'dismissed',
       decided_at: nowIso
-    })));
+    }), doc.last_run ?? undefined));
     const prior = await opened.readFile(CALENDAR_GHOST_DECISIONS_PATH);
     const line = JSON.stringify({ ...plan.decision, at: nowIso });
     const base = typeof prior === 'string' ? prior : '';
@@ -381,7 +433,7 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
     decided_at: nowIso,
     // Set before the tasks call so a failure in step 2 still has a retry marker.
     ...(taskSteps.length ? { tasks_pending: true } : {})
-  })));
+  }), doc.last_run ?? undefined));
   return {
     kind: 'accept',
     changed,
@@ -506,12 +558,12 @@ async function runAlmanacGhostDecision({
 
 async function clearTasksPending(open, commit, id) {
   const opened = await open();
-  const queue = parsePendingCalendarGhosts(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
-  const entry = findGhost(queue, id);
+  const doc = parsePendingCalendarGhostsDoc(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
+  const entry = findGhost(doc.ghosts, id);
   if (!entry || entry.tasks_pending !== true) return;
   const changed = new Map([[
     PENDING_CALENDAR_GHOSTS_PATH,
-    serializePendingCalendarGhosts(markGhost(queue, id, { tasks_pending: false }))
+    serializePendingCalendarGhosts(markGhost(doc.ghosts, id, { tasks_pending: false }), doc.last_run ?? undefined)
   ]]);
   await commit(changed, opened.base, `chore(calendar): tasks applied ${id}`);
 }
@@ -651,6 +703,37 @@ export function createCalendarGhostsHandler({
         }
         const from = url.searchParams.get('from');
         const to = url.searchParams.get('to');
+        const instant = new Date(now());
+        const today = getSydneyDateKey(instant);
+        const nowIso = getSydneyTimestamp(instant);
+
+        // Calendar open: refresh proposals when the range covers today and
+        // the last run is stale or Life records for today changed.
+        if (from <= today && to >= today) {
+          try {
+            const { runCalendarGhostsPropose } = await import('./_shared/calendar-ghosts-propose.mjs');
+            const tasksStoreFn = () => getTasksStore(env);
+            const terms = await readSchoolTerms(tasksStoreFn);
+            const [lessons, professionalEvents] = await Promise.all([
+              loadLessons(env),
+              loadProfessionalEvents(env)
+            ]);
+            await runCalendarGhostsPropose({
+              open,
+              commit,
+              today,
+              nowIso,
+              nowMs: instant.getTime(),
+              terms,
+              lessons,
+              professionalEvents,
+              trigger: 'refresh'
+            });
+          } catch (error) {
+            console.warn('calendar-ghosts GET refresh propose failed', error);
+          }
+        }
+
         const opened = await open();
         const ghosts = pendingGhostsInRange(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH), from, to);
         return jsonResponse(200, { ok: true, ghosts }, PRIVATE_CACHE);

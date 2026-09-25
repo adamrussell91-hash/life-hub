@@ -1,17 +1,17 @@
 /**
  * Morning ghost propose: load the week, call proposeGhosts, append to the queue.
- * Shared by the Netlify schedule and the mock POST /api/calendar-ghosts-propose.
+ * Shared by the Netlify schedule, calendar GET refresh, and mock POST.
  */
 import { load as loadYaml } from 'js-yaml';
 import { parseEventDocument } from '../../../apps/life/js/core/records.js';
-import { getSydneyDateKey, getSydneyTimestamp } from '../../../apps/life/js/core/time.js';
+import { getSydneyDateKey, getSydneyMinutesOfDay, getSydneyTimestamp } from '../../../apps/life/js/core/time.js';
 import { capacityForDates } from '../../../apps/life/js/app/capacity-model.js';
-import { proposeGhosts } from '../../../apps/life/js/app/ghost-proposer.js';
+import { proposeGhosts, ghostSemanticKey } from '../../../apps/life/js/app/ghost-proposer.js';
 import { addDays } from '../../../packages/design-kit/js/lead-lines.js';
 import {
   CALENDAR_GHOST_DECISIONS_PATH,
   PENDING_CALENDAR_GHOSTS_PATH,
-  parsePendingCalendarGhosts,
+  parsePendingCalendarGhostsDoc,
   serializePendingCalendarGhosts
 } from '../calendar-ghosts.mjs';
 import {
@@ -20,6 +20,9 @@ import {
 } from '../almanac.mjs';
 
 const DAY_MS = 86_400_000;
+const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+const WINDOW_START_MIN = 5 * 60 + 25; // 05:25 Sydney
+const WINDOW_END_MIN = 6 * 60 + 35; // 06:35 Sydney
 const RECORD_PATH = /^data\/(?:nutrition|fitness|mind|sleep|heart|skincare|fragrance|body|calendar)\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-[a-z0-9-]+\.md$/;
 const LEGACY_RECORD_PATH = /^records\/\d{4}\/\d{2}\/\d{2}\/[^/]+\.md$/; // visual-seed workout path
 const VISUAL_PATH = 'calendar-visual.json';
@@ -51,15 +54,49 @@ function parseDecisionsJsonl(text) {
   return rows;
 }
 
-function alreadyRanToday(queue, today) {
-  return (queue ?? []).some(entry =>
-    entry?.via === 'scheduled'
-    && typeof entry.created_at === 'string'
-    && entry.created_at.slice(0, 10) === today);
+/** Exactly one of the two UTC cron slots should fire — the 05:30 Sydney one. */
+export function inSydneyProposeWindow(instant = new Date()) {
+  const mins = getSydneyMinutesOfDay(instant instanceof Date ? instant : new Date(instant));
+  return mins >= WINDOW_START_MIN && mins <= WINDOW_END_MIN;
+}
+
+/**
+ * Refresh when: no run for today, last run > 2h ago, or today's Life records
+ * changed (newest updated_at > last_run.newest_record_at).
+ */
+export function shouldRefreshPropose(last_run, { today, nowMs, newestRecordAt }) {
+  if (!last_run || last_run.date !== today) return true;
+  const lastAt = typeof last_run.at === 'string' ? Date.parse(last_run.at) : NaN;
+  if (Number.isFinite(lastAt) && Number.isFinite(nowMs) && (nowMs - lastAt) > TWO_HOURS_MS) {
+    return true;
+  }
+  if (typeof newestRecordAt === 'string' && newestRecordAt) {
+    if (!last_run.newest_record_at || newestRecordAt > last_run.newest_record_at) return true;
+  }
+  return false;
+}
+
+/** Scheduled: skip if we already recorded a run for today's Sydney date. */
+export function shouldScheduledPropose(last_run, today) {
+  return !last_run || last_run.date !== today;
 }
 
 function pathDate(path) {
   return RECORD_PATH.exec(path)?.[1] ?? null;
+}
+
+/** Newest updated_at (else created_at) among Life records dated `today`. */
+export function newestRecordAtForDate(events, today) {
+  let newest = null;
+  for (const event of events ?? []) {
+    const rec = event?.record;
+    if (!rec || rec.date !== today) continue;
+    const at = typeof rec.updated_at === 'string' && rec.updated_at
+      ? rec.updated_at
+      : (typeof rec.created_at === 'string' ? rec.created_at : null);
+    if (typeof at === 'string' && (!newest || at > newest)) newest = at;
+  }
+  return newest;
 }
 
 async function readEvents(paths, readFile, from, to, warn) {
@@ -111,29 +148,45 @@ function readProfile(visual, planning) {
   return { day_profile: { sleep: '22:30' } };
 }
 
+function alreadyQueued(queue, ghost) {
+  const key = ghostSemanticKey(ghost);
+  return (queue ?? []).some(entry =>
+    entry.id === ghost.id || (key && ghostSemanticKey(entry) === key));
+}
+
 /**
  * Core propose run. `open` / `commit` match calendar-ghosts.mjs.
- * Returns { ok, proposed, skipped?, ghosts }.
+ * trigger: 'scheduled' | 'refresh' | 'manual'
+ * Returns { ok, proposed, skipped?, ghosts, last_run? }.
  */
 export async function runCalendarGhostsPropose({
   open,
   commit,
   today,
   nowIso,
+  nowMs = null,
   terms = [],
   lessons = [],
   professionalEvents = [],
   planningProfile = null,
+  trigger = 'scheduled',
+  instant = null,
   warn = console.warn
 } = {}) {
   if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
     throw new TypeError('runCalendarGhostsPropose needs today (YYYY-MM-DD)');
   }
-  const opened = await open();
-  const queue = parsePendingCalendarGhosts(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
-  if (alreadyRanToday(queue, today)) {
-    return { ok: true, proposed: 0, skipped: 'already_ran', ghosts: [] };
+
+  if (trigger === 'scheduled') {
+    const when = instant instanceof Date ? instant : (instant != null ? new Date(instant) : new Date());
+    if (!inSydneyProposeWindow(when)) {
+      return { ok: true, proposed: 0, skipped: 'outside_window', ghosts: [] };
+    }
   }
+
+  const opened = await open();
+  const doc = parsePendingCalendarGhostsDoc(await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH));
+  const queue = doc.ghosts;
 
   const week = weekDates(today);
   const horizonTo = addDays(today, 13);
@@ -153,6 +206,18 @@ export async function runCalendarGhostsPropose({
     await readEvents(paths, path => opened.readFile(path), addDays(from, -7), horizonTo, warn),
     visual
   );
+  const newestRecordAt = newestRecordAtForDate(events, today);
+  const clockMs = Number.isFinite(nowMs) ? nowMs : (typeof nowIso === 'string' ? Date.parse(nowIso) : Date.now());
+
+  if (trigger === 'scheduled') {
+    if (!shouldScheduledPropose(doc.last_run, today)) {
+      return { ok: true, proposed: 0, skipped: 'already_ran', ghosts: [], last_run: doc.last_run };
+    }
+  } else if (trigger === 'refresh') {
+    if (!shouldRefreshPropose(doc.last_run, { today, nowMs: clockMs, newestRecordAt })) {
+      return { ok: true, proposed: 0, skipped: 'fresh', ghosts: [], last_run: doc.last_run };
+    }
+  }
 
   const isHoliday = date => schoolTerms.length
     ? !schoolTerms.some(term => date >= term.starts_on && date <= term.ends_on)
@@ -182,23 +247,28 @@ export async function runCalendarGhostsPropose({
     pending: queue,
     decisions,
     profile: readProfile(visual, planningProfile)
-  });
+  }).filter(ghost => !alreadyQueued(queue, ghost));
 
-  if (!proposed.length) {
-    return { ok: true, proposed: 0, ghosts: [] };
-  }
-
+  const via = trigger === 'refresh' ? 'refresh' : (trigger === 'manual' ? 'manual' : 'scheduled');
   const stamped = proposed.map(ghost => ({
     ...ghost,
     created_at: nowIso,
     status: 'pending',
-    via: 'scheduled'
+    via
   }));
   const next = [...queue, ...stamped];
-  const changed = new Map([[PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(next)]]);
-  await commit(changed, opened.base, `chore(calendar): propose ${stamped.length} ghost${stamped.length === 1 ? '' : 's'}`);
-  console.log(`calendar-ghosts-propose: proposed ${stamped.length}`);
-  return { ok: true, proposed: stamped.length, ghosts: stamped };
+  const last_run = {
+    date: today,
+    at: nowIso,
+    newest_record_at: newestRecordAt
+  };
+  // Always record last_run — a run that proposes nothing still counts.
+  const changed = new Map([[PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts(next, last_run)]]);
+  await commit(changed, opened.base, stamped.length
+    ? `chore(calendar): propose ${stamped.length} ghost${stamped.length === 1 ? '' : 's'}`
+    : 'chore(calendar): propose run (none)');
+  if (stamped.length) console.log(`calendar-ghosts-propose: proposed ${stamped.length}`);
+  return { ok: true, proposed: stamped.length, ghosts: stamped, last_run };
 }
 
 /** Build open/commit for a GitHub client the same way calendar-ghosts does. */
@@ -238,7 +308,8 @@ export function createCalendarGhostsProposeHandler({
   getTasksStore,
   loadLessons,
   loadProfessionalEvents,
-  readSchoolTerms: readTerms = readSchoolTerms
+  readSchoolTerms: readTerms = readSchoolTerms,
+  trigger = 'scheduled'
 } = {}) {
   return async function calendarGhostsProposeHandler() {
     const instant = new Date(now());
@@ -262,9 +333,12 @@ export function createCalendarGhostsProposeHandler({
       commit,
       today,
       nowIso,
+      nowMs: instant.getTime(),
+      instant,
       terms,
       lessons,
-      professionalEvents
+      professionalEvents,
+      trigger
     });
   };
 }

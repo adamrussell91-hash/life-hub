@@ -496,9 +496,12 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           },
           today: getSydneyDateKey(instant),
           nowIso: getSydneyTimestamp(instant),
+          nowMs: instant.getTime(),
+          instant,
           terms,
           lessons: [],
-          professionalEvents: []
+          professionalEvents: [],
+          trigger: 'manual'
         });
         json(response, 200, result);
       } catch (proposeError) {
@@ -520,11 +523,35 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           error(response, 400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.', false);
           return true;
         }
+        const from = url.searchParams.get('from');
+        const to = url.searchParams.get('to');
+        const today = getSydneyDateKey(instant);
+        if (from <= today && to >= today) {
+          try {
+            const terms = await readSchoolTerms(async () => taskStore);
+            await runCalendarGhostsPropose({
+              open: openRepo,
+              commit: async (changed) => {
+                for (const [path, content] of changed) confirmedFiles.set(path, content);
+              },
+              today,
+              nowIso: getSydneyTimestamp(instant),
+              nowMs: instant.getTime(),
+              instant,
+              terms,
+              lessons: [],
+              professionalEvents: [],
+              trigger: 'refresh'
+            });
+          } catch (refreshError) {
+            console.warn('mock calendar-ghosts GET refresh failed', refreshError);
+          }
+        }
         const opened = await open();
         const ghosts = pendingGhostsInRange(
           await opened.readFile(PENDING_CALENDAR_GHOSTS_PATH),
-          url.searchParams.get('from'),
-          url.searchParams.get('to')
+          from,
+          to
         );
         json(response, 200, { ok: true, ghosts });
         return true;

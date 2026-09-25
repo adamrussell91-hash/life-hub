@@ -49,18 +49,42 @@ export function ghostId(agent, kind, date) {
   return `${agent}-${kind}-${date}`;
 }
 
+/**
+ * Semantic target for dedupe: workoutPath / taskId / start (or bedtime time).
+ * Same meaning with a different id still counts as already proposed.
+ */
+export function ghostTarget(ghost) {
+  if (!ghost || typeof ghost !== 'object') return '';
+  if (typeof ghost.workoutPath === 'string' && ghost.workoutPath) return ghost.workoutPath;
+  if (typeof ghost.taskId === 'string' && ghost.taskId) return ghost.taskId;
+  if (typeof ghost.start === 'string' && ghost.start) return ghost.start;
+  if (typeof ghost.time === 'string' && ghost.time) return ghost.time;
+  return '';
+}
+
+/** Stable key: agent + kind + date + target. */
+export function ghostSemanticKey(ghost) {
+  if (!ghost || typeof ghost !== 'object') return '';
+  const date = typeof ghost.date === 'string' && ghost.date
+    ? ghost.date
+    : (typeof ghost.from === 'string' ? ghost.from : '');
+  return `${ghost.agent ?? ''}\0${ghost.kind ?? ''}\0${date}\0${ghostTarget(ghost)}`;
+}
+
 function statusOf(entry) {
   return typeof entry?.status === 'string' && entry.status ? entry.status : 'pending';
 }
 
-/** Ids already pending, accepted or dismissed — never re-propose. */
-function knownIds(pending) {
-  const ids = new Set();
+/** Semantic keys already pending, accepted or dismissed — never re-propose. */
+function knownSemanticKeys(pending) {
+  const keys = new Set();
   for (const entry of pending ?? []) {
-    if (!entry || typeof entry.id !== 'string') continue;
-    if (['pending', 'accepted', 'dismissed'].includes(statusOf(entry))) ids.add(entry.id);
+    if (!entry || typeof entry.agent !== 'string' || typeof entry.kind !== 'string') continue;
+    if (!['pending', 'accepted', 'dismissed'].includes(statusOf(entry))) continue;
+    const key = ghostSemanticKey(entry);
+    if (key) keys.add(key);
   }
-  return ids;
+  return keys;
 }
 
 function wallsOn(events) {
@@ -196,7 +220,7 @@ export function proposeGhosts({
   const dateKeys = Array.isArray(days) && days.length
     ? days.filter(d => DATE_KEY.test(d))
     : Array.from({ length: GOOD_NIGHT_HORIZON }, (_, i) => addDays(today, i));
-  const known = knownIds(pending);
+  const known = knownSemanticKeys(pending);
   const walls = wallsOn(events);
   const decisionRows = parseDecisions(decisions);
   const sleepHhmm = profile?.day_profile?.sleep ?? profile?.sleep ?? DEFAULT_SLEEP;
@@ -204,14 +228,15 @@ export function proposeGhosts({
   const out = [];
 
   const take = ghost => {
-    if (known.has(ghost.id) || out.some(g => g.id === ghost.id)) return;
+    const key = ghostSemanticKey(ghost);
+    if (known.has(key) || out.some(g => ghostSemanticKey(g) === key)) return;
     if (walls.has(ghost.date)) return;
     if (ghost.kind === 'bedtime' && ghost.time > LIGHTS_OUT_CAP) return;
     if (ghost.kind === 'protect_block' && (ghost.start >= LIGHTS_OUT_CAP || ghost.end > LIGHTS_OUT_CAP)) return;
     if (isThrottled(decisionRows, ghost.agent, ghost.kind, today)) return;
     validateGhost(ghost);
     out.push(ghost);
-    known.add(ghost.id);
+    known.add(key);
   };
 
   for (const date of dateKeys) {
