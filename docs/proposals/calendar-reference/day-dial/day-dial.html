@@ -1,0 +1,1802 @@
+<!doctype html>
+<html lang="en" data-hub="life">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Day Dial reference</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- Real kit files. Open from the repo (docs/proposals/calendar-reference/day-dial/) so the paths resolve. -->
+<link rel="stylesheet" href="../../../../packages/design-kit/tokens.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/overlays.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/actions.css">
+<link rel="stylesheet" href="../../../../packages/design-kit/filters.css">
+<style>
+/* Day Dial reference styles. PORT VERBATIM (from `.dd{` down) to packages/design-kit/calendar-day-dial.css. Tokens only. */
+*{box-sizing:border-box}
+body{margin:0;overflow-x:hidden;font-family:var(--font-ui);color:var(--ink);background:var(--warm-white);-webkit-font-smoothing:antialiased}
+/* Harness only: a stand-in for the Life rail (330px), so every width here matches the app at that width. */
+body{display:grid;grid-template-columns:330px minmax(0,1fr)}
+.shell-rail{background:var(--navy);color:color-mix(in srgb,#fff 75%,transparent);padding:var(--space-8) var(--space-6);font-size:var(--text-xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold)}
+.page{width:100%;max-width:1280px;margin:0 auto;padding:var(--space-8) var(--space-6) var(--space-16)}
+.page-shell{display:grid;grid-template-columns:1fr}
+.page-header__eyebrow{font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold);margin:0}
+.page-header__title{font-size:var(--text-xl);letter-spacing:var(--tracking-tight);margin:var(--space-1) 0 var(--space-5);color:var(--navy);font-weight:var(--weight-semibold)}
+.ref-controls{display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin:0 0 var(--space-4);font-size:var(--text-xs);color:var(--muted)}
+.ref-controls .btn{min-height:2rem;font-size:var(--text-xs);padding:var(--space-1) var(--space-3)}
+@media (max-width:719px){body{display:block}.shell-rail{display:none}.page{padding:var(--space-4) var(--space-4) var(--space-12)}}
+
+.dd{
+  --dd-school:color-mix(in srgb,var(--pastel-blue) 80%,#fff);
+  --dd-yours:var(--pastel-peach);
+  --dd-quiet:color-mix(in srgb,var(--navy) 5%,transparent);
+  --dd-track:color-mix(in srgb,var(--navy) 6%,transparent);
+  --dd-rule:color-mix(in srgb,var(--navy) 10%,transparent);
+  --dd-ghost-fill:color-mix(in srgb,var(--wave) 6%,transparent);
+  --dd-ghost-line:color-mix(in srgb,var(--navy) 55%,transparent);
+  --dd-health:color-mix(in srgb,var(--sand) 34%,#fff);
+  --dd-health-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
+  --dd-lilac-line:color-mix(in srgb,var(--pastel-lilac-ink) 72%,#fff);
+  position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size
+}
+/* nav */
+.dd__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
+.dd__round{width:2.25rem;height:2.25rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);display:inline-grid;place-items:center;color:var(--navy);cursor:pointer}
+.dd__round svg{width:1rem;height:1rem;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.dd__period{display:grid;line-height:1.2;padding:0 var(--space-1);min-width:0}
+.dd__period b{font-size:var(--text-md);font-weight:var(--weight-semibold);color:var(--navy);letter-spacing:var(--tracking-tight);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dd__period span{font-size:var(--text-xs);color:var(--muted)}
+.dd__spacer{flex:1}
+/* card */
+.dd__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
+.dd__body{display:grid;grid-template-columns:minmax(0,1fr) 340px}
+.dd__dialcell{display:grid;place-items:start center;padding:var(--space-5) 0;min-width:0}
+.dd__side{border-left:1px solid var(--line);padding:var(--space-5);display:grid;gap:var(--space-5);align-content:start;min-width:0}
+.dd-dial{display:block;font-family:var(--font-ui)} /* width/height set in px at mount: laid out, never scaled */
+/* dial parts */
+.dd-disc{fill:color-mix(in srgb,#fff 55%,transparent);stroke:var(--dd-rule)}
+.dd-ctx--sleep{fill:url(#dd-hatch)}
+.dd-ctx--morning,.dd-ctx--after,.dd-ctx--day{fill:var(--dd-quiet)}
+.dd-ctx--school{fill:var(--dd-school)}
+.dd-ctx--yours{fill:var(--dd-yours)}
+.dd-track{fill:none;stroke:var(--dd-track)}
+.dd-arc{stroke:#fff;stroke-width:1.5;cursor:pointer}
+.dd-arc.k-teaching,.dd-arc.k-fitness{fill:var(--pastel-blue)}
+.dd-arc.k-professional{fill:var(--pastel-lilac);stroke:var(--dd-lilac-line);stroke-width:1.2}
+.dd-arc.k-health{fill:var(--dd-health);stroke:var(--dd-health-line);stroke-width:1.2}
+.dd-arc.k-corey{fill:var(--pastel-peach);stroke:var(--pastel-peach-ink);stroke-width:1.4}
+.dd-arc.is-class{fill:color-mix(in srgb,var(--pastel-blue) 70%,#fff)}
+.dd-arc.is-proposal{stroke:var(--dd-ghost-line);stroke-width:1.5;stroke-dasharray:4 3}
+.dd-arc.is-ghost{fill:var(--dd-ghost-fill);stroke:var(--dd-ghost-line);stroke-width:1.4;stroke-dasharray:3 3}
+.dd-arc.is-skipped{opacity:.35}
+.dd-arc:focus-visible{outline:none;stroke:var(--wave);stroke-width:2.5;stroke-dasharray:none}
+.dd-left{fill:var(--high-sea);opacity:.85}
+.dd-log{stroke-width:1.6}
+.dd-log.is-meal{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink)}
+.dd-log.is-symptom{fill:#fff;stroke:var(--high-sea-ink)}
+.dd-log.is-missing{fill:#fff;stroke:var(--pastel-gold-ink);stroke-dasharray:2 2}
+.dd-log.is-skin{fill:var(--pastel-sage);stroke:var(--pastel-sage-ink)}
+.dd-logring{fill:none;stroke:color-mix(in srgb,var(--navy) 8%,transparent);stroke-dasharray:1 5;stroke-linecap:round}
+.dd-tick{stroke:color-mix(in srgb,var(--navy) 30%,transparent)}
+.dd-tick.is-major{stroke-width:1.5}
+.dd-t-hour{font-size:11.5px;font-weight:600;fill:var(--navy);text-anchor:middle}
+.dd-t-ring{font-size:10.5px;font-weight:500;text-anchor:middle}
+.dd-t-ring.is-sleep{fill:var(--navy)}.dd-t-ring.is-school{fill:var(--pastel-blue-ink)}.dd-t-ring.is-yours{fill:var(--pastel-peach-ink)}
+.dd-lead{stroke:color-mix(in srgb,var(--navy) 22%,transparent);fill:none}
+.dd-t-call{font-size:12px;font-weight:600;fill:var(--ink)}
+.dd-t-call.is-corey{fill:var(--pastel-peach-ink)}
+.dd-t-call.is-symptom{fill:var(--high-sea-ink)}
+.dd-t-call.is-meal{fill:var(--pastel-gold-ink)}
+.dd-t-sub{font-size:11px;fill:var(--muted)}
+.dd-gauge-track{fill:none;stroke:color-mix(in srgb,var(--navy) 8%,transparent)}
+.dd-gauge{fill:none;stroke-linecap:round}
+.dd-t-caps{font-size:11px;font-weight:600;letter-spacing:.08em;fill:var(--muted);text-anchor:middle}
+.dd-t-pct{font-weight:700;letter-spacing:-1.5px;text-anchor:middle;font-variant-numeric:tabular-nums}
+.dd-t-note{font-size:12px;fill:var(--muted);text-anchor:middle}
+.dd-hand{stroke:var(--danger);stroke-width:2.5;stroke-linecap:round}
+.dd-hand-dot{fill:var(--danger)}
+.dd-t-now{font-size:11.5px;font-weight:700;fill:var(--danger)}
+/* side panels */
+.dd-h{margin:0;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;color:var(--muted);font-weight:var(--weight-semibold)}
+.dd-big{font-size:1.375rem;font-weight:var(--weight-bold);color:var(--navy);letter-spacing:var(--tracking-tight);line-height:1.15;margin-top:var(--space-1)}
+.dd-big small{display:block;font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--muted);letter-spacing:0;margin-top:4px}
+.dd-tag{display:inline-block;margin-left:6px;font-size:var(--text-2xs);font-weight:var(--weight-semibold);padding:1px 7px;border-radius:6px;background:var(--pastel-gold);color:var(--pastel-gold-ink);vertical-align:2px}
+.dd-rows{display:grid}
+.dd-row{display:grid;grid-template-columns:56px minmax(0,1fr);gap:var(--space-3);padding:var(--space-3) 0;border-top:1px solid var(--line)}
+.dd-row__t{font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--muted);font-variant-numeric:tabular-nums;padding-top:1px}
+.dd-row__w b{display:block;font-size:var(--text-sm);font-weight:var(--weight-semibold);line-height:1.3}
+.dd-row__w > span{font-size:var(--text-xs);color:var(--muted)}
+.dd-row.is-struck .dd-row__w b{text-decoration:line-through;color:var(--muted)}
+.dd-row.k-corey .dd-row__w b{color:var(--pastel-peach-ink)}
+.dd-suggest{display:flex;gap:var(--space-2);align-items:flex-start;margin-top:6px;padding:6px 8px;border-radius:10px;background:var(--dd-ghost-fill);border:1.5px dashed var(--dd-ghost-line);font-size:var(--text-xs)}
+.dd-acts{display:flex;gap:6px;margin-top:6px}
+.dd-acts .btn{min-height:1.75rem;padding:2px var(--space-3);font-size:var(--text-xs)}
+.dd-av{width:1.125rem;height:1.125rem;border-radius:var(--radius-full);background:var(--navy);color:#fff;font-size:0.625rem;font-weight:var(--weight-semibold);display:inline-grid;place-items:center;flex:none}
+.dd-av--sara{background:var(--pastel-sage-ink)}
+.dd-mark{display:inline-block;width:14px;height:9px;position:relative;margin-right:3px}
+.dd-mark::before,.dd-mark::after{content:"";position:absolute;top:0;width:9px;height:9px;border-radius:50%;border:1.5px solid currentColor}
+.dd-mark::before{left:0}.dd-mark::after{left:5px}
+/* week of mini dials */
+.dd-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);background:color-mix(in srgb,#fff 40%,transparent)}
+.dd-wd{display:grid;justify-items:center;gap:2px;padding:var(--space-3) 2px var(--space-3);border:0;border-left:1px solid var(--line);background:none;font:inherit;font-size:var(--text-xs);color:var(--muted);cursor:pointer;min-width:0}
+.dd-wd:first-child{border-left:0}
+.dd-wd b{color:var(--ink);font-weight:var(--weight-semibold);font-size:var(--text-xs)}
+.dd-wd span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dd-wd[aria-pressed="true"]{background:color-mix(in srgb,var(--danger) 5%,transparent)}
+.dd-wd[aria-pressed="true"] b{color:var(--danger)}
+.dd-wd:focus-visible{outline:2px solid var(--wave);outline-offset:-2px}
+/* popover, toast */
+.dd-pop{position:absolute;z-index:30;width:300px;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius-sm);box-shadow:var(--elev-2);padding:var(--space-3) var(--space-4) var(--space-4);font-size:var(--text-sm)}
+.dd-pop[hidden]{display:none}
+.dd-pop b{font-weight:var(--weight-semibold)}
+.dd-pop__meta{margin:4px 0 0;font-size:var(--text-xs);color:var(--muted)}
+.dd-pop__label{margin:var(--space-3) 0 4px;font-size:var(--text-2xs);letter-spacing:var(--tracking-caps);text-transform:uppercase;font-weight:var(--weight-semibold);color:var(--muted)}
+.dd-pop__writes{margin:0;padding:var(--space-2) var(--space-3);border-radius:10px;background:var(--dd-ghost-fill);border:1.5px dashed var(--dd-ghost-line);font-size:var(--text-xs);line-height:1.45}
+.dd-pop__acts{display:flex;gap:var(--space-2);margin-top:var(--space-3)}
+.dd-pop__acts .btn{min-height:2rem;padding:var(--space-1) var(--space-3);font-size:var(--text-sm)}
+.dd-toast{position:absolute;right:var(--space-6);bottom:var(--space-6);max-width:30rem;background:var(--navy);color:#fff;border-radius:var(--radius-sm);padding:var(--space-3) var(--space-4) var(--space-3) 2.5rem;font-size:var(--text-sm);line-height:1.45;box-shadow:0 12px 32px color-mix(in srgb,var(--depth) 28%,transparent);opacity:0;pointer-events:none;z-index:20}
+.dd-toast::before{content:"✓";position:absolute;left:14px;top:12px;width:18px;height:18px;border-radius:50%;background:var(--pastel-sage);color:var(--pastel-sage-ink);font-weight:var(--weight-bold);font-size:0.6875rem;display:grid;place-items:center}
+.dd-toast b{font-weight:var(--weight-semibold)}
+.dd-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* narrow card: panels move under the dial */
+@container (max-width:780px){ .dd__body{grid-template-columns:minmax(0,1fr)} .dd__side{border-left:0;border-top:1px solid var(--line)} }
+.dd__card{container-type:inline-size}
+@media (max-width:719px){
+  .dd__nav .hub-pills[data-part="zoom-pills"]{display:none}
+  .dd-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
+  .dd-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
+  .dd-wd span{display:none}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <pattern id="dd-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="color-mix(in srgb, var(--navy) 5%, transparent)"/><rect width="2" height="6" fill="color-mix(in srgb, var(--navy) 16%, transparent)"/></pattern>
+</defs></svg>
+<aside class="shell-rail" aria-hidden="true">Life Hub · rail stand-in</aside>
+<main class="page">
+  <p class="page-header__eyebrow">Calendar reference · C · Day Dial</p>
+  <h1 class="page-header__title">Today as one honest circle</h1>
+  <div class="ref-controls" data-part="ref-controls">
+    <span>Reference controls (not product):</span>
+    <button class="btn btn--secondary" type="button" id="ref-reset">Reset</button>
+    <button class="btn btn--secondary" type="button" id="ref-slow" aria-pressed="false">Slow motion ×5</button>
+    <button class="btn btn--secondary" type="button" id="ref-reduced" aria-pressed="false">Reduced motion</button>
+    <span>Clock frozen at Thu 24/09/26 6:05 pm.</span>
+  </div>
+  <div class="page-shell"><div id="app"></div></div>
+</main>
+<script>/* Generated from src/dial-ref.ts. Do not edit day-dial.html; edit src/ and rebuild. */
+(() => {
+  // packages/design-kit/js/hub-motion-engine.js
+  var MOTION = {
+    settle: 420,
+    // live update: an entity moves because data changed elsewhere
+    zoom: 280,
+    // day width changes (zoom pills, wheel, pinch)
+    release: 220,
+    // a dragged bar settles onto its snapped day
+    cascadeStagger: 30,
+    // dependants follow a released bar, one after another
+    enter: 320,
+    // a new bar, curve or chip appears
+    exit: 160,
+    // an entity leaves
+    expand: 300,
+    // a group opens or closes; rows slide
+    rowStagger: 24,
+    // rows revealed by expand, top to bottom
+    hover: 120,
+    // hover and focus emphasis
+    morph: 620,
+    // Bars <-> Lines flight: the kit spring settles in ~618 ms (see springEasing)
+    crossfade: 160,
+    // real views swap during the morph
+    reducedFade: 120
+    // the only motion left under prefers-reduced-motion
+  };
+  function cubicBezier(x1, y1, x2, y2) {
+    const cx = 3 * x1;
+    const bx = 3 * (x2 - x1) - cx;
+    const ax = 1 - cx - bx;
+    const cy = 3 * y1;
+    const by = 3 * (y2 - y1) - cy;
+    const ay = 1 - cy - by;
+    const sampleX = (t) => ((ax * t + bx) * t + cx) * t;
+    const sampleY = (t) => ((ay * t + by) * t + cy) * t;
+    const slopeX = (t) => (3 * ax * t + 2 * bx) * t + cx;
+    const solve = (x) => {
+      let t = x;
+      for (let i = 0; i < 8; i++) {
+        const err = sampleX(t) - x;
+        if (Math.abs(err) < 1e-6)
+          return t;
+        const d = slopeX(t);
+        if (Math.abs(d) < 1e-6)
+          break;
+        t -= err / d;
+      }
+      let lo = 0;
+      let hi = 1;
+      t = x;
+      while (hi - lo > 1e-6) {
+        const v = sampleX(t);
+        if (v < x)
+          lo = t;
+        else
+          hi = t;
+        t = (lo + hi) / 2;
+      }
+      return t;
+    };
+    return (p) => {
+      if (p <= 0)
+        return 0;
+      if (p >= 1)
+        return 1;
+      return sampleY(solve(p));
+    };
+  }
+  var EASE = cubicBezier(0.2, 0.8, 0.2, 1);
+  var OVERSHOOT = cubicBezier(0.34, 1.3, 0.64, 1);
+  var LINEAR = (t) => t;
+  var EPS = 1e-6;
+  function browserClock() {
+    return {
+      now: () => performance.now(),
+      request: (cb) => requestAnimationFrame(cb),
+      cancel: (id) => cancelAnimationFrame(id)
+    };
+  }
+  function prefersReduced() {
+    return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  function createMotion(options) {
+    const clock2 = options.clock ?? browserClock();
+    const reduced2 = options.reducedMotion ?? prefersReduced;
+    const entities = /* @__PURE__ */ new Map();
+    const frameCosts = [];
+    let frameId = null;
+    let disposed = false;
+    function entity(id) {
+      let e = entities.get(id);
+      if (!e) {
+        e = { props: {}, tweens: /* @__PURE__ */ new Map(), exiting: null, dirty: false };
+        entities.set(id, e);
+      }
+      return e;
+    }
+    function schedule() {
+      if (frameId !== null || disposed)
+        return;
+      frameId = clock2.request(frame);
+    }
+    function valueAt(tween, now) {
+      if (tween.duration <= 0)
+        return tween.to;
+      const p = (now - tween.start) / tween.duration;
+      if (p <= 0)
+        return tween.from;
+      if (p >= 1)
+        return tween.to;
+      return tween.from + (tween.to - tween.from) * tween.easing(p);
+    }
+    function step(now) {
+      let active = false;
+      const finishedExits = [];
+      for (const [id, e] of entities) {
+        for (const [prop, tween] of e.tweens) {
+          const v = valueAt(tween, now);
+          if (e.props[prop] !== v) {
+            e.props[prop] = v;
+            e.dirty = true;
+          }
+          if (now >= tween.start + tween.duration)
+            e.tweens.delete(prop);
+          else
+            active = true;
+        }
+        if (e.dirty) {
+          e.dirty = false;
+          options.apply(id, e.props);
+        }
+        if (e.exiting && e.tweens.size === 0)
+          finishedExits.push([id, e.exiting]);
+      }
+      for (const [id, done] of finishedExits) {
+        entities.delete(id);
+        done();
+      }
+      return active;
+    }
+    function frame() {
+      frameId = null;
+      if (disposed)
+        return;
+      const t0 = clock2.now();
+      const active = step(t0);
+      const cost = clock2.now() - t0;
+      frameCosts.push(cost);
+      if (frameCosts.length > 600)
+        frameCosts.shift();
+      if (active)
+        schedule();
+      else
+        options.onIdle?.();
+    }
+    function startTween(e, prop, to, opts, now) {
+      const running = e.tweens.get(prop);
+      if (running && Math.abs(running.to - to) < EPS)
+        return;
+      const current = running ? valueAt(running, now) : e.props[prop];
+      if (current === void 0) {
+        e.props[prop] = to;
+        e.dirty = true;
+        return;
+      }
+      if (!running && Math.abs(current - to) < EPS)
+        return;
+      const duration = opts.duration ?? MOTION.settle;
+      e.tweens.set(prop, {
+        from: current,
+        to,
+        start: now + (opts.delay ?? 0),
+        duration,
+        easing: running && opts.easing === OVERSHOOT ? EASE : opts.easing ?? EASE
+      });
+    }
+    function flushDirty(id, e) {
+      if (e.dirty) {
+        e.dirty = false;
+        options.apply(id, e.props);
+      }
+    }
+    const engine2 = {
+      place(id, props) {
+        const e = entity(id);
+        for (const [prop, value] of Object.entries(props)) {
+          e.tweens.delete(prop);
+          if (e.props[prop] !== value) {
+            e.props[prop] = value;
+            e.dirty = true;
+          }
+        }
+        flushDirty(id, e);
+      },
+      to(id, props, opts = {}) {
+        const e = entity(id);
+        e.exiting = null;
+        const now = clock2.now();
+        if (reduced2()) {
+          const { opacity, ...geometry } = props;
+          engine2.place(id, geometry);
+          if (opacity !== void 0) {
+            startTween(e, "opacity", opacity, { duration: MOTION.reducedFade, easing: LINEAR }, now);
+          }
+        } else {
+          for (const [prop, value] of Object.entries(props))
+            startTween(e, prop, value, opts, now);
+        }
+        flushDirty(id, e);
+        if (e.tweens.size)
+          schedule();
+      },
+      enter(id, props, opts = {}) {
+        const from = opts.from ?? { opacity: 0, scale: 0.6 };
+        const start = { ...props, ...from };
+        const target = { opacity: 1, scale: 1, ...props };
+        if (reduced2()) {
+          engine2.place(id, { ...target, opacity: 0 });
+          engine2.to(id, { opacity: target.opacity ?? 1 });
+          return;
+        }
+        engine2.place(id, start);
+        engine2.to(id, target, { duration: MOTION.enter, easing: OVERSHOOT, ...opts });
+      },
+      exit(id, done, opts = {}) {
+        const e = entities.get(id);
+        if (!e) {
+          done();
+          return;
+        }
+        if (e.exiting) {
+          e.exiting = done;
+          return;
+        }
+        for (const prop of [...e.tweens.keys()])
+          if (prop !== "opacity")
+            e.tweens.delete(prop);
+        e.exiting = done;
+        const duration = reduced2() ? MOTION.reducedFade : opts.duration ?? MOTION.exit;
+        startTween(e, "opacity", 0, { ...opts, duration, easing: opts.easing ?? EASE }, clock2.now());
+        if (!e.tweens.size) {
+          entities.delete(id);
+          done();
+          return;
+        }
+        schedule();
+      },
+      get: (id) => entities.get(id)?.props,
+      forget: (id) => {
+        entities.delete(id);
+      },
+      has: (id) => entities.has(id),
+      target: (id, prop) => {
+        const e = entities.get(id);
+        if (!e)
+          return void 0;
+        return e.tweens.get(prop)?.to ?? e.props[prop];
+      },
+      busy: () => [...entities.values()].some((e) => e.tweens.size > 0),
+      finish() {
+        step(Number.POSITIVE_INFINITY);
+        if (frameId !== null) {
+          clock2.cancel(frameId);
+          frameId = null;
+        }
+      },
+      stats() {
+        const sorted = [...frameCosts].sort((a, b) => a - b);
+        const p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+        return { frames: frameCosts.length, p95, max: sorted.length ? sorted[sorted.length - 1] : 0 };
+      },
+      dispose() {
+        disposed = true;
+        if (frameId !== null)
+          clock2.cancel(frameId);
+        frameId = null;
+        entities.clear();
+      }
+    };
+    return engine2;
+  }
+
+  // packages/design-kit/js/dial-geometry.js
+  var TAU = Math.PI * 2;
+  function angleForHour(hour) {
+    const h = (hour % 24 + 24) % 24;
+    return (h - 12 + 24) % 24 / 24 * TAU;
+  }
+  function point(cx, cy, r, hour) {
+    const a = angleForHour(hour);
+    return { x: cx + r * Math.sin(a), y: cy - r * Math.cos(a) };
+  }
+  function spanHours(h1, h2) {
+    const s2 = ((h2 - h1) % 24 + 24) % 24;
+    return s2 === 0 && h1 !== h2 ? 24 : s2;
+  }
+  var f = (n) => (Math.round(n * 100) / 100).toString();
+  function arcPath(cx, cy, r1, r2, h1, h2) {
+    const span = spanHours(h1, h2);
+    if (span <= 0) return "";
+    const large = span > 12 ? 1 : 0;
+    const a = point(cx, cy, r2, h1);
+    const b = point(cx, cy, r2, h1 + span);
+    const c = point(cx, cy, r1, h1 + span);
+    const d = point(cx, cy, r1, h1);
+    return `M${f(a.x)} ${f(a.y)} A${f(r2)} ${f(r2)} 0 ${large} 1 ${f(b.x)} ${f(b.y)} L${f(c.x)} ${f(c.y)} A${f(r1)} ${f(r1)} 0 ${large} 0 ${f(d.x)} ${f(d.y)} Z`;
+  }
+  function visibleSpan(h1, h2, sweep) {
+    if (sweep >= 24) return [h1, h1 + spanHours(h1, h2)];
+    if (sweep <= 0) return null;
+    const off = (h) => ((h - 12) % 24 + 24) % 24;
+    const start = off(h1);
+    const end = start + spanHours(h1, h2);
+    const a = Math.max(start, 0);
+    const b = Math.min(end, sweep);
+    if (b <= a) return null;
+    return [12 + a, 12 + b];
+  }
+  var DIAL_RINGS = Object.freeze({
+    margin: 132,
+    // px each side for callouts (labels get calloutRoom(size) px and are fitted to it)
+    compactMargin: 40,
+    // phone: no callouts, but room for the 6 am / 6 pm hour labels
+    verticalMargin: 40,
+    // above and below: the noon and midnight labels
+    log: 0.94,
+    // log-dot ring, fraction of R
+    ticksIn: 0.985,
+    eventOuter: 0.88,
+    eventInner: 0.7,
+    contextOuter: 0.66,
+    contextInner: 0.575,
+    gauge: 0.43,
+    gaugeWidth: 10
+  });
+  var MIN_CALLOUT_SIZE = 460;
+  function calloutRoom(size) {
+    const { R, compact } = ringRadii(size);
+    if (compact) return { r: R, width: 0 };
+    const r = R + 26;
+    const reach = 6;
+    return { r, reach, width: Math.floor(size / 2 - r - reach - 8) };
+  }
+  function ringRadii(size) {
+    const compact = size < MIN_CALLOUT_SIZE;
+    const margin = compact ? DIAL_RINGS.compactMargin : DIAL_RINGS.margin;
+    const R = Math.max(40, size / 2 - margin);
+    const vMargin = compact ? margin : DIAL_RINGS.verticalMargin;
+    return {
+      compact,
+      cx: size / 2,
+      cy: R + vMargin,
+      height: Math.round(2 * (R + vMargin)),
+      R,
+      log: R * DIAL_RINGS.log,
+      ticks: R * DIAL_RINGS.ticksIn,
+      event: [R * DIAL_RINGS.eventInner, R * DIAL_RINGS.eventOuter],
+      context: [R * DIAL_RINGS.contextInner, R * DIAL_RINGS.contextOuter],
+      gauge: R * DIAL_RINGS.gauge,
+      gaugeWidth: DIAL_RINGS.gaugeWidth
+    };
+  }
+  function layoutCallouts(items, { cx, cy, r, gap = 6, top = 8, bottom, reach = 14 }) {
+    const out = /* @__PURE__ */ new Map();
+    const sides = { right: [], left: [] };
+    for (const it of items) {
+      const a = angleForHour(it.hour);
+      const side = a > 0 && a < Math.PI ? "right" : a === 0 ? "right" : "left";
+      const p = point(cx, cy, r, it.hour);
+      sides[side].push({ ...it, px: p.x, py: p.y, want: p.y });
+    }
+    for (const [side, list] of Object.entries(sides)) {
+      list.sort((p, q) => p.want - q.want);
+      let y = -Infinity;
+      for (const it of list) {
+        it.y = Math.max(it.want, y);
+        y = it.y + it.height + gap;
+      }
+      const maxY = (bottom ?? cy * 2) - 8;
+      let limit = maxY;
+      for (let i = list.length - 1; i >= 0; i--) {
+        const it = list[i];
+        if (it.y + it.height > limit) it.y = limit - it.height;
+        limit = it.y - gap;
+      }
+      for (const it of list) {
+        it.y = Math.max(top, it.y);
+        const right = side === "right";
+        const edgeX = right ? cx + r + reach : cx - r - reach;
+        out.set(it.id, {
+          x: edgeX + (right ? 4 : -4),
+          y: it.y,
+          anchor: right ? "start" : "end",
+          lead: { x1: it.px, y1: it.py, x2: edgeX, y2: it.y + Math.min(it.height, 14) / 2 }
+        });
+      }
+    }
+    return out;
+  }
+
+  // packages/design-kit/js/calendar-bands.js
+  var DEFAULT_BANDS = Object.freeze([
+    Object.freeze({ id: "morning", label: "Morning", from: 6, to: 8.25, px: 58 }),
+    Object.freeze({ id: "school", label: "School", from: 8.25, to: 15 + 10 / 60, px: 158 }),
+    Object.freeze({ id: "after", label: "After bell", from: 15 + 10 / 60, to: 17.5, px: 104 }),
+    Object.freeze({ id: "yours", label: "Yours", from: 17.5, to: 22, px: 232 })
+  ]);
+  var DENSITY = Object.freeze({ sliver: 14, line: 38, actions: 62 });
+  var HOUR_RE = /^(\d{1,2}):(\d{2})$/;
+  function hourOf(value) {
+    if (typeof value === "number") return value;
+    const m = HOUR_RE.exec(String(value ?? "").trim());
+    if (!m) throw new TypeError(`Invalid time: ${value}`);
+    return Number(m[1]) + Number(m[2]) / 60;
+  }
+  function bandsFromProfile(profile = {}, { school = true } = {}) {
+    const d = DEFAULT_BANDS;
+    const start = profile.day_start ? hourOf(profile.day_start) : d[0].from;
+    const schoolStart = profile.school_start ? hourOf(profile.school_start) : d[1].from;
+    const bell = profile.bell ? hourOf(profile.bell) : d[2].from;
+    const home = profile.home ? hourOf(profile.home) : d[3].from;
+    const sleep = profile.sleep ? hourOf(profile.sleep) : d[3].to;
+    if (!(start < schoolStart && schoolStart < bell && bell < home && home < sleep)) {
+      throw new RangeError("Planning profile times must increase: day_start < school_start < bell < home < sleep");
+    }
+    if (!school) {
+      return [
+        { id: "morning", label: "Morning", from: start, to: schoolStart, px: d[0].px },
+        { id: "day", label: "Day", from: schoolStart, to: home, px: d[1].px + d[2].px },
+        { id: "yours", label: "Yours", from: home, to: sleep, px: d[3].px }
+      ];
+    }
+    return [
+      { id: "morning", label: "Morning", from: start, to: schoolStart, px: d[0].px },
+      { id: "school", label: "School", from: schoolStart, to: bell, px: d[1].px },
+      { id: "after", label: "After bell", from: bell, to: home, px: d[2].px },
+      { id: "yours", label: "Yours", from: home, to: sleep, px: d[3].px }
+    ];
+  }
+
+  // apps/life/js/app/capacity-model.js
+  var CAPACITY = Object.freeze({
+    baseline: 80,
+    floor: 10,
+    ceiling: 95,
+    sleepTarget: 7,
+    // hours; below this costs capacity
+    sleepPoor: 6,
+    // below this the note says "poor sleep", else "short sleep"
+    sleepPerHour: 8,
+    sleepMaxPenalty: 30,
+    energy: Object.freeze({ low: -15, medium: 0, high: 8 }),
+    lowMoodScore: 3,
+    // mood_score (1-10) at or below this costs capacity
+    lowMoodPenalty: 8,
+    symptomPenalty: 15,
+    symptomMaxPenalty: 25,
+    belowParPct: 60,
+    // a day under this counts toward a streak
+    streakPenalty: 4,
+    streakMax: 8,
+    softenPct: 40,
+    // under this the day is flagged and agents may propose softening it
+    budgetHours: 6,
+    // discretionary commitment hours a 100% day can carry
+    recovery: 0.6,
+    // forecast: share of the gap to baseline still open after each day
+    holidayLift: 5
+  });
+  var SYMPTOM_PATTERNS = [
+    ["sore throat", /\bsore throat\b/i],
+    ["sniffles", /\bsniffl(?:es|y)\b|\brunny nose\b/i],
+    ["run down", /\brun[- ]down\b/i],
+    ["viral", /\bviral\b|\bvirus\b|\bflu\b/i],
+    ["headache", /\bheadache\b|\bmigraine\b/i],
+    ["nausea", /\bnause(?:a|ous)\b/i],
+    ["flare", /\bflare(?:[- ]up)?\b/i],
+    ["cramps", /\bcramp(?:s|ing)?\b/i],
+    ["fatigue", /\bfatigue\b|\bexhausted\b|\bwiped out\b/i],
+    ["fever", /\bfever\b|\btemperature\b/i]
+  ];
+  function symptomsIn(record, body = "") {
+    if (Array.isArray(record?.symptoms)) {
+      return record.symptoms.map((s2) => String(s2).trim()).filter(Boolean);
+    }
+    const text = `${record?.title ?? ""}
+${record?.notes ?? ""}
+${body ?? ""}`;
+    return SYMPTOM_PATTERNS.filter(([, re]) => re.test(text)).map(([name]) => name);
+  }
+  function clamp(pct) {
+    return Math.round(Math.min(CAPACITY.ceiling, Math.max(CAPACITY.floor, pct)));
+  }
+  function dayCapacity({ sleepHours = null, diaries = [], priorBelowPar = 0 } = {}) {
+    const factors = [];
+    if (sleepHours != null && Number.isFinite(sleepHours) && sleepHours < CAPACITY.sleepTarget) {
+      const delta = -Math.min(CAPACITY.sleepMaxPenalty, (CAPACITY.sleepTarget - sleepHours) * CAPACITY.sleepPerHour);
+      factors.push({ id: "sleep", label: sleepHours < CAPACITY.sleepPoor ? "poor sleep" : "short sleep", delta });
+    }
+    const energies = diaries.map((d) => d.record?.energy).filter((e) => e in CAPACITY.energy);
+    if (energies.length) {
+      const worst = energies.reduce((a, b) => CAPACITY.energy[a] <= CAPACITY.energy[b] ? a : b);
+      const delta = CAPACITY.energy[worst];
+      if (delta !== 0) factors.push({ id: "energy", label: `${worst} energy`, delta });
+    }
+    const scores = diaries.map((d) => d.record?.mood_score).filter(Number.isFinite);
+    if (scores.length && Math.min(...scores) <= CAPACITY.lowMoodScore) {
+      factors.push({ id: "mood", label: "low mood", delta: -CAPACITY.lowMoodPenalty });
+    }
+    const symptoms = [...new Set(diaries.flatMap((d) => symptomsIn(d.record, d.body)))];
+    if (symptoms.length) {
+      const delta = -Math.min(CAPACITY.symptomMaxPenalty, symptoms.length * CAPACITY.symptomPenalty);
+      factors.push({ id: "symptoms", label: symptoms.slice(0, 2).join(", "), delta, symptoms });
+    }
+    if (priorBelowPar > 0) {
+      const delta = -Math.min(CAPACITY.streakMax, priorBelowPar * CAPACITY.streakPenalty);
+      factors.push({ id: "streak", label: `${ordinal(priorBelowPar + 1)} low day in a row`, delta });
+    }
+    const pct = clamp(CAPACITY.baseline + factors.reduce((sum, f2) => sum + f2.delta, 0));
+    return { pct, note: noteFor(factors), factors, soften: pct < CAPACITY.softenPct, forecast: false };
+  }
+  function ordinal(n) {
+    const s2 = ["th", "st", "nd", "rd"];
+    const v = n % 100;
+    return `${n}${s2[(v - 20) % 10] || s2[v] || s2[0]}`;
+  }
+  function noteFor(factors) {
+    const order = { symptoms: 0, sleep: 1, energy: 2, mood: 3, streak: 4 };
+    const drains = factors.filter((f2) => f2.delta < 0).sort((a, b) => a.delta - b.delta || order[a.id] - order[b.id]);
+    if (!drains.length) return factors.some((f2) => f2.delta > 0) ? "good energy" : "steady";
+    const main = drains.find((f2) => f2.id !== "streak") ?? drains[0];
+    const second = drains.find((f2) => f2 !== main && f2.id !== "streak");
+    const firstLabel = main.id === "symptoms" ? main.symptoms[0] : main.label;
+    return second ? `${firstLabel}, ${second.id === "symptoms" ? second.symptoms[0] : second.label}` : firstLabel;
+  }
+  function forecastCapacity(lastPct, daysAhead, { holiday = false } = {}) {
+    const gap = CAPACITY.baseline - lastPct;
+    const recovered = lastPct + gap * (1 - CAPACITY.recovery ** Math.max(0, daysAhead));
+    const pct = clamp(recovered + (holiday ? CAPACITY.holidayLift : 0));
+    return { pct, note: "forecast", factors: [], soften: pct < CAPACITY.softenPct, forecast: true };
+  }
+  function capacityForDates(events, dateKeys, { isHoliday: isHoliday2 = () => false } = {}) {
+    const byDate = new Map(dateKeys.map((d) => [d, { sleepHours: null, diaries: [] }]));
+    for (const event of events ?? []) {
+      const rec = event?.record;
+      const slot = rec && byDate.get(rec.date);
+      if (!slot) continue;
+      if (rec.type === "sleep" && Number.isFinite(rec.duration_h)) slot.sleepHours = rec.duration_h;
+      if (rec.type === "diary") slot.diaries.push(event);
+    }
+    const out = /* @__PURE__ */ new Map();
+    let streak = 0;
+    let last = null;
+    let lastIndex = -1;
+    dateKeys.forEach((date, i) => {
+      const slot = byDate.get(date);
+      const logged = slot.sleepHours != null || slot.diaries.length > 0;
+      if (logged) {
+        const result = dayCapacity({ ...slot, priorBelowPar: streak });
+        out.set(date, result);
+        streak = result.pct < CAPACITY.belowParPct ? streak + 1 : 0;
+        last = result.pct;
+        lastIndex = i;
+      } else if (last != null) {
+        out.set(date, forecastCapacity(last, i - lastIndex, { holiday: isHoliday2(date) }));
+      } else {
+        out.set(date, { pct: CAPACITY.baseline, note: "no logs", factors: [], soften: false, forecast: true });
+      }
+    });
+    return out;
+  }
+
+  // apps/life/js/app/day-brief.js
+  var BRIEF = Object.freeze({
+    lightsOut: 22,
+    // profile sleep; a pending or accepted bedtime ghost brings it earlier
+    dinnerAt: 19,
+    // where the "Dinner" row sits when nothing is logged
+    eveningFrom: 17,
+    // after this, a missing dinner is worth a row
+    lunchWindow: [11, 15],
+    maxComingUp: 3
+  });
+  var toH = (hhmm) => Number(String(hhmm).slice(0, 2)) + Number(String(hhmm).slice(3, 5)) / 60;
+  function formatDuration(minutes) {
+    const m = Math.max(0, Math.round(minutes));
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (!h) return `${r} m`;
+    return r ? `${h} h ${r} m` : `${h} h`;
+  }
+  function clock12(hour) {
+    const h = Math.floor(hour);
+    const m = Math.round((hour - h) * 60);
+    const hh = (h % 24 + 11) % 12 + 1;
+    const suffix = h % 24 >= 12 ? "pm" : "am";
+    return m ? `${hh}:${String(m).padStart(2, "0")} ${suffix}` : `${hh}:00 ${suffix}`;
+  }
+  function lightsOutFor(date, ghosts, profileSleep = BRIEF.lightsOut) {
+    const bed = (ghosts ?? []).find((g) => g.kind === "bedtime" && g.date === date && g.status !== "dismissed");
+    return bed ? Math.min(profileSleep, toH(bed.time)) : profileSleep;
+  }
+  function tonight({ date, now, chips = [], ghosts = [], logs = [], profileSleep = BRIEF.lightsOut }) {
+    const lightsOut = lightsOutFor(date, ghosts, profileSleep);
+    const bedGhost = ghosts.find((g) => g.kind === "bedtime" && g.date === date && g.status !== "dismissed");
+    const minutes = Math.max(0, (lightsOut - now) * 60);
+    const rows = [];
+    for (const c of chips) {
+      if (c.isClass || c.end <= now || c.start >= lightsOut) continue;
+      const proposal = ghosts.find((g) => g.overItem === c.id && g.status !== "dismissed" && g.status !== "accepted");
+      rows.push({
+        at: c.start,
+        time: clock12(c.start),
+        title: c.title,
+        kind: c.kind,
+        note: c.skipped ? "Skipped" : c.protected ? `Protected \xB7 ${formatDuration((c.end - c.start) * 60)} \xB7 nothing else can book here` : c.meta ?? "",
+        struck: !!c.skipped,
+        ghostId: proposal?.id ?? null,
+        suggestion: proposal ? `${agentName(proposal.agent)}: ${proposal.label.toLowerCase()}` : null
+      });
+    }
+    for (const g of ghosts) {
+      if (g.date !== date || g.overItem || g.status === "dismissed") continue;
+      const at = g.kind === "bedtime" ? toH(g.time) - 0.25 : g.start ? toH(g.start) : null;
+      if (at == null || at < now) continue;
+      rows.push({
+        at,
+        time: clock12(at),
+        title: g.kind === "bedtime" ? `Wind down \u2192 lights out ${clock12(toH(g.time))}` : g.label,
+        kind: g.kind === "bedtime" ? "health" : g.chip?.kind ?? "task",
+        note: g.reason ? `${agentName(g.agent)} \xB7 ${g.reason}` : agentName(g.agent),
+        struck: false,
+        ghostId: g.status === "accepted" ? null : g.id,
+        suggestion: null
+      });
+    }
+    const meals = logs.filter((l) => l.type === "meal" && l.date === date && l.time).map((l) => ({ ...l, h: toH(l.time) }));
+    const lastMeal = meals.sort((a, b) => a.h - b.h).at(-1);
+    const hadLunch = meals.some((m) => m.h >= BRIEF.lunchWindow[0] && m.h < BRIEF.lunchWindow[1]);
+    if (now >= BRIEF.eveningFrom && !meals.some((m) => m.h >= BRIEF.lunchWindow[1])) {
+      const since = lastMeal ? `Nothing logged since ${lastMeal.meal ?? "your last meal"}` : "Nothing logged today";
+      rows.push({ at: Math.max(now, BRIEF.dinnerAt), time: clock12(Math.max(now, BRIEF.dinnerAt)), title: "Dinner", kind: "log", note: hadLunch ? since : `${since} (no lunch)`, struck: false, ghostId: null, suggestion: null });
+    }
+    rows.sort((a, b) => a.at - b.at);
+    return {
+      timeLeft: {
+        minutes,
+        label: minutes ? `${formatDuration(minutes)} that's yours` : "Your evening is done",
+        until: clock12(lightsOut),
+        by: bedGhost ? agentName(bedGhost.agent) : null
+      },
+      rows
+    };
+  }
+  var AGENTS = { sara: "Sara", hammond: "Hammond", clare: "Clare", chadwick: "Chadwick" };
+  function agentName(slug) {
+    return AGENTS[slug] ?? slug;
+  }
+  function tomorrow({ date, chips = [], due = [], ghosts = [], capacity, tag = null, holidayDaysAfter = 0 }) {
+    const rows = chips.filter((c) => !c.isClass).sort((a, b) => a.start - b.start).map((c) => ({ at: c.start, time: clock12(c.start), title: c.title, kind: c.kind, note: c.meta ?? "", ghostId: null, suggestion: null }));
+    for (const d of due) {
+      const move = ghosts.find((g) => g.kind === "move_task" && g.taskId === d.id && g.status !== "dismissed" && g.status !== "accepted");
+      rows.push({ at: 99, time: "Due", title: d.title, kind: "task", note: "Tasks \xB7 open", ghostId: move?.id ?? null, suggestion: move ? `${agentName(move.agent)}: move to ${move.label.replace(/^→\s*/, "")}` : null });
+    }
+    const classes = chips.filter((c) => c.isClass).length;
+    const big = rows.filter((r) => r.at !== 99).length;
+    const parts = [];
+    if (big) parts.push(big === 1 ? "One big thing" : `${big} commitments`);
+    if (classes) parts.push(`${classes} class${classes === 1 ? "" : "es"}`);
+    let note = parts.join(" and ") || "Nothing booked";
+    if (holidayDaysAfter) note += `, then holidays for ${holidayDaysAfter} days`;
+    return {
+      date,
+      headline: capacity ? `${capacity.forecast ? "Forecast" : "Capacity"} ${capacity.pct}%` : "No forecast yet",
+      tag: tag?.text ?? null,
+      note: `${note}.`,
+      rows
+    };
+  }
+  function holidayRun(from, terms) {
+    const inTerm = (d) => terms.some((t) => d >= t.starts_on && d <= t.ends_on);
+    if (inTerm(from)) return 0;
+    const next = terms.map((t) => t.starts_on).filter((s2) => s2 > from).sort()[0];
+    if (!next) return 0;
+    const ms = (k) => Date.UTC(+k.slice(0, 4), +k.slice(5, 7) - 1, +k.slice(8, 10));
+    return Math.round((ms(next) - ms(from)) / 864e5);
+  }
+
+  // packages/design-kit/js/format-display-date.js
+  var SYDNEY_TZ = "Australia/Sydney";
+  var DATE_KEY = /^(\d{4})-(\d{2})-(\d{2})$/;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+  function fromYmd(year, month, day) {
+    return `${pad2(day)}/${pad2(month)}/${String(year).slice(-2)}`;
+  }
+  function fromInstant(instant) {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: SYDNEY_TZ,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+      }).formatToParts(instant).filter((part) => part.type !== "literal").map((part) => [part.type, part.value])
+    );
+    return fromYmd(Number(parts.year), Number(parts.month), Number(parts.day));
+  }
+  function formatDisplayDate(value) {
+    if (value == null || value === "") return "";
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? "" : fromInstant(value);
+    }
+    const text = String(value).trim();
+    if (!text) return "";
+    const key = DATE_KEY.exec(text);
+    if (key) return fromYmd(Number(key[1]), Number(key[2]), Number(key[3]));
+    const ms = Date.parse(text);
+    if (!Number.isNaN(ms)) return fromInstant(new Date(ms));
+    return text;
+  }
+
+  // apps/life/js/core/central-node-write.js
+  var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function formatLogDate(dateKey) {
+    const [, month, day] = dateKey.split("-").map(Number);
+    return `${day} ${SHORT_MONTHS[month - 1]}`;
+  }
+
+  // apps/life/js/app/ghost-writes.js
+  var GHOST_AGENTS = Object.freeze({
+    sara: "Sara",
+    hammond: "Hammond",
+    clare: "Clare",
+    chadwick: "Chadwick",
+    brisket: "Brisket",
+    penelope: "Penelope",
+    vera: "Vera"
+  });
+  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
+  var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
+  var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  function short(dateKey) {
+    return formatDisplayDate(dateKey).slice(0, 5);
+  }
+  function weekday(dateKey) {
+    return new Intl.DateTimeFormat("en-AU", { weekday: "short", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${dateKey}T00:00:00Z`));
+  }
+  function clock122(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const suffix = h >= 12 ? "pm" : "am";
+    const hour = (h + 11) % 12 + 1;
+    return m ? `${hour}:${String(m).padStart(2, "0")} ${suffix}` : `${hour}:00 ${suffix}`;
+  }
+  function windDownStart(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const t = Math.max(0, h * 60 + m - 30);
+    return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+  }
+  function oneLine(text) {
+    return String(text ?? "").replace(/\s+/g, " ").trim();
+  }
+  function cn(section, op, payload) {
+    return { target: "central_node", patch: { section, op, payload } };
+  }
+  function recentAction(dateKey, agentName2, text) {
+    return cn("recent_actions", "append_line", {
+      summary: `${agentName2}: ${text}`,
+      text: `- ${formatLogDate(dateKey)} \u2014 ${agentName2}: ${text}`
+    });
+  }
+  function validateGhost(ghost) {
+    if (!ghost || typeof ghost !== "object") throw new TypeError("Ghost must be an object");
+    if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
+    if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
+    if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
+    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
+    if (ghost.kind === "create_task") {
+      if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
+      if (!DATE_KEY2.test(ghost.due ?? "")) throw new TypeError("create_task needs due (YYYY-MM-DD)");
+    }
+    if (ghost.kind === "draft_message") {
+      if (!oneLine(ghost.to) || !String(ghost.text ?? "").trim()) throw new TypeError("draft_message needs to and text");
+    }
+    if (ghost.kind === "bedtime" && !HHMM.test(ghost.time ?? "")) throw new TypeError("bedtime needs time HH:MM");
+    if (ghost.kind === "protect_block") {
+      if (!HHMM.test(ghost.start ?? "") || !HHMM.test(ghost.end ?? "") || ghost.start >= ghost.end) {
+        throw new TypeError("protect_block needs start < end (HH:MM)");
+      }
+      if (!oneLine(ghost.title)) throw new TypeError("protect_block needs a title");
+    }
+    if (ghost.kind === "move_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
+      if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    return ghost;
+  }
+  function acceptPlan(ghost, { today = null } = {}) {
+    validateGhost(ghost);
+    const actedOn = today ?? ghost.date ?? ghost.from;
+    const who = GHOST_AGENTS[ghost.agent];
+    const reason = oneLine(ghost.reason);
+    const why = reason ? ` (${reason})` : "";
+    const steps = [];
+    let receipt;
+    switch (ghost.kind) {
+      case "skip_workout": {
+        const line = `- ${who}\u2192Chadwick: skip ${weekday(ghost.date)} ${short(ghost.date)} workout${why}.`;
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Chadwick: skip workout ${short(ghost.date)}`, text: line }));
+        if (ghost.workoutPath) {
+          steps.push({ target: "life_record", mode: "update", path: ghost.workoutPath, fields: { status: "skipped" } });
+        }
+        steps.push(recentAction(actedOn, who, `skip workout accepted${why}`));
+        receipt = `${who} \u2192 Central Node: \u201C${line.slice(2)}\u201D${ghost.workoutPath ? " Chadwick\u2019s session is marked skipped." : ""}`;
+        break;
+      }
+      case "bedtime": {
+        const text = `lights out ${clock122(ghost.time)}${why}`;
+        steps.push(cn("todays_status", "upsert_field", { summary: `${who}: protect sleep ${short(ghost.date)}`, field: "Sleep", text: `**Sleep:** ${text}` }));
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: { type: "calendar_block", date: ghost.date, time: windDownStart(ghost.time), end_time: ghost.time, kind: "rest", status: "confirmed", protected: true, title: `Wind down \xB7 lights out ${clock122(ghost.time)}`, source_agent: ghost.agent }
+        });
+        steps.push(recentAction(actedOn, who, `bedtime ${clock122(ghost.time)} accepted`));
+        receipt = `${who} \u2192 Today\u2019s Status: Sleep \u201C${text}\u201D. A protected wind-down is on the calendar.`;
+        break;
+      }
+      case "protect_block": {
+        const withCorey = ghost.with === "corey";
+        const title = oneLine(ghost.title);
+        const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock122(ghost.start)}\u2013${clock122(ghost.end)}`;
+        steps.push({
+          target: "life_record",
+          mode: "create",
+          record: {
+            type: "calendar_block",
+            date: ghost.date,
+            time: ghost.start,
+            end_time: ghost.end,
+            kind: withCorey ? "corey" : "protected",
+            status: "tentative",
+            protected: true,
+            title,
+            source_agent: ghost.agent
+          }
+        });
+        steps.push(cn("this_week", "append_line", { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? " with Corey" : ""} (protected).` }));
+        steps.push(cn("cross_agent", "append_line", { summary: `${who}\u2192Clare: keep ${short(ghost.date)} clear`, text: `- ${who}\u2192Clare: keep ${span} clear${withCorey ? " (Corey)" : ""}.` }));
+        receipt = `${who} \u2192 Life: \u201C${title}\u201D${withCorey ? " with Corey" : ""}, ${span}, tentative and protected. ${who}\u2192Clare: keep it clear. Nothing is booked or paid without you.`;
+        break;
+      }
+      case "move_task": {
+        steps.push({ target: "tasks", method: "PATCH", id: ghost.taskId, body: { due_date: ghost.to } });
+        steps.push(recentAction(actedOn, who, `moved \u201C${oneLine(ghost.title) || ghost.taskId}\u201D ${short(ghost.from)} \u2192 ${short(ghost.to)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${oneLine(ghost.title) || ghost.taskId}\u201D due ${formatDisplayDate(ghost.from)} \u2192 ${formatDisplayDate(ghost.to)}.`;
+        break;
+      }
+      case "create_task": {
+        const title = oneLine(ghost.title);
+        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        steps.push({ target: "tasks", method: "POST", body });
+        steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
+        receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
+        break;
+      }
+      case "draft_message": {
+        steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
+        receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
+        break;
+      }
+      default:
+        throw new TypeError(`Unhandled ghost kind: ${ghost.kind}`);
+    }
+    return { ghostId: ghost.id, steps, receipt };
+  }
+
+  // packages/design-kit/js/hub-motion.js
+  var CARD_SELECTOR = [
+    ".metric-card",
+    ".week-card",
+    ".hub-card",
+    ".glass-panel",
+    ".glass-tile",
+    ".card",
+    ".sign-in__card",
+    ".mind-tile",
+    ".alchemist-card",
+    ".podcast-card",
+    ".wiki-card",
+    ".uni-tl__card",
+    ".quiz-card",
+    ".pcard"
+  ].join(",");
+  var MAGNET_SELECTOR = [
+    ".hub-pulse-card",
+    ".home-class-tile",
+    ".dashboard-overview__tile"
+  ].join(",");
+  var LIST_SELECTOR = [
+    ".logging-list",
+    ".meal-log",
+    ".cards",
+    ".nutrition-challenge-list",
+    "[data-hub-list]"
+  ].join(",");
+  var COUNT_SELECTOR = [
+    "[data-value]",
+    "[data-hub-count]",
+    "[data-percent]",
+    ".hub-pulse-card__count"
+  ].join(",");
+  function prefersReducedMotion(root2 = document) {
+    const view = root2.defaultView ?? globalThis;
+    return Boolean(view.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  }
+  function isActiveHubPill(btn) {
+    if (!btn) return false;
+    return btn.classList.contains("is-active") || btn.classList.contains("is-selected") || btn.getAttribute("aria-selected") === "true" || btn.getAttribute("aria-checked") === "true" || btn.getAttribute("aria-pressed") === "true";
+  }
+  function isLoosePills(group) {
+    return group.classList.contains("hub-pills--loose") || group.getAttribute("data-hub-pills") === "loose";
+  }
+  function directChild(group, className) {
+    return [...group.children ?? []].find((node) => node.classList?.contains(className)) ?? null;
+  }
+  function hubPillsButtons(group) {
+    return [...group.children ?? []].filter((node) => node.classList?.contains("hub-pills__btn"));
+  }
+  function ensurePillThumb(group) {
+    let thumb = directChild(group, "hub-pills__thumb");
+    if (thumb) return thumb;
+    const doc = group.ownerDocument ?? document;
+    thumb = doc.createElement("span");
+    thumb.className = "hub-pills__thumb";
+    thumb.setAttribute("aria-hidden", "true");
+    group.insertBefore(thumb, group.firstChild);
+    return thumb;
+  }
+  function applyHubPillsThumb(group, options = {}) {
+    if (!group?.style?.setProperty) return null;
+    if (isLoosePills(group)) {
+      group.classList.remove("is-ready", "is-animated");
+      directChild(group, "hub-pills__thumb")?.remove();
+      return null;
+    }
+    const buttons = hubPillsButtons(group);
+    if (buttons.length < 2) {
+      group.classList.remove("is-ready", "is-animated");
+      return null;
+    }
+    const active = buttons.find(isActiveHubPill);
+    if (!active) {
+      group.classList.remove("is-ready");
+      return null;
+    }
+    const missingThumb = !directChild(group, "hub-pills__thumb");
+    ensurePillThumb(group);
+    const box = {
+      x: `${active.offsetLeft}px`,
+      y: `${active.offsetTop}px`,
+      w: `${active.offsetWidth}px`,
+      h: `${active.offsetHeight}px`
+    };
+    group.style.setProperty("--hub-pill-x", box.x);
+    group.style.setProperty("--hub-pill-y", box.y);
+    group.style.setProperty("--hub-pill-w", box.w);
+    group.style.setProperty("--hub-pill-h", box.h);
+    group.classList.add("is-ready");
+    const reduced2 = options.reduced ?? prefersReducedMotion(group);
+    const animate = options.animate !== false && !reduced2 && !missingThumb;
+    group.classList.toggle("is-animated", animate);
+    return box;
+  }
+
+  // docs/proposals/calendar-reference/src/fixture.ts
+  var NOW = { date: "2026-09-24", time: "18:05" };
+  var WEEK = ["2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27"];
+  var HOLIDAY_FROM = "2026-09-26";
+  var DAY_TAGS = {
+    "2026-09-25": { text: "Last day T3", tone: "term" },
+    "2026-09-26": { text: "Holidays", tone: "holiday" },
+    "2026-09-27": { text: "Holidays", tone: "holiday" }
+  };
+  var LOGS = [
+    { record: { type: "sleep", date: "2026-09-21", duration_h: 6.9 } },
+    { record: { type: "meal", date: "2026-09-21", meal: "breakfast", time: "07:30" } },
+    { record: { type: "meal", date: "2026-09-21", meal: "lunch", time: "12:43" } },
+    { record: { type: "sleep", date: "2026-09-22", duration_h: 6.2 } },
+    { record: { type: "meal", date: "2026-09-22", meal: "breakfast", time: "07:00" } },
+    { record: { type: "diary", date: "2026-09-22", mood: "low", energy: "low", mood_score: 3 }, body: "" },
+    { record: { type: "sleep", date: "2026-09-23", duration_h: 5.9 } },
+    { record: { type: "meal", date: "2026-09-23", meal: "snack", time: "10:30", protein_g: 17, calories: 452 } },
+    { record: { type: "diary", date: "2026-09-23", time: "08:00" }, body: "Feeling run down, possible viral illness" },
+    { record: { type: "sleep", date: "2026-09-24", duration_h: 5.4 } },
+    { record: { type: "meal", date: "2026-09-24", meal: "breakfast", time: "07:10" } },
+    { record: { type: "diary", date: "2026-09-24", time: "07:40" }, body: "Sore throat, sniffles, poor sleep" }
+  ];
+  var P = {
+    1: ["08:40", "09:35"],
+    2: ["09:35", "10:30"],
+    3: ["10:50", "11:45"],
+    4: ["11:45", "12:40"],
+    5: ["13:20", "14:15"],
+    6: ["14:15", "15:10"]
+  };
+  function cls(date, p, title, focus) {
+    return { id: `class-${date}-p${p}`, date, start: P[p][0], end: P[p][1], kind: "teaching", title, meta: `P${p} \xB7 ${focus}`, isClass: true, sample: true };
+  }
+  var ITEMS = [
+    cls("2026-09-21", 1, "Y12 English Adv", "Common Module revision"),
+    cls("2026-09-21", 2, "Y11 English Adv", "Module C drafts"),
+    { id: "resource-day", date: "2026-09-21", start: "10:51", end: "14:50", kind: "professional", title: "Focus Area: Texts and human experience \xB7 resource day", meta: "10:51 am \u2013 2:50 pm" },
+    { id: "mon-corey", date: "2026-09-21", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    cls("2026-09-22", 1, "Y11 English Adv", "Module C"),
+    cls("2026-09-22", 3, "Y12 English Adv", "HSC practice paper"),
+    cls("2026-09-22", 5, "HPGE planning", "with Leader of Learning"),
+    { id: "tue-workout", date: "2026-09-22", start: "17:45", end: "18:15", kind: "fitness", title: "Workout \xB7 30 min", meta: "5:45 pm", sample: true },
+    { id: "tue-corey", date: "2026-09-22", start: "19:15", end: "21:15", kind: "corey", title: "Dinner at home", meta: "7:15 \u2013 9:15 pm", protected: true, sample: true },
+    cls("2026-09-23", 2, "Y12 English Adv", "Paper 1 timing"),
+    cls("2026-09-23", 4, "Y11 English Adv", "peer feedback"),
+    cls("2026-09-23", 6, "MindWorks", "UN Voice coaching"),
+    { id: "wed-marking", date: "2026-09-23", start: "15:40", end: "17:20", kind: "teaching", title: "Mark Y11 Module C drafts", meta: "3:40 \u2013 5:20 pm", sample: true },
+    { id: "wed-corey", date: "2026-09-23", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV", meta: "7:30 \u2013 9:30 pm", protected: true, sample: true },
+    cls("2026-09-24", 1, "Y12 English Adv", "last full lesson"),
+    cls("2026-09-24", 3, "Y11 English Adv", "drafts returned"),
+    { id: "gastro", date: "2026-09-24", start: "13:15", end: "14:15", kind: "health", title: "Gastroenterologist follow-up \xB7 Dr Chris Keily", meta: "1:15 pm \xB7 2 records merged", mergedRecords: 2 },
+    { id: "thu-workout", date: "2026-09-24", start: "18:15", end: "19:25", kind: "fitness", title: "Workout \xB7 upper body", meta: "Chadwick\u2019s plan", sample: true },
+    { id: "thu-corey", date: "2026-09-24", start: "19:30", end: "21:30", kind: "corey", title: "Tea + TV with Corey", meta: "Protected \xB7 7:30 \u2013 9:30 pm", protected: true, sample: true },
+    { id: "pd-hard-conversations", date: "2026-09-25", start: "08:30", end: "10:30", kind: "professional", title: "Courageously Navigating Hard Conversations", meta: "8:30 \u2013 10:30 am \xB7 PD" },
+    cls("2026-09-25", 3, "Y11 English Adv", "end of term"),
+    cls("2026-09-25", 5, "Y12 English Adv", "farewell lesson"),
+    { id: "sat-gym", date: "2026-09-26", start: "09:00", end: "10:00", kind: "fitness", title: "Gym \xB7 lower body", meta: "9 \u2013 10 am \xB7 Chadwick", sample: true }
+  ];
+  var DUE = [
+    { id: "task-josh-y10", date: "2026-09-25", title: "Find out about Year 10 leadership opportunities for Josh Lizzio", kind: "task", ghostId: "g-move" }
+  ];
+  var GHOSTS = [
+    {
+      id: "g-skip",
+      agent: "sara",
+      kind: "skip_workout",
+      date: "2026-09-24",
+      reason: "capacity 34%, sore throat",
+      workoutPath: "records/2026/09/24/workout-1815.md",
+      label: "Skip workout",
+      meta: "Sara \xB7 you\u2019re at 34%",
+      overItem: "thu-workout",
+      chip: { date: "2026-09-24", start: "18:15", end: "19:25", kind: "fitness" }
+    },
+    {
+      id: "g-bed",
+      agent: "sara",
+      kind: "bedtime",
+      date: "2026-09-24",
+      time: "22:00",
+      reason: "5.4 h last night",
+      label: "Lights out 10:00",
+      meta: "Sara",
+      chip: { date: "2026-09-24", start: "21:30", end: "22:00", kind: "health" }
+    },
+    {
+      id: "g-good",
+      agent: "hammond",
+      kind: "protect_block",
+      date: "2026-09-26",
+      start: "18:00",
+      end: "22:00",
+      title: "Dinner out + a show",
+      with: "corey",
+      label: "Good night: dinner out + a show",
+      meta: "Hammond \xB7 your definition of a good night",
+      chip: { date: "2026-09-26", start: "18:00", end: "22:00", kind: "corey" }
+    },
+    {
+      id: "g-move",
+      agent: "hammond",
+      kind: "move_task",
+      taskId: "task-josh-y10",
+      title: "Year 10 leadership opportunities for Josh Lizzio",
+      from: "2026-09-25",
+      to: "2026-10-13",
+      label: "\u2192 T4 W1",
+      meta: "Hammond"
+    }
+  ];
+
+  // docs/proposals/calendar-reference/day-dial/src/dial-ref.ts
+  var DD = {
+    maxSize: 620,
+    // the dial never grows past this, however wide the column
+    sidePanel: 340,
+    sweepMs: 900,
+    // entrance: the day is revealed clockwise from noon
+    handMs: 700,
+    // the now hand swings from noon to now (OVERSHOOT), starting at handDelay
+    handDelay: 260,
+    gaugeMs: 700,
+    daySwitchMs: 480,
+    // choosing another day re-sweeps, faster
+    weekStagger: 40,
+    toastInMs: 220,
+    toastRise: 6,
+    toastHoldMs: 5200,
+    popMs: 180,
+    popRise: 4,
+    popWidth: 300,
+    popGap: 10,
+    acceptMs: 320,
+    saveLatencyMs: 350,
+    // PROTOTYPE ONLY: stands in for POST /api/calendar-ghosts
+    calloutGap: 6,
+    miniSize: 68,
+    callFont: "600 12px Inter, ui-sans-serif, sans-serif",
+    subFont: "400 11px Inter, ui-sans-serif, sans-serif"
+  };
+  var measureCtx = document.createElement("canvas").getContext("2d");
+  var measured = /* @__PURE__ */ new Map();
+  function textW(t, font) {
+    const k = `${font}|${t}`;
+    let w = measured.get(k);
+    if (w == null) {
+      measureCtx.font = font;
+      w = measureCtx.measureText(t).width;
+      measured.set(k, w);
+    }
+    return w;
+  }
+  function fitText(t, max, font) {
+    if (textW(t, font) <= max) return t;
+    let lo = 0, hi = t.length;
+    while (lo < hi) {
+      const mid = lo + hi + 1 >> 1;
+      if (textW(t.slice(0, mid).trimEnd() + "\u2026", font) <= max) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo > 0 ? t.slice(0, lo).trimEnd() + "\u2026" : "";
+  }
+  var toH2 = (hhmm) => Number(hhmm.slice(0, 2)) + Number(hhmm.slice(3, 5)) / 60;
+  var NOW_H = toH2(NOW.time);
+  var isHoliday = (d) => d >= HOLIDAY_FROM;
+  var CAP = capacityForDates(LOGS, WEEK, { isHoliday });
+  var TERMS = [{ starts_on: "2026-07-21", ends_on: "2026-09-25" }, { starts_on: "2026-10-13", ends_on: "2026-12-17" }];
+  var state = { day: NOW.date, accepted: /* @__PURE__ */ new Set(), dismissed: /* @__PURE__ */ new Set(), phone: false };
+  var ghostsNow = () => GHOSTS.map((g) => ({ ...g, status: state.accepted.has(g.id) ? "accepted" : state.dismissed.has(g.id) ? "dismissed" : "pending" }));
+  function chipsFor(date) {
+    return ITEMS.filter((i) => i.date === date).map((i) => ({
+      id: i.id,
+      start: toH2(i.start),
+      end: toH2(i.end),
+      kind: i.kind,
+      title: i.title,
+      meta: i.meta,
+      isClass: i.isClass,
+      protected: i.protected,
+      skipped: GHOSTS.some((g) => g.overItem === i.id && state.accepted.has(g.id))
+    }));
+  }
+  var logsFor = (date) => LOGS.filter((l) => l.record.date === date).map((l) => ({ ...l.record }));
+  var dayLabel = (d) => new Intl.DateTimeFormat("en-AU", { weekday: "long", timeZone: "UTC" }).format(/* @__PURE__ */ new Date(`${d}T00:00:00Z`));
+  var dd = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(2, 4)}`;
+  var capColour = (pct) => pct >= 60 ? "var(--pastel-sage-ink)" : pct >= 40 ? "var(--pastel-gold-ink)" : "var(--high-sea)";
+  var AGENT_INITIAL = { sara: "S", hammond: "H", clare: "C" };
+  var NS = "http://www.w3.org/2000/svg";
+  var nodes = /* @__PURE__ */ new Map();
+  var engine;
+  var root;
+  var svg;
+  var rings;
+  var toastTimer = 0;
+  var popFor = null;
+  var mountOptions = {};
+  var arcs = [];
+  function el(tag, cls2, html, parent, attrs = {}) {
+    const n = document.createElement(tag);
+    if (cls2) n.className = cls2;
+    if (html != null) n.innerHTML = html;
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    parent?.appendChild(n);
+    return n;
+  }
+  function s(tag, attrs, parent, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+    if (text != null) n.textContent = text;
+    parent.appendChild(n);
+    return n;
+  }
+  function mount(host, options = mountOptions, { entrance = true } = {}) {
+    mountOptions = options;
+    engine?.dispose();
+    nodes.clear();
+    host.replaceChildren();
+    state.phone = matchMedia("(max-width: 719px)").matches;
+    root = el("section", "dd", void 0, host, { "data-part": "day-dial", "aria-label": "Day" });
+    const nav = el("header", "dd__nav", void 0, root, { "data-part": "nav" });
+    el("button", "dd__round", '<svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>', nav, { type: "button", "aria-label": "Previous day", "data-step": "-1" });
+    el("div", "dd__period", `<b>${dayLabel(state.day)} ${dd(state.day)} \xB7 T3 W10</b><span>${state.day === NOW.date ? `${clock12(NOW_H)} \xB7 ${DAY_TAGS["2026-09-25"] ? "second-last school day of term" : ""}` : DAY_TAGS[state.day]?.text ?? ""}</span>`, nav, { "data-part": "period" });
+    el("button", "dd__round", '<svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>', nav, { type: "button", "aria-label": "Next day", "data-step": "1" });
+    el("button", "btn btn--secondary", "Today", nav, { type: "button", "data-today": "" });
+    const zoom = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', nav, { role: "group", "aria-label": "Zoom", "data-part": "zoom-pills" });
+    for (const z of ["Day", "Week", "Term", "Year", "Almanac"]) el("button", `hub-pills__btn${z === "Day" ? " is-active" : ""}`, z, zoom, { type: "button", "aria-pressed": String(z === "Day") });
+    el("div", "dd__spacer", void 0, nav);
+    const view = el("div", "hub-pills", '<span class="hub-pills__thumb"></span>', nav, { role: "group", "aria-label": "View", "data-part": "view-pills" });
+    el("button", "hub-pills__btn is-active", "Dial", view, { type: "button", "aria-pressed": "true" });
+    el("button", "hub-pills__btn", "Linear", view, { type: "button", "aria-pressed": "false", title: "In the hub: the Tideline one-day view", "data-linear": "" });
+    const card = el("div", "dd__card", void 0, root, { "data-part": "card" });
+    const body = el("div", "dd__body", void 0, card);
+    const cell = el("div", "dd__dialcell", void 0, body, { "data-part": "dial-cell" });
+    const side = el("div", "dd__side", void 0, body, { "data-part": "side" });
+    mountWeek(card);
+    const size = Math.min(DD.maxSize, Math.floor(cell.clientWidth));
+    rings = ringRadii(size);
+    svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "dd-dial");
+    svg.setAttribute("viewBox", `0 0 ${size} ${rings.height}`);
+    svg.setAttribute("width", String(size));
+    svg.setAttribute("height", String(rings.height));
+    svg.setAttribute("role", "img");
+    svg.setAttribute("data-part", "dial");
+    svg.setAttribute("aria-label", `${dayLabel(state.day)}: a 24-hour dial with noon at the top`);
+    cell.appendChild(svg);
+    mountDial(size);
+    mountSide(side);
+    nodes.set("__toast", el("div", "dd-toast", "", root, { role: "status", "aria-live": "polite", "data-part": "toast" }));
+    nodes.set("__pop", el("div", "dd-pop", "", root, { role: "dialog", "data-part": "popover", hidden: "" }));
+    nodes.set("__live", el("div", "dd-sr", "", root, { "aria-live": "polite", "data-part": "announcer" }));
+    engine = createMotion({ apply, clock: options.clock, reducedMotion: options.reducedMotion });
+    engine.place("__toast", { opacity: 0, y: DD.toastRise });
+    engine.place("__pop", { opacity: 0, y: DD.popRise });
+    for (const a of arcs) if (nodes.get(`arc:${a.id}`)?.classList.contains("is-ghost")) engine.place(`arc:${a.id}`, { solid: 0 });
+    const pct = CAP.get(state.day).pct;
+    if (entrance) {
+      engine.place("__sweep", { h: 0 });
+      engine.to("__sweep", { h: 24 }, { duration: DD.sweepMs, easing: EASE });
+      engine.place("__hand", { h: 12, o: 0 });
+      engine.to("__hand", { h: 12 + ((NOW_H - 12) % 24 + 24) % 24, o: 1 }, { duration: DD.handMs, delay: DD.handDelay, easing: OVERSHOOT });
+      engine.place("__gauge", { v: 0 });
+      engine.to("__gauge", { v: pct }, { duration: DD.gaugeMs, easing: EASE });
+      WEEK.forEach((d, i) => engine.enter(`wd:${d}`, { opacity: 1, y: 0 }, { from: { opacity: 0, y: 6 }, delay: i * DD.weekStagger, duration: MOTION.enter }));
+    } else {
+      engine.place("__sweep", { h: 24 });
+      engine.place("__hand", { h: 12 + ((NOW_H - 12) % 24 + 24) % 24, o: 1 });
+      engine.place("__gauge", { v: pct });
+    }
+    requestAnimationFrame(() => {
+      applyHubPillsThumb(zoom);
+      applyHubPillsThumb(view);
+    });
+    wire(root);
+  }
+  function mountDial(size) {
+    const { cx, cy, R } = rings;
+    const date = state.day;
+    const isToday = date === NOW.date;
+    s("circle", { class: "dd-disc", cx, cy, r: R + 8 }, svg);
+    const bands = bandsFromProfile({}, { school: !isHoliday(date) && (/* @__PURE__ */ new Date(`${date}T00:00:00Z`)).getUTCDay() % 6 !== 0 });
+    const ctx = s("g", { "data-part": "context-ring" }, svg);
+    const [c1, c2] = rings.context;
+    const segs = [{ id: "sleep", h1: 22, h2: 6.25 }, ...bands.map((b) => ({ id: b.id, h1: b.from, h2: b.to }))];
+    for (const g2 of segs) nodes.set(`ctx:${g2.id}`, s("path", { class: `dd-ctx dd-ctx--${g2.id}`, "data-h1": g2.h1, "data-h2": g2.h2 }, ctx));
+    if (!rings.compact) {
+      const lab = (h, t, cls2) => {
+        const p = point(cx, cy, (c1 + c2) / 2, h);
+        s("text", { class: `dd-t-ring ${cls2}`, x: p.x.toFixed(1), y: (p.y + 4).toFixed(1) }, ctx, t);
+      };
+      lab(3, "sleep wall", "is-sleep");
+      if (bands.some((b) => b.id === "school")) lab(11.7, "school", "is-school");
+      lab(19.75, "yours", "is-yours");
+    }
+    const [e1, e2] = rings.event;
+    s("circle", { class: "dd-track", cx, cy, r: (e1 + e2) / 2, "stroke-width": e2 - e1 }, svg);
+    const ev = s("g", { "data-part": "event-ring" }, svg);
+    arcs = [];
+    const ghosts = ghostsNow();
+    for (const c of chipsFor(date)) {
+      const proposal = ghosts.find((g2) => g2.overItem === c.id && g2.status === "pending");
+      const inset = c.isClass ? 4 : 2;
+      const cls2 = ["dd-arc", `k-${c.kind}`, c.isClass ? "is-class" : "", proposal ? "is-proposal" : "", c.skipped ? "is-skipped" : ""].join(" ");
+      const n = s("path", { class: cls2, tabindex: 0, role: "button", "data-part": c.isClass ? "class-arc" : "arc", "data-id": c.id, "aria-label": `${c.title}. ${c.meta}` }, ev);
+      nodes.set(`arc:${c.id}`, n);
+      arcs.push({ id: c.id, h1: c.start, h2: c.end, r1: e1 + inset, r2: e2 - inset });
+    }
+    for (const g2 of ghosts) {
+      if (!g2.chip || g2.chip.date !== date || g2.overItem || g2.status === "dismissed") continue;
+      const pending = g2.status === "pending";
+      const n = s("path", { class: `dd-arc k-${g2.chip.kind}${pending ? " is-ghost" : ""}`, tabindex: 0, role: "button", "data-part": pending ? "ghost-arc" : "arc", "data-id": g2.id, "aria-label": pending ? `${g2.label}. Proposal from ${g2.agent}.` : g2.label }, ev);
+      nodes.set(`arc:${g2.id}`, n);
+      arcs.push({ id: g2.id, h1: toH2(g2.chip.start), h2: toH2(g2.chip.end), r1: e1 + 4, r2: e2 - 4 });
+    }
+    if (isToday) nodes.set("left", s("path", { class: "dd-left", "data-part": "time-left" }, svg));
+    const logs = logsFor(date);
+    s("circle", { class: "dd-logring", cx, cy, r: rings.log }, svg);
+    const logG = s("g", { "data-part": "log-ring" }, svg);
+    const logDots = [];
+    for (const l of logs) {
+      if (!l.time) continue;
+      if (l.type === "meal") logDots.push({ id: `log-${l.meal}`, h: toH2(l.time), cls: "is-meal", label: l.meal });
+      if (l.type === "diary") logDots.push({ id: "log-symptom", h: toH2(l.time), cls: "is-symptom", label: CAP.get(date).factors.find((f2) => f2.id === "symptoms")?.symptoms?.[0] ?? "diary" });
+    }
+    const meals = logs.filter((l) => l.type === "meal" && l.time).map((l) => toH2(l.time));
+    if ((!isToday || NOW_H > 15) && logs.length && !meals.some((h) => h >= 11 && h < 15)) logDots.push({ id: "log-nolunch", h: 12.75, cls: "is-missing", label: "no lunch" });
+    for (const d of logDots) {
+      const p = point(cx, cy, rings.log, d.h);
+      s("circle", { class: `dd-log ${d.cls}`, cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 5, "data-part": "log-dot", "data-id": d.id }, logG);
+    }
+    for (let h = 0; h < 24; h++) {
+      const a = point(cx, cy, R - 2, h), b = point(cx, cy, R + (h % 6 === 0 ? 6 : 3), h);
+      s("line", { class: `dd-tick${h % 6 === 0 ? " is-major" : ""}`, x1: a.x.toFixed(1), y1: a.y.toFixed(1), x2: b.x.toFixed(1), y2: b.y.toFixed(1) }, svg);
+    }
+    const hourLab = (h, t) => {
+      const p = point(cx, cy, R + 18, h);
+      s("text", { class: "dd-t-hour", x: p.x.toFixed(1), y: (p.y + 4).toFixed(1) }, svg, t);
+    };
+    hourLab(12, "noon");
+    hourLab(18, "6 pm");
+    hourLab(0, "midnight");
+    hourLab(6, "6 am");
+    if (!rings.compact) {
+      const calls = [];
+      for (const c of chipsFor(date)) {
+        if (c.isClass) continue;
+        const proposal = ghosts.find((g2) => g2.overItem === c.id && g2.status === "pending");
+        calls.push({ id: c.id, hour: (c.start + c.end) / 2, height: 28, text: c.kind === "corey" ? "Corey" : c.title.replace(/ · Dr .*$/, ""), sub: proposal ? `${proposal.agent === "sara" ? "Sara" : "Hammond"}: ${proposal.label.toLowerCase()}` : c.kind === "corey" ? c.title.replace(/ with Corey$/, "") : c.meta.split(" \xB7 ")[0], cls: c.kind === "corey" ? "is-corey" : "" });
+      }
+      for (const d of logDots) calls.push({ id: d.id, hour: d.h, height: 14, text: d.label, cls: d.cls === "is-symptom" ? "is-symptom" : "is-meal" });
+      const room = calloutRoom(size);
+      const pos = layoutCallouts(calls.map((c) => ({ id: c.id, hour: c.hour, height: c.height })), { cx, cy, r: room.r, gap: DD.calloutGap, top: 8, bottom: rings.height - 8, reach: room.reach });
+      const cg = s("g", { "data-part": "callouts" }, svg);
+      for (const c of calls) {
+        const p = pos.get(c.id);
+        const a = point(cx, cy, c.height === 14 ? rings.log + 7 : rings.event[1] + 2, c.hour);
+        s("path", { class: "dd-lead", d: `M${a.x.toFixed(1)} ${a.y.toFixed(1)} L${p.lead.x2.toFixed(1)} ${p.lead.y2.toFixed(1)}` }, cg);
+        s("text", { class: `dd-t-call ${c.cls}`, x: p.x.toFixed(1), y: (p.y + 11).toFixed(1), "text-anchor": p.anchor, "data-part": "callout", "data-id": c.id }, cg, fitText(c.text, room.width, DD.callFont));
+        if (c.sub) s("text", { class: "dd-t-sub", x: p.x.toFixed(1), y: (p.y + 25).toFixed(1), "text-anchor": p.anchor }, cg, fitText(c.sub, room.width, DD.subFont));
+      }
+    }
+    const cap = CAP.get(date);
+    const g = s("g", { "data-part": "gauge", "data-pct": cap.pct }, svg);
+    s("circle", { class: "dd-gauge-track", cx, cy, r: rings.gauge, "stroke-width": rings.gaugeWidth }, g);
+    const arc = s("circle", { class: "dd-gauge", cx, cy, r: rings.gauge, "stroke-width": rings.gaugeWidth, stroke: capColour(cap.pct), transform: `rotate(-90 ${cx} ${cy})` }, g);
+    nodes.set("gauge", arc);
+    const big = Math.max(28, Math.min(48, rings.gauge * 0.42));
+    s("text", { class: "dd-t-caps", x: cx, y: (cy + big * 0.35 - big - 6).toFixed(1) }, g, cap.forecast ? "FORECAST" : "CAPACITY");
+    nodes.set("pct", s("text", { class: "dd-t-pct", x: cx, y: (cy + big * 0.35).toFixed(1), "font-size": big, fill: capColour(cap.pct) }, g, `${cap.pct}%`));
+    const noteRoom = rings.gauge * 1.6;
+    s("text", { class: "dd-t-note", x: cx, y: cy + big * 0.38 + 22 }, g, fitText(cap.note, noteRoom, "400 12px Inter, ui-sans-serif, sans-serif"));
+    const streak = cap.factors.find((f2) => f2.id === "streak");
+    if (streak && !rings.compact) s("text", { class: "dd-t-note", x: cx, y: cy + big * 0.38 + 38 }, g, fitText(streak.label, noteRoom, "400 12px Inter, ui-sans-serif, sans-serif"));
+    if (isToday) {
+      nodes.set("hand", s("line", { class: "dd-hand", "data-part": "now-hand" }, svg));
+      nodes.set("hand-dot", s("circle", { class: "dd-hand-dot", r: 5 }, svg));
+      if (!rings.compact) nodes.set("hand-label", s("text", { class: "dd-t-now" }, svg, `now ${clock12(NOW_H).replace(" pm", "").replace(" am", "")}`));
+    }
+  }
+  function mountSide(side) {
+    const date = state.day;
+    const ghosts = ghostsNow();
+    const isToday = date === NOW.date;
+    if (isToday) {
+      const t = tonight({ date, now: NOW_H, chips: chipsFor(date), ghosts, logs: logsFor(date) });
+      const sec = el("section", "", void 0, side, { "data-part": "tonight" });
+      el("h4", "dd-h", "Tonight", sec);
+      el("div", "dd-big", `${t.timeLeft.label}<small>Now ${clock12(NOW_H)} \xB7 lights out ${t.timeLeft.until}${t.timeLeft.by ? ` (${t.timeLeft.by})` : ""}</small>`, sec, { "data-part": "time-left-label" });
+      renderRows(el("div", "dd-rows", void 0, sec), t.rows, ghosts);
+    }
+    const next = WEEK[WEEK.indexOf(date) + 1];
+    if (next) {
+      const tm = tomorrow({
+        date: next,
+        chips: chipsFor(next),
+        due: DUE.filter((d) => d.date === next).map((d) => ({ id: d.id, title: d.title })),
+        ghosts,
+        capacity: CAP.get(next),
+        tag: DAY_TAGS[next] ?? null,
+        holidayDaysAfter: holidayRun(WEEK[WEEK.indexOf(next) + 1] ?? next, TERMS)
+      });
+      const sec = el("section", "", void 0, side, { "data-part": "tomorrow" });
+      el("h4", "dd-h", `Tomorrow \xB7 ${dayLabel(next).slice(0, 3)} ${next.slice(8)}`, sec);
+      el("div", "dd-big", `${tm.headline}${tm.tag ? `<span class="dd-tag">${tm.tag}</span>` : ""}<small>${tm.note}</small>`, sec, { "data-part": "tomorrow-headline" });
+      renderRows(el("div", "dd-rows", void 0, sec), tm.rows, ghosts);
+    }
+  }
+  function renderRows(wrap, rows, ghosts) {
+    for (const r of rows) {
+      const row = el("div", `dd-row k-${r.kind}${r.struck ? " is-struck" : ""}`, void 0, wrap, { "data-part": "row", "data-title": r.title });
+      el("div", "dd-row__t", r.time, row);
+      const w = el("div", "dd-row__w", `<b>${r.kind === "corey" ? '<span class="dd-mark"></span>' : ""}${r.title}</b><span>${r.note}</span>`, row);
+      if (r.ghostId) {
+        const g = ghosts.find((x) => x.id === r.ghostId);
+        if (r.suggestion) el("div", "dd-suggest", `<span class="dd-av ${g.agent === "sara" ? "dd-av--sara" : ""}">${AGENT_INITIAL[g.agent]}</span><span>${r.suggestion}</span>`, w);
+        el("div", "dd-acts", `<button type="button" class="btn btn--primary" data-accept="${g.id}">${g.kind === "skip_workout" ? "Skip" : g.kind === "move_task" ? "Move" : "Accept"}</button>${g.kind === "bedtime" ? "" : `<button type="button" class="btn btn--ghost" data-dismiss="${g.id}">${g.kind === "skip_workout" ? "Keep" : "Dismiss"}</button>`}`, w);
+      }
+    }
+  }
+  function mountWeek(card) {
+    const wk = el("div", "dd-week", void 0, card, { "data-part": "week", role: "group", "aria-label": "Week" });
+    for (const d of WEEK) {
+      const cap = CAP.get(d);
+      const b = el("button", "dd-wd", void 0, wk, { type: "button", "data-day": d, "aria-pressed": String(d === state.day), "aria-label": `${dayLabel(d)} ${d.slice(8)}, ${cap.pct}%` });
+      const r = ringRadii(DD.miniSize);
+      const m = 34, r1 = 18, r2 = 26, circ = 2 * Math.PI * 13;
+      const school = !isHoliday(d) && (/* @__PURE__ */ new Date(`${d}T00:00:00Z`)).getUTCDay() % 6 !== 0;
+      let svgm = `<svg width="${DD.miniSize}" height="${DD.miniSize}" viewBox="0 0 68 68" aria-hidden="true">`;
+      svgm += `<path class="dd-ctx dd-ctx--sleep" d="${arcPath(m, m, r1, r2, 22, 6.25)}"/>`;
+      if (school) svgm += `<path class="dd-ctx dd-ctx--school" d="${arcPath(m, m, r1, r2, 8.25, 15 + 10 / 60)}"/>`;
+      svgm += `<path class="dd-ctx dd-ctx--yours" d="${arcPath(m, m, r1, r2, 17.5, 22)}"/>`;
+      for (const c of ITEMS.filter((i) => i.date === d && !i.isClass)) svgm += `<path class="dd-arc k-${c.kind}" d="${arcPath(m, m, r2 - 2, r2 + 4, toH2(c.start), toH2(c.end))}"/>`;
+      svgm += `<circle cx="34" cy="34" r="13" fill="none" stroke="var(--dd-track)" stroke-width="4"/><circle cx="34" cy="34" r="13" fill="none" stroke="${capColour(cap.pct)}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(circ * cap.pct / 100).toFixed(1)} ${circ.toFixed(1)}" transform="rotate(-90 34 34)"${cap.forecast ? ' opacity=".55"' : ""}/>`;
+      svgm += `<text x="34" y="38" font-size="10" font-weight="600" fill="var(--ink)" text-anchor="middle">${cap.pct}</text></svg>`;
+      void r;
+      b.innerHTML = `${svgm}<b>${dayLabel(d).slice(0, 3)} ${Number(d.slice(8))}</b><span>${d === NOW.date ? "today" : cap.forecast ? "forecast" : cap.note}</span>`;
+      nodes.set(`wd:${d}`, b);
+    }
+  }
+  function apply(id, p) {
+    if (id === "__sweep") return renderSweep(p.h);
+    if (id === "__gauge") {
+      const circ = 2 * Math.PI * rings.gauge;
+      nodes.get("gauge")?.setAttribute("stroke-dasharray", `${(circ * p.v / 100).toFixed(1)} ${circ.toFixed(1)}`);
+      return;
+    }
+    if (id === "__hand") {
+      const hand = nodes.get("hand");
+      if (!hand) return;
+      const { cx, cy } = rings;
+      const a = point(cx, cy, rings.gauge + 12, p.h), b = point(cx, cy, rings.event[1] + 10, p.h);
+      hand.setAttribute("x1", a.x.toFixed(1));
+      hand.setAttribute("y1", a.y.toFixed(1));
+      hand.setAttribute("x2", b.x.toFixed(1));
+      hand.setAttribute("y2", b.y.toFixed(1));
+      hand.style.opacity = String(p.o);
+      const dot = nodes.get("hand-dot");
+      dot.setAttribute("cx", b.x.toFixed(1));
+      dot.setAttribute("cy", b.y.toFixed(1));
+      dot.style.opacity = String(p.o);
+      const lab = nodes.get("hand-label");
+      if (lab) {
+        const l = point(cx, cy, rings.event[1] + 14, p.h);
+        lab.setAttribute("x", (l.x + 8).toFixed(1));
+        lab.setAttribute("y", (l.y + 22).toFixed(1));
+        lab.style.opacity = String(p.o);
+      }
+      return;
+    }
+    if (id === "__toast" || id === "__pop") {
+      const n = nodes.get(id);
+      n.style.opacity = String(p.opacity);
+      n.style.transform = `translateY(${p.y}px)`;
+      return;
+    }
+    if (id.startsWith("wd:")) {
+      const n = nodes.get(id);
+      n.style.opacity = String(p.opacity);
+      n.style.transform = p.y ? `translateY(${p.y}px)` : "";
+      return;
+    }
+    if (id.startsWith("arc:")) {
+      const n = nodes.get(id);
+      if (n && p.solid != null) {
+        n.style.strokeDasharray = p.solid >= 1 ? "none" : "";
+        n.style.fillOpacity = String(0.4 + 0.6 * p.solid);
+      }
+    }
+  }
+  function renderSweep(sweep) {
+    const { cx, cy } = rings;
+    const [c1, c2] = rings.context;
+    for (const [id, n] of nodes) {
+      if (!id.startsWith("ctx:")) continue;
+      const h1 = Number(n.getAttribute("data-h1")), h2 = Number(n.getAttribute("data-h2"));
+      const v = visibleSpan(h1, h2, sweep);
+      n.setAttribute("d", v ? arcPath(cx, cy, c1, c2, v[0], v[1]) : "");
+    }
+    for (const a of arcs) {
+      const v = visibleSpan(a.h1, a.h2, sweep);
+      nodes.get(`arc:${a.id}`)?.setAttribute("d", v ? arcPath(cx, cy, a.r1, a.r2, v[0], v[1]) : "");
+    }
+    const left = nodes.get("left");
+    if (left) {
+      const lights = ghostsNow().some((g) => g.kind === "bedtime" && g.date === state.day && g.status !== "dismissed") ? Math.min(22, toH2(GHOSTS.find((g) => g.kind === "bedtime").time)) : 22;
+      const v = visibleSpan(NOW_H, lights, sweep);
+      left.setAttribute("d", v ? arcPath(cx, cy, rings.event[1] + 3, rings.event[1] + 7, v[0], v[1]) : "");
+    }
+  }
+  function showToast(html) {
+    const t = nodes.get("__toast");
+    t.innerHTML = html;
+    engine.to("__toast", { opacity: 1, y: 0 }, { duration: DD.toastInMs });
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => engine.to("__toast", { opacity: 0, y: DD.toastRise }, { duration: DD.toastInMs }), DD.toastHoldMs);
+  }
+  function ghostInput(g) {
+    const { label, meta, chip, overItem, status, ...rest } = g;
+    return rest;
+  }
+  var wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  function openPop(arcId) {
+    const pop = nodes.get("__pop");
+    const item = ITEMS.find((i) => i.id === arcId);
+    const g = ghostsNow().find((x) => (x.id === arcId || x.overItem === arcId) && x.status === "pending");
+    let html = `<b>${item?.title ?? g?.label ?? ""}</b><p class="dd-pop__meta">${item?.meta ?? g?.meta ?? ""}</p>`;
+    if (g) {
+      if (g.overItem) html += `<p class="dd-pop__label">${g.agent === "sara" ? "Sara" : "Hammond"} suggests</p><p class="dd-pop__meta">${g.label} \xB7 ${g.meta}</p>`;
+      html += `<p class="dd-pop__label">Accept writes</p><p class="dd-pop__writes" data-part="write-preview">${acceptPlan(ghostInput(g), { today: NOW.date }).receipt}</p>`;
+      html += `<div class="dd-pop__acts"><button type="button" class="btn btn--primary" data-accept="${g.id}">Accept</button>${g.kind === "bedtime" ? "" : `<button type="button" class="btn btn--ghost" data-dismiss="${g.id}">Dismiss</button>`}</div>`;
+    }
+    pop.innerHTML = html;
+    pop.hidden = false;
+    const r = root.getBoundingClientRect();
+    const b = nodes.get(`arc:${arcId}`).getBoundingClientRect();
+    const room = r.right - b.right;
+    pop.style.left = `${Math.max(0, room > DD.popWidth + DD.popGap ? b.right - r.left + DD.popGap : b.left - r.left - DD.popWidth - DD.popGap)}px`;
+    pop.style.top = `${b.top - r.top}px`;
+    popFor = arcId;
+    engine.place("__pop", { opacity: 0, y: DD.popRise });
+    engine.to("__pop", { opacity: 1, y: 0 }, { duration: DD.popMs });
+  }
+  function closePop() {
+    if (!popFor) return;
+    popFor = null;
+    engine.to("__pop", { opacity: 0, y: DD.popRise }, { duration: DD.popMs });
+    window.setTimeout(() => {
+      if (!popFor) nodes.get("__pop").hidden = true;
+    }, DD.popMs);
+  }
+  async function decide(ghostId, decision) {
+    const g = GHOSTS.find((x) => x.id === ghostId);
+    if (!g || state.accepted.has(ghostId) || state.dismissed.has(ghostId)) return;
+    closePop();
+    root.querySelectorAll(`[data-accept="${ghostId}"],[data-dismiss="${ghostId}"]`).forEach((b) => {
+      b.disabled = true;
+      if (b.dataset.accept) b.textContent = "Saving\u2026";
+    });
+    const plan = decision === "accept" ? acceptPlan(ghostInput(g), { today: NOW.date }) : null;
+    await wait(DD.saveLatencyMs);
+    (decision === "accept" ? state.accepted : state.dismissed).add(ghostId);
+    const host = root.parentElement;
+    mount(host, mountOptions, { entrance: false });
+    showToast(plan ? `<b>Written.</b> ${plan.receipt}` : "<b>Dismissed.</b> Nothing written.");
+    nodes.get("__live").textContent = plan ? plan.receipt : "Dismissed. Nothing written.";
+  }
+  function setDay(date) {
+    if (!WEEK.includes(date) || date === state.day) return;
+    state.day = date;
+    const host = root.parentElement;
+    mount(host, mountOptions, { entrance: false });
+    engine.place("__sweep", { h: 0 });
+    engine.to("__sweep", { h: 24 }, { duration: DD.daySwitchMs, easing: EASE });
+    engine.place("__gauge", { v: 0 });
+    engine.to("__gauge", { v: CAP.get(date).pct }, { duration: DD.daySwitchMs, easing: EASE });
+    nodes.get("__live").textContent = `${dayLabel(date)}, capacity ${CAP.get(date).pct}%`;
+    nodes.get(`wd:${date}`)?.focus({ preventScroll: true });
+  }
+  function wire(r) {
+    r.addEventListener("click", (e) => {
+      const t = e.target;
+      const acc = t.closest("[data-accept]");
+      if (acc) return void decide(acc.dataset.accept, "accept");
+      const dis = t.closest("[data-dismiss]");
+      if (dis) return void decide(dis.dataset.dismiss, "dismiss");
+      const day = t.closest("[data-day]");
+      if (day) return setDay(day.dataset.day);
+      const step = t.closest("[data-step]");
+      if (step) return setDay(WEEK[WEEK.indexOf(state.day) + Number(step.dataset.step)]);
+      if (t.closest("[data-today]")) return setDay(NOW.date);
+      if (t.closest("[data-linear]")) return showToast("<b>Linear</b> opens the Tideline one-day view in the hub.");
+      const arc = t.closest(".dd-arc[data-id]");
+      if (arc) {
+        const id = arc.getAttribute("data-id");
+        return id === popFor ? closePop() : openPop(id);
+      }
+      if (!t.closest('[data-part="popover"]')) closePop();
+    });
+    r.addEventListener("keydown", (e) => {
+      const t = e.target;
+      if (e.key === "Escape") closePop();
+      if ((e.key === "Enter" || e.key === " ") && t.classList?.contains("dd-arc")) {
+        openPop(t.getAttribute("data-id"));
+        e.preventDefault();
+      }
+      if (e.key === "ArrowLeft" && !t.closest("input")) setDay(WEEK[WEEK.indexOf(state.day) - 1]);
+      if (e.key === "ArrowRight" && !t.closest("input")) setDay(WEEK[WEEK.indexOf(state.day) + 1]);
+    });
+  }
+  var slow = 1;
+  var reduced = false;
+  var clock = { now: () => performance.now() / slow, request: (cb) => requestAnimationFrame(cb), cancel: (id) => cancelAnimationFrame(id) };
+  function boot() {
+    const host = document.getElementById("app");
+    const start = (entrance = true) => mount(host, { clock, reducedMotion: () => reduced || matchMedia("(prefers-reduced-motion: reduce)").matches }, { entrance });
+    (document.fonts?.ready ?? Promise.resolve()).then(() => start(true));
+    document.getElementById("ref-reset")?.addEventListener("click", () => {
+      state.accepted.clear();
+      state.dismissed.clear();
+      state.day = NOW.date;
+      start(true);
+    });
+    document.getElementById("ref-slow")?.addEventListener("click", (e) => {
+      slow = slow === 1 ? 5 : 1;
+      e.currentTarget.setAttribute("aria-pressed", String(slow === 5));
+    });
+    document.getElementById("ref-reduced")?.addEventListener("click", (e) => {
+      reduced = !reduced;
+      e.currentTarget.setAttribute("aria-pressed", String(reduced));
+    });
+    let lastW = 0;
+    new ResizeObserver((entries) => {
+      const w = Math.round(entries[0].contentRect.width);
+      if (lastW && Math.abs(w - lastW) > 2) requestAnimationFrame(() => start(false));
+      lastW = w;
+    }).observe(host);
+    window.__dayDial = {
+      state,
+      DD,
+      capacity: Object.fromEntries([...CAP].map(([d, c]) => [d, c.pct])),
+      rings: () => rings,
+      setDay,
+      decide,
+      openPop,
+      closePop,
+      finish: () => engine.finish(),
+      stats: () => engine.stats()
+    };
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
