@@ -1,0 +1,12 @@
+export declare function angleForHour(hour: number): number;
+export declare function point(cx: number, cy: number, r: number, hour: number): { x: number; y: number };
+export declare function spanHours(h1: number, h2: number): number;
+export declare function arcPath(cx: number, cy: number, r1: number, r2: number, h1: number, h2: number): string;
+export declare function visibleSpan(h1: number, h2: number, sweep: number): [number, number] | null;
+export declare const DIAL_RINGS: Readonly<Record<string, number>>;
+export declare const MIN_CALLOUT_SIZE: number;
+export type Rings = { compact: boolean; cx: number; cy: number; height: number; R: number; log: number; ticks: number; event: [number, number]; context: [number, number]; gauge: number; gaugeWidth: number };
+export declare function ringRadii(size: number): Rings;
+export type Callout = { x: number; y: number; anchor: 'start' | 'end'; lead: { x1: number; y1: number; x2: number; y2: number } };
+export declare function layoutCallouts(items: { id: string; hour: number; height: number }[], opts: { cx: number; cy: number; r: number; gap?: number; top?: number; bottom?: number; reach?: number }): Map<string, Callout>;
+export declare function calloutRoom(size: number): { r: number; reach?: number; width: number };
