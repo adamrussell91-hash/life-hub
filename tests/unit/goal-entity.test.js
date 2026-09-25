@@ -6,6 +6,12 @@ import { hrefForHubRef, labelForHubRef } from '../../netlify/functions/_shared/h
 import { RESOLVER_SLOTS, resolveEntity } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { validateRelationshipInput } from '../../netlify/functions/_shared/relationship-registry.mjs';
 import { createAccessContext } from '../../netlify/functions/_shared/entity-access.mjs';
+import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
+import { createEntitySearchHandler } from '../../netlify/functions/entity-search.mjs';
+
+const SECRET = 's'.repeat(32);
+const env = { LIFE_HUB_PASSPHRASE_HASH: 'configured', SESSION_SECRET: SECRET, SITE_ORIGIN: 'https://life-hub.adam-russell.com' };
+const session = createSessionToken({ now: Date.parse('2026-08-01T00:00:00Z'), randomBytes: () => Buffer.alloc(16, 7) }, SECRET).token;
 
 function memoryStore(seed = {}) {
   const map = new Map(Object.entries(seed));
@@ -55,4 +61,35 @@ test('anything can be tagged_with a goal, both ways', () => {
   const task = parseEntityRef('tasks:task:t1');
   assert.equal(validateRelationshipInput({ sourceRef: page, targetRef: goal, relationshipType: 'tagged_with' }).key, 'tagged_with');
   assert.equal(validateRelationshipInput({ sourceRef: goal, targetRef: task, relationshipType: 'tagged_with' }).key, 'tagged_with');
+});
+
+test('@ search returns goals and projects from their indexes', async () => {
+  const tasksStore = memoryStore({
+    'goals/_index': ['goal_ha', 'goal_x'],
+    'goals/goal_ha': { id: 'goal_ha', title: 'Highly Accomplished evidence', sphere: 'professional', status: 'active' },
+    'goals/goal_x': { id: 'goal_x', title: 'Unrelated', sphere: 'life', status: 'active' },
+    'projects/_index': ['proj_ha'],
+    'projects/proj_ha': { id: 'proj_ha', title: 'HA evidence portfolio', status: 'active' }
+  });
+  const handler = createEntitySearchHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore(),
+    getTasksStore: async () => tasksStore,
+    getProfessionalStore: async () => memoryStore()
+  });
+  const response = await handler(new Request('https://api.adam-russell.com/api/entities/search?q=Highly&kinds=goal,project', {
+    headers: { cookie: `life_hub_session=${session}`, origin: 'https://life-hub.adam-russell.com' }
+  }));
+  assert.equal(response.status, 200);
+  const { groups } = (await response.json()).data;
+  assert.deepEqual(groups.goal.map(item => item.ref), ['tasks:goal:goal_ha']);
+  assert.equal(groups.goal[0].href, '/tasks/#/goal/goal_ha');
+
+  const projects = await handler(new Request('https://api.adam-russell.com/api/entities/search?q=HA&kinds=project', {
+    headers: { cookie: `life_hub_session=${session}`, origin: 'https://life-hub.adam-russell.com' }
+  }));
+  const projectGroups = (await projects.json()).data.groups;
+  assert.deepEqual(projectGroups.project.map(item => item.ref), ['tasks:project:proj_ha']);
+  assert.equal(projectGroups.project[0].href, '/tasks/#/project/proj_ha');
 });
