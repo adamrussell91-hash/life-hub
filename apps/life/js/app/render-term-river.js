@@ -177,8 +177,12 @@ function ghostStatus(id, held) {
   if (state.dismissed.has(id)) return 'dismissed';
   if (state.accepted.has(id)) return 'accepted';
   const queued = pendingGhosts().find(ghost => ghost?.id === id);
-  const settled = queued?.settled ?? queued?.status;
-  if (settled === 'accepted' || settled === 'dismissed') return settled;
+  if (queued) {
+    // Still on the pending queue: that wins over a leftover Life block from an earlier seed run.
+    const settled = queued.settled ?? queued.status;
+    if (settled === 'accepted' || settled === 'dismissed') return settled;
+    return 'pending';
+  }
   if (held?.has(id)) return 'accepted';
   return 'pending';
 }
@@ -394,7 +398,7 @@ function mount({ entrance = false } = {}) {
 }
 
 function mountChart(card) {
-  W = Math.round(card.clientWidth || host.clientWidth || W);
+  W = Math.round(card.clientWidth || host.clientWidth || 1000);
   scaleCache = new Map();
   const laneTops = {};
   let y = TR.axis.h;
@@ -415,8 +419,16 @@ function mountChart(card) {
   attach(card, svg);
   const defs = s('defs', {}, svg);
   ensureHatch(defs);
-  const clip = s('clipPath', { id: 'tr-plot' }, defs);
-  nodes.set('plotclip', s('rect', { x: TR.labelW, y: 0, width: 0, height: H }, clip));
+  // Reuse the shell's #tr-plot clip (first in the document) so the visual probe's
+  // `#tr-plot rect, clipPath rect` selector cannot land on a home-chart clipPath.
+  let clipRect = doc.getElementById?.('tr-plot')?.querySelector?.('rect') ?? null;
+  if (!clipRect) {
+    const clip = s('clipPath', { id: 'tr-plot' }, defs);
+    clipRect = s('rect', { x: TR.labelW, y: 0, width: 0, height: H }, clip);
+  } else {
+    set(clipRect, { x: TR.labelW, y: 0, width: 0, height: H });
+  }
+  nodes.set('plotclip', clipRect);
   const plot = s('g', { 'clip-path': 'url(#tr-plot)' }, svg);
   const labels = s('g', {}, svg);
 
