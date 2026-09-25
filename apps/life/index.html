@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="packages/design-kit/mobile.css">
   <link rel="stylesheet" href="packages/design-kit/calendar.css">
   <link rel="stylesheet" href="packages/design-kit/calendar-tideline.css">
+  <link rel="stylesheet" href="packages/design-kit/calendar-almanac.css">
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -47,6 +48,12 @@
   <div id="app-shell" hidden>
   <a class="skip-link" href="#main-content">Skip to Life Hub Home</a>
   <div class="app-shell" id="app" data-state="loading">
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <pattern id="alm-hatch" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="color-mix(in srgb, var(--navy) 4%, transparent)"/><rect width="2" height="7" fill="color-mix(in srgb, var(--navy) 13%, transparent)"/></pattern>
+        <linearGradient id="alm-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--wave)" stop-opacity=".24"/><stop offset="1" stop-color="var(--wave)" stop-opacity="0"/></linearGradient>
+      </defs>
+    </svg>
     <aside class="desktop-rail hub-rail" aria-label="Life Hub navigation">
       <header class="brand">
         <span class="brand-copy">
