@@ -119,6 +119,47 @@ export function appendGovernanceLogSchema() {
   };
 }
 
+const CALENDAR_GHOST_KIND_ENUM = [
+  'skip_workout',
+  'bedtime',
+  'protect_block',
+  'move_task',
+  'create_task'
+];
+
+export function proposeCalendarGhostSchema() {
+  return {
+    name: 'propose_calendar_ghost',
+    description:
+      'Propose a dashed ghost on Adam’s calendar (skip workout, bedtime, protect a block, move/create a task). Validated and queued only — nothing is written to Life, Central Node or Tasks until he Accepts on the calendar.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        kind: {
+          type: 'string',
+          enum: [...CALENDAR_GHOST_KIND_ENUM],
+          description: 'Ghost kind'
+        },
+        date: { type: 'string', description: 'YYYY-MM-DD for dated kinds' },
+        reason: { type: 'string', description: 'Short why, shown on the chip' },
+        time: { type: 'string', description: 'bedtime lights-out HH:MM' },
+        start: { type: 'string', description: 'protect_block start HH:MM' },
+        end: { type: 'string', description: 'protect_block end HH:MM' },
+        title: { type: 'string', description: 'protect_block / create_task / move_task title' },
+        with: { type: 'string', description: 'protect_block companion (e.g. corey)' },
+        workoutPath: { type: 'string', description: 'skip_workout Life record path' },
+        overItem: { type: 'string', description: 'skip_workout chip id to decorate' },
+        taskId: { type: 'string', description: 'move_task id' },
+        from: { type: 'string', description: 'move_task from date' },
+        to: { type: 'string', description: 'move_task to date' },
+        due: { type: 'string', description: 'create_task due date' },
+        notes: { type: 'string', description: 'create_task notes' }
+      },
+      required: ['kind']
+    }
+  };
+}
+
 const SPECIALIST_CN_SENDERS = {
   clare: 'Clare',
   ann: 'Ann'

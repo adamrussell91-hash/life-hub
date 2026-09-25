@@ -20,7 +20,8 @@ import { validateCentralNodePatchInput, applyCentralNodePatch } from './_shared/
 import { renderMarkdown } from './_shared/persist-log.mjs';
 import { validateRecord } from '../../apps/life/js/core/validate.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
-import { acceptPlan, dismissPlan } from '../../apps/life/js/app/ghost-writes.js';
+import { acceptPlan, dismissPlan, validateGhost, GHOST_AGENTS } from '../../apps/life/js/app/ghost-writes.js';
+import { ghostId } from '../../apps/life/js/app/ghost-proposer.js';
 import {
   ghostsForAlmanacAction,
   loadProfessionalEventsFromBlobs,
@@ -74,6 +75,44 @@ export function parsePendingCalendarGhosts(text) {
 
 export function serializePendingCalendarGhosts(list) {
   return JSON.stringify(Array.isArray(list) ? list : [], null, 2);
+}
+
+/**
+ * Build and validate a queue entry from a chat tool call.
+ * Agent is forced to the calling slug. Id is deterministic.
+ */
+export function calendarGhostFromToolInput(input, { agent, nowIso }) {
+  if (!agent || !(agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${agent}`);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new TypeError('Ghost input must be an object');
+  }
+  const kind = input.kind;
+  const dateKey = typeof input.date === 'string' && input.date
+    ? input.date
+    : typeof input.from === 'string' && input.from
+      ? input.from
+      : typeof input.due === 'string' && input.due
+        ? input.due
+        : 'undated';
+  const id = ghostId(agent, kind, dateKey);
+  const ghost = { ...input, id, agent };
+  validateGhost(ghost);
+  return {
+    ...ghost,
+    created_at: nowIso,
+    status: 'pending',
+    via: 'chat'
+  };
+}
+
+/** Append one ghost to the queue text. Returns the next serialized queue. */
+export function appendPendingCalendarGhost(queueText, entry) {
+  const list = parsePendingCalendarGhosts(queueText);
+  if (list.some(item => item.id === entry.id)) {
+    return { content: serializePendingCalendarGhosts(list), added: false, list };
+  }
+  const next = [...list, entry];
+  return { content: serializePendingCalendarGhosts(next), added: true, list: next };
 }
 
 function findGhost(list, id) {

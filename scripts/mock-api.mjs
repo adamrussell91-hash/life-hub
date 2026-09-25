@@ -17,6 +17,7 @@ import {
   readGhostDecision,
   runGhostDecision
 } from '../netlify/functions/calendar-ghosts.mjs';
+import { runCalendarGhostsPropose } from '../netlify/functions/_shared/calendar-ghosts-propose.mjs';
 import { CALENDAR_VISUAL_PATH, loadCalendarVisualSeed } from './calendar-visual-seed.mjs';
 import { loadAlmanacVisualSeed } from './almanac-visual-seed.mjs';
 import {
@@ -469,11 +470,39 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         const seeded = await loadCalendarVisualSeed();
         clock.now = () => Date.parse(seeded.now);
         for (const [path, content] of seeded.files) confirmedFiles.set(path, content);
+        if (url.searchParams.get('clearGhosts') === '1') {
+          const { serializePendingCalendarGhosts } = await import('../netlify/functions/calendar-ghosts.mjs');
+          confirmedFiles.set(PENDING_CALENDAR_GHOSTS_PATH, serializePendingCalendarGhosts([]));
+        }
         for (const task of seeded.tasks) taskData.set(taskKey(task.id), task);
         taskData.set(TASKS_INDEX_KEY, seeded.tasks.map(task => task.id));
         json(response, 200, { ok: true, data: { now: seeded.now, ...seeded.counts } });
       } catch (seedError) {
         error(response, 500, 'seed_failed', seedError instanceof Error ? seedError.message : 'Calendar visual seed failed.', true);
+      }
+      return true;
+    }
+
+    if (url.pathname === '/api/calendar-ghosts-propose') {
+      if (request.method !== 'POST') return methodNotAllowed(response, 'POST');
+      if (!readSession(request)) return unauthenticated(response);
+      const instant = new Date(clock.now());
+      try {
+        const terms = await readSchoolTerms(async () => taskStore);
+        const result = await runCalendarGhostsPropose({
+          open: openRepo,
+          commit: async (changed) => {
+            for (const [path, content] of changed) confirmedFiles.set(path, content);
+          },
+          today: getSydneyDateKey(instant),
+          nowIso: getSydneyTimestamp(instant),
+          terms,
+          lessons: [],
+          professionalEvents: []
+        });
+        json(response, 200, result);
+      } catch (proposeError) {
+        error(response, 500, 'propose_failed', proposeError instanceof Error ? proposeError.message : 'Propose failed.', true);
       }
       return true;
     }

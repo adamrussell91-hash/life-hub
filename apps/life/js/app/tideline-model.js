@@ -41,10 +41,21 @@ function termAt(key, terms) {
 }
 
 function weekLabel(key, terms) {
+  if (!terms?.length) return null;
   const term = termAt(key, terms);
-  if (!term) return null;
-  const week = Math.floor((toMs(mondayOf(key)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
-  return `T${term.term} W${week}`;
+  if (term) {
+    const week = Math.floor((toMs(mondayOf(key)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
+    return `T${term.term} W${week}`;
+  }
+  const prev = [...terms].filter(t => t.ends_on < key).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
+  if (!prev) return null;
+  let start = mondayOf(new Date(toMs(prev.ends_on) + DAY_MS).toISOString().slice(0, 10));
+  while (termAt(start, terms)) {
+    start = new Date(toMs(start) + 7 * DAY_MS).toISOString().slice(0, 10);
+  }
+  const week = Math.floor((toMs(mondayOf(key)) - toMs(start)) / (7 * DAY_MS)) + 1;
+  if (week < 1) return null;
+  return `Hol W${week}`;
 }
 
 export function isSchoolHoliday(key, terms) {
@@ -61,10 +72,16 @@ export function movedCaption(date, terms) {
 
 function periodTitle(week, terms) {
   const inside = week.find(day => termAt(day, terms));
-  const label = inside ? weekLabel(inside, terms) : null;
-  const ending = (terms ?? []).find(term => term.ends_on >= week[0] && term.ends_on <= week[week.length - 1]);
-  if (label && ending) return `${label} · last week of term`;
-  return label;
+  if (inside) {
+    const label = weekLabel(inside, terms);
+    const ending = (terms ?? []).find(term => term.ends_on >= week[0] && term.ends_on <= week[week.length - 1]);
+    if (label && ending) return `${label} · last week of term`;
+    return label;
+  }
+  const holidayDay = week.find(day => isSchoolHoliday(day, terms));
+  if (!holidayDay) return null;
+  const label = weekLabel(holidayDay, terms);
+  return label ? `${label} · holidays` : null;
 }
 
 function dayTag(date, terms) {

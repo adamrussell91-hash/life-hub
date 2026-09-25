@@ -292,6 +292,49 @@ test('holding an opening writes the block and does not queue a ghost', async () 
   assert.match(github.files.get(blocks[0]), /Good night: dinner out \+ a show/);
 });
 
+test('after a hold, buildAlmanac marks that opening held until the date passes', async () => {
+  const { load } = await import('js-yaml');
+  const { handler, github } = ghostHarness();
+  assert.equal((await handler(post({ id: 'alm-hold-good-night', decision: 'accept' }))).status, 200);
+
+  const blockEntries = [...github.files.entries()]
+    .filter(([path]) => path.startsWith('data/calendar/'))
+    .map(([, content]) => {
+      const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(content);
+      return match ? load(match[1]) : null;
+    })
+    .filter(Boolean);
+
+  const held = buildAlmanac({
+    today: '2026-09-24',
+    from: '2026-09-24',
+    to: '2027-01-10',
+    anchors: parseAlmanacAnchors(SEEDED.files.get('almanac-anchors.yml') ?? ''),
+    done: [],
+    terms: FIXTURE.TERMS,
+    logs: [],
+    blocks: blockEntries
+  });
+  const goodNight = held.openings.find(opening => opening.wantId === 'good-night');
+  assert.equal(goodNight?.held, true);
+  assert.deepEqual(goodNight?.dates, ['2026-10-02']);
+  assert.equal(goodNight?.ids?.hold, null);
+
+  const after = buildAlmanac({
+    today: '2026-10-03',
+    from: '2026-10-03',
+    to: '2027-01-10',
+    anchors: parseAlmanacAnchors(SEEDED.files.get('almanac-anchors.yml') ?? ''),
+    done: [],
+    terms: FIXTURE.TERMS,
+    logs: [],
+    blocks: blockEntries
+  });
+  const next = after.openings.find(opening => opening.wantId === 'good-night');
+  assert.equal(next?.held, false);
+  assert.ok(next?.dates?.[0] > '2026-10-02');
+});
+
 test('accepting a draft writes nothing and returns the text', async () => {
   const { handler, github, store } = ghostHarness();
   const before = new Map(github.files);

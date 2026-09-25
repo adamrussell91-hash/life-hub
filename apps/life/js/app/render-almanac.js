@@ -132,6 +132,10 @@ function periodCopy(view) {
 
 function whenText(opening) {
   const [start, end] = opening.dates;
+  if (opening.held && start) {
+    if (end) return `Held \u00b7 ${DOW(start)} ${dd(start).slice(0, 2)} \u2013 ${DOW(end)} ${dd(end)}`;
+    return `Held \u00b7 ${DOW(start)} ${dd(start)}`;
+  }
   if (end) return `${DOW(start)} ${dd(start).slice(0, 2)} \u2013 ${DOW(end)} ${dd(end)}`;
   if (opening.span === 'evening') return `${DOW(start)} ${dd(start)} · 6\u201310 pm`;
   if (opening.span === 'lunch') return `${DOW(start)} ${dd(start)} · lunch`;
@@ -929,8 +933,9 @@ function paint(doc, host, view, options) {
     heading.textContent = 'Openings · free, high-capacity windows held for you';
     for (const opening of view.openings) {
       if (!opening.dates?.length) continue;
+      if (opening.held) state.held.add(opening.wantId);
       const corey = opening.with === 'corey';
-      const held = state.held.has(opening.wantId);
+      const held = opening.held === true || state.held.has(opening.wantId);
       const article = el('article', `alm-open${corey ? ' is-corey' : ''}${held ? ' is-held' : ''}`, wrap, { 'data-part': 'opening', 'data-want': opening.wantId });
       const when = el('div', 'alm-open__when', article);
       const whenLabel = el('span', '', when);
@@ -944,7 +949,7 @@ function paint(doc, host, view, options) {
       why.textContent = WANT_WHY[opening.wantId] ?? '';
       const buttons = el('div', 'alm-open__btns', article);
       const hold = HOLD_LABEL[opening.wantId];
-      if (hold && opening.ids?.hold) {
+      if (hold && (opening.ids?.hold || held)) {
         const button = el('button', 'btn btn--primary', buttons, { type: 'button', 'data-open': opening.wantId, 'data-act': 'hold' });
         button.textContent = held ? heldLabel(opening.wantId) : hold;
         if (held) button.disabled = true;
@@ -978,7 +983,8 @@ function paint(doc, host, view, options) {
   function placeHeld() {
     for (const opening of view.openings) {
       if (!nodes.has(`open:${opening.wantId}`)) continue;
-      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
+      const held = opening.held === true || state.held.has(opening.wantId);
+      engine.place(`open:${opening.wantId}`, { held: held ? 1 : 0 });
     }
   }
 
