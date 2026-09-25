@@ -32,6 +32,7 @@ import {
 import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
+import { normalizeGoalRecord } from './_shared/goal-record.mjs';
 import {
   defaultGetTasksStore,
   getJSON,
@@ -292,7 +293,16 @@ export function ghostTaskId(ghostId) {
   return `ghost-${ghostId}`;
 }
 
-async function applyTaskStep(store, step, { ghostId } = {}) {
+export async function applyTaskStep(store, step, { ghostId } = {}) {
+  if (step.method === 'PATCH' && step.collection === 'goals') {
+    const key = `goals/${step.id}`;
+    const existing = await getJSON(store, key);
+    if (!existing || typeof existing !== 'object') {
+      throw Object.assign(new Error('Goal not found'), { code: 'goal_not_found' });
+    }
+    await setJSON(store, key, normalizeGoalRecord({ ...existing, ...(step.body ?? {}), updated_at: new Date().toISOString() }));
+    return;
+  }
   if (step.method === 'PATCH') {
     const existing = await getJSON(store, taskKey(step.id));
     if (!existing || typeof existing !== 'object') {
@@ -312,7 +322,8 @@ async function applyTaskStep(store, step, { ghostId } = {}) {
       throw Object.assign(new Error('title and a valid domain are required'), { code: 'validation_error' });
     }
     const timestamp = new Date().toISOString();
-    const id = ghostId ? ghostTaskId(ghostId) : newTaskId();
+    const baseId = ghostId ? ghostTaskId(ghostId) : newTaskId();
+    const id = ghostId && typeof step.suffix === 'string' && step.suffix ? `${baseId}-${step.suffix}` : baseId;
     if (ghostId) {
       const existing = await getJSON(store, taskKey(id));
       if (existing && typeof existing === 'object') {
@@ -326,12 +337,15 @@ async function applyTaskStep(store, step, { ghostId } = {}) {
       id,
       title,
       description: typeof body.notes === 'string' ? body.notes : '',
-      kind: 'task',
+      kind: body.kind === 'step' && typeof body.parent_task_id === 'string' ? 'step' : 'task',
       bucket: 'active',
       domain,
       status: typeof body.status === 'string' && body.status ? body.status : 'open',
       priority: 'medium',
       parent_project_id: null,
+      parent_goal_id: typeof body.parent_goal_id === 'string' ? body.parent_goal_id : null,
+      parent_task_id: typeof body.parent_task_id === 'string' ? body.parent_task_id : null,
+      step_order: Number.isInteger(body.step_order) ? body.step_order : 0,
       created_at: timestamp,
       updated_at: timestamp,
       completed_at: null,
