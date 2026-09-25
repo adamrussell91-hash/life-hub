@@ -61,7 +61,8 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/calendar/2026/09/2026-09-26-dinner-out-a-show-1800.md',
     'data/fitness/templates/chest-and-curls.md',
     'data/remember/week-flags.json',
-    'data/research/2026-08-01-knee-load.json'
+    'data/research/2026-08-01-knee-load.json',
+    'records/2026/09/24/workout-1815.md'
   ]) assert.equal(isAllowedRepositoryPath(path), true, path);
 });
 
@@ -103,6 +104,8 @@ test('client file range allows config and in-range events, not templates or out-
   assert.equal(isClientFileInRange('data/nutrition/2026/07/2026-07-01-old.md', range), false);
   assert.equal(isClientFileInRange('data/fitness/templates/chest-and-curls.md', range), false);
   assert.equal(isClientFileInRange('private/secret.md', range), false);
+  assert.equal(isClientFileInRange('records/2026/09/24/workout-1815.md', range), false);
+  assert.equal(isClientFileInRange('records/2026/07/30/workout-1815.md', { from: '2026-07-02', to: '2026-08-01' }), true);
 });
 
 test('date ranges require one canonical ordered date pair no longer than 366 days', () => {

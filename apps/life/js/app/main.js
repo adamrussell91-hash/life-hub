@@ -216,7 +216,8 @@ controller = createAppController({
   chatPanel,
   chatClearUnread: () => chatController?.clearUnread?.(),
   sessionStorage,
-  localStorage
+  localStorage,
+  apiFetch: fetchImpl
 });
 
 controller.start();

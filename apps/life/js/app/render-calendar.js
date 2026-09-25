@@ -72,7 +72,10 @@ export function renderCalendar(root, model, {
   now = new Date(),
   events = [],
   calendarVisual = null,
-  planningProfile = null
+  planningProfile = null,
+  calendarGhosts = null,
+  apiFetch = null,
+  onSourcesChanged = null
 } = {}) {
   const dashboard = root.querySelector('#calendar-dashboard');
   if (!dashboard || !model) return;
@@ -101,6 +104,9 @@ export function renderCalendar(root, model, {
     renderTideline(root, calendar, {
       events,
       visual: calendarVisual,
+      ghosts: calendarGhosts,
+      apiFetch,
+      onSourcesChanged,
       week: (model.weekDays ?? []).map(day => day.date),
       today: model.date,
       now,
