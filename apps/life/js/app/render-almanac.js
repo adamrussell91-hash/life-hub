@@ -180,6 +180,7 @@ function apply(id, props) {
     if (!node) return;
     node.setAttribute('transform', `scale(${props.scale})`);
     node.style.opacity = String(props.opacity);
+    return;
   }
   if (id.startsWith('open:')) node?.style.setProperty('--held', String(props.held));
 }
@@ -251,18 +252,22 @@ function openPop(stepId) {
   if (!hit || !pop || !engine || !rootEl) return;
   const { st } = hit;
   const rule = ALMANAC_RULES.find(r => r.id === st.ruleId);
-  const left = st.daysLeft < 0 ? `${-st.daysLeft} days late` : st.daysLeft === 0 ? 'today' : `${st.daysLeft} days left`;
+  let left;
+  if (st.daysLeft < 0) left = `${-st.daysLeft} days late`;
+  else if (st.daysLeft === 0) left = 'today';
+  else left = `${st.daysLeft} days left`;
   let html = `<div class="alm-pop__head"><b>${st.title}</b></div><p class="alm-pop__meta">Last safe day <b>${formatDisplayDate(st.lastSafe)}</b> · ${left}</p>`;
   if (rule?.why) html += `<p class="alm-pop__why">${rule.why}</p>`;
   if (st.status !== 'done') {
-    const ghost = taskGhost(stepId);
-    const receipt = state.tasked.has(stepId)
-      ? 'Already on your task list.'
-      : ghost
-        ? acceptPlan(ghost, { today: current.today }).receipt
-        : '';
+    let receipt = '';
+    if (state.tasked.has(stepId)) receipt = 'Already on your task list.';
+    else {
+      const ghost = taskGhost(stepId);
+      if (ghost) receipt = acceptPlan(ghost, { today: current.today }).receipt;
+    }
     html += `<p class="alm-pop__label">Add as task writes</p><p class="alm-pop__writes" data-part="write-preview">${receipt}</p>`;
-    html += `<div class="alm-pop__acts">${state.tasked.has(stepId) ? '' : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
+    const taskBtn = state.tasked.has(stepId) ? '' : `<button type="button" class="btn btn--primary" data-task="${stepId}">Add as task</button>`;
+    html += `<div class="alm-pop__acts">${taskBtn}<button type="button" class="btn btn--secondary" data-done="${stepId}">Already done</button></div>`;
   }
   pop.innerHTML = html;
   pop.hidden = false;
@@ -803,6 +808,13 @@ function paint(doc, host, view, options) {
     plan.textContent = 'Plan it with Hammond';
   }
 
+  function placeHeld() {
+    for (const opening of view.openings) {
+      if (!nodes.has(`open:${opening.wantId}`)) continue;
+      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
+    }
+  }
+
   function entrance() {
     if (!state.phone && nodes.has('wave-clip')) {
       engine.place('wave', { w: 0 });
@@ -825,28 +837,20 @@ function paint(doc, host, view, options) {
     } else {
       engine.place('wave', { w: ALM.width });
     }
-    for (const opening of view.openings) {
-      if (!nodes.has(`open:${opening.wantId}`)) continue;
-      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
-    }
+    placeHeld();
   }
 
   /** Resize / re-layout: final geometry, no entrance replay. */
   function settleMotion() {
+    engine.place('wave', { w: ALM.width });
     if (!state.phone && nodes.has('wave-clip')) {
-      engine.place('wave', { w: ALM.width });
       for (const lead of view.lines) {
         const id = lead.anchor?.id;
         if (id && nodes.has(`rail:${id}`)) engine.place(`rail:${id}`, { draw: 1 });
         for (const step of lead.steps) engine.place(`bead:${step.id}`, { opacity: 1, scale: 1 });
       }
-    } else {
-      engine.place('wave', { w: ALM.width });
     }
-    for (const opening of view.openings) {
-      if (!nodes.has(`open:${opening.wantId}`)) continue;
-      engine.place(`open:${opening.wantId}`, { held: state.held.has(opening.wantId) ? 1 : 0 });
-    }
+    placeHeld();
   }
 }
 
