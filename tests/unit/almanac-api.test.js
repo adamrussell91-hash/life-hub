@@ -9,7 +9,8 @@ import { createCalendarGhostsHandler, ghostTaskId } from '../../netlify/function
 import {
   HUB_PREFS_KEY,
   buildAlmanac,
-  parseAlmanacAnchors
+  parseAlmanacAnchors,
+  readSchoolTerms
 } from '../../netlify/functions/almanac.mjs';
 import { ALMANAC_WANTS } from '../../apps/life/js/app/almanac-rules.js';
 import { forecastSeries } from '../../apps/life/js/app/capacity-model.js';
@@ -157,6 +158,37 @@ function referenceOpenings(fixture) {
   });
   return findOpenings(days, ALMANAC_WANTS);
 }
+
+test('readSchoolTerms flattens the year-nested school_terms hub-prefs writes, sorted by starts_on', async () => {
+  const store = memoryTasks();
+  store.data.set(HUB_PREFS_KEY, {
+    school_terms: [
+      {
+        year: 2027,
+        terms: [
+          { term: 2, starts_on: '2027-04-27', ends_on: '2027-07-02' },
+          { term: 1, starts_on: '2027-02-01', ends_on: '2027-04-09' }
+        ]
+      },
+      {
+        year: 2026,
+        terms: [
+          { term: 3, starts_on: '2026-07-20', ends_on: '2026-09-25' },
+          { term: 4, starts_on: '2026-10-12', ends_on: '2026-12-18' }
+        ]
+      }
+    ]
+  });
+  const warnings = [];
+  const terms = await readSchoolTerms(async () => store, { warn: message => warnings.push(message) });
+  assert.deepEqual(terms, [
+    { term: 3, starts_on: '2026-07-20', ends_on: '2026-09-25' },
+    { term: 4, starts_on: '2026-10-12', ends_on: '2026-12-18' },
+    { term: 1, starts_on: '2027-02-01', ends_on: '2027-04-09' },
+    { term: 2, starts_on: '2027-04-27', ends_on: '2027-07-02' }
+  ]);
+  assert.deepEqual(warnings, []);
+});
 
 test('a bad anchor row is skipped with a warning', () => {
   const warnings = [];
