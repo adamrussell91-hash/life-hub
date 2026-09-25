@@ -99,6 +99,8 @@ export const TaskSchema = z.object({
   priority: TaskPrioritySchema.default('medium'),
   parent_project_id: z.string().nullable().default(null),
   parent_task_id: z.string().nullable().default(null),
+  /** The goal that hosts this task directly (not via a project). */
+  parent_goal_id: z.string().nullable().default(null),
   depends_on: z.array(z.string()).default([]),
   /** Typed incoming links (FS/SS/FF + offset). When absent, `depends_on` is treated as FS / 0. */
   dependency_links: z.array(DependencyLinkSchema).optional(),
@@ -180,6 +182,7 @@ export const TaskCreateSchema = TaskSchema.omit({
   priority: true,
   parent_project_id: true,
   parent_task_id: true,
+  parent_goal_id: true,
   depends_on: true,
   dependency_links: true,
   tags: true,

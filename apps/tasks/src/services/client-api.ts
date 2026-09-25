@@ -1,6 +1,7 @@
 import { ApiClientError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from '@/api/client';
 import { getApiBaseUrl } from '@/api/config';
 import type { Task } from '@/schemas/task';
+import { normalizeGoal } from '@/schemas/goal';
 import { ProjectSchema, type ComplianceModule, type Project } from '@/schemas/project';
 import {
   filterCachedTasks,
@@ -87,15 +88,6 @@ async function* readClareDumpSse(body: ReadableStream<Uint8Array>): AsyncGenerat
       }
     }
   }
-}
-
-/** Goals stored before the API wrote `tags` / `description` arrive without them. */
-function withGoalDefaults(goal: import('@/schemas/goal').Goal): import('@/schemas/goal').Goal {
-  return {
-    ...goal,
-    description: goal.description ?? '',
-    tags: Array.isArray(goal.tags) ? goal.tags : []
-  };
 }
 
 export const tasksApi = {
@@ -439,9 +431,9 @@ export const tasksApi = {
   deleteArea: (id: string) => apiDelete<{ deleted: boolean }>(`/api/areas?id=${encodeURIComponent(id)}`),
 
   listGoals: () =>
-    apiGet<{ goals: import('@/schemas/goal').Goal[] }>('/api/goals').then((r) => r.goals.map(withGoalDefaults)),
+    apiGet<{ goals: import('@/schemas/goal').Goal[] }>('/api/goals').then((r) => r.goals.map(normalizeGoal)),
   getGoal: (id: string) =>
-    apiGet<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`).then(withGoalDefaults),
+    apiGet<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`).then(normalizeGoal),
   createGoal: (body: unknown) => apiPost<import('@/schemas/goal').Goal>('/api/goals', body),
   updateGoal: (id: string, body: unknown) =>
     apiPatch<import('@/schemas/goal').Goal>(`/api/goals?id=${encodeURIComponent(id)}`, body),
