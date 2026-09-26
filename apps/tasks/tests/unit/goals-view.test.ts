@@ -88,7 +88,7 @@ describe('goals landing', () => {
     await renderGoalsView(canvas, '2026-11-04');
     expect(canvas.querySelector('[data-action="plan-next-term"]')).toBeTruthy();
     expect(canvas.querySelector('.goals-direction')).toBeTruthy();
-    expect(canvas.textContent).toContain('Set your purpose and vision');
+    expect(canvas.textContent).toContain('Direction not set');
   });
 
   it('mounts year zoom runway and lead-measure count figure', async () => {

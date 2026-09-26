@@ -359,7 +359,7 @@ describe('calendar productivity layer', () => {
     await renderMonthView(canvas);
 
     const segments = [...canvas.querySelectorAll<HTMLAnchorElement>('.calendar-horizon-bar__segment')];
-    expect(segments.map((s) => s.textContent)).toEqual(['Areas · 2', 'Goals · 1', 'Projects · 1', 'Actions · 1']);
+    expect(segments.map((s) => s.textContent)).toEqual(['Spheres · 1', 'Goals · 1', 'Projects · 1', 'Actions · 1']);
     expect(segments[0]?.getAttribute('href')).toBe('#/goals');
     expect(segments[1]?.getAttribute('href')).toBe('#/goals');
     expect(segments[2]?.getAttribute('href')).toBe('#/projects');

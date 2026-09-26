@@ -49,7 +49,7 @@ export const CLARE_PRODUCTIVITY_PROTOCOLS = [
   {
     id: 'weekly-review',
     label: 'Weekly Review',
-    explain: 'Clare runs the eight-stage weekly review with confirm before write.'
+    explain: 'Clare runs the nine-stage weekly review with confirm before write.'
   },
   {
     id: 'plan-day',
