@@ -29,6 +29,15 @@ import {
   el,
   optionList
 } from '@/views/hub-kit';
+
+const SORT_OPTIONS: Array<{ value: ProgramSort; label: string }> = [
+  { value: 'name', label: 'Title' },
+  { value: 'month', label: 'Month' },
+  { value: 'length', label: 'Length' },
+  { value: 'organiser', label: 'Organiser' },
+  { value: 'level', label: 'Level' },
+  { value: 'cost', label: 'Cost' }
+];
 import { createPlusButton } from '@/views/plus-add';
 import { createViewOnMap, isMappablePlace } from '../../design-kit/js/view-on-map.js';
 
@@ -40,14 +49,6 @@ interface CatalogState {
   sort: ProgramSort;
   view: CatalogView;
 }
-
-const SORTS: Array<{ id: ProgramSort; label: string }> = [
-  { id: 'name', label: 'Name' },
-  { id: 'month', label: 'Month' },
-  { id: 'organiser', label: 'Organiser' },
-  { id: 'level', label: 'Level' },
-  { id: 'cost', label: 'Cost' }
-];
 
 function allOption(label: string): { value: string; label: string } {
   return { value: '', label };
@@ -139,12 +140,14 @@ function renderToolbar(
     filters.append(filter.el);
   }
 
-  const sortPills = createHubPills({
-    label: 'Sort',
-    items: SORTS.map((sort) => ({ id: sort.id, label: sort.label })),
+  const sortBy = createHubFilter({
+    key: 'Sort by',
+    label: 'Sort by',
+    defaultValue: 'name',
+    options: SORT_OPTIONS,
     value: state.sort,
-    onSelect: (id) => {
-      state.sort = id;
+    onChange: (value) => {
+      state.sort = (value as ProgramSort) || 'name';
       onChange();
     }
   });
@@ -183,7 +186,7 @@ function renderToolbar(
   const searchRow = el('div', 'catalog-toolbar__row');
   searchRow.append(search.el, collapsed.root);
   const controls = el('div', 'catalog-toolbar__row');
-  controls.append(sortPills, viewPills, add);
+  controls.append(sortBy.el, viewPills, add);
   wrap.append(searchRow, controls);
   return wrap;
 }
@@ -328,7 +331,9 @@ function renderDetail(
   onDelete: () => void,
   onLinkChange: (patch: { excursionId: string; linked: boolean }) => void
 ): HTMLElement {
-  const card = el('section', 'catalog-overlay__card task-row');
+  // Opaque sheet (kit morph-dialog pattern) — do not reuse .task-row glass here;
+  // nested backdrop-filter over the frosted scrim lets the catalogue bleed through.
+  const card = el('section', 'catalog-overlay__card');
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-modal', 'true');
   card.setAttribute('aria-label', program.name);
@@ -452,7 +457,7 @@ function renderAddForm(
   confirmHost: HTMLElement,
   onCreated: () => void
 ): void {
-  const card = el('section', 'catalog-overlay__card task-row');
+  const card = el('section', 'catalog-overlay__card');
   card.setAttribute('role', 'dialog');
   card.setAttribute('aria-modal', 'true');
   card.setAttribute('aria-label', 'Add program');

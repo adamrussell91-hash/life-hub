@@ -1,7 +1,8 @@
 import type { Program } from '@/schemas/program';
-import { PROGRAM_MONTHS } from '@/schemas/program';
+import { PROGRAM_LENGTHS, PROGRAM_MONTHS } from '@/schemas/program';
 
 const MONTH_RANK = new Map(PROGRAM_MONTHS.map((month, index) => [month, index]));
+const LENGTH_RANK = new Map(PROGRAM_LENGTHS.map((length, index) => [length, index]));
 
 export interface ProgramFilters {
   query?: string;
@@ -15,7 +16,8 @@ export interface ProgramFilters {
   nsw?: '' | 'available' | 'unavailable';
 }
 
-export type ProgramSort = 'name' | 'month' | 'organiser' | 'level' | 'cost';
+/** Catalogue sort keys. `month` is the date field (programs store calendar month, not a day). */
+export type ProgramSort = 'name' | 'month' | 'length' | 'organiser' | 'level' | 'cost';
 
 function haystack(program: Program): string {
   return [
@@ -70,6 +72,14 @@ export function sortPrograms(programs: Program[], sort: ProgramSort = 'name'): P
       const am = a.month ? (MONTH_RANK.get(a.month as (typeof PROGRAM_MONTHS)[number]) ?? 99) : 100;
       const bm = b.month ? (MONTH_RANK.get(b.month as (typeof PROGRAM_MONTHS)[number]) ?? 99) : 100;
       if (am !== bm) return am - bm;
+    } else if (sort === 'length') {
+      const al = a.competition_length
+        ? (LENGTH_RANK.get(a.competition_length as (typeof PROGRAM_LENGTHS)[number]) ?? 99)
+        : 100;
+      const bl = b.competition_length
+        ? (LENGTH_RANK.get(b.competition_length as (typeof PROGRAM_LENGTHS)[number]) ?? 99)
+        : 100;
+      if (al !== bl) return al - bl;
     } else if (sort === 'organiser') {
       const cmp = compareNullable(a.organiser || null, b.organiser || null);
       if (cmp !== 0) return cmp;
