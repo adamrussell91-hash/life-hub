@@ -208,6 +208,14 @@ function pendingVisibleGhosts() {
   return pendingGhostPartition().visible;
 }
 
+/** All unsettled ghosts (ignores source filter) — Review fallback when every pending item is filtered off. */
+function allPendingGhosts() {
+  if (!model) return [];
+  return model.ghosts.filter(
+    (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted'
+  );
+}
+
 function applyAllLabel(visibleCount, hiddenCount) {
   return hiddenCount ? `Apply ${visibleCount} · ${hiddenCount} hidden` : 'Apply all';
 }
@@ -241,6 +249,43 @@ function closeReview() {
   markup(panel, '');
 }
 
+function showReviewPanel(panel) {
+  panel.hidden = false;
+  panel.removeAttribute?.('hidden');
+  panel.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+}
+
+/** After Accept/Dismiss: rebuild Review if it is still open. */
+function refreshOpenReview(result) {
+  const panel = nodes.get('__review');
+  if (result && panel && !panel.hidden) openReviewPanel();
+}
+
+function reviewRowHtml(ghost) {
+  const preview = writePreview(ghost);
+  const who = agentName(ghost.agent);
+  const title = escapeHtml(ghost.label || ghost.title || 'Proposed change');
+  const meta = escapeHtml([who, ghost.meta, ghost.date].filter(Boolean).join(' · '));
+  const avClass = agentAvatarClass(ghost.agent, 'cal-av--sm');
+  const initial = AGENT_INITIAL[ghost.agent] || '?';
+  const id = escapeHtml(ghost.id);
+  const dismiss =
+    ghost.kind === 'bedtime'
+      ? ''
+      : `<button type="button" class="btn btn--ghost" data-dismiss="${id}">Dismiss</button>`;
+  return (
+    `<li class="cal-review__row" data-review-ghost="${id}">` +
+    `<div class="cal-review__row-head"><span class="${avClass}" aria-hidden="true">${initial}</span><div><b>${title}</b><p class="cal-review__meta">${meta}</p></div></div>` +
+    (preview
+      ? `<p class="cal-review__label">Accept writes</p><p class="cal-review__writes" data-part="write-preview">${escapeHtml(preview)}</p>`
+      : '') +
+    `<div class="cal-review__acts">` +
+    `<button type="button" class="btn btn--primary" data-accept="${id}" data-label="Accept">Accept</button>${dismiss}` +
+    `<button type="button" class="btn btn--secondary" data-action="reveal-ghost" data-ghost-id="${id}">Show on calendar</button>` +
+    `</div></li>`
+  );
+}
+
 /**
  * Review opens the pending-changes panel (what is waiting), not a silent chip cycle.
  * Chip popovers still work from “Show on calendar” / chip click.
@@ -249,12 +294,7 @@ function openReviewPanel() {
   const { visible, hidden } = pendingGhostPartition();
   // Prefer filter-visible ghosts; if the tray count is all filter-hidden, still list them
   // so Review never looks like a no-op while the strip says changes are waiting.
-  let pending = visible;
-  if (!pending.length && model) {
-    pending = model.ghosts.filter(
-      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted'
-    );
-  }
+  const pending = visible.length ? visible : allPendingGhosts();
   closePop();
   if (!pending.length) {
     closeReview();
@@ -268,38 +308,13 @@ function openReviewPanel() {
     : visible.length < pending.length
       ? ' · currently filtered off — listed so you can still decide'
       : '';
-  let html =
+  const html =
     '<div class="cal-review__head"><div><p class="cal-review__eyebrow">Hammond</p><b>Waiting for review</b></div>' +
     '<button type="button" class="btn btn--ghost" data-action="close-review">Close</button></div>' +
     `<p class="cal-review__summary">${pending.length} change${pending.length === 1 ? '' : 's'}${filterNote} · nothing is written until you accept</p>` +
-    '<ul class="cal-review__list">';
-  for (const ghost of pending) {
-    const preview = writePreview(ghost);
-    const who = agentName(ghost.agent);
-    const title = escapeHtml(ghost.label || ghost.title || 'Proposed change');
-    const meta = escapeHtml([who, ghost.meta, ghost.date].filter(Boolean).join(' · '));
-    const avClass = agentAvatarClass(ghost.agent, 'cal-av--sm');
-    const initial = AGENT_INITIAL[ghost.agent] || '?';
-    const dismiss =
-      ghost.kind === 'bedtime'
-        ? ''
-        : `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(ghost.id)}">Dismiss</button>`;
-    html +=
-      `<li class="cal-review__row" data-review-ghost="${escapeHtml(ghost.id)}">` +
-      `<div class="cal-review__row-head"><span class="${avClass}" aria-hidden="true">${initial}</span><div><b>${title}</b><p class="cal-review__meta">${meta}</p></div></div>` +
-      (preview
-        ? `<p class="cal-review__label">Accept writes</p><p class="cal-review__writes" data-part="write-preview">${escapeHtml(preview)}</p>`
-        : '') +
-      `<div class="cal-review__acts">` +
-      `<button type="button" class="btn btn--primary" data-accept="${escapeHtml(ghost.id)}" data-label="Accept">Accept</button>${dismiss}` +
-      `<button type="button" class="btn btn--secondary" data-action="reveal-ghost" data-ghost-id="${escapeHtml(ghost.id)}">Show on calendar</button>` +
-      `</div></li>`;
-  }
-  html += '</ul>';
+    `<ul class="cal-review__list">${pending.map(reviewRowHtml).join('')}</ul>`;
   markup(panel, html);
-  panel.hidden = false;
-  panel.removeAttribute?.('hidden');
-  panel.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  showReviewPanel(panel);
   const live = nodes.get('__live');
   if (live) live.textContent = `${pending.length} change${pending.length === 1 ? '' : 's'} waiting for review`;
 }
@@ -1059,14 +1074,12 @@ function openPop(chipId) {
   );
   const item = model.days.flatMap((day) => day.chips).find((chipItem) => chipItem.id === chipId);
   const due = model.days.flatMap((day) => day.due).find((row) => row.id === chipId);
-  const title =
-    ghost && !ghost.overItem && ghost.kind !== 'move_task'
-      ? ghost.label
-      : item?.title ?? due?.title ?? chip.title ?? ghost?.label ?? '';
-  const meta =
-    ghost && !ghost.overItem && ghost.kind !== 'move_task'
-      ? ghost.meta
-      : item?.meta ?? due?.meta ?? '';
+  // Standalone proposal owns the popover title; overlays / move_task keep the calendar item title.
+  const ghostOwnsCopy = Boolean(ghost && !ghost.overItem && ghost.kind !== 'move_task');
+  const title = ghostOwnsCopy
+    ? ghost.label
+    : item?.title ?? due?.title ?? chip.title ?? ghost?.label ?? '';
+  const meta = ghostOwnsCopy ? ghost.meta : item?.meta ?? due?.meta ?? '';
   let html = `<div class="cal-pop__head">${ghost ? `<span class="cal-av cal-av--sm ${ghost.agent === 'sara' ? 'cal-av--sara' : ''}">${AGENT_INITIAL[ghost.agent] || ''}</span>` : `<i class="cal-pop__dot k-${chip.dataset.kind || 'task'}"></i>`}<b>${escapeHtml(title)}</b></div><p class="cal-pop__meta">${escapeHtml(meta)}</p>`;
   if (ghost) {
     const preview = writePreview(ghost);
@@ -1121,35 +1134,36 @@ function wire(section) {
     const raw = event.target;
     const target = raw && typeof raw.closest === 'function' ? raw : raw?.parentElement;
     if (!target || typeof target.closest !== 'function') return;
-    if (target.closest('[data-action="close-review"]')) {
+
+    const action = target.closest('[data-action]')?.dataset?.action;
+    if (action === 'close-review') {
       closeReview();
       return;
     }
-    const reveal = target.closest('[data-action="reveal-ghost"]');
-    if (reveal?.dataset?.ghostId) {
-      revealGhost(reveal.dataset.ghostId);
+    if (action === 'reveal-ghost') {
+      const ghostId = target.closest('[data-action="reveal-ghost"]')?.dataset?.ghostId;
+      if (ghostId) revealGhost(ghostId);
       return;
     }
-    if (target.closest('[data-action="apply-all"]')) {
+    if (action === 'apply-all') {
       closeReview();
       void applyAll();
       return;
     }
-    if (target.closest('[data-action="review"]')) {
+    if (action === 'review') {
       openReviewPanel();
       return;
     }
-    if (target.closest('[data-action="dismiss-all"]')) {
+    if (action === 'dismiss-all') {
       closeReview();
       void dismissAll();
       return;
     }
+
     const acceptButton = target.closest('[data-accept]');
     if (acceptButton) {
       closePop();
-      void accept(acceptButton.dataset.accept).then((result) => {
-        if (result && nodes.get('__review') && !nodes.get('__review').hidden) openReviewPanel();
-      });
+      void accept(acceptButton.dataset.accept).then(refreshOpenReview);
       return;
     }
     const dismissButton = target.closest('[data-dismiss]');
