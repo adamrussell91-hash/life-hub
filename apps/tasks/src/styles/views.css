@@ -736,7 +736,14 @@
   margin-bottom: 0;
 }
 
-.someday-view > .empty-state {
+.someday-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.someday-view .empty-state {
   margin: 0;
 }
 
