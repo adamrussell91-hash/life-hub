@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 45/46 (98%)**
+**Progress: 46/46 (100%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -91,13 +91,16 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 ## M11: Docs and ship
 
 - [x] **G-45** Docs update — — — `cbbed4c4`
-- [ ] **G-46** Final verification + screenshots + ready PR — —
+- [x] **G-46** Final verification + screenshots + ready PR — — — `96457847`
 
 ---
 
 ## Discovered
 
-_(empty)_
+- Weekly review stage count tests expected 8 stages; updated to 9 (`goals` after `projects`) as part of G-38.
+- `someday-view` mocks needed `listGoals` + `getHubPrefs` after G-25/G-28.
+- Live Tasks Vite is passphrase-gated in Cloud Agent; G-46 screenshots for check-in / weekly / Hammond used design-kit fixtures + prior landing/goal captures.
+
 
 ## Deviations
 
