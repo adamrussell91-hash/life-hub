@@ -16,6 +16,7 @@ import { searchEntities } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
 import type { CommunicationRecord, FollowUpOperationProjection } from '@/domain/types';
+import { createAutoRetry, type AutoRetryHandle } from '@/lib/auto-retry';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -351,6 +352,8 @@ export async function renderCommunicationDetailView(
     const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
     followUpBtn.type = 'button';
 
+    let followUpRetry: AutoRetryHandle | null = null;
+
     function paintFollowUpFromOperation(operation: FollowUpOperationProjection): void {
       followUpStatus.hidden = false;
       if (operation.status === 'committed') {
@@ -360,17 +363,26 @@ export async function renderCommunicationDetailView(
         followUpBtn.hidden = true;
         return;
       }
-      const failed = (operation.failed_relationships ?? [])
-        .map((item) => `${item.relationship_type} → ${item.target_ref}`)
-        .join('; ');
-      followUpStatus.textContent = operation.task_id
-        ? `Task ${operation.task_id} saved. Incomplete follow up (operation ${operation.operation_id})${
-            failed ? `: ${failed}` : '.'
-          } Use Retry.`
-        : `Incomplete follow up (operation ${operation.operation_id}). Use Retry.`;
-      followUpBtn.textContent = 'Retry incomplete follow up';
-      followUpBtn.disabled = false;
-      followUpBtn.hidden = false;
+      followUpBtn.hidden = true;
+      followUpBtn.disabled = true;
+      followUpStatus.textContent = 'Linking follow up…';
+      followUpRetry?.stop();
+      followUpRetry = createAutoRetry({
+        run: async () => {
+          if (!followUp.isConnected) {
+            followUpRetry?.stop();
+            return;
+          }
+          const result = await retryFollowUpTask(record.id);
+          paint(result.communication);
+        },
+        onState: (state, error) => {
+          if (state === 'stuck') {
+            const reason = error instanceof Error && error.message ? error.message : 'Tasks did not answer.';
+            followUpStatus.textContent = `● Follow up still linking. ${reason} It keeps trying.`;
+          }
+        }
+      });
     }
 
     if (record.follow_up_operation) {
@@ -381,13 +393,9 @@ export async function renderCommunicationDetailView(
       followUpBtn.disabled = true;
       followUpStatus.hidden = true;
       try {
-        const existing = record.follow_up_operation;
-        const result =
-          existing && existing.status !== 'committed'
-            ? await retryFollowUpTask(record.id)
-            : await createFollowUpTask(record.id, {
-                title: `Follow up: ${labelFor(record)}`
-              });
+        const result = await createFollowUpTask(record.id, {
+          title: `Follow up: ${labelFor(record)}`
+        });
         paint(result.communication);
       } catch (err) {
         if (isFollowUpIncompleteError(err)) {
