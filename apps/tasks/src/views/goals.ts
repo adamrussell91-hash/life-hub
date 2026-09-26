@@ -17,6 +17,7 @@ import { LIFE_AREAS } from '@/domain/someday';
 import { renderHammondStrip } from '@/views/hammond-goal';
 import { openPlanNextTerm } from '@/views/goals-plan-next';
 import { mountDirectionStrip } from '@/views/goals-direction';
+import { mountYearZoom, type YearZoomHandle } from '@/views/goals-year-zoom';
 import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_DIRECTION } from '@/schemas/planning-direction';
@@ -34,6 +35,7 @@ export type RunwayOverlay = { crunchWeeks: string[]; proposedRest: Record<string
 
 let selectedTermStart: string | null = null;
 let runwayMode: 'term' | 'year' = 'term';
+let zoomHandle: YearZoomHandle | null = null;
 
 /** Term Runway (spec: docs/superpowers/specs/2026-09-26-goals-redesign-design.md). */
 export async function renderGoalsView(canvas: HTMLElement, today = sydneyToday()): Promise<void> {
@@ -122,12 +124,37 @@ export function paintGoals(
         value: runwayMode === 'year' ? 'year' : term.starts_on,
         onSelect: (id) => {
           if (id === 'year') {
+            if (runwayMode === 'year') return;
             runwayMode = 'year';
+            if (zoomHandle) {
+              zoomHandle.setMode('year');
+              summary.textContent = `${term.starts_on.slice(0, 4)} · year view`;
+              return;
+            }
             paintGoals(canvas, data, overlay, envelopes, extra);
             return;
           }
-          runwayMode = 'term';
+          const termChanged = selectedTermStart !== id;
           selectedTermStart = id;
+          if (!termChanged && runwayMode === 'year' && zoomHandle) {
+            runwayMode = 'term';
+            zoomHandle.setMode('term');
+            const r = buildRunway({
+              goals: data.goals,
+              projects: data.projects,
+              tasks: data.tasks,
+              term,
+              today: data.today,
+              crunchWeeks: overlay.crunchWeeks,
+              proposedRest: overlay.proposedRest
+            });
+            const when = r.nowWeek !== null
+              ? `week ${r.nowWeek} of ${r.weeks.length}`
+              : data.today < term.starts_on ? 'starts soon' : 'finished';
+            summary.textContent = `Term ${term.term} · ${when} · this week ${r.weekSummary.done} of ${r.weekSummary.total} moves done`;
+            return;
+          }
+          runwayMode = 'term';
           paintGoals(canvas, data, overlay, envelopes, extra);
         }
       })
@@ -160,10 +187,32 @@ export function paintGoals(
     return null;
   }
 
-  if (runwayMode === 'year') {
-    summary.textContent = `${term.starts_on.slice(0, 4)} · year view`;
-    canvas.append(renderYearRunway(data, overlay, term.starts_on.slice(0, 4)));
-    return null;
+  zoomHandle?.dispose();
+  zoomHandle = null;
+  const zoomHost = el('div', 'goals-zoom-host');
+  canvas.append(zoomHost);
+
+  const zoom = mountYearZoom(zoomHost, data, overlay, term, runwayMode);
+  if (zoom) {
+    zoomHandle = zoom;
+    if (runwayMode === 'year') {
+      summary.textContent = `${term.starts_on.slice(0, 4)} · year view`;
+      return null;
+    }
+    const runway = buildRunway({
+      goals: data.goals,
+      projects: data.projects,
+      tasks: data.tasks,
+      term,
+      today: data.today,
+      crunchWeeks: overlay.crunchWeeks,
+      proposedRest: overlay.proposedRest
+    });
+    const when = runway.nowWeek !== null
+      ? `week ${runway.nowWeek} of ${runway.weeks.length}`
+      : data.today < term.starts_on ? 'starts soon' : 'finished';
+    summary.textContent = `Term ${term.term} · ${when} · this week ${runway.weekSummary.done} of ${runway.weekSummary.total} moves done`;
+    return runway;
   }
 
   const runway = buildRunway({
@@ -179,7 +228,7 @@ export function paintGoals(
     ? `week ${runway.nowWeek} of ${runway.weeks.length}`
     : data.today < term.starts_on ? 'starts soon' : 'finished';
   summary.textContent = `Term ${term.term} · ${when} · this week ${runway.weekSummary.done} of ${runway.weekSummary.total} moves done`;
-  canvas.append(renderRunway(runway, data, overlay));
+  zoomHost.append(renderRunway(runway, data, overlay));
   return runway;
 }
 
@@ -326,29 +375,6 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
   return form;
 }
 
-/** G-17 Year view — list by term with holiday gaps noted. Full zoom blend lands with G-41. */
-function renderYearRunway(data: GoalsData, overlay: RunwayOverlay, year: string): HTMLElement {
-  const wrap = el('section', 'glass-tile runway runway--year');
-  const yearTerms = data.terms.filter((t) => t.starts_on.startsWith(year));
-  for (const term of yearTerms) {
-    const block = el('div', 'runway__year-term');
-    block.append(el('h3', '', `Term ${term.term}`));
-    const runway = buildRunway({
-      goals: data.goals,
-      projects: data.projects,
-      tasks: data.tasks,
-      term,
-      today: data.today,
-      crunchWeeks: overlay.crunchWeeks,
-      proposedRest: overlay.proposedRest
-    });
-    block.append(renderRunway(runway, data, overlay));
-    wrap.append(block);
-  }
-  if (!yearTerms.length) wrap.append(el('p', 'empty-state', 'No terms in this year.'));
-  return wrap;
-}
-
 function renderRunway(runway: Runway, data: GoalsData, overlay: RunwayOverlay): HTMLElement {
   const wrap = el('section', 'glass-tile runway');
   const grid = el('div', 'runway__grid');
@@ -407,10 +433,21 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   const title = el('p', 'runway__goal-title', row.goal.title);
   title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
   const dream = row.goal.parent_someday_id ? data.tasks.find((t) => t.id === row.goal.parent_someday_id) : undefined;
-  const lead = row.goal.lead_measure
-    ? `${row.goal.lead_measure.label} · ${row.thisWeek.count}/${row.goal.lead_measure.per_week} this week`
-    : 'No lead measure yet';
-  info.append(title, el('p', 'runway__goal-meta', dream ? `${lead} · ✦ ${dream.title}` : lead));
+  const meta = el('p', 'runway__goal-meta');
+  if (row.thisWeek.perWeek !== null) {
+    const fig = el('span', 'runway__lead-count');
+    fig.setAttribute('data-hub-count', '');
+    fig.textContent = `${row.thisWeek.count}/${row.thisWeek.perWeek}`;
+    meta.append(
+      document.createTextNode(row.goal.lead_measure ? `${row.goal.lead_measure.label} · ` : ''),
+      fig,
+      document.createTextNode(' this week')
+    );
+  } else {
+    meta.textContent = row.goal.lead_measure?.label ?? 'No lead measure yet';
+  }
+  if (dream) meta.append(document.createTextNode(` · ✦ ${dream.title}`));
+  info.append(title, meta);
   link.append(info);
   for (const cell of row.cells) {
     const box = el('span', 'runway__cell');

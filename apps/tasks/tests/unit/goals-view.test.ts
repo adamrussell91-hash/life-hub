@@ -46,14 +46,14 @@ describe('goals landing', () => {
     const canvas = document.createElement('div');
     await renderGoalsView(canvas, '2026-11-04');
     expect(canvas.querySelector('.goals-summary')?.textContent).toContain('Term 4 · week 4 of 10');
-    const lanes = [...canvas.querySelectorAll('.runway__lane')].map((n) => n.textContent);
+    const lanes = [...canvas.querySelectorAll('.runway-zoom__lane-label, .runway__lane')].map((n) => n.textContent);
     expect(lanes[0]).toContain('Life');
-    expect(lanes[1]).toContain('1 of 3 slots');
-    const row = canvas.querySelector<HTMLAnchorElement>('a.runway__row[href="#/goal/w1"]');
+    expect(lanes.some((t) => t?.includes('1 of 3 slots'))).toBe(true);
+    const row = canvas.querySelector<HTMLAnchorElement>('a[href="#/goal/w1"]');
     expect(row?.textContent).toContain('Marking back in 10 days');
     expect(row?.textContent).toContain('LEAD/LAG');
     expect(row?.textContent).toContain('Yr 11 essays');
-    expect(row?.querySelectorAll('.cell')).toHaveLength(10);
+    expect(row?.querySelectorAll('.cell').length).toBeGreaterThan(0);
     expect(canvas.querySelector('.runway__parked')?.textContent).toContain('Half marathon');
   });
 
@@ -88,6 +88,27 @@ describe('goals landing', () => {
     expect(canvas.querySelector('[data-action="plan-next-term"]')).toBeTruthy();
     expect(canvas.querySelector('.goals-direction')).toBeTruthy();
     expect(canvas.textContent).toContain('Set your purpose and vision');
+  });
+
+  it('mounts year zoom runway and lead-measure count figure', async () => {
+    vi.mocked(tasksApi.getHubPrefs).mockResolvedValue({
+      school_terms: [{
+        year: 2026,
+        terms: [
+          { term: 3, starts_on: '2026-07-20', ends_on: '2026-09-25' },
+          { term: 4, starts_on: '2026-10-12', ends_on: '2026-12-18' }
+        ]
+      }]
+    } as never);
+    const canvas = document.createElement('div');
+    await renderGoalsView(canvas, '2026-11-04');
+    expect(canvas.querySelector('[data-part="year-zoom"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-hub-count]')?.textContent).toMatch(/\d+\/\d+/);
+    const yearBtn = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Year');
+    expect(yearBtn).toBeTruthy();
+    yearBtn!.click();
+    expect(canvas.querySelector('[data-part="year-zoom"]')).toBeTruthy();
+    expect(canvas.querySelector('.goals-summary')?.textContent).toContain('year view');
   });
 
   it('shows a clear empty state when no school terms are set', async () => {

@@ -21,6 +21,26 @@
 .goals-plan-summary__num { font-weight: var(--weight-bold); font-size: var(--text-xl); }
 .runway--year { display: flex; flex-direction: column; gap: var(--space-6); }
 .runway__year-term h3 { margin: 0 0 var(--space-3); font-size: var(--text-md); }
+.runway__lead-count { font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold); color: var(--ink); }
+.goals-zoom-host { min-width: 0; }
+.runway--zoom { padding: var(--space-5) var(--space-6); overflow: hidden; }
+.runway-zoom__plot { position: relative; min-height: 12rem; }
+.runway-zoom__axis { position: relative; height: 1.75rem; margin-bottom: var(--space-3); margin-left: 12.5rem; }
+.runway-zoom__tick { position: absolute; top: 0; font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); text-align: center; overflow: hidden; white-space: nowrap; }
+.runway-zoom__tick.is-holiday { color: var(--shallow); opacity: 0.7; }
+.runway-zoom__tick.is-now { color: var(--high-sea-ink); }
+.runway-zoom__lane { margin: var(--space-4) 0 var(--space-2); }
+.runway-zoom__lane-label { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; margin-bottom: var(--space-2); }
+.runway-zoom__lane-label small { margin-left: auto; font-size: var(--text-sm); font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.runway-zoom__row { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr) 10rem; gap: var(--space-2); align-items: center; text-decoration: none; color: inherit; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); min-height: 2.75rem; }
+.runway-zoom__info { min-width: 0; }
+.runway-zoom__track { position: relative; height: 1.5rem; min-width: 0; }
+.runway-zoom__bar { position: absolute; top: 0.35rem; height: 0.5rem; border-radius: var(--radius-xs); background: var(--line); opacity: 0.55; pointer-events: none; }
+.runway-zoom__track .cell { position: absolute; top: 0.125rem; }
+.runway__row--life .runway-zoom__bar { background: var(--pastel-sage); }
+.runway__row--work .runway-zoom__bar { background: var(--pastel-blue); }
+.runway__row--professional .runway-zoom__bar { background: var(--pastel-lilac); }
+.runway-phone__card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); margin-bottom: var(--space-2); text-decoration: none; color: inherit; background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius-md); min-height: 2.75rem; }
 
 .runway { padding: var(--space-5) var(--space-6); position: relative; }
 .runway__grid { display: grid; grid-template-columns: minmax(12rem, 18rem) repeat(var(--weeks, 10), minmax(1.5rem, 1fr)) minmax(10rem, 15rem); column-gap: var(--space-1); align-items: center; }
