@@ -12,3 +12,18 @@ test('applyImportPlan writes people before records and records each import mappi
   assert.deepEqual(calls, ['person', 'comm']);
   assert.deepEqual(maps.get(`imports/notion-comms/pages/${'a'.repeat(32)}`), { kind: 'comm', id: 'c_1' });
 });
+
+test('applyImportPlan patches dismissed promises after creation and retains normalised pending refs', async () => {
+  const created = []; const patched = [];
+  const identityRepo = { createIdentity: async ({ input }) => ({ ref: `shared:person:${input.display_name}` }) };
+  const communicationRepo = { createCommunication: async () => ({ communication: { id: 'c_2' } }), updateCommunication: async () => {} };
+  const ledgerRepo = { createItem: async (item) => { created.push(item); return { item: { id: 'ledger_1' }, created: true }; }, patchItem: async (id, patch) => patched.push({ id, patch }) };
+  await applyImportPlan({
+    peopleToCreate: [{ display_name: 'Avery P.', aliases: [], sourceKey: 'avery p.' }],
+    records: [{ notionId: 'd'.repeat(32), kind: 'comm', subject: 'Hello', title: 'Hello', people: ['pending:avery p.'], date: { start: '2026-09-20T00:00:00.000Z' }, channel: 'email', direction: 'outbound', blocks: [], summary: '' }],
+    threads: [],
+    promises: [{ commNotionId: 'd'.repeat(32), personRef: 'pending:avery p.', direction: 'you_owe', text: 'Follow up', due: null, status: 'dismissed', source_key: 'source' }]
+  }, { identityRepo, communicationRepo, meetingRepo: {}, eventRepo: {}, threadRepo: { createThread: async () => ({ id: 'thread_1' }) }, ledgerRepo, setMap: async () => {}, sleep: async () => {} });
+  assert.equal(created[0].person_ref, 'shared:person:Avery P.');
+  assert.deepEqual(patched, [{ id: 'ledger_1', patch: { status: 'dismissed' } }]);
+});
