@@ -161,8 +161,9 @@ export async function renderOrganisationPage(
     title.textContent = model.displayName;
     how.heading.textContent = `How ${model.displayName} is run`;
     time.heading.textContent = `Your time with ${model.displayName}`;
+    const peopleWord = model.peopleCount === 1 ? 'person' : 'people';
     how.heading.append(
-      el('span', 'people-pane__h2-sub', `${model.peopleCount} people you know`)
+      el('span', 'people-pane__h2-sub', `${model.peopleCount} ${peopleWord} you know`)
     );
 
     const crest = crestNode(model.monogram, 'xl', {

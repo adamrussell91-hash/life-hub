@@ -667,6 +667,17 @@ export function createMockApi() {
           }
         }
 
+        // Mirror production deriveOrganisationChips dedupe (kind:label).
+        const seenChip = new Set<string>();
+        const dedupedChips = chips.filter((c) => {
+          const key = `${c.kind}:${c.label}`;
+          if (seenChip.has(key)) return false;
+          seenChip.add(key);
+          return true;
+        });
+        chips.length = 0;
+        chips.push(...dedupedChips);
+
         const peopleList = [...peopleMap.values()];
         const warmth_spread = {
           warm: peopleList.filter((p) => p.warmth_band === 'warm').length,

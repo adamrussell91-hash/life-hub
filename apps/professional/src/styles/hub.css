@@ -3104,6 +3104,10 @@
   min-width: 0;
 }
 
+.orgs-page__bar[hidden] {
+  display: none;
+}
+
 .orgs-page__title {
   font-size: var(--text-2xl);
   font-weight: 700;
@@ -3206,13 +3210,19 @@
 }
 
 .orgs-opps__body {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(0, 1fr));
-  gap: var(--space-3);
+  display: block;
+  min-width: 0;
+  width: 100%;
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--paper);
   border: 1px solid var(--line);
+}
+
+.orgs-opps__body:has(.orgs-opp) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-3);
 }
 
 .orgs-wall__grid {

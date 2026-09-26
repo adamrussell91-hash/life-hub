@@ -48,7 +48,7 @@ test('deriveOrganisationChips: workplace + event venue with years (D5)', () => {
     ],
     { selfPersonRef: selfRef, nowMs }
   );
-  assert.equal(chips.find((c) => c.kind === 'workplace')?.detail, '25–now');
+  assert.equal(chips.find((c) => c.kind === 'workplace')?.detail, '2025–now');
   assert.equal(chips.find((c) => c.kind === 'event_venue')?.detail, '2 events');
 });
 

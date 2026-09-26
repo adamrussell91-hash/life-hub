@@ -30,20 +30,20 @@ function isCurrentLink(link, nowMs) {
   return link.status === 'current' || !link.valid_to;
 }
 
-function yearShort(iso) {
+function yearFull(iso) {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  return String(d.getUTCFullYear()).slice(2);
+  return String(d.getUTCFullYear());
 }
 
 function yearSpan(from, to, nowMs) {
-  const start = yearShort(from);
+  const start = yearFull(from);
   if (!start) return '';
   if (!to) return `${start}–now`;
   const endMs = Date.parse(to);
   if (Number.isFinite(endMs) && endMs > nowMs) return `${start}–now`;
-  const end = yearShort(to);
+  const end = yearFull(to);
   return end ? `${start}–${end}` : `${start}–now`;
 }
 
@@ -96,7 +96,7 @@ export function deriveOrganisationChips(relationships, options = {}) {
       chips.push({
         kind: isAccreditation ? 'accreditation' : 'member',
         label: isAccreditation ? 'Accreditation' : 'Member',
-        detail: link.role || (link.valid_from ? `since ${yearShort(link.valid_from)}` : ''),
+        detail: link.role || (link.valid_from ? `since ${yearFull(link.valid_from)}` : ''),
         filterBucket: isAccreditation ? 'bodies' : 'bodies',
         _selfOnly: selfRef ? endpoint.ref === selfRef : false,
         _personId: endpoint.ref?.split(':')[2] ?? null
@@ -118,7 +118,7 @@ export function deriveOrganisationChips(relationships, options = {}) {
       chips.push({
         kind: 'placement',
         label: 'Placement',
-        detail: yearSpan(link.valid_from, link.valid_to, nowMs) || yearShort(link.valid_from) || '',
+        detail: yearSpan(link.valid_from, link.valid_to, nowMs) || yearFull(link.valid_from) || '',
         filterBucket: 'study',
         _selfOnly: selfRef ? endpoint.ref === selfRef : false,
         _personId: endpoint.ref?.split(':')[2] ?? null
