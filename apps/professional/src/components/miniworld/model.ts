@@ -315,7 +315,9 @@ export function buildWorldModel(
         memberCount: memberRefs.length,
         density,
         avgYears,
-        orgCount: Math.max(1, orgs.size),
+        // An organisation cluster is one place; don't count side-memberships
+        // as extra orgs in the why-text (D5).
+        orgCount: cluster.kind === 'organisation' ? 1 : Math.max(1, orgs.size),
         bridgeCount,
         quietCount,
         internalLinks: internal,

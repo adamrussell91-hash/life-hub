@@ -1728,8 +1728,12 @@
 }
 
 @media (max-width: 719px) {
+  /* Map chrome only — phone uses Communities cards (L5: no toolbar pile). */
+  .miniworld__toolbar,
   .miniworld__seg,
-  .miniworld__map-host {
+  .miniworld__map-host,
+  .miniworld__layers,
+  .miniworld__layer-note {
     display: none !important;
   }
 
@@ -1748,10 +1752,6 @@
 
   .miniworld__scrub {
     grid-column: 1 / -1;
-  }
-
-  .miniworld__toolbar {
-    gap: var(--space-2);
   }
 }
 
