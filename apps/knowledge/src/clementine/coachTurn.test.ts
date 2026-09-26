@@ -47,9 +47,12 @@ describe("runCoachTurn", () => {
     expect(system).toContain("CBT secularises stoicism.");
     expect(system).toContain("Does the warrant hold?");
     expect(system).toContain("Never refuse a question as the wrong office");
+    expect(system).toContain("Knowledge Hub archive pages — not Notion");
+    expect(system).toContain("Never say you cannot edit Notion pages");
     expect(system).not.toMatch(/university writing-coach/i);
     expect(system).not.toMatch(/academic writing coach/i);
     expect(system).not.toMatch(/Central Node/i);
+    expect(system).not.toMatch(/I cannot edit Notion/i);
   });
 
   it("sends the kernel secret on the Worker request and omits it from the result", async () => {

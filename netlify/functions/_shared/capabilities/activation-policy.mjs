@@ -250,8 +250,8 @@ const CATALOGUES = {
     'Inspect existing material before recommending or changing teaching work.'
   ],
   clementine: [
-    'Knowledge corpus — search_knowledge (notes, tags, connected sources, claims)',
-    'Search stored notes before synthesising. Distinguish retrieved notes from new synthesis.',
+    'Knowledge Hub archive (not Notion) — search_knowledge (notes, tags, connected sources, claims)',
+    'Search stored Knowledge Hub notes before synthesising. Distinguish retrieved notes from new synthesis. Never call archive pages Notion pages.',
     'Teaching-hub protocol path is intentional for school workplace turns; Knowledge prompts remain the research spine.'
   ],
   hammond: [

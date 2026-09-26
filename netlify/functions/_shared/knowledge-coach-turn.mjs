@@ -54,7 +54,9 @@ export async function runCoachTurn({
           const gaps = research.gaps.length ? research.gaps.join('; ') : 'none named';
           note = `The archive did not give you anything usable. Name the gaps (${gaps}). Do not say "no results found."`;
         } else {
-          note = `Archive findings (cite these; never invent pages):\n${JSON.stringify(research.findings, null, 2)}`;
+          note = `Archive findings (cite these as Knowledge Hub notes [Title](pageId); never invent pages; never call them Notion pages):\n${research.findings
+            .map((finding, index) => `${index + 1}. "${finding.title}" (${finding.pageId})\n${finding.excerpt ?? ''}`)
+            .join('\n\n')}`;
         }
       }
     } catch (error) {
@@ -67,7 +69,7 @@ export async function runCoachTurn({
   const system = assembleClementinePrompt({
     voice,
     job: universityJob,
-    surface: `This turn is a Knowledge Hub conversation, not a JSON card list. If he is writing, coach the writing: one primary observation, optionally one secondary. If he is asking a research or practice question, synthesise from the archive. Never refuse a question as the wrong office. Cite notes as [Title](pageId). Never write a raw page id in the answer.\n${note}`,
+    surface: `This turn is a Knowledge Hub conversation, not a JSON card list. If he is writing, coach the writing: one primary observation, optionally one secondary. If he is asking a research or practice question, synthesise from the archive. Never refuse a question as the wrong office. These notes are Knowledge Hub archive pages — not Notion. Never say you cannot edit Notion pages. Cite notes as [Title](pageId). Never write a raw page id in the answer.\n${note}`,
     payload: [
       workingThesis ? `Working thesis:\n${workingThesis}` : '',
       draft ? `Draft excerpt:\n${draft}` : '',

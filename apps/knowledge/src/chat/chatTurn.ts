@@ -78,13 +78,13 @@ export const RESEARCH_THE_OPEN_WEB =
 export const CITE_NOTES_AS_LINKS =
   "Cite archive notes as markdown links [Note title](pageId). Never write a raw page_notion_ or page_hub_ id in the reader-facing answer.";
 
-export const NOTE_EDIT_PROTOCOL = `You can edit archive notes when Adam asks in natural language (retag this, swap that tag, drop this tag). Never claim a write already happened. If you intend a tag change, append exactly one fenced block after your prose:
+export const NOTE_EDIT_PROTOCOL = `These are Knowledge Hub archive notes — not Notion pages. You can retag them when Adam asks in natural language (retag this, swap that tag, drop this tag). Never claim a write already happened. Never refuse by saying you cannot edit Notion pages. If you intend a tag change, append exactly one fenced block after your prose:
 
 \`\`\`note-edit
 {"action":"retag","pageId":"page_…","title":"Exact note title","tags":["Closed list tag"]}
 \`\`\`
 
-tags must be from the closed topic vocabulary, at most three. pageId must be a real archive id from this sitting or the notes in play. If you cannot identify the note or the closed-list tags, ask; do not emit a block.`;
+tags must be from the closed topic vocabulary, at most three. pageId must be a real Knowledge Hub archive id from this sitting or the notes in play (\`page_hub_*\` or legacy \`page_notion_*\`). If you cannot identify the note or the closed-list tags, ask; do not emit a block. Body rewrites of an existing note go through the Knowledge Hub page editor or Tidy — say that plainly if he asks, without mentioning Notion.`;
 
 export const KERNEL_BUDGET_MS = 20_000;
 export const QUICK_KERNEL_BUDGET_MS = 8_000;
