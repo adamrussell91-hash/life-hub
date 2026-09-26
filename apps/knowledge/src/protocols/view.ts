@@ -124,7 +124,10 @@ const localCatalog: Definition[] = [
     modes: (modes as string[]).map(label => {
       const modeId = label.toLowerCase();
       const sourceMode = source?.modes.find(mode => mode.id === modeId);
-      return { id: modeId, label, description: sourceMode?.description ?? label };
+      const description = sourceMode && sourceMode.description.trim() !== sourceMode.label.trim()
+        ? sourceMode.description
+        : label;
+      return { id: modeId, label, description };
     }),
     intake: [{ id: "prompt", label: "What would you like to examine?", required: true, type: "textarea" }],
     voices: (voices as string[]).map((voiceName, index) => {
@@ -242,7 +245,7 @@ function cards(definitions: Definition[]) {
         <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><span class="protocol-card__description">${escapeHtml(d.description)}</span>
       </button>
       <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
-        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join(" · ")}</p></div>
+        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join('<span class="protocol-card__voice-sep" aria-hidden="true"> · </span>')}</p></div>
         <div class="protocol-card__actions"><button class="btn btn--ghost" data-protocol-flip type="button">Back</button><button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button></div>
       </section>
     </div>

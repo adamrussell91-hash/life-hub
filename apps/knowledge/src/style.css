@@ -803,6 +803,12 @@
   display: inline-block;
 }
 
+.protocol-card__voice .agent-protocol-pills__tip {
+  text-transform: none;
+  letter-spacing: var(--tracking-normal);
+  font-weight: var(--weight-regular);
+}
+
 .protocol-card__voice-role {
   display: none;
 }
@@ -2263,12 +2269,23 @@ body.is-universe-fullscreen .local-banner {
     display: none;
   }
 
+  .protocol-card__voices {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .protocol-card__voice-sep {
+    display: none;
+  }
+
   .protocol-card__voice-role {
     display: block;
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--pastel-gold) 70%, var(--paper));
-    font-size: var(--text-2xs, 0.7rem);
-    font-weight: var(--weight-regular, 400);
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-regular);
     letter-spacing: var(--tracking-normal);
     line-height: var(--leading-snug);
     text-transform: none;
