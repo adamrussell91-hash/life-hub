@@ -6,7 +6,7 @@ const meeting = {
   schema_version: 2, id: MEETING_ID, title: 'HALT NSW board meeting',
   scheduled_start: '2026-09-24T08:00:00.000Z', scheduled_end: '2026-09-24T09:15:00.000Z', time_zone: 'Australia/Sydney',
   location_text: 'Teams', agenda: '1. Minutes\n2. Treasurer’s report\n3. Medal ceremony run sheet', notes: null, state: 'scheduled',
-  occurrence_history: [], created_at: '', updated_at: '', purpose: null, blocks: [], decisions: []
+  occurrence_history: [], created_at: '', updated_at: '', purpose: 'Get a yes on the TeachMeet date', blocks: [], decisions: []
 };
 
 vi.mock('@/api/meetings', () => ({
@@ -33,6 +33,11 @@ vi.mock('@/api/ledger', () => ({
   listLedgerForSources: vi.fn(async () => ({ items: [] })),
   createLedgerItem: vi.fn(async (body: object) => ({ item: { id: 'l', status: 'open', ...body }, created: true })),
   patchLedger: vi.fn()
+}));
+vi.mock('@/api/clare-comms', () => ({
+  clarePurposeCheck: vi.fn(async () => ({ met: false, note: 'TeachMeet date was deferred to October.' })),
+  clareSummary: vi.fn(async () => ({ summary: 'Board agreed the run sheet.', promises: [], numbers: [] })),
+  clareHandwriting: vi.fn()
 }));
 let savedBlocks: unknown[] = [];
 vi.mock('@/components/block-page', () => ({
@@ -88,5 +93,17 @@ describe('meeting page', () => {
     expect(updateMeeting).toHaveBeenCalledWith(MEETING_ID, expect.objectContaining({
       decisions: [expect.objectContaining({ text: 'Minutes accepted', agenda_heading: 'Minutes' })]
     }));
+  });
+
+  it('After: purpose check shows the verdict and offers to carry it forward', async () => {
+    const { createLedgerItem } = await import('@/api/ledger');
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
+    canvas.querySelector<HTMLButtonElement>('[data-part="purpose-check"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.textContent).toContain('TeachMeet date was deferred to October.');
+    canvas.querySelector<HTMLButtonElement>('[data-part="carry-purpose"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(createLedgerItem).toHaveBeenCalledWith(expect.objectContaining({ direction: 'you_owe', text: expect.stringContaining('Carried:') }));
   });
 });

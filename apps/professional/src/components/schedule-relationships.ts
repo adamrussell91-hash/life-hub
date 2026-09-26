@@ -78,6 +78,7 @@ export function mountTaskLinkPanel(options: {
   onRetry?: (operationId: string) => Promise<void>;
   incompleteOperationId?: string | null;
   statusMessage?: string | null;
+  suggestTitle?: () => Promise<string>;
 }): { root: HTMLElement } {
   const root = el('section', 'task-link-panel');
   root.append(el('h2', undefined, options.heading));
@@ -98,6 +99,19 @@ export function mountTaskLinkPanel(options: {
   title.type = 'text';
   title.placeholder = 'Task title';
   title.setAttribute('aria-label', `${options.heading} title`);
+
+  if (options.suggestTitle) {
+    title.placeholder = 'Clare is suggesting a title…';
+    options.suggestTitle().then(
+      (suggested) => {
+        if (!title.value) title.value = suggested;
+        title.placeholder = 'Task title';
+      },
+      () => {
+        title.placeholder = 'Task title';
+      }
+    );
+  }
 
   const taskInput = document.createElement('input');
   taskInput.type = 'text';

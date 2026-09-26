@@ -10,6 +10,8 @@ import { agendaToBlocks, extractDecisions, extractMentions } from '@/lib/meeting
 import { groupRoom, type RoomCluster } from '@/lib/room';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { LedgerItem, MeetingRecord } from '@/domain/types';
+import { clareHandwriting, clarePurposeCheck } from '@/api/clare-comms';
+import { buildClareContext } from '@/lib/clare-context';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -104,6 +106,7 @@ export async function renderMeetingPage(
     void blockPage?.flush();
     blockPage?.dispose();
     main.replaceChildren();
+    if (next === 'during') main.append(duringStrip());
     const body = el('div', 'meeting-page__notes');
     main.append(body);
     let n = 0;
@@ -120,6 +123,72 @@ export async function renderMeetingPage(
         paintMentions(blocks);
       }
     });
+    if (next === 'after' && record.purpose) main.prepend(purposeCheckCard());
+  }
+
+  function duringStrip(): HTMLElement {
+    const strip = el('div', 'live-strip');
+    const photo = el('label', 'btn btn--ghost', '✎ Read a photo');
+    const file = el('input') as HTMLInputElement;
+    file.type = 'file';
+    file.accept = 'image/jpeg,image/png,image/webp';
+    file.hidden = true;
+    photo.append(file);
+    file.addEventListener('change', async () => {
+      const picked = file.files?.[0];
+      if (!picked || !blockPage) return;
+      photo.firstChild!.textContent = 'Reading…';
+      try {
+        const { text } = await clareHandwriting(picked);
+        const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' }).format(new Date());
+        const html = `<p><em>From your handwriting · ${stamp}</em></p>` + text.split('\n').map((lineText) => `<p>${lineText.replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' })[c]!)}</p>`).join('');
+        blockPage.append([{ id: `hand_${Date.now()}`, block_type: 'rich_text', variant: 'medium', content: { html } }]);
+      } catch (err) {
+        strip.append(el('span', 'muted', err instanceof Error ? err.message : 'Clare could not read that photo.'));
+      } finally {
+        photo.firstChild!.textContent = '✎ Read a photo';
+        file.value = '';
+      }
+    });
+    strip.append(photo);
+    return strip;
+  }
+
+  function purposeCheckCard(): HTMLElement {
+    const card = el('section', 'card clare');
+    card.append(el('p', 'clare__who', '✦ Clare · did you get what you came for?'));
+    const check = el('button', 'btn btn--secondary', 'Check against your purpose') as HTMLButtonElement;
+    check.type = 'button';
+    check.dataset.part = 'purpose-check';
+    const out = el('div');
+    check.addEventListener('click', async () => {
+      check.disabled = true;
+      try {
+        const verdict = await clarePurposeCheck(buildClareContext({
+          title: record.title, kind: 'meeting', when: record.scheduled_start, purpose: record.purpose,
+          withPeople: [], attendees: people, previousSummaries: [], ledger, blocks: blockPage?.current() ?? record.blocks ?? [],
+          todayKey: new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date())
+        }));
+        out.replaceChildren(el('p', verdict.met ? 'quiet-link' : 'muted', `${verdict.met ? '✓ Met' : '◐ Not yet'}. ${verdict.note}`));
+        if (!verdict.met && people[0]) {
+          const carry = el('button', 'btn btn--ghost', 'Carry it to next time') as HTMLButtonElement;
+          carry.type = 'button';
+          carry.dataset.part = 'carry-purpose';
+          carry.addEventListener('click', async () => {
+            carry.disabled = true;
+            await createLedgerItem({ direction: 'you_owe', person_ref: people[0]!.ref, text: `Carried: ${record.purpose}`, comm_ref: meetingRef });
+            carry.replaceWith(el('span', 'quiet-link', '✓ It will open your next meeting in this thread'));
+          });
+          out.append(carry);
+        }
+      } catch (err) {
+        out.replaceChildren(el('p', 'muted', err instanceof Error ? err.message : 'Clare could not check.'));
+      } finally {
+        check.disabled = false;
+      }
+    });
+    card.append(check, out);
+    return card;
   }
 
   async function syncPromises(blocks: unknown[]): Promise<void> {

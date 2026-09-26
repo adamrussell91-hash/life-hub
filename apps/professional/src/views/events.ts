@@ -25,6 +25,8 @@ import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wal
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
 import { loadEntityRelationships, mountKnowledgePagePicker, mountTaskLinkPanel } from '@/components/schedule-relationships';
 import { mountTagAnythingSection } from '@/views/entity-tagger';
+import { clareTaskTitle } from '@/api/clare-comms';
+import { blockPlainText } from '@/lib/inline-promises';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -937,6 +939,7 @@ export function buildLearningTaskPanel(record: EventRecord, reload: () => Promis
       record.learning_operation?.status === 'committed'
         ? `Learning Task ${record.learning_operation.task_id}`
         : null,
+    suggestTitle: () => clareTaskTitle({ title: record.title, notes: blockPlainText(record.blocks ?? []) }).then((out) => out.title),
     onSubmit: async (input) => {
       try {
         await linkEventTask(record.id, { relationship_type: 'learning_for', ...input });

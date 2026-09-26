@@ -58,4 +58,15 @@ describe('Task link panel with an incomplete link', () => {
     await vi.advanceTimersByTimeAsync(30000);
     expect(onRetry).not.toHaveBeenCalled();
   });
+
+  it('prefills the title from suggestTitle', async () => {
+    vi.useRealTimers();
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountTaskLinkPanel({
+      host, heading: 'Learning task', relationshipType: 'learning_for', onSubmit: async () => {},
+      suggestTitle: async () => 'Apply Warlight close-reading to the Y10 unit'
+    });
+    await vi.waitFor(() => expect(host.querySelector<HTMLInputElement>('input[aria-label="Learning task title"]')!.value).toBe('Apply Warlight close-reading to the Y10 unit'));
+  });
 });
