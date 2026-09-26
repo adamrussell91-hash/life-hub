@@ -10,6 +10,8 @@ import {
   isValidApplicationOperationId
 } from './application-schema.mjs';
 import { isValidObservationId } from './observation-schema.mjs';
+import { isValidLinkProposalId } from './link-proposal-schema.mjs';
+import { isValidLedgerItemId } from './ledger-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -35,6 +37,14 @@ export const APPLICATION_OPERATION_PREFIX = 'applications/operations/';
 
 export const OBSERVATION_PREFIX = 'observations/records/';
 export const OBSERVATION_BY_ABOUT_REF_PREFIX = 'observations/by-about-ref/';
+
+export const LINK_PROPOSAL_PREFIX = 'link-proposals/records/';
+export const LINK_PROPOSAL_BY_PERSON_PREFIX = 'link-proposals/by-person/';
+export const LINK_PROPOSAL_BY_HASH_PREFIX = 'link-proposals/by-hash/';
+
+export const LEDGER_ITEM_PREFIX = 'ledger-items/records/';
+export const LEDGER_ITEM_BY_PERSON_PREFIX = 'ledger-items/by-person/';
+export const LEDGER_ITEM_BY_SOURCE_PREFIX = 'ledger-items/by-source/';
 
 function assertValidCommunicationId(id) {
   if (!isValidCommunicationId(id)) {
@@ -226,6 +236,74 @@ export function observationByAboutRefKey(aboutRef, id) {
 
 export async function listObservationIndexKeysForAboutRef(store, aboutRef) {
   return (await listBlobKeys(store, `${OBSERVATION_BY_ABOUT_REF_PREFIX}${aboutRef}/`)).filter(
+    (key) => !isIndexKey(key)
+  );
+}
+
+function assertValidLinkProposalId(id) {
+  if (!isValidLinkProposalId(id)) {
+    throw Object.assign(new Error(`Invalid Link Proposal id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_link_proposal_id'
+    });
+  }
+  return id;
+}
+
+function assertValidLedgerItemId(id) {
+  if (!isValidLedgerItemId(id)) {
+    throw Object.assign(new Error(`Invalid Ledger Item id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_ledger_item_id'
+    });
+  }
+  return id;
+}
+
+export function linkProposalKey(id) {
+  return `${LINK_PROPOSAL_PREFIX}${assertValidLinkProposalId(id)}`;
+}
+
+export function linkProposalByPersonKey(personRef, id) {
+  return `${LINK_PROPOSAL_BY_PERSON_PREFIX}${personRef}/${assertValidLinkProposalId(id)}`;
+}
+
+export function linkProposalByHashKey(hash) {
+  if (typeof hash !== 'string' || !hash) {
+    throw Object.assign(new Error('Invalid equivalence hash.'), {
+      status: 400,
+      code: 'invalid_equivalence_hash'
+    });
+  }
+  return `${LINK_PROPOSAL_BY_HASH_PREFIX}${hash}`;
+}
+
+export async function listLinkProposalKeysForPerson(store, personRef) {
+  return (await listBlobKeys(store, `${LINK_PROPOSAL_BY_PERSON_PREFIX}${personRef}/`)).filter(
+    (key) => !isIndexKey(key)
+  );
+}
+
+export function ledgerItemKey(id) {
+  return `${LEDGER_ITEM_PREFIX}${assertValidLedgerItemId(id)}`;
+}
+
+export function ledgerItemByPersonKey(personRef, id) {
+  return `${LEDGER_ITEM_BY_PERSON_PREFIX}${personRef}/${assertValidLedgerItemId(id)}`;
+}
+
+export function ledgerItemBySourceKey(sourceKey) {
+  if (typeof sourceKey !== 'string' || !sourceKey) {
+    throw Object.assign(new Error('Invalid ledger source key.'), {
+      status: 400,
+      code: 'invalid_ledger_source_key'
+    });
+  }
+  return `${LEDGER_ITEM_BY_SOURCE_PREFIX}${sourceKey}`;
+}
+
+export async function listLedgerItemKeysForPerson(store, personRef) {
+  return (await listBlobKeys(store, `${LEDGER_ITEM_BY_PERSON_PREFIX}${personRef}/`)).filter(
     (key) => !isIndexKey(key)
   );
 }

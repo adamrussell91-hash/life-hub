@@ -13,7 +13,7 @@ describe('parseRoute', () => {
 
   it('parses each flat destination', () => {
     expect(parseRoute('#/home')).toEqual({ name: 'home' });
-    expect(parseRoute('#/people')).toEqual({ name: 'people' });
+    expect(parseRoute('#/people')).toEqual({ name: 'people', id: null });
     expect(parseRoute('#/organisations')).toEqual({ name: 'organisations' });
     expect(parseRoute('#/relationships')).toEqual({ name: 'relationships' });
     expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
@@ -31,6 +31,7 @@ describe('parseRoute', () => {
   });
 
   it('parses a valid person/organisation id into a detail route', () => {
+    expect(parseRoute(`#/people/${VALID_PERSON_ID}`)).toEqual({ name: 'people', id: VALID_PERSON_ID });
     expect(parseRoute(`#/person/${VALID_PERSON_ID}`)).toEqual({ name: 'person', id: VALID_PERSON_ID });
     expect(parseRoute(`#/organisation/${VALID_ORG_ID}`)).toEqual({ name: 'organisation', id: VALID_ORG_ID });
   });
@@ -77,8 +78,9 @@ describe('parseRoute', () => {
 describe('railHighlightFor', () => {
   it('maps person/organisation detail routes back to their list destination', () => {
     expect(railHighlightFor({ name: 'person', id: VALID_PERSON_ID })).toBe('people');
+    expect(railHighlightFor({ name: 'people', id: VALID_PERSON_ID })).toBe('people');
+    expect(railHighlightFor({ name: 'people', id: null })).toBe('people');
     expect(railHighlightFor({ name: 'organisation', id: VALID_ORG_ID })).toBe('organisations');
-    expect(railHighlightFor({ name: 'people' })).toBe('people');
     expect(railHighlightFor({ name: 'home' })).toBe('home');
     expect(railHighlightFor({ name: 'not-found', path: 'x' })).toBeNull();
   });
@@ -94,11 +96,11 @@ describe('railHighlightFor', () => {
 
 describe('route builders', () => {
   it('encode the id into the hash', () => {
-    expect(personRoute(VALID_PERSON_ID)).toBe(`#/person/${VALID_PERSON_ID}`);
+    expect(personRoute(VALID_PERSON_ID)).toBe(`#/people/${VALID_PERSON_ID}`);
     expect(organisationRoute(VALID_ORG_ID)).toBe(`#/organisation/${VALID_ORG_ID}`);
   });
 
-  it('personBriefRoute encodes the id into the 3-segment hash', () => {
-    expect(personBriefRoute(VALID_PERSON_ID)).toBe(`#/person/${VALID_PERSON_ID}/brief`);
+  it('maps Person Brief builder onto the People page', () => {
+    expect(personBriefRoute(VALID_PERSON_ID)).toBe(`#/people/${VALID_PERSON_ID}`);
   });
 });

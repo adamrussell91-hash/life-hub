@@ -152,8 +152,10 @@ export function parseOrganisationRecord(raw) {
   if (!ORGANISATION_LIFECYCLE_STATUSES.has(raw.lifecycle_status)) return null;
   if (!isNullableString(raw.retention_reason)) return null;
   if (!isNullableString(raw.retention_review_at)) return null;
+  // logo_key may be absent on pre-crest records — treat as null (people-redesign Phase 1).
+  if (raw.logo_key !== undefined && !isNullableString(raw.logo_key)) return null;
   if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
-  return { ...raw, aliases: [...raw.aliases] };
+  return { ...raw, aliases: [...raw.aliases], logo_key: raw.logo_key ?? null };
 }
 
 export function validateOrganisationCreateInput(input) {
@@ -196,6 +198,16 @@ export function validateOrganisationFieldUpdate(input) {
   if (input.aliases !== undefined) {
     if (!isStringArray(input.aliases)) throw validationError('invalid_aliases', 'aliases must be an array of strings.');
     patch.aliases = [...input.aliases];
+  }
+  if (input.logo_key !== undefined) {
+    if (input.logo_key !== null && typeof input.logo_key !== 'string') {
+      throw validationError('invalid_logo_key', 'logo_key must be a string or null.');
+    }
+    const trimmed = typeof input.logo_key === 'string' ? input.logo_key.trim() : null;
+    if (trimmed === '') {
+      throw validationError('invalid_logo_key', 'logo_key cannot be empty.');
+    }
+    patch.logo_key = trimmed;
   }
   return patch;
 }

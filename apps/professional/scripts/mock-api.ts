@@ -359,6 +359,102 @@ export function createMockApi() {
       return json(200, { ok: true, data: overview });
     }
 
+    if (path === '/api/people/directory' && method === 'GET') {
+      const rows = [...people.values()]
+        .filter((p) => !p.is_self && !['deleted', 'deidentified'].includes(p.lifecycle_status))
+        .map((p) => {
+          const parts = p.display_name.trim().split(/\s+/);
+          const initials =
+            parts.length <= 1
+              ? (parts[0] ?? '?').slice(0, 2).toUpperCase()
+              : `${parts[0]![0] ?? ''}${parts[parts.length - 1]![0] ?? ''}`.toUpperCase();
+          return {
+            id: p.id,
+            ref: `shared:person:${p.id}`,
+            display_name: p.display_name,
+            initials,
+            role_line: 'No relationship on record',
+            relationship_roles: [],
+            organisation: null,
+            organisations: [],
+            warmth: 50,
+            warmth_band: 'warm',
+            relationship_state: 'active',
+            relationship_reasons: [],
+            open_item_count: 0,
+            you_owe_count: 0,
+            they_owe_count: 0,
+            pending_proposal_count: 0,
+            next_label: null,
+            created_at: String(p.created_at ?? '2020-01-01T00:00:00.000Z'),
+            updated_at: String(p.updated_at ?? '2020-01-01T00:00:00.000Z')
+          };
+        });
+      return json(200, {
+        ok: true,
+        data: {
+          people: rows,
+          organisations: [...organisations.values()].map((o) => ({
+            ref: `shared:organisation:${o.id}`,
+            id: o.id,
+            display_name: o.display_name,
+            logo_key: (o as { logo_key?: string | null }).logo_key ?? null,
+            monogram: o.display_name.slice(0, 3).toUpperCase(),
+            current: true
+          })),
+          counts: { people: rows.length, organisations: organisations.size }
+        }
+      });
+    }
+
+    if (path === '/api/people/link-proposals' && method === 'GET') {
+      return json(200, { ok: true, data: { proposals: [], count: 0 } });
+    }
+
+    if (path === '/api/people/link-proposals' && method === 'POST') {
+      return json(200, { ok: true, data: { created: 0, skipped: 0, proposals: [], proposal: null } });
+    }
+
+    if (path === '/api/people/ledger' && method === 'GET') {
+      return json(200, {
+        ok: true,
+        data: {
+          you_owe: [],
+          they_owe: [],
+          you_owe_count: 0,
+          they_owe_count: 0,
+          open_item_count: 0
+        }
+      });
+    }
+
+    if (path === '/api/people/ledger' && method === 'POST') {
+      return json(200, { ok: true, data: { created: [], count: 0, note: 'Clare found nothing new to add.' } });
+    }
+
+    if (path === '/api/people/brief' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      const person = id ? people.get(id) : null;
+      if (!person) {
+        return json(404, { ok: false, error: { code: 'entity_not_found', message: 'Person not found.' } });
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          header: {
+            person: { ref: `shared:person:${person.id}`, display_name: person.display_name, href: null },
+            role: null,
+            organisation: null,
+            next_interaction: null
+          },
+          who_they_are: '',
+          open_loops: [],
+          current_shared_work: [],
+          mutual_connections: []
+        }
+      });
+    }
+
     if (path === '/api/entities' && method === 'PATCH') {
       const ref = url.searchParams.get('ref');
       const action = url.searchParams.get('action') ?? 'update';

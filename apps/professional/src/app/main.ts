@@ -24,7 +24,7 @@ import {
   unmountProfessionalCalendar
 } from '@/calendar/hub-calendar';
 import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
-import { renderPeopleHomeView } from '@/views/people-home';
+import { renderPeoplePage } from '@/views/people';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
@@ -49,10 +49,9 @@ import {
   renderApplicationsView
 } from '@/views/applications';
 import { renderCareerView } from '@/views/career';
-import { renderPersonPage } from '@/views/person-page';
-import { renderPersonBrief } from '@/views/person-brief';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
+import { personRoute } from '@/app/router';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -123,12 +122,16 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'people') {
-      renderPageHeader(shell, viewChrome('people'));
-      await renderPeopleHomeView(shell.canvas, {
+      // One h1 lives in the People page canvas (P3 — no shell "People / People").
+      shell.pageHeader.classList.add('page-header--people-redesign');
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      await renderPeoplePage(shell.canvas, {
+        selectedId: route.id,
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
+    shell.pageHeader.classList.remove('page-header--people-redesign');
     if (route.name === 'organisations') {
       renderPageHeader(shell, viewChrome('organisations'));
       renderOrganisationsView(shell.canvas);
@@ -248,24 +251,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
       });
       return;
     }
-    if (route.name === 'person') {
-      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…', person: true });
-      await renderPersonPage(shell.canvas, route.id, {
-        onTitleReady: (title) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'People', title, person: true });
-        },
-        onHeaderReady: (header) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, {
-            eyebrow: 'People',
-            title: header.title,
-            person: true,
-            actions: header.actions
-          });
-        },
-        isCurrent: () => generation === routeGeneration
-      });
+    if (route.name === 'person' || route.name === 'person-brief') {
+      // People redesign Phase 1: brief and legacy person routes redirect to `#/people/<id>`.
+      location.replace(personRoute(route.id));
       return;
     }
     if (route.name === 'organisation') {
@@ -278,16 +266,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
         isCurrent: () => generation === routeGeneration
       });
       return;
-    }
-    if (route.name === 'person-brief') {
-      renderPageHeader(shell, { eyebrow: 'People', title: 'Loading…' });
-      await renderPersonBrief(shell.canvas, route.id, {
-        onTitleReady: (title) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'People', title: `${title} — Brief` });
-        },
-        isCurrent: () => generation === routeGeneration
-      });
     }
   }
 

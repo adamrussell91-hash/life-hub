@@ -22,7 +22,7 @@ export type RailViewId =
 export type Route =
   | { name: 'home' }
   | { name: 'calendar'; zoom: string }
-  | { name: 'people' }
+  | { name: 'people'; id: string | null }
   | { name: 'person'; id: string }
   | { name: 'person-brief'; id: string }
   | { name: 'organisations' }
@@ -63,7 +63,12 @@ export function parseRoute(hash: string = location.hash): Route {
     const zoom = segments[1] === 'month' ? 'week' : segments[1]!;
     return { name: 'calendar', zoom };
   }
-  if (segments.length === 1 && segments[0] === 'people') return { name: 'people' };
+  if (segments.length === 1 && segments[0] === 'people') return { name: 'people', id: null };
+  if (segments.length === 2 && segments[0] === 'people') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidPersonId(id)) return { name: 'people', id };
+    return { name: 'not-found', path };
+  }
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
@@ -178,12 +183,19 @@ export function railHighlightFor(route: Route): RailViewId | null {
   return null;
 }
 
+/** Canonical People page with optional selected person (`#/people` or `#/people/<id>`). */
 export function personRoute(id: string): string {
-  return `#/person/${encodeURIComponent(id)}`;
+  return `#/people/${encodeURIComponent(id)}`;
 }
 
+/** @deprecated Brief is the profile pane — redirects to `#/people/<id>`. */
 export function personBriefRoute(id: string): string {
-  return `#/person/${encodeURIComponent(id)}/brief`;
+  return `#/people/${encodeURIComponent(id)}`;
+}
+
+export function peopleRoute(id: string | null = null, query = ''): string {
+  const base = id ? `#/people/${encodeURIComponent(id)}` : '#/people';
+  return `${base}${query}`;
 }
 
 export function organisationRoute(id: string): string {

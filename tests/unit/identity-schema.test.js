@@ -49,6 +49,7 @@ function organisationRecord(overrides = {}) {
     display_name: 'Example University',
     legal_name: 'Example University Ltd',
     aliases: ['ExU'],
+    logo_key: null,
     lifecycle_status: 'active',
     retention_reason: null,
     retention_review_at: null,
@@ -134,9 +135,25 @@ test('validateOrganisationCreateInput requires display_name', () => {
   assert.deepEqual(result, { display_name: 'Example University', legal_name: null, aliases: [] });
 });
 
-test('validateOrganisationFieldUpdate accepts only display_name/legal_name/aliases', () => {
-  const patch = validateOrganisationFieldUpdate({ legal_name: 'Example University Ltd', lifecycle_status: 'archived' });
-  assert.deepEqual(patch, { legal_name: 'Example University Ltd' });
+test('validateOrganisationFieldUpdate accepts display_name/legal_name/aliases/logo_key', () => {
+  const patch = validateOrganisationFieldUpdate({
+    legal_name: 'Example University Ltd',
+    lifecycle_status: 'archived',
+    logo_key: 'org-crests/organisation_00000000-0000-4000-8000-000000000002/crest.png'
+  });
+  assert.deepEqual(patch, {
+    legal_name: 'Example University Ltd',
+    logo_key: 'org-crests/organisation_00000000-0000-4000-8000-000000000002/crest.png'
+  });
+});
+
+test('parseOrganisationRecord defaults missing logo_key to null', () => {
+  const { logo_key: _ignored, ...without } = organisationRecord();
+  void _ignored;
+  const raw = { ...without };
+  delete raw.logo_key;
+  const parsed = parseOrganisationRecord(raw);
+  assert.equal(parsed.logo_key, null);
 });
 
 test('redactIdentityRecord hides display_name/sort_name/legal_name/aliases only for deleted or deidentified records', () => {
