@@ -419,7 +419,7 @@ function mount() {
 
 function tidelineFilterItems() {
   const chips = model.days.flatMap((day) => day.chips);
-  const dues = model.days.flatMap((day) => day.due.map((due) => ({ ...due, kind: 'task', filterKey: 'tasks' })));
+  const dues = model.days.flatMap((day) => day.due.map((due) => ({ ...due, kind: due.kind ?? 'task', filterKey: due.filterKey ?? 'tasks' })));
   const ghosts = model.ghosts.filter((ghost) => !ghost.overItem).map((ghost) => ghost.chip || ghost);
   return [...chips, ...dues, ...ghosts];
 }
@@ -454,7 +454,7 @@ function applyTidelineFilter({ replay = false } = {}) {
   const entries = [];
   for (const day of model.days) {
     for (const chip of day.chips) entries.push({ id: `chip:${chip.id}`, item: chip });
-    for (const due of day.due) entries.push({ id: `due:${due.id}`, item: { ...due, kind: 'task', filterKey: 'tasks' } });
+    for (const due of day.due) entries.push({ id: `due:${due.id}`, item: { ...due, kind: due.kind ?? 'task', filterKey: due.filterKey ?? 'tasks' } });
   }
   applyItemVisibility(nodes, entries, filterState, {
     reducedMotion: reduced || !replay,
@@ -519,7 +519,10 @@ function mountAllDay(grid, date) {
   for (const due of day.due) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
-    const chip = el('div', 'cal-due', `<b>${due.title}</b>`, cell, { 'data-part': 'due', 'data-id': due.id });
+    const promiseClass = due.kind === 'promise'
+      ? ` is-promise ${due.direction === 'they_owe' ? 'is-them' : 'is-you'}${due.late ? ' is-late' : ''}`
+      : '';
+    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>`, cell, { 'data-part': 'due', 'data-id': due.id, ...(due.kind === 'promise' ? { 'data-kind': 'promise' } : {}) });
     const movedTo = due.movedTo || (moved?.outcome === 'accepted' && moved.ghost.kind === 'move_task' ? moved.ghost.to : null);
     if (ghost && ghost.kind === 'move_task' && !due.moved) {
       el('span', 'cal-due__move', `<span class="cal-av cal-av--sm">${AGENT_INITIAL[ghost.agent] || ''}</span>${escapeHtml(ghost.label)}<button type="button" data-accept="${ghost.id}" data-label="Move">Move</button>`, chip, { 'data-ghost': ghost.id });
@@ -596,6 +599,7 @@ function mountChip(body, chip) {
   if (chip.isClass) classes.push('is-class');
   if (chip.skipped) classes.push('is-skipped');
   if (chip.kind === 'corey') classes.push('is-corey');
+  if (chip.pin) classes.push('is-pin');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
   const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;

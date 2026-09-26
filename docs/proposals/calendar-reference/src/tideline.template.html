@@ -243,6 +243,27 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
   .cal-head__num{width:1.625rem;height:1.625rem;font-size:var(--text-sm)}
 }
 @media (prefers-reduced-motion:reduce){.cal-band svg{transition:none}}
+
+/* ---------- comms, events, promises (26/09/26, calendar comms spec) ---------- */
+.k-comm{--k-bg:var(--pastel-blue);--k-stripe:var(--wave)}
+.k-event{--k-bg:var(--pastel-gold);--k-stripe:var(--pastel-gold-ink)}
+.cal-chip.is-pin{height:22px!important;border-radius:var(--radius-full);padding:2px 8px;background:var(--paper);border:1px solid color-mix(in srgb,var(--wave) 35%,transparent)}
+.cal-chip.is-pin::before{display:none}
+.cal-chip.is-pin .cal-chip__meta{display:none}
+.cal-chip.is-pin .cal-chip__title{font-size:var(--text-2xs);-webkit-line-clamp:1}
+.cal-due.is-promise{background:color-mix(in srgb,var(--high-sea) 7%,transparent);border:1px dashed color-mix(in srgb,var(--high-sea-ink) 50%,transparent);color:var(--high-sea-ink)}
+.cal-due.is-promise.is-them{background:color-mix(in srgb,var(--wave) 6%,transparent);border-color:color-mix(in srgb,var(--wave) 45%,transparent);color:var(--pastel-blue-ink)}
+.cal-due.is-promise.is-late{background:var(--high-sea);border:1px solid var(--high-sea);color:#fff}
+/* source pill dots */
+.cal-src.k-classes{--k-stripe:var(--wave)}
+.cal-src.k-comms{--k-stripe:var(--wave)}
+.cal-src.k-meetings{--k-stripe:var(--cal-lilac-stripe)}
+.cal-src.k-events{--k-stripe:var(--pastel-gold-ink)}
+.cal-src.k-pd{--k-stripe:var(--pastel-peach-ink)}
+.cal-src.k-promises{--k-stripe:var(--high-sea)}
+.cal-src.k-tasks{--k-stripe:var(--cal-sage-stripe)}
+.cal-src.k-health{--k-stripe:var(--cal-health-stripe)}
+.cal-src.k-fitness{--k-stripe:var(--wave)}
 </style>
 </head>
 <body>
