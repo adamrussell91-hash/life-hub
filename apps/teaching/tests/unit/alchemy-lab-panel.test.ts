@@ -60,7 +60,7 @@ describe('Alchemy Lab panel', () => {
     await Promise.resolve();
     await Promise.resolve();
     const link = host.querySelector<HTMLAnchorElement>('a[target="_blank"]');
-    expect(link?.href).toContain('#page/note_1');
+    expect(link?.href).toBe('https://life-hub.adam-russell.com/knowledge/#page/note_1');
     expect(link?.rel).toContain('noopener');
     panel.dispose();
   });

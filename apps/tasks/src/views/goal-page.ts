@@ -241,6 +241,8 @@ function paint(
   });
 
   const meta = el('div', 'goal-page__meta');
+  const metaTop = el('div', 'goal-page__meta-top');
+  const metaLead = el('div', 'goal-page__meta-lead');
   const chips = el('div', 'goal-page__chips row');
   chips.append(
     closedChip({
@@ -381,24 +383,23 @@ function paint(
   ]);
   metaActions.append(back, focus, menu);
 
-  const metaLeft = el('div', 'goal-page__meta-left');
-  metaLeft.append(chain);
+  metaLead.append(chain);
   if (dream) {
     const chip = el('a', 'goal-page__dream-chip', `✦ ${dream.title}`) as HTMLAnchorElement;
     chip.href = `#/someday`;
     chip.title = 'Source dream on Someday';
-    metaLeft.append(chip);
+    metaLead.append(chip);
   }
-  metaLeft.append(chips);
+  metaLead.append(chips);
+  metaTop.append(metaLead, metaActions);
   const metaCard = el('div', 'goal-page__meta-card glass-tile');
   metaCard.append(descHost, tags.el, lifeWall.el);
-  metaLeft.append(metaCard);
-  meta.append(metaLeft, metaActions);
+  meta.append(metaTop, metaCard);
 
   const page = el('div', 'goal-page');
   const main = el('div', 'goal-page__main');
   const aside = el('aside', 'goal-page__hammond');
-  page.append(main, aside);
+  page.append(aside, main);
   canvas.append(meta, page);
 
   // G-23 Structure card with morph + Details disclosure for other structures

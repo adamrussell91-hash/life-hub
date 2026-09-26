@@ -174,7 +174,7 @@ export function buildPrompt(s,currentStep){
  const maxBursts=currentStep.maxBursts??3,burst=(s.burst||0)+1,finalBurst=burst>=maxBursts;
  const budget=stopBudget(s,currentStep,stage);
  const knownContext=s.evidence.filter(e=>e.kind==='knowledge'||e.kind==='knowledge_hub_note'||e.kind==='central_node'||e.kind==='web'||String(e.kind||'').startsWith('web')||String(e.id||'').startsWith('web:'));
- const continuation=burst>1?`Continuation burst ${burst} of ${maxBursts}. The user answered your previous question. Continue from that answer. Do not repeat prior analysis.`:`Burst ${burst} of ${maxBursts}. Default length about ${budget} words.`;
+ const continuation=burst>1?`Continuation burst ${burst} of ${maxBursts}. The user answered your previous question. Continue from that answer. Do not repeat prior analysis. Keep the same assigned voice register as the first burst.`:`Burst ${burst} of ${maxBursts}. Default length about ${budget} words.`;
  const closeRule=finalBurst&&!gate?'This is your final burst for this step. Close without asking a question.':'';
  const questionRule=gate?`This is a ${gate} checkpoint. Return one targeted question and STOP. Set done true.`:`One question per burst maximum. If you ask a question and will continue later, set done false. If this contribution is complete, set done true. ${closeRule}`;
  const midSearch=(s.protocolId==='cartographers'&&['surveyor','miner','cartographer'].includes(speaker))||(s.protocolId==='refinery'&&speaker==='builder');

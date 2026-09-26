@@ -1,7 +1,8 @@
 import { apiPost } from '@/api/client';
 import { parseAlchemyResult, type AlchemyResult } from '@/alchemy/connections';
 
-export const DEFAULT_KNOWLEDGE_HUB_ORIGIN = 'https://knowledge-hub.adam-russell.com';
+/** Umbrella Knowledge SPA base (no trailing slash). Override with VITE_KNOWLEDGE_HUB_ORIGIN. */
+export const DEFAULT_KNOWLEDGE_HUB_ORIGIN = 'https://life-hub.adam-russell.com/knowledge';
 
 export function knowledgeHubOrigin(): string {
   const baked = import.meta.env.VITE_KNOWLEDGE_HUB_ORIGIN as string | undefined;

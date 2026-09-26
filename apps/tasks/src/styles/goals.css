@@ -158,10 +158,9 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
-.goal-page { display: grid; grid-template-columns: minmax(0, 1fr) 26rem; gap: var(--space-5); align-items: start; }
-
-
-.goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.goal-page { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; align-items: stretch; }
+.goal-page__hammond { width: 100%; min-width: 0; }
+.goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; width: 100%; }
 .goal-page__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
 .goal-page__chain-sep { color: var(--shallow); }
 .goal-page__chain-link { color: var(--ink); text-decoration: none; }
@@ -170,13 +169,14 @@
 .goal-details { margin-top: var(--space-3); }
 .goal-details__block { margin-bottom: var(--space-3); }
 .goal-current-source { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
-.goal-page__meta { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); color: var(--muted); }
-.goal-page__meta-left { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
+.goal-page__meta { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-3); width: 100%; margin-bottom: var(--space-4); color: var(--muted); }
+.goal-page__meta-top { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); width: 100%; }
+.goal-page__meta-lead { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
 .goal-page__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .goal-page__description { margin: 0; font-size: var(--text-sm); color: var(--ink); max-width: 36rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .goal-page__desc { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
 .goal-page__actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-.goal-page__pair { display: grid; grid-template-columns: 1.15fr 1fr; gap: var(--space-4); }
+.goal-page__pair { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--space-4); width: 100%; }
 .goal-card { padding: var(--space-5) var(--space-6); }
 .runway, .goal-card, .goals-new, .goal-page__meta-card {
   background: var(--glass);
@@ -220,7 +220,7 @@ textarea.goal-field { resize: vertical; min-height: 3.5rem; }
 .focus-strip__clock { font-variant-numeric: tabular-nums; font-weight: var(--weight-bold); color: var(--high-sea); }
 .focus-strip .btn { margin-left: auto; color: var(--on-dark); }
 
-.hammond { background: var(--depth); color: var(--on-dark); border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--elev-4); position: sticky; top: var(--space-6); }
+.hammond { background: var(--depth); color: var(--on-dark); border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--elev-4); position: static; width: 100%; }
 .hammond__who { display: flex; align-items: center; gap: var(--space-3); }
 .hammond__who img { width: 3rem; height: 3rem; border-radius: var(--radius-full); object-fit: cover; }
 .hammond__stamp { font-size: var(--text-xs); color: var(--on-dark-muted); }
