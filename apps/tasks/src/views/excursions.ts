@@ -1,6 +1,8 @@
 import { isProjectArchived, type ComplianceModule, type Project } from '@/schemas/project';
+import type { Program } from '@/schemas/program';
 import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate, LeadTimeOverrides } from '@/schemas/templates';
+import type { HubPrefs } from '@/domain/hub-prefs';
 import { tasksApi } from '@/services/client-api';
 import {
   defaultExcursionEventDate,
@@ -15,12 +17,24 @@ import { DEFAULT_EXCURSION_TITLE } from '@/domain/excursion-catalog';
 import { newExcursionHash, projectPageHash, projectProgress } from '@/domain/cards';
 import { matchesProjectQuery } from '@/domain/projects-pulse';
 import { computeProjectVariance } from '@/domain/closure';
-import { parseDue, startOfDay } from '@/domain/queries';
+import { parseDue, startOfDay, toDateKey } from '@/domain/queries';
+import {
+  closedExcursions,
+  openFolderNames,
+  termsForYear,
+  usualCalls
+} from '@/domain/excursion-desk';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { hashQuery } from '@/shell/shell';
 import { deleteProjectNow, showCompleteConfirm } from '@/views/card-actions';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import { renderComplianceBundle } from '@/views/excursion-compliance';
+import {
+  readExcursionCarry,
+  renderCarryForward,
+  renderSeasonDesk,
+  renderYearLog
+} from '@/views/excursion-desk';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import {
@@ -159,10 +173,12 @@ function renderSlackList(
 function confirmCreate(
   host: HTMLElement,
   template: ExcursionTemplate,
-  onCreated: (project: Project) => void
+  onCreated: (project: Project) => void,
+  preset?: { eventDate?: string; title?: string; carry?: string[] }
 ): void {
-  let title = DEFAULT_EXCURSION_TITLE;
-  let eventDate = defaultExcursionEventDate();
+  let title = preset?.title?.trim() || DEFAULT_EXCURSION_TITLE;
+  let eventDate = preset?.eventDate || defaultExcursionEventDate();
+  const carryLine = preset?.carry?.length ? ` Carrying ${preset.carry.join(', ')}.` : '';
   let leadOverrides: LeadTimeOverrides = {};
   let complianceModules = cloneDefaultComplianceModules();
 
@@ -173,7 +189,7 @@ function confirmCreate(
   const refreshSummary = () => {
     const summaryEl = host.querySelector('.page-header__supporting');
     if (summaryEl) {
-      summaryEl.textContent = `${confirmSummary(withLeadOverrides(template, leadOverrides), eventDate)} Do not apply until Confirm.`;
+      summaryEl.textContent = `${confirmSummary(withLeadOverrides(template, leadOverrides), eventDate)}${carryLine} Do not apply until Confirm.`;
     }
   };
 
@@ -226,7 +242,7 @@ function confirmCreate(
   showConfirm(
     host,
     `Create “${title}”`,
-    confirmSummary(template, eventDate),
+    `${confirmSummary(withLeadOverrides(template, leadOverrides), eventDate)}${carryLine}`,
     async () => {
       onCreated(await createFromTemplate(template, title, eventDate, complianceModules, leadOverrides));
     },
@@ -253,6 +269,11 @@ const WHEN_LANES: ExcursionLane[] = [
 
 let excursionQuery = '';
 let excursionGroupBy: ExcursionsGroupBy = 'clearance';
+let proposedDate = '';
+let historyId: string | null = null;
+let placedId: string | null = null;
+let carry = new Set<string>();
+let carryReady = false;
 
 function eventDayDelta(project: Project, now: Date): number | null {
   const event = parseDue(project.current_end_date);
@@ -400,7 +421,7 @@ function renderExcursionBoard(
     onDelete: (project: Project) => void;
     onCompleted: (project: Project) => void;
   }
-): HTMLElement {
+): HTMLElement | null {
   const visible = excursions.filter((project) => matchesProjectQuery(project, excursionQuery));
   const lanes = excursionGroupBy === 'when' ? WHEN_LANES : CLEARANCE_LANES;
   const grouped = lanes
@@ -418,14 +439,9 @@ function renderExcursionBoard(
   grid.style.gridTemplateColumns = grouped.length
     ? `repeat(${grouped.length}, minmax(0, 1fr))`
     : 'minmax(0, 1fr)';
+  if (!excursions.length) return null;
   if (!grouped.length) {
-    grid.append(
-      el(
-        'p',
-        'empty-state',
-        excursions.length ? 'No excursions match.' : 'No excursions yet. Create one above.'
-      )
-    );
+    grid.append(el('p', 'empty-state', 'No excursions match.'));
     return grid;
   }
   for (const group of grouped) {
@@ -451,30 +467,41 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
 
   showViewLoading(canvas, 'Loading…', '.excursions-board');
 
-  let excursions: Project[];
+  let allExcursions: Project[];
   let tasks: Task[];
   let templates: ExcursionTemplate[] = [];
+  let programs: Program[] = [];
+  let prefs: HubPrefs | null = null;
   try {
-    const [projects, allTasks, templatesPayload] = await Promise.all([
+    const [projects, allTasks, templatesPayload, programList, hubPrefs] = await Promise.all([
       tasksApi.listProjects(),
       tasksApi.listTasks(),
-      tasksApi.listTemplates().catch(() => ({ excursion_templates: [] as ExcursionTemplate[] }))
+      tasksApi.listTemplates().catch(() => ({ excursion_templates: [] as ExcursionTemplate[] })),
+      tasksApi.listPrograms().catch(() => [] as Program[]),
+      tasksApi.getHubPrefs().catch(() => null)
     ]);
-    excursions = projects.filter(
-      (project) => project.type === 'excursion' && !isProjectArchived(project.status)
-    );
+    allExcursions = projects.filter((project) => project.type === 'excursion');
     tasks = allTasks;
     templates = templatesPayload.excursion_templates as ExcursionTemplate[];
+    programs = programList;
+    prefs = hubPrefs;
   } catch (err) {
     renderLoadError(canvas, err, () => void renderExcursionsView(canvas), 'Could not load excursions');
     return;
   }
 
   const now = new Date();
+  const today = toDateKey(now);
 
   function dropProject(projectId: string): void {
-    excursions = excursions.filter((project) => project.id !== projectId);
+    allExcursions = allExcursions.filter((project) => project.id !== projectId);
     tasks = tasks.filter((task) => task.parent_project_id !== projectId);
+    paint();
+  }
+
+  function finishProject(project: Project): void {
+    const found = allExcursions.find((item) => item.id === project.id);
+    if (found) found.status = 'completed';
     paint();
   }
 
@@ -526,14 +553,57 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
         location.hash = newExcursionHash(templates[0]?.id);
       })
     );
-    canvas.append(toolbar, confirmHost);
-    canvas.append(
-      renderExcursionBoard(excursions, tasks, now, confirmHost, {
-        onOpen: openProjectPage,
-        onDelete: (current) => deleteProjectNow(current, () => dropProject(current.id), confirmHost),
-        onCompleted: (current) => dropProject(current.id)
-      })
-    );
+    const closed = closedExcursions(allExcursions);
+    if (!proposedDate) proposedDate = defaultExcursionEventDate(now);
+    if (!historyId && closed[0]) historyId = closed[0].id;
+    if (!carryReady) {
+      carryReady = true;
+      for (const name of openFolderNames(closed[0] ?? null)) carry.add(name);
+    }
+    const live = allExcursions.filter((project) => !isProjectArchived(project.status));
+    const model = {
+      terms: termsForYear(prefs, Number(today.slice(0, 4))),
+      excursions: allExcursions,
+      usual: usualCalls(programs, allExcursions, termsForYear(prefs, Number(today.slice(0, 4))), today),
+      closed,
+      template: templates[0] ?? null,
+      today,
+      proposedDate,
+      historyId,
+      placedId,
+      carry
+    };
+    const handlers = {
+      onPropose: (date: string) => {
+        proposedDate = date;
+        paint();
+      },
+      onSelectHistory: (id: string) => {
+        historyId = id;
+        paint();
+      },
+      onPlace: (call: { programId: string; suggestedDate: string }) => {
+        proposedDate = call.suggestedDate;
+        placedId = call.programId;
+        paint();
+      },
+      onToggleCarry: (name: string, on: boolean) => {
+        if (on) carry.add(name);
+        else carry.delete(name);
+        paint();
+      }
+    };
+
+    canvas.append(toolbar, confirmHost, renderSeasonDesk(model, handlers));
+    const carried = renderCarryForward(model, handlers);
+    if (carried) canvas.append(carried);
+    const board = renderExcursionBoard(live, tasks, now, confirmHost, {
+      onOpen: openProjectPage,
+      onDelete: (current) => deleteProjectNow(current, () => dropProject(current.id), confirmHost),
+      onCompleted: finishProject
+    });
+    if (board) canvas.append(board);
+    canvas.append(renderYearLog(model, handlers));
 
     canvas.scrollTop = scrollTop;
     if (restoreSearch) {
@@ -551,6 +621,11 @@ export async function renderExcursionsView(canvas: HTMLElement): Promise<void> {
 export function resetExcursionsViewStateForTests(): void {
   excursionQuery = '';
   excursionGroupBy = 'clearance';
+  proposedDate = '';
+  historyId = null;
+  placedId = null;
+  carry = new Set();
+  carryReady = false;
 }
 
 /** Confirm the (single) template, then write — event date is editable inline, no template picker. */
@@ -579,7 +654,12 @@ export async function renderNewExcursionPage(canvas: HTMLElement): Promise<void>
     return;
   }
 
-  confirmCreate(confirmHost, prefillTpl, openProjectPage);
+  const presetDate = hashQuery().get('date');
+  confirmCreate(confirmHost, prefillTpl, openProjectPage, {
+    eventDate: presetDate && /^\d{4}-\d{2}-\d{2}$/.test(presetDate) ? presetDate : undefined,
+    title: hashQuery().get('title') ?? undefined,
+    carry: readExcursionCarry()
+  });
 
   canvas.replaceChildren(page);
 }

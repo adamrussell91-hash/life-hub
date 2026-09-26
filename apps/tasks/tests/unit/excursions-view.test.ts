@@ -4,14 +4,20 @@ import { closeCardMenu } from '@/views/card-menu';
 import { resetCollapsibleFiltersForTests } from '@/views/collapsible-filters';
 import { tasksApi } from '@/services/client-api';
 import type { Project } from '@/schemas/project';
+import type { Program } from '@/schemas/program';
 import type { Task } from '@/schemas/task';
 import type { ExcursionTemplate } from '@/schemas/templates';
+import { usualCalls, termsForYear } from '@/domain/excursion-desk';
+import { toDateKey } from '@/domain/queries';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listProjects: vi.fn(),
     listTasks: vi.fn(),
     listTemplates: vi.fn(),
+    listPrograms: vi.fn(async () => []),
+    getHubPrefs: vi.fn(async () => null),
     createExcursionFromTemplate: vi.fn(),
     deleteProject: vi.fn(),
     closeProject: vi.fn()
@@ -108,6 +114,8 @@ describe('excursions dashboard', () => {
   beforeEach(() => {
     resetExcursionsViewStateForTests();
     resetCollapsibleFiltersForTests();
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([]);
+    vi.mocked(tasksApi.getHubPrefs).mockResolvedValue(null as never);
   });
 
   afterEach(() => {
@@ -278,9 +286,96 @@ describe('excursions dashboard', () => {
     const canvas = document.createElement('main');
     await renderExcursionsView(canvas);
 
-    expect(canvas.textContent).toContain('No excursions yet. Create one above.');
+    expect(canvas.textContent).not.toContain('No excursions yet');
+    expect(canvas.querySelector('.projects-board')).toBeNull();
+    expect(canvas.querySelector('[aria-label="Season"]')).not.toBeNull();
+    expect(canvas.querySelector('[aria-label="Year log"]')?.textContent).toContain('Run again');
+    expect(canvas.querySelector('[aria-label="Year log"]')?.textContent).toContain('Next date');
     expect(canvas.querySelector('.excursion-list-meta')).toBeNull();
     expect(canvas.querySelector('.projects-toolbar')).not.toBeNull();
+  });
+
+  it('keeps the season desk above a live board and the year log beneath it', async () => {
+    location.hash = '#/excursions';
+    const canvas = await mount();
+    const season = canvas.querySelector('[aria-label="Season"]');
+    const board = canvas.querySelector('.projects-board');
+    const log = canvas.querySelector('[aria-label="Year log"]');
+    expect(season).not.toBeNull();
+    expect(board).not.toBeNull();
+    expect(log).not.toBeNull();
+    expect(season!.compareDocumentPosition(board!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(board!.compareDocumentPosition(log!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(log?.textContent).toContain('Plan this date');
+
+    const before = canvas.querySelector('.excursion-desk__when')?.textContent;
+    canvas.querySelector<HTMLButtonElement>('[aria-label="One week later"]')?.click();
+    expect(canvas.querySelector('.excursion-desk__when')?.textContent).not.toBe(before);
+  });
+
+  it('names a catalogue program whose usual month has no trip yet', async () => {
+    const program = {
+      id: 'prog_tom',
+      name: 'Tournament of Minds',
+      month: 'September'
+    } as Program;
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [template],
+      task_templates: [],
+      project_templates: []
+    });
+    vi.mocked(tasksApi.listPrograms).mockResolvedValue([program]);
+    location.hash = '#/excursions';
+    const canvas = document.createElement('main');
+    await renderExcursionsView(canvas);
+
+    const today = toDateKey(new Date());
+    const [call] = usualCalls([program], [], termsForYear(null, Number(today.slice(0, 4))), today);
+    const passed = call?.monthPassed ? ', which has passed' : '';
+    expect(canvas.textContent).toContain(
+      `Tournament of Minds usually falls in September${passed}.`
+    );
+    expect(canvas.textContent).toContain(formatDisplayDate(call!.suggestedDate));
+    expect(canvas.querySelectorAll('.excursion-term__ghost')).toHaveLength(call?.monthPassed ? 1 : 0);
+  });
+
+  it('offers unfinished folder items from the latest closed trip', async () => {
+    const closed: Project = {
+      ...excursion,
+      id: 'proj_closed',
+      title: 'Museum trip',
+      status: 'completed',
+      current_end_date: '2026-08-12',
+      folder_items: [
+        { id: 'folder_0', name: 'Medical Notes', on: false },
+        { id: 'folder_1', name: 'Permission Forms', on: true }
+      ]
+    };
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([closed]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([]);
+    vi.mocked(tasksApi.listTemplates).mockResolvedValue({
+      frameworks: [],
+      excursion_templates: [template],
+      task_templates: [],
+      project_templates: []
+    });
+    location.hash = '#/excursions';
+    const canvas = document.createElement('main');
+    await renderExcursionsView(canvas);
+
+    const carry = canvas.querySelector('[aria-label="Carry forward"]');
+    expect(carry?.textContent).toContain('Medical Notes');
+    expect(carry?.textContent).not.toContain('Permission Forms');
+    expect(canvas.querySelector('.projects-board')).toBeNull();
+
+    [...canvas.querySelectorAll('button')].find((btn) => btn.textContent === 'Start with these')?.click();
+    expect(location.hash).toContain('#/excursions/new?');
+    expect(location.hash).toContain('title=Museum+trip');
+    expect(sessionStorage.getItem('tasks-hub:excursion-carry')).toContain('Medical Notes');
+    sessionStorage.removeItem('tasks-hub:excursion-carry');
   });
 
   it('regroups the board by when without refetching', async () => {
@@ -459,6 +554,21 @@ describe('new excursion page', () => {
     );
     back?.click();
     expect(location.hash).toBe('#/excursions');
+  });
+
+  it('opens the confirm card on the carried date, title, and folder items', async () => {
+    mockList();
+    sessionStorage.setItem('tasks-hub:excursion-carry', JSON.stringify(['Medical Notes']));
+    location.hash = '#/excursions/new?template=ext_excursion&date=2026-10-13&title=Museum%20trip';
+    const canvas = document.createElement('main');
+    await renderNewExcursionPage(canvas);
+
+    expect(canvas.querySelector('.confirm-card .page-header__title')?.textContent).toBe(
+      'Create “Museum trip”'
+    );
+    expect(canvas.querySelector('.page-header__supporting')?.textContent).toContain('Carrying Medical Notes.');
+    expect(canvas.querySelector<HTMLInputElement>('[aria-label="Event date"]')?.value).toBe('2026-10-13');
+    sessionStorage.removeItem('tasks-hub:excursion-carry');
   });
 
   it('shows an empty state when there are no templates at all', async () => {
