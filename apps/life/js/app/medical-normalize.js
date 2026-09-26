@@ -2,16 +2,28 @@ import { daysBetween, isCalendarDate } from '../core/time.js';
 
 export const MEDICAL_RECORD_TYPES = [
   'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
-  'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
+  'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination', 'Symptom'
 ];
+
+export const MEDICAL_WEIGHTS = ['major', 'routine', 'minor'];
 
 const MEDICAL_LANES = [
   'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
-  'dental', 'therapy', 'eye', 'appointment'
+  'dental', 'therapy', 'eye', 'appointment', 'symptom'
 ];
+
+const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done'];
+const DATE_PRECISIONS = ['day', 'month', 'tbd'];
+const EPISODE_STATUSES = ['active', 'resolved'];
 
 const RECORD_TYPE_SET = new Set(MEDICAL_RECORD_TYPES);
 const LANE_SET = new Set(MEDICAL_LANES);
+const WEIGHT_SET = new Set(MEDICAL_WEIGHTS);
+const STATUS_SET = new Set(MEDICAL_STATUSES);
+const DATE_PRECISION_SET = new Set(DATE_PRECISIONS);
+
+const SYMPTOM_LANGUAGE = /\b(sore|sniffles|cough|headache|cramping|nausea|tired|run down|congested|throat|fever|ache|painful|runny nose|cold symptoms)\b/i;
+const VISIT_OR_PROVIDER_LANGUAGE = /\b(dr\.?|doctor|gp|clinic|hospital|appointment|consult|saw |visited |referral|pathology|scan|mri|mrcp|colonoscopy|injection|infusion|stelara|humira)\b/i;
 
 /** Same-title visits more than this many days apart are new timeline entries, not appends. */
 const APPEND_DATE_SLOP_DAYS = 3;
@@ -97,7 +109,50 @@ function normalizeEpisode(value) {
   const id = cleanString(value.id);
   const title = cleanString(value.title);
   if (!id || !title) return null;
-  return { id, title };
+  const episode = { id, title };
+  const status = cleanString(value.status);
+  if (status && EPISODE_STATUSES.includes(status)) episode.status = status;
+  const started = parseCalendarDate(value.started);
+  if (started) episode.started = started;
+  const resolved = parseCalendarDate(value.resolved);
+  if (resolved) episode.resolved = resolved;
+  return episode;
+}
+
+/**
+ * Visual importance for the weighted river. Sara may omit weight; infer from type/title.
+ * major: surgery/hospital, imaging, referral, specialist consultation, biologic infusion/injection, lab with bloods
+ * routine: appointment, prescription (non-biologic), vaccination, therapy
+ * minor: Symptom (default)
+ */
+export function inferWeight(record = {}) {
+  const explicit = cleanString(record.weight);
+  if (explicit && WEIGHT_SET.has(explicit)) return explicit;
+
+  const recordType = cleanString(record.record_type) || '';
+  const blob = `${record.title ?? ''} ${record.notes ?? ''} ${record.provider ?? ''}`.toLowerCase();
+
+  if (recordType === 'Symptom') return 'minor';
+  if (
+    recordType === 'Surgery/Hospital'
+    || recordType === 'Imaging'
+    || recordType === 'Referral'
+    || (recordType === 'Consultation' && /specialist|gastro|hepat|rheumat|cardio|endocrin|neurolog/i.test(blob))
+    || (recordType === 'Lab Work' && (record.lab || /bloods|panel|pathology/i.test(blob)))
+    || /infusion|injection|stelara|ustekinumab|humira|adalimumab|biologic/i.test(blob)
+  ) {
+    return 'major';
+  }
+  if (
+    recordType === 'Appointment'
+    || recordType === 'Prescription'
+    || recordType === 'Vaccination'
+    || recordType === 'Consultation'
+    || /therap|psycholog/i.test(blob)
+  ) {
+    return 'routine';
+  }
+  return 'routine';
 }
 
 export function locationKindFor(title, location) {
@@ -109,6 +164,7 @@ export function locationKindFor(title, location) {
 
 export function laneFor(recordType, title, provider, location) {
   const blob = `${title ?? ''} ${provider ?? ''} ${location ?? ''}`;
+  if (recordType === 'Symptom') return 'symptom';
   if (recordType === 'Surgery/Hospital') return 'hospital';
   if (recordType === 'Lab Work' || recordType === 'Test Result') return 'lab';
   if (recordType === 'Imaging') return 'imaging';
@@ -125,17 +181,66 @@ export function inferRecordType(recordType, title, notes) {
   const cleaned = cleanString(recordType);
   if (cleaned && RECORD_TYPE_SET.has(cleaned)) return cleaned;
 
-  const blob = `${title ?? ''} ${notes ?? ''} ${cleaned ?? ''}`.toLowerCase();
-  if (/vaccin|immunis|flu shot|covid shot/i.test(blob)) return 'Vaccination';
-  if (/referr/i.test(blob)) return 'Referral';
-  if (/\bx-?ray\b|\bmri\b|\bct\b|\bultrasound\b|\bimaging\b|\bscan\b/i.test(blob)) return 'Imaging';
-  if (/\blab\b|blood test|pathology|calprotectin|ferritin|panel\b/i.test(blob)) return 'Lab Work';
-  if (/surgery|hospital|admission|procedure\b/i.test(blob)) return 'Surgery/Hospital';
+  const blob = `${title ?? ''} ${notes ?? ''} ${cleaned ?? ''}`;
+  const lower = blob.toLowerCase();
+  if (/vaccin|immunis|flu shot|covid shot/i.test(lower)) return 'Vaccination';
+  if (/referr/i.test(lower)) return 'Referral';
+  if (/\bx-?ray\b|\bmri\b|\bct\b|\bultrasound\b|\bimaging\b|\bscan\b/i.test(lower)) return 'Imaging';
+  if (/\blab\b|blood test|pathology|calprotectin|ferritin|panel\b/i.test(lower)) return 'Lab Work';
+  if (/surgery|hospital|admission|procedure\b/i.test(lower)) return 'Surgery/Hospital';
   if (
-    /injection|infusion|stelara|ustekinumab|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(blob)
+    /injection|infusion|stelara|ustekinumab|humira|adalimumab|biologic|prescription|script|medication|dose\b/i.test(lower)
   ) return 'Prescription';
-  if (/consult/i.test(blob)) return 'Consultation';
+  if (/consult/i.test(lower)) return 'Consultation';
+  // Symptom when feeling language is present and there are no provider/visit words.
+  if (SYMPTOM_LANGUAGE.test(blob) && !VISIT_OR_PROVIDER_LANGUAGE.test(blob)) return 'Symptom';
   return 'Appointment';
+}
+
+function slugifyEpisodeId(title) {
+  return String(title ?? '')
+    .normalize('NFKD')
+    .replace(/['’]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32) || 'episode';
+}
+
+/**
+ * Join a Symptom onto the newest active episode started within 7 days,
+ * otherwise start a new episode titled from the symptom.
+ */
+export function joinOrCreateEpisode(fields, { notes, today, activeEpisodes = [] } = {}) {
+  if (fields?.episode) return normalizeEpisode(fields.episode);
+  const recordType = inferRecordType(fields?.record_type, fields?.title, notes);
+  if (recordType !== 'Symptom') return null;
+
+  const entryDate = parseCalendarDate(fields?.date, { today })
+    ?? (typeof today === 'string' && isCalendarDate(today) ? today : null);
+  const active = [...activeEpisodes]
+    .filter(ep => ep && (ep.status === 'active' || !ep.status))
+    .sort((a, b) => String(b.started ?? '').localeCompare(String(a.started ?? '')));
+
+  for (const ep of active) {
+    const start = ep.started || ep.firstDate;
+    if (!start || !entryDate || !isCalendarDate(start) || !isCalendarDate(entryDate)) continue;
+    if (Math.abs(daysBetween(start, entryDate)) <= 7) {
+      return normalizeEpisode({
+        id: ep.id,
+        title: ep.title,
+        status: ep.status || 'active',
+        started: start,
+        resolved: ep.resolved
+      });
+    }
+  }
+
+  const title = cleanString(fields?.title)
+    ?? inferTitleFromNotes(notes)
+    ?? 'Symptom episode';
+  const id = `ep-${slugifyEpisodeId(title)}-${(entryDate || today || 'new').replace(/-/g, '')}`;
+  return { id, title, status: 'active', ...(entryDate ? { started: entryDate } : {}) };
 }
 
 /**
@@ -143,7 +248,7 @@ export function inferRecordType(recordType, title, notes) {
  * Mirrors the import path: infer missing enums, drop empty placeholders, and
  * only keep optional fields when they are actually valid.
  */
-export function normalizeMedicalFields(fields, { notes, today } = {}) {
+export function normalizeMedicalFields(fields, { notes, today, activeEpisodes } = {}) {
   if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
     return { title: 'Medical visit' };
   }
@@ -164,6 +269,29 @@ export function normalizeMedicalFields(fields, { notes, today } = {}) {
     location_kind
   };
 
+  const weight = WEIGHT_SET.has(fields.weight) ? fields.weight : inferWeight({
+    ...fields,
+    record_type,
+    title,
+    notes,
+    provider
+  });
+  if (weight) normalized.weight = weight;
+
+  const status = cleanString(fields.status);
+  if (status && STATUS_SET.has(status)) normalized.status = status;
+
+  const date_precision = cleanString(fields.date_precision);
+  if (date_precision && DATE_PRECISION_SET.has(date_precision)) {
+    normalized.date_precision = date_precision;
+  }
+
+  const cadence_days = parseFiniteNumber(fields.cadence_days);
+  if (cadence_days != null && cadence_days > 0) normalized.cadence_days = Math.round(cadence_days);
+
+  const task_id = cleanString(fields.task_id);
+  if (task_id) normalized.task_id = task_id;
+
   const date_end = parseCalendarDate(fields.date_end, { today });
   if (date_end) normalized.date_end = date_end;
 
@@ -179,7 +307,13 @@ export function normalizeMedicalFields(fields, { notes, today } = {}) {
   const insurance_status = cleanString(fields.insurance_status);
   if (insurance_status) normalized.insurance_status = insurance_status;
 
-  const episode = normalizeEpisode(fields.episode);
+  let episode = normalizeEpisode(fields.episode);
+  if (!episode && record_type === 'Symptom') {
+    episode = joinOrCreateEpisode(
+      { ...fields, record_type, title, date: fields.date },
+      { notes, today, activeEpisodes }
+    );
+  }
   if (episode) normalized.episode = episode;
 
   return normalized;
@@ -207,6 +341,11 @@ export function mergeMedicalFields(existing, incoming, { notes, existingNotes, t
     provider: next.provider ?? base.provider,
     location: next.location ?? base.location,
     record_type: next.record_type ?? base.record_type,
+    weight: next.weight ?? base.weight,
+    status: next.status ?? base.status,
+    date_precision: next.date_precision ?? base.date_precision,
+    cadence_days: next.cadence_days ?? base.cadence_days,
+    task_id: next.task_id ?? base.task_id,
     date_end: next.date_end ?? base.date_end,
     follow_up_date: next.follow_up_date ?? base.follow_up_date,
     cost_aud: next.cost_aud ?? base.cost_aud,
@@ -276,6 +415,9 @@ export function parseMedicalEventTolerant(text, path, loadYaml) {
  * Same-title visits dated more than APPEND_DATE_SLOP_DAYS apart stay separate
  * timeline entries (e.g. next Stelara dose on 27/10) unless Sara explicitly
  * sets follow_up_date on the prior visit.
+ *
+ * Symptom / episode updates on a different calendar day become a new dated
+ * record in the same episode (MO-05) — never merge onto the old date.
  */
 export async function resolveMedicalLogCandidate(client, input, {
   today,
@@ -300,6 +442,7 @@ export async function resolveMedicalLogCandidate(client, input, {
     entry.type === 'blob' && MEDICAL_PATH.test(entry.path)
   );
 
+  const parsedRecords = [];
   let best = null;
   let bestScore = 0;
   for (const entry of entries) {
@@ -312,6 +455,7 @@ export async function resolveMedicalLogCandidate(client, input, {
     if (!text) continue;
     const parsed = parseMedicalEventTolerant(text, entry.path, loadYaml);
     if (!parsed) continue;
+    parsedRecords.push(parsed);
     let score = scoreMedicalTitleMatch(titleHint, parsed.record.title);
     if (coercedDate && parsed.record.date === coercedDate) score += 20;
     if (score > bestScore) {
@@ -320,8 +464,52 @@ export async function resolveMedicalLogCandidate(client, input, {
     }
   }
 
+  const activeEpisodes = collectActiveEpisodes(parsedRecords);
+  const previewType = inferRecordType(fields.record_type, titleHint, input.notes);
+  const normalizedIncoming = normalizeMedicalFields(
+    { ...fields, date: coercedDate },
+    { notes: input.notes, today, activeEpisodes }
+  );
+
   if (!best || bestScore < 55) {
-    return coercedDate && coercedDate !== input.date ? { ...input, date: coercedDate } : input;
+    const out = {
+      ...input,
+      ...(coercedDate ? { date: coercedDate } : {}),
+      fields: normalizedIncoming
+    };
+    return out;
+  }
+
+  const matchedIsSymptom = best.record.record_type === 'Symptom'
+    || best.record.lane === 'symptom';
+  const matchedHasEpisode = Boolean(best.record.episode?.id);
+  const incomingIsSymptom = previewType === 'Symptom'
+    || normalizedIncoming.record_type === 'Symptom';
+  const differentDay = Boolean(
+    coercedDate
+    && isCalendarDate(best.record.date)
+    && isCalendarDate(coercedDate)
+    && best.record.date !== coercedDate
+  );
+
+  // MO-05: Symptom/episode + different date → new dated record in same episode.
+  if (differentDay && (matchedIsSymptom || matchedHasEpisode || incomingIsSymptom)) {
+    const episode = normalizeEpisode(normalizedIncoming.episode)
+      || normalizeEpisode(best.record.episode)
+      || joinOrCreateEpisode(
+        { ...normalizedIncoming, date: coercedDate },
+        { notes: input.notes, today, activeEpisodes }
+      );
+    return {
+      type: 'medical',
+      date: coercedDate,
+      time: input.time,
+      notes: input.notes,
+      fields: {
+        ...normalizedIncoming,
+        ...(episode ? { episode } : {})
+      }
+    };
   }
 
   const explicitFollowUp = coerceCalendarDate(fields.follow_up_date, { today });
@@ -332,12 +520,28 @@ export async function resolveMedicalLogCandidate(client, input, {
     && !explicitFollowUp
   ) {
     const delta = daysBetween(best.record.date, coercedDate);
+    // Visit slop only for non-Symptom, non-episode visits.
     if (Math.abs(delta) > APPEND_DATE_SLOP_DAYS) {
-      // Future (or distant past) same-title dose = its own Medical Overview card.
       return {
         ...input,
         date: coercedDate,
-        fields: normalizeMedicalFields(fields, { notes: input.notes, today })
+        fields: normalizedIncoming
+      };
+    }
+    if (
+      Math.abs(delta) > 0
+      && (matchedIsSymptom || matchedHasEpisode || incomingIsSymptom)
+    ) {
+      // Same-day-only merge for symptoms/episodes (already handled above when differentDay).
+      return {
+        type: 'medical',
+        date: coercedDate,
+        time: input.time,
+        notes: input.notes,
+        fields: {
+          ...normalizedIncoming,
+          episode: normalizedIncoming.episode || best.record.episode || undefined
+        }
       };
     }
   }
@@ -359,4 +563,27 @@ export async function resolveMedicalLogCandidate(client, input, {
     notes: merged.notes,
     fields: merged.fields
   };
+}
+
+function collectActiveEpisodes(parsedRecords) {
+  const byId = new Map();
+  for (const parsed of parsedRecords) {
+    const ep = parsed?.record?.episode;
+    if (!ep?.id || !ep?.title) continue;
+    const status = ep.status || 'active';
+    if (status === 'resolved') continue;
+    const existing = byId.get(ep.id);
+    const started = ep.started || parsed.record.date;
+    if (!existing || String(started) > String(existing.started || '')) {
+      byId.set(ep.id, {
+        id: ep.id,
+        title: ep.title,
+        status: 'active',
+        started,
+        firstDate: started,
+        resolved: ep.resolved
+      });
+    }
+  }
+  return [...byId.values()];
 }

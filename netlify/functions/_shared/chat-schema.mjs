@@ -226,10 +226,10 @@ const DOMAIN_PROPERTIES = {
     title: { type: 'string', description: 'Short visit label, e.g. "Stelara injection". Required.' },
     record_type: {
       type: 'string',
-      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination.',
+      description: 'Optional — Life Hub infers this from the title/notes when omitted. One of Appointment, Consultation, Lab Work, Test Result, Imaging, Surgery/Hospital, Prescription, Referral, Vaccination, Symptom.',
       enum: [
         'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
-        'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
+        'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination', 'Symptom'
       ]
     },
     lane: {
@@ -237,8 +237,31 @@ const DOMAIN_PROPERTIES = {
       description: 'Optional — inferred from record_type when omitted.',
       enum: [
         'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
-        'dental', 'therapy', 'eye', 'appointment'
+        'dental', 'therapy', 'eye', 'appointment', 'symptom'
       ]
+    },
+    weight: {
+      type: 'string',
+      description: 'Optional visual importance: major | routine | minor. Inferred when omitted.',
+      enum: ['major', 'routine', 'minor']
+    },
+    status: {
+      type: 'string',
+      description: 'Optional. planned | to_book | booked | done. Use to_book for ordered-but-unbooked items.',
+      enum: ['planned', 'to_book', 'booked', 'done']
+    },
+    date_precision: {
+      type: 'string',
+      description: 'Optional. day | month | tbd. Use month for "Feb 2027", tbd when only "to book".',
+      enum: ['day', 'month', 'tbd']
+    },
+    cadence_days: {
+      type: 'number',
+      description: 'Optional dosing interval in days (e.g. Stelara = 56). Omit when unknown.'
+    },
+    task_id: {
+      type: 'string',
+      description: 'Optional Tasks Hub task id when this planned item is linked. Omit when unknown.'
     },
     date_end: { type: 'string', description: 'Optional end date YYYY-MM-DD. Omit when unknown.' },
     provider: { type: 'string', description: 'Optional clinician or clinic name.' },
@@ -256,10 +279,13 @@ const DOMAIN_PROPERTIES = {
     insurance_status: { type: 'string', description: 'Optional insurance note. Omit when unknown.' },
     episode: {
       type: 'object',
-      description: 'Optional episode grouping. Omit entirely unless grouping related visits.',
+      description: 'Optional episode grouping. Omit entirely unless grouping related visits/symptoms.',
       properties: {
         id: { type: 'string' },
-        title: { type: 'string' }
+        title: { type: 'string' },
+        status: { type: 'string', enum: ['active', 'resolved'] },
+        started: { type: 'string', description: 'YYYY-MM-DD episode start' },
+        resolved: { type: 'string', description: 'YYYY-MM-DD when resolved' }
       }
     }
   }

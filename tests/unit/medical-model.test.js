@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildMedicalModel, mapsUrl } from '../../apps/life/js/app/medical-model.js';
+import { buildMedicalModel, buildThreadModel, deriveVirtualDoses, mapsUrl } from '../../apps/life/js/app/medical-model.js';
 
 function visit(overrides = {}) {
   return {
@@ -24,7 +24,7 @@ test('mapsUrl encodes a place and returns null for telehealth', () => {
   assert.equal(mapsUrl({ location: 'Zoom', location_kind: 'telehealth' }), null);
 });
 
-test('buildMedicalModel puts future soonest-first above today and past newest-first below', () => {
+test('buildMedicalModel puts upcoming farthest-first above today and past newest-first below', () => {
   const model = buildMedicalModel({
     today: '2026-08-20',
     events: [
@@ -35,8 +35,10 @@ test('buildMedicalModel puts future soonest-first above today and past newest-fi
     ]
   });
   const ids = model.items.filter(item => item.kind === 'visit').map(item => item.visit.id);
-  assert.deepEqual(ids, ['next', 'later', 'past-new', 'past-old']);
+  // MO-25: descending date toward Today (soonest nearest to TODAY).
+  assert.deepEqual(ids, ['later', 'next', 'past-new', 'past-old']);
   assert.equal(model.items.find(item => item.kind === 'today')?.kind, 'today');
+  assert.ok(model.items.some(item => item.kind === 'upcoming'));
   assert.ok(model.items.some(item => item.kind === 'heading' && item.label === 'August 2026'));
 });
 
@@ -144,4 +146,88 @@ test('buildMedicalModel opens the selected visit year', () => {
   const year = model.items.find(item => item.kind === 'year' && item.year === '2025');
   assert.equal(year.expanded, true);
   assert.ok(year.items.some(item => item.visit?.id === 'a'));
+});
+
+test('MO-06 planned status and future dates land in nextItems with to_book first', () => {
+  const model = buildMedicalModel({
+    today: '2026-09-26',
+    showMinor: true,
+    events: [
+      visit({ id: 'mrcp', date: '2026-09-26', title: 'MRCP', status: 'to_book', date_precision: 'tbd', weight: 'major' }),
+      visit({ id: 'colo', date: '2027-02-01', title: 'Colonoscopy', status: 'planned', date_precision: 'month', weight: 'major' }),
+      visit({ id: 'bloods', date: '2026-12-01', title: 'Repeat bloods', status: 'planned', date_precision: 'month', weight: 'routine' })
+    ]
+  });
+  assert.equal(model.nextItems[0].id, 'mrcp');
+  assert.ok(model.nextItems.some(item => item.id === 'colo'));
+  assert.ok(model.items.some(item => item.kind === 'upcoming'));
+});
+
+test('MO-07 cadence virtual dose from last Stelara 27/08 + 56d', () => {
+  const visits = [
+    {
+      id: 'stelara-1',
+      date: '2026-08-27',
+      title: 'Stelara 90mg',
+      record_type: 'Prescription',
+      cadence_days: 56,
+      weight: 'major',
+      notes: '',
+      planned: false,
+      virtual: false
+    }
+  ];
+  const virtuals = deriveVirtualDoses(visits, '2026-09-26');
+  assert.equal(virtuals.length, 1);
+  assert.equal(virtuals[0].date, '2026-10-22');
+  assert.equal(virtuals[0].virtual, true);
+
+  const suppressed = deriveVirtualDoses([
+    ...visits,
+    { ...visits[0], id: 'stelara-2', date: '2026-10-20', planned: true }
+  ], '2026-09-26');
+  assert.equal(suppressed.length, 0);
+
+  const model = buildMedicalModel({
+    today: '2026-09-26',
+    events: [
+      visit({
+        id: 'stelara-1',
+        date: '2026-08-27',
+        title: 'Stelara 90mg',
+        record_type: 'Prescription',
+        cadence_days: 56,
+        weight: 'major'
+      })
+    ]
+  });
+  assert.ok(model.visits.some(v => v.virtual && v.date === '2026-10-22'));
+});
+
+test('MO-17 buildThreadModel maps IBD Liver Mind Acute', () => {
+  const threads = buildThreadModel([
+    {
+      id: '1', date: '2026-09-24', title: 'Gastro follow-up', record_type: 'Consultation',
+      lane: 'appointment', provider: 'Dr Keily', notes: 'calprotectin down', episode: null
+    },
+    {
+      id: '2', date: '2026-09-24', title: 'Sore throat', record_type: 'Symptom',
+      lane: 'symptom', notes: '', episode: { id: 'ep', title: 'Head cold' }
+    },
+    {
+      id: '3', date: '2026-08-01', title: 'Therapy', record_type: 'Appointment',
+      lane: 'therapy', provider: 'Kate Semple', notes: '', episode: null
+    }
+  ], [{
+    date: '2026-09-17',
+    markers: [
+      { key: 'ggt', label: 'GGT', value: 233, status: 'High', ref_low: 0, ref_high: 50 },
+      { key: 'calprotectin', label: 'Calprotectin', value: 15, status: 'Normal', ref_low: 0, ref_high: 50 }
+    ]
+  }], '2026-09-26');
+  const ids = threads.lanes.map(l => l.id);
+  assert.ok(ids.includes('IBD'));
+  assert.ok(ids.includes('Liver'));
+  assert.ok(ids.includes('Mind'));
+  assert.ok(ids.includes('Acute'));
 });

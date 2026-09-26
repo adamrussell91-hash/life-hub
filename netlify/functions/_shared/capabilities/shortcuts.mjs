@@ -1313,6 +1313,12 @@ async function handleCreateTask(ctx, input) {
   if (items.length > CREATE_TASK_MAX_ITEMS) {
     return deny(`at most ${CREATE_TASK_MAX_ITEMS} tasks per create_task call`);
   }
+  // Sara may only create health-domain tasks (Medical Overview ↔ Tasks).
+  if (ctx.agentSlug === 'sara') {
+    const bad = items.find(item => (item.domain || 'other') !== 'health');
+    if (bad) return deny('Sara create_task is restricted to domain: health');
+    for (const item of items) item.domain = 'health';
+  }
   const now = new Date().toISOString();
   const today = typeof ctx.today === 'string' && ctx.today.trim() ? ctx.today.trim() : null;
   const writes = items.map(item => {

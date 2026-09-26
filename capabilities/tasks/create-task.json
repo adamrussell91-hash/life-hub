@@ -3,7 +3,8 @@
   "tool_name": "create_task",
   "verb": "Tasks",
   "agents": [
-    "clare"
+    "clare",
+    "sara"
   ],
   "risk": "confirm",
   "kind": "capacity",
