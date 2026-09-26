@@ -3,6 +3,8 @@ import { ID_RE } from './_shared/cognitive-controller.mjs';
 import { createCognitiveService } from './_shared/cognitive-service.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { createAnthropicClient } from './_shared/anthropic-client.mjs';
+import { gatherContext, topicSearchTerms, readCentralNodeMarkdown } from './_shared/cognitive-context.mjs';
+import { writeCentralNodeMarkdown } from './_shared/cognitive-writeback.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
@@ -11,6 +13,14 @@ import { readKnowledgeFile } from './_shared/knowledge-data.mjs';
 export const config = { path: '/api/knowledge/protocols' };
 
 function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
+
+export function parseListPaging(url) {
+  const lim = Number(url.searchParams.get('limit'));
+  const off = Number(url.searchParams.get('offset'));
+  const limit = Number.isFinite(lim) ? Math.min(200, Math.max(1, Math.floor(lim))) : 100;
+  const offset = Number.isFinite(off) ? Math.max(0, Math.floor(off)) : 0;
+  return { limit, offset };
+}
 
 export async function defaultModel(prompt, env, fetchImpl = fetch) {
   const apiKey = env.ANTHROPIC_API_KEY;
@@ -21,7 +31,10 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
     for await (const event of client.streamMessage({
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],
-      maxTokens: Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
+      tools: Array.isArray(prompt.tools) ? prompt.tools : undefined,
+      maxTokens: Number(prompt.maxTokens) > 0
+        ? Math.min(8192, Number(prompt.maxTokens))
+        : Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
     })) if (event.type === 'text') text += event.delta ?? '';
   } catch (error) {
     // Sonnet 5 rejects the client's max_tokens assistant-prefill continuation.
@@ -34,6 +47,8 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
 const STOP = new Set(['about','after','again','also','and','any','are','because','been','before','being','between','but','can','could','for','from','has','have','here','how','into','its','just','like','may','might','more','most','need','not','only','other','our','out','over','really','same','should','some','stay','such','than','that','the','their','them','then','there','they','this','through','too','under','very','want','was','were','what','when','where','whether','which','while','who','why','will','with','would','you','your']);
 
 export function searchableTerms(session) {
+  const topic = topicSearchTerms(session);
+  if (topic.length) return topic;
   return Object.values(session?.intake ?? {})
     .join(' ')
     .toLowerCase()
@@ -55,6 +70,15 @@ function termHits(haystack, term) {
   return false;
 }
 
+function pageBodyText(page) {
+  if (!page || typeof page !== 'object') return '';
+  if (typeof page.body === 'string' && page.body.trim()) return page.body;
+  if (typeof page.content === 'string' && page.content.trim()) return page.content;
+  if (typeof page.markdown === 'string' && page.markdown.trim()) return page.markdown;
+  if (typeof page.text === 'string' && page.text.trim()) return page.text;
+  return '';
+}
+
 export async function defaultRetrieve(session, env, fetchImpl = fetch) {
   const terms = searchableTerms(session);
   if (!terms.length) return { evidence: [], status: 'none' };
@@ -69,17 +93,37 @@ export async function defaultRetrieve(session, env, fetchImpl = fetch) {
     }).filter(({ row, score }) => typeof row?.id === 'string' && score >= 2)
       .sort((left, right) => right.score - left.score)
       .slice(0, 6);
-    const evidence = ranked.map(({ row }) => ({
-      id: `knowledge:${row.id}`,
-      kind: 'knowledge_hub_note',
-      title: typeof row.title === 'string' && row.title ? row.title : row.id,
-      text: typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '',
-      source: 'Knowledge Hub archive'
-    }));
+    const top = ranked.slice(0, 3);
+    const evidence = [];
+    for (const { row } of top) {
+      let text = typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '';
+      try {
+        const page = await readKnowledgeFile(`pages/${row.id}.json`, { env, fetchImpl });
+        const body = pageBodyText(page);
+        if (body) text = body.slice(0, 4000);
+      } catch { /* keep excerpt */ }
+      evidence.push({
+        id: `knowledge:${row.id}`,
+        kind: 'knowledge_hub_note',
+        title: typeof row.title === 'string' && row.title ? row.title : row.id,
+        text,
+        source: 'Knowledge Hub archive'
+      });
+    }
     return evidence.length ? { evidence, status: 'grounded' } : { evidence: [], status: 'none' };
   } catch {
-    return { evidence: [], status: 'none' };
+    return { evidence: [], status: 'unavailable' };
   }
+}
+
+export async function defaultGatherContext(session, env, fetchImpl = fetch, deps = {}) {
+  return gatherContext(session, env, {
+    fetchImpl,
+    retrieveKnowledge: deps.retrieveKnowledge ?? defaultRetrieve,
+    model: deps.model ?? (prompt => defaultModel(prompt, env, fetchImpl)),
+    readCentralNode: deps.readCentralNode,
+    research: deps.research
+  });
 }
 
 export function protocolRunUrl(request) {
@@ -103,10 +147,16 @@ export async function defaultInvokeProtocolRun(request, sessionId, env = {}, fet
 async function serviceFor(env, deps) {
   const store = deps.getStore ? await deps.getStore(env) : await defaultGetCognitiveStore(env);
   if (!store) throw Object.assign(new Error('Protocol session storage is not configured.'), { status: 503, code: 'cognitive_store_unbound' });
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const retrieve = deps.retrieve ?? ((session) => defaultGatherContext(session, env, fetchImpl, deps));
   return createCognitiveService({
     store,
-    model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)),
-    retrieve: deps.retrieve ?? (session => defaultRetrieve(session, env, deps.fetchImpl))
+    model: deps.model ?? (prompt => defaultModel(prompt, env, fetchImpl)),
+    retrieve,
+    env,
+    fetchImpl,
+    readCentralNode: deps.readCentralNode ?? readCentralNodeMarkdown,
+    writeCentralNode: deps.writeCentralNode ?? writeCentralNodeMarkdown
   });
 }
 
@@ -119,7 +169,7 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       try {
         const service = await serviceFor(env, deps);
         const data = url.searchParams.has('list')
-          ? { sessions: await service.list(owner(env)) }
+          ? { sessions: await service.list(owner(env), parseListPaging(url)) }
           : { session: await service.get(owner(env), url.searchParams.get('sessionId') ?? '') };
         return withCors(okResponse(200, data), request, env);
       } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message, error.status >= 500), request, env); }
