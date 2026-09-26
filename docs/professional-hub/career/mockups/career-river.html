@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Career River</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --warm-white: #fbf8f2;
+  --depth: #0a1536;
+  --marine: #142b51;
+  --navy: #17375e;
+  --wave: #376fb7;
+  --high-sea: #f68620;
+  --high-sea-ink: #a85a0c;
+  --ink: #13233a;
+  --muted: #5f6b7d;
+  --faint: #a7abb9;
+  --line: rgba(23, 55, 94, 0.11);
+  --glass: rgba(255, 255, 255, 0.78);
+  --solid: #ffffff;
+  --pastel-blue: #dceafa;
+  --pastel-sage: #dfe9e1; --pastel-sage-ink: #3c5949;
+  --pastel-gold: #f1e2b6; --pastel-gold-ink: #6c581f;
+  --pastel-peach: #f2dfd0; --pastel-peach-ink: #7a5038;
+  --good: #2f7a4f; --good-bg: rgba(47,122,79,.12);
+  --warn: #a85a0c; --warn-bg: rgba(246,134,32,.14);
+  --bad: #a23a3a; --bad-bg: rgba(162,58,58,.10);
+  --on-dark: rgba(255,255,255,.92); --on-dark-muted: rgba(255,255,255,.64); --on-dark-hover: rgba(255,255,255,.1);
+  --radius-sm: 12px; --radius-md: 18px; --radius-lg: 24px;
+  --elev-2: 0 1px 2px rgba(20,35,70,.05), 0 2px 8px rgba(20,35,70,.06);
+  --elev-4: 0 4px 8px rgba(20,35,70,.08), 0 20px 48px rgba(20,35,70,.16);
+  --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--warm-white); color: var(--ink); font-family: var(--font); font-size: 14px; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible, textarea:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+.app { display: flex; min-height: 100vh; }
+.rail { width: 232px; flex: 0 0 232px; background: linear-gradient(180deg, var(--depth), var(--marine)); padding: 28px 14px; position: sticky; top: 0; height: 100vh; }
+.rail__brand { color: var(--on-dark); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 0 10px 24px; }
+.rail__sec { color: var(--on-dark-muted); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; padding: 14px 12px 6px; }
+.rail__link { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 8px 12px; border-radius: var(--radius-sm); color: var(--on-dark-muted); font-size: 13px; font-weight: 500; }
+.rail__link svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; }
+.rail__link.on { background: var(--on-dark-hover); color: var(--on-dark); }
+.rail__note { margin: 18px 12px 0; font-size: 11px; line-height: 1.45; color: var(--on-dark-muted); }
+.topbar { display: none; }
+
+.main { flex: 1; min-width: 0; padding: 36px 44px 64px; display: flex; flex-direction: column; gap: 28px; max-width: 1280px; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+
+.head { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+.head h1 { font-size: 44px; font-weight: 800; letter-spacing: -.02em; color: var(--navy); line-height: 1.05; margin-top: 6px; }
+.head .stats { margin-top: 8px; color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.head .stats b { color: var(--ink); font-weight: 600; }
+.head .actions { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 18px; border-radius: 999px; font-size: 14px; font-weight: 600; border: 1px solid var(--line); background: var(--solid); white-space: nowrap; }
+.btn.primary { background: var(--navy); color: #fff; border-color: transparent; }
+.btn.sm { min-height: 32px; padding: 0 13px; font-size: 12.5px; }
+.btn.ghost { background: transparent; }
+.btn.good { background: var(--good); color: #fff; border-color: transparent; }
+.btn[disabled] { opacity: .55; cursor: default; }
+
+.card { background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--elev-2); }
+.sec-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.sec-title h2 { font-size: 20px; font-weight: 700; color: var(--depth); letter-spacing: -.01em; }
+
+/* add-a-future panel */
+.addf { padding: 20px 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.addf textarea { width: 100%; min-height: 96px; border-radius: var(--radius-sm); border: 1px solid var(--line); padding: 12px; font: inherit; background: var(--solid); resize: vertical; }
+.addf ol { margin: 8px 0 12px; padding-left: 20px; line-height: 1.6; }
+
+/* river */
+.river { padding: 20px 22px 18px; }
+.river__top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.river__top h2 { font-size: 20px; font-weight: 700; color: var(--depth); }
+.river__hint { font-size: 13px; color: var(--muted); }
+.switch { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--solid); border-radius: 999px; padding: 5px 12px 5px 6px; font-size: 12.5px; font-weight: 600; }
+.switch i { width: 30px; height: 18px; border-radius: 999px; background: #cfd4de; position: relative; transition: background .2s; }
+.switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s; }
+.switch[aria-pressed="true"] i { background: var(--navy); }
+.switch[aria-pressed="true"] i::after { transform: translateX(12px); }
+
+.spotted { margin-top: 14px; display: flex; gap: 16px; align-items: flex-start; padding: 14px 16px; border-radius: var(--radius-md); background: linear-gradient(120deg, rgba(31,138,138,.10), rgba(31,138,138,.03)); border: 1px dashed rgba(31,138,138,.45); }
+.spotted__mark { width: 34px; height: 34px; border-radius: 50%; flex: 0 0 34px; display: grid; place-items: center; background: #1f8a8a; color: #fff; }
+.spotted__body { flex: 1; min-width: 0; }
+.spotted__body h3 { font-size: 15px; font-weight: 700; color: #145e5e; }
+.spotted__body p { margin: 4px 0 10px; line-height: 1.5; max-width: 72ch; }
+.spotted__acts { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.river__wrap { position: relative; margin-top: 10px; touch-action: pan-y; }
+.river__wrap.drop { outline: 2px dashed var(--high-sea); outline-offset: 4px; border-radius: var(--radius-md); background: rgba(246,134,32,.04); }
+#river { display: block; width: 100%; height: auto; overflow: visible; }
+#river text { font-family: var(--font); }
+.tip { position: absolute; pointer-events: none; background: var(--depth); color: #fff; font-size: 12px; line-height: 1.4; padding: 8px 10px; border-radius: 10px; max-width: 240px; box-shadow: var(--elev-4); z-index: 5; }
+.tip b { display: block; font-weight: 600; }
+.tip span { color: rgba(255,255,255,.7); }
+
+@keyframes flow { to { stroke-dashoffset: -16; } }
+.spot-line { animation: flow 1.1s linear infinite; }
+@keyframes pulse { 0% { r: 4; opacity: .9; } 100% { r: 22; opacity: 0; } }
+.pulse { animation: pulse 1.4s ease-out 3; }
+@media (prefers-reduced-motion: reduce) { .spot-line, .pulse { animation: none; } }
+
+.legend { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.lg { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--solid); font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.lg .sw { width: 14px; height: 14px; border-radius: 50%; }
+.lg .pct { color: var(--muted); font-weight: 500; }
+.lg[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--navy); border-color: transparent; }
+.lg.fading { opacity: .55; }
+.lg.dotted .sw { background: transparent !important; border: 2px dotted #1f8a8a; }
+.lg.parked { border-style: dashed; color: var(--muted); font-weight: 500; }
+
+.whatif { margin-top: 14px; padding: 14px 16px; border-radius: var(--radius-md); background: rgba(246,134,32,.07); border: 1px solid rgba(246,134,32,.25); }
+.whatif__head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.whatif__head b { font-size: 14px; }
+.moves { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.move { touch-action: none; user-select: none; -webkit-user-select: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 10px; border-radius: 999px; background: var(--solid); border: 1.5px dashed var(--high-sea); font-size: 13px; font-weight: 600; cursor: grab; }
+.move .grip { color: var(--high-sea); font-size: 11px; letter-spacing: -1px; }
+.move[aria-pressed="true"] { background: var(--high-sea); color: #fff; border-style: solid; }
+.move[aria-pressed="true"] .grip { color: #fff; }
+.move-ghost { position: fixed; z-index: 50; pointer-events: none; transform: translate(-50%, -50%) rotate(-3deg); box-shadow: var(--elev-4); }
+.whatif__result { margin-top: 10px; font-size: 13px; line-height: 1.55; min-height: 20px; }
+.whatif__result .up { color: var(--good); font-weight: 700; }
+.delta { display: inline-block; margin-right: 12px; white-space: nowrap; }
+
+/* two-column */
+.cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.panel { padding: 22px; }
+
+.fd-head { display: flex; gap: 16px; align-items: center; }
+.fd-head h2 { font-size: 22px; font-weight: 700; color: var(--depth); }
+.fd-head p { margin: 3px 0 0; color: var(--muted); }
+.ring { margin-left: auto; flex: 0 0 auto; position: relative; width: 76px; height: 76px; }
+.ring svg { transform: rotate(-90deg); }
+.ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ring small { position: absolute; left: 0; right: 0; bottom: -16px; text-align: center; font-size: 10.5px; color: var(--muted); }
+.banner { margin-top: 16px; padding: 12px 14px; border-radius: var(--radius-sm); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.banner.fade { background: #eef0f4; }
+.banner.spot { background: rgba(31,138,138,.1); color: #145e5e; }
+.banner span { flex: 1; min-width: 200px; }
+.h3 { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 26px 0 10px; }
+.crit { display: grid; grid-template-columns: 14px 1fr; gap: 4px 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.crit:first-of-type { border-top: 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; }
+.dot.green { background: var(--good); } .dot.amber { background: var(--high-sea); } .dot.red { background: var(--bad); }
+.crit .c { font-weight: 600; }
+.crit .e { grid-column: 2; font-size: 12.5px; color: var(--muted); }
+.crit .e.none { color: var(--bad); }
+.stone { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.stone:first-of-type { border-top: 0; }
+.stone .when { font-size: 12px; color: var(--muted); width: 64px; flex: 0 0 64px; font-variant-numeric: tabular-nums; }
+.stone .l { flex: 1; font-weight: 500; }
+.stone .shared { font-size: 11px; font-weight: 700; color: var(--navy); background: var(--pastel-blue); border-radius: 999px; padding: 2px 8px; margin-left: 6px; white-space: nowrap; }
+.stone .new { font-size: 11px; font-weight: 700; color: var(--high-sea-ink); background: var(--warn-bg); border-radius: 999px; padding: 2px 8px; margin-left: 6px; }
+.ghost { display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.ghost:first-of-type { border-top: 0; }
+.av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+.ghost .route { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.draft { grid-column: 1 / -1; background: var(--solid); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; line-height: 1.55; font-size: 13px; }
+
+/* harvest */
+.hv { border-top: 1px solid var(--line); padding: 16px 0; }
+.hv:first-of-type { border-top: 0; padding-top: 4px; }
+.hv__src { font-size: 11.5px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.hv h3 { font-size: 15px; font-weight: 700; margin: 6px 0 8px; line-height: 1.35; }
+.hv h3[contenteditable="true"] { background: var(--solid); outline: 1.5px solid var(--wave); border-radius: 6px; padding: 2px 6px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--pastel-gold); color: var(--pastel-gold-ink); white-space: nowrap; }
+.fit { display: inline-flex; gap: 3px; align-items: center; font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+.fit i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+details.star { margin-top: 10px; font-size: 13px; }
+details.star summary { cursor: pointer; font-weight: 600; color: var(--navy); font-size: 12.5px; }
+details.star dl { display: grid; grid-template-columns: 22px 1fr; gap: 6px 8px; margin: 10px 0 0; line-height: 1.5; }
+details.star dt { font-weight: 800; color: var(--navy); }
+details.star dd { margin: 0; }
+.hv__foot { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.wit { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); flex-basis: 100%; margin-bottom: 4px; }
+.wit .av { width: 24px; height: 24px; font-size: 9.5px; border: 2px solid #fff; margin-right: -10px; }
+.wit .av:last-of-type { margin-right: 0; }
+.hv.done { opacity: .6; }
+.hv.done .hv__foot .btn { display: none; }
+.kept { font-size: 12.5px; font-weight: 600; color: var(--good); }
+
+/* applications */
+.apps { display: grid; grid-template-columns: minmax(0,1fr); gap: 14px; }
+.app-row { display: flex; gap: 14px; align-items: center; padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--line); background: var(--solid); flex-wrap: wrap; }
+.app-row .t { font-weight: 700; }
+.app-row .m { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.app-row .grow { flex: 1; min-width: 200px; }
+.pill { font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.pill.good { background: var(--good-bg); color: var(--good); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.match { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--navy); }
+.match small { font-size: 11px; font-weight: 600; color: var(--muted); display: block; text-align: right; }
+.fb { flex-basis: 100%; font-size: 12.5px; color: var(--muted); padding-left: 2px; }
+.fb b { color: var(--ink); font-weight: 600; }
+
+.mirror { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 22px; padding: 20px; border-radius: var(--radius-md); background: #f4f1ea; border: 1px solid var(--line); }
+.mirror textarea { width: 100%; min-height: 250px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; font: inherit; font-size: 13px; line-height: 1.55; background: var(--solid); resize: vertical; }
+.mc { padding: 12px 0; border-top: 1px solid var(--line); }
+.mc:first-of-type { border-top: 0; padding-top: 0; }
+.mc__top { display: flex; gap: 10px; align-items: baseline; }
+.mc__top .c { flex: 1; font-weight: 600; line-height: 1.4; }
+.mc__top .n { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px; }
+.bar { height: 6px; border-radius: 999px; background: rgba(23,55,94,.08); margin: 8px 0 6px; overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 999px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+.mc .ev { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.mc .ev.gap { color: var(--bad); font-weight: 600; }
+.mc .act { margin-top: 8px; }
+.refs { margin-top: 18px; grid-column: 1 / -1; }
+.ref { display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.ref .w { font-size: 12.5px; color: var(--muted); }
+.ref .w b { color: var(--ink); }
+.warmup { color: var(--warn); font-weight: 600; }
+.brief { grid-column: 1 / -1; background: var(--solid); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 16px 18px; line-height: 1.6; font-size: 13px; }
+.brief h4 { margin: 0 0 6px; font-size: 14px; }
+.brief ol { margin: 6px 0; padding-left: 20px; }
+
+/* ledger */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.flt { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--solid); display: inline-flex; gap: 6px; align-items: center; }
+.flt[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: transparent; }
+.flt i { width: 9px; height: 9px; border-radius: 50%; }
+.led { display: grid; grid-template-columns: 76px 1fr auto; gap: 14px; align-items: center; padding: 10px 4px; border-top: 1px solid var(--line); }
+.led .d { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.led .t { font-weight: 500; }
+.led.fresh .t::after { content: "this week"; margin-left: 8px; font-size: 11px; font-weight: 700; color: var(--good); background: var(--good-bg); padding: 2px 8px; border-radius: 999px; }
+.led .bs { display: flex; gap: 3px; }
+.led .bs i { width: 9px; height: 9px; border-radius: 50%; }
+
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--depth); color: #fff; padding: 12px 18px; border-radius: 999px; font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .25s, transform .25s; z-index: 60; max-width: calc(100vw - 32px); box-shadow: var(--elev-4); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.foot { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+@media (max-width: 1100px) { .cols { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 900px) {
+  .rail { display: none; }
+  .topbar { display: flex; align-items: center; gap: 10px; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--depth); color: var(--on-dark); padding: 12px 16px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .app { flex-direction: column; }
+  .main { padding: 20px 16px 48px; gap: 22px; }
+  .head h1 { font-size: 34px; }
+  .head .actions { margin-left: 0; }
+  .addf, .mirror { grid-template-columns: minmax(0,1fr); }
+  .river, .panel { padding: 16px 14px; }
+  .switch { margin-left: 0; }
+  .spotted { flex-direction: column; gap: 10px; }
+  .led { grid-template-columns: 64px 1fr; }
+  .led .bs { grid-column: 2; }
+}
+</style>
+
+<div class="app">
+  <aside class="rail" aria-label="Professional Hub">
+    <div class="rail__brand">Professional Hub</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9"/></svg>Home</div>
+    <div class="rail__sec">Network</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 20c0-3.3 2.5-5.5 5.5-5.5s5.5 2.2 5.5 5.5"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.2c2.6.1 4.8 2.2 4.8 5.3"/></svg>People</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><rect x="5" y="9" width="6" height="11"/><rect x="13" y="4" width="6" height="16"/></svg>Organisations</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><path d="M4 6h16v10H8l-4 4z"/></svg>Communications</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>Meetings</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 20h14"/></svg>Events</div>
+    <div class="rail__link on"><svg viewBox="0 0 24 24"><path d="M3 12c4 0 5-4 9-4"/><path d="M12 8c3 0 4-3 9-3"/><path d="M12 8c3 0 4 3 9 3"/><path d="M12 8c3 0 4 8 9 8"/></svg>Career</div>
+    <div class="rail__link"><svg viewBox="0 0 24 24"><circle cx="6" cy="6.5" r="2.1"/><circle cx="18" cy="9" r="2.1"/><circle cx="8" cy="18" r="2.1"/><path d="M7.7 8.1 9 15.5M16.1 10 10 16.3"/></svg>Network Ecology</div>
+    <div class="rail__sec">Hubs</div>
+    <div class="rail__link">Life</div><div class="rail__link">Teaching</div><div class="rail__link">Knowledge</div>
+    <p class="rail__note">Applications has folded into Career.</p>
+  </aside>
+  <div class="topbar">Professional Hub · Career</div>
+
+  <main class="main">
+    <header class="head">
+      <div>
+        <div class="eyebrow">Professional</div>
+        <h1>Career</h1>
+        <div class="stats" id="stats"></div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="addFutureBtn" aria-expanded="false">Add a future</button>
+        <button class="btn primary" id="newAppBtn">New application</button>
+      </div>
+    </header>
+
+    <section class="card addf" id="addFuture" hidden>
+      <div>
+        <div class="eyebrow">Add a future</div>
+        <p style="margin:6px 0 10px;line-height:1.5">Paste a real job ad, or just describe the role. Ann drafts the criteria a role like this usually asks for. Paste a real ad later to sharpen them.</p>
+        <label for="futureText" class="eyebrow" style="display:block;margin-bottom:6px">The role</label>
+        <textarea id="futureText">Head of Teaching &amp; Learning at a larger K–12 school, in about four years.</textarea>
+      </div>
+      <div>
+        <div class="eyebrow">Ann's draft criteria</div>
+        <ol>
+          <li>Lead instructional improvement across faculties</li>
+          <li>Design and run whole-staff professional learning</li>
+          <li>Use data to evaluate teaching programs</li>
+          <li>Coach and appraise middle leaders</li>
+          <li>Manage a professional learning budget</li>
+        </ol>
+        <p class="muted" style="margin:0 0 12px;font-size:13px">First read: 3 of 5 already have evidence. You'd start at about 62%.</p>
+        <button class="btn primary sm" id="addFutureGo">Add to river</button>
+      </div>
+    </section>
+
+    <section class="card river" aria-labelledby="riverTitle">
+      <div class="river__top">
+        <h2 id="riverTitle">Your river</h2>
+        <span class="river__hint" id="riverHint">One past, forking into the futures you're weighing. Hover or tap a future to light up the evidence behind it.</span>
+        <button class="switch" id="ghostSwitch" aria-pressed="true"><i></i>People who got there</button>
+      </div>
+
+      <div class="spotted" id="spotted">
+        <div class="spotted__mark" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></div>
+        <div class="spotted__body">
+          <h3>Ann spotted a path you didn't plan</h3>
+          <p id="spottedText"></p>
+          <div class="spotted__acts">
+            <button class="btn primary sm" id="spotAdd">Add this future</button>
+            <button class="btn sm" id="spotShow" aria-pressed="false">Show me the evidence</button>
+            <button class="btn ghost sm" id="spotNo">Not for me</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="river__wrap" id="riverWrap">
+        <svg id="river" role="img" aria-label="Career river: your past as one line forking into possible futures"></svg>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+
+      <div class="legend" id="legend" role="group" aria-label="Futures"></div>
+
+      <div class="whatif">
+        <div class="whatif__head"><b>What if…</b><span class="muted" style="font-size:13px">Drag a move onto the river, or tap it. Every future reacts.</span>
+          <button class="btn ghost sm" id="resetMoves" style="margin-left:auto">Reset</button></div>
+        <div class="moves" id="moves"></div>
+        <div class="whatif__result" id="whatifResult" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="card panel" id="future" aria-live="polite"></section>
+      <section class="card panel" aria-labelledby="hvTitle">
+        <div class="sec-title"><h2 id="hvTitle">Skills scan</h2><span class="muted" style="font-size:13px">Sun 27 Sep · Ann read your hubs</span></div>
+        <div id="harvest"></div>
+      </section>
+    </div>
+
+    <section class="card panel" aria-labelledby="appsTitle">
+      <div class="sec-title"><h2 id="appsTitle">Applications</h2><span class="muted" style="font-size:13px">Each one is a probe out along a branch</span></div>
+      <div class="apps" id="apps"></div>
+    </section>
+
+    <section class="card panel" aria-labelledby="ledTitle">
+      <div class="sec-title"><h2 id="ledTitle">Skills ledger</h2><span class="muted" style="font-size:13px" id="ledCount"></span></div>
+      <div class="filters" id="filters"></div>
+      <div id="ledger"></div>
+      <button class="btn sm" id="ledMore" style="margin-top:12px">Show all</button>
+    </section>
+
+    <p class="foot">Mockup. People, schools, dates and percentages are placeholder data. Criteria tags use the APST (AITSL) focus areas.</p>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+const NOW = 2026.74, START = 2015, END = 2033, PAST = 0.4;
+const tOf = y => y <= NOW ? PAST * (y - START) / (NOW - START) : PAST + (1 - PAST) * (y - NOW) / (END - NOW);
+const term = y => { const f = y - Math.floor(y); return (f < .3 ? 'T1 ' : f < .52 ? 'T2 ' : f < .76 ? 'T3 ' : 'T4 ') + Math.floor(y); };
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const monYr = y => MONTHS[Math.min(11, Math.floor((y - Math.floor(y)) * 12))] + ' ' + Math.floor(y);
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const PEOPLE = {
+  HM: { n: 'Dr Helen Marsh', r: 'Principal', c: '#2e4a78' },
+  JW: { n: 'James Whitford', r: 'Head of Teaching & Learning', c: '#5b6b86' },
+  AR: { n: 'Anita Rao', r: 'Parents & Friends president', c: '#8a5a44' },
+  LC: { n: 'Lucy Chen', r: 'Early-career teacher', c: '#3f7f5c' },
+  DK: { n: 'Dan Kowalski', r: 'English faculty', c: '#6d5ba8' },
+};
+
+const B = [
+  { id: 'lect', name: 'University lecturer, gifted education', short: 'Lecturer', where: 'Faculty of Education', color: '#6d5ba8', lane: -0.86, r: 44, arr: 2031.4,
+    stones: [{ y: 2027.7, l: 'Publish the gifted policy as a case study' }, { y: 2028.6, l: 'Start a part-time PhD' }, { y: 2030.4, l: 'Sessional tutoring, two semesters' }],
+    ghosts: [{ i: 'PN', n: 'Dr Priya Natarajan', c: '#6d5ba8', now: 'Lecturer, gifted education', way: [[1.5, 'Master of Research'], [4, 'Sessional tutor'], [6, 'Lecturer']] }],
+    crit: [['Doctorate, or close to completing one', 'red', null], ['Research publications in gifted education', 'amber', 'Policy evidence summary (internal), 2026'], ['University teaching experience', 'red', null], ['Deep knowledge of gifted pedagogy', 'green', 'Gifted education certificate, 2021 · identification testing since 2021']] },
+  { id: 'gift', name: 'Head of Gifted Education', short: 'Gifted', where: 'Larger independent school', color: '#b8457a', lane: -0.52, r: 81, arr: 2027.85,
+    stones: [{ y: 2027.45, l: 'Co-manage the G&T program budget' }],
+    ghosts: [{ i: 'SL', n: 'Sarah Lindqvist', c: '#b8457a', now: 'Head of Gifted Education', way: [[1, 'G&T coordinator, second school'], [2.2, 'Head of Gifted']] }],
+    crit: [['Expertise in identifying gifted learners', 'green', 'Identification testing since 2021 · advised two schools, 2026'], ['Lead staff professional learning', 'green', "Whole-staff PD 'Teaching the top 10%', 2024"], ['Write and implement policy', 'green', 'Acceleration guidelines, 2025 · policy consultation, 2026'], ['Manage a program budget', 'red', null]] },
+  { id: 'dp', name: 'Deputy Principal', short: 'Deputy', where: 'K–12 school', color: '#376fb7', lane: -0.17, r: 58, arr: 2030.2,
+    stones: [{ y: 2028.4, l: 'Lead a team for 12+ months' }, { y: 2029.2, l: 'Timetabling and staffing exposure' }, { y: 2029.8, l: 'Acting Deputy for a term' }],
+    ghosts: [{ i: 'MO', n: 'Michael Okafor', c: '#376fb7', now: 'Deputy Principal', way: [[1.5, 'Leader of Learning'], [3.5, 'Acting Deputy'], [4.5, 'Deputy']] },
+             { i: 'TR', n: 'Tom Reyes', c: '#2e4a78', now: 'Deputy Principal', way: [[2, 'Head of Teaching & Learning'], [4.8, 'Assistant Principal'], [6.2, 'Deputy']] }],
+    crit: [['Lead whole-school change', 'green', 'Gifted policy consultation with 40 staff, 2026'], ['Manage staff and performance', 'amber', 'Mentored two pre-service teachers, 2019 · one early-career teacher, 2026'], ['Timetabling, staffing and budgets', 'red', null], ['Community and board engagement', 'green', 'Presented to the school board, 2025']] },
+  { id: 'hod', name: 'Leader of Learning (faculty head)', short: 'Leader', where: 'Your school or nearby', color: '#3f7f5c', lane: 0.17, r: 72, arr: 2028.45,
+    stones: [{ y: 2028.0, l: 'Manage a faculty budget' }],
+    ghosts: [],
+    crit: [['Lead a faculty team', 'amber', 'Committee chair only; no line management yet'], ['Curriculum and assessment design', 'green', 'Year 8 extension unit, 2017 · Year 11 research projects, 2025'], ['Use data to improve results', 'green', 'Extension cohort data dashboard, 2023'], ['Manage a faculty budget', 'red', null]] },
+  { id: 'policy', name: 'Curriculum & Policy Adviser', short: 'Policy', where: 'Sector office', color: '#1f8a8a', lane: 0.52, r: 69, arr: 2028.95, spotted: true,
+    stones: [{ y: 2028.1, l: 'Secondment to the sector office' }],
+    ghosts: [],
+    crit: [['Policy writing and consultation', 'green', 'Gifted policy consultation, 40 staff, 2026'], ['Knowledge of the sector and its systems', 'amber', 'Submission to the sector curriculum review, 2026'], ['Work across schools', 'green', 'Advised two schools on identification, 2026'], ['Summarise evidence for decision-makers', 'green', "The policy's evidence summary, 2026"]] },
+  { id: 'edtech', name: 'EdTech learning designer', short: 'EdTech', where: 'Ed product company', color: '#8b8fa0', lane: 0.86, r: 31, arr: 2031.0, fading: 'March 2026',
+    stones: [{ y: 2028.2, l: 'Ship a small learning product' }],
+    ghosts: [],
+    crit: [['Instructional design portfolio', 'amber', 'Extension LMS course, 2020'], ['Product or UX experience', 'red', null], ['Data and analytics', 'green', 'Extension cohort dashboard, 2023'], ['Industry network', 'red', null]] },
+];
+const byId = Object.fromEntries(B.map(b => [b.id, b]));
+
+const SHARED = [
+  { id: 'wsi', y: 2027.25, l: 'Lead the gifted policy rollout school-wide', serves: ['dp', 'gift', 'hod', 'policy', 'lect'] },
+  { id: 'halt', y: 2027.7, l: 'Lead Teacher accreditation (HALT)', serves: ['dp', 'hod', 'policy'] },
+];
+
+const EVIDENCE = [
+  [2016.4, 'Ran the debating program', ['dp', 'hod']],
+  [2017.2, 'Wrote the Year 8 extension unit', ['gift', 'hod', 'lect']],
+  [2017.9, 'Tournament of Minds coach, state finalists', ['gift']],
+  [2018.6, 'Faculty PD on differentiation', ['gift', 'lect', 'hod', 'policy']],
+  [2019.3, 'Mentored two pre-service teachers', ['dp', 'hod', 'lect']],
+  [2020.4, 'Remote learning plan for 300 students', ['dp', 'hod', 'policy', 'edtech']],
+  [2020.9, 'Built the extension LMS course', ['edtech', 'gift']],
+  [2021.3, 'Gifted education certificate', ['gift', 'lect', 'policy']],
+  [2021.8, 'Started G&T identification testing', ['gift', 'policy', 'lect']],
+  [2022.7, 'Chaired the wellbeing committee', ['dp']],
+  [2023.3, 'Parent information series, four nights', ['gift', 'dp']],
+  [2023.9, 'Data dashboard for the extension cohort', ['edtech', 'policy', 'gift', 'hod']],
+  [2024.3, "Whole-staff PD: 'Teaching the top 10%'", ['gift', 'dp', 'hod', 'policy', 'lect']],
+  [2024.8, 'Set up the cross-school G&T network', ['gift', 'policy', 'dp']],
+  [2025.25, 'Drafted acceleration guidelines', ['gift', 'policy']],
+  [2025.6, 'Presented to the school board', ['dp', 'policy']],
+  [2025.9, 'Supervised Year 11 research projects', ['lect', 'gift', 'hod']],
+  [2026.1, 'Gifted policy consultation, 40 staff', ['policy', 'gift', 'dp']],
+  [2026.3, 'Submission to the sector curriculum review', ['policy', 'lect']],
+  [2026.45, "Wrote the policy's evidence summary", ['policy', 'lect', 'gift']],
+  [2026.58, 'Advised two schools on identification', ['policy', 'gift']],
+].map(([y, t, b]) => ({ y, t, b }));
+
+const ROLES = [{ a: 2015.1, z: 2023.2, l: 'English teacher' }, { a: 2023.2, z: NOW, l: 'G&T coordinator' }];
+const PAST_APPS = [{ a: 2022.2, z: 2022.55, l: 'Leader of Learning, English', o: 'Not successful' }, { a: 2023.0, z: 2023.2, l: 'G&T coordinator', o: 'Successful' }];
+
+const HARVEST = [
+  { id: 'h1', t: 'Gifted education policy approved by the executive', src: 'Meetings · Exec, Tue 22 Sep', src2: 'Teaching · Policy draft v7', tags: ['APST 1.5 Lead', 'APST 7.2'], b: ['gift', 'dp', 'policy', 'hod'], w: ['HM', 'JW'],
+    star: ['No written policy for gifted students; practice varied by faculty.', 'Draft a whole-school policy and get it through the executive.', 'Consulted 40 staff over two terms, ran parent focus groups, wrote seven drafts and an evidence summary.', 'Approved 22 Sep. School-wide from Term 1 2027.'] },
+  { id: 'h2', t: 'Year 9 extension parent evening, 64 families attended', src: 'Events · Thu 24 Sep', tags: ['APST 7.3'], b: ['gift', 'dp'], w: ['AR'],
+    star: ['Parents unclear on how extension placement works.', 'Explain identification and pathways in one evening.', 'Built the presentation, ran a Q&A panel with two students.', '64 families; 11 follow-up emails answered; placement queries down.'] },
+  { id: 'h3', t: 'Mentored an early-career teacher to Proficient accreditation', src: 'Meetings · 9 mentoring sessions', src2: 'Tasks · done Fri 25 Sep', tags: ['APST 6.3 Lead', 'APST 6.2'], b: ['dp', 'hod', 'lect'], w: ['LC', 'HM'],
+    star: ['A new teacher needed a mentor for Proficient accreditation.', 'Guide her evidence and observations over the year.', 'Nine sessions, three observed lessons with written feedback.', 'Accredited Proficient this week.'] },
+  { id: 'h4', t: 'Your Stage 5 assessment rubric adopted by the English faculty', src: 'Knowledge · Rubric doc, 6 edits by others', tags: ['APST 5.1', 'APST 5.3'], b: ['hod', 'policy'], w: ['DK'],
+    star: ['Stage 5 marking was inconsistent across classes.', 'Write one rubric the faculty could share.', 'Drafted it, moderated 30 samples with two colleagues.', 'Adopted faculty-wide for Term 4.'] },
+];
+
+const MOVES = [
+  { id: 'm1', l: 'Acting Head of Department, T1 2027', y: 2027.15, on: 'hod', fx: { dp: [9, -0.6], hod: [14, -0.5], policy: [3, 0] } },
+  { id: 'm2', l: 'Start an M.Ed (research) in 2027', y: 2027.1, on: 'lect', fx: { lect: [16, -1.3], policy: [6, -0.2], gift: [4, 0] } },
+  { id: 'm3', l: 'Present at the state gifted conference', y: 2027.4, on: 'gift', fx: { gift: [5, -0.1], lect: [6, -0.2], policy: [7, -0.3] } },
+  { id: 'm4', l: 'Join the regional curriculum working party (2 yrs)', y: 2028.5, shared: ['dp', 'hod', 'policy'], fx: { policy: [10, -0.4], dp: [4, 0], hod: [3, 0] } },
+];
+
+const APP_CRIT = [
+  { c: 'Demonstrated expertise in identifying and meeting the needs of gifted and high-potential learners', base: 92, ev: 'Identification testing since 2021 · gifted certificate, 2021 · advised two schools, 2026' },
+  { c: 'Proven ability to lead professional learning for staff', base: 85, ev: "Whole-staff PD 'Teaching the top 10%', 2024 · faculty PD on differentiation, 2018" },
+  { c: 'Experience developing and implementing whole-school policy', base: 60, ev: 'Acceleration guidelines, 2025 · policy consultation, 2026', boost: { by: 'h1', to: 94, ev: 'Gifted policy approved by the executive, Sep 2026 · consultation with 40 staff' } },
+  { c: 'Experience managing a program budget and resources', base: 12, ev: null, gap: 'Ask to co-manage the G&T program budget in Term 4' },
+  { c: 'Strong communication with parents, carers and the community', base: 58, ev: 'Parent information series, 2023', boost: { by: 'h2', to: 88, ev: 'Year 9 extension parent evening, 64 families · parent series, 2023' } },
+];
+const REFS = [
+  { p: 'HM', n: 7, last: '2 weeks ago', warm: false, brief: ['The gifted policy: you saw the consultation with 40 staff and the executive approval in September.', "'Teaching the top 10%' in 2024, and what changed in classrooms after it.", 'The identification process I set up in 2021.'] },
+  { p: 'JW', n: 5, last: '7 months ago', warm: true, brief: ['The whole-staff PD I designed and ran with you in 2024.', "How I mentored Lucy to Proficient this year.", 'My work on the policy evidence summary.'] },
+  { p: 'AR', n: 2, last: '1 month ago', warm: false, brief: ['The parent evenings, including 64 families at the Year 9 night.', 'How I handled parent questions about placement.', 'Anything you noticed from the Parents & Friends side.'] },
+];
+
+const S = {
+  sel: 'dp', hover: null, lock: null, ghosts: true, spotted: 'pending', parked: new Set(), moves: new Set(),
+  kept: new Set(), binned: new Set(), tasks: new Set(), extraStones: [], mirrorOpen: true, briefOpen: 'HM', coffee: null,
+  ledFilter: 'all', ledAll: false, pulseAt: null, gapDone: false,
+  disp: {},
+};
+
+// ---------- derived values ----------
+function visible(b) { return !S.parked.has(b.id) && !(b.spotted && S.spotted === 'dismissed'); }
+function target(b) {
+  let r = b.r, a = b.arr;
+  for (const m of MOVES) if (S.moves.has(m.id) && m.fx[b.id]) { r += m.fx[b.id][0]; a += m.fx[b.id][1]; }
+  if (b.id === 'gift' && S.kept.has('h1')) r += 3;
+  if (b.id === 'dp' && S.kept.has('h3')) r += 2;
+  r = Math.min(97, r);
+  let s = NOW + 0.12;
+  for (const x of SHARED) if (x.serves.includes(b.id)) s = Math.max(s, x.y + 0.08);
+  for (const m of MOVES) if (S.moves.has(m.id) && m.shared && m.shared.includes(b.id)) s = Math.max(s, m.y + 0.08);
+  a = Math.max(a, s + 0.55);
+  return { r, a, s };
+}
+function allEvidence() {
+  const kept = HARVEST.filter(h => S.kept.has(h.id)).map((h, i) => ({ y: NOW - 0.015 - i * 0.012, t: h.t, b: h.b, fresh: true, id: h.id }));
+  return EVIDENCE.concat(kept);
+}
+
+// ---------- geometry ----------
+const wrap = $('#riverWrap'), svg = $('#river'), tip = $('#tip');
+let G;
+function geo() {
+  const W = Math.max(300, wrap.clientWidth), vertical = W < 640;
+  if (!vertical) {
+    const H = 470, L = 26, R = 196, T = 36, Bm = 46, cy = (T + H - Bm) / 2, half = (H - Bm - T) / 2 - 6;
+    return { W, H, vertical, P: (t, l) => [L + t * (W - L - R), cy + l * half], half };
+  }
+  const H = 1020, T = 96, Bm = 36, M = 30, cx = W / 2 + 10, half = W / 2 - M - 6;
+  return { W, H, vertical, P: (t, l) => [cx + l * half, H - Bm - t * (H - Bm - T)], half };
+}
+const f = p => p[0].toFixed(1) + ' ' + p[1].toFixed(1);
+function curve(pts) {
+  let d = 'M' + f(G.P(...pts[0]));
+  for (let i = 1; i < pts.length; i++) {
+    const [t0, l0] = pts[i - 1], [t1, l1] = pts[i], dt = (t1 - t0) / 2;
+    d += ' C' + f(G.P(t0 + dt, l0)) + ' ' + f(G.P(t1 - dt, l1)) + ' ' + f(G.P(t1, l1));
+  }
+  return d;
+}
+
+// ---------- river render ----------
+function focusId() { return S.lock || S.hover; }
+function drawRiver() {
+  G = geo();
+  const { W, H, vertical, P } = G;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const vis = B.filter(visible);
+  const fid = focusId();
+  const tN = tOf(NOW), pN = P(tN, 0);
+  let o = `<defs><linearGradient id="fut" x1="${vertical ? 0 : 0}" y1="${vertical ? 1 : 0}" x2="${vertical ? 0 : 1}" y2="0"><stop offset="0" stop-color="#376fb7" stop-opacity=".07"/><stop offset="1" stop-color="#376fb7" stop-opacity="0"/></linearGradient></defs>`;
+  // future wash + now line
+  if (!vertical) {
+    o += `<rect x="${pN[0]}" y="0" width="${W - pN[0]}" height="${H - 30}" fill="url(#fut)" rx="14"/>`;
+    o += `<line x1="${pN[0]}" y1="10" x2="${pN[0]}" y2="${H - 34}" stroke="#17375e" stroke-opacity=".35" stroke-dasharray="3 5"/>`;
+    o += `<text x="${pN[0] + 8}" y="20" font-size="11" font-weight="700" fill="#17375e" letter-spacing=".06em">NOW · ${term(NOW)}</text>`;
+    o += `<text x="${pN[0] - 8}" y="20" font-size="11" font-weight="700" fill="#5f6b7d" text-anchor="end" letter-spacing=".06em">WHAT HAPPENED</text>`;
+    o += `<text x="${W - 10}" y="20" font-size="11" font-weight="700" fill="#5f6b7d" text-anchor="end" letter-spacing=".06em">WHAT COULD</text>`;
+  } else {
+    o += `<rect x="0" y="0" width="${W}" height="${pN[1]}" fill="url(#fut)" rx="14"/>`;
+    o += `<line x1="4" y1="${pN[1]}" x2="${W - 4}" y2="${pN[1]}" stroke="#17375e" stroke-opacity=".35" stroke-dasharray="3 5"/>`;
+    o += `<text x="6" y="${pN[1] - 8}" font-size="10.5" font-weight="700" fill="#17375e" letter-spacing=".06em">NOW · ${term(NOW)}</text>`;
+    o += `<text x="6" y="${pN[1] + 18}" font-size="10.5" font-weight="700" fill="#5f6b7d" letter-spacing=".06em">WHAT HAPPENED</text>`;
+    o += `<text x="6" y="14" font-size="10.5" font-weight="700" fill="#5f6b7d" letter-spacing=".06em">WHAT COULD</text>`;
+  }
+  // axis
+  for (const y of [2015, 2018, 2021, 2024, 2028, 2030, 2032]) {
+    const p = P(tOf(y), 0);
+    o += vertical
+      ? `<text x="6" y="${p[1] + 4}" font-size="10" fill="#8a93a3" font-variant-numeric="tabular-nums">${y}</text>`
+      : `<text x="${p[0]}" y="${H - 12}" font-size="11" fill="#8a93a3" text-anchor="middle">${y}</text><line x1="${p[0]}" y1="${H - 30}" x2="${p[0]}" y2="${H - 26}" stroke="#a7abb9"/>`;
+  }
+  // roles + past applications (desktop only)
+  if (!vertical) {
+    for (const r of ROLES) {
+      const a = P(tOf(r.a), 0.2), z = P(tOf(r.z), 0.2);
+      o += `<line x1="${a[0] + 3}" y1="${a[1]}" x2="${z[0] - 3}" y2="${a[1]}" stroke="#17375e" stroke-opacity=".25" stroke-width="3" stroke-linecap="round"/>`;
+      o += `<text x="${a[0] + 4}" y="${a[1] + 18}" font-size="11.5" font-weight="600" fill="#5f6b7d">${r.l}</text>`;
+    }
+    PAST_APPS.forEach((ap, k) => {
+      const a = P(tOf(ap.a), 0), z = P(tOf(ap.z), 0), good = ap.o === 'Successful', mx = (a[0] + z[0]) / 2, hgt = k ? 44 : 96;
+      o += `<path d="M${a[0]} ${a[1] - 9} Q${mx} ${a[1] - hgt} ${z[0]} ${z[1] - 9}" fill="none" stroke="${good ? '#2f7a4f' : '#a23a3a'}" stroke-width="1.5" stroke-dasharray="${good ? '0' : '4 3'}" data-tip="${esc(ap.l)}|Application · ${ap.o}"/>`;
+      o += `<circle cx="${z[0]}" cy="${z[1] - 9}" r="3.5" fill="${good ? '#2f7a4f' : '#a23a3a'}"/>`;
+      o += `<text x="${mx}" y="${a[1] - hgt / 2 - 12}" font-size="10.5" font-weight="600" fill="${good ? '#2f7a4f' : '#a23a3a'}" text-anchor="middle">${ap.o === 'Successful' ? '✓' : '✕'} ${esc(ap.l)}</text>`;
+    });
+  }
+  // trunk
+  o += `<path d="${curve([[0, 0], [tN, 0]])}" stroke="#17375e" stroke-width="${vertical ? 11 : 13}" stroke-linecap="round" fill="none"/>`;
+
+  // ghost paths (under branches)
+  if (S.ghosts) {
+    const gb = byId[fid] || byId[S.sel];
+    if (gb && visible(gb)) gb.ghosts.forEach((g, k) => {
+      const side = gb.lane < 0 ? -1 : 1, off = side * (0.1 + k * 0.1);
+      const tot = g.way[g.way.length - 1][0];
+      const pts = [[tN, 0]].concat(g.way.map(([dy]) => [tOf(NOW + dy), gb.lane * (dy / tot) + off * Math.min(1, dy / 1.2)]));
+      o += `<path d="${curve(pts)}" fill="none" stroke="${g.c}" stroke-opacity=".5" stroke-width="1.6" stroke-dasharray="1 5" stroke-linecap="round"/>`;
+      g.way.forEach(([dy, lab], j) => {
+        const p = G.P(...pts[j + 1]), last = j === g.way.length - 1;
+        if (last) {
+          o += `<g data-tip="${esc(g.n)}|Got to ${esc(g.now)} ${dy} years from where you are now"><circle cx="${p[0]}" cy="${p[1]}" r="11" fill="${g.c}" fill-opacity=".85" stroke="#fff" stroke-width="2"/><text x="${p[0]}" y="${p[1] + 3.5}" font-size="9" font-weight="700" fill="#fff" text-anchor="middle">${g.i}</text></g>`;
+          if (!vertical) o += `<text x="${p[0]}" y="${p[1] + (side < 0 ? -16 : 24)}" font-size="10.5" fill="${g.c}" text-anchor="middle" font-weight="600">${esc(g.n.split(' ').slice(-2).join(' '))} · ${dy} yrs</text>`;
+        } else {
+          o += `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="#fff" stroke="${g.c}" stroke-opacity=".7" stroke-width="1.5" data-tip="${esc(g.n)}|${esc(lab)} after ${dy} yrs"/>`;
+        }
+      });
+    });
+  }
+
+  // branches
+  const order = vis.map(b => b.id);
+  const labels = [];
+  vis.forEach((b, idx) => {
+    const d = S.disp[b.id];
+    const off = (idx - (order.length - 1) / 2) * (vertical ? 0.026 : 0.02);
+    const tS = tOf(d.s), tA = tOf(d.a);
+    const tC = tOf(Math.min(d.s + 0.4, d.a - 0.05));
+    const path = curve([[tN, off], [tS, off], [tC, b.lane], [tA, b.lane]]);
+    const w = 2 + d.r / 100 * (vertical ? 7 : 9);
+    const pending = b.spotted && S.spotted === 'pending';
+    let op = b.fading ? 0.38 : pending ? 0.9 : 0.95;
+    if (fid && fid !== b.id) op *= 0.28;
+    if (S.sel === b.id && !pending) o += `<path d="${path}" stroke="${b.color}" stroke-opacity=".16" stroke-width="${w + 10}" fill="none" stroke-linecap="round"/>`;
+    o += `<path d="${path}" stroke="${b.color}" stroke-opacity="${op}" stroke-width="${pending ? 3 : w}" fill="none" stroke-linecap="round" ${pending ? 'stroke-dasharray="2 6" class="spot-line"' : ''}/>`;
+    o += `<path d="${path}" stroke="transparent" stroke-width="${Math.max(18, w + 10)}" fill="none" data-branch="${b.id}" data-tip="${esc(b.name)}|${Math.round(d.r)}% ready · ${term(d.a)}" style="cursor:pointer"/>`;
+    // own stones
+    const own = b.stones.concat(S.extraStones.filter(x => x.b === b.id));
+    for (const st of own) {
+      const ty = Math.min(Math.max(st.y, d.s + 0.3), d.a - 0.12);
+      const p = P(tOf(ty), b.lane);
+      o += `<rect x="${p[0] - 5}" y="${p[1] - 5}" width="10" height="10" transform="rotate(45 ${p[0]} ${p[1]})" fill="${st.isNew ? '#f68620' : '#fff'}" stroke="${b.color}" stroke-opacity="${op}" stroke-width="2" data-tip="${esc(st.l)}|Stepping stone · ${esc(b.short)}"/>`;
+    }
+    // end cap + label
+    const e = P(tA, b.lane);
+    o += `<circle cx="${e[0]}" cy="${e[1]}" r="${pending ? 5 : 6.5}" fill="${pending ? '#fff' : b.color}" fill-opacity="${op}" stroke="${b.color}" stroke-width="2" stroke-opacity="${op}"/>`;
+    labels.push({ b, e, d, pending, op });
+  });
+  for (const { b, e, d, pending, op } of labels) {
+    const lo = Math.max(op, 0.45);
+    const nm = pending ? (vertical ? 'Policy?' : 'Policy adviser?') : vertical ? b.short : b.name;
+    const sub = pending ? 'Ann spotted this' : b.fading && !vertical ? `${Math.round(d.r)}% · fading` : `${Math.round(d.r)}%${vertical ? '' : ' ready · ' + term(d.a)}`;
+    if (!vertical) {
+      o += `<g data-branch="${b.id}" style="cursor:pointer" opacity="${lo}"><text x="${e[0] + 13}" y="${e[1] - 3}" font-size="12.5" font-weight="700" fill="${b.fading ? '#6b7280' : b.color}" ${pending ? 'font-style="italic"' : ''}>${esc(nm.length > 26 ? b.short + (b.id === 'lect' ? ' (uni)' : '') : nm)}</text>`;
+      o += `<text x="${e[0] + 13}" y="${e[1] + 12}" font-size="11" fill="#5f6b7d" font-variant-numeric="tabular-nums">${sub}</text></g>`;
+    } else {
+      o += `<g data-branch="${b.id}" style="cursor:pointer" opacity="${lo}"><text x="${e[0]}" y="${e[1] - 26}" font-size="11" font-weight="700" fill="${b.fading ? '#6b7280' : b.color}" text-anchor="middle">${esc(nm)}</text>`;
+      o += `<text x="${e[0]}" y="${e[1] - 13}" font-size="10.5" fill="#5f6b7d" text-anchor="middle">${sub}</text></g>`;
+    }
+  }
+  // shared stones
+  const sharedAll = SHARED.map(x => ({ ...x })).concat(MOVES.filter(m => S.moves.has(m.id) && m.shared).map(m => ({ y: m.y, l: m.l, serves: m.shared, hypo: true })));
+  for (const x of sharedAll) {
+    const n = x.serves.filter(id => visible(byId[id])).length;
+    if (!n) continue;
+    const p = P(tOf(x.y), 0);
+    const lit = fid && x.serves.includes(fid);
+    o += `<g data-tip="${esc(x.l)}|${x.hypo ? 'What if · ' : ''}Shared step · helps ${n} futures"><circle cx="${p[0]}" cy="${p[1]}" r="${vertical ? 10 : 11}" fill="${x.hypo ? '#fff7ee' : '#fff'}" stroke="${x.hypo ? '#f68620' : lit ? byId[fid].color : '#17375e'}" stroke-width="2.5" ${x.hypo ? 'stroke-dasharray="3 3"' : ''}/><text x="${p[0]}" y="${p[1] + 4}" font-size="10.5" font-weight="800" fill="${x.hypo ? '#a85a0c' : '#17375e'}" text-anchor="middle">${n}</text></g>`;
+  }
+  // non-shared what-if stones
+  for (const m of MOVES) if (S.moves.has(m.id) && !m.shared && visible(byId[m.on])) {
+    const b = byId[m.on], d = S.disp[b.id];
+    const ty = Math.max(m.y, d.s + 0.25), p = P(tOf(Math.min(ty, d.a - 0.1)), b.lane);
+    o += `<g data-tip="What if|${esc(m.l)}"><circle cx="${p[0]}" cy="${p[1]}" r="9" fill="#fff7ee" stroke="#f68620" stroke-width="2.5" stroke-dasharray="3 3"/><text x="${p[0]}" y="${p[1] + 3.5}" font-size="10" font-weight="800" fill="#a85a0c" text-anchor="middle">?</text></g>`;
+  }
+  // fork marker (latest split among branches that share the road)
+  let fork = null;
+  for (const b of vis) { const s = S.disp[b.id].s; if (s > NOW + 0.2 && (!fork || s > fork)) fork = s; }
+  if (fork) {
+    const cnt = vis.filter(b => S.disp[b.id].s >= fork - 0.02).length;
+    const p = P(tOf(fork), 0);
+    if (!vertical) {
+      o += `<line x1="${p[0]}" y1="${p[1] + 14}" x2="${p[0]}" y2="${H - 62}" stroke="#17375e" stroke-opacity=".3" stroke-dasharray="2 4"/>`;
+      o += `<text x="${p[0] + 6}" y="${H - 52}" font-size="10.5" font-weight="700" fill="#17375e">LAST FORK · ${term(fork)}</text>`;
+      o += `<text x="${p[0] + 6}" y="${H - 39}" font-size="10.5" fill="#5f6b7d">${cnt} futures share the road until here</text>`;
+    } else {
+      o += `<line x1="44" y1="${p[1]}" x2="${p[0] - 12}" y2="${p[1]}" stroke="#17375e" stroke-opacity=".3" stroke-dasharray="2 4"/><text x="6" y="${p[1] - 4}" font-size="10" font-weight="700" fill="#17375e">Fork</text><text x="6" y="${p[1] + 8}" font-size="10" fill="#5f6b7d">${term(fork)}</text>`;
+    }
+  }
+  // evidence dots
+  const spotLit = S.spotted === 'pending' && S.lock === 'policy';
+  allEvidence().forEach((ev, i) => {
+    const jit = (i % 2 ? 1 : -1) * (vertical ? 0 : 0);
+    const p = P(tOf(ev.y), jit);
+    const rel = fid && ev.b.includes(fid);
+    const col = rel ? byId[fid].color : '#fff';
+    const r = fid ? (rel ? 5.5 : 2.6) : 3.8;
+    o += `<circle cx="${p[0]}" cy="${p[1]}" r="${r}" fill="${col}" stroke="${rel ? '#fff' : '#17375e'}" stroke-width="${rel ? 2 : 1}" fill-opacity="${fid && !rel ? .55 : 1}" data-tip="${esc(ev.t)}|${monYr(ev.y)}${ev.fresh ? ' · kept this week' : ''}"/>`;
+    if (S.pulseAt === ev.id) o += `<circle class="pulse" cx="${p[0]}" cy="${p[1]}" r="4" fill="none" stroke="#2f7a4f" stroke-width="2"/>`;
+  });
+  svg.innerHTML = o;
+  void spotLit;
+}
+
+// ---------- tween ----------
+let raf = null;
+function settle(animate = true) {
+  const tg = {};
+  for (const b of B) tg[b.id] = target(b);
+  const from = {};
+  for (const b of B) from[b.id] = S.disp[b.id] || tg[b.id];
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!animate || reduce) { for (const b of B) S.disp[b.id] = { ...tg[b.id] }; drawRiver(); drawLegend(); return; }
+  cancelAnimationFrame(raf);
+  const t0 = performance.now(), dur = 750;
+  const step = now => {
+    const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+    for (const b of B) { const a = from[b.id], z = tg[b.id]; S.disp[b.id] = { r: a.r + (z.r - a.r) * e, a: a.a + (z.a - a.a) * e, s: a.s + (z.s - a.s) * e }; }
+    drawRiver(); drawLegend();
+    if (k < 1) raf = requestAnimationFrame(step);
+  };
+  raf = requestAnimationFrame(step);
+}
+
+// ---------- legend ----------
+function drawLegend() {
+  let o = '';
+  for (const b of B) {
+    if (b.spotted && S.spotted === 'dismissed') continue;
+    if (S.parked.has(b.id)) { o += `<button class="lg parked" data-unpark="${b.id}">Parked: ${esc(b.short)} · restore</button>`; continue; }
+    const pending = b.spotted && S.spotted === 'pending';
+    const d = S.disp[b.id];
+    o += `<button class="lg${b.fading ? ' fading' : ''}${pending ? ' dotted' : ''}" data-sel="${b.id}" aria-pressed="${S.sel === b.id}"><span class="sw" style="background:${b.color}"></span>${esc(pending ? 'Policy adviser?' : b.short)} <span class="pct">${Math.round(d.r)}%</span></button>`;
+  }
+  $('#legend').innerHTML = o;
+}
+
+// ---------- spotted card ----------
+function spottedCount() {
+  const recent = allEvidence().filter(e => e.y >= NOW - 1.6);
+  return [recent.filter(e => e.b.includes('policy')).length, recent.length];
+}
+function drawSpotted() {
+  const el = $('#spotted');
+  el.hidden = S.spotted !== 'pending';
+  const [n, of] = spottedCount();
+  $('#spottedText').innerHTML = `<b>${n} of your last ${of} skill cards</b> point toward curriculum and policy work: the staff consultation, the sector review submission, advising two other schools. People keep asking you for policy. <b>Curriculum &amp; Policy Adviser</b> at a sector office could be a future, and you're already about ${Math.round(S.disp.policy.r)}% ready for it.`;
+  $('#spotShow').setAttribute('aria-pressed', S.lock === 'policy');
+}
+
+// ---------- what-if ----------
+function drawMoves() {
+  $('#moves').innerHTML = MOVES.map(m => `<button class="move" data-move="${m.id}" aria-pressed="${S.moves.has(m.id)}"><span class="grip" aria-hidden="true">⋮⋮</span>${esc(m.l)}</button>`).join('');
+  const res = $('#whatifResult');
+  if (!S.moves.size) { res.innerHTML = '<span class="muted">Nothing tried yet. Try the working party: three futures stay on one road a year longer.</span>'; return; }
+  const parts = [];
+  for (const b of B) {
+    if (!visible(b)) continue;
+    const base = { r: Math.min(97, b.r), a: b.arr };
+    const saved = S.moves; S.moves = new Set(); const t0 = target(b); S.moves = saved;
+    const t1 = target(b);
+    const dr = Math.round(t1.r - t0.r), da = t1.a - t0.a;
+    if (!dr && Math.abs(da) < 0.05) continue;
+    const mo = Math.round(-da * 12);
+    parts.push(`<span class="delta"><b style="color:${b.color}">${esc(b.short)}</b> <span class="up">+${dr}</span>${mo > 0 ? ` · ${mo} months sooner` : ''}</span>`);
+    void base;
+  }
+  let forkNote = '';
+  if (S.moves.has('m4')) forkNote = `<span class="delta">Fork moves to <b>${term(2028.58)}</b>: Deputy, Leader and Policy stay on one road a year longer.</span>`;
+  res.innerHTML = parts.join('') + forkNote;
+}
+function toggleMove(id, force) {
+  const on = force ?? !S.moves.has(id);
+  on ? S.moves.add(id) : S.moves.delete(id);
+  drawMoves(); settle(); drawFuture();
+}
+
+// drag
+let drag = null;
+$('#moves').addEventListener('pointerdown', e => {
+  const btn = e.target.closest('.move'); if (!btn) return;
+  drag = { id: btn.dataset.move, x: e.clientX, y: e.clientY, btn, moved: false, ghost: null };
+  btn.setPointerCapture(e.pointerId);
+});
+$('#moves').addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) {
+    drag.moved = true;
+    drag.ghost = drag.btn.cloneNode(true); drag.ghost.classList.add('move-ghost'); document.body.appendChild(drag.ghost);
+  }
+  if (drag.moved) {
+    drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+    const r = wrap.getBoundingClientRect();
+    wrap.classList.toggle('drop', e.clientX > r.left && e.clientX < r.right && e.clientY > r.top && e.clientY < r.bottom);
+  }
+});
+function endDrag(e, cancelled) {
+  if (!drag) return;
+  const d = drag; drag = null;
+  if (d.ghost) d.ghost.remove();
+  const over = wrap.classList.contains('drop'); wrap.classList.remove('drop');
+  if (cancelled) return;
+  if (!d.moved) toggleMove(d.id);
+  else if (over) { toggleMove(d.id, true); toast('Dropped on the river: ' + MOVES.find(m => m.id === d.id).l); }
+}
+$('#moves').addEventListener('pointerup', e => endDrag(e, false));
+$('#moves').addEventListener('pointercancel', e => endDrag(e, true));
+$('#moves').addEventListener('keydown', e => { const b = e.target.closest('.move'); if (b && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleMove(b.dataset.move); } });
+$('#resetMoves').addEventListener('click', () => { S.moves.clear(); drawMoves(); settle(); drawFuture(); });
+
+// ---------- future detail ----------
+function ringSvg(pct, color) {
+  const r = 32, c = 2 * Math.PI * r;
+  return `<div class="ring"><svg width="76" height="76" viewBox="0 0 76 76"><circle cx="38" cy="38" r="${r}" fill="none" stroke="rgba(23,55,94,.1)" stroke-width="7"/><circle cx="38" cy="38" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${c * pct / 100} ${c}"/></svg><b>${Math.round(pct)}%</b><small>ready</small></div>`;
+}
+function drawFuture() {
+  const b = byId[S.sel];
+  const el = $('#future');
+  if (!b || !visible(b)) { el.innerHTML = '<p class="muted">Pick a future on the river.</p>'; return; }
+  const t = target(b);
+  const pending = b.spotted && S.spotted === 'pending';
+  let o = `<div class="fd-head"><div><div class="eyebrow" style="color:${b.color}">${pending ? 'Suggested future' : 'Future'}</div><h2>${esc(b.name)}</h2><p>${esc(b.where)} · ready around <b>${term(t.a)}</b></p></div>${ringSvg(t.r, b.color)}</div>`;
+  if (b.fading) o += `<div class="banner fade"><span>No new evidence for this future since <b>${b.fading}</b>. Still want it?</span><button class="btn sm" data-keep="${b.id}">Keep it</button><button class="btn sm ghost" data-park="${b.id}">Park it</button></div>`;
+  if (pending) o += `<div class="banner spot"><span>Ann suggested this from your evidence. Add it and it becomes a full branch with stepping stones.</span><button class="btn sm primary" data-spotadd>Add this future</button></div>`;
+  o += `<div class="h3">What this role asks for</div>`;
+  for (const [c, s, ev] of b.crit) o += `<div class="crit"><span class="dot ${s}"></span><div class="c">${esc(c)}</div><div class="e${ev ? '' : ' none'}">${ev ? esc(ev) : 'No evidence yet. This is a stepping stone.'}</div></div>`;
+  o += `<div class="h3">Stepping stones</div>`;
+  const shared = SHARED.filter(x => x.serves.includes(b.id)).map(x => ({ y: x.y, l: x.l, n: x.serves.length, id: x.id }));
+  const hyp = MOVES.filter(m => S.moves.has(m.id) && (m.on === b.id || (m.shared || []).includes(b.id))).map(m => ({ y: m.y, l: m.l, what: true, id: m.id }));
+  const own = b.stones.map((s, i) => ({ ...s, id: b.id + i })).concat(S.extraStones.filter(x => x.b === b.id));
+  const list = shared.concat(own, hyp).sort((a, z) => a.y - z.y);
+  for (const s of list) {
+    const inT = S.tasks.has(s.id) || s.isNew;
+    o += `<div class="stone"><span class="when">${term(s.y)}</span><span class="l">${esc(s.l)}${s.n ? `<span class="shared">helps ${s.n} futures</span>` : ''}${s.what ? '<span class="new">what if</span>' : ''}${s.isNew ? '<span class="new">from a gap</span>' : ''}</span>${s.what ? '' : `<button class="btn sm${inT ? ' good' : ''}" data-task="${s.id}" ${inT ? 'disabled' : ''}>${inT ? 'In Tasks ✓' : 'Add to Tasks'}</button>`}</div>`;
+  }
+  if (b.ghosts.length) {
+    o += `<div class="h3">People who got there</div>`;
+    for (const g of b.ghosts) {
+      o += `<div class="ghost"><div class="av" style="background:${g.c}">${g.i}</div><div><b>${esc(g.n)}</b><div class="route">${g.way.map(w => esc(w[1])).join(' → ')} · ${g.way[g.way.length - 1][0]} years from your stage</div></div><button class="btn sm" data-coffee="${g.i}">${S.coffee === g.i ? 'Hide note' : 'Draft a coffee note'}</button>`;
+      if (S.coffee === g.i) o += `<div class="draft">Hi ${esc(g.n.startsWith('Dr') ? g.n : g.n.split(' ')[0])}, I'm starting to think seriously about a ${esc(b.name)} role in the next few years. You went from ${esc(g.way[0][1])} to ${esc(g.now)} in about ${g.way[g.way.length - 1][0]} years, and I'd love to hear what mattered most along the way. Coffee in the next few weeks? Adam</div>`;
+      o += `</div>`;
+    }
+  } else if (!pending) {
+    o += `<div class="h3">People who got there</div><p class="muted" style="margin:0;font-size:13px">Nobody in your Network holds this role yet. Ann will add a ghost path when someone does.</p>`;
+  }
+  el.innerHTML = o;
+}
+$('#future').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.task) { S.tasks.add(t.dataset.task); drawFuture(); toast('Added to Tasks'); }
+  if (t.dataset.coffee) { S.coffee = S.coffee === t.dataset.coffee ? null : t.dataset.coffee; drawFuture(); }
+  if (t.dataset.park) { S.parked.add(t.dataset.park); S.sel = 'dp'; settle(); drawFuture(); toast('Parked. It stays in your ledger; restore it from the legend.'); }
+  if (t.dataset.keep) { toast('Kept. Ann will look for evidence for it in the next Skills scan.'); }
+  if ('spotadd' in t.dataset) addSpotted();
+});
+
+// ---------- spotted actions ----------
+function addSpotted() {
+  S.spotted = 'added'; S.lock = null; S.sel = 'policy';
+  byId.policy.spotted = false;
+  drawSpotted(); settle(); drawFuture(); drawFilters(); drawLedger();
+  toast('Curriculum & Policy Adviser added to your river');
+}
+$('#spotAdd').addEventListener('click', addSpotted);
+$('#spotNo').addEventListener('click', () => { S.spotted = 'dismissed'; S.lock = null; if (S.sel === 'policy') S.sel = 'dp'; drawSpotted(); settle(); drawFuture(); toast("Dismissed. Ann won't suggest it again for six months."); });
+$('#spotShow').addEventListener('click', () => { S.lock = S.lock === 'policy' ? null : 'policy'; drawSpotted(); drawRiver(); });
+$('#spotted').addEventListener('pointerenter', () => { if (!S.lock) { S.hover = 'policy'; drawRiver(); } });
+$('#spotted').addEventListener('pointerleave', () => { S.hover = null; drawRiver(); });
+
+// ---------- river interactions ----------
+svg.addEventListener('pointerover', e => {
+  const el = e.target.closest('[data-branch]');
+  const id = el ? el.dataset.branch : null;
+  if (e.pointerType === 'touch') return;
+  if (id !== S.hover) { S.hover = id; drawRiver(); }
+});
+wrap.addEventListener('pointerleave', () => { tip.hidden = true; if (S.hover) { S.hover = null; drawRiver(); } });
+svg.addEventListener('click', e => {
+  const el = e.target.closest('[data-branch]'); if (!el) return;
+  S.sel = el.dataset.branch; S.coffee = null;
+  if (e.pointerType === 'touch' || !matchMedia('(hover: hover)').matches) S.lock = S.sel;
+  drawRiver(); drawLegend(); drawFuture();
+});
+wrap.addEventListener('pointermove', e => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) { tip.hidden = true; return; }
+  const [a, b] = el.dataset.tip.split('|');
+  tip.innerHTML = `<b>${a}</b><span>${b || ''}</span>`;
+  tip.hidden = false;
+  const r = wrap.getBoundingClientRect();
+  let x = e.clientX - r.left + 14, y = e.clientY - r.top + 14;
+  if (x + 250 > r.width) x = e.clientX - r.left - 250;
+  tip.style.left = Math.max(0, x) + 'px'; tip.style.top = y + 'px';
+});
+$('#legend').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.unpark) { S.parked.delete(t.dataset.unpark); settle(); drawFuture(); return; }
+  S.sel = t.dataset.sel; S.lock = S.lock ? t.dataset.sel : null; S.coffee = null;
+  drawRiver(); drawLegend(); drawFuture();
+});
+$('#legend').addEventListener('pointerover', e => { const t = e.target.closest('[data-sel]'); if (t && e.pointerType !== 'touch' && S.hover !== t.dataset.sel) { S.hover = t.dataset.sel; drawRiver(); } });
+$('#legend').addEventListener('pointerleave', () => { if (S.hover) { S.hover = null; drawRiver(); } });
+$('#ghostSwitch').addEventListener('click', () => { S.ghosts = !S.ghosts; $('#ghostSwitch').setAttribute('aria-pressed', S.ghosts); drawRiver(); });
+
+// ---------- harvest ----------
+function drawHarvest() {
+  const items = HARVEST.filter(h => !S.binned.has(h.id));
+  if (!items.length) { $('#harvest').innerHTML = '<p class="muted">All sorted. Next harvest Sun 4 Oct.</p>'; return; }
+  $('#harvest').innerHTML = items.map(h => {
+    const done = S.kept.has(h.id);
+    return `<article class="hv${done ? ' done' : ''}" data-h="${h.id}">
+      <div class="hv__src">From ${esc(h.src)}${h.src2 ? ' · ' + esc(h.src2) : ''}</div>
+      <h3 id="t-${h.id}">${esc(h.t)}</h3>
+      <div class="tags">${h.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}<span class="fit">helps ${h.b.map(id => `<i style="background:${byId[id].color}" title="${esc(byId[id].short)}"></i>`).join('')} ${h.b.map(id => byId[id].short).join(', ')}</span></div>
+      <details class="star"><summary>STAR answer, drafted</summary><dl><dt>S</dt><dd>${esc(h.star[0])}</dd><dt>T</dt><dd>${esc(h.star[1])}</dd><dt>A</dt><dd>${esc(h.star[2])}</dd><dt>R</dt><dd>${esc(h.star[3])}</dd></dl></details>
+      <div class="hv__foot"><span class="wit">${h.w.map(p => `<span class="av" style="background:${PEOPLE[p].c}" title="${esc(PEOPLE[p].n)}">${p}</span>`).join('')}<span style="margin-left:14px">Witnessed by ${h.w.map(p => esc(PEOPLE[p].n)).join(', ')}</span></span>
+      ${done ? '<span class="kept">Kept · on the river</span>' : `<button class="btn sm good" data-keep-h="${h.id}">Keep</button><button class="btn sm" data-edit-h="${h.id}">Edit</button><button class="btn sm ghost" data-bin-h="${h.id}">Bin</button>`}</div>
+    </article>`;
+  }).join('');
+}
+$('#harvest').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.dataset.keepH) {
+    const id = t.dataset.keepH;
+    const h1 = $('#t-' + id); if (h1) HARVEST.find(h => h.id === id).t = h1.textContent.trim();
+    S.kept.add(id); S.pulseAt = id;
+    drawHarvest(); settle(); drawFuture(); drawSpotted(); drawLedger(); drawStats(); drawApps();
+    toast('Kept. It\'s on your river now.');
+    setTimeout(() => { S.pulseAt = null; }, 4500);
+  }
+  if (t.dataset.binH) { S.binned.add(t.dataset.binH); drawHarvest(); toast('Binned. Ann will learn from that.'); }
+  if (t.dataset.editH) {
+    const h = $('#t-' + t.dataset.editH);
+    const on = h.getAttribute('contenteditable') === 'true';
+    h.setAttribute('contenteditable', on ? 'false' : 'true');
+    t.textContent = on ? 'Edit' : 'Done';
+    if (!on) { h.focus(); }
+  }
+});
+
+// ---------- applications ----------
+function critScore(c) {
+  if (c.boost && S.kept.has(c.boost.by)) return { n: c.boost.to, ev: c.boost.ev, up: true };
+  return { n: c.base, ev: c.ev };
+}
+function drawApps() {
+  const scores = APP_CRIT.map(critScore);
+  const gapDone = S.gapDone;
+  const match = Math.round(scores.reduce((s, x) => s + x.n, 0) / scores.length);
+  let o = `<div class="app-row"><div class="av" style="background:#b8457a">LL</div><div class="grow"><div class="t">Leader of Learning, Gifted &amp; Talented</div><div class="m">Northbridge College · closes Mon 12 Oct · on your <b style="color:#b8457a">Gifted</b> branch</div></div><span class="pill warn">Drafting</span><div class="match">${match}%<small>match</small></div><button class="btn sm primary" id="mirrorBtn" aria-expanded="${S.mirrorOpen}">${S.mirrorOpen ? 'Hide Criteria Mirror' : 'Open Criteria Mirror'}</button></div>`;
+  if (S.mirrorOpen) {
+    o += `<div class="mirror"><div><label class="eyebrow" for="criteriaText" style="display:block;margin-bottom:8px">Pasted from the job ad</label><textarea id="criteriaText">Selection criteria
+
+1. Demonstrated expertise in identifying and meeting the needs of gifted and high-potential learners.
+2. Proven ability to lead professional learning for staff.
+3. Experience developing and implementing whole-school policy.
+4. Experience managing a program budget and resources.
+5. Strong communication with parents, carers and the wider community.</textarea>
+      <p class="muted" style="font-size:12.5px;line-height:1.5;margin:10px 0 0">Ann split the ad into five criteria and matched each one against your ledger. Keep this week's Skills scan cards and watch criteria 3 and 5 change.</p></div><div>`;
+    APP_CRIT.forEach((c, i) => {
+      const s = scores[i];
+      const col = s.n >= 80 ? 'var(--good)' : s.n >= 45 ? 'var(--high-sea)' : 'var(--bad)';
+      o += `<div class="mc"><div class="mc__top"><span class="c">${i + 1}. ${esc(c.c)}</span><span class="n" style="color:${col}">${s.n}%</span></div><div class="bar"><i style="width:${s.n}%;background:${col}"></i></div>`;
+      if (s.ev) o += `<div class="ev">${s.up ? '<b style="color:var(--good)">Stronger after this week\'s Skills scan.</b> ' : ''}${esc(s.ev)}</div>`;
+      else o += `<div class="ev gap">Gap. No evidence in your ledger.</div><div class="act">${gapDone ? `<span class="kept">Stepping stone added to Gifted · in Tasks, due Mon 5 Oct</span>` : `<button class="btn sm" id="gapBtn">Make it a stepping stone: ${esc(c.gap)}</button>`}</div>`;
+      o += `</div>`;
+    });
+    o += `</div><div class="refs"><div class="h3" style="margin-top:4px">Referees, ranked by what they saw</div>`;
+    for (const r of REFS) {
+      const p = PEOPLE[r.p];
+      o += `<div class="ref"><div class="av" style="background:${p.c}">${r.p}</div><div><b>${esc(p.n)}</b> <span class="muted" style="font-size:12.5px">· ${esc(p.r)}</span><div class="w">Witnessed <b>${r.n}</b> of your cards for these criteria · last contact ${r.last}${r.warm ? ' · <span class="warmup">warm up first</span>' : ''}</div></div><button class="btn sm" data-brief="${r.p}">${S.briefOpen === r.p ? 'Hide briefing' : 'Draft briefing'}</button>`;
+      if (S.briefOpen === r.p) o += `<div class="brief"><h4>Referee briefing for ${esc(p.n)}</h4><div class="muted" style="font-size:12.5px">Leader of Learning, Gifted &amp; Talented · Northbridge College · closes Mon 12 Oct</div><p style="margin:10px 0 4px">Three things I'd love you to speak to:</p><ol>${r.brief.map(x => `<li>${esc(x)}</li>`).join('')}</ol><p style="margin:6px 0 0" class="muted">Attached: the selection criteria and my one-page summary.</p></div>`;
+      o += `</div>`;
+    }
+    o += `</div></div>`;
+  }
+  o += `<div class="app-row"><div class="av" style="background:#2f7a4f">GT</div><div class="grow"><div class="t">G&amp;T coordinator</div><div class="m">Internal · Mar 2023</div></div><span class="pill good">Successful</span></div>`;
+  o += `<div class="app-row"><div class="av" style="background:#a23a3a">LE</div><div class="grow"><div class="t">Leader of Learning, English</div><div class="m">Nearby school · Jul 2022</div></div><span class="pill bad">Not successful</span><div class="fb">Panel feedback: <b>"We needed evidence of whole-school impact."</b> That became the stepping stone <b>Lead a whole-school initiative</b>. The gifted policy now covers it.</div></div>`;
+  $('#apps').innerHTML = o;
+}
+$('#apps').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.id === 'mirrorBtn') { S.mirrorOpen = !S.mirrorOpen; drawApps(); }
+  if (t.dataset.brief) { S.briefOpen = S.briefOpen === t.dataset.brief ? null : t.dataset.brief; drawApps(); }
+  if (t.id === 'gapBtn') {
+    S.gapDone = true;
+    S.extraStones.push({ b: 'gift', y: 2026.85, l: 'Co-manage the G&T program budget (T4)', isNew: true, id: 'gap1' });
+    byId.gift.stones = byId.gift.stones.filter(s => !/budget/.test(s.l));
+    drawApps(); settle(); drawFuture();
+    toast('Stepping stone added to your Gifted branch and to Tasks');
+  }
+});
+$('#newAppBtn').addEventListener('click', () => { S.mirrorOpen = true; drawApps(); $('#apps').scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => $('#criteriaText')?.focus(), 400); });
+
+// ---------- ledger ----------
+function drawFilters() {
+  const bs = B.filter(b => !(b.spotted && S.spotted !== 'added') && !(b.id === 'policy' && S.spotted === 'dismissed'));
+  $('#filters').innerHTML = `<button class="flt" data-f="all" aria-pressed="${S.ledFilter === 'all'}">All</button>` + bs.map(b => `<button class="flt" data-f="${b.id}" aria-pressed="${S.ledFilter === b.id}"><i style="background:${b.color}"></i>${esc(b.short)}</button>`).join('');
+}
+function drawLedger() {
+  const ev = allEvidence().slice().sort((a, z) => z.y - a.y).filter(e => S.ledFilter === 'all' || e.b.includes(S.ledFilter));
+  const show = S.ledAll ? ev : ev.slice(0, 8);
+  $('#ledCount').textContent = `${allEvidence().length} cards${S.ledFilter !== 'all' ? ` · ${ev.length} for ${byId[S.ledFilter].short}` : ''}`;
+  $('#ledger').innerHTML = show.map(e => `<div class="led${e.fresh ? ' fresh' : ''}"><span class="d">${monYr(e.y)}</span><span class="t">${esc(e.t)}</span><span class="bs">${e.b.filter(id => visible(byId[id]) && !(byId[id].spotted && S.spotted === 'pending')).map(id => `<i style="background:${byId[id].color}" title="${esc(byId[id].short)}"></i>`).join('')}</span></div>`).join('');
+  $('#ledMore').hidden = ev.length <= 8;
+  $('#ledMore').textContent = S.ledAll ? 'Show fewer' : `Show all ${ev.length}`;
+}
+$('#filters').addEventListener('click', e => { const t = e.target.closest('[data-f]'); if (!t) return; S.ledFilter = t.dataset.f; drawFilters(); drawLedger(); });
+$('#ledMore').addEventListener('click', () => { S.ledAll = !S.ledAll; drawLedger(); });
+
+// ---------- header ----------
+function drawStats() {
+  const futures = B.filter(b => visible(b) && !(b.spotted && S.spotted === 'pending')).length;
+  $('#stats').innerHTML = `<b>11 years</b> behind you · <b>${futures} futures</b> ahead · <b>${allEvidence().length}</b> skill cards`;
+}
+$('#addFutureBtn').addEventListener('click', () => { const p = $('#addFuture'); p.hidden = !p.hidden; $('#addFutureBtn').setAttribute('aria-expanded', !p.hidden); });
+$('#addFutureGo').addEventListener('click', () => toast('Mockup: this adds a seventh branch with Ann\'s draft criteria'));
+
+let tt;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2600); }
+
+// ---------- boot ----------
+settle(false);
+drawSpotted(); drawMoves(); drawFuture(); drawHarvest(); drawApps(); drawFilters(); drawLedger(); drawStats();
+let rw = wrap.clientWidth;
+new ResizeObserver(() => { if (wrap.clientWidth !== rw) { rw = wrap.clientWidth; drawRiver(); } }).observe(wrap);
+})();
+</script>
