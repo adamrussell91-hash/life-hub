@@ -34,13 +34,13 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M3: Landing page (Term Runway)
 
-- [x] **G-13** Runway filters by term + Ongoing group —
-- [x] **G-14** Lane cap (term only) + park-one / add-as-parked —
-- [x] **G-15** New goal form: sphere / term / life area chips —
-- [x] **G-16** Plan next term (card-swipe) —
+- [x] **G-13** Runway filters by term + Ongoing group — 
+- [x] **G-14** Lane cap (term only) + park-one / add-as-parked — 
+- [x] **G-15** New goal form: sphere / term / life area chips — 
+- [x] **G-16** Plan next term (card-swipe) — 
 - [ ] **G-17** Year pill + Term↔Year zoom — —
-- [x] **G-18** Direction strip —
-- [x] **G-19** Active-projects meter —
+- [x] **G-18** Direction strip — 
+- [x] **G-19** Active-projects meter — 
 - [ ] **G-20** Week cell count + lead measure figure — —
 
 ## M4: Goal page
