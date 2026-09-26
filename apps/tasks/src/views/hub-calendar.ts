@@ -5,6 +5,7 @@
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
 import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../../design-kit/js/calendar/hub-calendar-zoom.js';
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
+import { getApiBaseUrl } from '@/api/config';
 import { taskPageHash } from '@/domain/cards';
 import { tasksApi } from '@/services/client-api';
 import {
@@ -36,7 +37,8 @@ export function tasksRouteFor(item: unknown): string | null {
 }
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-  return fetch(path, { credentials: 'include', ...(init ?? {}) });
+  // Pages host has no /api — Functions live on api.adam-russell.com (same as api/client).
+  return fetch(`${getApiBaseUrl()}${path}`, { credentials: 'include', ...(init ?? {}) });
 }
 
 function itemType(item: unknown): string {

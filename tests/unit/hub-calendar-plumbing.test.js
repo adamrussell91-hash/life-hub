@@ -32,6 +32,21 @@ test('hub adapters stay ≤150 lines (defaultFilter, fills, routeFor, mount only
   assert.ok(lineCount('apps/tasks/src/views/hub-calendar.ts') <= 150);
 });
 
+test('Pages hub calendar adapters prefix getApiBaseUrl (not same-origin /api)', () => {
+  // life-hub.adam-russell.com is GitHub Pages — /api/* is SPA HTML 404.
+  // Functions live on api.adam-russell.com; relative fetch breaks every source.
+  for (const rel of [
+    'apps/teaching/src/teacher/hub-calendar.ts',
+    'apps/professional/src/calendar/hub-calendar.ts',
+    'apps/tasks/src/views/hub-calendar.ts'
+  ]) {
+    const src = readFileSync(join(root, rel), 'utf8');
+    assert.match(src, /getApiBaseUrl/, rel);
+    assert.match(src, /\$\{getApiBaseUrl\(\)\}/, rel);
+    assert.doesNotMatch(src, /return fetch\(path,/);
+  }
+});
+
 test('open-in-hub maps domains and builds full-nav Open in links', () => {
   assert.equal(hubDomainForItem({ kind: 'task' }), 'tasks');
   assert.equal(hubDomainForItem({ source: 'professional_meeting' }), 'professional');
