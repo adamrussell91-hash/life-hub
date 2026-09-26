@@ -19,6 +19,13 @@ describe('parseRoute', () => {
     expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
   });
 
+  it('parses calendar zoom routes (month → week)', () => {
+    expect(parseRoute('#/calendar')).toEqual({ name: 'calendar', zoom: 'week' });
+    expect(parseRoute('#/calendar/term')).toEqual({ name: 'calendar', zoom: 'term' });
+    expect(parseRoute('#/calendar/month')).toEqual({ name: 'calendar', zoom: 'week' });
+    expect(railHighlightFor({ name: 'calendar', zoom: 'year' })).toBe('home');
+  });
+
   it('parses the Network Ecology route', () => {
     expect(parseRoute('#/network-ecology')).toEqual({ name: 'network-ecology' });
   });

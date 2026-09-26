@@ -9,12 +9,21 @@ import '../../design-kit/filters.css';
 import '../../design-kit/person-brief.css';
 import '../../design-kit/view-on-map.css';
 import '../../design-kit/calendar.css';
+import '../../design-kit/calendar-tideline.css';
+import '../../design-kit/calendar-day-dial.css';
+import '../../design-kit/calendar-almanac.css';
+import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
 import { parseRoute, railHighlightFor } from '@/app/router';
+import {
+  mountProfessionalCalendar,
+  unmountProfessionalCalendar
+} from '@/calendar/hub-calendar';
+import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { renderPeopleHomeView } from '@/views/people-home';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
@@ -70,12 +79,23 @@ async function bootApp(root: HTMLElement): Promise<void> {
   });
 
   let routeGeneration = 0;
+  let calendarHandle: HubCalendarHandle | null = null;
 
   async function paint(): Promise<void> {
-    const generation = ++routeGeneration;
     const route = parseRoute();
+
+    // Soft zoom change: keep the kit mount so Term/Year tween in place.
+    if (route.name === 'calendar' && calendarHandle) {
+      renderPrimaryNav(shell.railNav, railHighlightFor(route));
+      void calendarHandle.syncZoom();
+      return;
+    }
+
+    const generation = ++routeGeneration;
     const highlight = railHighlightFor(route);
     renderPrimaryNav(shell.railNav, highlight);
+    unmountProfessionalCalendar();
+    calendarHandle = null;
 
     if (route.name === 'not-found') {
       renderPageHeader(shell, { eyebrow: 'Missing', title: 'Page not found' });
@@ -86,6 +106,20 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'home') {
       renderPageHeader(shell, viewChrome('home'));
       await renderHomeView(shell.canvas);
+      return;
+    }
+    if (route.name === 'calendar') {
+      renderPageHeader(shell, {
+        eyebrow: 'Professional Hub',
+        title: 'Calendar',
+        supporting: 'Day · Week · Term · Year · Almanac'
+      });
+      shell.canvas.replaceChildren();
+      const host = document.createElement('div');
+      host.className = 'pro-calendar-host';
+      host.style.minWidth = '0';
+      shell.canvas.append(host);
+      calendarHandle = mountProfessionalCalendar(host, { routeZoom: true });
       return;
     }
     if (route.name === 'people') {
