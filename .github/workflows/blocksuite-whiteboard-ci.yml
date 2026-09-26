@@ -3,15 +3,37 @@ name: Whiteboard integration validation
 on:
   pull_request:
     branches: [main]
+    # BlockSuite lives in the shared block editor, so those files stay listed.
+    # ponytail: do not widen this to apps/tasks/** or apps/teaching/** — that
+    # reruns this job for unrelated views such as Excursions. Split the
+    # whiteboard editor out of editors/render/registry if those files get too hot.
     paths:
       - 'package.json'
       - 'package-lock.json'
-      - 'apps/teaching/**'
-      - 'apps/tasks/**'
+      - 'apps/teaching/package.json'
+      - 'apps/teaching/package-lock.json'
+      - 'apps/tasks/package.json'
+      - 'apps/tasks/package-lock.json'
       - 'packages/whiteboard/**'
+      - 'apps/teaching/src/blocks/whiteboard-runtime.ts'
+      - 'apps/teaching/src/blocks/create-block.ts'
+      - 'apps/teaching/src/blocks/editors.ts'
+      - 'apps/teaching/src/blocks/render.ts'
+      - 'apps/teaching/src/blocks/registry.ts'
+      - 'apps/teaching/src/schemas/block.ts'
+      - 'apps/teaching/tests/unit/whiteboard-block.test.ts'
+      - 'apps/tasks/src/blocks/whiteboard-runtime.ts'
+      - 'apps/tasks/src/blocks/create-block.ts'
+      - 'apps/tasks/src/blocks/editors.ts'
+      - 'apps/tasks/src/blocks/render.ts'
+      - 'apps/tasks/src/blocks/registry.ts'
+      - 'apps/tasks/src/schemas/block.ts'
+      - 'apps/tasks/tests/unit/whiteboard-block.test.ts'
       - 'netlify/functions/whiteboards.mjs'
       - 'netlify/functions/_shared/whiteboard-blobs.mjs'
       - 'netlify/functions/lesson-publish.mjs'
+      - 'netlify/functions/published-unit.mjs'
+      - 'netlify/functions/published-class.mjs'
       - 'tests/unit/whiteboard-documents.test.js'
       - '.github/workflows/blocksuite-whiteboard-ci.yml'
 
