@@ -106,7 +106,22 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 2: Page merge, routes, Skills ledger
 
-**Status:** pending
+**Status:** done (2026-09-26)
+**Checked:** L1 L5 I3 P1 W1 W2 V4
+
+- Applications removed from rail; Career uses branching-river icon
+- Legacy redirects via `redirectLegacyCareerHash` + `location.replace`
+- `applicationRoute` → `#/career/application/<id>`; resolvers + Knowledge hub-ref + hub-map updated
+- Page order: stats · river placeholder · Futures | Skills scan · Applications · Skills ledger
+- Phone: scan before futures (`order: -1`)
+- Skills ledger empty state + Add card; filters row (All + future chips)
+- Named test: `applications-career.test.ts` (routes + Career shell)
+
+**diff vs mockup:** River is a Phase 3 placeholder (honest empty). Future panel / scan are stubs until Phases 4–5. Branch colours tokens present in `hub.css`.
+
+**Must:** `#/career` loads; Applications rail gone; old `#/applications` redirects.
+**Must-not:** Broken Back loop on redirect.
+**Verify:** unit tests above; manual redirect in Phase 8 screenshots.
 
 ---
 
