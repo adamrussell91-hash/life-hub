@@ -25,6 +25,7 @@ import {
   readFilterState,
   writeFilterState
 } from './calendar-filter.js';
+import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 /** Design spec: expanded band remembered per session. Life default; other hubs pass `hub` later. */
@@ -844,6 +845,11 @@ function openPop(chipId) {
     if (ghost.overItem) html += `<p class="cal-pop__label">${agentName(ghost.agent)} suggests</p><p class="cal-pop__meta cal-pop__meta--strong">${escapeHtml(ghost.label)} · ${escapeHtml(ghost.meta)}</p>`;
     html += `<p class="cal-pop__label">Accept writes</p><p class="cal-pop__writes" data-part="write-preview">${escapeHtml(preview)}</p>`;
     html += `<div class="cal-pop__acts"><button type="button" class="btn btn--primary" data-accept="${ghost.id}" data-label="Accept">Accept</button>${ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${ghost.id}">Dismiss</button>`}</div>`;
+  } else {
+    html += openInHubLinkHtml(item || { kind: chip.dataset.kind, source: chip.dataset.source, id: chipId }, {
+      hub: input?.hub || 'life',
+      routeFor: input?.routeFor
+    });
   }
   markup(pop, html);
   pop.hidden = false;
@@ -895,6 +901,21 @@ function wire(section) {
     }
     const chip = target.closest?.('.cal-chip');
     if (chip) {
+      const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chip.dataset.id);
+      const hub = input?.hub || 'life';
+      if (item && isOwnHubItem(item, hub) && typeof input?.routeFor === 'function') {
+        const href = openInHubHref(item, input.routeFor);
+        if (href) {
+          closePop();
+          const loc = root.defaultView?.location;
+          if (href.startsWith('#')) {
+            if (loc) loc.hash = href;
+          } else if (loc) {
+            loc.assign(href);
+          }
+          return;
+        }
+      }
       if (chip.dataset.id === popFor) closePop();
       else openPop(chip.dataset.id);
       return;

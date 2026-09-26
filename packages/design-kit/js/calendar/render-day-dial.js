@@ -24,6 +24,7 @@ import {
   paintSourceFilter,
   readFilterState
 } from './calendar-filter.js';
+import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -782,6 +783,8 @@ function openPop(arcId) {
     if (receipt) html += `<p class="dd-pop__label">Accept writes</p><p class="dd-pop__writes" data-part="write-preview">${escapeHtml(receipt)}</p>`;
     const dismiss = ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(ghost.id)}">Dismiss</button>`;
     html += `<div class="dd-pop__acts"><button type="button" class="btn btn--primary" data-accept="${escapeHtml(ghost.id)}" data-label="Accept">Accept</button>${dismiss}</div>`;
+  } else if (item) {
+    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
   }
   pop.innerHTML = html;
   pop.hidden = false;
@@ -929,6 +932,21 @@ function wire(section) {
     const arc = target.closest?.('.dd-arc[data-id]');
     if (arc) {
       const id = arc.getAttribute('data-id');
+      const item = chipsFor(state.day).find(chip => chip.id === id);
+      const hub = input?.hub || 'life';
+      if (item && isOwnHubItem(item, hub) && typeof input?.routeFor === 'function') {
+        const href = openInHubHref(item, input.routeFor);
+        if (href) {
+          closePop();
+          const loc = doc.defaultView?.location;
+          if (href.startsWith('#')) {
+            if (loc) loc.hash = href;
+          } else if (loc) {
+            loc.assign(href);
+          }
+          return;
+        }
+      }
       return id === popFor ? closePop() : openPop(id);
     }
     if (!target.closest?.('[data-part="popover"]')) closePop();

@@ -61,6 +61,11 @@ import { currentAppPath } from './base-path';
 import { isClassSiteHost, isClassSiteStudentRoute, renderClassSiteDeadEnd } from './class-site';
 import { navigate, start, type RouteMatch } from './router';
 import { renderPageHeader } from '@/teacher/page-header';
+import {
+  mountTeachingCalendar,
+  unmountTeachingCalendar
+} from '@/teacher/hub-calendar';
+import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 
 const root = document.querySelector('#app');
 if (!(root instanceof HTMLElement)) {
@@ -94,6 +99,7 @@ let studentClassViewHandle: StudentClassViewHandle | null = null;
 // Home dashboard handle (clock interval + create control), if mounted.
 let homeHandle: { dispose: () => void } | null = null;
 let chatHandle: { dispose: () => void } | null = null;
+let calendarHandle: HubCalendarHandle | null = null;
 
 // Scope sequences index handle (create control), if mounted.
 let scopeIndexHandle: { dispose?: () => void } | null = null;
@@ -137,6 +143,11 @@ function teardownStudentClassView(): void {
   if (!studentClassViewHandle) return;
   studentClassViewHandle.dispose();
   studentClassViewHandle = null;
+}
+
+function teardownTeacherCalendar(): void {
+  unmountTeachingCalendar();
+  calendarHandle = null;
 }
 
 function teardownTeacherHome(): void {
@@ -482,6 +493,25 @@ function renderTeacherChatRoute(token: number): void {
   void loadNavAndHandleErrors(refs, token, 'chat', undefined, (curriculum) => {
     teardownTeacherChat();
     chatHandle = renderTeacherChat(refs.canvas, curriculum);
+  });
+}
+
+function renderTeacherCalendarRoute(token: number): void {
+  const refs = mountTeacherShell();
+  renderRailStatus(refs.railNav, 'Loading curriculum…');
+  void loadNavAndHandleErrors(refs, token, 'home', undefined, () => {
+    if (token !== renderToken) return;
+    refs.canvas.replaceChildren();
+    renderPageHeader(refs.canvas, {
+      eyebrow: 'Teaching Hub',
+      title: 'Calendar',
+      supporting: 'Day · Week · Term · Year · Almanac'
+    });
+    const host = document.createElement('div');
+    host.className = 'teacher-calendar-host';
+    host.style.minWidth = '0';
+    refs.canvas.append(host);
+    calendarHandle = mountTeachingCalendar(host);
   });
 }
 
@@ -876,6 +906,9 @@ function renderRoute(match: RouteMatch, token: number): void {
     case 'teacher-chat':
       renderTeacherChatRoute(token);
       break;
+    case 'teacher-calendar':
+      renderTeacherCalendarRoute(token);
+      break;
     case 'teacher-classes':
       renderTeacherClassesRoute(token);
       break;
@@ -930,6 +963,12 @@ function renderRoute(match: RouteMatch, token: number): void {
 }
 
 async function handleRoute(match: RouteMatch): Promise<void> {
+  // Soft zoom change on the calendar page: keep the mount so Term/Year tween in place.
+  if (match.name === 'teacher-calendar' && calendarHandle) {
+    void calendarHandle.syncZoom();
+    return;
+  }
+
   renderToken += 1;
   const token = renderToken;
 
@@ -939,6 +978,7 @@ async function handleRoute(match: RouteMatch): Promise<void> {
   await teardownLessonEditor();
   teardownTeacherHome();
   teardownTeacherChat();
+  teardownTeacherCalendar();
   teardownScopeIndex();
   teardownClassesIndex();
   teardownClassPage();

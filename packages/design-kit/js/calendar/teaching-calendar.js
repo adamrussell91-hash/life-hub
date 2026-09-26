@@ -21,6 +21,8 @@ export function teachingEventsFromCurriculum(data) {
       record: {
         type: 'scheduled_lesson',
         id: row.id,
+        lesson_id: typeof row.lesson_id === 'string' ? row.lesson_id : undefined,
+        class_id: typeof row.class_id === 'string' ? row.class_id : undefined,
         date: row.date,
         time: TIME_KEY.test(row.start_time) ? row.start_time : undefined,
         duration_min: 60,
