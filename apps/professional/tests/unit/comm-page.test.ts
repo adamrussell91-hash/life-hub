@@ -115,4 +115,27 @@ describe('comm page', () => {
     expect(canvas.querySelector('[data-part="ledger"]')).not.toBeNull();
     expect(canvas.querySelectorAll('[data-part="ledger"] [role="switch"]').length).toBe(1);
   });
+
+  it('joins the single matching thread and says so, with Undo', async () => {
+    const links = await import('@/api/universal-links');
+    const threads = await import('@/api/threads');
+    // This comm has people but no thread yet.
+    (links.listUniversalLinksForEntity as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
+      outgoing: [
+        { link: { id: 'l1', source_ref: COMM_REF, target_ref: 'shared:person:p_declan', relationship_type: 'recipient', status: 'current' },
+          endpoint: { ref: 'shared:person:p_declan', kind: 'person', display_label: 'Declan J.', href: null }, direction: 'outgoing' }
+      ],
+      incoming: []
+    }));
+    (threads.listThreads as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ threads: [
+      { id: 'thread_00000000-0000-4000-8000-000000000001', kind: 'general', title: 'Declan J. · study approach', purpose_tag: 'feedback', goals: [], status: 'open', schema_version: 1, created_at: '', updated_at: '2026-09-25T02:00:00.000Z' }
+    ] });
+    const canvas = await render();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(links.createUniversalLink).toHaveBeenCalledWith(expect.objectContaining({
+      source_ref: COMM_REF, target_ref: THREAD_REF, relationship_type: 'in_thread'
+    }));
+    expect(canvas.textContent).toContain('Added to Declan J. · study approach');
+    expect(canvas.querySelector('[data-part="thread-undo"]')).not.toBeNull();
+  });
 });

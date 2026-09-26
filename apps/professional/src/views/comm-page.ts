@@ -1,10 +1,18 @@
 import { getCommunication, updateCommunication } from '@/api/communications';
-import { createTask, createUniversalLink, listUniversalLinksForEntity, type UniversalLinkEntry } from '@/api/universal-links';
+import {
+  createTask,
+  createUniversalLink,
+  endUniversalLink,
+  listUniversalLinksForEntity,
+  type UniversalLinkEntry
+} from '@/api/universal-links';
 import { createLedgerItem, listLedgerForSources, patchLedger } from '@/api/ledger';
 import { mountBlockPage, type BlockPageHandle } from '@/components/block-page';
 import { buildFollowUpSection } from '@/views/communications';
 import { nextSwitchDelayMs, phaseFor, type CommPhase } from '@/lib/comm-phase';
 import { blockPlainText, extractInlinePromises, resolvePromiseOwner, type PersonOnPage } from '@/lib/inline-promises';
+import { listThreads } from '@/api/threads';
+import { pickThreadForComm, type ThreadCandidate } from '@/lib/thread-match';
 import { threadRoute } from '@/app/router';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { AgendaItem, CommunicationRecord, LedgerItem } from '@/domain/types';
@@ -62,6 +70,31 @@ async function loadPage(id: string): Promise<PageData> {
     ? { ref: threadEntry.endpoint!.ref, label: threadEntry.endpoint!.display_label, id: threadEntry.endpoint!.ref.split(':').pop()! }
     : null;
   return { record, commRef, withPeople, alsoConcerned, thread, previousRef, memberCount, ledger };
+}
+
+async function autoJoinThread(data: PageData): Promise<{ threadRef: string; label: string; linkId: string } | null> {
+  if (data.thread || !data.record.purpose_tag) return null;
+  const personRefs = [...data.withPeople, ...data.alsoConcerned].map((person) => person.ref);
+  if (!personRefs.length) return null;
+  const { threads } = await listThreads();
+  const candidates: ThreadCandidate[] = [];
+  for (const thread of threads.filter((entry) => entry.status === 'open' && entry.purpose_tag === data.record.purpose_tag)) {
+    const threadRef = `professional:thread:${thread.id}`;
+    const members = (await listUniversalLinksForEntity(threadRef)).incoming.filter((entry) => entry.link.relationship_type === 'in_thread');
+    const latest = members.at(-1);
+    const people = latest
+      ? (await listUniversalLinksForEntity(latest.link.source_ref)).outgoing
+          .filter((entry) => ['recipient', 'about_person'].includes(entry.link.relationship_type))
+          .map((entry) => entry.endpoint!.ref)
+      : [];
+    candidates.push({ id: thread.id, status: thread.status, purpose_tag: thread.purpose_tag, personRefs: people, lastAt: thread.updated_at });
+  }
+  const pick = pickThreadForComm({ personRefs, purposeTag: data.record.purpose_tag, at: data.record.scheduled_start ?? data.record.occurred_at }, candidates);
+  if (!pick.join) return null;
+  const threadRef = `professional:thread:${pick.join}`;
+  const { link } = await createUniversalLink({ source_ref: data.commRef, target_ref: threadRef, relationship_type: 'in_thread' });
+  const label = threads.find((thread) => thread.id === pick.join)!.title;
+  return { threadRef, label, linkId: link.id };
 }
 
 export async function renderCommPage(
@@ -122,6 +155,20 @@ export async function renderCommPage(
   grid.append(main, rail);
   root.append(head, threadStrip, grid);
   canvas.replaceChildren(root);
+
+  void autoJoinThread(data).then((joined) => {
+    if (!joined || !root.isConnected) return;
+    threadStrip.hidden = false;
+    threadStrip.replaceChildren(el('span', 'eyebrow', 'Thread'), el('span', undefined, `Added to ${joined.label}`));
+    const undo = el('button', 'btn btn--ghost', 'Undo') as HTMLButtonElement;
+    undo.type = 'button';
+    undo.dataset.part = 'thread-undo';
+    undo.addEventListener('click', async () => {
+      await endUniversalLink(joined.linkId);
+      threadStrip.hidden = true;
+    });
+    threadStrip.append(undo);
+  });
 
   function setPhase(next: CommPhase): void {
     phase = next;
