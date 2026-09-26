@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { tasksApi } from '@/services/client-api';
 import { renderGoalsView } from '@/views/goals';
+import { mountYearZoom } from '@/views/goals-year-zoom';
 import { goal, task } from './goal-fixtures';
 
 vi.mock('@/services/client-api', () => ({
@@ -125,6 +126,67 @@ describe('goals landing', () => {
     await renderGoalsView(canvas, '2026-11-04');
     canvas.querySelector<HTMLButtonElement>('[data-action="plan-next-term"]')!.click();
     expect(canvas.querySelector('.goals-plan-sheet')?.textContent).toContain('Ongoing craft');
+  });
+
+  it('keeps term weeks and year months inside the track', () => {
+    const termHost = document.createElement('div');
+    const termOnly = { term: 4 as const, starts_on: '2026-10-12', ends_on: '2026-12-18' };
+    const termZoom = mountYearZoom(
+      termHost,
+      {
+        goals: [goal({ id: 'g', title: 'Study at Cambridge', term: { year: 2026, term: 4 }, sphere: 'life' })],
+        projects: [],
+        tasks: [],
+        terms: [termOnly],
+        today: '2026-11-04'
+      },
+      { crunchWeeks: [], proposedRest: {}, proposalGoalIds: new Set() },
+      termOnly,
+      'term'
+    );
+    const weeks = [...termHost.querySelectorAll<HTMLElement>('.runway-zoom__tick')]
+      .filter((el) => !el.classList.contains('runway-zoom__tick--month') && el.style.opacity !== '0' && el.textContent);
+    expect(weeks.map((el) => el.textContent)).toEqual(['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10']);
+    for (const el of weeks) {
+      expect(el.style.left.endsWith('%')).toBe(true);
+      const left = Number.parseFloat(el.style.left);
+      const width = Number.parseFloat(el.style.width);
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(left + width).toBeLessThanOrEqual(100.01);
+    }
+    expect(Number.parseFloat(weeks[0]!.style.left)).toBeLessThan(1);
+    expect(Number.parseFloat(weeks.at(-1)!.style.left) + Number.parseFloat(weeks.at(-1)!.style.width)).toBeGreaterThan(99);
+
+    const host = document.createElement('div');
+    const terms = [
+      { term: 1 as const, starts_on: '2026-01-27', ends_on: '2026-04-02' },
+      { term: 2 as const, starts_on: '2026-04-20', ends_on: '2026-06-26' },
+      { term: 3 as const, starts_on: '2026-07-13', ends_on: '2026-09-18' },
+      { term: 4 as const, starts_on: '2026-10-06', ends_on: '2026-12-18' }
+    ];
+    const zoom = mountYearZoom(
+      host,
+      {
+        goals: [goal({ id: 'g', title: 'Study at Cambridge', term: null, sphere: 'life' })],
+        projects: [],
+        tasks: [],
+        terms,
+        today: '2026-11-04'
+      },
+      { crunchWeeks: [], proposedRest: {}, proposalGoalIds: new Set() },
+      terms[3]!,
+      'year'
+    );
+    const months = [...host.querySelectorAll<HTMLElement>('.runway-zoom__tick--month')].filter((el) => !el.hidden);
+    expect(months.map((el) => el.textContent)).toContain('Dec');
+    for (const el of months) {
+      const left = Number.parseFloat(el.style.left);
+      const width = Number.parseFloat(el.style.width);
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(left + width).toBeLessThanOrEqual(100.01);
+    }
+    zoom?.dispose();
+    termZoom?.dispose();
   });
 
   it('shows a clear empty state when no school terms are set', async () => {

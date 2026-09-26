@@ -618,8 +618,13 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
   const inputs = await loadGoalInputs(store);
   const goal = inputs.goals.find(item => item.id === goalId);
   if (!goal) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
-  const read = buildGoalRead({ goal, projects: inputs.projects, tasks: inputs.tasks, terms: inputs.terms, today });
-  const ghost = read.ghosts.find(item => item.id === decision.id);
+  // Accept the proposal the panel showed. A fresh read can omit it and 404 a confirm that is still on screen.
+  const cached = (await getJSON(store, goalReadKey(goalId))) ?? {};
+  const cachedGhost = cached.read?.ghosts?.find(item => item.id === decision.id);
+  const read = cachedGhost
+    ? null
+    : buildGoalRead({ goal, projects: inputs.projects, tasks: inputs.tasks, terms: inputs.terms, today });
+  const ghost = cachedGhost ?? read.ghosts.find(item => item.id === decision.id);
   if (!ghost) return fail(404, 'ghost_not_found', 'This proposal no longer applies.');
 
   let plan;
