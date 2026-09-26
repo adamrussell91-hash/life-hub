@@ -13,6 +13,7 @@ import {
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
 import { findActiveSelfPerson } from './career-overview.mjs';
+import { parseProfessionalProfile } from './professional-profile.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
@@ -107,6 +108,22 @@ function currentOrganisationContexts(relationships) {
     });
   }
   return items;
+}
+
+// Entity overview is the only identity response that may carry the imported
+// People profile extension. Build it deliberately rather than letting an
+// object spread expose any future private-data field. Deidentified/deleted
+// records keep identity redaction and never return their source material.
+function overviewEntity(record, canonicalRef) {
+  const redacted = redactIdentityRecord(record);
+  const { professional_profile: ignoredProfile, ...entity } = redacted;
+  if (record.kind !== 'person' || redacted.lifecycle_status === 'deidentified' || redacted.lifecycle_status === 'deleted') {
+    return { ref: canonicalRef, ...entity };
+  }
+  const professionalProfile = parseProfessionalProfile(record.professional_profile);
+  return professionalProfile
+    ? { ref: canonicalRef, ...entity, professional_profile: professionalProfile }
+    : { ref: canonicalRef, ...entity };
 }
 
 // A GitHub-canonical-import record (github-professional-data.mjs) falls
@@ -350,7 +367,7 @@ export async function assembleEntityOverview(refInput, deps = {}) {
   }
 
   return {
-    entity: { ref: canonicalRef, ...redactIdentityRecord(record) },
+    entity: overviewEntity(record, canonicalRef),
     current_relationships,
     historical_relationships,
     timeline,
