@@ -5433,9 +5433,67 @@ html.is-map-fullscreen .map-page .map-preview {
   margin: var(--space-4) 0 0;
 }
 
+/* Kit workspace is already a single full-width column; keep Tasks chrome tight. */
 .hub-calendar--workspace .hub-calendar__workspace {
-  grid-template-columns: minmax(0, 1fr) min(16rem, 28%);
   gap: var(--space-3);
+}
+
+/* Locks / next actions / dump sit under the kit (not a right column). */
+.tasks-calendar-chrome__workspace.hub-calendar__workspace {
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+}
+
+.tasks-calendar-chrome__kit {
+  width: 100%;
+  min-width: 0;
+}
+
+.tasks-calendar-chrome__kit .hub-calendar,
+.tasks-calendar-chrome__kit .cal {
+  width: 100%;
+  max-width: none;
+}
+
+.tasks-calendar-chrome__below.hub-calendar__rail {
+  position: static;
+  top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.tasks-calendar-chrome__below .calendar-shortcuts {
+  grid-column: 1 / -1;
+}
+
+.tasks-calendar-chrome__below .calendar-locks {
+  grid-column: 1 / -1;
+}
+
+.tasks-calendar-chrome__below .calendar-locks__list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.tasks-calendar-chrome__below .calendar-lock-row {
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 3.5rem;
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .tasks-calendar-chrome__below.hub-calendar__rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tasks-calendar-chrome__below .calendar-locks__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Month grid uses the full canvas — the empty 16rem rail was pinning it short. */
@@ -5474,12 +5532,8 @@ html.is-map-fullscreen .map-page .map-preview {
   flex: 1 1 auto;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
-}
-
-.hub-calendar--month .hub-calendar__workspace:has(.calendar-preview:not(:empty)) {
-  grid-template-columns: minmax(0, 1fr) min(16rem, 28%);
 }
 
 .hub-calendar--month .hub-calendar__rail:not(:has(.calendar-preview:not(:empty))) {
