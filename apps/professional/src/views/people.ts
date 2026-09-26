@@ -809,9 +809,37 @@ export async function renderPeoplePage(
   });
 
   function openFilterSheet(): void {
+    const onPhone = isPhone();
     sheet.hidden = false;
     sheetInner.replaceChildren();
     sheetInner.append(el('h2', 'people-pane__name', 'Filters'));
+
+    let sortSelect: HTMLSelectElement | null = null;
+    let groupSelect: HTMLSelectElement | null = null;
+    // Phone Filters sheet owns sort + group (1.6 / L5); desktop keeps toolbar menus.
+    if (onPhone) {
+      const sortField = el('label', 'people-page__field', 'Sort');
+      sortSelect = document.createElement('select');
+      for (const key of Object.keys(SORT_LABELS) as DirectorySort[]) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = SORT_LABELS[key];
+        if (query.sort === key) opt.selected = true;
+        sortSelect.append(opt);
+      }
+      sortField.append(sortSelect);
+      const groupField = el('label', 'people-page__field', 'Group');
+      groupSelect = document.createElement('select');
+      for (const key of Object.keys(GROUP_LABELS) as DirectoryGroup[]) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = GROUP_LABELS[key];
+        if (query.group === key) opt.selected = true;
+        groupSelect.append(opt);
+      }
+      groupField.append(groupSelect);
+      sheetInner.append(sortField, groupField);
+    }
 
     const roleField = el('label', 'people-page__field', 'Relationship');
     const roleSelect = document.createElement('select');
@@ -872,32 +900,6 @@ export async function renderPeoplePage(
     openCb.checked = query.hasOpen;
     open.append(openCb, document.createTextNode(' Has open items'));
 
-    let sortSelect: HTMLSelectElement | null = null;
-    let groupSelect: HTMLSelectElement | null = null;
-    if (phone) {
-      const sortField = el('label', 'people-page__field', 'Sort');
-      sortSelect = document.createElement('select');
-      for (const key of Object.keys(SORT_LABELS) as DirectorySort[]) {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = SORT_LABELS[key];
-        if (query.sort === key) opt.selected = true;
-        sortSelect.append(opt);
-      }
-      sortField.append(sortSelect);
-      const groupField = el('label', 'people-page__field', 'Group');
-      groupSelect = document.createElement('select');
-      for (const key of Object.keys(GROUP_LABELS) as DirectoryGroup[]) {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = GROUP_LABELS[key];
-        if (query.group === key) opt.selected = true;
-        groupSelect.append(opt);
-      }
-      groupField.append(groupSelect);
-      sheetInner.append(sortField, groupField);
-    }
-
     const apply = el('button', 'btn btn--primary', 'Apply') as HTMLButtonElement;
     apply.type = 'button';
     apply.addEventListener('click', () => {
@@ -922,6 +924,7 @@ export async function renderPeoplePage(
       sheet.hidden = true;
     });
     sheetInner.append(roleField, orgScopeField, orgField, warmth, open, apply, close);
+    sheetInner.scrollTop = 0;
   }
 
   filterBtn.addEventListener('click', openFilterSheet);

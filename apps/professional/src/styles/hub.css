@@ -2763,6 +2763,8 @@
 .people-page__sheet-inner {
   width: 100%;
   max-width: 28rem;
+  max-height: min(85dvh, 36rem);
+  overflow-y: auto;
   background: var(--paper);
   border-radius: var(--radius-md) var(--radius-md) 0 0;
   padding: var(--space-4);
