@@ -87,11 +87,11 @@ test('hub source loader surfaces per-source error with Retry copy, never silent 
         json: async () => ({ ok: false })
       };
     }
-    if (path.includes('tasks') || path.includes('work-blocks') || path.includes('planning') || path.includes('workflow')) {
+    if (path.includes('tasks') || path.includes('work-blocks') || path.includes('planning') || path.includes('workflow') || path.includes('hub-prefs')) {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ ok: true, data: { tasks: [], work_blocks: [] } })
+        json: async () => ({ ok: true, data: { tasks: [], work_blocks: [], school_terms: [] } })
       };
     }
     if (path.includes('knowledge')) {

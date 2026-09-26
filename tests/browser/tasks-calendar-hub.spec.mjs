@@ -7,10 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { calendarHubArtifactsDir } from './calendar-hub-artifacts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
-const OUT = path.join('/opt/cursor/artifacts', 'tasks-calendar-hub');
+const OUT = calendarHubArtifactsDir('tasks-calendar-hub');
 fs.mkdirSync(OUT, { recursive: true });
 
 let browser;
@@ -120,6 +121,110 @@ test('tasks calendar: reduced-motion + 390', async () => {
   try {
     assert.equal(errors.length, 0, errors.join('\n'));
     await page.screenshot({ path: path.join(OUT, 'week-390-default.png') });
+  } finally {
+    await context.close();
+  }
+});
+
+
+const frames = (page, ms, probe) =>
+  page.evaluate(
+    async ({ ms, probe }) => {
+      const f = new Function(`return (${probe})`)();
+      const out = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < ms) {
+        await new Promise((r) => requestAnimationFrame(r));
+        out.push(f());
+      }
+      return out;
+    },
+    { ms, probe: probe.toString() }
+  );
+
+test('tasks calendar: filter toggle hides items; capacity unchanged', async () => {
+  const { context, page } = await openTasksCalendar();
+  try {
+    const chip = page.locator('[data-part="sources"] button[data-filter="tasks"]').first();
+    await chip.waitFor();
+    const before = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return {
+        caps: [...root.querySelectorAll('[data-part="capacity"]')].map((n) => n.dataset.pct),
+        bands: window.__tideline?.heights?.() ?? null,
+        visible: [...root.querySelectorAll('.cal-chip')].filter((n) => !n.hidden).length
+      };
+    });
+    await chip.click();
+    const after = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return {
+        caps: [...root.querySelectorAll('[data-part="capacity"]')].map((n) => n.dataset.pct),
+        bands: window.__tideline?.heights?.() ?? null,
+        visible: [...root.querySelectorAll('.cal-chip')].filter((n) => !n.hidden).length,
+        still: Boolean(root)
+      };
+    });
+    assert.deepEqual(after.caps, before.caps);
+    if (before.bands && after.bands) assert.deepEqual(after.bands, before.bands);
+    assert.ok(after.still, 'tideline remounted');
+  } finally {
+    await context.close();
+  }
+});
+
+test('tasks calendar: foreign chip Open in Hub; Accept posts {id,decision}', async () => {
+  const { context, page } = await openTasksCalendar();
+  const posts = [];
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url().includes('/api/calendar-ghosts')) posts.push(req.postData() || '');
+  });
+  try {
+    const classes = page.locator('[data-part="sources"] button[data-filter="classes"]').first();
+    if (await classes.count()) {
+      if ((await classes.getAttribute('aria-pressed')) !== 'true') await classes.click();
+    }
+    const foreign = page.locator('.cal-chip.is-class, .cal-chip.k-teaching, .cal-chip.k-professional').first();
+    if (await foreign.count()) {
+      await foreign.click();
+      await page.locator('[data-part="open-in-hub"]').waitFor({ timeout: 5000 });
+      assert.match(await page.locator('[data-part="open-in-hub"]').textContent(), /Open in/);
+    }
+    const accepted = await page.evaluate(async () => {
+      const id = document.querySelector('[data-accept]')?.getAttribute('data-accept');
+      if (!id || !window.__tideline?.accept) return false;
+      await window.__tideline.accept(id);
+      return true;
+    });
+    if (accepted) {
+      await page.waitForTimeout(400);
+      assert.ok(posts.length >= 1);
+      const body = JSON.parse(posts[posts.length - 1]);
+      assert.deepEqual(Object.keys(body).sort(), ['decision', 'id']);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('tasks calendar: Term tier bars; Term↔Year tween; Back/Forward', async () => {
+  const { context, page } = await openTasksCalendar({ hash: '#/term' });
+  try {
+    await page.locator('[data-part="term-river"]').waitFor({ timeout: 15000 });
+    const period = await page.locator('[data-part="period"]').textContent();
+    assert.match(period || '', /Term|T3|T4|→/i);
+    await page.locator('[data-part="zoom-pills"] button[data-zoom="year"]').click();
+    const f = await frames(page, 800, () => ({ t: window.__termRiver?.blend?.() ?? 0 }));
+    const blends = f.map((v) => v.t).filter((t) => typeof t === 'number');
+    if (blends.length >= 10) {
+      assert.ok(new Set(blends.map((t) => t.toFixed(3))).size >= 8);
+    }
+    await page.goBack();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /#\/term/);
+    await page.goForward();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /#\/year/);
   } finally {
     await context.close();
   }

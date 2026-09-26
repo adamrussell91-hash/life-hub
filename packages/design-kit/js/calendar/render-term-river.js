@@ -22,7 +22,8 @@ import {
   countHidden,
   isItemVisible,
   paintSourceFilter,
-  readFilterState
+  readFilterState,
+  writeFilterState
 } from './calendar-filter.js';
 import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
 
@@ -401,18 +402,45 @@ function mount({ entrance = false } = {}) {
 
   const filterState = readFilterState(input?.hub || 'life');
   const riverItems = (input?.events ?? []).map((event) => event.record || event).filter(Boolean);
+  const riverVisualItems = Array.isArray(input?.visual?.RIVER?.ITEMS)
+    ? input.visual.RIVER.ITEMS
+    : [];
+  const filterItems = [
+    ...riverItems,
+    ...riverVisualItems,
+    ...(input?.ghosts ?? []).map((g) => g.chip || g)
+  ];
   const sources = el('div', 'cal__sources', undefined, root, { 'data-part': 'sources' });
+
+  function applyRiverFilter(next) {
+    writeFilterState(input?.hub || 'life', next);
+    for (const [id, node] of nodes) {
+      if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
+      const itemId = id.split(':')[1];
+      const item =
+        filterItems.find((row) => row.id === itemId) ||
+        riverItems.find((record) => record.id === itemId);
+      if (!item) continue;
+      const visible = isItemVisible(item, next);
+      node.setAttribute?.('visibility', visible ? 'visible' : 'hidden');
+      if (node.style) node.style.opacity = visible ? '' : '0';
+      node.classList?.toggle?.('is-filter-hidden', !visible);
+    }
+    paintSourceFilter(doc, sources, {
+      hub: input?.hub || 'life',
+      state: next,
+      counts: countByFilterKey(filterItems),
+      hidden: countHidden(filterItems, next),
+      onChange: applyRiverFilter
+    });
+  }
+
   paintSourceFilter(doc, sources, {
     hub: input?.hub || 'life',
     state: filterState,
-    counts: countByFilterKey(riverItems.map((record) => ({
-      kind: record.type === 'scheduled_lesson' ? 'teaching' : record.type?.startsWith('professional') ? 'professional' : record.kind || record.type,
-      source: record.type,
-      isClass: record.type === 'scheduled_lesson',
-      filterKey: undefined
-    }))),
-    hidden: countHidden(riverItems, filterState),
-    onChange: () => mount({ entrance: false })
+    counts: countByFilterKey(filterItems),
+    hidden: countHidden(filterItems, filterState),
+    onChange: applyRiverFilter
   });
 
   const card = el('div', 'tr__card', undefined, root, { 'data-part': 'card' });
@@ -609,7 +637,7 @@ function mountChart(card) {
     });
   }
 
-  // Today
+  // Today — clamp the pill so "Today" is never clipped to "oday" at the plot edge.
   const today = s('g', { class: 'tr-today', 'data-part': 'today' }, plot);
   const line = s('line', { y1: TR.axis.tiers + 4, y2: H }, today);
   // The pill sits on the axis rule, below the week dates.
@@ -617,9 +645,13 @@ function mountChart(card) {
   const text = s('text', { y: TR.axis.h + 4 }, today, 'Today');
   placers.push(X => {
     const x = X(TODAY) + 0.5 * (X(addDays(TODAY, 1)) - X(TODAY));
+    const pillW = 52;
+    const minX = TR.labelW;
+    const maxX = Math.max(minX, W - TR.padR - pillW);
+    const pillX = Math.min(maxX, Math.max(minX, x - pillW / 2));
     set(line, { x1: x, x2: x });
-    set(pill, { x: x - 26 });
-    set(text, { x });
+    set(pill, { x: pillX });
+    set(text, { x: pillX + pillW / 2 });
   });
 }
 

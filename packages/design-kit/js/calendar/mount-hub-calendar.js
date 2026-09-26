@@ -100,6 +100,7 @@ export function mountHubCalendar(host, adapter) {
   const loader = createHubSourceLoader({
     apiFetch: adapter.apiFetch,
     loadLife: adapter.loadLife,
+    today: adapter.today,
     onChange: () => {
       if (!destroyed) schedulePaint();
     }
@@ -160,6 +161,8 @@ export function mountHubCalendar(host, adapter) {
     const today = adapter.today || getSydneyDateKey(adapter.now ?? new Date());
     const week = weekFor(selectedDate);
     const tasksMeta = loader.getMeta('tasks');
+    const terms = loader.getTerms?.() ?? [];
+    const visual = loader.getVisual?.() ?? null;
     return {
       hub,
       fills: adapter.fills ?? {},
@@ -176,8 +179,8 @@ export function mountHubCalendar(host, adapter) {
       today,
       now: adapter.now ?? new Date(),
       dayProfile: tasksMeta?.planningProfile?.day_profile ?? null,
-      terms: tasksMeta?.planningProfile?.school_terms ?? null,
-      visual: null,
+      terms: terms.length ? terms : null,
+      visual,
       onShiftRange: (delta) => {
         const step = zoom === 'day' ? delta : delta * 7;
         selectedDate = addDaysKey(selectedDate, step);
@@ -217,7 +220,9 @@ export function mountHubCalendar(host, adapter) {
         now: input.now,
         apiFetch: adapter.apiFetch,
         onSwitchView: input.onSwitchView,
-        routeFor: adapter.routeFor
+        routeFor: adapter.routeFor,
+        events: input.events,
+        ghosts: input.ghosts
       });
       return;
     }

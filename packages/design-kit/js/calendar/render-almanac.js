@@ -645,12 +645,17 @@ function paint(doc, host, view, options) {
 
   const filterState = readFilterState(options?.hub || 'life');
   const beadItems = (view.lines ?? []).flatMap((line) => line.steps ?? []);
+  const eventItems = [
+    ...(options?.events ?? []).map((event) => event.record || event),
+    ...(options?.ghosts ?? []).map((g) => g.chip || g)
+  ].filter(Boolean);
+  const filterItems = [...beadItems, ...eventItems];
   const sources = el('div', 'cal__sources', root, { 'data-part': 'sources' });
   paintSourceFilter(doc, sources, {
     hub: options?.hub || 'life',
     state: filterState,
-    counts: countByFilterKey(beadItems),
-    hidden: countHidden(beadItems, filterState),
+    counts: countByFilterKey(filterItems),
+    hidden: countHidden(filterItems, filterState),
     onChange: () => {
       if (session) paint(doc, host, current ?? view, { ...options, hub: options?.hub || 'life' });
     }
@@ -915,9 +920,14 @@ function paint(doc, host, view, options) {
     });
 
     const today = s('g', { class: 'alm-today', 'data-part': 'today' }, svg);
-    s('line', { x1: X(view.today), x2: X(view.today), y1: 16, y2: 640 }, today);
-    s('rect', { x: X(view.today) - 26, y: 0, width: 52, height: 18, rx: 9 }, today);
-    s('text', { x: X(view.today), y: 13 }, today, 'Today');
+    const x = X(view.today);
+    const pillW = 52;
+    const minX = 0;
+    const maxX = Math.max(minX, (props?.w ?? 800) - pillW);
+    const pillX = Math.min(maxX, Math.max(minX, x - pillW / 2));
+    s('line', { x1: x, x2: x, y1: 16, y2: 640 }, today);
+    s('rect', { x: pillX, y: 0, width: pillW, height: 18, rx: 9 }, today);
+    s('text', { x: pillX + pillW / 2, y: 13 }, today, 'Today');
   }
 
   function mountList(parent) {

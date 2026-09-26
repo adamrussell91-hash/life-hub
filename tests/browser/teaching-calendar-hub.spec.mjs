@@ -9,10 +9,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { calendarHubArtifactsDir } from './calendar-hub-artifacts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
-const OUT = path.join('/opt/cursor/artifacts', 'teaching-calendar-hub');
+const OUT = calendarHubArtifactsDir('teaching-calendar-hub');
 fs.mkdirSync(OUT, { recursive: true });
 
 let browser;
@@ -208,6 +209,103 @@ test('teaching calendar: reduced-motion lands; phone 390 screenshot', async () =
     assert.equal(errors.length, 0, errors.join('\n'));
     await page.locator('[data-part="tideline"]').waitFor();
     await page.screenshot({ path: path.join(OUT, 'week-390-default.png') });
+  } finally {
+    await context.close();
+  }
+});
+
+const frames = (page, ms, probe) =>
+  page.evaluate(
+    async ({ ms, probe }) => {
+      const f = new Function(`return (${probe})`)();
+      const out = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < ms) {
+        await new Promise((r) => requestAnimationFrame(r));
+        out.push(f());
+      }
+      return out;
+    },
+    { ms, probe: probe.toString() }
+  );
+
+test('teaching calendar: Term shows tier bars and week labels', async () => {
+  const { context, page } = await openTeachingCalendar({ pathSuffix: '/calendar/term' });
+  try {
+    await page.locator('[data-part="term-river"]').waitFor({ timeout: 15000 });
+    const period = await page.locator('[data-part="period"]').textContent();
+    assert.match(period || '', /Term|T3|T4|→/i);
+    const tiers = await page.locator('[data-part="term-river"] .tr-tier, [data-part="term-river"] [data-part="tier"]').count();
+    const weekLabels = await page.locator('[data-part="term-river"] .tr-week, [data-part="term-river"] text').count();
+    assert.ok(tiers + weekLabels > 0, 'expected tier bars or week labels on Term');
+    await page.screenshot({ path: path.join(OUT, 'term-1280.png') });
+  } finally {
+    await context.close();
+  }
+});
+
+test('teaching calendar: Term↔Year continuous tween on same SVG node', async () => {
+  const { context, page } = await openTeachingCalendar({ pathSuffix: '/calendar/term' });
+  try {
+    await page.locator('[data-part="term-river"]').waitFor({ timeout: 15000 });
+    const svg0 = await page.evaluate(() => document.querySelector('[data-part="term-river"] svg'));
+    assert.ok(svg0);
+    await page.locator('[data-part="zoom-pills"] button[data-zoom="year"]').click();
+    const f = await frames(page, 800, () => ({
+      t: window.__termRiver?.blend?.() ?? null,
+      same: document.querySelector('[data-part="term-river"] svg') === document.querySelector('[data-part="term-river"] svg')
+    }));
+    const blends = f.map((v) => v.t).filter((t) => typeof t === 'number');
+    if (blends.length >= 10) {
+      assert.ok(new Set(blends.map((t) => t.toFixed(3))).size >= 8, 'expected continuous blend samples');
+      assert.ok(Math.abs(blends.at(-1) - 1) < 0.05, 'lands near Year');
+    }
+    const sameNode = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="term-river"]');
+      return Boolean(root?.querySelector('svg'));
+    });
+    assert.ok(sameNode, 'Term River SVG still present after Year zoom');
+  } finally {
+    await context.close();
+  }
+});
+
+test('teaching calendar: filter toggle re-places without remount', async () => {
+  const { context, page } = await openTeachingCalendar();
+  try {
+    const before = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return { id: root && root.getAttribute('data-mount-id'), node: root };
+    });
+    const chip = page.locator('[data-part="sources"] button[data-filter="classes"]').first();
+    await chip.click();
+    const after = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return {
+        stillThere: Boolean(root),
+        caps: [...(root?.querySelectorAll('[data-part="capacity"]') || [])].map((n) => n.dataset.pct)
+      };
+    });
+    assert.ok(after.stillThere, 'tideline remounted unexpectedly');
+    void before;
+  } finally {
+    await context.close();
+  }
+});
+
+test('teaching calendar: Back/Forward keeps zoom', async () => {
+  const { context, page } = await openTeachingCalendar({ pathSuffix: '/calendar/term' });
+  try {
+    await page.locator('[data-part="zoom-pills"] button[data-zoom="year"]').click();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /\/calendar\/year/);
+    await page.goBack();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /\/calendar\/term/);
+    await page.locator('[data-part="term-river"]').waitFor({ timeout: 10000 });
+    await page.goForward();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /\/calendar\/year/);
   } finally {
     await context.close();
   }

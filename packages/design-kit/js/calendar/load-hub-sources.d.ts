@@ -14,12 +14,15 @@ export type HubSourceLoader = {
   getEvents(): unknown[];
   getStatuses(): Record<string, HubSourceStatusRow>;
   getMeta(sourceId: string): unknown;
+  getTerms(): { term: number | null; starts_on: string; ends_on: string }[];
+  getVisual(): unknown;
   legacySourceStatus(): Record<string, string>;
 };
 
 export function createHubSourceLoader(opts: {
   apiFetch: (path: string, init?: RequestInit) => Promise<Response>;
   loadLife?: () => Promise<unknown[]>;
+  today?: string;
   onChange?: () => void;
 }): HubSourceLoader;
 
