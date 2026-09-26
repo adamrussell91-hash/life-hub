@@ -13,18 +13,18 @@ Direction: `mockups/04-directory-plus` (Option A+). Recorded 26 Sep 2026.
 | Feature | Built by | Notes |
 |---|---|---|
 | Crests | Product | Logo field and upload on Organisation. Adam supplies the images |
-| Link inference | Agent sweep (Hammond daily sweep and annotation automations) | Sweeps Tasks and Events (then other hubs) for people. Proposes `professional_relationship` / `employee_at` / `collaborator` / `contact` links. Adam confirms each one |
+| Link inference | Clare's sweep of Tasks and Events; Hammond's daily sweep for other hubs | Sweeps Tasks and Events (then other hubs) for people. Proposes `professional_relationship` / `employee_at` / `collaborator` / `contact` links. Adam confirms each one |
 | Warmth score | Product algorithm | Weighted by relationship: people closer to Adam, and closer to his current circumstances (current workplace, active projects), go cold faster. Communications feeds it once built |
-| Remember | Agent automation, about twice a day | Pulls facts from notes, tasks and comms. Each fact shows its source. Editable |
-| Ledger | Agent, triggered from an avatar button on the person card, plus the sweep | Two directions: you owe / they owe. Writes into the card live, patching in place with no reload flash. Every item is editable. Conversions: ledger item → task, task → comms item |
-| Ask | AI search agent (owner undecided, see below) | Needs cross-hub context: people graph, tasks, projects, teaching/APST |
+| Remember | Ann, about twice a day | Pulls facts from notes, tasks and comms. Each fact shows its source. Editable |
+| Ledger | Clare, from her avatar button on the person card and in her sweep | Two directions: you owe / they owe. Writes into the card live, patching in place with no reload flash. Every item is editable. Conversions: ledger item → task, task → comms item |
+| Ask | Ann | Needs cross-hub context: people graph, tasks, projects, teaching/APST |
 | Today strip | Product | Adam's own availability only. Suggests times from the history of past meetings with that person. No other staff timetables |
 
-## Open question: which agent owns Professional?
-No agent currently has the professional domain (`_shared/agent-directory.mjs`).
-Ann O'Tation is set up as a teaching and lesson coach. Hammond is the
-whole-hub coordinator. Options:
-1. Extend Ann's remit to professional practice (mentoring, APST, colleagues).
-2. A new Professional specialist that owns People, the ledger, Remember and Ask.
-   Hammond's sweep hands People work to it.
-3. Hammond does it directly.
+## Agent split
+- **Clare DeMind** handles anything based on tasks, events and comms: the ledger,
+  converting ledger items to tasks and tasks to comms, and proposing links from Tasks and Events.
+- **Ann O'Tation** takes on professional practice beyond lessons: Remember, Ask,
+  and the meaning of relationships (mentoring, APST, colleagues). Her voice and
+  remit in `_shared/agent-directory.mjs` need widening.
+- **Hammond** coordinates: runs the daily sweep, hands People work to Clare and
+  Ann, and flags relationships going cold that matter to the current mission.
