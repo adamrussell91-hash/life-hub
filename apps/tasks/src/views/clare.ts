@@ -1,6 +1,7 @@
 import { buildChatView } from '@/chat/build-chat-view';
 import { createClareChatController } from '@/chat/clare-controller';
 import { getClareSession } from '@/chat/clare-session';
+import { applyClareDeepLink, parseClareDeepLink } from '@/chat/clare-deep-link';
 import { CLARE_ADHD_PROTOCOLS, CLARE_PROTOCOLS, CLARE_VIEW_PROTOCOLS, CLARE_WAIT_LINES } from '@/domain/clare-protocols';
 import { renderLoadError } from '@/views/feedback';
 import { tasksApi } from '@/services/client-api';
@@ -39,6 +40,7 @@ async function mountStandalone(canvas: HTMLElement): Promise<void> {
   canvas.replaceChildren(view);
   controller = createClareChatController({ root: view, isVisible: () => true });
   await controller.start();
+  applyClareDeepLink(view, parseClareDeepLink());
 }
 
 /** Clare DeMind desk — Life Hub chat window, morning sweep, dump, confirm-card create. */
@@ -50,6 +52,7 @@ export async function renderClareView(canvas: HTMLElement): Promise<void> {
     await session.start();
     // Mount inside the chat view (above the composer) so the input stays on the floor.
     await session.appendExtras(session.view);
+    applyClareDeepLink(session.view, parseClareDeepLink());
     return;
   }
   await mountStandalone(canvas);

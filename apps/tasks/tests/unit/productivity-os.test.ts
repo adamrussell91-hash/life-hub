@@ -27,6 +27,7 @@ import {
 import { createProjectPlan, updateProjectPlanStage } from '@/domain/project-plan';
 import { activeProjectMeter, assessNewCommitment } from '@/domain/hammond-portfolio';
 import { buildHorizonsChain } from '@/domain/hammond-horizons';
+import type { Goal } from '@/schemas/goal';
 import { availableWindowMinutes, dayCapacity, protectedSpansForDate } from '@/domain/hammond-capacity';
 import {
   threefoldWorkAudit,
@@ -424,36 +425,27 @@ describe('hammond portfolio and horizons', () => {
         purpose: 'Teach well',
         vision: 'Calm classroom'
       },
-      areas: [
-        {
-          schema_version: 1,
-          id: 'a1',
-          title: 'Teaching',
-          description: '',
-          tags: [],
-          created_at: '2026-01-01T00:00:00.000Z',
-          updated_at: '2026-01-01T00:00:00.000Z'
-        }
-      ],
       goals: [
         {
           schema_version: 1,
           id: 'g1',
           title: 'Term outcomes',
           description: '',
-          parent_area_id: 'a1',
+          parent_area_id: null,
+          sphere: 'work',
           status: 'active',
           tags: [],
           created_at: '2026-01-01T00:00:00.000Z',
           updated_at: '2026-01-01T00:00:00.000Z'
-        }
+        } as Goal
       ],
       projects: [project({ id: 'p1', title: 'Unit rewrite', parent_goal_id: 'g1' })],
       tasks: [task({ id: 't1', title: 'Outline', parent_project_id: 'p1' })],
       focus: { type: 'project', id: 'p1' }
     });
     expect(chain.purpose).toBe('Teach well');
-    expect(chain.area?.title).toBe('Teaching');
+    expect(chain.sphere?.title).toBe('Work');
+    expect(chain.area?.title).toBe('Work');
     expect(chain.next_actions[0]!.title).toBe('Outline');
   });
 });

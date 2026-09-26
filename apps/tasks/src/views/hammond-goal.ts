@@ -6,6 +6,8 @@ import { errorMessage } from '@/views/feedback';
 import { el } from '@/views/hub-kit';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
+import { checkInProminent, checkInStripLine, openSundayCheckIn } from '@/views/goals-checkin';
+import { sydneyToday } from '@/domain/goal-runway';
 
 function avatar(): HTMLImageElement {
   const img = el('img');
@@ -77,13 +79,23 @@ function renderPanel(host: HTMLElement, goal: Goal, envelope: GoalReadEnvelope, 
   who.append(avatar(), copy);
   root.append(who);
   if (read) {
-    root.append(el('p', 'hammond__read', read.verdict));
+    const verdict = el('p', 'hammond__read', read.verdict);
+    if (read.verdict_source === 'model') {
+      const mark = el('span', 'hammond__ai', '✦');
+      mark.title = 'Written by Hammond (AI)';
+      verdict.prepend(mark, document.createTextNode(' '));
+    }
+    root.append(verdict);
     const looked = el('div', 'hammond__looked');
     read.looked_at.forEach((label) => looked.append(el('span', '', label)));
     root.append(looked, el('p', 'hammond__head', 'Proposals · nothing changes until you confirm'));
-    if (read.ghosts.length === 0) root.append(el('p', 'hammond__why', 'Nothing to propose right now.'));
+    if (read.ghosts.length === 0) root.append(el('p', 'hammond__why', 'Nothing to propose right now. Keep going.'));
     read.ghosts.forEach((ghost) => root.append(confirmCard(ghost, onApplied)));
   }
+  const ask = el('a', 'btn btn--ghost hammond__ask', 'Ask Hammond about this goal…') as HTMLAnchorElement;
+  const move = goal.next_start ? ` Next move: ${goal.next_start}.` : '';
+  ask.href = `#/clare?agent=hammond&prompt=${encodeURIComponent(`Help me with “${goal.title}”.${move}`)}`;
+  root.append(ask);
   host.replaceChildren(root);
 }
 
@@ -99,8 +111,19 @@ export function mountHammondPanel(host: HTMLElement, goal: Goal, onApplied: () =
 /** The landing strip: coldest two verdicts and up to two proposal chips across all goals. */
 export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelope[], goals: Goal[], onApplied: () => void): void {
   const reads = orderReadsForStrip(envelopes.flatMap((e) => (e.read ? [e.read] : [])));
+  const today = sydneyToday();
   if (!reads.length) {
-    host.replaceChildren();
+    const strip = el('section', 'hammond-strip');
+    strip.setAttribute('aria-label', 'General Hammond');
+    const body = el('div');
+    body.append(el('p', 'hammond__stamp', 'General Hammond'), el('p', 'empty-state', 'Hammond has no read yet.'));
+    const checkBtn = el('button', `btn ${checkInProminent(today) ? 'btn--primary' : 'btn--ghost'}`, 'Sunday check-in');
+    checkBtn.type = 'button';
+    checkBtn.dataset.action = 'sunday-checkin';
+    checkBtn.addEventListener('click', () => openSundayCheckIn(host, goals, envelopes, today, onApplied));
+    body.append(checkBtn);
+    strip.append(avatar(), body, el('span'));
+    host.replaceChildren(strip);
     return;
   }
   const titles = new Map(goals.map((g) => [g.id, g.title]));
@@ -125,6 +148,21 @@ export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelop
     chips.append(chip);
   }
   body.append(chips);
+  if (![...reads.flatMap((r) => r.ghosts)].length) {
+    body.append(el('p', 'empty-state', 'Nothing to change. Keep going.'));
+  }
+  const checkBtn = el('button', `btn ${checkInProminent(today) ? 'btn--primary' : 'btn--ghost'}`, 'Sunday check-in');
+  checkBtn.type = 'button';
+  checkBtn.dataset.action = 'sunday-checkin';
+  checkBtn.addEventListener('click', () => openSundayCheckIn(host, goals, envelopes, today, onApplied));
+  body.append(checkBtn);
+  void fetch('/api/goal-checkins', { credentials: 'include' })
+    .then((r) => r.json())
+    .then((data) => {
+      const line = checkInStripLine(data?.checkin ?? null, today);
+      if (line) body.append(el('p', 'hammond-strip__checkin', line));
+    })
+    .catch(() => undefined);
   strip.append(avatar(), body, el('span'));
   host.replaceChildren(strip);
 }

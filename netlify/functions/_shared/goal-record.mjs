@@ -8,7 +8,12 @@ import { normalizeTags } from './tasks-collection.mjs';
 const SPHERES = new Set(['life', 'work', 'professional']);
 const STATUSES = new Set(['active', 'parked', 'achieved', 'dropped', 'archived']);
 const STRUCTURES = new Set(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch']);
+const TERM_OUTCOMES = new Set(['carried', 'parked', 'achieved', 'dropped']);
+const LIFE_AREAS = new Set(['career', 'health', 'love', 'money', 'create', 'explore', 'learn', 'friends']);
+const CURRENT_SOURCES = new Set(['typed', 'tasks', 'signal']);
+const SIGNAL_ROWS = new Set(['weight', 'fat', 'ratio', 'lift']);
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_AT = /^\d{4}-\d{2}-\d{2}T/;
 const TEXT_PARTS = {
   woop: ['wish', 'outcome', 'obstacle', 'plan'],
   smarter: ['specific', 'measurable', 'achievable', 'relevant', 'time_bound', 'evaluate', 'readjust'],
@@ -107,18 +112,82 @@ function normalizeMilestones(value) {
     }));
 }
 
+export function normalizeTerm(value) {
+  if (!isObject(value)) return null;
+  const year = Number.isInteger(value.year) ? value.year : null;
+  const term = Number.isInteger(value.term) && value.term >= 1 && value.term <= 4 ? value.term : null;
+  return year && term ? { year, term } : null;
+}
+
+function normalizeTermHistory(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(item => isObject(item))
+    .map(item => {
+      const year = Number.isInteger(item.year) ? item.year : null;
+      const term = Number.isInteger(item.term) && item.term >= 1 && item.term <= 4 ? item.term : null;
+      const outcome = TERM_OUTCOMES.has(item.outcome) ? item.outcome : null;
+      const at = typeof item.at === 'string' && ISO_AT.test(item.at) ? item.at : null;
+      return year && term && outcome && at ? { year, term, outcome, at } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 40);
+}
+
+function normalizeLifeArea(value, sphere) {
+  if (sphere !== 'life') return null;
+  return LIFE_AREAS.has(value) ? value : null;
+}
+
+/** Map an Area title to a Goals sphere (§2.3). Used when a stored goal has no sphere. */
+export function sphereFromAreaTitle(title) {
+  const t = typeof title === 'string' ? title : '';
+  if (/teach|school|work|class/i.test(t)) return 'work';
+  if (/career|professional|pd|leader/i.test(t)) return 'professional';
+  return 'life';
+}
+
+/**
+ * If the stored goal has no sphere field, derive one from its parent area.
+ * Marks `_sphere_derived` so PATCH can write it through once.
+ */
+export function ensureGoalSphere(record, areasById) {
+  if (!record || typeof record !== 'object') return record;
+  if (Object.prototype.hasOwnProperty.call(record, 'sphere') && record.sphere != null && record.sphere !== '') {
+    const { _sphere_derived, ...rest } = record;
+    return rest;
+  }
+  const areaId = typeof record.parent_area_id === 'string' ? record.parent_area_id : '';
+  const area = areaId && areasById instanceof Map ? areasById.get(areaId) : null;
+  const title = area && typeof area.title === 'string' ? area.title : '';
+  return { ...record, sphere: sphereFromAreaTitle(title), _sphere_derived: true };
+}
+
 /** The goal fields a client may send on create or patch. Everything else is ignored. */
 export const GOAL_INPUT_KEYS = Object.freeze([
   'title', 'description', 'parent_area_id', 'parent_someday_id', 'sphere', 'status', 'structure',
   'frame', 'lead_measure', 'week_log', 'rest_weeks', 'if_then', 'next_start', 'due_date',
-  'milestones', 'tags', 'life_wall'
+  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal'
 ]);
 
+function normalizeCurrentSource(value) {
+  return CURRENT_SOURCES.has(value) ? value : 'typed';
+}
+
+function normalizeSignal(value, sphere) {
+  if (sphere !== 'life' || !isObject(value)) return null;
+  if (value.source !== 'binding_goal') return null;
+  if (!SIGNAL_ROWS.has(value.row)) return null;
+  return { source: 'binding_goal', row: value.row };
+}
+
 export function normalizeGoalRecord(record) {
+  const sphere = SPHERES.has(record.sphere) ? record.sphere : 'life';
+  const { _sphere_derived, ...rest } = record;
   return {
-    ...record,
+    ...rest,
     description: typeof record.description === 'string' ? record.description : '',
-    sphere: SPHERES.has(record.sphere) ? record.sphere : 'life',
+    sphere,
     status: STATUSES.has(record.status) ? record.status : 'active',
     structure: STRUCTURES.has(record.structure) ? record.structure : 'woop',
     frame: normalizeFrame(record.frame),
@@ -129,6 +198,11 @@ export function normalizeGoalRecord(record) {
     next_start: text(record.next_start) || null,
     due_date: DATE_KEY.test(record.due_date ?? '') ? record.due_date : null,
     milestones: normalizeMilestones(record.milestones),
-    tags: normalizeTags(record.tags)
+    tags: normalizeTags(record.tags),
+    term: normalizeTerm(record.term),
+    term_history: normalizeTermHistory(record.term_history),
+    life_area: normalizeLifeArea(record.life_area, sphere),
+    current_source: normalizeCurrentSource(record.current_source),
+    signal: normalizeSignal(record.signal, sphere)
   };
 }

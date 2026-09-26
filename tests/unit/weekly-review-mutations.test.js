@@ -446,13 +446,14 @@ describe('Weekly Review durable mutations W1–W12', () => {
     assert.notEqual(result.kind, 'propose');
   });
 
-  it('stages list remains the established eight-stage model', () => {
+  it('stages list remains the established nine-stage model (goals after projects)', () => {
     assert.deepEqual(WEEKLY_REVIEW_STAGES, [
       'capture',
       'past_calendar',
       'upcoming_calendar',
       'waiting',
       'projects',
+      'goals',
       'someday',
       'build_week',
       'confirm'

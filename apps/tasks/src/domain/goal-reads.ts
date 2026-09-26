@@ -3,7 +3,7 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 export type GoalGhost = {
   id: string;
   agent: 'hammond';
-  kind: 'create_task' | 'split_task' | 'goal_rest_weeks' | 'move_task';
+  kind: 'create_task' | 'split_task' | 'goal_rest_weeks' | 'move_task' | 'protect_block';
   title?: string;
   reason?: string;
   due?: string;
@@ -14,6 +14,9 @@ export type GoalGhost = {
   goalId?: string;
   from?: string;
   to?: string;
+  date?: string;
+  start?: string;
+  end?: string;
 };
 
 export type GoalRead = {
@@ -25,6 +28,7 @@ export type GoalRead = {
   week: { count: number; per_week: number | null };
   crunch_weeks: string[];
   verdict: string;
+  verdict_source?: 'model' | 'deterministic';
   looked_at: string[];
   ghosts: GoalGhost[];
 };
@@ -65,6 +69,16 @@ export function describeGhost(ghost: GoalGhost): GhostCard {
         title: `Move “${ghost.title}”`,
         why,
         diff: { before: `Due ${formatDisplayDate(ghost.from ?? '')}`, after: [`Due ${formatDisplayDate(ghost.to ?? '')}`] }
+      };
+    case 'protect_block':
+      return {
+        kind: 'Calendar · protect block',
+        title: `Protect “${ghost.title}”`,
+        why,
+        diff: {
+          before: null,
+          after: [`${ghost.date ?? ''} ${ghost.start ?? ''}–${ghost.end ?? ''}`]
+        }
       };
   }
 }

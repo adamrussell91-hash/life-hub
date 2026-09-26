@@ -15,6 +15,29 @@ describe('goal schema v2', () => {
     expect(goal.rest_weeks).toEqual([]);
     expect(goal.frame).toEqual({});
     expect(goal.milestones).toEqual([]);
+    expect(goal.term).toBeNull();
+    expect(goal.term_history).toEqual([]);
+    expect(goal.life_area).toBeNull();
+  });
+
+  it('keeps term and life_area on Life; strips life_area off Work', () => {
+    const life = GoalSchema.parse({
+      schema_version: 1, id: 'g4', title: 'Health', sphere: 'life',
+      term: { year: 2026, term: 4 },
+      term_history: [{ year: 2026, term: 3, outcome: 'carried', at: '2026-09-01T00:00:00.000Z' }],
+      life_area: 'health',
+      created_at: 'a', updated_at: 'b'
+    });
+    expect(life.term).toEqual({ year: 2026, term: 4 });
+    expect(life.life_area).toBe('health');
+
+    const work = normalizeGoal({
+      schema_version: 1, id: 'g5', title: 'Class', sphere: 'work',
+      term: { year: 2026, term: 1 }, life_area: 'career',
+      created_at: 'a', updated_at: 'b'
+    } as never);
+    expect(work.term).toEqual({ year: 2026, term: 1 });
+    expect(work.life_area).toBeNull();
   });
 
   it('keeps a record that fails parsing usable instead of throwing', () => {

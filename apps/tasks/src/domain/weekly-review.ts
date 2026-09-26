@@ -12,6 +12,7 @@ export const WEEKLY_REVIEW_STAGES = [
   'upcoming_calendar',
   'waiting',
   'projects',
+  'goals',
   'someday',
   'build_week',
   'confirm'
@@ -29,6 +30,17 @@ export type WeeklyReviewState = {
   waiting: WaitingItem[];
   project_health: ProjectHealthResult[];
   someday_due: Array<{ task_id: string; title: string; review_at: string }>;
+  /** G-38 Goals stage rows. */
+  goals_review?: Array<{
+    goal_id: string;
+    title: string;
+    count: number;
+    per_week: number | null;
+    verdict: string;
+  }>;
+  /** G-39 Tasks completed this week with no goal. */
+  orphan_completions?: Array<{ task_id: string; title: string }>;
+  orphan_links?: Record<string, string | null>;
   schedule: ScheduleComposeResult | null;
   next_action_titles?: Record<string, string>;
   waiting_decisions?: Record<string, { action: string; follow_up_at?: string | null }>;
@@ -56,6 +68,7 @@ export function buildWeeklyPendingChanges(state: WeeklyReviewState) {
   const nextTitles = state.next_action_titles ?? {};
   const waitingDecisions = state.waiting_decisions ?? {};
   const somedayDecisions = state.someday_decisions ?? {};
+  const orphanLinks = state.orphan_links ?? {};
   const capture = (state.capture?.items ?? [])
     .filter((i) => i.destination !== 'trash' && i.destination !== 'reference')
     .map((i) => ({
@@ -63,6 +76,28 @@ export function buildWeeklyPendingChanges(state: WeeklyReviewState) {
       kind: 'capture',
       destination: i.destination,
       summary: `Clarify → ${i.destination}: ${i.text.slice(0, 60)}`,
+      selected: true,
+      confirmable: true
+    }));
+  const goalLinks = Object.entries(orphanLinks)
+    .filter(([, goalId]) => goalId)
+    .map(([taskId, goalId]) => ({
+      id: `orphan:${taskId}`,
+      kind: 'goal_link',
+      task_id: taskId,
+      summary: `Link completed task ${taskId} → goal ${goalId}`,
+      selected: true,
+      confirmable: true,
+      action: 'set_parent_goal',
+      destination: goalId!
+    }));
+  const dismissedOrphans = Object.entries(orphanLinks)
+    .filter(([, goalId]) => goalId === null)
+    .map(([taskId]) => ({
+      id: `orphan-dismiss:${taskId}`,
+      kind: 'goal_link_dismiss',
+      task_id: taskId,
+      summary: `No goal for completed task ${taskId} (this week)`,
       selected: true,
       confirmable: true
     }));
@@ -148,7 +183,7 @@ export function buildWeeklyPendingChanges(state: WeeklyReviewState) {
       selected: true,
       confirmable: true
     }));
-  return [...capture, ...nextActions, ...waiting, ...someday, ...schedule];
+  return [...capture, ...nextActions, ...waiting, ...someday, ...goalLinks, ...dismissedOrphans, ...schedule];
 }
 
 export function createWeeklyReview(id = `wr_${Date.now()}`): WeeklyReviewState {
@@ -161,6 +196,9 @@ export function createWeeklyReview(id = `wr_${Date.now()}`): WeeklyReviewState {
     upcoming_calendar_notes: [],
     waiting: [],
     project_health: [],
+    goals_review: [],
+    orphan_completions: [],
+    orphan_links: {},
     someday_due: [],
     schedule: null,
     pending_changes: [],
@@ -192,6 +230,10 @@ export function runWeeklyReviewStage(
     upcoming_notes?: string[];
     tasks?: Task[];
     projects?: Project[];
+    goals?: import('@/schemas/goal').Goal[];
+    goals_review?: WeeklyReviewState['goals_review'];
+    orphan_completions?: WeeklyReviewState['orphan_completions'];
+    orphan_links?: Record<string, string | null>;
     today_key?: string;
     schedule?: ScheduleComposeResult | null;
     next_action_titles?: Record<string, string>;
@@ -203,7 +245,8 @@ export function runWeeklyReviewStage(
     ...state,
     next_action_titles: { ...(state.next_action_titles ?? {}), ...(input.next_action_titles ?? {}) },
     waiting_decisions: { ...(state.waiting_decisions ?? {}), ...(input.waiting_decisions ?? {}) },
-    someday_decisions: { ...(state.someday_decisions ?? {}), ...(input.someday_decisions ?? {}) }
+    someday_decisions: { ...(state.someday_decisions ?? {}), ...(input.someday_decisions ?? {}) },
+    orphan_links: { ...(state.orphan_links ?? {}), ...(input.orphan_links ?? {}) }
   };
   const stage = state.current_stage;
   if (stage === 'capture') {
@@ -239,6 +282,26 @@ export function runWeeklyReviewStage(
         project_health: inspectActiveProjectsHealth(input.projects ?? [], input.tasks ?? [])
       },
       'projects'
+    );
+  }
+  if (stage === 'goals') {
+    const goalsReview = Array.isArray((input as { goals_review?: WeeklyReviewState['goals_review'] }).goals_review)
+      ? (input as { goals_review: WeeklyReviewState['goals_review'] }).goals_review
+      : state.goals_review ?? [];
+    const orphans = Array.isArray((input as { orphan_completions?: WeeklyReviewState['orphan_completions'] }).orphan_completions)
+      ? (input as { orphan_completions: WeeklyReviewState['orphan_completions'] }).orphan_completions
+      : state.orphan_completions ?? [];
+    return advance(
+      {
+        ...state,
+        goals_review: goalsReview,
+        orphan_completions: orphans,
+        orphan_links: {
+          ...(state.orphan_links ?? {}),
+          ...((input as { orphan_links?: Record<string, string | null> }).orphan_links ?? {})
+        }
+      },
+      'goals'
     );
   }
   if (stage === 'someday') {

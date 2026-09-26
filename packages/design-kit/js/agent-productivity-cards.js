@@ -317,6 +317,7 @@ const REVIEW_STAGE_LABELS = {
   upcoming_calendar: 'Upcoming calendar',
   waiting: 'Waiting',
   projects: 'Projects',
+  goals: 'Goals',
   someday: 'Someday',
   build_week: 'Build week',
   confirm: 'Confirm'
@@ -362,6 +363,8 @@ export function createReviewProgressCard(root, options = {}) {
     body.hidden = !isCurrent;
     if (isCurrent && stage === 'confirm' && pendingChanges.length) {
       body.append(renderWeeklyConfirmDecisions(create, pendingChanges, options));
+    } else if (isCurrent && stage === 'goals') {
+      body.append(renderWeeklyGoalsStage(create, options));
     } else if (isCurrent && options.currentDetail) {
       body.textContent = options.currentDetail;
     } else if (done) {
@@ -394,6 +397,93 @@ export function createReviewProgressCard(root, options = {}) {
     )
   );
   return card;
+}
+
+function renderWeeklyGoalsStage(create, options) {
+  const wrap = create('div');
+  wrap.className = 'prod-card__goals-stage';
+  wrap.dataset.goalsStage = 'true';
+
+  const rows = Array.isArray(options.goalsReview) ? options.goalsReview : [];
+  const orphans = Array.isArray(options.orphanCompletions) ? options.orphanCompletions : [];
+  const goals = Array.isArray(options.goalChips) ? options.goalChips : rows.map((r) => ({ id: r.goal_id, title: r.title }));
+  const links = options.orphanLinks && typeof options.orphanLinks === 'object' ? { ...options.orphanLinks } : {};
+
+  const list = create('ul');
+  list.className = 'prod-card__goal-rows';
+  wrap.append(list);
+  if (!rows.length) {
+    const empty = create('p');
+    empty.className = 'empty-state';
+    empty.textContent = 'No active goals in this term.';
+    wrap.append(empty);
+  }
+  for (const row of rows) {
+    const li = create('li');
+    li.className = 'prod-card__goal-row';
+    const title = create('p');
+    title.textContent = row.title || row.goal_id;
+    const cells = create('p');
+    cells.className = 'meta';
+    const per = row.per_week == null ? '—' : String(row.per_week);
+    cells.textContent = `${row.count ?? 0}/${per} this week`;
+    li.append(title, cells);
+    if (row.verdict) {
+      const verdict = create('p');
+      verdict.className = 'meta';
+      verdict.textContent = row.verdict;
+      li.append(verdict);
+    }
+    list.append(li);
+  }
+
+  if (orphans.length) {
+    const head = create('p');
+    head.className = 'prod-card__goals-orphans-head';
+    head.textContent = 'Completed this week with no goal';
+    wrap.append(head);
+    for (const orphan of orphans) {
+      const row = create('div');
+      row.className = 'prod-card__orphan';
+      row.dataset.taskId = orphan.task_id;
+      const title = create('p');
+      title.textContent = orphan.title || orphan.task_id;
+      const chips = create('div');
+      chips.className = 'row';
+      const label = create('span');
+      label.className = 'meta';
+      label.textContent = 'serves →';
+      chips.append(label);
+      for (const g of goals) {
+        const btn = create('button');
+        btn.type = 'button';
+        btn.className = 'hub-chip';
+        btn.textContent = g.title || g.id;
+        if (links[orphan.task_id] === g.id) btn.classList.add('is-selected');
+        btn.addEventListener('click', () => {
+          links[orphan.task_id] = g.id;
+          options.onOrphanLink?.(orphan.task_id, g.id, { ...links });
+          for (const peer of chips.querySelectorAll('.hub-chip')) peer.classList.remove('is-selected');
+          btn.classList.add('is-selected');
+        });
+        chips.append(btn);
+      }
+      const fine = create('button');
+      fine.type = 'button';
+      fine.className = 'btn btn--ghost';
+      fine.textContent = "No goal, that's fine";
+      fine.addEventListener('click', () => {
+        links[orphan.task_id] = null;
+        options.onOrphanLink?.(orphan.task_id, null, { ...links });
+        fine.disabled = true;
+        fine.textContent = 'Dismissed';
+      });
+      row.append(title, chips, fine);
+      wrap.append(row);
+    }
+  }
+
+  return wrap;
 }
 
 function renderWeeklyConfirmDecisions(create, pendingChanges, options) {

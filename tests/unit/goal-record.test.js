@@ -26,6 +26,45 @@ test('a legacy goal gains every v2 default', () => {
   assert.deepEqual(goal.milestones, []);
   assert.deepEqual(goal.tags, []);
   assert.equal(goal.description, '');
+  assert.equal(goal.term, null);
+  assert.deepEqual(goal.term_history, []);
+  assert.equal(goal.life_area, null);
+});
+
+test('term, term_history and life_area survive; life_area stripped off non-Life', () => {
+  const life = normalizeGoalRecord({
+    ...BASE,
+    sphere: 'life',
+    term: { year: 2026, term: 4 },
+    term_history: [
+      { year: 2026, term: 3, outcome: 'carried', at: '2026-09-01T00:00:00.000Z' },
+      { year: 2026, term: 2, outcome: 'nope', at: 'x' },
+      { year: 2026, term: 9, outcome: 'parked', at: '2026-06-01T00:00:00.000Z' }
+    ],
+    life_area: 'health'
+  });
+  assert.deepEqual(life.term, { year: 2026, term: 4 });
+  assert.deepEqual(life.term_history, [
+    { year: 2026, term: 3, outcome: 'carried', at: '2026-09-01T00:00:00.000Z' }
+  ]);
+  assert.equal(life.life_area, 'health');
+
+  const work = normalizeGoalRecord({
+    ...BASE,
+    sphere: 'work',
+    term: { year: 2026, term: 1 },
+    life_area: 'career'
+  });
+  assert.deepEqual(work.term, { year: 2026, term: 1 });
+  assert.equal(work.life_area, null);
+
+  const bad = normalizeGoalRecord({
+    ...BASE,
+    term: { year: 'x', term: 2 },
+    life_area: 'not-an-area'
+  });
+  assert.equal(bad.term, null);
+  assert.equal(bad.life_area, null);
 });
 
 test('known values survive, junk is dropped', () => {

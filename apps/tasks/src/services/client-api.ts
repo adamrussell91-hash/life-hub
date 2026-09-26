@@ -385,6 +385,14 @@ export const tasksApi = {
     return { receipt: body.receipt ?? '', writes: body.writes ?? 'applied' };
   },
 
+  planTerm: (body: {
+    from: { year: number; term: 1 | 2 | 3 | 4 };
+    decisions: Array<{ goal_id: string; outcome: 'carried' | 'parked' | 'achieved' | 'dropped' }>;
+  }) =>
+    apiPost<{ goals: import('@/schemas/goal').Goal[] }>('/api/goals/plan-term', body).then((r) => ({
+      goals: r.goals.map(normalizeGoal)
+    })),
+
   getTaskProperties: () => apiGet<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties'),
   updateTaskProperties: (body: import('@/schemas/task-properties').TaskPropertyConfig) =>
     apiPut<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties', body),

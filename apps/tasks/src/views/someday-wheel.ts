@@ -166,6 +166,9 @@ function buildAreaRow(
   track.append(fill);
   row.append(track);
   row.append(el('span', 'someday-wheel__count', String(area.count)));
+  if (area.goalCount > 0) {
+    row.append(el('span', 'someday-wheel__goals-mark', `${area.goalCount}g`));
+  }
   wireAreaTarget(row, area.id, root, onSelect);
   return row;
 }
@@ -176,7 +179,12 @@ function maturityLabel(task: Task): string {
 
 function buildAreaDetail(area: LifeCoverageArea, dreams: Task[]): HTMLElement {
   const panel = el('div', 'someday-wheel__detail');
-  const countLabel = area.count === 1 ? '1 dream' : `${area.count} dreams`;
+  const countLabel =
+    area.goalCount > 0
+      ? `${area.count === 1 ? '1 dream' : `${area.count} dreams`} · ${area.goalCount} goal${area.goalCount === 1 ? '' : 's'}`
+      : area.count === 1
+        ? '1 dream'
+        : `${area.count} dreams`;
   panel.append(el('h2', 'someday-wheel__detail-title', `${area.label} · ${countLabel}`));
   if (dreams.length === 0) {
     panel.append(el('p', 'someday-wheel__detail-empty', `Nothing parked in ${area.label} yet.`));
@@ -202,8 +210,9 @@ function buildAreaDetail(area: LifeCoverageArea, dreams: Task[]): HTMLElement {
 export async function renderSomedayWheelView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Lighting up the sky…', '.someday-wheel');
   try {
-    const tasks = somedayTasks(await tasksApi.listTasks());
-    const coverage = computeLifeCoverage(tasks);
+    const [allTasks, goals] = await Promise.all([tasksApi.listTasks(), tasksApi.listGoals().catch(() => [])]);
+    const tasks = somedayTasks(allTasks);
+    const coverage = computeLifeCoverage(tasks, goals);
     let selectedId: string | null = null;
     const paint = () =>
       paintWheel(canvas, coverage, tasks, selectedId, (id) => {
@@ -234,7 +243,8 @@ function paintWheel(
   panel.append(buildConstellation(coverage, selectedId, root, onSelect));
   root.append(panel);
   root.append(
-    el('p', 'someday-wheel__key', 'Size = how many dreams. Brightness = how developed they are.')
+    el('p', 'someday-wheel__key', 'Size = how many dreams. Brightness = how developed they are.'),
+    el('p', 'someday-wheel__key someday-wheel__key--goals', 'Goals = active Life goals by life area (mark · g).')
   );
 
   const selected = coverage.find((row) => row.id === selectedId) ?? null;

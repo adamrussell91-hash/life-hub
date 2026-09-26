@@ -107,7 +107,7 @@ export const AGENT_PROTOCOLS = {
       { id: 'shatter-start', label: 'Shatter start', steer: 'One-minute first move with a physical cue', explain: 'Unstick a frozen task.' },
       { id: 'time-map', label: 'Time map', steer: 'Hidden setup and wrap usually double the guess', explain: 'Make the estimate honest.' },
       { id: 'open-loops', label: 'Open loops', steer: 'Name the unfinished threads that are stealing attention', explain: 'Surface what is still open.' },
-      { id: 'weekly-review', label: 'Weekly Review', steer: 'Productivity OS — eight-stage weekly review; confirm before write', explain: 'Run the weekly review with confirm before write.' },
+      { id: 'weekly-review', label: 'Weekly Review', steer: 'Productivity OS — nine-stage weekly review; confirm before write', explain: 'Run the weekly review with confirm before write.' },
       { id: 'plan-day', label: 'Plan Day', steer: 'Productivity OS — compose day schedule; ghost blocks until confirm', explain: 'Propose work blocks for the day.' },
       { id: 'project-plan', label: 'Project Plan', steer: 'Productivity OS — purpose → outcome → next actions for one project', explain: 'Walk one project from purpose to next actions.' },
       { id: 'waiting', label: 'Waiting', steer: 'Productivity OS — list waiting items and follow-ups that need a nudge', explain: 'Review waiting items and follow-ups.' },

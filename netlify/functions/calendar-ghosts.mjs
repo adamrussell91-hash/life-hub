@@ -591,12 +591,27 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
   const goalId = goalIdFromGhostId(decision.id);
   if (!goalId) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
   const store = await tasksStore();
+  const { appendDecision } = await import('./_shared/goal-dismissal-learn.mjs');
+
+  const kindGuess = decision.id.includes('-block-')
+    ? 'protect_block'
+    : decision.id.includes('-rest-')
+      ? 'goal_rest_weeks'
+      : decision.id.includes('-split-')
+        ? 'split_task'
+        : decision.id.includes('-move-')
+          ? 'move_task'
+          : decision.id.includes('-start')
+            ? 'create_task'
+            : 'unknown';
 
   if (decision.decision === 'dismiss') {
     const cached = (await getJSON(store, goalReadKey(goalId))) ?? {};
     const dismissed = [...new Set([...(Array.isArray(cached.dismissed) ? cached.dismissed : []), decision.id])];
     const read = cached.read ? { ...cached.read, ghosts: (cached.read.ghosts ?? []).filter(g => g.id !== decision.id) } : null;
     await setJSON(store, goalReadKey(goalId), { ...cached, read, dismissed });
+    const ghostKind = cached.read?.ghosts?.find?.(g => g.id === decision.id)?.kind ?? kindGuess;
+    await appendDecision(store, { kind: ghostKind, outcome: 'dismiss', at: nowIso }, { getJSON, setJSON }).catch(() => undefined);
     return applied({ receipt: 'Dismissed. Nothing written.' });
   }
 
@@ -625,9 +640,9 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
       throw error;
     }
     const result = await finishTasks({ open, commit, tasksStore, id: decision.id, settlement });
-    // The goal changed; drop the saved read so the next GET recomputes it.
     const cached = (await getJSON(store, goalReadKey(goalId))) ?? {};
     await setJSON(store, goalReadKey(goalId), { ...cached, read: null });
+    await appendDecision(store, { kind: ghost.kind, outcome: 'accept', at: nowIso }, { getJSON, setJSON }).catch(() => undefined);
     return result;
   }
   return fail(409, 'write_conflict', 'The repository changed while accepting. Try again.');

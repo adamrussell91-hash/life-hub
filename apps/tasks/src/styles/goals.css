@@ -4,6 +4,43 @@
 .goals-top__actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .goals-new { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); }
 .goals-new input { min-width: 16rem; }
+.goals-summary-row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; flex: 1; }
+.goals-meter--compact { max-width: 14rem; }
+.goals-meter--compact .prod-card { padding: var(--space-2) var(--space-3); }
+.goals-direction { padding: var(--space-3) var(--space-4); margin-bottom: var(--space-3); }
+.goals-direction__collapsed { all: unset; cursor: pointer; display: block; width: 100%; font: inherit; color: var(--ink); font-size: var(--text-sm); }
+.goals-direction__editor { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
+.goals-new__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.runway__ongoing { grid-column: 1 / -1; margin: var(--space-2) 0; padding-left: var(--space-3); border-left: 2px solid var(--line); }
+.runway__ongoing-label { font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); margin: 0 0 var(--space-1); }
+.runway__chip--ongoing { color: var(--muted); }
+.goals-plan-sheet { position: fixed; inset: 0; z-index: 40; background: var(--canvas); padding: var(--space-6); overflow: auto; display: flex; flex-direction: column; gap: var(--space-4); }
+.goals-plan-card { padding: var(--space-5); min-height: 12rem; }
+.goals-plan-card__choices { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.goals-plan-summary__counts { list-style: none; padding: 0; display: flex; gap: var(--space-4); font-variant-numeric: tabular-nums; }
+.goals-plan-summary__num { font-weight: var(--weight-bold); font-size: var(--text-xl); }
+.runway--year { display: flex; flex-direction: column; gap: var(--space-6); }
+.runway__year-term h3 { margin: 0 0 var(--space-3); font-size: var(--text-md); }
+.runway__lead-count { font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold); color: var(--ink); }
+.goals-zoom-host { min-width: 0; }
+.runway--zoom { padding: var(--space-5) var(--space-6); overflow: hidden; }
+.runway-zoom__plot { position: relative; min-height: 12rem; }
+.runway-zoom__axis { position: relative; height: 1.75rem; margin-bottom: var(--space-3); margin-left: 12.5rem; }
+.runway-zoom__tick { position: absolute; top: 0; font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); text-align: center; overflow: hidden; white-space: nowrap; }
+.runway-zoom__tick.is-holiday { color: var(--shallow); opacity: 0.7; }
+.runway-zoom__tick.is-now { color: var(--high-sea-ink); }
+.runway-zoom__lane { margin: var(--space-4) 0 var(--space-2); }
+.runway-zoom__lane-label { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; margin-bottom: var(--space-2); }
+.runway-zoom__lane-label small { margin-left: auto; font-size: var(--text-sm); font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--muted); }
+.runway-zoom__row { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr) 10rem; gap: var(--space-2); align-items: center; text-decoration: none; color: inherit; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); min-height: 2.75rem; }
+.runway-zoom__info { min-width: 0; }
+.runway-zoom__track { position: relative; height: 1.5rem; min-width: 0; }
+.runway-zoom__bar { position: absolute; top: 0.35rem; height: 0.5rem; border-radius: var(--radius-xs); background: var(--line); opacity: 0.55; pointer-events: none; }
+.runway-zoom__track .cell { position: absolute; top: 0.125rem; }
+.runway__row--life .runway-zoom__bar { background: var(--pastel-sage); }
+.runway__row--work .runway-zoom__bar { background: var(--pastel-blue); }
+.runway__row--professional .runway-zoom__bar { background: var(--pastel-lilac); }
+.runway-phone__card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); margin-bottom: var(--space-2); text-decoration: none; color: inherit; background: var(--glass); border: 1px solid var(--line); border-radius: var(--radius-md); min-height: 2.75rem; }
 
 .runway { padding: var(--space-5) var(--space-6); position: relative; }
 .runway__grid { display: grid; grid-template-columns: minmax(12rem, 18rem) repeat(var(--weeks, 10), minmax(1.5rem, 1fr)) minmax(10rem, 15rem); column-gap: var(--space-1); align-items: center; }
@@ -46,9 +83,57 @@
 .runway__legend span { display: inline-flex; align-items: center; gap: var(--space-2); }
 .runway__legend .cell { width: 0.875rem; height: 0.875rem; }
 
+.goal-page__dream-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0 var(--space-2); border-radius: var(--radius-xs);
+  background: var(--pastel-gold, #f5e6c8); color: var(--navy);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold);
+  text-decoration: none; border: 1px solid var(--line);
+}
+.someday-card__grown { color: var(--high-sea-ink); font-weight: var(--weight-semibold); text-decoration: none; }
+.someday-card__grown:hover { text-decoration: underline; }
+.someday-wheel__goals-mark { font-size: var(--text-2xs); color: var(--pastel-sage-ink); margin-left: var(--space-1); }
+.promote-goal-panel { padding: var(--space-4); margin-top: var(--space-2); max-width: 22rem; }
+.promote-goal__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.goals-new__tabs { display: flex; gap: var(--space-2); width: 100%; margin-bottom: var(--space-2); }
+.goals-new__tabs .is-active { font-weight: var(--weight-bold); }
+.goals-new__dreams { display: flex; flex-wrap: wrap; gap: var(--space-2); width: 100%; margin-bottom: var(--space-2); }
+.goals-new__dream.is-selected { outline: 2px solid var(--wave); }
+
+.goals-checkin-sheet {
+  position: fixed; inset: 0; z-index: 50; background: var(--canvas);
+  padding: var(--space-6); overflow: auto;
+  display: flex; flex-direction: column; gap: var(--space-4);
+}
+.goals-checkin__row, .goals-checkin__stuck, .goals-checkin__card {
+  padding: var(--space-3) var(--space-4);
+  background: var(--glass); border: 1px solid var(--line);
+  border-radius: var(--radius-md); margin-bottom: var(--space-2);
+}
+.goals-checkin__nav { margin-top: var(--space-4); gap: var(--space-2); }
+.hub-chip.is-selected { outline: 2px solid var(--wave); }
+.hammond-strip__checkin { font-size: var(--text-sm); color: var(--muted); margin-top: var(--space-2); }
+.hammond__ai { color: var(--high-sea-ink); }
+.hammond__ask { margin-top: var(--space-3); }
+
 .goal-page { display: grid; grid-template-columns: minmax(0, 1fr) 26rem; gap: var(--space-5); align-items: start; }
+
+
 .goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.goal-page__meta { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); color: var(--muted); }
+.goal-page__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
+.goal-page__chain-sep { color: var(--shallow); }
+.goal-page__chain-link { color: var(--ink); text-decoration: none; }
+.goal-page__chain-link:hover { text-decoration: underline; }
+.goal-page__chain-link.is-muted { color: var(--muted); font-style: italic; }
+.goal-details { margin-top: var(--space-3); }
+.goal-details__block { margin-bottom: var(--space-3); }
+.goal-current-source { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
+.goal-page__meta { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); color: var(--muted); }
+.goal-page__meta-left { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
+.goal-page__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.goal-page__description { margin: 0; font-size: var(--text-sm); color: var(--ink); max-width: 36rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.goal-page__desc { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+.goal-page__actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .goal-page__pair { display: grid; grid-template-columns: 1.15fr 1fr; gap: var(--space-4); }
 .goal-card { padding: var(--space-5) var(--space-6); }
 .runway, .goal-card, .goals-new {
@@ -121,12 +206,32 @@ textarea.goal-field { resize: vertical; min-height: 3.5rem; }
   .runway { padding: var(--space-4); }
   .runway__grid { display: block; }
   .runway__head { display: none; }
-  .runway__row { display: block; background: rgba(255, 255, 255, 0.7); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-2); }
+  .runway__row { display: block; background: rgba(255, 255, 255, 0.7); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-2); min-height: 2.75rem; }
   .runway__row > * { border: none; padding: var(--space-1) 0; background: none !important; }
   .runway__cell { display: none; }
   .runway__cell.is-now { display: flex; justify-content: flex-start; }
   .runway__move { border-left: none; padding-left: 0 !important; }
   .goal-page, .goal-page__pair, .goal-frame__grid, .goal-frame__grid--3 { grid-template-columns: 1fr; }
-  .hammond { position: static; }
+  .hammond { position: static; order: 2; }
+  .goal-page__main { order: 1; }
   .hammond-strip { grid-template-columns: 1fr; }
+  .goals-plan-sheet, .goals-checkin-sheet { padding: var(--space-4); }
+  .goals-plan-card__choices .btn, .goals-checkin__nav .btn, .hub-chip, .runway-phone__card {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .runway--year-list { display: flex; flex-direction: column; gap: var(--space-4); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .runway__row, .runway__cell .cell, .goals-plan-card, .goals-checkin-sheet,
+  .goals-direction__editor, .goal-page, .hammond-chip, .hub-steps__item {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cell.is-now { animation: none !important; }
+}
+
+.goals-empty { padding: var(--space-5); margin: var(--space-4) 0; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.runway__empty-lane { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
+.goals-plan-sheet .btn, .goals-checkin-sheet .btn, .runway__row { min-height: 2.75rem; }

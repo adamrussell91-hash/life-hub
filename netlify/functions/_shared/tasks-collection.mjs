@@ -49,7 +49,10 @@ export function createTasksCollectionHandler({
   notFound,
   create,
   normalize = null,
-  pickPatch = null
+  pickPatch = null,
+  onRead = null,
+  onDelete = null,
+  beforePatch = null
 }, deps = {}) {
   const shape = record => (normalize ? normalize(record) : record);
   return createOperatorHandler(async (request, context) => {
@@ -62,9 +65,19 @@ export function createTasksCollectionHandler({
           if (!record || typeof record !== 'object' || Array.isArray(record)) {
             return withCors(errorResponse(404, 'not_found', notFound, false), request, env);
           }
-          return withCors(okResponse(200, shape(record)), request, env);
+          const enriched = onRead ? await onRead(record, store) : record;
+          return withCors(okResponse(200, shape(enriched)), request, env);
         }
-        const items = (await listJSON(store, prefix)).map(item => (item && typeof item === 'object' && !Array.isArray(item) ? shape(item) : item));
+        const raw = await listJSON(store, prefix);
+        const items = [];
+        for (const item of raw) {
+          if (!item || typeof item !== 'object' || Array.isArray(item)) {
+            items.push(item);
+            continue;
+          }
+          const enriched = onRead ? await onRead(item, store) : item;
+          items.push(shape(enriched));
+        }
         return withCors(okResponse(200, { [listKey]: items }), request, env);
       }
 
@@ -100,6 +113,7 @@ export function createTasksCollectionHandler({
           return withCors(errorResponse(404, 'not_found', notFound, false), request, env);
         }
         if (request.method === 'DELETE') {
+          if (onDelete) await onDelete({ id, existing, store });
           await deleteKey(store, recordKey(prefix, id));
           await writeIndex(store, indexKey, (await readIndex(store, indexKey)).filter(item => item !== id));
           return withCors(okResponse(200, { id, deleted: true }), request, env);
@@ -110,7 +124,10 @@ export function createTasksCollectionHandler({
         if (!wall.ok) {
           return withCors(errorResponse(400, 'validation_error', wall.error, false), request, env);
         }
-        const patch = pickPatch ? pickPatch(parsed.value) : parsed.value;
+        let patch = pickPatch ? pickPatch(parsed.value) : parsed.value;
+        if (beforePatch) {
+          patch = await beforePatch(existing, patch, store);
+        }
         const next = shape(mergeRecord(existing, patch));
         await setJSON(store, recordKey(prefix, id), next);
         return withCors(okResponse(200, next), request, env);
