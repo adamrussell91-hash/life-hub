@@ -8,6 +8,7 @@ import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProp
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
 import { shiftYearMonth } from './calendar-model.js';
+import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
 import { DEFAULT_MIND_WATCHLIST, resolveWatchlist } from './mind-model.js';
 import { upgradeOtherProductCategories } from './skincare-product-library.js';
@@ -1337,13 +1338,17 @@ export function createAppController(dependencies) {
     return { from: days[0], to: days[days.length - 1] };
   }
 
-  /** Ghosts for Term/Year: the year zoom window (or the river payload's year range). */
+  /** Ghosts for Term/Year: the year zoom window (seeded RIVER.ZOOMS, else derived from terms). */
   function calendarGhostRange() {
     if (calendarView === 'term' || calendarView === 'year') {
       const river = latestResult?.calendarVisual?.RIVER;
       const year = river?.ZOOMS?.year;
       if (year?.from && year?.to) return { from: year.from, to: year.to };
-      return { from: '2026-07-20', to: '2027-01-10' };
+      const terms = latestResult?.calendarVisual?.school_terms
+        ?? calendarPlanningProfile?.school_terms
+        ?? [];
+      const derived = deriveRiverZooms(terms, latestResult?.date ?? calendarSelectedDate);
+      return { from: derived.year.from, to: derived.year.to };
     }
     return visibleWeekRange();
   }

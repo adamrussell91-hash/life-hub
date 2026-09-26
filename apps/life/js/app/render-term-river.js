@@ -14,7 +14,7 @@ import { TR } from '../../../../packages/design-kit/js/term-river-geometry.js';
 import { addDaysKey, buildTimeScale } from '../../../../packages/design-kit/js/school-time.js';
 import { formatDisplayDate } from '../../../../packages/design-kit/js/format-display-date.js';
 import { applyHubPillsThumb } from '../../../../packages/design-kit/js/hub-motion.js';
-import { LANES, byLane, riverWeekLabel, weeklyLoad, weeksBetween } from './term-river.js';
+import { LANES, byLane, deriveRiverZooms, riverWeekLabel, weeklyLoad, weeksBetween } from './term-river.js';
 import { forecastSeries } from './capacity-model.js';
 import { acceptPlan } from './ghost-writes.js';
 
@@ -30,11 +30,6 @@ const WEEK_FONT = '600 12px Inter, ui-sans-serif, sans-serif';
 const DATE_FONT = '400 11px Inter, ui-sans-serif, sans-serif';
 const TIER_FONT = '600 10.5px Inter, sans-serif';
 const HUM_FONT = '400 11px Inter, ui-sans-serif, sans-serif';
-/** The zoom ranges the reference uses when the visual payload carries none. */
-const DEFAULT_ZOOMS = {
-  term: { from: '2026-09-14', to: '2026-11-01', holidayFactor: 0.65 },
-  year: { from: '2026-07-20', to: '2027-01-10', holidayFactor: 0.5 }
-};
 /** The reveal owns the chart for this long: data and resize re-layouts wait for it. */
 const ENTRANCE_GUARD_MS = TR.revealMs + 120;
 
@@ -104,14 +99,21 @@ let entranceGuardUntil = 0;
 let skipResize = false;
 let lastHostW = 0;
 let lastZoomInput = null;
+/** Skips no-op remounts when the controller re-renders with the same river inputs. */
+let lastPaintKey = null;
+/**
+ * Nav ‹ › override of the term/year windows. Cleared by Today.
+ * Seeded `RIVER.ZOOMS` still wins when this is null.
+ */
+let zoomOverride = null;
 /** The pending queue re-read after a decision, until the app hands us a fresh one. */
 let fetchedGhosts = null;
 /** Both zoom scales for the current width. Rebuilt on mount, never inside the frame loop. */
 let scaleCache = new Map();
 
 // Resolved once per mount from `input`.
-let ZOOMS = DEFAULT_ZOOMS;
-let YEAR = DEFAULT_ZOOMS.year;
+let ZOOMS = deriveRiverZooms([], null);
+let YEAR = ZOOMS.year;
 let TODAY = '';
 let TERMS = [];
 let ITEMS = [];
@@ -232,12 +234,41 @@ function monthFirsts() {
   return out;
 }
 
+/** Stamp of inputs that require a re-layout (not a Term↔Year tween). */
+function paintKey(inp) {
+  const riverData = inp?.visual?.RIVER;
+  const ghosts = Array.isArray(inp?.ghosts)
+    ? inp.ghosts.map(ghost => `${ghost?.id}:${ghost?.settled ?? ghost?.status ?? ''}`).join(',')
+    : '';
+  return [
+    inp?.today ?? '',
+    ghosts,
+    riverData?.TODAY ?? '',
+    riverData?.ZOOMS?.term?.from ?? '',
+    riverData?.ZOOMS?.term?.to ?? '',
+    riverData?.ZOOMS?.year?.from ?? '',
+    riverData?.ZOOMS?.year?.to ?? '',
+    zoomOverride?.term?.from ?? '',
+    zoomOverride?.term?.to ?? '',
+    zoomOverride?.year?.from ?? '',
+    zoomOverride?.year?.to ?? ''
+  ].join('|');
+}
+
+function shiftDateYear(key, delta) {
+  const year = Number(key.slice(0, 4)) + delta;
+  if (!Number.isFinite(year)) return key;
+  return `${year}${key.slice(4)}`;
+}
+
 function buildModel() {
   const data = river();
-  ZOOMS = data.ZOOMS ?? DEFAULT_ZOOMS;
-  YEAR = ZOOMS.year ?? DEFAULT_ZOOMS.year;
-  TODAY = data.TODAY ?? input?.today ?? YEAR.from;
   TERMS = input?.terms?.length ? input.terms : (data.TERMS ?? input?.visual?.school_terms ?? []);
+  TODAY = data.TODAY ?? input?.today ?? TERMS[0]?.starts_on ?? '';
+  const derived = deriveRiverZooms(TERMS, TODAY);
+  ZOOMS = zoomOverride ?? data.ZOOMS ?? derived;
+  YEAR = ZOOMS.year ?? derived.year;
+  if (!TODAY) TODAY = YEAR.from;
   WALLS = data.WALLS ?? [];
   LOGGED = data.LOGGED ?? {};
   PATTERN = data.PATTERN ?? [];
@@ -394,6 +425,7 @@ function mount({ entrance = false } = {}) {
   else settle();
   wire(root);
   publish(view);
+  if (input) lastPaintKey = paintKey(input);
   if (state.toast && Date.now() < state.toast.until) showToast(state.toast.html, { resume: true });
 }
 
@@ -825,6 +857,59 @@ function setZoom(next) {
   announce(next === 'year' ? 'Year view.' : 'Term view.');
 }
 
+/** Switch Term↔Year via the app route when available so the hash stays in sync. */
+function requestZoom(name) {
+  if (name !== 'term' && name !== 'year') return;
+  if (name === state.zoom) return;
+  if (typeof input?.onSwitchView === 'function') {
+    input.onSwitchView(name);
+    return;
+  }
+  setZoom(name);
+}
+
+/**
+ * ‹ › step the focused window: adjacent school terms, or the year window by ±1 calendar year.
+ * Re-lays out without replaying the reveal. Today clears the override and restores seeded/derived zooms.
+ */
+function stepRiver(delta) {
+  if (!delta) return;
+  const sorted = [...TERMS].sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
+  if (state.zoom === 'year') {
+    const year = ZOOMS.year ?? YEAR;
+    if (!year?.from || !year?.to) return;
+    zoomOverride = {
+      term: { ...(ZOOMS.term ?? deriveRiverZooms(TERMS, TODAY).term) },
+      year: {
+        from: shiftDateYear(year.from, delta),
+        to: shiftDateYear(year.to, delta),
+        holidayFactor: year.holidayFactor ?? 0.5
+      }
+    };
+    mount({ entrance: false });
+    announce(delta > 0 ? 'Later year.' : 'Earlier year.');
+    return;
+  }
+  if (!sorted.length) return;
+  const focus = termNear(ZOOMS.term?.from ?? TODAY);
+  const index = focus ? sorted.findIndex(term => term.starts_on === focus.starts_on && term.ends_on === focus.ends_on) : -1;
+  const next = sorted[index + delta];
+  if (!next) return;
+  const factor = ZOOMS.term?.holidayFactor ?? 0.65;
+  zoomOverride = {
+    term: { from: next.starts_on, to: next.ends_on, holidayFactor: factor },
+    year: { ...(ZOOMS.year ?? YEAR) }
+  };
+  mount({ entrance: false });
+  announce(`Term ${next.term}.`);
+}
+
+function riverToday() {
+  zoomOverride = null;
+  mount({ entrance: false });
+  announce('Back to today.');
+}
+
 function announce(text) {
   const live = nodes.get('__live');
   if (live) live.textContent = text;
@@ -987,13 +1072,13 @@ function wire(section) {
     const zoom = target.closest?.('[data-zoom]');
     if (zoom) {
       const name = zoom.getAttribute('data-zoom');
-      if (name === 'term' || name === 'year') return setZoom(name);
+      if (name === 'term' || name === 'year') return requestZoom(name);
       input?.onSwitchView?.(name);
       return;
     }
     const stepper = target.closest?.('[data-step]');
-    if (stepper) return void input?.onShiftRange?.(Number(stepper.getAttribute('data-step')));
-    if (target.closest?.('[data-today]')) return void input?.onSelectDate?.(input.today);
+    if (stepper) return void stepRiver(Number(stepper.getAttribute('data-step')));
+    if (target.closest?.('[data-today]')) return void riverToday();
     const item = target.closest?.('[data-part="item"],[data-part="ghost"]');
     if (item && !item.classList?.contains?.('is-sample')) {
       const id = item.getAttribute('data-id');
@@ -1010,8 +1095,8 @@ function wire(section) {
       event.preventDefault();
     }
     if (target?.closest?.('input, textarea')) return;
-    if (event.key === '+') setZoom('term');
-    if (event.key === '-') setZoom('year');
+    if (event.key === '+') requestZoom('term');
+    if (event.key === '-') requestZoom('year');
   });
 }
 
@@ -1024,6 +1109,8 @@ function publish(view) {
     loads: LOADS,
     lanes: () => Object.fromEntries(Object.entries(GROUPED).map(([lane, items]) => [lane, items.map(item => item.id)])),
     setZoom,
+    stepRiver,
+    riverToday,
     decide,
     openPop,
     closePop,
@@ -1076,25 +1163,44 @@ export function renderTermRiver(nextDoc, riverHost, nextInput) {
   input = nextInput;
   const fresh = mountedFor !== riverHost;
   host = riverHost;
-  if (fresh || input.zoom !== lastZoomInput) state.zoom = input.zoom === 'year' ? 'year' : 'term';
-  lastZoomInput = input.zoom;
+  const nextZoom = input.zoom === 'year' ? 'year' : 'term';
+  const key = paintKey(input);
+
   if (fresh) {
     observer?.disconnect();
     observer = null;
     fetchedGhosts = null;
+    zoomOverride = null;
     playedEntrance = false;
     entranceGuardUntil = 0;
     mountedFor = riverHost;
     observe();
+    state.zoom = nextZoom;
+    lastZoomInput = input.zoom;
+    lastPaintKey = key;
+    playedEntrance = true;
+    mount({ entrance: true });
+    return;
   }
-  const entrance = !playedEntrance;
-  if (!entrance && (perfNow() < entranceGuardUntil || engine?.busy())) {
+
+  // Route zoom change (pill / Back / Forward): tween in place — no remount, no reveal.
+  if (input.zoom !== lastZoomInput) {
+    lastZoomInput = input.zoom;
+    lastPaintKey = key;
+    if (nextZoom !== state.zoom) setZoom(nextZoom);
+    return;
+  }
+
+  // Same zoom echo (hashchange after onSwitchView) or unchanged inputs: keep the chart.
+  if (key === lastPaintKey) return;
+
+  if (perfNow() < entranceGuardUntil || engine?.busy()) {
     // The reveal or a zoom owns the chart: paint this data once it has finished.
     repaintAfter(Math.max(16, entranceGuardUntil - perfNow() + 16));
     return;
   }
-  playedEntrance = true;
-  mount({ entrance });
+  lastPaintKey = key;
+  mount({ entrance: false });
 }
 
 export function unmountTermRiver() {
@@ -1118,6 +1224,8 @@ export function unmountTermRiver() {
   entranceGuardUntil = 0;
   lastHostW = 0;
   lastZoomInput = null;
+  lastPaintKey = null;
+  zoomOverride = null;
   fetchedGhosts = null;
   popFor = null;
   root = null;
