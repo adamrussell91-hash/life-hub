@@ -7,7 +7,8 @@ import { parseEntityRef } from './entity-ref.mjs';
  * Clare-authored (and Adam-edited) durable items.
  */
 
-export const LEDGER_SCHEMA_VERSION = 1;
+export const LEDGER_SCHEMA_VERSION = 2;
+const READABLE_SCHEMA_VERSIONS = new Set([1, 2]);
 
 export const LEDGER_DIRECTIONS = new Set(['you_owe', 'they_owe']);
 export const LEDGER_AUTHORS = new Set(['clare', 'adam']);
@@ -30,6 +31,29 @@ function validationError(code, message) {
 function isIsoTimestamp(value) {
   if (typeof value !== 'string' || !value) return false;
   return Number.isFinite(Date.parse(value));
+}
+
+/** YYYY-MM-DD that names a real calendar day. */
+export function isValidDueDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function readDue(value, code = 'invalid_due') {
+  if (value === undefined || value === null) return null;
+  if (!isValidDueDate(value)) throw validationError(code, 'due must be a YYYY-MM-DD date.');
+  return value;
+}
+
+export function parseDueRangeQuery(params) {
+  const from = params.get('due_from');
+  const to = params.get('due_to') ?? from;
+  if (!isValidDueDate(from) || !isValidDueDate(to)) {
+    throw validationError('invalid_due_range', 'due_from and due_to must be YYYY-MM-DD dates.');
+  }
+  if (to < from) throw validationError('invalid_due_range', 'due_to must not be before due_from.');
+  return { from, to };
 }
 
 function parseSources(raw) {
@@ -70,7 +94,9 @@ const STORED_KEYS = new Set([
   'status',
   'source_key',
   'created_at',
-  'updated_at'
+  'updated_at',
+  'due',
+  'checked_in_ref'
 ]);
 
 export function parseLedgerItemRecord(raw) {
@@ -78,7 +104,7 @@ export function parseLedgerItemRecord(raw) {
   for (const key of Object.keys(raw)) {
     if (!STORED_KEYS.has(key)) return null;
   }
-  if (raw.schema_version !== LEDGER_SCHEMA_VERSION) return null;
+  if (!READABLE_SCHEMA_VERSIONS.has(raw.schema_version)) return null;
   if (!isValidLedgerItemId(raw.id)) return null;
   if (typeof raw.person_ref !== 'string' || !parseEntityRef(raw.person_ref)) return null;
   if (!LEDGER_DIRECTIONS.has(raw.direction)) return null;
@@ -89,7 +115,11 @@ export function parseLedgerItemRecord(raw) {
   if (raw.task_ref !== null && (typeof raw.task_ref !== 'string' || !parseEntityRef(raw.task_ref))) return null;
   if (raw.comm_ref !== null && (typeof raw.comm_ref !== 'string' || !parseEntityRef(raw.comm_ref))) return null;
   if (!isIsoTimestamp(raw.created_at) || !isIsoTimestamp(raw.updated_at)) return null;
-  return { ...raw, sources: parseSources(raw.sources) };
+  const due = raw.due ?? null;
+  if (due !== null && !isValidDueDate(due)) return null;
+  const checked_in_ref = raw.checked_in_ref ?? null;
+  if (checked_in_ref !== null && (typeof checked_in_ref !== 'string' || !parseEntityRef(checked_in_ref))) return null;
+  return { ...raw, due, checked_in_ref, sources: parseSources(raw.sources) };
 }
 
 export function validateLedgerItemCreateInput(input) {
@@ -118,6 +148,7 @@ export function validateLedgerItemCreateInput(input) {
     throw validationError('invalid_comm_ref', 'comm_ref must be a well-formed entity reference.');
   }
   const sources = parseSources(input.sources);
+  const due = readDue(input.due);
   const primarySource = sources[0]?.ref ?? task_ref ?? null;
   return {
     person_ref,
@@ -126,6 +157,7 @@ export function validateLedgerItemCreateInput(input) {
     sources,
     task_ref,
     comm_ref,
+    due,
     author: input.author ?? 'clare',
     source_key: ledgerSourceKey({
       person_ref,
@@ -165,6 +197,13 @@ export function validateLedgerItemPatchInput(input) {
     }
     patch.task_ref = input.task_ref;
   }
+  if (input.due !== undefined) patch.due = readDue(input.due);
+  if (input.checked_in_ref !== undefined) {
+    if (input.checked_in_ref !== null && !parseEntityRef(input.checked_in_ref)) {
+      throw validationError('invalid_checked_in_ref', 'checked_in_ref must be a well-formed entity reference.');
+    }
+    patch.checked_in_ref = input.checked_in_ref;
+  }
   return patch;
 }
 
@@ -182,6 +221,8 @@ export function projectLedgerItem(record) {
     source_label: sourceLabel,
     task_ref: record.task_ref,
     comm_ref: record.comm_ref,
+    due: record.due ?? null,
+    checked_in_ref: record.checked_in_ref ?? null,
     author: record.author,
     status: record.status,
     source_key: record.source_key,

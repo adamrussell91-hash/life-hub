@@ -8,15 +8,19 @@ import { parseRoute, railHighlightFor, communicationRoute } from '@/app/router';
 const VALID_COMMUNICATION_ID = 'communication_00000000-0000-4000-8000-000000000010';
 
 describe('communication routes', () => {
-  it('parses list, compose, and detail routes', () => {
-    expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
+  it('parses compose and detail routes; list redirects to calendar', () => {
+    expect(parseRoute('#/communications')).toEqual({
+      name: 'calendar',
+      zoom: 'week',
+      redirectedFrom: 'communications'
+    });
     expect(parseRoute('#/communication/new')).toEqual({ name: 'communication-new' });
     expect(parseRoute(`#/communication/${VALID_COMMUNICATION_ID}`)).toEqual({
       name: 'communication',
       id: VALID_COMMUNICATION_ID
     });
     expect(parseRoute('#/communication/not-valid').name).toBe('not-found');
-    expect(railHighlightFor({ name: 'communication-new' })).toBe('communications');
+    expect(railHighlightFor({ name: 'communication-new' })).toBe('calendar');
     expect(communicationRoute(VALID_COMMUNICATION_ID)).toBe(
       `#/communication/${VALID_COMMUNICATION_ID}`
     );
@@ -127,5 +131,85 @@ describe('renderCommunicationNewView', () => {
     expect(canvas.querySelector('input[name="occurred_at"]')).toBeTruthy();
     expect(canvas.querySelector('input[aria-label="Recipient"]')).toBeTruthy();
     expect(canvas.textContent).toMatch(/Save/);
+  });
+});
+
+describe('renderCommunicationDetailView follow-up auto-retry', () => {
+  const originalFetch = globalThis.fetch;
+  const incompleteOp = {
+    status: 'incomplete' as const,
+    operation_id: 'op_9',
+    task_id: 'task_1',
+    failed_relationships: [] as Array<{
+      intent_id: string;
+      relationship_type: string;
+      target_ref: string;
+    }>,
+    completed_intent_ids: [] as string[],
+    completed_link_ids: [] as string[],
+    failed_intent_ids: [] as string[],
+    pending_intent_ids: [] as string[],
+    title: 'Follow up'
+  };
+
+  const baseRecord = {
+    schema_version: 1,
+    id: VALID_COMMUNICATION_ID,
+    direction: 'outbound',
+    channel: 'email',
+    occurred_at: '2026-09-01T10:00:00.000Z',
+    subject: 'Proposal',
+    summary: 'Hi',
+    status: 'completed',
+    created_at: '2026-09-01T10:00:00.000Z',
+    updated_at: '2026-09-01T10:00:00.000Z',
+    follow_up_operation: incompleteOp
+  };
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    document.body.replaceChildren();
+  });
+
+  it('an incomplete follow up retries by itself and never shows a Retry button', async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = String(input);
+      if (href.includes('action=retry-follow-up') && init?.method === 'POST') {
+        return Response.json({
+          ok: true,
+          data: {
+            communication: {
+              ...baseRecord,
+              follow_up_operation: { ...incompleteOp, status: 'committed' }
+            },
+            follow_up_operation: { ...incompleteOp, status: 'committed' },
+            task_id: 'task_1',
+            created_task: false,
+            incomplete: false
+          }
+        });
+      }
+      return Response.json({
+        ok: true,
+        data: { communication: baseRecord }
+      });
+    });
+    globalThis.fetch = fetchMock;
+
+    const { renderCommunicationDetailView } = await import('@/views/communications');
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderCommunicationDetailView(canvas, VALID_COMMUNICATION_ID);
+    expect(canvas.textContent).not.toMatch(/Retry incomplete follow up/);
+    expect(canvas.textContent).toContain('Linking follow up…');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) => String(url).includes('action=retry-follow-up') && (init as RequestInit)?.method === 'POST'
+      )
+    ).toBe(true);
   });
 });

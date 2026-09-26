@@ -1,14 +1,21 @@
 import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/format-display-date.js';
 import { listEvents } from '@/api/events';
 import { listMeetings } from '@/api/meetings';
-import { eventRoute, meetingRoute } from '@/app/router';
+import { communicationRoute, eventRoute, meetingRoute } from '@/app/router';
 import {
   mountProfessionalCalendar,
   unmountProfessionalCalendar
 } from '@/calendar/hub-calendar';
-import type { EventOccurrenceState, EventRecord, MeetingRecord, MeetingState } from '@/domain/types';
+import type { CommunicationRecord, EventOccurrenceState, EventRecord, LedgerItem, MeetingRecord, MeetingState } from '@/domain/types';
 import { splitEventLabels } from '@/domain/priority-area';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { nextWalkIn, homeNudges } from '@/lib/walk-in';
+import { clareBrief } from '@/api/clare-comms';
+import { listCommunications } from '@/api/communications';
+import { listLedgerDue } from '@/api/ledger';
+import { listThreads } from '@/api/threads';
+import { listLedgerForSources } from '@/api/ledger';
+import { listUniversalLinksForEntity } from '@/api/universal-links';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -115,6 +122,7 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
   const categoryTotals = new Map<string, number>();
   const priorityTotals = new Map<string, number>();
   for (const event of events) {
+    if (event.event_type !== 'professional_development') continue;
     if (event.occurrence_state !== 'completed') continue;
     if (event.hours == null) continue;
     const key = sydneyDateKey(event.start);
@@ -349,6 +357,103 @@ function renderTimeline(events: EventRecord[]): HTMLElement {
   return card;
 }
 
+async function quietThreads(now: Date): Promise<Array<{ title: string; days: number; href: string }>> {
+  const nowMs = now.getTime();
+  let threads: Array<{ id: string; title: string; status: string; updated_at: string }> = [];
+  try {
+    threads = (await listThreads()).threads ?? [];
+  } catch {
+    return [];
+  }
+  const candidates = threads
+    .filter((thread) => thread.status === 'open')
+    .map((thread) => ({ thread, days: Math.round((nowMs - Date.parse(thread.updated_at)) / 86_400_000) }))
+    .filter(({ days }) => days >= 14 && days <= 60)
+    .slice(0, 10);
+
+  const out: Array<{ title: string; days: number; href: string }> = [];
+  for (const { thread, days } of candidates) {
+    try {
+      const threadRef = `professional:thread:${thread.id}`;
+      const members = (await listUniversalLinksForEntity(threadRef)).incoming
+        .filter((entry) => entry.link.relationship_type === 'in_thread' && entry.link.status === 'current')
+        .map((entry) => ({ ref: entry.link.source_ref, at: String(entry.link.created_at ?? '') }))
+        .sort((a, b) => b.at.localeCompare(a.at));
+      const latest = members[0];
+      if (!latest) continue;
+      const { items } = await listLedgerForSources([latest.ref]);
+      if (items.some((item) => item.direction === 'they_owe' && item.status === 'open')) {
+        out.push({ title: thread.title, days, href: `#/thread/${encodeURIComponent(thread.id)}` });
+      }
+    } catch {
+      continue;
+    }
+  }
+  return out;
+}
+
+async function renderWalkInAndNudges(host: HTMLElement, meetings: MeetingRecord[]): Promise<void> {
+  const now = new Date();
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(now);
+  const dayKey = (offset: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date(now.getTime() + offset * 86_400_000));
+  const [commsResult, ledgerResult, quiet] = await Promise.all([
+    listCommunications().catch(() => ({ communications: [] as CommunicationRecord[] })),
+    listLedgerDue(dayKey(-60), dayKey(-1)).catch(() => ({ items: [] as LedgerItem[] })),
+    quietThreads(now).catch(() => [] as Array<{ title: string; days: number; href: string }>)
+  ]);
+  const communications = commsResult.communications ?? [];
+  const lateItems = ledgerResult.items ?? [];
+
+  const walk = nextWalkIn([
+    ...communications.filter((comm) => comm.scheduled_start).map((comm) => ({ kind: 'comm' as const, id: comm.id, title: comm.subject || 'Comm', start: comm.scheduled_start!, href: communicationRoute(comm.id) })),
+    ...meetings.map((meeting) => ({ kind: 'meeting' as const, id: meeting.id, title: meeting.title, start: meeting.scheduled_start, href: meetingRoute(meeting.id) }))
+  ], now);
+
+  if (walk) {
+    const card = el('section', 'walk-in');
+    card.dataset.part = 'walk-in';
+    card.append(el('p', 'walk-in__count', walk.minutes >= 0 ? `in ${walk.minutes} min` : `started ${-walk.minutes} min ago`), el('h3', undefined, walk.title));
+    const list = el('ol');
+    card.append(list);
+    const owed = el('p', 'walk-in__owe');
+    card.append(owed);
+    const start = el('a', 'btn walk-in__start', 'Start') as HTMLAnchorElement;
+    start.href = walk.href;
+    start.dataset.part = 'walk-in-start';
+    card.append(start);
+    host.append(card);
+    clareBrief({ title: walk.title, kind: walk.kind, when: walk.start, people: [], previous: [], open_promises: [], notes: '' })
+      .then((brief) => {
+        for (const point of brief.points) list.append(el('li', undefined, point.text));
+        owed.textContent = brief.owed_line ?? '';
+      })
+      .catch(() => list.append(el('li', undefined, 'Open the page for the full brief.')));
+  }
+
+  const late = lateItems
+    .filter((item) => item.direction === 'you_owe' && item.status === 'open' && item.due && item.due < todayKey)
+    .map((item) => ({
+      text: item.text,
+      days_late: Math.round((Date.parse(`${todayKey}T00:00:00Z`) - Date.parse(`${item.due}T00:00:00Z`)) / 86_400_000),
+      href: item.comm_ref ? communicationRoute(item.comm_ref.split(':').pop()!) : '#/calendar'
+    }));
+  const wrapUps = communications
+    .filter((comm) => comm.scheduled_end && Date.parse(comm.scheduled_end) < now.getTime() && Date.parse(comm.scheduled_end) > now.getTime() - 3 * 86_400_000 && !comm.summary)
+    .map((comm) => ({ title: comm.subject || 'a comm', href: communicationRoute(comm.id) }));
+  const nudges = homeNudges({ late, wrapUps, quiet });
+  if (nudges.length) {
+    const card = el('section', 'card home-nudges');
+    card.dataset.part = 'nudges';
+    card.append(el('h3', undefined, 'Clare noticed'));
+    for (const nudge of nudges) {
+      const link = el('a', `home-nudges__item is-${nudge.tone}`, nudge.text) as HTMLAnchorElement;
+      link.href = nudge.href;
+      card.append(link);
+    }
+    host.append(card);
+  }
+}
+
 export async function renderHomeView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading…');
 
@@ -356,14 +461,16 @@ export async function renderHomeView(canvas: HTMLElement): Promise<void> {
     showViewLoading(canvas, 'Loading…');
     try {
       const [{ events }, { meetings }] = await Promise.all([listEvents(), listMeetings()]);
-      paint(events, meetings);
+      await paint(events, meetings);
     } catch (err) {
       renderLoadError(canvas, err, () => void load());
     }
   }
 
-  function paint(events: EventRecord[], meetings: MeetingRecord[]): void {
+  async function paint(events: EventRecord[], meetings: MeetingRecord[]): Promise<void> {
     canvas.replaceChildren();
+
+    await renderWalkInAndNudges(canvas, meetings);
 
     const actions = el('div', 'pro-home__actions');
     const add = el('a', 'btn btn--primary', '+ Log PD event');
