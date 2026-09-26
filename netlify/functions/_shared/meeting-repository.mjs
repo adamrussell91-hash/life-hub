@@ -163,7 +163,10 @@ export function createMeetingRepository(deps = {}) {
       state: 'scheduled',
       occurrence_history: [],
       created_at: timestamp,
-      updated_at: timestamp
+      updated_at: timestamp,
+      purpose: null,
+      blocks: [],
+      decisions: []
     };
 
     await setJSON(professionalStore, meetingKey(id), record);

@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  MEETING_SCHEMA_VERSION,
   assertMeetingStateTransition,
   parseMeetingRecord,
   projectMeeting,
   validateMeetingCreateInput,
+  validateMeetingFieldUpdate,
   validateMeetingRescheduleInput
 } from '../../netlify/functions/_shared/meeting-schema.mjs';
 import {
@@ -211,4 +213,40 @@ test('schedule projections are deterministic and dedupe on merge', () => {
     ['professional_event', 'professional_meeting']
   );
   assert.equal(projectMeeting({ ...meeting, schema_version: 1, location_text: null, agenda: null, notes: null, occurrence_history: [], created_at: 't', updated_at: 't' }).id, MEETING_ID);
+});
+
+const MEETING_V1 = {
+  schema_version: 1,
+  id: 'meeting_00000000-0000-4000-8000-000000000001',
+  title: 'HALT NSW board meeting',
+  scheduled_start: '2026-09-24T08:00:00.000Z',
+  scheduled_end: '2026-09-24T09:15:00.000Z',
+  time_zone: 'Australia/Sydney',
+  location_text: 'Teams',
+  agenda: '1. Minutes\n2. Treasurer\n3. Medal ceremony run sheet',
+  notes: null,
+  state: 'scheduled',
+  occurrence_history: [],
+  created_at: '2026-09-01T00:00:00.000Z',
+  updated_at: '2026-09-01T00:00:00.000Z'
+};
+
+test('meeting v2 reads v1 with empty purpose, blocks and decisions', () => {
+  assert.equal(MEETING_SCHEMA_VERSION, 2);
+  const parsed = parseMeetingRecord(MEETING_V1);
+  assert.equal(parsed.purpose, null);
+  assert.deepEqual(parsed.blocks, []);
+  assert.deepEqual(parsed.decisions, []);
+  assert.equal(projectMeeting(parsed).agenda, MEETING_V1.agenda);
+});
+
+test('meeting update accepts purpose, blocks and decisions', () => {
+  const patch = validateMeetingFieldUpdate({
+    purpose: 'Present the run sheet; get a yes on the TeachMeet date.',
+    blocks: [{ id: 'block_1', block_type: 'heading', content: { text: 'Minutes' } }],
+    decisions: [{ id: 'd1', text: 'Minutes accepted', agenda_heading: 'Minutes' }]
+  });
+  assert.equal(patch.decisions[0].agenda_heading, 'Minutes');
+  assert.throws(() => validateMeetingFieldUpdate({ decisions: [{ id: 'd1' }] }), { code: 'invalid_decisions' });
+  assert.throws(() => validateMeetingFieldUpdate({ purpose: 'x'.repeat(501) }), { code: 'purpose_too_long' });
 });
