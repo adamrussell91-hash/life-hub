@@ -2,6 +2,7 @@ import { renderRelationshipList, type TabDef } from '@/components/entity-detail'
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
 import { buildObservationsTab } from '@/components/observations-tab';
 import { buildEvidenceTab } from '@/components/evidence-tab';
+import { renderProfessionalProfileTab } from '@/components/professional-profile';
 import { classifyRelationshipState, type RelationshipStateInput } from '@/domain/relationship-state';
 import type { EntityOverview, PersonRecord, RelationshipEndpoint, RelationshipEntry } from '@/domain/types';
 
@@ -17,6 +18,14 @@ export function buildPersonTabs(onRoleChanged: () => void): TabDef[] {
       id: 'overview',
       label: 'Overview',
       render: (host, overview) => renderOverviewTab(host, overview, onRoleChanged)
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      render: (host, overview) => renderProfessionalProfileTab(
+        host,
+        overview.entity.kind === 'person' ? overview.entity.professional_profile : undefined
+      )
     },
     {
       id: 'timeline',
