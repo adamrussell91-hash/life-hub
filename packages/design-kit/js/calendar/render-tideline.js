@@ -159,33 +159,52 @@ function agentName(agent) {
   return GHOST_AGENTS[agent] || 'Hammond';
 }
 
+function agentAvatarClass(agent, sizeClass = '') {
+  const parts = ['cal-av'];
+  if (sizeClass) parts.push(sizeClass);
+  if (agent === 'sara') parts.push('cal-av--sara');
+  else if (agent === 'clare') parts.push('cal-av--clare');
+  return parts.join(' ');
+}
+
 /** Portrait when the hub ships the asset; letter fallback only if missing. */
 function agentAvatarNode(agent, sizeClass = '') {
-  const cls = `cal-av${sizeClass ? ` ${sizeClass}` : ''}${agent === 'sara' ? ' cal-av--sara' : agent === 'clare' ? ' cal-av--clare' : ''}`;
+  const cls = agentAvatarClass(agent, sizeClass);
   const src = AGENT_AVATAR_SRC[agent];
-  if (src) {
-    const img = el('img', cls, undefined, null, {
-      src,
-      alt: '',
-      'aria-hidden': 'true',
-      decoding: 'async'
-    });
-    img.addEventListener?.('error', () => {
-      img.replaceWith?.(el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' }));
-    });
-    return img;
+  if (!src) {
+    return el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' });
   }
-  return el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' });
+  const img = el('img', cls, undefined, null, {
+    src,
+    alt: '',
+    'aria-hidden': 'true',
+    decoding: 'async'
+  });
+  img.addEventListener?.('error', () => {
+    img.replaceWith?.(el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' }));
+  });
+  return img;
+}
+
+/** Pending ghosts split by current filter — shared by tray label, Apply, Review, Dismiss. */
+function pendingGhostPartition() {
+  const visible = [];
+  let hidden = 0;
+  if (!model) return { visible, hidden };
+  for (const ghost of model.ghosts) {
+    if (state.settled.has(ghost.id) || ghost.settled === 'accepted') continue;
+    if (isItemVisible(ghost.chip || ghost, filterState)) visible.push(ghost);
+    else hidden += 1;
+  }
+  return { visible, hidden };
 }
 
 function pendingVisibleGhosts() {
-  if (!model) return [];
-  return model.ghosts.filter(
-    (ghost) =>
-      !state.settled.has(ghost.id) &&
-      ghost.settled !== 'accepted' &&
-      isItemVisible(ghost.chip || ghost, filterState)
-  );
+  return pendingGhostPartition().visible;
+}
+
+function applyAllLabel(visibleCount, hiddenCount) {
+  return hiddenCount ? `Apply ${visibleCount} · ${hiddenCount} hidden` : 'Apply all';
 }
 
 /** Review = step through each visible pending ghost (open its chip popover). */
@@ -196,14 +215,10 @@ function reviewNextGhost() {
     showToast('<b>Nothing to review.</b> No pending proposals in this filter.');
     return;
   }
-  let index = 0;
-  if (popFor) {
-    const current = pending.findIndex(
-      (ghost) => ghost.id === popFor || ghost.overItem === popFor
-    );
-    index = current >= 0 ? (current + 1) % pending.length : 0;
-  }
-  const ghost = pending[index];
+  const current = popFor
+    ? pending.findIndex((ghost) => ghost.id === popFor || ghost.overItem === popFor)
+    : -1;
+  const ghost = pending[current >= 0 ? (current + 1) % pending.length : 0];
   const chipId = ghost.overItem || ghost.id;
   const chip = nodes.get(`chip:${chipId}`) || nodes.get(`due:${ghost.taskId}`);
   chip?.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
@@ -335,16 +350,12 @@ function mount() {
     tray.append(agentAvatarNode(model.tray.agent));
     el('span', '', `<b>${model.tray.headline}</b> <span class="cal__tray-detail">· ${model.tray.detail}</span>`, tray);
     el('span', 'cal__spacer', undefined, tray);
-    const visibleGhosts = model.ghosts.filter(
-      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
-    );
-    const hiddenGhosts = model.ghosts.filter(
-      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
-    ).length;
-    const applyLabel = hiddenGhosts
-      ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
-      : 'Apply all';
-    el('button', 'btn btn--primary', applyLabel, tray, { type: 'button', 'data-action': 'apply-all', 'data-part': 'apply-all' });
+    const { visible, hidden } = pendingGhostPartition();
+    el('button', 'btn btn--primary', applyAllLabel(visible.length, hidden), tray, {
+      type: 'button',
+      'data-action': 'apply-all',
+      'data-part': 'apply-all'
+    });
     el('button', 'btn btn--secondary', 'Review', tray, { type: 'button', 'data-action': 'review', 'data-part': 'review' });
     el('button', 'btn btn--ghost', 'Dismiss', tray, { type: 'button', 'data-action': 'dismiss-all', 'data-part': 'dismiss-all' });
   }
@@ -429,15 +440,8 @@ function paintTidelineSources(host = nodes.get('__sources')) {
       paintTidelineSources(host);
       const apply = host.parentElement?.querySelector?.('[data-part="apply-all"]');
       if (apply) {
-        const visibleGhosts = model.ghosts.filter(
-          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
-        );
-        const hiddenGhosts = model.ghosts.filter(
-          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
-        ).length;
-        apply.textContent = hiddenGhosts
-          ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
-          : 'Apply all';
+        const { visible, hidden } = pendingGhostPartition();
+        apply.textContent = applyAllLabel(visible.length, hidden);
       }
     }
   });

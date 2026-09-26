@@ -131,9 +131,8 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
   const head = el('div', 'pro-home__progress-head');
   const titleRow = el('div', 'pro-home__progress-title-row');
   titleRow.append(el('h2', 'pro-home__card-title', 'Accreditation progress'));
-  const toggle = document.createElement('button');
+  const toggle = el('button', 'pro-home__progress-toggle');
   toggle.type = 'button';
-  toggle.className = 'pro-home__progress-toggle';
   toggle.setAttribute('aria-expanded', 'false');
   toggle.setAttribute('aria-controls', 'pro-home-progress-details');
   toggle.setAttribute('aria-label', 'Show PD breakdown');

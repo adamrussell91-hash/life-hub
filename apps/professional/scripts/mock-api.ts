@@ -1017,17 +1017,18 @@ export function createMockApi() {
         month: '2-digit',
         day: '2-digit'
       }).format(new Date());
+      const id = 'ghost_mock_block_1';
       return json(200, {
         ghosts: [
           {
-            id: 'ghost_mock_block_1',
+            id,
             agent: 'hammond',
             kind: 'calendar_block',
             label: 'Protect marking block',
             meta: 'Tue 16:00–18:00 · clears a collision',
             date: today,
             chip: {
-              id: 'ghost_mock_block_1',
+              id,
               title: 'Protect marking block',
               date: today,
               start: '16:00',
@@ -1045,7 +1046,7 @@ export function createMockApi() {
       return json(200, { ok: true, receipt: 'Dismissed. Nothing written.' });
     }
 
-    // Soft-empty Life source so local Home does not paint a hard fail banner.
+    // Soft-empty hub calendar sources so local Home does not paint fail banners.
     if (path.startsWith('/api/repo/manifest') && method === 'GET') {
       return json(200, {
         ok: true,
@@ -1064,16 +1065,17 @@ export function createMockApi() {
       return json(200, { ok: true, data: { commitSha: 'a'.repeat(40), files: [] } });
     }
 
-    // Soft-empty other hub calendar sources for local Home (no fail banners).
     if (
       method === 'GET' &&
-      (path.startsWith('/api/curriculum') ||
-        path.startsWith('/api/tasks') ||
-        path.startsWith('/api/work-blocks') ||
-        path.startsWith('/api/planning-profile') ||
-        path.startsWith('/api/workflow-state') ||
-        path.startsWith('/api/hub-prefs') ||
-        path.startsWith('/api/knowledge'))
+      [
+        '/api/curriculum',
+        '/api/tasks',
+        '/api/work-blocks',
+        '/api/planning-profile',
+        '/api/workflow-state',
+        '/api/hub-prefs',
+        '/api/knowledge'
+      ].some((prefix) => path.startsWith(prefix))
     ) {
       return json(200, {
         ok: true,
