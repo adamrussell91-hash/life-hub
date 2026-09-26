@@ -344,18 +344,19 @@ export async function renderHomeView(canvas: HTMLElement): Promise<void> {
     canvas.append(actions);
 
     const today = sydneyParts(new Date());
-    canvas.append(renderYearStrip(today, events, meetings));
+
+    const lede = el('div', 'pro-home__lede');
+    lede.append(renderYearStrip(today, events, meetings));
+    const side = el('div', 'pro-home__side');
+    side.append(renderAccreditation(today, events));
+    lede.append(side);
+    canvas.append(lede);
 
     const body = el('div', 'pro-home__body');
     unmountProfessionalCalendar();
     const calendarHost = el('div', 'pro-home__calendar-host');
-    calendarHost.style.minWidth = '0';
     body.append(calendarHost);
     mountProfessionalCalendar(calendarHost, { routeZoom: false });
-
-    const side = el('div', 'pro-home__side');
-    side.append(renderAccreditation(today, events));
-    body.append(side);
 
     canvas.append(body);
     canvas.append(renderTimeline(events));
