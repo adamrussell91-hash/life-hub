@@ -1848,19 +1848,17 @@ function renderDeepHoursWidget(tasks: Task[], projects: Project[], days: Date[])
   return card;
 }
 
-/** Real 4-level hierarchy — Areas of Focus, Goals, Projects, Actions — all real
- *  entities in this app (unlike "Purpose"/"Vision", which have no backing here
- *  and are deliberately not shown). Counts are live; each segment links to the
- *  real page for that altitude. */
-function renderHorizonBreadcrumb(areas: Area[], goals: Goal[], projects: Project[], tasks: Task[]): HTMLElement {
+/** Sphere → Goals → Projects → Actions (G-29: Areas retired from the breadcrumb). */
+function renderHorizonBreadcrumb(_areas: Area[], goals: Goal[], projects: Project[], tasks: Task[]): HTMLElement {
+  const spheres = new Set(goals.filter((g) => g.status === 'active').map((g) => g.sphere));
   const segments: Array<{ label: string; count: number; href: string }> = [
-    { label: 'Areas', count: areas.length, href: '#/goals' },
+    { label: 'Spheres', count: spheres.size, href: '#/goals' },
     { label: 'Goals', count: goals.filter((g) => g.status === 'active').length, href: '#/goals' },
     { label: 'Projects', count: projects.filter((p) => !isProjectArchived(p.status)).length, href: '#/projects' },
     { label: 'Actions', count: openTasks(tasks).length, href: '#/board' }
   ];
   const bar = el('nav', 'calendar-horizon-bar');
-  bar.setAttribute('aria-label', 'Areas to actions hierarchy');
+  bar.setAttribute('aria-label', 'Spheres to actions hierarchy');
   segments.forEach((segment, index) => {
     if (index > 0) {
       const arrow = el('span', 'calendar-horizon-bar__arrow', '→');
