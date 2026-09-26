@@ -11,6 +11,9 @@
  * Reference: docs/proposals/calendar-reference/term-river/VISUAL-SPEC.md ("Lanes", "Load").
  */
 
+import { addDaysKey, weekLabel } from '../../../../packages/design-kit/js/school-time.js';
+import { CAPACITY } from './capacity-model.js';
+
 export const LANES = Object.freeze([
   Object.freeze({ id: 'teacher', label: 'Teacher', sub: 'classes · HPGE · MindWorks' }),
   Object.freeze({ id: 'corey', label: 'Corey', sub: 'comes first' }),
@@ -19,14 +22,18 @@ export const LANES = Object.freeze([
   Object.freeze({ id: 'body', label: 'Body', sub: 'capacity from your logs' })
 ]);
 
-import { addDaysKey, weekLabel } from '../../../../packages/design-kit/js/school-time.js';
-import { CAPACITY } from './capacity-model.js';
-
 const TERM_HOLIDAY_FACTOR = 0.65;
 const YEAR_HOLIDAY_FACTOR = 0.5;
 /** Days before the first term / after the last when deriving the year window. */
 const YEAR_PAD_BEFORE = 1;
 const YEAR_PAD_AFTER = 24;
+
+function emptyRiverZooms(anchor) {
+  return {
+    term: { from: anchor, to: addDaysKey(anchor, 49), holidayFactor: TERM_HOLIDAY_FACTOR },
+    year: { from: addDaysKey(anchor, -30), to: addDaysKey(anchor, 180), holidayFactor: YEAR_HOLIDAY_FACTOR }
+  };
+}
 
 /**
  * Term and Year zoom windows from school terms and today.
@@ -38,13 +45,7 @@ export function deriveRiverZooms(terms, today) {
     .filter(term => term?.starts_on && term?.ends_on)
     .sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
   const day = today || sorted[0]?.starts_on;
-  if (!day || !sorted.length) {
-    const anchor = day || '1970-01-01';
-    return {
-      term: { from: anchor, to: addDaysKey(anchor, 49), holidayFactor: TERM_HOLIDAY_FACTOR },
-      year: { from: addDaysKey(anchor, -30), to: addDaysKey(anchor, 180), holidayFactor: YEAR_HOLIDAY_FACTOR }
-    };
-  }
+  if (!day || !sorted.length) return emptyRiverZooms(day || '1970-01-01');
   const current = sorted.find(term => day >= term.starts_on && day <= term.ends_on)
     ?? sorted.find(term => term.starts_on > day)
     ?? sorted[sorted.length - 1];

@@ -94,7 +94,6 @@ let toastTimer = 0;
 let repaintTimer = 0;
 let observer = null;
 let mountedFor = null;
-let playedEntrance = false;
 let entranceGuardUntil = 0;
 let skipResize = false;
 let lastHostW = 0;
@@ -234,9 +233,15 @@ function monthFirsts() {
   return out;
 }
 
+/** from/to stamp for paintKey equality checks. */
+function rangeKey(range) {
+  return `${range?.from ?? ''}:${range?.to ?? ''}`;
+}
+
 /** Stamp of inputs that require a re-layout (not a Term↔Year tween). */
 function paintKey(inp) {
   const riverData = inp?.visual?.RIVER;
+  const zooms = riverData?.ZOOMS;
   const ghosts = Array.isArray(inp?.ghosts)
     ? inp.ghosts.map(ghost => `${ghost?.id}:${ghost?.settled ?? ghost?.status ?? ''}`).join(',')
     : '';
@@ -244,14 +249,10 @@ function paintKey(inp) {
     inp?.today ?? '',
     ghosts,
     riverData?.TODAY ?? '',
-    riverData?.ZOOMS?.term?.from ?? '',
-    riverData?.ZOOMS?.term?.to ?? '',
-    riverData?.ZOOMS?.year?.from ?? '',
-    riverData?.ZOOMS?.year?.to ?? '',
-    zoomOverride?.term?.from ?? '',
-    zoomOverride?.term?.to ?? '',
-    zoomOverride?.year?.from ?? '',
-    zoomOverride?.year?.to ?? ''
+    rangeKey(zooms?.term),
+    rangeKey(zooms?.year),
+    rangeKey(zoomOverride?.term),
+    rangeKey(zoomOverride?.year)
   ].join('|');
 }
 
@@ -861,53 +862,57 @@ function setZoom(next) {
 function requestZoom(name) {
   if (name !== 'term' && name !== 'year') return;
   if (name === state.zoom) return;
-  if (typeof input?.onSwitchView === 'function') {
-    input.onSwitchView(name);
-    return;
-  }
-  setZoom(name);
+  if (typeof input?.onSwitchView === 'function') input.onSwitchView(name);
+  else setZoom(name);
+}
+
+/** Apply a nav override (or clear it) and re-lay out without replaying the reveal. */
+function applyZoomOverride(next, message) {
+  zoomOverride = next;
+  mount({ entrance: false });
+  announce(message);
 }
 
 /**
  * ‹ › step the focused window: adjacent school terms, or the year window by ±1 calendar year.
- * Re-lays out without replaying the reveal. Today clears the override and restores seeded/derived zooms.
+ * Today clears the override and restores seeded/derived zooms.
  */
 function stepRiver(delta) {
   if (!delta) return;
-  const sorted = [...TERMS].sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
   if (state.zoom === 'year') {
     const year = ZOOMS.year ?? YEAR;
     if (!year?.from || !year?.to) return;
-    zoomOverride = {
-      term: { ...(ZOOMS.term ?? deriveRiverZooms(TERMS, TODAY).term) },
+    const term = ZOOMS.term ?? deriveRiverZooms(TERMS, TODAY).term;
+    applyZoomOverride({
+      term: { ...term },
       year: {
         from: shiftDateYear(year.from, delta),
         to: shiftDateYear(year.to, delta),
         holidayFactor: year.holidayFactor ?? 0.5
       }
-    };
-    mount({ entrance: false });
-    announce(delta > 0 ? 'Later year.' : 'Earlier year.');
+    }, delta > 0 ? 'Later year.' : 'Earlier year.');
     return;
   }
+  const sorted = [...TERMS].sort((a, b) => String(a.starts_on).localeCompare(String(b.starts_on)));
   if (!sorted.length) return;
   const focus = termNear(ZOOMS.term?.from ?? TODAY);
-  const index = focus ? sorted.findIndex(term => term.starts_on === focus.starts_on && term.ends_on === focus.ends_on) : -1;
+  const index = focus
+    ? sorted.findIndex(term => term.starts_on === focus.starts_on && term.ends_on === focus.ends_on)
+    : -1;
   const next = sorted[index + delta];
   if (!next) return;
-  const factor = ZOOMS.term?.holidayFactor ?? 0.65;
-  zoomOverride = {
-    term: { from: next.starts_on, to: next.ends_on, holidayFactor: factor },
+  applyZoomOverride({
+    term: {
+      from: next.starts_on,
+      to: next.ends_on,
+      holidayFactor: ZOOMS.term?.holidayFactor ?? 0.65
+    },
     year: { ...(ZOOMS.year ?? YEAR) }
-  };
-  mount({ entrance: false });
-  announce(`Term ${next.term}.`);
+  }, `Term ${next.term}.`);
 }
 
 function riverToday() {
-  zoomOverride = null;
-  mount({ entrance: false });
-  announce('Back to today.');
+  applyZoomOverride(null, 'Back to today.');
 }
 
 function announce(text) {
@@ -1171,14 +1176,12 @@ export function renderTermRiver(nextDoc, riverHost, nextInput) {
     observer = null;
     fetchedGhosts = null;
     zoomOverride = null;
-    playedEntrance = false;
     entranceGuardUntil = 0;
     mountedFor = riverHost;
     observe();
     state.zoom = nextZoom;
     lastZoomInput = input.zoom;
     lastPaintKey = key;
-    playedEntrance = true;
     mount({ entrance: true });
     return;
   }
@@ -1220,7 +1223,6 @@ export function unmountTermRiver() {
   state.toast = null;
   state.zoom = 'term';
   mountedFor = null;
-  playedEntrance = false;
   entranceGuardUntil = 0;
   lastHostW = 0;
   lastZoomInput = null;

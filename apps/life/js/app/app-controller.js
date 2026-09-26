@@ -1340,17 +1340,14 @@ export function createAppController(dependencies) {
 
   /** Ghosts for Term/Year: the year zoom window (seeded RIVER.ZOOMS, else derived from terms). */
   function calendarGhostRange() {
-    if (calendarView === 'term' || calendarView === 'year') {
-      const river = latestResult?.calendarVisual?.RIVER;
-      const year = river?.ZOOMS?.year;
-      if (year?.from && year?.to) return { from: year.from, to: year.to };
-      const terms = latestResult?.calendarVisual?.school_terms
-        ?? calendarPlanningProfile?.school_terms
-        ?? [];
-      const derived = deriveRiverZooms(terms, latestResult?.date ?? calendarSelectedDate);
-      return { from: derived.year.from, to: derived.year.to };
-    }
-    return visibleWeekRange();
+    if (calendarView !== 'term' && calendarView !== 'year') return visibleWeekRange();
+    const year = latestResult?.calendarVisual?.RIVER?.ZOOMS?.year;
+    if (year?.from && year?.to) return { from: year.from, to: year.to };
+    const terms = latestResult?.calendarVisual?.school_terms
+      ?? calendarPlanningProfile?.school_terms
+      ?? [];
+    const derived = deriveRiverZooms(terms, latestResult?.date ?? calendarSelectedDate).year;
+    return { from: derived.from, to: derived.to };
   }
 
   async function loadCalendarGhostsForView() {
