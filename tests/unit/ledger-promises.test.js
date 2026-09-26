@@ -111,3 +111,27 @@ test('repository writes v2 records with due', async () => {
   assert.equal(stored.schema_version, 2);
   assert.equal(stored.checked_in_ref, null);
 });
+
+test('listDueBetween returns open items due in range, ordered by due date', async () => {
+  const store = memoryStore();
+  let n = 0;
+  const repo = createLedgerItemRepository({
+    store,
+    now: () => '2026-09-26T00:00:00.000Z',
+    generateId: () => `ledger_00000000-0000-4000-8000-00000000001${++n}`
+  });
+  const make = (text, due, person = PERSON) =>
+    repo.createItem({ person_ref: person, direction: 'you_owe', text, author: 'adam', due });
+  await make('Thursday thing', '2026-09-24');
+  await make('Monday thing', '2026-09-21');
+  await make('Next week', '2026-09-29');
+  await make('No date', undefined);
+  const { item: done } = await make('Already done', '2026-09-22', 'shared:person:person_amy');
+  await repo.patchItem(done.id, { status: 'done' });
+
+  const items = await repo.listDueBetween('2026-09-21', '2026-09-27');
+  assert.deepEqual(items.map((item) => item.text), ['Monday thing', 'Thursday thing']);
+
+  const withDone = await repo.listDueBetween('2026-09-21', '2026-09-27', { status: null });
+  assert.equal(withDone.length, 3);
+});
