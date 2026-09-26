@@ -257,3 +257,32 @@ describe("detectForks", () => {
     expect(result?.branches[1]).toEqual({ label: "Fork 2", body: "pursue a PhD. Opens research paths." });
   });
 });
+
+describe("protocol sources", () => {
+  it("renders a Sources list for cited evidence urls on a voice turn", () => {
+    const html = sessionView(session({
+      status: "completed",
+      checkpoint: null,
+      transcript: [{
+        id: "t1",
+        role: "voice",
+        speaker: "lachesis",
+        stage: "briefing",
+        text: "The literature points here.",
+        evidenceIds: ["web:1", "web:2"]
+      }],
+      evidence: [
+        { id: "web:1", title: "Participation study", url: "https://example.test/a" },
+        { id: "web:2", title: "No link note", text: "local only" },
+        { id: "web:3", title: "Unused", url: "https://example.test/c" }
+      ]
+    }), definition);
+    expect(html).toContain("Sources");
+    expect(html).toContain('href="https://example.test/a"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain("Participation study");
+    expect(html).not.toContain("https://example.test/c");
+    expect(html).not.toContain("No link note");
+  });
+});

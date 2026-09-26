@@ -64,6 +64,10 @@
 .protocol-turn-card__role { margin:0 0 var(--space-3); color:#a89f8a; font-size:var(--text-xs); }
 .protocol-turn-card p { margin:0 0 var(--space-3); font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.65; font-family:var(--font-display); color:#f3ecdd; }
 .protocol-turn-card p:last-child { margin-bottom:0; }
+.protocol-sources { margin-top:var(--space-3); padding-top:var(--space-2); border-top:1px solid rgba(228,201,138,.2); }
+.protocol-sources__label { margin:0 0 var(--space-1); color:#a89f8a; font-size:var(--text-xs); letter-spacing:.08em; text-transform:uppercase; font-family:var(--font-ui); }
+.protocol-sources ul { margin:0; padding-left:1.1rem; }
+.protocol-sources a { color:#e4c98a; }
 .protocol-turn-card--listening p { color:#c9c0ac; font-family:var(--font-ui); font-style:italic; }
 .protocol-turn-card--listening { animation:none; }
 /* "Fork one: ... Fork two: ..." replies become side-by-side branch cards instead of one wall of text. */
