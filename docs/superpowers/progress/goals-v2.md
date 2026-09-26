@@ -64,7 +64,9 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 ## M7: Hammond, the smarter version
 
 - [x] **G-30** Calendar-aware protect_block — `b55a8fd6`
+  - **Reopened:** production `createGoalReadsHandler()` never passed `loadCalendarContext`, so Hammond never proposed calendar blocks. Fixed on `fix/goals-calendar-context` (default loader via `createGitHubClient` / `githubOpenCommit` / `readEvents`). Commit: _pending push_.
 - [x] **G-31** Life Hub signals — `b55a8fd6`
+  - **Reopened:** same missing default loader meant binding-goal signal never reached the read. Fixed with G-30 on `fix/goals-calendar-context`. Commit: _pending push_.
 - [x] **G-32** Model-written verdict + splits — `b55a8fd6`
 - [x] **G-33** Dismissal learning — `b55a8fd6`
 - [x] **G-34** Honest looked-at labels — `b55a8fd6`
