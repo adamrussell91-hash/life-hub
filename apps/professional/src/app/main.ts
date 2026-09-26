@@ -19,6 +19,7 @@ import '../styles/block-page.css';
 import '../styles/comm-page.css';
 import '../styles/thread-page.css';
 import '../styles/meeting-page.css';
+import '../styles/event-page.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
@@ -38,10 +39,8 @@ import { renderCommPage } from '@/views/comm-page';
 import { renderThreadPage } from '@/views/thread-page';
 import { renderMeetingNewView } from '@/views/meetings';
 import { renderMeetingPage } from '@/views/meeting-page';
-import {
-  renderEventDetailView,
-  renderEventNewView
-} from '@/views/events';
+import { renderEventNewView } from '@/views/events';
+import { renderEventPage } from '@/views/event-page';
 import {
   renderApplicationDetailView,
   renderApplicationNewView,
@@ -211,20 +210,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'event') {
-      renderPageHeader(shell, { eyebrow: 'Events', title: 'Loading…' });
-      await renderEventDetailView(shell.canvas, route.id, {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Event', title: 'Loading…' });
+      await renderEventPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Events', title });
-        },
-        onHeaderReady: (header) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, {
-            eyebrow: 'Events',
-            title: header.title,
-            supporting: header.supporting,
-            actions: header.actions
-          });
+          renderPageHeader(shell, { eyebrow: 'Calendar · Event', title });
         },
         isCurrent: () => generation === routeGeneration
       });

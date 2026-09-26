@@ -1,0 +1,213 @@
+/* Event page (Plan 3, Task 10) — ported from docs/professional-hub/calendar/mockups/index.html
+   (.pd-toggle, .shape, .series, .sn, .prog, .pi, .kn), renamed to the classes this view uses
+   and re-tokenised (design-kit tokens only). Reuses .card, .switch and .muted from
+   comm-page.css. */
+
+.event-page {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 72rem;
+}
+
+.pd-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--cotton);
+  border: 1px solid var(--line);
+  font-size: var(--text-sm);
+  flex-wrap: wrap;
+}
+
+/* ── Shape picker ── */
+.shape {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+@media (max-width: 620px) {
+  .shape {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shape__opt {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.shape__opt b {
+  display: block;
+  font-size: var(--text-sm);
+}
+
+.shape__opt small {
+  display: block;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+.shape__opt.is-on {
+  border-color: var(--high-sea);
+  box-shadow: 0 0 0 3px var(--warning-surface);
+  background: var(--pastel-peach);
+}
+
+/* ── Series / program strip ── */
+.series {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.series__session {
+  flex: 1 0 150px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  background: #fff;
+  position: relative;
+  text-decoration: none;
+  color: inherit;
+}
+
+.series__session:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.series__session:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.series__session + .series__session {
+  border-left: 0;
+}
+
+.series__date {
+  display: block;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.series__hours {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.series__session.is-current {
+  background: var(--pastel-peach);
+  border-color: var(--high-sea);
+}
+
+.series__session.is-future {
+  background: transparent;
+  border-style: dashed;
+}
+
+.series__gap {
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  transform: translate(50%, -50%);
+  z-index: 2;
+  font-size: var(--text-2xs);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 1px 6px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Talks and activities ── */
+.prog {
+  display: flex;
+  flex-direction: column;
+}
+
+.pi {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.pi:first-child {
+  border-top: 0;
+}
+
+@media (max-width: 620px) {
+  .pi {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pi__time {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pi__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.pi__who {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.kn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-xs);
+  white-space: nowrap;
+  background: var(--pastel-lilac);
+  color: var(--pastel-lilac-ink);
+}
+
+.kn.is-draft {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+
+.talk-add {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr) 5rem auto;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 620px) {
+  .talk-add {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.event-page__notes {
+  display: grid;
+  gap: var(--space-3);
+}

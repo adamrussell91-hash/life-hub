@@ -829,6 +829,14 @@ export async function renderEventNewView(
         certificate: payload.certificate,
         links: payload.pendingLinks
       });
+      const pdGroupId = new URLSearchParams(location.hash.split('?')[1] ?? '').get('pd_group');
+      if (pdGroupId) {
+        await createUniversalLink({
+          source_ref: `professional:event:${result.event.id}`,
+          target_ref: `professional:pd_group:${pdGroupId}`,
+          relationship_type: 'in_pd_group'
+        });
+      }
       window.location.hash = eventRoute(result.event.id);
     } catch (err) {
       if (isEventIncompleteLinksError(err)) {
@@ -889,6 +897,64 @@ function relationshipChip(entry: UniversalLinkEntry): HTMLElement {
   }
   item.append(el('span', 'entity-chip__meta', entry.link.relationship_type.replace(/_/g, ' ')));
   return item;
+}
+
+function factRow(label: string, value: string): HTMLElement {
+  const wrap = el('div', 'event-detail__fact');
+  wrap.append(el('span', 'event-detail__fact-label', label), el('span', 'event-detail__fact-value', value));
+  return wrap;
+}
+
+/**
+ * Preparation/reflection sections stay read-only here: today's schema has no
+ * dedicated editors for hours, attendance, accreditation, priority area, or
+ * certificate beyond the shared Add-event form (Edit re-opens that). `onSaved`
+ * is kept for callers that repaint after an edit elsewhere completes.
+ */
+export function buildPdFields(record: EventRecord, onSaved: (next: EventRecord) => void): HTMLElement {
+  void onSaved;
+  const evidence = el('div', 'event-detail__evidence');
+  evidence.append(
+    el('p', 'event-detail__kicker', 'Evidence'),
+    factRow('Hours', record.hours != null ? `${record.hours} hours` : 'Not logged'),
+    factRow('Attendance', record.attendance_state ?? 'Not recorded'),
+    factRow('Certificate', certificateSummary(record.certificate)),
+    factRow('Accreditation', splitEventLabels(record).category || 'Not specified'),
+    factRow('Priority area', splitEventLabels(record).priority || 'No priority')
+  );
+  return evidence;
+}
+
+export function buildLearningTaskPanel(record: EventRecord, reload: () => Promise<void>): HTMLElement {
+  const host = el('div', 'event-detail__task-host');
+  mountTaskLinkPanel({
+    host,
+    heading: 'Learning task',
+    relationshipType: 'learning_for',
+    incompleteOperationId:
+      record.learning_operation?.status === 'incomplete' ? record.learning_operation.operation_id : null,
+    statusMessage:
+      record.learning_operation?.status === 'committed'
+        ? `Learning Task ${record.learning_operation.task_id}`
+        : null,
+    onSubmit: async (input) => {
+      try {
+        await linkEventTask(record.id, { relationship_type: 'learning_for', ...input });
+        await reload();
+      } catch (err) {
+        if (isEventTaskLinkIncompleteError(err)) {
+          await reload();
+          return;
+        }
+        throw err;
+      }
+    },
+    onRetry: async (operationId) => {
+      await retryEventTaskLink(record.id, operationId);
+      await reload();
+    }
+  });
+  return host;
 }
 
 function paintLinkedList(host: HTMLElement, title: string, entries: UniversalLinkEntry[], empty: string): void {
@@ -1088,64 +1154,18 @@ export async function renderEventDetailView(
     });
     if (map?.el) session.append(map.el);
 
-    function factRow(label: string, value: string): HTMLElement {
-      const wrap = el('div', 'event-detail__fact');
-      wrap.append(el('span', 'event-detail__fact-label', label), el('span', 'event-detail__fact-value', value));
-      return wrap;
-    }
-
     const purposeCard = el('section', 'event-detail__card');
     purposeCard.append(el('h2', 'event-detail__section-title', 'This session is for'));
     const linkedHost = el('div', 'event-detail__linked-host');
     linkedHost.append(el('p', 'event-detail__kicker', 'Knowledge'), el('p', undefined, 'Loading…'));
     purposeCard.append(linkedHost);
-    const taskHost = el('div', 'event-detail__task-host');
-    mountTaskLinkPanel({
-      host: taskHost,
-      heading: 'Learning task',
-      relationshipType: 'learning_for',
-      incompleteOperationId:
-        record.learning_operation?.status === 'incomplete'
-          ? record.learning_operation.operation_id
-          : null,
-      statusMessage:
-        record.learning_operation?.status === 'committed'
-          ? `Learning Task ${record.learning_operation.task_id}`
-          : null,
-      onSubmit: async (input) => {
-        try {
-          const result = await linkEventTask(record.id, {
-            relationship_type: 'learning_for',
-            ...input
-          });
-          paint(result.event);
-        } catch (err) {
-          if (isEventTaskLinkIncompleteError(err)) {
-            await load();
-            return;
-          }
-          throw err;
-        }
-      },
-      onRetry: async (operationId) => {
-        const result = await retryEventTaskLink(record.id, operationId);
-        paint(result.event);
-      }
-    });
-    purposeCard.append(taskHost);
+    purposeCard.append(buildLearningTaskPanel(record, load));
 
     const whoCard = el('section', 'event-detail__card');
     whoCard.append(el('h2', 'event-detail__section-title', 'Who'));
     const peopleHost = el('div', 'event-detail__people-host');
     peopleHost.append(el('p', undefined, 'Loading…'));
-    const evidence = el('div', 'event-detail__evidence');
-    evidence.append(
-      el('p', 'event-detail__kicker', 'Evidence'),
-      factRow('Certificate', certificateSummary(record.certificate)),
-      factRow('Accreditation', splitEventLabels(record).category || 'Not specified'),
-      factRow('Priority area', splitEventLabels(record).priority || 'No priority')
-    );
-    whoCard.append(peopleHost, evidence);
+    whoCard.append(peopleHost, buildPdFields(record, (next) => paint(next)));
 
     const columns = el('div', 'event-detail__columns');
     columns.append(purposeCard, whoCard);
