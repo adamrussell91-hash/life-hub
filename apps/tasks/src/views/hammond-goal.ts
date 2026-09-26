@@ -111,8 +111,19 @@ export function mountHammondPanel(host: HTMLElement, goal: Goal, onApplied: () =
 /** The landing strip: coldest two verdicts and up to two proposal chips across all goals. */
 export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelope[], goals: Goal[], onApplied: () => void): void {
   const reads = orderReadsForStrip(envelopes.flatMap((e) => (e.read ? [e.read] : [])));
+  const today = sydneyToday();
   if (!reads.length) {
-    host.replaceChildren();
+    const strip = el('section', 'hammond-strip');
+    strip.setAttribute('aria-label', 'General Hammond');
+    const body = el('div');
+    body.append(el('p', 'hammond__stamp', 'General Hammond'), el('p', 'empty-state', 'Hammond has no read yet.'));
+    const checkBtn = el('button', `btn ${checkInProminent(today) ? 'btn--primary' : 'btn--ghost'}`, 'Sunday check-in');
+    checkBtn.type = 'button';
+    checkBtn.dataset.action = 'sunday-checkin';
+    checkBtn.addEventListener('click', () => openSundayCheckIn(host, goals, envelopes, today, onApplied));
+    body.append(checkBtn);
+    strip.append(avatar(), body, el('span'));
+    host.replaceChildren(strip);
     return;
   }
   const titles = new Map(goals.map((g) => [g.id, g.title]));
@@ -137,7 +148,9 @@ export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelop
     chips.append(chip);
   }
   body.append(chips);
-  const today = sydneyToday();
+  if (![...reads.flatMap((r) => r.ghosts)].length) {
+    body.append(el('p', 'empty-state', 'Nothing to change. Keep going.'));
+  }
   const checkBtn = el('button', `btn ${checkInProminent(today) ? 'btn--primary' : 'btn--ghost'}`, 'Sunday check-in');
   checkBtn.type = 'button';
   checkBtn.dataset.action = 'sunday-checkin';

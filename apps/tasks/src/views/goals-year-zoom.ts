@@ -263,7 +263,7 @@ function mountPhoneYearList(
   mode: 'term' | 'year'
 ): YearZoomHandle {
   host.replaceChildren();
-  const wrap = el('section', 'glass-tile runway runway--year runway--phone');
+  const wrap = el('section', 'glass-tile runway runway--year runway--phone runway--year-list');
   if (mode === 'year') {
     for (const term of yearData.terms) {
       const block = el('div', 'runway__year-term');

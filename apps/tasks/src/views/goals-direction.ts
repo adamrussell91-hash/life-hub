@@ -10,7 +10,7 @@ function oneLine(direction: PlanningDirection): string {
   const purpose = direction.purpose.trim();
   const vision = direction.vision.trim();
   if (!purpose && !vision) {
-    return 'Set your purpose and vision. Hammond checks goals against them.';
+    return 'Direction not set — tap to add purpose and vision.';
   }
   const parts = [
     purpose ? `Purpose: ${purpose}` : null,

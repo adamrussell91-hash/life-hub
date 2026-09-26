@@ -188,6 +188,20 @@ export function paintGoals(
     return null;
   }
 
+  if (!data.goals.some((g) => g.status === 'active' || g.status === 'parked')) {
+    const empty = el('div', 'goals-empty glass-tile');
+    empty.append(
+      el('p', 'empty-state', 'No goals yet.'),
+      (() => {
+        const btn = el('button', 'btn btn--primary', 'New goal') as HTMLButtonElement;
+        btn.type = 'button';
+        btn.addEventListener('click', () => add.click());
+        return btn;
+      })()
+    );
+    canvas.append(empty);
+  }
+
   zoomHandle?.dispose();
   zoomHandle = null;
   const zoomHost = el('div', 'goals-zoom-host');
@@ -454,8 +468,20 @@ function renderLane(lane: RunwayLane, data: GoalsData, overlay: RunwayOverlay): 
   const label = el('div', `runway__lane runway__lane--${lane.sphere}`);
   label.append(el('span', 'runway__dot'), el('span', '', lane.label), el('small', '', `${lane.slotsUsed} of ${LANE_CAP} slots`));
   const nodes: HTMLElement[] = [label];
-  if (lane.rows.length === 0 && lane.ongoing.length === 0) {
-    nodes.push(el('p', 'runway__empty', 'No active goals in this lane.'));
+  if (!lane.rows.length && !lane.ongoing.length) {
+    const empty = el('div', 'runway__empty-lane');
+    empty.append(
+      el('p', 'runway__empty', 'No active goals in this lane.'),
+      (() => {
+        const btn = el('button', 'btn btn--ghost', `Add a ${lane.label} goal`) as HTMLButtonElement;
+        btn.type = 'button';
+        btn.addEventListener('click', () => {
+          document.querySelector<HTMLButtonElement>('[data-action="new-goal"]')?.click();
+        });
+        return btn;
+      })()
+    );
+    nodes.push(empty);
   }
   for (const row of lane.rows) nodes.push(renderRow(row, lane.sphere, data, overlay));
   if (lane.ongoing.length) {
@@ -488,6 +514,8 @@ function renderLane(lane: RunwayLane, data: GoalsData, overlay: RunwayOverlay): 
 function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay: RunwayOverlay): HTMLElement {
   const link = el('a', `runway__row runway__row--${sphere}`);
   link.href = goalPageHash(row.goal.id);
+  link.setAttribute('tabindex', '0');
+  link.setAttribute('aria-label', `${row.goal.title}. Open goal.`);
   const info = el('div', 'runway__goal');
   const title = el('p', 'runway__goal-title', row.goal.title);
   title.setAttribute('data-hub-morph', 'title');
@@ -510,6 +538,12 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   info.append(title, meta);
   link.append(info);
   link.addEventListener('click', () => rememberGoalMorph(title));
+  link.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    rememberGoalMorph(title);
+    window.location.hash = goalPageHash(row.goal.id);
+  });
   for (const cell of row.cells) {
     const box = el('span', 'runway__cell');
     if (cell.isNow) box.classList.add('is-now');

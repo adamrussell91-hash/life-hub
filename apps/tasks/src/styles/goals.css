@@ -206,12 +206,32 @@ textarea.goal-field { resize: vertical; min-height: 3.5rem; }
   .runway { padding: var(--space-4); }
   .runway__grid { display: block; }
   .runway__head { display: none; }
-  .runway__row { display: block; background: rgba(255, 255, 255, 0.7); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-2); }
+  .runway__row { display: block; background: rgba(255, 255, 255, 0.7); border-radius: var(--radius-md); padding: var(--space-3); margin-bottom: var(--space-2); min-height: 2.75rem; }
   .runway__row > * { border: none; padding: var(--space-1) 0; background: none !important; }
   .runway__cell { display: none; }
   .runway__cell.is-now { display: flex; justify-content: flex-start; }
   .runway__move { border-left: none; padding-left: 0 !important; }
   .goal-page, .goal-page__pair, .goal-frame__grid, .goal-frame__grid--3 { grid-template-columns: 1fr; }
-  .hammond { position: static; }
+  .hammond { position: static; order: 2; }
+  .goal-page__main { order: 1; }
   .hammond-strip { grid-template-columns: 1fr; }
+  .goals-plan-sheet, .goals-checkin-sheet { padding: var(--space-4); }
+  .goals-plan-card__choices .btn, .goals-checkin__nav .btn, .hub-chip, .runway-phone__card {
+    min-height: 2.75rem;
+    min-width: 2.75rem;
+  }
+  .runway--year-list { display: flex; flex-direction: column; gap: var(--space-4); }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .runway__row, .runway__cell .cell, .goals-plan-card, .goals-checkin-sheet,
+  .goals-direction__editor, .goal-page, .hammond-chip, .hub-steps__item {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cell.is-now { animation: none !important; }
+}
+
+.goals-empty { padding: var(--space-5); margin: var(--space-4) 0; display: flex; flex-direction: column; gap: var(--space-3); align-items: flex-start; }
+.runway__empty-lane { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
+.goals-plan-sheet .btn, .goals-checkin-sheet .btn, .runway__row { min-height: 2.75rem; }

@@ -114,6 +114,7 @@ export function openPlanNextTerm(host: HTMLElement, goals: Goal[], term: SchoolT
 
   function showSummary(): void {
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keydown', onEsc);
     deckHost.hidden = true;
     summary.hidden = false;
     summary.replaceChildren();
@@ -163,10 +164,19 @@ export function openPlanNextTerm(host: HTMLElement, goals: Goal[], term: SchoolT
 
   const cancel = el('button', 'btn btn--ghost', 'Cancel');
   cancel.type = 'button';
-  cancel.addEventListener('click', () => {
+  const closeSheet = () => {
     document.removeEventListener('keydown', onKey);
+    document.removeEventListener('keydown', onEsc);
     sheet.remove();
-  });
+  };
+  const onEsc = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeSheet();
+    }
+  };
+  document.addEventListener('keydown', onEsc);
+  cancel.addEventListener('click', closeSheet);
   sheet.append(cancel);
   host.append(sheet);
 }
