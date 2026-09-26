@@ -507,3 +507,48 @@ test('preflight invalid link target performs no Communication write', async () =
   const listed = await professionalStore.list({ prefix: 'communications/records/' });
   assert.equal(listed.blobs.length, 0);
 });
+
+test('v2: create stores a scheduled window, PATCH stores agenda and blocks', async () => {
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const handler = makeHandler({
+    professionalStore,
+    universalStore,
+    tasksStore: memoryStore(),
+    linkCreateImpl: async () => ({ link: { id: 'ul_x' }, created: true })
+  });
+  const created = await handler(
+    request({
+      method: 'POST',
+      body: {
+        direction: 'outbound',
+        channel: 'in_person',
+        occurred_at: '2026-10-14T00:50:00.000Z',
+        scheduled_start: '2026-10-14T00:50:00.000Z',
+        scheduled_end: '2026-10-14T01:05:00.000Z',
+        time_zone: 'Australia/Sydney',
+        purpose_tag: 'feedback',
+        subject: 'Declan essay feedback'
+      }
+    })
+  );
+  assert.equal(created.status, 201);
+  const comm = (await created.json()).data.communication;
+  assert.equal(comm.schema_version, 2);
+  assert.equal(comm.scheduled_end, '2026-10-14T01:05:00.000Z');
+
+  const patched = await handler(
+    request({
+      method: 'PATCH',
+      url: `https://api.adam-russell.com/api/communications?id=${comm.id}`,
+      body: {
+        agenda: [{ id: 'ag_1', text: 'What went well', source: 'you' }],
+        blocks: [{ id: 'block_1', block_type: 'rich_text', content: { html: '<p>Tighter redraft.</p>' } }]
+      }
+    })
+  );
+  assert.equal(patched.status, 200);
+  const after = (await patched.json()).data.communication;
+  assert.equal(after.agenda[0].text, 'What went well');
+  assert.equal(after.blocks[0].id, 'block_1');
+});
