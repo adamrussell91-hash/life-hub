@@ -175,6 +175,7 @@ export function createMockApi() {
     ])
   );
   const applications = new Map<string, Record<string, unknown>>();
+  const threads = new Map<string, Record<string, unknown>>();
 
   let authenticated = false;
 
@@ -1061,6 +1062,51 @@ export function createMockApi() {
       }
       meeting.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { meeting } });
+    }
+
+    if (path === '/api/threads' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const thread = threads.get(id);
+        if (!thread) {
+          return json(404, { ok: false, error: { code: 'thread_not_found', message: 'Thread not found.' } });
+        }
+        return json(200, { ok: true, data: { thread } });
+      }
+      return json(200, { ok: true, data: { threads: [...threads.values()] } });
+    }
+
+    if (path === '/api/threads' && method === 'POST') {
+      const input = (body ?? {}) as { kind?: string; title?: string; purpose_tag?: string | null; goals?: unknown[] };
+      const now = new Date().toISOString();
+      const id = `thread_${crypto.randomUUID()}`;
+      const thread = {
+        schema_version: 1,
+        id,
+        kind: input.kind === 'case' ? 'case' : 'general',
+        title: typeof input.title === 'string' ? input.title.trim() : 'Thread',
+        purpose_tag: typeof input.purpose_tag === 'string' ? input.purpose_tag.trim().toLowerCase() || null : null,
+        goals: Array.isArray(input.goals) ? input.goals : [],
+        status: 'open',
+        created_at: now,
+        updated_at: now
+      };
+      threads.set(id, thread);
+      return json(200, { ok: true, data: { thread } });
+    }
+
+    if (path === '/api/threads' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const thread = id ? threads.get(id) : null;
+      if (!thread) {
+        return json(404, { ok: false, error: { code: 'thread_not_found', message: 'Thread not found.' } });
+      }
+      const patch = (body ?? {}) as Record<string, unknown>;
+      for (const key of ['kind', 'title', 'purpose_tag', 'goals', 'status']) {
+        if (patch[key] !== undefined) thread[key] = patch[key];
+      }
+      thread.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { thread } });
     }
 
     if (path === '/api/events' && method === 'GET') {
