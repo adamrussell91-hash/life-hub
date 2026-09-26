@@ -1009,6 +1009,91 @@ export function createMockApi() {
       return json(200, { ok: true, data: { projections } });
     }
 
+    // Local seed so Home Tideline can paint the Hammond tray (Apply / Review / Dismiss).
+    if (path === '/api/calendar-ghosts' && method === 'GET') {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Australia/Sydney',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+      const id = 'ghost_mock_block_1';
+      return json(200, {
+        ghosts: [
+          {
+            id,
+            agent: 'hammond',
+            kind: 'calendar_block',
+            label: 'Protect marking block',
+            meta: 'Tue 16:00–18:00 · clears a collision',
+            date: today,
+            chip: {
+              id,
+              title: 'Protect marking block',
+              date: today,
+              start: '16:00',
+              end: '18:00',
+              kind: 'professional',
+              meta: 'Hammond · proposal',
+              ghost: true
+            }
+          }
+        ]
+      });
+    }
+
+    if (path === '/api/calendar-ghosts' && method === 'POST') {
+      return json(200, { ok: true, receipt: 'Dismissed. Nothing written.' });
+    }
+
+    // Soft-empty hub calendar sources so local Home does not paint fail banners.
+    if (path.startsWith('/api/repo/manifest') && method === 'GET') {
+      return json(200, {
+        ok: true,
+        data: {
+          commitSha: 'a'.repeat(40),
+          treeSha: 'b'.repeat(40),
+          manifestId: 'local-mock',
+          from: url.searchParams.get('from'),
+          to: url.searchParams.get('to'),
+          files: []
+        }
+      });
+    }
+
+    if (path === '/api/repo/files' && method === 'POST') {
+      return json(200, { ok: true, data: { commitSha: 'a'.repeat(40), files: [] } });
+    }
+
+    if (
+      method === 'GET' &&
+      [
+        '/api/curriculum',
+        '/api/tasks',
+        '/api/work-blocks',
+        '/api/planning-profile',
+        '/api/workflow-state',
+        '/api/hub-prefs',
+        '/api/knowledge'
+      ].some((prefix) => path.startsWith(prefix))
+    ) {
+      return json(200, {
+        ok: true,
+        data: {
+          years: [],
+          subjects: [],
+          units: [],
+          lessons: [],
+          classes: [],
+          scheduled_lessons: [],
+          tasks: [],
+          work_blocks: [],
+          school_terms: [],
+          pages: []
+        }
+      });
+    }
+
     if (path === '/api/applications' && method === 'GET') {
       const id = url.searchParams.get('id');
       if (id) {
