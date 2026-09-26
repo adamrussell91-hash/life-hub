@@ -252,10 +252,11 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
   meta.dataset.part = 'calendar-meta';
   const pressure = el('div', 'pressure-host');
   pressure.dataset.part = 'pressure-host';
+  // Calendar fills the page; week chrome (locks / next actions) stacks under it — not a right column.
   const workspace = el('div', 'tasks-calendar-chrome__workspace hub-calendar__workspace');
   const calendarHost = el('div', 'tasks-calendar-chrome__kit');
   calendarHost.dataset.part = 'kit-host';
-  const rail = el('div', 'hub-calendar__rail');
+  const rail = el('div', 'hub-calendar__rail tasks-calendar-chrome__below');
   rail.dataset.part = 'calendar-rail';
   workspace.append(calendarHost, rail);
   root.append(meta, pressure, workspace);
@@ -264,6 +265,9 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
   const ac = new AbortController();
   let tasks: Task[] = [];
   let todayKey = new Date().toISOString().slice(0, 10);
+  /** Skip / patch rail when content is unchanged — mirror Someday #514 (shell once, patch lists). */
+  let railSignature = '';
+  let railZoom = '';
 
   async function loadTasks() {
     try {
@@ -272,6 +276,27 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
     } catch {
       tasks = [];
     }
+  }
+
+  function railContentSignature(zoom: string): string {
+    const taskSig = tasks
+      .map((t) => `${t.id}:${t.due_date ?? ''}:${t.status}:${t.title}`)
+      .join('|');
+    return `${zoom}|${todayKey}|${state.planningLens}|${state.planWorkMode}|${taskSig}`;
+  }
+
+  function weekDatesForToday(): string[] {
+    const monday = (() => {
+      const d = new Date(`${todayKey}T12:00:00`);
+      const day = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - day);
+      return d;
+    })();
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
   }
 
   function paintMeta() {
@@ -292,7 +317,7 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
           if (id === 'lens') state.planningLens = !state.planningLens;
           else state.planWorkMode = !state.planWorkMode;
           paintMeta();
-          void paintRail();
+          void paintRail(railZoom || 'week');
         }
       })
     );
@@ -329,29 +354,42 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
         pinchLineLabel(pinches.length)
       )
     );
-    renderPressureStrips(pressure, tasks, todayDate, () => void refresh(), { emptyClear: false });
+    renderPressureStrips(pressure, tasks, todayDate, () => void refresh({ zoom: railZoom || 'week' }), {
+      emptyClear: false
+    });
   }
 
   function paintRail(zoom = 'week') {
+    const signature = railContentSignature(zoom);
+    if (signature === railSignature && rail.childElementCount > 0) return;
+
+    // Same zoom: patch locks + next-actions only — keep dump form / links (Someday #514 pattern).
+    if (
+      zoom === railZoom &&
+      zoom === 'week' &&
+      rail.querySelector('[data-part="rail-locks"]') &&
+      rail.querySelector('[data-part="rail-next-actions"]')
+    ) {
+      const weekDates = weekDatesForToday();
+      rail.querySelector('[data-part="rail-locks"]')?.replaceWith(renderLocksWidget(tasks, weekDates));
+      rail
+        .querySelector('[data-part="rail-next-actions"]')
+        ?.replaceWith(renderNextActionsWidget(tasks));
+      railSignature = signature;
+      return;
+    }
+
+    railZoom = zoom;
+    railSignature = signature;
     rail.replaceChildren();
     rail.append(renderShortcutHint());
     if (zoom === 'day') {
       rail.append(renderDayAgenda(tasks, todayKey));
     } else if (zoom === 'week') {
-      const monday = (() => {
-        const d = new Date(`${todayKey}T12:00:00`);
-        const day = (d.getDay() + 6) % 7;
-        d.setDate(d.getDate() - day);
-        return d;
-      })();
-      const weekDates = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        return d.toISOString().slice(0, 10);
-      });
+      const weekDates = weekDatesForToday();
       rail.append(renderLocksWidget(tasks, weekDates));
       rail.append(renderNextActionsWidget(tasks));
-      rail.append(renderDumpWidget(() => void refresh()));
+      rail.append(renderDumpWidget(() => void refresh({ zoom })));
       const links = el('section', 'hub-calendar__detail');
       links.dataset.part = 'rail-quick-links';
       links.append(el('h3', 'hub-calendar__detail-heading', 'Quick links'));
@@ -414,11 +452,13 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
 
   async function refresh(opts?: { zoom?: string; today?: string }) {
     if (opts?.today) todayKey = opts.today;
+    const zoom = opts?.zoom || 'week';
     await loadTasks();
     paintMeta();
-    paintRail(opts?.zoom || 'week');
+    paintRail(zoom);
   }
 
+  // Load once after mount — do not paint an empty locks strip first (that was the flash).
   void refresh();
 
   return {
