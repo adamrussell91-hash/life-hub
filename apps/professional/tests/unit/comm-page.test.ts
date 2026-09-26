@@ -18,7 +18,15 @@ vi.mock('@/api/communications', () => ({
   updateCommunication: vi.fn(async (_id: string, patch: object) => ({ communication: { ...record, ...patch } })),
   retryFollowUpTask: vi.fn(),
   createFollowUpTask: vi.fn(),
-  isFollowUpIncompleteError: () => false
+  isFollowUpIncompleteError: () => false,
+  createCommunication: vi.fn(async () => ({ communication: { id: 'communication_sent' }, created: true }))
+}));
+vi.mock('@/api/clare-comms', () => ({
+  clareBrief: vi.fn(async () => ({ points: [{ text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' }], owed_line: 'Send Denielle the summary after this one.' })),
+  clareSummary: vi.fn(async () => ({ summary: 'Good progress.', promises: [{ direction: 'they_owe', person_ref: 'shared:person:p_declan', text: 'Rewrite the fence paragraph', due: '2026-10-19' }], numbers: [] })),
+  clareDrafts: vi.fn(async () => ({ drafts: [{ person_ref: 'shared:person:p_denielle', to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle,' }] })),
+  clareProposeNext: vi.fn(async () => ({ date: '2026-10-21', time: '11:50', duration_min: 15, reason: 'Weekly.', ghost_id: 'g', queued: true })),
+  clareHandwriting: vi.fn(async () => ({ text: 'quote → so what?' }))
 }));
 vi.mock('@/api/universal-links', () => ({
   listUniversalLinksForEntity: vi.fn(async (ref: string) => {
@@ -65,7 +73,7 @@ vi.mock('@/api/threads', () => ({ listThreads: vi.fn(async () => ({ threads: [] 
 vi.mock('@/components/block-page', () => ({
   mountBlockPage: vi.fn((host: HTMLElement) => {
     host.append(Object.assign(document.createElement('div'), { className: 'block-page-stub' }));
-    return { flush: async () => {}, current: () => [], dispose: () => {} };
+    return { flush: async () => {}, current: () => [], append: () => {}, dispose: () => {} };
   })
 }));
 
@@ -137,5 +145,40 @@ describe('comm page', () => {
     }));
     expect(canvas.textContent).toContain('Added to Ollie P. · study approach');
     expect(canvas.querySelector('[data-part="thread-undo"]')).not.toBeNull();
+  });
+
+  it('Before shows Clare’s brief with sources', async () => {
+    const canvas = await render();
+    await vi.advanceTimersByTimeAsync(0);
+    const brief = canvas.querySelector('[data-part="clare-brief"]')!;
+    expect(brief.textContent).toContain('His redraft came in yesterday.');
+    expect(brief.textContent).toContain('Canvas, 13/10');
+    expect(brief.textContent).toContain('Send Denielle the summary after this one.');
+  });
+
+  it('After: Summarise fills the summary and adds ticked promises to the ledger', async () => {
+    const { createLedgerItem } = await import('@/api/ledger');
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
+    canvas.querySelector<HTMLButtonElement>('[data-part="clare-summarise"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(canvas.querySelector<HTMLTextAreaElement>('.comm-page__summary-text')!.value).toBe('Good progress.');
+    canvas.querySelector<HTMLButtonElement>('[data-part="clare-add-promises"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(createLedgerItem).toHaveBeenCalledWith(expect.objectContaining({ text: 'Rewrite the fence paragraph', direction: 'they_owe', due: '2026-10-19' }));
+  });
+
+  it('After: Mark as sent logs an outbound comm to that person and ticks the promise', async () => {
+    const comms = await import('@/api/communications');
+    const canvas = await render();
+    canvas.querySelector<HTMLButtonElement>('[data-set-phase="after"]')!.click();
+    canvas.querySelector<HTMLButtonElement>('[data-part="clare-drafts"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    canvas.querySelector<HTMLButtonElement>('[data-part="mark-sent"]')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(comms.createCommunication).toHaveBeenCalledWith(expect.objectContaining({
+      direction: 'outbound', channel: 'email', subject: 'Declan update',
+      links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_denielle' }]
+    }));
   });
 });

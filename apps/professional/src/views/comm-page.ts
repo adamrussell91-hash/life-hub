@@ -1,4 +1,4 @@
-import { getCommunication, updateCommunication } from '@/api/communications';
+import { createCommunication, getCommunication, updateCommunication } from '@/api/communications';
 import {
   createTask,
   createUniversalLink,
@@ -16,6 +16,8 @@ import { pickThreadForComm, type ThreadCandidate } from '@/lib/thread-match';
 import { threadRoute } from '@/app/router';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import type { AgendaItem, CommunicationRecord, LedgerItem } from '@/domain/types';
+import { clareBrief, clareDrafts, clareHandwriting, clareProposeNext, clareSummary, type ClareDraft } from '@/api/clare-comms';
+import { buildClareContext } from '@/lib/clare-context';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -117,6 +119,43 @@ export async function renderCommPage(
   let manual = false;
   let clock: ReturnType<typeof setTimeout> | null = null;
   let blockPage: BlockPageHandle | null = null;
+
+  const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date());
+  const clareContext = () => buildClareContext({
+    title: data.record.subject || 'Comm',
+    kind: 'comm',
+    when: whenLabel(data.record),
+    withPeople: data.withPeople,
+    alsoConcerned: data.alsoConcerned,
+    previousSummaries: [],
+    ledger: data.ledger,
+    blocks: data.record.blocks ?? [],
+    summary: data.record.summary || null,
+    todayKey,
+    extra: {
+      time_zone: data.record.time_zone ?? 'Australia/Sydney',
+      purpose_tag: data.record.purpose_tag ?? null,
+      thread_ref: data.thread?.ref ?? null,
+      channel: data.record.channel
+    }
+  });
+
+  function clareCard(part: string, title: string): { card: HTMLElement; body: HTMLElement } {
+    const card = el('section', 'card clare');
+    card.dataset.part = part;
+    const head = el('p', 'clare__who', `✦ Clare · ${title}`);
+    const body = el('div', 'clare__body');
+    card.append(head, body);
+    return { card, body };
+  }
+
+  function showClareError(body: HTMLElement, err: unknown, retry: () => void): void {
+    body.replaceChildren(el('p', 'muted', err instanceof Error ? err.message : 'Clare could not finish.'));
+    const again = el('button', 'btn btn--ghost', 'Try again') as HTMLButtonElement;
+    again.type = 'button';
+    again.addEventListener('click', retry);
+    body.append(again);
+  }
 
   const root = el('div', 'comm-page');
   const head = el('header', 'comm-page__head');
@@ -252,7 +291,27 @@ export async function renderCommPage(
   }
 
   function paintBefore(): void {
-    main.append(carriedCard(), agendaCard());
+    const { card, body } = clareCard('clare-brief', 'brief');
+    const load = () => {
+      body.replaceChildren(el('p', 'muted', 'Clare is reading the thread…'));
+      clareBrief(clareContext()).then((brief) => {
+        body.replaceChildren();
+        const list = el('ol');
+        for (const point of brief.points) {
+          const li = el('li', undefined, point.text);
+          li.append(el('span', 'src', ` · ${point.source}`));
+          list.append(li);
+        }
+        body.append(list);
+        if (brief.owed_line) body.append(el('p', 'muted', brief.owed_line));
+        const refresh = el('button', 'btn btn--ghost', 'Refresh') as HTMLButtonElement;
+        refresh.type = 'button';
+        refresh.addEventListener('click', load);
+        body.append(refresh);
+      }, (err) => showClareError(body, err, load));
+    };
+    load();
+    main.append(card, carriedCard(), agendaCard());
   }
 
   function paintDuring(): void {
@@ -270,6 +329,29 @@ export async function renderCommPage(
       setPhase('after');
     });
     strip.append(el('span', 'live-strip__rec', 'Live'), end);
+    const photo = el('label', 'btn btn--ghost', '✎ Read a photo');
+    const file = el('input') as HTMLInputElement;
+    file.type = 'file';
+    file.accept = 'image/jpeg,image/png,image/webp';
+    file.hidden = true;
+    photo.append(file);
+    file.addEventListener('change', async () => {
+      const picked = file.files?.[0];
+      if (!picked || !blockPage) return;
+      photo.firstChild!.textContent = 'Reading…';
+      try {
+        const { text } = await clareHandwriting(picked);
+        const stamp = new Intl.DateTimeFormat('en-AU', { timeZone: 'Australia/Sydney', hour: 'numeric', minute: '2-digit' }).format(new Date());
+        const html = `<p><em>From your handwriting · ${stamp}</em></p>` + text.split('\n').map((lineText) => `<p>${lineText.replace(/[<&>]/g, (c) => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' })[c]!)}</p>`).join('');
+        blockPage.append([{ id: `hand_${Date.now()}`, block_type: 'rich_text', variant: 'medium', content: { html } }]);
+      } catch (err) {
+        strip.append(el('span', 'muted', err instanceof Error ? err.message : 'Clare could not read that photo.'));
+      } finally {
+        photo.firstChild!.textContent = '✎ Read a photo';
+        file.value = '';
+      }
+    });
+    strip.append(photo);
     const body = el('div', 'comm-page__body');
     main.append(strip, body);
     blockPage = mountBlockPage(body, {
@@ -302,6 +384,82 @@ export async function renderCommPage(
       data.record = (await updateCommunication(data.record.id, { summary: text.value })).communication;
     });
     summary.append(text);
+
+    const clareRow = el('div', 'clare-row');
+    const summarise = el('button', 'btn btn--secondary', '✦ Summarise') as HTMLButtonElement;
+    summarise.type = 'button';
+    summarise.dataset.part = 'clare-summarise';
+    const draftsBtn = el('button', 'btn btn--secondary', '✦ Draft follow-ups') as HTMLButtonElement;
+    draftsBtn.type = 'button';
+    draftsBtn.dataset.part = 'clare-drafts';
+    const nextBtn = el('button', 'btn btn--ghost', '✦ Suggest next session') as HTMLButtonElement;
+    nextBtn.type = 'button';
+    nextBtn.hidden = !data.thread;
+    clareRow.append(summarise, draftsBtn, nextBtn);
+    const found = el('div', 'clare-found');
+    const draftsHost = el('div', 'clare-drafts');
+
+    summarise.addEventListener('click', async () => {
+      summarise.disabled = true;
+      try {
+        const out = await clareSummary(clareContext());
+        text.value = out.summary;
+        data.record = (await updateCommunication(data.record.id, { summary: out.summary })).communication;
+        found.replaceChildren(el('h4', undefined, 'Promises Clare found'));
+        const boxes: Array<[HTMLInputElement, (typeof out.promises)[number]]> = [];
+        for (const promise of out.promises) {
+          const label = el('label', 'clare-found__item');
+          const box = el('input') as HTMLInputElement;
+          box.type = 'checkbox';
+          box.checked = true;
+          label.append(box, document.createTextNode(` ${promise.direction === 'you_owe' ? 'You' : 'They'}: ${promise.text}${promise.due ? ` · ${promise.due.split('-').reverse().join('/')}` : ''}`));
+          found.append(label);
+          boxes.push([box, promise]);
+        }
+        const add = el('button', 'btn btn--primary', 'Add to the ledger') as HTMLButtonElement;
+        add.type = 'button';
+        add.dataset.part = 'clare-add-promises';
+        add.addEventListener('click', async () => {
+          add.disabled = true;
+          for (const [box, promise] of boxes) {
+            if (!box.checked) continue;
+            const { item, created } = await createLedgerItem({ ...promise, comm_ref: data.commRef });
+            if (created) data.ledger.push(item);
+          }
+          setPhase('after');
+        });
+        found.append(add);
+      } catch (err) {
+        showClareError(found, err, () => summarise.click());
+      } finally {
+        summarise.disabled = false;
+      }
+    });
+
+    draftsBtn.addEventListener('click', async () => {
+      draftsBtn.disabled = true;
+      try {
+        const { drafts } = await clareDrafts(clareContext());
+        draftsHost.replaceChildren();
+        for (const draft of drafts) draftsHost.append(draftCard(draft));
+        if (!drafts.length) draftsHost.append(el('p', 'muted', 'Nobody on this page needs a follow-up.'));
+      } catch (err) {
+        showClareError(draftsHost, err, () => draftsBtn.click());
+      } finally {
+        draftsBtn.disabled = false;
+      }
+    });
+
+    nextBtn.addEventListener('click', async () => {
+      nextBtn.disabled = true;
+      try {
+        const next = await clareProposeNext(clareContext());
+        nextBtn.replaceWith(el('span', 'muted', `Proposed on your calendar: ${next.date.split('-').reverse().join('/')} at ${next.time}. Accept or dismiss it there.`));
+      } catch (err) {
+        nextBtn.disabled = false;
+        clareRow.append(el('span', 'muted', err instanceof Error ? err.message : 'Clare could not suggest a time.'));
+      }
+    });
 
     const ledger = el('section', 'card comm-page__ledger');
     ledger.dataset.part = 'ledger';
@@ -338,7 +496,44 @@ export async function renderCommPage(
     const follow = buildFollowUpSection(data.record, (next) => { data.record = next; }, async () => {
       await renderCommPage(canvas, id, options);
     });
-    main.append(summary, ledger, follow);
+    main.append(clareRow, found, summary, ledger, draftsHost, follow);
+  }
+
+  function draftCard(draft: ClareDraft): HTMLElement {
+    const card = el('section', 'draft');
+    card.append(el('p', 'draft__to', `To ${draft.to} · ${draft.subject}`));
+    const body = el('textarea', 'draft__body') as HTMLTextAreaElement;
+    body.value = draft.body;
+    body.setAttribute('aria-label', `Draft to ${draft.to}`);
+    const copy = el('button', 'btn btn--primary', 'Copy') as HTMLButtonElement;
+    copy.type = 'button';
+    copy.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(body.value);
+        copy.textContent = 'Copied';
+      } catch {
+        body.select();
+      }
+    });
+    const sent = el('button', 'btn btn--secondary', 'Mark as sent') as HTMLButtonElement;
+    sent.type = 'button';
+    sent.dataset.part = 'mark-sent';
+    sent.addEventListener('click', async () => {
+      sent.disabled = true;
+      const { communication } = await createCommunication({
+        direction: 'outbound', channel: 'email', occurred_at: new Date().toISOString(),
+        subject: draft.subject, summary: body.value,
+        links: [{ relationship_type: 'recipient', target_ref: draft.person_ref }]
+      });
+      if (data.thread) {
+        await createUniversalLink({ source_ref: `professional:communication:${communication.id}`, target_ref: data.thread.ref, relationship_type: 'in_thread' });
+      }
+      const owed = data.ledger.find((item) => item.status === 'open' && item.direction === 'you_owe' && item.person_ref === draft.person_ref);
+      if (owed) Object.assign(owed, (await patchLedger(owed.id, { status: 'done', checked_in_ref: `professional:communication:${communication.id}` })).item);
+      sent.replaceWith(el('span', 'quiet-link', '✓ Logged as sent'));
+    });
+    card.append(body, copy, sent);
+    return card;
   }
 
   function buildPeopleRail(page: PageData): HTMLElement {
