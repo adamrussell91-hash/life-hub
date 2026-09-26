@@ -3,7 +3,8 @@ import { ID_RE } from './_shared/cognitive-controller.mjs';
 import { createCognitiveService } from './_shared/cognitive-service.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { createAnthropicClient } from './_shared/anthropic-client.mjs';
-import { gatherContext, topicSearchTerms } from './_shared/cognitive-context.mjs';
+import { gatherContext, topicSearchTerms, readCentralNodeMarkdown } from './_shared/cognitive-context.mjs';
+import { writeCentralNodeMarkdown } from './_shared/cognitive-writeback.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
@@ -12,6 +13,14 @@ import { readKnowledgeFile } from './_shared/knowledge-data.mjs';
 export const config = { path: '/api/knowledge/protocols' };
 
 function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
+
+export function parseListPaging(url) {
+  const lim = Number(url.searchParams.get('limit'));
+  const off = Number(url.searchParams.get('offset'));
+  const limit = Number.isFinite(lim) ? Math.min(200, Math.max(1, Math.floor(lim))) : 100;
+  const offset = Number.isFinite(off) ? Math.max(0, Math.floor(off)) : 0;
+  return { limit, offset };
+}
 
 export async function defaultModel(prompt, env, fetchImpl = fetch) {
   const apiKey = env.ANTHROPIC_API_KEY;
@@ -138,11 +147,16 @@ export async function defaultInvokeProtocolRun(request, sessionId, env = {}, fet
 async function serviceFor(env, deps) {
   const store = deps.getStore ? await deps.getStore(env) : await defaultGetCognitiveStore(env);
   if (!store) throw Object.assign(new Error('Protocol session storage is not configured.'), { status: 503, code: 'cognitive_store_unbound' });
-  const retrieve = deps.retrieve ?? ((session) => defaultGatherContext(session, env, deps.fetchImpl ?? fetch, deps));
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const retrieve = deps.retrieve ?? ((session) => defaultGatherContext(session, env, fetchImpl, deps));
   return createCognitiveService({
     store,
-    model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)),
-    retrieve
+    model: deps.model ?? (prompt => defaultModel(prompt, env, fetchImpl)),
+    retrieve,
+    env,
+    fetchImpl,
+    readCentralNode: deps.readCentralNode ?? readCentralNodeMarkdown,
+    writeCentralNode: deps.writeCentralNode ?? writeCentralNodeMarkdown
   });
 }
 
@@ -155,7 +169,7 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       try {
         const service = await serviceFor(env, deps);
         const data = url.searchParams.has('list')
-          ? { sessions: await service.list(owner(env)) }
+          ? { sessions: await service.list(owner(env), parseListPaging(url)) }
           : { session: await service.get(owner(env), url.searchParams.get('sessionId') ?? '') };
         return withCors(okResponse(200, data), request, env);
       } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message, error.status >= 500), request, env); }

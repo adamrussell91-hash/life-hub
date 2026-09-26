@@ -5,7 +5,7 @@ import { escapeHtml } from "../lib/dom";
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
 type Evidence = { id: string; kind?: string; title: string; text?: string; url?: string };
 type Turn = { id: string; role: string; speaker: string; stage: string; text: string; evidenceIds?: string[] };
-type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
+type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean }; protocolId?: string; mode?: string; summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[]; forHammond?: string | null } };
 const ASSET_ROOT = `${import.meta.env.BASE_URL}assets/cognitive-protocols`;
 const voiceAsset: Record<string, string> = {
   "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
@@ -123,6 +123,75 @@ async function catalog() {
   if (!response.ok) throw new Error("The protocol catalogue is unavailable.");
   const body = await response.json();
   return body.data.catalog as Definition[];
+}
+
+async function listPastRuns(offset = 0, limit = 20) {
+  if (USE_LOCAL_DATA) return [];
+  const response = await fetch(`${API_BASE}/protocols?list=1&limit=${limit}&offset=${offset}`, { credentials: "include" });
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body?.data?.sessions) ? body.data.sessions : [];
+}
+
+function formatRunDate(iso: string) {
+  try {
+    return new Intl.DateTimeFormat("en-AU", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+export function protocolDisplayName(id: string, definitions: Definition[] = []) {
+  return definitions.find(d => d.id === id)?.name || id;
+}
+
+export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string, definitions: Definition[] = [], { hasMore = false } = {}) {
+  const filtered = filterId ? runs.filter(run => run.protocolId === filterId) : runs;
+  const options = ["", "fates", "horizon", "refinery", "cartographers", "mirror", "consilium", "witness", "tribunal"]
+    .map(id => `<option value="${id}" ${id === filterId ? "selected" : ""}>${id ? escapeHtml(protocolDisplayName(id, definitions)) : "All protocols"}</option>`)
+    .join("");
+  const rows = filtered.length
+    ? filtered.map(run => {
+      const resumable = run.status === "waiting" || run.status === "paused";
+      return `<li class="protocol-past__row">
+        <button type="button" class="protocol-past__open" data-protocol-open-run="${escapeHtml(String(run.id))}">
+          <span>${escapeHtml(formatRunDate(String(run.updatedAt || run.createdAt || "")))}</span>
+          <span>${escapeHtml(protocolDisplayName(String(run.protocolId || ""), definitions))}</span>
+          <span>${escapeHtml(String(run.title || "Untitled"))}</span>
+          <span>${escapeHtml(String(run.mode || ""))}</span>
+          <span>${escapeHtml(String(run.status || ""))}</span>
+        </button>
+        ${resumable ? `<button type="button" class="btn btn--ghost" data-protocol-resume-run="${escapeHtml(String(run.id))}">Resume</button>` : ""}
+      </li>`;
+    }).join("")
+    : `<li class="protocol-past__empty">No past runs yet.</li>`;
+  const more = hasMore ? `<button type="button" class="btn btn--ghost" data-protocol-past-more>Load more</button>` : "";
+  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label></header><ul class="protocol-past__list">${rows}</ul>${more}</section>`;
+}
+
+function downloadMarkdown(session: Session & { summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[] }; protocolId?: string; mode?: string }) {
+  const lines = [
+    `# ${session.summary?.title || session.protocolId || "Protocol run"}`,
+    "",
+    `- Protocol: ${session.protocolId || ""}`,
+    `- Mode: ${session.mode || ""}`,
+    `- Status: ${session.status}`,
+    session.summary?.keyFinding ? `- Key finding: ${session.summary.keyFinding}` : "",
+    "",
+    session.summary?.summary || "",
+    "",
+    ...(session.summary?.openQuestions || []).map(q => `- ${q}`),
+    "",
+    "## Transcript",
+    ...session.transcript.map(turn => `### ${turn.speaker} (${turn.stage})\n\n${turn.text}`)
+  ].filter(line => line !== undefined);
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${session.protocolId || "protocol"}-${session.id || "run"}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function cardArt(id: string) {
@@ -339,7 +408,7 @@ export function sessionView(session: Session, definition: Definition, viewingInd
     : activeSpeakerId === "you"
       ? `<div class="protocol-portrait protocol-portrait--you" aria-hidden="true">You</div>`
       : "";
-  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
+  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${(session as Session & { summary?: { title?: string; keyFinding?: string; summary?: string } }).summary && isLatest ? `<aside class="protocol-summary" aria-label="Run summary"><h2>${escapeHtml((session as Session & { summary?: { title?: string } }).summary?.title || "Summary")}</h2><p>${escapeHtml((session as Session & { summary?: { keyFinding?: string } }).summary?.keyFinding || "")}</p><p>${escapeHtml((session as Session & { summary?: { summary?: string } }).summary?.summary || "")}</p></aside>` : ""}${renderScrubber(session, index, isLatest, definition)}</section>`;
 }
 export function applySession(root: HTMLElement, session: Session, definition: Definition, viewingIndex?: number) {
   const total = session.transcript.length;
@@ -356,6 +425,11 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let definitions = localCatalog;
   let selected: Definition | null = null;
   let currentSession: Session | null = null;
+  let pastRuns: Array<Record<string, unknown>> = [];
+  let pastFilter = "";
+  let pastOffset = 0;
+  let pastHasMore = false;
+  const PAST_PAGE = 20;
   let pollTimer: number | null = null;
   let viewingIndex: number | null = null;
   const effectiveIndex = () => {
@@ -364,9 +438,20 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
   };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
+  const refreshPastRuns = async ({ append = false } = {}) => {
+    if (USE_LOCAL_DATA) return;
+    const offset = append ? pastOffset : 0;
+    const page = await listPastRuns(offset, PAST_PAGE);
+    pastRuns = append ? [...pastRuns, ...page] : page;
+    pastOffset = pastRuns.length;
+    pastHasMore = page.length >= PAST_PAGE;
+    if (!selected && !currentSession) paint();
+  };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
-    else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
+    else host.innerHTML = selected
+      ? intake(selected)
+      : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
   };
   const poll = async () => {
     if (!currentSession?.id || USE_LOCAL_DATA) return;
@@ -376,6 +461,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const body = await response.json();
       currentSession = body.data.session;
       paint();
+      if (currentSession.status === "completed") void refreshPastRuns();
       if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, PROTOCOL_POLL_MS);
     } catch {
       if (currentSession) {
@@ -413,9 +499,39 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     }
     const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
     if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; paint(); return; }
-    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); void refreshPastRuns(); return; }
+    if (target.closest("[data-protocol-past-more]")) { void refreshPastRuns({ append: true }); return; }
+    if (target.closest("[data-protocol-download]") && currentSession) { downloadMarkdown(currentSession); return; }
+    const openRun = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun
+      || target.closest<HTMLButtonElement>("[data-protocol-resume-run]")?.dataset.protocolResumeRun;
+    if (openRun) {
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/protocols?sessionId=${encodeURIComponent(openRun)}`, { credentials: "include" });
+          const body = await response.json().catch(() => null);
+          const session = sessionFromProtocolPayload(body);
+          if (!session) return;
+          selected = definitions.find(d => d.id === session.protocolId) ?? definitions.find(d => d.id === String((body as { data?: { session?: { protocolId?: string } } })?.data?.session?.protocolId)) ?? selected;
+          if (!selected && session.protocolId) selected = definitions.find(d => d.id === session.protocolId) || null;
+          currentSession = session;
+          viewingIndex = null;
+          if (target.closest("[data-protocol-resume-run]") && ["waiting", "paused"].includes(session.status) && session.allowedActions.includes("resume")) {
+            await postAction({ sessionId: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: "resume" });
+          } else paint();
+        } catch { /* leave library visible */ }
+      })();
+      return;
+    }
+    const filter = target.closest<HTMLSelectElement>("[data-protocol-past-filter]");
+    if (filter && event.type === "click") return;
     const action = target.closest<HTMLButtonElement>("[data-protocol-action]")?.dataset.protocolAction;
     if (action && currentSession) void postAction({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action });
+  };
+  host.onchange = event => {
+    const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
+    if (!filter) return;
+    pastFilter = filter.value;
+    paint();
   };
   host.onsubmit = async event => {
     const form = event.target as HTMLFormElement;
@@ -461,5 +577,6 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   paint();
   void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);
+  void refreshPastRuns().catch(() => undefined);
   return stopPolling;
 }

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { act, advance, createSession, fault, publicSession } from './cognitive-controller.mjs';
+import { summariseCompletedSession, writeBackRetryable, writeProtocolCentralNodeLines } from './cognitive-writeback.mjs';
 
 const LEASE_MS = 90_000;
 
@@ -17,7 +18,7 @@ function failed(session, error) {
   return next;
 }
 
-export function createCognitiveService({ store, model, retrieve, now = Date.now } = {}) {
+export function createCognitiveService({ store, model, retrieve, now = Date.now, writeCentralNode, readCentralNode, env = {}, fetchImpl = fetch } = {}) {
   if (!store || !model || !retrieve) throw new TypeError('Cognitive service dependencies are required.');
   async function read(owner, id) {
     const row = await store.read(owner, id);
@@ -34,6 +35,36 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
     if (!written) throw fault(409, 'revision_conflict', 'Session changed. Refresh before continuing.');
     return written;
   }
+  async function finishIfCompleted(session) {
+    if (session.status !== 'completed') return session;
+    const next = structuredClone(session);
+    let changed = false;
+    if (!next.summary) {
+      try { next.summary = await summariseCompletedSession(next, model); }
+      catch { next.summary = { title: next.protocolId, keyFinding: 'Run completed.', summary: 'Summary unavailable.', openQuestions: [], forHammond: null }; }
+      changed = true;
+    }
+    const attempts = next.writeBackAttempts || 0;
+    const needsWrite = !next.writeBack;
+    const needsRetry = next.writeBack?.ok === false && attempts < 1 && writeBackRetryable(next.writeBack.error);
+    if (needsWrite || needsRetry) {
+      const priorFailed = Boolean(next.writeBack);
+      try {
+        next.writeBack = await writeProtocolCentralNodeLines(next, env, { fetchImpl, readCentralNode, writeCentralNode });
+      } catch (error) {
+        next.writeBack = { ok: false, error: error?.code || error?.message || 'write_failed', written: [] };
+      }
+      if (priorFailed) next.writeBackAttempts = attempts + 1;
+      else if (next.writeBack?.ok === false) next.writeBackAttempts = 0;
+      changed = true;
+    }
+    return changed ? next : session;
+  }
+  async function touchCompleted(owner, id, row) {
+    const finished = await finishIfCompleted(row.value);
+    if (finished === row.value) return publicSession(row.value);
+    return publicSession((await commit(owner, id, finished, row.etag)).value);
+  }
   return {
     async create(owner, input) {
       const id = input?.sessionId ?? idForRequest(input?.requestId);
@@ -48,10 +79,24 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
       if (!written) return publicSession((await read(owner, id)).value);
       return publicSession(written.value);
     },
-    async get(owner, id) { return publicSession((await read(owner, id)).value); },
-    async list(owner) {
-      const rows = await store.list(owner, 50);
-      return rows.map(({ value }) => ({ id: value.id, protocolId: value.protocolId, mode: value.mode, status: value.status, stage: value.stage, updatedAt: value.updatedAt }));
+    async get(owner, id) {
+      const row = await read(owner, id);
+      if (row.value.status === 'completed') return touchCompleted(owner, id, row);
+      return publicSession(row.value);
+    },
+    async list(owner, { limit = 100, offset = 0 } = {}) {
+      const rows = await store.list(owner, Math.max(0, limit), Math.max(0, offset));
+      return rows.map(({ value }) => ({
+        id: value.id,
+        protocolId: value.protocolId,
+        mode: value.mode,
+        status: value.status,
+        stage: value.stage,
+        updatedAt: value.updatedAt,
+        createdAt: value.createdAt,
+        title: value.summary?.title || value.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
+        summary: value.summary || (typeof value.summary === 'string' ? value.summary : null) || null
+      }));
     },
     async action(owner, input) {
       const row = await read(owner, input.sessionId);
@@ -60,12 +105,17 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
         if (prior.action !== input.action || prior.text !== input.text) throw fault(409, 'request_reused', 'A request ID cannot be reused for another action.');
         return publicSession(row.value);
       }
-      const next = act(row.value, input);
+      if (row.value.status === 'completed' && !['correct'].includes(input.action)) {
+        return touchCompleted(owner, input.sessionId, row);
+      }
+      let next = act(row.value, input);
       next.requests[input.requestId] = { action: input.action, text: input.text };
+      next = await finishIfCompleted(next);
       return publicSession((await commit(owner, input.sessionId, next, row.etag)).value);
     },
     async run(owner, id) {
       const row = await read(owner, id);
+      if (row.value.status === 'completed') return touchCompleted(owner, id, row);
       if (!['queued', 'running'].includes(row.value.status)) return publicSession(row.value);
       if (row.value.status === 'running' && row.value.lease?.expiresAt > now()) return publicSession(row.value);
       const leaseId = randomUUID();
@@ -76,7 +126,7 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
       if (!lease) return publicSession((await read(owner, id)).value);
       let latest = lease;
       try {
-        const advanced = await advance(latest.value, {
+        let advanced = await advance(latest.value, {
           model,
           retrieve,
           onProgress: async progress => {
@@ -89,6 +139,7 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
         const check = await store.read(owner, id);
         if (!check || check.value.lease?.id !== leaseId || check.value.status === 'cancelled') return publicSession(check?.value ?? latest.value);
         advanced.lease = null;
+        advanced = await finishIfCompleted(advanced);
         return publicSession((await commit(owner, id, advanced, check.etag)).value);
       } catch (error) {
         const check = await store.read(owner, id);
