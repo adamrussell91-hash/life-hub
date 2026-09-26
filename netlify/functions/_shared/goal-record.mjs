@@ -137,6 +137,30 @@ function normalizeLifeArea(value, sphere) {
   return LIFE_AREAS.has(value) ? value : null;
 }
 
+/** Map an Area title to a Goals sphere (§2.3). Used when a stored goal has no sphere. */
+export function sphereFromAreaTitle(title) {
+  const t = typeof title === 'string' ? title : '';
+  if (/teach|school|work|class/i.test(t)) return 'work';
+  if (/career|professional|pd|leader/i.test(t)) return 'professional';
+  return 'life';
+}
+
+/**
+ * If the stored goal has no sphere field, derive one from its parent area.
+ * Marks `_sphere_derived` so PATCH can write it through once.
+ */
+export function ensureGoalSphere(record, areasById) {
+  if (!record || typeof record !== 'object') return record;
+  if (Object.prototype.hasOwnProperty.call(record, 'sphere') && record.sphere != null && record.sphere !== '') {
+    const { _sphere_derived, ...rest } = record;
+    return rest;
+  }
+  const areaId = typeof record.parent_area_id === 'string' ? record.parent_area_id : '';
+  const area = areaId && areasById instanceof Map ? areasById.get(areaId) : null;
+  const title = area && typeof area.title === 'string' ? area.title : '';
+  return { ...record, sphere: sphereFromAreaTitle(title), _sphere_derived: true };
+}
+
 /** The goal fields a client may send on create or patch. Everything else is ignored. */
 export const GOAL_INPUT_KEYS = Object.freeze([
   'title', 'description', 'parent_area_id', 'parent_someday_id', 'sphere', 'status', 'structure',
@@ -146,8 +170,9 @@ export const GOAL_INPUT_KEYS = Object.freeze([
 
 export function normalizeGoalRecord(record) {
   const sphere = SPHERES.has(record.sphere) ? record.sphere : 'life';
+  const { _sphere_derived, ...rest } = record;
   return {
-    ...record,
+    ...rest,
     description: typeof record.description === 'string' ? record.description : '',
     sphere,
     status: STATUSES.has(record.status) ? record.status : 'active',

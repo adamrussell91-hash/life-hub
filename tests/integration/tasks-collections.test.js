@@ -266,6 +266,41 @@ test('goals keep v2 fields on create and patch, and legacy goals list with defau
   assert.equal(legacy.structure, 'woop');
 });
 
+test('goals without sphere derive it from the parent area and write through on PATCH', async () => {
+  const store = memoryStore({
+    'areas/area_teach': {
+      schema_version: 1, id: 'area_teach', title: 'Teaching',
+      created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-01T00:00:00.000Z'
+    },
+    'goals/goal_nosphere': {
+      schema_version: 1, id: 'goal_nosphere', title: 'Unit plans', parent_area_id: 'area_teach',
+      status: 'active',
+      created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-01T00:00:00.000Z'
+    },
+    'goals/_index': ['goal_nosphere']
+  });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+
+  const got = await createGoalsHandler(deps)(
+    request({ url: 'https://api.adam-russell.com/api/goals?id=goal_nosphere' })
+  );
+  assert.equal(got.status, 200);
+  assert.equal((await got.json()).data.sphere, 'work');
+  // Stored record still has no sphere until the next write.
+  assert.equal('sphere' in (await store.get('goals/goal_nosphere', { type: 'json' })), false);
+
+  const patched = await createGoalsHandler(deps)(request({
+    method: 'PATCH',
+    url: 'https://api.adam-russell.com/api/goals?id=goal_nosphere',
+    body: { description: 'written through' }
+  }));
+  assert.equal(patched.status, 200);
+  const next = (await patched.json()).data;
+  assert.equal(next.sphere, 'work');
+  assert.equal(next.description, 'written through');
+  assert.equal((await store.get('goals/goal_nosphere', { type: 'json' })).sphere, 'work');
+});
+
 test('tasks POST keeps parent_goal_id, steps and tags', async () => {
   const store = memoryStore();
   const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };

@@ -1,5 +1,6 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
-import { GOAL_INPUT_KEYS, normalizeGoalRecord } from './_shared/goal-record.mjs';
+import { GOAL_INPUT_KEYS, normalizeGoalRecord, ensureGoalSphere } from './_shared/goal-record.mjs';
+import { listJSON } from './_shared/tasks-blobs.mjs';
 
 export const config = { path: '/api/goals' };
 
@@ -11,6 +12,15 @@ function pickGoalInput(body) {
   return out;
 }
 
+async function areasById(store) {
+  const areas = await listJSON(store, 'areas/');
+  const map = new Map();
+  for (const area of areas) {
+    if (area && typeof area === 'object' && typeof area.id === 'string') map.set(area.id, area);
+  }
+  return map;
+}
+
 export function createGoalsHandler(deps = {}) {
   return createTasksCollectionHandler({
     prefix: 'goals/',
@@ -20,6 +30,16 @@ export function createGoalsHandler(deps = {}) {
     notFound: 'Goal not found',
     normalize: normalizeGoalRecord,
     pickPatch: pickGoalInput,
+    async onRead(record, store) {
+      return ensureGoalSphere(record, await areasById(store));
+    },
+    async beforePatch(existing, patch, store) {
+      // Write through a derived sphere on the next write (§2.3).
+      if (Object.prototype.hasOwnProperty.call(patch, 'sphere')) return patch;
+      const ensured = ensureGoalSphere(existing, await areasById(store));
+      if (!ensured._sphere_derived) return patch;
+      return { ...patch, sphere: ensured.sphere };
+    },
     create(body, id, timestamp) {
       const title = typeof body.title === 'string' ? body.title.trim() : '';
       if (!title) {
