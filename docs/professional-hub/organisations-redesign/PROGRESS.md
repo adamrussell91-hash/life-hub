@@ -10,11 +10,12 @@ One PR: `cursor/organisations-redesign-5124`. Phases are commits.
 - [x] Relationship chips + `studied_at` / `placement_at` registry
 - [x] Crest wall + URL filter/sort/group
 - [x] Organisation page skeleton (How / Ann / Opps empty; Your time built)
-- [x] Phone 390: Filters sheet, one-column wall
+- [x] Phone 390: Filters sheet, one-column wall; bar `[hidden]{display:none}`
 - [x] Route `#/organisations/<id>` (legacy singular still resolves)
-- [x] Tests: model, query, timeline, directory assemble, page, router
-- Failure-register checked: L1 L2 L5 S2 S3 S4 V2 V4 R1 R2 C1 C2 C3 D1 D5 I2 W1 W2 P3 (guardian pending)
-- Diff vs mockup: kit surfaces (no cream); no Compare wiring yet; opportunities empty host
+- [x] Tests: model, query, timeline, directory, wall W2, getBBox C1
+- [x] hub-ui-guardian **PASS**
+- Failure-register checked: L1 L2 L5 S2 S3 S4 V2 V4 R1 R2 C1 C2 C3 D1 D5 I2 W1 W2 P3
+- Diff vs mockup: kit surfaces (no cream); no Compare; opportunities empty host; mock seed not live D3
 
 ## Phase 2 — Structure data
 
