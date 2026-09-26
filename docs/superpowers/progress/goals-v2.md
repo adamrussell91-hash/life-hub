@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 35/46 (76%)**
+**Progress: 37/46 (80%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -72,8 +72,8 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M8: Sunday check-in
 
-- [ ] **G-36** Sunday check-in 3-step flow — —
-- [ ] **G-37** Check-in saved + strip line — —
+- [x] **G-36** Sunday check-in 3-step flow — `7b710316`
+- [x] **G-37** Check-in saved + strip line — `7b710316`
 
 ## M9: Weekly review
 
