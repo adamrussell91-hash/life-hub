@@ -22,6 +22,7 @@ import {
   applyItemVisibility,
   countByFilterKey,
   countHidden,
+  defaultFilterForHub,
   isItemVisible,
   paintSourceFilter,
   readFilterState,
@@ -472,9 +473,7 @@ function applyTidelineFilter({ replay = false } = {}) {
         { 'data-part': 'empty-filter' }
       );
       note.addEventListener('click', () => {
-        const all = Object.fromEntries(
-          ['classes', 'events', 'pd', 'meetings', 'tasks', 'health', 'fitness', 'corey'].map((id) => [id, true])
-        );
+        const all = defaultFilterForHub('life');
         filterState = all;
         writeFilterState(input?.hub || 'life', all);
         applyTidelineFilter({ replay: true });
