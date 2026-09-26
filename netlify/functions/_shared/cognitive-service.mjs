@@ -1,6 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { act, advance, createSession, fault, publicSession } from './cognitive-controller.mjs';
 import { summariseCompletedSession, writeBackRetryable, writeProtocolCentralNodeLines } from './cognitive-writeback.mjs';
+import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
+import {
+  HORIZON_MIN_DAYS,
+  lastCompletedRun,
+  horizonCompletedDateKey,
+  horizonNeedsJustification,
+  horizonNextReviewDue
+} from './cognitive-horizon.mjs';
+
+export { HORIZON_MIN_DAYS, lastCompletedRun, horizonNextReviewDue };
 
 const LEASE_MS = 90_000;
 
@@ -73,7 +83,28 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         if (existing.value.requests?.[input.requestId]) return publicSession(existing.value);
         throw fault(409, 'session_exists', 'That session ID is already in use.');
       }
+      let lastReviewDate = null;
+      if (input?.protocolId === 'horizon') {
+        const last = await lastCompletedRun(store, owner, 'horizon');
+        if (last) {
+          lastReviewDate = horizonCompletedDateKey(last.completedAt);
+          const today = getSydneyDateKey(new Date(now()));
+          if (horizonNeedsJustification(last.completedAt, today)) {
+            const justification = typeof input?.intake?.frequencyJustification === 'string'
+              ? input.intake.frequencyJustification.trim()
+              : '';
+            if (!justification) {
+              throw fault(
+                400,
+                'frequency_justification_required',
+                `Last Horizon review was ${lastReviewDate}. Another review before ${horizonNextReviewDue(last.completedAt)} needs a frequency justification.`
+              );
+            }
+          }
+        }
+      }
       const session = createSession({ ...input, id, owner });
+      if (lastReviewDate) session.lastReviewDate = lastReviewDate;
       session.requests[input.requestId] = { type: 'create' };
       const written = await store.write(owner, id, session, null);
       if (!written) return publicSession((await read(owner, id)).value);

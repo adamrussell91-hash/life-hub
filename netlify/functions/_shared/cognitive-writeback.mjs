@@ -1,6 +1,7 @@
 import { createGitHubClient } from './github-client.mjs';
 import { applyCentralNodePatch } from '../../../apps/life/js/core/central-node-patch.js';
 import { assertAgentMayApplyCentralNodePatch, PROTOCOL_CN_SENDERS } from './hammond-tools.mjs';
+import { horizonNextReviewDue } from './cognitive-horizon.mjs';
 
 export { PROTOCOL_CN_SENDERS };
 
@@ -96,7 +97,11 @@ export function buildProtocolWriteBackLines(session) {
   const sender = PROTOCOL_CN_SENDERS[session.protocolId] || session.protocolId;
   const date = (session.updatedAt || new Date().toISOString()).slice(0, 10);
   const finding = (session.summary?.keyFinding || 'Run completed.').replace(/!+/g, '.').trim();
-  const recent = `${sender}: ${date}: ${finding}`.slice(0, 200);
+  let recent = `${sender}: ${date}: ${finding}`;
+  if (session.protocolId === 'horizon') {
+    recent += `; next review due ${horizonNextReviewDue(session.updatedAt || new Date().toISOString())}`;
+  }
+  recent = recent.slice(0, 200);
   const lines = [];
   if (centralNodeLineOk(recent)) {
     lines.push({ section: 'recent_actions', op: 'append_line', payload: { summary: 'Protocol recent action', text: recent }, sender });

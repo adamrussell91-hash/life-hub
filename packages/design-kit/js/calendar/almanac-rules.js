@@ -7,9 +7,33 @@
  *
  * Reference: docs/proposals/calendar-reference/almanac/VISUAL-SPEC.md ("Rules").
  */
-import { overlapsTerm } from '../lead-lines.js';
+import { addDays, overlapsTerm } from '../lead-lines.js';
+
+/** Keep in sync with netlify/functions/_shared/cognitive-horizon.mjs */
+const HORIZON_MIN_DAYS = 90;
+const HORIZON_LEAD_DAYS = 14;
+
+function horizonLastKey(ctx) {
+  const last = ctx.horizon?.lastCompletedAt;
+  if (!last) return null;
+  return typeof last === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(last)
+    ? last
+    : String(last).slice(0, 10);
+}
 
 export const ALMANAC_RULES = Object.freeze([
+  // Cognitive protocols — synthetic horizon-council anchor injected by almanac.mjs
+  { id: 'horizon-review', stepId: 'horizon-review', title: 'Run the Horizon Council',
+    appliesTo: { tags: ['horizon-review'] },
+    by: (_anchor, ctx) => {
+      const key = horizonLastKey(ctx);
+      return key ? addDays(key, HORIZON_MIN_DAYS) : null;
+    },
+    when: (_anchor, ctx) => {
+      const key = horizonLastKey(ctx);
+      return Boolean(key && ctx.today && ctx.today >= addDays(key, HORIZON_MIN_DAYS - HORIZON_LEAD_DAYS));
+    },
+    why: (_anchor, ctx) => `Last review ${horizonLastKey(ctx) ?? ''}. Quarterly cadence.` },
   // Trips
   { id: 'passport', title: 'Passport valid 6 months past return?', leadDays: 61, appliesTo: { tags: ['international'] },
     why: 'Renewals take about 6 weeks; many countries want 6 months of validity.' },

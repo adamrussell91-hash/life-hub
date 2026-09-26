@@ -223,13 +223,19 @@ function cards(definitions: Definition[]) {
   </article>`).join("");
 }
 
-function intake(definition: Definition) {
-  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label><button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form><p class="protocol-intake__error" data-protocol-error hidden role="status"></p><p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
+function intake(definition: Definition, gateMessage = "") {
+  const freq = gateMessage
+    ? `<label>Reason for another review within this quarter<textarea name="frequencyJustification" required placeholder="Why run Horizon again inside this quarter?">${escapeHtml(gateMessage)}</textarea></label>`
+    : "";
+  const error = gateMessage
+    ? `<p class="protocol-intake__error" data-protocol-error role="status">${escapeHtml(gateMessage)}</p>`
+    : `<p class="protocol-intake__error" data-protocol-error hidden role="status"></p>`;
+  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label>${freq}<button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form>${error}<p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
 }
 
-function compactIntake(definition: Definition, prompt: string) {
+function compactIntake(definition: Definition, prompt: string, extra: Record<string, string> = {}) {
   const required: Record<string, string[]> = { fates: ["task"], horizon: ["focus"], refinery: ["claim", "context", "audience"], cartographers: ["topic", "purpose"], mirror: ["conflict"], consilium: ["dilemma", "parties", "constraints"], witness: ["instance"], tribunal: ["problem", "entrenchment", "framing"] };
-  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]));
+  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]).concat(Object.entries(extra).filter(([, v]) => v.trim())));
 }
 
 export const PROTOCOL_POLL_MS = 400;
@@ -302,9 +308,23 @@ type ProtocolActionPayload = Record<string, unknown> & {
   action?: string;
 };
 
+export class ProtocolRequestError extends Error {
+  code: string;
+  constructor(message: string, code = "protocol_failed") {
+    super(message);
+    this.name = "ProtocolRequestError";
+    this.code = code;
+  }
+}
+
 function protocolErrorMessage(payload: unknown): string {
   const message = (payload as { error?: { message?: unknown } } | null)?.error?.message;
   return typeof message === "string" && message.trim() ? message : "The protocol request could not be completed.";
+}
+
+function protocolErrorCode(payload: unknown): string {
+  const code = (payload as { error?: { code?: unknown } } | null)?.error?.code;
+  return typeof code === "string" && code.trim() ? code : "protocol_failed";
 }
 
 function sessionFromProtocolPayload(payload: unknown): Session | null {
@@ -336,9 +356,9 @@ export async function postProtocolAction(payload: ProtocolActionPayload, fetchIm
     }
   }
 
-  if (!response.ok) throw new Error(protocolErrorMessage(body));
+  if (!response.ok) throw new ProtocolRequestError(protocolErrorMessage(body), protocolErrorCode(body));
   const session = sessionFromProtocolPayload(body);
-  if (!session) throw new Error("The protocol returned an invalid session.");
+  if (!session) throw new ProtocolRequestError("The protocol returned an invalid session.");
   return session;
 }
 
@@ -432,6 +452,9 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   const PAST_PAGE = 20;
   let pollTimer: number | null = null;
   let viewingIndex: number | null = null;
+  let frequencyGate: string | null = null;
+  let lastPrompt = "";
+  let lastMode = "";
   const effectiveIndex = () => {
     const total = currentSession?.transcript.length ?? 0;
     if (total === 0) return 0;
@@ -449,9 +472,15 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
-    else host.innerHTML = selected
-      ? intake(selected)
-      : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+    else if (selected) {
+      host.innerHTML = intake(selected, frequencyGate ?? "");
+      const prompt = host.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
+      const mode = host.querySelector<HTMLSelectElement>('select[name="mode"]');
+      if (prompt && lastPrompt) prompt.value = lastPrompt;
+      if (mode && lastMode) mode.value = lastMode;
+    } else {
+      host.innerHTML = `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+    }
   };
   const poll = async () => {
     if (!currentSession?.id || USE_LOCAL_DATA) return;
@@ -498,8 +527,8 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       return;
     }
     const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
-    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; paint(); return; }
-    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); void refreshPastRuns(); return; }
+    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; frequencyGate = null; lastPrompt = ""; lastMode = ""; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; frequencyGate = null; paint(); void refreshPastRuns(); return; }
     if (target.closest("[data-protocol-past-more]")) { void refreshPastRuns({ append: true }); return; }
     if (target.closest("[data-protocol-download]") && currentSession) { downloadMarkdown(currentSession); return; }
     const openRun = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun
@@ -540,13 +569,23 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       if (USE_LOCAL_DATA || !selected) return;
       const data = new FormData(form);
       const prompt = String(data.get("prompt") ?? "").trim();
+      const justification = String(data.get("frequencyJustification") ?? "").trim();
+      lastPrompt = prompt;
+      lastMode = String(data.get("mode") ?? selected.defaultMode);
       currentSession = { id: "", status: "queued", stage: "briefing", speaker: selected.voices[0]?.id ?? null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
       viewingIndex = null;
       paint();
       try {
-        await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() });
+        const intakePayload = compactIntake(selected, prompt, justification ? { frequencyJustification: justification } : {});
+        await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: intakePayload, requestId: crypto.randomUUID() });
+        frequencyGate = null;
       } catch (reason) {
         currentSession = null;
+        if (reason instanceof ProtocolRequestError && reason.code === "frequency_justification_required") {
+          frequencyGate = reason.message;
+          paint();
+          return;
+        }
         paint();
         const error = host.querySelector<HTMLElement>("[data-protocol-error]");
         if (error) { error.textContent = reason instanceof Error ? reason.message : "The protocol could not start."; error.hidden = false; }
