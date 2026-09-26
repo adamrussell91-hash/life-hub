@@ -122,6 +122,7 @@ export function renderMedicalStrip(root, model, hooks = {}) {
     const width = Math.max(320, canvas.clientWidth || state.width || 720);
     state.width = width;
     canvas.replaceChildren(buildSvg(root, model, lanes, state.zoom, width, hooks));
+    resolveAxisLabelCollisions(canvas.querySelector('svg'));
   };
 
   if (typeof ResizeObserver === 'function') {
@@ -275,6 +276,7 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   todayLine.setAttribute('stroke-width', '2');
   svg.append(todayLine);
   const todayLabel = svgEl(root, 'text');
+  todayLabel.setAttribute('data-strip-today-label', '1');
   todayLabel.setAttribute('x', String(xToday + 6));
   todayLabel.setAttribute('y', String(AXIS_H - 8));
   todayLabel.setAttribute('fill', 'var(--accent)');
@@ -375,6 +377,7 @@ function drawAxis(root, svg, zoom, width) {
     const x = dateToX(tick.date, zoom, width);
     if (x < GUTTER || x > width - PAD_R) continue;
     const text = svgEl(root, 'text');
+    text.setAttribute('data-strip-axis-tick', '1');
     text.setAttribute('x', String(x));
     text.setAttribute('y', '18');
     text.setAttribute('fill', 'var(--muted)');
@@ -382,6 +385,40 @@ function drawAxis(root, svg, zoom, width) {
     text.setAttribute('text-anchor', 'middle');
     text.textContent = tick.label;
     svg.append(text);
+  }
+}
+
+/** Hide month ticks whose getBBox intersects TODAY (MO-21 / §4.13). */
+function resolveAxisLabelCollisions(svg) {
+  if (!svg?.querySelector) return;
+  const today = svg.querySelector('[data-strip-today-label]');
+  if (!today || typeof today.getBBox !== 'function') return;
+  let todayBox;
+  try {
+    todayBox = today.getBBox();
+  } catch {
+    return;
+  }
+  if (!todayBox || todayBox.width <= 0) return;
+  const pad = 3;
+  const t = {
+    x: todayBox.x - pad,
+    y: todayBox.y - pad,
+    w: todayBox.width + pad * 2,
+    h: todayBox.height + pad * 2
+  };
+  const overlaps = (a, b) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+  for (const tick of svg.querySelectorAll('[data-strip-axis-tick]')) {
+    let box;
+    try {
+      box = tick.getBBox();
+    } catch {
+      continue;
+    }
+    if (!box || box.width <= 0) continue;
+    if (overlaps({ x: box.x, y: box.y, w: box.width, h: box.height }, t)) {
+      tick.setAttribute('visibility', 'hidden');
+    }
   }
 }
 
