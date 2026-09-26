@@ -28,12 +28,12 @@ export function createMemoryCognitiveStore() {
       rows.set(key, next);
       return { value: structuredClone(next.value), etag: next.etag };
     },
-    async list(owner, limit = 50) {
+    async list(owner, limit = 1000, offset = 0) {
       return [...rows.entries()]
         .filter(([key]) => key.startsWith(`${PREFIX}/${encodeURIComponent(owner)}/`))
         .map(([, row]) => ({ value: structuredClone(row.value), etag: row.etag }))
         .sort((a, b) => String(b.value.updatedAt).localeCompare(String(a.value.updatedAt)))
-        .slice(0, limit);
+        .slice(offset, offset + limit);
     }
   };
 }

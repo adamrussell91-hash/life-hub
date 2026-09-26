@@ -94,7 +94,7 @@ function refresh(s){
  if(s.protocolId==='mirror'&&['waiting','completed'].includes(s.status)&&!s.allowedActions.includes('correct'))s.allowedActions.push('correct');
  s.updatedAt=stamp();if(Buffer.byteLength(JSON.stringify(s))>MAX_BYTES)throw fault(413,'session_limit','Session storage limit reached. Download this session and start a new one.');return s;
 }
-export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]));}
+export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','summary','writeBack'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
 function nextDialogue(s,candidate){
  const voices=['principle','consequence','virtue'],max=s.mode==='extended'?24:12,total=Object.values(s.dialogueCounts).reduce((a,b)=>a+b,0);
  if(total>=max&&canFinish(s))return step('controller','map','reflection',{maxBursts:1,burstWords:425});
