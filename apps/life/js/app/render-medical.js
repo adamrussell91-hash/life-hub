@@ -8,6 +8,9 @@ import {
   mountHubPlacesMap,
   parseMapPlacesPayload
 } from '../../../../packages/design-kit/js/hub-places-map.js';
+import { renderBriefRow, formatRelativeMedicalDate } from './medical-brief.js';
+import { renderMedicalStrip } from './medical-strip.js';
+import { markerRow, markerFromRawBloodsMarker } from './render-bloods.js';
 
 /** Seeded Sydney-area medical coords for the constellation prototype (not a geocoder). */
 const MEDICAL_PLACE_COORDS = {
@@ -34,6 +37,13 @@ export function renderMedical(root, model, {
   onEdit,
   onSave,
   onCancel,
+  onShowMinor,
+  onAddToTasks,
+  onOpenEpisode,
+  onJumpUpcoming,
+  onWeightChange,
+  onMarkBooked,
+  onMarkDone,
   renderLabSnapshot
 } = {}) {
   const dashboard = root.querySelector('#body-medical-dashboard');
@@ -53,16 +63,49 @@ export function renderMedical(root, model, {
     openMedicalPlacesMap(root, model, event.currentTarget);
   });
   bindOnce(root, '#medical-sheet-close', 'click', () => onClose?.());
+  bindOnce(root, '#medical-show-minor', 'click', () => onShowMinor?.(!model.showMinor));
+  bindOnce(root, '#medical-filters', 'click', () => {
+    const toolbar = root.querySelector('.medical-toolbar');
+    const btn = root.querySelector('#medical-filters');
+    if (!toolbar) return;
+    const open = !toolbar.classList.contains('is-filters-open');
+    toolbar.classList.toggle('is-filters-open', open);
+    btn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 
   const search = root.querySelector('#medical-search');
   if (search && search.value !== model.query) search.value = model.query ?? '';
+  paintShowMinor(root, model.showMinor);
   paintFilters(root, model, { onTypeChange, onProviderChange });
   paintDensity(root, model.density);
+
+  renderBriefRow(root, model, {
+    onSelect,
+    onAddToTasks,
+    onOpenEpisode: onOpenEpisode || (id => {
+      const band = root.querySelector?.(`[data-episode-id="${id}"]`);
+      if (band?.tagName === 'DETAILS') band.open = true;
+      band?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    }),
+    onJumpUpcoming: onJumpUpcoming || (() => {
+      root.querySelector?.('.medical-upcoming')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    })
+  });
+  renderMedicalStrip(root, model, { onSelect, onDensityChange });
 
   renderChips(root, model, { onSearch, onTypeChange, onProviderChange });
   renderEmpty(root, model);
   renderTimeline(root, model, { onSelect, onToggleYear });
-  renderSheet(root, model, { onEdit, onSave, onCancel, onClose, renderLabSnapshot });
+  renderSheet(root, model, {
+    onEdit,
+    onSave,
+    onCancel,
+    onClose,
+    onWeightChange,
+    onMarkBooked,
+    onMarkDone,
+    renderLabSnapshot
+  });
   dashboard.hidden = false;
   dashboard.removeAttribute?.('hidden');
 }
@@ -72,6 +115,14 @@ function bindOnce(root, selector, type, handler) {
   if (!node || node.dataset.bound) return;
   node.dataset.bound = '1';
   node.addEventListener(type, handler);
+}
+
+function paintShowMinor(root, showMinor) {
+  const btn = root.querySelector('#medical-show-minor');
+  if (!btn) return;
+  btn.setAttribute('aria-pressed', showMinor ? 'true' : 'false');
+  btn.classList.toggle?.('is-active', !!showMinor);
+  btn.textContent = showMinor ? 'Hide minor' : 'Show minor';
 }
 
 function openMedicalPlacesMap(root, model, trigger) {
@@ -288,10 +339,17 @@ function renderTimeline(root, model, { onSelect, onToggleYear } = {}) {
   if (!host) return;
   host.className = `medical-timeline is-density-${model.density}`;
   host.replaceChildren();
-  for (const item of model.items) appendTimelineItem(root, host, item, model.selected, { onSelect, onToggleYear });
+  for (const item of model.items) appendTimelineItem(root, host, item, model, { onSelect, onToggleYear });
 }
 
-function appendTimelineItem(root, host, item, selected, hooks) {
+function appendTimelineItem(root, host, item, model, hooks) {
+  if (item.kind === 'upcoming') {
+    const heading = root.createElement('p');
+    heading.className = 'medical-heading medical-upcoming';
+    heading.textContent = 'Upcoming';
+    host.append(heading);
+    return;
+  }
   if (item.kind === 'today') {
     const marker = root.createElement('div');
     marker.className = 'medical-today';
@@ -307,19 +365,19 @@ function appendTimelineItem(root, host, item, selected, hooks) {
     return;
   }
   if (item.kind === 'year') {
-    host.append(yearRow(root, item, selected, hooks));
+    host.append(yearRow(root, item, model, hooks));
     return;
   }
   if (item.kind === 'band') {
-    host.append(bandBlock(root, item, selected, hooks.onSelect));
+    host.append(bandBlock(root, item, model, hooks.onSelect));
     return;
   }
   if (item.kind === 'visit' && item.visit) {
-    host.append(visitCard(root, item.visit, selected, hooks.onSelect));
+    host.append(visitCard(root, item.visit, model, hooks.onSelect));
   }
 }
 
-function yearRow(root, item, selected, { onSelect, onToggleYear }) {
+function yearRow(root, item, model, { onSelect, onToggleYear }) {
   const wrap = root.createElement('div');
   wrap.className = item.expanded ? 'medical-year is-open' : 'medical-year';
   wrap.dataset.year = item.year;
@@ -344,61 +402,212 @@ function yearRow(root, item, selected, { onSelect, onToggleYear }) {
   if (item.expanded && item.items?.length) {
     const nest = root.createElement('div');
     nest.className = 'medical-year__items';
-    for (const child of item.items) appendTimelineItem(root, nest, child, selected, { onSelect, onToggleYear });
+    for (const child of item.items) appendTimelineItem(root, nest, child, model, { onSelect, onToggleYear });
     wrap.append(nest);
   }
   return wrap;
 }
 
-function bandBlock(root, item, selected, onSelect) {
-  const wrap = root.createElement('div');
-  wrap.className = 'medical-band';
-  const title = root.createElement('p');
-  title.className = 'medical-band__title';
-  title.textContent = item.episode.title;
-  wrap.append(title);
-  for (const visit of item.visits) wrap.append(visitCard(root, visit, selected, onSelect));
-  return wrap;
+function bandBlock(root, item, model, onSelect) {
+  const details = root.createElement('details');
+  details.className = 'medical-band';
+  details.dataset.episodeId = item.episode?.id || '';
+  details.setAttribute('data-episode-id', item.episode?.id || '');
+  const active = item.episode?.status === 'active'
+    || (model.activeEpisode && model.activeEpisode.id === item.episode?.id);
+  details.open = Boolean(active);
+
+  const summary = root.createElement('summary');
+  summary.className = 'medical-band__summary';
+  const dates = (item.visits || []).map(v => v.date).filter(Boolean).sort();
+  const start = dates[0] ? formatDisplayDate(dates[0]) : '';
+  const end = dates.at(-1) ? formatDisplayDate(dates.at(-1)) : '';
+  const status = item.episode?.status === 'resolved' || item.episode?.status === 'resolved?'
+    ? item.episode.status
+    : 'ongoing';
+  const count = item.visits?.length || 0;
+  summary.textContent = `🤧 ${item.episode?.title || 'Episode'} · ${start}${end && end !== start ? ` → ${end}` : ''} · ${status} · ${count} note${count === 1 ? '' : 's'}`;
+  details.append(summary);
+
+  const list = root.createElement('ol');
+  list.className = 'medical-band__list';
+  for (const visit of item.visits || []) {
+    const li = root.createElement('li');
+    const btn = root.createElement('button');
+    btn.type = 'button';
+    btn.className = 'medical-band__entry';
+    btn.dataset.visitId = visit.id;
+    btn.setAttribute('data-visit-id', visit.id);
+    const when = root.createElement('strong');
+    when.textContent = formatDisplayDate(visit.date);
+    const body = root.createElement('span');
+    body.textContent = visit.notes || visit.title;
+    btn.append(when, body);
+    btn.addEventListener('click', () => onSelect?.(visit.id));
+    if (model.selected?.id === visit.id) btn.classList.add('is-selected');
+    li.append(btn);
+    list.append(li);
+  }
+  details.append(list);
+  return details;
 }
 
-function visitCard(root, visit, selected, onSelect) {
+function visitCard(root, visit, model, onSelect) {
+  const weight = visit.weight || 'routine';
+  const planned = visit.planned || visit.virtual || visit.status === 'planned' || visit.status === 'to_book';
+
+  if (weight === 'minor') {
+    return minorRow(root, visit, model, onSelect, planned);
+  }
+
   const card = root.createElement('button');
   card.type = 'button';
-  card.className = 'medical-card';
+  card.className = [
+    'medical-card',
+    weight === 'major' ? 'medical-card--major' : 'medical-card--routine',
+    planned ? 'medical-card--planned' : '',
+    (weight === 'major' && (visit.lab || detailPills(visit, model).length)) ? 'medical-card--has-detail' : ''
+  ].filter(Boolean).join(' ');
   card.dataset.visitId = visit.id;
   card.dataset.lane = visit.lane;
+  card.dataset.weight = weight;
   card.setAttribute('data-visit-id', visit.id);
   card.setAttribute('data-lane', visit.lane);
-  if (selected?.id === visit.id) card.classList.add('is-selected');
+  if (model.selected?.id === visit.id) card.classList.add('is-selected');
   card.addEventListener('click', () => onSelect?.(visit.id));
 
+  const head = root.createElement('div');
+  head.className = 'medical-card__head';
   const title = root.createElement('strong');
   title.className = 'medical-card__title';
   title.textContent = visit.title;
+  head.append(title);
+  if (planned) {
+    const cd = root.createElement('span');
+    cd.className = 'medical-card__countdown';
+    const label = formatRelativeMedicalDate(visit.date, model.today, {
+      precision: visit.date_precision,
+      status: visit.status,
+      virtual: visit.virtual
+    });
+    cd.textContent = visit.virtual && !label.startsWith('~') ? `~${label}` : label;
+    if (label === 'action') cd.dataset.tone = 'danger';
+    head.append(cd);
+  }
+  card.append(head);
+
   const meta = root.createElement('span');
   meta.className = 'medical-card__meta';
-  meta.textContent = [visit.displayDate || formatDisplayDate(visit.date), visit.provider || visit.location || visit.record_type]
-    .filter(Boolean)
-    .join(' · ');
-  card.append(title, meta);
+  const typeLabel = visit.virtual
+    ? 'Dose'
+    : (visit.provider || visit.location || visit.record_type);
+  const metaBits = [
+    visit.displayDate || formatDisplayDate(visit.date),
+    typeLabel
+  ].filter(Boolean);
+  meta.textContent = metaBits.join(' · ');
+  card.append(meta);
 
-  if (visit.lab) {
-    const chips = root.createElement('div');
-    chips.className = 'medical-card__labs';
-    const inRange = root.createElement('span');
-    inRange.className = 'bloods-flag';
-    inRange.textContent = `${visit.lab.inRange} in`;
-    chips.append(inRange);
-    for (const flag of visit.lab.flags.slice(0, 3)) {
-      const chip = root.createElement('span');
-      chip.className = 'bloods-flag';
-      chip.dataset.status = flag.status;
-      chip.textContent = `${flag.label} ${flag.status}`;
-      chips.append(chip);
+  if (weight === 'major') {
+    const pills = detailPills(visit, model);
+    if (pills.length) {
+      const row = root.createElement('div');
+      row.className = 'medical-card__pills';
+      for (const text of pills) {
+        const pill = root.createElement('span');
+        pill.className = 'medical-card__pill';
+        pill.textContent = text;
+        row.append(pill);
+      }
+      card.append(row);
     }
-    card.append(chips);
+    if (visit.lab) card.append(miniLabPanel(root, visit));
   }
   return card;
+}
+
+/** Up to 3 detail pills from flagged markers + planned linked to this visit (MO-24). */
+function detailPills(visit, model) {
+  const pills = [];
+  const seen = new Set();
+  const push = text => {
+    const key = String(text || '').toLowerCase();
+    if (!text || seen.has(key) || pills.length >= 3) return;
+    seen.add(key);
+    pills.push(text);
+  };
+
+  for (const flag of visit.lab?.flags || []) {
+    const arrow = flag.status === 'High' ? '↑' : flag.status === 'Low' ? '↓' : '';
+    push(`${flag.label || flag.key} ${flag.value ?? ''} ${arrow}`.trim());
+  }
+
+  const notes = String(visit.notes || '');
+  const calpro = notes.match(/calprotectin\s+(\d+(?:\.\d+)?)\s*(↑|↓)?/i);
+  if (calpro) push(`Calprotectin ${calpro[1]} ${calpro[2] || '↓'}`.trim());
+  if (/ggt/i.test(notes) && /concern/i.test(notes)) push('GGT concern');
+  if (/mrcp\s+ordered/i.test(notes)) push('MRCP ordered');
+
+  const all = model.allVisits || model.visits || [];
+  for (const other of all) {
+    if (pills.length >= 3) break;
+    if (other.id === visit.id) continue;
+    if (!(other.status === 'to_book' || other.date_precision === 'tbd' || other.planned)) continue;
+    const linked = /ordered/i.test(other.notes || '')
+      || (other.date && visit.date && other.date.slice(0, 7) === visit.date.slice(0, 7));
+    if (!linked && !/mrcp|colonoscopy|bloods/i.test(other.title || '')) continue;
+    if (/mrcp/i.test(other.title || '') && /mrcp/i.test(notes)) {
+      push('MRCP ordered');
+    }
+  }
+
+  return pills.slice(0, 3);
+}
+
+function minorRow(root, visit, model, onSelect, planned) {
+  const row = root.createElement('button');
+  row.type = 'button';
+  row.className = planned ? 'medical-minor medical-minor--planned' : 'medical-minor';
+  row.dataset.visitId = visit.id;
+  row.dataset.lane = visit.lane;
+  row.dataset.weight = 'minor';
+  row.setAttribute('data-visit-id', visit.id);
+  row.setAttribute('data-lane', visit.lane);
+  if (model.selected?.id === visit.id) row.classList.add('is-selected');
+  row.addEventListener('click', () => onSelect?.(visit.id));
+  const when = root.createElement('strong');
+  when.textContent = visit.displayDate || formatDisplayDate(visit.date);
+  const title = root.createElement('span');
+  title.textContent = visit.title;
+  row.append(when, title);
+  return row;
+}
+
+function miniLabPanel(root, visit) {
+  const panel = root.createElement('div');
+  panel.className = 'medical-card__labs medical-mini-lab';
+  const markers = visit.lab?.markers || visit.bloods?.markers || [];
+  const flagged = markers.filter(m => m.status === 'High' || m.status === 'Low');
+  const rest = markers.filter(m => m.status !== 'High' && m.status !== 'Low');
+  const pick = [...flagged, ...rest].slice(0, 4);
+  for (const raw of pick) {
+    const shaped = markerFromRawBloodsMarker(raw, { date: visit.lab?.date || visit.date });
+    if (shaped) panel.append(markerRow(root, shaped, { compact: true }));
+  }
+  const inRange = visit.lab?.inRange ?? 0;
+  if (inRange > 0) {
+    const link = root.createElement('a');
+    link.className = 'medical-mini-lab__more';
+    link.href = '#body-bloods-dashboard';
+    const firstKey = pick[0]?.key || flagged[0]?.key || markers[0]?.key;
+    if (firstKey) link.href = `#bloods-marker-${firstKey}`;
+    link.textContent = `+${inRange} in range`;
+    link.addEventListener('click', event => {
+      event.stopPropagation?.();
+    });
+    panel.append(link);
+  }
+  return panel;
 }
 
 function renderSheet(root, model, hooks) {
@@ -408,6 +617,7 @@ function renderSheet(root, model, hooks) {
   const visit = model.selected;
   if (!visit && model.mode !== 'write') {
     host.hidden = true;
+    host.setAttribute('hidden', '');
     const empty = root.createElement('p');
     empty.className = 'metric-caption';
     empty.textContent = 'Select a visit.';
@@ -415,6 +625,7 @@ function renderSheet(root, model, hooks) {
     return;
   }
   host.hidden = false;
+  host.removeAttribute('hidden');
   host.className = 'medical-sheet';
 
   if (model.mode === 'write') {
@@ -431,6 +642,51 @@ function renderSheet(root, model, hooks) {
   meta.className = 'metric-caption';
   meta.textContent = [visit.displayDate, visit.record_type, visit.provider].filter(Boolean).join(' · ');
   host.append(kicker, title, meta);
+
+  if (visit.episode?.id) {
+    const epCtx = root.createElement('p');
+    epCtx.className = 'medical-sheet__episode';
+    const siblings = (model.allVisits || model.visits || [])
+      .filter(v => v.episode?.id === visit.episode.id)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const index = Math.max(1, siblings.findIndex(v => v.id === visit.id) + 1);
+    epCtx.textContent = `Part of ${visit.episode.title}, entry ${index} of ${siblings.length || 1}`;
+    host.append(epCtx);
+  }
+
+  if (visit.planned || visit.status === 'planned' || visit.status === 'to_book' || visit.virtual) {
+    const planned = root.createElement('div');
+    planned.className = 'medical-sheet__planned';
+    const book = root.createElement('button');
+    book.type = 'button';
+    book.className = 'btn btn--secondary';
+    book.textContent = 'Mark booked';
+    book.addEventListener('click', () => hooks.onMarkBooked?.(visit));
+    const done = root.createElement('button');
+    done.type = 'button';
+    done.className = 'btn btn--ghost';
+    done.textContent = 'Mark done';
+    done.addEventListener('click', () => hooks.onMarkDone?.(visit));
+    planned.append(book, done);
+    host.append(planned);
+  }
+
+  const weightRow = root.createElement('div');
+  weightRow.className = 'medical-sheet__weight hub-pills';
+  weightRow.setAttribute('role', 'group');
+  weightRow.setAttribute('aria-label', 'Weight');
+  for (const value of ['major', 'routine', 'minor']) {
+    const btn = root.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hub-pills__btn';
+    btn.textContent = value;
+    const on = (visit.weight || 'routine') === value;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.addEventListener('click', () => hooks.onWeightChange?.(visit, value));
+    weightRow.append(btn);
+  }
+  host.append(weightRow);
 
   if (visit.notes) {
     const notes = root.createElement('p');
