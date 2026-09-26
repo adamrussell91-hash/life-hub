@@ -12,6 +12,7 @@ import {
 import { isValidObservationId } from './observation-schema.mjs';
 import { isValidLinkProposalId } from './link-proposal-schema.mjs';
 import { isValidLedgerItemId } from './ledger-schema.mjs';
+import { isValidRememberFactId } from './remember-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -45,6 +46,10 @@ export const LINK_PROPOSAL_BY_HASH_PREFIX = 'link-proposals/by-hash/';
 export const LEDGER_ITEM_PREFIX = 'ledger-items/records/';
 export const LEDGER_ITEM_BY_PERSON_PREFIX = 'ledger-items/by-person/';
 export const LEDGER_ITEM_BY_SOURCE_PREFIX = 'ledger-items/by-source/';
+
+export const REMEMBER_FACT_PREFIX = 'remember-facts/records/';
+export const REMEMBER_FACT_BY_PERSON_PREFIX = 'remember-facts/by-person/';
+export const REMEMBER_RUN_STATE_KEY = 'remember-facts/_run_state';
 
 function assertValidCommunicationId(id) {
   if (!isValidCommunicationId(id)) {
@@ -304,6 +309,30 @@ export function ledgerItemBySourceKey(sourceKey) {
 
 export async function listLedgerItemKeysForPerson(store, personRef) {
   return (await listBlobKeys(store, `${LEDGER_ITEM_BY_PERSON_PREFIX}${personRef}/`)).filter(
+    (key) => !isIndexKey(key)
+  );
+}
+
+function assertValidRememberFactId(id) {
+  if (!isValidRememberFactId(id)) {
+    throw Object.assign(new Error(`Invalid Remember Fact id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_remember_fact_id'
+    });
+  }
+  return id;
+}
+
+export function rememberFactKey(id) {
+  return `${REMEMBER_FACT_PREFIX}${assertValidRememberFactId(id)}`;
+}
+
+export function rememberFactByPersonKey(personRef, id) {
+  return `${REMEMBER_FACT_BY_PERSON_PREFIX}${personRef}/${assertValidRememberFactId(id)}`;
+}
+
+export async function listRememberFactKeysForPerson(store, personRef) {
+  return (await listBlobKeys(store, `${REMEMBER_FACT_BY_PERSON_PREFIX}${personRef}/`)).filter(
     (key) => !isIndexKey(key)
   );
 }

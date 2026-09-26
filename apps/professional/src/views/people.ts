@@ -1,25 +1,33 @@
 /**
- * People redesign Phase 1 — directory + person pane on one page.
- * Agents (Clare/Ann/Ask/Today) fill later-phase slots; empty states are visible (I3).
+ * People redesign — directory + person pane (Phases 1–8).
+ * Remember / Ask / Today / Clare–Hammond coordination fill the agent slots (I3).
  */
 
 import { fetchEntityOverview } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
   acceptLinkProposal,
+  askPeople,
   declineLinkProposal,
   fetchLinkProposals,
   fetchOrgCrestUrl,
   fetchPeopleDirectory,
   fetchPersonLedger,
+  fetchRememberFacts,
+  fetchTodayStrip,
   patchLedgerItem,
+  patchRememberFact,
+  runAnnRememberScan,
   runClareLedgerScan,
   runLinkInference,
   signOrgCrest,
   updateOrganisation,
   uploadSignedCrest,
+  type AskResponse,
   type DirectoryPersonRow,
-  type PeopleDirectoryResponse
+  type PeopleDirectoryResponse,
+  type RememberFact,
+  type TodayStripResponse
 } from '@/api/people-directory';
 import { mountAddPersonForm } from '@/components/add-person-form';
 import { peopleRoute } from '@/app/router';
@@ -310,9 +318,9 @@ export async function renderPeoplePage(
   const search = document.createElement('input');
   search.type = 'search';
   search.className = 'people-page__search';
-  search.placeholder = 'Search name or organisation';
+  search.placeholder = 'Search name or organisation — or ask Ann a question';
   search.value = query.q;
-  search.setAttribute('aria-label', 'Search people');
+  search.setAttribute('aria-label', 'Search or ask about people');
   const addBtn = el('button', 'btn btn--primary', 'Add person') as HTMLButtonElement;
   addBtn.type = 'button';
   titleRow.append(h1, count, spacer, search, addBtn);
@@ -320,12 +328,24 @@ export async function renderPeoplePage(
   const addHost = el('div', 'people-page__add-host');
   addHost.hidden = true;
 
+  const todayStrip = el('div', 'people-page__today');
+  todayStrip.setAttribute('aria-label', 'Today');
+  todayStrip.append(el('p', 'people-pane__loading', 'Loading today…'));
+
+  const askCard = el('div', 'people-page__ask-card');
+  askCard.hidden = true;
+  askCard.setAttribute('role', 'region');
+  askCard.setAttribute('aria-label', 'Ask answer');
+
   const split = el('div', 'people-page__split');
   const dir = el('section', 'people-page__dir card');
   const pane = el('section', 'people-page__pane card');
   split.append(dir, pane);
-  root.append(titleRow, addHost, split);
+  root.append(titleRow, addHost, todayStrip, askCard, split);
   canvas.append(root);
+
+  let askResult: AskResponse | null = null;
+  let todayData: TodayStripResponse | null = null;
 
   const tools = el('div', 'people-page__tools');
   const filterBtn = el('button', 'people-page__tool', 'Filter') as HTMLButtonElement;
@@ -562,11 +582,12 @@ export async function renderPeoplePage(
 
     try {
       const ref = personRef(id);
-      const [overview, brief, proposalsRes, ledgerRes] = await Promise.all([
+      const [overview, brief, proposalsRes, ledgerRes, rememberRes] = await Promise.all([
         fetchEntityOverview(ref),
         fetchPersonBrief(id).catch(() => null),
         fetchLinkProposals(ref, { status: 'pending' }).catch(() => ({ proposals: [], count: 0 })),
-        fetchPersonLedger(ref).catch(() => null)
+        fetchPersonLedger(ref).catch(() => null),
+        fetchRememberFacts(ref).catch(() => ({ facts: [] as RememberFact[], count: 0 }))
       ]);
       if (!isCurrent() || selectedId !== id) return;
 
@@ -623,6 +644,10 @@ export async function renderPeoplePage(
           row.warmth_band = model.warmthBand;
         }
       }
+
+      // V4: Today strip + Next share one suggestion model for this person.
+      await reloadToday();
+      if (!isCurrent() || selectedId !== id) return;
 
       if (headerHost) {
         headerHost.replaceChildren();
@@ -720,8 +745,28 @@ export async function renderPeoplePage(
 
       if (nextHost) {
         nextHost.replaceChildren();
-        if (!model.next) {
-          setSectionState(nextHost, 'empty', 'No upcoming meeting or event with them.');
+        const suggestion = todayData?.suggestion;
+        if (suggestion?.note && suggestion.note !== 'No pattern yet' && suggestion.slot_id) {
+          const slot = todayData?.slots.find((s) => s.id === suggestion.slot_id);
+          const card = el('div', 'people-pane__next');
+          card.append(
+            el(
+              'p',
+              undefined,
+              slot
+                ? `You're free at ${slot.start_label}. ${suggestion.note}.`
+                : suggestion.note
+            )
+          );
+          nextHost.append(card);
+        } else if (!model.next) {
+          setSectionState(
+            nextHost,
+            'empty',
+            suggestion?.note === 'No pattern yet'
+              ? 'No pattern yet'
+              : 'No upcoming meeting or event with them.'
+          );
         } else {
           const card = el('div', 'people-pane__next');
           const when = formatDisplayDate(model.next.detail);
@@ -775,7 +820,7 @@ export async function renderPeoplePage(
       }
 
       if (rememberHost) {
-        setSectionState(rememberHost, 'empty', "Ann hasn't found anything yet. Run now");
+        renderRememberSection(rememberHost, rememberRes.facts ?? [], id, model.displayName);
       }
 
       if (arcHost) {
@@ -819,6 +864,110 @@ export async function renderPeoplePage(
       if (rememberHost) setSectionState(rememberHost, 'error', msg);
       if (arcHost) setSectionState(arcHost, 'error', msg);
     }
+  }
+
+  function renderRememberSection(
+    host: HTMLElement,
+    facts: RememberFact[],
+    personId: string,
+    displayName: string
+  ): void {
+    host.replaceChildren();
+    const runNow = el('button', 'btn btn--ghost people-pane__run-ann', 'Run now') as HTMLButtonElement;
+    runNow.type = 'button';
+    runNow.title = 'Ask Ann to pull facts from notes and tasks';
+    runNow.addEventListener('click', () => {
+      void (async () => {
+        runNow.disabled = true;
+        runNow.textContent = 'Ann is reading…';
+        try {
+          await runAnnRememberScan({
+            person_ref: personRef(personId),
+            display_name: displayName
+          });
+          await loadPersonSections(personId);
+        } catch (err) {
+          window.alert(err instanceof Error ? err.message : 'Remember scan failed.');
+          runNow.disabled = false;
+          runNow.textContent = 'Run now';
+        }
+      })();
+    });
+
+    if (!facts.length) {
+      const empty = el('p', 'people-pane__empty');
+      empty.append(document.createTextNode("Ann hasn't found anything yet. "));
+      empty.append(runNow);
+      host.append(empty);
+      return;
+    }
+
+    const list = el('div', 'people-pane__remember');
+    facts.forEach((fact, index) => {
+      list.append(renderRememberFact(fact, personId, facts, index));
+    });
+    host.append(list, runNow);
+  }
+
+  function renderRememberFact(
+    fact: RememberFact,
+    personId: string,
+    all: RememberFact[],
+    index: number
+  ): HTMLElement {
+    const li = el('div', 'people-pane__li people-pane__li--remember');
+    const text = el('div', 'people-pane__li-text', fact.text);
+    // I1: editable facts are plain contentEditable — no kinetic/motion class.
+    text.contentEditable = 'true';
+    text.spellcheck = false;
+    text.addEventListener('blur', () => {
+      const next = (text.textContent ?? '').trim().slice(0, 120);
+      if (!next || next === fact.text) {
+        text.textContent = fact.text;
+        return;
+      }
+      void patchRememberFact({ id: fact.id, text: next }).then(() => loadPersonSections(personId));
+    });
+    li.append(text);
+    li.append(el('div', 'people-page__row-sub', fact.source_label || (fact.author === 'ann' ? 'Ann' : 'note')));
+    const acts = el('div', 'people-pane__li-acts');
+    if (index > 0) {
+      const up = el('button', 'people-pane__li-act', '↑') as HTMLButtonElement;
+      up.type = 'button';
+      up.title = 'Move up';
+      up.addEventListener('click', () => {
+        const prev = all[index - 1];
+        if (!prev) return;
+        void Promise.all([
+          patchRememberFact({ id: fact.id, sort_order: prev.sort_order }),
+          patchRememberFact({ id: prev.id, sort_order: fact.sort_order })
+        ]).then(() => loadPersonSections(personId));
+      });
+      acts.append(up);
+    }
+    if (index < all.length - 1) {
+      const down = el('button', 'people-pane__li-act', '↓') as HTMLButtonElement;
+      down.type = 'button';
+      down.title = 'Move down';
+      down.addEventListener('click', () => {
+        const next = all[index + 1];
+        if (!next) return;
+        void Promise.all([
+          patchRememberFact({ id: fact.id, sort_order: next.sort_order }),
+          patchRememberFact({ id: next.id, sort_order: fact.sort_order })
+        ]).then(() => loadPersonSections(personId));
+      });
+      acts.append(down);
+    }
+    const dismiss = el('button', 'people-pane__li-act', 'Dismiss') as HTMLButtonElement;
+    dismiss.type = 'button';
+    dismiss.title = 'Dismiss';
+    dismiss.addEventListener('click', () => {
+      void patchRememberFact({ id: fact.id, status: 'dismissed' }).then(() => loadPersonSections(personId));
+    });
+    acts.append(dismiss);
+    li.append(acts);
+    return li;
   }
 
   function renderLedgerItem(
@@ -879,7 +1028,7 @@ export async function renderPeoplePage(
       back.addEventListener('click', () => {
         selectedId = null;
         applyQueryToHash();
-        paintLayout();
+        void paintLayout();
       });
       pane.append(back);
     }
@@ -960,15 +1109,20 @@ export async function renderPeoplePage(
     mountPaneSkeleton();
     root.classList.toggle('people-page--person', Boolean(selectedId) && phone);
     root.classList.toggle('people-page--dir', !selectedId || !phone);
-    if (selectedId) await loadPersonSections(selectedId);
+    if (selectedId) {
+      await loadPersonSections(selectedId);
+    } else {
+      await reloadToday();
+    }
   }
 
-  function paintLayout(): void {
+  async function paintLayout(): Promise<void> {
     phone = isPhone();
     root.classList.toggle('is-phone', phone);
     syncControlLabels();
+    renderAskCard();
     renderDirectory();
-    void paintSelection();
+    await paintSelection();
   }
 
   // Menus
@@ -1134,11 +1288,140 @@ export async function renderPeoplePage(
   search.addEventListener('input', () => {
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => {
-      query = { ...query, q: search.value };
+      const value = search.value;
+      query = { ...query, q: value };
       applyQueryToHash();
-      renderDirectory();
-    }, 150);
+      const askLike = /\?$/.test(value.trim()) || /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(value.trim());
+      if (askLike && value.trim().length >= 4) {
+        void runAsk(value.trim());
+      } else {
+        askResult = null;
+        renderAskCard();
+        renderDirectory();
+      }
+    }, 280);
   });
+
+  async function runAsk(question: string): Promise<void> {
+    askCard.hidden = false;
+    askCard.replaceChildren(el('p', 'people-pane__loading', 'Ann is thinking…'));
+    try {
+      askResult = await askPeople(question);
+      if (!isCurrent()) return;
+      if (askResult.mode === 'search') {
+        askResult = null;
+        renderAskCard();
+        renderDirectory();
+        return;
+      }
+      renderAskCard();
+    } catch (err) {
+      if (!isCurrent()) return;
+      askCard.replaceChildren(
+        el('p', 'people-pane__error', err instanceof Error ? err.message : 'Ask failed.')
+      );
+    }
+  }
+
+  function renderAskCard(): void {
+    if (!askResult || askResult.mode !== 'ask') {
+      askCard.hidden = true;
+      askCard.replaceChildren();
+      return;
+    }
+    askCard.hidden = false;
+    askCard.replaceChildren();
+    askCard.append(el('p', 'people-page__ask-answer', askResult.answer ?? "I don't know enough about who knows that yet."));
+    if (askResult.people.length) {
+      const list = el('ul', 'people-page__ask-list');
+      for (const p of askResult.people.slice(0, 5)) {
+        const li = el('li');
+        const a = document.createElement('a');
+        a.href = peopleRoute(p.id, serializeDirectoryQuery(query));
+        a.textContent = p.display_name;
+        a.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          selectedId = p.id;
+          applyQueryToHash();
+          void paintSelection();
+          renderDirectory();
+        });
+        li.append(a, document.createTextNode(` — ${p.reason} · ${p.source}`));
+        list.append(li);
+      }
+      askCard.append(list);
+      const show = el('button', 'btn btn--secondary', 'Show these in the list') as HTMLButtonElement;
+      show.type = 'button';
+      show.addEventListener('click', () => {
+        const ids = new Set(askResult!.people.map((p) => p.id));
+        if (askResult!.filter?.role) query = { ...query, role: askResult!.filter.role };
+        if (askResult!.filter?.org) query = { ...query, org: askResult!.filter.org };
+        if (askResult!.filter?.q) query = { ...query, q: askResult!.filter.q };
+        // Narrow directory to asked people via q of first names when no structured filter.
+        if (!askResult!.filter?.role && !askResult!.filter?.org && askResult!.people.length) {
+          personModels.clear();
+          if (directory) {
+            directory = {
+              ...directory,
+              people: directory.people.filter((row) => ids.has(row.id))
+            };
+          }
+        }
+        applyQueryToHash();
+        syncControlLabels();
+        renderDirectory();
+      });
+      askCard.append(show);
+    }
+  }
+
+  function renderTodayStrip(): void {
+    todayStrip.replaceChildren();
+    if (!todayData) {
+      todayStrip.append(el('p', 'people-pane__empty', 'No day loaded yet.'));
+      return;
+    }
+    const label = el('div', 'people-page__today-label', `Today · ${todayData.day_key.slice(8)}/${todayData.day_key.slice(5, 7)}`);
+    const scroller = el('div', 'people-page__today-scroll');
+    for (const slot of todayData.slots) {
+      const card = el('div', `people-page__today-slot${slot.suggested ? ' is-suggested' : ''}`);
+      card.append(el('div', 'people-page__today-time', slot.start_label));
+      card.append(el('div', 'people-page__today-title', slot.title));
+      if (slot.people.length) {
+        card.append(
+          el('div', 'people-page__row-sub', slot.people.map((p) => p.display_name).join(', '))
+        );
+      }
+      if (slot.suggestion_note) {
+        card.append(el('div', 'people-page__today-note', slot.suggestion_note));
+      }
+      scroller.append(card);
+    }
+    if (!todayData.slots.length) {
+      scroller.append(el('p', 'people-pane__empty', 'No slots on the next school day.'));
+    }
+    todayStrip.append(label, scroller);
+  }
+
+  async function reloadToday(): Promise<void> {
+    try {
+      const model = selectedId ? personModels.get(selectedId) : null;
+      const hasMeet = Boolean(
+        model?.ledgerYouOwe.some((i) => /meet/i.test(i.text)) ||
+          model?.openItemCount
+      );
+      todayData = await fetchTodayStrip({
+        person_ref: model?.ref,
+        display_name: model?.displayName,
+        has_meet_item: hasMeet
+      });
+      if (!isCurrent()) return;
+      renderTodayStrip();
+    } catch {
+      if (!isCurrent()) return;
+      todayStrip.replaceChildren(el('p', 'people-pane__empty', 'Today strip unavailable.'));
+    }
+  }
 
   addBtn.addEventListener('click', () => {
     addHost.hidden = !addHost.hidden;
@@ -1156,7 +1439,7 @@ export async function renderPeoplePage(
   const mq = window.matchMedia(PHONE_MQ);
   const onMq = () => {
     if (!isCurrent()) return;
-    paintLayout();
+    void paintLayout();
   };
   mq.addEventListener('change', onMq);
 
@@ -1168,7 +1451,7 @@ export async function renderPeoplePage(
       if (!selectedId && directory.people[0] && !phone) {
         // Desktop: leave unselected until click — mockup shows a selection; pick first for empty hash? Plan: `#/people` is directory; selection optional.
       }
-      paintLayout();
+      await paintLayout();
     } catch (err) {
       if (!isCurrent()) return;
       count.textContent = 'Unavailable';

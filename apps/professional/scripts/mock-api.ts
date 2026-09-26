@@ -432,6 +432,66 @@ export function createMockApi() {
       return json(200, { ok: true, data: { created: [], count: 0, note: 'Clare found nothing new to add.' } });
     }
 
+    if (path === '/api/people/remember' && method === 'GET') {
+      return json(200, { ok: true, data: { facts: [], count: 0 } });
+    }
+
+    if (path === '/api/people/remember' && method === 'POST') {
+      const action = (body as { action?: string } | null)?.action;
+      if (action === 'run' || action === 'ann_scan') {
+        return json(200, {
+          ok: true,
+          data: { created: [], count: 0, facts: [], note: "Ann hasn't found anything yet." }
+        });
+      }
+      return json(200, { ok: true, data: { fact: null } });
+    }
+
+    if (path === '/api/people/ask' && method === 'POST') {
+      const question = String((body as { question?: string } | null)?.question ?? '').trim();
+      if (/\?$/.test(question) || /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(question)) {
+        return json(200, {
+          ok: true,
+          data: {
+            mode: 'ask',
+            answer: "I don't know enough about who knows that yet.",
+            people: [],
+            filter: null,
+            source: 'mock'
+          }
+        });
+      }
+      return json(200, {
+        ok: true,
+        data: { mode: 'search', answer: null, people: [], filter: { q: question }, source: 'name_search' }
+      });
+    }
+
+    if (path === '/api/people/today' && method === 'GET') {
+      const now = new Date();
+      const dayKey = now.toISOString().slice(0, 10);
+      return json(200, {
+        ok: true,
+        data: {
+          day_key: dayKey,
+          slots: [],
+          suggestion: null
+        }
+      });
+    }
+
+    if (path === '/api/people/coordination' && method === 'POST') {
+      return json(200, {
+        ok: true,
+        data: {
+          clare: { inference: { created: 0 }, ledger_items_created: 0, people_touched: [] },
+          remember: { skipped: true },
+          hammond_cooling_flags: [],
+          links_require_confirm: true
+        }
+      });
+    }
+
     if (path === '/api/people/brief' && method === 'GET') {
       const id = url.searchParams.get('id');
       const person = id ? people.get(id) : null;

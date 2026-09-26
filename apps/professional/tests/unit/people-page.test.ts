@@ -124,6 +124,41 @@ describe('renderPeoplePage (W2 real entry)', () => {
             open_item_count: 1
           });
         }
+        if (url.includes('/api/people/remember')) {
+          return jsonResponse({ facts: [], count: 0 });
+        }
+        if (url.includes('/api/people/today')) {
+          return jsonResponse({
+            day_key: '2026-09-28',
+            slots: [
+              {
+                id: 'free:785',
+                kind: 'free',
+                title: 'Free',
+                start_minutes: 785,
+                end_minutes: 860,
+                start_label: '1:05pm',
+                people: [],
+                suggested: true,
+                suggestion_note: 'You usually meet Henry after lunch'
+              }
+            ],
+            suggestion: {
+              slot_id: 'free:785',
+              note: 'You usually meet Henry after lunch',
+              person_ref: `shared:person:${PERSON_ID}`
+            }
+          });
+        }
+        if (url.includes('/api/people/ask')) {
+          return jsonResponse({
+            mode: 'ask',
+            answer: "I don't know enough about who knows that yet.",
+            people: [],
+            filter: null,
+            source: 'test'
+          });
+        }
         return jsonResponse({});
       })
     );
@@ -146,5 +181,17 @@ describe('renderPeoplePage (W2 real entry)', () => {
     const full = canvas.querySelector('details.people-pane__full') as HTMLDetailsElement | null;
     expect(full).toBeTruthy();
     expect(full?.open).toBe(false);
+  });
+
+  it('Remember empty offers Run now; Today strip mounts (Phases 5–7)', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+    const remember = canvas.querySelector('[data-section="remember"] .people-pane__section-body');
+    expect(remember?.textContent).toMatch(/Ann hasn't found anything yet/);
+    expect(remember?.querySelector('button.people-pane__run-ann')?.textContent).toBe('Run now');
+    const today = canvas.querySelector('.people-page__today');
+    expect(today).toBeTruthy();
+    expect(today?.textContent).toMatch(/You usually meet Henry after lunch|Today/);
   });
 });
