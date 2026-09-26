@@ -6,7 +6,7 @@ const S7 = 'professional:communication:communication_00000000-0000-4000-8000-000
 
 vi.mock('@/api/threads', () => ({
   getThread: vi.fn(async () => ({ thread: {
-    schema_version: 1, id: THREAD_ID, kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'case management',
+    schema_version: 1, id: THREAD_ID, kind: 'case', title: 'Sam K. · case management', purpose_tag: 'case management',
     goals: [{ id: 'g1', text: 'Maths C → B', progress: 62, note: '31/50' }], status: 'open', created_at: '', updated_at: ''
   } })),
   patchThread: vi.fn(async (_id: string, patch: object) => ({ thread: { id: THREAD_ID, kind: 'case', goals: [], ...patch } }))
@@ -18,14 +18,14 @@ vi.mock('@/api/universal-links', () => ({
           endpoint: { ref: S7, kind: 'communication', display_label: 'Session 7 · fillable bar', href: '/professional/#/communication/communication_00000000-0000-4000-8000-000000000007' }, direction: 'incoming' }
       ] }
     : { outgoing: [
-        { link: { id: 'p', source_ref: S7, target_ref: 'shared:person:p_fletcher', relationship_type: 'recipient', status: 'current' },
-          endpoint: { ref: 'shared:person:p_fletcher', kind: 'person', display_label: 'Fletcher W.', href: null }, direction: 'outgoing' }
+        { link: { id: 'p', source_ref: S7, target_ref: 'shared:person:p_sam', relationship_type: 'recipient', status: 'current' },
+          endpoint: { ref: 'shared:person:p_sam', kind: 'person', display_label: 'Sam K.', href: null }, direction: 'outgoing' }
       ], incoming: [] })
 }));
 vi.mock('@/api/ledger', () => ({
   listLedgerForSources: vi.fn(async () => ({ items: [
     { id: 'a', direction: 'they_owe', text: '2 hrs maths on the bar', status: 'open', comm_ref: S7 },
-    { id: 'b', direction: 'you_owe', text: 'Email Amy the template', status: 'done', comm_ref: S7 }
+    { id: 'b', direction: 'you_owe', text: 'Email Nadia the template', status: 'done', comm_ref: S7 }
   ] }))
 }));
 
@@ -39,7 +39,7 @@ describe('thread page (case)', () => {
     document.body.append(canvas);
     await renderThreadPage(canvas, THREAD_ID, { isCurrent: () => true, onTitleReady: () => {} });
     expect(canvas.querySelector('[data-part="goals"]')?.textContent).toContain('Maths C → B');
-    expect(canvas.querySelector('[data-part="circle"]')?.textContent).toContain('Fletcher W.');
+    expect(canvas.querySelector('[data-part="circle"]')?.textContent).toContain('Sam K.');
     expect(canvas.querySelector('[data-part="sessions"]')?.textContent).toContain('Session 7 · fillable bar');
     expect(canvas.querySelector('[data-part="stats"]')?.textContent).toContain('1 of 2 kept');
     expect(canvas.querySelector('[data-part="export"]')).not.toBeNull();

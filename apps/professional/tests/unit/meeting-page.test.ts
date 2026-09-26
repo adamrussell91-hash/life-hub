@@ -16,17 +16,17 @@ vi.mock('@/api/meetings', () => ({
 vi.mock('@/views/meetings', () => ({ buildMeetingTaskLinks: () => document.createElement('section') }));
 vi.mock('@/api/universal-links', () => ({
   listUniversalLinksForEntity: vi.fn(async () => ({ outgoing: [
-    { link: { id: 'a1', source_ref: MEETING_REF, target_ref: 'shared:person:vicki', relationship_type: 'attendee', role: 'chair', status: 'current' },
-      endpoint: { ref: 'shared:person:vicki', kind: 'person', display_label: 'Vicki Sheehan', href: null }, direction: 'outgoing' },
-    { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:greg', relationship_type: 'attendee', role: null, status: 'current' },
-      endpoint: { ref: 'shared:person:greg', kind: 'person', display_label: 'Greg R.', href: null }, direction: 'outgoing' }
+    { link: { id: 'a1', source_ref: MEETING_REF, target_ref: 'shared:person:rachel', relationship_type: 'attendee', role: 'chair', status: 'current' },
+      endpoint: { ref: 'shared:person:rachel', kind: 'person', display_label: 'Rachel Ford', href: null }, direction: 'outgoing' },
+    { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:ben', relationship_type: 'attendee', role: null, status: 'current' },
+      endpoint: { ref: 'shared:person:ben', kind: 'person', display_label: 'Ben C.', href: null }, direction: 'outgoing' }
   ], incoming: [] })),
   createTask: vi.fn(async () => ({ id: 'task_1', title: 'x' }))
 }));
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({ people: [
-    { ref: 'shared:person:vicki', display_name: 'Vicki Sheehan', initials: 'VS', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'warm', created_at: '2024-01-01T00:00:00.000Z' },
-    { ref: 'shared:person:greg', display_name: 'Greg R.', initials: 'GR', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
+    { ref: 'shared:person:rachel', display_name: 'Rachel Ford', initials: 'RF', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'warm', created_at: '2024-01-01T00:00:00.000Z' },
+    { ref: 'shared:person:ben', display_name: 'Ben C.', initials: 'BC', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
   ], organisations: [], counts: { people: 2, organisations: 1 } }))
 }));
 vi.mock('@/api/ledger', () => ({

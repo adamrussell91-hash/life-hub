@@ -528,7 +528,7 @@ test('v2: create stores a scheduled window, PATCH stores agenda and blocks', asy
         scheduled_end: '2026-10-14T01:05:00.000Z',
         time_zone: 'Australia/Sydney',
         purpose_tag: 'feedback',
-        subject: 'Declan essay feedback'
+        subject: 'Ollie essay feedback'
       }
     })
   );

@@ -5,10 +5,10 @@ import { buildTidelineModel } from '../../packages/design-kit/js/calendar/tideli
 const WEEK = ['2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27'];
 
 const events = [
-  { path: 'p:1', record: { type: 'professional_communication', id: 'c1', date: '2026-09-22', time: '08:40', duration_min: 15, title: 'Fletcher W. · session 7', pin: false } },
-  { path: 'p:2', record: { type: 'professional_communication', id: 'c2', date: '2026-09-21', time: '09:10', duration_min: 1, title: 'Email Amy W.', pin: true, channel: 'email' } },
+  { path: 'p:1', record: { type: 'professional_communication', id: 'c1', date: '2026-09-22', time: '08:40', duration_min: 15, title: 'Sam K. · session 7', pin: false } },
+  { path: 'p:2', record: { type: 'professional_communication', id: 'c2', date: '2026-09-21', time: '09:10', duration_min: 1, title: 'Email Nadia K.', pin: true, channel: 'email' } },
   { path: 'p:3', record: { type: 'professional_event', id: 'e1', date: '2026-09-25', time: '18:00', duration_min: 105, title: 'HALT medal ceremony', event_type: 'ceremony' } },
-  { path: 'ledger:a', record: { type: 'ledger_item', id: 'ledger_a', date: '2026-09-23', title: 'You owe · Email Denielle · 3 days late', direction: 'you_owe', late: true } }
+  { path: 'ledger:a', record: { type: 'ledger_item', id: 'ledger_a', date: '2026-09-23', title: 'You owe · Email Grace · 3 days late', direction: 'you_owe', late: true } }
 ];
 
 function build(inputEvents) {

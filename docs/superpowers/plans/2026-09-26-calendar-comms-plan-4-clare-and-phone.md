@@ -194,12 +194,12 @@ const fake = (reply) => {
 };
 
 const ctx = {
-  title: 'Declan J. · essay feedback',
+  title: 'Ollie P. · essay feedback',
   kind: 'comm',
   when: 'Wed 14/10/26 11:50',
-  people: [{ ref: 'shared:person:p_declan', name: 'Declan J.', role: 'with' }, { ref: 'shared:person:p_denielle', name: 'Denielle J.', role: 'also concerned' }],
+  people: [{ ref: 'shared:person:p_ollie', name: 'Ollie P.', role: 'with' }, { ref: 'shared:person:p_grace', name: 'Grace P.', role: 'also concerned' }],
   previous: [{ when: '25/09/26', summary: 'Quote bank agreed.' }],
-  open_promises: [{ direction: 'you_owe', text: 'Email Denielle a summary', days_late: 3 }],
+  open_promises: [{ direction: 'you_owe', text: 'Email Grace a summary', days_late: 3 }],
   notes: 'Redraft is tighter. Second quote is retold.'
 };
 
@@ -208,47 +208,47 @@ test('brief: at most 3 points with sources, and an optional owed line', async ()
     points: [
       { text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' },
       { text: 'One target at a time works.', source: 'comm 2' },
-      { text: 'Denielle is waiting on you.', source: 'ledger' },
+      { text: 'Grace is waiting on you.', source: 'ledger' },
       { text: 'extra', source: 'x' }
     ],
-    owed_line: 'Send Denielle the summary after this one.'
+    owed_line: 'Send Grace the summary after this one.'
   });
   const brief = await generateBrief(ctx, { complete });
   assert.equal(brief.points.length, 3);
   assert.equal(brief.points[0].source, 'Canvas, 13/10');
-  assert.equal(brief.owed_line, 'Send Denielle the summary after this one.');
+  assert.equal(brief.owed_line, 'Send Grace the summary after this one.');
   assert.match(calls[0].system, /Australian English/);
-  assert.match(calls[0].content[0].text, /Declan J\./);
+  assert.match(calls[0].content[0].text, /Ollie J\./);
 });
 
 test('summary: summary text plus promises tied to people on the page; unknown owners dropped', async () => {
   const { complete } = fake({
     summary: 'Good progress.',
     promises: [
-      { owner: 'me', to: 'Denielle J.', text: 'Email Denielle the summary', due: '2026-10-14' },
-      { owner: 'Declan J.', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
-      { owner: 'Greg', text: 'Not on this page', due: null },
-      { owner: 'me', to: 'Declan J.', text: 'Mark it', due: 'soon' }
+      { owner: 'me', to: 'Grace P.', text: 'Email Grace the summary', due: '2026-10-14' },
+      { owner: 'Ollie P.', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
+      { owner: 'Ben', text: 'Not on this page', due: null },
+      { owner: 'me', to: 'Ollie P.', text: 'Mark it', due: 'soon' }
     ],
     numbers: [{ label: 'Maths quiz', value: '31/50' }]
   });
   const out = await generateSummary(ctx, { complete });
   assert.equal(out.summary, 'Good progress.');
   assert.deepEqual(out.promises, [
-    { direction: 'you_owe', person_ref: 'shared:person:p_denielle', text: 'Email Denielle the summary', due: '2026-10-14' },
-    { direction: 'they_owe', person_ref: 'shared:person:p_declan', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
-    { direction: 'you_owe', person_ref: 'shared:person:p_declan', text: 'Mark it', due: null }
+    { direction: 'you_owe', person_ref: 'shared:person:p_grace', text: 'Email Grace the summary', due: '2026-10-14' },
+    { direction: 'they_owe', person_ref: 'shared:person:p_ollie', text: 'Rewrite the fence paragraph', due: '2026-10-19' },
+    { direction: 'you_owe', person_ref: 'shared:person:p_ollie', text: 'Mark it', due: null }
   ]);
   assert.deepEqual(out.numbers, [{ label: 'Maths quiz', value: '31/50' }]);
 });
 
 test('drafts: one per person on the page, never to strangers', async () => {
   const { complete } = fake({ drafts: [
-    { to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle, …' },
+    { to: 'Grace P.', subject: 'Ollie update', body: 'Hi Grace, …' },
     { to: 'Someone else', subject: 'x', body: 'y' }
   ] });
   const out = await generateDrafts({ ...ctx, summary: 'Good progress.' }, { complete });
-  assert.deepEqual(out.drafts, [{ person_ref: 'shared:person:p_denielle', to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle, …' }]);
+  assert.deepEqual(out.drafts, [{ person_ref: 'shared:person:p_grace', to: 'Grace P.', subject: 'Ollie update', body: 'Hi Grace, …' }]);
 });
 
 test('handwriting sends the image as an image block and returns text', async () => {
@@ -463,9 +463,9 @@ import { applyProfessionalStep } from '../../netlify/functions/calendar-ghosts.m
 
 const ghost = {
   id: 'clare-book_comm-2026-10-21', agent: 'clare', kind: 'book_comm', date: '2026-10-21', time: '11:50', duration_min: 15,
-  title: 'Declan J. · feedback', channel: 'in_person', time_zone: 'Australia/Sydney', purpose_tag: 'feedback',
+  title: 'Ollie P. · feedback', channel: 'in_person', time_zone: 'Australia/Sydney', purpose_tag: 'feedback',
   thread_ref: 'professional:thread:thread_00000000-0000-4000-8000-000000000001',
-  person_refs: ['shared:person:p_declan'], reason: 'Weekly, same slot.'
+  person_refs: ['shared:person:p_ollie'], reason: 'Weekly, same slot.'
 };
 
 test('book_comm validates and plans one professional step plus a recent action', () => {
@@ -476,7 +476,7 @@ test('book_comm validates and plans one professional step plus a recent action',
   const step = plan.steps.find((item) => item.target === 'professional');
   assert.deepEqual(step, {
     target: 'professional', action: 'create_communication', date: '2026-10-21', time: '11:50', duration_min: 15,
-    time_zone: 'Australia/Sydney', title: 'Declan J. · feedback', channel: 'in_person', purpose_tag: 'feedback',
+    time_zone: 'Australia/Sydney', title: 'Ollie P. · feedback', channel: 'in_person', purpose_tag: 'feedback',
     thread_ref: ghost.thread_ref, person_refs: ghost.person_refs
   });
   assert.match(plan.receipt, /Clare → Calendar/);
@@ -490,7 +490,7 @@ test('applyProfessionalStep turns wall time into UTC and links people and thread
   );
   assert.equal(created[0].scheduled_start, '2026-10-21T00:50:00.000Z');
   assert.equal(created[0].scheduled_end, '2026-10-21T01:05:00.000Z');
-  assert.deepEqual(created[0].links, [{ relationship_type: 'recipient', target_ref: 'shared:person:p_declan' }]);
+  assert.deepEqual(created[0].links, [{ relationship_type: 'recipient', target_ref: 'shared:person:p_ollie' }]);
   assert.deepEqual(created[1], { source_ref: 'professional:communication:communication_x', target_ref: ghost.thread_ref, relationship_type: 'in_thread' });
 });
 
@@ -669,8 +669,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 import { createClareCommsHandler } from '../../netlify/functions/clare-comms.mjs';
 
 const context = {
-  title: 'Declan J. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
-  people: [{ ref: 'shared:person:p_declan', name: 'Declan J.', role: 'with' }], previous: [], open_promises: [], notes: 'x'
+  title: 'Ollie P. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
+  people: [{ ref: 'shared:person:p_ollie', name: 'Ollie P.', role: 'with' }], previous: [], open_promises: [], notes: 'x'
 };
 
 test('brief action returns Clare’s brief', async () => {
@@ -694,7 +694,7 @@ test('propose_next queues a book_comm ghost, never writes the comm', async () =>
   assert.equal(res.status, 200);
   assert.equal(queued[0].kind, 'book_comm');
   assert.equal(queued[0].agent, 'clare');
-  assert.deepEqual(queued[0].person_refs, ['shared:person:p_declan']);
+  assert.deepEqual(queued[0].person_refs, ['shared:person:p_ollie']);
 });
 
 test('no API key is a clear 503', async () => {
@@ -842,10 +842,10 @@ import assert from 'node:assert/strict';
 import { latePromiseGhosts, selectLatePromises } from '../../netlify/functions/_shared/promise-nudges.mjs';
 
 const items = [
-  { id: 'l1', direction: 'you_owe', status: 'open', due: '2026-09-22', text: 'Email Denielle the summary', person_ref: 'shared:person:p_denielle' },
-  { id: 'l2', direction: 'you_owe', status: 'open', due: '2026-09-25', text: 'Seating list', person_ref: 'shared:person:vicki' },
-  { id: 'l3', direction: 'they_owe', status: 'open', due: '2026-09-20', text: 'T4 dates', person_ref: 'shared:person:kathleen' },
-  { id: 'l4', direction: 'you_owe', status: 'done', due: '2026-09-20', text: 'Done', person_ref: 'shared:person:amy' }
+  { id: 'l1', direction: 'you_owe', status: 'open', due: '2026-09-22', text: 'Email Grace the summary', person_ref: 'shared:person:p_grace' },
+  { id: 'l2', direction: 'you_owe', status: 'open', due: '2026-09-25', text: 'Seating list', person_ref: 'shared:person:rachel' },
+  { id: 'l3', direction: 'they_owe', status: 'open', due: '2026-09-20', text: 'T4 dates', person_ref: 'shared:person:helen' },
+  { id: 'l4', direction: 'you_owe', status: 'done', due: '2026-09-20', text: 'Done', person_ref: 'shared:person:nadia' }
 ];
 
 test('selectLatePromises keeps your open ones at least 2 days late', () => {
@@ -854,9 +854,9 @@ test('selectLatePromises keeps your open ones at least 2 days late', () => {
 });
 
 test('latePromiseGhosts builds one draft_message ghost per promise, keyed by ledger id', () => {
-  const ghosts = latePromiseGhosts(selectLatePromises(items, '2026-09-26', 2), { 'shared:person:p_denielle': 'Denielle J.', 'shared:person:vicki': 'Vicki Sheehan' }, '2026-09-26T07:00:00+10:00');
+  const ghosts = latePromiseGhosts(selectLatePromises(items, '2026-09-26', 2), { 'shared:person:p_grace': 'Grace P.', 'shared:person:rachel': 'Rachel Ford' }, '2026-09-26T07:00:00+10:00');
   assert.equal(ghosts[0].kind, 'draft_message');
-  assert.equal(ghosts[0].to, 'Denielle J.');
+  assert.equal(ghosts[0].to, 'Grace P.');
   assert.match(ghosts[0].text, /summary/);
   assert.equal(ghosts[0].id, 'clare-nudge-l1');
   assert.match(ghosts[0].reason, /4 days late/);
@@ -1114,19 +1114,19 @@ import { buildClareContext } from '@/lib/clare-context';
 describe('buildClareContext', () => {
   it('maps the page into Clare’s context with days late and plain notes', () => {
     const ctx = buildClareContext({
-      title: 'Declan J. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
-      withPeople: [{ ref: 'shared:person:p_declan', name: 'Declan J.' }],
-      alsoConcerned: [{ ref: 'shared:person:p_denielle', name: 'Denielle J.' }],
+      title: 'Ollie P. · essay feedback', kind: 'comm', when: 'Wed 14/10/26 11:50',
+      withPeople: [{ ref: 'shared:person:p_ollie', name: 'Ollie P.' }],
+      alsoConcerned: [{ ref: 'shared:person:p_grace', name: 'Grace P.' }],
       previousSummaries: [{ when: '25/09/26', summary: 'Quote bank agreed.' }],
-      ledger: [{ direction: 'you_owe', text: 'Email Denielle', status: 'open', due: '2026-09-22' }],
+      ledger: [{ direction: 'you_owe', text: 'Email Grace', status: 'open', due: '2026-09-22' }],
       blocks: [{ id: 'a', block_type: 'rich_text', content: { html: '<p>Tighter redraft.</p>' } }],
       todayKey: '2026-09-26'
     });
     expect(ctx.people).toEqual([
-      { ref: 'shared:person:p_declan', name: 'Declan J.', role: 'with' },
-      { ref: 'shared:person:p_denielle', name: 'Denielle J.', role: 'also concerned' }
+      { ref: 'shared:person:p_ollie', name: 'Ollie P.', role: 'with' },
+      { ref: 'shared:person:p_grace', name: 'Grace P.', role: 'also concerned' }
     ]);
-    expect(ctx.open_promises).toEqual([{ direction: 'you_owe', text: 'Email Denielle', days_late: 4 }]);
+    expect(ctx.open_promises).toEqual([{ direction: 'you_owe', text: 'Email Grace', days_late: 4 }]);
     expect(ctx.notes).toBe('Tighter redraft.');
   });
 });
@@ -1196,9 +1196,9 @@ Expected: PASS.
 
 ```ts
 vi.mock('@/api/clare-comms', () => ({
-  clareBrief: vi.fn(async () => ({ points: [{ text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' }], owed_line: 'Send Denielle the summary after this one.' })),
-  clareSummary: vi.fn(async () => ({ summary: 'Good progress.', promises: [{ direction: 'they_owe', person_ref: 'shared:person:p_declan', text: 'Rewrite the fence paragraph', due: '2026-10-19' }], numbers: [] })),
-  clareDrafts: vi.fn(async () => ({ drafts: [{ person_ref: 'shared:person:p_denielle', to: 'Denielle J.', subject: 'Declan update', body: 'Hi Denielle,' }] })),
+  clareBrief: vi.fn(async () => ({ points: [{ text: 'His redraft came in yesterday.', source: 'Canvas, 13/10' }], owed_line: 'Send Grace the summary after this one.' })),
+  clareSummary: vi.fn(async () => ({ summary: 'Good progress.', promises: [{ direction: 'they_owe', person_ref: 'shared:person:p_ollie', text: 'Rewrite the fence paragraph', due: '2026-10-19' }], numbers: [] })),
+  clareDrafts: vi.fn(async () => ({ drafts: [{ person_ref: 'shared:person:p_grace', to: 'Grace P.', subject: 'Ollie update', body: 'Hi Grace,' }] })),
   clareProposeNext: vi.fn(async () => ({ date: '2026-10-21', time: '11:50', duration_min: 15, reason: 'Weekly.', ghost_id: 'g', queued: true })),
   clareHandwriting: vi.fn(async () => ({ text: 'quote → so what?' }))
 }));
@@ -1211,7 +1211,7 @@ it('Before shows Clare’s brief with sources', async () => {
   const brief = canvas.querySelector('[data-part="clare-brief"]')!;
   expect(brief.textContent).toContain('His redraft came in yesterday.');
   expect(brief.textContent).toContain('Canvas, 13/10');
-  expect(brief.textContent).toContain('Send Denielle the summary after this one.');
+  expect(brief.textContent).toContain('Send Grace the summary after this one.');
 });
 
 it('After: Summarise fills the summary and adds ticked promises to the ledger', async () => {
@@ -1236,8 +1236,8 @@ it('After: Mark as sent logs an outbound comm to that person and ticks the promi
   canvas.querySelector<HTMLButtonElement>('[data-part="mark-sent"]')!.click();
   await vi.advanceTimersByTimeAsync(0);
   expect(comms.createCommunication).toHaveBeenCalledWith(expect.objectContaining({
-    direction: 'outbound', channel: 'email', subject: 'Declan update',
-    links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_denielle' }]
+    direction: 'outbound', channel: 'email', subject: 'Ollie update',
+    links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_grace' }]
   }));
 });
 ```
@@ -1661,8 +1661,8 @@ const now = new Date('2026-10-13T21:31:00.000Z'); // Wed 14/10 8:31 am Sydney
 describe('nextWalkIn', () => {
   it('picks the soonest comm or meeting starting within 10 minutes, or already running under 15', () => {
     const items = [
-      { kind: 'comm' as const, id: 'c1', title: 'Fletcher W. · session 8', start: '2026-10-13T21:40:00.000Z', href: '#/communication/c1' },
-      { kind: 'meeting' as const, id: 'm1', title: 'Nina · gifted audit', start: '2026-10-13T23:20:00.000Z', href: '#/meeting/m1' }
+      { kind: 'comm' as const, id: 'c1', title: 'Sam K. · session 8', start: '2026-10-13T21:40:00.000Z', href: '#/communication/c1' },
+      { kind: 'meeting' as const, id: 'm1', title: 'Maya · gifted audit', start: '2026-10-13T23:20:00.000Z', href: '#/meeting/m1' }
     ];
     expect(nextWalkIn(items, now)?.id).toBe('c1');
     expect(nextWalkIn(items, now)?.minutes).toBe(9);
@@ -1674,14 +1674,14 @@ describe('nextWalkIn', () => {
 describe('homeNudges', () => {
   it('orders late promises, wrap-ups and quiet threads, at most 5', () => {
     const nudges = homeNudges({
-      late: [{ text: 'Email Denielle J.', days_late: 3, href: '#/communication/c0' }],
-      wrapUps: [{ title: 'Declan J. + Denielle', href: '#/communication/c2' }],
-      quiet: [{ title: 'Kathleen E. · enrichment', days: 9, href: '#/thread/t1' }]
+      late: [{ text: 'Email Grace P.', days_late: 3, href: '#/communication/c0' }],
+      wrapUps: [{ title: 'Ollie P. + Grace', href: '#/communication/c2' }],
+      quiet: [{ title: 'Helen M. · enrichment', days: 9, href: '#/thread/t1' }]
     });
     expect(nudges.map((nudge) => nudge.text)).toEqual([
-      'Email Denielle J. · 3 days late',
-      'Wrap up Declan J. + Denielle',
-      'Kathleen E. · enrichment has been quiet for 9 days'
+      'Email Grace P. · 3 days late',
+      'Wrap up Ollie P. + Grace',
+      'Helen M. · enrichment has been quiet for 9 days'
     ]);
   });
 });
@@ -1697,7 +1697,7 @@ describe('guessChannel', () => {
 describe('quickLogBody', () => {
   it('builds a logged comm with the person as recipient and pulls out »me', () => {
     const body = quickLogBody({
-      personRef: 'shared:person:p_declan', channel: 'in_person',
+      personRef: 'shared:person:p_ollie', channel: 'in_person',
       line: 'Chat after period 4: essay plan fine, needs a quote bank. »me send quote bank by Thu',
       at: new Date('2026-10-14T02:47:00.000Z')
     });
@@ -1705,9 +1705,9 @@ describe('quickLogBody', () => {
       direction: 'outbound', channel: 'in_person', occurred_at: '2026-10-14T02:47:00.000Z',
       subject: 'Chat after period 4: essay plan fine, needs a quote bank.',
       summary: 'Chat after period 4: essay plan fine, needs a quote bank. »me send quote bank by Thu',
-      links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_declan' }]
+      links: [{ relationship_type: 'recipient', target_ref: 'shared:person:p_ollie' }]
     });
-    expect(body.promises).toEqual([{ direction: 'you_owe', person_ref: 'shared:person:p_declan', text: 'send quote bank by Thu' }]);
+    expect(body.promises).toEqual([{ direction: 'you_owe', person_ref: 'shared:person:p_ollie', text: 'send quote bank by Thu' }]);
   });
 });
 ```
@@ -1825,11 +1825,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 it('shows the walk-in card with Clare’s three points ten minutes before a comm', async () => {
   vi.useFakeTimers({ now: new Date('2026-10-13T21:31:00.000Z') });
   // Arrange: listCommunications returns one comm, scheduled_start '2026-10-13T21:40:00.000Z',
-  // subject 'Fletcher W. · session 8'; clareBrief resolves { points: [a, b, c], owed_line: 'Amy template done ✓' }.
+  // subject 'Sam K. · session 8'; clareBrief resolves { points: [a, b, c], owed_line: 'Nadia template done ✓' }.
   const canvas = await renderHomeForTest();
   await vi.advanceTimersByTimeAsync(0);
   const card = canvas.querySelector('[data-part="walk-in"]')!;
-  expect(card.textContent).toContain('Fletcher W. · session 8');
+  expect(card.textContent).toContain('Sam K. · session 8');
   expect(card.textContent).toContain('in 9 min');
   expect(card.querySelectorAll('li').length).toBe(3);
   expect(card.querySelector('a[data-part="walk-in-start"]')?.getAttribute('href')).toContain('#/communication/');
@@ -1837,9 +1837,9 @@ it('shows the walk-in card with Clare’s three points ten minutes before a comm
 });
 
 it('lists late promises first in the nudges', async () => {
-  // Arrange: listLedgerDue resolves one you_owe item due 3 days ago, text 'Email Denielle J.'.
+  // Arrange: listLedgerDue resolves one you_owe item due 3 days ago, text 'Email Grace P.'.
   const canvas = await renderHomeForTest();
-  expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Denielle J. · 3 days late');
+  expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Grace P. · 3 days late');
 });
 ```
 
@@ -1937,7 +1937,19 @@ export function listLedgerDue(from: string, to: string, options: { signal?: Abor
 }
 ```
 
-`styles/walk-in.css`: port the mockup's `.walkin` and `.owe` rules (tab 6) to `.walk-in`, `.walk-in__count` and `.walk-in__owe`, using tokens only. It must look right at 390px, where it's the first thing on Home. Import it in `main.ts`.
+`styles/walk-in.css` (tokens only). It must look right at 390px, where it's the first thing on Home. Import it in `main.ts`:
+
+```css
+.walk-in{display:grid;gap:var(--space-3);padding:var(--space-5);border-radius:var(--radius-lg);background:linear-gradient(165deg,var(--navy),var(--depth));color:var(--on-dark)}
+.walk-in h3{margin:0;font-size:var(--text-lg);color:var(--paper)}
+.walk-in__count{margin:0;font-size:var(--text-xs);font-weight:var(--weight-semibold);color:var(--high-sea)}
+.walk-in ol{margin:0;padding-left:1.25rem;display:grid;gap:var(--space-2)}
+.walk-in__owe{margin:0;padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);font-size:var(--text-sm);background:color-mix(in srgb,var(--high-sea) 16%,transparent)}
+.walk-in__owe:empty{display:none}
+.walk-in__start{justify-content:center;min-height:2.75rem;background:var(--high-sea);border-color:var(--high-sea);color:var(--paper)}
+.home-nudges__item{display:block;padding:var(--space-2) 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}
+.home-nudges__item.is-late{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+```
 
 - [ ] **Step 4: Run the tests and confirm they pass**
 
@@ -1973,8 +1985,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({ people: [
-    { ref: 'shared:person:p_declan', display_name: 'Declan J.', initials: 'DJ', updated_at: '2026-10-14T01:00:00.000Z' },
-    { ref: 'shared:person:p_fletcher', display_name: 'Fletcher W.', initials: 'FW', updated_at: '2026-10-13T01:00:00.000Z' }
+    { ref: 'shared:person:p_ollie', display_name: 'Ollie P.', initials: 'OP', updated_at: '2026-10-14T01:00:00.000Z' },
+    { ref: 'shared:person:p_sam', display_name: 'Sam K.', initials: 'SK', updated_at: '2026-10-13T01:00:00.000Z' }
   ], organisations: [], counts: { people: 2, organisations: 0 } }))
 }));
 vi.mock('@/api/communications', () => ({ createCommunication: vi.fn(async () => ({ communication: { id: 'communication_new' }, created: true })) }));
@@ -1992,7 +2004,7 @@ describe('quick log', () => {
     document.body.append(canvas);
     const navigate = vi.fn();
     await renderQuickLog(canvas, { now: () => new Date('2026-10-14T02:47:00.000Z'), navigate });
-    expect(canvas.querySelector('[data-person][aria-pressed="true"]')?.textContent).toContain('Declan J.');
+    expect(canvas.querySelector('[data-person][aria-pressed="true"]')?.textContent).toContain('Ollie P.');
     expect(canvas.querySelector('[data-channel="in_person"]')?.getAttribute('aria-pressed')).toBe('true');
     const field = canvas.querySelector<HTMLTextAreaElement>('textarea')!;
     field.value = 'Essay plan fine. »me send quote bank by Thu';
@@ -2136,7 +2148,22 @@ Opening the new comm lets Plan 2's auto-join file it into the right thread. The 
 
 If `mountMobileChrome`'s primary list is capped at three, replace Organisations with Log there (Organisations stays in "more").
 
-`styles/quick-log.css`: port the mockup's `.sheet`, `.recents`, `.chan` and `.field` rules (tab 6) to the classes above, using tokens only. At under 720px, `.quick-log` sits at the bottom of the screen as a sheet (`position:sticky;bottom:0`) with 16px side padding. Buttons are at least 44px tall.
+`styles/quick-log.css` (tokens only; every control at least 44px tall). Under 720px the log sits at the bottom of the screen as a sheet. Import it in `main.ts`:
+
+```css
+.quick-log{display:grid;gap:var(--space-3);padding:var(--space-4);background:var(--paper);border-radius:var(--radius-lg) var(--radius-lg) 0 0;box-shadow:var(--elev-3)}
+@media (max-width:719px){.quick-log{position:sticky;bottom:0}}
+.quick-log__title{margin:0;font-size:var(--text-md)}
+.quick-log__people{display:flex;gap:var(--space-2);overflow-x:auto}
+.quick-log__person{display:flex;flex-direction:column;align-items:center;gap:var(--space-1);min-width:3.5rem;min-height:2.75rem;border:0;background:transparent;font-size:var(--text-2xs);color:var(--ink);text-decoration:none}
+.quick-log__initials{display:grid;place-items:center;width:2.25rem;height:2.25rem;border-radius:50%;background:var(--pastel-blue);color:var(--pastel-blue-ink);font-weight:var(--weight-bold)}
+.quick-log__person[aria-pressed="true"] .quick-log__initials{box-shadow:0 0 0 2px var(--high-sea)}
+.quick-log__channels{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.quick-log__channel{display:grid;justify-items:center;gap:2px;min-height:2.75rem;padding:var(--space-2) 0;border:0;border-radius:var(--radius-sm);background:var(--cotton, var(--glass));font-size:var(--text-2xs);font-weight:var(--weight-semibold)}
+.quick-log__channel[aria-pressed="true"]{background:var(--navy);color:var(--paper)}
+.quick-log__line{padding:var(--space-3);border:1px solid var(--line);border-radius:var(--radius-sm);font:inherit;font-size:var(--text-md)}
+.quick-log__go{justify-content:center;min-height:2.875rem}
+```
 
 - [ ] **Step 4: Run the tests and confirm they pass**
 

@@ -3,10 +3,10 @@ import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/li
 
 describe('extractInlinePromises', () => {
   it('finds »me and »Name lines', () => {
-    const text = 'Good redraft.\n»me send the quote bank by Thu\n»Declan · rewrite the fence paragraph';
+    const text = 'Good redraft.\n»me send the quote bank by Thu\n»Ollie · rewrite the fence paragraph';
     expect(extractInlinePromises(text)).toEqual([
       { owner: 'me', text: 'send the quote bank by Thu' },
-      { owner: 'Declan', text: 'rewrite the fence paragraph' }
+      { owner: 'Ollie', text: 'rewrite the fence paragraph' }
     ]);
   });
   it('ignores empty promises and plain text', () => {
@@ -18,27 +18,27 @@ describe('blockPlainText', () => {
   it('reads html and text from nested blocks', () => {
     const blocks = [
       { id: 'a', block_type: 'rich_text', content: { html: '<p>»me <b>quote bank</b></p>' } },
-      { id: 'b', block_type: 'section', content: { blocks: [{ id: 'c', block_type: 'quote', content: { text: '»Declan redraft' } }] } }
+      { id: 'b', block_type: 'section', content: { blocks: [{ id: 'c', block_type: 'quote', content: { text: '»Ollie redraft' } }] } }
     ];
-    expect(blockPlainText(blocks)).toBe('»me quote bank\n»Declan redraft');
+    expect(blockPlainText(blocks)).toBe('»me quote bank\n»Ollie redraft');
   });
 });
 
 describe('resolvePromiseOwner', () => {
   const people = [
-    { ref: 'shared:person:p_declan', name: 'Declan J.' },
-    { ref: 'shared:person:p_denielle', name: 'Denielle J.' }
+    { ref: 'shared:person:p_ollie', name: 'Ollie P.' },
+    { ref: 'shared:person:p_grace', name: 'Grace P.' }
   ];
   it('me owes the first person; a name owes by first-name match', () => {
     expect(resolvePromiseOwner('me', people)).toEqual({
       direction: 'you_owe',
-      person_ref: 'shared:person:p_declan'
+      person_ref: 'shared:person:p_ollie'
     });
-    expect(resolvePromiseOwner('Denielle', people)).toEqual({
+    expect(resolvePromiseOwner('Grace', people)).toEqual({
       direction: 'they_owe',
-      person_ref: 'shared:person:p_denielle'
+      person_ref: 'shared:person:p_grace'
     });
-    expect(resolvePromiseOwner('Greg', people)).toBeNull();
+    expect(resolvePromiseOwner('Ben', people)).toBeNull();
     expect(resolvePromiseOwner('me', [])).toBeNull();
   });
 });

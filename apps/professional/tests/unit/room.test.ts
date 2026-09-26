@@ -9,14 +9,14 @@ const row = (ref: string, name: string, org: string | null, warmth: 'warm' | 'co
 
 describe('groupRoom', () => {
   const directory = [
-    row('shared:person:vicki', 'Vicki Sheehan', 'HALT NSW', 'warm'),
-    row('shared:person:greg', 'Greg R.', 'HALT NSW', 'cooling'),
+    row('shared:person:rachel', 'Rachel Ford', 'HALT NSW', 'warm'),
+    row('shared:person:ben', 'Ben C.', 'HALT NSW', 'cooling'),
     row('shared:person:jo', 'Jo T.', 'Barker College', 'cold'),
     row('shared:person:sam', 'Sam O.', null, 'cold', '2026-09-20T00:00:00.000Z')
   ];
   const attendees = [
-    { ref: 'shared:person:greg', role: 'treasurer' },
-    { ref: 'shared:person:vicki', role: 'chair' },
+    { ref: 'shared:person:ben', role: 'treasurer' },
+    { ref: 'shared:person:rachel', role: 'chair' },
     { ref: 'shared:person:jo', role: null },
     { ref: 'shared:person:sam', role: null }
   ];
@@ -24,7 +24,7 @@ describe('groupRoom', () => {
   it('clusters by organisation, biggest first; no organisation goes last', () => {
     const room = groupRoom(attendees, directory, new Date('2026-09-24T08:00:00.000Z'));
     expect(room.map((cluster) => [cluster.organisation, cluster.people.map((person) => person.name)])).toEqual([
-      ['HALT NSW', ['Vicki Sheehan', 'Greg R.']],
+      ['HALT NSW', ['Rachel Ford', 'Ben C.']],
       ['Barker College', ['Jo T.']],
       [null, ['Sam O.']]
     ]);
@@ -33,10 +33,10 @@ describe('groupRoom', () => {
   it('warmth becomes 3/2/1 dots; people added in the last 14 days are new', () => {
     const room = groupRoom(attendees, directory, new Date('2026-09-24T08:00:00.000Z'));
     const people = room.flatMap((cluster) => cluster.people);
-    expect(people.find((person) => person.name === 'Vicki Sheehan')!.warmthDots).toBe(3);
-    expect(people.find((person) => person.name === 'Greg R.')!.warmthDots).toBe(2);
+    expect(people.find((person) => person.name === 'Rachel Ford')!.warmthDots).toBe(3);
+    expect(people.find((person) => person.name === 'Ben C.')!.warmthDots).toBe(2);
     expect(people.find((person) => person.name === 'Jo T.')!.warmthDots).toBe(1);
     expect(people.find((person) => person.name === 'Sam O.')!.isNew).toBe(true);
-    expect(people.find((person) => person.name === 'Vicki Sheehan')!.role).toBe('chair');
+    expect(people.find((person) => person.name === 'Rachel Ford')!.role).toBe('chair');
   });
 });

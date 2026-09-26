@@ -34,9 +34,9 @@ describe('extractDecisions', () => {
 
 describe('extractMentions', () => {
   it('collects @Name lines per person', () => {
-    const text = '@Greg surplus of $4.2k\nPremier’s grant closes 30 Oct\n@Greg grant closes 30 Oct\n@Sam O. first time here';
+    const text = '@Ben surplus of $4.2k\nPremier’s grant closes 30 Oct\n@Ben grant closes 30 Oct\n@Sam O. first time here';
     expect(extractMentions(text)).toEqual([
-      { name: 'Greg', lines: ['surplus of $4.2k', 'grant closes 30 Oct'] },
+      { name: 'Ben', lines: ['surplus of $4.2k', 'grant closes 30 Oct'] },
       { name: 'Sam O.', lines: ['first time here'] }
     ]);
   });

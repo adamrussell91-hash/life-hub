@@ -93,7 +93,7 @@ const V1 = {
   direction: 'outbound',
   channel: 'in_person',
   occurred_at: '2026-10-14T00:50:00.000Z',
-  subject: 'Declan essay feedback',
+  subject: 'Ollie essay feedback',
   summary: '',
   status: 'completed',
   created_at: '2026-10-01T00:00:00.000Z',
@@ -348,7 +348,7 @@ test('v2: create stores a scheduled window, PATCH stores agenda and blocks', asy
     scheduled_end: '2026-10-14T01:05:00.000Z',
     time_zone: 'Australia/Sydney',
     purpose_tag: 'feedback',
-    subject: 'Declan essay feedback'
+    subject: 'Ollie essay feedback'
   });
   const comm = (await created.json()).data.communication;
   assert.equal(comm.schema_version, 2);
@@ -527,7 +527,7 @@ function memoryStore() {
 test('thread ids and create validation', () => {
   assert.equal(isValidThreadId('thread_00000000-0000-4000-8000-000000000001'), true);
   assert.equal(isValidThreadId('thread_x'), false);
-  const input = validateThreadCreateInput({ kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'Case Management' });
+  const input = validateThreadCreateInput({ kind: 'case', title: 'Sam K. · case management', purpose_tag: 'Case Management' });
   assert.equal(input.purpose_tag, 'case management');
   assert.deepEqual(input.goals, []);
   assert.throws(() => validateThreadCreateInput({ kind: 'saga', title: 'x' }), { code: 'invalid_kind' });
@@ -548,9 +548,9 @@ test('repository create / get / list / patch', async () => {
     now: () => '2026-09-26T00:00:00.000Z',
     generateId: () => 'thread_00000000-0000-4000-8000-000000000001'
   });
-  const thread = await repo.createThread({ kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'case management' });
+  const thread = await repo.createThread({ kind: 'case', title: 'Sam K. · case management', purpose_tag: 'case management' });
   assert.equal(thread.status, 'open');
-  assert.equal((await repo.getThread(thread.id)).title, 'Fletcher W. · case management');
+  assert.equal((await repo.getThread(thread.id)).title, 'Sam K. · case management');
   assert.equal((await repo.listThreads()).length, 1);
   const patched = await repo.patchThread(thread.id, { goals: [{ id: 'g1', text: 'Maths C → B', progress: 62 }] });
   assert.equal(patched.goals.length, 1);
@@ -812,9 +812,9 @@ test('threads are entities and records join them with in_thread', async () => {
 
   const store = memoryStore();
   const repo = createThreadRepository({ store, now: () => '2026-09-26T00:00:00.000Z', generateId: () => 'thread_00000000-0000-4000-8000-000000000001' });
-  await repo.createThread({ kind: 'case', title: 'Fletcher W. · case management' });
+  await repo.createThread({ kind: 'case', title: 'Sam K. · case management' });
   const endpoint = await resolveThread('thread_00000000-0000-4000-8000-000000000001', { visibility: 'operator', allowed_visibility: ['operator'] }, { getStore: async () => store });
-  assert.equal(endpoint.display_label, 'Fletcher W. · case management');
+  assert.equal(endpoint.display_label, 'Sam K. · case management');
   assert.equal(endpoint.href, '/professional/#/thread/thread_00000000-0000-4000-8000-000000000001');
 });
 ```
@@ -919,7 +919,7 @@ function threadsHandler(store) {
 test('POST creates, GET lists and reads, PATCH updates goals', async () => {
   const store = memoryStore(); // copy memoryStore from tests/unit/threads.test.js
   const handler = threadsHandler(store);
-  const created = await send(handler, 'POST', '/api/threads', { kind: 'case', title: 'Fletcher W. · case management' });
+  const created = await send(handler, 'POST', '/api/threads', { kind: 'case', title: 'Sam K. · case management' });
   assert.equal(created.status, 200);
   const thread = (await created.json()).data.thread;
 
@@ -1036,7 +1036,7 @@ import { projectCommunicationSchedule } from '../../netlify/functions/_shared/sc
 test('timed comms project as blocks; logged comms as pins', () => {
   const base = {
     id: 'communication_00000000-0000-4000-8000-000000000001',
-    subject: 'Declan essay feedback',
+    subject: 'Ollie essay feedback',
     channel: 'in_person',
     direction: 'outbound',
     status: 'completed',
@@ -1170,7 +1170,7 @@ import { promiseEventsFromLedger } from '../../packages/design-kit/js/calendar/p
 test('comm projections become professional_communication rows with pin', () => {
   const [row] = professionalEventsFromProjections([projectCommunicationSchedule({
     id: 'communication_00000000-0000-4000-8000-000000000002',
-    subject: 'Email Amy W.',
+    subject: 'Email Nadia K.',
     channel: 'email',
     status: 'completed',
     occurred_at: '2026-09-20T23:10:00.000Z',
@@ -1187,16 +1187,16 @@ test('comm projections become professional_communication rows with pin', () => {
 
 test('promiseEventsFromLedger makes dated ledger rows and flags late ones', () => {
   const rows = promiseEventsFromLedger([
-    { id: 'ledger_a', direction: 'you_owe', text: 'Email Denielle the summary', due: '2026-09-23', status: 'open' },
-    { id: 'ledger_b', direction: 'they_owe', text: 'Kathleen: T4 dates', due: '2026-09-30', status: 'open' }
+    { id: 'ledger_a', direction: 'you_owe', text: 'Email Grace the summary', due: '2026-09-23', status: 'open' },
+    { id: 'ledger_b', direction: 'they_owe', text: 'Helen: T4 dates', due: '2026-09-30', status: 'open' }
   ], '2026-09-26');
   assert.equal(rows[0].record.type, 'ledger_item');
   assert.equal(rows[0].record.date, '2026-09-23');
   assert.equal(rows[0].record.late, true);
   assert.equal(rows[0].record.days_late, 3);
-  assert.equal(rows[0].record.title, 'You owe · Email Denielle the summary · 3 days late');
+  assert.equal(rows[0].record.title, 'You owe · Email Grace the summary · 3 days late');
   assert.equal(rows[1].record.late, false);
-  assert.equal(rows[1].record.title, 'Owed to you · Kathleen: T4 dates');
+  assert.equal(rows[1].record.title, 'Owed to you · Helen: T4 dates');
 });
 ```
 
@@ -1310,10 +1310,10 @@ import assert from 'node:assert/strict';
 import { /* builder from Step 1 */ } from '../../packages/design-kit/js/calendar/tideline-model.js';
 
 const events = [
-  { path: 'p:1', record: { type: 'professional_communication', id: 'c1', date: '2026-09-22', time: '08:40', duration_min: 15, title: 'Fletcher W. · session 7', pin: false } },
-  { path: 'p:2', record: { type: 'professional_communication', id: 'c2', date: '2026-09-21', time: '09:10', duration_min: 1, title: 'Email Amy W.', pin: true, channel: 'email' } },
+  { path: 'p:1', record: { type: 'professional_communication', id: 'c1', date: '2026-09-22', time: '08:40', duration_min: 15, title: 'Sam K. · session 7', pin: false } },
+  { path: 'p:2', record: { type: 'professional_communication', id: 'c2', date: '2026-09-21', time: '09:10', duration_min: 1, title: 'Email Nadia K.', pin: true, channel: 'email' } },
   { path: 'p:3', record: { type: 'professional_event', id: 'e1', date: '2026-09-25', time: '18:00', duration_min: 105, title: 'HALT medal ceremony', event_type: 'ceremony' } },
-  { path: 'ledger:a', record: { type: 'ledger_item', id: 'ledger_a', date: '2026-09-23', title: 'You owe · Email Denielle · 3 days late', direction: 'you_owe', late: true } }
+  { path: 'ledger:a', record: { type: 'ledger_item', id: 'ledger_a', date: '2026-09-23', title: 'You owe · Email Grace · 3 days late', direction: 'you_owe', late: true } }
 ];
 
 test('comms are comm chips; pins stay short; non-PD events are event chips; promises are dues', () => {
@@ -1983,10 +1983,10 @@ import { blockPlainText, extractInlinePromises, resolvePromiseOwner } from '@/li
 
 describe('extractInlinePromises', () => {
   it('finds »me and »Name lines', () => {
-    const text = 'Good redraft.\n»me send the quote bank by Thu\n»Declan · rewrite the fence paragraph';
+    const text = 'Good redraft.\n»me send the quote bank by Thu\n»Ollie · rewrite the fence paragraph';
     expect(extractInlinePromises(text)).toEqual([
       { owner: 'me', text: 'send the quote bank by Thu' },
-      { owner: 'Declan', text: 'rewrite the fence paragraph' }
+      { owner: 'Ollie', text: 'rewrite the fence paragraph' }
     ]);
   });
   it('ignores empty promises and plain text', () => {
@@ -1998,21 +1998,21 @@ describe('blockPlainText', () => {
   it('reads html and text from nested blocks', () => {
     const blocks = [
       { id: 'a', block_type: 'rich_text', content: { html: '<p>»me <b>quote bank</b></p>' } },
-      { id: 'b', block_type: 'section', content: { blocks: [{ id: 'c', block_type: 'quote', content: { text: '»Declan redraft' } }] } }
+      { id: 'b', block_type: 'section', content: { blocks: [{ id: 'c', block_type: 'quote', content: { text: '»Ollie redraft' } }] } }
     ];
-    expect(blockPlainText(blocks)).toBe('»me quote bank\n»Declan redraft');
+    expect(blockPlainText(blocks)).toBe('»me quote bank\n»Ollie redraft');
   });
 });
 
 describe('resolvePromiseOwner', () => {
   const people = [
-    { ref: 'shared:person:p_declan', name: 'Declan J.' },
-    { ref: 'shared:person:p_denielle', name: 'Denielle J.' }
+    { ref: 'shared:person:p_ollie', name: 'Ollie P.' },
+    { ref: 'shared:person:p_grace', name: 'Grace P.' }
   ];
   it('me owes the first person; a name owes by first-name match', () => {
-    expect(resolvePromiseOwner('me', people)).toEqual({ direction: 'you_owe', person_ref: 'shared:person:p_declan' });
-    expect(resolvePromiseOwner('Denielle', people)).toEqual({ direction: 'they_owe', person_ref: 'shared:person:p_denielle' });
-    expect(resolvePromiseOwner('Greg', people)).toBeNull();
+    expect(resolvePromiseOwner('me', people)).toEqual({ direction: 'you_owe', person_ref: 'shared:person:p_ollie' });
+    expect(resolvePromiseOwner('Grace', people)).toEqual({ direction: 'they_owe', person_ref: 'shared:person:p_grace' });
+    expect(resolvePromiseOwner('Ben', people)).toBeNull();
     expect(resolvePromiseOwner('me', [])).toBeNull();
   });
 });
@@ -2118,28 +2118,28 @@ import { pickThreadForComm, type ThreadCandidate } from '@/lib/thread-match';
 
 const at = '2026-10-14T00:50:00.000Z';
 const cand = (over: Partial<ThreadCandidate>): ThreadCandidate => ({
-  id: 'thread_a', status: 'open', purpose_tag: 'feedback', personRefs: ['shared:person:declan'], lastAt: '2026-09-25T02:00:00.000Z', ...over
+  id: 'thread_a', status: 'open', purpose_tag: 'feedback', personRefs: ['shared:person:ollie'], lastAt: '2026-09-25T02:00:00.000Z', ...over
 });
 
 describe('pickThreadForComm', () => {
   it('joins the one open thread with the same purpose, a shared person, active in 90 days', () => {
-    expect(pickThreadForComm({ personRefs: ['shared:person:declan'], purposeTag: 'feedback', at }, [cand({})])).toEqual({ join: 'thread_a', candidates: ['thread_a'] });
+    expect(pickThreadForComm({ personRefs: ['shared:person:ollie'], purposeTag: 'feedback', at }, [cand({})])).toEqual({ join: 'thread_a', candidates: ['thread_a'] });
   });
   it('proposes instead of joining when two threads match', () => {
-    const result = pickThreadForComm({ personRefs: ['shared:person:declan'], purposeTag: 'feedback', at }, [cand({}), cand({ id: 'thread_b' })]);
+    const result = pickThreadForComm({ personRefs: ['shared:person:ollie'], purposeTag: 'feedback', at }, [cand({}), cand({ id: 'thread_b' })]);
     expect(result).toEqual({ join: null, candidates: ['thread_a', 'thread_b'] });
   });
   it('skips closed, other-purpose, stranger and stale threads', () => {
     const threads = [
       cand({ id: 'closed', status: 'closed' }),
       cand({ id: 'other', purpose_tag: 'case management' }),
-      cand({ id: 'stranger', personRefs: ['shared:person:amy'] }),
+      cand({ id: 'stranger', personRefs: ['shared:person:nadia'] }),
       cand({ id: 'stale', lastAt: '2026-06-01T00:00:00.000Z' })
     ];
-    expect(pickThreadForComm({ personRefs: ['shared:person:declan'], purposeTag: 'feedback', at }, threads)).toEqual({ join: null, candidates: [] });
+    expect(pickThreadForComm({ personRefs: ['shared:person:ollie'], purposeTag: 'feedback', at }, threads)).toEqual({ join: null, candidates: [] });
   });
   it('no purpose tag means no auto-join', () => {
-    expect(pickThreadForComm({ personRefs: ['shared:person:declan'], purposeTag: null, at }, [cand({})]).join).toBeNull();
+    expect(pickThreadForComm({ personRefs: ['shared:person:ollie'], purposeTag: null, at }, [cand({})]).join).toBeNull();
   });
 });
 ```
@@ -2434,7 +2434,7 @@ const THREAD_REF = 'professional:thread:thread_00000000-0000-4000-8000-000000000
 
 const record = {
   schema_version: 2, id: COMM_ID, direction: 'outbound', channel: 'in_person',
-  occurred_at: '2026-10-14T00:50:00.000Z', subject: 'Declan J. · essay feedback', summary: '',
+  occurred_at: '2026-10-14T00:50:00.000Z', subject: 'Ollie P. · essay feedback', summary: '',
   status: 'completed', created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
   scheduled_start: '2026-10-14T00:50:00.000Z', scheduled_end: '2026-10-14T01:05:00.000Z',
   time_zone: 'Australia/Sydney', purpose_tag: 'feedback', agenda: [], blocks: []
@@ -2452,12 +2452,12 @@ vi.mock('@/api/universal-links', () => ({
     if (ref === COMM_REF) {
       return {
         outgoing: [
-          { link: { id: 'l1', source_ref: COMM_REF, target_ref: 'shared:person:p_declan', relationship_type: 'recipient', status: 'current' },
-            endpoint: { ref: 'shared:person:p_declan', kind: 'person', display_label: 'Declan J.', href: null }, direction: 'outgoing' },
-          { link: { id: 'l2', source_ref: COMM_REF, target_ref: 'shared:person:p_denielle', relationship_type: 'about_person', status: 'current' },
-            endpoint: { ref: 'shared:person:p_denielle', kind: 'person', display_label: 'Denielle J.', href: null }, direction: 'outgoing' },
+          { link: { id: 'l1', source_ref: COMM_REF, target_ref: 'shared:person:p_ollie', relationship_type: 'recipient', status: 'current' },
+            endpoint: { ref: 'shared:person:p_ollie', kind: 'person', display_label: 'Ollie P.', href: null }, direction: 'outgoing' },
+          { link: { id: 'l2', source_ref: COMM_REF, target_ref: 'shared:person:p_grace', relationship_type: 'about_person', status: 'current' },
+            endpoint: { ref: 'shared:person:p_grace', kind: 'person', display_label: 'Grace P.', href: null }, direction: 'outgoing' },
           { link: { id: 'l3', source_ref: COMM_REF, target_ref: THREAD_REF, relationship_type: 'in_thread', status: 'current' },
-            endpoint: { ref: THREAD_REF, kind: 'thread', display_label: 'Declan J. · study approach', href: null }, direction: 'outgoing' }
+            endpoint: { ref: THREAD_REF, kind: 'thread', display_label: 'Ollie P. · study approach', href: null }, direction: 'outgoing' }
         ],
         incoming: []
       };
@@ -2466,9 +2466,9 @@ vi.mock('@/api/universal-links', () => ({
       outgoing: [],
       incoming: [
         { link: { id: 'm0', source_ref: PREV_REF, target_ref: THREAD_REF, relationship_type: 'in_thread', status: 'current', created_at: '2026-09-25T02:00:00.000Z' },
-          endpoint: { ref: PREV_REF, kind: 'communication', display_label: 'Declan · quote bank', href: null }, direction: 'incoming' },
+          endpoint: { ref: PREV_REF, kind: 'communication', display_label: 'Ollie · quote bank', href: null }, direction: 'incoming' },
         { link: { id: 'm1', source_ref: COMM_REF, target_ref: THREAD_REF, relationship_type: 'in_thread', status: 'current', created_at: '2026-10-01T00:00:00.000Z' },
-          endpoint: { ref: COMM_REF, kind: 'communication', display_label: 'Declan J. · essay feedback', href: null }, direction: 'incoming' }
+          endpoint: { ref: COMM_REF, kind: 'communication', display_label: 'Ollie P. · essay feedback', href: null }, direction: 'incoming' }
       ]
     };
   }),
@@ -2479,10 +2479,10 @@ vi.mock('@/api/universal-links', () => ({
 vi.mock('@/api/ledger', () => ({
   listLedgerForSources: vi.fn(async () => ({
     items: [
-      { id: 'ledger_1', person_ref: 'shared:person:p_declan', direction: 'you_owe', text: 'Send Declan the quote bank', comm_ref: PREV_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
-      { id: 'ledger_2', person_ref: 'shared:person:p_declan', direction: 'they_owe', text: 'Redraft paragraph 2', comm_ref: PREV_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
-      { id: 'ledger_3', person_ref: 'shared:person:p_denielle', direction: 'you_owe', text: 'Email Denielle the summary', comm_ref: COMM_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
-      { id: 'ledger_4', person_ref: 'shared:person:p_declan', direction: 'they_owe', text: 'Rewrite the fence paragraph', comm_ref: COMM_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null }
+      { id: 'ledger_1', person_ref: 'shared:person:p_ollie', direction: 'you_owe', text: 'Send Ollie the quote bank', comm_ref: PREV_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
+      { id: 'ledger_2', person_ref: 'shared:person:p_ollie', direction: 'they_owe', text: 'Redraft paragraph 2', comm_ref: PREV_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
+      { id: 'ledger_3', person_ref: 'shared:person:p_grace', direction: 'you_owe', text: 'Email Grace the summary', comm_ref: COMM_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null },
+      { id: 'ledger_4', person_ref: 'shared:person:p_ollie', direction: 'they_owe', text: 'Rewrite the fence paragraph', comm_ref: COMM_REF, status: 'open', due: null, task_ref: null, checked_in_ref: null }
     ]
   })),
   createLedgerItem: vi.fn(async (body: object) => ({ item: { id: 'ledger_new', status: 'open', ...body }, created: true })),
@@ -2516,9 +2516,9 @@ describe('comm page', () => {
   it('opens in Before with carried promises, people and the thread', async () => {
     const canvas = await render();
     expect(canvas.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('before');
-    expect(canvas.textContent).toContain('Send Declan the quote bank');
-    expect(canvas.textContent).toContain('Denielle J.');
-    expect(canvas.textContent).toContain('Declan J. · study approach');
+    expect(canvas.textContent).toContain('Send Ollie the quote bank');
+    expect(canvas.textContent).toContain('Grace P.');
+    expect(canvas.textContent).toContain('Ollie P. · study approach');
     expect(canvas.querySelector('[data-part="carried"] [data-owner="you"]')).not.toBeNull();
   });
 
@@ -2892,7 +2892,7 @@ Check against the codebase:
 
 - [ ] **Step 5: Styles** `apps/professional/src/styles/comm-page.css`
 
-Build this from the mockup's `.phase`, `.tick`, `.who-tag`, `.agenda`, `.live-strip`, `.ledger`, `.pr`, `.switch` and `.pcard` rules (`docs/professional-hub/calendar/mockups/index.html`, `<style>` block). Rename them to the classes used above, and use only design-kit tokens (`var(--…)`), never hex values. Add this to lay out the page:
+(Built 26–27/09/26; the mockup has since been removed.) Build this from the `.phase`, `.tick`, `.who-tag`, `.agenda`, `.live-strip`, `.ledger`, `.pr`, `.switch` and `.pcard` rules. Rename them to the classes used above, and use only design-kit tokens (`var(--…)`), never hex values. Add this to lay out the page:
 
 ```css
 .comm-page{display:grid;gap:var(--space-5)}
@@ -2950,25 +2950,25 @@ it('joins the single matching thread and says so, with Undo', async () => {
   // This comm has people but no thread yet.
   (links.listUniversalLinksForEntity as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
     outgoing: [
-      { link: { id: 'l1', source_ref: COMM_REF, target_ref: 'shared:person:p_declan', relationship_type: 'recipient', status: 'current' },
-        endpoint: { ref: 'shared:person:p_declan', kind: 'person', display_label: 'Declan J.', href: null }, direction: 'outgoing' }
+      { link: { id: 'l1', source_ref: COMM_REF, target_ref: 'shared:person:p_ollie', relationship_type: 'recipient', status: 'current' },
+        endpoint: { ref: 'shared:person:p_ollie', kind: 'person', display_label: 'Ollie P.', href: null }, direction: 'outgoing' }
     ],
     incoming: []
   }));
   (threads.listThreads as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ threads: [
-    { id: 'thread_00000000-0000-4000-8000-000000000001', kind: 'general', title: 'Declan J. · study approach', purpose_tag: 'feedback', goals: [], status: 'open', schema_version: 1, created_at: '', updated_at: '2026-09-25T02:00:00.000Z' }
+    { id: 'thread_00000000-0000-4000-8000-000000000001', kind: 'general', title: 'Ollie P. · study approach', purpose_tag: 'feedback', goals: [], status: 'open', schema_version: 1, created_at: '', updated_at: '2026-09-25T02:00:00.000Z' }
   ] });
   const canvas = await render();
   await vi.advanceTimersByTimeAsync(0);
   expect(links.createUniversalLink).toHaveBeenCalledWith(expect.objectContaining({
     source_ref: COMM_REF, target_ref: THREAD_REF, relationship_type: 'in_thread'
   }));
-  expect(canvas.textContent).toContain('Added to Declan J. · study approach');
+  expect(canvas.textContent).toContain('Added to Ollie P. · study approach');
   expect(canvas.querySelector('[data-part="thread-undo"]')).not.toBeNull();
 });
 ```
 
-The thread's people come from its latest member's `recipient` links. The mocked `listUniversalLinksForEntity` returns the thread members first, and then `p_declan` for the member, from the default mock above. Check `lastAt` against the thread's `updated_at`.
+The thread's people come from its latest member's `recipient` links. The mocked `listUniversalLinksForEntity` returns the thread members first, and then `p_ollie` for the member, from the default mock above. Check `lastAt` against the thread's `updated_at`.
 
 - [ ] **Step 2: Run the test and confirm it fails**
 
@@ -3066,18 +3066,18 @@ import { caseSummaryText } from '@/lib/case-summary';
 describe('caseSummaryText', () => {
   it('writes goals, sessions and open promises as plain text', () => {
     const text = caseSummaryText({
-      title: 'Fletcher W. · case management',
+      title: 'Sam K. · case management',
       goals: [{ id: 'g1', text: 'Maths C → B', progress: 62, note: '31/50' }],
       sessions: [
         { label: 'Session 7 · fillable bar', at: '2026-09-22T22:40:00.000Z', summary: 'Fillable bar introduced.' },
         { label: 'Session 6', at: '2026-09-08T22:40:00.000Z', summary: '' }
       ],
-      open: [{ text: 'Check in with Ms D’Souza', direction: 'you_owe' }, { text: '2 hrs maths on the bar', direction: 'they_owe' }],
+      open: [{ text: 'Check in with Ms Lee', direction: 'you_owe' }, { text: '2 hrs maths on the bar', direction: 'they_owe' }],
       kept: 19,
       made: 24
     });
     expect(text).toBe([
-      'Fletcher W. · case management',
+      'Sam K. · case management',
       '',
       'Goals',
       '- Maths C → B: 62% (31/50)',
@@ -3087,7 +3087,7 @@ describe('caseSummaryText', () => {
       '- 09/09/26 Session 6',
       '',
       'Open promises',
-      '- Mr Russell: Check in with Ms D’Souza',
+      '- Mr Russell: Check in with Ms Lee',
       '- Student/family: 2 hrs maths on the bar',
       '',
       'Promises kept: 19 of 24'
@@ -3155,7 +3155,7 @@ const S7 = 'professional:communication:communication_00000000-0000-4000-8000-000
 
 vi.mock('@/api/threads', () => ({
   getThread: vi.fn(async () => ({ thread: {
-    schema_version: 1, id: THREAD_ID, kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'case management',
+    schema_version: 1, id: THREAD_ID, kind: 'case', title: 'Sam K. · case management', purpose_tag: 'case management',
     goals: [{ id: 'g1', text: 'Maths C → B', progress: 62, note: '31/50' }], status: 'open', created_at: '', updated_at: ''
   } })),
   patchThread: vi.fn(async (_id: string, patch: object) => ({ thread: { id: THREAD_ID, kind: 'case', goals: [], ...patch } }))
@@ -3167,14 +3167,14 @@ vi.mock('@/api/universal-links', () => ({
           endpoint: { ref: S7, kind: 'communication', display_label: 'Session 7 · fillable bar', href: '/professional/#/communication/communication_00000000-0000-4000-8000-000000000007' }, direction: 'incoming' }
       ] }
     : { outgoing: [
-        { link: { id: 'p', source_ref: S7, target_ref: 'shared:person:p_fletcher', relationship_type: 'recipient', status: 'current' },
-          endpoint: { ref: 'shared:person:p_fletcher', kind: 'person', display_label: 'Fletcher W.', href: null }, direction: 'outgoing' }
+        { link: { id: 'p', source_ref: S7, target_ref: 'shared:person:p_sam', relationship_type: 'recipient', status: 'current' },
+          endpoint: { ref: 'shared:person:p_sam', kind: 'person', display_label: 'Sam K.', href: null }, direction: 'outgoing' }
       ], incoming: [] })
 }));
 vi.mock('@/api/ledger', () => ({
   listLedgerForSources: vi.fn(async () => ({ items: [
     { id: 'a', direction: 'they_owe', text: '2 hrs maths on the bar', status: 'open', comm_ref: S7 },
-    { id: 'b', direction: 'you_owe', text: 'Email Amy the template', status: 'done', comm_ref: S7 }
+    { id: 'b', direction: 'you_owe', text: 'Email Nadia the template', status: 'done', comm_ref: S7 }
   ] }))
 }));
 
@@ -3188,7 +3188,7 @@ describe('thread page (case)', () => {
     document.body.append(canvas);
     await renderThreadPage(canvas, THREAD_ID, { isCurrent: () => true, onTitleReady: () => {} });
     expect(canvas.querySelector('[data-part="goals"]')?.textContent).toContain('Maths C → B');
-    expect(canvas.querySelector('[data-part="circle"]')?.textContent).toContain('Fletcher W.');
+    expect(canvas.querySelector('[data-part="circle"]')?.textContent).toContain('Sam K.');
     expect(canvas.querySelector('[data-part="sessions"]')?.textContent).toContain('Session 7 · fillable bar');
     expect(canvas.querySelector('[data-part="stats"]')?.textContent).toContain('1 of 2 kept');
     expect(canvas.querySelector('[data-part="export"]')).not.toBeNull();
@@ -3378,7 +3378,7 @@ function goalsCard(thread: ThreadRecord, id: string): HTMLElement {
 
 - [ ] **Step 9: Styles** `styles/thread-page.css`
 
-Port the mockup's `.spine`, `.sess`, `.goal`, `.carry` rules (tab 3 of `docs/professional-hub/calendar/mockups/index.html`) using tokens only. Then add this:
+(Built 26–27/09/26; the mockup has since been removed.) Port the `.spine`, `.sess`, `.goal`, `.carry` rules using tokens only. Then add this:
 
 ```css
 .thread-page__grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:var(--space-5);align-items:start}

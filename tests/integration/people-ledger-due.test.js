@@ -69,7 +69,7 @@ test('GET ?due_from&due_to returns the repository range', async () => {
     ledgerRepo: {
       async listDueBetween(from, to) {
         calls.push([from, to]);
-        return [{ id: 'ledger_x', text: 'Email Denielle', due: '2026-09-23', direction: 'you_owe' }];
+        return [{ id: 'ledger_x', text: 'Email Grace', due: '2026-09-23', direction: 'you_owe' }];
       }
     }
   });
@@ -77,7 +77,7 @@ test('GET ?due_from&due_to returns the repository range', async () => {
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.deepEqual(calls, [['2026-09-21', '2026-09-27']]);
-  assert.equal(body.data.items[0].text, 'Email Denielle');
+  assert.equal(body.data.items[0].text, 'Email Grace');
 });
 
 test('GET with a bad range is a 400 invalid_due_range', async () => {

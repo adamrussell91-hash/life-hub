@@ -71,7 +71,7 @@ function threadsHandler(store) {
 test('POST creates, GET lists and reads, PATCH updates goals', async () => {
   const store = memoryStore();
   const handler = threadsHandler(store);
-  const created = await send(handler, 'POST', '/api/threads', { kind: 'case', title: 'Fletcher W. · case management' });
+  const created = await send(handler, 'POST', '/api/threads', { kind: 'case', title: 'Sam K. · case management' });
   assert.equal(created.status, 200);
   const thread = (await created.json()).data.thread;
 

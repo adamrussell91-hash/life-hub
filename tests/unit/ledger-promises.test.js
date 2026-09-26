@@ -11,7 +11,7 @@ import {
 } from '../../netlify/functions/_shared/ledger-schema.mjs';
 import { createLedgerItemRepository } from '../../netlify/functions/_shared/ledger-repository.mjs';
 
-const PERSON = 'shared:person:person_denielle';
+const PERSON = 'shared:person:person_grace';
 const COMM = 'professional:communication:communication_00000000-0000-4000-8000-000000000001';
 
 function memoryStore(seed = {}) {

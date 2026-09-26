@@ -908,9 +908,9 @@ describe('extractDecisions', () => {
 
 describe('extractMentions', () => {
   it('collects @Name lines per person', () => {
-    const text = '@Greg surplus of $4.2k\nPremier’s grant closes 30 Oct\n@Greg grant closes 30 Oct\n@Sam O. first time here';
+    const text = '@Ben surplus of $4.2k\nPremier’s grant closes 30 Oct\n@Ben grant closes 30 Oct\n@Sam O. first time here';
     expect(extractMentions(text)).toEqual([
-      { name: 'Greg', lines: ['surplus of $4.2k', 'grant closes 30 Oct'] },
+      { name: 'Ben', lines: ['surplus of $4.2k', 'grant closes 30 Oct'] },
       { name: 'Sam O.', lines: ['first time here'] }
     ]);
   });
@@ -977,7 +977,7 @@ export function extractMentions(text: string): Array<{ name: string; lines: stri
 }
 ```
 
-The regex takes an optional second capitalised word, so `@Sam O.` captures `Sam O.`. In `@Greg surplus`, the second word is lowercase, so the name stays `Greg`.
+The regex takes an optional second capitalised word, so `@Sam O.` captures `Sam O.`. In `@Ben surplus`, the second word is lowercase, so the name stays `Ben`.
 
 - [ ] **Step 4: Run the tests and confirm they pass**
 
@@ -1015,14 +1015,14 @@ const row = (ref: string, name: string, org: string | null, warmth: 'warm' | 'co
 
 describe('groupRoom', () => {
   const directory = [
-    row('shared:person:vicki', 'Vicki Sheehan', 'HALT NSW', 'warm'),
-    row('shared:person:greg', 'Greg R.', 'HALT NSW', 'cooling'),
+    row('shared:person:rachel', 'Rachel Ford', 'HALT NSW', 'warm'),
+    row('shared:person:ben', 'Ben C.', 'HALT NSW', 'cooling'),
     row('shared:person:jo', 'Jo T.', 'Barker College', 'cold'),
     row('shared:person:sam', 'Sam O.', null, 'cold', '2026-09-20T00:00:00.000Z')
   ];
   const attendees = [
-    { ref: 'shared:person:greg', role: 'treasurer' },
-    { ref: 'shared:person:vicki', role: 'chair' },
+    { ref: 'shared:person:ben', role: 'treasurer' },
+    { ref: 'shared:person:rachel', role: 'chair' },
     { ref: 'shared:person:jo', role: null },
     { ref: 'shared:person:sam', role: null }
   ];
@@ -1030,7 +1030,7 @@ describe('groupRoom', () => {
   it('clusters by organisation, biggest first; no organisation goes last', () => {
     const room = groupRoom(attendees, directory, new Date('2026-09-24T08:00:00.000Z'));
     expect(room.map((cluster) => [cluster.organisation, cluster.people.map((person) => person.name)])).toEqual([
-      ['HALT NSW', ['Vicki Sheehan', 'Greg R.']],
+      ['HALT NSW', ['Rachel Ford', 'Ben C.']],
       ['Barker College', ['Jo T.']],
       [null, ['Sam O.']]
     ]);
@@ -1039,11 +1039,11 @@ describe('groupRoom', () => {
   it('warmth becomes 3/2/1 dots; people added in the last 14 days are new', () => {
     const room = groupRoom(attendees, directory, new Date('2026-09-24T08:00:00.000Z'));
     const people = room.flatMap((cluster) => cluster.people);
-    expect(people.find((person) => person.name === 'Vicki Sheehan')!.warmthDots).toBe(3);
-    expect(people.find((person) => person.name === 'Greg R.')!.warmthDots).toBe(2);
+    expect(people.find((person) => person.name === 'Rachel Ford')!.warmthDots).toBe(3);
+    expect(people.find((person) => person.name === 'Ben C.')!.warmthDots).toBe(2);
     expect(people.find((person) => person.name === 'Jo T.')!.warmthDots).toBe(1);
     expect(people.find((person) => person.name === 'Sam O.')!.isNew).toBe(true);
-    expect(people.find((person) => person.name === 'Vicki Sheehan')!.role).toBe('chair');
+    expect(people.find((person) => person.name === 'Rachel Ford')!.role).toBe('chair');
   });
 });
 ```
@@ -1284,17 +1284,17 @@ vi.mock('@/api/meetings', () => ({
 vi.mock('@/views/meetings', () => ({ buildMeetingTaskLinks: () => document.createElement('section') }));
 vi.mock('@/api/universal-links', () => ({
   listUniversalLinksForEntity: vi.fn(async () => ({ outgoing: [
-    { link: { id: 'a1', source_ref: MEETING_REF, target_ref: 'shared:person:vicki', relationship_type: 'attendee', role: 'chair', status: 'current' },
-      endpoint: { ref: 'shared:person:vicki', kind: 'person', display_label: 'Vicki Sheehan', href: null }, direction: 'outgoing' },
-    { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:greg', relationship_type: 'attendee', role: null, status: 'current' },
-      endpoint: { ref: 'shared:person:greg', kind: 'person', display_label: 'Greg R.', href: null }, direction: 'outgoing' }
+    { link: { id: 'a1', source_ref: MEETING_REF, target_ref: 'shared:person:rachel', relationship_type: 'attendee', role: 'chair', status: 'current' },
+      endpoint: { ref: 'shared:person:rachel', kind: 'person', display_label: 'Rachel Ford', href: null }, direction: 'outgoing' },
+    { link: { id: 'a2', source_ref: MEETING_REF, target_ref: 'shared:person:ben', relationship_type: 'attendee', role: null, status: 'current' },
+      endpoint: { ref: 'shared:person:ben', kind: 'person', display_label: 'Ben C.', href: null }, direction: 'outgoing' }
   ], incoming: [] })),
   createTask: vi.fn(async () => ({ id: 'task_1', title: 'x' }))
 }));
 vi.mock('@/api/people-directory', () => ({
   fetchPeopleDirectory: vi.fn(async () => ({ people: [
-    { ref: 'shared:person:vicki', display_name: 'Vicki Sheehan', initials: 'VS', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'warm', created_at: '2024-01-01T00:00:00.000Z' },
-    { ref: 'shared:person:greg', display_name: 'Greg R.', initials: 'GR', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
+    { ref: 'shared:person:rachel', display_name: 'Rachel Ford', initials: 'RF', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'warm', created_at: '2024-01-01T00:00:00.000Z' },
+    { ref: 'shared:person:ben', display_name: 'Ben C.', initials: 'BC', organisation: { ref: 'o', display_name: 'HALT NSW', monogram: 'H', logo_key: null, current: true }, warmth_band: 'cooling', created_at: '2024-01-01T00:00:00.000Z' }
   ], organisations: [], counts: { people: 2, organisations: 1 } }))
 }));
 vi.mock('@/api/ledger', () => ({
@@ -1586,7 +1586,7 @@ Notes:
 
 - [ ] **Step 5: Styles** `styles/meeting-page.css`
 
-Port the mockup's `.purpose`, `.org-cluster`, `.pp`, `.warm`, `.agh`, `.dec` rules (tab 4 of `docs/professional-hub/calendar/mockups/index.html`) to the class names above, using tokens only. Then add:
+(Built 26–27/09/26; the mockup has since been removed.) Port the `.purpose`, `.org-cluster`, `.pp`, `.warm`, `.agh`, `.dec` rules to the class names above, using tokens only. Then add:
 
 ```css
 .meeting-page{display:grid;gap:var(--space-5)}
@@ -1978,7 +1978,7 @@ Check against the codebase:
 
 - [ ] **Step 5: Styles** `styles/event-page.css`
 
-Port the mockup's `.pd-toggle`, `.shape`, `.series`, `.sn`, `.prog`, `.pi`, `.kn` rules (tab 5) to the classes above, using tokens only. Then add:
+(Built 26–27/09/26; the mockup has since been removed.) Port the `.pd-toggle`, `.shape`, `.series`, `.sn`, `.prog`, `.pi`, `.kn` rules to the classes above, using tokens only. Then add:
 
 ```css
 .event-page{display:grid;gap:var(--space-4);max-width:72rem}
@@ -2165,7 +2165,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 - [ ] **Step 3:** `node --test --test-concurrency=1 tests/browser/calendar-filter.spec.mjs tests/browser/professional-calendar-hub.spec.mjs && TIDELINE_APP=1 node --test tests/browser/tideline-visual.spec.mjs`. Expected: PASS.
 - [ ] **Step 4: Walk it** (`cd apps/professional && npx vite`):
   - Open a meeting during its time. It's live, "Why you're there" saves, the room groups by organisation with warmth dots, and the notes start from the agenda as headings.
-  - Type `✓ Minutes accepted` under a heading and `»me seating list to Vicki`: the decision and action appear on the right. Type `@Sam O. first time here`: "Add to People" shows.
+  - Type `✓ Minutes accepted` under a heading and `»me seating list to Rachel`: the decision and action appear on the right. Type `@Sam O. first time here`: "Add to People" shows.
   - Open Warlight: PD is on. Choose Series: a group is created and the strip shows. Add a talk, then Make note: a Knowledge page exists, linked back.
   - Turn PD off on the HALT ceremony: the PD panels go, the calendar shows it on the Events chip (gold), and the PD dashboard hours don't count it.
   - Check it all at 390px.

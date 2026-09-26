@@ -55,7 +55,7 @@ import { filterKeyForItem } from '../../packages/design-kit/js/calendar/calendar
 test('comm projections become professional_communication rows with pin', () => {
   const [row] = kitProfessionalEventsFromProjections([projectCommunicationSchedule({
     id: 'communication_00000000-0000-4000-8000-000000000002',
-    subject: 'Email Amy W.',
+    subject: 'Email Nadia K.',
     channel: 'email',
     status: 'completed',
     occurred_at: '2026-09-20T23:10:00.000Z',
@@ -72,23 +72,23 @@ test('comm projections become professional_communication rows with pin', () => {
 
 test('promiseEventsFromLedger makes dated ledger rows and flags late ones', () => {
   const rows = promiseEventsFromLedger([
-    { id: 'ledger_a', direction: 'you_owe', text: 'Email Denielle the summary', due: '2026-09-23', status: 'open' },
-    { id: 'ledger_b', direction: 'they_owe', text: 'Kathleen: T4 dates', due: '2026-09-30', status: 'open' }
+    { id: 'ledger_a', direction: 'you_owe', text: 'Email Grace the summary', due: '2026-09-23', status: 'open' },
+    { id: 'ledger_b', direction: 'they_owe', text: 'Helen: T4 dates', due: '2026-09-30', status: 'open' }
   ], '2026-09-26');
   assert.equal(rows[0].record.type, 'ledger_item');
   assert.equal(rows[0].record.date, '2026-09-23');
   assert.equal(rows[0].record.late, true);
   assert.equal(rows[0].record.days_late, 3);
-  assert.equal(rows[0].record.title, 'You owe · Email Denielle the summary · 3 days late');
+  assert.equal(rows[0].record.title, 'You owe · Email Grace the summary · 3 days late');
   assert.equal(rows[1].record.late, false);
-  assert.equal(rows[1].record.title, 'Owed to you · Kathleen: T4 dates');
+  assert.equal(rows[1].record.title, 'Owed to you · Helen: T4 dates');
 });
 
 
 test('timed comms project as blocks; logged comms as pins', () => {
   const base = {
     id: 'communication_00000000-0000-4000-8000-000000000001',
-    subject: 'Declan essay feedback',
+    subject: 'Ollie essay feedback',
     channel: 'in_person',
     direction: 'outbound',
     status: 'completed',

@@ -1,7 +1,6 @@
 # Calendar: comms, meetings and events (Professional Hub)
 
-Status: design approved by Adam, 26/09/26. The mockups are the visual contract.
-Mockups: `docs/professional-hub/calendar/mockups/index.html` (published as the "Calendar and Comms" artifact, round 2).
+Status: design approved by Adam, 26/09/26. The round-2 mockups were the visual contract while building. They were removed from this repo on 27/09/26 because they used real names, and this repo is public. Examples here use invented people.
 
 ## The idea
 
@@ -9,7 +8,7 @@ Comms, Meetings and Events stop being three separate sections. They become one *
 
 | Kind | What it is | Example |
 |---|---|---|
-| **Comm** | You start it, in any channel: in person, email, call, text, chat | Declan's essay feedback, an email to Amy |
+| **Comm** | You start it, in any channel: in person, email, call, text, chat | Ollie's essay feedback, an email to Nadia |
 | **Meeting** | Someone else's, which you attend. It can be big or small, in person or online, and it has a purpose | HALT board meeting |
 | **Event** | Planned in advance. PD is optional | HALT medal ceremony (not PD), Warlight (PD) |
 
@@ -35,7 +34,7 @@ Students, parents and colleagues are all People. No separate "student" field.
   - Promises you owe: dashed High Sea.
   - Promises owed to you: dashed Wave.
   - Overdue: solid High Sea with "N days late".
-- **Clare's tray.** Clare's proposals ("book session 8", "wrap up Declan", "Denielle's summary is late") follow the ghost rules. They only go into `pending-calendar-ghosts.json`, and Accept writes on the server through `acceptPlan`. A proposed wrap-up block is a ghost chip.
+- **Clare's tray.** Clare's proposals ("book session 8", "wrap up Ollie", "Grace's summary is late") follow the ghost rules. They only go into `pending-calendar-ghosts.json`, and Accept writes on the server through `acceptPlan`. A proposed wrap-up block is a ghost chip.
 - Old routes `#/communications`, `#/meetings` and `#/events` redirect to `#/calendar`. Record routes such as `#/meeting/<id>` and `#/event/<id>` stay.
 
 ## 2. The shared page shell

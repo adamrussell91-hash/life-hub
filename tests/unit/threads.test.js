@@ -30,7 +30,7 @@ function memoryStore() {
 test('thread ids and create validation', () => {
   assert.equal(isValidThreadId('thread_00000000-0000-4000-8000-000000000001'), true);
   assert.equal(isValidThreadId('thread_x'), false);
-  const input = validateThreadCreateInput({ kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'Case Management' });
+  const input = validateThreadCreateInput({ kind: 'case', title: 'Sam K. · case management', purpose_tag: 'Case Management' });
   assert.equal(input.purpose_tag, 'case management');
   assert.deepEqual(input.goals, []);
   assert.throws(() => validateThreadCreateInput({ kind: 'saga', title: 'x' }), { code: 'invalid_kind' });
@@ -51,9 +51,9 @@ test('repository create / get / list / patch', async () => {
     now: () => '2026-09-26T00:00:00.000Z',
     generateId: () => 'thread_00000000-0000-4000-8000-000000000001'
   });
-  const thread = await repo.createThread({ kind: 'case', title: 'Fletcher W. · case management', purpose_tag: 'case management' });
+  const thread = await repo.createThread({ kind: 'case', title: 'Sam K. · case management', purpose_tag: 'case management' });
   assert.equal(thread.status, 'open');
-  assert.equal((await repo.getThread(thread.id)).title, 'Fletcher W. · case management');
+  assert.equal((await repo.getThread(thread.id)).title, 'Sam K. · case management');
   assert.equal((await repo.listThreads()).length, 1);
   const patched = await repo.patchThread(thread.id, { goals: [{ id: 'g1', text: 'Maths C → B', progress: 62 }] });
   assert.equal(patched.goals.length, 1);
@@ -74,12 +74,12 @@ test('threads are entities and records join them with in_thread', async () => {
     now: () => '2026-09-26T00:00:00.000Z',
     generateId: () => 'thread_00000000-0000-4000-8000-000000000001'
   });
-  await repo.createThread({ kind: 'case', title: 'Fletcher W. · case management' });
+  await repo.createThread({ kind: 'case', title: 'Sam K. · case management' });
   const endpoint = await resolveThread(
     'thread_00000000-0000-4000-8000-000000000001',
     createAccessContext({ workflow: 'professional' }),
     { getStore: async () => store }
   );
-  assert.equal(endpoint.display_label, 'Fletcher W. · case management');
+  assert.equal(endpoint.display_label, 'Sam K. · case management');
   assert.equal(endpoint.href, '/professional/#/thread/thread_00000000-0000-4000-8000-000000000001');
 });
