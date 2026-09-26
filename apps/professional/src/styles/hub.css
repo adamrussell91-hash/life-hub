@@ -2551,11 +2551,38 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
+  position: relative;
   clip-path: polygon(0 0, 100% 0, 100% 62%, 50% 100%, 0 62%);
-  background: linear-gradient(160deg, #7a1f2b, #4d1019);
-  color: #fff;
+  background: linear-gradient(160deg, var(--depth), #0f2a4a);
+  color: var(--on-dark);
   font-size: 8px;
   font-weight: 700;
+}
+
+.people-crest__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.people-crest--badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 14px;
+  height: 16px;
+  font-size: 6px;
+  box-shadow: 0 0 0 1px var(--paper);
+}
+
+.people-ring {
+  position: relative;
+}
+
+.people-crest--upload {
+  cursor: pointer;
 }
 
 .people-crest--md {
@@ -2791,6 +2818,12 @@
   }
 
   .people-page--person .people-page__dir {
+    display: none;
+  }
+
+  .people-page--person .people-page__title-row .people-page__search,
+  .people-page--person .people-page__title-row .btn--primary,
+  .people-page--person .people-page__add-host {
     display: none;
   }
 

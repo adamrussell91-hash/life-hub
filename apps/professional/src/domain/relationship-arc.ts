@@ -103,7 +103,7 @@ export function renderRelationshipArcSvg(points: ArcPoint[]): SVGSVGElement {
 
   const area = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   area.setAttribute('d', layout.areaPath);
-  area.setAttribute('fill', '#376fb7');
+  area.setAttribute('fill', 'var(--wave)');
   area.setAttribute('fill-opacity', '0.08');
   area.setAttribute('stroke', 'none');
   svg.append(area);
@@ -111,7 +111,7 @@ export function renderRelationshipArcSvg(points: ArcPoint[]): SVGSVGElement {
   const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   line.setAttribute('d', layout.path);
   line.setAttribute('fill', 'none');
-  line.setAttribute('stroke', '#376fb7');
+  line.setAttribute('stroke', 'var(--wave)');
   line.setAttribute('stroke-width', '2.5');
   svg.append(line);
 
@@ -120,7 +120,7 @@ export function renderRelationshipArcSvg(points: ArcPoint[]): SVGSVGElement {
     c.setAttribute('cx', String(p.x));
     c.setAttribute('cy', String(p.y));
     c.setAttribute('r', '5');
-    c.setAttribute('fill', '#17375e');
+    c.setAttribute('fill', 'var(--depth)');
     svg.append(c);
     if (p.showLabel) {
       const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
@@ -129,7 +129,7 @@ export function renderRelationshipArcSvg(points: ArcPoint[]): SVGSVGElement {
       t.setAttribute('text-anchor', 'middle');
       t.setAttribute('font-family', 'Inter, system-ui, sans-serif');
       t.setAttribute('font-size', '11');
-      t.setAttribute('fill', '#6b7788');
+      t.setAttribute('fill', 'var(--muted)');
       t.textContent = p.label;
       svg.append(t);
     }

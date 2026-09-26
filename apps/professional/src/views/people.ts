@@ -6,7 +6,11 @@
 import { fetchEntityOverview } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
+  fetchOrgCrestUrl,
   fetchPeopleDirectory,
+  signOrgCrest,
+  updateOrganisation,
+  uploadSignedCrest,
   type DirectoryPersonRow,
   type PeopleDirectoryResponse
 } from '@/api/people-directory';
@@ -34,6 +38,36 @@ export interface PeoplePageOptions {
 }
 
 const PHONE_MQ = '(max-width: 719px)';
+
+const ROLE_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: '', label: 'Any relationship' },
+  { value: 'colleague', label: 'Colleague' },
+  { value: 'former_colleague', label: 'Former colleague' },
+  { value: 'mentor', label: 'Mentor' },
+  { value: 'mentee', label: 'Mentee' },
+  { value: 'academic_contact', label: 'Academic contact' },
+  { value: 'research_collaborator', label: 'Research collaborator' },
+  { value: 'recruiter', label: 'Recruiter' },
+  { value: 'referee', label: 'Referee' },
+  { value: 'conference_contact', label: 'Conference contact' },
+  { value: 'introduction', label: 'Introduction' },
+  { value: 'other', label: 'Other' }
+];
+
+const crestUrlCache = new Map<string, string | null>();
+
+async function resolveCrestUrl(orgRef: string | null | undefined, logoKey: string | null | undefined): Promise<string | null> {
+  if (!orgRef || !logoKey) return null;
+  if (crestUrlCache.has(orgRef)) return crestUrlCache.get(orgRef) ?? null;
+  try {
+    const res = await fetchOrgCrestUrl(orgRef);
+    crestUrlCache.set(orgRef, res.url);
+    return res.url;
+  } catch {
+    crestUrlCache.set(orgRef, null);
+    return null;
+  }
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -150,18 +184,78 @@ function groupRows(
   return [...map.entries()].map(([key, v]) => ({ key, label: v.label, monogram: v.monogram, rows: v.rows }));
 }
 
-function crestNode(monogram: string | null, size: 'sm' | 'md' = 'sm'): HTMLElement {
+function crestNode(
+  monogram: string | null,
+  size: 'sm' | 'md' = 'sm',
+  opts: { orgRef?: string | null; logoKey?: string | null; onUpload?: (file: File) => void } = {}
+): HTMLElement {
   const crest = el('span', `people-crest people-crest--${size}${monogram ? '' : ' people-crest--empty'}`);
-  crest.textContent = monogram ?? '';
   crest.setAttribute('aria-hidden', 'true');
+  const label = el('span', 'people-crest__mono', monogram ?? '');
+  crest.append(label);
+  if (opts.orgRef && opts.logoKey) {
+    void resolveCrestUrl(opts.orgRef, opts.logoKey).then((url) => {
+      if (!url) return;
+      label.hidden = true;
+      const img = document.createElement('img');
+      img.className = 'people-crest__img';
+      img.alt = '';
+      img.src = url;
+      crest.prepend(img);
+    });
+  }
+  if (opts.onUpload) {
+    crest.classList.add('people-crest--upload');
+    crest.title = 'Upload crest (PNG or SVG, ≤512KB)';
+    crest.tabIndex = 0;
+    crest.setAttribute('role', 'button');
+    crest.setAttribute('aria-label', 'Upload organisation crest');
+    const pick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/png,image/svg+xml,.png,.svg';
+      input.hidden = true;
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (file) opts.onUpload?.(file);
+        input.remove();
+      });
+      document.body.append(input);
+      input.click();
+    };
+    crest.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pick();
+    });
+    crest.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        pick();
+      }
+    });
+  }
   return crest;
 }
 
-function warmthRing(warmth: number, initials: string, size: 'sm' | 'lg' = 'sm'): HTMLElement {
+function warmthRing(
+  warmth: number,
+  initials: string,
+  size: 'sm' | 'lg' = 'sm',
+  badge?: { monogram: string | null; orgRef?: string | null; logoKey?: string | null }
+): HTMLElement {
   const wrap = el('span', `people-ring people-ring--${size}${warmth < 30 ? ' people-ring--cool' : ''}`);
   wrap.style.setProperty('--w', String(Math.max(0, Math.min(100, warmth))));
   const av = el('span', 'people-avatar', initials);
   wrap.append(av);
+  if (badge) {
+    const badgeEl = crestNode(badge.monogram, 'sm', {
+      orgRef: badge.orgRef,
+      logoKey: badge.logoKey
+    });
+    badgeEl.classList.add('people-crest--badge');
+    wrap.append(badgeEl);
+  }
   return wrap;
 }
 
@@ -353,7 +447,22 @@ export async function renderPeoplePage(
     const groups = groupRows(rows, query.group);
     for (const g of groups) {
       const gh = el('div', 'people-page__group');
-      if (g.monogram) gh.append(crestNode(g.monogram, 'sm'));
+      const sample = g.rows[0]?.organisation;
+      if (g.monogram || sample) {
+        const orgId = sample?.ref?.split(':')[2] ?? null;
+        gh.append(
+          crestNode(g.monogram ?? sample?.monogram ?? null, 'sm', {
+            orgRef: sample?.ref,
+            logoKey: sample?.logo_key ?? null,
+            onUpload:
+              orgId && sample?.ref
+                ? (file) => {
+                    void uploadCrest(sample.ref, orgId, file);
+                  }
+                : undefined
+          })
+        );
+      }
       gh.append(el('span', 'people-page__group-label', g.label));
       gh.append(el('span', 'people-page__group-n', String(g.rows.length)));
       listHost.append(gh);
@@ -364,7 +473,12 @@ export async function renderPeoplePage(
         const a = document.createElement('a');
         a.className = `people-page__row${row.id === selectedId ? ' is-on' : ''}`;
         a.href = peopleRoute(row.id, serializeDirectoryQuery(query));
-        a.append(warmthRing(warmth, row.initials, 'sm'));
+        const org = row.organisation;
+        a.append(
+          warmthRing(warmth, row.initials, 'sm', org
+            ? { monogram: org.monogram, orgRef: org.ref, logoKey: org.logo_key }
+            : undefined)
+        );
         const stack = el('div', 'people-page__row-stack');
         stack.append(el('span', 'people-page__row-name', row.display_name));
         stack.append(el('span', 'people-page__row-sub', roleLine));
@@ -383,6 +497,35 @@ export async function renderPeoplePage(
         });
         listHost.append(a);
       }
+    }
+  }
+
+  async function uploadCrest(orgRef: string, organisationId: string, file: File): Promise<void> {
+    try {
+      const signed = await signOrgCrest({
+        organisation_id: organisationId,
+        filename: file.name,
+        content_type: file.type || (file.name.endsWith('.svg') ? 'image/svg+xml' : 'image/png'),
+        byte_size: file.size
+      });
+      await uploadSignedCrest(signed.put_url, file, signed.attachment.content_type);
+      await updateOrganisation(orgRef, { logo_key: signed.attachment.r2_key });
+      crestUrlCache.delete(orgRef);
+      if (directory) {
+        for (const p of directory.people) {
+          if (p.organisation?.ref === orgRef) p.organisation.logo_key = signed.attachment.r2_key;
+          for (const o of p.organisations) {
+            if (o.ref === orgRef) o.logo_key = signed.attachment.r2_key;
+          }
+        }
+        for (const o of directory.organisations) {
+          if (o.ref === orgRef) o.logo_key = signed.attachment.r2_key;
+        }
+      }
+      renderDirectory();
+      if (selectedId) void paintSelection();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Crest upload failed.');
     }
   }
 
@@ -426,7 +569,22 @@ export async function renderPeoplePage(
       if (headerHost) {
         headerHost.replaceChildren();
         const row = el('div', 'people-pane__header');
-        row.append(warmthRing(model.warmth, model.initials, 'lg'));
+        row.append(
+          warmthRing(
+            model.warmth,
+            model.initials,
+            'lg',
+            model.organisation
+              ? {
+                  monogram: model.organisation.monogram,
+                  orgRef: model.organisation.ref,
+                  logoKey:
+                    directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
+                    null
+                }
+              : undefined
+          )
+        );
         const stack = el('div', 'people-pane__header-stack');
         stack.append(el('h2', 'people-pane__name', model.displayName));
         const chips = el('div', 'people-pane__chips');
@@ -654,6 +812,48 @@ export async function renderPeoplePage(
     sheet.hidden = false;
     sheetInner.replaceChildren();
     sheetInner.append(el('h2', 'people-pane__name', 'Filters'));
+
+    const roleField = el('label', 'people-page__field', 'Relationship');
+    const roleSelect = document.createElement('select');
+    for (const optDef of ROLE_FILTER_OPTIONS) {
+      const opt = document.createElement('option');
+      opt.value = optDef.value;
+      opt.textContent = optDef.label;
+      if ((query.role ?? '') === optDef.value) opt.selected = true;
+      roleSelect.append(opt);
+    }
+    roleField.append(roleSelect);
+
+    const orgScopeField = el('label', 'people-page__field', 'Organisation');
+    const orgScopeSelect = document.createElement('select');
+    for (const [value, label] of [
+      ['all', 'Current & former'],
+      ['current', 'Current only'],
+      ['former', 'Former only']
+    ] as const) {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if (query.orgScope === value) opt.selected = true;
+      orgScopeSelect.append(opt);
+    }
+    orgScopeField.append(orgScopeSelect);
+
+    const orgField = el('label', 'people-page__field', 'Specific organisation');
+    const orgSelect = document.createElement('select');
+    const anyOrg = document.createElement('option');
+    anyOrg.value = '';
+    anyOrg.textContent = 'Any';
+    orgSelect.append(anyOrg);
+    for (const org of directory?.organisations ?? []) {
+      const opt = document.createElement('option');
+      opt.value = org.ref;
+      opt.textContent = org.display_name;
+      if (query.org === org.ref) opt.selected = true;
+      orgSelect.append(opt);
+    }
+    orgField.append(orgSelect);
+
     const warmth = el('label', 'people-page__field', 'Warmth');
     const warmthSelect = document.createElement('select');
     for (const w of ['all', 'warm', 'cooling', 'cold'] as const) {
@@ -664,19 +864,52 @@ export async function renderPeoplePage(
       warmthSelect.append(opt);
     }
     warmth.append(warmthSelect);
+
     const open = document.createElement('label');
     open.className = 'people-page__field';
     const openCb = document.createElement('input');
     openCb.type = 'checkbox';
     openCb.checked = query.hasOpen;
     open.append(openCb, document.createTextNode(' Has open items'));
+
+    let sortSelect: HTMLSelectElement | null = null;
+    let groupSelect: HTMLSelectElement | null = null;
+    if (phone) {
+      const sortField = el('label', 'people-page__field', 'Sort');
+      sortSelect = document.createElement('select');
+      for (const key of Object.keys(SORT_LABELS) as DirectorySort[]) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = SORT_LABELS[key];
+        if (query.sort === key) opt.selected = true;
+        sortSelect.append(opt);
+      }
+      sortField.append(sortSelect);
+      const groupField = el('label', 'people-page__field', 'Group');
+      groupSelect = document.createElement('select');
+      for (const key of Object.keys(GROUP_LABELS) as DirectoryGroup[]) {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = GROUP_LABELS[key];
+        if (query.group === key) opt.selected = true;
+        groupSelect.append(opt);
+      }
+      groupField.append(groupSelect);
+      sheetInner.append(sortField, groupField);
+    }
+
     const apply = el('button', 'btn btn--primary', 'Apply') as HTMLButtonElement;
     apply.type = 'button';
     apply.addEventListener('click', () => {
       query = {
         ...query,
+        role: roleSelect.value || null,
+        org: orgSelect.value || null,
+        orgScope: orgScopeSelect.value as DirectoryQueryState['orgScope'],
         warmth: warmthSelect.value as DirectoryQueryState['warmth'],
-        hasOpen: openCb.checked
+        hasOpen: openCb.checked,
+        sort: (sortSelect?.value as DirectorySort | undefined) ?? query.sort,
+        group: (groupSelect?.value as DirectoryGroup | undefined) ?? query.group
       };
       sheet.hidden = true;
       syncControlLabels();
@@ -688,7 +921,7 @@ export async function renderPeoplePage(
     close.addEventListener('click', () => {
       sheet.hidden = true;
     });
-    sheetInner.append(warmth, open, apply, close);
+    sheetInner.append(roleField, orgScopeField, orgField, warmth, open, apply, close);
   }
 
   filterBtn.addEventListener('click', openFilterSheet);
@@ -728,7 +961,7 @@ export async function renderPeoplePage(
     try {
       directory = await fetchPeopleDirectory();
       if (!isCurrent()) return;
-      count.textContent = `${directory.counts.people} people · ${directory.counts.organisations} organisations`;
+      count.textContent = `${directory.counts.people} ${directory.counts.people === 1 ? 'person' : 'people'} · ${directory.counts.organisations} ${directory.counts.organisations === 1 ? 'organisation' : 'organisations'}`;
       if (!selectedId && directory.people[0] && !phone) {
         // Desktop: leave unselected until click — mockup shows a selection; pick first for empty hash? Plan: `#/people` is directory; selection optional.
       }
