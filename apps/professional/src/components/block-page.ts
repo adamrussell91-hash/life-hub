@@ -5,6 +5,7 @@ import { mountBlockInsert } from '@tasks/views/block-insert';
 export type BlockPageHandle = {
   flush(): Promise<void>;
   current(): Block[];
+  append(blocks: Block[]): void;
   dispose(): void;
 };
 
@@ -63,6 +64,13 @@ export function mountBlockPage(
   return {
     flush: save,
     current: () => blocks,
+    append(extra) {
+      blocks = [...blocks, ...extra];
+      canvas.update(blocks);
+      dirty = true;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => void save(), debounceMs);
+    },
     dispose() {
       if (timer !== null) clearTimeout(timer);
       insert?.dispose();
