@@ -130,7 +130,7 @@ test('completed Horizon writes recent_actions and optional cross_agent', async (
   }
   assert.equal(s.status, 'completed');
   assert.equal(written.length, 1);
-  assert.match(written[0], /Horizon Council: \d{4}-\d{2}-\d{2}: Two load-bearing choices/);
+  assert.match(written[0], /Horizon Council: \d{4}-\d{2}-\d{2}: Two load-bearing choices; next review due \d{4}-\d{2}-\d{2}/);
   assert.match(written[0], /Horizon Council→Hammond: Protect the Wednesday afternoon block/);
   const listed = await service.list('owner');
   assert.equal(listed[0].summary?.title, 'Career forks');

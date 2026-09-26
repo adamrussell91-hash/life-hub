@@ -8,6 +8,7 @@ export const fault=(status,code,message)=>Object.assign(new Error(message),{stat
 const copy=v=>structuredClone(v);
 const words=s=>String(s||'').trim().split(/\s+/u).filter(Boolean).length;
 const stamp=()=>new Date().toISOString();
+const stampCompleted=s=>{if(!s.completedAt)s.completedAt=stamp();};
 const COMPILE=new Set(['map','synthesis','convergence','weave']);
 // Per-protocol non-compile burst budgets (reviewable). Analytic stages get 180; Fates, Consilium dialogue and Tribunal stay short.
 export const BURST_WORDS={
@@ -94,7 +95,7 @@ function refresh(s){
  if(s.protocolId==='mirror'&&['waiting','completed'].includes(s.status)&&!s.allowedActions.includes('correct'))s.allowedActions.push('correct');
  s.updatedAt=stamp();if(Buffer.byteLength(JSON.stringify(s))>MAX_BYTES)throw fault(413,'session_limit','Session storage limit reached. Download this session and start a new one.');return s;
 }
-export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','summary','writeBack'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
+export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','completedAt','summary','writeBack','lastReviewDate','cadenceUnknown'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
 function nextDialogue(s,candidate){
  const voices=['principle','consequence','virtue'],max=s.mode==='extended'?24:12,total=Object.values(s.dialogueCounts).reduce((a,b)=>a+b,0);
  if(total>=max&&canFinish(s))return step('controller','map','reflection',{maxBursts:1,burstWords:425});
@@ -130,7 +131,7 @@ export function act(current,{action,text,revision,requestId}){
  }
  if(action==='close'&&atFilter(s)){add(s,'user','you',s.stage,text?.trim()||'Close the filter.');s.cursor++;s.burst=0;s.continueBurst=false;s.checkpoint=null;s.status='queued';return refresh(s);}
  add(s,'user','you',s.stage,text?.trim()||({confirm:'Confirmed.',uncertain:'Uncertain; proceed with reduced confidence.',decline:'Explicitly declined.',finish:'Ready for the convergence and conflict map.'}[action]));
- if(action==='reflect'){s.status='completed';s.checkpoint=null;return refresh(s);}
+ if(action==='reflect'){s.status='completed';s.checkpoint=null;stampCompleted(s);return refresh(s);}
  if(action==='correct'){
   if(s.protocolId==='witness'){s.cursor=0;s.burst=0;s.verification=null;}
   else if(s.protocolId==='mirror'){s.intake.conflict=text.trim();s.steps=plan(s.protocolId,s.mode,s.intake);s.cursor=0;s.burst=0;add(s,'controller','controller','correction','The prior reading is superseded. Restarting from the corrected conflict.');}
@@ -179,7 +180,13 @@ export function buildPrompt(s,currentStep){
  const midSearch=(s.protocolId==='cartographers'&&['surveyor','miner','cartographer'].includes(speaker))||(s.protocolId==='refinery'&&speaker==='builder');
  const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='ketill'?'You are Ketill only. Near horizon only: stop at two years, even if Adam named a longer one. Three to seven forks in consecutive sentences. Do not number them and do not say fork one. Miðgarðr speech, your own Old Norse words, one physical action, one of your names for Adam. You may ask one steering question per burst in character. No plan and no other voice\'s lines.':'',s.protocolId==='horizon'&&speaker==='alvar'?'You are Alvar only. Far horizon, work backwards, three to seven preconditions in consecutive sentences. Do not number them and do not say first, second or third. Your own Old Norse and mythic territory. You may answer Ketill. You may ask one steering question per burst in character. Do not write his or Sigrid\'s lines. Invent any memory. Do not copy one from the instructions.':'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling.':'',s.protocolId==='horizon'&&speaker==='sigrid'?'You are Sigrid only. One turn of the iron ring. Cross-reference the findings already spoken. Each is a deliberate trade-off, unexamined drift, or unclassified. Ask that and stop. No reassurance and no other voice\'s lines.':'',s.protocolId==='horizon'&&speaker==='controller'?'You are the map compiler, not a fourth voice. Preserve each speaker\'s wording and every contradiction. No praise, plan, or recommendation.':'',s.protocolId==='mirror'&&speaker==='present'&&s.intake.timescale==='long-arc'?'Ask what the user is willing to sit with, tolerate or protect this week.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'' ,s.protocolId==='tribunal'&&stage==='clarify'?'Ask up to two short steering questions that resolve thin or ambiguous intake. No reframe yet.':'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.' :'',midSearch?'You may use one web_search this burst for topic terms only. Never search personal details.':''].filter(Boolean).join('\n');
  const originalInput=isolated||s.protocolId==='tribunal'?{...s.intake}:s.intake;
- return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,tools:midSearch?[{type:'web_search_20250305',name:'web_search'}]:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
+ const lastReviewDate=s.lastReviewDate||s.intake?.lastReviewDate;
+ const frequencyJustification=s.intake?.frequencyJustification;
+ const cadence=s.protocolId==='horizon'&&(lastReviewDate||frequencyJustification)?{
+  ...(lastReviewDate?{lastReviewDate}:{}),
+  ...(frequencyJustification?{frequencyJustification}:{})
+ }:null;
+ return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,tools:midSearch?[{type:'web_search_20250305',name:'web_search'}]:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
 // Voices are prompted for JSON; the provider adapter streams that payload as text.
 // Models often put literal newlines inside strings, which JSON.parse rejects.
@@ -326,10 +333,11 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
    s.cursor++;s.burst=0;s.continueBurst=false;
    if(s.protocolId==='consilium'&&st.stage==='dialogue')s.steps.push(nextDialogue(s,result.nextSpeaker));
   }
-  if(s.cursor>=s.steps.length&&s.status==='running')s.status='completed';
+  if(s.cursor>=s.steps.length&&s.status==='running'){s.status='completed';stampCompleted(s);}
   if(oneStage&&s.status==='running')s.status='queued';
   s=refresh(s);await onProgress(s);
   if(oneStage)break;
  }
- if(s.status==='running')s.status='completed';return refresh(s);
+ if(s.status==='running'){s.status='completed';stampCompleted(s);}
+ return refresh(s);
 }

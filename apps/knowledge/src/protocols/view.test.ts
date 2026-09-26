@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, expect, it, vi } from "vitest";
-import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
+import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, ProtocolRequestError, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
 
 const definition = {
   id: "fates",
@@ -188,6 +188,60 @@ describe("postProtocolAction", () => {
     const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ error: { message: "The session has ended." } }), { status: 410 })) as unknown as typeof fetch;
 
     await expect(postProtocolAction({ sessionId: "sess-1", revision: 3, requestId: "request-3", action: "answer", text: "My reply" }, fetchImpl)).rejects.toThrow("The session has ended.");
+  });
+
+  it("preserves frequency_justification_required and accepts a justified resubmit", async () => {
+    let createCalls = 0;
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      createCalls += 1;
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (!body.intake?.frequencyJustification) {
+        return new Response(JSON.stringify({
+          error: {
+            code: "frequency_justification_required",
+            message: "Last Horizon review was 2026-06-01. Another review before 2026-08-30 needs a frequency justification."
+          }
+        }), { status: 400 });
+      }
+      return new Response(JSON.stringify({
+        data: {
+          session: {
+            id: "sess-h",
+            protocolId: "horizon",
+            mode: "full",
+            status: "waiting",
+            stage: "ketill",
+            speaker: "ketill",
+            revision: 1,
+            transcript: [],
+            checkpoint: { kind: "answer", question: "Which fork?" },
+            allowedActions: ["answer", "cancel"],
+            error: null
+          }
+        }
+      }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await expect(postProtocolAction({
+      protocolId: "horizon", mode: "full", intake: { focus: "Career" }, requestId: "r1"
+    }, fetchImpl)).rejects.toMatchObject({
+      name: "ProtocolRequestError",
+      code: "frequency_justification_required",
+      message: expect.stringContaining("2026-06-01")
+    });
+
+    const session = await postProtocolAction({
+      protocolId: "horizon",
+      mode: "full",
+      intake: {
+        focus: "Career",
+        frequencyJustification: "Last Horizon review was 2026-06-01. Another review before 2026-08-30 needs a frequency justification."
+      },
+      requestId: "r2"
+    }, fetchImpl);
+    expect(session.id).toBe("sess-h");
+    expect(createCalls).toBe(2);
+    expect(ProtocolRequestError).toBeTypeOf("function");
   });
 });
 

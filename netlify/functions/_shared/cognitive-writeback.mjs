@@ -1,6 +1,8 @@
 import { createGitHubClient } from './github-client.mjs';
 import { applyCentralNodePatch } from '../../../apps/life/js/core/central-node-patch.js';
 import { assertAgentMayApplyCentralNodePatch, PROTOCOL_CN_SENDERS } from './hammond-tools.mjs';
+import { horizonNextReviewDue } from './cognitive-horizon.mjs';
+import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 
 export { PROTOCOL_CN_SENDERS };
 
@@ -34,6 +36,18 @@ function clampToSentenceOrClause(text, maxWords) {
     kept = candidate;
   }
   return kept || null;
+}
+
+/** Trim finding so prefix + finding + suffix stay within 200 chars and 40 words. Suffix stays whole. */
+function fitFinding(finding, prefix, suffix) {
+  const maxChars = Math.max(0, 200 - prefix.length - suffix.length);
+  const maxWords = Math.max(0, 40 - words(prefix) - words(suffix));
+  let text = String(finding || '').replace(/!+/g, '.').trim() || 'Run completed.';
+  const tokens = text.split(/\s+/u).filter(Boolean);
+  while (tokens.length && (tokens.length > maxWords || tokens.join(' ').length > maxChars)) {
+    tokens.pop();
+  }
+  return tokens.join(' ') || text.slice(0, maxChars).trim();
 }
 
 export function clampSummary(raw = {}) {
@@ -94,9 +108,18 @@ export async function summariseCompletedSession(session, model) {
 
 export function buildProtocolWriteBackLines(session) {
   const sender = PROTOCOL_CN_SENDERS[session.protocolId] || session.protocolId;
-  const date = (session.updatedAt || new Date().toISOString()).slice(0, 10);
+  const stamp = session.completedAt || session.updatedAt || new Date().toISOString();
+  const date = getSydneyDateKey(new Date(stamp));
   const finding = (session.summary?.keyFinding || 'Run completed.').replace(/!+/g, '.').trim();
-  const recent = `${sender}: ${date}: ${finding}`.slice(0, 200);
+  let recent;
+  if (session.protocolId === 'horizon') {
+    const due = horizonNextReviewDue(stamp);
+    const suffix = `; next review due ${due}`;
+    const prefix = `${sender}: ${date}: `;
+    recent = `${prefix}${fitFinding(finding, prefix, suffix)}${suffix}`;
+  } else {
+    recent = `${sender}: ${date}: ${finding}`.slice(0, 200);
+  }
   const lines = [];
   if (centralNodeLineOk(recent)) {
     lines.push({ section: 'recent_actions', op: 'append_line', payload: { summary: 'Protocol recent action', text: recent }, sender });
