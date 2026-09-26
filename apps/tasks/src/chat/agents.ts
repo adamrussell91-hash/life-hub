@@ -57,7 +57,7 @@ export const CHAT_AGENTS: readonly ChatAgent[] = [
     avatarSrc: '/assets/agents/hammond.jpg',
     placeholder: "What's running. Or name the drift.",
     canEyebrow: 'Hammond can',
-    // Network StressFlag protocols retired — empty tray hides cleanly in build-chat-view.
+    // Empty tray hides cleanly in build-chat-view.
     protocols: [],
     waitLines: [
       'Getting the full picture…',
