@@ -1,8 +1,9 @@
 import { API_BASE } from "../api/config";
 import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
+import { catalog as definitionCatalog } from "../../../../config/knowledge/cognitive/definitions.mjs";
 
-type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
+type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string; description: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
 type Evidence = { id: string; kind?: string; title: string; text?: string; url?: string };
 type Turn = { id: string; role: string; speaker: string; stage: string; text: string; evidenceIds?: string[] };
 type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean }; protocolId?: string; mode?: string; summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[]; forHammond?: string | null } };
@@ -106,6 +107,17 @@ function speakerColor(definition: Definition, speakerId: string): string {
   return SPEAKER_PALETTE[(index < 0 ? 0 : index) % SPEAKER_PALETTE.length];
 }
 
+const LOCAL_VOICE_IDS: Record<string, string[]> = {
+  fates: ["lachesis", "clotho", "atropos", "weave"],
+  horizon: ["ketill", "alvar", "sigrid"],
+  refinery: ["builder", "breaker", "reforger"],
+  cartographers: ["surveyor", "miner", "cartographer"],
+  mirror: ["retrospective", "prospective", "present"],
+  consilium: ["principle", "consequence", "virtue"],
+  witness: ["trace", "patterns", "recalibration"],
+  tribunal: ["inverter", "scaler", "context-shifter"],
+};
+
 const localCatalog: Definition[] = [
   ["fates", "The Three Fates", "Live dialectic across generative, critical and strategic voices.", "Greek threads", "normal", ["Normal", "Sprint", "Long"], ["Lachesis", "Clotho", "Atropos", "The Weave"]],
   ["horizon", "The Horizon Council", "Map present trajectories against a desired future.", "Norse long hall", "full", ["Full", "Brief"], ["Ketill", "Alvar", "Sigrid"]],
@@ -115,7 +127,27 @@ const localCatalog: Definition[] = [
   ["consilium", "The Consilium", "Deliberate through incompatible ethical standpoints without a verdict.", "Roman advisory chamber", "standard", ["Standard", "Extended"], ["The Principle", "The Consequence", "The Virtue"]],
   ["witness", "The Witness", "Audit a specific thinking process before trusting its result.", "Zen and Vipassana observation", "standard", ["Standard", "Deep"], ["Process Trace", "Pattern Match", "Recalibration"]],
   ["tribunal", "The Tribunal of Frames", "Open three independent reframes of an entrenched problem.", "Nested frames and scale", "standard", ["Quick", "Standard", "Deep"], ["The Inverter", "The Scaler", "The Context Shifter"]]
-].map(([id, name, description, motif, defaultMode, modes, voices]) => ({ id, name, description, motif, defaultMode, modes: (modes as string[]).map(label => ({ id: label.toLowerCase(), label })), intake: [{ id: "prompt", label: "What would you like to examine?", required: true, type: "textarea" }], voices: (voices as string[]).map((name, index) => ({ id: ({ fates: ["lachesis", "clotho", "atropos", "weave"], horizon: ["ketill", "alvar", "sigrid"], refinery: ["builder", "breaker", "reforger"], cartographers: ["surveyor", "miner", "cartographer"], mirror: ["retrospective", "prospective", "present"], consilium: ["principle", "consequence", "virtue"], witness: ["trace", "patterns", "recalibration"], tribunal: ["inverter", "scaler", "context-shifter"] } as Record<string, string[]>)[id as string][index], name, role: "" })) }));
+].map(([id, name, description, motif, defaultMode, modes, voices]) => {
+  const protocolId = id as string;
+  const source = (definitionCatalog as Definition[]).find(entry => entry.id === protocolId);
+  return {
+    id: protocolId, name, description, motif, defaultMode,
+    modes: (modes as string[]).map(label => {
+      const modeId = label.toLowerCase();
+      const sourceMode = source?.modes.find(mode => mode.id === modeId);
+      // Only keep a distinct description; otherwise mirror the local label so modeHintText omits it.
+      const description = sourceMode && sourceMode.description.trim() !== sourceMode.label.trim()
+        ? sourceMode.description
+        : label;
+      return { id: modeId, label, description };
+    }),
+    intake: [{ id: "prompt", label: "What would you like to examine?", required: true, type: "textarea" }],
+    voices: (voices as string[]).map((voiceName, index) => {
+      const voiceId = LOCAL_VOICE_IDS[protocolId][index];
+      return { id: voiceId, name: voiceName, role: source?.voices.find(voice => voice.id === voiceId)?.role ?? "" };
+    }),
+  };
+});
 
 async function catalog() {
   if (USE_LOCAL_DATA) return localCatalog;
@@ -208,6 +240,15 @@ function cardArt(id: string) {
   return `<svg class="protocol-card__art" viewBox="0 0 120 208" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${paths[id] ?? paths.tribunal}</svg>`;
 }
 
+function voiceChipHtml(protocolId: string, voice: Definition["voices"][number]): string {
+  const name = escapeHtml(voice.name);
+  const role = voice.role.trim();
+  if (!role) return `<span class="protocol-card__voice">${name}</span>`;
+  const tipId = `protocol-voice-tip-${protocolId}-${voice.id}`;
+  const roleHtml = escapeHtml(role);
+  return `<span class="protocol-card__voice" tabindex="0" aria-describedby="${tipId}">${name}<span class="agent-protocol-pills__tip" id="${tipId}" role="tooltip">${roleHtml}</span><span class="protocol-card__voice-role">${roleHtml}</span></span>`;
+}
+
 function cards(definitions: Definition[]) {
   return definitions.map((d, index) => `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
     <div class="protocol-card__inner">
@@ -216,11 +257,17 @@ function cards(definitions: Definition[]) {
         <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><span class="protocol-card__description">${escapeHtml(d.description)}</span>
       </button>
       <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
-        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => escapeHtml(v.name)).join(" · ")}</p></div>
+        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join("")}</p></div>
         <div class="protocol-card__actions"><button class="btn btn--ghost" data-protocol-flip type="button">Back</button><button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button></div>
       </section>
     </div>
   </article>`).join("");
+}
+
+function modeHintText(mode: Definition["modes"][number] | undefined): string {
+  if (!mode) return "";
+  const description = mode.description.trim();
+  return description && description !== mode.label.trim() ? description : "";
 }
 
 function intake(definition: Definition, gateMessage = "") {
@@ -230,7 +277,9 @@ function intake(definition: Definition, gateMessage = "") {
   const error = gateMessage
     ? `<p class="protocol-intake__error" data-protocol-error role="status">${escapeHtml(gateMessage)}</p>`
     : `<p class="protocol-intake__error" data-protocol-error hidden role="status"></p>`;
-  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label>${freq}<button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form>${error}<p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
+  const selectedMode = definition.modes.find(m => m.id === definition.defaultMode) ?? definition.modes[0];
+  const hint = modeHintText(selectedMode);
+  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><p class="compose__hint" data-protocol-mode-hint ${hint ? "" : "hidden"}>${escapeHtml(hint)}</p><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label>${freq}<button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form>${error}<p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
 }
 
 function compactIntake(definition: Definition, prompt: string, extra: Record<string, string> = {}) {
@@ -476,8 +525,14 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       host.innerHTML = intake(selected, frequencyGate ?? "");
       const prompt = host.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
       const mode = host.querySelector<HTMLSelectElement>('select[name="mode"]');
+      const hint = host.querySelector<HTMLElement>("[data-protocol-mode-hint]");
       if (prompt && lastPrompt) prompt.value = lastPrompt;
       if (mode && lastMode) mode.value = lastMode;
+      if (mode && hint) {
+        const text = modeHintText(selected.modes.find(entry => entry.id === mode.value));
+        hint.textContent = text;
+        hint.hidden = !text;
+      }
     } else {
       host.innerHTML = `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
     }
@@ -503,6 +558,14 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     currentSession = await postProtocolAction(payload);
     paint();
     void poll();
+  };
+  host.onchange = event => {
+    const select = (event.target as HTMLElement).closest<HTMLSelectElement>("select[name='mode']");
+    const hint = select && selected ? host.querySelector<HTMLElement>("[data-protocol-mode-hint]") : null;
+    if (!select || !hint || !selected) return;
+    const text = modeHintText(selected.modes.find(entry => entry.id === select.value));
+    hint.textContent = text;
+    hint.hidden = !text;
   };
   host.onclick = event => {
     const target = event.target as HTMLElement;
