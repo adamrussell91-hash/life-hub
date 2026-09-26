@@ -412,7 +412,7 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
     if (url.pathname === '/api/schedule-projections') {
       if (!readSession(request)) return unauthenticated(response);
       // Empty projections so Professional kit calendar mounts under the mock server.
-      json(response, 200, { ok: true, data: { projections: [] } }, PRIVATE_HEADERS);
+      json(response, 200, { ok: true, data: { projections: [], promises: [] } }, PRIVATE_HEADERS);
       return true;
     }
 

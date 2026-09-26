@@ -2,21 +2,35 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { createMeetingRepository } from './_shared/meeting-repository.mjs';
 import { createEventRepository } from './_shared/event-repository.mjs';
+import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createLedgerItemRepository } from './_shared/ledger-repository.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
-import { mergeScheduleProjections } from './_shared/schedule-projection.mjs';
+import { mergeScheduleProjections, projectCommunicationSchedule } from './_shared/schedule-projection.mjs';
 import {
   resolveMeeting,
   resolveEvent,
+  resolveCommunication,
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
 
 export const config = { path: '/api/schedule-projections' };
 
+function sydneyDateKey(date) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Sydney',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
+}
+
 export function createScheduleProjectionsHandler(deps = {}) {
   const scheduleNow = deps.scheduleNow ?? (() => new Date().toISOString());
   const createMeetings = deps.createMeetingRepository ?? createMeetingRepository;
   const createEvents = deps.createEventRepository ?? createEventRepository;
+  const createCommunications = deps.createCommunicationRepository ?? createCommunicationRepository;
+  const createLedger = deps.createLedgerItemRepository ?? createLedgerItemRepository;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
 
   return createOperatorHandler(
@@ -41,6 +55,12 @@ export function createScheduleProjectionsHandler(deps = {}) {
             getStore: async () => store
           });
         }
+        if (ref?.namespace === 'professional' && ref.kind === 'communication') {
+          return resolveCommunication(ref.id, accessContext, {
+            ...options,
+            getStore: async () => store
+          });
+        }
         return baseResolveEntity(refInput, accessContext, options);
       };
 
@@ -55,12 +75,24 @@ export function createScheduleProjectionsHandler(deps = {}) {
           now: scheduleNow,
           resolveEntity
         });
-        const [meetingProjections, eventProjections] = await Promise.all([
+        const commRepo = createCommunications({
+          store,
+          now: scheduleNow,
+          resolveEntity
+        });
+        const ledgerRepo = createLedger({ store, now: scheduleNow });
+        const today = new Date(scheduleNow());
+        const from = sydneyDateKey(new Date(today.getTime() - 30 * 86_400_000));
+        const to = sydneyDateKey(new Date(today.getTime() + 120 * 86_400_000));
+        const [meetingProjections, eventProjections, communications, promises] = await Promise.all([
           meetingRepo.listScheduleProjections(),
-          eventRepo.listScheduleProjections()
+          eventRepo.listScheduleProjections(),
+          commRepo.listCommunications(),
+          ledgerRepo.listDueBetween(from, to)
         ]);
-        const projections = mergeScheduleProjections([meetingProjections, eventProjections]);
-        return withCors(okResponse(200, { projections }), request, env);
+        const commProjections = communications.map(projectCommunicationSchedule);
+        const projections = mergeScheduleProjections([meetingProjections, eventProjections, commProjections]);
+        return withCors(okResponse(200, { projections, promises }), request, env);
       } catch (error) {
         const status = Number.isInteger(error?.status) ? error.status : 500;
         const code = typeof error?.code === 'string' ? error.code : 'internal_error';

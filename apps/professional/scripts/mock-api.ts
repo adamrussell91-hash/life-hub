@@ -1273,7 +1273,7 @@ export function createMockApi() {
           href: `/professional/#/event/${event.id}`
         }))
       ];
-      return json(200, { ok: true, data: { projections } });
+      return json(200, { ok: true, data: { projections, promises: [] } });
     }
 
     // Local seed so Home Tideline can paint the Hammond tray (Apply / Review / Dismiss).
