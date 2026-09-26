@@ -18,6 +18,7 @@ import {
   stalledLinkedProjects,
   suggestFirstMilestone,
   suggestIfThen,
+  type SomedayKind,
   type SomedayKindFilter
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
@@ -391,6 +392,113 @@ function renderSomedayCard(
   return card;
 }
 
+/** Kind-first capture — Bucket list journal / Dreams jar / Career, not a generic category dropdown. */
+const SOMEDAY_CAPTURE_CHOICES: Array<{ id: SomedayKind; label: string; placeholder: string }> = [
+  {
+    id: 'bucket_list',
+    label: 'Add from bucket list journal',
+    placeholder: 'Something for the bucket list…'
+  },
+  {
+    id: 'dreams_jar',
+    label: 'Dreams jar',
+    placeholder: 'Drop a dream in the jar…'
+  },
+  {
+    id: 'career',
+    label: 'Career',
+    placeholder: 'A career someday idea…'
+  }
+];
+
+function buildSomedayCapture(options: {
+  onCreated: (task: Task) => void;
+  onError: (message: string) => void;
+}): { panel: HTMLElement; reset: () => void } {
+  const panel = el('div', 'someday-capture');
+  const choices = el('div', 'plus-add__choices someday-capture__choices');
+  const form = el('form', 'someday-add hub-toolbar');
+  form.hidden = true;
+
+  const title = createHubSearch({
+    type: 'text',
+    placeholder: 'Capture a someday idea',
+    ariaLabel: 'Someday idea',
+    required: true
+  });
+  const origin = createHubField({
+    type: 'date',
+    ariaLabel: 'Origin date for the new someday idea'
+  });
+  const originWrap = labeledField('Origin', origin.el, 'hub-field hub-field--compact');
+  const kindLabel = el('p', 'someday-capture__kind', '');
+  const back = el('button', 'btn btn--ghost btn--sm', 'Back');
+  back.type = 'button';
+  const submit = el('button', 'btn btn--decisive', 'Park it');
+  submit.type = 'submit';
+  form.append(kindLabel, title.el, originWrap, back, submit);
+
+  let activeKind: SomedayKind | null = null;
+
+  const showChoices = () => {
+    activeKind = null;
+    form.hidden = true;
+    choices.hidden = false;
+    title.input.value = '';
+    origin.input.value = '';
+    originWrap.hidden = true;
+  };
+
+  const showForm = (kind: SomedayKind, label: string, placeholder: string) => {
+    activeKind = kind;
+    choices.hidden = true;
+    form.hidden = false;
+    kindLabel.textContent = label;
+    title.input.placeholder = placeholder;
+    title.input.setAttribute('aria-label', label);
+    originWrap.hidden = !showsOriginDate(kind);
+    title.input.focus();
+  };
+
+  for (const choice of SOMEDAY_CAPTURE_CHOICES) {
+    const btn = el('button', 'btn btn--secondary hub-create__item', choice.label);
+    btn.type = 'button';
+    btn.dataset.somedayKind = choice.id;
+    btn.addEventListener('click', () => showForm(choice.id, choice.label, choice.placeholder));
+    choices.append(btn);
+  }
+
+  back.addEventListener('click', showChoices);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!activeKind) return;
+    const nextTitle = title.input.value.trim();
+    if (!nextTitle) return;
+    submit.disabled = true;
+    try {
+      const created = await tasksApi.createTask({
+        title: nextTitle,
+        domain: 'other',
+        bucket: 'someday',
+        status: 'deferred',
+        someday_kind: activeKind,
+        origin_date: showsOriginDate(activeKind) ? origin.input.value || null : null
+      });
+      showChoices();
+      options.onCreated(created);
+    } catch (err) {
+      options.onError(errorMessage(err));
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  panel.append(choices, form);
+  showChoices();
+  return { panel, reset: showChoices };
+}
+
 /** Someday / Maybe holding pen — off the active board until promoted. Dreams stay even once promoted. */
 export async function renderSomedayView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading someday ideas…', '.someday-view');
@@ -510,61 +618,23 @@ function paintSomeday(
     }).el
   );
 
-  const addForm = el('form', 'someday-add hub-toolbar');
-  const title = createHubSearch({
-    type: 'text',
-    placeholder: 'Capture a someday idea',
-    ariaLabel: 'Someday idea',
-    required: true
-  });
-  const origin = createHubField({
-    type: 'date',
-    ariaLabel: 'Origin date for the new someday idea'
-  });
-  const originWrap = labeledField('Origin', origin.el, 'hub-field hub-field--compact');
-  originWrap.hidden = true;
-  const kind = selectField({
-    ariaLabel: 'Category for the new someday idea',
-    value: '',
-    placeholder: 'Category…',
-    choices: SOMEDAY_KINDS.map((entry) => ({ id: entry.id, label: entry.label })),
-    onChange: (value) => {
-      originWrap.hidden = !showsOriginDate(value);
+  let closeCapture = () => {};
+  const capture = buildSomedayCapture({
+    onCreated: (created) => {
+      closeCapture();
+      setItems([created, ...items]);
+    },
+    onError: (message) => {
+      root.append(el('p', 'empty-state', message));
     }
   });
-  const submit = el('button', 'btn btn--decisive', 'Park it');
-  submit.type = 'submit';
-  addForm.append(title.el, labeledField('Category', kind, 'hub-field hub-field--compact'), originWrap, submit);
   const plus = createPlusAdd({
     ariaLabel: 'Add a someday idea',
-    panel: addForm,
+    panel: capture.panel,
     className: 'plus-add--inline'
   });
-  addForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    submit.disabled = true;
-    try {
-      const someday_kind = kind.value || null;
-      const created = await tasksApi.createTask({
-        title: title.input.value.trim(),
-        domain: 'other',
-        bucket: 'someday',
-        status: 'deferred',
-        someday_kind,
-        origin_date: showsOriginDate(someday_kind) ? origin.input.value || null : null
-      });
-      title.input.value = '';
-      kind.value = '';
-      origin.input.value = '';
-      originWrap.hidden = true;
-      plus.close();
-      setItems([created, ...items]);
-    } catch (err) {
-      root.append(el('p', 'empty-state', errorMessage(err)));
-    } finally {
-      submit.disabled = false;
-    }
-  });
+  closeCapture = () => plus.close();
+  plus.root.querySelector('.plus-add__btn')?.addEventListener('click', () => capture.reset());
   toolbar.append(filters.root, plus.root);
   root.append(toolbar);
 

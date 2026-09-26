@@ -159,6 +159,20 @@ describe('renderSomedayView', () => {
     expect(toolbar?.querySelector('.hub-filters')?.nextElementSibling?.classList.contains('plus-add')).toBe(
       true
     );
+    toolbar?.querySelector<HTMLButtonElement>('.plus-add__btn')?.click();
+    const capture = canvas.querySelector('.someday-capture');
+    expect(capture?.textContent).toContain('Add from bucket list journal');
+    expect(capture?.textContent).toContain('Dreams jar');
+    expect(capture?.querySelector('select')).toBeNull();
+    expect(capture?.querySelector('form.someday-add')?.hasAttribute('hidden')).toBe(true);
+    const jar = [...capture!.querySelectorAll<HTMLButtonElement>('.hub-create__item')].find(
+      (btn) => btn.textContent === 'Dreams jar'
+    );
+    jar?.click();
+    const form = capture!.querySelector<HTMLFormElement>('form.someday-add');
+    expect(form?.hidden).toBe(false);
+    expect(form?.textContent).toContain('Dreams jar');
+    expect(form?.querySelector('[aria-label="Origin date for the new someday idea"]')).toBeTruthy();
     canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
     const branch = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
       (btn) => btn.textContent === 'Branch it'

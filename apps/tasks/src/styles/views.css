@@ -740,6 +740,35 @@
   margin: 0;
 }
 
+.someday-capture {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: min(22rem, 100%);
+}
+
+.someday-capture__choices {
+  margin: 0;
+}
+
+.someday-capture__choices .hub-create__item {
+  flex: 1 1 9rem;
+  justify-content: center;
+  text-align: center;
+}
+
+.someday-capture__kind {
+  margin: 0;
+  flex: 1 1 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+}
+
+.someday-capture .someday-add {
+  margin-bottom: 0;
+}
+
 .someday-cta,
 .someday-preview-card {
   display: flex;
