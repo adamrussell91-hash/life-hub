@@ -107,6 +107,67 @@ describe('program queries', () => {
       expect(index(months[i]!)).toBeGreaterThanOrEqual(index(months[i - 1]!));
     }
   });
+
+  it('composes year + subject filters with month sort', () => {
+    const filtered = queryPrograms(
+      programs,
+      { age_group: 'Year 9', subject: 'Legal', type: 'Competition' },
+      'month'
+    );
+    expect(filtered.length).toBeGreaterThan(0);
+    expect(
+      filtered.every(
+        (item) =>
+          item.age_groups.includes('Year 9') &&
+          item.subjects.includes('Legal') &&
+          item.types.includes('Competition')
+      )
+    ).toBe(true);
+    const months = filtered.map((item) => item.month).filter(Boolean) as string[];
+    const rank = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+      'TBA',
+      'Various'
+    ];
+    for (let i = 1; i < months.length; i += 1) {
+      expect(rank.indexOf(months[i]!)).toBeGreaterThanOrEqual(rank.indexOf(months[i - 1]!));
+    }
+  });
+
+  it('sorts by competition length then title', () => {
+    const sorted = queryPrograms(programs, { type: 'Competition' }, 'length');
+    const lengths = sorted
+      .map((item) => item.competition_length)
+      .filter((value): value is string => Boolean(value));
+    const rank = ['Single Day', 'Long Term', 'Year Long', 'Recurring'];
+    for (let i = 1; i < lengths.length; i += 1) {
+      expect(rank.indexOf(lengths[i]!)).toBeGreaterThanOrEqual(rank.indexOf(lengths[i - 1]!));
+    }
+  });
+
+  it('keeps Model UN search hits when Year 9 and month sort are applied', () => {
+    const hits = queryPrograms(programs, { query: 'model united', age_group: 'Year 9' }, 'month');
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((item) => item.age_groups.includes('Year 9'))).toBe(true);
+    expect(
+      hits.some(
+        (item) =>
+          item.name.toLowerCase().includes('model united') ||
+          item.description.toLowerCase().includes('model united')
+      )
+    ).toBe(true);
+  });
 });
 
 describe('program store', () => {
