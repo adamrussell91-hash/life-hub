@@ -200,6 +200,11 @@ test('professional calendar: Term tier bars; Term↔Year tween; Back/Forward', a
   const { context, page } = await openProfessionalCalendar({ hash: '#/calendar/term' });
   try {
     await page.locator('[data-part="term-river"]').waitFor({ timeout: 15000 });
+    await page.waitForFunction(
+      () => /Term|T3|T4|→/i.test(document.querySelector('[data-part="period"]')?.textContent || ''),
+      null,
+      { timeout: 15000 }
+    );
     assert.match((await page.locator('[data-part="period"]').textContent()) || '', /Term|T3|T4|→/i);
     await page.locator('[data-part="zoom-pills"] button[data-zoom="year"]').click();
     const f = await frames(page, 800, () => ({ t: window.__termRiver?.blend?.() ?? 0 }));

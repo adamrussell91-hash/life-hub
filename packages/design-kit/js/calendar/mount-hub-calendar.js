@@ -56,6 +56,8 @@ export function mountHubCalendar(host, adapter) {
   let ghosts = [];
   let ghostsKey = '';
   let paintToken = 0;
+  /** Suppress paints until the first loadAll finishes so Term/Year never flash empty-terms windows. */
+  let sourcesReady = false;
 
   const shell = doc.createElement('div');
   shell.className = 'hub-calendar-mount';
@@ -102,7 +104,7 @@ export function mountHubCalendar(host, adapter) {
     loadLife: adapter.loadLife,
     today: adapter.today,
     onChange: () => {
-      if (!destroyed) schedulePaint();
+      if (!destroyed && sourcesReady) schedulePaint();
     }
   });
 
@@ -275,6 +277,7 @@ export function mountHubCalendar(host, adapter) {
 
   void loader.loadAll().then(async () => {
     if (destroyed) return;
+    sourcesReady = true;
     await loadGhosts(currentZoom());
     if (!destroyed) paint();
   });
