@@ -179,6 +179,38 @@ export function createMockApi() {
   const pdGroups = new Map<string, Record<string, unknown>>();
   const knowledgePages = new Map<string, Record<string, unknown>>();
   const ledgerItems = new Map<string, Record<string, unknown>>();
+  const achievements = new Map<string, Record<string, unknown>>();
+  const futures = new Map<string, Record<string, unknown>>();
+  const stones = new Map<string, Record<string, unknown>>();
+  const scanProposals = new Map<string, Record<string, unknown>>();
+  const careerMoves = new Map<string, Record<string, unknown>>();
+  let scanState: { last_run_at: string | null; last_success_week: string | null } = {
+    last_run_at: null,
+    last_success_week: null
+  };
+
+  function nextSundayLabel(from = new Date()): string {
+    const d = new Date(from);
+    const day = d.getUTCDay();
+    const add = day === 0 ? 7 : 7 - day;
+    d.setUTCDate(d.getUTCDate() + add);
+    return d.toLocaleDateString('en-AU', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC'
+    });
+  }
+
+  function scanPanelPayload() {
+    const proposals = [...scanProposals.values()].filter((p) => p.status === 'pending');
+    return {
+      proposals,
+      scan_state: scanState,
+      pending_count: proposals.length,
+      next_scan_label: nextSundayLabel()
+    };
+  }
 
   let authenticated = false;
 
@@ -1813,6 +1845,7 @@ export function createMockApi() {
           occurrence_state: event.occurrence_state,
           href: `/professional/#/event/${event.id}`
         }));
+      const pendingScan = [...scanProposals.values()].filter((p) => p.status === 'pending');
       return json(200, {
         ok: true,
         data: {
@@ -1821,9 +1854,186 @@ export function createMockApi() {
           professional_development: { status: 'ok', items: pdItems },
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
-          deferred: ['publication', 'presentation']
+          deferred: ['publication', 'presentation'],
+          achievements: [...achievements.values()],
+          futures: [...futures.values()],
+          stones: [...stones.values()],
+          supports_future: [],
+          answers_criterion: [],
+          stone_for: [],
+          stone_actions: [],
+          scan: {
+            pending_count: pendingScan.length,
+            last_run_at: scanState.last_run_at
+          }
         }
       });
+    }
+
+    if (path === '/api/career-scan' && method === 'GET') {
+      return json(200, { ok: true, data: scanPanelPayload() });
+    }
+
+    if (path === '/api/career-scan' && method === 'POST') {
+      const action = url.searchParams.get('action') || 'run-now';
+      if (action === 'run-now') {
+        scanState = {
+          last_run_at: new Date().toISOString(),
+          last_success_week: scanState.last_success_week
+        };
+        return json(200, {
+          ok: true,
+          data: {
+            skipped: false,
+            sources: 0,
+            saved: 0,
+            spotted_future: null,
+            ...scanPanelPayload()
+          }
+        });
+      }
+      if (action === 'bin') {
+        const id = typeof (body as { id?: string })?.id === 'string' ? (body as { id: string }).id : null;
+        if (!id || !scanProposals.has(id)) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Proposal not found.' } });
+        }
+        const proposal = { ...scanProposals.get(id)!, status: 'binned' };
+        scanProposals.set(id, proposal);
+        return json(200, { ok: true, data: { proposal } });
+      }
+      if (action === 'keep') {
+        const id = typeof (body as { id?: string })?.id === 'string' ? (body as { id: string }).id : null;
+        if (!id || !scanProposals.has(id)) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Proposal not found.' } });
+        }
+        const proposal = scanProposals.get(id)!;
+        const achievementId = `ach_${randomUUID().slice(0, 8)}`;
+        const nowIso = new Date().toISOString();
+        const achievement = {
+          id: achievementId,
+          title: typeof (body as { title?: string })?.title === 'string'
+            ? (body as { title: string }).title
+            : String(proposal.title ?? 'Kept skill'),
+          occurred_on: proposal.occurred_on ?? nowIso.slice(0, 10),
+          date_precision: proposal.date_precision ?? 'day',
+          skills: proposal.skills ?? [],
+          apst: proposal.apst ?? [],
+          source_refs: proposal.source_refs ?? [],
+          created_at: nowIso,
+          updated_at: nowIso
+        };
+        achievements.set(achievementId, achievement);
+        scanProposals.set(id, { ...proposal, status: 'kept' });
+        return json(200, { ok: true, data: { achievement, proposal: scanProposals.get(id) } });
+      }
+      if (action === 'edit') {
+        return json(200, { ok: true, data: { ok: true, note: 'Edit in place on the card, then Keep.' } });
+      }
+      return json(400, { ok: false, error: { code: 'unknown_action', message: 'Unknown scan action.' } });
+    }
+
+    if (path === '/api/career-achievements' && method === 'GET') {
+      return json(200, { ok: true, data: { achievements: [...achievements.values()] } });
+    }
+
+    if (path === '/api/career-achievements' && method === 'POST') {
+      const input = body as { title?: string };
+      const id = `ach_${randomUUID().slice(0, 8)}`;
+      const nowIso = new Date().toISOString();
+      const achievement = {
+        id,
+        title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Untitled',
+        occurred_on: nowIso.slice(0, 10),
+        date_precision: 'day',
+        skills: [],
+        apst: [],
+        source_refs: [],
+        created_at: nowIso,
+        updated_at: nowIso
+      };
+      achievements.set(id, achievement);
+      return json(201, { ok: true, data: { achievement } });
+    }
+
+    if (path === '/api/career-futures' && method === 'GET') {
+      return json(200, { ok: true, data: { futures: [...futures.values()] } });
+    }
+
+    if (path === '/api/career-futures' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      const input = body as { title?: string; where?: string; criteria?: unknown[] };
+      if (action === 'draft') {
+        return json(200, {
+          ok: true,
+          data: {
+            draft: {
+              title: typeof input.title === 'string' ? input.title : 'Draft future',
+              where: typeof input.where === 'string' ? input.where : null,
+              criteria: Array.isArray(input.criteria) ? input.criteria : []
+            }
+          }
+        });
+      }
+      const id = `fut_${randomUUID().slice(0, 8)}`;
+      const nowIso = new Date().toISOString();
+      const future = {
+        id,
+        title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Untitled future',
+        where: typeof input.where === 'string' ? input.where : null,
+        status: 'active',
+        criteria: Array.isArray(input.criteria) ? input.criteria : [],
+        colour_slot: futures.size % 6,
+        created_at: nowIso,
+        updated_at: nowIso
+      };
+      futures.set(id, future);
+      return json(201, { ok: true, data: { future } });
+    }
+
+    if (path === '/api/career-futures' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      if (!id || !futures.has(id)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Future not found.' } });
+      }
+      const patch = (body ?? {}) as Record<string, unknown>;
+      const future = { ...futures.get(id)!, ...patch, id, updated_at: new Date().toISOString() };
+      futures.set(id, future);
+      return json(200, { ok: true, data: { future } });
+    }
+
+    if (path === '/api/career-stones' && method === 'GET') {
+      return json(200, { ok: true, data: { stones: [...stones.values()] } });
+    }
+
+    if (path === '/api/career-stones' && method === 'POST') {
+      const input = body as { title?: string; future_id?: string };
+      const id = `stone_${randomUUID().slice(0, 8)}`;
+      const nowIso = new Date().toISOString();
+      const stone = {
+        id,
+        title: typeof input.title === 'string' && input.title.trim() ? input.title.trim() : 'Untitled stone',
+        future_id: typeof input.future_id === 'string' ? input.future_id : null,
+        status: 'open',
+        created_at: nowIso,
+        updated_at: nowIso
+      };
+      stones.set(id, stone);
+      return json(201, { ok: true, data: { stone } });
+    }
+
+    if (path === '/api/career-stones' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      if (!id || !stones.has(id)) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Stone not found.' } });
+      }
+      const patch = (body ?? {}) as Record<string, unknown>;
+      const stone = { ...stones.get(id)!, ...patch, id, updated_at: new Date().toISOString() };
+      stones.set(id, stone);
+      return json(200, { ok: true, data: { stone } });
+    }
+
+    if (path === '/api/career-moves' && method === 'GET') {
+      return json(200, { ok: true, data: { moves: [...careerMoves.values()] } });
     }
 
     if (path === '/api/tasks' && method === 'POST') {
