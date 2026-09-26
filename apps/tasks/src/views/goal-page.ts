@@ -16,7 +16,7 @@ import { takeGoalMorph } from '@/domain/goal-morph';
 import { LIFE_AREAS } from '@/domain/someday';
 import { DEFAULT_PLANNING_DIRECTION } from '@/schemas/planning-direction';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { enhanceInlineEdit, createTagList } from '../../design-kit/js/hub-inline-edit.js';
+import { createTagList } from '../../design-kit/js/hub-inline-edit.js';
 import {
   createMorphingClosedFieldPopover,
   createMorphingNotePopover,
@@ -28,6 +28,7 @@ import { morphFromRect, runMorphTransform } from '../../design-kit/js/morphing-d
 import { renderCardMenu } from '@/views/card-menu';
 import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { mountHammondPanel } from '@/views/hammond-goal';
+import { bindEditablePageTitle } from '@/shell/shell';
 
 const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
   { id: 'woop', label: 'WOOP' },
@@ -143,6 +144,18 @@ function parseTermValue(value: string): GoalTerm | null {
   return { year: Number(match[1]), term: Number(match[2]) as 1 | 2 | 3 | 4 };
 }
 
+function reflectSavedTitle(root: HTMLElement, previous: string, title: string): void {
+  const goalLink = root.querySelector<HTMLElement>('[data-chain="goal"]');
+  if (goalLink) goalLink.textContent = title;
+  if (!previous || previous === title) return;
+  for (const echo of root.querySelectorAll<HTMLElement>('[aria-label], [placeholder], [title]')) {
+    for (const attr of ['aria-label', 'placeholder', 'title'] as const) {
+      const value = echo.getAttribute(attr);
+      if (value?.includes(previous)) echo.setAttribute(attr, value.split(previous).join(title));
+    }
+  }
+}
+
 function descriptionPreview(text: string): string {
   const lines = text.trim().split(/\n+/).filter(Boolean);
   if (!lines.length) return 'Add a description';
@@ -163,21 +176,46 @@ function paint(
       .then((next) => paint(canvas, { ...state, goal: normalizeGoal(next) }, mountHammond, options))
       .catch((err) => window.alert(errorMessage(err)));
 
-  // G-06: title in the page header is editable inline.
-  const headerTitle =
-    options.header?.querySelector<HTMLElement>('.page-header__title') ??
-    options.header?.querySelector<HTMLElement>('h1');
-  if (headerTitle) {
-    headerTitle.textContent = goal.title;
-    headerTitle.setAttribute('aria-label', 'Goal title');
-    headerTitle.setAttribute('data-hub-morph', 'title');
-    enhanceInlineEdit(headerTitle, {
+  // G-06: draft locally. One PATCH on blur/Enter. Stale responses never overwrite a newer title.
+  let headerTitle: HTMLElement | null = null;
+  let savedTitle = goal.title;
+  let titleSave = 0;
+  if (options.header) {
+    headerTitle =
+      options.header.querySelector<HTMLElement>('.page-header__title') ??
+      options.header.querySelector<HTMLElement>('h1');
+    headerTitle?.classList.remove('hub-kinetic');
+    bindEditablePageTitle(options.header, goal.title, {
+      current: () => savedTitle,
       onCommit: (value) => {
         const next = value.trim();
-        if (!next || next === goal.title) return;
-        void save({ title: next });
+        if (!next || next === savedTitle) return;
+        const id = ++titleSave;
+        void tasksApi
+          .updateGoal(goal.id, { title: next })
+          .then((updated) => {
+            if (id !== titleSave) return;
+            const title = normalizeGoal(updated).title;
+            const previous = savedTitle;
+            savedTitle = title;
+            const field = options.header?.querySelector<HTMLTextAreaElement>('.page-header__title-input');
+            if (field && document.activeElement === field) {
+              reflectSavedTitle(canvas, previous, title);
+              return;
+            }
+            paint(canvas, { ...state, goal: normalizeGoal({ ...updated, title }) }, mountHammond, options);
+          })
+          .catch((err) => {
+            if (id !== titleSave) return;
+            window.alert(errorMessage(err));
+          });
       }
     });
+    // Remorph target after bindEditablePageTitle replaces h1 with textarea.
+    headerTitle =
+      options.header.querySelector<HTMLElement>('.page-header__title') ??
+      options.header.querySelector<HTMLElement>('h1');
+    headerTitle?.setAttribute('data-hub-morph', 'title');
   }
 
   canvas.replaceChildren();
@@ -193,9 +231,12 @@ function paint(
     if (seg.href && !seg.muted) {
       const link = el('a', 'goal-page__chain-link', seg.label) as HTMLAnchorElement;
       link.href = seg.href;
+      link.dataset.chain = seg.id;
       chain.append(link);
     } else {
-      chain.append(el('span', `goal-page__chain-link${seg.muted ? ' is-muted' : ''}`, seg.label));
+      const span = el('span', `goal-page__chain-link${seg.muted ? ' is-muted' : ''}`, seg.label);
+      span.dataset.chain = seg.id;
+      chain.append(span);
     }
   });
 
@@ -273,9 +314,10 @@ function paint(
 
   const descPreview = el('p', 'goal-page__description', descriptionPreview(goal.description ?? ''));
   descPreview.dataset.slot = 'description-preview';
+  const descEmpty = !(goal.description ?? '').trim();
   const descApi = createMorphingNotePopover({
     root: document,
-    label: 'Edit description',
+    label: descEmpty ? 'Add description' : 'Edit description',
     title: 'Description',
     value: goal.description ?? '',
     rows: 4,
@@ -287,7 +329,9 @@ function paint(
   });
   const descHost = el('div', 'goal-page__desc');
   descHost.dataset.slot = 'description';
-  descHost.append(descPreview, descApi.el);
+  // One control: hide the preview line when empty so only Add description shows.
+  if (!descEmpty) descHost.append(descPreview);
+  descHost.append(descApi.el);
 
   const tags = createTagList({
     tags: goal.tags ?? [],
@@ -345,7 +389,10 @@ function paint(
     chip.title = 'Source dream on Someday';
     metaLeft.append(chip);
   }
-  metaLeft.append(chips, descHost, tags.el, lifeWall.el);
+  metaLeft.append(chips);
+  const metaCard = el('div', 'goal-page__meta-card glass-tile');
+  metaCard.append(descHost, tags.el, lifeWall.el);
+  metaLeft.append(metaCard);
   meta.append(metaLeft, metaActions);
 
   const page = el('div', 'goal-page');

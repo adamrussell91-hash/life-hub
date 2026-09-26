@@ -100,17 +100,28 @@ describe('goal page', () => {
     const canvas = document.createElement('div');
     const header = document.createElement('header');
     const title = document.createElement('h1');
-    title.className = 'page-header__title';
-    title.textContent = 'HA evidence';
+    title.className = 'page-header__title hub-kinetic';
+    // Simulate kinetic doubling that used to corrupt textContent on edit.
+    const sr = document.createElement('span');
+    sr.className = 'hub-kinetic__sr';
+    sr.textContent = 'HA evidence';
+    const vis = document.createElement('span');
+    vis.textContent = 'HA evidence';
+    title.append(sr, vis);
     header.append(title);
     await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
 
-    expect(title.classList.contains('hub-inline-edit')).toBe(true);
-    title.click();
-    const input = title.querySelector('input')!;
-    input.value = 'Renamed goal';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: 'Renamed goal' });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('HA evidence');
+    expect(header.querySelector('.hub-kinetic')).toBeNull();
+    input.value = 'Study at Cambridge';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+    input.dispatchEvent(new Event('blur'));
+    expect(tasksApi.updateGoal).toHaveBeenCalledTimes(1);
+    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: 'Study at Cambridge' });
+    expect(input.value).toBe('Study at Cambridge');
 
     expect(canvas.querySelector('[data-chip="sphere"]')?.textContent).toMatch(/Professional/i);
     expect(canvas.querySelector('[data-chip="status"]')?.textContent).toMatch(/Active/i);
@@ -119,7 +130,8 @@ describe('goal page', () => {
     expect(canvas.querySelector('[data-chip="due-date"]')?.textContent).toMatch(/20\/03\/27/);
     expect(canvas.querySelector('[data-slot="description-preview"]')?.textContent).toContain('First line');
     expect(canvas.querySelector('[data-slot="tags"]')).toBeTruthy();
-    expect(canvas.querySelector('[data-slot="life-wall"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-slot="life-wall"]')?.textContent).toMatch(/Life Wall/);
+    expect(canvas.querySelector('.goal-page__meta-card')).toBeTruthy();
 
     vi.mocked(tasksApi.getGoal).mockResolvedValueOnce(
       goal({ ...G, sphere: 'life', life_area: 'health' })
@@ -139,4 +151,134 @@ describe('goal page', () => {
     expect(offerTimedUndo).toHaveBeenCalled();
     expect(tasksApi.deleteGoal).toHaveBeenCalledWith('g1');
   });
+
+  it('G-06 rename keeps spaces exactly when seeded from goal.title', async () => {
+    vi.mocked(tasksApi.getGoal).mockResolvedValueOnce(goal({ ...G, title: 'Study at Cambridge' }));
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    const title = document.createElement('h1');
+    title.className = 'page-header__title hub-kinetic';
+    title.textContent = 'Study at CambridgeStudy at Cambridge';
+    header.append(title);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    expect(input.value).toBe('Study at Cambridge');
+  });
+
+  it('saves a title once on blur, with the full text', async () => {
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    header.append(heading('HA evidence'));
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    const text = 'Study at Cambridge check';
+    for (let i = 1; i <= text.length; i += 1) {
+      input.value = text.slice(0, i);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+    input.dispatchEvent(new Event('blur'));
+    expect(tasksApi.updateGoal).toHaveBeenCalledTimes(1);
+    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: text });
+  });
+
+  it('saves on Enter and does not insert a newline', async () => {
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    header.append(heading('HA evidence'));
+    document.body.append(header);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    input.focus();
+    input.value = 'Study at Cambridge check';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(input.value).toBe('Study at Cambridge check');
+    expect(tasksApi.updateGoal).toHaveBeenCalledTimes(1);
+    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: 'Study at Cambridge check' });
+    header.remove();
+  });
+
+  it('keeps the newer title when save responses arrive out of order', async () => {
+    const pending: Array<{ title: string; resolve: (goal: ReturnType<typeof goal>) => void }> = [];
+    vi.mocked(tasksApi.updateGoal).mockImplementation(
+      (_id, patch) =>
+        new Promise((resolve) => {
+          pending.push({ title: String((patch as { title?: string }).title), resolve });
+        })
+    );
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    header.append(heading('HA evidence'));
+    document.body.append(canvas, header);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+
+    input.value = 'Study at Cambridge one';
+    input.dispatchEvent(new Event('blur'));
+    input.value = 'Study at Cambridge two';
+    input.dispatchEvent(new Event('blur'));
+    expect(pending.map((item) => item.title)).toEqual(['Study at Cambridge one', 'Study at Cambridge two']);
+
+    pending[1]!.resolve(goal({ ...G, title: 'Study at Cambridge two' }));
+    await Promise.resolve();
+    pending[0]!.resolve(goal({ ...G, title: 'Study at Cambridge one' }));
+    await Promise.resolve();
+
+    const field = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    expect(field.value).toBe('Study at Cambridge two');
+    expect(canvas.querySelector('[data-chain="goal"]')?.textContent).toBe('Study at Cambridge two');
+    field.dispatchEvent(new Event('blur'));
+    expect(tasksApi.updateGoal).toHaveBeenCalledTimes(2);
+    canvas.remove();
+    header.remove();
+  });
+
+  it('does not write a title response into a focused field', async () => {
+    let resolveSave: (goal: ReturnType<typeof goal>) => void = () => undefined;
+    vi.mocked(tasksApi.updateGoal).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSave = resolve;
+        })
+    );
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    header.append(heading('HA evidence'));
+    document.body.append(canvas, header);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    input.value = 'Study at Cambridge check';
+    input.dispatchEvent(new Event('blur'));
+    input.focus();
+    input.value = 'Study at Cambridge check still typing';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    resolveSave(goal({ ...G, title: 'Study at Cambridge check' }));
+    await Promise.resolve();
+    expect(input.value).toBe('Study at Cambridge check still typing');
+    expect(document.activeElement).toBe(input);
+    canvas.remove();
+    header.remove();
+  });
+
+  it('restores the saved title on Escape and does not save', async () => {
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    header.append(heading('HA evidence'));
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    input.value = 'Study at Cambridge nope';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(input.value).toBe('HA evidence');
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+    input.dispatchEvent(new Event('blur'));
+    expect(tasksApi.updateGoal).not.toHaveBeenCalled();
+  });
 });
+
+function heading(text: string): HTMLHeadingElement {
+  const title = document.createElement('h1');
+  title.className = 'page-header__title';
+  title.textContent = text;
+  return title;
+}

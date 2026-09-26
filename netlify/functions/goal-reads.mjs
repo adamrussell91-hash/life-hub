@@ -16,7 +16,12 @@ import {
   decisionsKey,
   quietLinesForCooled
 } from './_shared/goal-dismissal-learn.mjs';
+import { createGitHubClient } from './_shared/github-client.mjs';
+import { decodeBlob } from './_shared/decode-blob.mjs';
+import { githubOpenCommit, readEvents } from './_shared/calendar-ghosts-propose.mjs';
+import { bindingFromEvents, buildSlotsFromEvents } from './_shared/goal-calendar-context.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
+import { addDays } from '../../packages/design-kit/js/lead-lines.js';
 
 export const config = { path: '/api/goal-reads' };
 const HUB_PREFS_KEY = 'meta/hub_prefs';
@@ -121,7 +126,40 @@ export async function readForGoal(store, goal, inputs, {
   return { read, reason };
 }
 
-async function loadHammondExtras(store, deps = {}) {
+/**
+ * G-30 / G-31: open the Life data repo the same way calendar-ghosts-propose does,
+ * then derive protect_block slots and binding-goal signal. Failures are soft.
+ */
+export async function defaultLoadCalendarContext({
+  env = process.env,
+  today,
+  createGitHubClient: createClient = createGitHubClient,
+  decodeBlob: decode = decodeBlob,
+  warn = console.warn
+} = {}) {
+  const empty = { slots: [], binding: null, calendarLooked: false, lifeHubLooked: false };
+  if (typeof today !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return empty;
+  try {
+    const client = createClient({ env });
+    const { open } = githubOpenCommit(client, { decodeBlob: decode });
+    const opened = await open();
+    const paths = typeof opened.listPaths === 'function' ? opened.listPaths() : [];
+    const from = addDays(today, -7);
+    const to = addDays(today, 14);
+    const events = await readEvents(paths, path => opened.readFile(path), from, to, warn);
+    return {
+      slots: buildSlotsFromEvents(events, today),
+      binding: bindingFromEvents(events, today),
+      calendarLooked: true,
+      lifeHubLooked: true
+    };
+  } catch (err) {
+    warn?.(`goal-reads: calendar context unavailable (${err instanceof Error ? err.message : err})`);
+    return empty;
+  }
+}
+
+async function loadHammondExtras(store, deps = {}, { today, env } = {}) {
   const decisionsDoc = await getJSON(store, decisionsKey()).catch(() => null);
   const cooledKinds = cooledKindsFromDecisions(decisionsDoc?.decisions ?? []);
   const quiet = quietLinesForCooled(cooledKinds);
@@ -129,16 +167,22 @@ async function loadHammondExtras(store, deps = {}) {
   let binding = null;
   let calendarLooked = false;
   let lifeHubLooked = false;
-  if (typeof deps.loadCalendarContext === 'function') {
-    try {
-      const ctx = await deps.loadCalendarContext();
-      slots = Array.isArray(ctx?.slots) ? ctx.slots : [];
-      binding = ctx?.binding ?? null;
-      calendarLooked = Boolean(ctx?.calendarLooked);
-      lifeHubLooked = Boolean(ctx?.lifeHubLooked);
-    } catch (err) {
-      console.warn('goal-reads: calendar context skipped', err?.message ?? err);
-    }
+  const loadCalendarContext = deps.loadCalendarContext
+    ?? (() => defaultLoadCalendarContext({
+      env: deps.env ?? env,
+      today,
+      createGitHubClient: deps.createGitHubClient,
+      decodeBlob: deps.decodeBlob,
+      warn: deps.warn
+    }));
+  try {
+    const ctx = await loadCalendarContext();
+    slots = Array.isArray(ctx?.slots) ? ctx.slots : [];
+    binding = ctx?.binding ?? null;
+    calendarLooked = Boolean(ctx?.calendarLooked);
+    lifeHubLooked = Boolean(ctx?.lifeHubLooked);
+  } catch (err) {
+    console.warn('goal-reads: calendar context skipped', err?.message ?? err);
   }
   return { slots, binding, calendarLooked, lifeHubLooked, cooledKinds, quiet };
 }
@@ -159,7 +203,7 @@ export function createGoalReadsHandler(deps = {}) {
     const { env, store } = context;
     try {
       const today = getSydneyDateKey(new Date(now()));
-      const extras = await loadHammondExtras(store, deps);
+      const extras = await loadHammondExtras(store, deps, { today, env });
       if (request.method === 'GET') {
         const inputs = await loadGoalInputs(store);
         const url = new URL(request.url);

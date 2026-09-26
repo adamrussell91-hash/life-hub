@@ -157,20 +157,17 @@ export function openSundayCheckIn(
       done.type = 'button';
       done.addEventListener('click', () => {
         const planned = Math.min(3, stuck.flatMap((g) => envelopes.find((e) => e.read?.goal_id === g.id)?.read?.ghosts ?? []).length);
-        void fetch('/api/goal-checkins', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
+        void tasksApi
+          .saveGoalCheckin({
             date: today,
             moved: moved.map((g) => g.id),
             stuck: [...reasons.entries()].map(([id, reason]) => ({ id, reason })),
             moves_planned: planned
           })
-        }).finally(() => {
-          sheet.remove();
-          onDone();
-        });
+          .finally(() => {
+            sheet.remove();
+            onDone();
+          });
       });
       nav.append(done);
     }
