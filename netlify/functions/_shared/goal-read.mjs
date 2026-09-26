@@ -102,7 +102,7 @@ function proposals({ goal, hostedTasks, tasks, today, crunch, domain }) {
   if (!open.length) {
     out.push({
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: goal.next_start || `First step on “${goal.title}”`, due: addDays(today, 2),
+      title: goal.next_start || `First step: ${goal.title}`, due: addDays(today, 2),
       goalId: goal.id, domain, reason: 'Nothing is open under this goal'
     });
   }
@@ -116,9 +116,9 @@ function proposals({ goal, hostedTasks, tasks, today, crunch, domain }) {
         id: `${prefix}split-${candidate.id}`, agent: 'hammond', kind: 'split_task',
         taskId: candidate.id, title: candidate.title,
         steps: [
-          `Get what you need for “${candidate.title}” (10 min)`,
+          `Get what you need for ${candidate.title} (10 min)`,
           'Do a rough first pass (20 min)',
-          `Finish and tick off “${candidate.title}” (10 min)`
+          `Finish and tick off ${candidate.title} (10 min)`
         ],
         goalId: goal.id, domain: candidate.domain || domain,
         reason: big ? 'It is one big block, and big blocks are hard to start' : 'It is due within a week'
@@ -158,7 +158,7 @@ export function protectBlockProposal({ goal, hostedTasks, today, slots = [], cou
   if (!slot) return null;
   const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
   const move = open.sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))[0];
-  const title = move?.title || goal.next_start || `Work on “${goal.title}”`;
+  const title = move?.title || goal.next_start || `Work on ${goal.title}`;
   const minutes = typeof move?.estimated_duration === 'number' && move.estimated_duration > 0
     ? move.estimated_duration
     : 45;
@@ -196,9 +196,9 @@ export function stuckReasonGhost({
         id: `${prefix}split-${candidate.id}`, agent: 'hammond', kind: 'split_task',
         taskId: candidate.id, title: candidate.title,
         steps: [
-          `Get what you need for “${candidate.title}” (10 min)`,
+          `Get what you need for ${candidate.title} (10 min)`,
           'Do a rough first pass (20 min)',
-          `Finish and tick off “${candidate.title}” (10 min)`
+          `Finish and tick off ${candidate.title} (10 min)`
         ],
         goalId: goal.id, domain: candidate.domain || domain,
         reason: 'Stuck: too big — split it so the first step fits in a short block'
@@ -206,7 +206,7 @@ export function stuckReasonGhost({
     }
     return {
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: `First small step on “${goal.title}”`, due: addDays(today, 2),
+      title: `First step: ${goal.title}`, due: addDays(today, 2),
       goalId: goal.id, domain,
       reason: 'Stuck: too big — start with one small, finishable step'
     };
@@ -214,7 +214,7 @@ export function stuckReasonGhost({
   if (stuck_reason === 'unclear') {
     return {
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: `SMARTER check: what does done look like for “${goal.title}”?`,
+      title: `SMARTER check: what does done look like for ${goal.title}?`,
       due: addDays(today, 2), goalId: goal.id, domain,
       reason: 'Stuck: unclear — tighten Specific / Measurable / Achievable / Relevant / Time-bound / Exciting / Recorded'
     };
@@ -222,7 +222,7 @@ export function stuckReasonGhost({
   if (stuck_reason === 'boring') {
     return {
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: `If it’s after coffee tomorrow, then 10 min on “${goal.title}”`,
+      title: `If it's after coffee tomorrow, then 10 min on ${goal.title}`,
       due: addDays(today, 1), goalId: goal.id, domain,
       reason: 'Stuck: boring — an if-then cue beats waiting for motivation'
     };
@@ -234,7 +234,7 @@ export function stuckReasonGhost({
     }
     return {
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: `15-min protect for “${goal.title}”`, due: addDays(today, 1),
+      title: `15-min protect for ${goal.title}`, due: addDays(today, 1),
       goalId: goal.id, domain,
       reason: 'Stuck: no time — book a short protect even without a free calendar slot'
     };
@@ -242,7 +242,7 @@ export function stuckReasonGhost({
   if (stuck_reason === 'waiting') {
     return {
       id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
-      title: `Chase the wait on “${goal.title}”`, due: addDays(today, 1),
+      title: `Chase the wait on ${goal.title}`, due: addDays(today, 1),
       goalId: goal.id, domain,
       reason: 'Stuck: waiting on someone — one chase keeps it warm'
     };

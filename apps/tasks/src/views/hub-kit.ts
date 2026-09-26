@@ -203,7 +203,22 @@ export function createHubPills<T extends string>(options: {
     } else {
       btn.setAttribute('aria-pressed', pressed ? 'true' : 'false');
     }
-    btn.addEventListener('click', () => options.onSelect(item.id));
+    btn.addEventListener('click', () => {
+      if (typeof options.value === 'string') {
+        for (const sibling of pills.querySelectorAll<HTMLElement>('.hub-pills__btn')) {
+          const on = sibling === btn;
+          sibling.classList.toggle('is-active', on);
+          if (isTablist) sibling.setAttribute('aria-selected', on ? 'true' : 'false');
+          else sibling.setAttribute('aria-pressed', on ? 'true' : 'false');
+        }
+      } else {
+        const on = !btn.classList.contains('is-active');
+        btn.classList.toggle('is-active', on);
+        if (isTablist) btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        else btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      options.onSelect(item.id);
+    });
     pills.append(btn);
   }
   return pills;

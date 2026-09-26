@@ -2,7 +2,7 @@
 
 **Progress: 46/46 (100%)**
 
-Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
+Branch: `fix/goals-v2-live-review` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
 ## Baseline (recorded before any code)
 
@@ -24,7 +24,9 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M2: Basic editing on the goal page
 
-- [x] **G-06** Rename (inline edit) — `a3058265`
+- [x] **G-06** Rename (inline edit) — live review fix: `bindEditablePageTitle` seeded from `goal.title`; no kinetic on editable titles
+  - **Reopened (live review 26/09):** page `h1` had both `hub-kinetic` and `hub-inline-edit`; spaces collapsed and `textContent` doubled.
+  - **Re-ticked (live review 26/09):** separate textarea input; kinetic stripped; test rename "Study at Cambridge".
 - [x] **G-07** Sphere / Status / Term / Life area chips — `a3058265`
 - [x] **G-08** Due date chip — `a3058265`
 - [x] **G-09** Description popover — `a3058265`
@@ -37,16 +39,24 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 - [x] **G-13** Runway filters by term + Ongoing group — `cd99ab06`
 - [x] **G-14** Lane cap (term only) + park-one / add-as-parked — `cd99ab06`
 - [x] **G-15** New goal form: sphere / term / life area chips — `cd99ab06`
-- [x] **G-16** Plan next term (card-swipe) — `cd99ab06`
-- [x] **G-17** Year pill + Term↔Year zoom — `0e8d5a7c`
-- [x] **G-18** Direction strip — `cd99ab06`
-- [x] **G-19** Active-projects meter — `cd99ab06`
+- [x] **G-16** Plan next term (card-swipe) — live review fix: always opens; Ongoing choices; empty → New goal
+  - **Reopened (live review 26/09):** with no active goals in the term the sheet stayed silent.
+  - **Re-ticked (live review 26/09):** Ongoing + empty-state New goal; never a dead button.
+- [x] **G-17** Year pill + Term↔Year zoom — live review fix: pill `is-active` sync; Term W1…W10; Year label fit + Move pad; media remount
+  - **Reopened (live review 26/09):** pills vs display mismatch; Term window around today; Year mash / Term 4 behind Move; phone Year at 1440.
+  - **Re-ticked (live review 26/09):** one mode source; Term River rules 4–5; PAD_R for Move; matchMedia remount.
+- [x] **G-18** Direction strip — live review fix: `[hidden]` CSS; glass card surface; starts collapsed
+  - **Reopened (live review 26/09):** editor `[hidden]` still visible; need real card surface.
+  - **Re-ticked (live review 26/09):** `.goals-direction__editor[hidden]{display:none}` + glass tokens.
+- [x] **G-19** Active-projects meter — live review polish: compact inline meter
 - [x] **G-20** Week cell count + lead measure figure — `0e8d5a7c`
 
 ## M4: Goal page
 
 - [x] **G-21** Chain breadcrumb — 
-- [x] **G-22** Row → page morph — 
+- [x] **G-22** Row → page morph — live review fix: real links + Enter; morph title text only; phone morph
+  - **Reopened (live review 26/09):** zoom rows / keyboard / clipboard corruption from kinetic title.
+  - **Re-ticked (live review 26/09):** `href` + keydown; chip-free morph source; no clipboard writes in runway.
 - [x] **G-23** Structure switch morph + Details disclosure — 
 - [x] **G-24** Linked measure for current — 
 
@@ -63,10 +73,12 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M7: Hammond, the smarter version
 
-- [x] **G-30** Calendar-aware protect_block — `b55a8fd6`
-  - **Reopened:** production `createGoalReadsHandler()` never passed `loadCalendarContext`, so Hammond never proposed calendar blocks. Fixed on `fix/goals-calendar-context` (default loader via `createGitHubClient` / `githubOpenCommit` / `readEvents`). Commit: `4e60ec48`.
-- [x] **G-31** Life Hub signals — `b55a8fd6`
-  - **Reopened:** same missing default loader meant binding-goal signal never reached the read. Fixed with G-30 on `fix/goals-calendar-context`. Commit: `4e60ec48`.
+- [x] **G-30** Calendar-aware protect_block — via `#486` on main; re-verified tests (a)–(d)
+  - **Reopened (live review 26/09):** production never passed `loadCalendarContext`.
+  - **Re-ticked (live review 26/09):** rebased onto main with #486; `goal-reads-calendar-context` 6/6 pass.
+- [x] **G-31** Life Hub signals — same as G-30
+  - **Reopened (live review 26/09):** same missing default loader.
+  - **Re-ticked (live review 26/09):** with G-30 on main.
 - [x] **G-32** Model-written verdict + splits — `b55a8fd6`
 - [x] **G-33** Dismissal learning — `b55a8fd6`
 - [x] **G-34** Honest looked-at labels — `b55a8fd6`
@@ -74,8 +86,12 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M8: Sunday check-in
 
-- [x] **G-36** Sunday check-in 3-step flow — `7b710316`
-- [x] **G-37** Check-in saved + strip line — `7b710316`
+- [x] **G-36** Sunday check-in 3-step flow — live review fix: `tasksApi.saveGoalCheckin`
+  - **Reopened (live review 26/09):** relative `fetch('/api/goal-checkins')` 404s on life-hub.
+  - **Re-ticked (live review 26/09):** through `apiPost` + `getApiBaseUrl()`; unit test asserts tasksApi.
+- [x] **G-37** Check-in saved + strip line — live review fix: `tasksApi.getGoalCheckins`
+  - **Reopened (live review 26/09):** same relative fetch; strip line never loads.
+  - **Re-ticked (live review 26/09):** through `apiGet`; strip uses unwrapped `{ checkin }`.
 
 ## M9: Weekly review
 
@@ -87,13 +103,15 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 - [x] **G-41** Every §4 animation + reduced motion — — — `36dd2fe5`
 - [x] **G-42** Keyboard access — — — `36dd2fe5`
-- [x] **G-43** Phone (< 720px) — — — `36dd2fe5`
+- [x] **G-43** Phone (< 720px) — live review fix: Move wrap; period title; current-week cell; no desktop `runway--phone`
+  - **Reopened (live review 26/09):** Move clipped; empty header; missing week cell; desktop phone list at 1440.
+  - **Re-ticked (live review 26/09):** matchMedia remount; phone period row; Move wraps.
 - [x] **G-44** Empty and first-run states — — — `36dd2fe5`
 
 ## M11: Docs and ship
 
 - [x] **G-45** Docs update — — — `cbbed4c4`
-- [x] **G-46** Final verification + screenshots + ready PR — — — `96457847`
+- [x] **G-46** Final verification + screenshots + ready PR — — — local mock screenshots on this branch
 
 ---
 
@@ -102,9 +120,11 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 - Weekly review stage count tests expected 8 stages; updated to 9 (`goals` after `projects`) as part of G-38.
 - `someday-view` mocks needed `listGoals` + `getHubPrefs` after G-25/G-28.
 - Live Tasks Vite is passphrase-gated in Cloud Agent; G-46 screenshots for check-in / weekly / Hammond used design-kit fixtures + prior landing/goal captures.
+- **Live review 26/09 (signed in, real data, 1440 + 375):** prior “screenshots” were fixtures; reopen list above. Branch `fix/goals-v2-live-review`.
+- PR #486 merged to main (default `loadCalendarContext`); this branch rebased onto that tip.
 
 
 ## Deviations
 
-- **G-17** Year Term↔Year uses `createMotion` placers (Term River rules); phone uses term list.
-- **G-46** Live signed-in UI screenshots for Year / Plan-next-term / all 5 structures blocked by passphrase gate in Cloud Agent; fixtures + prior landing/goal captures attached instead.
+- **G-17** Year Term↔Year uses `createMotion` placers (Term River rules); phone uses term list; remounts on 719px media change.
+- **G-46** Live signed-in production screenshots still need Adam’s passphrase on Cloud Agent; this branch ships **local mock screenshots** labelled as such.

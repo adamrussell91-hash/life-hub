@@ -283,7 +283,7 @@ describe('projects view rebuild', () => {
     // the mix count and appear when the Completed slice is selected.
     expect(lanes).not.toContain('Completed');
 
-    const open = canvas.querySelector<HTMLButtonElement>('[data-project-id="proj_go"] .btn');
+    const open = canvas.querySelector<HTMLButtonElement>('[data-project-id="proj_go"] .pcard__actions .btn');
     expect(open?.textContent).toBe('Open page');
     open?.click();
     expect(location.hash).toBe('#/project/proj_go');

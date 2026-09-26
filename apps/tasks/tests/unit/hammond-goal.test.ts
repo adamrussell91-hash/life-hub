@@ -6,7 +6,12 @@ import { mountHammondPanel, renderHammondStrip } from '@/views/hammond-goal';
 import { goal } from './goal-fixtures';
 
 vi.mock('@/services/client-api', () => ({
-  tasksApi: { getGoalRead: vi.fn(), rescanGoalRead: vi.fn(), decideGhost: vi.fn() }
+  tasksApi: {
+    getGoalRead: vi.fn(),
+    rescanGoalRead: vi.fn(),
+    decideGhost: vi.fn(),
+    getGoalCheckins: vi.fn().mockResolvedValue({ checkin: null })
+  }
 }));
 
 const READ: GoalRead = {

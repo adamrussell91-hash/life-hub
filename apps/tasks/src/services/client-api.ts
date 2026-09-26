@@ -393,6 +393,32 @@ export const tasksApi = {
       goals: r.goals.map(normalizeGoal)
     })),
 
+  getGoalCheckins: (date?: string) =>
+    apiGet<{
+      checkin: {
+        date: string;
+        moved?: string[];
+        stuck?: Array<{ id: string; reason: string }>;
+        moves_planned?: number;
+        saved_at?: string;
+      } | null;
+    }>(date ? `/api/goal-checkins?date=${encodeURIComponent(date)}` : '/api/goal-checkins'),
+  saveGoalCheckin: (body: {
+    date: string;
+    moved: string[];
+    stuck: Array<{ id: string; reason: string }>;
+    moves_planned: number;
+  }) =>
+    apiPost<{
+      checkin: {
+        date: string;
+        moved?: string[];
+        stuck?: Array<{ id: string; reason: string }>;
+        moves_planned?: number;
+        saved_at?: string;
+      };
+    }>('/api/goal-checkins', body),
+
   getTaskProperties: () => apiGet<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties'),
   updateTaskProperties: (body: import('@/schemas/task-properties').TaskPropertyConfig) =>
     apiPut<import('@/schemas/task-properties').TaskPropertyConfig>('/api/task-properties', body),
