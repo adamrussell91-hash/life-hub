@@ -9,12 +9,14 @@ import {
   parseApplicationRecord
 } from './application-schema.mjs';
 import { isValidThreadId, parseThreadRecord, threadDisplayLabel } from './thread-schema.mjs';
+import { isValidPdGroupId, parsePdGroupRecord, pdGroupDisplayLabel } from './pd-group-schema.mjs';
 import {
   communicationKey,
   meetingKey,
   eventKey,
   applicationKey,
   threadKey,
+  pdGroupKey,
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
@@ -255,6 +257,24 @@ export async function resolveThread(id, accessContext, { getStore = defaultGetPr
   };
 }
 
+export async function resolvePdGroup(id, accessContext, { getStore = defaultGetProfessionalStore } = {}) {
+  if (!isValidPdGroupId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'pd_group', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parsePdGroupRecord(await getProfessionalJSON(store, pdGroupKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'pd_group',
+    display_label: pdGroupDisplayLabel(record),
+    supporting_label: record.shape,
+    href: `/professional/#/pd-group/${encodeURIComponent(id)}`,
+    lifecycle_status: null,
+    visibility: 'operator'
+  };
+}
+
 export async function resolveEvent(
   id,
   accessContext,
@@ -311,6 +331,7 @@ export const RESOLVER_SLOTS = Object.freeze({
   'professional:communication': resolveCommunication,
   'professional:meeting': resolveMeeting,
   'professional:thread': resolveThread,
+  'professional:pd_group': resolvePdGroup,
   'professional:event': resolveEvent,
   'professional:application': resolveApplication,
   'knowledge:page': resolveKnowledgePage,
