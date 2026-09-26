@@ -16,9 +16,9 @@ describe('parseAlchemyResult', () => {
 });
 
 describe('knowledgeHubPageUrl', () => {
-  it('builds a #page/ deep link', () => {
-    expect(knowledgeHubPageUrl('https://knowledge-hub.adam-russell.com/', 'note_1')).toBe(
-      'https://knowledge-hub.adam-russell.com/#page/note_1'
+  it('builds a #page/ deep link under the umbrella Knowledge base', () => {
+    expect(knowledgeHubPageUrl('https://life-hub.adam-russell.com/knowledge/', 'note_1')).toBe(
+      'https://life-hub.adam-russell.com/knowledge/#page/note_1'
     );
   });
 });
