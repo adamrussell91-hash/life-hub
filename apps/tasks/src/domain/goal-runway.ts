@@ -14,7 +14,16 @@ export type RunwayRow = {
   move: { title: string; taskId: string | null } | null;
   thisWeek: { count: number; perWeek: number | null };
 };
-export type RunwayLane = { sphere: GoalSphere; label: string; rows: RunwayRow[]; parked: Goal[]; slotsUsed: number };
+export type RunwayLane = {
+  sphere: GoalSphere;
+  label: string;
+  rows: RunwayRow[];
+  /** Active goals with term: null — shown in an Ongoing group; do not count toward the lane cap. */
+  ongoing: RunwayRow[];
+  parked: Goal[];
+  /** Active goals in this term only (Ongoing excluded). */
+  slotsUsed: number;
+};
 export type Runway = {
   term: SchoolTerm;
   weeks: RunwayWeek[];
@@ -77,6 +86,44 @@ export function cellState(goal: Goal, count: number, monday: string, nowMonday: 
   return monday < nowMonday ? 'missed' : 'empty';
 }
 
+/** Year of a school term row — from starts_on. */
+export function termYear(term: SchoolTerm): number {
+  return Number(term.starts_on.slice(0, 4));
+}
+
+/** True when the goal is tied to this school term (not Ongoing). */
+export function goalBelongsToTerm(goal: Goal, term: SchoolTerm): boolean {
+  if (!goal.term) return false;
+  return goal.term.term === term.term && goal.term.year === termYear(term);
+}
+
+function buildRow(
+  goal: Goal,
+  weeks: RunwayWeek[],
+  projects: Project[],
+  tasks: Task[],
+  nowMonday: string,
+  proposedRest: Record<string, string[]>
+): RunwayRow {
+  const hosted = hostedTasks(goal, tasks, projects);
+  const proposed = new Set(proposedRest[goal.id] ?? []);
+  const cells = weeks.map((week): RunwayCell => {
+    const count = weekCount(goal, hosted, week.monday);
+    const sunday = addDaysKey(week.monday, 6);
+    return {
+      monday: week.monday,
+      state: cellState(goal, count, week.monday, nowMonday),
+      count,
+      isNow: week.isNow,
+      milestone: goal.milestones.some((m) => m.due_date !== null && m.due_date >= week.monday && m.due_date <= sunday),
+      proposed: proposed.has(week.monday)
+    };
+  });
+  const thisCount = weekCount(goal, hosted, nowMonday);
+  const perWeek = goal.lead_measure?.per_week ?? null;
+  return { goal, cells, move: oneMove(goal, hosted), thisWeek: { count: thisCount, perWeek } };
+}
+
 export function buildRunway(input: {
   goals: Goal[];
   projects: Project[];
@@ -96,36 +143,24 @@ export function buildRunway(input: {
 
   const lanes = SPHERES.map((sphere): RunwayLane => {
     const inLane = goals.filter((g) => g.sphere === sphere);
-    const active = inLane.filter((g) => g.status === 'active');
-    const rows = active.map((goal): RunwayRow => {
-      const hosted = hostedTasks(goal, tasks, projects);
-      const proposed = new Set(proposedRest[goal.id] ?? []);
-      const cells = weeks.map((week): RunwayCell => {
-        const count = weekCount(goal, hosted, week.monday);
-        const sunday = addDaysKey(week.monday, 6);
-        return {
-          monday: week.monday,
-          state: cellState(goal, count, week.monday, nowMonday),
-          count,
-          isNow: week.isNow,
-          milestone: goal.milestones.some((m) => m.due_date !== null && m.due_date >= week.monday && m.due_date <= sunday),
-          proposed: proposed.has(week.monday)
-        };
-      });
-      const thisCount = weekCount(goal, hosted, nowMonday);
-      const perWeek = goal.lead_measure?.per_week ?? null;
-      if (perWeek !== null && !goal.rest_weeks.includes(nowMonday)) {
+    const termActive = inLane.filter((g) => g.status === 'active' && goalBelongsToTerm(g, term));
+    const ongoingActive = inLane.filter((g) => g.status === 'active' && g.term === null);
+    const rows = termActive.map((goal) => buildRow(goal, weeks, projects, tasks, nowMonday, proposedRest));
+    const ongoing = ongoingActive.map((goal) => buildRow(goal, weeks, projects, tasks, nowMonday, proposedRest));
+    for (const row of [...rows, ...ongoing]) {
+      const perWeek = row.thisWeek.perWeek;
+      if (perWeek !== null && !row.goal.rest_weeks.includes(nowMonday)) {
         total += 1;
-        if (thisCount >= perWeek) done += 1;
+        if (row.thisWeek.count >= perWeek) done += 1;
       }
-      return { goal, cells, move: oneMove(goal, hosted), thisWeek: { count: thisCount, perWeek } };
-    });
+    }
     return {
       sphere,
       label: SPHERE_LABEL[sphere],
       rows,
+      ongoing,
       parked: inLane.filter((g) => g.status === 'parked' || g.status === 'achieved' || g.status === 'dropped'),
-      slotsUsed: active.length
+      slotsUsed: termActive.length
     };
   });
 
