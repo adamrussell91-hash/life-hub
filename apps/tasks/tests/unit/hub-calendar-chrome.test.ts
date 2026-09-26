@@ -4,12 +4,22 @@ import { describe, expect, it } from 'vitest';
 
 const chromeSrc = readFileSync(resolve(process.cwd(), 'src/views/hub-calendar-chrome.ts'), 'utf8');
 const viewsCss = readFileSync(resolve(process.cwd(), 'src/styles/views.css'), 'utf8');
+const kitCalendarCss = readFileSync(
+  resolve(process.cwd(), '../../packages/design-kit/calendar.css'),
+  'utf8'
+);
 
 describe('Tasks week calendar chrome', () => {
   it('stacks locks under the calendar instead of a right rail column', () => {
     expect(chromeSrc).toMatch(/tasks-calendar-chrome__below/);
-    expect(viewsCss).toMatch(
-      /\.tasks-calendar-chrome__workspace\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
+    expect(kitCalendarCss).toMatch(
+      /\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
+    );
+    expect(kitCalendarCss).not.toMatch(
+      /\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+min\(/
+    );
+    expect(viewsCss).not.toMatch(
+      /\.hub-calendar--workspace\s+\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+min\(/
     );
     expect(viewsCss).toMatch(/\.tasks-calendar-chrome__below\.hub-calendar__rail/);
     expect(viewsCss).toMatch(
