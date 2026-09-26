@@ -45,11 +45,19 @@ describe('application and career routes', () => {
       id: VALID_APPLICATION_ID
     });
     expect(parseRoute('#/career')).toEqual({ name: 'career' });
+    expect(parseRoute('#/career/application/new')).toEqual({ name: 'career-application-new' });
+    expect(parseRoute(`#/career/application/${VALID_APPLICATION_ID}`)).toEqual({
+      name: 'career-application',
+      id: VALID_APPLICATION_ID
+    });
     expect(parseRoute('#/application/not-valid').name).toBe('not-found');
-    expect(railHighlightFor({ name: 'application-new' })).toBe('applications');
+    expect(railHighlightFor({ name: 'application-new' })).toBe('career');
     expect(railHighlightFor({ name: 'career' })).toBe('career');
-    expect(railHighlightFor({ name: 'application', id: VALID_APPLICATION_ID })).toBe('applications');
-    expect(applicationRoute(VALID_APPLICATION_ID)).toBe(`#/application/${VALID_APPLICATION_ID}`);
+    expect(railHighlightFor({ name: 'application', id: VALID_APPLICATION_ID })).toBe('career');
+    expect(railHighlightFor({ name: 'career-application', id: VALID_APPLICATION_ID })).toBe('career');
+    expect(applicationRoute(VALID_APPLICATION_ID)).toBe(
+      `#/career/application/${VALID_APPLICATION_ID}`
+    );
   });
 });
 
@@ -97,7 +105,7 @@ describe('renderApplicationsView', () => {
     expect(canvas.textContent).toMatch(/Head of Stage/);
     expect(canvas.textContent).toMatch(/Example University/);
     expect(canvas.querySelector('.applications__pipeline')).toBeTruthy();
-    expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/application/new');
+    expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/career/application/new');
 
     const listBtn = [...canvas.querySelectorAll('button')].find((btn) => btn.textContent === 'List');
     expect(listBtn).toBeTruthy();
@@ -332,7 +340,7 @@ describe('renderCareerView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders unavailable sections honestly with reason', async () => {
+  it('renders merged Career shell with empty states', async () => {
     globalThis.fetch = vi.fn(async () =>
       Response.json({
         ok: true,
@@ -346,18 +354,25 @@ describe('renderCareerView', () => {
           professional_development: { status: 'ok', items: [] },
           people: { status: 'unavailable', reason: 'linked_entities_unavailable', items: [] },
           organisations: { status: 'ok', items: [] },
-          deferred: ['publication', 'presentation']
+          deferred: ['publication', 'presentation'],
+          achievements: [],
+          futures: [],
+          stones: [],
+          scan: { pending_count: 0, last_run_at: null }
         }
       })
     );
     const canvas = document.createElement('div');
     await renderCareerView(canvas);
-    expect(canvas.textContent).toMatch(/Unavailable · applications_store_offline/);
-    expect(canvas.textContent).toMatch(/Unavailable · linked_entities_unavailable/);
-    expect(canvas.textContent).toMatch(/Publication|Presentation|deferred/i);
+    expect(canvas.querySelector('.career-page')).toBeTruthy();
+    expect(canvas.textContent).toMatch(/Skills scan/);
+    expect(canvas.textContent).toMatch(/Skills ledger/);
+    expect(canvas.textContent).toMatch(/Applications/);
+    expect(canvas.textContent).toMatch(/Futures/);
+    expect(canvas.textContent).toMatch(/No skill cards yet/);
   });
 
-  it('links application items to Professional routes', async () => {
+  it('links application items to Career application routes', async () => {
     globalThis.fetch = vi.fn(async () =>
       Response.json({
         ok: true,
@@ -369,7 +384,7 @@ describe('renderCareerView', () => {
                 id: VALID_APPLICATION_ID,
                 position_title: 'Classroom Teacher',
                 pipeline_status: 'drafting',
-                href: `/professional/#/application/${VALID_APPLICATION_ID}`
+                href: `/professional/#/career/application/${VALID_APPLICATION_ID}`
               }
             ]
           },
@@ -377,7 +392,10 @@ describe('renderCareerView', () => {
           professional_development: { status: 'ok', items: [] },
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
-          deferred: ['publication', 'presentation']
+          deferred: ['publication', 'presentation'],
+          achievements: [],
+          futures: [],
+          stones: []
         }
       })
     );
@@ -386,7 +404,7 @@ describe('renderCareerView', () => {
     const link = [...canvas.querySelectorAll('a')].find((a) =>
       a.textContent?.includes('Classroom Teacher')
     );
-    expect(link?.getAttribute('href')).toBe(`#/application/${VALID_APPLICATION_ID}`);
+    expect(link?.getAttribute('href')).toBe(`#/career/application/${VALID_APPLICATION_ID}`);
   });
 });
 

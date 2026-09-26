@@ -324,7 +324,7 @@ export async function resolveApplication(
     kind: 'application',
     display_label: applicationDisplayLabel(record),
     supporting_label: record.pipeline_status,
-    href: `/professional/#/application/${encodeURIComponent(id)}`,
+    href: `/professional/#/career/application/${encodeURIComponent(id)}`,
     lifecycle_status: record.pipeline_status,
     visibility: 'operator'
   };

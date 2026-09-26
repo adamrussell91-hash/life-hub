@@ -26,7 +26,7 @@ import '../styles/event-page.css';
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
 import { renderHubShell, renderPageHeader, renderPrimaryNav, viewChrome, type HubShellRefs } from '@/shell/shell';
-import { parseRoute, railHighlightFor } from '@/app/router';
+import { parseRoute, railHighlightFor, redirectLegacyCareerHash } from '@/app/router';
 import {
   mountProfessionalCalendar,
   unmountProfessionalCalendar
@@ -46,8 +46,7 @@ import { renderEventNewView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
 import {
   renderApplicationDetailView,
-  renderApplicationNewView,
-  renderApplicationsView
+  renderApplicationNewView
 } from '@/views/applications';
 import { renderCareerView } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
@@ -83,6 +82,8 @@ async function bootApp(root: HTMLElement): Promise<void> {
   let calendarHandle: HubCalendarHandle | null = null;
 
   async function paint(): Promise<void> {
+    if (redirectLegacyCareerHash()) return;
+
     const route = parseRoute();
     if (route.name === 'calendar' && route.redirectedFrom) {
       history.replaceState(null, '', '#/calendar');
@@ -239,27 +240,27 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'applications') {
-      renderPageHeader(shell, viewChrome('applications'));
-      await renderApplicationsView(shell.canvas);
+      // Legacy — redirectLegacyCareerHash should have caught this.
+      location.replace('#/career');
       return;
     }
-    if (route.name === 'application-new') {
-      renderPageHeader(shell, { eyebrow: 'Applications', title: 'New application' });
+    if (route.name === 'application-new' || route.name === 'career-application-new') {
+      renderPageHeader(shell, { eyebrow: 'Career', title: 'New application' });
       await renderApplicationNewView(shell.canvas);
       return;
     }
-    if (route.name === 'application') {
-      renderPageHeader(shell, { eyebrow: 'Applications', title: 'Loading…' });
+    if (route.name === 'application' || route.name === 'career-application') {
+      renderPageHeader(shell, { eyebrow: 'Career', title: 'Loading…' });
       await renderApplicationDetailView(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Applications', title });
+          renderPageHeader(shell, { eyebrow: 'Career', title });
         },
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
-    if (route.name === 'career') {
+    if (route.name === 'career' || route.name === 'career-future' || route.name === 'career-card') {
       renderPageHeader(shell, viewChrome('career'));
       await renderCareerView(shell.canvas);
       return;

@@ -88,7 +88,7 @@ export async function renderApplicationsView(canvas: HTMLElement): Promise<void>
     canvas.replaceChildren();
     const actions = el('div', 'applications__actions');
     const compose = el('a', 'btn btn--primary', 'New application');
-    compose.href = '#/application/new';
+    compose.href = '#/career/application/new';
 
     const toggle = el('div', 'applications__toggle');
     const pipelineBtn = el('button', 'btn btn--secondary', 'Pipeline') as HTMLButtonElement;
@@ -338,7 +338,7 @@ export async function renderApplicationNewView(canvas: HTMLElement): Promise<voi
   const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
   save.type = 'submit';
   const cancel = el('a', 'btn btn--ghost', 'Cancel');
-  cancel.href = '#/applications';
+  cancel.href = '#/career';
 
   form.append(
     el('label', undefined, 'Position title'),
@@ -454,7 +454,7 @@ export async function renderApplicationDetailView(
     options.onTitleReady?.(record.position_title);
 
     const back = el('a', 'btn btn--ghost', 'Back to Applications');
-    back.href = '#/applications';
+    back.href = '#/career';
 
     const facts = el('div', 'application-detail__facts');
     facts.append(

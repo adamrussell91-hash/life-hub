@@ -1799,7 +1799,7 @@ export function createMockApi() {
         pipeline_status: record.pipeline_status,
         closing_date: record.closing_date ?? null,
         updated_at: record.updated_at,
-        href: `/professional/#/application/${record.id}`
+        href: `/professional/#/career/application/${record.id}`
       }));
       const pdItems = [...events.values()]
         .filter((event) => event.event_type === 'professional_development')

@@ -89,7 +89,7 @@ describe("parseHubRef", () => {
       "/professional/#/meeting/meeting_1",
     );
     expect(hrefForHubRef({ hub: "professional", kind: "application", id: "application_1" })).toBe(
-      "/professional/#/application/application_1",
+      "/professional/#/career/application/application_1",
     );
   });
 });
