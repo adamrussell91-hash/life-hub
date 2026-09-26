@@ -945,6 +945,16 @@ test('clementine prompt does not gain a Knowledge coordination block', () => {
   assert.doesNotMatch(prompt, /Knowledge Hub coordination/);
 });
 
+test('Clementine prompt treats Knowledge Hub archive as the store — not Notion', () => {
+  const prompt = buildSystemPrompt({ slug: 'clementine' });
+  assert.match(prompt, /Knowledge Hub archive pages are the store/);
+  assert.match(prompt, /not Notion/);
+  assert.match(prompt, /search_knowledge/);
+  assert.match(prompt, /Never say Knowledge Hub lives in Notion|cannot edit Notion pages/i);
+  assert.doesNotMatch(prompt, /write to Notion/);
+  assert.doesNotMatch(prompt, /I cannot edit Notion/);
+});
+
 test('protocolSteer is injected after voice so the model stays in character', () => {
   const prompt = buildSystemPrompt({
     slug: 'brisket',

@@ -19,6 +19,13 @@ const RESEARCH_THE_OPEN_WEB =
   'Search the open web for this topic. Do not dig the archive for answers Adam does not already have. Cite web sources as markdown links [Title](url). Never invent a URL.';
 const CITE_NOTES_AS_LINKS =
   'Cite archive notes as markdown links [Note title](pageId). Never write a raw page_notion_ or page_hub_ id in the reader-facing answer.';
+const NOTE_EDIT_PROTOCOL = `These are Knowledge Hub archive notes — not Notion pages. You can retag them when Adam asks in natural language (retag this, swap that tag, drop this tag). Never claim a write already happened. Never refuse by saying you cannot edit Notion pages. If you intend a tag change, append exactly one fenced block after your prose:
+
+\`\`\`note-edit
+{"action":"retag","pageId":"page_…","title":"Exact note title","tags":["Closed list tag"]}
+\`\`\`
+
+tags must be from the closed topic vocabulary, at most three. pageId must be a real Knowledge Hub archive id from this sitting or the notes in play (page_hub_* or legacy page_notion_*). If you cannot identify the note or the closed-list tags, ask; do not emit a block. Body rewrites of an existing note go through the Knowledge Hub page editor or Tidy — say that plainly if he asks, without mentioning Notion.`;
 
 function lastUserQuery(messages) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -183,7 +190,7 @@ function assembledSystem(input, archive) {
         : '';
   const grounding = input.hat === 'fromBook' || input.hat === 'makeNote'
     ? RESEARCH_THE_OPEN_WEB
-    : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}`;
+    : `${ANSWER_FROM_ARCHIVE}\n${CITE_NOTES_AS_LINKS}\n${NOTE_EDIT_PROTOCOL}`;
   let evidenceBlock = '';
   let interpretationBlock = '';
   try {

@@ -10,7 +10,7 @@ Lesson-editor rules (also stacked at call time):
 - Propose schema-valid content via tools; never silently mutate.
 - Prefer claims over topic dumps; cut hedging spirals.
 - ADHD-aware starting blocks when stuck.
-- Do not invent citations. Do not write to Notion or Central Node from this app.
+- Do not invent citations. Do not write Knowledge Hub archive pages or Central Node from this app.
 
 ## Visual evidence
 

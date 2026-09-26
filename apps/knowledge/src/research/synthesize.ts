@@ -16,6 +16,14 @@ export type SynthesisSource = {
   tags?: string[];
 };
 
+/** Migration provenance URLs (notion.so) are not live Knowledge Hub page links — keep them out of model prompts. */
+export function archivePromptUrl(sourceUrl?: string): string {
+  const url = String(sourceUrl ?? "").trim();
+  if (!url) return "";
+  if (/notion\.so/i.test(url)) return "";
+  return url;
+}
+
 export function buildSynthesisPrompt(input: {
   query: string;
   documentContext?: string;
@@ -24,7 +32,8 @@ export function buildSynthesisPrompt(input: {
   const sources = input.sources
     .map((source, index) => {
       const tags = source.tags?.length ? `; tags: ${source.tags.join(", ")}` : "";
-      return `[${index + 1}] "${source.title}" (id: ${source.pageId}${source.sourceUrl ? `; url: ${source.sourceUrl}` : ""}${tags})\n${source.excerpt}`;
+      const url = archivePromptUrl(source.sourceUrl);
+      return `[${index + 1}] "${source.title}" (id: ${source.pageId}${url ? `; url: ${url}` : ""}${tags})\n${source.excerpt}`;
     })
     .join("\n\n");
   const context = input.documentContext?.trim()
@@ -33,7 +42,7 @@ export function buildSynthesisPrompt(input: {
   return assembleClementinePrompt({
     voice,
     job: university,
-    surface: `You are filing a research brief over a personal knowledge archive. Retrieve is already done; your job is critical analysis, not more search. Return only JSON. Do not break JSON to make a joke. Diagnose, then prescribe, in analysis, gaps, and followUpQueries. No waffle; no fake warmth.`,
+    surface: `You are filing a research brief over a personal Knowledge Hub archive. Retrieve is already done; your job is critical analysis, not more search. Return only JSON. Do not break JSON to make a joke. Diagnose, then prescribe, in analysis, gaps, and followUpQueries. No waffle; no fake warmth. These ids are Knowledge Hub archive pages — not Notion.`,
     payload: `Query:
 ${input.query}
 ${context}
@@ -46,7 +55,7 @@ Return only JSON with this shape:
     {
       "pageId": "string — must be one of the ids above",
       "title": "string",
-      "sourceUrl": "string — use the url from the source if given",
+      "sourceUrl": "string — use the url from the source if given, else empty string",
       "excerpt": "short quoted or paraphrased evidence",
       "stance": "supports" | "complicates" | "extends" | "related",
       "analysis": "why this source matters for the query/document, specifically",

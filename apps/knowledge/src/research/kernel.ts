@@ -93,7 +93,8 @@ function roundDeps(env: KernelEnv, search: Pick<KernelSearchInput, "k" | "tags">
             {
               title: page.title,
               excerpt: excerptFromBody(page.body, SYNTHESIS_EXCERPT_CHARS),
-              sourceUrl: page.source_notion_url,
+              // Do not feed migration provenance (notion.so) to the model as a live page URL.
+              sourceUrl: "",
               tags: page.tags,
             },
           ] as const;

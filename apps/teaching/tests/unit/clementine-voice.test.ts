@@ -13,6 +13,8 @@ describe('Clementine voice pack', () => {
     expect(protocol).toContain('any part of the lesson');
     expect(protocol).not.toContain('University Reading Protocol');
     expect(protocol).not.toContain('search the Knowledge Hub Notion database');
+    expect(protocol).not.toContain('write to Notion');
+    expect(protocol).toContain('Do not write Knowledge Hub archive pages or Central Node from this app');
   });
 });
 

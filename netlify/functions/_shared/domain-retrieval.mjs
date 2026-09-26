@@ -1117,7 +1117,7 @@ export function domainRetrievalSchemasFor(slug) {
       {
         name: 'search_knowledge',
         description:
-          'Search the Knowledge corpus (titles, tags, excerpts, connected). Call before answering what Adam already has on a topic. Distinguish retrieved notes from new synthesis.',
+          'Search the Knowledge Hub archive (titles, tags, excerpts, connected). These are Knowledge Hub pages — not Notion. Call before answering what Adam already has on a topic. Distinguish retrieved notes from new synthesis.',
         input_schema: {
           type: 'object',
           properties: {
