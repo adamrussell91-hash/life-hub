@@ -17,6 +17,7 @@ import '../styles/hub.css';
 import '../styles/tasks-engine.css';
 import '../styles/block-page.css';
 import '../styles/comm-page.css';
+import '../styles/thread-page.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
@@ -33,6 +34,7 @@ import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import { renderCommunicationNewView } from '@/views/communications';
 import { renderCommPage } from '@/views/comm-page';
+import { renderThreadPage } from '@/views/thread-page';
 import {
   renderMeetingDetailView,
   renderMeetingNewView
@@ -168,6 +170,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Calendar · Comm', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'thread') {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Thread', title: 'Loading…' });
+      await renderThreadPage(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Calendar · Thread', title });
         },
         isCurrent: () => generation === routeGeneration
       });
