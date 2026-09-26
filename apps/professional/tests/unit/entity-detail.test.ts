@@ -663,24 +663,58 @@ describe('renderOrganisationPage', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders legal name when present and no edit controls', async () => {
+  it('renders crest-wall organisation page (not generic entity detail)', async () => {
     vi.mocked(fetch).mockResolvedValue(
       jsonResponse(200, {
         ok: true,
         data: {
-          entity: {
-            ref: `shared:organisation:${ORG_ID}`,
-            id: ORG_ID,
-            kind: 'organisation',
-            display_name: 'Example University',
-            legal_name: 'Example University Ltd',
-            lifecycle_status: 'active',
-            aliases: []
-          },
-          current_relationships: [],
-          historical_relationships: [],
-          timeline: [],
-          linked_records: { tasks: [], communications: [], organisations: [], people: [] }
+          organisations: [
+            {
+              id: ORG_ID,
+              ref: `shared:organisation:${ORG_ID}`,
+              display_name: 'Example University',
+              legal_name: 'Example University Ltd',
+              logo_key: null,
+              monogram: 'EU',
+              chips: [
+                {
+                  kind: 'workplace',
+                  label: 'Workplace',
+                  detail: '2023–now',
+                  filterBucket: 'work'
+                }
+              ],
+              people_count: 1,
+              people: [
+                {
+                  id: 'person_1',
+                  display_name: 'Seth',
+                  warmth_band: 'warm',
+                  warmth: 70,
+                  first_link_at: '2023-01-15T00:00:00.000Z'
+                }
+              ],
+              warmth_spread: { warm: 1, cooling: 0, cold: 0, total: 1 },
+              arc_points: [
+                { id: 'person_1', at: '2023-01-15T00:00:00.000Z', label: '1' }
+              ],
+              is_current_workplace: true,
+              first_touch_at: '2023-01-15T00:00:00.000Z',
+              last_activity_at: '2026-01-01T00:00:00.000Z',
+              timeline_lanes: [
+                {
+                  id: 'lane_1',
+                  kind: 'work_study',
+                  label: 'Workplace',
+                  start: '2023-01-15T00:00:00.000Z',
+                  end: null
+                }
+              ],
+              created_at: '2020-01-01T00:00:00.000Z',
+              updated_at: '2026-01-01T00:00:00.000Z'
+            }
+          ],
+          counts: { organisations: 1, people: 1 }
         }
       })
     );
@@ -688,7 +722,11 @@ describe('renderOrganisationPage', () => {
     let title = '';
     await renderOrganisationPage(canvas, ORG_ID, { onTitleReady: (t) => { title = t; } });
     expect(title).toBe('Example University');
-    expect(canvas.querySelector('.entity-detail__legal-name')?.textContent).toBe('Example University Ltd');
-    expect(canvas.querySelectorAll('button').length).toBe(0);
+    expect(canvas.querySelector('.entity-detail')).toBeNull();
+    expect(canvas.querySelector('.orgs-page__title')?.textContent).toBe('Example University');
+    expect(canvas.querySelector('.orgs-section--how')).not.toBeNull();
+    expect(canvas.querySelector('.orgs-section--ann')).not.toBeNull();
+    expect(canvas.textContent).toMatch(/No structure yet/);
+    expect(canvas.querySelector('.orgs-section--time')).not.toBeNull();
   });
 });

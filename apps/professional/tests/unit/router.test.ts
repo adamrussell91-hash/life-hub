@@ -34,6 +34,7 @@ describe('parseRoute', () => {
     expect(parseRoute(`#/people/${VALID_PERSON_ID}`)).toEqual({ name: 'people', id: VALID_PERSON_ID });
     expect(parseRoute(`#/person/${VALID_PERSON_ID}`)).toEqual({ name: 'person', id: VALID_PERSON_ID });
     expect(parseRoute(`#/organisation/${VALID_ORG_ID}`)).toEqual({ name: 'organisation', id: VALID_ORG_ID });
+    expect(parseRoute(`#/organisations/${VALID_ORG_ID}`)).toEqual({ name: 'organisation', id: VALID_ORG_ID });
   });
 
   it('rejects an id that does not match the server contract shape', () => {
@@ -97,7 +98,7 @@ describe('railHighlightFor', () => {
 describe('route builders', () => {
   it('encode the id into the hash', () => {
     expect(personRoute(VALID_PERSON_ID)).toBe(`#/people/${VALID_PERSON_ID}`);
-    expect(organisationRoute(VALID_ORG_ID)).toBe(`#/organisation/${VALID_ORG_ID}`);
+    expect(organisationRoute(VALID_ORG_ID)).toBe(`#/organisations/${VALID_ORG_ID}`);
   });
 
   it('maps Person Brief builder onto the People page', () => {

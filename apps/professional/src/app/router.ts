@@ -70,6 +70,11 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
+  if (segments.length === 2 && segments[0] === 'organisations') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidOrganisationId(id)) return { name: 'organisation', id };
+    return { name: 'not-found', path };
+  }
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
   if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
   if (segments.length === 1 && segments[0] === 'meetings') return { name: 'meetings' };
@@ -108,6 +113,7 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
 
+  // Legacy singular path — keep resolving so old links still open.
   if (segments.length === 2 && segments[0] === 'organisation') {
     const id = safeDecode(segments[1]!);
     if (id && isValidOrganisationId(id)) return { name: 'organisation', id };
@@ -198,8 +204,14 @@ export function peopleRoute(id: string | null = null, query = ''): string {
   return `${base}${query}`;
 }
 
-export function organisationRoute(id: string): string {
-  return `#/organisation/${encodeURIComponent(id)}`;
+export function organisationRoute(id: string, query = ''): string {
+  return `#/organisations/${encodeURIComponent(id)}${query}`;
+}
+
+/** Crest wall or organisation detail. Prefer plural path (BUILD-PLAN). */
+export function organisationsRoute(id: string | null = null, query = ''): string {
+  if (!id) return `#/organisations${query}`;
+  return `#/organisations/${encodeURIComponent(id)}${query}`;
 }
 
 export function communicationRoute(id: string): string {

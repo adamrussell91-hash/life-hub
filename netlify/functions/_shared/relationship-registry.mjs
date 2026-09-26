@@ -96,6 +96,30 @@ const REGISTRY = new Map([
     })
   ],
   [
+    'studied_at',
+    declaration({
+      key: 'studied_at',
+      sourceKinds: ['shared:person'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'has_student',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'optional_text'
+    })
+  ],
+  [
+    'placement_at',
+    declaration({
+      key: 'placement_at',
+      sourceKinds: ['shared:person'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'has_placement',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'optional_text'
+    })
+  ],
+  [
     // Person-to-person core identity relationship (the only registry key
     // connecting shared:person to shared:person). Direction is not
     // semantically fixed by role (e.g. 'mentor'/'mentee' reads
