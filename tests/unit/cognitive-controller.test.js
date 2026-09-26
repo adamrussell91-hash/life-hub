@@ -301,3 +301,11 @@ test('Fates stopBudget caps the first burst at burstWords and never exceeds rema
   assert.ok(second.wordBudget<=150);
   assert.equal(second.wordBudget,Math.min(125,250-100));
 });
+
+test('continuation bursts explicitly preserve the assigned voice register',()=>{
+  const s=start('refinery','build');
+  const st=s.steps[0];
+  s.burst=1;
+  const prompt=buildPrompt(s,st);
+  assert.match(prompt.system,/Keep the same assigned voice register as the first burst\./);
+});
