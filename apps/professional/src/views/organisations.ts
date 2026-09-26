@@ -491,7 +491,9 @@ export async function renderOrganisationsView(
       directory = await fetchOrganisationsDirectory();
       if (!isCurrent()) return;
       models = directory.organisations.map(rowToModel);
-      countEl.textContent = `${directory.counts.organisations} organisations · ${directory.counts.people} people`;
+      const orgWord = directory.counts.organisations === 1 ? 'organisation' : 'organisations';
+      const peopleWord = directory.counts.people === 1 ? 'person' : 'people';
+      countEl.textContent = `${directory.counts.organisations} ${orgWord} · ${directory.counts.people} ${peopleWord}`;
       syncControls();
       renderWall();
     } catch (err) {
