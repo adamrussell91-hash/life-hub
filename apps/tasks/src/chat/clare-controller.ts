@@ -1546,6 +1546,23 @@ export function createClareChatController({
     started = true;
     bindChrome();
     paintRoster();
+    // #region agent log
+    try {
+      void fetch('/api/_agent-debug', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hypothesisId: 'H1-H4',
+          location: 'clare-controller.ts:start',
+          message: 'listTemplates about to call',
+          data: {}
+        })
+      });
+    } catch {
+      /* ignore */
+    }
+    // #endregion
     const templates = await tasksApi.listTemplates();
     frameworks = templates.frameworks as FrameworkEntry[];
     await newChat();

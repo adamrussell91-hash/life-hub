@@ -167,7 +167,48 @@ async function bootApp(root: HTMLElement): Promise<void> {
     onRefresh: () => void paint({ force: true })
   });
   const clare = installClareSession(root);
-  void clare.start();
+  // #region agent log
+  const agentLog = (payload: Record<string, unknown>) => {
+    try {
+      void fetch('/api/_agent-debug', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch {
+      /* ignore */
+    }
+  };
+  agentLog({
+    hypothesisId: 'H4',
+    location: 'main.ts:bootApp',
+    message: 'clare.start invoking',
+    data: { hash: location.hash }
+  });
+  // Keep rejection unhandled so pageerror still surfaces; only observe.
+  void clare
+    .start()
+    .then(() =>
+      agentLog({
+        hypothesisId: 'H4',
+        location: 'main.ts:bootApp',
+        message: 'clare.start resolved',
+        data: {}
+      })
+    )
+    .catch((err: unknown) => {
+      agentLog({
+        hypothesisId: 'H4',
+        location: 'main.ts:bootApp',
+        message: 'clare.start rejected (rethrow)',
+        data: { error: err instanceof Error ? err.message : String(err) }
+      });
+      queueMicrotask(() => {
+        throw err instanceof Error ? err : new Error(String(err));
+      });
+    });
+  // #endregion
   attachVisualViewportInset();
   await loadTaskProperties();
 
@@ -312,6 +353,29 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     const view = nextView ?? parseHashRoute();
+    // #region agent log
+    try {
+      void fetch('/api/_agent-debug', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hypothesisId: 'H3',
+          location: 'main.ts:paint',
+          message: 'paint view',
+          data: {
+            hash: location.hash,
+            view,
+            soft,
+            surface: viewSurface(view),
+            kitHandle: Boolean(kitCalendarHandle)
+          }
+        })
+      });
+    } catch {
+      /* ignore */
+    }
+    // #endregion
     const chrome = viewChrome(view);
     renderPrimaryNav(shell.railNav, view);
     renderPageHeader(shell, chrome);
@@ -324,6 +388,23 @@ async function bootApp(root: HTMLElement): Promise<void> {
       await renderActiveView(view, shell.canvas);
       lastView = view;
     } catch (err) {
+      // #region agent log
+      try {
+        void fetch('/api/_agent-debug', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            hypothesisId: 'H4',
+            location: 'main.ts:paint-catch',
+            message: 'paint failed',
+            data: { error: err instanceof Error ? err.message : String(err), view }
+          })
+        });
+      } catch {
+        /* ignore */
+      }
+      // #endregion
       resetPaint();
       renderLoadError(shell.canvas, err, () => void paint({ force: true }), `Could not load ${chrome.title}`);
     }
