@@ -771,6 +771,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
         display_name: validated.display_name,
         legal_name: validated.legal_name,
         aliases: validated.aliases,
+        logo_key: null,
         lifecycle_status: 'active',
         retention_reason: null,
         retention_review_at: null,

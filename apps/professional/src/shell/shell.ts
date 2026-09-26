@@ -254,11 +254,13 @@ export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): 
   eyebrow.className = 'page-header__eyebrow';
   eyebrow.textContent = config.eyebrow;
 
-  const title = document.createElement('h1');
-  title.className = 'page-header__title hub-kinetic';
-  title.textContent = config.title;
-
-  copy.append(eyebrow, createTitleRow(title));
+  copy.append(eyebrow);
+  if (config.title) {
+    const title = document.createElement('h1');
+    title.className = 'page-header__title hub-kinetic';
+    title.textContent = config.title;
+    copy.append(createTitleRow(title));
+  }
   if (config.supporting) {
     const supporting = document.createElement('p');
     supporting.className = 'page-header__supporting';
