@@ -94,23 +94,26 @@ Every comm, meeting and event page has:
   - **Promise stats:** made / kept / open, and per-person keep rate.
   - **Export case summary**, for Learning Support or parent meetings.
 
-## 4. Promises
+## 4. Promises = the People ledger
 
-A promise is its own record:
+Promises are **ledger items**. They use the existing store from the People redesign: `netlify/functions/_shared/ledger-schema.mjs`, `ledger-repository.mjs` and `GET/POST /api/people/ledger`. There is no second promise store.
 
-- `id`
-- `source_ref`: the comm, meeting or event it was made in
-- `owner`: `me` or a person ref
-- `text`
-- `due`: optional
-- `state`: open / kept / dropped
-- `task_id`: set only for promises you own, when you choose to make a task
-- `checked_in_ref`: the record where it was ticked
+How the ledger fields map:
 
-What reads and writes promises:
+| Ledger field | Promise meaning |
+|---|---|
+| `direction` | `you_owe` = I owe; `they_owe` = they owe me |
+| `person_ref` | Who the promise is to, or from |
+| `comm_ref` | The source record. It can be any entity ref: a comm, meeting or event |
+| `task_ref` | Set only for `you_owe` items, when Adam turns on the Task switch |
+| `status` | `open` / `done` (kept) / `dismissed` (dropped) |
 
-- The calendar Due row, the thread strip, the walk-in card and Home nudges all read this store.
-- Only your own promises can become tasks. Other people's promises never create tasks.
+Ledger schema v2 adds two fields:
+
+- `due`: optional `YYYY-MM-DD`.
+- `checked_in_ref`: the record where the promise was ticked.
+
+The repository also gains `listDueBetween(from, to)` for the calendar Due row. The calendar Due row, the thread strip, the walk-in card, Home nudges and People pages all read this one store.
 
 ## 5. Meetings
 
@@ -186,14 +189,20 @@ What reads and writes promises:
 
 | Record | Add |
 |---|---|
-| `CommunicationRecord` | `scheduled_start`, `scheduled_end`, `time_zone` (optional, for timed comms); `thread_id`; `agenda`; `blocks`; `purpose_tag` |
-| `MeetingRecord` | `purpose`; `thread_id` / series ref; `blocks` (the agenda becomes headings); `decisions[]` |
-| `EventRecord` | `pd_group_id`; `talks[]` (`id`, `time`, `title`, `presenter`, `hours`, `knowledge_page_id`); `blocks` |
-| New `Thread` | `id`, `kind` (general / case), `people[]`, `purpose_tag`, `goals[]` (case only) |
-| New `Promise` | as in section 4 |
-| New `PdGroup` | `id`, `shape` (series / program), `title`, `provider`, `event_ids[]` |
+| `CommunicationRecord` | `scheduled_start`, `scheduled_end`, `time_zone` (optional, for timed comms); `agenda`; `blocks`; `purpose_tag` |
+| `MeetingRecord` | `purpose`; `blocks` (the agenda becomes headings); `decisions[]` |
+| `EventRecord` | `talks[]` (`id`, `time`, `title`, `presenter`, `hours`); `blocks` |
+| New `Thread` | `id`, `kind` (general / case), `purpose_tag`, `goals[]` (case only) |
+| Ledger item (v2) | `due`, `checked_in_ref` (section 4) |
+| New `PdGroup` | `id`, `shape` (series / program), `title`, `provider` |
 
-- People links keep using universal links and relationships. Existing `agenda` and `notes` strings are migrated into text blocks.
+**Relationships live only as Universal Links**, as they already do for comms, meetings and events. No person, task, thread or group ids are stored on records. The new link types:
+
+- `in_thread` (comm, meeting or event → thread)
+- `in_pd_group` (event → PD group)
+- `talk_note` (event → Knowledge page, with the talk id in link metadata)
+
+- Existing `agenda` and `notes` strings are migrated into text blocks. Stored schemas reject unknown keys, so each record whose shape changes gets a schema version bump, and its parser accepts both the old and the new version.
 
 ## Out of scope
 
@@ -203,18 +212,21 @@ What reads and writes promises:
 - Month view (not a zoom stop).
 - An internet sweep for PD.
 
-## Open questions for the plan
+## Decisions on the open questions (Adam, 26/09/26)
 
-1. How Teaching imports the block engine, and whether it moves to `packages/` (section 2).
-2. Where students currently live (Teaching roster or People), and how a student joins People without duplicates.
-3. The migration of existing Communications from Notion (Meeting Type becomes `purpose_tag`; Parent item and Sub-item become thread links). This may be a separate step.
+1. **Block engine.** Professional uses the Tasks block engine as it is. No files move.
+   - Tasks code imports its own files through `@/`, and in Professional `@/` means Professional's `src`.
+   - So Professional's Vite config gets a small resolver that sends `@/` imports made *from* `apps/tasks/src` back into `apps/tasks/src`.
+   - TypeScript sees a typed facade module.
+2. **Students** don't live anywhere yet. For this build a student is an ordinary Person. A proper home for students is a separate project.
+3. **Notion Communications history** is imported after the framework is built, as its own plan.
 
 ## Build shape
 
 One PR, phases as commits:
 
 1. Block engine available in Professional.
-2. Data additions and the promise store.
+2. Data additions, and ledger v2 as the promise store.
 3. Calendar sources (shared kit), Due row promises, pin chips, route redirects.
 4. Page shell and phases for comms.
 5. Threads and the case page.
