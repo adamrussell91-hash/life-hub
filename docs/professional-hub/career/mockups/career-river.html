@@ -346,7 +346,7 @@ details.star dd { margin: 0; }
     <div class="cols">
       <section class="card panel" id="future" aria-live="polite"></section>
       <section class="card panel" aria-labelledby="hvTitle">
-        <div class="sec-title"><h2 id="hvTitle">This week's harvest</h2><span class="muted" style="font-size:13px">Sun 27 Sep · Ann read your hubs</span></div>
+        <div class="sec-title"><h2 id="hvTitle">Skills scan</h2><span class="muted" style="font-size:13px">Sun 27 Sep · Ann read your hubs</span></div>
         <div id="harvest"></div>
       </section>
     </div>
@@ -357,7 +357,7 @@ details.star dd { margin: 0; }
     </section>
 
     <section class="card panel" aria-labelledby="ledTitle">
-      <div class="sec-title"><h2 id="ledTitle">Evidence ledger</h2><span class="muted" style="font-size:13px" id="ledCount"></span></div>
+      <div class="sec-title"><h2 id="ledTitle">Skills ledger</h2><span class="muted" style="font-size:13px" id="ledCount"></span></div>
       <div class="filters" id="filters"></div>
       <div id="ledger"></div>
       <button class="btn sm" id="ledMore" style="margin-top:12px">Show all</button>
@@ -720,7 +720,7 @@ function drawSpotted() {
   const el = $('#spotted');
   el.hidden = S.spotted !== 'pending';
   const [n, of] = spottedCount();
-  $('#spottedText').innerHTML = `<b>${n} of your last ${of} evidence cards</b> point toward curriculum and policy work: the staff consultation, the sector review submission, advising two other schools. People keep asking you for policy. <b>Curriculum &amp; Policy Adviser</b> at a sector office could be a future, and you're already about ${Math.round(S.disp.policy.r)}% ready for it.`;
+  $('#spottedText').innerHTML = `<b>${n} of your last ${of} skill cards</b> point toward curriculum and policy work: the staff consultation, the sector review submission, advising two other schools. People keep asking you for policy. <b>Curriculum &amp; Policy Adviser</b> at a sector office could be a future, and you're already about ${Math.round(S.disp.policy.r)}% ready for it.`;
   $('#spotShow').setAttribute('aria-pressed', S.lock === 'policy');
 }
 
@@ -826,7 +826,7 @@ $('#future').addEventListener('click', e => {
   if (t.dataset.task) { S.tasks.add(t.dataset.task); drawFuture(); toast('Added to Tasks'); }
   if (t.dataset.coffee) { S.coffee = S.coffee === t.dataset.coffee ? null : t.dataset.coffee; drawFuture(); }
   if (t.dataset.park) { S.parked.add(t.dataset.park); S.sel = 'dp'; settle(); drawFuture(); toast('Parked. It stays in your ledger; restore it from the legend.'); }
-  if (t.dataset.keep) { toast('Kept. Ann will look for evidence for it in the next harvest.'); }
+  if (t.dataset.keep) { toast('Kept. Ann will look for evidence for it in the next Skills scan.'); }
   if ('spotadd' in t.dataset) addSpotted();
 });
 
@@ -932,12 +932,12 @@ function drawApps() {
 3. Experience developing and implementing whole-school policy.
 4. Experience managing a program budget and resources.
 5. Strong communication with parents, carers and the wider community.</textarea>
-      <p class="muted" style="font-size:12.5px;line-height:1.5;margin:10px 0 0">Ann split the ad into five criteria and matched each one against your ledger. Keep this week's harvest cards and watch criteria 3 and 5 change.</p></div><div>`;
+      <p class="muted" style="font-size:12.5px;line-height:1.5;margin:10px 0 0">Ann split the ad into five criteria and matched each one against your ledger. Keep this week's Skills scan cards and watch criteria 3 and 5 change.</p></div><div>`;
     APP_CRIT.forEach((c, i) => {
       const s = scores[i];
       const col = s.n >= 80 ? 'var(--good)' : s.n >= 45 ? 'var(--high-sea)' : 'var(--bad)';
       o += `<div class="mc"><div class="mc__top"><span class="c">${i + 1}. ${esc(c.c)}</span><span class="n" style="color:${col}">${s.n}%</span></div><div class="bar"><i style="width:${s.n}%;background:${col}"></i></div>`;
-      if (s.ev) o += `<div class="ev">${s.up ? '<b style="color:var(--good)">Stronger after this week\'s harvest.</b> ' : ''}${esc(s.ev)}</div>`;
+      if (s.ev) o += `<div class="ev">${s.up ? '<b style="color:var(--good)">Stronger after this week\'s Skills scan.</b> ' : ''}${esc(s.ev)}</div>`;
       else o += `<div class="ev gap">Gap. No evidence in your ledger.</div><div class="act">${gapDone ? `<span class="kept">Stepping stone added to Gifted · in Tasks, due Mon 5 Oct</span>` : `<button class="btn sm" id="gapBtn">Make it a stepping stone: ${esc(c.gap)}</button>`}</div>`;
       o += `</div>`;
     });
@@ -987,7 +987,7 @@ $('#ledMore').addEventListener('click', () => { S.ledAll = !S.ledAll; drawLedger
 // ---------- header ----------
 function drawStats() {
   const futures = B.filter(b => visible(b) && !(b.spotted && S.spotted === 'pending')).length;
-  $('#stats').innerHTML = `<b>11 years</b> behind you · <b>${futures} futures</b> ahead · <b>${allEvidence().length}</b> pieces of evidence`;
+  $('#stats').innerHTML = `<b>11 years</b> behind you · <b>${futures} futures</b> ahead · <b>${allEvidence().length}</b> skill cards`;
 }
 $('#addFutureBtn').addEventListener('click', () => { const p = $('#addFuture'); p.hidden = !p.hidden; $('#addFutureBtn').setAttribute('aria-expanded', !p.hidden); });
 $('#addFutureGo').addEventListener('click', () => toast('Mockup: this adds a seventh branch with Ann\'s draft criteria'));
