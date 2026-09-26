@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v179';
+const CACHE_NAME = 'life-hub-shell-v180';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -168,6 +168,26 @@ const SHELL_FILES = [
   'js/app/ghost-writes.js',
   'js/app/ghost-proposer.js',
   'packages/design-kit/js/calendar-bands.js',
+  'packages/design-kit/js/school-time.js',
+  'packages/design-kit/js/lead-lines.js',
+  'packages/design-kit/js/openings.js',
+  'packages/design-kit/js/term-river-geometry.js',
+  'packages/design-kit/js/sydney-clock.js',
+  'packages/design-kit/js/calendar/capacity-model.js',
+  'packages/design-kit/js/calendar/day-brief.js',
+  'packages/design-kit/js/calendar/almanac-rules.js',
+  'packages/design-kit/js/calendar/tideline-model.js',
+  'packages/design-kit/js/calendar/term-river.js',
+  'packages/design-kit/js/calendar/ghost-writes.js',
+  'packages/design-kit/js/calendar/render-tideline.js',
+  'packages/design-kit/js/calendar/render-day-dial.js',
+  'packages/design-kit/js/calendar/render-almanac.js',
+  'packages/design-kit/js/calendar/render-term-river.js',
+  'packages/design-kit/js/calendar/calendar-sources.js',
+  'packages/design-kit/js/calendar/teaching-calendar.js',
+  'packages/design-kit/js/calendar/tasks-calendar.js',
+  'packages/design-kit/js/calendar/professional-calendar.js',
+  'packages/design-kit/js/calendar/knowledge-calendar.js',
   'js/app/render-central-node.js',
   'js/app/render-chat.js',
   'js/app/render-fitness.js',
