@@ -7,7 +7,8 @@ const EPISODE_EMOJI = { Acute: '🤧', IBD: '🩺', Liver: '🫀', Mind: '🧠' 
 export function formatRelativeMedicalDate(date, today, {
   precision = null,
   status = null,
-  virtual = false
+  virtual = false,
+  compact = false
 } = {}) {
   if (status === 'to_book' || precision === 'tbd') return 'action';
   if (!date || !today || !isCalendarDate(date) || !isCalendarDate(today)) {
@@ -24,13 +25,15 @@ export function formatRelativeMedicalDate(date, today, {
   const prefix = virtual ? '~' : '';
   if (days === 0) return `${prefix}today`;
   if (days === 1) return `${prefix}tomorrow`;
-  if (days > 1 && days < 60) return `${prefix}in ${days} days`;
+  if (days > 1 && days < 60) {
+    return compact ? `${prefix}${days} days` : `${prefix}in ${days} days`;
+  }
   if (days < 0 && days > -60) return `${Math.abs(days)}d ago`;
   return `${prefix}${formatDisplayDate(date)}`;
 }
 
 /**
- * Health Brief / Active Episode / Next card row (MO-12–16).
+ * Health Brief (inverted) + Next card row — Concept C hero composition.
  * @param {object} root document-like with createElement / querySelector
  * @param {object} model buildMedicalModel result
  * @param {object} hooks onAddToTasks, onSelect, onJumpUpcoming, onOpenEpisode
@@ -40,104 +43,63 @@ export function renderBriefRow(root, model, hooks = {}) {
   if (!host || !model) return;
   host.replaceChildren();
   host.append(
-    briefCard(root, model),
-    episodeCard(root, model, hooks),
+    healthBriefCard(root, model, hooks),
     nextCard(root, model, hooks)
   );
 }
 
-function briefCard(root, model) {
-  const card = surfaceCard(root, 'Health Brief');
+/** One navy card: Active episode · Stelara cycle · Watch (stacked). */
+function healthBriefCard(root, model, hooks) {
+  const card = root.createElement('article');
+  card.className = 'medical-brief-card medical-brief-card--now';
+  card.setAttribute('aria-label', 'Health Brief');
+
+  const title = root.createElement('h3');
+  title.className = 'medical-brief-card__title medical-brief-card__title--now';
+  title.textContent = 'Health Brief';
+  card.append(title);
+
+  const body = root.createElement('div');
+  body.className = 'medical-brief__now';
+
+  const ep = model.activeEpisode;
   const brief = model.brief || {};
-  const has = brief.cycle || (brief.watch && brief.watch.length) || brief.verdict;
-  if (!has) {
-    card.append(emptyLine(root, 'No cycle meter, watch items, or verdict yet.'));
+  const hasEpisode = Boolean(ep);
+  const hasCycle = Boolean(brief.cycle);
+  const hasWatch = Boolean(brief.watch?.length) || Boolean(brief.verdict)
+    || Boolean(watchSupportLine(model));
+
+  if (!hasEpisode && !hasCycle && !hasWatch) {
+    card.append(emptyLine(root, 'No active episode, cycle meter, or watch items yet.'));
     return card;
   }
 
-  if (brief.cycle) {
-    const label = root.createElement('p');
-    label.className = 'medical-brief__kicker';
-    label.textContent = `${brief.cycle.label} cycle`;
-    const value = root.createElement('p');
-    value.className = 'medical-brief__value';
-    value.textContent = `Week ${brief.cycle.week} of ${brief.cycle.of}`;
-    const meter = root.createElement('div');
-    meter.className = 'medical-brief__meter';
-    meter.setAttribute('aria-hidden', 'true');
-    for (let i = 1; i <= brief.cycle.of; i += 1) {
-      const seg = root.createElement('i');
-      if (i <= brief.cycle.week) seg.className = 'is-filled';
-      meter.append(seg);
-    }
-    card.append(label, value, meter);
-  }
-
-  if (brief.watch?.length) {
-    const watchLabel = root.createElement('p');
-    watchLabel.className = 'medical-brief__kicker';
-    watchLabel.textContent = 'Watch';
-    card.append(watchLabel);
-    for (const item of brief.watch) {
-      const row = root.createElement('p');
-      row.className = 'medical-brief__watch';
-      row.dataset.status = item.status === 'High' || item.status === 'Low' ? 'flag' : 'ok';
-      const ref = formatWatchRef(item);
-      row.textContent = `${item.label} ${item.value ?? ''} ${item.arrow || ''}${ref ? ` · ${ref}` : ''}`.trim();
-      card.append(row);
-    }
-  }
-
-  if (brief.verdict) {
-    const verdict = root.createElement('p');
-    verdict.className = 'medical-brief__verdict';
-    verdict.textContent = brief.verdict;
-    card.append(verdict);
-  }
+  body.append(episodeSection(root, model, hooks));
+  if (hasCycle) body.append(cycleSection(root, brief.cycle));
+  if (hasWatch) body.append(watchSection(root, model));
+  card.append(body);
   return card;
 }
 
-function episodeCard(root, model, hooks) {
-  const card = surfaceCard(root, 'Active Episode');
+function episodeSection(root, model, hooks) {
+  const section = root.createElement('div');
+  section.className = 'medical-brief__section';
+
+  const kicker = root.createElement('p');
+  kicker.className = 'medical-brief__kicker';
+  kicker.textContent = 'Active episode';
+  section.append(kicker);
+
   const ep = model.activeEpisode;
   if (!ep) {
     const last = lastResolvedEpisode(model.allVisits || model.visits || []);
-    const line = emptyLine(
+    section.append(emptyLine(
       root,
       last
         ? `No active episode · last: ${last.title}, resolved ${formatDisplayDate(last.resolved || last.lastDate)}`
         : 'No active episode.'
-    );
-    card.append(line);
-    return card;
-  }
-
-  const emoji = EPISODE_EMOJI.Acute;
-  const title = root.createElement('p');
-  title.className = 'medical-brief__value';
-  title.textContent = `${emoji} ${ep.title} · day ${ep.dayNumber || 1}`;
-
-  const latest = ep.entries?.[0];
-  const note = root.createElement('p');
-  note.className = 'medical-brief__verdict';
-  note.textContent = latest
-    ? `${truncate(latest.notes || latest.title, 120)} · ${formatDisplayDate(latest.date)}`
-    : '';
-
-  const dots = root.createElement('div');
-  dots.className = 'medical-brief__dots';
-  dots.setAttribute('aria-hidden', 'true');
-  const started = ep.started;
-  const today = model.today;
-  if (started && today && isCalendarDate(started) && isCalendarDate(today)) {
-    const span = Math.max(1, daysBetween(started, today) + 1);
-    const dated = new Set((ep.entries || []).map(entry => entry.date));
-    for (let i = 0; i < span; i += 1) {
-      const day = addDaysSafe(started, i);
-      const dot = root.createElement('i');
-      if (dated.has(day)) dot.className = 'is-filled';
-      dots.append(dot);
-    }
+    ));
+    return section;
   }
 
   const btn = root.createElement('button');
@@ -145,13 +107,106 @@ function episodeCard(root, model, hooks) {
   btn.className = 'medical-brief__hit';
   btn.setAttribute('aria-label', `Open ${ep.title} episode in timeline`);
   btn.addEventListener('click', () => hooks.onOpenEpisode?.(ep.id));
-  btn.append(title, note, dots);
-  card.append(btn);
-  return card;
+
+  const value = root.createElement('p');
+  value.className = 'medical-brief__value';
+  value.textContent = `${EPISODE_EMOJI.Acute} ${ep.title} · day ${ep.dayNumber || 1}`;
+
+  const latest = ep.entries?.[0];
+  const note = root.createElement('p');
+  note.className = 'medical-brief__support';
+  note.textContent = latest
+    ? `${truncate(latest.notes || latest.title, 120)}${latest.date ? ` · ${formatDisplayDate(latest.date)}` : ''}`
+    : '';
+
+  btn.append(value, note);
+  section.append(btn);
+  return section;
+}
+
+function cycleSection(root, cycle) {
+  const section = root.createElement('div');
+  section.className = 'medical-brief__section';
+
+  const kicker = root.createElement('p');
+  kicker.className = 'medical-brief__kicker';
+  kicker.textContent = `${cycle.label} cycle`;
+
+  const value = root.createElement('p');
+  value.className = 'medical-brief__value';
+  value.textContent = `Week ${cycle.week} of ${cycle.of}`;
+
+  const meter = root.createElement('div');
+  meter.className = 'medical-brief__meter';
+  meter.setAttribute('aria-hidden', 'true');
+  for (let i = 1; i <= cycle.of; i += 1) {
+    const seg = root.createElement('i');
+    if (i <= cycle.week) seg.className = 'is-filled';
+    meter.append(seg);
+  }
+
+  section.append(kicker, value, meter);
+
+  if (cycle.nextDate && isCalendarDate(cycle.nextDate)) {
+    const support = root.createElement('p');
+    support.className = 'medical-brief__support';
+    support.textContent = `Next dose ~${formatShortDayMonth(cycle.nextDate)}`;
+    section.append(support);
+  }
+  return section;
+}
+
+function watchSection(root, model) {
+  const section = root.createElement('div');
+  section.className = 'medical-brief__section';
+
+  const kicker = root.createElement('p');
+  kicker.className = 'medical-brief__kicker';
+  kicker.textContent = 'Watch';
+  section.append(kicker);
+
+  const watch = model.brief?.watch || [];
+  if (watch.length) {
+    const primary = watch[0];
+    const value = root.createElement('p');
+    value.className = 'medical-brief__value medical-brief__value--watch';
+    value.dataset.status = primary.status === 'High' || primary.status === 'Low' ? 'flag' : 'ok';
+    value.textContent = `${primary.label} ${primary.value ?? ''} ${primary.arrow || ''}`.trim();
+    section.append(value);
+    if (watch[1]) {
+      const second = root.createElement('p');
+      second.className = 'medical-brief__watch-secondary';
+      second.dataset.status = watch[1].status === 'High' || watch[1].status === 'Low' ? 'flag' : 'ok';
+      second.textContent = `${watch[1].label} ${watch[1].value ?? ''} ${watch[1].arrow || ''}`.trim();
+      section.append(second);
+    }
+  }
+
+  const supportText = watchSupportLine(model) || model.brief?.verdict;
+  if (supportText) {
+    const support = root.createElement('p');
+    support.className = 'medical-brief__support';
+    support.textContent = supportText;
+    section.append(support);
+  } else if (!watch.length) {
+    section.append(emptyLine(root, 'Nothing on watch.'));
+  }
+  return section;
+}
+
+/** Prefer a to_book / MRI-style support line under Watch (Concept C). */
+function watchSupportLine(model) {
+  const action = (model.nextItems || []).find(visit =>
+    visit.status === 'to_book' || visit.date_precision === 'tbd'
+  );
+  if (!action) return null;
+  const short = shortBookTitle(action.title);
+  return `${short} ordered — not booked yet`;
 }
 
 function nextCard(root, model, hooks) {
   const card = surfaceCard(root, 'Next');
+  card.classList.add('medical-brief-card--next');
   const items = model.nextItems || [];
   if (!items.length) {
     card.append(emptyLine(root, 'Nothing planned.'));
@@ -183,19 +238,28 @@ function buildNextRow(root, visit, model, hooks) {
   const titleBtn = root.createElement('button');
   titleBtn.type = 'button';
   titleBtn.className = 'medical-brief__next-open';
+
+  const emoji = root.createElement('span');
+  emoji.className = 'medical-brief__next-emoji';
+  emoji.setAttribute('aria-hidden', 'true');
+  emoji.textContent = nextEmoji(visit);
+
   const title = root.createElement('span');
   title.className = 'medical-brief__next-title';
-  title.textContent = visit.title;
+  title.textContent = nextTitle(visit);
+
   const when = root.createElement('span');
   when.className = 'medical-brief__next-when';
   const label = formatRelativeMedicalDate(visit.date, model.today, {
     precision: visit.date_precision,
     status: visit.status,
-    virtual: visit.virtual
+    virtual: false,
+    compact: true
   });
   when.textContent = label;
-  if (label === 'action') when.dataset.tone = 'danger';
-  titleBtn.append(title, when);
+  if (label === 'action') when.dataset.tone = 'action';
+
+  titleBtn.append(emoji, title, when);
   titleBtn.addEventListener('click', () => hooks.onSelect?.(visit.id));
   li.append(titleBtn);
 
@@ -217,16 +281,37 @@ function buildNextRow(root, visit, model, hooks) {
   return li;
 }
 
-function formatWatchRef(item) {
-  const high = item.ref_high;
-  const low = item.ref_low;
-  if (high != null && Number.isFinite(Number(high)) && (low == null || Number(low) === 0)) {
-    return `ref <${high}`;
+function nextEmoji(visit) {
+  const title = String(visit.title || '');
+  if (visit.status === 'to_book' || visit.date_precision === 'tbd') return '📞';
+  if (/stelara|ustekinumab/i.test(title)) return '💉';
+  if (/blood/i.test(title) || visit.lane === 'lab' || visit.record_type === 'Lab Work') return '🩸';
+  if (/colonoscop/i.test(title)) return '🔬';
+  if (/gastro|review|consult/i.test(title) || visit.record_type === 'Consultation') return '🩺';
+  if (visit.lane === 'imaging' || visit.record_type === 'Imaging') return '🔬';
+  if (visit.lane === 'therapy') return '🧠';
+  return '🗓️';
+}
+
+function nextTitle(visit) {
+  const raw = String(visit.title || '').trim();
+  if (visit.status === 'to_book' || visit.date_precision === 'tbd') {
+    return `Book ${shortBookTitle(raw)}`;
   }
-  if (low != null && high != null) return `ref ${low}–${high}`;
-  if (high != null) return `ref <${high}`;
-  if (low != null) return `ref >${low}`;
-  return '';
+  return raw;
+}
+
+function shortBookTitle(title) {
+  const raw = String(title || '').trim();
+  if (!raw) return 'appointment';
+  const head = raw.split(/\s*[—–-]\s*/)[0].trim();
+  return head || raw;
+}
+
+function formatShortDayMonth(dateKey) {
+  if (!isCalendarDate(dateKey)) return formatDisplayDate(dateKey);
+  const [, m, d] = dateKey.split('-').map(Number);
+  return `${d} ${MONTHS_SHORT[m - 1] || ''}`.trim();
 }
 
 function surfaceCard(root, heading) {
@@ -274,15 +359,4 @@ function lastResolvedEpisode(visits) {
     if (!best || ep.lastDate > best.lastDate) best = ep;
   }
   return best;
-}
-
-function addDaysSafe(dateKey, days) {
-  if (!isCalendarDate(dateKey)) return dateKey;
-  const [y, m, d] = dateKey.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  dt.setUTCDate(dt.getUTCDate() + days);
-  const yy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${yy}-${mm}-${dd}`;
 }

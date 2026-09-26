@@ -430,7 +430,8 @@ function buildHealthBrief(visits, bloods, today) {
       week,
       of: Math.round(stelara.cadence_days / 7) || 8,
       lastDate: stelara.date,
-      cadence_days: stelara.cadence_days
+      cadence_days: stelara.cadence_days,
+      nextDate: addDays(stelara.date, stelara.cadence_days)
     };
   }
 

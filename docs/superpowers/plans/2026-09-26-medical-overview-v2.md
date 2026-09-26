@@ -50,29 +50,32 @@ Branch: `medical/overview-v2` (from `main`). One draft PR for the whole build. A
 
 ```
 ┌ page header (unchanged: eyebrow HISTORY, title, ← Body, date pill) ─────────────┐
-├───────────────────────┬───────────────────────┬───────────────────────┤
-│ 1. HEALTH BRIEF       │ 2. ACTIVE EPISODE     │ 3. NEXT               │  ← three equal cards,
-│ Stelara cycle meter   │ 🤧 Head cold · day 4  │ Book MRCP   action    │    one row, equal height
-│ Watch: GGT 233 ↑      │ latest note + date    │ Stelara     26 days   │
-│ Sara's 1-line verdict │ mini day-dots         │ Bloods      early Dec │
-├───────────────────────┴───────────────────────┴───────────────────────┤
-│ 4. HEALTH THREADS strip  [▾ collapse]  [Weeks|Months|Years] [−][+]     │  ← full content width,
-│ IBD ●──●──■──|──○──○──○──□   (calprotectin ribbon)                      │    horizontal, pinchable,
-│ Liver ─────────|──□──○        (GGT ribbon vs normal band)               │    TODAY line visible
-│ Mind  ●  ●  ●  |                                                        │
-│ Acute ▬      ▬ |                                                        │
-├───────────────────────────────────────────────────────────────────────┤
-│ 5. toolbar: search · Type · Practitioner · Show minor ▾ · Add            │
-│ 6. WEIGHTED RIVER (concept A): UPCOMING → TODAY line → past by month    │
-└───────────────────────────────────────────────────────────────────────┘
+├─────────────────────────────────────────┬─────────────────────────────────────┤
+│ 1. HEALTH BRIEF (inverted / navy)       │ 2. NEXT (light card)                │
+│   ACTIVE EPISODE  🤧 Head cold · day 4  │ 📞 Book MRCP              action    │
+│   STELARA CYCLE   Week 5 of 8 + meter   │ 💉 Stelara                26 days   │
+│                   Next dose ~22 Oct     │ 🩸 Repeat bloods          early Dec │
+│   WATCH           GGT 233 ↑             │ 🔬 Colonoscopy            Feb 2027  │
+│                   MRCP ordered…         │ 🩺 Gastro review          Mar 2027  │
+├─────────────────────────────────────────┴─────────────────────────────────────┤
+│ 3. HEALTH THREADS strip  [▾ collapse]  [Weeks|Months|Years] [−][+]             │
+│ IBD ●──●──■──|──○──○──○──□   (calprotectin ribbon)                              │
+│ Liver ─────────|──□──○        (GGT ribbon vs normal band)                       │
+│ Mind  ●  ●  ●  |                                                                │
+│ Acute ▬      ▬ |                                                                │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ 4. toolbar: search · Type · Practitioner · Show minor ▾ · Add                    │
+│ 5. WEIGHTED RIVER (concept A): UPCOMING → TODAY line → past by month            │
+└───────────────────────────────────────────────────────────────────────────────┘
 ```
 
+Adam locked the top row to **Concept C**: one inverted navy Health Brief (episode + cycle + watch stacked) and a separate light Next list — not three equal glass cards.
 - **The strip must get the page's full content width.** It is a sibling of the card row, not inside a column. Its SVG width comes from its container (ResizeObserver), with **no max-width** below the page's own.
 - The strip is an accordion. On desktop it opens by default; on phone it starts collapsed and shows a one-line summary ("4 threads · 2 planned"). The open state persists per viewer (localStorage, wrapped in try/catch).
 - The existing **Places** button and map stay available from the toolbar. The detail side sheet stays, but its body text uses the kit type scale (see §4.12).
 
 ### 2.2 Phone (< 720px)
-Cards stack in the order Brief, Episode, Next. The strip becomes an accordion whose body scrolls horizontally **inside its own box** (`overflow-x:auto`), with the page never scrolling sideways, and it opens scrolled so TODAY sits at 70% of the width. The river keeps its rail; minor rows stay one line.
+Cards stack Brief then Next. The strip becomes an accordion whose body scrolls horizontally **inside its own box** (`overflow-x:auto`), with the page never scrolling sideways, and it opens scrolled so TODAY sits at 70% of the width. The river keeps its rail; minor rows stay one line.
 
 ### 2.3 Weight (visual importance)
 Every medical record has `weight: major | routine | minor`.
@@ -135,11 +138,11 @@ Any Next item with status `to_book` (or a planned item without a booked date) sh
 | "had my Stelara today" | 1 major dose record with `cadence_days: 56`; the model shows a virtual next dose |
 | "cold's gone" | active episode → resolved |
 
-### M2: Top row (three cards)
-- [ ] **MO-12** Card row container: a grid with `repeat(3, minmax(0, 1fr))`, `align-items: stretch`, and cards that are `height: 100%` with an explicit kit surface (see §4.2). ≤ 1023px: 2 + 1; < 720px: stacked.
-- [ ] **MO-13** **Health Brief** card: the Stelara cycle meter (week n of 8, segmented), up to 2 **Watch** items (the latest flagged bloods markers still out of range, each with value, arrow and reference), and Sara's latest compact verdict line (from the Central Node Health status, or the latest `notes` verdict). When there's no data, show an empty state with one sentence and nothing else.
-- [ ] **MO-14** **Active Episode** card: title with emoji by lane, "day n", the latest entry text and date, and a dot row with one dot per day since the start (filled on days with an entry). With no active episode it reads "No active episode · last: Head cold, resolved 30/09". Clicking it scrolls to and expands the band in the river.
-- [ ] **MO-15** **Next** card: up to 5 items sorted as actions (`to_book`) first, then by date. Each row: icon, title, and relative time ("in 26 days", "early Dec", "Feb 2027", or "action" in `--danger` tone). "+n more" jumps to UPCOMING in the river.
+### M2: Top row (Health Brief + Next)
+- [ ] **MO-12** Card row container: a grid with `minmax(0, 1.35fr) minmax(0, 1fr)` (Brief | Next), `align-items: stretch`, and cards that are `height: 100%`. ≤ 1023px / < 720px: stacked Brief then Next.
+- [ ] **MO-13** **Health Brief** card (inverted navy): three stacked sections — **Active episode** (emoji, title, day n, latest note), **Stelara cycle** (week n of 8, segmented meter, next dose line), **Watch** (flagged lab value + to_book / verdict support line). When there's no data, show an empty state with one sentence and nothing else.
+- [ ] **MO-14** *(folded into MO-13)* Active episode lives inside the Health Brief, not a separate card. Clicking it scrolls to and expands the band in the river.
+- [ ] **MO-15** **Next** card: up to 5 items sorted as actions (`to_book`) first, then by date. Each row: emoji, title (Book X for to_book), and relative time ("26 days", "early Dec", "Feb 2027", or "action" in High Sea ink). "+n more" jumps to UPCOMING in the river.
 - [ ] **MO-16** Add to Tasks on eligible Next rows (§2.8), through `tasksApi` / `apiPost` (**no relative fetch**, see §4.7). Test: `task_id` is stored and the label flips.
 
 ### M3: Health Threads strip

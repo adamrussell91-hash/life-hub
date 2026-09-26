@@ -7407,11 +7407,11 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 }
 
 /* —— Medical Overview v2: brief / strip / weighted river ——
-   Surfaces match Life `.metric-card` (glass + blur + shadow-card), not the
-   cream/white card frame from docs/mockups/medical-overview-redesign.html. */
+   Health Brief = inverted kit surface (Concept C Now strip).
+   Next = light glass list. Tokens only — no cream mockup palette. */
 .medical-brief-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
   gap: var(--space-grid);
   align-items: stretch;
   margin: 0 0 var(--space-stack);
@@ -7430,6 +7430,12 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(var(--hub-glass-blur)) saturate(125%);
 }
+.medical-brief-card--now {
+  background: linear-gradient(135deg, var(--depth) 0%, var(--marine) 100%);
+  border-color: transparent;
+  color: var(--on-dark);
+  backdrop-filter: none;
+}
 .medical-brief-card__title {
   margin: 0;
   color: var(--muted);
@@ -7437,6 +7443,22 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
+}
+.medical-brief-card__title--now {
+  color: var(--on-dark-muted);
+}
+.medical-brief__now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  flex: 1;
+}
+.medical-brief__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 .medical-brief__kicker {
   margin: 0;
@@ -7446,12 +7468,30 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
+.medical-brief-card--now .medical-brief__kicker {
+  color: var(--on-dark-muted);
+}
 .medical-brief__value {
   margin: 0;
   color: var(--depth);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   letter-spacing: var(--tracking-tight);
+}
+.medical-brief-card--now .medical-brief__value {
+  color: var(--on-dark);
+}
+.medical-brief__value--watch[data-status="flag"] {
+  color: var(--high-sea);
+}
+.medical-brief__watch-secondary {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--on-dark);
+}
+.medical-brief__watch-secondary[data-status="flag"] {
+  color: var(--high-sea);
 }
 .medical-brief__meter {
   display: flex;
@@ -7465,19 +7505,15 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--muted) 25%, transparent);
 }
+.medical-brief-card--now .medical-brief__meter i {
+  background: var(--on-dark-hover);
+}
 .medical-brief__meter i.is-filled {
   background: var(--high-sea);
 }
-.medical-brief__watch {
+.medical-brief__support {
   margin: 0;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
-}
-.medical-brief__watch[data-status="flag"] { color: var(--danger); }
-.medical-brief__verdict {
-  margin: 0;
-  color: var(--orca);
+  color: var(--on-dark-muted);
   font-size: var(--text-sm);
 }
 .medical-brief__empty {
@@ -7485,9 +7521,12 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   color: var(--muted);
   font-size: var(--text-sm);
 }
+.medical-brief-card--now .medical-brief__empty {
+  color: var(--on-dark-muted);
+}
 .medical-brief__hit {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--space-1);
   width: 100%;
   padding: 0;
   border: 0;
@@ -7497,18 +7536,6 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font: inherit;
   cursor: pointer;
 }
-.medical-brief__dots {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.medical-brief__dots i {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
-}
-.medical-brief__dots i.is-filled { background: var(--accent); }
 .medical-brief__next {
   list-style: none;
   margin: 0;
@@ -7528,8 +7555,9 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 }
 .medical-brief__next-row:last-child { border-bottom: 0; }
 .medical-brief__next-open {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
   gap: var(--space-2);
   width: 100%;
   min-width: 0;
@@ -7540,6 +7568,11 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font: inherit;
   text-align: left;
   cursor: pointer;
+}
+.medical-brief__next-emoji {
+  flex: none;
+  font-size: var(--text-base);
+  line-height: 1.2;
 }
 .medical-brief__next-title {
   min-width: 0;
@@ -7554,10 +7587,11 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   font-weight: var(--weight-semibold);
   white-space: nowrap;
 }
-.medical-brief__next-when[data-tone="danger"] { color: var(--danger); }
+.medical-brief__next-when[data-tone="action"] { color: var(--high-sea-ink); }
 .medical-brief__task,
 .medical-brief__more {
   align-self: flex-start;
+  margin-left: calc(var(--text-base) + var(--space-2));
   font-size: var(--text-xs);
 }
 
@@ -8079,19 +8113,13 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 
 @media (max-width: 1023px) {
   .medical-brief-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .medical-brief-row > :last-child {
-    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
 @media (max-width: 719px) {
   .medical-brief-row {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .medical-brief-row > :last-child {
-    grid-column: auto;
   }
   .medical-strip__body {
     overflow-x: auto;
