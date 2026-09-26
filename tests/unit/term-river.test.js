@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LANES, byLane, laneFor, riverWeekLabel, weeklyLoad, weeksBetween } from '../../apps/life/js/app/term-river.js';
+import { LANES, byLane, deriveRiverZooms, laneFor, riverWeekLabel, weeklyLoad, weeksBetween } from '../../apps/life/js/app/term-river.js';
 
 const TERMS = [
   { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
@@ -69,4 +69,17 @@ test('the load strip uses the capacity model’s rule: classes, Corey time and g
   const reportWeek = load.find(w => w.week === '2026-11-16');
   assert.equal(reportWeek.booked, 22.5);
   assert.equal(reportWeek.over, true, 'report-writing at 40% runs over');
+});
+
+test('deriveRiverZooms: term containing today; year pads first→last term', () => {
+  const today = '2026-09-24';
+  const zooms = deriveRiverZooms(TERMS, today);
+  assert.deepEqual(zooms.term, { from: '2026-07-21', to: '2026-09-25', holidayFactor: 0.65 });
+  assert.deepEqual(zooms.year, { from: '2026-07-20', to: '2027-01-10', holidayFactor: 0.5 });
+});
+
+test('deriveRiverZooms: after a term ends, picks the next term', () => {
+  const zooms = deriveRiverZooms(TERMS, '2026-10-01');
+  assert.equal(zooms.term.from, '2026-10-13');
+  assert.equal(zooms.term.to, '2026-12-17');
 });
