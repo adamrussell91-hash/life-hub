@@ -107,6 +107,28 @@ export async function resolveTasksProject(
   });
 }
 
+export async function resolveTasksGoal(
+  id,
+  accessContext,
+  { getStore = defaultGetTasksStore } = {}
+) {
+  if (typeof id !== 'string' || !REF_ID.test(id)) throw endpointNotFoundError();
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = await getTasksJSON(store, `goals/${id}`);
+  if (!record || typeof record !== 'object') throw endpointNotFoundError();
+  const hubRef = { hub: 'tasks', kind: 'goal', id };
+  return projection({
+    namespace: 'tasks',
+    kind: 'goal',
+    id,
+    displayLabel: typeof record.title === 'string' && record.title ? record.title : id,
+    supportingLabel: typeof record.sphere === 'string' ? record.sphere : null,
+    href: hrefForHubRef(hubRef),
+    lifecycleStatus: typeof record.status === 'string' ? record.status : 'active'
+  });
+}
+
 /**
  * Life decisions are not Blob-backed in Slice 7. Callers inject `getDecision`
  * (fixture map or Life store adapter). Without it, the endpoint is absent.

@@ -1,4 +1,4 @@
-import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
+import { createTasksCollectionHandler, normalizeTags } from './_shared/tasks-collection.mjs';
 
 export const config = { path: '/api/areas' };
 
@@ -20,6 +20,7 @@ export function createAreasHandler(deps = {}) {
           id,
           title,
           description: typeof body.description === 'string' ? body.description : '',
+          tags: normalizeTags(body.tags),
           created_at: timestamp,
           updated_at: timestamp
         }

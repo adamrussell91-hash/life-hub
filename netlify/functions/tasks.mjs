@@ -22,6 +22,7 @@ import {
   taskKey,
   writeTaskIndex
 } from './_shared/tasks-blobs.mjs';
+import { normalizeTags } from './_shared/tasks-collection.mjs';
 
 export const config = { path: '/api/tasks' };
 
@@ -125,12 +126,16 @@ export function createTasksHandler(deps = {}) {
         }
         const timestamp = new Date().toISOString();
         const id = newTaskId();
+        const parentTaskId = typeof parsed.value.parent_task_id === 'string' && parsed.value.parent_task_id
+          ? parsed.value.parent_task_id
+          : null;
+        const isStep = parsed.value.kind === 'step' && parentTaskId !== null;
         const task = {
           schema_version: 1,
           id,
           title,
           description: typeof parsed.value.description === 'string' ? parsed.value.description : '',
-          kind: 'task',
+          kind: isStep ? 'step' : 'task',
           bucket: typeof parsed.value.bucket === 'string' && parsed.value.bucket ? parsed.value.bucket : 'active',
           domain,
           status: typeof parsed.value.status === 'string' && parsed.value.status ? parsed.value.status : 'open',
@@ -138,11 +143,18 @@ export function createTasksHandler(deps = {}) {
           parent_project_id: typeof parsed.value.parent_project_id === 'string'
             ? parsed.value.parent_project_id
             : null,
+          parent_goal_id: typeof parsed.value.parent_goal_id === 'string' && parsed.value.parent_goal_id
+            ? parsed.value.parent_goal_id
+            : null,
+          parent_task_id: parentTaskId,
+          step_order: Number.isInteger(parsed.value.step_order) && parsed.value.step_order >= 0
+            ? parsed.value.step_order
+            : 0,
           created_at: timestamp,
           updated_at: timestamp,
           completed_at: null,
           depends_on: [],
-          tags: [],
+          tags: normalizeTags(parsed.value.tags),
           attachments: [],
           source: 'manual',
           // Someday / Maybe fields — no-ops for board tasks that never set them.

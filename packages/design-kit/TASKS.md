@@ -27,6 +27,7 @@ Agent writes: propose → **confirm card** → apply.
 |---------|------|
 | **Board** | Home. Task / project / excursion cards as Teaching tiles (glass, `--hub-tile-gap`). |
 | **Calendar** | Reference paint for every hub. Day / Week / Month, 7-day Monday week, `.event-chip`. See `CALENDAR.md`. |
+| **Goals** | `#/goals` Term Runway: three lanes (Life / Work / Professional), week cells from `goals.css` (never red for a miss), Hammond strip. `#/goal/:id`: structure card, if-then, next start, hosting, `@` tags, Hammond panel with `.confirm-card` proposals. Reference: `docs/proposals/goals-reference/`. |
 | **Graph** | A rail page, not home. Three views: **Lines** (project transit), **Branch** (dependency flowchart), **Orbit** (due-date radar). |
 | **Charts** | Blocks on the board (counts, trends). Not a third chrome system. |
 

@@ -22,7 +22,7 @@ export const ENTITY_REF_NAMESPACES = new Set([
 export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
   professional: new Set(['communication', 'meeting', 'event', 'application']),
-  tasks: new Set(['task', 'project', 'program']),
+  tasks: new Set(['task', 'project', 'program', 'goal']),
   // `class` and `student_reference` are Slice 8's own additions — Slice 11
   // deliberately deferred both pending this privacy-scoped work (see
   // tests/unit/slice11-entity-adapters.test.js). `class` gets an ordinary

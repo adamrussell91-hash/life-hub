@@ -131,6 +131,10 @@ export function projectPageHash(id: string): string {
   return `#/project/${encodeURIComponent(id)}`;
 }
 
+export function goalPageHash(id: string): string {
+  return `#/goal/${encodeURIComponent(id)}`;
+}
+
 export function programHash(id: string): string {
   return `#/programs?id=${encodeURIComponent(id)}`;
 }

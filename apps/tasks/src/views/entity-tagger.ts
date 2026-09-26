@@ -6,7 +6,7 @@ import {
   suppressUniversalLink
 } from '@/api/universal-links';
 
-const TAGGABLE_KINDS = 'person,organisation,task,application,program,page,unit,lesson,class,event,meeting';
+const TAGGABLE_KINDS = 'person,organisation,task,goal,project,application,program,page,unit,lesson,class,event,meeting';
 
 /**
  * The one generic "@ tag anything" section for this hub — mount instead of

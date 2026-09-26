@@ -58,6 +58,8 @@ const SUPPORTED_KINDS = new Set([
   'task',
   'application',
   'program',
+  'goal',
+  'project',
   'page',
   'unit',
   'lesson',
@@ -271,6 +273,31 @@ async function searchProgramKind(getTasksStore, query) {
   return out;
 }
 
+async function searchTasksCollectionKind(getTasksStore, query, { indexKey, prefix, kind, supporting }) {
+  const store = await getTasksStore();
+  const ids = await readIndex(store, indexKey);
+  const records = await mapBounded(ids, READ_BATCH_SIZE, id => getTasksJSON(store, `${prefix}${id}`));
+  const out = [];
+  for (const record of records) {
+    if (!record || typeof record !== 'object' || typeof record.id !== 'string') continue;
+    if (record.status === 'archived') continue;
+    const label = typeof record.title === 'string' ? record.title : '';
+    const rank = matchRank(query, label, null);
+    if (rank === null) continue;
+    out.push({
+      rank,
+      ref: formatEntityRef({ namespace: 'tasks', kind, id: record.id }),
+      kind,
+      display_label: label || record.id,
+      supporting_label: supporting(record),
+      href: hrefForHubRef({ hub: 'tasks', kind, id: record.id }),
+      lifecycle_status: typeof record.status === 'string' ? record.status : 'active',
+      visibility: 'operator'
+    });
+  }
+  return out;
+}
+
 async function searchEventKind(getProfessionalStore, query) {
   const store = await getProfessionalStore();
   const indexKeys = await listEventIndexKeys(store);
@@ -444,6 +471,18 @@ export function createEntitySearchHandler(deps = {}) {
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
       requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],
       requestedKinds.has('program') ? searchProgramKind(getTasksStore, query) : [],
+      requestedKinds.has('goal')
+        ? searchTasksCollectionKind(getTasksStore, query, {
+          indexKey: 'goals/_index', prefix: 'goals/', kind: 'goal',
+          supporting: record => (typeof record.sphere === 'string' ? record.sphere : null)
+        })
+        : [],
+      requestedKinds.has('project')
+        ? searchTasksCollectionKind(getTasksStore, query, {
+          indexKey: 'projects/_index', prefix: 'projects/', kind: 'project',
+          supporting: record => (typeof record.status === 'string' ? record.status : null)
+        })
+        : [],
       requestedKinds.has('event') ? searchEventKind(getProfessionalStore, query) : [],
       requestedKinds.has('meeting') ? searchMeetingKind(getProfessionalStore, query) : [],
       requestedKinds.has('page')
@@ -475,6 +514,8 @@ export function createEntitySearchHandler(deps = {}) {
       task: [],
       application: [],
       program: [],
+      goal: [],
+      project: [],
       event: [],
       meeting: [],
       page: [],
