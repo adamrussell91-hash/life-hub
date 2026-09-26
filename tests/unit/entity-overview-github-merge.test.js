@@ -200,3 +200,42 @@ test('a native Blob-backed Person keeps working unchanged when the GitHub import
   assert.equal(overview.entity.display_name, 'Native Only');
   assert.equal(overview.current_relationships.length, 0);
 });
+
+test('a redacted Person overview omits imported professional profile material', async () => {
+  const { generatePersonId, IDENTITY_SCHEMA_VERSION } = await import('../../netlify/functions/_shared/identity-schema.mjs');
+  const { personKey } = await import('../../netlify/functions/_shared/universal-link-blobs.mjs');
+  const store = emptyStore();
+  const id = generatePersonId();
+  await store.setJSON(personKey(id), {
+    schema_version: IDENTITY_SCHEMA_VERSION,
+    id,
+    kind: 'person',
+    display_name: 'Removed Person',
+    sort_name: 'Person, Removed',
+    aliases: ['Former name'],
+    lifecycle_status: 'deidentified',
+    is_self: false,
+    retention_reason: null,
+    retention_review_at: null,
+    created_at: '2026-09-11T00:00:00.000Z',
+    updated_at: '2026-09-11T00:00:00.000Z',
+    professional_profile: {
+      schema_version: 1,
+      source: { system: 'notion', page_url: null, properties: { Notes: 'Private source note' } },
+      summary: 'Private source note',
+      contact: { email: 'private@example.com', phone: null, linkedin_url: null },
+      last_contacted: null,
+      current_workplace: [],
+      references: { communications: [], books: [], podcasts: [], notes: [] },
+      body_markdown: 'Private source body'
+    }
+  });
+
+  const overview = await assembleEntityOverview(`shared:person:${id}`, {
+    store,
+    resolveEntity: makeResolveEntity(store, githubFetch({ people: [], organisations: [], relationships: [] }))
+  });
+
+  assert.equal(overview.entity.display_name, 'Removed record');
+  assert.equal('professional_profile' in overview.entity, false);
+});
