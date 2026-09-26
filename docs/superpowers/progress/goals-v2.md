@@ -24,13 +24,13 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M2: Basic editing on the goal page
 
-- [x] **G-06** Rename (inline edit) —
-- [x] **G-07** Sphere / Status / Term / Life area chips —
-- [x] **G-08** Due date chip —
-- [x] **G-09** Description popover —
-- [x] **G-10** Tags —
-- [x] **G-11** Delete with confirm + undo —
-- [x] **G-12** Life Wall editor —
+- [x] **G-06** Rename (inline edit) — `a3058265`
+- [x] **G-07** Sphere / Status / Term / Life area chips — `a3058265`
+- [x] **G-08** Due date chip — `a3058265`
+- [x] **G-09** Description popover — `a3058265`
+- [x] **G-10** Tags — `a3058265`
+- [x] **G-11** Delete with confirm + undo — `a3058265`
+- [x] **G-12** Life Wall editor — `a3058265`
 
 ## M3: Landing page (Term Runway)
 
