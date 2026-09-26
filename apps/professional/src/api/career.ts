@@ -71,6 +71,18 @@ export function runCareerScan(options: { signal?: AbortSignal } = {}) {
   return apiPost('/api/career-scan?action=run-now', {}, { signal: options.signal });
 }
 
+export function keepScanProposal(
+  id: string,
+  body: Record<string, unknown> = {},
+  options: { signal?: AbortSignal } = {}
+) {
+  return apiPost('/api/career-scan?action=keep', { id, ...body }, { signal: options.signal });
+}
+
+export function binScanProposal(id: string, options: { signal?: AbortSignal } = {}) {
+  return apiPost('/api/career-scan?action=bin', { id }, { signal: options.signal });
+}
+
 export function listCareerMoves(options: { signal?: AbortSignal } = {}) {
   return apiGet('/api/career-moves', { signal: options.signal });
 }

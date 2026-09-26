@@ -268,6 +268,13 @@ export async function assembleCareerOverview(deps = {}) {
       pending_count: 0,
       last_run_at: scanState.last_run_at ?? null
     };
+    try {
+      const { listScanProposals } = await import('./career-scan-service.mjs');
+      const pending = await listScanProposals(professionalStore, { status: 'pending' });
+      scan.pending_count = pending.length;
+    } catch {
+      /* scan store optional */
+    }
 
     const linkRepo = createLinkRepo({
       store: universalStore,

@@ -13,6 +13,7 @@ import { isValidApplicationId } from '@/domain/ids';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
 import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
+import { renderSkillsScanPanel } from '@/views/career-skills-scan';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -106,29 +107,19 @@ function renderFuturePanel(
   host.append(panel);
 }
 
-function renderSkillsScan(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
-  const panel = el('section', 'career-page__panel career-page__scan');
-  surface(panel);
-  panel.append(el('h2', 'career-page__heading', 'Skills scan'));
-  const pending = model.scan?.pending_count ?? 0;
-  if (!pending) {
-    panel.append(
-      el(
-        'p',
-        'empty-state',
-        'All sorted. Next scan runs Sunday evening, or run one now.'
-      )
-    );
-  } else {
-    panel.append(el('p', 'career-page__meta', `${pending} proposals waiting.`));
-  }
-  const run = el('button', 'btn btn--secondary', 'Run scan now') as HTMLButtonElement;
-  run.type = 'button';
-  run.addEventListener('click', () => {
-    panel.append(el('p', 'career-page__note', 'Weekly Skills scan lands in Phase 5.'));
+function renderSkillsScan(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  onReload: () => void
+): void {
+  const wrap = el('div', 'career-page__scan-host');
+  host.append(wrap);
+  renderSkillsScanPanel(wrap, model, {
+    onChanged: onReload,
+    onKept: () => {
+      /* river remounts via onChanged */
+    }
   });
-  panel.append(run);
-  host.append(panel);
 }
 
 function renderApplicationsSection(
@@ -295,7 +286,7 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
 
   const columns = el('div', 'career-page__columns');
   renderFuturePanel(columns, model, selectedFutureId, reload);
-  renderSkillsScan(columns, model);
+  renderSkillsScan(columns, model, reload);
   page.append(columns);
 
   renderApplicationsSection(page, model, overview);

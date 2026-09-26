@@ -3900,6 +3900,72 @@
   gap: var(--space-2);
 }
 
+.career-scan__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.career-scan__card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.career-scan__sources,
+.career-scan__tags,
+.career-scan__witnesses,
+.career-scan__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.career-scan__source-chip,
+.career-scan__apst,
+.career-scan__future-dot,
+.career-scan__witness {
+  font-size: var(--text-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  background: var(--glass);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.career-scan__title {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.career-scan__star summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.career-scan__kept {
+  margin: 0;
+  font-weight: 600;
+  color: var(--career-branch-3);
+}
+
+@media (max-width: 719px) {
+  .career-scan__witnesses {
+    width: 100%;
+  }
+
+  .career-scan__actions {
+    width: 100%;
+  }
+}
+
 @media (min-width: 720px) {
   .career-sheet {
     align-items: center;

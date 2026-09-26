@@ -1,10 +1,23 @@
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
-import { defaultGetProfessionalStore, getJSON, CAREER_SCAN_STATE_KEY } from './_shared/professional-blobs.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { readJsonObject } from './_shared/teaching-record-get.mjs';
+import {
+  binScanProposal,
+  getScanPanelPayload,
+  keepScanProposal,
+  runCareerScanPass
+} from './_shared/career-scan-service.mjs';
 
 export const config = { path: '/api/career-scan' };
 
-/** Skills scan endpoint — list/keep/bin/run-now. Full Ann pass is Phase 5. */
+function toErrorResponse(error) {
+  const status = Number.isInteger(error?.status) ? error.status : 500;
+  const code = typeof error?.code === 'string' ? error.code : 'internal_error';
+  const message = typeof error?.message === 'string' && error.message ? error.message : 'Request failed.';
+  return errorResponse(status, code, message, status === 503);
+}
+
 export function createCareerScanHandler(deps = {}) {
   return createOperatorHandler(
     async (request, context) => {
@@ -12,25 +25,36 @@ export function createCareerScanHandler(deps = {}) {
       const url = new URL(request.url);
       try {
         if (request.method === 'GET') {
-          const state = (await getJSON(store, CAREER_SCAN_STATE_KEY)) ?? {
-            last_run_at: null,
-            last_success_week: null
-          };
-          return withCors(
-            okResponse(200, { proposals: [], scan_state: state, pending_count: 0 }),
-            request,
-            env
-          );
+          const payload = await getScanPanelPayload(store);
+          return withCors(okResponse(200, payload), request, env);
         }
         if (request.method === 'POST') {
           const action = url.searchParams.get('action') || 'run-now';
-          if (action === 'run-now' || action === 'keep' || action === 'bin' || action === 'edit') {
+          const body = await readJsonObject(request).catch(() => ({}));
+          if (action === 'run-now') {
+            const result = await runCareerScanPass({
+              ...deps,
+              env,
+              professionalStore: store,
+              force: Boolean(body?.force)
+            });
+            const payload = await getScanPanelPayload(store);
+            return withCors(okResponse(200, { ...result, ...payload }), request, env);
+          }
+          if (action === 'bin') {
+            const id = body?.id || url.searchParams.get('id');
+            const proposal = await binScanProposal(store, id);
+            return withCors(okResponse(200, { proposal }), request, env);
+          }
+          if (action === 'keep') {
+            const id = body?.id || url.searchParams.get('id');
+            const result = await keepScanProposal({ ...deps, env, store }, id);
+            return withCors(okResponse(200, result), request, env);
+          }
+          if (action === 'edit') {
+            // Title / STAR edits before keep — Phase 5 keeps edit on the client until Keep.
             return withCors(
-              okResponse(200, {
-                ok: true,
-                action,
-                note: 'Skills scan keep/bin/run-now fully wired in Phase 5.'
-              }),
+              okResponse(200, { ok: true, note: 'Edit in place on the card, then Keep.' }),
               request,
               env
             );
@@ -39,12 +63,7 @@ export function createCareerScanHandler(deps = {}) {
         }
         return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
       } catch (error) {
-        const status = Number.isInteger(error?.status) ? error.status : 500;
-        return withCors(
-          errorResponse(status, error?.code || 'internal_error', error?.message || 'Request failed.'),
-          request,
-          env
-        );
+        return withCors(toErrorResponse(error), request, env);
       }
     },
     {
