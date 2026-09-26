@@ -84,6 +84,24 @@ function deriveLinkId(relationship) {
   return `ul_${digest}`;
 }
 
+// Person↔person link ids sort the two legacy ids so the same pair written
+// in either order collapses to one stable id.
+function derivePersonPersonLinkId(relationship) {
+  const a = relationship.person_legacy_id;
+  const b = relationship.other_person_legacy_id;
+  const [first, second] = a < b ? [a, b] : [b, a];
+  const digest = createHash('sha256')
+    .update([
+      first,
+      second,
+      relationship.relationship_type,
+      relationship.valid_from ?? '',
+      relationship.role ?? ''
+    ].join('|'))
+    .digest('hex');
+  return `ul_${digest}`;
+}
+
 async function githubJson(url, { token, fetchImpl }) {
   let response;
   try {
@@ -194,6 +212,11 @@ function isIsoDateOrNull(value) {
   return typeof value === 'string' && !Number.isNaN(new Date(value).getTime());
 }
 
+function pushPersonEntry(byPersonId, personId, entry) {
+  if (!byPersonId.has(personId)) byPersonId.set(personId, []);
+  byPersonId.get(personId).push(entry);
+}
+
 // Builds synthetic Universal-Link-shaped `link` objects — never written
 // anywhere, only ever held in memory for one request — indexed by the
 // derived person/organisation id each relationship touches, so
@@ -202,14 +225,50 @@ function isIsoDateOrNull(value) {
 function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegacyId) {
   const byPersonId = new Map();
   const byOrganisationId = new Map();
+  const seenPersonPersonIds = new Set();
   for (const row of Array.isArray(rows) ? rows : []) {
     if (!row || typeof row !== 'object') continue;
+    if (row.role !== null && row.role !== undefined && typeof row.role !== 'string') continue;
+    if (!isIsoDateOrNull(row.valid_from) || !isIsoDateOrNull(row.valid_to)) continue;
+
+    if (row.relationship_type === 'professional_relationship') {
+      const personId = peopleIdByLegacyId.get(row.person_legacy_id);
+      const otherId = peopleIdByLegacyId.get(row.other_person_legacy_id);
+      if (!personId || !otherId || personId === otherId) continue;
+      const linkId = derivePersonPersonLinkId(row);
+      if (seenPersonPersonIds.has(linkId)) continue;
+      seenPersonPersonIds.add(linkId);
+
+      const sourceRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
+      const targetRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: otherId });
+      const link = {
+        id: linkId,
+        source_ref: sourceRef,
+        target_ref: targetRef,
+        relationship_type: 'professional_relationship',
+        role: row.role ?? null,
+        context_key: null,
+        context_ref: null,
+        temporal_mode: 'period',
+        valid_from: row.valid_from ?? null,
+        valid_to: row.valid_to ?? null,
+        occurred_at: null,
+        status: row.valid_to ? 'ended' : 'current',
+        visibility: 'operator',
+        metadata: {},
+        created_at: LEGACY_IMPORT_TIMESTAMP,
+        updated_at: LEGACY_IMPORT_TIMESTAMP
+      };
+      // Index under both people: outgoing for the first, incoming for the second.
+      pushPersonEntry(byPersonId, personId, { link, otherRef: targetRef, direction: 'outgoing' });
+      pushPersonEntry(byPersonId, otherId, { link, otherRef: sourceRef, direction: 'incoming' });
+      continue;
+    }
+
     if (row.relationship_type !== 'employee_at' && row.relationship_type !== 'member_of') continue;
     const personId = peopleIdByLegacyId.get(row.person_legacy_id);
     const organisationId = organisationsIdByLegacyId.get(row.organisation_legacy_id);
     if (!personId || !organisationId) continue;
-    if (row.role !== null && row.role !== undefined && typeof row.role !== 'string') continue;
-    if (!isIsoDateOrNull(row.valid_from) || !isIsoDateOrNull(row.valid_to)) continue;
 
     const sourceRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
     const targetRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
@@ -232,8 +291,7 @@ function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegac
       updated_at: LEGACY_IMPORT_TIMESTAMP
     };
 
-    if (!byPersonId.has(personId)) byPersonId.set(personId, []);
-    byPersonId.get(personId).push({ link, otherRef: targetRef, direction: 'outgoing' });
+    pushPersonEntry(byPersonId, personId, { link, otherRef: targetRef, direction: 'outgoing' });
 
     if (!byOrganisationId.has(organisationId)) byOrganisationId.set(organisationId, []);
     byOrganisationId.get(organisationId).push({ link, otherRef: sourceRef, direction: 'incoming' });

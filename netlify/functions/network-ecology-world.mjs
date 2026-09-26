@@ -36,6 +36,7 @@ export function createNetworkEcologyWorldHandler(deps = {}) {
           store,
           professionalStore,
           env,
+          fetchImpl: deps.fetchImpl,
           resolveEntity,
           createRepository,
           now: now(),

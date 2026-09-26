@@ -309,3 +309,67 @@ test('PRIVACY: an archived person is also excluded from bridge_people even if th
   assert.equal(body.clusters.find((c) => c.id === unsw.ref), undefined);
   assert.equal(body.clusters.find((c) => c.id === stAloysius.ref), undefined);
 });
+
+test('W2: stubbed GitHub professional_relationship appears as a world edge', async () => {
+  const { derivePersonId, resetProfessionalDataCache } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
+  resetProfessionalDataCache();
+
+  function githubContents(body) {
+    const text = JSON.stringify(body);
+    return { sha: 'sha1', encoding: 'base64', content: Buffer.from(text).toString('base64'), size: Buffer.byteLength(text) };
+  }
+
+  const people = [
+    { legacy_id: 'gh-alice', display_name: 'Gh Alice' },
+    { legacy_id: 'gh-bob', display_name: 'Gh Bob' }
+  ];
+  const organisations = [];
+  const relationships = [
+    {
+      person_legacy_id: 'gh-alice',
+      other_person_legacy_id: 'gh-bob',
+      relationship_type: 'professional_relationship',
+      role: null,
+      valid_from: null,
+      valid_to: null
+    }
+  ];
+
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/data/professional/people.json')) {
+      return { ok: true, status: 200, json: async () => githubContents(people) };
+    }
+    if (String(url).endsWith('/data/professional/organisations.json')) {
+      return { ok: true, status: 200, json: async () => githubContents(organisations) };
+    }
+    if (String(url).endsWith('/data/professional/relationships.json')) {
+      return { ok: true, status: 200, json: async () => githubContents(relationships) };
+    }
+    return { ok: false, status: 404 };
+  };
+
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  const aliceId = derivePersonId('gh-alice');
+  const bobId = derivePersonId('gh-bob');
+  const aliceRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: aliceId });
+  const bobRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: bobId });
+
+  const handler = createNetworkEcologyWorldHandler({
+    ...baseDeps(store, professionalStore),
+    env: { ...env, GITHUB_TOKEN: 'token' },
+    fetchImpl
+  });
+  const response = await handler(request({ url: URL_BASE }));
+  assert.equal(response.status, 200);
+  const body = (await response.json()).data;
+  const edge = body.edges.find(
+    (e) =>
+      e.relationship_type === 'professional_relationship' &&
+      ((e.source_ref === aliceRef && e.target_ref === bobRef) ||
+        (e.source_ref === bobRef && e.target_ref === aliceRef))
+  );
+  assert.ok(edge, 'expected a person↔person edge from the stubbed GitHub row');
+  assert.ok(body.nodes.some((n) => n.ref === aliceRef));
+  assert.ok(body.nodes.some((n) => n.ref === bobRef));
+});

@@ -65,7 +65,7 @@ export function parseProfessionalPeopleCsv(csvText) {
   };
 }
 
-function nameKey(value) {
+export function nameKey(value) {
   return String(value ?? '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
