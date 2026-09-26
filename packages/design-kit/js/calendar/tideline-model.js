@@ -91,6 +91,8 @@ function clockMeta(start, end) {
 
 function eventKind(record) {
   if (record.type === 'scheduled_lesson') return 'teaching';
+  if (record.type === 'professional_communication') return 'comm';
+  if (record.type === 'professional_event' && record.event_type && record.event_type !== 'professional_development') return 'event';
   if (record.type === 'professional_meeting' || record.type === 'professional_event') return 'professional';
   if (record.type === 'workout') return 'fitness';
   if (record.type === 'medical') return 'health';
@@ -121,20 +123,27 @@ function chipFromEvent(event) {
   const workout = workoutOnGrid(record);
   if (workout === 'omit') return null;
   const start = toHour(record.time);
-  const end = record.end_time
-    ? toHour(record.end_time)
-    : start + (Number(record.duration_min) || 60) / 60;
+  const pin = record.pin === true;
+  const end = pin
+    ? start + 0.4
+    : record.end_time
+      ? toHour(record.end_time)
+      : start + (Number(record.duration_min) || 60) / 60;
   const kind = eventKind(record);
   const isClass = record.type === 'scheduled_lesson' || record.isClass === true;
   const filterKey = kind === 'teaching' || isClass
     ? (isClass || record.type === 'scheduled_lesson' ? 'classes' : 'events')
-    : kind === 'professional'
-      ? (record.type === 'professional_meeting' ? 'meetings' : 'pd')
-      : kind === 'task'
-        ? 'tasks'
-        : kind === 'health' || kind === 'fitness' || kind === 'corey'
-          ? kind
-          : null;
+    : kind === 'comm'
+      ? 'comms'
+      : kind === 'event'
+        ? 'events'
+        : kind === 'professional'
+          ? (record.type === 'professional_meeting' ? 'meetings' : 'pd')
+          : kind === 'task'
+            ? 'tasks'
+            : kind === 'health' || kind === 'fitness' || kind === 'corey'
+              ? kind
+              : null;
   const classMeta = isClass
     ? record.period
       ? `P${record.period} · ${record.focus || record.title || ''}`.trim()
@@ -156,6 +165,7 @@ function chipFromEvent(event) {
     provider: record.provider || record.clinician || '',
     source: record.type,
     filterKey,
+    pin,
     lesson_id: typeof record.lesson_id === 'string' ? record.lesson_id : undefined,
     class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
     ...(workout?.skipped ? { skipped: true } : {})
@@ -255,14 +265,21 @@ function dueFor(visual, events, date, useVisual) {
       return item;
     });
   }
-  return (events ?? [])
+  const tasks = (events ?? [])
     .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
+    .map(event => ({ id: event.record.id || event.path, date, title: event.record.title || 'Task', kind: 'task', filterKey: 'tasks' }));
+  const promises = (events ?? [])
+    .filter(event => event.record?.type === 'ledger_item' && event.record.date === date)
     .map(event => ({
-      id: event.record.id || event.path,
+      id: event.record.id,
       date,
-      title: event.record.title || 'Task',
-      kind: 'task'
+      title: event.record.title,
+      kind: 'promise',
+      filterKey: 'promises',
+      direction: event.record.direction,
+      late: event.record.late === true
     }));
+  return [...tasks, ...promises];
 }
 
 function wallsFor(visual, events, date, useVisual) {
@@ -329,7 +346,7 @@ function sourceCounts(days) {
   const counts = Object.fromEntries(SOURCE_ORDER.map(id => [id, 0]));
   for (const day of days) {
     for (const chip of day.chips) counts[chip.kind] = (counts[chip.kind] ?? 0) + 1;
-    for (const due of day.due) counts.task += 1;
+    for (const due of day.due) if (due.kind !== 'promise') counts.task += 1;
   }
   return SOURCE_ORDER
     .filter(id => counts[id] > 0)
