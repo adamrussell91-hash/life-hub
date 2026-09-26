@@ -1,0 +1,985 @@
+<title>Calendar and Comms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Caveat:wght@500&display=swap">
+<style>
+/* Cotton Glass tokens from packages/design-kit. The product is light-only, so this page is too. */
+:root{
+  --paper:#fbf8f2; --cotton:#f5f1e9; --depth:#0a1536; --marine:#142b51; --navy:#17375e; --navy-2:#244f7c;
+  --wave:#376fb7; --shallow:#a7abb9; --high-sea:#f68620; --high-sea-ink:#a85a0c; --ink:#13233a; --muted:#6b7788;
+  --line:rgba(23,55,94,.10); --line-2:rgba(23,55,94,.18); --glass:rgba(255,255,255,.72);
+  --pastel-blue:#dceafa; --pastel-blue-ink:#294c71; --pastel-sage:#dfe9e1; --pastel-sage-ink:#3c5949;
+  --pastel-peach:#f2dfd0; --pastel-peach-ink:#7a5038; --pastel-gold:#f1e2b6; --pastel-gold-ink:#6c581f;
+  --pastel-lilac:#e8e0f1; --pastel-lilac-ink:#5d4e70; --pastel-sand:#ece6da; --pastel-sand-ink:#5e5443;
+  --on-dark:rgba(255,255,255,.92); --on-dark-muted:rgba(255,255,255,.62); --on-dark-hover:rgba(255,255,255,.10);
+  --success:#2f7a4f; --success-surface:rgba(47,122,79,.10); --warning-surface:rgba(246,134,32,.12); --danger:#9b2c2c;
+  --comm:var(--wave); --comm-bg:var(--pastel-blue); --comm-ink:var(--pastel-blue-ink);
+  --meet:#7a62a0; --meet-bg:var(--pastel-lilac); --meet-ink:var(--pastel-lilac-ink);
+  --event:#b08a2a; --event-bg:var(--pastel-gold); --event-ink:var(--pastel-gold-ink);
+  --pd:#b57a52; --pd-bg:var(--pastel-peach); --pd-ink:var(--pastel-peach-ink);
+  --task:#6f9178; --task-bg:var(--pastel-sage); --task-ink:var(--pastel-sage-ink);
+  --r-sm:14px; --r-md:20px; --r-lg:24px;
+  --elev-1:0 1px 2px rgba(20,35,70,.06); --elev-2:0 1px 2px rgba(20,35,70,.05),0 2px 6px rgba(20,35,70,.06);
+  --elev-3:0 18px 48px rgba(39,55,74,.10),inset 0 1px 0 rgba(255,255,255,.96);
+  --font:"Inter",ui-sans-serif,-apple-system,"Segoe UI",sans-serif;
+  --hand:"Caveat","Bradley Hand","Segoe Print",cursive;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(1200px 500px at 85% -10%,rgba(55,111,183,.10),transparent 60%),radial-gradient(900px 500px at -10% 30%,rgba(242,223,208,.45),transparent 60%);}
+.wrap{max-width:1480px;margin:0 auto;padding-inline:24px;padding-block:24px 80px}
+@media (max-width:600px){.wrap{padding-inline:16px}}
+h1,h2,h3{text-wrap:balance;margin:0}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ── Viewer chrome ── */
+.intro{margin-bottom:18px}
+.intro h1{font-size:28px;letter-spacing:-.015em;color:var(--depth)}
+.intro p{margin:4px 0 0;color:var(--muted);max-width:78ch}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:6px;background:var(--glass);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--elev-2);
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:30;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);margin-bottom:18px}
+.tab{flex:0 0 auto;border:0;background:transparent;padding:8px 14px;border-radius:12px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tab b{font-weight:700;color:var(--shallow);margin-right:6px}
+.tab[aria-selected="true"]{background:var(--navy);color:#fff}
+.tab[aria-selected="true"] b{color:var(--on-dark-muted)}
+.note{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 28px;margin-bottom:16px;padding:16px 20px;border-radius:var(--r-md);background:var(--cotton);border:1px solid var(--line)}
+.note h2{font-size:17px;color:var(--depth);margin-bottom:4px}
+.note p{margin:0;max-width:68ch}
+.note ul{margin:0;padding-left:18px}
+.note li{margin:2px 0}
+.note .lab{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--high-sea-ink);margin-bottom:4px}
+.note .chg{color:var(--success);font-weight:600}
+@media (max-width:760px){.note{grid-template-columns:1fr}}
+
+/* ── Product screen ── */
+.screen{display:flex;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--line);box-shadow:var(--elev-3);background:var(--paper);min-height:780px}
+.rail{flex:0 0 220px;background:linear-gradient(180deg,var(--depth),var(--marine));padding:24px 12px;display:flex;flex-direction:column;gap:2px}
+.rail .brand{color:var(--on-dark);font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:0 10px 18px}
+.rail .sec{color:var(--on-dark-muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:14px 10px 6px}
+.rail a{display:flex;align-items:center;gap:10px;min-height:36px;padding:6px 10px;border-radius:12px;color:var(--on-dark-muted);font-size:13px;font-weight:500;text-decoration:none}
+.rail a.sub{padding-left:34px}
+.rail a.cur{background:var(--on-dark-hover);color:var(--on-dark)}
+.rail a .new{margin-left:auto;font-size:10px;font-weight:700;color:var(--high-sea);letter-spacing:.06em}
+.rail .gone{color:rgba(255,255,255,.28);text-decoration:line-through;font-size:12px;padding:3px 10px}
+.canvas{flex:1;min-width:0;padding:28px 32px 36px;display:flex;flex-direction:column;gap:20px}
+@media (max-width:980px){.rail{display:none}.canvas{padding:20px 16px 28px}}
+
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.ph{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px 24px}
+.ph h2{font-size:30px;letter-spacing:-.015em;color:var(--depth);line-height:1.15;margin-top:4px}
+.ph .sub{color:var(--muted);margin-top:6px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:12px;font-size:13px;font-weight:600;border:1px solid var(--line-2);background:#fff;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.sm{height:30px;padding:0 10px;font-size:12px;border-radius:10px}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 20px;box-shadow:var(--elev-1)}
+.card h3{font-size:15px;color:var(--depth);margin-bottom:10px}
+.card h3 .muted{font-weight:500}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:600;background:var(--pastel-sand);color:var(--pastel-sand-ink);white-space:nowrap}
+.chip.comm{background:var(--comm-bg);color:var(--comm-ink)}
+.chip.meet{background:var(--meet-bg);color:var(--meet-ink)}
+.chip.event{background:var(--event-bg);color:var(--event-ink)}
+.chip.pd{background:var(--pd-bg);color:var(--pd-ink)}
+.chip.sage{background:var(--pastel-sage);color:var(--pastel-sage-ink)}
+.chip.warn{background:var(--warning-surface);color:var(--high-sea-ink)}
+.chip.ok{background:var(--success-surface);color:var(--success)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 8px}
+.av{width:34px;height:34px;border-radius:50%;display:inline-grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 34px;border:2px solid #fff}
+.av.lg{width:44px;height:44px;flex-basis:44px;font-size:14px}
+.av.sm{width:24px;height:24px;flex-basis:24px;font-size:10px;border-width:1.5px}
+.a1{background:var(--pastel-blue);color:var(--pastel-blue-ink)} .a2{background:var(--pastel-peach);color:var(--pastel-peach-ink)}
+.a3{background:var(--pastel-sage);color:var(--pastel-sage-ink)} .a4{background:var(--pastel-lilac);color:var(--pastel-lilac-ink)}
+.a5{background:var(--pastel-gold);color:var(--pastel-gold-ink)} .a6{background:var(--pastel-sand);color:var(--pastel-sand-ink)}
+.stack{display:flex}.stack .av{margin-left:-8px}.stack .av:first-child{margin-left:0}
+.grid2{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.grid2{grid-template-columns:1fr}}
+.col-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;font-size:13px;margin:0}
+.kv dt{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-top:2px}
+.kv dd{margin:0}
+.clare{background:linear-gradient(160deg,rgba(220,234,250,.7),rgba(255,255,255,.75));border:1px solid rgba(55,111,183,.22)}
+.clare .who{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--comm-ink);margin-bottom:8px}
+.spark{width:22px;height:22px;border-radius:7px;background:var(--navy);color:#fff;display:grid;place-items:center;font-size:12px;flex:0 0 22px}
+.clare ol,.clare ul{margin:0;padding-left:18px}.clare li{margin:4px 0}
+.src{font-size:11px;color:var(--muted);margin-left:4px}
+.li{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.li:first-of-type{border-top:0}
+.li .t{font-weight:600;font-size:13px}
+.li .m{font-size:12px;color:var(--muted)}
+.ico{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:0 0 28px;font-size:13px}
+.quiet-link{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--success)}
+.fold-note{font-size:12px;color:var(--muted);padding:8px 12px;border-radius:10px;background:var(--cotton);display:flex;gap:8px;align-items:center}
+
+/* ══ Tideline (mirrors calendar-tideline.css) ══ */
+.tl-nav{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px}
+.round{width:36px;height:36px;border-radius:50%;border:1px solid var(--line-2);background:#fff;display:grid;place-items:center;font-size:16px;cursor:pointer}
+.period b{display:block;font-size:17px;font-weight:600;color:var(--navy);line-height:1.2}
+.period span{font-size:12px;color:var(--muted)}
+.pills{display:inline-flex;background:var(--cotton);border:1px solid var(--line);border-radius:12px;padding:3px}
+.pills button{border:0;background:transparent;padding:6px 12px;border-radius:9px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer}
+.pills button.is-active{background:#fff;color:var(--ink);box-shadow:var(--elev-1);font-weight:600}
+.tray{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);box-shadow:var(--elev-2);flex-wrap:wrap}
+.tray .ttl{font-size:13px;font-weight:600;flex:1;min-width:200px}
+.tray .ttl span{font-weight:400;color:var(--muted)}
+.sources{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.src-pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 12px;border-radius:999px;border:1px solid var(--line-2);background:#fff;font-size:12px;font-weight:500;cursor:pointer}
+.src-pill .n{color:var(--muted)}
+.src-pill[aria-pressed="false"]{background:transparent;opacity:.5}
+.src-pill.new-src{box-shadow:0 0 0 3px rgba(246,134,32,.18)}
+.ambient{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:999px;border:1px dashed var(--line-2);color:var(--muted);font-size:12px}
+.calcard{overflow-x:auto;border-radius:var(--r-md);border:1px solid var(--line);background:rgba(255,255,255,.72);box-shadow:var(--elev-1)}
+.tl{display:grid;grid-template-columns:104px repeat(7,minmax(118px,1fr));min-width:930px}
+.tl>div{border-top:1px solid var(--line);border-left:1px solid var(--line);position:relative}
+.tl>.lab{border-left:0;padding:10px 12px}
+.tl .lab b{display:block;font-size:12px;font-weight:600;color:var(--navy)}
+.tl .lab span{font-size:11px;color:var(--muted);line-height:1.3;display:block}
+.tl .hd{border-top:0;padding:12px 10px;min-height:108px;display:flex;flex-direction:column;gap:5px}
+.tl .hd.lab{border-left:0}
+.dow{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dow .dt{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:0}
+.dow .dt.today{background:var(--danger);color:#fff}
+.tag{font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:6px;align-self:flex-start}
+.tag.gold{background:var(--pastel-gold);color:var(--pastel-gold-ink)}.tag.sage{background:var(--pastel-sage);color:var(--pastel-sage-ink)}
+.cap{height:6px;border-radius:3px;background:var(--pastel-sand);overflow:hidden}
+.cap i{display:block;height:100%;border-radius:3px}
+.cap.fc i{background:repeating-linear-gradient(90deg,currentColor 0 5px,transparent 5px 7px)!important;opacity:.6}
+.capt{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.capt b{color:var(--ink)}
+.tl .due{min-height:64px;padding:6px;display:flex;flex-direction:column;gap:4px}
+.promise{font-size:11px;line-height:1.3;padding:5px 7px;border-radius:8px;border:1px dashed rgba(168,90,12,.5);background:rgba(246,134,32,.07);color:var(--high-sea-ink)}
+.promise.them{border-color:rgba(55,111,183,.45);background:rgba(55,111,183,.06);color:var(--comm-ink)}
+.promise.late{background:var(--high-sea);color:#fff;border:1px solid var(--high-sea);font-weight:600}
+.promise b{font-weight:700}
+.taskchip{font-size:11px;padding:5px 8px;border-radius:8px;background:rgba(223,233,225,.8);color:var(--task-ink);font-weight:600}
+.band{height:var(--h)}
+.band.school{background:rgba(220,234,250,.35)}
+.band.yours{background:rgba(242,223,208,.28)}
+.band.wall{background-image:repeating-linear-gradient(135deg,transparent 0 9px,rgba(23,55,94,.06) 9px 10px)}
+.lockpill{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;white-space:nowrap}
+.cc{position:absolute;left:6px;right:6px;border-radius:9px;padding:5px 8px 5px 10px;font-size:11px;line-height:1.25;overflow:hidden;border-left:3px solid;box-shadow:var(--elev-1)}
+.cc b{display:block;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc span{display:block;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc.class{background:rgba(255,255,255,.8);border:1px solid rgba(55,111,183,.18);border-left:3px solid var(--wave);box-shadow:none}
+.cc.comm{background:var(--comm-bg);border-color:var(--comm);color:var(--comm-ink)}
+.cc.meet{background:var(--meet-bg);border-color:var(--meet);color:var(--meet-ink)}
+.cc.event{background:var(--event-bg);border-color:var(--event);color:var(--event-ink)}
+.cc.pdk{background:var(--pd-bg);border-color:var(--pd);color:var(--pd-ink)}
+.cc.corey{background:linear-gradient(160deg,#f6e6d8,#f2dfd0);border-color:var(--pd);color:var(--pd-ink)}
+.cc.pin{height:22px;padding:3px 8px;border-radius:999px;border:1px solid rgba(55,111,183,.35);background:#fff;color:var(--comm-ink);font-weight:600;box-shadow:none}
+.cc.pin b{font-size:11px;display:inline}
+.cc.ghost{background:rgba(255,255,255,.6);border:1.5px dashed rgba(23,55,94,.55);color:var(--navy)}
+.ag{position:absolute;top:4px;right:4px}
+.now{position:absolute;left:0;right:0;height:2px;background:var(--danger)}
+.now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--danger)}
+.now em{position:absolute;right:4px;top:-17px;font-style:normal;font-size:11px;font-weight:600;color:var(--danger)}
+.past{opacity:.72}
+[data-hide~="comms"] .k-comms,[data-hide~="meetings"] .k-meetings,[data-hide~="events"] .k-events,[data-hide~="pd"] .k-pd,[data-hide~="promises"] .k-promises,[data-hide~="classes"] .k-classes,[data-hide~="tasks"] .k-tasks,[data-hide~="corey"] .k-corey{display:none}
+.side3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.side3{grid-template-columns:1fr}}
+.hubs-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:900px){.hubs-row{grid-template-columns:1fr 1fr}}
+.hubcard{padding:10px 12px;border-radius:14px;background:#fff;border:1px solid var(--line);font-size:12px}
+.hubcard b{display:block;font-size:13px;margin-bottom:6px;color:var(--depth)}
+.hubcard .mini{display:flex;flex-wrap:wrap;gap:4px}
+.mini span{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;border:1px solid var(--line-2);font-size:10.5px}
+.mini span.off{opacity:.45}
+
+/* ── Comm page ── */
+.thread{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.beads{display:flex;align-items:center}
+.bead{width:12px;height:12px;border-radius:50%;background:var(--comm);border:2px solid #fff;box-shadow:0 0 0 1px var(--comm)}
+.bead.now{width:18px;height:18px;background:var(--high-sea);box-shadow:0 0 0 1px var(--high-sea)}
+.beads .ln{width:18px;height:2px;background:rgba(55,111,183,.35)}
+.phase{display:inline-flex;background:var(--cotton);border:1px solid var(--line);border-radius:14px;padding:4px;gap:2px}
+.phase button{border:0;background:transparent;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:8px}
+.phase button .tm{font-weight:500;font-size:11px}
+.phase button.on{background:#fff;color:var(--depth);box-shadow:var(--elev-1)}
+.phase button.on.live{background:var(--high-sea);color:#fff}
+.autonote{font-size:12px;color:var(--muted)}
+.people{display:flex;flex-direction:column;gap:10px}
+.pcard{display:flex;gap:12px;align-items:flex-start;padding:10px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+.pcard .nm{font-weight:700;font-size:13px}
+.pcard .rl{font-size:12px;color:var(--muted)}
+.pcard .ctx{font-size:12px;margin-top:4px}
+.pcard.ghost{border-style:dashed;background:transparent}
+.tick{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.tick:first-child,.card h3+.tick{border-top:0}
+.box{width:18px;height:18px;border-radius:6px;border:1.5px solid var(--line-2);flex:0 0 18px;margin-top:1px;display:grid;place-items:center;font-size:11px;color:#fff;background:#fff}
+.tick.done .box{background:var(--success);border-color:var(--success)}
+.tick.done .tx{color:var(--muted);text-decoration:line-through}
+.tick.part .box{background:var(--high-sea);border-color:var(--high-sea)}
+.who-tag{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:1px}
+.who-me{background:var(--warning-surface);color:var(--high-sea-ink)}
+.who-them{background:var(--comm-bg);color:var(--comm-ink)}
+.agenda{counter-reset:ag;display:flex;flex-direction:column;gap:6px}
+.agenda .ai{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:12px;background:#fff;border:1px solid var(--line)}
+.agenda .ai::before{counter-increment:ag;content:counter(ag);width:22px;height:22px;border-radius:7px;background:var(--cotton);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--muted);flex:0 0 22px}
+.agenda .ai .from{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.live-strip{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 14px;border-radius:14px;background:var(--depth);color:var(--on-dark)}
+.live-strip .rec{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:12px}
+.live-strip .rec::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--high-sea);box-shadow:0 0 0 4px rgba(246,134,32,.25)}
+.live-strip .muted{color:var(--on-dark-muted)}
+
+/* Block page: mirrors Tasks page-editor */
+.doc{background:#fff;border:1px solid var(--line);border-radius:var(--r-md);padding:22px 26px;display:flex;flex-direction:column;gap:14px}
+@media (max-width:600px){.doc{padding:16px}}
+.doc p{margin:0;max-width:72ch}
+.doc h4{margin:0;font-size:15px;color:var(--depth)}
+.blk{position:relative;padding-left:22px}
+.blk::before{content:"⋮⋮";position:absolute;left:0;top:2px;font-size:10px;letter-spacing:-2px;color:var(--shallow)}
+.blk .bt{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--shallow);margin-bottom:4px}
+.page-editor__add{position:relative;display:flex;justify-content:center;padding:2px 0}
+.page-editor__add-btn{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:rgba(255,255,255,.8);font-size:21px;font-weight:500;line-height:1;box-shadow:var(--elev-1);cursor:pointer;display:grid;place-items:center}
+.page-editor__add-btn:hover,.page-editor__add-btn[aria-expanded="true"]{border-color:var(--wave);color:var(--marine)}
+.page-editor__insert{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);z-index:20;display:grid;gap:12px;width:min(22rem,calc(100vw - 2rem));max-height:24rem;overflow:auto;padding:12px;
+  background:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.9);border-radius:var(--r-md);box-shadow:var(--elev-3),0 0 0 1px var(--line);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.page-editor__insert.static{position:relative;left:auto;top:auto;transform:none;margin:0 auto}
+.page-editor__insert h5{margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.pcardb{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px;width:100%;padding:8px;text-align:left;border:0;background:transparent;border-radius:10px;cursor:pointer}
+.pcardb:hover{background:var(--cotton)}
+.pcardb i{width:32px;height:32px;border-radius:9px;background:var(--cotton);display:grid;place-items:center;font-style:normal;font-size:14px}
+.pcardb b{display:block;font-size:13px;font-weight:600}
+.pcardb small{display:block;font-size:11.5px;color:var(--muted);line-height:1.3}
+.imgblk{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:14px;padding:12px;border-radius:14px;background:var(--cotton);border:1px solid var(--line)}
+@media (max-width:620px){.imgblk{grid-template-columns:1fr}}
+.paper{aspect-ratio:4/3;max-width:100%;border-radius:10px;background:#fffdf6 repeating-linear-gradient(180deg,transparent 0 17px,rgba(55,111,183,.18) 17px 18px);box-shadow:inset 0 0 0 1px var(--line),0 2px 6px rgba(0,0,0,.06);padding:10px 12px;font-family:var(--hand);font-size:17px;line-height:18px;color:#29406b;transform:rotate(-1.2deg)}
+.clare-act{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--comm-ink);background:var(--comm-bg);padding:3px 9px;border-radius:8px}
+.inline-promise{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:8px;background:var(--warning-surface);color:var(--high-sea-ink);font-weight:600;font-size:13px}
+.inline-promise.them{background:var(--comm-bg);color:var(--comm-ink)}
+.mini-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.mini-table th,.mini-table td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+.mini-table th{font-size:11px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tblwrap{overflow-x:auto}
+.qt{border-left:3px solid var(--shallow);padding:2px 0 2px 12px;font-style:italic;color:var(--ink)}
+.ledger{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:620px){.ledger{grid-template-columns:1fr}}
+.ledger .col-h{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px}
+.pr{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--line);margin-bottom:8px}
+.pr .tx{font-size:13px;flex:1}
+.pr .due{font-size:11px;color:var(--muted)}
+.switch{width:34px;height:20px;border-radius:999px;background:var(--line-2);position:relative;flex:0 0 34px;cursor:pointer;border:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:var(--elev-1);transition:left .15s}
+.switch[aria-checked="true"]{background:var(--success)}
+.switch[aria-checked="true"]::after{left:16px}
+.draft{border-radius:14px;border:1px solid var(--line);background:#fff;overflow:hidden}
+.draft .dh{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:12px;flex-wrap:wrap}
+.draft .db{padding:12px 14px;font-size:13px;white-space:pre-line}
+.dtabs{display:flex;gap:4px}
+.dtabs span{padding:3px 10px;border-radius:8px;font-size:12px;font-weight:600;color:var(--muted)}
+.dtabs span.on{background:var(--cotton);color:var(--ink)}
+[data-phase-show]{display:none!important}
+[data-phase="before"] [data-phase-show~="before"],[data-phase="during"] [data-phase-show~="during"],[data-phase="after"] [data-phase-show~="after"]{display:flex!important}
+
+/* ── Case management ── */
+.spine{position:relative;display:flex;flex-direction:column;gap:14px;padding-left:34px}
+.spine::before{content:"";position:absolute;left:12px;top:8px;bottom:8px;width:2px;background:linear-gradient(180deg,rgba(55,111,183,.15),rgba(55,111,183,.5))}
+.sess{position:relative}
+.sess::before{content:"";position:absolute;left:-28px;top:14px;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--comm)}
+.sess.cur::before{background:var(--high-sea);border-color:var(--high-sea);width:18px;height:18px;left:-30px}
+.sess .card{padding:12px 16px}
+.sess.fold .card{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;background:rgba(255,255,255,.5)}
+.sess .when{font-size:12px;color:var(--muted);font-weight:600}
+.carry{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--high-sea-ink);font-weight:600;padding:4px 0 4px 2px}
+.goal{padding:10px 0;border-top:1px solid var(--line)}
+.goal:first-of-type{border-top:0}
+.goal .gt{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:600}
+.goal .gb{height:6px;border-radius:3px;background:var(--pastel-sand);margin-top:6px;overflow:hidden}
+.goal .gb i{display:block;height:100%;background:var(--wave);border-radius:3px}
+.trend{display:flex;align-items:flex-end;gap:5px;height:44px}
+.trend i{width:14px;border-radius:4px 4px 0 0;background:var(--pastel-blue)}
+.trend i.hi{background:var(--wave)}
+
+/* ── Meeting ── */
+.purpose{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:var(--r-md);background:var(--meet-bg);color:var(--meet-ink)}
+.purpose b{color:var(--depth)}
+.room{display:flex;flex-direction:column;gap:12px}
+.org-cluster{padding:12px;border-radius:14px;background:#fff;border:1px solid var(--line)}
+.org-cluster .on{font-size:12px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.crest{width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:10px;font-weight:800;color:#fff}
+.pp{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12.5px}
+.pp .r{color:var(--muted);font-size:11.5px}
+.pp .warm{margin-left:auto;display:flex;gap:2px}.pp .warm i{width:5px;height:5px;border-radius:50%;background:var(--line-2)}.pp .warm i.w{background:var(--high-sea)}
+.agh{display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid var(--line)}
+.agh:first-child{border-top:0;padding-top:0}
+.agh .n{width:26px;height:26px;border-radius:8px;background:var(--cotton);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--muted);flex:0 0 26px}
+.agh.mine .n{background:var(--high-sea);color:#fff}
+.agh h4{flex:1}
+.agh .tm{font-size:11px;color:var(--muted)}
+.dec{display:inline-flex;gap:6px;align-items:center;font-size:11px;font-weight:700;color:var(--success);background:var(--success-surface);padding:2px 8px;border-radius:6px}
+.dec.carry2{background:var(--warning-surface);color:var(--high-sea-ink)}
+.at{color:var(--meet);font-weight:700}
+.newp{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;border:1px dashed var(--line-2);background:#fff;margin-bottom:8px;font-size:12.5px}
+.newp .btn{margin-left:auto}
+
+/* ── Events / PD ── */
+.evhead{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:18px;align-items:center;padding:18px 20px;border-radius:var(--r-md);background:#fff;border:1px solid var(--line)}
+.evdate{text-align:center;padding:8px 14px;border-radius:14px;background:var(--event-bg);color:var(--event-ink)}
+.evdate.pdd{background:var(--pd-bg);color:var(--pd-ink)}
+.evdate b{display:block;font-size:26px;line-height:1;color:var(--depth)}
+@media (max-width:620px){.evhead{grid-template-columns:auto 1fr}.evhead>.btn{grid-column:1/-1}}
+.pd-toggle{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:14px;background:var(--cotton);border:1px solid var(--line);font-size:13px;flex-wrap:wrap}
+.two-events{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:20px}
+@media (max-width:1100px){.two-events{grid-template-columns:1fr}}
+.evcol{display:flex;flex-direction:column;gap:14px;min-width:0}
+.shape{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:620px){.shape{grid-template-columns:1fr}}
+.shape button{border:1px solid var(--line-2);background:#fff;border-radius:14px;padding:10px 12px;text-align:left;cursor:pointer}
+.shape button b{display:block;font-size:13px}
+.shape button small{display:block;font-size:11.5px;color:var(--muted);line-height:1.35;margin-top:2px}
+.shape button.on{border-color:var(--pd);box-shadow:0 0 0 3px rgba(181,122,82,.18);background:rgba(242,223,208,.35)}
+.series{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:4px}
+.sn{flex:1 0 150px;padding:10px 12px;border:1px solid var(--line);background:#fff;position:relative}
+.sn:first-child{border-radius:14px 0 0 14px}.sn:last-child{border-radius:0 14px 14px 0}
+.sn+.sn{border-left:0}
+.sn .d{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.sn b{display:block;font-size:13px;margin-top:2px}
+.sn .h{font-size:12px;color:var(--muted)}
+.sn.cur{background:rgba(242,223,208,.45);border-color:rgba(181,122,82,.45)}
+.sn.future{background:transparent;border-style:dashed}
+.sn .gap{position:absolute;right:-1px;top:50%;transform:translate(50%,-50%);z-index:2;font-size:10px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:1px 6px;color:var(--muted);white-space:nowrap}
+.prog{display:flex;flex-direction:column}
+.pi{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.pi:first-child{border-top:0}
+.pi .tm{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pi .t{font-size:13px;font-weight:600}
+.pi .w{font-size:12px;color:var(--muted)}
+.kn{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:8px;white-space:nowrap;background:var(--pastel-lilac);color:var(--pastel-lilac-ink)}
+.kn.draft{background:transparent;border:1px dashed var(--line-2);color:var(--muted)}
+@media (max-width:620px){.pi{grid-template-columns:1fr}}
+.ring{width:96px;height:96px;flex:0 0 96px}
+.minigal{display:flex;gap:6px}
+.minigal i{width:64px;height:48px;border-radius:8px;display:block}
+
+/* ── Phones ── */
+.phones{display:flex;flex-wrap:wrap;gap:32px;justify-content:center;padding:24px 0}
+.phone{width:min(390px,100%);border-radius:44px;background:var(--depth);padding:12px;box-shadow:var(--elev-3)}
+.phone .scr{border-radius:34px;background:var(--paper);min-height:760px;overflow:hidden;display:flex;flex-direction:column}
+.phone .sb{display:flex;justify-content:space-between;padding:12px 26px 6px;font-size:13px;font-weight:600}
+.phone .pbody{padding:8px 16px 20px;display:flex;flex-direction:column;gap:12px;flex:1}
+.walkin{border-radius:24px;background:linear-gradient(165deg,var(--navy),var(--depth));color:var(--on-dark);padding:18px;display:flex;flex-direction:column;gap:12px}
+.walkin .cd{font-size:12px;color:var(--on-dark-muted);display:flex;justify-content:space-between}
+.walkin .cd b{color:var(--high-sea);font-size:13px}
+.walkin h3{font-size:22px;color:#fff}
+.walkin .last{font-size:12.5px;color:var(--on-dark-muted);border-top:1px solid rgba(255,255,255,.14);padding-top:10px}
+.walkin ol{margin:0;padding-left:20px;font-size:14px;display:flex;flex-direction:column;gap:6px}
+.walkin .owe{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;padding:8px 10px;border-radius:12px;background:rgba(246,134,32,.16);color:#ffd9b3}
+.walkin .go{display:flex;gap:8px}
+.walkin .go .btn{flex:1;justify-content:center;height:42px;border:0}
+.walkin .go .btn.l{background:var(--high-sea);color:#fff}
+.walkin .go .btn.d{background:rgba(255,255,255,.12);color:#fff}
+.sheet{border-radius:24px 24px 0 0;background:#fff;box-shadow:0 -10px 40px rgba(20,35,70,.14);padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px;margin-top:auto}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--line-2);margin:0 auto}
+.chan{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.chan span{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0;border-radius:12px;background:var(--cotton);font-size:11px;font-weight:600}
+.chan span.on{background:var(--navy);color:#fff}
+.chan span i{font-style:normal;font-size:16px}
+.field{border-radius:14px;border:1px solid var(--line-2);padding:12px 14px;font-size:15px;min-height:48px}
+.field .caret{display:inline-block;width:2px;height:18px;background:var(--wave);vertical-align:-3px;margin-left:1px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.field .caret{animation:none}.switch::after{transition:none}}
+.recents{display:flex;gap:8px;overflow-x:auto}
+.recents .rp{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;min-width:56px}
+.recents .rp.on .av{box-shadow:0 0 0 2px var(--high-sea)}
+.hint{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:flex-start}
+.tabbar{display:flex;justify-content:space-around;padding:10px 0 16px;border-top:1px solid var(--line);font-size:10.5px;color:var(--muted)}
+.tabbar span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbar span.on{color:var(--navy);font-weight:700}
+.tabbar i{font-style:normal;font-size:17px}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div class="eyebrow">Professional Hub · mockup set · round 2 · 26/09/26</div>
+    <h1>Calendar: comms, meetings and events</h1>
+    <p>Round 2 with your notes applied. The calendar is now the shared Tideline, and the new source pills go to every hub. Block adding uses the existing "+" palette. Case management gets its own page. The notebook direction is gone. Meetings get a notes page. PD events can be one-offs, series or multi-talk programs.</p>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Mockups">
+    <button class="tab" role="tab" data-tab="calendar" aria-selected="true"><b>1</b>Calendar</button>
+    <button class="tab" role="tab" data-tab="comm" aria-selected="false"><b>2</b>Comm · student</button>
+    <button class="tab" role="tab" data-tab="case" aria-selected="false"><b>3</b>Case management</button>
+    <button class="tab" role="tab" data-tab="meeting" aria-selected="false"><b>4</b>Meeting</button>
+    <button class="tab" role="tab" data-tab="event" aria-selected="false"><b>5</b>Events and PD</button>
+    <button class="tab" role="tab" data-tab="phone" aria-selected="false"><b>6</b>Phone</button>
+  </nav>
+
+  <!-- ═════════════ 1 · CALENDAR ═════════════ -->
+  <section id="calendar" class="panel" role="tabpanel">
+    <div class="note">
+      <div><h2>The Tideline you already have, with comms added</h2><p>Nothing about the calendar object changes: same nav, same Day · Week · Term · Year · Almanac, same bands, capacity and walls. Two things are added. The <b>source pills</b> get round dots and new sources for <b>Comms</b>, <b>Events</b> and <b>Promises</b>. The <b>Due</b> row now holds promises as well as tasks.</p></div>
+      <div><div class="lab">Every hub gets this</div><ul><li>The pills live in the shared <code>calendar-filter.js</code>, so Life, Teaching, Tasks and Professional all get the Comms filter from one change. Each hub only picks which pills start switched on (see the strip under the calendar).</li><li>An email or text is a small pin, not a block, because it has no duration.</li><li>Clare's tray works like Sara's: she proposes, you apply.</li></ul></div>
+    </div>
+    <div class="screen">
+      <nav class="rail" aria-label="Hub navigation">
+        <div class="brand">Professional Hub</div>
+        <a href="#calendar">⌂ Home</a>
+        <a class="sub cur" href="#calendar">Calendar <span class="new">NEW</span></a>
+        <div class="sec">Network</div>
+        <a href="#calendar">People</a><a href="#calendar">Organisations</a><a href="#calendar">Relationships</a>
+        <div class="gone">Communications</div><div class="gone">Meetings</div><div class="gone">Events</div>
+        <a href="#calendar">Applications</a><a href="#calendar">Career</a><a href="#calendar">Network Ecology</a>
+      </nav>
+      <div class="canvas" id="calRoot" data-hide="">
+        <div class="tl-nav">
+          <button class="round" aria-label="Previous week">‹</button>
+          <div class="period"><b>T3 W10 · last week of term</b><span class="tnum">21/09/26 – 27/09/26</span></div>
+          <button class="round" aria-label="Next week">›</button>
+          <button class="btn">Today</button>
+          <div class="pills"><button>Day</button><button class="is-active">Week</button><button>Term</button><button>Year</button><button>Almanac</button></div>
+        </div>
+        <div class="tl-nav"><span class="small muted">Focus</span><div class="pills"><button class="is-active">Balanced</button><button>Morning</button><button>School</button><button>After bell</button><button>Yours</button></div></div>
+        <div class="tray"><span class="spark" style="width:28px;height:28px;border-radius:50%">C</span><div class="ttl">3 things from this week's comms <span>· Denielle's summary is 3 days late · Declan + Denielle needs a wrap-up · book Fletcher's session 8 for T4 W1</span></div><button class="btn pri sm">Apply all</button><button class="btn sm">Review</button><button class="btn sm ghost">Dismiss</button></div>
+        <div class="sources" role="group" aria-label="Sources">
+          <button class="src-pill" data-src="classes" aria-pressed="true"><span class="dot" style="background:var(--wave)"></span>Classes <span class="n">11</span></button>
+          <button class="src-pill new-src" data-src="comms" aria-pressed="true"><span class="dot" style="background:var(--comm);box-shadow:0 0 0 2px var(--comm-bg)"></span>Comms <span class="n">6</span></button>
+          <button class="src-pill" data-src="meetings" aria-pressed="true"><span class="dot" style="background:var(--meet)"></span>Meetings <span class="n">3</span></button>
+          <button class="src-pill new-src" data-src="events" aria-pressed="true"><span class="dot" style="background:var(--event)"></span>Events <span class="n">1</span></button>
+          <button class="src-pill" data-src="pd" aria-pressed="true"><span class="dot" style="background:var(--pd)"></span>PD <span class="n">0</span></button>
+          <button class="src-pill new-src" data-src="promises" aria-pressed="true"><span class="dot" style="background:var(--high-sea)"></span>Promises <span class="n">5</span></button>
+          <button class="src-pill" data-src="tasks" aria-pressed="true"><span class="dot" style="background:var(--task)"></span>Tasks <span class="n">1</span></button>
+          <button class="src-pill" data-src="corey" aria-pressed="false"><span class="dot" style="background:var(--pd);box-shadow:0 0 0 2px var(--pd-bg)"></span>Corey <span class="n">4</span></button>
+          <span class="ambient">Ambient: 9 meals · 3 diary · 12 notes touched</span>
+        </div>
+
+        <div class="calcard">
+          <div class="tl">
+            <!-- heads -->
+            <div class="hd lab"><span style="margin-top:auto" class="small muted">Capacity from your logs</span></div>
+            <div class="hd past"><div class="dow">Mon <span class="dt">21</span></div><div class="cap"><i style="width:79%;background:var(--pastel-sage-ink)"></i></div><div class="capt"><b>79%</b> · short sleep</div></div>
+            <div class="hd past"><div class="dow">Tue <span class="dt">22</span></div><div class="cap"><i style="width:51%;background:var(--pastel-gold-ink)"></i></div><div class="capt"><b>51%</b> · low energy</div></div>
+            <div class="hd past"><div class="dow">Wed <span class="dt">23</span></div><div class="cap"><i style="width:42%;background:var(--pastel-gold-ink)"></i></div><div class="capt"><b>42%</b> · run down</div></div>
+            <div class="hd past"><div class="dow">Thu <span class="dt">24</span></div><div class="cap"><i style="width:34%;background:var(--high-sea)"></i></div><div class="capt"><b>34%</b> · sore throat</div></div>
+            <div class="hd past"><div class="dow">Fri <span class="dt">25</span></div><span class="tag gold">Last day T3</span><div class="cap"><i style="width:52%;background:var(--pastel-gold-ink)"></i></div><div class="capt"><b>52%</b> · big night</div></div>
+            <div class="hd"><div class="dow">Sat <span class="dt today">26</span></div><span class="tag sage">Holidays</span><div class="cap"><i style="width:68%;background:var(--pastel-sage-ink)"></i></div><div class="capt"><b>68%</b> · recovering</div></div>
+            <div class="hd"><div class="dow">Sun <span class="dt">27</span></div><span class="tag sage">Holidays</span><div class="cap fc" style="color:var(--pastel-sage-ink)"><i style="width:75%"></i></div><div class="capt"><b>75%</b> · forecast</div></div>
+            <!-- due + promises -->
+            <div class="lab"><b>Due</b><span>tasks and promises</span></div>
+            <div class="due past"><span class="promise k-promises"><b>You →</b> Amy W.: fillable-bar template ✓</span></div>
+            <div class="due past"></div>
+            <div class="due"><span class="promise late k-promises"><b>You →</b> Denielle J.: email summary · 3 days late</span></div>
+            <div class="due past"><span class="promise them k-promises"><b>Kathleen E. →</b> you: T4 enrichment dates</span></div>
+            <div class="due"><span class="promise k-promises"><b>You →</b> Nina: audit draft</span><span class="taskchip k-tasks">Mark Y11 Module C</span></div>
+            <div class="due"></div>
+            <div class="due"><span class="promise them k-promises"><b>Fletcher W.</b>: 2 hrs maths on the bar</span></div>
+            <!-- morning 70 -->
+            <div class="lab" style="height:70px"><b>Morning ⌄</b><span>up 6:15</span></div>
+            <div class="band past" style="--h:70px"></div><div class="band past" style="--h:70px"></div>
+            <div class="band past" style="--h:70px"><div class="cc pin k-comms" style="top:24px"><b>✆ Text · Vicki S.</b></div></div>
+            <div class="band past" style="--h:70px"></div><div class="band past" style="--h:70px"></div><div class="band" style="--h:70px"></div>
+            <div class="band wall" style="--h:70px"><span class="lockpill">🔒 Your day</span></div>
+            <!-- school 230 -->
+            <div class="lab" style="height:230px"><b>School ⌄</b><span>8:15 – bell 3:10</span></div>
+            <div class="band school past" style="--h:230px">
+              <div class="cc pin k-comms" style="top:8px"><b>✉ Email · Amy W.</b></div>
+              <div class="cc class k-classes" style="top:36px;height:26px"><b>Y12 English</b></div>
+              <div class="cc class k-classes" style="top:110px;height:26px"><b>Y11 English</b></div>
+              <div class="cc class k-classes" style="top:170px;height:26px"><b>9.3 English</b></div>
+            </div>
+            <div class="band school past" style="--h:230px">
+              <div class="cc comm k-comms" style="top:8px;height:40px"><b>Fletcher W. · session 7</b><span>8:40 · Library</span></div>
+              <div class="cc class k-classes" style="top:60px;height:26px"><b>Y11 English</b></div>
+              <div class="cc class k-classes" style="top:130px;height:26px"><b>Y12 English</b></div>
+            </div>
+            <div class="band school past" style="--h:230px">
+              <div class="cc class k-classes" style="top:30px;height:26px"><b>Y12 English</b></div>
+              <div class="cc meet k-meetings" style="top:130px;height:44px"><b>Learning Enrichment</b><span>1:10 · with Nina</span></div>
+            </div>
+            <div class="band school past" style="--h:230px">
+              <div class="cc comm k-comms" style="top:14px;height:40px"><b>Kathleen E.</b><span>9:10 · Teams · enrichment</span></div>
+              <div class="cc class k-classes" style="top:70px;height:26px"><b>Y11 English</b></div>
+              <div class="cc class k-classes" style="top:150px;height:26px"><b>Y12 English</b></div>
+            </div>
+            <div class="band school past" style="--h:230px">
+              <div class="cc class k-classes" style="top:20px;height:26px"><b>Y11 English</b></div>
+              <div class="cc comm k-comms" style="top:96px;height:52px;border-style:solid;box-shadow:0 0 0 2px rgba(246,134,32,.5)"><b>Declan J. + Denielle</b><span>11:50 · needs wrap-up</span></div>
+              <div class="cc class k-classes" style="top:170px;height:26px"><b>Y12 English</b></div>
+            </div>
+            <div class="band" style="--h:230px"></div>
+            <div class="band wall" style="--h:230px"></div>
+            <!-- after bell 110 -->
+            <div class="lab" style="height:110px"><b>After bell ⌄</b><span>work window to 5:30</span></div>
+            <div class="band past" style="--h:110px"><div class="cc meet k-meetings" style="top:6px;height:60px"><b>English faculty</b><span>3:15–4:30 · A-block · 11</span></div></div>
+            <div class="band past" style="--h:110px"><div class="cc pin k-comms" style="top:44px"><b>☏ Call · Denielle J.</b></div></div>
+            <div class="band past" style="--h:110px"></div><div class="band past" style="--h:110px"></div><div class="band past" style="--h:110px"></div><div class="band" style="--h:110px"></div>
+            <div class="band wall" style="--h:110px"></div>
+            <!-- yours 190 -->
+            <div class="lab" style="height:190px"><b>Yours ⌄</b><span>home ~5:30 · the hours that count</span></div>
+            <div class="band yours past" style="--h:190px"><div class="cc corey k-corey" style="top:96px;height:50px"><b>Tea + TV</b><span>7:30 – 9:30</span></div></div>
+            <div class="band yours past" style="--h:190px"></div>
+            <div class="band yours past" style="--h:190px"></div>
+            <div class="band yours past" style="--h:190px"><div class="cc meet k-meetings" style="top:20px;height:62px"><b>HALT board</b><span>6:00–7:15 · Teams · 9</span></div></div>
+            <div class="band yours past" style="--h:190px"><div class="cc event k-events" style="top:20px;height:80px"><b>HALT medal ceremony</b><span>6:00–7:45 · Parliament</span><span>not PD</span></div></div>
+            <div class="band yours" style="--h:190px">
+              <div class="cc ghost k-comms" style="top:34px;height:62px"><span class="av sm ag" style="background:var(--navy);color:#fff">C</span><b>Wrap up Declan</b><span>15 min · Clare</span></div>
+              <div class="now" style="top:128px"><em>9:07 pm</em></div>
+            </div>
+            <div class="band yours wall" style="--h:190px"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="eyebrow" style="margin-bottom:8px">Same pills in every hub · starting state</div>
+          <div class="hubs-row">
+            <div class="hubcard"><b>Life</b><div class="mini"><span>● Comms</span><span>● Meetings</span><span>● Events</span><span>● Promises</span><span>● Corey</span></div></div>
+            <div class="hubcard"><b>Teaching</b><div class="mini"><span>● Classes</span><span>● Comms</span><span class="off">● Meetings</span><span>● Promises</span></div></div>
+            <div class="hubcard"><b>Professional</b><div class="mini"><span>● Comms</span><span>● Meetings</span><span>● Events</span><span>● PD</span><span>● Promises</span></div></div>
+            <div class="hubcard"><b>Tasks</b><div class="mini"><span>● Tasks</span><span>● Promises</span><span class="off">● Comms</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ 2 · COMM (student / general) ═════════════ -->
+  <section id="comm" class="panel" role="tabpanel" hidden>
+    <div class="note">
+      <div><h2>Comm · general and student comms</h2><p>For feedback, study chats, parent emails and colleague catch-ups. The page changes with the clock: <b>prep</b> before, <b>capture</b> during, <b>wrap-up</b> after. Click Before, During and After. The body is the <b>same block page as Tasks and Lessons</b>, with the round "+" and its palette. Only the Clare actions are new.</p></div>
+      <div><div class="lab">Changed from round 1</div><ul><li class="chg">The custom block toolbar is gone. The existing "+" palette is open in During so you can see it.</li><li class="chg">Handwriting is an ordinary image block with a "Read handwriting" action. Claude reads handwriting well from photos, so the API can do this.</li><li class="chg">The example is now Declan J. Fletcher moved to Case management.</li></ul></div>
+    </div>
+    <div class="screen">
+      <nav class="rail" aria-label="Hub navigation">
+        <div class="brand">Professional Hub</div>
+        <a href="#comm">⌂ Home</a><a class="sub cur" href="#comm">Calendar</a>
+        <div class="sec">Network</div><a href="#comm">People</a><a href="#comm">Organisations</a><a href="#comm">Relationships</a><a href="#comm">Applications</a>
+      </nav>
+      <div class="canvas" id="commA" data-phase="before">
+        <div class="ph">
+          <div>
+            <div class="row"><span class="chip comm">● Comm · in person</span><span class="chip">Feedback</span><span class="chip">Y10 English</span></div>
+            <h2>Declan J. · essay feedback</h2>
+            <div class="sub">Wed 14 Oct · 11:50–12:05 · A0033 · after period 4</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <div class="phase" role="group" aria-label="Page phase">
+              <button data-set-phase="before" class="on">Before <span class="tm">prep</span></button>
+              <button data-set-phase="during">During <span class="tm">capture</span></button>
+              <button data-set-phase="after">After <span class="tm">wrap-up</span></button>
+            </div>
+            <div class="autonote" id="phaseNote">Switches to During by itself at 11:50</div>
+          </div>
+        </div>
+        <div class="thread">
+          <span class="eyebrow" style="color:var(--comm-ink)">Thread</span>
+          <div class="beads" aria-label="Comm 5 of the thread"><span class="bead"></span><span class="ln"></span><span class="bead"></span><span class="ln"></span><span class="bead"></span><span class="ln"></span><span class="bead"></span><span class="ln"></span><span class="bead now"></span></div>
+          <span>Declan J. · study approach · since Feb 2026 · 5 comms, 2 with Denielle J.</span>
+        </div>
+
+        <div class="grid2">
+          <div class="col-stack">
+            <!-- BEFORE -->
+            <div class="card" data-phase-show="before" style="flex-direction:column">
+              <h3>Carried from 25 Sep <span class="muted">· tick what happened</span></h3>
+              <div class="tick done" data-tick><span class="box">✓</span><span class="tx">Send Declan the quote bank<span class="who-tag who-me">You</span></span></div>
+              <div class="tick" data-tick><span class="box"></span><span class="tx">Redraft paragraph 2 using two quotes from the bank<span class="who-tag who-them">Declan</span></span></div>
+              <div class="tick part" data-tick><span class="box">–</span><span class="tx">Email Denielle a summary<span class="who-tag who-me">You</span> <span class="small muted">· drafted, not sent. 3 days late.</span></span></div>
+            </div>
+            <div class="card clare" data-phase-show="before" style="flex-direction:column">
+              <div class="who"><span class="spark">✦</span>Clare · brief</div>
+              <ol>
+                <li><b>His redraft came in on Canvas yesterday.</b> Paragraph 2 now uses 2 quotes, but he still summarises them instead of analysing.<span class="src">· Canvas, 13 Oct</span></li>
+                <li><b>He responds to one clear target at a time.</b> In February, "one analytical verb per quote" worked.<span class="src">· comm 2</span></li>
+                <li><b>Denielle hasn't heard from you since 22 Sep.</b> Send the summary after this one.</li>
+              </ol>
+            </div>
+            <div class="card" data-phase-show="before" style="flex-direction:column">
+              <h3>Agenda</h3>
+              <div class="agenda">
+                <div class="ai">What went well in the redraft<span class="from">Clare</span></div>
+                <div class="ai">From quote to analysis: one verb per quote<span class="from">comm 2</span></div>
+                <div class="ai">Next step before the Term 4 essay<span class="from">you</span></div>
+              </div>
+            </div>
+
+            <!-- DURING -->
+            <div class="live-strip" data-phase-show="during"><span class="rec">Live · 06:12</span><span class="muted">Agenda 2 of 3 · quote to analysis</span><span class="muted" style="margin-left:auto">End ›</span></div>
+            <div class="doc" data-phase-show="during" style="flex-direction:column">
+              <div class="blk"><div class="bt">Text</div><p>The redraft is much tighter. Two quotes, both well chosen. He agreed the second one is "just retelling it".</p></div>
+              <div class="blk"><div class="bt">Image · photo 11:58</div>
+                <div class="imgblk"><div class="paper">quote → so what?<br>verb: reveals / undercuts<br>"the fence" = what he<br>can't say out loud</div>
+                  <div><div class="row" style="margin-bottom:6px"><span class="clare-act">✦ Read handwriting</span><span class="small muted">done</span></div><p style="font-size:13px">Quote, then "so what?". Verbs: reveals / undercuts. "The fence" = what he can't say out loud.</p><div class="small muted" style="margin-top:6px">The text sits under the photo. Edit any line.</div></div></div></div>
+              <div class="blk"><div class="bt">Quote</div><div class="qt">"The fence stood between them like the words neither would say."</div></div>
+              <div class="blk"><p><span class="inline-promise them">» Declan · rewrite the fence paragraph with "undercuts", by Mon</span></p></div>
+              <div class="page-editor__add"><button class="page-editor__add-btn" aria-label="Add a block" aria-expanded="true">+</button></div>
+              <div class="page-editor__insert static" role="dialog" aria-label="Insert a block">
+                <section><h5>Basic</h5>
+                  <button class="pcardb"><i>¶</i><span><b>Text</b><small>Write formatted paragraphs, lists, and inline links.</small></span></button>
+                  <button class="pcardb"><i>❝</i><span><b>Quote</b><small>Feature a quotation with optional attribution.</small></span></button>
+                  <button class="pcardb"><i>!</i><span><b>Callout</b><small>Highlight a tip, warning, or key idea in a styled box.</small></span></button></section>
+                <section><h5>Media</h5>
+                  <button class="pcardb"><i>▣</i><span><b>Image</b><small>Display a single image. Photos of handwriting get "Read handwriting".</small></span></button>
+                  <button class="pcardb"><i>♪</i><span><b>Audio</b><small>Add an audio clip. Recordings get "Transcribe and summarise".</small></span></button>
+                  <button class="pcardb"><i>📎</i><span><b>Attachment</b><small>Link a file, a pasted email, or a transcript.</small></span></button></section>
+                <section><h5>Teaching</h5>
+                  <button class="pcardb"><i>▦</i><span><b>Table</b><small>Present rows and columns of structured data.</small></span></button></section>
+                <section><h5>Visualisation</h5>
+                  <button class="pcardb"><i>◫</i><span><b>Whiteboard</b><small>Draw it out together.</small></span></button>
+                  <button class="pcardb"><i>✺</i><span><b>Mind map</b><small>Branch ideas outward from a central concept node.</small></span></button></section>
+              </div>
+            </div>
+
+            <!-- AFTER -->
+            <div class="card clare" data-phase-show="after" style="flex-direction:column">
+              <div class="who"><span class="spark">✦</span>Clare · summary <span class="small muted" style="font-weight:500">· edit anything</span></div>
+              <p style="margin:0">Good progress. The redraft uses two well-chosen quotes. The gap is still analysis: the second quote is retold rather than read. You agreed on "quote, then so what?" with a verb from a short list (reveals, undercuts). He'll rewrite the fence paragraph by Monday.</p>
+            </div>
+            <div class="card" data-phase-show="after" style="flex-direction:column">
+              <h3>Promise ledger</h3>
+              <div class="ledger">
+                <div><div class="col-h" style="color:var(--high-sea-ink)">I owe</div>
+                  <div class="pr"><div class="tx">Email Denielle the summary<div class="due">Today · was due 22 Sep</div></div><div style="text-align:center"><button class="switch" role="switch" aria-checked="true" aria-label="Make task"></button><div class="small muted">Task</div></div></div>
+                  <div class="pr"><div class="tx">Mark the fence paragraph<div class="due">Tue 20 Oct</div></div><div style="text-align:center"><button class="switch" role="switch" aria-checked="false" aria-label="Make task"></button><div class="small muted">Task</div></div></div>
+                </div>
+                <div><div class="col-h" style="color:var(--comm-ink)">They owe · checked next time</div>
+                  <div class="pr"><div class="tx">Declan: rewrite the fence paragraph with "undercuts"<div class="due">Mon 19 Oct</div></div></div>
+                </div>
+              </div>
+              <div class="row"><span class="quiet-link">✓ 1 task linked in Tasks</span></div>
+            </div>
+            <div class="draft" data-phase-show="after" style="flex-direction:column">
+              <div class="dh"><b>Follow-up drafts</b><div class="dtabs"><span class="on">To Denielle J.</span><span>To Declan</span></div><span class="muted" style="margin-left:auto">Clare drafted this. You edit and send it yourself.</span></div>
+              <div class="db">Hi Denielle,
+
+Apologies this is a little later than promised. I caught up with Declan today about his essay. His redraft is much tighter, and the quotes he chose are strong. The next step is explaining what the quotes show rather than retelling them. We've agreed a simple method, and he'll have a go by Monday.
+
+Mr Russell</div>
+              <div class="dh" style="border-top:1px solid var(--line);border-bottom:0"><button class="btn sm pri">Copy to Outlook</button><button class="btn sm">Mark as sent</button><span class="small muted">Marking it sent logs a comm on this thread and ticks the promise</span></div>
+            </div>
+          </div>
+
+          <div class="col-stack">
+            <div class="card" style="display:flex;flex-direction:column">
+              <h3>With</h3>
+              <div class="people">
+                <div class="pcard"><span class="av lg a2">DJ</span><div><div class="nm">Declan J.</div><div class="rl">Student · Year 10 · English 10.2</div><div class="ctx">5 comms · keeps 4 in 5 promises</div></div></div>
+                <div class="pcard ghost"><span class="av lg a5">DJ</span><div><div class="nm">Denielle J.</div><div class="rl">Parent · also concerned, not here</div><div class="ctx" style="color:var(--high-sea-ink)">You owe her a summary · 3 days late</div></div></div>
+                <button class="btn ghost sm" style="align-self:flex-start">＋ Add person, class or group</button>
+              </div>
+            </div>
+            <div class="card" style="display:flex;flex-direction:column">
+              <h3>Linked</h3>
+              <dl class="kv">
+                <dt>Thread</dt><dd>Declan · study approach</dd>
+                <dt>Class</dt><dd>10.2 English</dd>
+                <dt>Assessment</dt><dd>T4 essay · due 06/11</dd>
+                <dt>Tasks</dt><dd><span class="quiet-link">✓ linked</span></dd>
+              </dl>
+            </div>
+            <div class="card" data-phase-show="during" style="flex-direction:column">
+              <h3>Agenda</h3>
+              <div class="tick done"><span class="box">✓</span><span class="tx">What went well</span></div>
+              <div class="tick"><span class="box" style="border-color:var(--high-sea)"></span><span class="tx"><b>Quote to analysis</b> · now</span></div>
+              <div class="tick"><span class="box"></span><span class="tx">Next step</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ 3 · CASE MANAGEMENT ═════════════ -->
+  <section id="case" class="panel" role="tabpanel" hidden>
+    <div class="note">
+      <div><h2>Case management · the whole case on one page</h2><p>A case is a thread with goals. The page shows <b>the goals</b>, <b>the circle of people</b>, and every session as a ledger. Old sessions fold down to one line each. The next session sits at the bottom with its carried promises. Opening a session gives you the same clock page as a comm (tab 2).</p></div>
+      <div><div class="lab">The 10%</div><ul><li>Goals have progress, taken from numbers you type in sessions ("31/50"). Clare spots them as you write.</li><li>Promise record: who keeps theirs, across the whole case.</li><li>One button exports a case summary for a Learning Support or parent meeting.</li></ul></div>
+    </div>
+    <div class="screen">
+      <nav class="rail" aria-label="Hub navigation"><div class="brand">Professional Hub</div><a href="#case">⌂ Home</a><a class="sub cur" href="#case">Calendar</a><div class="sec">Network</div><a href="#case">People</a><a href="#case">Organisations</a></nav>
+      <div class="canvas">
+        <div class="ph">
+          <div><div class="row"><span class="chip comm">● Case</span><span class="chip">Learning Enrichment</span></div><h2>Fletcher W. · case management</h2><div class="sub">Opened 31/03/25 · 8 sessions · 3 parent emails · 1 teacher check-in · next Tue 13 Oct</div></div>
+          <div class="row"><button class="btn">Export case summary</button><button class="btn pri">＋ New in case</button></div>
+        </div>
+        <div class="grid2">
+          <div class="spine">
+            <div class="sess fold"><div class="card"><span class="when">31/03/25</span><b>Session 1 · note-taking strategy</b><span class="chip comm">in person</span><span class="small muted">3 promises, all kept</span></div></div>
+            <div class="sess fold"><div class="card"><span class="when">14/08/25</span><b>Session 4 · post-it system</b><span class="chip comm">in person</span><span class="small muted">4 promises, 3 kept</span></div></div>
+            <div class="sess fold"><div class="card"><span class="when">10/09/25</span><b>Email · Amy W. · update</b><span class="chip comm">email</span></div></div>
+            <div class="fold-note">⋯ 3 more · show all</div>
+            <div class="sess"><div class="card"><div class="row" style="justify-content:space-between"><span class="when">Tue 22/09/26 · session 7</span><span class="chip comm">in person · 15 min</span></div>
+              <p style="margin:6px 0 8px">Fillable bar introduced for maths. Sandwich method agreed. The August maths jump came up and he was proud of it.</p>
+              <div class="carry">↳ 4 promises carried to session 8</div></div></div>
+            <div class="sess cur"><div class="card" style="border-color:rgba(246,134,32,.45);box-shadow:0 0 0 4px rgba(246,134,32,.10)"><div class="row" style="justify-content:space-between"><span class="when" style="color:var(--high-sea-ink)">Tue 13/10 · session 8 · in 17 days</span><span class="chip warn">prep ready</span></div>
+              <h3 style="margin:8px 0">Carried in</h3>
+              <div class="tick done" data-tick><span class="box">✓</span><span class="tx">Email Amy the fillable-bar template<span class="who-tag who-me">You</span></span></div>
+              <div class="tick" data-tick><span class="box"></span><span class="tx">2 hrs maths on the bar<span class="who-tag who-them">Fletcher</span></span></div>
+              <div class="tick" data-tick><span class="box"></span><span class="tx">20 min of something enjoyable first<span class="who-tag who-them">Fletcher</span></span></div>
+              <div class="tick part" data-tick><span class="box">–</span><span class="tx">Check in with Ms D'Souza<span class="who-tag who-me">You</span></span></div>
+              <div class="row" style="margin-top:10px"><button class="btn pri sm">Open session page</button><button class="btn sm">Start capturing</button></div></div></div>
+          </div>
+          <div class="col-stack">
+            <div class="card"><h3>Goals</h3>
+              <div class="goal"><div class="gt"><span>Maths: C → B through steady effort</span><span class="muted tnum">31/50</span></div><div class="gb"><i style="width:62%"></i></div></div>
+              <div class="goal"><div class="gt"><span>Homework remembered and brought home</span><span class="muted">most weeks</span></div><div class="gb"><i style="width:70%"></i></div></div>
+              <div class="goal"><div class="gt"><span>Steady energy after school</span><span class="muted">weak spot</span></div><div class="gb"><i style="width:30%;background:var(--high-sea)"></i></div></div>
+              <button class="btn ghost sm">＋ Goal</button>
+            </div>
+            <div class="card"><h3>The circle</h3>
+              <div class="li"><span class="av sm a1">FW</span><div><div class="t">Fletcher W. · student</div><div class="m">Keeps 7 in 10 promises</div></div></div>
+              <div class="li"><span class="av sm a2">AW</span><div><div class="t">Amy W. · parent</div><div class="m">Likes short emails with one question</div></div></div>
+              <div class="li"><span class="av sm a3">DS</span><div><div class="t">Ms D'Souza · maths</div><div class="m">Teams check-ins</div></div></div>
+              <div class="li"><span class="av sm a6">LS</span><div><div class="t">Learning Support</div><div class="m">Copied on the export</div></div></div>
+            </div>
+            <div class="card"><h3>Promises across the case</h3>
+              <div class="row" style="gap:18px"><div><b style="font-size:22px;color:var(--depth)" class="tnum">24</b><div class="small muted">made</div></div><div><b style="font-size:22px;color:var(--success)" class="tnum">19</b><div class="small muted">kept</div></div><div><b style="font-size:22px;color:var(--high-sea-ink)" class="tnum">3</b><div class="small muted">open</div></div></div></div>
+            <div class="card clare"><div class="who"><span class="spark">✦</span>Clare · case read</div><p style="margin:0;font-size:13px">Structure is working. Every jump followed a concrete tool (post-its, then the bar). Energy is the steady blocker. Worth raising with Amy before Term 4 assessments start.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ 4 · MEETING ═════════════ -->
+  <section id="meeting" class="panel" role="tabpanel" hidden>
+    <div class="note">
+      <div><h2>Meeting · with a proper notes page</h2><p>Your notes and the agenda are now one page. Each agenda item is a heading, with your block notes, decisions and promises underneath it, so your notes file themselves by item. The round "+" adds any block anywhere, and there's space above the first item for anything that's off the agenda.</p></div>
+      <div><div class="lab">Kept from round 1</div><ul><li>Your purpose, checked by Clare afterwards.</li><li>The room, grouped by organisation, with warmth dots.</li><li>Tag what's said to a person: <span class="at">@Greg</span>. Actions split three ways: yours, theirs, and decisions.</li><li>New faces get a one-tap "Add to People".</li></ul></div>
+    </div>
+    <div class="screen">
+      <nav class="rail" aria-label="Hub navigation"><div class="brand">Professional Hub</div><a href="#meeting">⌂ Home</a><a class="sub cur" href="#meeting">Calendar</a><div class="sec">Network</div><a href="#meeting">People</a><a href="#meeting">Organisations</a></nav>
+      <div class="canvas">
+        <div class="ph">
+          <div><div class="row"><span class="chip meet">● Meeting · Teams</span><span class="chip">HALT</span><span class="chip">Board</span></div>
+            <h2>HALT NSW board meeting</h2><div class="sub">Thu 24 Sep · 6:00–7:15 pm · Teams · called by Vicki Sheehan · 9 people</div></div>
+          <div class="phase" role="group" aria-label="Page phase (static)"><button>Before</button><button class="on live">During</button><button>After</button></div>
+        </div>
+        <div class="purpose"><span style="font-size:20px">◎</span><div><b>Why you're there:</b> Board member. You're presenting the medal ceremony run sheet (item 3) and want a yes on the TeachMeet date for Term 4.</div></div>
+        <div class="grid2">
+          <div class="col-stack">
+            <div class="live-strip"><span class="rec">Live · 38:40</span><span class="muted">Item 3 · yours</span><span class="muted" style="margin-left:auto">Transcript on · Teams</span></div>
+            <div class="doc">
+              <div class="blk"><div class="bt">Text · before item 1</div><p class="muted">Vicki flagged a late apology from Lena. Priya joined 10 min late.</p></div>
+              <div class="agh"><span class="n">1</span><h4>Minutes and matters arising</h4><span class="tm">6:00</span></div>
+              <div class="blk"><span class="dec">✓ Decision · minutes accepted</span></div>
+              <div class="agh"><span class="n">2</span><h4>Treasurer's report</h4><span class="tm">6:10</span></div>
+              <div class="blk"><p><span class="at">@Greg</span> Surplus of $4.2k after the conference. Premier's grant closes 30 Oct.</p></div>
+              <div class="blk"><p><span class="inline-promise them">» Greg R. · reconciled accounts to the board by 9 Oct</span></p></div>
+              <div class="agh mine"><span class="n">3</span><h4>Medal ceremony run sheet · <span style="color:var(--high-sea-ink)">yours</span></h4><span class="tm">6:25</span></div>
+              <div class="blk"><div class="bt">Table</div>
+                <div class="tblwrap"><table class="mini-table"><thead><tr><th>Time</th><th>Item</th><th>Who</th></tr></thead><tbody>
+                  <tr><td class="tnum">6:00</td><td>Welcome</td><td>Vicki (MC)</td></tr><tr><td class="tnum">6:15</td><td>Keynote</td><td>Dr Helen C.</td></tr><tr><td class="tnum">6:45</td><td>Medals, 12 recipients</td><td>You</td></tr></tbody></table></div></div>
+              <div class="blk"><span class="dec">✓ Decision · run sheet agreed as above</span></div>
+              <div class="blk"><p><span class="inline-promise">» me · final seating list to Vicki by Tue</span></p></div>
+              <div class="page-editor__add" id="meetAdd"><button class="page-editor__add-btn" aria-label="Add a block" aria-expanded="false" data-insert>+</button></div>
+              <div class="agh"><span class="n">4</span><h4>TeachMeet Term 4</h4><span class="tm">6:50</span></div>
+              <div class="blk"><p class="muted">Type here…</p></div>
+            </div>
+          </div>
+          <div class="col-stack">
+            <div class="card"><h3>The room <span class="muted">· 9</span></h3>
+              <div class="room">
+                <div class="org-cluster"><div class="on"><span class="crest" style="background:#2b4d7e">H</span>HALT NSW</div>
+                  <div class="pp"><span class="av sm a2">VS</span>Vicki Sheehan <span class="r">chair</span><span class="warm"><i class="w"></i><i class="w"></i><i class="w"></i></span></div>
+                  <div class="pp"><span class="av sm a5">GR</span>Greg R. <span class="r">treasurer</span><span class="warm"><i class="w"></i><i class="w"></i><i></i></span></div>
+                  <div class="pp"><span class="av sm a3">LM</span>Lena M. <span class="r">secretary · apology</span><span class="warm"><i class="w"></i><i></i><i></i></span></div></div>
+                <div class="org-cluster"><div class="on"><span class="crest" style="background:#7a3b2e">S</span>Schools · 4</div>
+                  <div class="pp"><span class="av sm a4">JT</span>Jo T. <span class="r">Barker</span><span class="warm"><i class="w"></i><i></i><i></i></span></div>
+                  <div class="pp"><span class="av sm a6">PK</span>Priya K. <span class="r">Abbotsleigh</span><span class="warm"><i class="w"></i><i class="w"></i><i></i></span></div></div>
+              </div>
+              <div class="newp" style="margin-top:10px"><span class="av sm a6">?</span><div><b>Sam O.</b> · first time here<div class="small muted">DoE Gifted & Talented</div></div><button class="btn sm">Add to People</button></div>
+            </div>
+            <div class="card"><h3>Actions so far</h3>
+              <div class="li"><div class="ico" style="background:var(--warning-surface);color:var(--high-sea-ink)">→</div><div><div class="t">Seating list to Vicki · Tue</div><div class="m"><span class="quiet-link">✓ task linked</span></div></div></div>
+              <div class="li"><div class="ico" style="background:var(--comm-bg);color:var(--comm-ink)">←</div><div><div class="t">Greg · reconciled accounts · 9 Oct</div><div class="m">Goes in the Due row</div></div></div>
+              <div class="li"><div class="ico" style="background:var(--success-surface);color:var(--success)">✓</div><div><div class="t">2 decisions</div><div class="m">Logged to HALT's organisation page</div></div></div>
+            </div>
+            <div class="card clare"><div class="who"><span class="spark">✦</span>Clare · listening</div><p style="margin:0;font-size:13px">Greg mentioned the Premier's grant closes 30 Oct. Add it as an opportunity on HALT's organisation page?</p><div class="row" style="margin-top:8px"><button class="btn sm">Add</button><button class="btn sm ghost">Not now</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ 5 · EVENTS + PD ═════════════ -->
+  <section id="event" class="panel" role="tabpanel" hidden>
+    <div class="note">
+      <div><h2>Events · one page, and PD has a shape</h2><p>Every event is a block page with the round "+", and photos are just a gallery block. Turn on <b>Counts as PD</b> and you choose its shape: <b>one-off</b> (a single Zoom or day), <b>series</b> (sessions weeks apart) or <b>program</b> (a multi-day seminar with many talks). Every talk or activity can become its own <b>Knowledge Hub note</b>, and its hours roll up to the session and then the whole series.</p></div>
+      <div><div class="lab">What's gone</div><ul><li class="chg">The "Retry incomplete Task link" button. The learning task links in the background, and you only see a small amber dot if it's still failing after an hour.</li><li class="chg">The large photo panel. Photos go in a gallery block if you want them.</li><li>The PD dashboard stays as it is. It reads hours from these pages.</li></ul></div>
+    </div>
+    <div class="screen">
+      <nav class="rail" aria-label="Hub navigation"><div class="brand">Professional Hub</div><a href="#event">⌂ Home</a><a class="sub cur" href="#event">Calendar</a><div class="sec">Network</div><a href="#event">People</a></nav>
+      <div class="canvas">
+        <div class="two-events">
+          <!-- non PD -->
+          <div class="evcol">
+            <div class="eyebrow">Not PD</div>
+            <div class="evhead"><div class="evdate"><span class="small">FRI</span><b>25</b><span class="small">SEP</span></div>
+              <div><div class="row"><span class="chip event">● Event</span><span class="chip sage">Ceremony</span></div><h3 style="font-size:22px;color:var(--depth);margin-top:4px">HALT medal ceremony</h3><div class="small muted">6:00–7:45 pm · NSW Parliament House · you ran it</div></div>
+              <button class="btn sm">Map</button></div>
+            <div class="pd-toggle"><button class="switch" role="switch" aria-checked="false" aria-label="Counts as PD" data-pd></button><b>Counts as PD</b><span class="muted small" data-pd-lab>Off. No hours or evidence.</span></div>
+            <div class="doc">
+              <div class="blk"><div class="bt">Text</div><p>Twelve medals. Sofia's speech about reading under the desk got the biggest laugh of the night. Vicki wants Parliament again next year.</p></div>
+              <div class="blk"><div class="bt">Gallery · 14</div><div class="minigal"><i style="background:linear-gradient(135deg,#c9a45a,#6b4f2a)"></i><i style="background:linear-gradient(135deg,#8aa6c9,#2b4d7e)"></i><i style="background:linear-gradient(135deg,#d9c6a8,#7a5038)"></i><span class="small muted" style="align-self:center">+11</span></div></div>
+              <div class="blk"><p><span class="inline-promise">» me · thank-you email to the Parliament events team</span></p></div>
+              <div class="page-editor__add"><button class="page-editor__add-btn" aria-label="Add a block" aria-expanded="false" data-insert>+</button></div>
+            </div>
+            <div class="card"><h3>Who was there</h3>
+              <div class="row" style="margin-bottom:10px"><div class="stack"><span class="av a2">VS</span><span class="av a5">GR</span><span class="av a4">JT</span><span class="av a6">PK</span><span class="av a3">+6</span></div><span class="small muted">10 you know</span></div>
+              <div class="newp"><span class="av sm a1">?</span><div><b>Dr Helen C.</b> · keynote<div class="small muted">Macquarie Uni</div></div><button class="btn sm">Add</button></div>
+              <div class="newp"><span class="av sm a5">?</span><div><b>Tom B.</b> · a recipient's dad<div class="small muted">Asked about enrichment</div></div><button class="btn sm">Add</button></div></div>
+          </div>
+          <!-- PD -->
+          <div class="evcol">
+            <div class="eyebrow">PD · series, part 1 of 3</div>
+            <div class="evhead"><div class="evdate pdd"><span class="small">FRI</span><b>18</b><span class="small">SEP</span></div>
+              <div><div class="row"><span class="chip pd">● PD · attended</span><span class="chip">Warlight</span></div><h3 style="font-size:22px;color:var(--depth);margin-top:4px">Warlight: Critical Study of Literature</h3><div class="small muted">Session 1 · 9:00 am–3:00 pm · St Aloysius' College, Milsons Point</div></div>
+              <button class="btn sm">Map</button></div>
+            <div class="pd-toggle"><button class="switch" role="switch" aria-checked="true" aria-label="Counts as PD" data-pd></button><b>Counts as PD</b><span class="muted small" data-pd-lab>Feeds the PD dashboard</span></div>
+            <div class="shape" role="radiogroup" aria-label="PD shape">
+              <button role="radio" aria-checked="false" data-shape><b>One-off</b><small>One Zoom, one day, one session</small></button>
+              <button role="radio" aria-checked="true" class="on" data-shape><b>Series</b><small>Sessions weeks apart, one program</small></button>
+              <button role="radio" aria-checked="false" data-shape><b>Program</b><small>Multi-day seminar, many talks</small></button>
+            </div>
+            <div class="card"><h3>The series <span class="muted">· 18 h across 3 sessions</span></h3>
+              <div class="series">
+                <div class="sn cur"><div class="d">18/09 · Fri</div><b>Session 1</b><div class="h">6 h · attended · 3 talks</div><span class="gap">6 wks</span></div>
+                <div class="sn future"><div class="d">30/10 · Fri</div><b>Session 2</b><div class="h">6 h · booked</div><span class="gap">3 wks</span></div>
+                <div class="sn future"><div class="d">20/11 · Fri · Zoom</div><b>Session 3</b><div class="h">6 h · in your calendar</div></div>
+              </div>
+              <div class="small muted" style="margin-top:8px">Each session is its own event on the calendar and has its own page. The series page adds up the hours.</div>
+            </div>
+            <div class="card"><h3>Today's program <span class="muted">· each talk → a Knowledge note</span></h3>
+              <div class="prog">
+                <div class="pi"><span class="tm">9:00</span><div><div class="t">Keynote · Reading against the grain</div><div class="w">Dr Mia L. · 1.5 h</div></div><span class="kn">✓ Knowledge note</span></div>
+                <div class="pi"><span class="tm">11:00</span><div><div class="t">Workshop · Silent annotation rounds</div><div class="w">Warlight team · 2 h</div></div><span class="kn">✓ Knowledge note</span></div>
+                <div class="pi"><span class="tm">1:30</span><div><div class="t">Panel · Whose voice is missing?</div><div class="w">3 teachers · 1.5 h</div></div><span class="kn draft">＋ Make note</span></div>
+              </div>
+              <div class="row" style="margin-top:6px"><button class="btn sm ghost">＋ Talk or activity</button><span class="small muted">Hours per talk add up to the session's 6 h</span></div>
+            </div>
+            <div class="card"><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+              <svg class="ring" viewBox="0 0 110 110" aria-label="6 of 18 series hours"><circle cx="55" cy="55" r="46" fill="none" stroke="#ece6da" stroke-width="10"/><circle cx="55" cy="55" r="46" fill="none" stroke="#b57a52" stroke-width="10" stroke-linecap="round" stroke-dasharray="96 289" transform="rotate(-90 55 55)"/><text x="55" y="54" text-anchor="middle" font-size="24" font-weight="700" fill="#0a1536" font-family="Inter,sans-serif">6/18</text><text x="55" y="72" text-anchor="middle" font-size="10" fill="#6b7788" font-family="Inter,sans-serif">series hours</text></svg>
+              <dl class="kv" style="flex:1;min-width:220px">
+                <dt>Focus</dt><dd>Critical Study of Literature</dd>
+                <dt>Standard</dt><dd>2.1 · Content and teaching strategies</dd>
+                <dt>Accreditation</dt><dd><span class="chip warn">Choose · NESA or elective</span></dd>
+                <dt>Certificate</dt><dd>Per session · <button class="btn sm">Drop PDF</button></dd>
+                <dt>Learning task</dt><dd><span class="quiet-link">✓ Apply close-reading to Y10 unit · linked</span></dd>
+              </dl></div></div>
+            <div class="doc">
+              <div class="blk"><div class="bt">Text · reflection</div><p>Three moves I'll steal: the silent-annotation round, "whose voice is missing", and exit tickets written as a question to the author.</p></div>
+              <div class="page-editor__add"><button class="page-editor__add-btn" aria-label="Add a block" aria-expanded="false" data-insert>+</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═════════════ 6 · PHONE ═════════════ -->
+  <section id="phone" class="panel" role="tabpanel" hidden>
+    <div class="note">
+      <div><h2>Phone · the walk-in card and the 10-second log</h2><p>On the left, ten minutes before any comm or meeting, Home shows the walk-in card: who it is, the last contact, three things to raise, and what you owe them. On the right, logging a hallway chat takes a person, a channel and one line. Clare files it into the right thread.</p></div>
+      <div><div class="lab">The 10%</div><ul><li>"Start" opens the During face, ready for a photo of your notebook.</li><li>The log shows recent people first. At school it guesses in person.</li><li>Write "»me" in the one line and it becomes a promise straight away.</li></ul></div>
+    </div>
+    <div class="phones">
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>8:31</span><span>●●● ▮</span></div>
+        <div class="pbody">
+          <div class="eyebrow">Home</div>
+          <div class="walkin">
+            <div class="cd"><span>Library · in person</span><b>in 9 min</b></div>
+            <div style="display:flex;gap:12px;align-items:center"><span class="av lg a1">FW</span><div><h3>Fletcher W.</h3><div class="small" style="color:var(--on-dark-muted)">Session 8 · case management</div></div></div>
+            <div class="last">Last time, 22/09: fillable bar introduced. Maths was up 27 places.</div>
+            <ol><li>Open with the maths win</li><li>Ask for the photo of his bar</li><li>Geography due 23/10: plan it backwards</li></ol>
+            <div class="owe"><span>●</span><span>You told Amy you'd send the template. <b>Done 24/09 ✓</b></span></div>
+            <div class="go"><button class="btn l">Start</button><button class="btn d">Open page</button></div>
+          </div>
+          <div class="card" style="padding:12px 14px"><div class="li" style="padding-top:0"><span class="av sm a4">NS</span><div><div class="t">Nina · gifted audit</div><div class="m">10:20 · meeting · you own item 2</div></div></div><div class="li"><span class="av sm a5">DJ</span><div><div class="t">Email Denielle J.</div><div class="m" style="color:var(--high-sea-ink)">Promise · 3 days late</div></div></div></div>
+        </div>
+        <div class="tabbar"><span class="on"><i>⌂</i>Home</span><span><i>▦</i>Calendar</span><span><i>＋</i>Log</span><span><i>☺</i>People</span></div>
+      </div></div>
+
+      <div class="phone"><div class="scr">
+        <div class="sb"><span>12:47</span><span>●●● ▮</span></div>
+        <div class="pbody" style="opacity:.5"><div class="eyebrow">Calendar</div><div class="card" style="padding:12px"><b>Today</b><div class="small muted">3 comms · 1 meeting</div></div></div>
+        <div class="sheet">
+          <div class="grab"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">Log a comm</b><span class="small muted">12:47 · just now</span></div>
+          <div class="recents">
+            <div class="rp on"><span class="av a2">DJ</span>Declan J.</div><div class="rp"><span class="av a1">FW</span>Fletcher</div><div class="rp"><span class="av a4">NS</span>Nina</div><div class="rp"><span class="av a3">DS</span>D'Souza</div><div class="rp"><span class="av a6">＋</span>Anyone</div>
+          </div>
+          <div class="chan"><span class="on"><i>☺</i>In person</span><span><i>✉</i>Email</span><span><i>☏</i>Call</span><span><i>✆</i>Text</span></div>
+          <div class="field">Chat after period 4: essay plan fine, needs a quote bank. »me send quote bank by Thu<span class="caret"></span></div>
+          <div class="hint"><span class="inline-promise" style="font-size:11px">» me · quote bank to Declan · Thu</span></div>
+          <div class="hint">✦ Clare will add this to Declan's thread (study approach) and mention it next time you email Denielle.</div>
+          <button class="btn pri" style="height:46px;justify-content:center;font-size:15px">Log it</button>
+          <div class="row" style="justify-content:center;gap:14px"><span class="small muted">▣ Photo</span><span class="small muted">♪ Voice note</span><span class="small muted">↗ Full page</span></div>
+        </div>
+      </div></div>
+    </div>
+  </section>
+</div>
+
+<template id="insertTpl">
+  <div class="page-editor__insert" role="dialog" aria-label="Insert a block">
+    <section><h5>Basic</h5>
+      <button class="pcardb"><i>¶</i><span><b>Text</b><small>Write formatted paragraphs, lists, and inline links.</small></span></button>
+      <button class="pcardb"><i>H</i><span><b>Heading</b><small>Add a section title or subtitle to structure the page.</small></span></button>
+      <button class="pcardb"><i>❝</i><span><b>Quote</b><small>Feature a quotation with optional attribution.</small></span></button></section>
+    <section><h5>Media</h5>
+      <button class="pcardb"><i>▣</i><span><b>Image</b><small>Display a single image with optional caption and alt text.</small></span></button>
+      <button class="pcardb"><i>▤</i><span><b>Gallery</b><small>Show multiple images in a swipeable or grid gallery.</small></span></button>
+      <button class="pcardb"><i>📎</i><span><b>Attachment</b><small>Link a downloadable file such as a PDF or worksheet.</small></span></button></section>
+    <section><h5>Teaching</h5>
+      <button class="pcardb"><i>▦</i><span><b>Table</b><small>Present rows and columns of structured data.</small></span></button></section>
+    <section><h5>Visualisation</h5>
+      <button class="pcardb"><i>◫</i><span><b>Whiteboard</b><small>Draw it out.</small></span></button></section>
+  </div>
+</template>
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var panels=[].slice.call(document.querySelectorAll('.panel'));
+  function show(id,push){
+    if(!document.getElementById(id)||!document.getElementById(id).classList.contains('panel'))id='calendar';
+    panels.forEach(function(p){p.hidden=p.id!==id});
+    tabs.forEach(function(t){t.setAttribute('aria-selected',String(t.dataset.tab===id))});
+    if(push){try{history.replaceState(null,'','#'+id)}catch(e){}}
+    window.scrollTo({top:0});
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){show(t.dataset.tab,true)})});
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1),false)});
+  show(location.hash.slice(1)||'calendar',false);
+  document.addEventListener('click',function(e){var a=e.target.closest('.rail a');if(a)e.preventDefault();});
+
+  // Calendar source pills
+  var root=document.getElementById('calRoot');
+  function syncHide(){root.setAttribute('data-hide',[].slice.call(document.querySelectorAll('.src-pill')).filter(function(x){return x.getAttribute('aria-pressed')==='false'}).map(function(x){return x.dataset.src}).join(' '))}
+  [].slice.call(document.querySelectorAll('.src-pill')).forEach(function(b){b.addEventListener('click',function(){b.setAttribute('aria-pressed',String(b.getAttribute('aria-pressed')!=='true'));syncHide()})});
+  syncHide();
+
+  // Comm phases
+  var commA=document.getElementById('commA'),note=document.getElementById('phaseNote');
+  var notes={before:'Switches to During by itself at 11:50',during:'Switches to After by itself at 12:05, or when you tap End',after:'Clare finished the summary 40 seconds after you ended'};
+  [].slice.call(document.querySelectorAll('[data-set-phase]')).forEach(function(b){
+    b.addEventListener('click',function(){
+      var ph=b.dataset.setPhase;commA.setAttribute('data-phase',ph);note.textContent=notes[ph];
+      [].slice.call(document.querySelectorAll('[data-set-phase]')).forEach(function(x){x.classList.toggle('on',x===b);x.classList.toggle('live',x===b&&ph==='during')});
+    });
+  });
+
+  // "+" insert popover (same behaviour as Tasks mountBlockInsert)
+  var tpl=document.getElementById('insertTpl');
+  function closeAll(except){[].slice.call(document.querySelectorAll('[data-insert][aria-expanded="true"]')).forEach(function(b){if(b===except)return;b.setAttribute('aria-expanded','false');var m=b.parentNode.querySelector('.page-editor__insert');if(m)m.remove();});}
+  document.addEventListener('click',function(e){
+    var plus=e.target.closest('[data-insert]');
+    if(plus){e.stopPropagation();var open=plus.getAttribute('aria-expanded')==='true';closeAll();if(!open){plus.parentNode.appendChild(tpl.content.cloneNode(true));plus.setAttribute('aria-expanded','true');}return;}
+    if(!e.target.closest('.page-editor__insert'))closeAll();
+    else if(e.target.closest('.pcardb')&&!e.target.closest('.static'))closeAll();
+
+    var t=e.target.closest('[data-tick]');
+    if(t){t.classList.remove('part');t.classList.toggle('done');t.querySelector('.box').textContent=t.classList.contains('done')?'✓':'';}
+    var s=e.target.closest('.switch');
+    if(s){s.setAttribute('aria-checked',String(s.getAttribute('aria-checked')!=='true'));
+      if(s.hasAttribute('data-pd')){var lab=s.parentNode.querySelector('[data-pd-lab]');lab.textContent=s.getAttribute('aria-checked')==='true'?'Feeds the PD dashboard. Shape, hours and standard appear.':'Off. No hours or evidence.';}}
+    var sh=e.target.closest('[data-shape]');
+    if(sh){[].slice.call(sh.parentNode.children).forEach(function(x){x.classList.toggle('on',x===sh);x.setAttribute('aria-checked',String(x===sh))});}
+  });
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')closeAll();});
+})();
+</script>
