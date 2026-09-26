@@ -218,6 +218,55 @@ describe('renderSomedayView', () => {
     expect(canvas.textContent).not.toContain('Promote to task');
   });
 
+  it('keeps the Someday shell mounted across open, edit, and field save', async () => {
+    const dream = task({
+      id: 't1',
+      title: 'Study at Cambridge',
+      description: 'A long-held one',
+      review_at: '2099-01-01',
+      maturity: 'new'
+    });
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([dream]);
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
+    vi.mocked(tasksApi.updateTask).mockImplementation(async (_id, body) => ({
+      ...dream,
+      ...(body as Partial<Task>)
+    }));
+
+    const canvas = document.createElement('div');
+    await renderSomedayView(canvas);
+
+    const root = canvas.querySelector('.someday-view')!;
+    const wash = canvas.querySelector('.someday-wash')!;
+    const toolbar = canvas.querySelector('.someday-toolbar')!;
+
+    canvas.querySelector<HTMLElement>('.someday-card')!.click();
+    expect(canvas.querySelector('.someday-view')).toBe(root);
+    expect(canvas.querySelector('.someday-wash')).toBe(wash);
+    expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
+
+    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
+    [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')]
+      .find((btn) => btn.textContent === 'Edit')
+      ?.click();
+    expect(canvas.querySelector('.someday-view')).toBe(root);
+    expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
+
+    const maturity = canvas.querySelector<HTMLSelectElement>(
+      'select[aria-label="How developed “Study at Cambridge” is"]'
+    )!;
+    maturity.value = 'set';
+    maturity.dispatchEvent(new Event('change', { bubbles: true }));
+    await vi.waitFor(() => {
+      expect(tasksApi.updateTask).toHaveBeenCalledWith('t1', { maturity: 'set' });
+    });
+    expect(canvas.querySelector('.someday-view')).toBe(root);
+    expect(canvas.querySelector('.someday-wash')).toBe(wash);
+    expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
+    expect(canvas.querySelector('.someday-card--open')).toBeTruthy();
+    expect(canvas.textContent).toContain('Set');
+  });
+
   it('filters by category and shows origin dates only for bucket list and dreams jar', async () => {
     vi.mocked(tasksApi.listTasks).mockResolvedValue([
       task({

@@ -736,7 +736,14 @@
   margin-bottom: 0;
 }
 
-.someday-view > .empty-state {
+.someday-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.someday-view .empty-state {
   margin: 0;
 }
 
@@ -5426,14 +5433,13 @@ html.is-map-fullscreen .map-page .map-preview {
   margin: var(--space-4) 0 0;
 }
 
+/* Kit workspace is already a single full-width column; keep Tasks chrome tight. */
 .hub-calendar--workspace .hub-calendar__workspace {
-  grid-template-columns: minmax(0, 1fr) min(16rem, 28%);
   gap: var(--space-3);
 }
 
-/* Tasks Week: kit calendar full width; locks / next actions under it (not a right column). */
+/* Locks / next actions / dump sit under the kit (not a right column). Kit owns full-width (#516). */
 .tasks-calendar-chrome__workspace.hub-calendar__workspace {
-  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
   width: 100%;
   max-width: none;
@@ -5526,12 +5532,8 @@ html.is-map-fullscreen .map-page .map-preview {
   flex: 1 1 auto;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   align-items: stretch;
-}
-
-.hub-calendar--month .hub-calendar__workspace:has(.calendar-preview:not(:empty)) {
-  grid-template-columns: minmax(0, 1fr) min(16rem, 28%);
 }
 
 .hub-calendar--month .hub-calendar__rail:not(:has(.calendar-preview:not(:empty))) {
