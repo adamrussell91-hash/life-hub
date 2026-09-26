@@ -9,7 +9,7 @@ import { addDays, daysBetween } from '../../../packages/design-kit/js/lead-lines
 export const SPHERE_DOMAIN = Object.freeze({ life: 'life', work: 'teaching', professional: 'other' });
 const MAX_GHOSTS = 3;
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
-const GHOST_ID = /^goal-(.+?)-(?:start|split-.+|rest-.+|move-.+)$/;
+const GHOST_ID = /^goal-(.+?)-(?:start|split-.+|rest-.+|move-.+|block-.+)$/;
 
 export function goalIdFromGhostId(id) {
   const match = typeof id === 'string' ? GHOST_ID.exec(id) : null;
@@ -149,6 +149,42 @@ function proposals({ goal, hostedTasks, tasks, today, crunch, domain }) {
   return out;
 }
 
+/** G-30: one protect_block when the lead measure is behind and a calendar slot exists. */
+export function protectBlockProposal({ goal, hostedTasks, today, slots = [], count, perWeek }) {
+  if (!perWeek || count >= perWeek || !Array.isArray(slots) || !slots.length) return null;
+  const sunday = addDays(mondayOfKey(today), 6);
+  const slot = slots.find(s => s && DATE_KEY.test(s.date ?? '') && s.date >= today && s.date <= sunday)
+    ?? slots.find(s => s && DATE_KEY.test(s.date ?? '') && s.date >= today);
+  if (!slot) return null;
+  const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
+  const move = open.sort((a, b) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999'))[0];
+  const title = move?.title || goal.next_start || `Work on “${goal.title}”`;
+  const minutes = typeof move?.estimated_duration === 'number' && move.estimated_duration > 0
+    ? move.estimated_duration
+    : 45;
+  const start = slot.start ?? '09:00';
+  const end = addMinutesHhMm(start, minutes);
+  return {
+    id: `goal-${goal.id}-block-${slot.date}`,
+    agent: 'hammond',
+    kind: 'protect_block',
+    date: slot.date,
+    start,
+    end,
+    title,
+    goalId: goal.id,
+    reason: `Behind on this week's lead measure (${count} of ${perWeek}). Protect a block before the week ends.`
+  };
+}
+
+function addMinutesHhMm(hhmm, minutes) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const total = (h * 60 + m + minutes) % (24 * 60);
+  const nh = Math.floor(total / 60);
+  const nm = total % 60;
+  return `${String(nh).padStart(2, '0')}:${String(nm).padStart(2, '0')}`;
+}
+
 function verdictFor({ days, temperature, count, perWeek, crunch }) {
   const when = days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`;
   const parts = [
@@ -163,7 +199,20 @@ function verdictFor({ days, temperature, count, perWeek, crunch }) {
   return parts.join(' ');
 }
 
-export function buildGoalRead({ goal, projects = [], tasks = [], terms = [], today, dismissed = [] }) {
+export function buildGoalRead({
+  goal,
+  projects = [],
+  tasks = [],
+  terms = [],
+  today,
+  dismissed = [],
+  slots = [],
+  binding = null,
+  calendarLooked = false,
+  lifeHubLooked = false,
+  cooledKinds = new Set(),
+  model = null
+}) {
   const { hostedProjects, hostedTasks } = hostedOf(goal, projects, tasks);
   const stamps = [goal.updated_at, ...hostedTasks.flatMap(t => [t.completed_at, t.updated_at])]
     .filter(stamp => typeof stamp === 'string' && stamp)
@@ -181,9 +230,35 @@ export function buildGoalRead({ goal, projects = [], tasks = [], terms = [], tod
   const perWeek = goal.lead_measure?.per_week ?? null;
   const crunch = crunchWeeks(tasks, terms, today);
   const skip = new Set(dismissed);
-  const ghosts = proposals({ goal, hostedTasks, tasks, today, crunch, domain: SPHERE_DOMAIN[goal.sphere] ?? 'life' })
-    .filter(ghost => !skip.has(ghost.id))
-    .slice(0, MAX_GHOSTS);
+  const domain = SPHERE_DOMAIN[goal.sphere] ?? 'life';
+
+  let ghosts = proposals({ goal, hostedTasks, tasks, today, crunch, domain })
+    .filter(ghost => !skip.has(ghost.id) && !cooledKinds.has(ghost.kind));
+
+  const block = protectBlockProposal({ goal, hostedTasks, today, slots, count, perWeek });
+  if (block && !skip.has(block.id) && !cooledKinds.has('protect_block')) {
+    ghosts = [block, ...ghosts];
+  }
+  ghosts = ghosts.slice(0, MAX_GHOSTS);
+
+  let verdict = verdictFor({ days, temperature, count, perWeek, crunch });
+  let bindingFlag = false;
+  if (binding && goal.signal?.source === 'binding_goal') {
+    const row = binding.rows?.find?.(r => r.id === goal.signal.row) ?? null;
+    if (row?.detail) verdict = `${verdict} ${row.detail}`;
+    if (binding.bindingId && goal.id === binding.bindingId) bindingFlag = true;
+  }
+
+  const modelWritten = model && typeof model.verdict === 'string' && model.verdict.trim();
+  if (modelWritten) verdict = model.verdict.trim().slice(0, 240);
+
+  // Content-aware splits from the model replace template steps on split_task ghosts.
+  if (model?.split_steps?.length >= 3) {
+    ghosts = ghosts.map(g =>
+      g.kind === 'split_task' ? { ...g, steps: model.split_steps.slice(0, 5) } : g
+    );
+  }
+
   return {
     goal_id: goal.id,
     computed_on: today,
@@ -192,12 +267,18 @@ export function buildGoalRead({ goal, projects = [], tasks = [], terms = [], tod
     days_since_movement: days,
     week: { count, per_week: perWeek },
     crunch_weeks: crunch,
-    verdict: verdictFor({ days, temperature, count, perWeek, crunch }),
+    verdict,
+    verdict_source: modelWritten ? 'model' : 'deterministic',
+    model_fallback: model?.fallback === true,
+    binding: bindingFlag,
+    signal_detail: binding?.rows?.find?.(r => r.id === goal.signal?.row)?.detail ?? null,
     looked_at: [
       'Progress',
       ...(perWeek ? ['Lead measure'] : []),
       'Due dates',
-      ...(terms.length ? ['Term rhythm'] : []),
+      ...(terms.length ? ['Due-date load'] : []),
+      ...(calendarLooked ? ['Calendar'] : []),
+      ...(lifeHubLooked ? ['Life Hub'] : []),
       'Stall check',
       ...(hostedProjects.length ? ['Linked projects'] : [])
     ],

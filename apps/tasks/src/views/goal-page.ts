@@ -232,6 +232,24 @@ function paint(
         label: LIFE_AREAS.find((a) => a.id === goal.life_area)?.label ?? 'Life area',
         choices: [{ value: '', label: 'None' }, ...LIFE_AREAS.map((a) => ({ value: a.id, label: a.label }))],
         onSave: (value) => void save({ life_area: (value || null) as GoalLifeArea | null })
+      }),
+      closedChip({
+        title: 'Signal',
+        value: goal.signal?.row ?? '',
+        label: goal.signal ? `Signal · ${goal.signal.row}` : 'Life Hub signal',
+        choices: [
+          { value: '', label: 'None' },
+          { value: 'weight', label: 'Weight' },
+          { value: 'fat', label: 'Body fat' },
+          { value: 'ratio', label: 'Shoulder:waist' },
+          { value: 'lift', label: 'Lift' }
+        ],
+        onSave: (value) =>
+          void save({
+            signal: value
+              ? { source: 'binding_goal', row: value as 'weight' | 'fat' | 'ratio' | 'lift' }
+              : null
+          })
       })
     );
   }

@@ -11,6 +11,11 @@ import {
   parseTermQuery,
   termRefsFromHubPrefs
 } from './_shared/goal-term-filter.mjs';
+import {
+  cooledKindsFromDecisions,
+  decisionsKey,
+  quietLinesForCooled
+} from './_shared/goal-dismissal-learn.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
 
 export const config = { path: '/api/goal-reads' };
@@ -49,15 +54,90 @@ export function staleReason(cached, { today, basis }) {
   return null;
 }
 
-export async function readForGoal(store, goal, inputs, { today, force = false }) {
+export async function readForGoal(store, goal, inputs, {
+  today,
+  force = false,
+  slots = [],
+  binding = null,
+  calendarLooked = false,
+  lifeHubLooked = false,
+  cooledKinds = new Set(),
+  model = null
+} = {}) {
   const cached = await getJSON(store, goalReadKey(goal.id));
   const basis = basisUpdatedAt(goal, inputs.projects, inputs.tasks);
   const reason = force ? 'manual' : staleReason(cached, { today, basis });
   if (!reason) return { read: cached.read, reason: cached.reason ?? 'daily' };
   const dismissed = Array.isArray(cached?.dismissed) ? cached.dismissed : [];
-  const read = buildGoalRead({ goal, projects: inputs.projects, tasks: inputs.tasks, terms: inputs.terms, today, dismissed });
-  await setJSON(store, goalReadKey(goal.id), { read, dismissed, reason });
+  let read = buildGoalRead({
+    goal,
+    projects: inputs.projects,
+    tasks: inputs.tasks,
+    terms: inputs.terms,
+    today,
+    dismissed,
+    slots,
+    binding,
+    calendarLooked,
+    lifeHubLooked,
+    cooledKinds,
+    model: null
+  });
+  // G-32: one Haiku call per recompute; fall back silently.
+  try {
+    const { fetchVerdictModel } = await import('./_shared/goal-verdict-model.mjs');
+    const model = await fetchVerdictModel({ read, goal });
+    if (model && !model.fallback) {
+      read = buildGoalRead({
+        goal,
+        projects: inputs.projects,
+        tasks: inputs.tasks,
+        terms: inputs.terms,
+        today,
+        dismissed,
+        slots,
+        binding,
+        calendarLooked,
+        lifeHubLooked,
+        cooledKinds,
+        model
+      });
+    } else if (model?.fallback) {
+      read = { ...read, model_fallback: true, verdict_source: 'deterministic' };
+    }
+  } catch (err) {
+    console.warn('goal-reads: model verdict skipped', err?.message ?? err);
+    read = { ...read, model_fallback: true, verdict_source: 'deterministic' };
+  }
+  await setJSON(store, goalReadKey(goal.id), {
+    read,
+    dismissed,
+    reason,
+    stuck_reason: cached?.stuck_reason ?? null
+  });
   return { read, reason };
+}
+
+async function loadHammondExtras(store, deps = {}) {
+  const decisionsDoc = await getJSON(store, decisionsKey()).catch(() => null);
+  const cooledKinds = cooledKindsFromDecisions(decisionsDoc?.decisions ?? []);
+  const quiet = quietLinesForCooled(cooledKinds);
+  let slots = [];
+  let binding = null;
+  let calendarLooked = false;
+  let lifeHubLooked = false;
+  if (typeof deps.loadCalendarContext === 'function') {
+    try {
+      const ctx = await deps.loadCalendarContext();
+      slots = Array.isArray(ctx?.slots) ? ctx.slots : [];
+      binding = ctx?.binding ?? null;
+      calendarLooked = Boolean(ctx?.calendarLooked);
+      lifeHubLooked = Boolean(ctx?.lifeHubLooked);
+    } catch (err) {
+      console.warn('goal-reads: calendar context skipped', err?.message ?? err);
+    }
+  }
+  return { slots, binding, calendarLooked, lifeHubLooked, cooledKinds, quiet };
 }
 
 /** Active goals for the landing strip: selected term, or current term + Ongoing. */
@@ -76,6 +156,7 @@ export function createGoalReadsHandler(deps = {}) {
     const { env, store } = context;
     try {
       const today = getSydneyDateKey(new Date(now()));
+      const extras = await loadHammondExtras(store, deps);
       if (request.method === 'GET') {
         const inputs = await loadGoalInputs(store);
         const url = new URL(request.url);
@@ -83,7 +164,8 @@ export function createGoalReadsHandler(deps = {}) {
         if (goalId) {
           const goal = inputs.goals.find(item => item.id === goalId);
           if (!goal) return withCors(errorResponse(404, 'not_found', 'Goal not found', false), request, env);
-          return withCors(okResponse(200, await readForGoal(store, goal, inputs, { today })), request, env);
+          const result = await readForGoal(store, goal, inputs, { today, ...extras });
+          return withCors(okResponse(200, { ...result, quiet: extras.quiet }), request, env);
         }
         const filtered = goalsForTermFilter(inputs.goals, {
           termQuery: url.searchParams.get('term'),
@@ -92,18 +174,25 @@ export function createGoalReadsHandler(deps = {}) {
         });
         const reads = [];
         for (const goal of filtered) {
-          reads.push(await readForGoal(store, goal, inputs, { today }));
+          reads.push(await readForGoal(store, goal, inputs, { today, ...extras }));
         }
-        return withCors(okResponse(200, { reads }), request, env);
+        return withCors(okResponse(200, { reads, quiet: extras.quiet }), request, env);
       }
       if (request.method === 'POST') {
         const parsed = await readJsonObject(request);
         if (parsed.error) return withCors(parsed.error, request, env);
+        // G-33 undo cooldown
+        if (parsed.value?.action === 'undo_cooldown' && typeof parsed.value.kind === 'string') {
+          const { clearKindCooldown } = await import('./_shared/goal-dismissal-learn.mjs');
+          await clearKindCooldown(store, parsed.value.kind, { getJSON, setJSON });
+          return withCors(okResponse(200, { ok: true, kind: parsed.value.kind }), request, env);
+        }
         const goalId = typeof parsed.value.goal_id === 'string' ? parsed.value.goal_id : '';
         const inputs = await loadGoalInputs(store);
         const goal = inputs.goals.find(item => item.id === goalId);
         if (!goal) return withCors(errorResponse(404, 'not_found', 'Goal not found', false), request, env);
-        return withCors(okResponse(200, await readForGoal(store, goal, inputs, { today, force: true })), request, env);
+        const result = await readForGoal(store, goal, inputs, { today, force: true, ...extras });
+        return withCors(okResponse(200, { ...result, quiet: extras.quiet }), request, env);
       }
       return withCors(methodNotAllowed('GET, POST, OPTIONS'), request, env);
     } catch {

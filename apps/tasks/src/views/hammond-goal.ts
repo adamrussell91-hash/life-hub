@@ -77,13 +77,23 @@ function renderPanel(host: HTMLElement, goal: Goal, envelope: GoalReadEnvelope, 
   who.append(avatar(), copy);
   root.append(who);
   if (read) {
-    root.append(el('p', 'hammond__read', read.verdict));
+    const verdict = el('p', 'hammond__read', read.verdict);
+    if (read.verdict_source === 'model') {
+      const mark = el('span', 'hammond__ai', '✦');
+      mark.title = 'Written by Hammond (AI)';
+      verdict.prepend(mark, document.createTextNode(' '));
+    }
+    root.append(verdict);
     const looked = el('div', 'hammond__looked');
     read.looked_at.forEach((label) => looked.append(el('span', '', label)));
     root.append(looked, el('p', 'hammond__head', 'Proposals · nothing changes until you confirm'));
-    if (read.ghosts.length === 0) root.append(el('p', 'hammond__why', 'Nothing to propose right now.'));
+    if (read.ghosts.length === 0) root.append(el('p', 'hammond__why', 'Nothing to propose right now. Keep going.'));
     read.ghosts.forEach((ghost) => root.append(confirmCard(ghost, onApplied)));
   }
+  const ask = el('a', 'btn btn--ghost hammond__ask', 'Ask Hammond about this goal…') as HTMLAnchorElement;
+  const move = goal.next_start ? ` Next move: ${goal.next_start}.` : '';
+  ask.href = `#/clare?agent=hammond&prompt=${encodeURIComponent(`Help me with “${goal.title}”.${move}`)}`;
+  root.append(ask);
   host.replaceChildren(root);
 }
 
