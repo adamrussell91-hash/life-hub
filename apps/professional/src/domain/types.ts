@@ -76,13 +76,11 @@ export interface OrganisationRecord {
   display_name: string;
   legal_name: string | null;
   aliases: string[];
-  /** R2 object key for the org crest (people redesign Phase 1), or null. */
+  /** R2 object key for the org crest; null until uploaded. */
   logo_key: string | null;
   lifecycle_status: string;
   retention_reason: string | null;
   retention_review_at: string | null;
-  /** R2 object key for crest image; null until uploaded. */
-  logo_key?: string | null;
   created_at: string;
   updated_at: string;
 }
