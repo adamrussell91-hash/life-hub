@@ -47,3 +47,17 @@ test('goalMatchesTermFilter keeps the selected term and Ongoing when defaulting'
   assert.equal(goalMatchesTermFilter({ term: { year: 2026, term: 3 } }, selected, { includeOngoing: true }), false);
   assert.equal(goalMatchesTermFilter({ term: null }, selected, { includeOngoing: false }), false);
 });
+
+test('goalsForTermFilter: explicit term excludes Ongoing; default includes it', () => {
+  const goals = [
+    { id: 'a', status: 'active', term: { year: 2026, term: 4 } },
+    { id: 'b', status: 'active', term: null },
+    { id: 'c', status: 'active', term: { year: 2026, term: 3 } },
+    { id: 'd', status: 'parked', term: { year: 2026, term: 4 } }
+  ];
+  const refs = termRefsFromHubPrefs(PREFS);
+  const explicit = goalsForTermFilter(goals, { termQuery: '2026-4', termRefs: refs, today: '2026-11-04' });
+  assert.deepEqual(explicit.map(g => g.id), ['a']);
+  const defaults = goalsForTermFilter(goals, { termQuery: null, termRefs: refs, today: '2026-11-04' });
+  assert.deepEqual(defaults.map(g => g.id).sort(), ['a', 'b']);
+});
