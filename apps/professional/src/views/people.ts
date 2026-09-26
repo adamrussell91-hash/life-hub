@@ -345,7 +345,8 @@ export async function renderPeoplePage(
   sheet.setAttribute('aria-label', 'Filters');
   const sheetInner = el('div', 'people-page__sheet-inner');
   sheet.append(sheetInner);
-  dir.append(sheet);
+  // Fixed overlay on the page root so the sheet is not clipped by the directory card.
+  root.append(sheet);
 
   const sortMenu = el('div', 'people-page__menu');
   sortMenu.hidden = true;
