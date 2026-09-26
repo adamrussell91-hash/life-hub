@@ -525,8 +525,14 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       host.innerHTML = intake(selected, frequencyGate ?? "");
       const prompt = host.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
       const mode = host.querySelector<HTMLSelectElement>('select[name="mode"]');
+      const hint = host.querySelector<HTMLElement>("[data-protocol-mode-hint]");
       if (prompt && lastPrompt) prompt.value = lastPrompt;
       if (mode && lastMode) mode.value = lastMode;
+      if (mode && hint) {
+        const text = modeHintText(selected.modes.find(entry => entry.id === mode.value));
+        hint.textContent = text;
+        hint.hidden = !text;
+      }
     } else {
       host.innerHTML = `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
     }
