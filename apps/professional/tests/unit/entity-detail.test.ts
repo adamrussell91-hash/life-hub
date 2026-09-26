@@ -576,7 +576,7 @@ describe('renderPersonPage', () => {
     expect(card?.querySelector('.person-card__kicker')?.textContent).toBe('Employee');
     expect(card?.querySelector('.person-card__org')?.textContent).toBe('Example University');
     expect(card?.querySelector('.person-card__status')?.textContent).toBe('Active');
-    expect(card?.querySelector('.person-card__brief')?.getAttribute('href')).toContain('/brief');
+    expect(card?.querySelector('.person-card__brief')?.getAttribute('href')).toContain('/people/');
   });
 
   it('saving a role edit calls change_role and reloads the overview', async () => {

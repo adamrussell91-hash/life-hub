@@ -12,7 +12,7 @@ const MUTUAL_ID = 'person_00000000-0000-4000-8000-000000000002';
 function briefFixture(overrides: Partial<PersonBrief> = {}): PersonBrief {
   return {
     header: {
-      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Dr Vicky Leighton', href: `/professional/#/person/${PERSON_ID}` },
+      person: { ref: `shared:person:${PERSON_ID}`, display_name: 'Dr Vicky Leighton', href: `/professional/#/people/${PERSON_ID}` },
       role: 'Senior Lecturer',
       organisation: {
         ref: 'shared:organisation:organisation_00000000-0000-4000-8000-000000000099',
@@ -37,7 +37,7 @@ function briefFixture(overrides: Partial<PersonBrief> = {}): PersonBrief {
       { kind: 'task', label: 'Research proposal', href: '#/task/task_b', status: 'in_progress' }
     ],
     mutual_connections: [
-      { ref: `shared:person:${MUTUAL_ID}`, display_label: 'Nina Fraser', href: `#/person/${MUTUAL_ID}` }
+      { ref: `shared:person:${MUTUAL_ID}`, display_label: 'Nina Fraser', href: `#/people/${MUTUAL_ID}` }
     ],
     ...overrides
   };
@@ -133,13 +133,13 @@ describe('renderPersonBrief', () => {
     await renderPersonBrief(canvas, PERSON_ID);
 
     const closeLink = canvas.querySelector<HTMLAnchorElement>('.person-brief__close')!;
-    expect(closeLink.getAttribute('href')).toBe(`#/person/${PERSON_ID}`);
+    expect(closeLink.getAttribute('href')).toBe(`#/people/${PERSON_ID}`);
 
     const openProfile = [...canvas.querySelectorAll('a')].find((a) => a.textContent === 'Open full profile')!;
-    expect(openProfile.getAttribute('href')).toBe(`#/person/${PERSON_ID}`);
+    expect(openProfile.getAttribute('href')).toBe(`#/people/${PERSON_ID}`);
 
     const mutualLink = [...canvas.querySelectorAll('a')].find((a) => a.textContent === 'Nina Fraser')!;
-    expect(mutualLink.getAttribute('href')).toBe(`#/person/${MUTUAL_ID}`);
+    expect(mutualLink.getAttribute('href')).toBe(`#/people/${MUTUAL_ID}`);
   });
 
   it('Snooze shows an honest not-built-yet state on click, never a fake success', async () => {

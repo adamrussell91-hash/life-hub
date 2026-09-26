@@ -221,7 +221,7 @@ describe('mountRelationalSearchPanel', () => {
     expect(resultItem).not.toBeNull();
     const link = resultItem.querySelector<HTMLAnchorElement>('.relational-search__result-name')!;
     expect(link.textContent).toBe('Alice Example');
-    expect(link.getAttribute('href')).toBe(`#/person/${PERSON_ALICE}`);
+    expect(link.getAttribute('href')).toBe(`#/people/${PERSON_ALICE}`);
 
     const reasons = [...resultItem.querySelectorAll('.relational-search__result-reasons li')].map((li) => li.textContent);
     expect(reasons).toEqual(['Employed at UNSW', "Observation mentions 'gifted education'"]);
@@ -314,7 +314,7 @@ describe('mountRelationalSearchPanel', () => {
     expect(resultItem).not.toBeNull();
     const link = resultItem.querySelector<HTMLAnchorElement>('.relational-search__result-name')!;
     expect(link.textContent).toBe('Alice Example');
-    expect(link.getAttribute('href')).toBe(`#/person/${PERSON_ALICE}`);
+    expect(link.getAttribute('href')).toBe(`#/people/${PERSON_ALICE}`);
   });
 
   it('"Ask a question" shows an honest "not configured" message on a 503 people_relational_search_nl_unbound', async () => {
