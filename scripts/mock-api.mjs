@@ -639,6 +639,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/work-blocks' && request.method === 'GET') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty work blocks so Tasks kit calendar mounts under the mock server.
+      json(response, 200, { ok: true, data: { work_blocks: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
     if ((url.pathname === '/api/tasks' || url.pathname === '/api/projects') && request.method === 'GET') {
       if (!readSession(request)) return unauthenticated(response);
       const index = await taskStore.get(TASKS_INDEX_KEY, { type: 'json' });
@@ -666,6 +673,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         json(response, 200, { ok: true, data: { tasks } });
         return true;
       }
+      // Unbound store — empty lists so Tasks kit calendar browser proofs can mount.
+      if (url.pathname === '/api/projects') {
+        json(response, 200, { ok: true, data: { projects: [] } }, PRIVATE_HEADERS);
+        return true;
+      }
+      json(response, 200, { ok: true, data: { tasks: [] } }, PRIVATE_HEADERS);
+      return true;
     }
 
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||

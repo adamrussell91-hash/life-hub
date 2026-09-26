@@ -13,7 +13,7 @@ import { tasksApi } from '@/services/client-api';
 import {
   getCalendarGhostBlocks,
   getCalendarGhostBlocksForProposal
-} from '@/views/calendar';
+} from '@/views/calendar-ghosts-session';
 import { detectStaleScheduleCollisions } from '@/domain/schedule-compose';
 import { ApiClientError } from '@/api/client';
 import { createDecisionStackCard } from '../../design-kit/js/agent-productivity-cards.js';

@@ -23,7 +23,7 @@ import { ApiClientError } from '@/api/client';
 import {
   setCalendarGhostBlocksForProposal,
   clearCalendarGhostBlocksForProposal
-} from '@/views/calendar';
+} from '@/views/calendar-ghosts-session';
 import type { WorkBlock } from '@/schemas/work-block';
 import { agentBySlug, DEFAULT_AGENT_SLUG, type ChatAgentSlug } from '@/chat/agents';
 import { paintProtocolTrays } from '@/chat/build-chat-view';

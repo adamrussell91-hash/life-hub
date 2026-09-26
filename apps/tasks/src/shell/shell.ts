@@ -757,13 +757,11 @@ export function parseHashRoute(): HubViewId {
   return KNOWN_VIEWS.includes(id) ? id : 'board';
 }
 
-// Classic Tasks calendar (week/month) until Step 6. Kit Term/Year/Almanac are a separate surface.
-const CALENDAR_VIEWS = new Set<HubViewId>(['week', 'month']);
-const KIT_CALENDAR_VIEWS = new Set<HubViewId>(['term', 'year', 'almanac']);
+// Locked kit calendar — Day / Week / Term / Year / Almanac share one mount (Month redirects to Week).
+const KIT_CALENDAR_VIEWS = new Set<HubViewId>(['day', 'week', 'month', 'term', 'year', 'almanac']);
 
-/** Shared paint surface — week/month stay on one calendar, query-only changes stay on the same view. */
+/** Shared paint surface — kit zoom stops soft-nav without remounting. */
 export function viewSurface(view: HubViewId): string {
-  if (CALENDAR_VIEWS.has(view)) return 'calendar';
   if (KIT_CALENDAR_VIEWS.has(view)) return 'kit-calendar';
   return view;
 }

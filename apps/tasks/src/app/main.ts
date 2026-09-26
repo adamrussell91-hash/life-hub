@@ -59,13 +59,11 @@ import { renderSomedayOdysseyView } from '@/views/someday-odyssey';
 import { renderArchiveView } from '@/views/archive';
 import { renderProgramsView } from '@/views/programs';
 import {
-  renderDayView,
   renderListView,
   renderSearchView,
   renderTemplatesView
 } from '@/views/dashboard';
 import { renderProjectsView } from '@/views/projects';
-import { renderWeekView, renderMonthView } from '@/views/calendar';
 import { mountTasksCalendar, unmountTasksCalendar } from '@/views/hub-calendar';
 import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { renderPageEditor } from '@/views/page-editor';
@@ -121,11 +119,8 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
     case 'branch':
       return renderGraphView(canvas);
     case 'day':
-      return renderDayView(canvas);
     case 'week':
-      return renderWeekView(canvas);
     case 'month':
-      return renderMonthView(canvas);
     case 'term':
     case 'year':
     case 'almanac': {

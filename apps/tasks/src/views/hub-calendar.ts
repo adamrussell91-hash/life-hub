@@ -1,12 +1,12 @@
 /**
  * Tasks hub calendar adapter — default filter, band fills, routeFor, mount only.
  * No calendar CSS or renderer logic outside packages/design-kit.
- * Shell wiring (replace calendar.ts) is Step 6; this file is the Step 3 contract.
  */
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
 import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../../design-kit/js/calendar/hub-calendar-zoom.js';
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { taskPageHash } from '@/domain/cards';
+import { tasksApi } from '@/services/client-api';
 
 export const TASKS_CALENDAR_FILLS = {
   after: 'work'
@@ -34,6 +34,40 @@ function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   return fetch(path, { credentials: 'include', ...(init ?? {}) });
 }
 
+function itemType(item: unknown): string {
+  const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+  const record = row?.record && typeof row.record === 'object' ? (row.record as Record<string, unknown>) : null;
+  return String(record?.type || row?.source || row?.kind || '');
+}
+
+function itemId(item: unknown): string {
+  const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+  const record = row?.record && typeof row.record === 'object' ? (row.record as Record<string, unknown>) : null;
+  return String(record?.id || row?.id || '');
+}
+
+async function rescheduleItem(
+  item: unknown,
+  patch: { date: string; start_time?: string | null }
+): Promise<void> {
+  const id = itemId(item);
+  if (!id || !patch.date) return;
+  const type = itemType(item);
+  if (type === 'work_block') {
+    await tasksApi.updateWorkBlock(id, {
+      date: patch.date,
+      ...(patch.start_time !== undefined ? { start_time: patch.start_time } : {})
+    });
+    return;
+  }
+  if (type === 'task' || type === 'deadline') {
+    await tasksApi.updateTask(id, {
+      due_date: patch.date,
+      ...(patch.start_time !== undefined ? { due_time: patch.start_time } : {})
+    });
+  }
+}
+
 let handle: HubCalendarHandle | null = null;
 
 /** Mount the locked kit calendar. Zoom follows `#/day|week|term|year|almanac`. */
@@ -45,11 +79,16 @@ export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
     defaultFilter: defaultFilterForHub('tasks'),
     routeFor: tasksRouteFor,
     apiFetch,
+    onReschedule: (item, patch) => rescheduleItem(item, patch),
     getZoom: () =>
       parseCalendarZoom({ pathname: location.pathname, hash: location.hash }, 'tasks') || 'week',
     setZoom: (zoom) => {
       const href = calendarZoomHref('tasks', normalizeCalendarZoom(zoom));
       if (location.hash !== href) location.hash = href;
+    },
+    onNavigate: (href) => {
+      if (href.startsWith('#')) location.hash = href;
+      else location.assign(href);
     }
   });
   return handle;
