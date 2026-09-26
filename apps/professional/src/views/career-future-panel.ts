@@ -4,6 +4,7 @@ import { searchEntities } from '@/api/entities';
 import { createTask, createUniversalLink } from '@/api/universal-links';
 import { careerCardRoute, careerFutureRoute } from '@/app/router';
 import type { buildCareerModel } from '@/domain/career-model';
+import { selectGhostPaths } from '@/domain/career-ghost-paths';
 import { branchColour } from '@/domain/career-river-geometry';
 
 type CareerModel = ReturnType<typeof buildCareerModel>;
@@ -243,9 +244,28 @@ export function renderFutureDetail(
   panel.append(stonesList);
 
   panel.append(el('h3', 'career-future__subhead', 'People who got there'));
-  panel.append(
-    el('p', 'empty-state', 'Ghost paths from people who held this role land in Phase 7.')
-  );
+  const ghosts = selectGhostPaths([], {
+    title: future.title,
+    aliases: future.aliases
+  });
+  if (!ghosts.length) {
+    panel.append(
+      el('p', 'empty-state', 'Nobody in your Network holds this role yet.')
+    );
+  } else {
+    const list = el('ul', 'career-future__ghosts');
+    for (const person of ghosts) {
+      const li = document.createElement('li');
+      li.className = 'career-future__ghost';
+      li.append(el('strong', null, person.display_name));
+      const route = person.route_labels.length
+        ? person.route_labels.join(' → ')
+        : person.role;
+      li.append(el('p', 'career-page__meta', route));
+      list.append(li);
+    }
+    panel.append(list);
+  }
 
   const edit = el('button', 'btn btn--ghost', 'Edit future') as HTMLButtonElement;
   edit.type = 'button';

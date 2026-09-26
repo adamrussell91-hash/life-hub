@@ -22,7 +22,7 @@ import {
 import { listBlobKeys, isIndexKey } from './blobs-list.mjs';
 import { defaultGetUniversalLinkStore } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
-import { skillsScanPrompt } from './career-prompts.mjs';
+import { skillsScanPrompt, spottedFuturePrompt } from './career-prompts.mjs';
 
 const RATE_LIMIT_MS = 10 * 60 * 1000;
 const WINDOW_CAP_DAYS = 21;
@@ -458,12 +458,83 @@ export async function runCareerScanPass(deps = {}) {
   };
   await setJSON(store, CAREER_SCAN_STATE_KEY, nextState);
 
+  // Phase 8: Ann spotted a future (after drafting)
+  let spotted = null;
+  const nowMs = Date.parse(nowIso);
+  if (apiKey && !deps.skipModel) {
+    try {
+      const achievements = await careerRepo.listAchievements();
+      const recent = achievements.filter((a) => {
+        const t = Date.parse(a.occurred_on);
+        return Number.isFinite(t) && nowMs - t < 18 * 30 * 86400000;
+      });
+      const body = {
+        model: MODEL,
+        max_tokens: 800,
+        messages: [
+          {
+            role: 'user',
+            content: spottedFuturePrompt({
+              ledgerSummary: recent.map((a) => ({ id: a.id, title: a.title, skills: a.skills })),
+              existingTitles: futures.map((f) => f.title)
+            })
+          }
+        ]
+      };
+      const response = await (deps.fetchImpl ?? fetch)('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        const json = await response.json();
+        const text = Array.isArray(json?.content)
+          ? json.content.map((p) => p?.text ?? '').join('')
+          : '';
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+          const parsed = JSON.parse(text.slice(start, end + 1));
+          if (parsed && !parsed.none && typeof parsed.title === 'string') {
+            spotted = await careerRepo.createFuture({
+              title: parsed.title.trim().slice(0, 200),
+              where: parsed.where ?? null,
+              aliases: Array.isArray(parsed.aliases) ? parsed.aliases.slice(0, 8) : [],
+              criteria: Array.isArray(parsed.criteria)
+                ? parsed.criteria.slice(0, 8).map((c, i) => ({
+                    text: String(c.text || '').slice(0, 500),
+                    order: i,
+                    source: 'ann'
+                  }))
+                : [],
+              status: 'suggested',
+              suggested_reason: typeof parsed.suggested_reason === 'string'
+                ? parsed.suggested_reason.slice(0, 1000)
+                : 'Ann spotted this from your ledger.',
+              colour_slot: Math.min(6, futures.length + 1),
+              lane_order: futures.length,
+              target_date: null,
+              dismissed_until: null
+            });
+          }
+        }
+      }
+    } catch {
+      spotted = null;
+    }
+  }
+
   const pending = await listScanProposals(store, { status: 'pending' });
   return {
     skipped: false,
     sources: sources.length,
     saved: saved.length,
     pending_count: pending.length,
+    spotted_future: spotted,
     scan_state: nextState,
     next_scan_label: nextSundayLabel(nowValue instanceof Date ? nowValue : new Date(nowIso))
   };

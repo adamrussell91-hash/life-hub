@@ -376,21 +376,31 @@ describe('renderCareerView', () => {
   });
 
   it('links application items to Career application routes', async () => {
-    globalThis.fetch = vi.fn(async () =>
-      Response.json({
-        ok: true,
-        data: {
-          applications: {
-            status: 'ok',
-            items: [
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/applications')) {
+        return Response.json({
+          ok: true,
+          data: {
+            applications: [
               {
                 id: VALID_APPLICATION_ID,
                 position_title: 'Classroom Teacher',
                 pipeline_status: 'drafting',
-                href: `/professional/#/career/application/${VALID_APPLICATION_ID}`
+                closing_date: null,
+                selection_criteria: [],
+                organisation: null,
+                outcome: { status: 'pending', date: null, offer_details: null, reason: null },
+                reflection: null
               }
             ]
-          },
+          }
+        });
+      }
+      return Response.json({
+        ok: true,
+        data: {
+          applications: { status: 'ok', items: [] },
           employment: { status: 'ok', items: [] },
           professional_development: { status: 'ok', items: [] },
           people: { status: 'ok', items: [] },
@@ -398,10 +408,11 @@ describe('renderCareerView', () => {
           deferred: ['publication', 'presentation'],
           achievements: [],
           futures: [],
-          stones: []
+          stones: [],
+          scan: { pending_count: 0, last_run_at: null }
         }
-      })
-    );
+      });
+    });
     const canvas = document.createElement('div');
     await renderCareerView(canvas);
     const link = [...canvas.querySelectorAll('a')].find((a) =>

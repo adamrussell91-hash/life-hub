@@ -186,22 +186,51 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 6: Applications + Criteria Mirror
 
-**Status:** pending
+**Status:** done (core) / referees partial (2026-09-26)
+**Checked:** L1 I4 D5 V4 W1 W2
+
+- Applications section loads live `listApplications`; active/past split; match % from model; **Open Criteria Mirror**
+- Criteria Mirror: ad textarea, confirm-before-write split into criteria, criterion rows with % bar, gap → stepping stone + task
+- Past apps: outcome + feedback quote + Turn feedback into a stepping stone
+- Named test: `applications-career.test.ts` (listApplications mock)
+
+**Partial:** Referee ranking / briefing (6.3) and `answers_criterion` suggestion chips not fully wired; coverage bars stay 0 until answers links exist.
+
+**Must:** Open Criteria Mirror; applications on Career with match label when model has answers.
+**Must-not:** Auto-write criteria without confirm.
+**Verify:** unit test links Classroom Teacher to career application route.
 
 ---
 
 ## Phase 7: Ghost paths
 
-**Status:** pending
+**Status:** done (matching + panel) / river draw partial (2026-09-26)
+**Checked:** D5 W2
+
+- `career-ghost-paths.ts` normalize/match/select (≤3)
+- Future panel "People who got there" uses matcher; empty copy per plan
+- Named test: `career-ghost-paths.test.ts`
+
+**Partial:** Dotted river ghost paths + coffee-note draft need Network people with current `employee_at` fed into the model (overview people not yet projected as ghost candidates).
 
 ---
 
 ## Phase 8: Ann spotted a future
 
-**Status:** pending
+**Status:** done (scan hook) (2026-09-26)
+**Checked:** agent-context-integrity W1
+
+- After Skills scan drafting, `spottedFuturePrompt` may create a `suggested` future
+- Suggested branches already draw dotted on the river (Phase 3)
 
 ---
 
 ## Phase 9: What if
 
-**Status:** pending
+**Status:** done (shell) / moves keep partial (2026-09-26)
+**Checked:** V4 I3
+
+- What if… section on Career; shows `what_if_deltas` from model when moves are active
+- `career-moves` keep/coverage still thin — deltas light up once moves exist
+
+**Remaining polish:** 1440/390 screenshots, hub-ui-guardian, 5.6 Career evidence inverse lists, referee briefings.

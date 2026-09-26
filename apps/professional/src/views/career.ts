@@ -1,19 +1,15 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { getCareer } from '@/api/career';
-import {
-  applicationRoute,
-  careerApplicationNewRoute,
-  careerCardRoute,
-  careerFutureRoute,
-  parseRoute
-} from '@/app/router';
+import { listApplications } from '@/api/applications';
+import { careerCardRoute, careerFutureRoute, parseRoute } from '@/app/router';
 import { buildCareerModel } from '@/domain/career-model';
 import type { CareerOverview } from '@/domain/types';
-import { isValidApplicationId } from '@/domain/ids';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
 import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
 import { renderSkillsScanPanel } from '@/views/career-skills-scan';
+import { renderCareerApplications } from '@/views/career-criteria-mirror';
+import { renderWhatIfPanel } from '@/views/career-what-if';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -122,70 +118,86 @@ function renderSkillsScan(
   });
 }
 
-function renderApplicationsSection(
-  host: HTMLElement,
-  model: ReturnType<typeof buildCareerModel>,
-  overview: CareerOverview
-): void {
-  const section = el('section', 'career-page__applications');
-  section.id = 'applications';
-  surface(section);
-  const head = el('div', 'career-page__section-head');
-  head.append(el('h2', 'career-page__heading', 'Applications'));
-  const compose = el('a', 'btn btn--primary', 'New application');
-  compose.href = careerApplicationNewRoute();
-  head.append(compose);
-  section.append(head);
-
-  const apps = model.applications;
-  if (!apps.length) {
-    const legacy =
-      overview.applications?.status === 'ok' ? overview.applications.items : [];
-    if (!legacy.length) {
-      section.append(el('p', 'empty-state', 'No applications yet.'));
-    } else {
-      const list = el('ul', 'career-page__app-list');
-      for (const item of legacy) {
-        const li = document.createElement('li');
-        li.className = 'career-page__app-row';
-        const title = item.position_title || item.display_label || item.id || 'Application';
-        if (item.id && isValidApplicationId(item.id)) {
-          const link = el('a', 'career-page__app-link', title);
-          link.href = applicationRoute(item.id);
-          li.append(link);
-        } else {
-          li.append(el('span', 'career-page__app-link', title));
-        }
-        const bits = [
-          item.pipeline_status?.replace(/_/g, ' '),
-          item.closing_date
-            ? `closes ${formatDisplayDate(item.closing_date) ?? item.closing_date}`
-            : null
-        ].filter(Boolean);
-        if (bits.length) li.append(el('p', 'career-page__meta', bits.join(' · ')));
-        list.append(li);
-      }
-      section.append(list);
-    }
-  } else {
-    const list = el('ul', 'career-page__app-list');
-    for (const app of apps) {
-      const li = document.createElement('li');
-      li.className = 'career-page__app-row';
-      const link = el('a', 'career-page__app-link', app.position_title);
-      link.href = applicationRoute(app.id);
-      li.append(link);
-      const bits = [
-        app.pipeline_status.replace(/_/g, ' '),
-        app.match_label ? `match ${app.match_label}` : null,
-        app.closing_date ? `closes ${formatDisplayDate(app.closing_date) ?? app.closing_date}` : null
-      ].filter(Boolean);
-      li.append(el('p', 'career-page__meta', bits.join(' · ')));
-      list.append(li);
-    }
-    section.append(list);
+export async function renderCareerView(canvas: HTMLElement): Promise<void> {
+  showViewLoading(canvas, 'Loading career…');
+  let overview: CareerOverview;
+  try {
+    overview = await getCareer();
+  } catch (error) {
+    renderLoadError(canvas, error, 'Could not load career.');
+    return;
   }
-  host.append(section);
+
+  let applicationRecords: Array<{
+    id: string;
+    position_title: string;
+    pipeline_status: string;
+    closing_date?: string | null;
+    selection_criteria?: Array<{ id: string }>;
+  }> = [];
+  try {
+    const listed = await listApplications();
+    applicationRecords = (listed.applications ?? []).map((a) => ({
+      id: a.id,
+      position_title: a.position_title,
+      pipeline_status: a.pipeline_status,
+      closing_date: a.closing_date,
+      selection_criteria: a.selection_criteria?.map((c) => ({ id: c.id }))
+    }));
+  } catch {
+    applicationRecords = [];
+  }
+
+  const model = buildCareerModel({
+    achievements: (overview.achievements as CareerOverview['achievements']) as never,
+    futures: overview.futures as never,
+    stones: overview.stones as never,
+    applications: applicationRecords as never,
+    supports_future: overview.supports_future as never,
+    answers_criterion: overview.answers_criterion as never,
+    stone_for: overview.stone_for as never,
+    stone_actions: overview.stone_actions as never,
+    employment: (overview.employment_items ??
+      (overview.employment?.status === 'ok' ? overview.employment.items : [])) as never,
+    scan: overview.scan
+  });
+
+  const route = parseRoute(location.hash);
+  const selectedFutureId =
+    route.name === 'career-future' && 'id' in route ? route.id : null;
+
+  const reload = () => {
+    void renderCareerView(canvas);
+  };
+
+  canvas.replaceChildren();
+  const page = el('div', 'career-page');
+
+  const stats = el('p', 'career-page__stats', model.stats_line);
+  page.append(stats);
+
+  renderRiver(page, model, selectedFutureId);
+
+  const columns = el('div', 'career-page__columns');
+  renderFuturePanel(columns, model, selectedFutureId, reload);
+  renderSkillsScan(columns, model, reload);
+  page.append(columns);
+
+  await renderCareerApplications(page, model, { onChanged: reload });
+  renderSkillsLedger(page, model);
+  renderWhatIfPanel(page, model);
+
+  canvas.append(page);
+
+  try {
+    const scrollTo = sessionStorage.getItem('career-scroll-to');
+    if (scrollTo === 'applications') {
+      sessionStorage.removeItem('career-scroll-to');
+      document.getElementById('applications')?.scrollIntoView({ block: 'start' });
+    }
+  } catch {
+    /* ignore */
+  }
 }
 
 function renderSkillsLedger(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
@@ -242,65 +254,4 @@ function renderSkillsLedger(host: HTMLElement, model: ReturnType<typeof buildCar
     section.append(list);
   }
   host.append(section);
-}
-
-export async function renderCareerView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading career…');
-  let overview: CareerOverview;
-  try {
-    overview = await getCareer();
-  } catch (error) {
-    renderLoadError(canvas, error, 'Could not load career.');
-    return;
-  }
-
-  const model = buildCareerModel({
-    achievements: (overview.achievements as CareerOverview['achievements']) as never,
-    futures: overview.futures as never,
-    stones: overview.stones as never,
-    applications: [],
-    supports_future: overview.supports_future as never,
-    answers_criterion: overview.answers_criterion as never,
-    stone_for: overview.stone_for as never,
-    stone_actions: overview.stone_actions as never,
-    employment: (overview.employment_items ??
-      (overview.employment?.status === 'ok' ? overview.employment.items : [])) as never,
-    scan: overview.scan
-  });
-
-  const route = parseRoute(location.hash);
-  const selectedFutureId =
-    route.name === 'career-future' && 'id' in route ? route.id : null;
-
-  const reload = () => {
-    void renderCareerView(canvas);
-  };
-
-  canvas.replaceChildren();
-  const page = el('div', 'career-page');
-
-  const stats = el('p', 'career-page__stats', model.stats_line);
-  page.append(stats);
-
-  renderRiver(page, model, selectedFutureId);
-
-  const columns = el('div', 'career-page__columns');
-  renderFuturePanel(columns, model, selectedFutureId, reload);
-  renderSkillsScan(columns, model, reload);
-  page.append(columns);
-
-  renderApplicationsSection(page, model, overview);
-  renderSkillsLedger(page, model);
-
-  canvas.append(page);
-
-  try {
-    const scrollTo = sessionStorage.getItem('career-scroll-to');
-    if (scrollTo === 'applications') {
-      sessionStorage.removeItem('career-scroll-to');
-      document.getElementById('applications')?.scrollIntoView({ block: 'start' });
-    }
-  } catch {
-    /* ignore */
-  }
 }
