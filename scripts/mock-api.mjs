@@ -368,8 +368,27 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
-    if (url.pathname === '/api/curriculum' ||
-        url.pathname === '/api/search' ||
+    if (url.pathname === '/api/curriculum') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Minimal empty curriculum so Teaching SPA chrome + kit calendar can mount in browser proofs.
+      json(response, 200, {
+        ok: true,
+        data: {
+          years: [],
+          subjects: [],
+          units: [],
+          lessons: [],
+          classes: [],
+          scheduled_lessons: [],
+          scope_sequences: [],
+          media: [],
+          schedule_anchor_date: getSydneyDateKey(clock.now())
+        }
+      }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/search' ||
         url.pathname === '/api/outcomes' ||
         url.pathname.startsWith('/api/outcomes/') ||
         url.pathname === '/api/media/upload' ||
