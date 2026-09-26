@@ -892,8 +892,9 @@ function wire(section) {
     const zoom = target.closest?.('[data-zoom]');
     if (zoom) {
       const name = zoom.getAttribute('data-zoom');
-      // Term and Year are not built yet; Day is where we already are.
-      if (name === 'week' || name === 'almanac') input?.onSwitchView?.(name);
+      if (name === 'week' || name === 'term' || name === 'year' || name === 'almanac') {
+        input?.onSwitchView?.(name);
+      }
       return;
     }
     const arc = target.closest?.('.dd-arc[data-id]');

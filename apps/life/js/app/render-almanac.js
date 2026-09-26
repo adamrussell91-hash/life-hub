@@ -684,7 +684,7 @@ function paint(doc, host, view, options) {
     const button = event.target.closest?.('[data-zoom]');
     if (!button) return;
     const name = button.getAttribute('data-zoom');
-    if (name === 'day' || name === 'week') options.onSwitchView?.(name);
+    if (name === 'day' || name === 'week' || name === 'term' || name === 'year') options.onSwitchView?.(name);
   });
   wire(root);
   publish(win);

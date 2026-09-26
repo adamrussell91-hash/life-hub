@@ -818,7 +818,9 @@ function wire(section) {
     const zoom = target.closest?.('[data-zoom]');
     if (zoom) {
       const name = zoom.dataset.zoom;
-      if (name === 'day' || name === 'week' || name === 'almanac') input.onSwitchView?.(name);
+      if (name === 'day' || name === 'week' || name === 'term' || name === 'year' || name === 'almanac') {
+        input.onSwitchView?.(name);
+      }
       return;
     }
     const band = target.closest?.('[data-band]');

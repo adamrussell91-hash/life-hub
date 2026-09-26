@@ -5,6 +5,7 @@
  */
 import { bandsFromProfile, baseHeights, totalHeight } from '../../../../packages/design-kit/js/calendar-bands.js';
 import { formatDisplayDate, formatDisplayDateRange } from '../../../../packages/design-kit/js/format-display-date.js';
+import { isHoliday, mondayOf, termAt, toMs, weekLabel } from '../../../../packages/design-kit/js/school-time.js';
 import { capacityForDates, dayLoadHours, isOverCapacity, symptomsIn } from './capacity-model.js';
 
 const DAY_MS = 86_400_000;
@@ -26,41 +27,11 @@ const SUBS = {
   yours: 'home ~5:30 · the hours that count'
 };
 
-const toMs = key => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
 const utcDay = key => new Date(toMs(key)).getUTCDay();
 export const toHour = hhmm => Number(String(hhmm).slice(0, 2)) + Number(String(hhmm).slice(3, 5)) / 60;
 
-function mondayOf(key) {
-  const ms = toMs(key);
-  const dow = (new Date(ms).getUTCDay() + 6) % 7;
-  return new Date(ms - dow * DAY_MS).toISOString().slice(0, 10);
-}
-
-function termAt(key, terms) {
-  return (terms ?? []).find(term => key >= term.starts_on && key <= term.ends_on) ?? null;
-}
-
-function weekLabel(key, terms) {
-  if (!terms?.length) return null;
-  const term = termAt(key, terms);
-  if (term) {
-    const week = Math.floor((toMs(mondayOf(key)) - toMs(mondayOf(term.starts_on))) / (7 * DAY_MS)) + 1;
-    return `T${term.term} W${week}`;
-  }
-  const prev = [...terms].filter(t => t.ends_on < key).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
-  if (!prev) return null;
-  let start = mondayOf(new Date(toMs(prev.ends_on) + DAY_MS).toISOString().slice(0, 10));
-  while (termAt(start, terms)) {
-    start = new Date(toMs(start) + 7 * DAY_MS).toISOString().slice(0, 10);
-  }
-  const week = Math.floor((toMs(mondayOf(key)) - toMs(start)) / (7 * DAY_MS)) + 1;
-  if (week < 1) return null;
-  return `Hol W${week}`;
-}
-
 export function isSchoolHoliday(key, terms) {
-  if (!terms?.length) return false;
-  return termAt(key, terms) == null;
+  return isHoliday(key, terms ?? []);
 }
 
 export function movedCaption(date, terms) {

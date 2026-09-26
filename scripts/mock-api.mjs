@@ -469,6 +469,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       try {
         const seeded = await loadCalendarVisualSeed();
         clock.now = () => Date.parse(seeded.now);
+        // Drop Accept leftovers not in this seed (e.g. cb-g-bob) so a fresh seed is clean.
+        for (const path of [...confirmedFiles.keys()]) {
+          if ((path.startsWith('records/') || path === CALENDAR_VISUAL_PATH || path === PENDING_CALENDAR_GHOSTS_PATH)
+            && !seeded.files.has(path)) {
+            confirmedFiles.delete(path);
+          }
+        }
         for (const [path, content] of seeded.files) confirmedFiles.set(path, content);
         if (url.searchParams.get('clearGhosts') === '1') {
           const { serializePendingCalendarGhosts } = await import('../netlify/functions/calendar-ghosts.mjs');
