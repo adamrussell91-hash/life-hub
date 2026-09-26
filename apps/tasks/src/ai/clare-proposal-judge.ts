@@ -27,7 +27,6 @@ Tools (use freely — do not guess):
 - check_clock / set_timezone
 - read_protocol / update_protocol (your live manual — rewrite when sticky prefs change)
 - search_board / get_task / get_project (tasks & projects include page_blocks)
-- list_inbox (StressFlags for Hammond / Penelope / Vera)
 - list_maps / get_map
 - read_repo_file (Tasks Hub source — then propose repo_file mutations)
 

@@ -13,9 +13,6 @@ import type { ClareDumpResult, ClareProposal, ClareProposalInput } from '@/domai
 import type { ClareBriefing } from '@/domain/clare-desk';
 import type { ClareProtocolId } from '@/domain/clare-protocols';
 import type { StallOutcome } from '@/domain/stall';
-import type { StressFlag } from '@/schemas/stress';
-import type { IntuitiveScanMeta } from '@/domain/intuitive-scan';
-import type { IntuitiveJudge } from '@/ai/intuitive-judge';
 import type { CapacityShare } from '@/schemas/capacity';
 import type { CapacitySnapshot, CapacityLevel } from '@/domain/capacity';
 import type { ProjectVariance } from '@/domain/closure';
@@ -169,29 +166,6 @@ export interface TasksStore {
     merge_into_project_id?: string | null;
   }): Promise<{ project: Project; review: ReviewLog; moved_task_ids: string[] }>;
 
-  listStressFlags(): Promise<StressFlag[]>;
-  listAgentInbox(agent: string): Promise<StressFlag[]>;
-  raiseStressFlag(input: {
-    pattern_description: string;
-    pattern_kind?: StressFlag['pattern_kind'];
-    source_project_or_task_id?: string | null;
-    fingerprint?: string;
-  }): Promise<StressFlag>;
-  scanAndRaiseStressFlags(options?: { now?: Date }): Promise<{
-    raised: StressFlag[];
-    skipped: number;
-    patterns: number;
-  }>;
-  getIntuitiveScanMeta(): Promise<IntuitiveScanMeta | null>;
-  runIntuitiveScan(options?: { now?: Date; judge?: IntuitiveJudge | null }): Promise<{
-    raised: StressFlag[];
-    skipped: number;
-    judged: number;
-    model: string | null;
-    ran_at: string;
-    skipped_ai: boolean;
-    reason: string | null;
-  }>;
   applyPriorityAssessments(options?: {
     mode?: import('@/domain/priority-assess').PriorityAssessMode;
     apply?: boolean;
