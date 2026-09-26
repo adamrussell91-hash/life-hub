@@ -115,7 +115,7 @@ export async function peekRefreshDue({ open, today, nowMs, warn = console.warn }
   return shouldRefreshPropose(doc.last_run, { today, nowMs, newestRecordAt });
 }
 
-async function readEvents(paths, readFile, from, to, warn) {
+export async function readEvents(paths, readFile, from, to, warn) {
   const events = [];
   for (const path of paths) {
     const date = pathDate(path);
