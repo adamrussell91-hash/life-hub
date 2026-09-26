@@ -44,3 +44,24 @@ test('professional calendar merge emits one row per projection_id', () => {
   assert.equal(events[0].record.title, 'Seth');
   assert.equal(events[1].record.type, 'professional_event');
 });
+
+import { projectEventSchedule } from '../../netlify/functions/_shared/schedule-projection.mjs';
+import { professionalEventsFromProjections as kitProfessionalEventsFromProjections } from '../../packages/design-kit/js/calendar/professional-calendar.js';
+import { filterKeyForItem } from '../../packages/design-kit/js/calendar/calendar-filter.js';
+
+test('non-PD events project event_type and filter to Events', () => {
+  const projection = projectEventSchedule({
+    id: 'event_00000000-0000-4000-8000-000000000001',
+    title: 'HALT medal ceremony',
+    event_type: 'ceremony',
+    start: '2026-09-25T08:00:00.000Z',
+    end: '2026-09-25T09:45:00.000Z',
+    time_zone: 'Australia/Sydney',
+    all_day: false,
+    occurrence_state: 'completed'
+  });
+  assert.equal(projection.event_type, 'ceremony');
+  const [row] = kitProfessionalEventsFromProjections([projection]);
+  assert.equal(row.record.event_type, 'ceremony');
+  assert.equal(filterKeyForItem(row), 'events');
+});

@@ -70,6 +70,7 @@ export function projectEventSchedule(record) {
     time_zone: record.time_zone,
     all_day: Boolean(record.all_day),
     status: record.occurrence_state,
+    event_type: typeof record.event_type === 'string' ? record.event_type : null,
     href: `/professional/#/event/${encodeURIComponent(record.id)}`
   };
 }
