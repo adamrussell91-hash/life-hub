@@ -319,7 +319,8 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
         })
       );
     }
-    const pinches = detectPinchPoints(tasks, todayKey, { days: 7 });
+    const todayDate = new Date(`${todayKey}T12:00:00`);
+    const pinches = detectPinchPoints(tasks, todayDate, { days: 7 });
     meta.append(
       filters,
       el(
@@ -328,7 +329,7 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
         pinchLineLabel(pinches.length)
       )
     );
-    renderPressureStrips(pressure, tasks, todayKey, () => void refresh(), { emptyClear: false });
+    renderPressureStrips(pressure, tasks, todayDate, () => void refresh(), { emptyClear: false });
   }
 
   function paintRail(zoom = 'week') {
