@@ -44,7 +44,8 @@ test('Wetland never applies to an organisation cluster, even with identical size
   };
   const result = classifyHabitat(organisationCluster);
   assert.notEqual(result, 'wetland');
-  assert.equal(result, null);
+  // Catch-all savannah — organisation clusters always get a landform.
+  assert.equal(result, 'savannah');
 });
 
 // --- Island ------------------------------------------------------------------
@@ -71,7 +72,7 @@ test('Island: just over the size boundary does not classify as island', () => {
     roleDiversity: 0
   });
   assert.notEqual(result, 'island');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 test('Island: just over the bridgeRatio boundary does not classify as island', () => {
@@ -84,7 +85,36 @@ test('Island: just over the bridgeRatio boundary does not classify as island', (
     roleDiversity: 0
   });
   assert.notEqual(result, 'island');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
+});
+
+// --- Sandbank ------------------------------------------------------------
+
+test('Sandbank: small org with every membership started within the last year', () => {
+  const result = classifyHabitat({
+    kind: 'organisation',
+    size: 3,
+    density: 0,
+    avgDurationDays: 30,
+    roleDiversity: 0,
+    bridgeRatio: 0,
+    isSandbankCandidate: true
+  });
+  assert.equal(result, 'sandbank');
+});
+
+test('Sandbank precedes Island when both would otherwise match', () => {
+  const result = classifyHabitat({
+    kind: 'organisation',
+    size: 3,
+    density: 0,
+    avgDurationDays: 30,
+    roleDiversity: 0,
+    bridgeRatio: 0,
+    isSandbankCandidate: true
+  });
+  assert.equal(result, 'sandbank');
+  assert.notEqual(result, 'island');
 });
 
 // --- Forest --------------------------------------------------------------
@@ -111,7 +141,7 @@ test('Forest: just under the density boundary does not classify as forest', () =
     bridgeRatio: 0
   });
   assert.notEqual(result, 'forest');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 test('Forest: just under the duration boundary does not classify as forest', () => {
@@ -124,7 +154,7 @@ test('Forest: just under the duration boundary does not classify as forest', () 
     bridgeRatio: 0
   });
   assert.notEqual(result, 'forest');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 test('Forest: just under the size boundary does not classify as forest', () => {
@@ -137,7 +167,8 @@ test('Forest: just under the size boundary does not classify as forest', () => {
     bridgeRatio: 1 // bypass Island (which would otherwise claim this small, low-density-irrelevant cluster)
   });
   assert.notEqual(result, 'forest');
-  assert.equal(result, null);
+  // Size 2 with bridgeRatio 1 → savannah catch-all (not island).
+  assert.equal(result, 'savannah');
 });
 
 // --- Reef ------------------------------------------------------------------
@@ -164,7 +195,7 @@ test('Reef: just under the density boundary does not classify as reef', () => {
     bridgeRatio: 0
   });
   assert.notEqual(result, 'reef');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 test('Reef: just under the roleDiversity boundary does not classify as reef', () => {
@@ -177,7 +208,7 @@ test('Reef: just under the roleDiversity boundary does not classify as reef', ()
     bridgeRatio: 0
   });
   assert.notEqual(result, 'reef');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 // --- Savannah ----------------------------------------------------------------
@@ -203,11 +234,11 @@ test('Savannah: just under the size boundary does not classify as savannah', () 
     roleDiversity: 0,
     bridgeRatio: 0
   });
-  assert.notEqual(result, 'savannah');
-  assert.equal(result, null);
+  // Below the explicit savannah size floor → catch-all savannah (landform).
+  assert.equal(result, 'savannah');
 });
 
-test('Savannah: just over the density boundary does not classify as savannah', () => {
+test('Savannah: just over the density boundary still gets the catch-all savannah landform', () => {
   const result = classifyHabitat({
     kind: 'organisation',
     size: SAVANNAH_MIN_SIZE,
@@ -216,13 +247,12 @@ test('Savannah: just over the density boundary does not classify as savannah', (
     roleDiversity: 0,
     bridgeRatio: 0
   });
-  assert.notEqual(result, 'savannah');
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
-// --- Explicit "no habitat forced" case ---------------------------------------
+// --- Catch-all landform (Open decision 1) ------------------------------------
 
-test('a genuinely ungrouped cluster classifies as null, not an error and not a forced habitat', () => {
+test('a cluster matching no specific rule classifies as savannah (every community needs a landform)', () => {
   const result = classifyHabitat({
     kind: 'organisation',
     size: 4,
@@ -231,12 +261,46 @@ test('a genuinely ungrouped cluster classifies as null, not an error and not a f
     roleDiversity: 0.1,
     bridgeRatio: 0.5 // bypass Island
   });
-  assert.equal(result, null);
+  assert.equal(result, 'savannah');
 });
 
 test('classifyHabitat handles a missing/undersized cluster without throwing', () => {
   assert.equal(classifyHabitat(null), null);
   assert.equal(classifyHabitat({ kind: 'organisation', size: 1, density: 1, avgDurationDays: 9999, roleDiversity: 1, bridgeRatio: 0 }), null);
+});
+
+test('computeOrganisationClusterStats sets isSandbankCandidate when every membership is recent', () => {
+  const now = new Date('2026-09-17T00:00:00.000Z');
+  const groups = [
+    {
+      ref: 'shared:organisation:new-org',
+      display_name: 'New Org',
+      members: [
+        { ref: 'shared:person:a', display_name: 'A', link: { valid_from: '2026-06-01T00:00:00.000Z' } },
+        { ref: 'shared:person:b', display_name: 'B', link: { valid_from: '2026-07-01T00:00:00.000Z' } }
+      ]
+    }
+  ];
+  const [stats] = computeOrganisationClusterStats(groups, [], { now });
+  assert.equal(stats.isSandbankCandidate, true);
+  assert.equal(stats.since, 2026);
+  assert.equal(classifyHabitat(stats), 'sandbank');
+});
+
+test('computeOrganisationClusterStats rejects sandbank when any membership lacks valid_from', () => {
+  const now = new Date('2026-09-17T00:00:00.000Z');
+  const groups = [
+    {
+      ref: 'shared:organisation:new-org',
+      display_name: 'New Org',
+      members: [
+        { ref: 'shared:person:a', display_name: 'A', link: { valid_from: '2026-06-01T00:00:00.000Z' } },
+        { ref: 'shared:person:b', display_name: 'B', link: { valid_from: null } }
+      ]
+    }
+  ];
+  const [stats] = computeOrganisationClusterStats(groups, [], { now });
+  assert.equal(stats.isSandbankCandidate, false);
 });
 
 // --- computeOrganisationClusterStats -----------------------------------------
