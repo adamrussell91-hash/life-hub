@@ -652,3 +652,19 @@ describe('renderDashboardOverview', () => {
     expect(statusHost.querySelector('.dashboard-focus__tile--danger')?.textContent).toContain('1');
   });
 });
+
+describe('dashboard overview tile height (L2)', () => {
+  it('does not stretch This week / Projects with min-height 100%', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const css = readFileSync(resolve(__dirname, '../../src/styles/views.css'), 'utf8');
+    const tileBlock = css.match(/\.dashboard-overview__tile\s*\{[^}]+\}/);
+    expect(tileBlock?.[0]).toBeTruthy();
+    expect(tileBlock?.[0]).not.toMatch(/min-height:\s*100%/);
+    expect(tileBlock?.[0]).toMatch(/height:\s*max-content/);
+    expect(tileBlock?.[0]).toMatch(/align-self:\s*start/);
+    expect(css).toMatch(
+      /\.dashboard-overview__grid--week\s*\{[^}]*align-items:\s*start/
+    );
+  });
+});
