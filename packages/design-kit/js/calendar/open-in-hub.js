@@ -37,6 +37,15 @@ const KIND_HUB = Object.freeze({
   study: 'life'
 });
 
+/** Hub landing when routeFor / item.href cannot deep-link (visual seed chips often lack type). */
+const HUB_LANDING = Object.freeze({
+  teaching: '/teaching/calendar',
+  professional: '/professional/#/calendar',
+  tasks: '/tasks/#/week',
+  knowledge: '/knowledge/',
+  life: '/#/calendar'
+});
+
 /** @param {unknown} item */
 export function hubDomainForItem(item) {
   if (!item || typeof item !== 'object') return null;
@@ -58,7 +67,8 @@ export function openInHubLabel(hub) {
 }
 
 /**
- * Same-origin path for full navigation. Prefer adapter routeFor, then item.href.
+ * Same-origin path for full navigation. Prefer adapter routeFor, then item.href,
+ * then the owning hub's calendar landing (foreign visual chips often have kind only).
  * @param {unknown} item
  * @param {(item: unknown) => string | null | undefined} [routeFor]
  */
@@ -69,7 +79,9 @@ export function openInHubHref(item, routeFor) {
   }
   const row = item && typeof item === 'object' ? /** @type {Record<string, unknown>} */ (item) : null;
   const href = row?.href || row?.record?.href || row?.chip?.href;
-  return typeof href === 'string' && href ? href : null;
+  if (typeof href === 'string' && href) return href;
+  const domain = hubDomainForItem(item);
+  return domain && HUB_LANDING[domain] ? HUB_LANDING[domain] : null;
 }
 
 /** @param {unknown} item @param {string} viewerHub */
