@@ -432,6 +432,131 @@ export function createMockApi() {
       return json(200, { ok: true, data: { created: [], count: 0, note: 'Clare found nothing new to add.' } });
     }
 
+    if (path === '/api/people/remember' && method === 'GET') {
+      return json(200, { ok: true, data: { facts: [], count: 0 } });
+    }
+
+    if (path === '/api/people/remember' && method === 'POST') {
+      const action = (body as { action?: string } | null)?.action;
+      if (action === 'run' || action === 'ann_scan') {
+        return json(200, {
+          ok: true,
+          data: { created: [], count: 0, facts: [], note: "Ann hasn't found anything yet." }
+        });
+      }
+      return json(200, { ok: true, data: { fact: null } });
+    }
+
+    if (path === '/api/people/ask' && method === 'POST') {
+      const question = String((body as { question?: string } | null)?.question ?? '').trim();
+      if (/\?$/.test(question) || /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(question)) {
+        const first = [...people.values()].find((p) => !p.is_self);
+        const peopleOut = first
+          ? [
+              {
+                id: first.id,
+                ref: `shared:person:${first.id}`,
+                display_name: first.display_name,
+                reason: 'Mock match for Ask demo',
+                source: 'mock'
+              }
+            ]
+          : [];
+        return json(200, {
+          ok: true,
+          data: {
+            mode: 'ask',
+            answer: peopleOut.length
+              ? `${peopleOut[0].display_name} — ${peopleOut[0].reason}.`
+              : "I don't know enough about who knows that yet.",
+            people: peopleOut,
+            filter: null,
+            source: 'mock'
+          }
+        });
+      }
+      return json(200, {
+        ok: true,
+        data: { mode: 'search', answer: null, people: [], filter: { q: question }, source: 'name_search' }
+      });
+    }
+
+    if (path === '/api/people/today' && method === 'GET') {
+      const dayKey = '2026-09-28';
+      const personRef = url.searchParams.get('person_ref');
+      const displayName = url.searchParams.get('display_name') || 'Henry';
+      const first = displayName.split(/\s+/)[0] || 'them';
+      const hasMeet = url.searchParams.get('has_meet_item') === '1';
+      const slots = [
+        {
+          id: 'meeting:briefing',
+          kind: 'meeting',
+          title: 'Staff briefing',
+          start_minutes: 490,
+          end_minutes: 520,
+          start_label: '8:10am',
+          people: [{ ref: null, display_name: 'Fr Ross' }]
+        },
+        {
+          id: 'lesson:p3',
+          kind: 'lesson',
+          title: 'Year 9 History',
+          start_minutes: 680,
+          end_minutes: 720,
+          start_label: '11:20am',
+          people: []
+        },
+        {
+          id: 'free:785',
+          kind: 'free',
+          title: 'Free',
+          start_minutes: 785,
+          end_minutes: 860,
+          start_label: '1:05pm',
+          people: personRef ? [{ ref: personRef, display_name: displayName }] : [],
+          suggested: Boolean(personRef && hasMeet),
+          suggestion_note:
+            personRef && hasMeet ? `You usually meet ${first} after lunch` : null
+        },
+        {
+          id: 'meeting:halt',
+          kind: 'meeting',
+          title: 'HALT committee',
+          start_minutes: 930,
+          end_minutes: 990,
+          start_label: '3:30pm',
+          people: [{ ref: null, display_name: 'Emma' }]
+        }
+      ];
+      return json(200, {
+        ok: true,
+        data: {
+          day_key: dayKey,
+          slots,
+          suggestion:
+            personRef && hasMeet
+              ? {
+                  slot_id: 'free:785',
+                  note: `You usually meet ${first} after lunch`,
+                  person_ref: personRef
+                }
+              : null
+        }
+      });
+    }
+
+    if (path === '/api/people/coordination' && method === 'POST') {
+      return json(200, {
+        ok: true,
+        data: {
+          clare: { inference: { created: 0 }, ledger_items_created: 0, people_touched: [] },
+          remember: { skipped: true },
+          hammond_cooling_flags: [],
+          links_require_confirm: true
+        }
+      });
+    }
+
     if (path === '/api/people/brief' && method === 'GET') {
       const id = url.searchParams.get('id');
       const person = id ? people.get(id) : null;

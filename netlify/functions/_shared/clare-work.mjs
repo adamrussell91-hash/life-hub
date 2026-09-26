@@ -1987,7 +1987,26 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
   }
   if (name === 'run_desk_protocol') {
     const briefing = buildClareBriefing(tasks, input.protocol_id, now, { projects });
-    return ok({ protocol_id: briefing.protocol_id, briefing });
+    let people_sweep = null;
+    if (input.protocol_id === 'morning-sweep' && input.include_people_sweep !== false) {
+      try {
+        const { runClarePeopleSweep } = await import('./people-coordination.mjs');
+        people_sweep = await runClarePeopleSweep({
+          env: ctx.env,
+          now: () => now.toISOString(),
+          tasksStore: ctx.tasksStore,
+          resolveEntity: ctx.resolveEntity,
+          createRepository: ctx.createRepository,
+          fetchImpl: ctx.fetchImpl
+        });
+      } catch (error) {
+        people_sweep = {
+          error: error?.message ?? 'people_sweep_failed',
+          skipped: true
+        };
+      }
+    }
+    return ok({ protocol_id: briefing.protocol_id, briefing, people_sweep });
   }
   if (name === 'inspect_board') {
     return inspectBoard(input.view, { tasks, projects, project_id: input.project_id, query: input.query }, now);
