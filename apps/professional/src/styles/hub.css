@@ -38,6 +38,18 @@
   overflow: hidden;
 }
 
+.hub-rail__link--sub {
+  padding-left: calc(var(--space-4) + 18px);
+}
+
+.pro-calendar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: flex-end;
+  margin-bottom: var(--space-3);
+}
+
 /* Network is long enough to push Tasks off a laptop viewport. The rail is
    height-locked, so this nav has to scroll or the hub switcher is clipped. */
 .hub-rail__nav {

@@ -4,39 +4,36 @@ import {
   isValidEventId,
   isValidMeetingId,
   isValidOrganisationId,
-  isValidPersonId
+  isValidPersonId,
+  isValidThreadId
 } from '@/domain/ids';
 
 export type RailViewId =
   | 'home'
+  | 'calendar'
   | 'people'
   | 'organisations'
   | 'relationships'
-  | 'communications'
-  | 'meetings'
-  | 'events'
   | 'applications'
   | 'career'
   | 'network-ecology';
 
 export type Route =
   | { name: 'home' }
-  | { name: 'calendar'; zoom: string }
+  | { name: 'calendar'; zoom: string; redirectedFrom?: string }
   | { name: 'people'; id: string | null }
   | { name: 'person'; id: string }
   | { name: 'person-brief'; id: string }
   | { name: 'organisations' }
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
-  | { name: 'communications' }
   | { name: 'communication-new' }
   | { name: 'communication'; id: string }
-  | { name: 'meetings' }
   | { name: 'meeting-new' }
   | { name: 'meeting'; id: string }
-  | { name: 'events' }
   | { name: 'event-new' }
   | { name: 'event'; id: string }
+  | { name: 'thread'; id: string }
   | { name: 'applications' }
   | { name: 'application-new' }
   | { name: 'application'; id: string }
@@ -71,9 +68,9 @@ export function parseRoute(hash: string = location.hash): Route {
   }
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
-  if (segments.length === 1 && segments[0] === 'communications') return { name: 'communications' };
-  if (segments.length === 1 && segments[0] === 'meetings') return { name: 'meetings' };
-  if (segments.length === 1 && segments[0] === 'events') return { name: 'events' };
+  if (segments.length === 1 && ['communications', 'meetings', 'events'].includes(segments[0]!)) {
+    return { name: 'calendar', zoom: 'week', redirectedFrom: segments[0]! };
+  }
   if (segments.length === 1 && segments[0] === 'applications') return { name: 'applications' };
   if (segments.length === 1 && segments[0] === 'career') return { name: 'career' };
   if (segments.length === 1 && segments[0] === 'network-ecology') return { name: 'network-ecology' };
@@ -138,6 +135,12 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
 
+  if (segments.length === 2 && segments[0] === 'thread') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidThreadId(id)) return { name: 'thread', id };
+    return { name: 'not-found', path };
+  }
+
   return { name: 'not-found', path };
 }
 
@@ -154,23 +157,22 @@ function safeDecode(segment: string): string | null {
 }
 
 export function railHighlightFor(route: Route): RailViewId | null {
-  if (route.name === 'home' || route.name === 'calendar') return 'home';
+  if (route.name === 'home') return 'home';
+  if (
+    route.name === 'calendar' ||
+    route.name === 'communication' ||
+    route.name === 'communication-new' ||
+    route.name === 'meeting' ||
+    route.name === 'meeting-new' ||
+    route.name === 'event' ||
+    route.name === 'event-new' ||
+    route.name === 'thread'
+  ) {
+    return 'calendar';
+  }
   if (route.name === 'people' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
-  if (
-    route.name === 'communications' ||
-    route.name === 'communication' ||
-    route.name === 'communication-new'
-  ) {
-    return 'communications';
-  }
-  if (route.name === 'meetings' || route.name === 'meeting' || route.name === 'meeting-new') {
-    return 'meetings';
-  }
-  if (route.name === 'events' || route.name === 'event' || route.name === 'event-new') {
-    return 'events';
-  }
   if (
     route.name === 'applications' ||
     route.name === 'application' ||
@@ -208,6 +210,10 @@ export function communicationRoute(id: string): string {
 
 export function meetingRoute(id: string): string {
   return `#/meeting/${encodeURIComponent(id)}`;
+}
+
+export function threadRoute(id: string): string {
+  return `#/thread/${encodeURIComponent(id)}`;
 }
 
 export function eventRoute(id: string): string {

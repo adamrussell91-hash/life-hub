@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { organisationRoute, parseRoute, personBriefRoute, personRoute, railHighlightFor } from '@/app/router';
+import { organisationRoute, parseRoute, personBriefRoute, personRoute, railHighlightFor, threadRoute } from '@/app/router';
 
 const VALID_PERSON_ID = 'person_00000000-0000-4000-8000-000000000001';
 const VALID_ORG_ID = 'organisation_00000000-0000-4000-8000-000000000002';
@@ -16,14 +16,13 @@ describe('parseRoute', () => {
     expect(parseRoute('#/people')).toEqual({ name: 'people', id: null });
     expect(parseRoute('#/organisations')).toEqual({ name: 'organisations' });
     expect(parseRoute('#/relationships')).toEqual({ name: 'relationships' });
-    expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
   });
 
   it('parses calendar zoom routes (month → week)', () => {
     expect(parseRoute('#/calendar')).toEqual({ name: 'calendar', zoom: 'week' });
     expect(parseRoute('#/calendar/term')).toEqual({ name: 'calendar', zoom: 'term' });
     expect(parseRoute('#/calendar/month')).toEqual({ name: 'calendar', zoom: 'week' });
-    expect(railHighlightFor({ name: 'calendar', zoom: 'year' })).toBe('home');
+    expect(railHighlightFor({ name: 'calendar', zoom: 'year' })).toBe('calendar');
   });
 
   it('parses the Network Ecology route', () => {
@@ -102,5 +101,19 @@ describe('route builders', () => {
 
   it('maps Person Brief builder onto the People page', () => {
     expect(personBriefRoute(VALID_PERSON_ID)).toBe(`#/people/${VALID_PERSON_ID}`);
+  });
+});
+
+describe('calendar comms routes', () => {
+  it('old list routes land on the calendar', () => {
+    for (const hash of ['#/communications', '#/meetings', '#/events']) {
+      expect(parseRoute(hash)).toEqual({ name: 'calendar', zoom: 'week', redirectedFrom: hash.slice(2) });
+    }
+  });
+  it('thread route validates the id', () => {
+    const id = 'thread_00000000-0000-4000-8000-000000000001';
+    expect(parseRoute(`#/thread/${id}`)).toEqual({ name: 'thread', id });
+    expect(parseRoute('#/thread/nope').name).toBe('not-found');
+    expect(threadRoute(id)).toBe(`#/thread/${id}`);
   });
 });

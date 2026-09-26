@@ -30,18 +30,15 @@ import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
 import {
   renderCommunicationDetailView,
-  renderCommunicationNewView,
-  renderCommunicationsView
+  renderCommunicationNewView
 } from '@/views/communications';
 import {
   renderMeetingDetailView,
-  renderMeetingNewView,
-  renderMeetingsView
+  renderMeetingNewView
 } from '@/views/meetings';
 import {
   renderEventDetailView,
-  renderEventNewView,
-  renderEventsView
+  renderEventNewView
 } from '@/views/events';
 import {
   renderApplicationDetailView,
@@ -82,6 +79,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
   async function paint(): Promise<void> {
     const route = parseRoute();
+    if (route.name === 'calendar' && route.redirectedFrom) {
+      history.replaceState(null, '', '#/calendar');
+    }
 
     // Soft zoom change: keep the kit mount so Term/Year tween in place.
     if (route.name === 'calendar' && calendarHandle) {
@@ -114,6 +114,20 @@ async function bootApp(root: HTMLElement): Promise<void> {
         supporting: 'Day · Week · Term · Year · Almanac'
       });
       shell.canvas.replaceChildren();
+      const actions = document.createElement('div');
+      actions.className = 'pro-calendar__actions';
+      for (const [label, href] of [
+        ['＋ Log a comm', '#/communication/new'],
+        ['＋ Meeting', '#/meeting/new'],
+        ['＋ Event', '#/event/new']
+      ] as const) {
+        const link = document.createElement('a');
+        link.className = 'btn btn--secondary';
+        link.href = href;
+        link.textContent = label;
+        actions.append(link);
+      }
+      shell.canvas.append(actions);
       const host = document.createElement('div');
       host.className = 'pro-calendar-host';
       host.style.minWidth = '0';
@@ -142,11 +156,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
       renderRelationshipsView(shell.canvas);
       return;
     }
-    if (route.name === 'communications') {
-      renderPageHeader(shell, viewChrome('communications'));
-      await renderCommunicationsView(shell.canvas);
-      return;
-    }
     if (route.name === 'communication-new') {
       renderPageHeader(shell, { eyebrow: 'Communications', title: 'Compose' });
       await renderCommunicationNewView(shell.canvas);
@@ -163,11 +172,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
       });
       return;
     }
-    if (route.name === 'meetings') {
-      renderPageHeader(shell, viewChrome('meetings'));
-      await renderMeetingsView(shell.canvas);
-      return;
-    }
     if (route.name === 'meeting-new') {
       renderPageHeader(shell, { eyebrow: 'Meetings', title: 'Schedule' });
       await renderMeetingNewView(shell.canvas);
@@ -182,11 +186,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
         },
         isCurrent: () => generation === routeGeneration
       });
-      return;
-    }
-    if (route.name === 'events') {
-      renderPageHeader(shell, viewChrome('events'));
-      await renderEventsView(shell.canvas);
       return;
     }
     if (route.name === 'event-new') {

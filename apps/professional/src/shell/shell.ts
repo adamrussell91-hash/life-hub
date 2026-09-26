@@ -26,16 +26,14 @@ interface NavItem {
 }
 
 const MAJOR_ITEMS: NavItem[] = [
-  { id: 'home', label: 'Home', href: '#/home' }
+  { id: 'home', label: 'Home', href: '#/home' },
+  { id: 'calendar', label: 'Calendar', href: '#/calendar' }
 ];
 
 const REST: NavItem[] = [
   { id: 'people', label: 'People', href: '#/people' },
   { id: 'organisations', label: 'Organisations', href: '#/organisations' },
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
-  { id: 'communications', label: 'Communications', href: '#/communications' },
-  { id: 'meetings', label: 'Meetings', href: '#/meetings' },
-  { id: 'events', label: 'Events', href: '#/events' },
   { id: 'applications', label: 'Applications', href: '#/applications' },
   { id: 'career', label: 'Career', href: '#/career' },
   { id: 'network-ecology', label: 'Network Ecology', href: '#/network-ecology' }
@@ -156,6 +154,7 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
 function buildNavLink(item: NavItem, highlight: RailViewId | null): HTMLAnchorElement {
   const link = document.createElement('a');
   link.className = 'hub-rail__link';
+  if (item.id === 'calendar') link.classList.add('hub-rail__link--sub');
   link.href = item.href;
   if (item.id === highlight) link.setAttribute('aria-current', 'page');
   link.append(railIconFor(item.id), document.createTextNode(item.label));
@@ -196,10 +195,10 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
         href: '#/relationships'
       },
       {
-        id: 'communications',
-        label: 'Communications',
-        paths: RAIL_ICON_PATHS.communications,
-        href: '#/communications'
+        id: 'calendar',
+        label: 'Calendar',
+        paths: RAIL_ICON_PATHS.calendar,
+        href: '#/calendar'
       },
       {
         id: 'network-ecology',
