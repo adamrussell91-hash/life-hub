@@ -19,7 +19,6 @@ import {
   ReviewLogSchema
 } from '@/schemas/templates';
 import { ClareCalibrationSchema, ClareNegotiationLogSchema } from '@/schemas/clare';
-import { CapacityShareSchema } from '@/schemas/capacity';
 import { TransitMapSchema } from '@/schemas/map';
 import { ProgramSchema } from '@/schemas/program';
 import { AreaSchema } from '@/schemas/area';
@@ -104,7 +103,6 @@ import { PageBlockSchema } from '@/schemas/page-block';
 import { lifeContextToPromptBlock } from '@/domain/life-context';
 import { buildClareBriefing } from '@/domain/clare-desk';
 import { DEFAULT_STALL_WEEKS, findStallCandidates, outcomeProjectStatus } from '@/domain/stall';
-import { buildCapacitySnapshot, toCoreyPublicView } from '@/domain/capacity';
 import { computeProjectVariance, deriveProjectEndDate } from '@/domain/closure';
 import type { IndexDoc, SeedData, TasksStore } from './types';
 
@@ -130,7 +128,6 @@ export interface KeyBuilders {
   agentActionLogKey: (id: string) => string;
   reviewLogKey: (id: string) => string;
   reviewLogsIndexKey: () => string;
-  capacityShareKey: () => string;
   clareCalibrationKey: (domain: string) => string;
   clareCalibrationsIndexKey: () => string;
   clareNegotiationLogKey: (id: string) => string;
@@ -1435,54 +1432,6 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         updated.push(await this.updateTask(change.id, { priority: change.suggested as Task['priority'] }));
       }
       return { ...preview, applied: true, tasks: updated };
-    },
-
-    async getCapacitySnapshot(now = new Date()) {
-      const tasks = await this.listTasks();
-      return buildCapacitySnapshot(tasks, now, 14);
-    },
-
-    async getCapacityShare() {
-      const raw = await kv.getJSON(keys.capacityShareKey());
-      return raw ? CapacityShareSchema.parse(raw) : null;
-    },
-
-    async ensureCapacityShare() {
-      const existing = await this.getCapacityShare();
-      if (existing?.enabled) return existing;
-      const stamp = nowIso();
-      const share = CapacityShareSchema.parse({
-        schema_version: 1,
-        id: newId('cap'),
-        token: crypto.randomUUID().replace(/-/g, ''),
-        enabled: true,
-        created_at: stamp,
-        rotated_at: null
-      });
-      await kv.setJSON(keys.capacityShareKey(), share);
-      return share;
-    },
-
-    async rotateCapacityShare() {
-      const existing = await this.getCapacityShare();
-      const stamp = nowIso();
-      const share = CapacityShareSchema.parse({
-        schema_version: 1,
-        id: existing?.id ?? newId('cap'),
-        token: crypto.randomUUID().replace(/-/g, ''),
-        enabled: true,
-        created_at: existing?.created_at ?? stamp,
-        rotated_at: stamp
-      });
-      await kv.setJSON(keys.capacityShareKey(), share);
-      return share;
-    },
-
-    async getPublicCapacityByToken(token) {
-      const share = await this.getCapacityShare();
-      if (!share || !share.enabled || share.token !== token) return null;
-      const snapshot = await this.getCapacitySnapshot();
-      return toCoreyPublicView(snapshot);
     },
 
     async getProjectVariance(projectId) {

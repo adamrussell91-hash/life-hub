@@ -160,16 +160,6 @@ export function createMockApi({ seed }: MockApiOptions) {
       return json(200, { ok: true, data: { loggedOut: true } });
     }
 
-    // Public Corey capacity — token only, no session
-    if (path === '/api/capacity' && method === 'GET' && url.searchParams.get('token')) {
-      const sPublic = store();
-      const view = await sPublic.getPublicCapacityByToken(url.searchParams.get('token')!);
-      if (!view) {
-        return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown share' } });
-      }
-      return json(200, { ok: true, data: view });
-    }
-
     if (!authenticated && path.startsWith('/api/')) {
       return json(401, { ok: false, error: { code: 'unauthenticated', message: 'Sign in required' } });
     }
@@ -676,27 +666,6 @@ export function createMockApi({ seed }: MockApiOptions) {
                   : String(b.merge_into_project_id)
             })
           });
-        }
-      }
-    }
-
-    if (path === '/api/capacity') {
-      if (method === 'GET') {
-        return json(200, {
-          ok: true,
-          data: {
-            snapshot: await s.getCapacitySnapshot(),
-            share: await s.getCapacityShare()
-          }
-        });
-      }
-      if (method === 'POST') {
-        const b = body as Record<string, unknown>;
-        if (b.action === 'ensure_share') {
-          return json(200, { ok: true, data: { share: await s.ensureCapacityShare() } });
-        }
-        if (b.action === 'rotate_share') {
-          return json(200, { ok: true, data: { share: await s.rotateCapacityShare() } });
         }
       }
     }

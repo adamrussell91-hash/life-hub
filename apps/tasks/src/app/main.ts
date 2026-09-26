@@ -53,7 +53,6 @@ import { renderSomedayWheelView } from '@/views/someday-wheel';
 import { renderSomedayOdysseyView } from '@/views/someday-odyssey';
 import { renderArchiveView } from '@/views/archive';
 import { renderProgramsView } from '@/views/programs';
-import { renderCoreyView } from '@/views/corey';
 import {
   renderDayView,
   renderListView,
@@ -132,8 +131,6 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderArchiveView(canvas);
     case 'programs':
       return renderProgramsView(canvas);
-    case 'corey':
-      return renderCoreyView(canvas);
     case 'properties':
       return renderPropertiesView(canvas);
     case 'term-dates':

@@ -13,8 +13,6 @@ import type { ClareDumpResult, ClareProposal, ClareProposalInput } from '@/domai
 import type { ClareBriefing } from '@/domain/clare-desk';
 import type { ClareProtocolId } from '@/domain/clare-protocols';
 import type { StallOutcome } from '@/domain/stall';
-import type { CapacityShare } from '@/schemas/capacity';
-import type { CapacitySnapshot, CapacityLevel } from '@/domain/capacity';
 import type { ProjectVariance } from '@/domain/closure';
 import type { TransitMap } from '@/schemas/map';
 import type { Program } from '@/schemas/program';
@@ -172,20 +170,6 @@ export interface TasksStore {
     now?: Date;
   }): Promise<import('@/domain/priority-assess').PriorityAssessResult>;
 
-  getCapacitySnapshot(now?: Date): Promise<CapacitySnapshot>;
-  ensureCapacityShare(): Promise<CapacityShare>;
-  rotateCapacityShare(): Promise<CapacityShare>;
-  getCapacityShare(): Promise<CapacityShare | null>;
-  getPublicCapacityByToken(token: string): Promise<{
-    generated_at: string;
-    headlines: string[];
-    overall: CapacityLevel;
-    days: Array<{
-      date_key: string;
-      weekday: string;
-      level: CapacityLevel;
-    }>;
-  } | null>;
 
   getProjectVariance(projectId: string): Promise<ProjectVariance>;
   closeProject(input: {

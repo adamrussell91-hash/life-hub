@@ -308,34 +308,6 @@ export const tasksApi = {
       return result;
     }),
 
-  getCapacity: () =>
-    apiGet<{
-      snapshot: import('@/domain/capacity').CapacitySnapshot;
-      share: import('@/schemas/capacity').CapacityShare | null;
-    }>('/api/capacity'),
-
-  ensureCapacityShare: () =>
-    apiPost<{ share: import('@/schemas/capacity').CapacityShare }>('/api/capacity', {
-      action: 'ensure_share'
-    }),
-
-  rotateCapacityShare: () =>
-    apiPost<{ share: import('@/schemas/capacity').CapacityShare }>('/api/capacity', {
-      action: 'rotate_share'
-    }),
-
-  getPublicCapacity: (token: string) =>
-    apiGet<{
-      generated_at: string;
-      headlines: string[];
-      overall: import('@/domain/capacity').CapacityLevel;
-      days: Array<{
-        date_key: string;
-        weekday: string;
-        level: import('@/domain/capacity').CapacityLevel;
-      }>;
-    }>(`/api/capacity?token=${encodeURIComponent(token)}`),
-
   /** Shared by the stall review loop and Corey's closure loop (same ReviewLog store). */
   listReviewLogs: () =>
     apiGet<{ reviews: import('@/schemas/templates').ReviewLog[] }>('/api/reviews').then(
