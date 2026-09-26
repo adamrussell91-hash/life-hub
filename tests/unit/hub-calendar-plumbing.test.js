@@ -54,14 +54,18 @@ test('Life events loader batches /api/repo/files like Life sync-repository', () 
   assert.match(src, /for \(const batch of batchLifeFileRequests/);
 });
 
-test('Tideline Hammond tray wires Review, Dismiss all, and portrait src', () => {
+test('Tideline Hammond tray wires Review to a pending-changes panel', () => {
   const src = readFileSync(join(root, 'packages/design-kit/js/calendar/render-tideline.js'), 'utf8');
   assert.match(src, /data-action': 'review'/);
   assert.match(src, /data-action': 'dismiss-all'/);
   assert.match(src, /\/assets\/agents\/hammond\.jpg/);
-  assert.match(src, /function reviewNextGhost/);
+  assert.match(src, /function openReviewPanel/);
+  assert.match(src, /Waiting for review/);
+  assert.match(src, /function writePreview/);
   assert.match(src, /function dismissAll/);
   assert.match(src, /agentAvatarNode/);
+  assert.match(src, /data-part': 'review-panel'/);
+  assert.doesNotMatch(src, /function reviewNextGhost/);
 });
 
 test('open-in-hub maps domains and builds full-nav Open in links', () => {

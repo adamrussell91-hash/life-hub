@@ -5431,6 +5431,65 @@ html.is-map-fullscreen .map-page .map-preview {
   gap: var(--space-3);
 }
 
+/* Tasks Week: kit calendar full width; locks / next actions under it (not a right column). */
+.tasks-calendar-chrome__workspace.hub-calendar__workspace {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  width: 100%;
+  max-width: none;
+}
+
+.tasks-calendar-chrome__kit {
+  width: 100%;
+  min-width: 0;
+}
+
+.tasks-calendar-chrome__kit .hub-calendar,
+.tasks-calendar-chrome__kit .cal {
+  width: 100%;
+  max-width: none;
+}
+
+.tasks-calendar-chrome__below.hub-calendar__rail {
+  position: static;
+  top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.tasks-calendar-chrome__below .calendar-shortcuts {
+  grid-column: 1 / -1;
+}
+
+.tasks-calendar-chrome__below .calendar-locks {
+  grid-column: 1 / -1;
+}
+
+.tasks-calendar-chrome__below .calendar-locks__list {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.tasks-calendar-chrome__below .calendar-lock-row {
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: 3.5rem;
+  height: 100%;
+}
+
+@media (max-width: 720px) {
+  .tasks-calendar-chrome__below.hub-calendar__rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tasks-calendar-chrome__below .calendar-locks__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* Month grid uses the full canvas — the empty 16rem rail was pinning it short. */
 .hub-layout[data-hub-view='month'] {
   height: 100dvh;
