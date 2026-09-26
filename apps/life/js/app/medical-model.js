@@ -4,11 +4,12 @@ import { inferWeight, normalizeMedicalFields } from './medical-normalize.js';
 export const MEDICAL_DENSITIES = ['weeks', 'months', 'years'];
 export const DEFAULT_MEDICAL_DENSITY = 'months';
 
+/* Kit palette only — no mockup hex (Tailwind blue/violet). */
 export const MEDICAL_THREAD_COLOURS = {
-  IBD: '#2563eb',
-  Liver: '#b45309',
-  Mind: '#7c3aed',
-  Acute: '#94a3b8'
+  IBD: '#376fb7',   /* --wave */
+  Liver: '#f68620', /* --high-sea */
+  Mind: '#244f7c',  /* --navy-2 */
+  Acute: '#a7abb9'  /* --shallow */
 };
 
 const THREAD_RULES = [

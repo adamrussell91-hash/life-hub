@@ -1,59 +1,145 @@
 <!doctype html>
-<html lang="en" data-hub="life">
+<html lang="en-AU" data-hub="life">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Medical Overview v2 — demo fixture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A1536">
+  <title>Life Hub · Medical Overview v2 (fixture)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <!-- Same kit stack as apps/life/index.html — no parallel mockup palette. -->
   <link rel="stylesheet" href="/packages/design-kit/tokens.css">
   <link rel="stylesheet" href="/packages/design-kit/overlays.css">
-  <link rel="stylesheet" href="/packages/design-kit/chrome.css">
+  <link rel="stylesheet" href="/packages/design-kit/actions.css">
+  <link rel="stylesheet" href="/packages/design-kit/filters.css">
+  <link rel="stylesheet" href="/packages/design-kit/motion.css">
+  <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css">
+  <link rel="stylesheet" href="/packages/design-kit/rail.css">
+  <link rel="stylesheet" href="/packages/design-kit/mobile.css">
   <link rel="stylesheet" href="/apps/life/css/app.css">
-  <style>
-    body { margin: 0; background: var(--bg, #faf8f3); }
-    .demo-shell { max-width: 1180px; margin: 0 auto; padding: 24px 16px 80px; }
-    .page-header__eyebrow { font: 600 12px/1 system-ui; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
-    h1 { margin: 4px 0 16px; font-size: var(--text-2xl, 1.75rem); }
-  </style>
 </head>
 <body>
-  <div class="demo-shell">
-    <p class="page-header__eyebrow">History</p>
-    <h1>Medical Overview</h1>
-    <section id="body-medical-dashboard" class="dashboard" aria-label="Medical Overview">
-      <div class="bloods-top">
-        <button type="button" id="medical-back" class="btn btn--secondary">← Body</button>
-        <button type="button" id="medical-today" class="btn btn--ghost">Today</button>
-      </div>
-      <div id="medical-brief-row" class="medical-brief-row" aria-label="Health brief"></div>
-      <div id="medical-strip" class="medical-strip" aria-label="Health threads"></div>
-      <div class="medical-toolbar">
-        <label class="hub-search">
-          <span class="visually-hidden">Search visits</span>
-          <input id="medical-search" class="hub-search__input" type="search" placeholder="Search visits" autocomplete="off">
-        </label>
-        <div id="medical-type-host"></div>
-        <div id="medical-provider-host"></div>
-        <div id="medical-density" class="hub-pills" role="group" aria-label="Timeline zoom">
-          <button type="button" class="hub-pills__btn" data-medical-density="weeks">Weeks</button>
-          <button type="button" class="hub-pills__btn is-active" data-medical-density="months">Months</button>
-          <button type="button" class="hub-pills__btn" data-medical-density="years">Years</button>
+  <div class="app-shell" id="app" data-state="ready">
+    <aside class="desktop-rail hub-rail" aria-label="Life Hub navigation">
+      <header class="brand">
+        <span class="brand-copy">
+          <a class="hub-rail__brand" href="#">Life Hub</a>
+          <span class="hub-rail__tagline">Private dashboard</span>
+        </span>
+      </header>
+      <nav class="rail-nav" aria-label="Primary">
+        <div class="hub-rail__majors">
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
+            </span>
+            <span>Home</span>
+          </a>
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg>
+            </span>
+            <span>Chat</span>
+          </a>
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg>
+            </span>
+            <span>Calendar</span>
+          </a>
         </div>
-        <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
-        <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
-        <button type="button" id="medical-add" class="btn btn--primary">Add</button>
-      </div>
-      <div id="medical-chips" class="hub-chips"></div>
-      <p id="medical-empty" class="metric-caption" hidden></p>
-      <div class="medical-layout">
-        <div id="medical-timeline" class="medical-timeline" aria-label="Medical timeline"></div>
-        <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview" hidden></aside>
-      </div>
-      <button type="button" id="medical-sheet-close" class="medical-sheet__close" aria-label="Close details">×</button>
-    </section>
+        <p class="hub-rail__section">Hubs</p>
+        <div class="hub-stack">
+          <div class="hub-row is-active is-open" data-hub="life">
+            <span class="hub-label">
+              <span class="nav-glyph" aria-hidden="true">
+                <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
+              </span>
+              <span>Life</span>
+            </span>
+          </div>
+          <div class="hub-panel is-open" data-hub-panel="life">
+            <div class="hub-panel-inner">
+              <a class="hub-nav-item is-active" href="#" aria-current="page">
+                <span class="nav-glyph" aria-hidden="true">
+                  <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg>
+                </span>
+                <span>Body</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="page-frame">
+      <header class="topbar page-header">
+        <div class="page-header__copy">
+          <p class="eyebrow page-header__eyebrow">History</p>
+          <div class="page-header__title-row">
+            <h1 class="page-header__title" id="page-title">Medical Overview</h1>
+          </div>
+        </div>
+        <div class="topbar-actions page-header__actions">
+          <div class="hub-utilities">
+            <button class="hub-icon-btn" type="button" aria-label="Refresh" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+            </button>
+            <button class="hub-icon-btn" type="button" aria-label="Sign out" title="Sign out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 7V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1"/><path d="M15 12H3"/><path d="m7 8-4 4 4 4"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section id="body-medical-dashboard" class="dashboard" aria-label="Medical Overview">
+          <div class="bloods-top">
+            <button type="button" id="medical-back" class="btn btn--secondary">← Body</button>
+            <button type="button" id="medical-today" class="btn btn--ghost">Today</button>
+          </div>
+          <div id="medical-brief-row" class="medical-brief-row" aria-label="Health brief"></div>
+          <div id="medical-strip" class="medical-strip" aria-label="Health threads"></div>
+          <div class="medical-toolbar">
+            <label class="hub-search">
+              <span class="visually-hidden">Search visits</span>
+              <svg class="hub-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.25" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10.2 10.2 13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <input id="medical-search" class="hub-search__input" type="search" placeholder="Search visits" autocomplete="off">
+            </label>
+            <div id="medical-type-host"></div>
+            <div id="medical-provider-host"></div>
+            <div id="medical-density" class="hub-pills" role="group" aria-label="Timeline zoom">
+              <button type="button" class="hub-pills__btn" data-medical-density="weeks">Weeks</button>
+              <button type="button" class="hub-pills__btn is-active" data-medical-density="months">Months</button>
+              <button type="button" class="hub-pills__btn" data-medical-density="years">Years</button>
+            </div>
+            <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
+            <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
+            <button type="button" id="medical-add" class="btn btn--primary">Add</button>
+          </div>
+          <div id="medical-chips" class="hub-chips"></div>
+          <p id="medical-empty" class="metric-caption" hidden></p>
+          <div class="medical-layout">
+            <div id="medical-timeline" class="medical-timeline" aria-label="Medical timeline"></div>
+            <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview" hidden></aside>
+          </div>
+          <button type="button" id="medical-sheet-close" class="medical-sheet__close" aria-label="Close details">×</button>
+        </section>
+      </main>
+    </div>
   </div>
+
   <script type="module">
     import { buildMedicalModel } from '/apps/life/js/app/medical-model.js';
     import { renderMedical } from '/apps/life/js/app/render-medical.js';
+
+    try {
+      localStorage.setItem('life-hub-medical-strip-open', '1');
+    } catch (_) { /* ignore */ }
 
     const cold = { id: 'ep-head-cold', title: 'Head cold', status: 'active', started: '2026-09-23' };
     const today = '2026-09-26';
@@ -165,7 +251,6 @@
       document.getElementById('body-medical-dashboard').hidden = false;
     }
     paint();
-    // Expose for screenshot automation
     window.__medicalDemo = { paint, setSelected(id) { selectedId = id; paint(); } };
   </script>
 </body>
