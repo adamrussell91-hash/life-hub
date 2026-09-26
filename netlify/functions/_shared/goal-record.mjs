@@ -10,6 +10,8 @@ const STATUSES = new Set(['active', 'parked', 'achieved', 'dropped', 'archived']
 const STRUCTURES = new Set(['woop', 'smarter', 'okr', 'lead_lag', 'floor_target_stretch']);
 const TERM_OUTCOMES = new Set(['carried', 'parked', 'achieved', 'dropped']);
 const LIFE_AREAS = new Set(['career', 'health', 'love', 'money', 'create', 'explore', 'learn', 'friends']);
+const CURRENT_SOURCES = new Set(['typed', 'tasks', 'signal']);
+const SIGNAL_ROWS = new Set(['weight', 'fat', 'ratio', 'lift']);
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const ISO_AT = /^\d{4}-\d{2}-\d{2}T/;
 const TEXT_PARTS = {
@@ -165,8 +167,19 @@ export function ensureGoalSphere(record, areasById) {
 export const GOAL_INPUT_KEYS = Object.freeze([
   'title', 'description', 'parent_area_id', 'parent_someday_id', 'sphere', 'status', 'structure',
   'frame', 'lead_measure', 'week_log', 'rest_weeks', 'if_then', 'next_start', 'due_date',
-  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area'
+  'milestones', 'tags', 'life_wall', 'term', 'term_history', 'life_area', 'current_source', 'signal'
 ]);
+
+function normalizeCurrentSource(value) {
+  return CURRENT_SOURCES.has(value) ? value : 'typed';
+}
+
+function normalizeSignal(value, sphere) {
+  if (sphere !== 'life' || !isObject(value)) return null;
+  if (value.source !== 'binding_goal') return null;
+  if (!SIGNAL_ROWS.has(value.row)) return null;
+  return { source: 'binding_goal', row: value.row };
+}
 
 export function normalizeGoalRecord(record) {
   const sphere = SPHERES.has(record.sphere) ? record.sphere : 'life';
@@ -188,6 +201,8 @@ export function normalizeGoalRecord(record) {
     tags: normalizeTags(record.tags),
     term: normalizeTerm(record.term),
     term_history: normalizeTermHistory(record.term_history),
-    life_area: normalizeLifeArea(record.life_area, sphere)
+    life_area: normalizeLifeArea(record.life_area, sphere),
+    current_source: normalizeCurrentSource(record.current_source),
+    signal: normalizeSignal(record.signal, sphere)
   };
 }

@@ -85,6 +85,14 @@
 
 .goal-page { display: grid; grid-template-columns: minmax(0, 1fr) 26rem; gap: var(--space-5); align-items: start; }
 .goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.goal-page__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
+.goal-page__chain-sep { color: var(--shallow); }
+.goal-page__chain-link { color: var(--ink); text-decoration: none; }
+.goal-page__chain-link:hover { text-decoration: underline; }
+.goal-page__chain-link.is-muted { color: var(--muted); font-style: italic; }
+.goal-details { margin-top: var(--space-3); }
+.goal-details__block { margin-bottom: var(--space-3); }
+.goal-current-source { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; margin-top: var(--space-3); }
 .goal-page__meta { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); color: var(--muted); }
 .goal-page__meta-left { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 1; }
 .goal-page__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }

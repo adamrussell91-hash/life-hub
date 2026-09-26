@@ -9,6 +9,13 @@ export const GoalTermOutcomeSchema = z.enum(['carried', 'parked', 'achieved', 'd
 export const GoalLifeAreaSchema = z.enum([
   'career', 'health', 'love', 'money', 'create', 'explore', 'learn', 'friends'
 ]);
+export const GoalCurrentSourceSchema = z.enum(['typed', 'tasks', 'signal']);
+export const GoalSignalSchema = z
+  .object({
+    source: z.literal('binding_goal'),
+    row: z.enum(['weight', 'fat', 'ratio', 'lift'])
+  })
+  .nullable();
 
 const Text = z.string().default('');
 const Num = z.number().nullable().default(null);
@@ -79,6 +86,10 @@ export const GoalSchema = z.object({
   term_history: z.array(GoalTermHistoryEntrySchema).default([]),
   /** Only valid when sphere is life; stripped otherwise. */
   life_area: GoalLifeAreaSchema.nullable().default(null),
+  /** Where OKR / Floor·target·stretch `current` comes from (G-24). */
+  current_source: GoalCurrentSourceSchema.default('typed'),
+  /** Life Hub binding signal (G-31). Only Life goals. */
+  signal: GoalSignalSchema.default(null),
   created_at: z.string(),
   updated_at: z.string(),
   life_wall: LifeWallFieldSchema
@@ -90,6 +101,7 @@ export type GoalStructure = z.infer<typeof GoalStructureSchema>;
 export type GoalFrame = z.infer<typeof GoalFrameSchema>;
 export type GoalTerm = z.infer<typeof GoalTermSchema>;
 export type GoalLifeArea = z.infer<typeof GoalLifeAreaSchema>;
+export type GoalCurrentSource = z.infer<typeof GoalCurrentSourceSchema>;
 
 const DEFAULTS = GoalSchema.parse({
   schema_version: 1, id: '_', title: '_', created_at: '', updated_at: ''
@@ -104,7 +116,8 @@ export function normalizeGoal(raw: Goal): Goal {
   const parsed = GoalSchema.safeParse(raw);
   if (parsed.success) {
     const goal = parsed.data;
-    return goal.sphere === 'life' ? goal : { ...goal, life_area: null };
+    if (goal.sphere !== 'life') return { ...goal, life_area: null, signal: null };
+    return goal;
   }
   const source = raw as Partial<Goal>;
   return {

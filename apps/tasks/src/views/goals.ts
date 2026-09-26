@@ -18,6 +18,7 @@ import { renderHammondStrip } from '@/views/hammond-goal';
 import { openPlanNextTerm } from '@/views/goals-plan-next';
 import { mountDirectionStrip } from '@/views/goals-direction';
 import { mountYearZoom, type YearZoomHandle } from '@/views/goals-year-zoom';
+import { rememberGoalMorph } from '@/domain/goal-morph';
 import { createMorphingClosedFieldPopover } from '../../design-kit/js/morphing-popover.js';
 import { createActiveProjectsMeter } from '../../design-kit/js/agent-productivity-cards.js';
 import { DEFAULT_PLANNING_DIRECTION } from '@/schemas/planning-direction';
@@ -431,6 +432,7 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   link.href = goalPageHash(row.goal.id);
   const info = el('div', 'runway__goal');
   const title = el('p', 'runway__goal-title', row.goal.title);
+  title.setAttribute('data-hub-morph', 'title');
   title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
   const dream = row.goal.parent_someday_id ? data.tasks.find((t) => t.id === row.goal.parent_someday_id) : undefined;
   const meta = el('p', 'runway__goal-meta');
@@ -449,6 +451,7 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   if (dream) meta.append(document.createTextNode(` · ✦ ${dream.title}`));
   info.append(title, meta);
   link.append(info);
+  link.addEventListener('click', () => rememberGoalMorph(title));
   for (const cell of row.cells) {
     const box = el('span', 'runway__cell');
     if (cell.isNow) box.classList.add('is-now');

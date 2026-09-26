@@ -13,6 +13,7 @@ import { goalPageHash } from '@/domain/cards';
 import { LANE_CAP } from '@/domain/goal-hosting';
 import { createMotion, EASE } from '../../design-kit/js/hub-motion-engine.js';
 import { el } from '@/views/hub-kit';
+import { rememberGoalMorph } from '@/domain/goal-morph';
 
 export type YearZoomData = {
   goals: Goal[];
@@ -145,6 +146,7 @@ export function mountYearZoom(
 
       const info = el('div', 'runway-zoom__info');
       const title = el('p', 'runway__goal-title', row.goal.title);
+      title.setAttribute('data-hub-morph', 'title');
       title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
       if (ongoing) title.append(el('span', 'runway__chip runway__chip--ongoing', 'Ongoing'));
       const leadFig = el('p', 'runway__goal-meta runway__lead-fig');
@@ -191,6 +193,7 @@ export function mountYearZoom(
       }
 
       rowEl.append(info, track, move);
+      rowEl.addEventListener('click', () => rememberGoalMorph(title));
       rowsHost.append(rowEl);
     }
 

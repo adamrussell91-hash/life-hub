@@ -8,7 +8,8 @@ import { goal, project, task } from './goal-fixtures';
 vi.mock('@/services/client-api', () => ({
   tasksApi: {
     getGoal: vi.fn(), updateGoal: vi.fn(), deleteGoal: vi.fn(), listProjects: vi.fn(), listTasks: vi.fn(), getHubPrefs: vi.fn(),
-    updateProject: vi.fn(), createTask: vi.fn(), updateTask: vi.fn(), getGoalRead: vi.fn(), rescanGoalRead: vi.fn(), decideGhost: vi.fn()
+    updateProject: vi.fn(), createTask: vi.fn(), updateTask: vi.fn(), getGoalRead: vi.fn(), rescanGoalRead: vi.fn(), decideGhost: vi.fn(),
+    getPlanningDirection: vi.fn()
   }
 }));
 vi.mock('@/views/entity-tagger', () => ({ mountTagAnythingSection: vi.fn() }));
@@ -43,6 +44,9 @@ beforeEach(() => {
   vi.mocked(tasksApi.createTask).mockResolvedValue(task({ id: 't2', title: 'New' }));
   vi.mocked(tasksApi.updateProject).mockResolvedValue(project({ id: 'p2', title: 'Free project', parent_goal_id: 'g1' }));
   vi.mocked(tasksApi.getGoalRead).mockResolvedValue({ read: null, reason: 'first' } as never);
+  vi.mocked(tasksApi.getPlanningDirection).mockResolvedValue({
+    schema_version: 1, id: 'default', purpose: 'Teach well', principles: [], vision: 'Calm rooms', updated_at: null
+  });
 });
 
 describe('goal page', () => {
@@ -57,6 +61,9 @@ describe('goal page', () => {
     expect(canvas.textContent).toContain('Portfolio');
     expect(canvas.textContent).toContain('Write up 6.3');
     expect(mountTagAnythingSection).toHaveBeenCalledWith(expect.any(HTMLElement), 'tasks:goal:g1');
+    expect(canvas.querySelector('.goal-page__chain')?.textContent).toContain('Teach well');
+    expect(canvas.querySelector('.goal-page__chain')?.textContent).toContain('HA evidence');
+    expect(canvas.querySelector('.goal-current-source')?.textContent).toMatch(/current/i);
   });
 
   it('switching structure patches only structure', async () => {
