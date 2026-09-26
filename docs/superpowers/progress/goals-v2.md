@@ -19,8 +19,8 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 - [x] **G-01** Goal schema: `term`, `term_history`, `life_area` — `661ad4bc`
 - [x] **G-02** Sphere derived from area at read time — `971ac3ee` 
 - [x] **G-03** Goal delete cascades — `55804b93`
-- [x] **G-04** `POST /api/goals/plan-term` —
-- [x] **G-05** Hammond reads term-aware —
+- [x] **G-04** `POST /api/goals/plan-term` — `2727875f`
+- [x] **G-05** Hammond reads term-aware — `2727875f`
 
 ## M2: Basic editing on the goal page
 
