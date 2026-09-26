@@ -59,6 +59,30 @@ describe("protocol conversation view", () => {
     expect(filterHtml).toContain("Name the element to reopen");
   });
 
+  it("shows a summary card and download control on completed runs", () => {
+    const html = sessionView(session({
+      status: "completed",
+      checkpoint: null,
+      allowedActions: [],
+      summary: { title: "Library event", keyFinding: "Audience first", summary: "Clotho and Atropos diverged on proof." }
+    }), definition);
+    expect(html).toContain("protocol-summary");
+    expect(html).toContain("Library event");
+    expect(html).toContain("Audience first");
+    expect(html).toContain("Download as markdown");
+  });
+
+  it("renders Past runs rows with resume for waiting sessions", async () => {
+    const { pastRunsHtml } = await import("./view");
+    const html = pastRunsHtml([
+      { id: "sess-past", protocolId: "horizon", mode: "full", status: "waiting", title: "Career forks", updatedAt: "2026-09-26T00:00:00.000Z" }
+    ], "");
+    expect(html).toContain("Past runs");
+    expect(html).toContain("Career forks");
+    expect(html).toContain('data-protocol-resume-run="sess-past"');
+    expect(html).toContain('data-protocol-open-run="sess-past"');
+  });
+
   it("gives each thinking persona an in-world status line", () => {
     const horizon = {
       ...definition,

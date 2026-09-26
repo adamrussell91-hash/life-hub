@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { act, advance, createSession, fault, publicSession } from './cognitive-controller.mjs';
+import { summariseCompletedSession, writeProtocolCentralNodeLines } from './cognitive-writeback.mjs';
 
 const LEASE_MS = 90_000;
 
@@ -17,7 +18,7 @@ function failed(session, error) {
   return next;
 }
 
-export function createCognitiveService({ store, model, retrieve, now = Date.now } = {}) {
+export function createCognitiveService({ store, model, retrieve, now = Date.now, writeCentralNode, readCentralNode, env = {}, fetchImpl = fetch } = {}) {
   if (!store || !model || !retrieve) throw new TypeError('Cognitive service dependencies are required.');
   async function read(owner, id) {
     const row = await store.read(owner, id);
@@ -34,6 +35,18 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
     if (!written) throw fault(409, 'revision_conflict', 'Session changed. Refresh before continuing.');
     return written;
   }
+  async function finishIfCompleted(session) {
+    if (session.status !== 'completed' || session.summary) return session;
+    const next = structuredClone(session);
+    try { next.summary = await summariseCompletedSession(next, model); }
+    catch { next.summary = { title: next.protocolId, keyFinding: 'Run completed.', summary: 'Summary unavailable.', openQuestions: [], forHammond: null }; }
+    try {
+      next.writeBack = await writeProtocolCentralNodeLines(next, env, { fetchImpl, readCentralNode, writeCentralNode });
+    } catch (error) {
+      next.writeBack = { ok: false, error: error?.message || 'write_failed', written: [] };
+    }
+    return next;
+  }
   return {
     async create(owner, input) {
       const id = input?.sessionId ?? idForRequest(input?.requestId);
@@ -49,9 +62,19 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
       return publicSession(written.value);
     },
     async get(owner, id) { return publicSession((await read(owner, id)).value); },
-    async list(owner) {
-      const rows = await store.list(owner, 50);
-      return rows.map(({ value }) => ({ id: value.id, protocolId: value.protocolId, mode: value.mode, status: value.status, stage: value.stage, updatedAt: value.updatedAt }));
+    async list(owner, { limit = 100, offset = 0 } = {}) {
+      const rows = await store.list(owner, Math.max(0, limit), Math.max(0, offset));
+      return rows.map(({ value }) => ({
+        id: value.id,
+        protocolId: value.protocolId,
+        mode: value.mode,
+        status: value.status,
+        stage: value.stage,
+        updatedAt: value.updatedAt,
+        createdAt: value.createdAt,
+        title: value.summary?.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
+        summary: value.summary || null
+      }));
     },
     async action(owner, input) {
       const row = await read(owner, input.sessionId);
@@ -76,7 +99,7 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
       if (!lease) return publicSession((await read(owner, id)).value);
       let latest = lease;
       try {
-        const advanced = await advance(latest.value, {
+        let advanced = await advance(latest.value, {
           model,
           retrieve,
           onProgress: async progress => {
@@ -89,6 +112,7 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now 
         const check = await store.read(owner, id);
         if (!check || check.value.lease?.id !== leaseId || check.value.status === 'cancelled') return publicSession(check?.value ?? latest.value);
         advanced.lease = null;
+        advanced = await finishIfCompleted(advanced);
         return publicSession((await commit(owner, id, advanced, check.etag)).value);
       } catch (error) {
         const check = await store.read(owner, id);

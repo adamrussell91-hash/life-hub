@@ -165,14 +165,36 @@ const SPECIALIST_CN_SENDERS = {
   ann: 'Ann'
 };
 
+const PROTOCOL_CN_SENDERS = {
+  fates: 'The Three Fates',
+  horizon: 'Horizon Council',
+  refinery: 'The Refinery',
+  cartographers: 'The Cartographers',
+  mirror: 'The Mirror Council',
+  consilium: 'The Consilium',
+  witness: 'The Witness',
+  tribunal: 'The Tribunal'
+};
+
 export function assertAgentMayApplyCentralNodePatch(slug, patch) {
   if (slug === 'hammond') return true;
-  const sender = SPECIALIST_CN_SENDERS[slug];
-  if (!sender || !patch || typeof patch !== 'object') return false;
-  if (patch.section !== 'cross_agent' || patch.op !== 'append_line') return false;
+  const specialist = SPECIALIST_CN_SENDERS[slug];
+  if (specialist) {
+    if (!patch || typeof patch !== 'object') return false;
+    if (patch.section !== 'cross_agent' || patch.op !== 'append_line') return false;
+    const text = typeof patch.payload?.text === 'string' ? patch.payload.text.trim() : '';
+    const line = text.replace(/^-\s*/, '');
+    return line.startsWith(`${specialist}\u2192`);
+  }
+  const protocolId = typeof slug === 'string' && slug.startsWith('protocol:') ? slug.slice('protocol:'.length) : '';
+  const sender = PROTOCOL_CN_SENDERS[protocolId] || (patch && PROTOCOL_CN_SENDERS[patch.protocolId]);
+  const named = patch?.sender && Object.values(PROTOCOL_CN_SENDERS).includes(patch.sender) ? patch.sender : sender;
+  if (!named || !patch || typeof patch !== 'object') return false;
+  if (!['recent_actions', 'cross_agent'].includes(patch.section) || patch.op !== 'append_line') return false;
   const text = typeof patch.payload?.text === 'string' ? patch.payload.text.trim() : '';
   const line = text.replace(/^-\s*/, '');
-  return line.startsWith(`${sender}\u2192`);
+  if (patch.section === 'recent_actions') return line.startsWith(`${named}:`);
+  return line.startsWith(`${named}\u2192`);
 }
 
 export function validateCentralNodePatchInput(input) {

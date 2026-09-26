@@ -153,7 +153,7 @@ export function createKnowledgeProtocolsHandler(deps = {}) {
       try {
         const service = await serviceFor(env, deps);
         const data = url.searchParams.has('list')
-          ? { sessions: await service.list(owner(env)) }
+          ? { sessions: await service.list(owner(env), { limit: Number(url.searchParams.get('limit') || 100), offset: Number(url.searchParams.get('offset') || 0) }) }
           : { session: await service.get(owner(env), url.searchParams.get('sessionId') ?? '') };
         return withCors(okResponse(200, data), request, env);
       } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_failed', error.message, error.status >= 500), request, env); }
