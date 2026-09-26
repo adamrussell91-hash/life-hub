@@ -39,7 +39,38 @@ function memoryFetch({ people = [], organisations = [], relationships = [] } = {
 }
 
 const PEOPLE = [
-  { legacy_id: 'leg-person-1', display_name: 'Lauren Stuart', sort_name: 'Stuart, Lauren', aliases: [] },
+  {
+    legacy_id: 'leg-person-1',
+    display_name: 'Lauren Stuart',
+    sort_name: 'Stuart, Lauren',
+    aliases: [],
+    professional_profile: {
+      schema_version: 1,
+      source: {
+        system: 'notion',
+        page_url: 'https://www.notion.so/lauren',
+        properties: {
+          'AI summary': 'A rich imported summary.',
+          'Future Notion column': 'Preserve me'
+        }
+      },
+      summary: 'A rich imported summary.',
+      contact: {
+        email: 'lauren@example.com',
+        phone: null,
+        linkedin_url: 'javascript:alert(1)'
+      },
+      last_contacted: null,
+      current_workplace: ['Example University'],
+      references: {
+        communications: [{ label: 'Planning note', source_url: 'https://www.notion.so/note', hub_href: null }],
+        books: [],
+        podcasts: [],
+        notes: []
+      },
+      body_markdown: '<script>not markup</script>\n\n# Profile'
+    }
+  },
   { legacy_id: 'leg-person-2', display_name: 'Notion Import', sort_name: null, aliases: ['Notey'] }
 ];
 const ORGANISATIONS = [
@@ -103,6 +134,22 @@ test('getGithubPerson/getGithubOrganisation return null for an id with no matchi
   assert.equal(await getGithubOrganisation('organisation_00000000-0000-0000-0000-000000000000', { env, fetchImpl }), null);
   const found = await getGithubPerson(derivePersonId('leg-person-1'), { env, fetchImpl });
   assert.equal(found.display_name, 'Lauren Stuart');
+});
+
+test('getGithubPerson preserves a lossless imported profile while normalising unsafe links', async () => {
+  const { fetchImpl } = memoryFetch({ people: PEOPLE, organisations: ORGANISATIONS, relationships: RELATIONSHIPS });
+  const person = await getGithubPerson(derivePersonId('leg-person-1'), { env: { GITHUB_TOKEN: 'token' }, fetchImpl });
+
+  assert.deepEqual(person.professional_profile.source.properties, {
+    'AI summary': 'A rich imported summary.',
+    'Future Notion column': 'Preserve me'
+  });
+  assert.equal(person.professional_profile.summary, 'A rich imported summary.');
+  assert.equal(person.professional_profile.contact.linkedin_url, null);
+  assert.deepEqual(person.professional_profile.references.communications, [
+    { label: 'Planning note', source_url: 'https://www.notion.so/note', hub_href: null }
+  ]);
+  assert.equal(person.professional_profile.body_markdown, '<script>not markup</script>\n\n# Profile');
 });
 
 test('without a token, every reader degrades to empty/null rather than throwing', async () => {
