@@ -289,6 +289,17 @@ describe('renderHomeView', () => {
     expect(canvas.querySelector('.pro-home__side .pro-home__progress')).toBeTruthy();
   });
 
+  it('stacks Priority areas above a full-width calendar host', async () => {
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    const body = canvas.querySelector('.pro-home__body');
+    const side = canvas.querySelector('.pro-home__side');
+    const calendarHost = canvas.querySelector('.pro-home__calendar-host');
+    expect(body?.firstElementChild).toBe(side);
+    expect(side?.nextElementSibling).toBe(calendarHost);
+    expect(calendarHost?.querySelector('[data-part="hub-calendar-mount"]')).toBeTruthy();
+  });
+
   it('plots a clickable year-strip mark for each meeting and event', async () => {
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
