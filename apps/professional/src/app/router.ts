@@ -4,6 +4,7 @@ import {
   isValidEventId,
   isValidMeetingId,
   isValidOrganisationId,
+  isValidPdGroupId,
   isValidPersonId,
   isValidThreadId
 } from '@/domain/ids';
@@ -34,6 +35,7 @@ export type Route =
   | { name: 'event-new' }
   | { name: 'event'; id: string }
   | { name: 'thread'; id: string }
+  | { name: 'pd-group'; id: string }
   | { name: 'applications' }
   | { name: 'application-new' }
   | { name: 'application'; id: string }
@@ -141,6 +143,12 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
 
+  if (segments.length === 2 && segments[0] === 'pd-group') {
+    const id = safeDecode(segments[1]!);
+    if (id && isValidPdGroupId(id)) return { name: 'pd-group', id };
+    return { name: 'not-found', path };
+  }
+
   return { name: 'not-found', path };
 }
 
@@ -166,7 +174,8 @@ export function railHighlightFor(route: Route): RailViewId | null {
     route.name === 'meeting-new' ||
     route.name === 'event' ||
     route.name === 'event-new' ||
-    route.name === 'thread'
+    route.name === 'thread' ||
+    route.name === 'pd-group'
   ) {
     return 'calendar';
   }

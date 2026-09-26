@@ -37,6 +37,7 @@ import { renderRelationshipsView } from '@/views/relationships';
 import { renderCommunicationNewView } from '@/views/communications';
 import { renderCommPage } from '@/views/comm-page';
 import { renderThreadPage } from '@/views/thread-page';
+import { renderPdGroupPage } from '@/views/pd-group-page';
 import { renderMeetingNewView } from '@/views/meetings';
 import { renderMeetingPage } from '@/views/meeting-page';
 import { renderEventNewView } from '@/views/events';
@@ -179,6 +180,17 @@ async function bootApp(root: HTMLElement): Promise<void> {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
           renderPageHeader(shell, { eyebrow: 'Calendar · Thread', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'pd-group') {
+      renderPageHeader(shell, { eyebrow: 'Calendar · PD', title: 'Loading…' });
+      await renderPdGroupPage(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Calendar · PD', title });
         },
         isCurrent: () => generation === routeGeneration
       });

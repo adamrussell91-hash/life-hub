@@ -116,4 +116,10 @@ describe('calendar comms routes', () => {
     expect(parseRoute('#/thread/nope').name).toBe('not-found');
     expect(threadRoute(id)).toBe(`#/thread/${id}`);
   });
+
+  it('pd-group route validates the id', () => {
+    const id = 'pd_group_00000000-0000-4000-8000-000000000001';
+    expect(parseRoute(`#/pd-group/${id}`)).toEqual({ name: 'pd-group', id });
+    expect(parseRoute('#/pd-group/nope').name).toBe('not-found');
+  });
 });
