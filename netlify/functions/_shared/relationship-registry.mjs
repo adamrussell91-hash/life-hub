@@ -213,6 +213,43 @@ const REGISTRY = new Map([
     })
   ],
   [
+    'in_thread',
+    declaration({
+      key: 'in_thread',
+      sourceKinds: ['professional:communication', 'professional:meeting', 'professional:event'],
+      targetKinds: ['professional:thread'],
+      inverseLabel: 'thread_member',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'in_pd_group',
+    declaration({
+      key: 'in_pd_group',
+      sourceKinds: ['professional:event'],
+      targetKinds: ['professional:pd_group'],
+      inverseLabel: 'pd_group_member',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'talk_note',
+    declaration({
+      key: 'talk_note',
+      sourceKinds: ['professional:event'],
+      targetKinds: ['knowledge:page'],
+      inverseLabel: 'note_of_talk',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none',
+      metadataKeys: ['talk_id']
+    })
+  ],
+  [
     'follow_up',
     declaration({
       key: 'follow_up',

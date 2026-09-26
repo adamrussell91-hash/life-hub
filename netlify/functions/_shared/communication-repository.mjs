@@ -416,6 +416,12 @@ export function createCommunicationRepository(deps = {}) {
       occurred_at: validated.occurred_at,
       subject: validated.subject,
       summary: validated.summary,
+      scheduled_start: validated.scheduled_start ?? null,
+      scheduled_end: validated.scheduled_end ?? null,
+      time_zone: validated.time_zone ?? null,
+      purpose_tag: validated.purpose_tag ?? null,
+      agenda: [],
+      blocks: [],
       status: validated.status,
       created_at: timestamp,
       updated_at: timestamp

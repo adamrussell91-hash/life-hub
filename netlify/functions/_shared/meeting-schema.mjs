@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { assertValidTimeZone } from './wall-time.mjs';
+import { validateBlocks } from './communication-schema.mjs';
 
 // Meeting records for Professional Hub (`professional-hub-content`).
 // Relationships live only as Universal Links — never store Person, Task,
@@ -8,7 +9,10 @@ import { assertValidTimeZone } from './wall-time.mjs';
 // Attendee Universal Link roles (relationship key `attendee`): null, 'chair',
 // or 'minute_taker' only — enforced in relationship-registry.mjs.
 
-export const MEETING_SCHEMA_VERSION = 1;
+export const MEETING_SCHEMA_VERSION = 2;
+const READABLE_MEETING_VERSIONS = new Set([1, 2]);
+export const PURPOSE_MAX_LENGTH = 500;
+export const DECISIONS_MAX = 50;
 
 export const MEETING_STATES = new Set([
   'scheduled',
@@ -83,6 +87,22 @@ function trimBounded(value, field, max, { allowEmpty = true } = {}) {
   return trimmed || null;
 }
 
+export function validateDecisions(value) {
+  if (!Array.isArray(value) || value.length > DECISIONS_MAX) {
+    throw validationError('invalid_decisions', `decisions must be an array of at most ${DECISIONS_MAX}.`);
+  }
+  return value.map((decision) => {
+    if (!decision || typeof decision.id !== 'string' || typeof decision.text !== 'string' || !decision.text.trim()) {
+      throw validationError('invalid_decisions', 'decisions need id and text.');
+    }
+    return {
+      id: decision.id,
+      text: decision.text.trim().slice(0, 500),
+      agenda_heading: typeof decision.agenda_heading === 'string' ? decision.agenda_heading.trim().slice(0, 200) : null
+    };
+  });
+}
+
 function assertTimeOrder(start, end) {
   if (Date.parse(end) < Date.parse(start)) {
     throw validationError('invalid_time_range', 'scheduled_end cannot precede scheduled_start.');
@@ -102,7 +122,10 @@ const STORED_KEYS = new Set([
   'state',
   'occurrence_history',
   'created_at',
-  'updated_at'
+  'updated_at',
+  'purpose',
+  'blocks',
+  'decisions'
 ]);
 
 const HISTORY_KEYS = new Set([
@@ -141,7 +164,7 @@ export function parseMeetingRecord(raw) {
   for (const key of Object.keys(raw)) {
     if (!STORED_KEYS.has(key)) return null;
   }
-  if (raw.schema_version !== MEETING_SCHEMA_VERSION) return null;
+  if (!READABLE_MEETING_VERSIONS.has(raw.schema_version)) return null;
   if (!isValidMeetingId(raw.id)) return null;
   if (typeof raw.title !== 'string') return null;
   if (!isIsoTimestamp(raw.scheduled_start) || !isIsoTimestamp(raw.scheduled_end)) return null;
@@ -166,7 +189,10 @@ export function parseMeetingRecord(raw) {
     state: raw.state,
     occurrence_history: history,
     created_at: raw.created_at,
-    updated_at: raw.updated_at
+    updated_at: raw.updated_at,
+    purpose: typeof raw.purpose === 'string' ? raw.purpose : null,
+    blocks: Array.isArray(raw.blocks) ? raw.blocks : [],
+    decisions: Array.isArray(raw.decisions) ? raw.decisions : []
   };
 }
 
@@ -217,7 +243,7 @@ export function validateMeetingCreateInput(input) {
   };
 }
 
-const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes']);
+const UPDATE_KEYS = new Set(['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions']);
 
 export function validateMeetingFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
@@ -241,6 +267,9 @@ export function validateMeetingFieldUpdate(input) {
   if (input.notes !== undefined) {
     patch.notes = trimBounded(input.notes, 'notes', NOTES_MAX_LENGTH);
   }
+  if (input.purpose !== undefined) patch.purpose = trimBounded(input.purpose, 'purpose', PURPOSE_MAX_LENGTH);
+  if (input.blocks !== undefined) patch.blocks = validateBlocks(input.blocks);
+  if (input.decisions !== undefined) patch.decisions = validateDecisions(input.decisions);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -307,7 +336,10 @@ export function projectMeeting(record, incompleteLinks = null) {
     state: record.state,
     occurrence_history: record.occurrence_history ?? [],
     created_at: record.created_at,
-    updated_at: record.updated_at
+    updated_at: record.updated_at,
+    purpose: record.purpose ?? null,
+    blocks: record.blocks ?? [],
+    decisions: record.decisions ?? []
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

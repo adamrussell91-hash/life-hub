@@ -89,13 +89,17 @@ describe('renderHomeView', () => {
     }
   ];
 
-  beforeEach(() => {
-    // Fri 18 Sep 2026, matching the events fixture below.
-    vi.setSystemTime(new Date('2026-09-18T02:00:00.000Z'));
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+  function defaultFetchMock(
+    overrides: Array<{ test: (url: string) => boolean; respond: () => Response }> = [],
+    fixtureMeetings: typeof meetings = meetings
+  ) {
+    return vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      for (const override of overrides) {
+        if (override.test(url)) return override.respond();
+      }
       if (url.includes('/api/meetings') && !url.includes('schedule-projections')) {
-        return Response.json({ ok: true, data: { meetings } });
+        return Response.json({ ok: true, data: { meetings: fixtureMeetings } });
       }
       if (url.includes('/api/schedule-projections')) {
         return Response.json({
@@ -114,7 +118,7 @@ describe('renderHomeView', () => {
                 source_ref: event.id,
                 href: `#/event/${event.id}`
               })),
-              ...meetings.map((meeting) => ({
+              ...fixtureMeetings.map((meeting) => ({
                 projection_id: `meeting:${meeting.id}`,
                 kind: 'meeting',
                 title: meeting.title,
@@ -150,7 +154,19 @@ describe('renderHomeView', () => {
       }
       return Response.json({ ok: true, data: { events } });
     });
+  }
+
+  beforeEach(() => {
+    // Fri 18 Sep 2026, matching the events fixture below.
+    vi.setSystemTime(new Date('2026-09-18T02:00:00.000Z'));
+    globalThis.fetch = defaultFetchMock();
   });
+
+  async function renderHomeForTest(): Promise<HTMLElement> {
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    return canvas;
+  }
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
@@ -195,6 +211,41 @@ describe('renderHomeView', () => {
     expect(progress?.classList.contains('is-expanded')).toBe(true);
     expect(toggle?.getAttribute('aria-expanded')).toBe('true');
     expect(canvas.textContent).toMatch(/goal is a placeholder/);
+  });
+
+  it('accreditation hours ignore non-PD events', async () => {
+    const completed = {
+      schema_version: 2,
+      start: '2026-09-18T00:00:00.000Z',
+      end: '2026-09-18T05:00:00.000Z',
+      time_zone: 'Australia/Sydney',
+      all_day: false,
+      occurrence_state: 'completed',
+      location_text: null,
+      accreditation_category: 'Workshop',
+      attendance_state: 'attended',
+      certificate: null,
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-18T05:00:00.000Z'
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/meetings')) return Response.json({ ok: true, data: { meetings: [] } });
+      return Response.json({
+        ok: true,
+        data: {
+          events: [
+            { ...completed, id: 'event_00000000-0000-4000-8000-000000000021', title: 'PD day', event_type: 'professional_development', hours: 6 },
+            { ...completed, id: 'event_00000000-0000-4000-8000-000000000022', title: 'HALT medal ceremony', event_type: 'general', hours: 2 }
+          ]
+        }
+      });
+    });
+
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    expect(canvas.querySelector('[data-part="accreditation-progress"]')?.textContent).toContain('6');
+    expect(canvas.querySelector('[data-part="accreditation-progress"]')?.textContent).not.toContain('8');
   });
 
   it('totals priority-area hours separately from the event type', async () => {
@@ -356,5 +407,77 @@ describe('renderHomeView', () => {
 
     meeting?.dispatchEvent(new Event('pointerleave'));
     expect(tip?.hidden).toBe(true);
+  });
+
+  it('shows the walk-in card with Clare’s three points ten minutes before a comm', async () => {
+    vi.setSystemTime(new Date('2026-10-13T21:31:00.000Z'));
+    const comm = {
+      schema_version: 2, id: 'communication_00000000-0000-4000-8000-000000000030',
+      direction: 'outbound', channel: 'in_person', occurred_at: '2026-10-13T21:40:00.000Z',
+      subject: 'Fletcher W. · session 8', summary: '', status: 'completed',
+      created_at: '2026-10-01T00:00:00.000Z', updated_at: '2026-10-01T00:00:00.000Z',
+      scheduled_start: '2026-10-13T21:40:00.000Z', scheduled_end: '2026-10-13T22:10:00.000Z',
+      time_zone: 'Australia/Sydney', purpose_tag: null, agenda: [], blocks: []
+    };
+    globalThis.fetch = defaultFetchMock(
+      [
+        { test: (url) => url.includes('/api/communications'), respond: () => Response.json({ ok: true, data: { communications: [comm] } }) },
+        { test: (url) => url.includes('/api/clare/comms'), respond: () => Response.json({ ok: true, data: {
+          points: [{ text: 'a', source: 's' }, { text: 'b', source: 's' }, { text: 'c', source: 's' }],
+          owed_line: 'Amy template done ✓'
+        } }) },
+        { test: (url) => url.includes('/api/people/ledger'), respond: () => Response.json({ ok: true, data: { items: [] } }) },
+        { test: (url) => url.includes('/api/threads'), respond: () => Response.json({ ok: true, data: { threads: [] } }) }
+      ],
+      []
+    );
+    const canvas = await renderHomeForTest();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const card = canvas.querySelector('[data-part="walk-in"]')!;
+    expect(card.textContent).toContain('Fletcher W. · session 8');
+    expect(card.textContent).toContain('in 9 min');
+    expect(card.querySelectorAll('li').length).toBe(3);
+    expect(card.querySelector('a[data-part="walk-in-start"]')?.getAttribute('href')).toContain('#/communication/');
+  });
+
+  it('lists late promises first in the nudges', async () => {
+    globalThis.fetch = defaultFetchMock([
+      { test: (url) => url.includes('/api/people/ledger'), respond: () => Response.json({ ok: true, data: { items: [
+        {
+          id: 'ledger_00000000-0000-4000-8000-000000000040', person_ref: 'shared:person:p_denielle',
+          direction: 'you_owe', text: 'Email Denielle J.', task_ref: null, comm_ref: null, due: '2026-09-15',
+          checked_in_ref: null, status: 'open', author: 'adam', created_at: '', updated_at: ''
+        }
+      ] } }) },
+      { test: (url) => url.includes('/api/communications'), respond: () => Response.json({ ok: true, data: { communications: [] } }) },
+      { test: (url) => url.includes('/api/threads'), respond: () => Response.json({ ok: true, data: { threads: [] } }) }
+    ]);
+    const canvas = await renderHomeForTest();
+    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Denielle J. · 3 days late');
+  });
+
+  it('lists a quiet thread with an open they_owe item in the nudges', async () => {
+    const threadId = 'thread_00000000-0000-4000-8000-000000000050';
+    const memberRef = 'professional:communication:communication_00000000-0000-4000-8000-000000000051';
+    globalThis.fetch = defaultFetchMock([
+      { test: (url) => url.includes('/api/people/ledger') && url.includes('due_from'), respond: () => Response.json({ ok: true, data: { items: [] } }) },
+      { test: (url) => url.includes('/api/people/ledger') && url.includes('source_refs'), respond: () => Response.json({ ok: true, data: { items: [
+        { id: 'ledger_00000000-0000-4000-8000-000000000052', person_ref: 'shared:person:kathleen', direction: 'they_owe', text: 'Send the reading list', task_ref: null, comm_ref: memberRef, due: null, checked_in_ref: null, status: 'open', author: 'adam', created_at: '', updated_at: '' }
+      ] } }) },
+      { test: (url) => url.includes('/api/communications'), respond: () => Response.json({ ok: true, data: { communications: [] } }) },
+      { test: (url) => url.includes('/api/threads') && !url.includes('?'), respond: () => Response.json({ ok: true, data: { threads: [
+        {
+          schema_version: 1, id: threadId, kind: 'general',
+          title: 'Kathleen E. · enrichment', purpose_tag: 'enrichment', goals: [], status: 'open',
+          created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-29T02:00:00.000Z'
+        }
+      ] } }) },
+      { test: (url) => url.includes('/api/universal-links') && url.includes(threadId), respond: () => Response.json({ ok: true, data: { outgoing: [], incoming: [
+        { link: { id: 'm1', source_ref: memberRef, target_ref: `professional:thread:${threadId}`, relationship_type: 'in_thread', status: 'current', created_at: '2026-08-29T02:00:00.000Z' },
+          endpoint: { ref: memberRef, kind: 'communication', display_label: 'Kathleen E. · enrichment chat', href: null }, direction: 'incoming' }
+      ] } }) }
+    ]);
+    const canvas = await renderHomeForTest();
+    expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Kathleen E. · enrichment has been quiet for 20 days');
   });
 });

@@ -175,6 +175,10 @@ export function createMockApi() {
     ])
   );
   const applications = new Map<string, Record<string, unknown>>();
+  const threads = new Map<string, Record<string, unknown>>();
+  const pdGroups = new Map<string, Record<string, unknown>>();
+  const knowledgePages = new Map<string, Record<string, unknown>>();
+  const ledgerItems = new Map<string, Record<string, unknown>>();
 
   let authenticated = false;
 
@@ -416,19 +420,81 @@ export function createMockApi() {
     }
 
     if (path === '/api/people/ledger' && method === 'GET') {
+      const sourceRefsParam = url.searchParams.get('source_refs');
+      if (sourceRefsParam) {
+        const refs = sourceRefsParam.split(',').map((ref) => ref.trim()).filter(Boolean);
+        const items = [...ledgerItems.values()].filter((item) => refs.includes(String(item.comm_ref)));
+        return json(200, { ok: true, data: { items } });
+      }
+      const personRef = url.searchParams.get('person_ref');
+      const openForPerson = [...ledgerItems.values()].filter(
+        (item) => item.person_ref === personRef && item.status === 'open'
+      );
       return json(200, {
         ok: true,
         data: {
-          you_owe: [],
-          they_owe: [],
-          you_owe_count: 0,
-          they_owe_count: 0,
-          open_item_count: 0
+          you_owe: openForPerson.filter((item) => item.direction === 'you_owe'),
+          they_owe: openForPerson.filter((item) => item.direction === 'they_owe'),
+          you_owe_count: openForPerson.filter((item) => item.direction === 'you_owe').length,
+          they_owe_count: openForPerson.filter((item) => item.direction === 'they_owe').length,
+          open_item_count: openForPerson.length
         }
       });
     }
 
     if (path === '/api/people/ledger' && method === 'POST') {
+      const input = body as {
+        action?: string;
+        id?: string;
+        person_ref?: string;
+        direction?: 'you_owe' | 'they_owe';
+        text?: string;
+        comm_ref?: string;
+        due?: string | null;
+        author?: string;
+        status?: string;
+        task_ref?: string | null;
+        checked_in_ref?: string | null;
+      } | null;
+      const action = input?.action;
+      if (action === 'create') {
+        // Mirrors the real repository's dedupe key so retyping the same »promise
+        // during a debounced autosave does not spawn duplicate ledger items.
+        const sourceKey = [input?.person_ref, input?.direction, input?.text?.trim(), input?.comm_ref]
+          .map((part) => String(part ?? ''))
+          .join('::');
+        const existingBySource = [...ledgerItems.values()].find((entry) => entry.source_key === sourceKey);
+        if (existingBySource) {
+          return json(200, { ok: true, data: { item: existingBySource, created: false } });
+        }
+        const timestamp = new Date().toISOString();
+        const item = {
+          id: `ledger_${randomUUID()}`,
+          person_ref: input?.person_ref ?? null,
+          direction: input?.direction ?? 'you_owe',
+          text: input?.text ?? '',
+          task_ref: null,
+          comm_ref: input?.comm_ref ?? null,
+          due: input?.due ?? null,
+          checked_in_ref: null,
+          status: 'open',
+          author: input?.author ?? 'adam',
+          source_key: sourceKey,
+          created_at: timestamp,
+          updated_at: timestamp
+        };
+        ledgerItems.set(item.id, item);
+        return json(200, { ok: true, data: { item, created: true } });
+      }
+      if (action === 'patch') {
+        const id = input?.id;
+        const existing = id ? ledgerItems.get(id) : null;
+        if (!existing) return json(404, { ok: false, error: { code: 'ledger_item_not_found', message: 'Ledger item not found.' } });
+        const { action: _action, id: _id, ...patch } = input ?? {};
+        const updated = { ...existing, ...patch, updated_at: new Date().toISOString() };
+        ledgerItems.set(id!, updated);
+        return json(200, { ok: true, data: { item: updated } });
+      }
       return json(200, { ok: true, data: { created: [], count: 0, note: 'Clare found nothing new to add.' } });
     }
 
@@ -1186,6 +1252,9 @@ export function createMockApi() {
         notes: input.notes ?? null,
         state: 'scheduled',
         occurrence_history: [],
+        purpose: null as string | null,
+        blocks: [] as unknown[],
+        decisions: [] as unknown[],
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -1217,11 +1286,56 @@ export function createMockApi() {
         return json(404, { ok: false, error: { code: 'meeting_not_found', message: 'Meeting not found.' } });
       }
       const patch = body as Record<string, unknown>;
-      for (const key of ['title', 'location_text', 'agenda', 'notes']) {
+      for (const key of ['title', 'location_text', 'agenda', 'notes', 'purpose', 'blocks', 'decisions']) {
         if (patch[key] !== undefined) meeting[key] = patch[key];
       }
       meeting.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { meeting } });
+    }
+
+    if (path === '/api/threads' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const thread = threads.get(id);
+        if (!thread) {
+          return json(404, { ok: false, error: { code: 'thread_not_found', message: 'Thread not found.' } });
+        }
+        return json(200, { ok: true, data: { thread } });
+      }
+      return json(200, { ok: true, data: { threads: [...threads.values()] } });
+    }
+
+    if (path === '/api/threads' && method === 'POST') {
+      const input = (body ?? {}) as { kind?: string; title?: string; purpose_tag?: string | null; goals?: unknown[] };
+      const now = new Date().toISOString();
+      const id = `thread_${crypto.randomUUID()}`;
+      const thread = {
+        schema_version: 1,
+        id,
+        kind: input.kind === 'case' ? 'case' : 'general',
+        title: typeof input.title === 'string' ? input.title.trim() : 'Thread',
+        purpose_tag: typeof input.purpose_tag === 'string' ? input.purpose_tag.trim().toLowerCase() || null : null,
+        goals: Array.isArray(input.goals) ? input.goals : [],
+        status: 'open',
+        created_at: now,
+        updated_at: now
+      };
+      threads.set(id, thread);
+      return json(200, { ok: true, data: { thread } });
+    }
+
+    if (path === '/api/threads' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const thread = id ? threads.get(id) : null;
+      if (!thread) {
+        return json(404, { ok: false, error: { code: 'thread_not_found', message: 'Thread not found.' } });
+      }
+      const patch = (body ?? {}) as Record<string, unknown>;
+      for (const key of ['kind', 'title', 'purpose_tag', 'goals', 'status']) {
+        if (patch[key] !== undefined) thread[key] = patch[key];
+      }
+      thread.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { thread } });
     }
 
     if (path === '/api/events' && method === 'GET') {
@@ -1307,6 +1421,8 @@ export function createMockApi() {
         hours: input.hours ?? null,
         attendance_state: input.attendance_state ?? null,
         certificate: input.certificate ?? null,
+        talks: [] as unknown[],
+        blocks: [] as unknown[],
         created_at: now,
         updated_at: now,
         incomplete_links: null as null
@@ -1351,7 +1467,10 @@ export function createMockApi() {
             'all_day',
             'start',
             'end',
-            'time_zone'
+            'time_zone',
+            'event_type',
+            'talks',
+            'blocks'
           ].includes(key)
         ) {
           event[key] = patch[key];
@@ -1388,7 +1507,7 @@ export function createMockApi() {
           href: `/professional/#/event/${event.id}`
         }))
       ];
-      return json(200, { ok: true, data: { projections } });
+      return json(200, { ok: true, data: { projections, promises: [] } });
     }
 
     // Local seed so Home Tideline can paint the Hammond tray (Apply / Review / Dismiss).
@@ -1722,11 +1841,72 @@ export function createMockApi() {
       return json(201, { ok: true, data: task });
     }
 
+    if (path === '/api/pd-groups' && method === 'GET') {
+      const id = url.searchParams.get('id');
+      if (id) {
+        const group = pdGroups.get(id);
+        if (!group) {
+          return json(404, { ok: false, error: { code: 'pd_group_not_found', message: 'PD group not found.' } });
+        }
+        return json(200, { ok: true, data: { group } });
+      }
+      return json(200, { ok: true, data: { groups: [...pdGroups.values()] } });
+    }
+
+    if (path === '/api/pd-groups' && method === 'POST') {
+      const input = (body ?? {}) as { shape?: string; title?: string; provider?: string | null };
+      const now = new Date().toISOString();
+      const id = `pd_group_${randomUUID()}`;
+      const group = {
+        schema_version: 1,
+        id,
+        shape: input.shape === 'program' ? 'program' : 'series',
+        title: typeof input.title === 'string' ? input.title.trim() || 'PD group' : 'PD group',
+        provider: typeof input.provider === 'string' ? input.provider : null,
+        created_at: now,
+        updated_at: now
+      };
+      pdGroups.set(id, group);
+      return json(201, { ok: true, data: { group } });
+    }
+
+    if (path === '/api/pd-groups' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const group = id ? pdGroups.get(id) : null;
+      if (!group) {
+        return json(404, { ok: false, error: { code: 'pd_group_not_found', message: 'PD group not found.' } });
+      }
+      const patch = (body ?? {}) as Record<string, unknown>;
+      for (const key of ['shape', 'title', 'provider']) {
+        if (patch[key] !== undefined) group[key] = patch[key];
+      }
+      group.updated_at = new Date().toISOString();
+      return json(200, { ok: true, data: { group } });
+    }
+
+    if (path === '/api/knowledge/pages' && method === 'POST') {
+      const input = (body ?? {}) as { title?: string; body?: string; area?: string; tags?: string[] };
+      const now = new Date().toISOString();
+      const id = `page_${randomUUID()}`;
+      const page = {
+        id,
+        title: typeof input.title === 'string' ? input.title.trim() || 'Untitled note' : 'Untitled note',
+        body: typeof input.body === 'string' ? input.body : '',
+        area: input.area ?? 'notes',
+        tags: Array.isArray(input.tags) ? input.tags : [],
+        created_at: now,
+        updated_at: now
+      };
+      knowledgePages.set(id, page);
+      return json(201, { ok: true, data: page });
+    }
+
     if (path === '/api/universal-links' && method === 'POST') {
       const input = body as {
         source_ref?: string;
         target_ref?: string;
         relationship_type?: string;
+        metadata?: Record<string, unknown>;
       };
       for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
         if (input && Object.prototype.hasOwnProperty.call(input, key)) {
@@ -1775,7 +1955,8 @@ export function createMockApi() {
         temporal_mode: 'timeless',
         valid_from: null,
         valid_to: null,
-        occurred_at: null
+        occurred_at: null,
+        ...(input.metadata ? { metadata: input.metadata } : {})
       });
       return json(201, {
         ok: true,
@@ -1785,7 +1966,8 @@ export function createMockApi() {
             source_ref: input.source_ref,
             target_ref: input.target_ref,
             relationship_type: input.relationship_type,
-            status: 'current'
+            status: 'current',
+            ...(input.metadata ? { metadata: input.metadata } : {})
           },
           created: true
         }

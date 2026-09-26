@@ -5,7 +5,7 @@ describe('professional rail hub switcher', () => {
   it('offers a Tasks Hub link from the rail', () => {
     const root = document.createElement('div');
     const refs = renderHubShell(root);
-    renderPrimaryNav(refs.railNav, 'meetings');
+    renderPrimaryNav(refs.railNav, 'calendar');
 
     const tasks = refs.rail.querySelector('a.hub-label[href="/tasks/"]');
     expect(tasks).not.toBeNull();

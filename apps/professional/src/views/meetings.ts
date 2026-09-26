@@ -41,6 +41,80 @@ function defaultZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
 }
 
+/** Preparation and follow-up Task link panels, with Plan 1's auto-retry. */
+export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promise<void>): HTMLElement {
+  const taskPanels = el('div', 'meeting-detail__task-panels');
+  mountTaskLinkPanel({
+    host: taskPanels,
+    heading: 'Preparation Task',
+    relationshipType: 'preparation',
+    incompleteOperationId:
+      record.preparation_operation?.status === 'incomplete'
+        ? record.preparation_operation.operation_id
+        : null,
+    statusMessage:
+      record.preparation_operation?.status === 'committed'
+        ? `Preparation Task ${record.preparation_operation.task_id}`
+        : record.preparation_operation?.status === 'incomplete'
+          ? 'Preparation link incomplete.'
+          : null,
+    onSubmit: async (input) => {
+      try {
+        await linkMeetingTask(record.id, {
+          relationship_type: 'preparation',
+          ...input
+        });
+        await reload();
+      } catch (err) {
+        if (isMeetingTaskLinkIncompleteError(err)) {
+          await reload();
+          return;
+        }
+        throw err;
+      }
+    },
+    onRetry: async (operationId) => {
+      await retryMeetingTaskLink(record.id, operationId);
+      await reload();
+    }
+  });
+  mountTaskLinkPanel({
+    host: taskPanels,
+    heading: 'Follow-up Task',
+    relationshipType: 'follow_up',
+    incompleteOperationId:
+      record.follow_up_operation?.status === 'incomplete'
+        ? record.follow_up_operation.operation_id
+        : null,
+    statusMessage:
+      record.follow_up_operation?.status === 'committed'
+        ? `Follow-up Task ${record.follow_up_operation.task_id}`
+        : record.follow_up_operation?.status === 'incomplete'
+          ? 'Follow-up link incomplete.'
+          : null,
+    onSubmit: async (input) => {
+      try {
+        await linkMeetingTask(record.id, {
+          relationship_type: 'follow_up',
+          ...input
+        });
+        await reload();
+      } catch (err) {
+        if (isMeetingTaskLinkIncompleteError(err)) {
+          await reload();
+          return;
+        }
+        throw err;
+      }
+    },
+    onRetry: async (operationId) => {
+      await retryMeetingTaskLink(record.id, operationId);
+      await reload();
+    }
+  });
+  return taskPanels;
+}
+
 export async function renderMeetingsView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading meetings…');
 
@@ -413,75 +487,7 @@ export async function renderMeetingDetailView(
     const relationships = el('section', 'meeting-detail__relationships');
     relationships.append(el('p', undefined, 'Loading relationships…'));
 
-    const taskPanels = el('div', 'meeting-detail__task-panels');
-    mountTaskLinkPanel({
-      host: taskPanels,
-      heading: 'Preparation Task',
-      relationshipType: 'preparation',
-      incompleteOperationId:
-        record.preparation_operation?.status === 'incomplete'
-          ? record.preparation_operation.operation_id
-          : null,
-      statusMessage:
-        record.preparation_operation?.status === 'committed'
-          ? `Preparation Task ${record.preparation_operation.task_id}`
-          : record.preparation_operation?.status === 'incomplete'
-            ? 'Preparation link incomplete.'
-            : null,
-      onSubmit: async (input) => {
-        try {
-          const result = await linkMeetingTask(record.id, {
-            relationship_type: 'preparation',
-            ...input
-          });
-          paint(result.meeting);
-        } catch (err) {
-          if (isMeetingTaskLinkIncompleteError(err)) {
-            await load();
-            return;
-          }
-          throw err;
-        }
-      },
-      onRetry: async (operationId) => {
-        const result = await retryMeetingTaskLink(record.id, operationId);
-        paint(result.meeting);
-      }
-    });
-    mountTaskLinkPanel({
-      host: taskPanels,
-      heading: 'Follow-up Task',
-      relationshipType: 'follow_up',
-      incompleteOperationId:
-        record.follow_up_operation?.status === 'incomplete'
-          ? record.follow_up_operation.operation_id
-          : null,
-      statusMessage:
-        record.follow_up_operation?.status === 'committed'
-          ? `Follow-up Task ${record.follow_up_operation.task_id}`
-          : record.follow_up_operation?.status === 'incomplete'
-            ? 'Follow-up link incomplete.'
-            : null,
-      onSubmit: async (input) => {
-        try {
-          const result = await linkMeetingTask(record.id, {
-            relationship_type: 'follow_up',
-            ...input
-          });
-          paint(result.meeting);
-        } catch (err) {
-          if (isMeetingTaskLinkIncompleteError(err)) {
-            await load();
-            return;
-          }
-          throw err;
-        }
-      },
-      onRetry: async (operationId) => {
-        const result = await retryMeetingTaskLink(record.id, operationId);
-        paint(result.meeting);
-      }
-    });
+    const taskPanels = buildMeetingTaskLinks(record, load);
 
     canvas.append(back, facts, actions, actionStatus, rescheduleForm, edit, relationships, taskPanels);
 

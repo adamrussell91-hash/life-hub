@@ -2,6 +2,12 @@
 
 export const RAIL_ICON_PATHS: Record<string, string[]> = {
   home: ['M4 11.5 12 4l8 7.5', 'M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9'],
+  calendar: [
+    'M4 5.5h16a2 2 0 0 1 2 2v10.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7.5a2 2 0 0 1 2-2Z',
+    'M8 3.5v4',
+    'M16 3.5v4',
+    'M4 10h16'
+  ],
   people: [
     'M9 12.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
     'M3.5 19c0-3 2.6-5 5.5-5s5.5 2 5.5 5',

@@ -164,7 +164,9 @@ export function createEventRepository(deps = {}) {
       attendance_state: validated.attendance_state,
       certificate: validated.certificate,
       created_at: timestamp,
-      updated_at: timestamp
+      updated_at: timestamp,
+      talks: [],
+      blocks: []
     };
 
     await setJSON(professionalStore, eventKey(id), record);

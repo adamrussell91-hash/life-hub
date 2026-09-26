@@ -28,6 +28,10 @@ export function eventSourceRef(id) {
   return formatEntityRef({ namespace: 'professional', kind: 'event', id });
 }
 
+export function communicationSourceRef(id) {
+  return formatEntityRef({ namespace: 'professional', kind: 'communication', id });
+}
+
 /**
  * @returns {{
  *   projection_id: string,
@@ -70,7 +74,29 @@ export function projectEventSchedule(record) {
     time_zone: record.time_zone,
     all_day: Boolean(record.all_day),
     status: record.occurrence_state,
+    event_type: typeof record.event_type === 'string' ? record.event_type : null,
     href: `/professional/#/event/${encodeURIComponent(record.id)}`
+  };
+}
+
+/** Timed comms are blocks; comms without a window (an email, a text) are pins on their hour. */
+export function projectCommunicationSchedule(record) {
+  const source_ref = communicationSourceRef(record.id);
+  const start = record.scheduled_start ?? record.occurred_at;
+  const pin = !record.scheduled_start || !record.scheduled_end;
+  return {
+    projection_id: deriveProjectionId(source_ref),
+    source_ref,
+    kind: 'communication',
+    title: record.subject || record.channel.replace(/_/g, ' '),
+    start,
+    end: pin ? start : record.scheduled_end,
+    time_zone: record.time_zone || 'Australia/Sydney',
+    all_day: false,
+    status: record.status,
+    channel: record.channel,
+    pin,
+    href: `/professional/#/communication/${encodeURIComponent(record.id)}`
   };
 }
 
@@ -142,7 +168,8 @@ export function lifeCalendarEventFromProjection(projection) {
       status: projection.status,
       source_ref: projection.source_ref,
       href: projection.href ?? null,
-      all_day: Boolean(projection.all_day)
+      all_day: Boolean(projection.all_day),
+      event_type: projection.event_type ?? null
     },
     body: ''
   };

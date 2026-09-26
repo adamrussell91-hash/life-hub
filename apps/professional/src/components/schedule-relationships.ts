@@ -6,6 +6,7 @@ import {
   type UniversalLinkEntry
 } from '@/api/universal-links';
 import { ApiClientError } from '@/api/client';
+import { createAutoRetry } from '@/lib/auto-retry';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -77,6 +78,7 @@ export function mountTaskLinkPanel(options: {
   onRetry?: (operationId: string) => Promise<void>;
   incompleteOperationId?: string | null;
   statusMessage?: string | null;
+  suggestTitle?: () => Promise<string>;
 }): { root: HTMLElement } {
   const root = el('section', 'task-link-panel');
   root.append(el('h2', undefined, options.heading));
@@ -97,6 +99,19 @@ export function mountTaskLinkPanel(options: {
   title.type = 'text';
   title.placeholder = 'Task title';
   title.setAttribute('aria-label', `${options.heading} title`);
+
+  if (options.suggestTitle) {
+    title.placeholder = 'Clare is suggesting a title…';
+    options.suggestTitle().then(
+      (suggested) => {
+        if (!title.value) title.value = suggested;
+        title.placeholder = 'Task title';
+      },
+      () => {
+        title.placeholder = 'Task title';
+      }
+    );
+  }
 
   const taskInput = document.createElement('input');
   taskInput.type = 'text';
@@ -173,20 +188,39 @@ export function mountTaskLinkPanel(options: {
   root.append(mode, title, taskInput, picker.root, chipsHost, submit, status);
 
   if (options.incompleteOperationId && options.onRetry) {
-    const retry = el('button', 'btn btn--primary', 'Retry incomplete Task link') as HTMLButtonElement;
-    retry.type = 'button';
-    retry.addEventListener('click', async () => {
-      if (!options.incompleteOperationId || !options.onRetry) return;
-      retry.disabled = true;
-      try {
-        await options.onRetry(options.incompleteOperationId);
-      } catch (err) {
-        status.hidden = false;
-        status.textContent = err instanceof Error ? err.message : 'Retry failed.';
-        retry.disabled = false;
+    const operationId = options.incompleteOperationId;
+    const onRetry = options.onRetry;
+    // One link at a time: no second task while this one is still landing.
+    submit.disabled = true;
+    mode.disabled = true;
+    title.disabled = true;
+
+    const linkState = el('p', 'task-link-panel__state', 'Linking…');
+    linkState.dataset.linkState = 'linking';
+    const tryNowBtn = el('button', 'btn btn--ghost task-link-panel__try', 'Try now') as HTMLButtonElement;
+    tryNowBtn.type = 'button';
+    tryNowBtn.hidden = true;
+
+    const retry = createAutoRetry({
+      run: async () => {
+        if (!root.isConnected) {
+          retry.stop();
+          return;
+        }
+        await onRetry(operationId);
+      },
+      onState: (state, error) => {
+        linkState.dataset.linkState = state;
+        tryNowBtn.hidden = state !== 'stuck';
+        if (state === 'linked') linkState.textContent = '✓ linked';
+        else if (state === 'stuck') {
+          const reason = error instanceof Error && error.message ? error.message : 'Tasks did not answer.';
+          linkState.textContent = `● Still linking. ${reason} It keeps trying.`;
+        } else linkState.textContent = 'Linking…';
       }
     });
-    root.append(retry);
+    tryNowBtn.addEventListener('click', () => void retry.tryNow());
+    root.append(linkState, tryNowBtn);
   }
   options.host.append(root);
   return { root };

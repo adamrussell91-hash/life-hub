@@ -7,19 +7,26 @@ const VALID_MEETING_ID = 'meeting_00000000-0000-4000-8000-000000000010';
 const VALID_EVENT_ID = 'event_00000000-0000-4000-8000-000000000010';
 
 describe('meeting and event routes', () => {
-  it('parses list, compose, and detail routes', () => {
-    expect(parseRoute('#/meetings')).toEqual({ name: 'meetings' });
+  it('parses compose and detail routes; lists redirect to calendar', () => {
+    expect(parseRoute('#/meetings')).toEqual({
+      name: 'calendar',
+      zoom: 'week',
+      redirectedFrom: 'meetings'
+    });
     expect(parseRoute('#/meeting/new')).toEqual({ name: 'meeting-new' });
     expect(parseRoute(`#/meeting/${VALID_MEETING_ID}`)).toEqual({
       name: 'meeting',
       id: VALID_MEETING_ID
     });
-    expect(parseRoute('#/events')).toEqual({ name: 'events' });
+    expect(parseRoute('#/events')).toEqual({
+      name: 'calendar',
+      zoom: 'week',
+      redirectedFrom: 'events'
+    });
     expect(parseRoute(`#/event/${VALID_EVENT_ID}`)).toEqual({ name: 'event', id: VALID_EVENT_ID });
     expect(parseRoute('#/meeting/not-valid').name).toBe('not-found');
-    expect(railHighlightFor({ name: 'meeting-new' })).toBe('meetings');
-    expect(railHighlightFor({ name: 'events' })).toBe('events');
-    expect(railHighlightFor({ name: 'event', id: VALID_EVENT_ID })).toBe('events');
+    expect(railHighlightFor({ name: 'meeting-new' })).toBe('calendar');
+    expect(railHighlightFor({ name: 'event', id: VALID_EVENT_ID })).toBe('calendar');
     expect(meetingRoute(VALID_MEETING_ID)).toBe(`#/meeting/${VALID_MEETING_ID}`);
     expect(eventRoute(VALID_EVENT_ID)).toBe(`#/event/${VALID_EVENT_ID}`);
   });

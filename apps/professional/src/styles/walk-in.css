@@ -1,0 +1,64 @@
+/* Walk-in card (Plan 4, Task 10) — ported from docs/professional-hub/calendar/mockups/index.html
+   (.walkin, .walkin .cd, .walkin .owe, .walkin .go .btn), renamed to .walk-in,
+   .walk-in__count and .walk-in__owe and re-tokenised (design-kit tokens only). */
+
+.walk-in {
+  border-radius: var(--radius-lg);
+  background: linear-gradient(165deg, var(--navy), var(--depth));
+  color: var(--on-dark);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.walk-in h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+  color: #fff;
+}
+
+.walk-in__count {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--on-dark-muted);
+}
+
+.walk-in ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: var(--text-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.walk-in__owe {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  font-size: var(--text-xs);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--warning-surface);
+  color: var(--high-sea);
+  margin: 0;
+}
+
+.walk-in__owe:empty {
+  display: none;
+}
+
+.walk-in__start {
+  align-self: flex-start;
+  background: var(--high-sea);
+  color: #fff;
+  border: 0;
+}
+
+@media (max-width: 390px) {
+  .walk-in {
+    padding: var(--space-4);
+  }
+}

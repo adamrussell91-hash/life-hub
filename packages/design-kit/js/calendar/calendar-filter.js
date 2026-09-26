@@ -5,9 +5,11 @@
 
 export const FILTER_CHIPS = Object.freeze([
   Object.freeze({ id: 'classes', label: 'Classes', group: 'teaching' }),
-  Object.freeze({ id: 'events', label: 'Events', group: 'teaching' }),
-  Object.freeze({ id: 'pd', label: 'PD', group: 'professional' }),
+  Object.freeze({ id: 'comms', label: 'Comms', group: 'shared' }),
   Object.freeze({ id: 'meetings', label: 'Meetings', group: 'professional' }),
+  Object.freeze({ id: 'events', label: 'Events', group: 'shared' }),
+  Object.freeze({ id: 'pd', label: 'PD', group: 'professional' }),
+  Object.freeze({ id: 'promises', label: 'Promises', group: 'shared' }),
   Object.freeze({ id: 'tasks', label: 'Tasks', group: 'tasks' }),
   Object.freeze({ id: 'health', label: 'Health', group: 'life' }),
   Object.freeze({ id: 'fitness', label: 'Fitness', group: 'life' }),
@@ -16,20 +18,16 @@ export const FILTER_CHIPS = Object.freeze([
 
 const ALL_IDS = FILTER_CHIPS.map((chip) => chip.id);
 
+const HUB_DEFAULTS = Object.freeze({
+  teaching: ['classes', 'comms', 'promises'],
+  professional: ['comms', 'meetings', 'events', 'pd', 'promises'],
+  tasks: ['tasks', 'promises']
+});
+
 /** @param {string} hub */
 export function defaultFilterForHub(hub = 'life') {
-  const on = Object.fromEntries(ALL_IDS.map((id) => [id, false]));
-  if (hub === 'teaching') {
-    on.classes = true;
-  } else if (hub === 'professional') {
-    on.pd = true;
-    on.meetings = true;
-  } else if (hub === 'tasks') {
-    on.tasks = true;
-  } else {
-    for (const id of ALL_IDS) on[id] = true;
-  }
-  return on;
+  const onIds = HUB_DEFAULTS[hub] ?? ALL_IDS;
+  return Object.fromEntries(ALL_IDS.map((id) => [id, onIds.includes(id)]));
 }
 
 function storageKey(hub) {
@@ -76,8 +74,12 @@ export function filterKeyForItem(item) {
   if (kind === 'teaching' || source === 'scheduled_lesson' || isClass) {
     return isClass || source === 'scheduled_lesson' ? 'classes' : 'events';
   }
+  if (kind === 'comm' || source === 'professional_communication') return 'comms';
+  if (kind === 'promise' || source === 'ledger_item') return 'promises';
   if (kind === 'professional' || source === 'professional_meeting' || source === 'professional_event') {
-    return source === 'professional_meeting' ? 'meetings' : 'pd';
+    if (source === 'professional_meeting') return 'meetings';
+    const eventType = item.event_type ?? item.record?.event_type ?? item.chip?.event_type ?? null;
+    return eventType && eventType !== 'professional_development' ? 'events' : 'pd';
   }
   if (kind === 'task' || source === 'task' || source === 'work_block' || source === 'deadline') return 'tasks';
   if (kind === 'health' || source === 'medical') return 'health';

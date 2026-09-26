@@ -14,6 +14,14 @@ import '../../design-kit/calendar-day-dial.css';
 import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
+import '../styles/walk-in.css';
+import '../styles/quick-log.css';
+import '../styles/tasks-engine.css';
+import '../styles/block-page.css';
+import '../styles/comm-page.css';
+import '../styles/thread-page.css';
+import '../styles/meeting-page.css';
+import '../styles/event-page.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
@@ -28,21 +36,14 @@ import { renderPeoplePage } from '@/views/people';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
-import {
-  renderCommunicationDetailView,
-  renderCommunicationNewView,
-  renderCommunicationsView
-} from '@/views/communications';
-import {
-  renderMeetingDetailView,
-  renderMeetingNewView,
-  renderMeetingsView
-} from '@/views/meetings';
-import {
-  renderEventDetailView,
-  renderEventNewView,
-  renderEventsView
-} from '@/views/events';
+import { renderCommunicationNewView } from '@/views/communications';
+import { renderCommPage } from '@/views/comm-page';
+import { renderThreadPage } from '@/views/thread-page';
+import { renderPdGroupPage } from '@/views/pd-group-page';
+import { renderMeetingNewView } from '@/views/meetings';
+import { renderMeetingPage } from '@/views/meeting-page';
+import { renderEventNewView } from '@/views/events';
+import { renderEventPage } from '@/views/event-page';
 import {
   renderApplicationDetailView,
   renderApplicationNewView,
@@ -51,6 +52,7 @@ import {
 import { renderCareerView } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
+import { renderQuickLog } from '@/views/quick-log';
 import { personRoute } from '@/app/router';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
@@ -82,6 +84,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
   async function paint(): Promise<void> {
     const route = parseRoute();
+    if (route.name === 'calendar' && route.redirectedFrom) {
+      history.replaceState(null, '', '#/calendar');
+    }
 
     // Soft zoom change: keep the kit mount so Term/Year tween in place.
     if (route.name === 'calendar' && calendarHandle) {
@@ -114,6 +119,20 @@ async function bootApp(root: HTMLElement): Promise<void> {
         supporting: 'Day · Week · Term · Year · Almanac'
       });
       shell.canvas.replaceChildren();
+      const actions = document.createElement('div');
+      actions.className = 'pro-calendar__actions';
+      for (const [label, href] of [
+        ['＋ Log a comm', '#/communication/new'],
+        ['＋ Meeting', '#/meeting/new'],
+        ['＋ Event', '#/event/new']
+      ] as const) {
+        const link = document.createElement('a');
+        link.className = 'btn btn--secondary';
+        link.href = href;
+        link.textContent = label;
+        actions.append(link);
+      }
+      shell.canvas.append(actions);
       const host = document.createElement('div');
       host.className = 'pro-calendar-host';
       host.style.minWidth = '0';
@@ -145,30 +164,42 @@ async function bootApp(root: HTMLElement): Promise<void> {
       renderRelationshipsView(shell.canvas);
       return;
     }
-    if (route.name === 'communications') {
-      renderPageHeader(shell, viewChrome('communications'));
-      await renderCommunicationsView(shell.canvas);
-      return;
-    }
     if (route.name === 'communication-new') {
       renderPageHeader(shell, { eyebrow: 'Communications', title: 'Compose' });
       await renderCommunicationNewView(shell.canvas);
       return;
     }
     if (route.name === 'communication') {
-      renderPageHeader(shell, { eyebrow: 'Communications', title: 'Loading…' });
-      await renderCommunicationDetailView(shell.canvas, route.id, {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Comm', title: 'Loading…' });
+      await renderCommPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Communications', title });
+          renderPageHeader(shell, { eyebrow: 'Calendar · Comm', title });
         },
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
-    if (route.name === 'meetings') {
-      renderPageHeader(shell, viewChrome('meetings'));
-      await renderMeetingsView(shell.canvas);
+    if (route.name === 'thread') {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Thread', title: 'Loading…' });
+      await renderThreadPage(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Calendar · Thread', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'pd-group') {
+      renderPageHeader(shell, { eyebrow: 'Calendar · PD', title: 'Loading…' });
+      await renderPdGroupPage(shell.canvas, route.id, {
+        onTitleReady: (title) => {
+          if (generation !== routeGeneration) return;
+          renderPageHeader(shell, { eyebrow: 'Calendar · PD', title });
+        },
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'meeting-new') {
@@ -177,19 +208,14 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'meeting') {
-      renderPageHeader(shell, { eyebrow: 'Meetings', title: 'Loading…' });
-      await renderMeetingDetailView(shell.canvas, route.id, {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Meeting', title: 'Loading…' });
+      await renderMeetingPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Meetings', title });
+          renderPageHeader(shell, { eyebrow: 'Calendar · Meeting', title });
         },
         isCurrent: () => generation === routeGeneration
       });
-      return;
-    }
-    if (route.name === 'events') {
-      renderPageHeader(shell, viewChrome('events'));
-      await renderEventsView(shell.canvas);
       return;
     }
     if (route.name === 'event-new') {
@@ -202,20 +228,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'event') {
-      renderPageHeader(shell, { eyebrow: 'Events', title: 'Loading…' });
-      await renderEventDetailView(shell.canvas, route.id, {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Event', title: 'Loading…' });
+      await renderEventPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Events', title });
-        },
-        onHeaderReady: (header) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, {
-            eyebrow: 'Events',
-            title: header.title,
-            supporting: header.supporting,
-            actions: header.actions
-          });
+          renderPageHeader(shell, { eyebrow: 'Calendar · Event', title });
         },
         isCurrent: () => generation === routeGeneration
       });
@@ -245,6 +262,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'career') {
       renderPageHeader(shell, viewChrome('career'));
       await renderCareerView(shell.canvas);
+      return;
+    }
+    if (route.name === 'log') {
+      renderPageHeader(shell, { eyebrow: 'Calendar', title: 'Log a comm' });
+      await renderQuickLog(shell.canvas);
       return;
     }
     if (route.name === 'network-ecology') {

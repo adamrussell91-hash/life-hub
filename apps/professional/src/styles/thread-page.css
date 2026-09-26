@@ -1,0 +1,110 @@
+/* Thread and case page (Plan 2, Task 19) — ported from docs/professional-hub/
+   calendar/mockups/index.html (.spine, .sess, .goal, .carry), renamed to the
+   classes this view uses and re-tokenised (design-kit tokens only). */
+
+.thread-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.thread-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.thread-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .thread-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.thread-page__sessions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.thread-page__session {
+  display: block;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.thread-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.thread-page__person {
+  margin: var(--space-1) 0;
+  font-size: var(--text-sm);
+}
+
+.thread-page__export {
+  white-space: pre-wrap;
+  font-size: var(--text-sm);
+  user-select: all;
+}
+
+/* ── Goals (case) ── */
+.goals {
+  display: flex;
+  flex-direction: column;
+}
+
+.goal {
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+
+.goal:first-of-type {
+  border-top: 0;
+}
+
+.goal__top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.goal__bar {
+  height: 6px;
+  border-radius: var(--radius-xs);
+  background: var(--cotton);
+  margin-top: var(--space-2);
+  overflow: hidden;
+}
+
+.goal__bar i {
+  display: block;
+  height: 100%;
+  background: var(--wave);
+  border-radius: var(--radius-xs);
+}
+
+.goal__add {
+  margin-top: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: var(--font-ui);
+}

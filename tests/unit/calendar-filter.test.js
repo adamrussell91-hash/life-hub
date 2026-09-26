@@ -4,6 +4,7 @@ import {
   countByFilterKey,
   countHidden,
   defaultFilterForHub,
+  FILTER_CHIPS,
   filterKeyForItem,
   isItemVisible,
   readFilterState,
@@ -66,4 +67,39 @@ test('sessionStorage read/write is per hub and survives try/catch failure', () =
   };
   assert.equal(readFilterState('life').classes, true);
   writeFilterState('life', next);
+});
+
+test('chips include Comms, Events and Promises for every hub', () => {
+  const ids = FILTER_CHIPS.map((chip) => chip.id);
+  assert.deepEqual(ids, [
+    'classes', 'comms', 'meetings', 'events', 'pd', 'promises', 'tasks', 'health', 'fitness', 'corey'
+  ]);
+  for (const id of ['comms', 'events', 'promises']) {
+    assert.equal(FILTER_CHIPS.find((chip) => chip.id === id).group, 'shared');
+  }
+});
+
+test('hub defaults: Teaching, Professional and Tasks start with their comms-era chips on', () => {
+  const on = (hub) => Object.entries(defaultFilterForHub(hub)).filter(([, v]) => v).map(([k]) => k).sort();
+  assert.deepEqual(on('teaching'), ['classes', 'comms', 'promises']);
+  assert.deepEqual(on('professional'), ['comms', 'events', 'meetings', 'pd', 'promises']);
+  assert.deepEqual(on('tasks'), ['promises', 'tasks']);
+  assert.equal(on('life').length, FILTER_CHIPS.length);
+});
+
+test('filterKeyForItem maps comms, promises and non-PD events', () => {
+  assert.equal(filterKeyForItem({ source: 'professional_communication' }), 'comms');
+  assert.equal(filterKeyForItem({ kind: 'comm' }), 'comms');
+  assert.equal(filterKeyForItem({ source: 'ledger_item' }), 'promises');
+  assert.equal(filterKeyForItem({ kind: 'promise' }), 'promises');
+  assert.equal(
+    filterKeyForItem({ record: { type: 'professional_event', event_type: 'ceremony' } }),
+    'events'
+  );
+  assert.equal(
+    filterKeyForItem({ record: { type: 'professional_event', event_type: 'professional_development' } }),
+    'pd'
+  );
+  // Old projections without event_type stay PD, as today.
+  assert.equal(filterKeyForItem({ kind: 'professional', source: 'professional_event' }), 'pd');
 });

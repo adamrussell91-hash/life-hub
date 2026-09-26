@@ -14,6 +14,7 @@ import {
 } from './_shared/http.mjs';
 import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from './_shared/github-client.mjs';
 import { decodeBlob } from './_shared/decode-blob.mjs';
+import { wallLocalToUtcIso } from './_shared/wall-time.mjs';
 import { buildCanonicalPath } from './_shared/chat-schema.mjs';
 import { parseDateRange } from './_shared/repo-policy.mjs';
 import { validateCentralNodePatchInput, applyCentralNodePatch } from './_shared/hammond-tools.mjs';
@@ -31,6 +32,11 @@ import {
   readSchoolTerms
 } from './almanac.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
+import { createAccessContext } from './_shared/entity-access.mjs';
 import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
@@ -297,6 +303,28 @@ export function ghostTaskId(ghostId) {
   return `ghost-${ghostId}`;
 }
 
+/** Accept of a book_comm ghost: create the comm, then join it to its thread. */
+export async function applyProfessionalStep(deps, step) {
+  if (step.action !== 'create_communication') throw new TypeError(`Unknown professional step: ${step.action}`);
+  const start = wallLocalToUtcIso(`${step.date}T${step.time}`, step.time_zone);
+  const end = new Date(Date.parse(start) + step.duration_min * 60_000).toISOString();
+  const { communication } = await deps.createCommunication({
+    direction: 'outbound',
+    channel: step.channel,
+    occurred_at: start,
+    scheduled_start: start,
+    scheduled_end: end,
+    time_zone: step.time_zone,
+    purpose_tag: step.purpose_tag,
+    subject: step.title,
+    links: step.person_refs.map((ref) => ({ relationship_type: 'recipient', target_ref: ref }))
+  });
+  if (step.thread_ref) {
+    await deps.createLink({ source_ref: `professional:communication:${communication.id}`, target_ref: step.thread_ref, relationship_type: 'in_thread' });
+  }
+  return communication;
+}
+
 export async function applyTaskStep(store, step, { ghostId } = {}) {
   if (step.method === 'PATCH' && step.collection === 'goals') {
     const key = `goals/${step.id}`;
@@ -389,9 +417,9 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
     return fail(400, 'invalid_ghost', message);
   }
 
-  // Step 1 already landed. Retry runs only the tasks steps.
+  // Step 1 already landed. Retry runs only the tasks/professional steps.
   if (status === 'accepted' && entry.tasks_pending === true) {
-    return { kind: 'tasks-only', plan, taskSteps: plan.steps.filter(step => step.target === 'tasks') };
+    return { kind: 'tasks-only', plan, taskSteps: plan.steps.filter(step => step.target === 'tasks' || step.target === 'professional') };
   }
 
   if (decision === 'dismiss') {
@@ -421,6 +449,10 @@ async function settle(opened, { id, decision, reason, today, nowIso }) {
       continue;
     }
     if (step.target === 'tasks') {
+      taskSteps.push(step);
+      continue;
+    }
+    if (step.target === 'professional') {
       taskSteps.push(step);
       continue;
     }
@@ -661,7 +693,7 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
  * GitHub commit (or the mock equivalent). Tasks run only after that commit.
  */
 export async function runGhostDecision({
-  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = [], horizon = null
+  open, commit, tasksStore, professionalDeps, decision, today, nowIso, lessons = [], professionalEvents = [], horizon = null
 }) {
   if (typeof decision.id === 'string' && decision.id.startsWith('alm-')) {
     return runAlmanacGhostDecision({
@@ -678,7 +710,7 @@ export async function runGhostDecision({
     const settlement = await settle(opened, { ...decision, today, nowIso });
     if (settlement.status) return settlement;
     if (settlement.kind === 'tasks-only') {
-      return finishTasks({ open, commit, tasksStore, id: decision.id, settlement });
+      return finishTasks({ open, commit, tasksStore, professionalDeps, id: decision.id, settlement });
     }
     try {
       if (settlement.changed.size) await commit(settlement.changed, opened.base, settlement.message);
@@ -686,17 +718,21 @@ export async function runGhostDecision({
       if (error instanceof GitHubClientError && error.code === 'write_conflict' && attempt === 0) continue;
       throw error;
     }
-    return finishTasks({ open, commit, tasksStore, id: decision.id, settlement });
+    return finishTasks({ open, commit, tasksStore, professionalDeps, id: decision.id, settlement });
   }
   return fail(409, 'write_conflict', 'The repository changed while accepting. Try again.');
 }
 
-async function finishTasks({ open, commit, tasksStore, id, settlement }) {
+async function finishTasks({ open, commit, tasksStore, professionalDeps, id, settlement }) {
   if (!settlement.taskSteps.length) return applied(settlement.plan, { drafts: settlement.drafts ?? [] });
   try {
     const store = await tasksStore();
     for (const step of settlement.taskSteps) {
-      await applyTaskStep(store, step, { ghostId: step.ghostId ?? id });
+      if (step.target === 'professional') {
+        await applyProfessionalStep(await professionalDeps(), step);
+      } else {
+        await applyTaskStep(store, step, { ghostId: step.ghostId ?? id });
+      }
     }
     try {
       await clearTasksPending(open, commit, id);
@@ -875,6 +911,17 @@ export function createCalendarGhostsHandler({
         open,
         commit,
         tasksStore: () => getTasksStore(env),
+        professionalDeps: async () => {
+          const professionalStore = await defaultGetProfessionalStore(env);
+          const repo = createCommunicationRepository({ store: professionalStore, env });
+          const universalLinkStore = await defaultGetUniversalLinkStore(env);
+          const links = createUniversalLinkRepository({ store: universalLinkStore });
+          const accessContext = createAccessContext({ workflow: 'life' });
+          return {
+            createCommunication: (input) => repo.createCommunication(input),
+            createLink: (link) => links.createLink(link, accessContext)
+          };
+        },
         decision,
         today: getSydneyDateKey(instant),
         nowIso: getSydneyTimestamp(instant),

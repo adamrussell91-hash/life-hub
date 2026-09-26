@@ -2,6 +2,7 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createLedgerItemRepository } from './_shared/ledger-repository.mjs';
+import { parseDueRangeQuery } from './_shared/ledger-schema.mjs';
 import {
   assemblePersonLedger,
   extractLedgerCandidatesFromText
@@ -53,6 +54,19 @@ export function createPeopleLedgerHandler(deps = {}) {
 
       try {
         if (request.method === 'GET') {
+          if (url.searchParams.has('due_from')) {
+            const { from, to } = parseDueRangeQuery(url.searchParams);
+            const items = await ledgerRepo.listDueBetween(from, to);
+            return withCors(okResponse(200, { items }), request, env);
+          }
+          if (url.searchParams.has('source_refs')) {
+            const refs = url.searchParams.get('source_refs').split(',').map((ref) => ref.trim()).filter(Boolean);
+            if (!refs.length || refs.length > 20 || refs.some((ref) => !parseEntityRef(ref))) {
+              return withCors(errorResponse(400, 'invalid_source_refs', 'source_refs must be 1–20 entity refs.', false), request, env);
+            }
+            const items = await ledgerRepo.listForSources(refs);
+            return withCors(okResponse(200, { items }), request, env);
+          }
           const personRef = url.searchParams.get('person_ref');
           if (!personRef || !parseEntityRef(personRef)) {
             return withCors(

@@ -1,5 +1,5 @@
 import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
-import type { CommunicationRecord } from '@/domain/types';
+import type { AgendaItem, CommunicationRecord } from '@/domain/types';
 
 export interface CommunicationLinkInput {
   source_ref?: string;
@@ -19,6 +19,10 @@ export interface CreateCommunicationInput {
   subject?: string;
   summary?: string;
   links?: CommunicationLinkInput[];
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  time_zone?: string | null;
+  purpose_tag?: string | null;
 }
 
 export interface CreateCommunicationResult {
@@ -56,7 +60,16 @@ export async function createCommunication(
 
 export function updateCommunication(
   id: string,
-  patch: { subject?: string; summary?: string },
+  patch: {
+    subject?: string;
+    summary?: string;
+    scheduled_start?: string | null;
+    scheduled_end?: string | null;
+    time_zone?: string | null;
+    purpose_tag?: string | null;
+    agenda?: AgendaItem[];
+    blocks?: unknown[];
+  },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ communication: CommunicationRecord }> {
   const params = new URLSearchParams({ id });

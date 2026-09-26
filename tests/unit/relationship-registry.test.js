@@ -27,6 +27,8 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'employee_at',
     'follow_up',
     'follows_from',
+    'in_pd_group',
+    'in_thread',
     'learning_for',
     'member_of',
     'participates_in',
@@ -40,6 +42,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'related_to',
     'studied_at',
     'tagged_with',
+    'talk_note',
     'venue'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
@@ -75,7 +78,10 @@ test('tagged_with accepts any declared kind on either side, including pairs no s
 
 test('projectRelationshipRegistry exposes every declaration without duplicate_fields, but excludes teaching_protected-only relationships', () => {
   const projected = projectRelationshipRegistry();
-  assert.equal(projected.length, 23);
+  // Public projection: full registry minus teaching_protected-only keys
+  // (participates_in). Includes calendar-comms (in_thread, in_pd_group,
+  // talk_note) and organisations (#508 studied_at, placement_at).
+  assert.equal(projected.length, 26);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as
