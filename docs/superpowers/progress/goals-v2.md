@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 44/46 (96%)**
+**Progress: 45/46 (98%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -90,7 +90,7 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M11: Docs and ship
 
-- [ ] **G-45** Docs update — —
+- [x] **G-45** Docs update — — — `cbbed4c4`
 - [ ] **G-46** Final verification + screenshots + ready PR — —
 
 ---
