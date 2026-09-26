@@ -60,12 +60,17 @@ const ALL_TAGGABLE_KINDS = [
   'professional:meeting',
   'professional:event',
   'professional:application',
+  'professional:achievement',
+  'professional:future',
+  'professional:stepping_stone',
   'knowledge:page',
   'teaching:unit',
   'teaching:lesson',
   'teaching:class',
   'life:decision'
 ];
+
+export { ALL_TAGGABLE_KINDS };
 
 // Slice 1 declarations — the first-slice set named in the implementation
 // programme. Register further relationship keys only in the slice whose
@@ -474,6 +479,93 @@ const REGISTRY = new Map([
       roleMode: 'none',
       metadataKeys: ['permission_status'],
       allowedVisibility: ['teaching_protected']
+    })
+  ],
+  [
+    'evidenced_by',
+    declaration({
+      key: 'evidenced_by',
+      sourceKinds: ['professional:achievement'],
+      targetKinds: ALL_TAGGABLE_KINDS,
+      inverseLabel: 'career_evidence_for',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none',
+      metadataKeys: ['role']
+    })
+  ],
+  [
+    'witnessed_by',
+    declaration({
+      key: 'witnessed_by',
+      sourceKinds: ['professional:achievement'],
+      targetKinds: ['shared:person'],
+      inverseLabel: 'witnessed',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'supports_future',
+    declaration({
+      key: 'supports_future',
+      sourceKinds: ['professional:achievement'],
+      targetKinds: ['professional:future'],
+      inverseLabel: 'supported_by',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none',
+      metadataKeys: ['criterion_ids', 'strength']
+    })
+  ],
+  [
+    'answers_criterion',
+    declaration({
+      key: 'answers_criterion',
+      sourceKinds: ['professional:achievement'],
+      targetKinds: ['professional:application'],
+      inverseLabel: 'answered_by',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none',
+      metadataKeys: ['criterion_id', 'strength']
+    })
+  ],
+  [
+    'probe_of',
+    declaration({
+      key: 'probe_of',
+      sourceKinds: ['professional:application'],
+      targetKinds: ['professional:future'],
+      inverseLabel: 'has_probe',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'stone_for',
+    declaration({
+      key: 'stone_for',
+      sourceKinds: ['professional:stepping_stone'],
+      targetKinds: ['professional:future'],
+      inverseLabel: 'has_stone',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'stone_action',
+    declaration({
+      key: 'stone_action',
+      sourceKinds: ['tasks:task', 'tasks:project', 'tasks:goal', 'tasks:program'],
+      targetKinds: ['professional:stepping_stone'],
+      inverseLabel: 'has_stone_action',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
     })
   ]
 ]);

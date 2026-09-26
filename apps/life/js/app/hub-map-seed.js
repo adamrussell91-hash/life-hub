@@ -174,8 +174,8 @@ export function buildHubMapSeed() {
   add('professional-meeting', 'Meeting page', 'professional', 'page-type', 'professional-meetings', { route: '#/meeting/' });
   add('professional-events', 'Events', 'professional', 'page', 'hub-professional', { route: '#/events' });
   add('professional-event', 'Event page', 'professional', 'page-type', 'professional-events', { route: '#/event/' });
-  add('professional-applications', 'Applications', 'professional', 'page', 'hub-professional', { route: '#/applications' });
-  add('professional-application', 'Application page', 'professional', 'page-type', 'professional-applications', { route: '#/application/' });
+  add('professional-applications', 'Applications', 'professional', 'page', 'hub-professional', { route: '#/career' });
+  add('professional-application', 'Application page', 'professional', 'page-type', 'professional-applications', { route: '#/career/application/' });
   add('professional-career', 'Career', 'professional', 'page', 'hub-professional', { route: '#/career' });
   add('professional-network-ecology', 'Network ecology', 'professional', 'page', 'hub-professional', { route: '#/network-ecology' });
 

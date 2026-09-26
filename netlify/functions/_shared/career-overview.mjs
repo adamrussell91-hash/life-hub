@@ -2,6 +2,7 @@ import { createAccessContext } from './entity-access.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { createApplicationRepository } from './application-repository.mjs';
 import { createEventRepository } from './event-repository.mjs';
+import { createCareerRepository } from './career-repository.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import { parsePersonRecord } from './identity-schema.mjs';
 import {
@@ -11,7 +12,7 @@ import {
   personKey
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
-import { defaultGetProfessionalStore } from './professional-blobs.mjs';
+import { defaultGetProfessionalStore, getJSON as getProfessionalJSON, CAREER_SCAN_STATE_KEY } from './professional-blobs.mjs';
 import { getGithubActiveSelfPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
 
 function sectionOk(items) {
@@ -87,6 +88,7 @@ export async function assembleCareerOverview(deps = {}) {
   const resolveEntity = deps.resolveEntity ?? defaultResolveEntity;
   const createApplicationRepo = deps.createApplicationRepository ?? createApplicationRepository;
   const createEventRepo = deps.createEventRepository ?? createEventRepository;
+  const createCareerRepo = deps.createCareerRepository ?? createCareerRepository;
   const createLinkRepo = deps.createUniversalLinkRepository ?? createUniversalLinkRepository;
   const now = deps.now ?? (() => new Date().toISOString());
   const github = { env: deps.env, fetchImpl: deps.fetchImpl };
@@ -245,12 +247,134 @@ export async function assembleCareerOverview(deps = {}) {
     organisations = sectionUnavailable(reason);
   }
 
+  let achievements = [];
+  let futures = [];
+  let stones = [];
+  let supports_future = [];
+  let answers_criterion = [];
+  let stone_for = [];
+  let stone_actions = [];
+  let scan = { pending_count: 0, last_run_at: null };
+  try {
+    const careerRepo = createCareerRepo({
+      store: professionalStore,
+      now
+    });
+    achievements = await careerRepo.listAchievements();
+    futures = await careerRepo.listFutures();
+    stones = await careerRepo.listSteppingStones();
+    const scanState = (await getProfessionalJSON(professionalStore, CAREER_SCAN_STATE_KEY)) ?? {};
+    scan = {
+      pending_count: 0,
+      last_run_at: scanState.last_run_at ?? null
+    };
+    try {
+      const { listScanProposals } = await import('./career-scan-service.mjs');
+      const pending = await listScanProposals(professionalStore, { status: 'pending' });
+      scan.pending_count = pending.length;
+    } catch {
+      /* scan store optional */
+    }
+
+    const linkRepo = createLinkRepo({
+      store: universalStore,
+      resolveEntity,
+      now
+    });
+    for (const achievement of achievements) {
+      const ref = formatEntityRef({
+        namespace: 'professional',
+        kind: 'achievement',
+        id: achievement.id
+      });
+      try {
+        const { outgoing } = await linkRepo.listForEntity(ref, accessContext);
+        for (const entry of outgoing) {
+          if (entry.link.relationship_type === 'supports_future') {
+            supports_future.push({
+              source_id: achievement.id,
+              target_id: entry.endpoint.ref?.split(':').pop(),
+              future_id: entry.endpoint.ref?.split(':').pop(),
+              criterion_ids: entry.link.metadata?.criterion_ids ?? [],
+              strength: entry.link.metadata?.strength ?? null,
+              updated_at: entry.link.updated_at ?? null,
+              created_at: entry.link.created_at ?? null
+            });
+          }
+          if (entry.link.relationship_type === 'answers_criterion') {
+            answers_criterion.push({
+              source_id: achievement.id,
+              target_id: entry.endpoint.ref?.split(':').pop(),
+              application_id: entry.endpoint.ref?.split(':').pop(),
+              criterion_id: entry.link.metadata?.criterion_id ?? null,
+              strength: entry.link.metadata?.strength ?? null
+            });
+          }
+        }
+      } catch {
+        // Link store gaps must not blank the overview.
+      }
+    }
+    for (const stone of stones) {
+      const ref = formatEntityRef({
+        namespace: 'professional',
+        kind: 'stepping_stone',
+        id: stone.id
+      });
+      try {
+        const { outgoing, incoming } = await linkRepo.listForEntity(ref, accessContext);
+        for (const entry of outgoing) {
+          if (entry.link.relationship_type === 'stone_for') {
+            stone_for.push({
+              source_id: stone.id,
+              stone_id: stone.id,
+              target_id: entry.endpoint.ref?.split(':').pop(),
+              future_id: entry.endpoint.ref?.split(':').pop()
+            });
+          }
+        }
+        for (const entry of incoming) {
+          if (entry.link.relationship_type === 'stone_action') {
+            stone_actions.push({
+              target_id: stone.id,
+              stone_id: stone.id,
+              endpoint: endpointSummary(entry.endpoint)
+            });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    achievements = [];
+    futures = [];
+    stones = [];
+  }
+
+  const applicationRecords =
+    applications.status === 'ok'
+      ? // listApplications already projected — overview keeps summaries for legacy sections
+        []
+      : [];
+
   return {
     applications,
     employment,
     professional_development,
     people,
     organisations,
-    deferred
+    deferred,
+    // River / Skills / Futures / Mirror feed (buildCareerModel)
+    achievements,
+    futures,
+    stones,
+    supports_future,
+    answers_criterion,
+    stone_for,
+    stone_actions,
+    scan,
+    application_records: applicationRecords,
+    employment_items: employment.status === 'ok' ? employment.items : []
   };
 }

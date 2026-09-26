@@ -15,6 +15,14 @@ import { isValidLedgerItemId } from './ledger-schema.mjs';
 import { isValidRememberFactId } from './remember-schema.mjs';
 import { isValidThreadId } from './thread-schema.mjs';
 import { isValidPdGroupId } from './pd-group-schema.mjs';
+import {
+  isValidAchievementId,
+  isValidFutureId,
+  isValidSteppingStoneId,
+  isValidScanProposalId,
+  isValidCareerMoveId,
+  isValidCareerOperationId
+} from './career-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -56,6 +64,19 @@ export const PD_GROUP_PREFIX = 'pd-groups/records/';
 export const REMEMBER_FACT_PREFIX = 'remember-facts/records/';
 export const REMEMBER_FACT_BY_PERSON_PREFIX = 'remember-facts/by-person/';
 export const REMEMBER_RUN_STATE_KEY = 'remember-facts/_run_state';
+
+export const CAREER_ACHIEVEMENT_PREFIX = 'career/achievements/records/';
+export const CAREER_ACHIEVEMENT_INDEX_PREFIX = 'career/achievements/index/';
+export const CAREER_FUTURE_PREFIX = 'career/futures/records/';
+export const CAREER_FUTURE_INDEX_PREFIX = 'career/futures/index/';
+export const CAREER_STONE_PREFIX = 'career/stones/records/';
+export const CAREER_STONE_INDEX_PREFIX = 'career/stones/index/';
+export const CAREER_SCAN_PROPOSAL_PREFIX = 'career/scan-proposals/records/';
+export const CAREER_SCAN_PROPOSAL_BY_HASH_PREFIX = 'career/scan-proposals/by-hash/';
+export const CAREER_MOVE_PREFIX = 'career/moves/records/';
+export const CAREER_MOVE_INDEX_PREFIX = 'career/moves/index/';
+export const CAREER_OPERATION_PREFIX = 'career/operations/';
+export const CAREER_SCAN_STATE_KEY = 'career/scan-state';
 
 function assertValidCommunicationId(id) {
   if (!isValidCommunicationId(id)) {
@@ -364,3 +385,121 @@ export async function listRememberFactKeysForPerson(store, personRef) {
     (key) => !isIndexKey(key)
   );
 }
+
+function assertValidAchievementId(id) {
+  if (!isValidAchievementId(id)) {
+    throw Object.assign(new Error(`Invalid Achievement id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_achievement_id'
+    });
+  }
+  return id;
+}
+
+function assertValidFutureId(id) {
+  if (!isValidFutureId(id)) {
+    throw Object.assign(new Error(`Invalid Future id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_future_id'
+    });
+  }
+  return id;
+}
+
+function assertValidSteppingStoneId(id) {
+  if (!isValidSteppingStoneId(id)) {
+    throw Object.assign(new Error(`Invalid Stepping Stone id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_stepping_stone_id'
+    });
+  }
+  return id;
+}
+
+function assertValidScanProposalId(id) {
+  if (!isValidScanProposalId(id)) {
+    throw Object.assign(new Error(`Invalid Scan Proposal id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_scan_proposal_id'
+    });
+  }
+  return id;
+}
+
+function assertValidCareerMoveId(id) {
+  if (!isValidCareerMoveId(id)) {
+    throw Object.assign(new Error(`Invalid Career Move id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_career_move_id'
+    });
+  }
+  return id;
+}
+
+function assertValidCareerOperationId(id) {
+  if (!isValidCareerOperationId(id)) {
+    throw Object.assign(new Error(`Invalid Career operation id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_career_operation_id'
+    });
+  }
+  return id;
+}
+
+export function careerAchievementKey(id) {
+  return `${CAREER_ACHIEVEMENT_PREFIX}${assertValidAchievementId(id)}`;
+}
+export function careerAchievementIndexKey(id) {
+  return `${CAREER_ACHIEVEMENT_INDEX_PREFIX}${assertValidAchievementId(id)}`;
+}
+export async function listCareerAchievementIndexKeys(store) {
+  return (await listBlobKeys(store, CAREER_ACHIEVEMENT_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function careerFutureKey(id) {
+  return `${CAREER_FUTURE_PREFIX}${assertValidFutureId(id)}`;
+}
+export function careerFutureIndexKey(id) {
+  return `${CAREER_FUTURE_INDEX_PREFIX}${assertValidFutureId(id)}`;
+}
+export async function listCareerFutureIndexKeys(store) {
+  return (await listBlobKeys(store, CAREER_FUTURE_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function careerStoneKey(id) {
+  return `${CAREER_STONE_PREFIX}${assertValidSteppingStoneId(id)}`;
+}
+export function careerStoneIndexKey(id) {
+  return `${CAREER_STONE_INDEX_PREFIX}${assertValidSteppingStoneId(id)}`;
+}
+export async function listCareerStoneIndexKeys(store) {
+  return (await listBlobKeys(store, CAREER_STONE_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function careerScanProposalKey(id) {
+  return `${CAREER_SCAN_PROPOSAL_PREFIX}${assertValidScanProposalId(id)}`;
+}
+export function careerScanProposalByHashKey(hash) {
+  if (typeof hash !== 'string' || !hash) {
+    throw Object.assign(new Error('Invalid scan proposal hash.'), {
+      status: 400,
+      code: 'invalid_scan_proposal_hash'
+    });
+  }
+  return `${CAREER_SCAN_PROPOSAL_BY_HASH_PREFIX}${hash}`;
+}
+
+export function careerMoveKey(id) {
+  return `${CAREER_MOVE_PREFIX}${assertValidCareerMoveId(id)}`;
+}
+export function careerMoveIndexKey(id) {
+  return `${CAREER_MOVE_INDEX_PREFIX}${assertValidCareerMoveId(id)}`;
+}
+export async function listCareerMoveIndexKeys(store) {
+  return (await listBlobKeys(store, CAREER_MOVE_INDEX_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function careerOperationKey(id) {
+  return `${CAREER_OPERATION_PREFIX}${assertValidCareerOperationId(id)}`;
+}
+

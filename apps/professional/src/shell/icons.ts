@@ -42,10 +42,12 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
     'M10 12h4',
     'M10 15h4'
   ],
+  // Branching river — Career (mockup rail)
   career: [
-    'M4.5 9.5h15v9h-15v-9Z',
-    'M9 9.5V7.5A1.5 1.5 0 0 1 10.5 6h3A1.5 1.5 0 0 1 15 7.5v2',
-    'M12 13v2'
+    'M3 12c4 0 5-4 9-4',
+    'M12 8c3 0 4-3 9-3',
+    'M12 8c3 0 4 3 9 3',
+    'M12 8c3 0 4 8 9 8'
   ],
   // Three connected habitat "nodes" — matches the rail icon drawn in
   // docs/professional-hub/people-experience/mockups/04-network-ecology.html

@@ -41,6 +41,10 @@ export type Route =
   | { name: 'application-new' }
   | { name: 'application'; id: string }
   | { name: 'career' }
+  | { name: 'career-application-new' }
+  | { name: 'career-application'; id: string }
+  | { name: 'career-future'; id: string }
+  | { name: 'career-card'; id: string }
   | { name: 'network-ecology' }
   | { name: 'not-found'; path: string };
 
@@ -83,6 +87,28 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 1 && segments[0] === 'career') return { name: 'career' };
   if (segments.length === 1 && segments[0] === 'network-ecology') return { name: 'network-ecology' };
   if (segments.length === 1 && segments[0] === 'log') return { name: 'log' };
+
+  if (segments.length === 2 && segments[0] === 'career' && segments[1] === 'application') {
+    return { name: 'not-found', path };
+  }
+  if (segments.length === 3 && segments[0] === 'career' && segments[1] === 'application' && segments[2] === 'new') {
+    return { name: 'career-application-new' };
+  }
+  if (segments.length === 3 && segments[0] === 'career' && segments[1] === 'application') {
+    const id = safeDecode(segments[2]!);
+    if (id && isValidApplicationId(id)) return { name: 'career-application', id };
+    return { name: 'not-found', path };
+  }
+  if (segments.length === 3 && segments[0] === 'career' && segments[1] === 'future') {
+    const id = safeDecode(segments[2]!);
+    if (id) return { name: 'career-future', id };
+    return { name: 'not-found', path };
+  }
+  if (segments.length === 3 && segments[0] === 'career' && segments[1] === 'card') {
+    const id = safeDecode(segments[2]!);
+    if (id) return { name: 'career-card', id };
+    return { name: 'not-found', path };
+  }
 
   if (segments.length === 2 && segments[0] === 'communication' && segments[1] === 'new') {
     return { name: 'communication-new' };
@@ -194,11 +220,15 @@ export function railHighlightFor(route: Route): RailViewId | null {
   if (
     route.name === 'applications' ||
     route.name === 'application' ||
-    route.name === 'application-new'
+    route.name === 'application-new' ||
+    route.name === 'career' ||
+    route.name === 'career-application' ||
+    route.name === 'career-application-new' ||
+    route.name === 'career-future' ||
+    route.name === 'career-card'
   ) {
-    return 'applications';
+    return 'career';
   }
-  if (route.name === 'career') return 'career';
   if (route.name === 'network-ecology') return 'network-ecology';
   return null;
 }
@@ -245,5 +275,42 @@ export function eventRoute(id: string): string {
 }
 
 export function applicationRoute(id: string): string {
-  return `#/application/${encodeURIComponent(id)}`;
+  return `#/career/application/${encodeURIComponent(id)}`;
+}
+
+export function careerApplicationNewRoute(): string {
+  return '#/career/application/new';
+}
+
+export function careerFutureRoute(id: string): string {
+  return `#/career/future/${encodeURIComponent(id)}`;
+}
+
+export function careerCardRoute(id: string): string {
+  return `#/career/card/${encodeURIComponent(id)}`;
+}
+
+/** Redirect legacy Applications URLs. Returns true when a replace was issued. */
+export function redirectLegacyCareerHash(hash: string = location.hash): boolean {
+  const raw = hash.replace(/^#\/?/, '').split('?')[0] ?? '';
+  const path = raw.replace(/\/+$/, '');
+  if (path === 'applications') {
+    location.replace('#/career');
+    try {
+      sessionStorage.setItem('career-scroll-to', 'applications');
+    } catch {
+      /* ignore */
+    }
+    return true;
+  }
+  if (path === 'application/new') {
+    location.replace('#/career/application/new');
+    return true;
+  }
+  const match = /^application\/([^/]+)$/.exec(path);
+  if (match?.[1] && isValidApplicationId(safeDecode(match[1]) ?? '')) {
+    location.replace(`#/career/application/${encodeURIComponent(safeDecode(match[1])!)}`);
+    return true;
+  }
+  return false;
 }

@@ -18,6 +18,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   const keys = listRelationshipDeclarations().map(decl => decl.key).sort();
   assert.deepEqual(keys, [
     'about_person',
+    'answers_criterion',
     'application_action',
     'application_contact',
     'applies_to',
@@ -25,6 +26,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'collaborator',
     'contact',
     'employee_at',
+    'evidenced_by',
     'follow_up',
     'follows_from',
     'in_pd_group',
@@ -35,15 +37,20 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'placement_at',
     'preparation',
     'presenter',
+    'probe_of',
     'professional_relationship',
     'provider',
     'recipient',
     'referee',
     'related_to',
+    'stone_action',
+    'stone_for',
     'studied_at',
+    'supports_future',
     'tagged_with',
     'talk_note',
-    'venue'
+    'venue',
+    'witnessed_by'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
   assert.equal(getRelationshipDeclaration('professional_relationship').inverse_label, 'professional_relationship');
@@ -61,6 +68,13 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.equal(getRelationshipDeclaration('participates_in').inverse_label, 'has_participant');
   assert.equal(getRelationshipDeclaration('presenter').inverse_label, 'presents_at');
   assert.equal(getRelationshipDeclaration('tagged_with').inverse_label, 'tagged_with');
+  assert.equal(getRelationshipDeclaration('evidenced_by').inverse_label, 'career_evidence_for');
+  assert.equal(getRelationshipDeclaration('witnessed_by').inverse_label, 'witnessed');
+  assert.equal(getRelationshipDeclaration('supports_future').inverse_label, 'supported_by');
+  assert.equal(getRelationshipDeclaration('answers_criterion').inverse_label, 'answered_by');
+  assert.equal(getRelationshipDeclaration('probe_of').inverse_label, 'has_probe');
+  assert.equal(getRelationshipDeclaration('stone_for').inverse_label, 'has_stone');
+  assert.equal(getRelationshipDeclaration('stone_action').inverse_label, 'has_stone_action');
 });
 
 test('tagged_with accepts any declared kind on either side, including pairs no specific key declares', () => {
@@ -80,8 +94,8 @@ test('projectRelationshipRegistry exposes every declaration without duplicate_fi
   const projected = projectRelationshipRegistry();
   // Public projection: full registry minus teaching_protected-only keys
   // (participates_in). Includes calendar-comms (in_thread, in_pd_group,
-  // talk_note) and organisations (#508 studied_at, placement_at).
-  assert.equal(projected.length, 26);
+  // talk_note), organisations (#508 studied_at, placement_at), and Career.
+  assert.equal(projected.length, 33);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as
