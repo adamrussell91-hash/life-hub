@@ -233,6 +233,59 @@ export function findNodeAt<T extends PositionedNode>(nodes: T[], x: number, y: n
   return null;
 }
 
+/** Scale+translate that maps simulation coordinates into the canvas with a
+ * margin. Identity when there are no positioned nodes. Exported so fit and
+ * hit-testing stay independently testable. */
+export interface ViewTransform {
+  scale: number;
+  tx: number;
+  ty: number;
+}
+
+export function computeViewTransform(
+  nodes: Array<{ x?: number; y?: number }>,
+  width: number,
+  height: number,
+  margin = 24
+): ViewTransform {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  let count = 0;
+  for (const node of nodes) {
+    if (node.x == null || node.y == null) continue;
+    minX = Math.min(minX, node.x);
+    maxX = Math.max(maxX, node.x);
+    minY = Math.min(minY, node.y);
+    maxY = Math.max(maxY, node.y);
+    count += 1;
+  }
+  if (!count || !Number.isFinite(minX)) {
+    return { scale: 1, tx: 0, ty: 0 };
+  }
+  const contentW = Math.max(maxX - minX, 1);
+  const contentH = Math.max(maxY - minY, 1);
+  const availW = Math.max(width - margin * 2, 1);
+  const availH = Math.max(height - margin * 2, 1);
+  const scale = Math.min(availW / contentW, availH / contentH);
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  return {
+    scale,
+    tx: width / 2 - midX * scale,
+    ty: height / 2 - midY * scale
+  };
+}
+
+export function worldToScreen(x: number, y: number, t: ViewTransform): { x: number; y: number } {
+  return { x: x * t.scale + t.tx, y: y * t.scale + t.ty };
+}
+
+export function screenToWorld(x: number, y: number, t: ViewTransform): { x: number; y: number } {
+  return { x: (x - t.tx) / t.scale, y: (y - t.ty) / t.scale };
+}
+
 function tooltipText(node: GraphNode): string {
   const parts = [node.label, node.kind === 'organisation' ? 'Organisation' : 'Person'];
   if (node.habitat) parts.push(HABITAT_META[node.habitat].label.split(' — ')[0]!);
@@ -269,6 +322,7 @@ export function mountNetworkGraph(
   let selectedId: string | null = null;
   let hoverNode: SimNode | null = null;
   let myceliumMode = options.myceliumMode ?? false;
+  let viewTransform: ViewTransform = { scale: 1, tx: 0, ty: 0 };
 
   host.replaceChildren();
 
@@ -297,10 +351,18 @@ export function mountNetworkGraph(
     return simNodes.filter((n) => n.x != null && n.y != null);
   }
 
+  function refreshFit(): void {
+    viewTransform = computeViewTransform(positionedNodes(), width, height, 24);
+  }
+
   function draw(): void {
     if (destroyed || !ctx) return;
+    refreshFit();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
+    ctx.save();
+    ctx.translate(viewTransform.tx, viewTransform.ty);
+    ctx.scale(viewTransform.scale, viewTransform.scale);
 
     // Habitat halos, per-node (documented decision above — no hull).
     // Mycelium mode fades the terrain heavily rather than removing it
@@ -378,6 +440,8 @@ export function mountNetworkGraph(
       }
     }
 
+    ctx.restore();
+
     if (!options.reducedMotion) {
       // Fade-in happens once, on first successful draw — cheap and
       // idempotent to re-set every frame.
@@ -392,9 +456,18 @@ export function mountNetworkGraph(
 
   function handlePointer(event: MouseEvent): SimNode | null {
     const rect = canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    return findNodeAt(positionedNodes() as PositionedNode[], x, y) as SimNode | null;
+    const sx = event.clientX - rect.left;
+    const sy = event.clientY - rect.top;
+    refreshFit();
+    // Hit-test in screen space so node targets stay ~constant pixel size
+    // after the fit transform (a lone node must not become a canvas-wide hit).
+    const screenNodes = positionedNodes().map((node) => {
+      const screen = worldToScreen(node.x!, node.y!, viewTransform);
+      return { ...node, x: screen.x, y: screen.y };
+    }) as PositionedNode[];
+    const hit = findNodeAt(screenNodes, sx, sy);
+    if (!hit) return null;
+    return simNodes.find((n) => n.id === hit.id) ?? null;
   }
 
   function onMouseMove(event: MouseEvent): void {

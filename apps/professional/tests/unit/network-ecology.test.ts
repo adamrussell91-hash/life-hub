@@ -197,6 +197,26 @@ describe('renderNetworkEcologyView', () => {
     expect(backButton?.hidden).toBe(false);
   });
 
+  it('V1: empty selected-node panel stays display:none (offsetHeight === 0)', async () => {
+    globalThis.fetch = routedFetch({});
+    // Inject the panel rule the same way hub.css does — jsdom does not load
+    // hub.css, so assert the `[hidden]` override contract directly.
+    const style = document.createElement('style');
+    style.textContent = `
+      .network-ecology__panel { display: flex; }
+      .network-ecology__panel[hidden] { display: none; }
+    `;
+    document.head.append(style);
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderNetworkEcologyView(canvas);
+    const panel = canvas.querySelector<HTMLElement>('.network-ecology__panel');
+    expect(panel).not.toBeNull();
+    expect(panel!.hasAttribute('hidden')).toBe(true);
+    expect(getComputedStyle(panel!).display).toBe('none');
+    expect(panel!.offsetHeight).toBe(0);
+  });
+
   it('Back to World View returns to World View mode', async () => {
     const fetchSpy = routedFetch({});
     globalThis.fetch = fetchSpy;

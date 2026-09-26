@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   bridgeMarkerColor,
+  computeViewTransform,
   findNodeAt,
   habitatAccentColor,
   habitatFillColor,
   mountNetworkGraph,
   opportunityMarkerColor,
+  worldToScreen,
   type GraphEdge,
   type GraphNode,
   type PositionedNode
@@ -24,6 +26,10 @@ function mockContext(): CanvasRenderingContext2D {
     arc: vi.fn(),
     fillText: vi.fn(),
     setLineDash: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
     strokeStyle: '',
     fillStyle: '',
     lineWidth: 1,
@@ -62,6 +68,10 @@ function mockRecordingContext(): {
     arc: vi.fn(),
     fillText: vi.fn(),
     setLineDash: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
     strokeStyle: '',
     fillStyle: '',
     lineWidth: 1,
@@ -77,6 +87,50 @@ function stubRect(canvasEl: HTMLCanvasElement): void {
   canvasEl.getBoundingClientRect = () =>
     ({ left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
 }
+
+describe('computeViewTransform — fit-to-frame stopgap', () => {
+  it('fits 300 nodes spread over ±2000px inside a 1170×664 canvas with a 24px margin', () => {
+    const nodes = Array.from({ length: 300 }, (_, i) => ({
+      x: ((i % 20) - 10) * 200,
+      y: (Math.floor(i / 20) - 7) * 200
+    }));
+    const width = 1170;
+    const height = 664;
+    const margin = 24;
+    const t = computeViewTransform(nodes, width, height, margin);
+    for (const node of nodes) {
+      const screen = worldToScreen(node.x, node.y, t);
+      expect(screen.x).toBeGreaterThanOrEqual(margin - 0.01);
+      expect(screen.x).toBeLessThanOrEqual(width - margin + 0.01);
+      expect(screen.y).toBeGreaterThanOrEqual(margin - 0.01);
+      expect(screen.y).toBeLessThanOrEqual(height - margin + 0.01);
+    }
+  });
+
+  it('selects a node when clicking its fitted screen position among a wide spread', () => {
+    const nodes = Array.from({ length: 20 }, (_, i) => ({
+      id: `n-${i}`,
+      kind: 'person' as const,
+      label: `N${i}`,
+      fx: ((i % 5) - 2) * 800,
+      fy: (Math.floor(i / 5) - 2) * 800
+    })) as unknown as GraphNode[];
+    const onNodeSelect = vi.fn();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const getContextSpy = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(mockContext());
+    mountNetworkGraph(host, nodes, [], { reducedMotion: true, onNodeSelect });
+    const canvasEl = host.querySelector('canvas')!;
+    stubRect(canvasEl);
+    const positioned = nodes.map((n) => ({ x: (n as { fx: number }).fx, y: (n as { fy: number }).fy }));
+    const t = computeViewTransform(positioned, 720, 420, 24);
+    const target = positioned[7]!;
+    const screen = worldToScreen(target.x, target.y, t);
+    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: screen.x, clientY: screen.y, bubbles: true }));
+    expect(onNodeSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'n-7' }));
+    getContextSpy.mockRestore();
+  });
+});
 
 describe('findNodeAt', () => {
   const nodes: PositionedNode[] = [
@@ -145,13 +199,14 @@ describe('mountNetworkGraph', () => {
     getContextSpy.mockRestore();
   });
 
-  it('fires onNodeSelect with the correct node when clicking its fixed position', () => {
+  it('fires onNodeSelect with the correct node when clicking its fitted screen position', () => {
     // `fx`/`fy` PIN a d3-force node to an exact coordinate regardless of
     // simulation forces — the technique that makes hit-testing
     // deterministic in a test without depending on simulation internals.
     // `reducedMotion: true` settles the simulation synchronously (many
     // manual `.tick()` calls) so the pinned position is in place before
     // the test dispatches its click, with no timer/animation frame wait.
+    // Clicks use screen coordinates after the fit transform.
     const nodes = [
       { id: 'person-a', kind: 'person', label: 'Person A', fx: 60, fy: 80 },
       { id: 'org-b', kind: 'organisation', label: 'Org B', fx: 300, fy: 300 }
@@ -162,8 +217,18 @@ describe('mountNetworkGraph', () => {
     mountNetworkGraph(host, nodes, [], { reducedMotion: true, onNodeSelect });
     const canvasEl = host.querySelector('canvas')!;
     stubRect(canvasEl);
+    const transform = computeViewTransform(
+      [
+        { x: 60, y: 80 },
+        { x: 300, y: 300 }
+      ],
+      720,
+      420,
+      24
+    );
+    const screen = worldToScreen(60, 80, transform);
 
-    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: 60, clientY: 80, bubbles: true }));
+    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: screen.x, clientY: screen.y, bubbles: true }));
 
     expect(onNodeSelect).toHaveBeenCalledTimes(1);
     expect(onNodeSelect.mock.calls[0]![0]).toMatchObject({ id: 'person-a', label: 'Person A' });
@@ -297,7 +362,9 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
     stubRect(canvasEl);
 
     // Select the node first, to confirm the toggle doesn't clear selection.
-    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: 50, clientY: 50, bubbles: true }));
+    const t = computeViewTransform([{ x: 50, y: 50 }], 720, 420, 24);
+    const screen = worldToScreen(50, 50, t);
+    canvasEl.dispatchEvent(new MouseEvent('click', { clientX: screen.x, clientY: screen.y, bubbles: true }));
     expect(onNodeSelect).toHaveBeenCalledTimes(1);
 
     recording.fillCalls.length = 0;
