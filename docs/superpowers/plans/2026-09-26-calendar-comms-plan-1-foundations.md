@@ -19,9 +19,9 @@
 **Spec:** `docs/superpowers/specs/2026-09-26-calendar-comms-design.md`. This plan covers spec sections 1 (the sources and dots), 2 (the engine import only), 4 and 7.
 
 **Later plans on this branch:**
-- Plan 2: pages. Calendar Due row and pin chips, redirects, the comm shell and phases, threads and the case page, meetings, events/PD.
-- Plan 3: Clare actions and the phone.
-- Plan 4: the Notion import.
+- Plan 2: calendar Due row, pins and redirects; the comm page; threads and the case page. Plan 3: meetings, events and PD.
+- Plan 4: Clare actions and the phone.
+- Plan 5: the Notion import.
 
 **Where to run things:** the repo root, unless a step says `apps/professional`. Branch: `claude/calendar-comms`.
 
