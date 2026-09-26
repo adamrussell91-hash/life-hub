@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Option B — Crest wall</title>
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="people.css">
+<style>
+  .needs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .need { padding: 16px 18px; display: flex; gap: 14px; align-items: flex-start; }
+  .need p { margin: 6px 0 10px; font-size: var(--text-sm); color: var(--ink); }
+  .wall { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .org { padding: 22px 22px 18px; display: flex; flex-direction: column; gap: 14px; position: relative; }
+  .org.home { grid-column: span 2; background: linear-gradient(135deg, rgba(255,255,255,0.9), var(--pastel-blue)); }
+  .org h3 { margin: 0; font-size: var(--text-md); color: var(--depth); }
+  .faces { display: flex; }
+  .faces .avatar { margin-right: -8px; border: 2px solid var(--warm-white); }
+  .faces .more { margin-left: 16px; align-self: center; }
+  .roles { display: flex; gap: 6px; flex-wrap: wrap; }
+  .drawer { position: absolute; right: 0; top: 0; bottom: 0; width: 520px; background: var(--paper); box-shadow: var(--elev-4); padding: 30px 32px; display: flex; flex-direction: column; gap: 18px; border-left: 1px solid var(--line); }
+  .scrim { position: absolute; inset: 0 520px 0 240px; background: rgba(10,21,54,0.18); }
+  .drawer .li { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: var(--text-sm); }
+  .rel { padding: 14px 16px; border-radius: var(--radius-sm); background: var(--pastel-gold); color: var(--pastel-gold-ink); font-size: var(--text-sm); }
+</style></head>
+<body><div class="screen">
+<aside class="hub-rail"></aside>
+<main class="canvas">
+  <div class="title-row">
+    <h1 class="page-title">People</h1><span class="spacer"></span>
+    <div class="search" style="width:300px">Find someone…<kbd>/</kbd></div><span class="btn btn-primary">Add person</span>
+  </div>
+
+  <div>
+    <div class="eyebrow" style="margin-bottom:10px">Needs you</div>
+    <div class="needs">
+      <div class="card need"><span class="avatar av a1">HM</span><div><span class="name">Henry McLennan</span><p>Set up mentoring meeting · Accreditation Mentor</p><span class="btn btn-primary" style="height:32px">Schedule</span></div></div>
+      <div class="card need"><span class="avatar av a3">BG</span><div><span class="name">Bianca Gambrill</span><p>No contact in 5 months since you left Trinity</p><span class="btn btn-outline" style="height:32px">Reconnect</span></div></div>
+      <div class="card need"><span class="avatar av a2">TH</span><div><span class="name">Tim Hildebrandt</span><p>New connection — who is he to you?</p><span class="btn btn-outline" style="height:32px">Add context</span></div></div>
+    </div>
+  </div>
+
+  <div class="wall">
+    <div class="card org home">
+      <div class="row"><span class="crest lg c-sac">SAC</span><div class="stack"><h3>St. Aloysius College</h3><span class="sub">Your workplace · 26 people</span></div></div>
+      <div class="faces"><span class="avatar av a1">HM</span><span class="avatar av a4">FR</span><span class="avatar av a2">CC</span><span class="avatar av a5">DR</span><span class="avatar av a6">CS</span><span class="avatar av a3">EQ</span><span class="avatar av a2">GS</span><span class="sub more">+19</span></div>
+      <div class="roles"><span class="chip chip-gold">1 mentee</span><span class="chip chip-lilac">3 leaders</span><span class="chip chip-blue">22 colleagues</span></div>
+    </div>
+    <div class="card org">
+      <div class="row"><span class="crest lg c-tcc">TCC</span><div class="stack"><h3>Trinity Catholic College</h3><span class="sub">Former workplace · 20</span></div></div>
+      <div class="faces"><span class="avatar av a3">BG</span><span class="avatar av a6">CG</span><span class="avatar av a4">CW</span><span class="sub more">+17</span></div>
+      <div class="roles"><span class="chip chip-outline">6 gone quiet</span></div>
+    </div>
+    <div class="card org">
+      <div class="row"><span class="crest lg c-mcc">MCC</span><div class="stack"><h3>Catherine McAuley</h3><span class="sub">4 people</span></div></div>
+      <div class="faces"><span class="avatar av a4">AM</span><span class="avatar av a5">EB</span><span class="sub more">+2</span></div>
+    </div>
+    <div class="card org">
+      <div class="row"><span class="crest lg c-lk">LK</span><div class="stack"><h3>Loreto Kirribilli</h3><span class="sub">3 people</span></div></div>
+      <div class="faces"><span class="avatar av a6">DT</span><span class="avatar av a2">KA</span><span class="avatar av a1">LS</span></div>
+    </div>
+    <div class="card org">
+      <div class="row"><span class="crest lg c-halt">HALT</span><div class="stack"><h3>NSW HALT Association</h3><span class="sub">Professional body · 2</span></div></div>
+      <div class="faces"><span class="avatar av a2">EM</span></div>
+    </div>
+  </div>
+</main>
+<div class="scrim"></div>
+<aside class="drawer">
+  <div class="row"><span class="avatar av lg a1">HM</span><div class="stack" style="flex:1"><h2 class="page-title" style="font-size:26px;margin:0">Henry McLennan</h2><div class="row" style="gap:8px;margin-top:6px"><span class="crest sm c-sac">SAC</span><span class="sub">Teacher · St. Aloysius College</span></div></div><span class="btn btn-ghost">✕</span></div>
+  <div class="rel"><b>Your mentee.</b> You're his accreditation mentor (Project: Accreditation Mentor) and you work together at St. Aloysius.</div>
+  <div><div class="h2">Open loops</div>
+    <div class="li">Set up mentoring meeting <span class="sub">· due 2 Oct</span></div>
+    <div class="li">Share Proficient evidence guide</div></div>
+  <div><div class="h2">Talking points</div>
+    <div class="li">Which standards he's starting with</div>
+    <div class="li">His first term at SAC</div></div>
+  <div><div class="h2" style="margin-bottom:8px">Timeline</div>
+    <div class="sub">17 Sep — connected · 22 Sep — task created in Accreditation Mentor</div></div>
+  <div class="row" style="margin-top:auto"><span class="btn btn-outline">Edit</span><span class="spacer" style="flex:1"></span><span class="btn btn-primary">Schedule meeting</span></div>
+</aside>
+<span class="tag" style="right:540px">Option B — crest wall. Organisations first; a person opens in a drawer, never a second page.</span>
+</div><script src="rail.js"></script></body></html>
