@@ -93,7 +93,12 @@ export function renderCalendar(root, model, {
     host.style.minWidth = '0';
     if (host.parentElement) host.parentElement.style.minWidth = '0';
     dashboard.removeAttribute('hidden');
-    renderAlmanac(root, host, { now, onSwitchView });
+    renderAlmanac(root, host, {
+      hub: 'life',
+      now,
+      apiFetch,
+      onSwitchView
+    });
     return;
   }
   unmountAlmanac();
@@ -101,6 +106,7 @@ export function renderCalendar(root, model, {
   const weekDates = (model.weekDays ?? []).map(day => day.date);
   const terms = calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null;
   const tidelineInput = {
+    hub: 'life',
     events,
     visual: calendarVisual,
     ghosts: calendarGhosts,

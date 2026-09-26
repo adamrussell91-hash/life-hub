@@ -249,6 +249,7 @@ test('desktop day view mounts the Day Dial', () => {
 });
 
 test('master calendar names every hub source', () => {
+  // Step 2 shared filter: Teaching splits into Classes/Events; Tasks stays Tasks.
   const root = fakeRoot({ mobile: false });
   const events = [
     { record: { type: 'scheduled_lesson', date: '2026-08-05', time: '09:15', title: 'Memory' }, body: '', path: 't' },
@@ -258,7 +259,7 @@ test('master calendar names every hub source', () => {
   const strip = root._host.querySelector('.cal__sources');
   assert.ok(strip);
   const labels = collect(strip).map(node => node.textContent).join(' ');
-  assert.match(labels, /Teaching 1/);
+  assert.match(labels, /Classes 1/);
   assert.match(labels, /Tasks 1/);
   assert.equal(labels.includes('2037'), false);
 });

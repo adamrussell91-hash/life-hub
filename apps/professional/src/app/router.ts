@@ -21,6 +21,7 @@ export type RailViewId =
 
 export type Route =
   | { name: 'home' }
+  | { name: 'calendar'; zoom: string }
   | { name: 'people' }
   | { name: 'person'; id: string }
   | { name: 'person-brief'; id: string }
@@ -57,6 +58,11 @@ export function parseRoute(hash: string = location.hash): Route {
   const segments = path.split('/').filter(Boolean);
 
   if (segments.length === 1 && segments[0] === 'home') return { name: 'home' };
+  if (segments.length === 1 && segments[0] === 'calendar') return { name: 'calendar', zoom: 'week' };
+  if (segments.length === 2 && segments[0] === 'calendar') {
+    const zoom = segments[1] === 'month' ? 'week' : segments[1]!;
+    return { name: 'calendar', zoom };
+  }
   if (segments.length === 1 && segments[0] === 'people') return { name: 'people' };
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
   if (segments.length === 1 && segments[0] === 'relationships') return { name: 'relationships' };
@@ -143,7 +149,7 @@ function safeDecode(segment: string): string | null {
 }
 
 export function railHighlightFor(route: Route): RailViewId | null {
-  if (route.name === 'home') return 'home';
+  if (route.name === 'home' || route.name === 'calendar') return 'home';
   if (route.name === 'people' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';

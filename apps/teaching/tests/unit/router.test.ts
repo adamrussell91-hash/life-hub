@@ -20,6 +20,27 @@ describe('router match', () => {
     });
   });
 
+  it('matches teacher calendar zoom routes (month → week)', () => {
+    expect(match('/calendar')).toEqual({
+      name: 'teacher-calendar',
+      params: { zoom: 'week' },
+      requiresAuth: true,
+      path: '/calendar'
+    });
+    expect(match('/calendar/term')).toEqual({
+      name: 'teacher-calendar',
+      params: { zoom: 'term' },
+      requiresAuth: true,
+      path: '/calendar/term'
+    });
+    expect(match('/calendar/month')).toEqual({
+      name: 'teacher-calendar',
+      params: { zoom: 'week' },
+      requiresAuth: true,
+      path: '/calendar'
+    });
+  });
+
   it('matches teacher lesson editor', () => {
     expect(match('/lessons/lesson_aotfw_008')).toEqual({
       name: 'teacher-lesson',

@@ -4,15 +4,9 @@ import { navigate } from '@/app/router';
 import type { CollectionResolveContext } from '@/blocks/collection-resolve';
 import type { Class, ScheduledLesson, Unit } from '@/schemas';
 import { resolveCoverUrl } from '@/schemas';
-import {
-  buildClassCalendarModel,
-  shiftYearMonth,
-  yearMonthFromDate
-} from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
-import { applyCalendarPresentation } from '@/teacher/calendar-presentation';
 import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
-import { renderClassCalendar, type ScheduleCalendarView } from '@/teacher/class-calendar';
+import { mountTeachingCalendar, unmountTeachingCalendar } from '@/teacher/hub-calendar';
 import { mountCreateControl } from '@/teacher/create/control';
 import type { EntityCreatedHandler } from '@/teacher/create/types';
 import { renderEntityBanner } from '@/teacher/entity-banner';
@@ -314,15 +308,8 @@ export function renderClassPage(
 
   const calendarHost = document.createElement('div');
   calendarHost.className = 'class-page__calendar-host';
+  calendarHost.style.minWidth = '0';
   main.append(calendarHost);
-
-  let selectedDate = today;
-  let viewMonth = yearMonthFromDate(today);
-  let calendarView: ScheduleCalendarView = window.matchMedia('(max-width: 720px)').matches
-    ? 'week'
-    : 'month';
-  let monthDelta = 0;
-  let selectedScheduledId: string | null = null;
 
   const errorBanner = document.createElement('p');
   errorBanner.className = 'class-page__error';
@@ -337,48 +324,17 @@ export function renderClassPage(
     options.onCreateLesson?.();
   };
 
-  const paintCalendar = (): void => {
-    const model = buildClassCalendarModel({
-      scheduled: classScheduled,
-      lessonTitles,
-      today,
-      selectedDate,
-      viewMonth
-    });
-    renderClassCalendar(calendarHost, model, {
-      view: calendarView,
-      onViewChange: (next) => {
-        calendarView = next;
-        monthDelta = 0;
-        paintCalendar();
-      },
-      onSelectDate: (date, next = {}) => {
-        selectedDate = date;
-        viewMonth = yearMonthFromDate(date);
-        monthDelta = 0;
-        selectedScheduledId = next.scheduledId ?? null;
-        paintCalendar();
-      },
-      onShiftMonth: (delta) => {
-        viewMonth = shiftYearMonth(viewMonth, delta);
-        monthDelta = delta;
-        paintCalendar();
-      },
-      monthDelta,
-      onNavigate: navigate,
-      selectedScheduledId,
-      onRescheduleLesson: (scheduledId, patch) => {
-        void runScheduleMutation(options, errorBanner, async () => {
-          await patchScheduledLesson(scheduledId, patch);
-        });
-      }
-    });
-    applyCalendarPresentation(calendarHost, {
-      onAdd: addLessonsToCalendar,
-      addLabel: 'Add lessons to calendar'
-    });
-  };
-  paintCalendar();
+  mountTeachingCalendar(calendarHost, {
+    classId: cls.id,
+    today,
+    onQuickAdd: addLessonsToCalendar,
+    quickAddLabel: 'Add lessons to calendar',
+    onReschedule: (scheduledId, patch) =>
+      runScheduleMutation(options, errorBanner, async () => {
+        await patchScheduledLesson(scheduledId, patch);
+      })
+  });
+  disposers.push(() => unmountTeachingCalendar());
   main.append(errorBanner);
 
   const sequenceHost = document.createElement('div');

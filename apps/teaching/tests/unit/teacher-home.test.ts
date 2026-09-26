@@ -117,22 +117,42 @@ const curriculum: CurriculumResponse = {
   ]
 };
 
+function stubCalendarFetches(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      const ok = (data: unknown) =>
+        ({ ok: true, status: 200, json: async () => ({ ok: true, data }) }) as Response;
+      if (path.includes('/api/curriculum')) return ok(curriculum);
+      if (path.includes('/api/calendar-ghosts')) {
+        return { ok: true, status: 200, json: async () => ({ ghosts: [] }) } as Response;
+      }
+      return ok({ tasks: [], work_blocks: [], pages: [] });
+    })
+  );
+}
+
 describe('teacher home dashboard', () => {
   let canvas: HTMLElement;
   let dispose: (() => void) | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    stubCalendarFetches();
     canvas = document.createElement('div');
+    document.body.append(canvas);
     dispose = undefined;
   });
 
   afterEach(() => {
     dispose?.();
+    canvas.remove();
+    vi.unstubAllGlobals();
     document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
 
-  it('renders a cover banner, clock, calendar, and classes without signal tiles', () => {
+  it('renders a cover banner, clock, calendar, and classes without signal tiles', async () => {
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
@@ -143,7 +163,9 @@ describe('teacher home dashboard', () => {
     ).not.toBeNull();
     expect(canvas.querySelector('[data-home-panel="signals"]')).toBeNull();
     expect(canvas.querySelector('.home-today')).toBeNull();
-    expect(canvas.querySelector('.class-calendar')).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="hub-calendar-mount"].class-calendar')).not.toBeNull();
+    });
     expect(canvas.querySelector('[data-home-panel="classes"]')).not.toBeNull();
     expect(canvas.querySelector('.page-header__title')?.textContent).toBe('Dashboard');
     expect(canvas.querySelector('.hub-mark')).toBeNull();
@@ -176,64 +198,26 @@ describe('teacher home dashboard', () => {
     dispose = result.dispose;
   });
 
-  it('shows weekday day numbers, today, class meta on chips, and lesson links', () => {
+  it('mounts kit Tideline with lesson chip (no classic month/timeline skin)', async () => {
+    // Month / Timeline zoom stops DROPPED — see HUB-MIGRATION.md / Step 4 PR note.
     const result = renderTeacherHome(canvas, curriculum);
     dispose = result.dispose;
 
-    const todayCol = canvas.querySelector('.class-calendar__week-day[data-today="true"]');
-    expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
-    expect(todayCol?.querySelector('.class-calendar__day-num')?.textContent).toBe('12');
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="tideline"]')).not.toBeNull();
+    });
 
-    const dayNumbers = [
-      ...canvas.querySelectorAll('.class-calendar__week-day .class-calendar__day-num')
-    ].map((el) => el.textContent);
-    expect(dayNumbers).toEqual(['10', '11', '12', '13', '14', '15', '16']);
-
-    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
+    expect(canvas.querySelector('[data-calendar-view="month"]')).toBeNull();
+    expect(canvas.querySelector('[data-calendar-view="timeline"]')).toBeNull();
     expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
     expect(canvas.querySelector('.calendar-compose')).toBeNull();
     expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
-    expect(
-      canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
-    ).toBe('minmax(0, 1fr)');
 
-    const lessonLink = canvas.querySelector<HTMLAnchorElement>(
-      'a.event-chip[href="/lessons/lesson_aotfw_008"]'
-    );
-    expect(lessonLink).not.toBeNull();
-    expect(lessonLink?.querySelector('.event-chip__title')?.textContent).toBe('Memory');
-    expect(lessonLink?.querySelector('.event-chip__meta')?.textContent).toBe('12ENGADV1');
-    expect(lessonLink?.dataset.tint).toMatch(/blue|sage|peach|gold|lilac/);
-
-    lessonLink?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    expect(navigate).not.toHaveBeenCalled();
-    expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
-    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
-  });
-
-  it('switches month and timeline views', () => {
-    const result = renderTeacherHome(canvas, curriculum);
-    dispose = result.dispose;
-
-    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="month"]')!.click();
-    expect(canvas.querySelector('[role="grid"]')).not.toBeNull();
-    expect(
-      canvas.querySelector('.class-calendar__day[data-today="true"]')
-    ).not.toBeNull();
-
-    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="timeline"]')!.click();
-    expect(canvas.querySelector('.class-calendar__timeline')).not.toBeNull();
-    expect(canvas.textContent).toContain('Memory');
-    expect(canvas.querySelector('.class-calendar__timeline-today')?.textContent).toBe('Today');
-
-    for (const view of ['day', 'week', 'month', 'timeline'] as const) {
-      canvas.querySelector<HTMLButtonElement>(`[data-calendar-view="${view}"]`)!.click();
-      expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
-      expect(canvas.querySelector('.calendar-compose')).toBeNull();
-      expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
-      expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
-      expect(canvas.textContent).not.toContain('No lessons scheduled this day.');
-    }
+    await vi.waitFor(() => {
+      const chip = canvas.querySelector<HTMLElement>('.cal-chip[data-lesson-id="lesson_aotfw_008"]');
+      expect(chip).not.toBeNull();
+      expect(chip?.querySelector('.cal-chip__title')?.textContent).toContain('Memory');
+    });
   });
 
   it('expands class tiles from the dashboard before opening the class page', async () => {
@@ -264,7 +248,7 @@ describe('teacher home dashboard', () => {
     clearSpy.mockRestore();
   });
 
-  it('does not render the standing Add card even when a deleted lesson remains in the library', () => {
+  it('does not render the standing Add card even when a deleted lesson remains in the library', async () => {
     const withDeleted: CurriculumResponse = {
       ...curriculum,
       lessons: [
@@ -284,24 +268,23 @@ describe('teacher home dashboard', () => {
     const result = renderTeacherHome(canvas, withDeleted);
     dispose = result.dispose;
 
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="tideline"]')).not.toBeNull();
+    });
     expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
     expect(canvas.querySelector('.calendar-compose')).toBeNull();
-    expect(canvas.querySelector('[aria-label="Class"]')).toBeNull();
-    expect(canvas.querySelector('[aria-label="Lesson"]')).toBeNull();
     expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
-    expect(
-      [...canvas.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
-    ).toBe(false);
   });
 
-  it('calendar add opens blank lesson flow instead of the home create menu', () => {
+  it('calendar add opens blank lesson flow instead of the home create menu', async () => {
     const onCreated = vi.fn();
     const result = renderTeacherHome(canvas, curriculum, { onCreated });
     dispose = result.dispose;
 
-    const addBtn = canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]');
-    expect(addBtn).not.toBeNull();
-    addBtn?.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-calendar-quick-add]')).not.toBeNull();
+    });
+    canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]')?.click();
 
     expect(openBlankLesson).toHaveBeenCalledWith({
       curriculum,

@@ -49,6 +49,9 @@ export type HubViewId =
   | 'day'
   | 'week'
   | 'month'
+  | 'term'
+  | 'year'
+  | 'almanac'
   | 'list'
   | 'search'
   | 'templates'
@@ -79,7 +82,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'day', label: 'Today', href: '#/day' },
       { id: 'week', label: 'Week', href: '#/week' },
-      { id: 'month', label: 'Month', href: '#/month' },
+      { id: 'term', label: 'Term', href: '#/term' },
+      { id: 'year', label: 'Year', href: '#/year' },
+      { id: 'almanac', label: 'Almanac', href: '#/almanac' },
       { id: 'list', label: 'Backlog', href: '#/list' },
       { id: 'graph', label: 'Graph', href: '#/graph' },
       { id: 'timeline', label: 'Timeline', href: '#/timeline' }
@@ -727,6 +732,8 @@ export function isKnownHashView(hash = location.hash): boolean {
   if (id === 'gantt') return true;
   if (id === 'constellation') return true;
   if (id === 'backlog') return true;
+  // Month is not a rail stop — still a known deep link; parseHashRoute redirects to week.
+  if (id === 'month') return true;
   if (parseEntityPage(hash)) return true;
   if (parseGoalPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
@@ -740,14 +747,25 @@ export function parseHashRoute(): HubViewId {
   if (id === 'constellation' || id === 'orbit' || id === 'branch' || id === 'universe') return 'graph';
   if (id === 'gantt') return 'timeline';
   if (id === 'backlog') return 'list';
+  // Month is not a locked zoom stop — land on Week (preserve ?date= via hash as-is for week).
+  if (id === 'month') {
+    if (typeof location !== 'undefined' && location.hash.startsWith('#/month')) {
+      const rest = location.hash.slice('#/month'.length);
+      const next = `#/week${rest}`;
+      if (location.hash !== next) history.replaceState(null, '', next);
+    }
+    return 'week';
+  }
   return KNOWN_VIEWS.includes(id) ? id : 'board';
 }
 
-const CALENDAR_VIEWS = new Set<HubViewId>(['week', 'month']);
+// Locked kit calendar — Day / Week / Term / Year / Almanac share one mount (Month redirects to Week).
+const KIT_CALENDAR_VIEWS = new Set<HubViewId>(['day', 'week', 'month', 'term', 'year', 'almanac']);
 
-/** Shared paint surface — week/month stay on one calendar, query-only changes stay on the same view. */
+/** Shared paint surface — kit zoom stops soft-nav without remounting. */
 export function viewSurface(view: HubViewId): string {
-  return CALENDAR_VIEWS.has(view) ? 'calendar' : view;
+  if (KIT_CALENDAR_VIEWS.has(view)) return 'kit-calendar';
+  return view;
 }
 
 export function isSoftViewChange(from: HubViewId | null, to: HubViewId): boolean {

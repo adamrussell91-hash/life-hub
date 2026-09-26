@@ -1,369 +1,170 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { buildClassCalendarModel, type ClassCalendarModel } from '@/schedule/class-calendar-model';
-import { renderClassCalendar } from '@/teacher/class-calendar';
+/**
+ * Step 4: classic renderClassCalendar deleted. Behaviour that still ships
+ * (lesson routes, default filter, reschedule hook, class-scoped mount) is
+ * covered here via the Teaching adapter + kit model.
+ */
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildTidelineModel } from '../../design-kit/js/calendar/tideline-model.js';
+import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
+import {
+  mountTeachingCalendar,
+  teachingRouteFor,
+  TEACHING_CALENDAR_FILLS,
+  unmountTeachingCalendar
+} from '@/teacher/hub-calendar';
 
-function modelForAugust(overrides?: {
-  selectedDate?: string;
-  today?: string;
-  scheduled?: Array<{
-    id: string;
-    lesson_id: string;
-    unit_id: string;
-    date: string;
-    delivery_status: 'planned' | 'current' | 'delivered' | 'skipped' | 'rescheduled';
-    schedule_order?: number;
-    start_time?: string;
-  }>;
-  lessonTitles?: Map<string, string>;
-}): ClassCalendarModel {
-  return buildClassCalendarModel({
-    scheduled: (overrides?.scheduled ?? [
-      {
-        id: 's1',
-        lesson_id: 'l1',
-        unit_id: 'u1',
-        date: '2026-08-12',
-        delivery_status: 'current',
-        schedule_order: 1
-      }
-    ]) as never,
-    lessonTitles:
-      overrides?.lessonTitles ??
-      new Map([['l1', 'Narrative Structure and Unreliable Memory']]),
-    today: overrides?.today ?? '2026-08-12',
-    selectedDate: overrides?.selectedDate ?? '2026-08-12',
-    viewMonth: '2026-08'
-  });
+function okJson(data: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({ ok: true, data })
+  } as Response;
 }
 
-describe('renderClassCalendar', () => {
-  let host: HTMLElement;
+function stubHubFetches(): void {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path.includes('/api/curriculum')) {
+        return okJson({
+          lessons: [{ id: 'lesson_1', title: 'Memory' }],
+          classes: [{ id: 'class_1', title: '12ENGADV1', code: '12ENGADV1' }],
+          scheduled_lessons: [
+            {
+              id: 'sched_1',
+              lesson_id: 'lesson_1',
+              class_id: 'class_1',
+              date: '2026-08-12',
+              start_time: '09:15'
+            },
+            {
+              id: 'sched_other',
+              lesson_id: 'lesson_1',
+              class_id: 'class_other',
+              date: '2026-08-12',
+              start_time: '10:15'
+            }
+          ]
+        });
+      }
+      if (path.includes('/api/calendar-ghosts')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ ghosts: [] })
+        } as Response;
+      }
+      if (
+        path.includes('/api/tasks') ||
+        path.includes('/api/work-blocks') ||
+        path.includes('/api/planning-profile') ||
+        path.includes('/api/workflow-state') ||
+        path.includes('/api/schedule-projections') ||
+        path.includes('/api/knowledge')
+      ) {
+        return okJson({ tasks: [], work_blocks: [], pages: [] });
+      }
+      return okJson({});
+    })
+  );
+}
 
-  beforeEach(() => {
-    document.body.replaceChildren();
-    host = document.createElement('div');
-    document.body.append(host);
+describe('Teaching kit calendar (replaces class-calendar renderer)', () => {
+  afterEach(() => {
+    unmountTeachingCalendar();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
-  it('renders 7 weekday headers plus monthDays.length day cells', () => {
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
-    });
-
-    const grid = host.querySelector('[role="grid"]')!;
-    const weekdays = grid.querySelectorAll('.class-calendar__weekday');
-    const days = grid.querySelectorAll('.class-calendar__day');
-    expect(weekdays).toHaveLength(7);
-    expect([...weekdays].map((el) => el.textContent)).toEqual(['M', 'T', 'W', 'T', 'F', 'S', 'S']);
-    expect(days).toHaveLength(model.monthDays.length);
+  it('default filter is Classes on; Events/Meetings off; school fill is periods', () => {
+    const filter = defaultFilterForHub('teaching');
+    expect(filter.classes).toBe(true);
+    expect(filter.events).toBe(false);
+    expect(filter.meetings).toBe(false);
+    expect(filter.pd).toBe(false);
+    expect(TEACHING_CALENDAR_FILLS.school).toBe('periods');
   });
 
-  it('renders lesson chips inside the day cell and links them', () => {
-    const model = modelForAugust();
-    renderClassCalendar(host, model, { onSelectDate: vi.fn(), onShiftMonth: vi.fn() });
-    const chip = host.querySelector<HTMLAnchorElement>('a.event-chip[href="/lessons/l1"]');
-    expect(chip).not.toBeNull();
-    expect(chip?.textContent).toContain('Narrative Structure');
-    expect(chip?.dataset.tint).toBeTruthy();
-  const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]');
-  expect(cell?.tagName).toBe('DIV');
-  expect(cell?.getAttribute('role')).toBe('gridcell');
+  it('routeFor preserves lessonHref rules via lesson_id on chips', () => {
+    expect(
+      teachingRouteFor({
+        id: 'sched_1',
+        lesson_id: 'lesson_1',
+        source: 'scheduled_lesson',
+        isClass: true
+      })
+    ).toBe('/lessons/lesson_1');
   });
 
-  it('renders a Today control that selects today', () => {
-    const onSelectDate = vi.fn();
-    const model = modelForAugust({ selectedDate: '2026-08-01', today: '2026-08-12' });
-    renderClassCalendar(host, model, { onSelectDate, onShiftMonth: vi.fn() });
-    host.querySelector<HTMLButtonElement>('[data-calendar="today"]')!.click();
-    expect(onSelectDate).toHaveBeenCalledWith('2026-08-12');
-  });
-
-  it('shows two chips and +N more when a day has more than two lessons', () => {
-    const model = modelForAugust({
-      scheduled: [1, 2, 3].map((n) => ({
-        id: `s${n}`,
-        lesson_id: `l${n}`,
-        unit_id: 'u1',
-        date: '2026-08-12',
-        delivery_status: 'planned' as const,
-        schedule_order: n
-      })),
-      lessonTitles: new Map([['l1', 'One'], ['l2', 'Two'], ['l3', 'Three']])
-    });
-    renderClassCalendar(host, model, { onSelectDate: vi.fn(), onShiftMonth: vi.fn() });
-    const day = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
-    expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
-    expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+1/);
-  });
-
-  it('marks today, selected, and outside days', () => {
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
-    });
-
-    const today = host.querySelector('.class-calendar__day[data-today="true"]');
-    const selected = host.querySelector('.class-calendar__day[data-selected="true"]');
-    const outside = host.querySelector('.class-calendar__day[data-outside="true"]');
-
-    expect(today).not.toBeNull();
-    expect(today!.querySelector('.hub-calendar__day-num')?.textContent).toBe('12');
-    expect(today!.getAttribute('aria-current')).toBe('date');
-    expect(selected).not.toBeNull();
-    expect(outside).not.toBeNull();
-    expect(outside!.getAttribute('data-date')).toBe('2026-07-27');
-  });
-
-  it('calls onSelectDate when a button day is clicked', () => {
-    const model = modelForAugust({
-      scheduled: [],
-      selectedDate: '2026-08-10'
-    });
-    const onSelectDate = vi.fn();
-    renderClassCalendar(host, model, {
-      onSelectDate,
-      onShiftMonth: vi.fn()
-    });
-
-    const day = host.querySelector<HTMLElement>(
-      '.class-calendar__day[data-date="2026-08-11"]'
-    )!;
-    expect(day).not.toBeNull();
-    day.click();
-    expect(onSelectDate).toHaveBeenCalledTimes(1);
-    expect(onSelectDate).toHaveBeenCalledWith('2026-08-11');
-  });
-
-  it('wires prev/next month buttons', () => {
-    const model = modelForAugust();
-    const onShiftMonth = vi.fn();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth
-    });
-
-    const prev = host.querySelector<HTMLButtonElement>(
-      'button[aria-label="Previous month"]'
-    )!;
-    const next = host.querySelector<HTMLButtonElement>('button[aria-label="Next month"]')!;
-    expect(prev.type).toBe('button');
-    expect(next.type).toBe('button');
-    expect(host.querySelector('.class-calendar__month-label')?.textContent).toBe('August 2026');
-
-    prev.click();
-    next.click();
-    expect(onShiftMonth).toHaveBeenCalledWith(-1);
-    expect(onShiftMonth).toHaveBeenCalledWith(1);
-  });
-
-  it('binds month nav handlers only once across consecutive renders', () => {
-    const model = modelForAugust();
-    const onShiftMonth = vi.fn();
-    const options = { onSelectDate: vi.fn(), onShiftMonth };
-
-    renderClassCalendar(host, model, options);
-    renderClassCalendar(host, model, options);
-
-    host.querySelector<HTMLButtonElement>('button[aria-label="Previous month"]')!.click();
-    expect(onShiftMonth).toHaveBeenCalledTimes(1);
-    expect(onShiftMonth).toHaveBeenCalledWith(-1);
-  });
-
-  it('shows two chips and +3 more for a five-lesson day', () => {
-    const model = modelForAugust({
-      scheduled: [
+  it('tideline model keeps lesson_id/class_id and lesson title on class chips', () => {
+    const built = buildTidelineModel({
+      events: [
         {
-          id: 's1',
-          lesson_id: 'l1',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'delivered',
-          schedule_order: 1
-        },
-        {
-          id: 's2',
-          lesson_id: 'l2',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'planned',
-          schedule_order: 2
-        },
-        {
-          id: 's3',
-          lesson_id: 'l3',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'skipped',
-          schedule_order: 3
-        },
-        {
-          id: 's4',
-          lesson_id: 'l4',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'rescheduled',
-          schedule_order: 4
-        },
-        {
-          id: 's5',
-          lesson_id: 'l5',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'current',
-          schedule_order: 5
+          path: 'teaching:sched_1',
+          record: {
+            type: 'scheduled_lesson',
+            id: 'sched_1',
+            lesson_id: 'lesson_1',
+            class_id: 'class_1',
+            date: '2026-08-12',
+            time: '09:15',
+            duration_min: 60,
+            title: 'Memory',
+            class_title: '12ENGADV1'
+          },
+          body: ''
         }
       ],
-      lessonTitles: new Map([
-        ['l1', 'One'],
-        ['l2', 'Two'],
-        ['l3', 'Three'],
-        ['l4', 'Four'],
-        ['l5', 'Five']
-      ])
+      week: ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13', '2026-08-14', '2026-08-15', '2026-08-16'],
+      today: '2026-08-12',
+      nowHour: 10
     });
-
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
-    });
-
-    const day = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
-    expect(day.tagName).toBe('DIV');
-    expect(day.querySelectorAll('a.event-chip')).toHaveLength(2);
-    expect(day.querySelector('.event-chip-more')?.textContent).toMatch(/\+3/);
-    expect(day.querySelector('.calendar-dot')).toBeNull();
-    expect(host.querySelector('.class-calendar__detail-lesson')).toBeNull();
-    expect(host.querySelector('[data-calendar="rail"]')).toBeNull();
+    const chip = built.days.find((day) => day.date === '2026-08-12')?.chips[0];
+    expect(chip?.title).toBe('Memory');
+    expect(chip?.lesson_id).toBe('lesson_1');
+    expect(chip?.class_id).toBe('class_1');
+    expect(chip?.isClass).toBe(true);
   });
 
-  it('applies month motion only when monthDelta is non-zero', () => {
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      monthDelta: 0
+  it('mounts kit shell with .class-calendar extra class and wires reschedule', async () => {
+    stubHubFetches();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const onReschedule = vi.fn();
+    mountTeachingCalendar(host, {
+      today: '2026-08-12',
+      onReschedule,
+      onQuickAdd: vi.fn(),
+      quickAddLabel: 'Create lesson'
     });
-    expect(host.querySelector('[role="grid"]')!.getAttribute('data-motion')).toBeNull();
 
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      monthDelta: 1
+    await vi.waitFor(() => {
+      expect(host.querySelector('[data-part="hub-calendar-mount"].class-calendar')).not.toBeNull();
+      expect(host.querySelector('[data-part="tideline"]')).not.toBeNull();
     });
-    expect(host.querySelector('[role="grid"]')!.getAttribute('data-motion')).toBe('forward');
 
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn(),
-      monthDelta: -1
-    });
-    expect(host.querySelector('[role="grid"]')!.getAttribute('data-motion')).toBe('back');
+    const chip = host.querySelector<HTMLElement>('.cal-chip[data-movable="1"]');
+    expect(chip).not.toBeNull();
+    expect(host.querySelector('[data-calendar-quick-add]')).not.toBeNull();
+    expect(host.querySelector('.cal-bg--school[data-fill="periods"]')).not.toBeNull();
+
+    host.remove();
   });
 
-  it('never renders a standing Add card or calendar rail in any view', () => {
-    const model = modelForAugust({ scheduled: [] });
-    for (const view of ['day', 'week', 'month', 'timeline'] as const) {
-      renderClassCalendar(host, model, {
-        onSelectDate: vi.fn(),
-        onShiftMonth: vi.fn(),
-        view
-      });
-      expect(host.querySelector('.calendar-compose-card'), view).toBeNull();
-      expect(host.querySelector('.calendar-compose'), view).toBeNull();
-      expect(host.querySelector('[data-calendar="rail"]'), view).toBeNull();
-      expect(host.querySelector('.class-calendar__detail'), view).toBeNull();
-      expect(host.querySelector('.class-calendar__week-heading > .icon-plus-btn'), view).toBeNull();
-      expect(host.textContent, view).not.toContain('No lessons scheduled this day.');
-      expect(
-        [...host.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
-      ).toBe(false);
-    }
-  });
+  it('classId scopes scheduled lessons to that class', async () => {
+    stubHubFetches();
+    const host = document.createElement('div');
+    document.body.append(host);
+    mountTeachingCalendar(host, { classId: 'class_1', today: '2026-08-12' });
 
-  it('sets accessible names on day cells', () => {
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate: vi.fn(),
-      onShiftMonth: vi.fn()
+    await vi.waitFor(() => {
+      const chips = [...host.querySelectorAll('.cal-chip[data-part="class"]')];
+      expect(chips.length).toBeGreaterThanOrEqual(1);
+      expect(chips.every((node) => node.getAttribute('data-class-id') === 'class_1')).toBe(true);
+      expect(host.querySelector('.cal-chip[data-id="sched_other"]')).toBeNull();
     });
 
-    const cell = host.querySelector('.class-calendar__day[data-date="2026-08-12"]')!;
-    expect(cell.getAttribute('aria-label')).toBe(
-      '12/08/26, Narrative Structure and Unreliable Memory'
-    );
-  });
-
-  it('renders week and timeline views from the view tabs', () => {
-    const onViewChange = vi.fn();
-    const onSelectDate = vi.fn();
-    const model = modelForAugust();
-    renderClassCalendar(host, model, {
-      onSelectDate,
-      onShiftMonth: vi.fn(),
-      onViewChange,
-      view: 'week',
-      chipMeta: () => '12ENA6'
-    });
-
-    expect(host.querySelector('.hub-calendar__timegrid')).not.toBeNull();
-    expect(host.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('7');
-    const todayCol = host.querySelector('.class-calendar__week-day[data-today="true"]');
-    expect(todayCol?.getAttribute('data-date')).toBe('2026-08-12');
-    expect(todayCol?.querySelector('.hub-calendar__day-num')?.textContent).toBe('12');
-    const weekNums = [
-      ...host.querySelectorAll('.class-calendar__week-day .hub-calendar__day-num')
-    ].map((el) => el.textContent);
-    expect(weekNums).toEqual(['10', '11', '12', '13', '14', '15', '16']);
-    expect(host.querySelector('[data-calendar="month-label"]')?.textContent).toBe(
-      '10/08/26 – 16/08/26'
-    );
-    expect(host.querySelector('.event-chip__meta')?.textContent).toBe('12ENA6');
-
-    host.querySelector<HTMLButtonElement>('[data-calendar-view="timeline"]')!.click();
-    expect(onViewChange).toHaveBeenCalledWith('timeline');
-
-    renderClassCalendar(host, model, {
-      onSelectDate,
-      onShiftMonth: vi.fn(),
-      onViewChange,
-      view: 'timeline'
-    });
-    expect(host.querySelector('.class-calendar__timeline')).not.toBeNull();
-    expect(host.textContent).toContain('Narrative Structure');
-  });
-
-  it('renders a day time grid without a standing Add compose card', () => {
-    const onSelectDate = vi.fn();
-    const model = modelForAugust({
-      scheduled: [
-        {
-          id: 's1',
-          lesson_id: 'l1',
-          unit_id: 'u1',
-          date: '2026-08-12',
-          delivery_status: 'current',
-          schedule_order: 1,
-          start_time: '09:00'
-        } as never
-      ]
-    });
-    renderClassCalendar(host, model, {
-      onSelectDate,
-      onShiftMonth: vi.fn(),
-      view: 'day'
-    });
-
-    expect(host.querySelector('.hub-calendar__timegrid')?.getAttribute('data-days')).toBe('1');
-    expect(host.querySelector('.event-chip--timed')).not.toBeNull();
-    expect(host.querySelector('.calendar-compose-card')).toBeNull();
-    expect(host.querySelector('.calendar-compose')).toBeNull();
-    expect(host.querySelector('[data-calendar="rail"]')).toBeNull();
-    expect(host.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
-    expect(
-      [...host.querySelectorAll('button')].some((button) => button.textContent?.trim() === 'Add')
-    ).toBe(false);
+    host.remove();
   });
 });

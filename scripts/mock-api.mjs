@@ -368,8 +368,48 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
-    if (url.pathname === '/api/curriculum' ||
-        url.pathname === '/api/search' ||
+    if (url.pathname === '/api/curriculum') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Minimal empty curriculum so Teaching SPA chrome + kit calendar can mount in browser proofs.
+      json(response, 200, {
+        ok: true,
+        data: {
+          years: [],
+          subjects: [],
+          units: [],
+          lessons: [],
+          classes: [],
+          scheduled_lessons: [],
+          scope_sequences: [],
+          media: [],
+          schedule_anchor_date: getSydneyDateKey(new Date(clock.now()))
+        }
+      }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/schedule-projections') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty projections so Professional kit calendar mounts under the mock server.
+      json(response, 200, { ok: true, data: { projections: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/events') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty PD events so Professional home can mount the kit calendar embed.
+      json(response, 200, { ok: true, data: { events: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/meetings') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty meetings so Professional home can mount the kit calendar embed.
+      json(response, 200, { ok: true, data: { meetings: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/search' ||
         url.pathname === '/api/outcomes' ||
         url.pathname.startsWith('/api/outcomes/') ||
         url.pathname === '/api/media/upload' ||
@@ -599,6 +639,13 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/work-blocks' && request.method === 'GET') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty work blocks so Tasks kit calendar mounts under the mock server.
+      json(response, 200, { ok: true, data: { work_blocks: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
     if ((url.pathname === '/api/tasks' || url.pathname === '/api/projects') && request.method === 'GET') {
       if (!readSession(request)) return unauthenticated(response);
       const index = await taskStore.get(TASKS_INDEX_KEY, { type: 'json' });
@@ -626,6 +673,28 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         json(response, 200, { ok: true, data: { tasks } });
         return true;
       }
+      // Unbound store — empty lists so Tasks kit calendar browser proofs can mount.
+      if (url.pathname === '/api/projects') {
+        json(response, 200, { ok: true, data: { projects: [] } }, PRIVATE_HEADERS);
+        return true;
+      }
+      json(response, 200, { ok: true, data: { tasks: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/templates' && request.method === 'GET') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty templates so Tasks Clare boot (listTemplates) does not 503 under the mock server.
+      json(response, 200, {
+        ok: true,
+        data: {
+          frameworks: [],
+          excursion_templates: [],
+          task_templates: [],
+          project_templates: []
+        }
+      }, PRIVATE_HEADERS);
+      return true;
     }
 
     if (url.pathname === '/api/tasks' || url.pathname.startsWith('/api/tasks/') ||

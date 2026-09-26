@@ -25,6 +25,10 @@ export const RAIL_ICON_PATHS: Record<string, string[]> = {
   day: ['M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8z', 'M12 3v2', 'M12 19v2', 'M4 12h2', 'M18 12h2'],
   week: ['M6 4v3', 'M18 4v3', 'M5 7h14v13H5z', 'M5 11h14'],
   month: ['M6 4v3', 'M18 4v3', 'M5 7h14v13H5z', 'M9 14h2', 'M13 14h2', 'M9 17h2'],
+  // Term / Year / Almanac — distinct from Week calendar glyph (RAIL.md uniqueness).
+  term: ['M4 7h16', 'M7 4v6', 'M12 4v10', 'M17 4v14'],
+  year: ['M5 7h14v12H5z', 'M5 11h14', 'M9 4v3', 'M15 4v3', 'M8 15h3', 'M13 15h3'],
+  almanac: ['M6 4h10l2 2v14H6z', 'M9 9h6', 'M9 13h6', 'M9 17h4'],
   list: ['M8 7h12', 'M8 12h12', 'M8 17h12', 'M5 7h.01', 'M5 12h.01', 'M5 17h.01'],
   projects: ['M4 8h6l2 2h8v10H4z'],
   excursions: ['M7 4v16', 'M7 5h10l-2.5 3L17 11H7'],

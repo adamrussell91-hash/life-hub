@@ -3,6 +3,7 @@ import { stripAppBase, withAppBase } from './base-path';
 export type RouteName =
   | 'teacher-home'
   | 'teacher-chat'
+  | 'teacher-calendar'
   | 'teacher-classes'
   | 'teacher-class'
   | 'teacher-scope-sequences'
@@ -24,6 +25,7 @@ export type RouteName =
 export type RouteParams = {
   'teacher-home': Record<string, never>;
   'teacher-chat': Record<string, never>;
+  'teacher-calendar': { zoom: string };
   'teacher-classes': Record<string, never>;
   'teacher-class': { classId: string };
   'teacher-scope-sequences': Record<string, never>;
@@ -139,6 +141,26 @@ export function match(pathname: string): RouteMatch | null {
       params: {},
       requiresAuth: true,
       path
+    };
+  }
+
+  if (path === '/calendar') {
+    return {
+      name: 'teacher-calendar',
+      params: { zoom: 'week' },
+      requiresAuth: true,
+      path
+    };
+  }
+
+  const teacherCalendar = path.match(/^\/calendar\/([^/]+)$/);
+  if (teacherCalendar) {
+    const zoom = teacherCalendar[1] === 'month' ? 'week' : teacherCalendar[1];
+    return {
+      name: 'teacher-calendar',
+      params: { zoom },
+      requiresAuth: true,
+      path: zoom === 'week' ? '/calendar' : `/calendar/${zoom}`
     };
   }
 

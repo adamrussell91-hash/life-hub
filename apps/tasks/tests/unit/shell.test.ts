@@ -173,7 +173,9 @@ describe('viewChrome', () => {
   it('uses the rail group then the tab name', () => {
     expect(viewChrome('day')).toEqual({ eyebrow: 'Views', title: 'Today' });
     expect(viewChrome('week')).toEqual({ eyebrow: 'Views', title: 'Week' });
-    expect(viewChrome('month')).toEqual({ eyebrow: 'Views', title: 'Month' });
+    expect(viewChrome('term')).toEqual({ eyebrow: 'Views', title: 'Term' });
+    expect(viewChrome('year')).toEqual({ eyebrow: 'Views', title: 'Year' });
+    expect(viewChrome('almanac')).toEqual({ eyebrow: 'Views', title: 'Almanac' });
     expect(viewChrome('list')).toEqual({ eyebrow: 'Views', title: 'Backlog' });
     expect(viewChrome('excursions')).toEqual({ eyebrow: 'Work', title: 'Excursions' });
     expect(viewChrome('maps')).toEqual({ eyebrow: 'Tools', title: 'Maps' });
@@ -196,30 +198,33 @@ describe('parseHashRoute', () => {
 });
 
 describe('view surfaces', () => {
-  it('keeps week and month on one calendar surface', () => {
-    expect(viewSurface('week')).toBe('calendar');
-    expect(viewSurface('month')).toBe('calendar');
-    expect(viewSurface('day')).toBe('day');
-    expect(isSoftViewChange('month', 'week')).toBe(true);
-    expect(isSoftViewChange('week', 'month')).toBe(true);
+  it('keeps day/week/term/year/almanac on one kit-calendar surface', () => {
+    expect(viewSurface('day')).toBe('kit-calendar');
+    expect(viewSurface('week')).toBe('kit-calendar');
+    expect(viewSurface('month')).toBe('kit-calendar');
+    expect(viewSurface('term')).toBe('kit-calendar');
+    expect(viewSurface('year')).toBe('kit-calendar');
+    expect(viewSurface('almanac')).toBe('kit-calendar');
+    expect(isSoftViewChange('week', 'term')).toBe(true);
+    expect(isSoftViewChange('day', 'week')).toBe(true);
     expect(isSoftViewChange('graph', 'graph')).toBe(true);
-    expect(isSoftViewChange('month', 'day')).toBe(false);
-    expect(isSoftViewChange(null, 'month')).toBe(false);
+    expect(isSoftViewChange('week', 'board')).toBe(false);
+    expect(isSoftViewChange(null, 'week')).toBe(false);
   });
 
   it('updates rail highlight and header copy without remounting chrome', () => {
     const root = document.createElement('div');
     const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
-    renderPrimaryNav(refs.railNav, 'month');
-    renderPageHeader(refs, { eyebrow: 'Horizon', title: 'Month' });
+    renderPrimaryNav(refs.railNav, 'term');
+    renderPageHeader(refs, { eyebrow: 'Views', title: 'Term' });
 
     const nav = refs.railNav.querySelector('.hub-rail__list');
     const title = refs.pageHeader.querySelector('.page-header__title');
     const refresh = refs.refreshButton;
-    expect(refs.railNav.querySelector('[aria-current="page"]')?.textContent).toBe('Month');
+    expect(refs.railNav.querySelector('[aria-current="page"]')?.textContent).toBe('Term');
 
     renderPrimaryNav(refs.railNav, 'week');
-    renderPageHeader(refs, { eyebrow: 'Shape', title: 'Week' });
+    renderPageHeader(refs, { eyebrow: 'Views', title: 'Week' });
 
     expect(refs.railNav.querySelector('.hub-rail__list')).toBe(nav);
     expect(refs.pageHeader.querySelector('.page-header__title')).toBe(title);

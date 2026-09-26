@@ -94,8 +94,59 @@ describe('renderHomeView', () => {
     vi.setSystemTime(new Date('2026-09-18T02:00:00.000Z'));
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      if (url.includes('/api/meetings')) {
+      if (url.includes('/api/meetings') && !url.includes('schedule-projections')) {
         return Response.json({ ok: true, data: { meetings } });
+      }
+      if (url.includes('/api/schedule-projections')) {
+        return Response.json({
+          ok: true,
+          data: {
+            projections: [
+              ...events.map((event) => ({
+                projection_id: `event:${event.id}`,
+                kind: 'event',
+                title: event.title,
+                start: event.start,
+                end: event.end,
+                time_zone: event.time_zone,
+                all_day: event.all_day,
+                status: event.occurrence_state,
+                source_ref: event.id,
+                href: `#/event/${event.id}`
+              })),
+              ...meetings.map((meeting) => ({
+                projection_id: `meeting:${meeting.id}`,
+                kind: 'meeting',
+                title: meeting.title,
+                start: meeting.scheduled_start,
+                end: meeting.scheduled_end,
+                time_zone: meeting.time_zone,
+                all_day: false,
+                status: meeting.state,
+                source_ref: meeting.id,
+                href: `#/meeting/${meeting.id}`
+              }))
+            ]
+          }
+        });
+      }
+      if (url.includes('/api/curriculum')) {
+        return Response.json({
+          ok: true,
+          data: { years: [], subjects: [], units: [], lessons: [], classes: [], scheduled_lessons: [] }
+        });
+      }
+      if (url.includes('/api/calendar-ghosts')) {
+        return Response.json({ ghosts: [] });
+      }
+      if (
+        url.includes('/api/tasks') ||
+        url.includes('/api/work-blocks') ||
+        url.includes('/api/planning-profile') ||
+        url.includes('/api/workflow-state') ||
+        url.includes('/api/knowledge')
+      ) {
+        return Response.json({ ok: true, data: { tasks: [], work_blocks: [], pages: [] } });
       }
       return Response.json({ ok: true, data: { events } });
     });
@@ -108,17 +159,22 @@ describe('renderHomeView', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders a month calendar with an event chip on the right day', async () => {
+  it('mounts kit Tideline with PD default filter (Month grid DROPPED)', async () => {
     const canvas = document.createElement('div');
+    document.body.append(canvas);
     await renderHomeView(canvas);
-    expect(canvas.querySelector('.hub-calendar__grid')).toBeTruthy();
-    expect(canvas.querySelector('.hub-calendar__nav')).toBeTruthy();
-    expect(canvas.querySelector('.hub-calendar__today')?.textContent).toBe('Today');
-    const chip = [...canvas.querySelectorAll('.event-chip')].find((node) =>
-      node.textContent?.includes('Critical Study PD Day')
-    );
-    expect(chip).toBeTruthy();
-    expect(chip?.getAttribute('href')).toBe('#/event/event_00000000-0000-4000-8000-000000000001');
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="hub-calendar-mount"]')).toBeTruthy();
+      expect(canvas.querySelector('[data-part="tideline"]')).toBeTruthy();
+    });
+    expect(canvas.querySelector('.hub-calendar__grid')).toBeNull();
+    expect(canvas.querySelector('[data-calendar-quick-add]')).toBeNull();
+    expect(canvas.querySelector('a.btn--primary')?.textContent).toMatch(/Log PD event/);
+    const pd = canvas.querySelector('[data-part="sources"] button[data-filter="pd"]');
+    const meetingsChip = canvas.querySelector('[data-part="sources"] button[data-filter="meetings"]');
+    expect(pd?.getAttribute('aria-pressed')).toBe('true');
+    expect(meetingsChip?.getAttribute('aria-pressed')).toBe('true');
+    canvas.remove();
   });
 
   it('sums completed hours for the accreditation progress bar', async () => {

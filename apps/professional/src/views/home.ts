@@ -2,6 +2,10 @@ import { formatDisplayDate, formatDisplayDateRange } from '../../design-kit/js/f
 import { listEvents } from '@/api/events';
 import { listMeetings } from '@/api/meetings';
 import { eventRoute, meetingRoute } from '@/app/router';
+import {
+  mountProfessionalCalendar,
+  unmountProfessionalCalendar
+} from '@/calendar/hub-calendar';
 import type { EventOccurrenceState, EventRecord, MeetingRecord, MeetingState } from '@/domain/types';
 import { splitEventLabels } from '@/domain/priority-area';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
@@ -27,7 +31,6 @@ const ACCREDITATION_TARGET_HOURS = 100;
 const MONTH_ABBR = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
-const WEEKDAY_HEADINGS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 interface YmdParts {
   year: number;
@@ -58,10 +61,6 @@ function ymdKey(parts: YmdParts): string {
 
 function sydneyDateKey(iso: string): string {
   return ymdKey(sydneyParts(new Date(iso)));
-}
-
-function daysInMonth(year: number, month1: number): number {
-  return new Date(Date.UTC(year, month1, 0)).getUTCDate();
 }
 
 const STATE_TINT: Record<EventOccurrenceState, string> = {
@@ -106,147 +105,6 @@ function yearProgressPct(year: number, parts: YmdParts, totalDays: number): numb
 
 function statusChip(state: EventOccurrenceState): HTMLElement {
   return el('span', `pro-home__chip-tag pro-home__chip-tag--${STATE_TINT[state]}`, STATE_LABEL[state]);
-}
-
-function monthLabel(year: number, month: number): string {
-  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString('en-AU', {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC'
-  });
-}
-
-function shiftMonth(view: YmdParts, delta: number): YmdParts {
-  const date = new Date(Date.UTC(view.year, view.month - 1 + delta, 1));
-  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: 1 };
-}
-
-function eventTint(state: EventOccurrenceState): 'sage' | 'blue' | 'sand' {
-  if (state === 'completed') return 'sage';
-  if (state === 'cancelled') return 'sand';
-  return 'blue';
-}
-
-function renderCalendar(today: YmdParts, events: EventRecord[]): HTMLElement {
-  const host = el('div');
-  let view: YmdParts = { year: today.year, month: today.month, day: 1 };
-
-  const paint = (): void => {
-    const byDay = new Map<string, EventRecord[]>();
-    for (const event of events) {
-      const key = sydneyDateKey(event.start);
-      const bucket = byDay.get(key);
-      if (bucket) bucket.push(event);
-      else byDay.set(key, [event]);
-    }
-
-    const card = el('section', 'hub-calendar hub-calendar--workspace');
-    const nav = el('div', 'hub-calendar__nav');
-    const paging = el('div', 'hub-calendar__paging');
-    paging.setAttribute('role', 'group');
-    paging.setAttribute('aria-label', 'Month navigation');
-
-    const prev = el('button', 'hub-calendar__nav-btn', '‹') as HTMLButtonElement;
-    prev.type = 'button';
-    prev.setAttribute('aria-label', 'Previous month');
-    prev.addEventListener('click', () => {
-      view = shiftMonth(view, -1);
-      paint();
-    });
-
-    const label = el('span', 'hub-calendar__month-label', monthLabel(view.year, view.month));
-
-    const next = el('button', 'hub-calendar__nav-btn', '›') as HTMLButtonElement;
-    next.type = 'button';
-    next.setAttribute('aria-label', 'Next month');
-    next.addEventListener('click', () => {
-      view = shiftMonth(view, 1);
-      paint();
-    });
-
-    const todayBtn = el('button', 'hub-calendar__today', 'Today') as HTMLButtonElement;
-    todayBtn.type = 'button';
-    todayBtn.addEventListener('click', () => {
-      view = { year: today.year, month: today.month, day: 1 };
-      paint();
-    });
-
-    paging.append(prev, label, next, todayBtn);
-    nav.append(paging);
-
-    const firstWeekday = (new Date(Date.UTC(view.year, view.month - 1, 1)).getUTCDay() + 6) % 7;
-    const total = daysInMonth(view.year, view.month);
-    const prevTotal = daysInMonth(
-      view.month - 1 <= 0 ? view.year - 1 : view.year,
-      view.month - 1 <= 0 ? 12 : view.month - 1
-    );
-    const cellCount = Math.ceil((firstWeekday + total) / 7) * 7;
-
-    const grid = el('div', 'hub-calendar__grid');
-    grid.setAttribute('role', 'grid');
-    grid.setAttribute('aria-label', 'Month calendar');
-    for (const heading of WEEKDAY_HEADINGS) {
-      grid.append(el('span', 'hub-calendar__weekday', heading));
-    }
-
-    for (let i = 0; i < cellCount; i += 1) {
-      const offset = i - firstWeekday;
-      const inMonth = offset >= 0 && offset < total;
-      let dayNum: number;
-      let cellParts: YmdParts;
-      if (offset < 0) {
-        dayNum = prevTotal + offset + 1;
-        const prevMonth = view.month - 1 <= 0 ? 12 : view.month - 1;
-        const prevYear = view.month - 1 <= 0 ? view.year - 1 : view.year;
-        cellParts = { year: prevYear, month: prevMonth, day: dayNum };
-      } else if (offset >= total) {
-        dayNum = offset - total + 1;
-        const nextMonth = view.month + 1 > 12 ? 1 : view.month + 1;
-        const nextYear = view.month + 1 > 12 ? view.year + 1 : view.year;
-        cellParts = { year: nextYear, month: nextMonth, day: dayNum };
-      } else {
-        dayNum = offset + 1;
-        cellParts = { year: view.year, month: view.month, day: dayNum };
-      }
-
-      const key = ymdKey(cellParts);
-      const cell = el('div', 'hub-calendar__day');
-      cell.setAttribute('role', 'gridcell');
-      cell.dataset.date = key;
-      if (!inMonth) cell.dataset.outside = 'true';
-      if (inMonth && key === ymdKey(today)) {
-        cell.dataset.today = 'true';
-        cell.setAttribute('aria-current', 'date');
-      }
-      cell.append(el('span', 'hub-calendar__day-num', String(dayNum)));
-
-      const dayEvents = byDay.get(key) ?? [];
-      const shown = dayEvents.slice(0, 2);
-      for (const event of shown) {
-        const chip = el('a', 'event-chip') as HTMLAnchorElement;
-        chip.href = eventRoute(event.id);
-        chip.dataset.tint = eventTint(event.occurrence_state);
-        if (event.occurrence_state === 'cancelled') chip.classList.add('is-done');
-        chip.append(el('span', 'event-chip__title', event.title));
-        cell.append(chip);
-      }
-      if (dayEvents.length > shown.length) {
-        cell.append(el('span', 'event-chip-more', `+${dayEvents.length - shown.length} more`));
-      }
-      grid.append(cell);
-    }
-
-    const body = el('div', 'hub-calendar__body');
-    body.append(grid);
-    const workspace = el('div', 'hub-calendar__workspace');
-    workspace.style.gridTemplateColumns = 'minmax(0, 1fr)';
-    workspace.append(body);
-    card.append(nav, workspace);
-    host.replaceChildren(card);
-  };
-
-  paint();
-  return host;
 }
 
 function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElement {
@@ -489,7 +347,11 @@ export async function renderHomeView(canvas: HTMLElement): Promise<void> {
     canvas.append(renderYearStrip(today, events, meetings));
 
     const body = el('div', 'pro-home__body');
-    body.append(renderCalendar(today, events));
+    unmountProfessionalCalendar();
+    const calendarHost = el('div', 'pro-home__calendar-host');
+    calendarHost.style.minWidth = '0';
+    body.append(calendarHost);
+    mountProfessionalCalendar(calendarHost, { routeZoom: false });
 
     const side = el('div', 'pro-home__side');
     side.append(renderAccreditation(today, events));
