@@ -184,3 +184,84 @@ export function patchLedgerItem(
 ): Promise<unknown> {
   return apiPost('/api/people/ledger', { action: 'patch', ...body }, { signal: options.signal });
 }
+
+export interface RememberFact {
+  id: string;
+  text: string;
+  source_label: string;
+  author: string;
+  status: string;
+  sort_order: number;
+}
+
+export function fetchRememberFacts(
+  personRef: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ facts: RememberFact[]; count: number }> {
+  const params = new URLSearchParams({ person_ref: personRef });
+  return apiGet(`/api/people/remember?${params.toString()}`, { signal: options.signal });
+}
+
+export function runAnnRememberScan(
+  body: { person_ref: string; display_name?: string },
+  options: { signal?: AbortSignal } = {}
+): Promise<{ facts: RememberFact[]; count: number; note: string }> {
+  return apiPost('/api/people/remember', { action: 'run', ...body }, { signal: options.signal });
+}
+
+export function patchRememberFact(
+  body: { id: string; text?: string; status?: string; sort_order?: number },
+  options: { signal?: AbortSignal } = {}
+): Promise<unknown> {
+  return apiPost('/api/people/remember', { action: 'patch', ...body }, { signal: options.signal });
+}
+
+export interface AskResponse {
+  mode: 'ask' | 'search';
+  answer: string | null;
+  people: Array<{
+    id: string;
+    ref: string;
+    display_name: string;
+    reason: string;
+    source: string;
+  }>;
+  filter: { org?: string | null; role?: string | null; q?: string } | null;
+  source: string;
+}
+
+export function askPeople(question: string, options: { signal?: AbortSignal } = {}): Promise<AskResponse> {
+  return apiPost('/api/people/ask', { question }, { signal: options.signal });
+}
+
+export interface TodayStripResponse {
+  day_key: string;
+  slots: Array<{
+    id: string;
+    kind: string;
+    title: string;
+    start_minutes: number;
+    end_minutes: number;
+    start_label: string;
+    people: Array<{ ref: string | null; display_name: string }>;
+    suggested?: boolean;
+    suggestion_note?: string | null;
+  }>;
+  suggestion: { slot_id: string | null; note: string; person_ref: string } | null;
+}
+
+export function fetchTodayStrip(
+  options: {
+    signal?: AbortSignal;
+    person_ref?: string;
+    display_name?: string;
+    has_meet_item?: boolean;
+  } = {}
+): Promise<TodayStripResponse> {
+  const params = new URLSearchParams();
+  if (options.person_ref) params.set('person_ref', options.person_ref);
+  if (options.display_name) params.set('display_name', options.display_name);
+  if (options.has_meet_item) params.set('has_meet_item', '1');
+  const q = params.toString();
+  return apiGet(`/api/people/today${q ? `?${q}` : ''}`, { signal: options.signal });
+}

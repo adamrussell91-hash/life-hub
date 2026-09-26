@@ -316,7 +316,8 @@ export function buildSystemPrompt({
     'Read the full Central Node (and Governance Log tail when provided) before triage or follow-on protocols. Persist durable signals with propose_central_node_patch for compact Central Node edits (server auto-applies low-risk writes and queues Confirm for high-risk) and append_governance_log for protocol reasoning / Coach\'s Notes. Cross-agent handoffs belong as Hammond→[Agent] lines via propose_central_node_patch on cross_agent — not chat-only signals.',
     'When Adam asks for a weekly recap, weekly review, Sunday planning, or the week ahead, use the Week inventory in this prompt (or call get_week_review). Recap facts first, then plan the forward window. Do not start a Central Node audit unless he asked for an audit.',
     'When Adam asks what is slipping across life, call inspect_hub_signals and state which hubs lacked usable evidence.',
-    'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.'
+    'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.',
+    'People cooling flags: only flag a relationship crossing into cooling when that person is Inner tier (mentor/mentee, workplace leader, active project collaborator) or linked to an active goal/project. Write Hammond→Clare: for People work outside Tasks/Events link inference, and Hammond→Ann: for Remember or relationship meaning. Never write a Universal Link without Adam\'s confirm.'
   ] : [];
 
   const clareBlocks = slug === 'clare' ? [
@@ -324,6 +325,7 @@ export function buildSystemPrompt({
       ? `Clare operating manual (follow these Life Hub / Tasks rules):\n${clareProtocol}`
       : '',
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
+    'People sweep (Professional Hub): when running Morning Sweep or when new tasks/events mention people, run the deterministic link-inference pass and refresh ledger items for people touched. Write link proposals with proposer rules or clare — Adam confirms every link. Ledger and Remember items write directly but stay editable.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
     'When Adam names work to capture, call create_task (title or items[]). That write lands immediately — do not ask him to Confirm a new row, and do not claim it is on the board until create_task returns status applied. When he wants an existing row changed, call get_task then update_task. update_task and clare_mutate still wait for Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
@@ -341,7 +343,8 @@ export function buildSystemPrompt({
     'Read Central Node Cross-Agent for Hammond→Ann (and any other →Ann line) before responding. Those lines are live directives, not background colour.',
     'When something durable must reach Hammond or another agent — a lesson/load collision, a teaching deadline hitting a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.',
-    'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.'
+    'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.',
+    'Professional practice remit (People Remember / Ask): mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. Remember facts are short (≤120 chars), sourced (note · dd/mm/yy, task, project), and never overwrite an Adam-authored fact. When you do not know enough about who knows someone, say so honestly — do not invent people or links.'
   ] : [];
 
   const clementineBlocks = slug === 'clementine' ? [

@@ -2850,6 +2850,126 @@
   color: var(--depth);
 }
 
+.people-page__today {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--elev-1);
+}
+
+.people-page__today-label {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--depth);
+  flex: 0 0 auto;
+}
+
+.people-page__today-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  min-width: 0;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.people-page__today-slot {
+  flex: 0 0 auto;
+  width: 96px;
+  max-width: 96px;
+  min-height: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.people-page__today-slot.is-suggested {
+  background: var(--pastel-gold);
+  border-color: transparent;
+  color: var(--pastel-gold-ink);
+}
+
+.people-page__today-time {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.people-page__today-slot.is-suggested .people-page__today-time {
+  color: var(--pastel-gold-ink);
+}
+
+.people-page__today-title {
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--ink);
+  line-height: 1.25;
+}
+
+.people-page__today-note {
+  font-size: var(--text-2xs);
+  color: var(--pastel-gold-ink);
+  font-weight: 600;
+}
+
+.people-page__ask-card {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--elev-1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.people-page__ask-card[hidden] {
+  display: none;
+}
+
+.people-page__ask-answer {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.people-page__ask-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.people-page__ask-list a {
+  color: var(--high-sea-ink);
+  font-weight: 600;
+}
+
+.people-pane__remember {
+  display: flex;
+  flex-direction: column;
+}
+
+.people-pane__li--remember {
+  max-height: none;
+}
+
+.people-pane__run-ann {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
 .people-page__sheet {
   position: fixed;
   inset: 0;
@@ -2944,5 +3064,9 @@
 
   .people-pane__name {
     font-size: var(--text-lg);
+  }
+
+  .people-page__today-scroll {
+    overflow-x: auto;
   }
 }
