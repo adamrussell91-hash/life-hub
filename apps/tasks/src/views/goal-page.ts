@@ -321,7 +321,12 @@ function paint(
 
   const metaLeft = el('div', 'goal-page__meta-left');
   metaLeft.append(chain);
-  if (dream) metaLeft.append(el('span', 'meta', `From ✦ ${dream.title}`));
+  if (dream) {
+    const chip = el('a', 'goal-page__dream-chip', `✦ ${dream.title}`) as HTMLAnchorElement;
+    chip.href = `#/someday`;
+    chip.title = 'Source dream on Someday';
+    metaLeft.append(chip);
+  }
   metaLeft.append(chips, descHost, tags.el, lifeWall.el);
   meta.append(metaLeft, metaActions);
 

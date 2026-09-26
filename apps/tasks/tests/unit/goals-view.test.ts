@@ -15,7 +15,8 @@ vi.mock('@/services/client-api', () => ({
     getGoalReads: vi.fn(),
     getPlanningDirection: vi.fn(),
     getPlanningProfile: vi.fn(),
-    planTerm: vi.fn()
+    planTerm: vi.fn(),
+    updateTask: vi.fn()
   }
 }));
 

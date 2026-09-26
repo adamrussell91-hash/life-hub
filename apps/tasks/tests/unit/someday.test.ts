@@ -105,15 +105,21 @@ describe('computeLifeCoverage', () => {
       task({ id: '1', title: 'Sail around Ireland', life_area: 'explore', maturity: 'set' }),
       task({ id: '2', title: 'Learn Portuguese', life_area: 'explore', maturity: 'new' })
     ];
-    const coverage = computeLifeCoverage(items);
+    const coverage = computeLifeCoverage(items, [
+      { status: 'active', sphere: 'life', life_area: 'explore' },
+      { status: 'active', sphere: 'life', life_area: 'health' },
+      { status: 'parked', sphere: 'life', life_area: 'explore' }
+    ]);
     expect(coverage.map((row) => row.id)).toEqual(LIFE_AREAS.map((area) => area.id));
 
     const explore = coverage.find((row) => row.id === 'explore')!;
     expect(explore.count).toBe(2);
+    expect(explore.goalCount).toBe(1);
     expect(explore.avgMaturity).toBeCloseTo((1 + 0.32) / 2);
 
     const health = coverage.find((row) => row.id === 'health')!;
     expect(health.count).toBe(0);
+    expect(health.goalCount).toBe(1);
     expect(health.avgMaturity).toBe(0);
   });
 

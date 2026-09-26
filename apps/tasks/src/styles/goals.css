@@ -83,7 +83,25 @@
 .runway__legend span { display: inline-flex; align-items: center; gap: var(--space-2); }
 .runway__legend .cell { width: 0.875rem; height: 0.875rem; }
 
+.goal-page__dream-chip {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0 var(--space-2); border-radius: var(--radius-xs);
+  background: var(--pastel-gold, #f5e6c8); color: var(--navy);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold);
+  text-decoration: none; border: 1px solid var(--line);
+}
+.someday-card__grown { color: var(--high-sea-ink); font-weight: var(--weight-semibold); text-decoration: none; }
+.someday-card__grown:hover { text-decoration: underline; }
+.someday-wheel__goals-mark { font-size: var(--text-2xs); color: var(--pastel-sage-ink); margin-left: var(--space-1); }
+.promote-goal-panel { padding: var(--space-4); margin-top: var(--space-2); max-width: 22rem; }
+.promote-goal__chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0; }
+.goals-new__tabs { display: flex; gap: var(--space-2); width: 100%; margin-bottom: var(--space-2); }
+.goals-new__tabs .is-active { font-weight: var(--weight-bold); }
+.goals-new__dreams { display: flex; flex-wrap: wrap; gap: var(--space-2); width: 100%; margin-bottom: var(--space-2); }
+.goals-new__dream.is-selected { outline: 2px solid var(--wave); }
+
 .goal-page { display: grid; grid-template-columns: minmax(0, 1fr) 26rem; gap: var(--space-5); align-items: start; }
+
 .goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .goal-page__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }
 .goal-page__chain-sep { color: var(--shallow); }

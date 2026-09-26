@@ -258,14 +258,62 @@ function closedChip(spec: {
 
 function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => void): HTMLFormElement {
   const form = el('form', 'glass-tile goals-new');
+  const tabs = el('div', 'goals-new__tabs');
+  const blankTab = el('button', 'btn btn--ghost is-active', 'Blank');
+  blankTab.type = 'button';
+  const dreamTab = el('button', 'btn btn--ghost', 'From a dream');
+  dreamTab.type = 'button';
+  tabs.append(blankTab, dreamTab);
+
   const title = el('input', 'goal-field');
   title.name = 'title';
   title.placeholder = 'What do you want to be true by the end of term?';
   title.setAttribute('aria-label', 'Goal title');
 
+  let parentSomedayId: string | null = null;
   let sphere: GoalSphere = 'life';
   let termValue: string = term ? `${termYear(term)}-${term.term}` : 'ongoing';
   let lifeArea: string = '';
+
+  const dreamPick = el('div', 'goals-new__dreams');
+  dreamPick.hidden = true;
+  const candidates = data.tasks
+    .filter(
+      (t) =>
+        t.someday_kind === 'bucket_list' ||
+        t.someday_kind === 'dreams_jar' ||
+        t.someday_kind === 'career' ||
+        t.status === 'someday'
+    )
+    .filter((t) => !data.goals.some((g) => g.parent_someday_id === t.id));
+  if (!candidates.length) {
+    dreamPick.append(el('p', 'meta', 'No unlinked Someday ideas yet.'));
+  } else {
+    for (const dream of candidates.slice(0, 20)) {
+      const btn = el('button', 'btn btn--ghost goals-new__dream', dream.title);
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        parentSomedayId = dream.id;
+        title.value = dream.title;
+        if (dream.someday_kind === 'career') sphere = 'professional';
+        if (typeof dream.life_area === 'string') lifeArea = dream.life_area;
+        for (const b of dreamPick.querySelectorAll('button')) b.classList.remove('is-selected');
+        btn.classList.add('is-selected');
+      });
+      dreamPick.append(btn);
+    }
+  }
+  blankTab.addEventListener('click', () => {
+    blankTab.classList.add('is-active');
+    dreamTab.classList.remove('is-active');
+    dreamPick.hidden = true;
+    parentSomedayId = null;
+  });
+  dreamTab.addEventListener('click', () => {
+    dreamTab.classList.add('is-active');
+    blankTab.classList.remove('is-active');
+    dreamPick.hidden = false;
+  });
 
   const chips = el('div', 'goals-new__chips row');
   chips.append(
@@ -316,7 +364,7 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
   const cancel = el('button', 'btn btn--ghost', 'Cancel');
   cancel.type = 'button';
   cancel.addEventListener('click', () => form.remove());
-  form.append(title, chips, submit, cancel);
+  form.append(tabs, dreamPick, title, chips, submit, cancel);
 
   form.addEventListener('submit', (event) => {
     event.preventDefault();
@@ -348,9 +396,19 @@ function newGoalForm(data: GoalsData, term: SchoolTerm | null, reload: () => voi
           sphere,
           term: selectedTerm,
           ...(status === 'parked' ? { status } : {}),
-          ...(sphere === 'life' && lifeArea ? { life_area: lifeArea as GoalLifeArea } : {})
+          ...(sphere === 'life' && lifeArea ? { life_area: lifeArea as GoalLifeArea } : {}),
+          ...(parentSomedayId ? { parent_someday_id: parentSomedayId } : {})
         })
-        .then(reload)
+        .then(async (goal) => {
+          if (parentSomedayId) {
+            const dream = data.tasks.find((t) => t.id === parentSomedayId);
+            if (dream) {
+              const linked = Array.isArray(dream.linked_goal_ids) ? dream.linked_goal_ids : [];
+              await tasksApi.updateTask(dream.id, { linked_goal_ids: [...linked, goal.id] }).catch(() => undefined);
+            }
+          }
+          reload();
+        })
         .catch((err) => window.alert(errorMessage(err)));
     };
 
