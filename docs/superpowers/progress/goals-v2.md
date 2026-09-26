@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 29/46 (63%)**
+**Progress: 35/46 (76%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -63,12 +63,12 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M7: Hammond, the smarter version
 
-- [ ] **G-30** Calendar-aware protect_block — —
-- [ ] **G-31** Life Hub signals — —
-- [ ] **G-32** Model-written verdict + splits — —
-- [ ] **G-33** Dismissal learning — —
-- [ ] **G-34** Honest looked-at labels — —
-- [ ] **G-35** Ask Hammond deep link — —
+- [x] **G-30** Calendar-aware protect_block — `b55a8fd6`
+- [x] **G-31** Life Hub signals — `b55a8fd6`
+- [x] **G-32** Model-written verdict + splits — `b55a8fd6`
+- [x] **G-33** Dismissal learning — `b55a8fd6`
+- [x] **G-34** Honest looked-at labels — `b55a8fd6`
+- [x] **G-35** Ask Hammond deep link — `b55a8fd6`
 
 ## M8: Sunday check-in
 
