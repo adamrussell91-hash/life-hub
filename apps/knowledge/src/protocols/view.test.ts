@@ -74,13 +74,17 @@ describe("protocol conversation view", () => {
 
   it("renders Past runs rows with resume for waiting sessions", async () => {
     const { pastRunsHtml } = await import("./view");
+    const defs = [{ id: "horizon", name: "The Horizon Council", description: "", motif: "", defaultMode: "full", modes: [], intake: [], voices: [] }];
     const html = pastRunsHtml([
       { id: "sess-past", protocolId: "horizon", mode: "full", status: "waiting", title: "Career forks", updatedAt: "2026-09-26T00:00:00.000Z" }
-    ], "");
+    ], "", defs, { hasMore: true });
     expect(html).toContain("Past runs");
+    expect(html).toContain("The Horizon Council");
     expect(html).toContain("Career forks");
     expect(html).toContain('data-protocol-resume-run="sess-past"');
     expect(html).toContain('data-protocol-open-run="sess-past"');
+    expect(html).toContain("Load more");
+    expect(html).toContain('data-protocol-past-more');
   });
 
   it("gives each thinking persona an in-world status line", () => {

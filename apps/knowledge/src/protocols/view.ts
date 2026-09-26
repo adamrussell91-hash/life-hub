@@ -3,13 +3,9 @@ import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
-<<<<<<< HEAD
 type Evidence = { id: string; kind?: string; title: string; text?: string; url?: string };
 type Turn = { id: string; role: string; speaker: string; stage: string; text: string; evidenceIds?: string[] };
-type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
-=======
-type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: { id: string; role: string; speaker: string; stage: string; text: string }[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean }; protocolId?: string; mode?: string; summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[]; forHammond?: string | null } };
->>>>>>> 834c4d6c (feat(protocols): Phase 3 run log, summary and Central Node write-back)
+type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean }; protocolId?: string; mode?: string; summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[]; forHammond?: string | null } };
 const ASSET_ROOT = `${import.meta.env.BASE_URL}assets/cognitive-protocols`;
 const voiceAsset: Record<string, string> = {
   "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
@@ -129,9 +125,9 @@ async function catalog() {
   return body.data.catalog as Definition[];
 }
 
-async function listPastRuns() {
+async function listPastRuns(offset = 0, limit = 20) {
   if (USE_LOCAL_DATA) return [];
-  const response = await fetch(`${API_BASE}/protocols?list=1&limit=100`, { credentials: "include" });
+  const response = await fetch(`${API_BASE}/protocols?list=1&limit=${limit}&offset=${offset}`, { credentials: "include" });
   if (!response.ok) return [];
   const body = await response.json();
   return Array.isArray(body?.data?.sessions) ? body.data.sessions : [];
@@ -145,10 +141,14 @@ function formatRunDate(iso: string) {
   }
 }
 
-export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string) {
+export function protocolDisplayName(id: string, definitions: Definition[] = []) {
+  return definitions.find(d => d.id === id)?.name || id;
+}
+
+export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string, definitions: Definition[] = [], { hasMore = false } = {}) {
   const filtered = filterId ? runs.filter(run => run.protocolId === filterId) : runs;
   const options = ["", "fates", "horizon", "refinery", "cartographers", "mirror", "consilium", "witness", "tribunal"]
-    .map(id => `<option value="${id}" ${id === filterId ? "selected" : ""}>${id ? id : "All protocols"}</option>`)
+    .map(id => `<option value="${id}" ${id === filterId ? "selected" : ""}>${id ? escapeHtml(protocolDisplayName(id, definitions)) : "All protocols"}</option>`)
     .join("");
   const rows = filtered.length
     ? filtered.map(run => {
@@ -156,7 +156,7 @@ export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: str
       return `<li class="protocol-past__row">
         <button type="button" class="protocol-past__open" data-protocol-open-run="${escapeHtml(String(run.id))}">
           <span>${escapeHtml(formatRunDate(String(run.updatedAt || run.createdAt || "")))}</span>
-          <span>${escapeHtml(String(run.protocolId || ""))}</span>
+          <span>${escapeHtml(protocolDisplayName(String(run.protocolId || ""), definitions))}</span>
           <span>${escapeHtml(String(run.title || "Untitled"))}</span>
           <span>${escapeHtml(String(run.mode || ""))}</span>
           <span>${escapeHtml(String(run.status || ""))}</span>
@@ -165,7 +165,8 @@ export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: str
       </li>`;
     }).join("")
     : `<li class="protocol-past__empty">No past runs yet.</li>`;
-  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label></header><ul class="protocol-past__list">${rows}</ul></section>`;
+  const more = hasMore ? `<button type="button" class="btn btn--ghost" data-protocol-past-more>Load more</button>` : "";
+  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label></header><ul class="protocol-past__list">${rows}</ul>${more}</section>`;
 }
 
 function downloadMarkdown(session: Session & { summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[] }; protocolId?: string; mode?: string }) {
@@ -426,6 +427,9 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let currentSession: Session | null = null;
   let pastRuns: Array<Record<string, unknown>> = [];
   let pastFilter = "";
+  let pastOffset = 0;
+  let pastHasMore = false;
+  const PAST_PAGE = 20;
   let pollTimer: number | null = null;
   let viewingIndex: number | null = null;
   const effectiveIndex = () => {
@@ -434,11 +438,20 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
   };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
+  const refreshPastRuns = async ({ append = false } = {}) => {
+    if (USE_LOCAL_DATA) return;
+    const offset = append ? pastOffset : 0;
+    const page = await listPastRuns(offset, PAST_PAGE);
+    pastRuns = append ? [...pastRuns, ...page] : page;
+    pastOffset = pastRuns.length;
+    pastHasMore = page.length >= PAST_PAGE;
+    if (!selected && !currentSession) paint();
+  };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
     else host.innerHTML = selected
       ? intake(selected)
-      : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter)}</section>`;
+      : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
   };
   const poll = async () => {
     if (!currentSession?.id || USE_LOCAL_DATA) return;
@@ -448,6 +461,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const body = await response.json();
       currentSession = body.data.session;
       paint();
+      if (currentSession.status === "completed") void refreshPastRuns();
       if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, PROTOCOL_POLL_MS);
     } catch {
       if (currentSession) {
@@ -485,7 +499,8 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     }
     const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
     if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; paint(); return; }
-    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); void refreshPastRuns(); return; }
+    if (target.closest("[data-protocol-past-more]")) { void refreshPastRuns({ append: true }); return; }
     if (target.closest("[data-protocol-download]") && currentSession) { downloadMarkdown(currentSession); return; }
     const openRun = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun
       || target.closest<HTMLButtonElement>("[data-protocol-resume-run]")?.dataset.protocolResumeRun;
@@ -562,6 +577,6 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   paint();
   void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);
-  void listPastRuns().then(runs => { pastRuns = runs; if (!selected && !currentSession) paint(); }).catch(() => undefined);
+  void refreshPastRuns().catch(() => undefined);
   return stopPolling;
 }

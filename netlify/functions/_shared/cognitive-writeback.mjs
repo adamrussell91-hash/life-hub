@@ -1,17 +1,8 @@
 import { createGitHubClient } from './github-client.mjs';
 import { applyCentralNodePatch } from '../../../apps/life/js/core/central-node-patch.js';
-import { assertAgentMayApplyCentralNodePatch } from './hammond-tools.mjs';
+import { assertAgentMayApplyCentralNodePatch, PROTOCOL_CN_SENDERS } from './hammond-tools.mjs';
 
-export const PROTOCOL_CN_SENDERS = {
-  fates: 'The Three Fates',
-  horizon: 'Horizon Council',
-  refinery: 'The Refinery',
-  cartographers: 'The Cartographers',
-  mirror: 'The Mirror Council',
-  consilium: 'The Consilium',
-  witness: 'The Witness',
-  tribunal: 'The Tribunal'
-};
+export { PROTOCOL_CN_SENDERS };
 
 const words = s => String(s || '').trim().split(/\s+/u).filter(Boolean).length;
 
@@ -21,6 +12,28 @@ export function centralNodeLineOk(line) {
   if (words(text) > 40) return false;
   if (/amazing|incredible|thrilled|excited|game.?changer/i.test(text)) return false;
   return true;
+}
+
+function clampToSentenceOrClause(text, maxWords) {
+  const cleaned = String(text || '').replace(/!+/g, '.').trim();
+  if (!cleaned) return null;
+  if (words(cleaned) <= maxWords) return cleaned;
+  const sentences = cleaned.match(/[^.!?]+[.!?]+/gu) || [];
+  let kept = '';
+  for (const sentence of sentences) {
+    const candidate = `${kept}${sentence}`.trim();
+    if (words(candidate) > maxWords) break;
+    kept = candidate;
+  }
+  if (kept) return kept;
+  const clauses = cleaned.split(/(?<=[;:—–-])\s+/u);
+  kept = '';
+  for (const clause of clauses) {
+    const candidate = kept ? `${kept} ${clause}`.trim() : clause.trim();
+    if (words(candidate) > maxWords) break;
+    kept = candidate;
+  }
+  return kept || null;
 }
 
 export function clampSummary(raw = {}) {
@@ -40,7 +53,10 @@ export function clampSummary(raw = {}) {
     ? raw.openQuestions.filter(q => typeof q === 'string' && q.trim()).map(q => q.trim()).slice(0, 6)
     : [];
   let forHammond = raw.forHammond == null || raw.forHammond === '' ? null : String(raw.forHammond).trim();
-  if (forHammond && (forHammond.includes('!') || words(forHammond) > 30)) forHammond = forHammond.replace(/!+/g, '.').split(/\s+/u).slice(0, 30).join(' ');
+  if (forHammond) {
+    forHammond = forHammond.replace(/!+/g, '.');
+    if (words(forHammond) > 30) forHammond = clampToSentenceOrClause(forHammond, 30);
+  }
   return { title, keyFinding, summary, openQuestions, forHammond };
 }
 
@@ -94,6 +110,24 @@ export function buildProtocolWriteBackLines(session) {
   return lines;
 }
 
+/** Same GitHub contents write path chat.mjs uses for Central Node patches. */
+export async function writeCentralNodeMarkdown(content, env, fetchImpl = fetch, { sha, message = 'chore(cn): protocol write-back' } = {}) {
+  const client = createGitHubClient({ env, fetchImpl });
+  let blobSha = sha;
+  if (!blobSha) {
+    const { tree } = await client.resolveTree();
+    const entry = tree.find(e => e.path === 'central-node.md' && e.type === 'blob');
+    if (!entry?.sha) throw Object.assign(new Error('central_node_missing'), { code: 'central_node_missing' });
+    blobSha = entry.sha;
+  }
+  return client.writeFile({
+    path: 'central-node.md',
+    content,
+    sha: blobSha,
+    message
+  });
+}
+
 export async function writeProtocolCentralNodeLines(session, env, { fetchImpl = fetch, readCentralNode, writeCentralNode } = {}) {
   const patches = buildProtocolWriteBackLines(session);
   if (!patches.length) return { ok: true, written: [] };
@@ -103,14 +137,18 @@ export async function writeProtocolCentralNodeLines(session, env, { fetchImpl = 
       return { ok: false, error: 'sender_not_permitted', written: [] };
     }
   }
-  try {
+
+  async function once() {
     let markdown;
-    if (typeof readCentralNode === 'function') markdown = await readCentralNode(env, fetchImpl);
-    else {
+    let sha;
+    if (typeof readCentralNode === 'function') {
+      markdown = await readCentralNode(env, fetchImpl);
+    } else {
       const client = createGitHubClient({ env, fetchImpl });
       const { tree } = await client.resolveTree();
       const entry = tree.find(e => e.path === 'central-node.md' && e.type === 'blob');
       if (!entry?.sha) return { ok: false, error: 'central_node_missing', written: [] };
+      sha = entry.sha;
       markdown = await client.readBlob(entry.sha);
     }
     let next = markdown;
@@ -121,14 +159,25 @@ export async function writeProtocolCentralNodeLines(session, env, { fetchImpl = 
       next = applied;
       written.push({ section: patch.section, text: patch.payload.text });
     }
-    if (typeof writeCentralNode === 'function') await writeCentralNode(next, env, fetchImpl);
-    else {
-      // ponytail: write path left to chat/commit helpers; tests inject writeCentralNode.
-      // Upgrade: shared GitHub write helper once protocol write-back is live-wired.
-      throw Object.assign(new Error('Central Node write helper not configured.'), { code: 'cn_write_unconfigured' });
-    }
+    if (typeof writeCentralNode === 'function') await writeCentralNode(next, env, fetchImpl, { sha });
+    else await writeCentralNodeMarkdown(next, env, fetchImpl, { sha, message: `chore(cn): protocol ${session.protocolId} write-back` });
     return { ok: true, written };
+  }
+
+  try {
+    return await once();
   } catch (error) {
+    if (error?.code === 'write_conflict') {
+      try { return await once(); }
+      catch (retryError) {
+        return { ok: false, error: retryError?.code || retryError?.message || 'write_failed', written: [] };
+      }
+    }
     return { ok: false, error: error?.code || error?.message || 'write_failed', written: [] };
   }
+}
+
+export function writeBackRetryable(error) {
+  const code = String(error || '');
+  return /write_conflict|write_failed|github_unavailable|cn_write_unconfigured|central_node_missing|timeout/i.test(code);
 }

@@ -135,3 +135,131 @@ test('completed Horizon writes recent_actions and optional cross_agent', async (
   const listed = await service.list('owner');
   assert.equal(listed[0].summary?.title, 'Career forks');
 });
+
+test('forHammond clamps to the last full sentence or clause under 30 words', () => {
+  const long = 'Hold the Wednesday afternoon block for deep work. Also protect Friday mornings for marking and never schedule evening meetings after seven o\'clock under any circumstances ever again.';
+  const clamped = clampSummary({ title: 't', keyFinding: 'k', summary: 's', openQuestions: [], forHammond: long });
+  assert.ok(clamped.forHammond);
+  assert.ok(clamped.forHammond.split(/\s+/).length <= 30);
+  assert.match(clamped.forHammond, /Hold the Wednesday afternoon block for deep work\./);
+  const noSentence = Array.from({ length: 40 }, () => 'word').join(' ');
+  assert.equal(clampSummary({ forHammond: noSentence }).forHammond, null);
+});
+
+test('parseListPaging falls back and clamps', async () => {
+  const { parseListPaging } = await import('../../netlify/functions/knowledge-protocols.mjs');
+  assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=abc&offset=no')), { limit: 100, offset: 0 });
+  assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=500&offset=-3')), { limit: 200, offset: 0 });
+  assert.deepEqual(parseListPaging(new URL('https://x.test/api?limit=12&offset=4')), { limit: 12, offset: 4 });
+});
+
+test('Consilium reflect and Mirror advance both finish with summary and write-back', async () => {
+  for (const [protocolId, intake] of [
+    ['consilium', { dilemma: 'Disclose a scoring error', parties: 'Applicant and committee', constraints: 'None' }],
+    ['mirror', { conflict: 'Rest versus volunteering', behaviour: 'I volunteered twice', aspirations: 'Protect rest', timescale: 'weekly' }]
+  ]) {
+    const written = [];
+    const store = createMemoryCognitiveStore();
+    const service = createCognitiveService({
+      store,
+      model: async p => {
+        if (p.stage === 'summary') return { text: JSON.stringify({ title: `${protocolId} done`, keyFinding: 'One finding', summary: 'Short summary.', openQuestions: [], forHammond: null }), evidenceIds: [] };
+        if (p.stage === 'dialogue' || p.gate || p.stage === 'present' || p.stage === 'framing') {
+          return { text: 'Voice speaks.', question: 'What next?', done: true, evidenceIds: [], nextSpeaker: 'consequence' };
+        }
+        return { text: 'Voice speaks.', question: null, done: true, evidenceIds: [], nextSpeaker: 'consequence' };
+      },
+      retrieve: async () => ({ evidence: [], status: 'none' }),
+      readCentralNode: async () => '## 📝 Recent Agent Actions\n\n## 🤝 Cross-Agent Coordination\n',
+      writeCentralNode: async markdown => { written.push(markdown); }
+    });
+    let s = await service.create('owner', { protocolId, intake, requestId: randomUUID() });
+    for (let n = 0; n < 80 && s.status !== 'completed'; n++) {
+      if (s.status === 'queued' || s.status === 'running') s = await service.run('owner', s.id);
+      else if (s.status === 'waiting') {
+        let action = 'answer';
+        if (s.checkpoint?.kind === 'reflection') action = 'reflect';
+        else if (s.allowedActions.includes('finish') && protocolId === 'consilium') action = 'finish';
+        else if (s.allowedActions.includes('confirm')) action = 'confirm';
+        s = await service.action('owner', { sessionId: s.id, revision: s.revision, requestId: randomUUID(), action, text: 'Concrete answer' });
+      } else break;
+    }
+    assert.equal(s.status, 'completed', protocolId);
+    assert.ok(s.summary, `${protocolId} missing summary`);
+    assert.equal(s.writeBack?.ok, true, `${protocolId} write-back`);
+    assert.ok(written.length >= 1, `${protocolId} wrote CN`);
+  }
+});
+
+test('failed write-back retries once on the next get then stops', async () => {
+  let writes = 0;
+  const store = createMemoryCognitiveStore();
+  const service = createCognitiveService({
+    store,
+    model: async p => {
+      if (p.stage === 'summary') return { text: JSON.stringify({ title: 'Done', keyFinding: 'Finding', summary: 'Short.', openQuestions: [], forHammond: null }), evidenceIds: [] };
+      return { text: 'Builder.', question: null, done: true, evidenceIds: [] };
+    },
+    retrieve: async () => ({ evidence: [], status: 'none' }),
+    readCentralNode: async () => '## 📝 Recent Agent Actions\n\n## 🤝 Cross-Agent Coordination\n',
+    writeCentralNode: async () => { writes += 1; throw Object.assign(new Error('write_conflict'), { code: 'write_conflict' }); }
+  });
+  let s = await service.create('owner', { protocolId: 'refinery', mode: 'build', intake: { claim: 'Short meetings help', context: 'Proposal', audience: 'Committee' }, requestId: randomUUID() });
+  s = await service.run('owner', s.id);
+  assert.equal(s.status, 'completed');
+  assert.equal(s.writeBack?.ok, false);
+  const afterFirst = writes;
+  assert.ok(afterFirst >= 1);
+  s = await service.get('owner', s.id);
+  assert.ok(writes > afterFirst);
+  const afterRetry = writes;
+  s = await service.get('owner', s.id);
+  assert.equal(writes, afterRetry);
+});
+
+test('R2 store lists from encrypted index objects with paging and ordering', async () => {
+  const { createR2CognitiveStore } = await import('../../netlify/functions/_shared/cognitive-store.mjs');
+  const { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = await import('@aws-sdk/client-s3');
+  const objects = new Map();
+  const client = {
+    send: async cmd => {
+      if (cmd instanceof PutObjectCommand || cmd?.constructor?.name === 'PutObjectCommand' || cmd?.input?.Body) {
+        objects.set(cmd.input.Key, { Body: cmd.input.Body, ETag: `"${objects.size + 1}"` });
+        return { ETag: `"${objects.size}"` };
+      }
+      if (cmd instanceof ListObjectsV2Command || cmd?.input?.Prefix) {
+        const prefix = cmd.input.Prefix;
+        const Contents = [...objects.keys()].filter(k => k.startsWith(prefix)).map(Key => ({ Key }));
+        return { Contents, IsTruncated: false };
+      }
+      if (cmd instanceof GetObjectCommand || cmd?.input?.Key) {
+        const row = objects.get(cmd.input.Key);
+        if (!row) throw Object.assign(new Error('missing'), { name: 'NoSuchKey', $metadata: { httpStatusCode: 404 } });
+        return { Body: { transformToString: async () => String(row.Body) }, ETag: row.ETag };
+      }
+      throw new Error(`unexpected command ${cmd?.constructor?.name}`);
+    }
+  };
+  const store = createR2CognitiveStore({ client, bucket: 'test', encryptionSecret: 'x'.repeat(32) });
+  for (const [i, updatedAt] of [['a', '2026-09-01T00:00:00.000Z'], ['b', '2026-09-03T00:00:00.000Z'], ['c', '2026-09-02T00:00:00.000Z']]) {
+    await store.write('owner', i, {
+      id: i,
+      protocolId: 'horizon',
+      mode: 'full',
+      status: 'completed',
+      stage: 'map',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      updatedAt,
+      intake: { focus: `Focus ${i}` },
+      summary: { title: `Run ${i}`, keyFinding: 'Finding', summary: 'Short.', openQuestions: [], forHammond: null }
+    }, null);
+  }
+  const page = await store.list('owner', 2, 0);
+  assert.equal(page.length, 2);
+  assert.deepEqual(page.map(r => r.value.id), ['b', 'c']);
+  const next = await store.list('owner', 2, 2);
+  assert.equal(next.length, 1);
+  assert.equal(next[0].value.id, 'a');
+  assert.equal(next[0].value.title, 'Run a');
+});
+

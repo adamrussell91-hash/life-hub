@@ -165,7 +165,7 @@ const SPECIALIST_CN_SENDERS = {
   ann: 'Ann'
 };
 
-const PROTOCOL_CN_SENDERS = {
+export const PROTOCOL_CN_SENDERS = {
   fates: 'The Three Fates',
   horizon: 'Horizon Council',
   refinery: 'The Refinery',
