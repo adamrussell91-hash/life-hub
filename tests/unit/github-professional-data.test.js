@@ -183,6 +183,90 @@ test('listGithubRelationshipEntries indexes employee_at/member_of by both sides,
   assert.equal(memberEntry.link.valid_to, '2021-06-30');
 });
 
+test('accepts professional_relationship person↔person rows under both people', async () => {
+  const { fetchImpl } = memoryFetch({
+    people: PEOPLE,
+    organisations: ORGANISATIONS,
+    relationships: [
+      ...RELATIONSHIPS,
+      {
+        person_legacy_id: 'leg-person-1',
+        other_person_legacy_id: 'leg-person-2',
+        relationship_type: 'professional_relationship',
+        role: 'colleague',
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const a = derivePersonId('leg-person-1');
+  const b = derivePersonId('leg-person-2');
+  const fromA = await listGithubRelationshipEntries('person', a, { env, fetchImpl });
+  const fromB = await listGithubRelationshipEntries('person', b, { env, fetchImpl });
+  const pairFromA = fromA.find((e) => e.link.relationship_type === 'professional_relationship');
+  const pairFromB = fromB.find((e) => e.link.relationship_type === 'professional_relationship');
+  assert.ok(pairFromA);
+  assert.ok(pairFromB);
+  assert.equal(pairFromA.direction, 'outgoing');
+  assert.equal(pairFromB.direction, 'incoming');
+  assert.equal(pairFromA.link.id, pairFromB.link.id);
+  assert.equal(pairFromA.otherRef, `shared:person:${b}`);
+  assert.equal(pairFromB.otherRef, `shared:person:${a}`);
+  // employee_at behaviour unchanged for person-1
+  assert.ok(fromA.some((e) => e.link.relationship_type === 'employee_at'));
+});
+
+test('drops professional_relationship rows whose other person is unknown', async () => {
+  const { fetchImpl } = memoryFetch({
+    people: PEOPLE,
+    organisations: ORGANISATIONS,
+    relationships: [
+      {
+        person_legacy_id: 'leg-person-1',
+        other_person_legacy_id: 'leg-missing',
+        relationship_type: 'professional_relationship',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const entries = await listGithubRelationshipEntries('person', derivePersonId('leg-person-1'), { env, fetchImpl });
+  assert.deepEqual(entries, []);
+});
+
+test('person↔person pairs written in reverse order dedupe to one link id', async () => {
+  const { fetchImpl } = memoryFetch({
+    people: PEOPLE,
+    organisations: ORGANISATIONS,
+    relationships: [
+      {
+        person_legacy_id: 'leg-person-1',
+        other_person_legacy_id: 'leg-person-2',
+        relationship_type: 'professional_relationship',
+        role: null,
+        valid_from: '2020-01-01',
+        valid_to: null
+      },
+      {
+        person_legacy_id: 'leg-person-2',
+        other_person_legacy_id: 'leg-person-1',
+        relationship_type: 'professional_relationship',
+        role: null,
+        valid_from: '2020-01-01',
+        valid_to: null
+      }
+    ]
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const a = derivePersonId('leg-person-1');
+  const fromA = await listGithubRelationshipEntries('person', a, { env, fetchImpl });
+  const pairs = fromA.filter((e) => e.link.relationship_type === 'professional_relationship');
+  assert.equal(pairs.length, 1);
+});
+
 test('caches parsed data for repeated calls within the TTL, issuing only one set of GitHub requests', async () => {
   const { fetchImpl, calls } = memoryFetch({ people: PEOPLE, organisations: ORGANISATIONS, relationships: RELATIONSHIPS });
   const env = { GITHUB_TOKEN: 'token' };
