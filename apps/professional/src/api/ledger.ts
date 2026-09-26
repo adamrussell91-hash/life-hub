@@ -24,6 +24,15 @@ export function createLedgerItem(
   });
 }
 
+export function listLedgerDue(
+  from: string,
+  to: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{ items: LedgerItem[] }> {
+  const params = new URLSearchParams({ due_from: from, due_to: to });
+  return apiGet(`/api/people/ledger?${params.toString()}`, { signal: options.signal });
+}
+
 export function patchLedger(
   id: string,
   patch: {

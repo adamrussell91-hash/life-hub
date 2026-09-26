@@ -14,6 +14,7 @@ import '../../design-kit/calendar-day-dial.css';
 import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
+import '../styles/walk-in.css';
 import '../styles/tasks-engine.css';
 import '../styles/block-page.css';
 import '../styles/comm-page.css';
