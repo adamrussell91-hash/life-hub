@@ -781,8 +781,28 @@
 }
 
 .someday-capture .someday-add .hub-field--compact {
-  flex: 0 1 9rem;
-  min-width: 7rem;
+  flex: 0 0 auto;
+  align-self: flex-end;
+  min-width: 8rem;
+  max-width: 10rem;
+}
+
+/* Date in a 999px search pill becomes a tall oval — square and pin the chrome. */
+.someday-capture .hub-field--compact .hub-search {
+  flex: none;
+  width: 100%;
+  border-radius: var(--radius-md);
+  min-height: 2.5rem;
+  height: 2.5rem;
+  max-height: 2.5rem;
+  padding-block: 0;
+  align-items: center;
+}
+
+.someday-capture .hub-field--compact .hub-search__input {
+  min-height: 0;
+  height: auto;
+  max-height: 2.25rem;
 }
 
 .someday-cta,
