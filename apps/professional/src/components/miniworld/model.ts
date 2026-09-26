@@ -199,9 +199,13 @@ function whySentence(community: {
     case 'forest':
       return `Dense and long-standing: ${stats.internalLinks} links among ${stats.memberCount} people (density ${d}), known for ${stats.avgYears.toFixed(1)} years on average.`;
     case 'reef':
-      return `Overlapping roles: ${stats.memberCount} people across ${stats.orgCount} organisations, with ${stats.internalLinks} links between them and ${stats.bridgeCount} shared with other communities.`;
+      return stats.orgCount <= 1
+        ? `Overlapping roles: ${stats.memberCount} people, with ${stats.internalLinks} links between them and ${stats.bridgeCount} shared with other communities.`
+        : `Overlapping roles: ${stats.memberCount} people across ${stats.orgCount} organisations, with ${stats.internalLinks} links between them and ${stats.bridgeCount} shared with other communities.`;
     case 'savannah':
-      return `Broad but spread out: ${stats.memberCount} people across ${stats.orgCount} organisations, and only ${stats.internalLinks} links between them (density ${d}).`;
+      return stats.orgCount <= 1
+        ? `Broad but spread out: ${stats.memberCount} people, and only ${stats.internalLinks} links between them (density ${d}).`
+        : `Broad but spread out: ${stats.memberCount} people across ${stats.orgCount} organisations, and only ${stats.internalLinks} links between them (density ${d}).`;
     case 'wetland':
       return community.eventDate
         ? `Gathers around an event on ${community.eventDate}. ${stats.memberCount} people come together, then recede.`

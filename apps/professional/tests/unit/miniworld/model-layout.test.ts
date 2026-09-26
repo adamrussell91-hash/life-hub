@@ -222,6 +222,13 @@ describe('buildWorldModel', () => {
     expect(bob.quiet).toBe(false); // null last_contacted = not quiet
   });
 
+  it('organisation clusters keep orgCount 1 even when members bridge elsewhere (D5)', () => {
+    const model = buildWorldModel(fixture(), 2026, today, { isNow: true });
+    const aloysius = model.communities.find((c) => c.id === 'shared:organisation:aloysius')!;
+    expect(aloysius.stats.orgCount).toBe(1);
+    expect(aloysius.why).not.toMatch(/across \d+ organisations/);
+  });
+
   it('person in two clusters keeps both homes', () => {
     const model = buildWorldModel(fixture(), 2026, today, { isNow: true });
     const adam = model.people.find((p) => p.ref === 'shared:person:adam')!;
