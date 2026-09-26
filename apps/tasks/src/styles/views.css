@@ -751,6 +751,11 @@
   margin: 0;
 }
 
+.someday-capture__choices[hidden],
+.someday-capture .someday-add[hidden] {
+  display: none;
+}
+
 .someday-capture__choices .hub-create__item {
   flex: 1 1 9rem;
   justify-content: center;
@@ -767,6 +772,17 @@
 
 .someday-capture .someday-add {
   margin-bottom: 0;
+  align-items: flex-end;
+}
+
+.someday-capture .someday-add .hub-search {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.someday-capture .someday-add .hub-field--compact {
+  flex: 0 1 9rem;
+  min-width: 7rem;
 }
 
 .someday-cta,
