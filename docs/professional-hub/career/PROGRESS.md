@@ -84,7 +84,23 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 1: Data layer
 
-**Status:** pending
+**Status:** done (2026-09-26)
+**Checked:** V4 W1 W2 D2
+
+- Entity kinds: `achievement`, `future`, `stepping_stone` in `entity-ref.mjs` + resolvers
+- Schemas: `career-schema.mjs` + `career-schema.test.js`
+- Relationships: `evidenced_by`, `witnessed_by`, `supports_future`, `answers_criterion`, `probe_of`, `stone_for`, `stone_action` (+ registry tests)
+- Blob prefixes + `career-repository.mjs`
+- Endpoints: `career-achievements`, `career-futures`, `career-stones`, `career-scan` (stub), `career-moves` (stub)
+- `buildCareerModel` in `apps/professional/src/domain/career-model.ts` + `career-model.test.ts`
+- Overview payload extended with achievements/futures/stones/links/scan
+- Stone done: project `status === 'completed'`; program never auto-done (no closed field)
+
+**Must:** One model call feeds readiness, match %, what-if deltas.
+**Must-not:** Store readiness on records.
+**Verify:** `career-model.test.ts`, `career-schema.test.js`, `relationship-registry.test.js`
+
+**diff vs mockup:** n/a (data layer)
 
 ---
 
