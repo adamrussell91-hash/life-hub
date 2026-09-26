@@ -1,0 +1,1474 @@
+{
+  "ok": true,
+  "data": {
+    "nodes": [
+      {
+        "ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "kind": "person",
+        "display_name": "Adam Russell",
+        "last_contacted": null,
+        "is_self": true
+      },
+      {
+        "ref": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "kind": "organisation",
+        "display_name": "HALT Pilot Network",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "kind": "organisation",
+        "display_name": "St Aloysius College",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "kind": "person",
+        "display_name": "Alex Chen",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+        "kind": "person",
+        "display_name": "Blair Ng",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+        "kind": "person",
+        "display_name": "Casey Wu",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+        "kind": "person",
+        "display_name": "Dana Park",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+        "kind": "person",
+        "display_name": "Ellis Xu",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+        "kind": "person",
+        "display_name": "Fran Li",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+        "kind": "person",
+        "display_name": "Glen Roe",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+        "kind": "person",
+        "display_name": "Hana Kim",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+        "kind": "person",
+        "display_name": "Ira Moss",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+        "kind": "person",
+        "display_name": "Jules Day",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+        "kind": "person",
+        "display_name": "Kai West",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+        "kind": "person",
+        "display_name": "Lee Ahn",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "kind": "person",
+        "display_name": "Mo Diaz",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "kind": "organisation",
+        "display_name": "Trinity Grammar School",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+        "kind": "person",
+        "display_name": "Nina Cho",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+        "kind": "person",
+        "display_name": "Omar Fay",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+        "kind": "person",
+        "display_name": "Pat Reed",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+        "kind": "person",
+        "display_name": "Quinn Yu",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+        "kind": "person",
+        "display_name": "Remy Fox",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+        "kind": "person",
+        "display_name": "Sam Ide",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5",
+        "kind": "person",
+        "display_name": "Tess Bo",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+        "kind": "person",
+        "display_name": "Uma Sur",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "kind": "organisation",
+        "display_name": "Catherine McAuley Westmead",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+        "kind": "person",
+        "display_name": "Vic Lam",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+        "kind": "person",
+        "display_name": "Wes Yin",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3",
+        "kind": "person",
+        "display_name": "Xan Poe",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+        "kind": "person",
+        "display_name": "Yen Cho",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "kind": "organisation",
+        "display_name": "Loreto Kirribilli",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8",
+        "kind": "person",
+        "display_name": "Zoe Han",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_59e5c09b-ebe8-4b35-b7f6-07fd551edbb0",
+        "kind": "person",
+        "display_name": "Open Sea One",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_b2e76a8b-a99a-4033-8691-7ff96c0ce93d",
+        "kind": "person",
+        "display_name": "Open Sea Two",
+        "last_contacted": null,
+        "is_self": false
+      },
+      {
+        "ref": "shared:person:person_a548212e-2aa7-4f0d-bbd1-12f8009c60a8",
+        "kind": "person",
+        "display_name": "Open Sea Three",
+        "last_contacted": null,
+        "is_self": false
+      }
+    ],
+    "edges": [
+      {
+        "source_ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "target_ref": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "target_ref": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+        "target_ref": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "relationship_type": "employee_at"
+      },
+      {
+        "source_ref": "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8",
+        "target_ref": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "relationship_type": "employee_at"
+      }
+    ],
+    "links": [
+      {
+        "source_ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "target_ref": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2026-06-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "target_ref": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2026-06-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2018-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "target_ref": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5",
+        "target_ref": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2019-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2020-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2020-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2020-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3",
+        "target_ref": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2020-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+        "target_ref": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2021-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      },
+      {
+        "source_ref": "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8",
+        "target_ref": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "relationship_type": "employee_at",
+        "role": null,
+        "valid_from": "2021-01-01T00:00:00.000Z",
+        "valid_to": null,
+        "status": "current"
+      }
+    ],
+    "clusters": [
+      {
+        "id": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+        "kind": "organisation",
+        "label": "HALT Pilot Network",
+        "member_refs": [
+          "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+          "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f"
+        ],
+        "habitat": "sandbank",
+        "since": 2026,
+        "event_date": null
+      },
+      {
+        "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+        "kind": "organisation",
+        "label": "St Aloysius College",
+        "member_refs": [
+          "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+          "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+          "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+          "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+          "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+          "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+          "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+          "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+          "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+          "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+          "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+          "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+          "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+          "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+        ],
+        "habitat": "savannah",
+        "since": 2018,
+        "event_date": null
+      },
+      {
+        "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+        "kind": "organisation",
+        "label": "Trinity Grammar School",
+        "member_refs": [
+          "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+          "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+          "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+          "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+          "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+          "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+          "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+          "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+        ],
+        "habitat": "savannah",
+        "since": 2019,
+        "event_date": null
+      },
+      {
+        "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+        "kind": "organisation",
+        "label": "Catherine McAuley Westmead",
+        "member_refs": [
+          "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+          "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+          "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+          "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+        ],
+        "habitat": "island",
+        "since": 2020,
+        "event_date": null
+      },
+      {
+        "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+        "kind": "organisation",
+        "label": "Loreto Kirribilli",
+        "member_refs": [
+          "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+          "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+        ],
+        "habitat": "island",
+        "since": 2021,
+        "event_date": null
+      }
+    ],
+    "bridge_people": [
+      {
+        "ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+        "display_name": "Adam Russell",
+        "organisation_refs": [
+          "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+          "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7"
+        ],
+        "description": "Connects HALT Pilot Network and St Aloysius College"
+      },
+      {
+        "ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+        "display_name": "Alex Chen",
+        "organisation_refs": [
+          "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+          "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7"
+        ],
+        "description": "Connects HALT Pilot Network and St Aloysius College"
+      },
+      {
+        "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+        "display_name": "Mo Diaz",
+        "organisation_refs": [
+          "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+          "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+        ],
+        "description": "Connects St Aloysius College and Trinity Grammar School"
+      }
+    ],
+    "timeline": {
+      "2018": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          }
+        ],
+        "bridge_people": []
+      },
+      "2019": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2020": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2021": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "sandbank",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2022": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "island",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2023": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "island",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2024": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "island",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2025": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "island",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      },
+      "2026": {
+        "clusters": [
+          {
+            "id": "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+            "kind": "organisation",
+            "label": "HALT Pilot Network",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f"
+            ],
+            "habitat": "sandbank",
+            "since": 2026,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+            "kind": "organisation",
+            "label": "St Aloysius College",
+            "member_refs": [
+              "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+              "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+              "shared:person:person_0959a5dd-d69b-4a25-ac3c-17fbf3f07d3e",
+              "shared:person:person_20943b12-c41a-4108-aae9-b0440bec560e",
+              "shared:person:person_7a74fef9-40d8-4393-8238-1638ff86f65d",
+              "shared:person:person_5808a5c0-0168-455d-a5de-a4900a577f13",
+              "shared:person:person_38ae03b3-b775-412f-b516-0093493c8bf8",
+              "shared:person:person_10a06bfb-11cd-485b-9dc8-b5a7e3a77874",
+              "shared:person:person_ab1a860b-8161-4298-bdbb-d91dff1128aa",
+              "shared:person:person_6799aa99-de6f-47a1-9c74-346b8685be03",
+              "shared:person:person_f4624c1a-744d-4d4c-8f64-cd9e8efa43f8",
+              "shared:person:person_852dd925-b9bc-4c30-a761-3fe3781d5719",
+              "shared:person:person_abbeb4f9-6642-4791-8011-f0c9adaa61c7",
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42"
+            ],
+            "habitat": "savannah",
+            "since": 2018,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9",
+            "kind": "organisation",
+            "label": "Trinity Grammar School",
+            "member_refs": [
+              "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+              "shared:person:person_076e9a5e-67b4-4769-9b7c-61f2e9477936",
+              "shared:person:person_07fb0680-ddc1-4d1d-ab1c-9e67d34202dc",
+              "shared:person:person_78c2d08b-9b67-42a2-be93-201156aaa162",
+              "shared:person:person_6f1bc634-9357-4cab-b09c-34a0a4281b84",
+              "shared:person:person_9bfe3470-2b15-42a1-b368-6a7b81c81552",
+              "shared:person:person_147bf819-d7d4-48fb-a0f0-0eaf9679fcc4",
+              "shared:person:person_1fa95986-2e0b-44e6-9f4f-4a2f13c80be5"
+            ],
+            "habitat": "savannah",
+            "since": 2019,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_aa03c414-1033-4e77-a142-0cf87582bfb0",
+            "kind": "organisation",
+            "label": "Catherine McAuley Westmead",
+            "member_refs": [
+              "shared:person:person_8d84a235-be21-4d44-85d3-182c0f65ebf2",
+              "shared:person:person_39e273ce-b9cc-49cd-a0a9-d387d2c05618",
+              "shared:person:person_ff75a6e0-5bb9-4a59-b67f-72e355812d24",
+              "shared:person:person_b02110d3-859a-4e5d-9f5e-aed4f7cf65d3"
+            ],
+            "habitat": "island",
+            "since": 2020,
+            "event_date": null
+          },
+          {
+            "id": "shared:organisation:organisation_74717d4d-be77-4c32-88a6-fe8e769086b9",
+            "kind": "organisation",
+            "label": "Loreto Kirribilli",
+            "member_refs": [
+              "shared:person:person_bac12b46-e06c-461a-9117-2599b26a6bd7",
+              "shared:person:person_7e1ffe7c-ca7e-4f0e-b1a1-f46e4c60c2a8"
+            ],
+            "habitat": "island",
+            "since": 2021,
+            "event_date": null
+          }
+        ],
+        "bridge_people": [
+          {
+            "ref": "shared:person:person_33f830a9-6828-4340-99aa-f80f380f82c0",
+            "display_name": "Adam Russell",
+            "organisation_refs": [
+              "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7"
+            ],
+            "description": "Connects HALT Pilot Network and St Aloysius College"
+          },
+          {
+            "ref": "shared:person:person_1f2a6957-f9ed-4b04-8b93-24897ed75c5f",
+            "display_name": "Alex Chen",
+            "organisation_refs": [
+              "shared:organisation:organisation_532e6368-a700-4762-b2c3-ceb601ea3267",
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7"
+            ],
+            "description": "Connects HALT Pilot Network and St Aloysius College"
+          },
+          {
+            "ref": "shared:person:person_abce7d80-c93a-495a-b79d-20d9c480cb42",
+            "display_name": "Mo Diaz",
+            "organisation_refs": [
+              "shared:organisation:organisation_6c459732-a245-471c-a43e-0aa5b782c8c7",
+              "shared:organisation:organisation_e7bb1fe7-19ec-448b-8510-52fc7669afc9"
+            ],
+            "description": "Connects St Aloysius College and Trinity Grammar School"
+          }
+        ]
+      }
+    },
+    "upcoming_events": []
+  }
+}
