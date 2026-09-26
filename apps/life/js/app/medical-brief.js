@@ -82,7 +82,8 @@ function briefCard(root, model) {
       const row = root.createElement('p');
       row.className = 'medical-brief__watch';
       row.dataset.status = item.status === 'High' || item.status === 'Low' ? 'flag' : 'ok';
-      row.textContent = `${item.label} ${item.value ?? ''} ${item.arrow || ''}`.trim();
+      const ref = formatWatchRef(item);
+      row.textContent = `${item.label} ${item.value ?? ''} ${item.arrow || ''}${ref ? ` · ${ref}` : ''}`.trim();
       card.append(row);
     }
   }
@@ -203,6 +204,7 @@ function buildNextRow(root, visit, model, hooks) {
     const taskBtn = root.createElement('button');
     taskBtn.type = 'button';
     taskBtn.className = 'btn btn--ghost medical-brief__task';
+    taskBtn.setAttribute('aria-label', visit.task_id ? 'Already in Tasks' : 'Add to Tasks');
     if (visit.task_id) {
       taskBtn.textContent = 'In Tasks ✓';
       taskBtn.disabled = true;
@@ -213,6 +215,18 @@ function buildNextRow(root, visit, model, hooks) {
     li.append(taskBtn);
   }
   return li;
+}
+
+function formatWatchRef(item) {
+  const high = item.ref_high;
+  const low = item.ref_low;
+  if (high != null && Number.isFinite(Number(high)) && (low == null || Number(low) === 0)) {
+    return `ref <${high}`;
+  }
+  if (low != null && high != null) return `ref ${low}–${high}`;
+  if (high != null) return `ref <${high}`;
+  if (low != null) return `ref >${low}`;
+  return '';
 }
 
 function surfaceCard(root, heading) {

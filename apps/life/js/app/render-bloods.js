@@ -455,6 +455,17 @@ export function markerRow(root, marker, { compact = false } = {}) {
     if (chart?.dataset) chart.dataset.status = tone;
     meter.append(visual);
   }
+
+  if (compact) {
+    row.append(meter);
+    const pill = root.createElement('span');
+    pill.className = 'bloods-status';
+    pill.dataset.status = tone;
+    pill.textContent = statusLabel(marker.latest?.status);
+    row.append(pill);
+    return row;
+  }
+
   const foot = root.createElement('div');
   foot.className = 'bloods-row__foot';
   const band = root.createElement('span');
@@ -467,12 +478,10 @@ export function markerRow(root, marker, { compact = false } = {}) {
   meter.append(foot);
   row.append(meter);
 
-  if (!compact) {
-    const delta = root.createElement('p');
-    delta.className = 'bloods-row__delta';
-    delta.textContent = marker.lastDeltaLabel || (marker.latest?.date ? formatDisplayDate(marker.latest.date) : '');
-    row.append(delta);
-  }
+  const delta = root.createElement('p');
+  delta.className = 'bloods-row__delta';
+  delta.textContent = marker.lastDeltaLabel || (marker.latest?.date ? formatDisplayDate(marker.latest.date) : '');
+  row.append(delta);
   return row;
 }
 

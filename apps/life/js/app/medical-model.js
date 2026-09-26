@@ -29,7 +29,7 @@ const THREAD_RULES = [
     thread: 'Mind',
     test: visit =>
       visit.lane === 'therapy'
-      || /therap|psycholog|adhd|kate semple|vera|mind/i.test(visitBlob(visit))
+      || /therap|psycholog|psychiatr|adhd(?:\s+centre)?|kate semple|hook|vera|mind/i.test(visitBlob(visit))
   },
   {
     thread: 'Acute',
@@ -134,7 +134,7 @@ export function buildMedicalModel({
 
   const items = [
     ...(future.length ? [{ kind: 'upcoming' }] : []),
-    ...pack(future, selectedDensity, openYears),
+    ...packUpcoming(future, selectedDensity, openYears),
     { kind: 'today', date: today },
     ...pack(past, selectedDensity, openYears)
   ];
@@ -253,7 +253,7 @@ function decorateVisit(record, event, bloods, today) {
     cost_aud: record.cost_aud ?? null,
     insurance_status: record.insurance_status ?? null,
     episode: record.episode ?? null,
-    displayDate: formatDisplayDate(record.date),
+    displayDate: null,
     lab: labSummary(bloods),
     bloods,
     mapsUrl: null,
@@ -262,7 +262,22 @@ function decorateVisit(record, event, bloods, today) {
   };
   visit.planned = isPlannedVisit(visit, today);
   visit.mapsUrl = mapsUrl(visit);
+  visit.displayDate = formatMedicalDisplayDate(visit);
   return visit;
+}
+
+/** Precision-aware river/meta date: never print a day for month/tbd (MO-06). */
+export function formatMedicalDisplayDate(visit) {
+  if (!visit) return '';
+  if (visit.status === 'to_book' || visit.date_precision === 'tbd') return 'To book';
+  if (visit.date_precision === 'month' && visit.date) {
+    const [y, m] = String(visit.date).split('-').map(Number);
+    const mon = MONTHS_SHORT[m - 1] || '';
+    return mon ? `${mon} ${y}` : formatDisplayDate(visit.date);
+  }
+  if (!visit.date) return '';
+  const day = formatDisplayDate(visit.date);
+  return visit.virtual ? `~${day}` : day;
 }
 
 /**
@@ -288,21 +303,23 @@ export function deriveVirtualDoses(visits, today) {
       return Math.abs(daysBetween(visit.date, nextDate)) <= 7;
     });
     if (suppressed) continue;
-    virtuals.push({
+    const virtual = {
       ...last,
       id: `virtual-${last.id}-${nextDate}`,
       date: nextDate,
-      displayDate: formatDisplayDate(nextDate),
       status: 'planned',
       date_precision: 'day',
       planned: true,
       virtual: true,
+      record_type: 'Dose',
       title: last.title,
       notes: `~${formatDisplayDate(nextDate)} · auto from cadence ${last.cadence_days}d`,
       lab: null,
       bloods: null,
       task_id: null
-    });
+    };
+    virtual.displayDate = formatMedicalDisplayDate(virtual);
+    virtuals.push(virtual);
   }
   return virtuals;
 }
@@ -437,7 +454,15 @@ function buildHealthBrief(visits, bloods, today) {
   }
 
   const verdictVisit = visits
-    .filter(visit => visit.notes && visit.date <= today)
+    .filter(visit =>
+      visit.notes
+      && visit.date <= today
+      && !visit.planned
+      && !visit.virtual
+      && visit.status !== 'to_book'
+      && visit.status !== 'planned'
+      && visit.record_type !== 'Symptom'
+    )
     .sort(compareNewest)[0];
   const verdict = extractVerdict(verdictVisit?.notes) || null;
 
@@ -506,6 +531,24 @@ function pack(visits, density, expandedYears) {
   return withHeadings(toItems(visits), density);
 }
 
+/** Upcoming: TO BOOK group first, then dated month/week headings (MO-06). */
+function packUpcoming(visits, density, expandedYears) {
+  const toBook = [];
+  const dated = [];
+  for (const visit of visits) {
+    if (visit.status === 'to_book' || visit.date_precision === 'tbd') toBook.push(visit);
+    else dated.push(visit);
+  }
+  const out = [];
+  if (toBook.length) {
+    out.push({ kind: 'heading', label: 'To book', date: null, toBook: true });
+    out.push(...toItems(toBook));
+  }
+  if (density === 'years') out.push(...collapseYears(dated, expandedYears));
+  else out.push(...withHeadings(toItems(dated), density));
+  return out;
+}
+
 function collapseYears(visits, expandedYears) {
   const groups = [];
   for (const visit of visits) {
@@ -532,7 +575,7 @@ function withHeadings(items, density) {
     const date = item.kind === 'visit'
       ? item.visit.date
       : item.kind === 'band'
-        ? item.visits[0]?.date
+        ? bandAnchorDate(item.visits)
         : null;
     if (date) {
       const label = headingFor(date, density);
@@ -546,6 +589,14 @@ function withHeadings(items, density) {
   return out;
 }
 
+function bandAnchorDate(visits = []) {
+  let max = '';
+  for (const visit of visits) {
+    if (visit?.date && visit.date > max) max = visit.date;
+  }
+  return max || visits[0]?.date || null;
+}
+
 function headingFor(date, density) {
   const [year, month] = String(date).split('-');
   if (!year) return '';
@@ -556,31 +607,44 @@ function headingFor(date, density) {
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/**
+ * Group by episode.id globally (not contiguous runs). Intervening visits
+ * (e.g. Gastro between cold notes) must not split an active episode band.
+ * Band sits at its latest entry date so an active cold lands under TODAY.
+ */
 function toItems(visits) {
-  const items = [];
-  let run = [];
-  const flush = () => {
-    if (!run.length) return;
-    if (run.length >= 2 && run[0].episode?.id && run.every(visit => visit.episode?.id === run[0].episode.id)) {
-      items.push({ kind: 'band', episode: run[0].episode, visits: run });
-    } else {
-      for (const visit of run) items.push({ kind: 'visit', visit });
-    }
-    run = [];
-  };
-
+  const byEpisode = new Map();
   for (const visit of visits) {
     const id = visit.episode?.id;
-    if (!id) {
-      flush();
-      items.push({ kind: 'visit', visit });
+    if (!id) continue;
+    if (!byEpisode.has(id)) byEpisode.set(id, []);
+    byEpisode.get(id).push(visit);
+  }
+  const banded = new Map();
+  for (const [id, group] of byEpisode) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort(compareNewest);
+    banded.set(id, {
+      kind: 'band',
+      episode: sorted[0].episode,
+      visits: sorted
+    });
+  }
+
+  const items = [];
+  const emitted = new Set();
+  for (const visit of visits) {
+    const id = visit.episode?.id;
+    if (id && banded.has(id)) {
+      if (emitted.has(id)) continue;
+      emitted.add(id);
+      items.push(banded.get(id));
       continue;
     }
-    if (run.length && run[0].episode?.id !== id) flush();
-    run.push(visit);
+    items.push({ kind: 'visit', visit });
   }
-  flush();
   return items;
 }
 

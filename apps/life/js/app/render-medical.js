@@ -64,6 +64,14 @@ export function renderMedical(root, model, {
   });
   bindOnce(root, '#medical-sheet-close', 'click', () => onClose?.());
   bindOnce(root, '#medical-show-minor', 'click', () => onShowMinor?.(!model.showMinor));
+  bindOnce(root, '#medical-filters', 'click', () => {
+    const toolbar = root.querySelector('.medical-toolbar');
+    const btn = root.querySelector('#medical-filters');
+    if (!toolbar) return;
+    const open = !toolbar.classList.contains('is-filters-open');
+    toolbar.classList.toggle('is-filters-open', open);
+    btn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 
   const search = root.querySelector('#medical-search');
   if (search && search.value !== model.query) search.value = model.query ?? '';
@@ -83,7 +91,7 @@ export function renderMedical(root, model, {
       root.querySelector?.('.medical-upcoming')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
     })
   });
-  renderMedicalStrip(root, model, { onSelect });
+  renderMedicalStrip(root, model, { onSelect, onDensityChange });
 
   renderChips(root, model, { onSearch, onTypeChange, onProviderChange });
   renderEmpty(root, model);
@@ -457,7 +465,8 @@ function visitCard(root, visit, model, onSelect) {
   card.className = [
     'medical-card',
     weight === 'major' ? 'medical-card--major' : 'medical-card--routine',
-    planned ? 'medical-card--planned' : ''
+    planned ? 'medical-card--planned' : '',
+    (weight === 'major' && (visit.lab || detailPills(visit, model).length)) ? 'medical-card--has-detail' : ''
   ].filter(Boolean).join(' ');
   card.dataset.visitId = visit.id;
   card.dataset.lane = visit.lane;
@@ -467,6 +476,12 @@ function visitCard(root, visit, model, onSelect) {
   if (model.selected?.id === visit.id) card.classList.add('is-selected');
   card.addEventListener('click', () => onSelect?.(visit.id));
 
+  const head = root.createElement('div');
+  head.className = 'medical-card__head';
+  const title = root.createElement('strong');
+  title.className = 'medical-card__title';
+  title.textContent = visit.title;
+  head.append(title);
   if (planned) {
     const cd = root.createElement('span');
     cd.className = 'medical-card__countdown';
@@ -477,25 +492,76 @@ function visitCard(root, visit, model, onSelect) {
     });
     cd.textContent = visit.virtual && !label.startsWith('~') ? `~${label}` : label;
     if (label === 'action') cd.dataset.tone = 'danger';
-    card.append(cd);
+    head.append(cd);
   }
+  card.append(head);
 
-  const title = root.createElement('strong');
-  title.className = 'medical-card__title';
-  title.textContent = visit.title;
   const meta = root.createElement('span');
   meta.className = 'medical-card__meta';
+  const typeLabel = visit.virtual
+    ? 'Dose'
+    : (visit.provider || visit.location || visit.record_type);
   const metaBits = [
-    visit.virtual ? `~${visit.displayDate || formatDisplayDate(visit.date)}` : (visit.displayDate || formatDisplayDate(visit.date)),
-    visit.provider || visit.location || visit.record_type
+    visit.displayDate || formatDisplayDate(visit.date),
+    typeLabel
   ].filter(Boolean);
   meta.textContent = metaBits.join(' · ');
-  card.append(title, meta);
+  card.append(meta);
 
-  if (weight === 'major' && visit.lab) {
-    card.append(miniLabPanel(root, visit));
+  if (weight === 'major') {
+    const pills = detailPills(visit, model);
+    if (pills.length) {
+      const row = root.createElement('div');
+      row.className = 'medical-card__pills';
+      for (const text of pills) {
+        const pill = root.createElement('span');
+        pill.className = 'medical-card__pill';
+        pill.textContent = text;
+        row.append(pill);
+      }
+      card.append(row);
+    }
+    if (visit.lab) card.append(miniLabPanel(root, visit));
   }
   return card;
+}
+
+/** Up to 3 detail pills from flagged markers + planned linked to this visit (MO-24). */
+function detailPills(visit, model) {
+  const pills = [];
+  const seen = new Set();
+  const push = text => {
+    const key = String(text || '').toLowerCase();
+    if (!text || seen.has(key) || pills.length >= 3) return;
+    seen.add(key);
+    pills.push(text);
+  };
+
+  for (const flag of visit.lab?.flags || []) {
+    const arrow = flag.status === 'High' ? '↑' : flag.status === 'Low' ? '↓' : '';
+    push(`${flag.label || flag.key} ${flag.value ?? ''} ${arrow}`.trim());
+  }
+
+  const notes = String(visit.notes || '');
+  const calpro = notes.match(/calprotectin\s+(\d+(?:\.\d+)?)\s*(↑|↓)?/i);
+  if (calpro) push(`Calprotectin ${calpro[1]} ${calpro[2] || '↓'}`.trim());
+  if (/ggt/i.test(notes) && /concern/i.test(notes)) push('GGT concern');
+  if (/mrcp\s+ordered/i.test(notes)) push('MRCP ordered');
+
+  const all = model.allVisits || model.visits || [];
+  for (const other of all) {
+    if (pills.length >= 3) break;
+    if (other.id === visit.id) continue;
+    if (!(other.status === 'to_book' || other.date_precision === 'tbd' || other.planned)) continue;
+    const linked = /ordered/i.test(other.notes || '')
+      || (other.date && visit.date && other.date.slice(0, 7) === visit.date.slice(0, 7));
+    if (!linked && !/mrcp|colonoscopy|bloods/i.test(other.title || '')) continue;
+    if (/mrcp/i.test(other.title || '') && /mrcp/i.test(notes)) {
+      push('MRCP ordered');
+    }
+  }
+
+  return pills.slice(0, 3);
 }
 
 function minorRow(root, visit, model, onSelect, planned) {

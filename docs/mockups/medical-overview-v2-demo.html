@@ -110,16 +110,19 @@
               </svg>
               <input id="medical-search" class="hub-search__input" type="search" placeholder="Search visits" autocomplete="off">
             </label>
-            <div id="medical-type-host"></div>
-            <div id="medical-provider-host"></div>
-            <div id="medical-density" class="hub-pills" role="group" aria-label="Timeline zoom">
+            <button type="button" id="medical-filters" class="btn btn--ghost medical-toolbar__filters-btn" aria-expanded="false" aria-controls="medical-filters-panel">Filters</button>
+            <div id="medical-filters-panel" class="medical-toolbar__filters-panel">
+              <div id="medical-type-host"></div>
+              <div id="medical-provider-host"></div>
+              <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
+            </div>
+            <div id="medical-density" class="hub-pills medical-toolbar__density" role="group" aria-label="Timeline pack density" hidden>
               <button type="button" class="hub-pills__btn" data-medical-density="weeks">Weeks</button>
               <button type="button" class="hub-pills__btn is-active" data-medical-density="months">Months</button>
               <button type="button" class="hub-pills__btn" data-medical-density="years">Years</button>
             </div>
-            <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
             <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
-            <button type="button" id="medical-add" class="btn btn--primary">Add</button>
+            <button type="button" id="medical-add" class="btn btn--primary medical-toolbar__add" aria-label="Add visit">Add</button>
           </div>
           <div id="medical-chips" class="hub-chips"></div>
           <p id="medical-empty" class="metric-caption" hidden></p>
@@ -148,20 +151,26 @@
         record: {
           type: 'medical', id: 'mrcp', date: '2026-09-26', title: 'MRCP — liver / bile ducts',
           record_type: 'Imaging', lane: 'imaging', weight: 'major', status: 'to_book', date_precision: 'tbd',
-          notes: 'Ordered 24 Sep'
-        }
-      },
-      {
-        record: {
-          type: 'medical', id: 'stelara-v', date: '2026-10-22', title: 'Stelara 90mg — maintenance dose',
-          record_type: 'Prescription', lane: 'prescription', weight: 'major', status: 'planned',
-          cadence_days: 56, notes: 'virtual suppressed in fixture — real upcoming'
+          notes: 'Ordered 24/09/26'
         }
       },
       {
         record: {
           type: 'medical', id: 'colo', date: '2027-02-01', title: 'Colonoscopy',
           record_type: 'Surgery/Hospital', lane: 'hospital', weight: 'major', status: 'planned', date_precision: 'month'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'bloods-dec', date: '2026-12-01', title: 'Repeat bloods',
+          record_type: 'Lab Work', lane: 'lab', weight: 'routine', status: 'planned', date_precision: 'month'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'gastro-mar', date: '2027-03-01', title: 'Gastro review',
+          record_type: 'Consultation', lane: 'appointment', weight: 'routine', status: 'planned', date_precision: 'month',
+          provider: 'Dr Chris Keily'
         }
       },
       {
@@ -189,7 +198,19 @@
         record: {
           type: 'medical', id: 'gastro', date: '2026-09-24', title: 'Gastro follow-up — biologics & liver',
           record_type: 'Consultation', lane: 'appointment', weight: 'major', provider: 'Dr Chris Keily',
-          notes: 'Calprotectin 15 — GGT still main concern — MRCP ordered'
+          notes: 'Calprotectin 15 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Stelara; liver imaging next'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'kate', date: '2026-09-04', title: 'Therapy · Kate Semple',
+          record_type: 'Appointment', lane: 'therapy', weight: 'routine', provider: 'Kate Semple'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'hook', date: '2026-08-06', title: 'Dr Hook · My ADHD Centre',
+          record_type: 'Appointment', lane: 'appointment', weight: 'routine', provider: 'Dr Hook'
         }
       },
       {
@@ -213,6 +234,15 @@
             { key: 'alt', label: 'ALT', value: 68, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 40 },
             { key: 'calprotectin', label: 'Calprotectin', value: 15, status: 'Normal', unit: 'ug/g', ref_low: 0, ref_high: 50 },
             { key: 'crp', label: 'CRP', value: 2, status: 'Normal', unit: 'mg/L', ref_low: 0, ref_high: 5 }
+          ]
+        }
+      },
+      {
+        record: {
+          type: 'bloods', id: 'bloods-0', date: '2026-05-19',
+          markers: [
+            { key: 'calprotectin', label: 'Calprotectin', value: 244, status: 'High', unit: 'ug/g', ref_low: 0, ref_high: 50 },
+            { key: 'ggt', label: 'GGT', value: 180, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 }
           ]
         }
       }

@@ -3,8 +3,10 @@ import { MEDICAL_THREAD_COLOURS } from './medical-model.js';
 
 const GUTTER = 140;
 const PAD_R = 24;
-const AXIS_H = 28;
-const LANE_H = 88;
+const AXIS_TODAY_H = 16;
+const AXIS_TICK_H = 18;
+const AXIS_H = AXIS_TODAY_H + AXIS_TICK_H;
+const LANE_H = 48;
 const STORAGE_OPEN = 'life-hub-medical-strip-open';
 const ZOOM_SPANS = { weeks: 42, months: 180, years: 730 };
 const stripStateByRoot = new WeakMap();
@@ -34,6 +36,7 @@ export function renderMedicalStrip(root, model, hooks = {}) {
   const lanes = model.threads?.lanes || [];
   host.replaceChildren();
   host.className = 'medical-strip';
+  host.dataset.open = state.open ? '1' : '0';
   host.style.touchAction = 'pan-y';
 
   const header = root.createElement('div');
@@ -59,37 +62,42 @@ export function renderMedicalStrip(root, model, hooks = {}) {
     renderMedicalStrip(root, model, hooks);
   });
 
-  const zoom = root.createElement('div');
-  zoom.className = 'medical-strip__zoom hub-pills';
-  zoom.setAttribute('role', 'group');
-  zoom.setAttribute('aria-label', 'Thread zoom');
-  for (const [key, days] of Object.entries(ZOOM_SPANS)) {
-    const btn = root.createElement('button');
-    btn.type = 'button';
-    btn.className = 'hub-pills__btn';
-    btn.dataset.stripZoom = key;
-    btn.textContent = key[0].toUpperCase() + key.slice(1);
-    const active = nearestZoomKey(state.zoom.spanDays) === key;
-    btn.classList.toggle('is-active', active);
-    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    btn.addEventListener('click', () => setSpan(root, model, hooks, days, true));
-    zoom.append(btn);
+  header.append(toggle);
+  if (state.open) {
+    const zoom = root.createElement('div');
+    zoom.className = 'medical-strip__zoom hub-pills';
+    zoom.setAttribute('role', 'group');
+    zoom.setAttribute('aria-label', 'Thread zoom');
+    for (const [key, days] of Object.entries(ZOOM_SPANS)) {
+      const btn = root.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hub-pills__btn';
+      btn.dataset.stripZoom = key;
+      btn.textContent = key[0].toUpperCase() + key.slice(1);
+      const active = nearestZoomKey(state.zoom.spanDays) === key;
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      btn.addEventListener('click', () => {
+        setSpan(root, model, hooks, days, true);
+        hooks.onDensityChange?.(key);
+      });
+      zoom.append(btn);
+    }
+    const minus = root.createElement('button');
+    minus.type = 'button';
+    minus.className = 'btn btn--ghost medical-strip__zoom-btn';
+    minus.textContent = '−';
+    minus.setAttribute('aria-label', 'Zoom out');
+    minus.addEventListener('click', () => setSpan(root, model, hooks, state.zoom.spanDays * 1.35, true));
+    const plus = root.createElement('button');
+    plus.type = 'button';
+    plus.className = 'btn btn--ghost medical-strip__zoom-btn';
+    plus.textContent = '+';
+    plus.setAttribute('aria-label', 'Zoom in');
+    plus.addEventListener('click', () => setSpan(root, model, hooks, state.zoom.spanDays / 1.35, true));
+    zoom.append(minus, plus);
+    header.append(zoom);
   }
-  const minus = root.createElement('button');
-  minus.type = 'button';
-  minus.className = 'btn btn--ghost medical-strip__zoom-btn';
-  minus.textContent = '−';
-  minus.setAttribute('aria-label', 'Zoom out');
-  minus.addEventListener('click', () => setSpan(root, model, hooks, state.zoom.spanDays * 1.35, true));
-  const plus = root.createElement('button');
-  plus.type = 'button';
-  plus.className = 'btn btn--ghost medical-strip__zoom-btn';
-  plus.textContent = '+';
-  plus.setAttribute('aria-label', 'Zoom in');
-  plus.addEventListener('click', () => setSpan(root, model, hooks, state.zoom.spanDays / 1.35, true));
-  zoom.append(minus, plus);
-
-  header.append(toggle, zoom);
   host.append(header);
 
   const body = root.createElement('div');
@@ -123,6 +131,7 @@ export function renderMedicalStrip(root, model, hooks = {}) {
     state.width = width;
     canvas.replaceChildren(buildSvg(root, model, lanes, state.zoom, width, hooks));
     resolveAxisLabelCollisions(canvas.querySelector('svg'));
+    resolveLabelCollisions(canvas.querySelector('svg'));
   };
 
   if (typeof ResizeObserver === 'function') {
@@ -278,7 +287,7 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   const todayLabel = svgEl(root, 'text');
   todayLabel.setAttribute('data-strip-today-label', '1');
   todayLabel.setAttribute('x', String(xToday + 6));
-  todayLabel.setAttribute('y', String(AXIS_H - 8));
+  todayLabel.setAttribute('y', String(AXIS_TODAY_H - 2));
   todayLabel.setAttribute('fill', 'var(--accent)');
   todayLabel.setAttribute('font-size', '11');
   todayLabel.setAttribute('font-weight', '700');
@@ -288,11 +297,12 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   lanes.forEach((lane, index) => {
     const y0 = AXIS_H + index * LANE_H;
     const colour = lane.colour || MEDICAL_THREAD_COLOURS[lane.id] || 'var(--muted)';
+    const railY = y0 + Math.round(LANE_H * 0.55);
     const label = svgEl(root, 'text');
     label.setAttribute('x', '12');
-    label.setAttribute('y', String(y0 + 28));
+    label.setAttribute('y', String(y0 + 18));
     label.setAttribute('fill', 'var(--ink)');
-    label.setAttribute('font-size', '13');
+    label.setAttribute('font-size', '12');
     label.setAttribute('font-weight', '700');
     label.textContent = lane.label;
     svg.append(label);
@@ -300,22 +310,15 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
     const rail = svgEl(root, 'line');
     rail.setAttribute('x1', String(GUTTER));
     rail.setAttribute('x2', String(width - PAD_R));
-    rail.setAttribute('y1', String(y0 + 40));
-    rail.setAttribute('y2', String(y0 + 40));
+    rail.setAttribute('y1', String(railY));
+    rail.setAttribute('y2', String(railY));
     rail.setAttribute('stroke', 'var(--line)');
     svg.append(rail);
 
-    drawRibbons(root, svg, lane, zoom, width, y0, colour);
+    drawRibbons(root, svg, lane, zoom, width, y0, colour, railY);
     const labelBoxes = [];
-    // Reserve axis TODAY label so event labels do not eat it.
-    labelBoxes.push({
-      x: xToday + 2,
-      y: AXIS_H - 22,
-      w: 48,
-      h: 14
-    });
     // Prefer biomarker last-point labels; event titles yield on collision.
-    const ribbonBoxes = collectRibbonLabelBoxes(lane, zoom, width, y0);
+    const ribbonBoxes = collectRibbonLabelBoxes(lane, zoom, width, y0, railY);
     for (const box of ribbonBoxes) labelBoxes.push(box);
 
     const markers = [...(lane.events || [])]
@@ -325,8 +328,8 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
       .sort((a, b) => a.x - b.x);
 
     for (const { event, x } of markers) {
-      const shape = drawMarker(root, svg, event, x, y0 + 40, colour, hooks);
-      const lab = placeLabel(root, svg, event, x, y0 + 40, width, labelBoxes);
+      const shape = drawMarker(root, svg, event, x, railY, colour, hooks);
+      const lab = placeLabel(root, svg, event, x, railY, width, labelBoxes, xToday);
       if (lab) labelBoxes.push(lab);
       shape?.addEventListener?.('keydown', ev => {
         if (ev.key === 'Enter' || ev.key === ' ') {
@@ -340,7 +343,7 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   return svg;
 }
 
-function collectRibbonLabelBoxes(lane, zoom, width, y0) {
+function collectRibbonLabelBoxes(lane, zoom, width, y0, railY) {
   const boxes = [];
   const groups = new Map();
   for (const point of lane.markers || []) {
@@ -353,7 +356,7 @@ function collectRibbonLabelBoxes(lane, zoom, width, y0) {
   for (const [, points] of groups) {
     const last = points[points.length - 1];
     if (!last?.date || !isCalendarDate(last.date)) {
-      offset += 18;
+      offset += 1;
       continue;
     }
     const x = dateToX(last.date, zoom, width);
@@ -362,11 +365,11 @@ function collectRibbonLabelBoxes(lane, zoom, width, y0) {
     const lx = Math.min(width - PAD_R, x + 6);
     boxes.push({
       x: lx,
-      y: y0 + 58 + offset - 14,
+      y: railY + 10 + offset * 12 - 10,
       w: approxW,
-      h: 12
+      h: 11
     });
-    offset += 18;
+    offset += 1;
   }
   return boxes;
 }
@@ -379,7 +382,7 @@ function drawAxis(root, svg, zoom, width) {
     const text = svgEl(root, 'text');
     text.setAttribute('data-strip-axis-tick', '1');
     text.setAttribute('x', String(x));
-    text.setAttribute('y', '18');
+    text.setAttribute('y', String(AXIS_H - 4));
     text.setAttribute('fill', 'var(--muted)');
     text.setAttribute('font-size', '11');
     text.setAttribute('text-anchor', 'middle');
@@ -422,7 +425,38 @@ function resolveAxisLabelCollisions(svg) {
   }
 }
 
-function drawRibbons(root, svg, lane, zoom, width, y0, colour) {
+/** Post-paint getBBox collision for event + ribbon labels near TODAY (MO-21). */
+function resolveLabelCollisions(svg) {
+  if (!svg?.querySelectorAll) return;
+  const labels = [...svg.querySelectorAll('.medical-strip__label, [data-strip-ribbon-label]')];
+  const today = svg.querySelector('[data-strip-today-label]');
+  const boxes = [];
+  const overlaps = (a, b) => !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y);
+  if (today && typeof today.getBBox === 'function') {
+    try {
+      const b = today.getBBox();
+      if (b.width > 0) boxes.push({ x: b.x - 2, y: b.y - 2, w: b.width + 4, h: b.height + 4, keep: true });
+    } catch { /* ignore */ }
+  }
+  for (const el of labels) {
+    if (typeof el.getBBox !== 'function') continue;
+    let box;
+    try {
+      box = el.getBBox();
+    } catch {
+      continue;
+    }
+    if (!box || box.width <= 0) continue;
+    const cur = { x: box.x - 1, y: box.y - 1, w: box.width + 2, h: box.height + 2 };
+    if (boxes.some(prev => !prev.keep && overlaps(cur, prev)) || boxes.some(prev => prev.keep && overlaps(cur, prev))) {
+      el.setAttribute('visibility', 'hidden');
+      continue;
+    }
+    boxes.push(cur);
+  }
+}
+
+function drawRibbons(root, svg, lane, zoom, width, y0, colour, railY) {
   const groups = new Map();
   for (const point of lane.markers || []) {
     if (!point.date || point.value == null) continue;
@@ -430,7 +464,10 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(point);
   }
-  let offset = 0;
+  const laneTop = y0 + 6;
+  const laneBottom = y0 + LANE_H - 4;
+  const plotH = Math.max(10, Math.min(16, laneBottom - railY - 2));
+  let ribbonIndex = 0;
   for (const [, points] of groups) {
     const ys = points.map(p => Number(p.value)).filter(Number.isFinite);
     if (!ys.length) continue;
@@ -438,14 +475,17 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour) {
     const refHigh = Number(points[0].ref_high);
     const min = Math.min(...ys, Number.isFinite(refLow) ? refLow : Infinity);
     const max = Math.max(...ys, Number.isFinite(refHigh) ? refHigh : -Infinity);
-    const bandY = y0 + 58 + offset;
-    const h = 14;
+    const bandY = Math.min(laneBottom - plotH, railY + 4 + ribbonIndex * 2);
     if (Number.isFinite(refLow) && Number.isFinite(refHigh) && max > min) {
+      const tLow = (refLow - min) / (max - min);
+      const tHigh = (refHigh - min) / (max - min);
+      const yHigh = bandY + plotH - Math.max(tLow, tHigh) * plotH;
+      const yLow = bandY + plotH - Math.min(tLow, tHigh) * plotH;
       const band = svgEl(root, 'rect');
       band.setAttribute('x', String(GUTTER));
-      band.setAttribute('y', String(bandY));
+      band.setAttribute('y', String(Math.max(laneTop, yHigh)));
       band.setAttribute('width', String(Math.max(0, width - GUTTER - PAD_R)));
-      band.setAttribute('height', String(h));
+      band.setAttribute('height', String(Math.max(2, Math.min(plotH, yLow - yHigh))));
       band.setAttribute('fill', 'color-mix(in srgb, var(--success) 18%, transparent)');
       svg.append(band);
     }
@@ -453,13 +493,14 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour) {
     points.forEach((point, i) => {
       const x = dateToX(point.date, zoom, width);
       const t = max === min ? 0.5 : (Number(point.value) - min) / (max - min);
-      const y = bandY + h - t * h;
+      const y = bandY + plotH - t * plotH;
       pathParts.push(`${i ? 'L' : 'M'}${x} ${y}`);
       if (i === points.length - 1) {
         const status = point.status === 'Normal' ? '✓' : '↑';
         const lab = svgEl(root, 'text');
+        lab.setAttribute('data-strip-ribbon-label', '1');
         lab.setAttribute('x', String(Math.min(width - PAD_R, x + 6)));
-        lab.setAttribute('y', String(y - 4));
+        lab.setAttribute('y', String(Math.max(laneTop + 8, y - 2)));
         lab.setAttribute('fill', colour);
         lab.setAttribute('font-size', '10');
         lab.setAttribute('font-weight', '700');
@@ -475,7 +516,7 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour) {
       line.setAttribute('stroke-width', '2');
       svg.append(line);
     }
-    offset += 18;
+    ribbonIndex += 1;
   }
 }
 
@@ -547,13 +588,13 @@ function drawMarker(root, svg, event, x, y, colour, hooks) {
   return node;
 }
 
-function placeLabel(root, svg, event, x, y, width, existing) {
-  const short = String(event.title || '').split(/[—-]/)[0].trim().slice(0, 14);
+function placeLabel(root, svg, event, x, y, width, existing, xToday = null) {
+  const short = String(event.title || '').split(/[—-]/)[0].trim().slice(0, 18);
   if (!short) return null;
   const nearRight = x > width - PAD_R - 60;
   const nearLeft = x < GUTTER + 40;
-  let ty = y - 14;
-  const approxW = short.length * 6.2;
+  let ty = y - 12;
+  const approxW = short.length * 5.8;
   const makeBox = (topY) => ({
     x: nearRight ? x - approxW : nearLeft ? x : x - approxW / 2,
     y: topY - 10,
@@ -562,13 +603,22 @@ function placeLabel(root, svg, event, x, y, width, existing) {
   });
   const collides = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
   const inBounds = (box) => box.x >= GUTTER - 4 && box.x + box.w <= width - PAD_R + 4;
+  const todayBox = xToday == null ? null : {
+    x: xToday - 4,
+    y: AXIS_TODAY_H - 14,
+    w: 52,
+    h: AXIS_H
+  };
 
   let box = makeBox(ty);
-  if (!inBounds(box) || existing.some(prev => collides(box, prev))) {
-    ty = y + 22;
+  const blocked = (b) => !inBounds(b)
+    || existing.some(prev => collides(b, prev))
+    || (todayBox && collides(b, todayBox));
+  if (blocked(box)) {
+    ty = y + 16;
     box = makeBox(ty);
   }
-  if (!inBounds(box) || existing.some(prev => collides(box, prev))) {
+  if (blocked(box)) {
     // Hide; reveal via tip on hover/focus (MO-21).
     return null;
   }
@@ -618,10 +668,18 @@ function hideTip(svg) {
 }
 
 function collapseSummary(lanes, model) {
-  const planned = (lanes || []).reduce((n, lane) => n + (lane.events || []).filter(e => e.planned).length, 0);
+  const plannedIds = new Set();
+  for (const visit of model?.allVisits || model?.visits || []) {
+    if (visit.planned || visit.virtual || visit.status === 'planned' || visit.status === 'to_book') {
+      plannedIds.add(visit.id);
+    }
+  }
+  if (!plannedIds.size && model?.nextItems?.length) {
+    for (const visit of model.nextItems) plannedIds.add(visit.id);
+  }
   const n = lanes.length;
   if (!n) return 'No threads';
-  return `${n} thread${n === 1 ? '' : 's'} · ${planned} planned`;
+  return `${n} thread${n === 1 ? '' : 's'} · ${plannedIds.size} planned`;
 }
 
 function nearestZoomKey(spanDays) {
