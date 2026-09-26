@@ -653,13 +653,14 @@ export function ghostsForAlmanacAction(id, view) {
   const stepId = id.slice('alm-'.length);
   const step = view.lines.flatMap(line => line.steps).find(item => item.id === stepId);
   if (!step) return null;
+  const horizonReview = isHorizonReviewStepId(stepId);
   let due = step.lastSafe;
-  if (isHorizonReviewStepId(stepId) && view.today && due < view.today) due = view.today;
+  if (horizonReview && view.today && due < view.today) due = view.today;
   return [{
     id,
     agent: 'hammond',
     kind: 'create_task',
-    title: isHorizonReviewStepId(stepId) ? 'Run the Horizon Council review' : step.title,
+    title: horizonReview ? 'Run the Horizon Council review' : step.title,
     due,
     source: `almanac:${stepId}`
   }];

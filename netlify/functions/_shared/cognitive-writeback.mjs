@@ -41,9 +41,8 @@ function clampToSentenceOrClause(text, maxWords) {
 /** Trim finding so prefix + finding + suffix stay within 200 chars and 40 words. Suffix stays whole. */
 function fitFinding(finding, prefix, suffix) {
   const maxChars = Math.max(0, 200 - prefix.length - suffix.length);
-  const maxWords = Math.max(0, 40 - words(`${prefix}${suffix}`));
-  let text = String(finding || '').replace(/!+/g, '.').trim();
-  if (!text) text = 'Run completed.';
+  const maxWords = Math.max(0, 40 - words(prefix) - words(suffix));
+  let text = String(finding || '').replace(/!+/g, '.').trim() || 'Run completed.';
   const tokens = text.split(/\s+/u).filter(Boolean);
   while (tokens.length && (tokens.length > maxWords || tokens.join(' ').length > maxChars)) {
     tokens.pop();

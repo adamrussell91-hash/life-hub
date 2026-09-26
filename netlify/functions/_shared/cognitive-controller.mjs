@@ -8,6 +8,7 @@ export const fault=(status,code,message)=>Object.assign(new Error(message),{stat
 const copy=v=>structuredClone(v);
 const words=s=>String(s||'').trim().split(/\s+/u).filter(Boolean).length;
 const stamp=()=>new Date().toISOString();
+const stampCompleted=s=>{if(!s.completedAt)s.completedAt=stamp();};
 const COMPILE=new Set(['map','synthesis','convergence','weave']);
 // Per-protocol non-compile burst budgets (reviewable). Analytic stages get 180; Fates, Consilium dialogue and Tribunal stay short.
 export const BURST_WORDS={
@@ -130,7 +131,7 @@ export function act(current,{action,text,revision,requestId}){
  }
  if(action==='close'&&atFilter(s)){add(s,'user','you',s.stage,text?.trim()||'Close the filter.');s.cursor++;s.burst=0;s.continueBurst=false;s.checkpoint=null;s.status='queued';return refresh(s);}
  add(s,'user','you',s.stage,text?.trim()||({confirm:'Confirmed.',uncertain:'Uncertain; proceed with reduced confidence.',decline:'Explicitly declined.',finish:'Ready for the convergence and conflict map.'}[action]));
- if(action==='reflect'){s.status='completed';s.checkpoint=null;if(!s.completedAt)s.completedAt=stamp();return refresh(s);}
+ if(action==='reflect'){s.status='completed';s.checkpoint=null;stampCompleted(s);return refresh(s);}
  if(action==='correct'){
   if(s.protocolId==='witness'){s.cursor=0;s.burst=0;s.verification=null;}
   else if(s.protocolId==='mirror'){s.intake.conflict=text.trim();s.steps=plan(s.protocolId,s.mode,s.intake);s.cursor=0;s.burst=0;add(s,'controller','controller','correction','The prior reading is superseded. Restarting from the corrected conflict.');}
@@ -332,11 +333,11 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
    s.cursor++;s.burst=0;s.continueBurst=false;
    if(s.protocolId==='consilium'&&st.stage==='dialogue')s.steps.push(nextDialogue(s,result.nextSpeaker));
   }
-  if(s.cursor>=s.steps.length&&s.status==='running'){s.status='completed';if(!s.completedAt)s.completedAt=stamp();}
+  if(s.cursor>=s.steps.length&&s.status==='running'){s.status='completed';stampCompleted(s);}
   if(oneStage&&s.status==='running')s.status='queued';
   s=refresh(s);await onProgress(s);
   if(oneStage)break;
  }
- if(s.status==='running'){s.status='completed';if(!s.completedAt)s.completedAt=stamp();}
+ if(s.status==='running'){s.status='completed';stampCompleted(s);}
  return refresh(s);
 }
