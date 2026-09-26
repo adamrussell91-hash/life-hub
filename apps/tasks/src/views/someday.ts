@@ -18,6 +18,7 @@ import {
   stalledLinkedProjects,
   suggestFirstMilestone,
   suggestIfThen,
+  type SomedayKind,
   type SomedayKindFilter
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
@@ -27,6 +28,7 @@ import {
   createHubField,
   createHubFilter,
   createHubSearch,
+  createHubToolbar,
   domainFilterOptions,
   el,
   labeledField
@@ -52,6 +54,13 @@ export function resetSomedayViewFilters(): void {
   editingSomedayId = null;
 }
 
+function isSomedayReviewNow(
+  item: Task,
+  todayKey = new Date().toISOString().slice(0, 10)
+): boolean {
+  return isReviewDue(item, todayKey) || !item.review_at;
+}
+
 export function groupSomedayForReview(
   items: Task[],
   todayKey = new Date().toISOString().slice(0, 10)
@@ -59,7 +68,7 @@ export function groupSomedayForReview(
   const reviewNow: Task[] = [];
   const parked: Task[] = [];
   for (const item of items) {
-    if (isReviewDue(item, todayKey) || !item.review_at) reviewNow.push(item);
+    if (isSomedayReviewNow(item, todayKey)) reviewNow.push(item);
     else parked.push(item);
   }
   return { reviewNow, parked };
@@ -390,91 +399,252 @@ function renderSomedayCard(
   return card;
 }
 
+/** Kind-first capture — Bucket list journal / Dreams jar / Career, not a generic category dropdown. */
+const SOMEDAY_CAPTURE_CHOICES: Array<{ id: SomedayKind; label: string; placeholder: string }> = [
+  {
+    id: 'bucket_list',
+    label: 'Add from bucket list journal',
+    placeholder: 'Something for the bucket list…'
+  },
+  {
+    id: 'dreams_jar',
+    label: 'Dreams jar',
+    placeholder: 'Drop a dream in the jar…'
+  },
+  {
+    id: 'career',
+    label: 'Career',
+    placeholder: 'A career someday idea…'
+  }
+];
+
+function buildSomedayCapture(options: {
+  onCreated: (task: Task) => void;
+  onError: (message: string) => void;
+}): { panel: HTMLElement; reset: () => void } {
+  const panel = el('div', 'someday-capture');
+  const choices = el('div', 'plus-add__choices someday-capture__choices');
+  const form = el('form', 'someday-add hub-toolbar');
+  form.hidden = true;
+
+  const title = createHubSearch({
+    type: 'text',
+    placeholder: 'Capture a someday idea',
+    ariaLabel: 'Someday idea',
+    required: true
+  });
+  const origin = createHubField({
+    type: 'date',
+    ariaLabel: 'Origin date for the new someday idea'
+  });
+  const originWrap = labeledField('Origin', origin.el, 'hub-field hub-field--compact');
+  const kindLabel = el('p', 'someday-capture__kind', '');
+  const back = el('button', 'btn btn--ghost btn--sm', 'Back');
+  back.type = 'button';
+  const submit = el('button', 'btn btn--decisive', 'Park it');
+  submit.type = 'submit';
+  form.append(kindLabel, title.el, originWrap, back, submit);
+
+  let activeKind: SomedayKind | null = null;
+
+  const showChoices = () => {
+    activeKind = null;
+    form.hidden = true;
+    choices.hidden = false;
+    title.input.value = '';
+    origin.input.value = '';
+    originWrap.hidden = true;
+  };
+
+  const showForm = (kind: SomedayKind, label: string, placeholder: string) => {
+    activeKind = kind;
+    choices.hidden = true;
+    form.hidden = false;
+    kindLabel.textContent = label;
+    title.input.placeholder = placeholder;
+    title.input.setAttribute('aria-label', label);
+    originWrap.hidden = !showsOriginDate(kind);
+    title.input.focus();
+  };
+
+  for (const choice of SOMEDAY_CAPTURE_CHOICES) {
+    const btn = el('button', 'btn btn--secondary hub-create__item', choice.label);
+    btn.type = 'button';
+    btn.dataset.somedayKind = choice.id;
+    btn.addEventListener('click', () => showForm(choice.id, choice.label, choice.placeholder));
+    choices.append(btn);
+  }
+
+  back.addEventListener('click', showChoices);
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!activeKind) return;
+    const nextTitle = title.input.value.trim();
+    if (!nextTitle) return;
+    submit.disabled = true;
+    try {
+      const created = await tasksApi.createTask({
+        title: nextTitle,
+        domain: 'other',
+        bucket: 'someday',
+        status: 'deferred',
+        someday_kind: activeKind,
+        origin_date: showsOriginDate(activeKind) ? origin.input.value || null : null
+      });
+      showChoices();
+      options.onCreated(created);
+    } catch (err) {
+      options.onError(errorMessage(err));
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  panel.append(choices, form);
+  showChoices();
+  return { panel, reset: showChoices };
+}
+
+type SomedaySession = {
+  canvas: HTMLElement;
+  root: HTMLElement;
+  listHost: HTMLElement;
+  items: Task[];
+  allTasks: Task[];
+  projects: Project[];
+  coverageSubtitle: HTMLElement;
+  filtersToggle: HTMLElement;
+  wheelCard: HTMLElement;
+};
+
+function somedayFiltersActive(): boolean {
+  return somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim());
+}
+
+function visibleSomedayItems(items: Task[]): Task[] {
+  const query = somedayQuery.trim().toLowerCase();
+  return items.filter((item) => {
+    if (somedayDomain !== 'all' && item.domain !== somedayDomain) return false;
+    if (!matchesSomedayKind(item, somedayKind)) return false;
+    if (
+      query &&
+      !item.title.toLowerCase().includes(query) &&
+      !item.description.toLowerCase().includes(query)
+    ) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function buildOdysseyCta(task: Task): HTMLAnchorElement {
+  const odysseyCta = el('a', 'someday-cta') as HTMLAnchorElement;
+  odysseyCta.href = `#/someday/odyssey/${encodeURIComponent(task.id)}`;
+  const ctaIcon = el('div', 'someday-cta__icon');
+  ctaIcon.innerHTML =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>';
+  const ctaBody = el('div', 'someday-cta__body');
+  ctaBody.append(
+    el('div', 'someday-cta__title', 'Start an Odyssey'),
+    el('div', 'someday-cta__subtitle', 'Sketch three futures before you pick one')
+  );
+  const ctaChevron = el('div', 'someday-cta__chevron');
+  ctaChevron.innerHTML =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+  odysseyCta.append(ctaIcon, ctaBody, ctaChevron);
+  return odysseyCta;
+}
+
+function syncSomedayChrome(session: SomedaySession): void {
+  session.coverageSubtitle.textContent = lifeCoverageHeadline(computeLifeCoverage(session.items));
+  const existing = session.root.querySelector<HTMLAnchorElement>(':scope > .someday-cta');
+  const target = session.items[0];
+  if (!target) {
+    existing?.remove();
+    return;
+  }
+  if (existing) {
+    existing.href = `#/someday/odyssey/${encodeURIComponent(target.id)}`;
+    return;
+  }
+  session.root.insertBefore(buildOdysseyCta(target), session.wheelCard);
+}
+
+function scrollHostFor(canvas: HTMLElement): HTMLElement {
+  const wrap = canvas.closest('.hub-canvas');
+  return wrap instanceof HTMLElement ? wrap : canvas;
+}
+
 /** Someday / Maybe holding pen — off the active board until promoted. Dreams stay even once promoted. */
 export async function renderSomedayView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading someday ideas…', '.someday-hero');
+  showViewLoading(canvas, 'Loading someday ideas…', '.someday-view');
   try {
     const [allTasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
-    let items = somedayTasks(allTasks);
-    const paint = () => {
-      paintSomeday(canvas, items, allTasks, projects, (next) => {
-        items = next;
-        paint();
-      });
-    };
-    paint();
+    mountSomedaySession(canvas, somedayTasks(allTasks), allTasks, projects);
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load someday items.')));
   }
 }
 
-function paintSomeday(
+/** Mount shell once; list/card updates stay in place so field edits and clicks do not flash-remount. */
+function mountSomedaySession(
   canvas: HTMLElement,
   items: Task[],
   allTasks: Task[],
-  projects: Project[],
-  setItems: (next: Task[]) => void
+  projects: Project[]
 ): void {
-  const restoreSearch =
-    document.activeElement instanceof HTMLInputElement &&
-    document.activeElement.getAttribute('aria-label') === 'Filter someday ideas';
-  const searchPos = restoreSearch
-    ? (document.activeElement as HTMLInputElement).selectionStart
-    : null;
-  canvas.replaceChildren();
+  const root = el('div', 'someday-view');
+  const wash = el('div', 'someday-wash');
+  wash.setAttribute('aria-hidden', 'true');
+  root.append(wash);
 
-  const hero = el('div', 'someday-hero');
-  hero.append(el('span', 'someday-hero__icon', '🌈'));
-  canvas.append(hero);
-
-  if (items.length > 0) {
-    const odysseyTarget = items[0];
-    const odysseyCta = el('a', 'someday-cta');
-    odysseyCta.href = `#/someday/odyssey/${encodeURIComponent(odysseyTarget.id)}`;
-    const ctaIcon = el('div', 'someday-cta__icon');
-    ctaIcon.innerHTML =
-      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>';
-    const ctaBody = el('div', 'someday-cta__body');
-    ctaBody.append(
-      el('div', 'someday-cta__title', 'Start an Odyssey'),
-      el('div', 'someday-cta__subtitle', 'Sketch three futures before you pick one')
-    );
-    const ctaChevron = el('div', 'someday-cta__chevron');
-    ctaChevron.innerHTML =
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
-    odysseyCta.append(ctaIcon, ctaBody, ctaChevron);
-    canvas.append(odysseyCta);
-  }
-
-  const coverage = computeLifeCoverage(items);
-  const wheelCard = el('a', 'someday-preview-card');
+  const wheelCard = el('a', 'someday-preview-card') as HTMLAnchorElement;
   wheelCard.href = '#/someday/wheel';
   const wheelIcon = el('div', 'someday-preview-card__icon');
   wheelIcon.innerHTML =
     '<svg width="26" height="26" viewBox="0 0 110 110"><polygon points="55,15 82,25 96,50 82,90 55,100 25,85 12,50 32,30" fill="var(--pastel-blue)" stroke="var(--wave)" stroke-width="2"/><polygon points="55,20 66,52 50,52 71,68 62,46 45,46" fill="var(--wave)" opacity="0.55"/></svg>';
   const wheelBody = el('div', 'someday-preview-card__body');
-  wheelBody.append(
-    el('div', 'someday-preview-card__title', 'Life coverage'),
-    el('div', 'someday-preview-card__subtitle', lifeCoverageHeadline(coverage))
-  );
+  const coverageSubtitle = el('div', 'someday-preview-card__subtitle', '');
+  wheelBody.append(el('div', 'someday-preview-card__title', 'Life coverage'), coverageSubtitle);
   const wheelChevron = el('div', 'someday-preview-card__chevron');
   wheelChevron.innerHTML =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   wheelCard.append(wheelIcon, wheelBody, wheelChevron);
-  canvas.append(wheelCard);
+  root.append(wheelCard);
 
+  const toolbar = createHubToolbar('someday-toolbar');
   const filters = createCollapsibleFilters({
     id: 'someday',
     ariaLabel: 'Filters',
-    active: somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim())
+    className: 'hub-filters--inline',
+    active: somedayFiltersActive()
   });
+
+  const session: SomedaySession = {
+    canvas,
+    root,
+    listHost: el('div', 'someday-list'),
+    items,
+    allTasks,
+    projects,
+    coverageSubtitle,
+    filtersToggle: filters.toggle,
+    wheelCard
+  };
+
+  const refreshFilters = () => {
+    session.filtersToggle.classList.toggle('is-set', somedayFiltersActive());
+    paintSomedayList(session);
+  };
+
   const search = createHubSearch({
     placeholder: 'Filter someday ideas…',
     ariaLabel: 'Filter someday ideas',
     value: somedayQuery,
     onInput: (value) => {
       somedayQuery = value;
-      paintSomeday(canvas, items, allTasks, projects, setItems);
+      refreshFilters();
     }
   });
   filters.panel.append(
@@ -487,7 +657,7 @@ function paintSomeday(
       value: somedayDomain,
       onChange: (value) => {
         somedayDomain = value as TaskDomain | 'all';
-        paintSomeday(canvas, items, allTasks, projects, setItems);
+        refreshFilters();
       }
     }).el,
     createHubFilter({
@@ -502,111 +672,56 @@ function paintSomeday(
       value: somedayKind,
       onChange: (value) => {
         somedayKind = value as SomedayKindFilter;
-        paintSomeday(canvas, items, allTasks, projects, setItems);
+        refreshFilters();
       }
     }).el
   );
-  canvas.append(filters.root);
 
-  const addForm = el('form', 'someday-add hub-toolbar');
-  const title = createHubSearch({
-    type: 'text',
-    placeholder: 'Capture a someday idea',
-    ariaLabel: 'Someday idea',
-    required: true
-  });
-  const origin = createHubField({
-    type: 'date',
-    ariaLabel: 'Origin date for the new someday idea'
-  });
-  const originWrap = labeledField('Origin', origin.el, 'hub-field hub-field--compact');
-  originWrap.hidden = true;
-  const kind = selectField({
-    ariaLabel: 'Category for the new someday idea',
-    value: '',
-    placeholder: 'Category…',
-    choices: SOMEDAY_KINDS.map((entry) => ({ id: entry.id, label: entry.label })),
-    onChange: (value) => {
-      originWrap.hidden = !showsOriginDate(value);
+  let closeCapture = () => {};
+  const capture = buildSomedayCapture({
+    onCreated: (created) => {
+      closeCapture();
+      session.items = [created, ...session.items];
+      syncSomedayChrome(session);
+      paintSomedayList(session);
+    },
+    onError: (message) => {
+      root.append(el('p', 'empty-state', message));
     }
   });
-  const submit = el('button', 'btn btn--decisive', 'Park it');
-  submit.type = 'submit';
-  addForm.append(title.el, labeledField('Category', kind, 'hub-field hub-field--compact'), originWrap, submit);
-  addForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    submit.disabled = true;
-    try {
-      const someday_kind = kind.value || null;
-      const created = await tasksApi.createTask({
-        title: title.input.value.trim(),
-        domain: 'other',
-        bucket: 'someday',
-        status: 'deferred',
-        someday_kind,
-        origin_date: showsOriginDate(someday_kind) ? origin.input.value || null : null
-      });
-      title.input.value = '';
-      kind.value = '';
-      origin.input.value = '';
-      originWrap.hidden = true;
-      setItems([created, ...items]);
-    } catch (err) {
-      canvas.append(el('p', 'empty-state', errorMessage(err)));
-    } finally {
-      submit.disabled = false;
-    }
+  const plus = createPlusAdd({
+    ariaLabel: 'Add a someday idea',
+    panel: capture.panel,
+    className: 'plus-add--inline'
   });
-  canvas.append(
-    createPlusAdd({
-      ariaLabel: 'Add a someday idea',
-      panel: addForm
-    }).root
+  closeCapture = () => plus.close();
+  plus.root.querySelector('.plus-add__btn')?.addEventListener('click', () => capture.reset());
+  toolbar.append(filters.root, plus.root);
+  root.append(toolbar, session.listHost);
+
+  canvas.replaceChildren(root);
+  syncSomedayChrome(session);
+  paintSomedayList(session);
+}
+
+function buildSomedayCard(session: SomedaySession, item: Task, flagged: boolean): HTMLElement {
+  const card = renderSomedayCard(
+    item,
+    flagged,
+    session.projects,
+    session.allTasks,
+    somedayCardHandlers(session, item)
   );
+  card.dataset.somedayId = item.id;
+  return card;
+}
 
-  const query = somedayQuery.trim().toLowerCase();
-  const visible = items.filter((item) => {
-    if (somedayDomain !== 'all' && item.domain !== somedayDomain) return false;
-    if (!matchesSomedayKind(item, somedayKind)) return false;
-    if (
-      query &&
-      !item.title.toLowerCase().includes(query) &&
-      !item.description.toLowerCase().includes(query)
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  if (visible.length === 0) {
-    canvas.append(
-      el(
-        'p',
-        'empty-state',
-        items.length === 0 ? 'Nothing in Someday / Maybe yet.' : 'No someday ideas match those filters.'
-      )
-    );
-    return;
-  }
-
-  const { reviewNow, parked } = groupSomedayForReview(visible);
-  const onCardChange = (item: Task, next: Task | null) => {
-    if (!next) {
-      if (openSomedayId === item.id) openSomedayId = null;
-      if (editingSomedayId === item.id) editingSomedayId = null;
-    }
-    setItems(
-      next
-        ? items.map((entry) => (entry.id === next.id ? next : entry))
-        : items.filter((entry) => entry.id !== item.id)
-    );
-  };
-
-  const repaint = () => paintSomeday(canvas, items, allTasks, projects, setItems);
-  const somedayCardHandlers = (item: Task, onChange: (next: Task | null) => void): SomedayCardHandlers => ({
+function somedayCardHandlers(session: SomedaySession, item: Task): SomedayCardHandlers {
+  const refreshCard = () => replaceSomedayCard(session, item.id);
+  return {
     open: openSomedayId === item.id,
     editing: editingSomedayId === item.id,
-    onChange,
+    onChange: (next) => applySomedayCardChange(session, item, next),
     onToggle: () => {
       if (openSomedayId === item.id) {
         openSomedayId = null;
@@ -615,58 +730,95 @@ function paintSomeday(
         openSomedayId = item.id;
         editingSomedayId = null;
       }
-      repaint();
+      refreshCard();
     },
     onEdit: () => {
       openSomedayId = item.id;
       editingSomedayId = item.id;
-      repaint();
+      refreshCard();
     },
     onDone: () => {
       editingSomedayId = null;
-      repaint();
+      refreshCard();
     }
-  });
+  };
+}
 
-  if (reviewNow.length) {
-    const group = el('section', 'someday-group');
-    const heading = el('h2', 'someday-group__title', 'Review now');
-    const sweepNote = el(
-      'span',
-      'someday-group__sweep',
-      reviewNow.length === 1
-        ? 'The Sweep found 1 dream ready for another look.'
-        : `The Sweep found ${reviewNow.length} dreams ready for another look.`
+function applySomedayCardChange(session: SomedaySession, item: Task, next: Task | null): void {
+  if (!next) {
+    if (openSomedayId === item.id) openSomedayId = null;
+    if (editingSomedayId === item.id) editingSomedayId = null;
+    session.items = session.items.filter((entry) => entry.id !== item.id);
+    syncSomedayChrome(session);
+    paintSomedayList(session);
+    return;
+  }
+
+  const movedBucket = isSomedayReviewNow(item) !== isSomedayReviewNow(next);
+  session.items = session.items.map((entry) => (entry.id === next.id ? next : entry));
+  session.allTasks = session.allTasks.map((entry) => (entry.id === next.id ? next : entry));
+  syncSomedayChrome(session);
+  if (movedBucket) paintSomedayList(session);
+  else replaceSomedayCard(session, next.id);
+}
+
+function replaceSomedayCard(session: SomedaySession, itemId: string): void {
+  const item = session.items.find((entry) => entry.id === itemId);
+  const existing = session.listHost.querySelector<HTMLElement>(
+    `.someday-card[data-someday-id="${CSS.escape(itemId)}"]`
+  );
+  if (!item || !existing) {
+    paintSomedayList(session);
+    return;
+  }
+  existing.replaceWith(buildSomedayCard(session, item, isSomedayReviewNow(item)));
+}
+
+function appendSomedayCards(
+  host: HTMLElement,
+  title: string,
+  items: Task[],
+  flagged: boolean,
+  session: SomedaySession,
+  sweepNote?: string
+): void {
+  if (!items.length) return;
+  const group = el('section', 'someday-group');
+  const heading = el('h2', 'someday-group__title', title);
+  if (sweepNote) heading.append(el('span', 'someday-group__sweep', sweepNote));
+  group.append(heading);
+  const grid = el('div', 'someday-grid');
+  for (const item of items) grid.append(buildSomedayCard(session, item, flagged));
+  group.append(grid);
+  host.append(group);
+}
+
+function paintSomedayList(session: SomedaySession): void {
+  const host = scrollHostFor(session.canvas);
+  const scrollTop = host.scrollTop;
+  const visible = visibleSomedayItems(session.items);
+  session.listHost.replaceChildren();
+
+  if (visible.length === 0) {
+    session.listHost.append(
+      el(
+        'p',
+        'empty-state',
+        session.items.length === 0
+          ? 'Nothing in Someday / Maybe yet.'
+          : 'No someday ideas match those filters.'
+      )
     );
-    heading.append(sweepNote);
-    group.append(heading);
-    const grid = el('div', 'someday-grid');
-    for (const item of reviewNow) {
-      grid.append(
-        renderSomedayCard(item, true, projects, allTasks, somedayCardHandlers(item, (next) => onCardChange(item, next)))
-      );
+  } else {
+    const { reviewNow, parked } = groupSomedayForReview(visible);
+    let sweepNote: string | undefined;
+    if (reviewNow.length === 1) sweepNote = 'The Sweep found 1 dream ready for another look.';
+    else if (reviewNow.length > 1) {
+      sweepNote = `The Sweep found ${reviewNow.length} dreams ready for another look.`;
     }
-    group.append(grid);
-    canvas.append(group);
-  }
-  if (parked.length) {
-    const group = el('section', 'someday-group');
-    group.append(el('h2', 'someday-group__title', 'Parked'));
-    const grid = el('div', 'someday-grid');
-    for (const item of parked) {
-      grid.append(
-        renderSomedayCard(item, false, projects, allTasks, somedayCardHandlers(item, (next) => onCardChange(item, next)))
-      );
-    }
-    group.append(grid);
-    canvas.append(group);
+    appendSomedayCards(session.listHost, 'Review now', reviewNow, true, session, sweepNote);
+    appendSomedayCards(session.listHost, 'Parked', parked, false, session);
   }
 
-  if (restoreSearch) {
-    const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter someday ideas"]');
-    if (field) {
-      field.focus();
-      if (searchPos != null) field.setSelectionRange(searchPos, searchPos);
-    }
-  }
+  host.scrollTop = scrollTop;
 }

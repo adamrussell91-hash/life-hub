@@ -67,6 +67,34 @@ export interface PersonRecord {
   retention_review_at: string | null;
   created_at: string;
   updated_at: string;
+  /** Lossless source material from the private Professional People import.
+   * It is returned only by a selected person's entity-overview response. */
+  professional_profile?: ProfessionalProfile;
+}
+
+export interface ProfessionalProfileReference {
+  label: string;
+  source_url: string | null;
+  hub_href: string | null;
+}
+
+export interface ProfessionalProfile {
+  schema_version: number;
+  source: {
+    system: 'notion';
+    page_url: string | null;
+    properties: Record<string, string>;
+  };
+  summary: string | null;
+  contact: {
+    email: string | null;
+    phone: string | null;
+    linkedin_url: string | null;
+  };
+  last_contacted: string | null;
+  current_workplace: string[];
+  references: Record<string, ProfessionalProfileReference[]>;
+  body_markdown: string | null;
 }
 
 export interface OrganisationRecord {
@@ -76,7 +104,7 @@ export interface OrganisationRecord {
   display_name: string;
   legal_name: string | null;
   aliases: string[];
-  /** R2 object key for the org crest (people redesign Phase 1), or null. */
+  /** R2 object key for the org crest; null until uploaded. */
   logo_key: string | null;
   lifecycle_status: string;
   retention_reason: string | null;

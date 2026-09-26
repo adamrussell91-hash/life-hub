@@ -4,6 +4,7 @@ import { personBriefRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
 import { updatePerson } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
+import { renderProfessionalProfileSummary } from '@/components/professional-profile';
 import type { EntityOverview, EntityRecord } from '@/domain/types';
 
 export interface PersonDetailHeader {
@@ -163,6 +164,7 @@ export async function renderPersonPage(
         self.textContent = 'Self';
         host.append(self);
       }
+      renderProfessionalProfileSummary(host, person.professional_profile);
       const shared = overview.shared_contexts_with_self ?? [];
       if (!person.is_self && shared.length) {
         const connection = document.createElement('p');

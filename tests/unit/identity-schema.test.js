@@ -53,6 +53,7 @@ function organisationRecord(overrides = {}) {
     lifecycle_status: 'active',
     retention_reason: null,
     retention_review_at: null,
+    logo_key: null,
     created_at: '2026-09-11T00:00:00.000Z',
     updated_at: '2026-09-11T00:00:00.000Z',
     ...overrides

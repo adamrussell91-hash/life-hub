@@ -54,14 +54,27 @@ test('Life events loader batches /api/repo/files like Life sync-repository', () 
   assert.match(src, /for \(const batch of batchLifeFileRequests/);
 });
 
-test('Tideline Hammond tray wires Review, Dismiss all, and portrait src', () => {
+test('Tideline Hammond tray wires Review to a pending-changes panel', () => {
   const src = readFileSync(join(root, 'packages/design-kit/js/calendar/render-tideline.js'), 'utf8');
   assert.match(src, /data-action': 'review'/);
   assert.match(src, /data-action': 'dismiss-all'/);
   assert.match(src, /\/assets\/agents\/hammond\.jpg/);
-  assert.match(src, /function reviewNextGhost/);
+  assert.match(src, /function openReviewPanel/);
+  assert.match(src, /Waiting for review/);
+  assert.match(src, /function writePreview/);
   assert.match(src, /function dismissAll/);
   assert.match(src, /agentAvatarNode/);
+  assert.match(src, /data-part': 'review-panel'/);
+  assert.doesNotMatch(src, /function reviewNextGhost/);
+});
+
+test('Tideline and hub mount suppress load/refresh entrance flash', () => {
+  const tideline = readFileSync(join(root, 'packages/design-kit/js/calendar/render-tideline.js'), 'utf8');
+  const mount = readFileSync(join(root, 'packages/design-kit/js/calendar/mount-hub-calendar.js'), 'utf8');
+  assert.match(tideline, /function paintKey/);
+  assert.match(tideline, /mount\(\{\s*entrance:\s*false\s*\}\)/);
+  assert.match(mount, /let ready = false/);
+  assert.match(mount, /if \(!destroyed && ready\) schedulePaint/);
 });
 
 test('open-in-hub maps domains and builds full-nav Open in links', () => {

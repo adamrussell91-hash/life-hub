@@ -333,6 +333,41 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
+    if (path === '/api/calendar-ghosts' && method === 'GET') {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Australia/Sydney',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(new Date());
+      const id = 'ghost_tasks_mock_1';
+      return json(200, {
+        ghosts: [
+          {
+            id,
+            agent: 'hammond',
+            kind: 'protect_block',
+            label: 'Protect deep work',
+            meta: 'Clears a collision this week',
+            date: today,
+            start: '09:00',
+            end: '11:00',
+            title: 'Protect deep work',
+            chip: {
+              id,
+              title: 'Protect deep work',
+              date: today,
+              start: '09:00',
+              end: '11:00',
+              kind: 'task',
+              meta: 'Hammond · proposal',
+              ghost: true
+            }
+          }
+        ]
+      });
+    }
+
     if (path === '/api/calendar-ghosts' && method === 'POST') {
       return json(200, { ok: true, receipt: 'Mock: nothing written.', writes: 'applied' });
     }

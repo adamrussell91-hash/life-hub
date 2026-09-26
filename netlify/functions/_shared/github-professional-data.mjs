@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { IDENTITY_SCHEMA_VERSION, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
+import { parseProfessionalProfile } from './professional-profile.mjs';
 
 // Read-only bridge onto the private `life-hub-data` repository's imported
 // Professional directory (350 people / 18 organisations / 74 relationships,
@@ -154,6 +155,8 @@ function normalizePeople(rows) {
       updated_at: LEGACY_IMPORT_TIMESTAMP
     });
     if (!record) continue;
+    const professionalProfile = parseProfessionalProfile(row.professional_profile);
+    if (professionalProfile) record.professional_profile = professionalProfile;
     byId.set(id, record);
     idByLegacyId.set(row.legacy_id, id);
   }
