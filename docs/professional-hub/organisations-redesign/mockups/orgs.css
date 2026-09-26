@@ -1,0 +1,87 @@
+/* Shared bits for the Organisations redesign mockups. Tokens: base.css; crests, avatars: people.css. */
+:root {
+  --warm: #f68620;
+  --cooling: #8fa7c7;
+  --cold: #d3d9e3;
+  --link-moved: #17375e;
+  --link-know: #f68620;
+  --link-event: #8a6fb0;
+}
+.crest.xl { width: 76px; height: 90px; font-size: 20px; }
+.crest.md { width: 28px; height: 33px; font-size: 9px; }
+.c-acu  { background: linear-gradient(160deg, #3b2a6b, #211642); }
+.c-hta  { background: linear-gradient(160deg, #8a6a1c, #57420c); }
+.c-nesa { background: linear-gradient(160deg, #0f6d73, #08474b); }
+.c-jea  { background: linear-gradient(160deg, #5a2330, #37121b); }
+
+/* Relationship chips: what the organisation is to you, with years */
+.rchips { display: flex; gap: 6px; flex-wrap: wrap; }
+.rchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; font-size: var(--text-2xs); font-weight: 600; white-space: nowrap; }
+.rchip b { font-weight: 700; }
+.rchip .yr { font-weight: 500; opacity: .75; }
+.r-work  { background: var(--pastel-blue); color: var(--pastel-blue-ink); }
+.r-past  { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.r-study { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.r-prac  { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.r-body  { background: var(--pastel-sage); color: var(--pastel-sage-ink); }
+.r-event { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.r-pd    { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.r-stage { background: var(--depth); color: var(--on-dark); }
+.r-apply { background: var(--warning-surface); color: var(--high-sea-ink); }
+
+/* Warmth spread: many people, so a stacked bar, not a ring */
+.spread { display: flex; height: 6px; border-radius: 99px; overflow: hidden; background: var(--cold); }
+.spread i { display: block; height: 100%; }
+.spread .w { background: var(--warm); } .spread .c { background: var(--cooling); } .spread .k { background: var(--cold); }
+.legend { display: flex; gap: 14px; font-size: var(--text-2xs); color: var(--muted); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.legend i { width: 9px; height: 9px; border-radius: 99px; display: inline-block; }
+
+/* Org chart */
+.dots { display: flex; flex-wrap: wrap; gap: 4px; }
+.dot { width: 10px; height: 10px; border-radius: 99px; background: var(--cold); }
+.dot.w { background: var(--warm); } .dot.c { background: var(--cooling); }
+.dot.me { background: var(--depth); box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--depth); }
+.node { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.node .avatar { width: 26px; height: 26px; font-size: 9px; border: 2px solid var(--paper); }
+.node .nm { font-size: var(--text-2xs); font-weight: 600; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .rl { font-size: 10px; color: var(--muted); line-height: 1.2; white-space: nowrap; }
+.ghostnode { display: flex; align-items: center; gap: 7px; }
+.ghostnode .g { width: 26px; height: 26px; border-radius: 99px; border: 1.5px dashed var(--shallow); }
+.ghostnode span { font-size: 10px; color: var(--muted); }
+.wring { padding: 2px; border-radius: 99px; display: inline-flex; }
+.wring.w { background: var(--warm); } .wring.c { background: var(--cooling); } .wring.k { background: var(--cold); }
+.wring .avatar { border: 2px solid var(--paper); }
+
+.ann { width: 30px; height: 30px; font-size: 11px; background: #5d4e70; }
+.src { white-space: nowrap; }
+
+/* Flowchart: every organisation draws its own layers; arrows point to who you report to */
+.flow { position: relative; }
+.flow svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.fn { position: absolute; display: flex; align-items: center; gap: 7px; padding: 6px 9px; border-radius: 11px; background: #fff; border: 1px solid var(--line); box-shadow: var(--elev-1); min-width: 0; }
+.fn .stack { min-width: 0; }
+.fn .nm { font-size: var(--text-2xs); font-weight: 650; color: var(--ink); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fn .rl { font-size: 10px; color: var(--muted); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fn .avatar { width: 22px; height: 22px; font-size: 8px; }
+.fn.ghost { background: transparent; border: 1.5px dashed var(--shallow); box-shadow: none; }
+.fn.ghost .g { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 99px; border: 1.5px dashed var(--shallow); }
+.fn.ext { background: var(--cotton); border: 1.5px dashed var(--orca); box-shadow: none; }
+.fn.ext .rl { text-transform: uppercase; letter-spacing: var(--tracking-caps); font-size: 9px; font-weight: 700; }
+.fn.onpath { border-color: var(--depth); box-shadow: 0 0 0 1px var(--depth), var(--elev-1); }
+.fn.group { flex-direction: column; align-items: stretch; gap: 6px; background: var(--cotton); }
+.fn.group.mine { background: var(--pastel-blue); border-color: var(--depth); box-shadow: 0 0 0 1px var(--depth); }
+.fn.group .gh { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.fn.group .gh i { font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); }
+.fn.group .gb { display: flex; gap: 8px; align-items: flex-start; }
+.fn.group .gb.rev { flex-direction: row-reverse; }
+.fn.group .dots { flex: 1; gap: 3.5px; }
+.fn.group .dot { width: 10px; height: 10px; }
+.fn .ports { display: flex; flex-direction: column; gap: 4px; }
+.fn .port { display: flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 99px; background: #fff; border: 1px solid var(--line); white-space: nowrap; }
+.fn .port .avatar { width: 20px; height: 20px; font-size: 7.5px; }
+.fn .port .nm { font-size: 10px; }
+.fn .port.hollow { border-style: dashed; background: transparent; }
+.fn .port.hollow .avatar { background: transparent; color: var(--depth); border: 1.5px dashed var(--depth); }
+.here { position: absolute; font-size: 9px; font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: #fff; background: var(--depth); padding: 2px 7px; border-radius: 99px; }
+.c-unsw { background: linear-gradient(160deg, #d6a21e, #8c6608); }
