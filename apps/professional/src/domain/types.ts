@@ -551,6 +551,16 @@ export interface CareerOverview {
   people: CareerSection;
   organisations: CareerSection;
   deferred: string[];
+  /** River / Skills / Futures feed (Phase 1+) */
+  achievements?: unknown[];
+  futures?: unknown[];
+  stones?: unknown[];
+  supports_future?: unknown[];
+  answers_criterion?: unknown[];
+  stone_for?: unknown[];
+  stone_actions?: unknown[];
+  scan?: { pending_count?: number; last_run_at?: string | null };
+  employment_items?: CareerSectionItem[];
 }
 
 /**

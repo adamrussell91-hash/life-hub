@@ -1,9 +1,15 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { getCareer } from '@/api/career';
-import { applicationRoute, eventRoute, organisationRoute, personRoute } from '@/app/router';
-import type { CareerOverview, CareerSection, CareerSectionItem } from '@/domain/types';
-import { isValidApplicationId, isValidEventId, isValidOrganisationId, isValidPersonId } from '@/domain/ids';
+import { listApplications } from '@/api/applications';
+import { careerCardRoute, careerFutureRoute, parseRoute } from '@/app/router';
+import { buildCareerModel } from '@/domain/career-model';
+import type { CareerOverview } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { mountCareerRiver } from '@/views/career-river';
+import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
+import { renderSkillsScanPanel } from '@/views/career-skills-scan';
+import { renderCareerApplications } from '@/views/career-criteria-mirror';
+import { renderWhatIfPanel } from '@/views/career-what-if';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -16,130 +22,236 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function hrefForItem(item: CareerSectionItem): string | null {
-  if (typeof item.href === 'string' && item.href) {
-    if (item.href.startsWith('/professional/#')) return item.href.replace('/professional/', '');
-    if (item.href.startsWith('#/')) return item.href;
-    return item.href;
-  }
-  if (item.id && isValidApplicationId(item.id)) return applicationRoute(item.id);
-  if (item.id && isValidEventId(item.id)) return eventRoute(item.id);
-  if (item.ref?.startsWith('shared:person:')) {
-    const id = item.ref.slice('shared:person:'.length);
-    if (isValidPersonId(id)) return personRoute(id);
-  }
-  if (item.ref?.startsWith('shared:organisation:')) {
-    const id = item.ref.slice('shared:organisation:'.length);
-    if (isValidOrganisationId(id)) return organisationRoute(id);
-  }
-  if (item.ref?.startsWith('professional:application:')) {
-    const id = item.ref.slice('professional:application:'.length);
-    if (isValidApplicationId(id)) return applicationRoute(id);
-  }
-  if (item.ref?.startsWith('professional:event:')) {
-    const id = item.ref.slice('professional:event:'.length);
-    if (isValidEventId(id)) return eventRoute(id);
-  }
-  return null;
+function surface(node: HTMLElement): void {
+  node.style.background = 'var(--glass)';
+  node.style.border = '1px solid var(--line)';
+  node.style.borderRadius = 'var(--radius-md)';
+  node.style.boxShadow = 'var(--elev-1)';
 }
 
-function itemLabel(item: CareerSectionItem): string {
-  if (item.position_title) return item.position_title;
-  if (item.title) return item.title;
-  if (item.display_label) return item.display_label;
-  return item.id ?? item.ref ?? 'Item';
-}
-
-function itemMeta(item: CareerSectionItem): string | null {
-  const bits = [
-    item.pipeline_status?.replace(/_/g, ' '),
-    item.occurrence_state?.replace(/_/g, ' '),
-    item.role,
-    item.closing_date ? `closes ${formatDisplayDate(item.closing_date) ?? item.closing_date}` : null,
-    item.start ? formatDisplayDate(item.start) ?? item.start.slice(0, 16) : null,
-    item.supporting_label
-  ].filter(Boolean);
-  return bits.length ? bits.join(' · ') : null;
-}
-
-function renderSection(host: HTMLElement, title: string, section: CareerSection): void {
-  const block = el('section', 'career__section');
-  block.append(el('h2', 'career__heading', title));
-  if (section.status === 'unavailable') {
-    block.append(
-      el(
-        'p',
-        'empty-state career__unavailable',
-        `Unavailable${section.reason ? ` · ${section.reason}` : '.'}`
-      )
-    );
-    host.append(block);
-    return;
-  }
-  if (!section.items.length) {
-    block.append(el('p', 'empty-state', 'No items.'));
-    host.append(block);
-    return;
-  }
-  const list = document.createElement('ul');
-  list.className = 'career__list';
-  for (const item of section.items) {
-    const li = document.createElement('li');
-    li.className = 'career__item';
-    const href = hrefForItem(item);
-    const label = itemLabel(item);
-    if (href) {
-      const link = el('a', 'career__link', label);
-      link.href = href;
-      li.append(link);
-    } else {
-      li.append(el('span', 'career__link', label));
+function renderRiver(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  selectedFutureId: string | null
+): void {
+  const section = el('section', 'career-page__river');
+  section.setAttribute('aria-label', 'Career river');
+  const mount = el('div', 'career-page__river-mount');
+  section.append(mount);
+  host.append(section);
+  mountCareerRiver(mount, model, {
+    selectedFutureId,
+    onSelectFuture: (id) => {
+      if (id) location.hash = careerFutureRoute(id);
+      else if (parseRoute(location.hash).name === 'career-future') {
+        location.hash = '#/career';
+      }
     }
-    const meta = itemMeta(item);
-    if (meta) li.append(el('p', 'career__meta', meta));
-    list.append(li);
+  });
+}
+
+function renderFuturePanel(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  selectedFutureId: string | null,
+  onReload: () => void
+): void {
+  if (selectedFutureId) {
+    const future = model.futures.find((f) => f.id === selectedFutureId);
+    if (future) {
+      const wrap = el('div', 'career-page__panel-host');
+      host.append(wrap);
+      renderFutureDetail(wrap, future, { onChanged: onReload });
+      return;
+    }
   }
-  block.append(list);
-  host.append(block);
+
+  const panel = el('section', 'career-page__panel career-page__futures');
+  surface(panel);
+  const head = el('div', 'career-page__section-head');
+  head.append(el('h2', 'career-page__heading', 'Futures'));
+  const add = el('button', 'btn btn--secondary', 'Add a future') as HTMLButtonElement;
+  add.type = 'button';
+  add.addEventListener('click', () => openAddFutureSheet(document.body, onReload));
+  head.append(add);
+  panel.append(head);
+
+  const active = model.futures.filter((f) => f.status === 'active');
+  if (!active.length) {
+    panel.append(
+      el('p', 'empty-state', 'No futures yet. Add a target role to start a branch.')
+    );
+  } else {
+    const list = el('ul', 'career-page__future-list');
+    for (const future of active) {
+      const li = document.createElement('li');
+      li.className = 'career-page__future-row';
+      const link = el('a', 'career-page__future-link', future.title);
+      link.href = careerFutureRoute(future.id);
+      li.append(link);
+      li.append(
+        el(
+          'p',
+          'career-page__meta',
+          `${future.readiness_label}${future.arrival_label ? ` · ready around ${future.arrival_label}` : ''}`
+        )
+      );
+      list.append(li);
+    }
+    panel.append(list);
+  }
+  host.append(panel);
+}
+
+function renderSkillsScan(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  onReload: () => void
+): void {
+  const wrap = el('div', 'career-page__scan-host');
+  host.append(wrap);
+  renderSkillsScanPanel(wrap, model, {
+    onChanged: onReload,
+    onKept: () => {
+      /* river remounts via onChanged */
+    }
+  });
 }
 
 export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   showViewLoading(canvas, 'Loading career…');
-
-  async function load(): Promise<void> {
-    showViewLoading(canvas, 'Loading career…');
-    try {
-      const overview = await getCareer();
-      paint(overview);
-    } catch (err) {
-      renderLoadError(canvas, err, () => void load());
-    }
+  let overview: CareerOverview;
+  try {
+    overview = await getCareer();
+  } catch (error) {
+    renderLoadError(canvas, error, 'Could not load career.');
+    return;
   }
 
-  function paint(overview: CareerOverview): void {
-    canvas.replaceChildren();
-    renderSection(canvas, 'Applications', overview.applications);
-    renderSection(canvas, 'Employment', overview.employment);
-    renderSection(canvas, 'Professional Development', overview.professional_development);
-    renderSection(canvas, 'People', overview.people);
-    renderSection(canvas, 'Organisations', overview.organisations);
+  let applicationRecords: Array<{
+    id: string;
+    position_title: string;
+    pipeline_status: string;
+    closing_date?: string | null;
+    selection_criteria?: Array<{ id: string }>;
+  }> = [];
+  try {
+    const listed = await listApplications();
+    applicationRecords = (listed.applications ?? []).map((a) => ({
+      id: a.id,
+      position_title: a.position_title,
+      pipeline_status: a.pipeline_status,
+      closing_date: a.closing_date,
+      selection_criteria: a.selection_criteria?.map((c) => ({ id: c.id }))
+    }));
+  } catch {
+    applicationRecords = [];
+  }
 
-    const deferred = el('section', 'career__section career__deferred');
-    deferred.append(el('h2', 'career__heading', 'Deferred'));
-    const labels = (overview.deferred ?? []).map((value) =>
-      value.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase())
-    );
-    deferred.append(
+  const model = buildCareerModel({
+    achievements: (overview.achievements as CareerOverview['achievements']) as never,
+    futures: overview.futures as never,
+    stones: overview.stones as never,
+    applications: applicationRecords as never,
+    supports_future: overview.supports_future as never,
+    answers_criterion: overview.answers_criterion as never,
+    stone_for: overview.stone_for as never,
+    stone_actions: overview.stone_actions as never,
+    employment: (overview.employment_items ??
+      (overview.employment?.status === 'ok' ? overview.employment.items : [])) as never,
+    scan: overview.scan
+  });
+
+  const route = parseRoute(location.hash);
+  const selectedFutureId =
+    route.name === 'career-future' && 'id' in route ? route.id : null;
+
+  const reload = () => {
+    void renderCareerView(canvas);
+  };
+
+  canvas.replaceChildren();
+  const page = el('div', 'career-page');
+
+  const stats = el('p', 'career-page__stats', model.stats_line);
+  page.append(stats);
+
+  renderRiver(page, model, selectedFutureId);
+
+  const columns = el('div', 'career-page__columns');
+  renderFuturePanel(columns, model, selectedFutureId, reload);
+  renderSkillsScan(columns, model, reload);
+  page.append(columns);
+
+  await renderCareerApplications(page, model, { onChanged: reload });
+  renderSkillsLedger(page, model);
+  renderWhatIfPanel(page, model);
+
+  canvas.append(page);
+
+  try {
+    const scrollTo = sessionStorage.getItem('career-scroll-to');
+    if (scrollTo === 'applications') {
+      sessionStorage.removeItem('career-scroll-to');
+      document.getElementById('applications')?.scrollIntoView({ block: 'start' });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function renderSkillsLedger(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
+  const section = el('section', 'career-page__ledger');
+  surface(section);
+  const head = el('div', 'career-page__section-head');
+  head.append(el('h2', 'career-page__heading', 'Skills ledger'));
+  const add = el('button', 'btn btn--secondary', 'Add card') as HTMLButtonElement;
+  add.type = 'button';
+  add.addEventListener('click', () => {
+    section.append(el('p', 'career-page__note', 'Add card with Ann draft lands with Skills scan.'));
+  });
+  head.append(add);
+  section.append(head);
+
+  const filters = el('div', 'career-page__ledger-filters');
+  filters.append(el('button', 'hub-pills__btn is-active', 'All') as HTMLButtonElement);
+  for (const future of model.futures.filter((f) => f.status === 'active')) {
+    const chip = el(
+      'button',
+      'hub-pills__btn',
+      future.title.split(' ')[0] || future.title
+    ) as HTMLButtonElement;
+    chip.type = 'button';
+    filters.append(chip);
+  }
+  section.append(filters);
+
+  if (!model.ledger.length) {
+    section.append(
       el(
         'p',
         'empty-state',
-        labels.length
-          ? `Publication and Presentation stay deferred — no authoritative store or active workflow yet (${labels.join(', ')}).`
-          : 'Publication and Presentation stay deferred — no authoritative store or active workflow yet.'
+        'No skill cards yet. Your first Skills scan runs Sunday evening, or add one now.'
       )
     );
-    canvas.append(deferred);
+  } else {
+    const list = el('ul', 'career-page__ledger-list');
+    for (const card of model.ledger) {
+      const li = document.createElement('li');
+      li.className = 'career-page__ledger-row';
+      const link = el('a', 'career-page__ledger-link', card.title);
+      link.href = careerCardRoute(card.id);
+      const date =
+        card.date_precision === 'year'
+          ? card.occurred_on.slice(0, 4)
+          : card.date_precision === 'month'
+            ? formatDisplayDate(`${card.occurred_on.slice(0, 7)}-01`)?.replace(/^\d{2}\//, '') ||
+              card.occurred_on.slice(0, 7)
+            : formatDisplayDate(card.occurred_on) ?? card.occurred_on;
+      li.append(el('span', 'career-page__ledger-date', date), link);
+      list.append(li);
+    }
+    section.append(list);
   }
-
-  await load();
+  host.append(section);
 }

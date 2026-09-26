@@ -11,12 +11,23 @@ import {
 import { isValidThreadId, parseThreadRecord, threadDisplayLabel } from './thread-schema.mjs';
 import { isValidPdGroupId, parsePdGroupRecord, pdGroupDisplayLabel } from './pd-group-schema.mjs';
 import {
+  isValidAchievementId,
+  isValidFutureId,
+  isValidSteppingStoneId,
+  parseAchievementRecord,
+  parseFutureRecord,
+  parseSteppingStoneRecord
+} from './career-schema.mjs';
+import {
   communicationKey,
   meetingKey,
   eventKey,
   applicationKey,
   threadKey,
   pdGroupKey,
+  careerAchievementKey,
+  careerFutureKey,
+  careerStoneKey,
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
@@ -313,8 +324,74 @@ export async function resolveApplication(
     kind: 'application',
     display_label: applicationDisplayLabel(record),
     supporting_label: record.pipeline_status,
-    href: `/professional/#/application/${encodeURIComponent(id)}`,
+    href: `/professional/#/career/application/${encodeURIComponent(id)}`,
     lifecycle_status: record.pipeline_status,
+    visibility: 'operator'
+  };
+}
+
+export async function resolveAchievement(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidAchievementId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'achievement', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseAchievementRecord(await getProfessionalJSON(store, careerAchievementKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'achievement',
+    display_label: record.title,
+    supporting_label: record.lifecycle_status,
+    href: `/professional/#/career/card/${encodeURIComponent(id)}`,
+    lifecycle_status: record.lifecycle_status,
+    visibility: 'operator'
+  };
+}
+
+export async function resolveFuture(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidFutureId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'future', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseFutureRecord(await getProfessionalJSON(store, careerFutureKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'future',
+    display_label: record.title,
+    supporting_label: record.status,
+    href: `/professional/#/career/future/${encodeURIComponent(id)}`,
+    lifecycle_status: record.status,
+    visibility: 'operator'
+  };
+}
+
+export async function resolveSteppingStone(
+  id,
+  accessContext,
+  { getStore = defaultGetProfessionalStore } = {}
+) {
+  if (!isValidSteppingStoneId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'stepping_stone', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseSteppingStoneRecord(await getProfessionalJSON(store, careerStoneKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'stepping_stone',
+    display_label: record.label,
+    supporting_label: record.origin,
+    href: `/professional/#/career?stone=${encodeURIComponent(id)}`,
+    lifecycle_status: record.status_override ?? 'open',
     visibility: 'operator'
   };
 }
@@ -334,6 +411,9 @@ export const RESOLVER_SLOTS = Object.freeze({
   'professional:pd_group': resolvePdGroup,
   'professional:event': resolveEvent,
   'professional:application': resolveApplication,
+  'professional:achievement': resolveAchievement,
+  'professional:future': resolveFuture,
+  'professional:stepping_stone': resolveSteppingStone,
   'knowledge:page': resolveKnowledgePage,
   'teaching:unit': resolveTeachingUnit,
   'teaching:lesson': resolveTeachingLesson,

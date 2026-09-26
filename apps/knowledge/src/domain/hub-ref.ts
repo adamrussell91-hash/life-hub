@@ -64,7 +64,7 @@ export function hrefForHubRef(ref: HubRef): string | null {
     return `/professional/#/meeting/${encodeURIComponent(ref.id)}`;
   }
   if (ref.hub === "professional" && ref.kind === "application") {
-    return `/professional/#/application/${encodeURIComponent(ref.id)}`;
+    return `/professional/#/career/application/${encodeURIComponent(ref.id)}`;
   }
   return null;
 }
