@@ -144,6 +144,18 @@ function parseTermValue(value: string): GoalTerm | null {
   return { year: Number(match[1]), term: Number(match[2]) as 1 | 2 | 3 | 4 };
 }
 
+function reflectSavedTitle(root: HTMLElement, previous: string, title: string): void {
+  const goalLink = root.querySelector<HTMLElement>('[data-chain="goal"]');
+  if (goalLink) goalLink.textContent = title;
+  if (!previous || previous === title) return;
+  for (const echo of root.querySelectorAll<HTMLElement>('[aria-label], [placeholder], [title]')) {
+    for (const attr of ['aria-label', 'placeholder', 'title'] as const) {
+      const value = echo.getAttribute(attr);
+      if (value?.includes(previous)) echo.setAttribute(attr, value.split(previous).join(title));
+    }
+  }
+}
+
 function descriptionPreview(text: string): string {
   const lines = text.trim().split(/\n+/).filter(Boolean);
   if (!lines.length) return 'Add a description';
@@ -164,20 +176,40 @@ function paint(
       .then((next) => paint(canvas, { ...state, goal: normalizeGoal(next) }, mountHammond, options))
       .catch((err) => window.alert(errorMessage(err)));
 
-  // G-06: editable title via a separate input seeded from goal.title — never kinetic + textContent.
+  // G-06: draft locally. One PATCH on blur/Enter. Stale responses never overwrite a newer title.
   let headerTitle: HTMLElement | null = null;
+  let savedTitle = goal.title;
+  let titleSave = 0;
   if (options.header) {
     headerTitle =
       options.header.querySelector<HTMLElement>('.page-header__title') ??
       options.header.querySelector<HTMLElement>('h1');
     headerTitle?.classList.remove('hub-kinetic');
     bindEditablePageTitle(options.header, goal.title, {
-      onChange: (value) => {
+      current: () => savedTitle,
+      onCommit: (value) => {
         const next = value.trim();
-        if (!next || next === goal.title) return;
-        void save({ title: next });
-      },
-      current: () => goal.title
+        if (!next || next === savedTitle) return;
+        const id = ++titleSave;
+        void tasksApi
+          .updateGoal(goal.id, { title: next })
+          .then((updated) => {
+            if (id !== titleSave) return;
+            const title = normalizeGoal(updated).title;
+            const previous = savedTitle;
+            savedTitle = title;
+            const field = options.header?.querySelector<HTMLTextAreaElement>('.page-header__title-input');
+            if (field && document.activeElement === field) {
+              reflectSavedTitle(canvas, previous, title);
+              return;
+            }
+            paint(canvas, { ...state, goal: normalizeGoal({ ...updated, title }) }, mountHammond, options);
+          })
+          .catch((err) => {
+            if (id !== titleSave) return;
+            window.alert(errorMessage(err));
+          });
+      }
     });
     // Remorph target after bindEditablePageTitle replaces h1 with textarea.
     headerTitle =
@@ -199,9 +231,12 @@ function paint(
     if (seg.href && !seg.muted) {
       const link = el('a', 'goal-page__chain-link', seg.label) as HTMLAnchorElement;
       link.href = seg.href;
+      link.dataset.chain = seg.id;
       chain.append(link);
     } else {
-      chain.append(el('span', `goal-page__chain-link${seg.muted ? ' is-muted' : ''}`, seg.label));
+      const span = el('span', `goal-page__chain-link${seg.muted ? ' is-muted' : ''}`, seg.label);
+      span.dataset.chain = seg.id;
+      chain.append(span);
     }
   });
 
