@@ -1,6 +1,10 @@
 /**
  * Load Life calendar events the same way Life does: repo manifest + files,
  * plus calendar-visual.json LOGS when present (visual seed / mock parity).
+ *
+ * `/api/repo/files` caps batches at 50 files / 1 MiB — same limits as
+ * apps/life/js/app/sync-repository.js. One unbatched POST fails when the
+ * date window has more than 50 Life logs (common on Professional Home).
  */
 
 import { addDaysKey, mondayOf } from '../school-time.js';
@@ -9,6 +13,8 @@ import { getSydneyDateKey } from '../sydney-clock.js';
 const CALENDAR_VISUAL_PATH = 'calendar-visual.json';
 const EVENT_MD = /^data\/(?:nutrition|fitness|mind|sleep|heart|skincare|fragrance|body|calendar)\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-.+\.md$/;
 const LINKED_MD = /^records\/\d{4}\/\d{2}\/\d{2}\/.+\.md$/;
+const MAX_BATCH_FILES = 50;
+const MAX_BATCH_BYTES = 1024 * 1024;
 
 async function resolveYamlLoad() {
   try {
@@ -43,6 +49,25 @@ async function readOkJson(apiFetch, path, init) {
   return payload;
 }
 
+/** Split wanted entries to honour /api/repo/files MAX_FILES / MAX_BATCH_BYTES. */
+export function batchLifeFileRequests(wanted) {
+  const batches = [];
+  let batch = [];
+  let bytes = 0;
+  for (const file of wanted) {
+    const size = Number.isFinite(file?.size) ? file.size : 0;
+    if (batch.length && (batch.length === MAX_BATCH_FILES || bytes + size > MAX_BATCH_BYTES)) {
+      batches.push(batch);
+      batch = [];
+      bytes = 0;
+    }
+    batch.push(file);
+    bytes += size;
+  }
+  if (batch.length) batches.push(batch);
+  return batches;
+}
+
 /**
  * @param {(path: string, init?: RequestInit) => Promise<Response>} apiFetch
  * @param {{ today?: string, from?: string, to?: string }} [opts]
@@ -71,17 +96,21 @@ export async function loadLifeCalendarEvents(apiFetch, opts = {}) {
   const events = [];
   if (!wanted.length) return { events, visual };
 
-  const filesPayload = await readOkJson(apiFetch, '/api/repo/files', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      from,
-      to,
-      commitSha: manifest.commitSha,
-      files: wanted.map(({ path, sha }) => ({ path, sha }))
-    })
-  });
-  const files = Array.isArray(filesPayload.data?.files) ? filesPayload.data.files : [];
+  const files = [];
+  for (const batch of batchLifeFileRequests(wanted)) {
+    const filesPayload = await readOkJson(apiFetch, '/api/repo/files', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        from,
+        to,
+        commitSha: manifest.commitSha,
+        files: batch.map(({ path, sha }) => ({ path, sha }))
+      })
+    });
+    const chunk = Array.isArray(filesPayload.data?.files) ? filesPayload.data.files : [];
+    files.push(...chunk);
+  }
   const loadYaml = await resolveYamlLoad();
 
   for (const file of files) {

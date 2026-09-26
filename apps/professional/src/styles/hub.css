@@ -1261,6 +1261,96 @@
   margin: 0 0 var(--space-3);
 }
 
+/* Contracted PD card matches Year-strip height; expand reveals breakdown. */
+.pro-home__progress {
+  padding: var(--space-3) var(--space-5);
+}
+
+.pro-home__progress-head {
+  min-width: 0;
+}
+
+.pro-home__progress-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.pro-home__progress-title-row .pro-home__card-title {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.pro-home__progress-toggle {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  margin: -0.25rem -0.35rem 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.pro-home__progress-toggle:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.pro-home__progress-toggle svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 300ms ease-in-out;
+}
+
+.pro-home__progress.is-expanded .pro-home__progress-toggle svg {
+  transform: rotate(180deg);
+}
+
+/* Same grid 0fr ↔ 1fr expand used by hub-scroll-hide in motion.css */
+.pro-home__progress-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  min-width: 0;
+  transition: grid-template-rows 300ms ease-in-out;
+}
+
+.pro-home__progress.is-expanded .pro-home__progress-reveal {
+  grid-template-rows: 1fr;
+}
+
+.pro-home__progress-reveal-inner {
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding-top: 0;
+  transition: padding-top 300ms ease-in-out;
+}
+
+.pro-home__progress.is-expanded .pro-home__progress-reveal-inner {
+  padding-top: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pro-home__progress-reveal,
+  .pro-home__progress-reveal-inner,
+  .pro-home__progress-toggle svg {
+    transition: none;
+  }
+}
+
 .pro-home__progress-top {
   display: flex;
   align-items: baseline;
@@ -1289,7 +1379,7 @@
   border-radius: var(--radius-full);
   background: var(--shore);
   overflow: hidden;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
 }
 
 .pro-home__progress-fill {
@@ -1302,6 +1392,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .pro-home__chip-tag {
