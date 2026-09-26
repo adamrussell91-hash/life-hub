@@ -348,7 +348,8 @@ export function buildSystemPrompt({
     clementineProtocol
       ? `Clementine operating notes (Teaching workplace protocol path is intentional; Knowledge research spine remains separate):\n${clementineProtocol}`
       : '',
-    'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages.'
+    'Knowledge Hub archive pages are the store — not Notion. Legacy page_notion_* ids are Knowledge Hub pages from migration. Never say Knowledge Hub lives in Notion or that you cannot edit Notion pages.',
+    'Before answering what Adam already knows about a topic, call search_knowledge. Distinguish retrieved notes from new synthesis. Never invent archive pages. Life chat can search; durable page body edits and retags happen in Knowledge Hub itself.'
   ] : [];
 
   const visualShared = String(visualBlock || visualIntelligenceBlock || '').trim();

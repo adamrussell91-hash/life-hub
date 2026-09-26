@@ -28,8 +28,34 @@ describe("buildSynthesisPrompt", () => {
     expect(prompt).toContain("research and knowledge synthesizer");
     expect(prompt).toContain("Never the wrong office");
     expect(prompt).toContain("Return only JSON");
+    expect(prompt).toContain("Knowledge Hub archive pages — not Notion");
     expect(prompt).not.toContain("You are a research assistant");
     expect(prompt).not.toMatch(/academic writing coach/i);
+  });
+
+  it("does not feed notion.so migration URLs into the model prompt", () => {
+    const prompt = buildSynthesisPrompt({
+      query: "spacing",
+      sources: [
+        {
+          pageId: "page_notion_abc",
+          title: "Spacing notes",
+          excerpt: "Spacing works",
+          sourceUrl: "https://www.notion.so/Spacing-abc",
+        },
+        {
+          pageId: "page_hub_def",
+          title: "Hub note",
+          excerpt: "Hub body",
+          sourceUrl: "https://example.test/hub",
+        },
+      ],
+    });
+    expect(prompt).toContain("page_notion_abc");
+    expect(prompt).toContain("https://example.test/hub");
+    expect(prompt).not.toMatch(/notion\.so/i);
+    expect(prompt).not.toMatch(/I cannot edit Notion/i);
+    expect(prompt).not.toMatch(/search the Knowledge Hub Notion/i);
   });
 });
 

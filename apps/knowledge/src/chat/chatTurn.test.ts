@@ -107,12 +107,17 @@ describe("runChatTurn", () => {
       },
     });
     expect(system).toContain("note-edit");
+    expect(system).toContain("Knowledge Hub archive notes — not Notion");
+    expect(system).toContain("Never refuse by saying you cannot edit Notion pages");
+    expect(system).toContain("The archive is Knowledge Hub — not Notion");
     expect(system).toContain("Retrieval practice and spacing (p1)");
     expect(system).toContain("Interleaving in mixed practice sets (p2)");
     expect(system).toContain("Theme evidence matrix");
     expect(system).toContain("Corpus audit");
     expect(system).toContain("Notes retrieved: 1");
     expect(system).toContain("Direct finding");
+    expect(system).not.toMatch(/I cannot edit Notion/i);
+    expect(system).not.toMatch(/search the Knowledge Hub Notion/i);
   });
 
   it("gives thematic synthesis a larger write budget than a cheap scoping map", () => {

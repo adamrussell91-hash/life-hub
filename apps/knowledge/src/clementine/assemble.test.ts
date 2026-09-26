@@ -20,6 +20,8 @@ describe("assembleClementinePrompt", () => {
     expect(assembled).toContain("APA 7th");
     expect(assembled).toContain("Reverse Outline");
     expect(assembled).toContain("Never the wrong office");
+    expect(assembled).toContain("The archive is Knowledge Hub — not Notion");
+    expect(assembled).toContain("Never say you cannot edit Notion pages");
     expect(assembled).toContain("Return JSON only");
     expect(assembled).toContain("Query: stoicism");
     expect(assembled).not.toMatch(/academic writing coach/i);
@@ -28,6 +30,7 @@ describe("assembleClementinePrompt", () => {
     expect(assembled).not.toMatch(/Central Node/i);
     expect(assembled).not.toMatch(/University Reading Protocol/i);
     expect(assembled).not.toMatch(/search the Knowledge Hub Notion/i);
+    expect(assembled).not.toMatch(/I cannot edit Notion/i);
   });
 
   it("throws when the voice file is missing", () => {
