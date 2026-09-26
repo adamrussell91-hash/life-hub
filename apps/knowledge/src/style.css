@@ -791,9 +791,36 @@
 [data-hat]:hover .agent-protocol-pills__tip,
 [data-hat]:focus-visible .agent-protocol-pills__tip,
 .hub-pills__btn:hover .agent-protocol-pills__tip,
-.hub-pills__btn:focus-visible .agent-protocol-pills__tip {
+.hub-pills__btn:focus-visible .agent-protocol-pills__tip,
+.protocol-card__voice:hover .agent-protocol-pills__tip,
+.protocol-card__voice:focus-visible .agent-protocol-pills__tip {
   opacity: 1;
   visibility: visible;
+}
+
+.protocol-card__voice {
+  position: relative;
+  display: inline-block;
+}
+
+.protocol-card__voice:not(:last-child)::after {
+  content: " · ";
+}
+
+.protocol-card__voice .agent-protocol-pills__tip,
+.protocol-card__voice-role {
+  text-transform: none;
+  letter-spacing: var(--tracking-normal);
+  font-weight: var(--weight-regular);
+}
+
+.protocol-card__voice-role {
+  display: none;
+}
+
+.protocol-intake .compose__hint {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: #a89f8a;
 }
 
 .chat__dials {
@@ -2245,6 +2272,25 @@ body.is-universe-fullscreen .local-banner {
 
   .agent-protocol-pills__tip {
     display: none;
+  }
+
+  .protocol-card__voices {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .protocol-card__voice:not(:last-child)::after {
+    content: none;
+  }
+
+  .protocol-card__voice-role {
+    display: block;
+    margin-top: 0.15rem;
+    color: color-mix(in srgb, var(--pastel-gold) 70%, var(--paper));
+    font-size: var(--text-2xs);
+    line-height: var(--leading-snug);
   }
 
   .agent-protocol-pills .hub-pills__btn {
