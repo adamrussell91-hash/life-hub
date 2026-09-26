@@ -58,10 +58,14 @@ test('returns projectRelationshipRegistry output and omits duplicate_fields and 
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const body = await response.json();
   assert.ok(Array.isArray(body.data.relationships));
-  assert.equal(body.data.relationships.length, 21);
+  // Public projection count: full registry minus teaching_protected-only
+  // keys (participates_in). Bumped when #508 added studied_at + placement_at.
+  assert.equal(body.data.relationships.length, 23);
   // participates_in (StudentReference membership, teaching_protected only)
   // must never appear on this generic, non-workflow-scoped route.
   assert.equal(body.data.relationships.some(r => r.key === 'participates_in'), false);
+  assert.ok(body.data.relationships.some(r => r.key === 'studied_at'));
+  assert.ok(body.data.relationships.some(r => r.key === 'placement_at'));
   const collaborator = body.data.relationships.find(r => r.key === 'collaborator');
   assert.ok(collaborator);
   const relatedTo = body.data.relationships.find(r => r.key === 'related_to');
