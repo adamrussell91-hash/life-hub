@@ -1,0 +1,1657 @@
+<title>Network Ecology Miniworld</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&display=swap">
+<style>
+  :root {
+    --paper: #fbf8f2;
+    --ground: #f5f0e4;
+    --ink: #13233a;
+    --navy: #17375e;
+    --marine: #142b51;
+    --muted: #6b7788;
+    --line: rgba(23, 55, 94, 0.12);
+    --wave: #376fb7;
+    --high-sea: #f68620;
+    --high-sea-ink: #a85a0c;
+    --shore: #eae7da;
+    --sage: #dfe9e1;
+    --sage-ink: #3c5949;
+    --card: rgba(255, 255, 255, 0.72);
+    --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-atlas: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    padding-inline: 24px;
+    padding-block: 28px 48px;
+  }
+  .app { max-width: 1320px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  h1 { font-size: clamp(30px, 4vw, 44px); line-height: 1.05; margin: 0; color: var(--navy); font-weight: 700; letter-spacing: -0.02em; text-wrap: balance; }
+  .lede { margin: 8px 0 0; color: var(--muted); max-width: 60ch; }
+  .sample { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--shore); color: var(--sage-ink); font-size: 12px; font-weight: 600; }
+  .sample::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--high-sea); }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+  .seg { display: inline-flex; background: var(--shore); border-radius: 10px; padding: 3px; }
+  .seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; font: 500 13px var(--font-ui); color: var(--muted); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(19, 35, 58, 0.08); }
+  .layers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .layers-label { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-right: 2px; }
+  .toggle { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 6px 12px; font: 500 13px var(--font-ui); color: var(--ink); cursor: pointer; }
+  .toggle::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); }
+  .toggle[aria-pressed="true"] { border-color: var(--navy); background: var(--navy); color: #fff; }
+  .toggle[aria-pressed="true"]::before { border-color: #fff; background: #fff; }
+  .toggle[data-layer="opportunity"][aria-pressed="true"] { background: var(--high-sea-ink); border-color: var(--high-sea-ink); }
+  button:focus-visible, .stage:focus-visible, input:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+  .layer-note { font-size: 13px; color: var(--high-sea-ink); margin: -6px 0 0; }
+
+  .stage { position: relative; height: clamp(520px, 68vh, 780px); border-radius: var(--radius); border: 1px solid var(--line); background: var(--ground); overflow: hidden; touch-action: none; }
+  .stage canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  .stage canvas.is-dragging { cursor: grabbing; }
+  .stage canvas.is-over { cursor: pointer; }
+  .tip { position: absolute; pointer-events: none; background: var(--marine); color: #fff; padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.35; max-width: 240px; box-shadow: 0 4px 14px rgba(19, 35, 58, 0.18); z-index: 4; }
+  .tip strong { display: block; font-size: 13px; }
+  .tip span { opacity: 0.8; }
+  .zoom { position: absolute; right: 14px; bottom: 14px; display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; z-index: 3; }
+  .zoom button { width: 38px; height: 36px; border: 0; background: transparent; font: 500 18px var(--font-ui); color: var(--navy); cursor: pointer; }
+  .zoom button + button { border-top: 1px solid var(--line); }
+  .zoom button.fit { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; }
+  .zoom button:hover { background: var(--shore); }
+  .hint { position: absolute; left: 14px; bottom: 14px; font-size: 12px; color: var(--muted); background: rgba(251, 248, 242, 0.85); padding: 6px 10px; border-radius: 8px; z-index: 3; }
+
+  .panel { position: absolute; top: 14px; right: 14px; width: min(320px, calc(100% - 28px)); max-height: calc(100% - 80px); overflow: auto; background: rgba(255, 255, 255, 0.94); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: 0 10px 30px rgba(19, 35, 58, 0.12); z-index: 5; display: flex; flex-direction: column; gap: 12px; }
+  .panel-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; font-size: 18px; color: var(--muted); cursor: pointer; }
+  .panel-close:hover { background: var(--shore); }
+  .panel-kicker { margin: 0; font-family: var(--font-atlas); font-style: italic; font-size: 15px; color: var(--sage-ink); }
+  .panel h2 { margin: 0; font-size: 20px; line-height: 1.2; color: var(--navy); padding-right: 24px; text-wrap: balance; }
+  .panel .role { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .panel h3 { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .panel ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+  .panel p.body { margin: 0; font-size: 13px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--sage); color: var(--sage-ink); }
+  .pill.dormant { background: #ecebe6; color: #6b6a63; }
+  .pill.bridge { background: #dceafa; color: #294c71; }
+  .pill.new { background: #f1e2b6; color: #6c581f; }
+  .pill.opp { background: #fde6cf; color: var(--high-sea-ink); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stat { background: var(--paper); border-radius: 8px; padding: 6px 8px; }
+  .stat b { display: block; font-size: 17px; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font: 500 12px var(--font-ui); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .chip:hover { border-color: var(--wave); }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .chip.is-dormant { color: var(--muted); border-style: dashed; }
+
+  .timeline { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 14px 20px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 18px; }
+  .play { width: 42px; height: 42px; border-radius: 50%; border: 0; background: var(--navy); color: #fff; cursor: pointer; display: grid; place-items: center; }
+  .play svg { width: 16px; height: 16px; fill: currentColor; }
+  .year { font-size: 30px; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; line-height: 1; min-width: 4.5ch; }
+  .year small { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+  .scrub { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .scrub input { width: 100%; accent-color: var(--navy); margin: 0; }
+  .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; padding-inline: 2px; }
+  .ticks span.now { color: var(--high-sea-ink); font-weight: 600; }
+
+  .below { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 18px; }
+  .box { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; }
+  .box h2 { margin: 0 0 10px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .insights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .insights button { text-align: left; width: 100%; border: 0; background: transparent; padding: 8px 10px; border-radius: 8px; font: 400 14px/1.45 var(--font-ui); color: var(--ink); cursor: pointer; display: flex; gap: 10px; }
+  .insights button:hover { background: var(--paper); }
+  .insights i { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+  .legend-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .legend-item canvas { width: 40px; height: 34px; flex-shrink: 0; }
+  .legend-item b { display: block; font-weight: 600; font-size: 13px; }
+  .legend-item span { color: var(--muted); font-size: 12px; line-height: 1.35; display: block; }
+  .legend-habitats { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .hab { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; }
+  .hab i { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid; display: inline-block; }
+  .hab em { font-family: var(--font-atlas); font-size: 14px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; border-top: 6px solid var(--hab, var(--shore)); }
+  .card-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .card-top em { font-family: var(--font-atlas); font-size: 16px; color: var(--hab-ink, var(--sage-ink)); }
+  .card-top span { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .card h3 { margin: 0; font-size: 18px; color: var(--navy); }
+  .card p { margin: 0; font-size: 13px; color: var(--muted); }
+  .mobile-note { display: none; margin: 0; font-size: 13px; color: var(--muted); background: var(--shore); padding: 10px 12px; border-radius: 10px; }
+
+  @media (max-width: 900px) {
+    .below { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    body { padding-inline: 16px; }
+    .seg, .stage { display: none !important; }
+    .cards { display: grid !important; grid-template-columns: 1fr; }
+    .mobile-note { display: block; }
+    .timeline { grid-template-columns: auto 1fr; }
+    .scrub { grid-column: 1 / -1; }
+    .legend { grid-template-columns: 1fr; }
+    .ticks span:nth-child(even) { visibility: hidden; }
+  }
+</style>
+
+<div class="app" id="app">
+  <header>
+    <div>
+      <p class="eyebrow">Professional · Prototype</p>
+      <h1>Network Ecology</h1>
+      <p class="lede">Your professional world as a small living map. Each creature is a person, each patch of land is a community, and plants grow where communities meet.</p>
+    </div>
+    <span class="sample">Sample data · 33 made-up people</span>
+  </header>
+
+  <div class="toolbar">
+    <div class="seg" role="group" aria-label="View">
+      <button type="button" id="viewWorld" aria-pressed="true">World</button>
+      <button type="button" id="viewCards" aria-pressed="false">Communities</button>
+    </div>
+    <div class="layers" role="group" aria-label="Layers">
+      <span class="layers-label">Show</span>
+      <button type="button" class="toggle" data-layer="names" aria-pressed="false">Names</button>
+      <button type="button" class="toggle" data-layer="mycelium" aria-pressed="false">Mycelium</button>
+      <button type="button" class="toggle" data-layer="opportunity" aria-pressed="false">Opportunity</button>
+      <button type="button" class="toggle" data-layer="dormancy" aria-pressed="false">Dormancy</button>
+    </div>
+  </div>
+  <p class="layer-note" id="layerNote" hidden></p>
+  <p class="mobile-note">The world map needs a bigger screen. On a phone you get the same communities as cards, and the timeline still works.</p>
+
+  <div class="stage" id="stage" tabindex="0" aria-label="Network world map. Use plus and minus to zoom, arrow keys to move, 0 to fit.">
+    <canvas id="world" role="img" aria-label="Map of professional communities. The Communities view lists the same information as text."></canvas>
+    <div class="tip" id="tip" hidden></div>
+    <aside class="panel" id="panel" hidden aria-live="polite"></aside>
+    <div class="hint">Scroll to zoom · drag to move · click anything</div>
+    <div class="zoom">
+      <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+      <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+      <button type="button" id="zoomFit" class="fit" aria-label="Fit whole world">FIT</button>
+    </div>
+  </div>
+
+  <div class="cards" id="cards" hidden></div>
+
+  <div class="timeline">
+    <button type="button" class="play" id="play" aria-label="Play history">
+      <svg viewBox="0 0 16 16" id="playIcon"><path d="M4 2.5v11l9-5.5z"/></svg>
+    </button>
+    <div class="year" id="yearOut">2026<small>Now</small></div>
+    <div class="scrub">
+      <input type="range" id="year" min="2015" max="2026" step="1" value="2026" aria-label="Year">
+      <div class="ticks" id="ticks"></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <section class="box">
+      <h2 id="insightsTitle">What the map says in 2026</h2>
+      <ul class="insights" id="insights"></ul>
+    </section>
+    <section class="box">
+      <h2>How to read it</h2>
+      <div class="legend" id="legend"></div>
+      <div class="legend-habitats" id="habLegend"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ───────────────────────── Sample data ─────────────────────────
+  const HAB = {
+    forest:   { label: 'Forest',     desc: 'Mature, dense community',      fill: '#6f8f69', edge: '#2f4a36', shell: '#f1e4c6', ink: '#6e5a38' },
+    reef:     { label: 'Coral Reef', desc: 'Diverse, overlapping roles',   fill: '#a2d7cf', edge: '#1f5a5a', shell: '#f2bda2', ink: '#8a4e36' },
+    savannah: { label: 'Savannah',   desc: 'Broad, dispersed network',     fill: '#d6c486', edge: '#5e4a18', shell: '#b8805a', ink: '#5a3a22' },
+    wetland:  { label: 'Wetland',    desc: 'Seasonal, gathers for events', fill: '#afcabd', edge: '#3d5650', shell: '#eee8da', ink: '#56606e' },
+    island:   { label: 'Island',     desc: 'Specialised, few routes out',  fill: '#9fbc86', edge: '#4e4064', shell: '#cdbde3', ink: '#5d4e70' }
+  };
+
+  const REGIONS = [
+    { id: 'gifted', name: 'Gifted Education', habitat: 'forest', cx: 560, cy: 470 },
+    { id: 'uni', name: 'University Research', habitat: 'reef', cx: 1090, cy: 420 },
+    { id: 'lead', name: 'School Leadership', habitat: 'savannah', cx: 690, cy: 950 },
+    { id: 'halt', name: 'HALT Conference', habitat: 'wetland', cx: 1110, cy: 800 },
+    { id: 'neuro', name: 'Educational Neuroscience', habitat: 'island', cx: 1435, cy: 165 }
+  ];
+
+  const ORGS = {
+    harbour: { name: 'Harbour Grammar', region: 'gifted', fr: 0.55, a: 1.35 },
+    columba: { name: "St Columba's College", region: 'gifted', fr: 0.5, a: -2.5 },
+    gea: { name: 'Gifted Education Association', region: 'gifted', fr: 0.45, a: -0.7 },
+    eastern: { name: 'Eastern University', region: 'uni', fr: 0.42, a: -2.5 },
+    coastal: { name: 'Coastal Institute of Education', region: 'uni', fr: 0.5, a: 0.6 },
+    westfield: { name: 'Westfield High', region: 'lead', fr: 0.5, a: -0.35 },
+    bayview: { name: 'Bayview College', region: 'lead', fr: 0.55, a: 2.5 },
+    nsn: { name: 'Northern Schools Network', region: 'lead', fr: 0.5, a: 1.25 },
+    spc: { name: "State Principals' Council", region: 'lead', fr: 0.45, a: -2.3 },
+    haltnet: { name: 'HALT Network', region: 'halt', fr: 0.3, a: -2.1 },
+    mbl: { name: 'Mind & Brain Lab', region: 'neuro', fr: 0.25, a: 2.6 }
+  };
+
+  const EVENT = { name: 'HALT Conference', date: '14 November 2026', region: 'halt' };
+
+  const PEOPLE = [
+    { id: 'you', name: 'You', role: 'Teacher, gifted programs', org: 'harbour', homes: ['gifted', 'lead'], since: 2015, you: true },
+    { id: 'maya', name: 'Maya Okafor', role: 'Head of Gifted Programs', org: 'harbour', homes: ['gifted'], since: 2015, attending: true },
+    { id: 'tom', name: 'Tom Reilly', role: 'Enrichment teacher', org: 'harbour', homes: ['gifted'], since: 2016 },
+    { id: 'priya', name: 'Priya Nair', role: 'Gifted coordinator', org: 'columba', homes: ['gifted'], since: 2017 },
+    { id: 'ellen', name: 'Ellen Barker', role: 'President', org: 'gea', homes: ['gifted'], since: 2015 },
+    { id: 'sam', name: 'Sam Whitlock', role: 'Curriculum lead', org: 'harbour', homes: ['gifted'], since: 2018 },
+    { id: 'grace', name: 'Grace Liu', role: 'Teacher', org: 'columba', homes: ['gifted'], since: 2020 },
+    { id: 'daniel', name: 'Daniel Fraser', role: 'Consultant', org: 'gea', homes: ['gifted'], since: 2019, dormantFrom: 2024 },
+    { id: 'hana', name: 'Hana Sato', role: 'Graduate teacher', org: 'harbour', homes: ['gifted'], since: 2026 },
+    { id: 'lena', name: 'Lena Marsh', role: 'Lecturer in gifted education', org: 'eastern', homes: ['gifted', 'uni'], since: 2019 },
+    { id: 'omar', name: 'Omar Haddad', role: 'PhD candidate', org: 'eastern', homes: ['gifted', 'uni'], since: 2022 },
+    { id: 'ruth', name: 'Ruth Kaplan', role: 'Research partner', org: 'coastal', homes: ['uni', 'gifted'], since: 2025 },
+    { id: 'alan', name: 'Alan Moore', role: 'Professor of Education', org: 'eastern', homes: ['uni'], since: 2019 },
+    { id: 'jess', name: 'Jess Carter', role: 'Research fellow', org: 'eastern', homes: ['uni'], since: 2020 },
+    { id: 'kofi', name: 'Kofi Mensah', role: 'Education data scientist', org: 'coastal', homes: ['uni'], since: 2021 },
+    { id: 'isla', name: 'Isla Brennan', role: 'Research ethics officer', org: 'eastern', homes: ['uni'], since: 2022 },
+    { id: 'wei', name: 'Wei Zhang', role: 'Postdoctoral fellow', org: 'coastal', homes: ['uni'], since: 2023 },
+    { id: 'mark', name: 'Mark Delaney', role: 'Principal', org: 'harbour', homes: ['lead'], since: 2015 },
+    { id: 'anita', name: 'Anita Rao', role: 'Deputy principal', org: 'westfield', homes: ['lead'], since: 2016, dormantFrom: 2023, attending: true },
+    { id: 'chris', name: 'Chris Doyle', role: 'Network director', org: 'nsn', homes: ['lead'], since: 2015, dormantFrom: 2021 },
+    { id: 'fiona', name: 'Fiona Walsh', role: 'Head of Teaching & Learning', org: 'westfield', homes: ['lead', 'halt'], homesSince: { halt: 2024 }, since: 2017, attending: true },
+    { id: 'ben', name: 'Ben Adeyemi', role: 'Principal', org: 'bayview', homes: ['lead'], since: 2018, dormantFrom: 2024 },
+    { id: 'kate', name: 'Kate Morrison', role: 'Council member', org: 'spc', homes: ['lead'], since: 2021 },
+    { id: 'luke', name: 'Luke Harper', role: 'Head of Year', org: 'bayview', homes: ['lead'], since: 2016, dormantFrom: 2020 },
+    { id: 'nadia', name: 'Nadia Petrov', role: 'Director of Studies', org: 'harbour', homes: ['lead', 'gifted'], since: 2016 },
+    { id: 'james', name: "James O'Neill", role: 'Deputy principal', org: 'columba', homes: ['lead', 'gifted'], since: 2019 },
+    { id: 'sophie', name: 'Sophie Grant', role: 'HALT assessor', org: 'haltnet', homes: ['halt'], since: 2024, attending: true },
+    { id: 'ravi', name: 'Ravi Patel', role: 'HALT candidate', org: 'westfield', homes: ['halt'], since: 2025, attending: true },
+    { id: 'zoe', name: 'Zoe Campbell', role: 'Conference organiser', org: 'haltnet', homes: ['halt'], since: 2024, attending: true },
+    { id: 'aisha', name: 'Aisha Karim', role: 'Neuroscientist', org: 'mbl', homes: ['neuro'], since: 2021 },
+    { id: 'felix', name: 'Felix Braun', role: 'Research assistant', org: 'mbl', homes: ['neuro'], since: 2022 },
+    { id: 'mei', name: 'Mei Tanaka', role: 'Cognitive psychologist', org: 'mbl', homes: ['neuro'], since: 2023 }
+  ];
+
+  const LINKS = `you-maya you-tom you-sam you-priya you-ellen maya-tom maya-sam maya-ellen maya-priya tom-sam priya-grace
+    priya-ellen ellen-daniel daniel-maya grace-tom hana-maya hana-you sam-grace
+    lena-maya lena-you lena-alan lena-jess omar-lena omar-priya omar-alan ruth-kofi ruth-maya ruth-lena
+    alan-jess alan-isla jess-kofi kofi-wei isla-jess wei-alan
+    aisha-felix aisha-mei felix-mei aisha-alan
+    mark-you mark-nadia mark-anita mark-chris mark-ben anita-fiona chris-luke ben-luke kate-mark kate-fiona
+    nadia-you nadia-maya james-priya james-mark james-kate fiona-you
+    fiona-sophie fiona-ravi sophie-zoe ravi-zoe zoe-kate`
+    .trim().split(/\s+/).map((pair) => pair.split('-'));
+
+  const byId = Object.fromEntries(PEOPLE.map((p) => [p.id, p]));
+  const regionById = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
+  const MIN_YEAR = 2015, MAX_YEAR = 2026;
+
+  // ───────────────────────── Data rules ─────────────────────────
+  const homesAt = (p, y) => (p.since > y ? [] : p.homes.filter((h) => ((p.homesSince && p.homesSince[h]) || p.since) <= y));
+  const isDormant = (p, y) => p.dormantFrom != null && y >= p.dormantFrom;
+  const membersAt = (rid, y) => PEOPLE.filter((p) => homesAt(p, y).includes(rid));
+  const linkSince = ([a, b]) => Math.max(byId[a].since, byId[b].since);
+  const linksAt = (y) => LINKS.filter((l) => linkSince(l) <= y);
+  const neighbours = (id, y) => linksAt(y).filter((l) => l.includes(id)).map((l) => (l[0] === id ? l[1] : l[0]));
+
+  function ecotonesAt(y) {
+    const map = new Map();
+    for (const p of PEOPLE) {
+      const h = homesAt(p, y);
+      if (h.length < 2) continue;
+      const [a, b] = [h[0], h[1]].sort();
+      const key = a + '|' + b;
+      if (!map.has(key)) map.set(key, { key, a, b, people: [] });
+      map.get(key).people.push(p.id);
+    }
+    return map;
+  }
+
+  function regionStats(rid, y) {
+    const members = membersAt(rid, y);
+    const set = new Set(members.map((m) => m.id));
+    const links = linksAt(y);
+    const inside = links.filter(([a, b]) => set.has(a) && set.has(b));
+    const out = links.filter(([a, b]) => set.has(a) !== set.has(b));
+    const n = members.length;
+    const pairs = (n * (n - 1)) / 2;
+    const dormant = members.filter((m) => isDormant(m, y));
+    const orgs = new Set(members.map((m) => m.org));
+    const avgYears = n ? members.reduce((s, m) => s + (y - m.since), 0) / n : 0;
+    const bridges = members.filter((m) => homesAt(m, y).length > 1);
+    return { members, n, links: inside.length, density: pairs ? inside.length / pairs : 0, dormant, orgs, avgYears, out, bridges };
+  }
+
+  function habitatReason(r, s) {
+    const d = s.density.toFixed(2);
+    switch (r.habitat) {
+      case 'forest': return `Dense and long-standing: ${s.links} links among ${s.n} people (density ${d}), known for ${s.avgYears.toFixed(1)} years on average.`;
+      case 'reef': return `Overlapping roles: ${s.n} people across ${s.orgs.size} organisations, with ${s.links} links between them and ${s.bridges.length} shared with other communities.`;
+      case 'savannah': return `Broad but spread out: ${s.n} people across ${s.orgs.size} organisations, and only ${s.links} links between them (density ${d}).`;
+      case 'wetland': return `Gathers around an event: the ${EVENT.name} on ${EVENT.date}. ${s.n} people, most of whom you met in the last two years.`;
+      case 'island': {
+        const via = [...new Set(s.out.map(([a, b]) => (s.members.some((m) => m.id === a) ? b : a)))].map((id) => byId[id].name);
+        return `Specialised and self-contained: ${s.links} links inside, ${s.out.length === 1 ? 'one route' : s.out.length + ' routes'} out${via.length ? ' (through ' + via.join(', ') + ')' : ''}.`;
+      }
+    }
+    return '';
+  }
+
+  // ───────────────────────── State ─────────────────────────
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const state = { year: MAX_YEAR, view: 'world', layers: { names: false, mycelium: false, opportunity: false, dormancy: false }, selected: null, hover: null };
+  const T = { k: 1, x: 0, y: 0 };
+  let cam = null;
+  let eco = new Map();
+  let prevEco = new Map();
+  const creatures = new Map();
+
+  // Deterministic randomness so the world looks the same every visit.
+  function rng(seed) {
+    return () => {
+      seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  const rand = rng(7);
+
+  REGIONS.forEach((r, i) => {
+    const R = rng(100 + i * 17);
+    r.s1 = R() * 6; r.s2 = R() * 6; r.s3 = R() * 6;
+    r.rCur = 0; r.rTarget = 0;
+    r.tex = [];
+    const count = { forest: 170, reef: 90, savannah: 170, wetland: 70, island: 26 }[r.habitat];
+    for (let j = 0; j < count; j++) r.tex.push({ fr: Math.sqrt(R()) * 0.94, a: R() * Math.PI * 2, s: 0.7 + R() * 0.6, v: R() });
+    r.reefTex = [];
+    if (r.habitat === 'island') for (let j = 0; j < 70; j++) r.reefTex.push({ fr: 1.1 + R() * 0.34, a: R() * Math.PI * 2, s: 0.7 + R() * 0.6, v: R() });
+  });
+
+  function blobR(r, a) {
+    const amp = r.habitat === 'savannah' ? 0.13 : r.habitat === 'island' ? 0.07 : 0.09;
+    return 1 + amp * (0.5 * Math.sin(3 * a + r.s1) + 0.35 * Math.sin(5 * a + r.s2) + 0.4 * Math.sin(2 * a + r.s3))
+      + 0.02 * Math.sin(8 * a + r.s2 * 2) + 0.008 * Math.sin(13 * a + r.s1 * 3);
+  }
+  function targetRadius(r, n) {
+    if (!n) return 0;
+    const base = 62 + 26 * Math.sqrt(n);
+    return base * (r.habitat === 'savannah' ? 1.22 : r.habitat === 'island' ? 0.92 : 1);
+  }
+  function regionPoint(r, frMax, R = r.rCur || r.rTarget) {
+    const a = rand() * Math.PI * 2;
+    const f = Math.sqrt(rand()) * frMax;
+    return [r.cx + Math.cos(a) * R * blobR(r, a) * f, r.cy + Math.sin(a) * R * blobR(r, a) * f];
+  }
+  function ecoPoint(e) {
+    const A = regionById[e.a], B = regionById[e.b];
+    if (!A.rCur || !B.rCur) return [(A.cx + B.cx) / 2, (A.cy + B.cy) / 2];
+    const [x, y] = routeFor(A, B, landEdge, landEdge).at(0.5);
+    return [x, y];
+  }
+
+
+  // ───────────────────────── Year recompute ─────────────────────────
+  function computeYear() {
+    const y = state.year;
+    prevEco = ecotonesAt(Math.max(MIN_YEAR, y - 2));
+    eco = ecotonesAt(y);
+    for (const r of REGIONS) {
+      r.stats = regionStats(r.id, y);
+      r.rTarget = targetRadius(r, r.stats.n);
+      if (reduceMotion) r.rCur = r.rTarget;
+    }
+    const now = performance.now();
+    const visible = new Set(PEOPLE.filter((p) => p.since <= y).map((p) => p.id));
+    for (const id of [...creatures.keys()]) if (!visible.has(id)) creatures.delete(id);
+    for (const p of PEOPLE) {
+      if (!visible.has(p.id)) continue;
+      let c = creatures.get(p.id);
+      if (!c) {
+        const home = regionById[homesAt(p, y)[0]];
+        const [x, yy] = regionPoint(home, 0.7, home.rTarget);
+        c = { id: p.id, x, y: yy, tx: x, ty: yy, wait: rand() * 3, phase: rand() * 6, facing: rand() < 0.5 ? -1 : 1, speed: 9 + rand() * 6, born: now };
+        creatures.set(p.id, c);
+      }
+      const dormant = isDormant(p, y);
+      if (dormant && !c.dormant) {
+        const home = regionById[homesAt(p, y)[0]];
+        const a = rand() * Math.PI * 2;
+        c.tx = home.cx + Math.cos(a) * home.rTarget * 0.78;
+        c.ty = home.cy + Math.sin(a) * home.rTarget * 0.78;
+        c.wait = 0;
+      }
+      if (!dormant && c.dormant) c.wait = 0;
+      c.dormant = dormant;
+      if (reduceMotion) { c.x = c.tx; c.y = c.ty; }
+    }
+    if (state.selected && state.selected.kind === 'person' && !visible.has(state.selected.id)) state.selected = null;
+    if (state.selected && state.selected.kind === 'eco' && !eco.has(state.selected.id)) state.selected = null;
+    if (state.selected && state.selected.kind === 'region' && !regionById[state.selected.id].stats.n) state.selected = null;
+    renderUI();
+  }
+
+  function pickTarget(c) {
+    const p = byId[c.id];
+    const homes = homesAt(p, state.year);
+    if (c.dormant) return;
+    if (homes.length > 1 && rand() < 0.45) {
+      const [a, b] = [homes[0], homes[1]].sort();
+      const e = eco.get(a + '|' + b);
+      if (e) {
+        const [ex, ey] = ecoPoint(e);
+        c.tx = ex + (rand() - 0.5) * 50; c.ty = ey + (rand() - 0.5) * 34;
+        return;
+      }
+    }
+    const home = regionById[homes[Math.floor(rand() * homes.length)]];
+    [c.tx, c.ty] = regionPoint(home, 0.74);
+  }
+
+  // ───────────────────────── Canvas ─────────────────────────
+  const stage = document.getElementById('stage');
+  const canvas = document.getElementById('world');
+  const ctx = canvas.getContext('2d');
+  let W = 800, H = 600, dpr = 1;
+
+  function resize() {
+    const rect = stage.getBoundingClientRect();
+    if (!rect.width) return;
+    const cx = (W / 2 - T.x) / T.k, cy = (H / 2 - T.y) / T.k;
+    W = rect.width; H = rect.height; dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    if (fitted) { T.x = W / 2 - cx * T.k; T.y = H / 2 - cy * T.k; }
+  }
+  let fitted = false;
+  function fitTransform() {
+    const vis = REGIONS.filter((r) => r.rTarget > 0);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const r of vis) {
+      const o = r.rTarget * OUTER[r.habitat];
+      x0 = Math.min(x0, r.cx - o); x1 = Math.max(x1, r.cx + o);
+      y0 = Math.min(y0, r.cy - o - 30); y1 = Math.max(y1, r.cy + o);
+    }
+    const pad = 40;
+    const k = Math.min(3, Math.max(0.35, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0))));
+    return { k, x: W / 2 - ((x0 + x1) / 2) * k, y: H / 2 - ((y0 + y1) / 2) * k };
+  }
+  function animateTo(target, dur = 650) {
+    if (reduceMotion) { Object.assign(T, target); return; }
+    cam = { from: { ...T }, to: target, t0: performance.now(), dur };
+  }
+  function focusOn(wx, wy, k = Math.max(T.k, 1.5)) {
+    animateTo({ k, x: W / 2 - 60 - wx * k, y: H / 2 - wy * k });
+  }
+  function zoomAt(sx, sy, f) {
+    cam = null;
+    const nk = Math.min(4, Math.max(0.35, T.k * f));
+    T.x = sx - (sx - T.x) * (nk / T.k);
+    T.y = sy - (sy - T.y) * (nk / T.k);
+    T.k = nk;
+  }
+  const toWorld = (sx, sy) => [(sx - T.x) / T.k, (sy - T.y) / T.k];
+  const toScreen = (wx, wy) => [wx * T.k + T.x, wy * T.k + T.y];
+
+  function mix(a, b, t) {
+    const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+    const ch = (p, s) => (p >> s) & 255;
+    const m = (s) => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
+    return '#' + ((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1);
+  }
+
+  function blobPath(c, r, scale = 1) {
+    const R = r.rCur * scale, N = 96, pts = [];
+    for (let i = 0; i < N; i++) {
+      const a = (i / N) * Math.PI * 2, rr = R * blobR(r, a);
+      pts.push([r.cx + Math.cos(a) * rr, r.cy + Math.sin(a) * rr]);
+    }
+    c.beginPath();
+    const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    const m0 = mid(pts[N - 1], pts[0]);
+    c.moveTo(m0[0], m0[1]);
+    for (let i = 0; i < N; i++) {
+      const m = mid(pts[i], pts[(i + 1) % N]);
+      c.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+    }
+    c.closePath();
+  }
+
+  // ── Drawing primitives (also used by the legend) ──
+  function drawCrab(c, x, y, s, o) {
+    c.save();
+    c.translate(x, y);
+    if (o.facing < 0) c.scale(-1, 1);
+    const body = '#e8a58a', bodyInk = '#8a4e36';
+    const bob = o.walking ? Math.sin(o.phase * 2) * 0.07 * s : 0;
+    c.lineCap = 'round';
+    if (!o.dormant) {
+      c.strokeStyle = bodyInk; c.lineWidth = 0.17 * s;
+      for (let i = 0; i < 3; i++) {
+        const lx = s * (0.3 + 0.3 * i), sw = o.walking ? Math.sin(o.phase + i * 2.1) * 0.2 * s : 0;
+        c.beginPath(); c.moveTo(lx, 0.45 * s); c.lineTo(lx + 0.22 * s + sw, 1.02 * s); c.stroke();
+      }
+      c.fillStyle = body; c.lineWidth = 0.11 * s;
+      c.beginPath(); c.ellipse(0.8 * s, 0.45 * s + bob, 0.55 * s, 0.36 * s, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.beginPath(); c.arc(1.36 * s, 0.55 * s + bob, 0.22 * s, 0, Math.PI * 2); c.fill(); c.stroke();
+      c.lineWidth = 0.1 * s;
+      c.beginPath(); c.moveTo(0.95 * s, 0.2 * s + bob); c.lineTo(1.0 * s, -0.33 * s + bob);
+      c.moveTo(1.15 * s, 0.22 * s + bob); c.lineTo(1.28 * s, -0.26 * s + bob); c.stroke();
+      c.fillStyle = '#13233a';
+      c.beginPath(); c.arc(1.0 * s, -0.38 * s + bob, 0.13 * s, 0, Math.PI * 2); c.arc(1.28 * s, -0.31 * s + bob, 0.13 * s, 0, Math.PI * 2); c.fill();
+    }
+    // Shell
+    c.translate(-0.05 * s, 0.02 * s + bob);
+    if (o.dormant) c.rotate(0.5);
+    const shell = o.dormant ? mix(o.shell, '#cbc8bf', 0.65) : o.shell;
+    const ink = o.dormant ? '#8f8c84' : o.ink;
+    c.fillStyle = shell;
+    c.beginPath(); c.arc(0, 0, s, 0, Math.PI * 2); c.fill();
+    if (o.shell2 && !o.dormant) {
+      c.save(); c.beginPath(); c.rect(-s * 1.1, -s * 1.1, s * 1.1, s * 2.2); c.clip();
+      c.fillStyle = o.shell2; c.beginPath(); c.arc(0, 0, s, 0, Math.PI * 2); c.fill(); c.restore();
+    }
+    c.strokeStyle = ink; c.lineWidth = 0.11 * s;
+    c.beginPath(); c.arc(0, 0, s, 0, Math.PI * 2); c.stroke();
+    c.strokeStyle = o.spiral || ink; c.globalAlpha = o.spiral ? 1 : 0.6; c.lineWidth = 0.1 * s;
+    c.beginPath();
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40, a = t * Math.PI * 3.2, rr = s * (0.82 - 0.72 * t);
+      const px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+      i ? c.lineTo(px, py) : c.moveTo(px, py);
+    }
+    c.stroke();
+    c.globalAlpha = 1;
+    c.restore();
+  }
+
+  function drawSleep(c, x, y, s, t) {
+    const drift = reduceMotion ? 0 : ((t / 1600) % 1);
+    c.fillStyle = '#8f8c84';
+    c.globalAlpha = reduceMotion ? 0.8 : 0.9 * (1 - drift);
+    c.font = `600 ${s * 0.95}px Inter, sans-serif`;
+    c.fillText('z', x + s * 0.7, y - s * (1.1 + drift * 0.9));
+    c.globalAlpha = 1;
+  }
+
+  function drawSparkle(c, x, y, s, t) {
+    const k = reduceMotion ? 1 : 0.75 + 0.25 * Math.sin(t / 300);
+    const r = s * 0.42 * k;
+    c.fillStyle = '#d9a82e';
+    c.beginPath();
+    c.moveTo(x, y - r); c.quadraticCurveTo(x, y, x + r, y); c.quadraticCurveTo(x, y, x, y + r);
+    c.quadraticCurveTo(x, y, x - r, y); c.quadraticCurveTo(x, y, x, y - r); c.fill();
+  }
+
+  function drawFlag(c, x, y, s) {
+    c.strokeStyle = '#a85a0c'; c.lineWidth = 0.12 * s;
+    c.beginPath(); c.moveTo(x, y - 0.9 * s); c.lineTo(x, y - 2.0 * s); c.stroke();
+    c.fillStyle = '#f68620';
+    c.beginPath(); c.moveTo(x, y - 2.0 * s); c.lineTo(x + 0.75 * s, y - 1.75 * s); c.lineTo(x, y - 1.5 * s); c.fill();
+  }
+
+  function drawPlant(c, x, y, count, sf, t, o = {}) {
+    const h = (9 + 5 * Math.min(count, 5)) * sf;
+    const sway = reduceMotion ? 0 : Math.sin(t / 1300) * 0.07;
+    c.fillStyle = '#d9d0b8';
+    c.beginPath(); c.ellipse(x, y + 1 * sf, 7 * sf, 2.4 * sf, 0, 0, Math.PI * 2); c.fill();
+    c.save(); c.translate(x, y); c.rotate(sway);
+    c.strokeStyle = '#5f8a6a'; c.lineWidth = 1.3 * sf; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(0, 0); c.quadraticCurveTo(-1.5 * sf, -h * 0.5, 0, -h); c.stroke();
+    const leaves = Math.min(count, 4) + 1;
+    c.fillStyle = '#8fb59a';
+    for (let i = 0; i < leaves; i++) {
+      const side = i % 2 ? 1 : -1, yy = -h * (0.22 + 0.16 * i);
+      c.beginPath(); c.ellipse(side * 3.4 * sf, yy, 3.4 * sf, 1.6 * sf, side * -0.5, 0, Math.PI * 2); c.fill();
+    }
+    if (count >= 3) {
+      c.fillStyle = '#d7c9ea';
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        c.beginPath(); c.arc(Math.cos(a) * 2.2 * sf, -h + Math.sin(a) * 2.2 * sf, 1.8 * sf, 0, Math.PI * 2); c.fill();
+      }
+      c.fillStyle = o.opp ? '#f68620' : '#e3c77f';
+      c.beginPath(); c.arc(0, -h, 1.4 * sf, 0, Math.PI * 2); c.fill();
+    } else {
+      c.fillStyle = o.opp ? '#f68620' : '#8fb59a';
+      c.beginPath(); c.ellipse(0, -h - 1 * sf, 1.8 * sf, 2.4 * sf, 0, 0, Math.PI * 2); c.fill();
+    }
+    c.restore();
+    if (o.badge !== false) {
+      const bx = x + 6 * sf, by = y - h - 4 * sf;
+      c.fillStyle = '#17375e';
+      c.beginPath(); c.arc(bx, by, 5.2 * sf, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#fff'; c.font = `700 ${6.6 * sf}px Inter, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(String(count), bx, by + 0.3 * sf);
+      c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    }
+    return h;
+  }
+
+  function drawCairn(c, x, y, sf) {
+    c.strokeStyle = '#a99c7c'; c.lineWidth = 0.6 * sf;
+    [[0, 6.5, 2.7, '#c9bd9d'], [-3.6, 4.8, 2.3, '#d6cbad'], [-6.6, 3.2, 1.8, '#e3d9bf']].forEach(([dy, rx, ry, fill]) => {
+      c.fillStyle = fill; c.beginPath(); c.ellipse(x, y + dy * sf, rx * sf, ry * sf, 0, 0, Math.PI * 2); c.fill(); c.stroke();
+    });
+  }
+
+  // ── Terrain: an archipelago seen from above ──
+  const SEA = { lagoon: '#b7e5de', lagoonSand: '#cfeee6', wetSand: '#d6c59b', sand: '#ebdfbc', shallowFar: '#bcdad9', shallowNear: '#c8e7e2' };
+  const OUTER = { forest: 1.32, savannah: 1.32, reef: 1.36, wetland: 1.28, island: 1.78 };
+  const LABEL_AT = { forest: 1.12, savannah: 1.12, reef: 1.24, wetland: 1.14, island: 1.58 };
+
+  function fillBlob(c, r, scale, color) { c.fillStyle = color; blobPath(c, r, scale); c.fill(); }
+  function strokeBlob(c, r, scale, color, lw) { c.strokeStyle = color; c.lineWidth = lw; blobPath(c, r, scale); c.stroke(); }
+  function texPos(r, it, k = 1) {
+    const rr = r.rCur * blobR(r, it.a) * it.fr * k;
+    return [r.cx + Math.cos(it.a) * rr, r.cy + Math.sin(it.a) * rr];
+  }
+  function circles(c, list, color) {
+    if (!list.length) return;
+    c.fillStyle = color; c.beginPath();
+    for (const [x, y, s] of list) { c.moveTo(x + s, y); c.arc(x, y, s, 0, Math.PI * 2); }
+    c.fill();
+  }
+  function ellipses(c, list, color) {
+    if (!list.length) return;
+    c.fillStyle = color; c.beginPath();
+    for (const [x, y, rx, ry, rot = 0] of list) { c.moveTo(x + rx * Math.cos(rot), y + rx * Math.sin(rot)); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); }
+    c.fill();
+  }
+  // Tree crowns lit from the top left, with a soft shadow falling bottom right.
+  function crowns(c, lobes, pal) {
+    ellipses(c, lobes.map(([x, y, s]) => [x + s * 0.4, y + s * 0.5, s * 1.05, s * 0.85]), pal.shadow);
+    circles(c, lobes, pal.base);
+    circles(c, lobes.map(([x, y, s]) => [x - s * 0.25, y - s * 0.28, s * 0.58]), pal.mid);
+    circles(c, lobes.map(([x, y, s]) => [x - s * 0.38, y - s * 0.42, s * 0.26]), pal.light);
+  }
+  function beach(c, r) {
+    fillBlob(c, r, 1.065, SEA.wetSand);
+    fillBlob(c, r, 1.03, SEA.sand);
+  }
+  function surf(c, r, scale) { strokeBlob(c, r, scale, 'rgba(255,255,255,0.55)', 1.4); }
+
+  function brainCorals(c, list, colors) {
+    ellipses(c, list.map(([x, y, s]) => [x + s * 0.3, y + s * 0.4, s, s * 0.8]), 'rgba(40,110,110,0.18)');
+    list.forEach((it, i) => (it.col = colors[i % colors.length]));
+    for (const col of colors) circles(c, list.filter((it) => it.col === col), col);
+    c.strokeStyle = 'rgba(120,70,60,0.28)'; c.lineWidth = 0.6; c.beginPath();
+    for (const [x, y, s] of list) { c.moveTo(x + s * 0.55, y); c.arc(x, y, s * 0.55, 0, Math.PI * 2); c.moveTo(x - s * 0.6, y - s * 0.1); c.quadraticCurveTo(x, y + s * 0.4, x + s * 0.6, y - s * 0.1); }
+    c.stroke();
+  }
+  function staghorn(c, list) {
+    c.strokeStyle = '#e8c3a2'; c.lineWidth = 1.5; c.lineCap = 'round'; c.beginPath();
+    for (const [x, y, s] of list) {
+      for (let i = 0; i < 5; i++) {
+        const a = -Math.PI / 2 + (i - 2) * 0.55, l = s * (0.8 + (i % 2) * 0.4);
+        const ex = x + Math.cos(a) * l, ey = y + Math.sin(a) * l;
+        c.moveTo(x, y); c.lineTo(ex, ey);
+        c.moveTo(ex - Math.cos(a) * l * 0.4, ey - Math.sin(a) * l * 0.4); c.lineTo(ex - Math.cos(a) * l * 0.4 + Math.cos(a + 0.8) * l * 0.35, ey - Math.sin(a) * l * 0.4 + Math.sin(a + 0.8) * l * 0.35);
+      }
+    }
+    c.stroke();
+  }
+  function seaFans(c, list) {
+    c.strokeStyle = 'rgba(160,125,190,0.8)'; c.lineWidth = 0.7; c.beginPath();
+    for (const [x, y, s] of list) for (let i = 0; i < 7; i++) {
+      const a = -Math.PI / 2 + (i - 3) * 0.28;
+      c.moveTo(x, y); c.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s);
+    }
+    c.stroke();
+    c.beginPath();
+    for (const [x, y, s] of list) { c.moveTo(x + Math.cos(-Math.PI / 2 - 0.9) * s * 0.7, y + Math.sin(-Math.PI / 2 - 0.9) * s * 0.7); c.arc(x, y, s * 0.7, -Math.PI / 2 - 0.9, -Math.PI / 2 + 0.9); }
+    c.stroke();
+  }
+  function caustics(c, list, t) {
+    if (reduceMotion) return;
+    c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 0.8; c.beginPath();
+    for (const [x, y, s, ph] of list) {
+      const w = Math.sin(t / 1400 + ph) * 2;
+      c.moveTo(x - 7 * s, y + w * 0.3); c.quadraticCurveTo(x - 2 * s, y - 3 * s + w, x + 3 * s, y); c.quadraticCurveTo(x + 6 * s, y + 2 * s - w, x + 9 * s, y - w * 0.3);
+    }
+    c.stroke();
+  }
+  function palms(c, list) {
+    // Top-down palms: a star of fronds with a shadow thrown to the lower right.
+    const fr = [], sh = [];
+    for (const [x, y, s] of list) for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 + s;
+      const f = [x + Math.cos(a) * 4.6 * s, y + Math.sin(a) * 4.6 * s, 4.8 * s, 1.35 * s, a];
+      fr.push(f); sh.push([f[0] + 3 * s, f[1] + 3.5 * s, f[2], f[3], a]);
+    }
+    ellipses(c, sh, 'rgba(40,70,50,0.22)');
+    ellipses(c, fr, '#6f9a5c');
+    ellipses(c, fr.map(([x, y, rx, ry, a]) => [x - Math.cos(a) * rx * 0.2, y - Math.sin(a) * rx * 0.2, rx * 0.55, ry * 0.45, a]), '#8db577');
+    circles(c, list.map(([x, y, s]) => [x, y, 1.3 * s]), '#8a6f4a');
+  }
+
+  function drawForest(c, r) {
+    beach(c, r);
+    fillBlob(c, r, 0.97, '#b9c99a');
+    fillBlob(c, r, 0.86, '#6f8f69');
+    c.save(); blobPath(c, r, 0.97); c.clip();
+    const deep = [], young = [];
+    for (const it of r.tex) {
+      const [x, y] = texPos(r, it);
+      const inner = it.fr < 0.8, s = (inner ? 7.2 : 3.8) * it.s;
+      (inner ? deep : young).push([x, y, s], [x + s * 0.62, y + s * 0.22, s * 0.72], [x - s * 0.5, y + s * 0.36, s * 0.64]);
+    }
+    crowns(c, young, { shadow: 'rgba(30,55,38,0.22)', base: '#89a97d', mid: '#9fbc8f', light: '#bcd3a8' });
+    crowns(c, deep, { shadow: 'rgba(24,46,32,0.32)', base: '#5f8663', mid: '#739a72', light: '#94b88c' });
+    c.restore();
+  }
+
+  function drawSavannah(c, r) {
+    beach(c, r);
+    fillBlob(c, r, 0.97, '#d6c486');
+    c.save(); blobPath(c, r, 0.97); c.clip();
+    const light = [], dark = [], earth = [], tufts = [], bushes = [], acacia = [];
+    for (const it of r.tex) {
+      const [x, y] = texPos(r, it);
+      if (it.v < 0.08) light.push([x, y, 22 * it.s, 12 * it.s, it.a]);
+      else if (it.v < 0.15) dark.push([x, y, 18 * it.s, 10 * it.s, it.a]);
+      else if (it.v < 0.18) earth.push([x, y, 8 * it.s, 5 * it.s, it.a]);
+      else if (it.v < 0.25) acacia.push([x, y, it.s]);
+      else if (it.v < 0.42) bushes.push([x, y, 2.4 * it.s]);
+      else tufts.push([x, y, it.s]);
+    }
+    ellipses(c, light, 'rgba(230,216,162,0.8)');
+    ellipses(c, dark, 'rgba(188,166,104,0.5)');
+    ellipses(c, earth, 'rgba(196,160,112,0.55)');
+    c.strokeStyle = 'rgba(150,126,62,0.5)'; c.lineWidth = 0.8; c.lineCap = 'round'; c.beginPath();
+    for (const [x, y, s] of tufts) {
+      c.moveTo(x - 1.8 * s, y + 1); c.lineTo(x - 0.9 * s, y - 2.4 * s);
+      c.moveTo(x, y + 1); c.lineTo(x + 0.1 * s, y - 3 * s);
+      c.moveTo(x + 1.8 * s, y + 1); c.lineTo(x + 0.9 * s, y - 2.2 * s);
+    }
+    c.stroke();
+    ellipses(c, bushes.map(([x, y, s]) => [x + s * 0.6, y + s * 0.7, s * 1.1, s * 0.8]), 'rgba(80,66,24,0.25)');
+    circles(c, bushes, '#7f8c50');
+    circles(c, bushes.map(([x, y, s]) => [x - s * 0.3, y - s * 0.3, s * 0.5]), '#98a462');
+    // Acacias: wide flat crowns throwing a long afternoon shadow.
+    ellipses(c, acacia.map(([x, y, s]) => [x + 7 * s, y + 6 * s, 15 * s, 7.5 * s]), 'rgba(80,64,24,0.22)');
+    const lobes = [];
+    for (const [x, y, s] of acacia) lobes.push([x, y, 8.5 * s, 5.2 * s], [x - 7 * s, y + 1 * s, 6 * s, 4 * s], [x + 7 * s, y + 0.6 * s, 6.4 * s, 4.1 * s], [x + 1 * s, y - 3 * s, 6 * s, 3.6 * s]);
+    ellipses(c, lobes, '#76874a');
+    ellipses(c, lobes.map(([x, y, a, b]) => [x - a * 0.2, y - b * 0.3, a * 0.6, b * 0.5]), '#8e9f5c');
+    ellipses(c, lobes.map(([x, y, a, b]) => [x - a * 0.35, y - b * 0.45, a * 0.28, b * 0.22]), '#a8b774');
+    c.restore();
+  }
+
+  function drawReef(c, r, t) {
+    // An atoll: a ring of reef around a calm lagoon, with a small sand cay.
+    fillBlob(c, r, 1.2, '#a2d7cf');
+    fillBlob(c, r, 1.08, '#93d0c9');
+    fillBlob(c, r, 1.0, SEA.lagoon);
+    fillBlob(c, r, 0.58, SEA.lagoonSand);
+    c.save(); blobPath(c, r, 1.2); c.clip();
+    const brain = [], stag = [], fans = [], caus = [];
+    for (const it of r.tex) {
+      const [x, y] = texPos(r, it, 1.22);
+      if (it.v < 0.45) brain.push([x, y, (3 + it.fr * 3) * it.s]);
+      else if (it.v < 0.75) stag.push([x, y, 6 * it.s]);
+      else fans.push([x, y, 5.5 * it.s]);
+      if (it.v > 0.6) caus.push([x + 8, y + 6, it.s, it.a * 5]);
+    }
+    brainCorals(c, brain, ['#e2b49e', '#d9a9b8', '#cdb682', '#e8c9a8']);
+    staghorn(c, stag);
+    seaFans(c, fans);
+    fillBlob(c, r, 1.2, 'rgba(150,212,210,0.24)');
+    caustics(c, caus, t);
+    c.restore();
+    strokeBlob(c, r, 1.15, 'rgba(236,220,196,0.9)', 4.5);
+    surf(c, r, 1.22);
+    fillBlob(c, r, 0.2, SEA.wetSand);
+    fillBlob(c, r, 0.17, SEA.sand);
+    palms(c, [[r.cx - 5, r.cy - 3, 0.9], [r.cx + 7, r.cy + 4, 0.75]]);
+  }
+
+  function drawWetland(c, r, t) {
+    // Tidal marsh in the channel between islands: brackish pools, mudflats and reed beds.
+    fillBlob(c, r, 1.12, '#bddad3');
+    fillBlob(c, r, 1.02, '#afcabd');
+    c.save(); blobPath(c, r, 1.02); c.clip();
+    const mud = [], reeds = [], pads = [], rip = [];
+    for (const it of r.tex) {
+      const [x, y] = texPos(r, it);
+      if (it.v < 0.28) mud.push([x, y, 15 * it.s, 8 * it.s, it.a]);
+      else if (it.v < 0.72) reeds.push([x, y, it.s]);
+      else if (it.v < 0.85) pads.push([x, y, 2.4 * it.s]);
+      else rip.push([x, y, it.s, it.a]);
+    }
+    ellipses(c, mud, 'rgba(200,188,150,0.9)');
+    ellipses(c, mud.map(([x, y, a, b, rot]) => [x - a * 0.15, y - b * 0.2, a * 0.6, b * 0.5, rot]), 'rgba(214,204,170,0.9)');
+    c.strokeStyle = '#9dbdb9'; c.lineWidth = 3.2; c.lineCap = 'round'; c.beginPath();
+    const R = r.rCur;
+    c.moveTo(r.cx - R, r.cy - R * 0.2); c.bezierCurveTo(r.cx - R * 0.4, r.cy + R * 0.3, r.cx + R * 0.1, r.cy - R * 0.4, r.cx + R, r.cy + R * 0.15);
+    c.moveTo(r.cx - R * 0.2, r.cy + R); c.quadraticCurveTo(r.cx + R * 0.05, r.cy + R * 0.2, r.cx - R * 0.15, r.cy - R * 0.1);
+    c.stroke();
+    c.strokeStyle = '#6f8150'; c.lineWidth = 0.8; c.beginPath();
+    for (const [x, y, s] of reeds) for (let i = 0; i < 7; i++) {
+      const a = -Math.PI / 2 + (i - 3) * 0.3, l = (5 + (i % 3)) * s;
+      c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l);
+    }
+    c.stroke();
+    ellipses(c, reeds.flatMap(([x, y, s]) => [[x - 2 * s, y - 5.5 * s, 0.7 * s, 1.5 * s], [x + 1.6 * s, y - 6.2 * s, 0.7 * s, 1.5 * s]]), '#8d7254');
+    c.fillStyle = '#7aa36d'; c.beginPath();
+    for (const [x, y, s] of pads) { c.moveTo(x, y); c.arc(x, y, s, 0.35, Math.PI * 2 - 0.1); c.closePath(); }
+    c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.4)'; c.lineWidth = 0.9; c.beginPath();
+    for (const [x, y, s, ph] of rip) {
+      const g = reduceMotion ? 0 : ((t / 3000 + ph) % 1);
+      c.moveTo(x + (4 + g * 6) * s, y); c.ellipse(x, y, (4 + g * 6) * s, (1.6 + g * 2.2) * s, 0, 0, Math.PI * 2);
+    }
+    c.stroke();
+    c.restore();
+  }
+
+  function drawIsland(c, r, t) {
+    // A small high island ringed by a fringing reef.
+    fillBlob(c, r, 1.5, '#a5dad2');
+    fillBlob(c, r, 1.3, '#b9e6de');
+    c.save(); blobPath(c, r, 1.5); c.clip();
+    const coral = [], stag = [];
+    for (const it of r.reefTex) {
+      const [x, y] = texPos(r, it);
+      (it.v < 0.6 ? coral : stag).push([x, y, (it.v < 0.6 ? 2.6 : 4.5) * it.s]);
+    }
+    brainCorals(c, coral, ['#e2b49e', '#d9a9b8', '#cdb682']);
+    staghorn(c, stag);
+    fillBlob(c, r, 1.5, 'rgba(150,212,210,0.22)');
+    c.restore();
+    strokeBlob(c, r, 1.44, 'rgba(236,220,196,0.9)', 4);
+    surf(c, r, 1.52);
+    beach(c, r);
+    fillBlob(c, r, 0.9, '#9fbc86');
+    c.save(); blobPath(c, r, 0.9); c.clip();
+    const shrubs = [], flowers = [], palmList = [];
+    for (const it of r.tex) {
+      const [x, y] = texPos(r, it);
+      if (it.v < 0.3) palmList.push([x, y, 0.8 + it.s * 0.3]);
+      else if (it.v < 0.7) shrubs.push([x, y, 3 * it.s]);
+      else flowers.push([x, y, 1.3 * it.s]);
+    }
+    crowns(c, shrubs, { shadow: 'rgba(30,55,38,0.22)', base: '#7da36e', mid: '#92b67f', light: '#b1cc98' });
+    circles(c, flowers, '#cdbde3');
+    c.restore();
+    palms(c, palmList);
+  }
+
+  function drawRegionBody(c, r, t) {
+    if (r.habitat === 'forest') { drawForest(c, r); surf(c, r, 1.09); }
+    else if (r.habitat === 'savannah') { drawSavannah(c, r); surf(c, r, 1.09); }
+    else if (r.habitat === 'reef') drawReef(c, r, t);
+    else if (r.habitat === 'wetland') drawWetland(c, r, t);
+    else if (r.habitat === 'island') drawIsland(c, r, t);
+  }
+
+  function frac(n) { return n - Math.floor(n); }
+  // A gently curved route between two landforms (quadratic bezier), bowed to one side.
+  function route(A, B, kA, kB) {
+    const dx = B.cx - A.cx, dy = B.cy - A.cy, d = Math.hypot(dx, dy), ux = dx / d, uy = dy / d;
+    const x0 = A.cx + ux * A.rCur * kA, y0 = A.cy + uy * A.rCur * kA, x1 = B.cx - ux * B.rCur * kB, y1 = B.cy - uy * B.rCur * kB;
+    const len = Math.hypot(x1 - x0, y1 - y0), bow = (frac(Math.sin(A.cx * 0.13 + B.cy * 0.07) * 43758.5) < 0.5 ? -1 : 1) * len * 0.14;
+    const cx = (x0 + x1) / 2 - uy * bow, cy = (y0 + y1) / 2 + ux * bow;
+    const at = (t) => {
+      const m = 1 - t;
+      const x = m * m * x0 + 2 * m * t * cx + t * t * x1, y = m * m * y0 + 2 * m * t * cy + t * t * y1;
+      let tx = 2 * m * (cx - x0) + 2 * t * (x1 - cx), ty = 2 * m * (cy - y0) + 2 * t * (y1 - cy);
+      const tl = Math.hypot(tx, ty) || 1;
+      return [x, y, tx / tl, ty / tl];
+    };
+    const path = (c) => { c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(cx, cy, x1, y1); };
+    return { len, at, path };
+  }
+  const landEdge = (r) => (r.habitat === 'island' ? 1.0 : r.habitat === 'reef' ? 1.1 : 0.95);
+  function routeFor(A, B, kA, kB) {
+    // Keep the ecotone plant on the same curve as the sandbar.
+    return A.cx < B.cx || (A.cx === B.cx && A.cy < B.cy) ? route(A, B, kA(A), kB(B)) : route(B, A, kA(B), kB(A));
+  }
+
+  // A sandbar through shallow water, lined with mangroves, wherever people bridge two communities.
+  function drawSandbar(c, A, B, count, stage) {
+    const R = routeFor(A, B, landEdge, landEdge);
+    c.lineCap = 'round';
+    const stroke = (color, w) => { c.strokeStyle = color; c.lineWidth = w; R.path(c); c.stroke(); };
+    if (stage === 'water') {
+      stroke('rgba(188,218,217,0.55)', 90 + 14 * count);
+      stroke(SEA.shallowFar, 62 + 12 * count);
+      stroke(SEA.shallowNear, 38 + 8 * count);
+      return;
+    }
+    const w = 9 + 4 * count;
+    stroke(SEA.wetSand, w + 5); stroke(SEA.sand, w);
+    const steps = Math.floor(R.len / 10), mang = [], roots = [];
+    for (let i = 1; i < steps; i++) {
+      const j = frac(Math.sin(i * 12.9898 + A.cx + B.cx) * 43758.5);
+      if (j < 0.3) continue;
+      const [px, py, tx, ty] = R.at(i / steps);
+      const side = i % 2 ? 1 : -1, off = w / 2 + 2 + j * 4;
+      const nx = -ty * side, ny = tx * side;
+      const mx = px + nx * off, my = py + ny * off, s = 3 + j * 2.4;
+      mang.push([mx, my, s], [mx + tx * s * 0.7, my + ty * s * 0.7, s * 0.72]);
+      roots.push([mx + nx * s * 0.9, my + ny * s * 0.9, s, nx, ny]);
+    }
+    c.strokeStyle = 'rgba(120,98,66,0.35)'; c.lineWidth = 0.6; c.beginPath();
+    for (const [x, y, s, nx, ny] of roots) for (let k = -1; k <= 1; k++) {
+      const bx = x - ny * k * s * 0.5, by = y + nx * k * s * 0.5;
+      c.moveTo(bx, by); c.quadraticCurveTo(bx + nx * s * 0.5, by + ny * s * 0.5, bx + nx * s * 0.9 - ny * k * s * 0.3, by + ny * s * 0.9 + nx * k * s * 0.3);
+    }
+    c.stroke();
+    crowns(c, mang, { shadow: 'rgba(24,46,32,0.24)', base: '#4f7a55', mid: '#62906a', light: '#82ab82' });
+  }
+
+  // Stepping stones through the shallows where links cross without anyone living in both places.
+  const shoalEdge = (r) => (r.habitat === 'island' ? 1.4 : r.habitat === 'reef' ? 1.15 : 1.05);
+  function drawShoal(c, A, B, n, stage) {
+    const R = routeFor(A, B, shoalEdge, shoalEdge);
+    if (stage === 'water') {
+      c.lineCap = 'round';
+      c.strokeStyle = 'rgba(200,231,226,0.45)'; c.lineWidth = 10 + 3 * n; R.path(c); c.stroke();
+      return;
+    }
+    const steps = Math.floor(R.len / 26), rocks = [];
+    for (let i = 0; i <= steps; i++) {
+      const j = frac(Math.sin(i * 78.233 + A.cy + B.cx) * 43758.5);
+      const [x, y, tx, ty] = R.at(i / steps);
+      const o = (j - 0.5) * 7;
+      rocks.push([x - ty * o, y + tx * o, 1.6 + j * 1.6]);
+      if (j > 0.55) rocks.push([x - ty * o + 3.5, y + tx * o + 1.5, 1 + j]);
+    }
+    ellipses(c, rocks.map(([x, y, s]) => [x + 0.8, y + 1, s, s * 0.8]), 'rgba(60,80,80,0.2)');
+    circles(c, rocks, '#b8ad92');
+    circles(c, rocks.map(([x, y, s]) => [x - s * 0.3, y - s * 0.3, s * 0.45]), '#d2c8ae');
+  }
+
+  // Open-water glints and depth lines.
+  const glints = [];
+  (() => {
+    const R = rng(99);
+    for (let i = 0; i < 220; i++) glints.push([-300 + R() * 2200, -250 + R() * 1600, 0.6 + R() * 0.8, R() * 6]);
+  })();
+  function drawSea(c, t) {
+    const buckets = [[], [], []];
+    for (const g of glints) {
+      const v = reduceMotion ? 0.5 : 0.5 + 0.5 * Math.sin(t / 2600 + g[3]);
+      buckets[Math.min(2, Math.floor(v * 3))].push(g);
+    }
+    buckets.forEach((list, i) => {
+      c.strokeStyle = `rgba(255,255,255,${0.1 + i * 0.12})`; c.lineWidth = 1; c.beginPath();
+      for (const [x, y, s] of list) { c.moveTo(x - 6 * s, y); c.quadraticCurveTo(x, y - 2.5 * s, x + 6 * s, y); }
+      c.stroke();
+    });
+  }
+
+  const sizeFactor = () => Math.pow(T.k, -0.4);
+
+  function update(dt, t) {
+    if (cam) {
+      const p = Math.min(1, (t - cam.t0) / cam.dur), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      T.k = cam.from.k + (cam.to.k - cam.from.k) * e;
+      T.x = cam.from.x + (cam.to.x - cam.from.x) * e;
+      T.y = cam.from.y + (cam.to.y - cam.from.y) * e;
+      if (p >= 1) cam = null;
+    }
+    for (const r of REGIONS) r.rCur += (r.rTarget - r.rCur) * Math.min(1, dt * 2.5);
+    if (reduceMotion) return;
+    for (const c of creatures.values()) {
+      c.walking = false;
+      if (c.wait > 0) { c.wait -= dt; continue; }
+      const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy);
+      if (d < 1.5) {
+        if (c.dormant) { c.wait = 9999; continue; }
+        c.wait = 2 + rand() * 5;
+        pickTarget(c);
+        continue;
+      }
+      const step = Math.min(d, c.speed * (c.dormant ? 0.5 : 1) * dt);
+      c.x += (dx / d) * step; c.y += (dy / d) * step;
+      if (Math.abs(dx) > 0.5) c.facing = dx < 0 ? -1 : 1;
+      c.phase += dt * 9;
+      c.walking = true;
+    }
+  }
+
+  function personLook(p) {
+    const y = state.year, homes = homesAt(p, y);
+    if (p.you) return { shell: '#17375e', ink: '#142b51', spiral: '#f1e2b6' };
+    const h1 = HAB[regionById[homes[0]].habitat];
+    const h2 = homes[1] ? HAB[regionById[homes[1]].habitat] : null;
+    return { shell: h1.shell, ink: h1.ink, shell2: h2 ? h2.shell : null };
+  }
+
+  function haloText(text, x, y, font, color, align = 'center') {
+    ctx.font = font; ctx.textAlign = align;
+    ctx.lineJoin = 'round'; ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(251,248,242,0.92)';
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = color; ctx.fillText(text, x, y);
+    ctx.textAlign = 'left';
+  }
+
+  function draw(t) {
+    const L = state.layers, y = state.year, sf = sizeFactor();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const sea = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.8);
+    sea.addColorStop(0, '#bfdae3'); sea.addColorStop(1, '#a4c3d3');
+    ctx.fillStyle = sea; ctx.fillRect(0, 0, W, H);
+    ctx.setTransform(dpr * T.k, 0, 0, dpr * T.k, dpr * T.x, dpr * T.y);
+
+    const live = REGIONS.filter((r) => r.rCur >= 2);
+    // Depth lines around every landform, like a chart.
+    for (const r of live) {
+      const o = OUTER[r.habitat];
+      strokeBlob(ctx, r, o * 1.28, 'rgba(255,255,255,0.16)', 1);
+      strokeBlob(ctx, r, o * 1.6, 'rgba(255,255,255,0.1)', 1);
+    }
+    drawSea(ctx, t);
+
+    const terrainAlpha = L.mycelium ? 0.4 : 1;
+    ctx.globalAlpha = terrainAlpha;
+
+    // Routes between communities: mangrove sandbars where people bridge, stepping stones where only links cross.
+    const drawnPairs = new Set();
+    const bars = [];
+    for (const e of eco.values()) {
+      const A = regionById[e.a], B = regionById[e.b];
+      drawnPairs.add(e.key);
+      if (A.rCur < 2 || B.rCur < 2) continue;
+      bars.push([A, B, e.people.length]);
+    }
+    const crossCounts = new Map();
+    const homeOf = (id) => homesAt(byId[id], y);
+    for (const [a, b] of linksAt(y)) {
+      for (const ha of homeOf(a)) for (const hb of homeOf(b)) {
+        if (ha === hb || homeOf(a).includes(hb) || homeOf(b).includes(ha)) continue;
+        const key = [ha, hb].sort().join('|');
+        crossCounts.set(key, (crossCounts.get(key) || 0) + 1);
+      }
+    }
+    const shoals = [];
+    for (const [key, n] of crossCounts) {
+      if (drawnPairs.has(key)) continue;
+      const [a, b] = key.split('|'), A = regionById[a], B = regionById[b];
+      if (A.rCur < 2 || B.rCur < 2) continue;
+      shoals.push([A, B, n]);
+    }
+
+    // Shallows first, so neighbouring water merges.
+    for (const r of live) {
+      if (r.habitat === 'wetland' && L.opportunity && y === MAX_YEAR) fillBlob(ctx, r, OUTER.wetland * 1.12, 'rgba(246,134,32,0.1)');
+      fillBlob(ctx, r, OUTER[r.habitat], SEA.shallowFar);
+      fillBlob(ctx, r, OUTER[r.habitat] * 0.9, SEA.shallowNear);
+    }
+    for (const [A, B, n] of bars) drawSandbar(ctx, A, B, n, 'water');
+    for (const [A, B, n] of shoals) drawShoal(ctx, A, B, n, 'water');
+    for (const [A, B, n] of shoals) drawShoal(ctx, A, B, n, 'land');
+    for (const [A, B, n] of bars) drawSandbar(ctx, A, B, n, 'land');
+
+    // Habitats
+    for (const r of live) {
+      const h = HAB[r.habitat];
+      drawRegionBody(ctx, r, t);
+      if (L.dormancy && r.stats.n) {
+        const share = r.stats.dormant.length / r.stats.n;
+        if (share > 0) fillBlob(ctx, r, 1.03, `rgba(226,224,216,${Math.min(0.7, share * 1.3)})`);
+      }
+      const sel = state.selected && state.selected.kind === 'region' && state.selected.id === r.id;
+      if (sel) {
+        ctx.save(); ctx.setLineDash([6 / T.k, 5 / T.k]);
+        strokeBlob(ctx, r, LABEL_AT[r.habitat] - 0.02, h.edge, 2 / T.k);
+        ctx.restore();
+      }
+      if (r.habitat === 'wetland' && L.opportunity && y === MAX_YEAR) {
+        ctx.save(); ctx.setLineDash([6, 7]);
+        ctx.lineDashOffset = reduceMotion ? 0 : -t / 120;
+        strokeBlob(ctx, r, 1.2, '#f68620', 2);
+        ctx.restore();
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Mycelium: every recorded connection, drawn fine and quiet.
+    if (L.mycelium) {
+      ctx.strokeStyle = 'rgba(23,55,94,0.32)'; ctx.lineWidth = 0.9 * sf;
+      for (const [a, b] of linksAt(y)) {
+        const ca = creatures.get(a), cb = creatures.get(b);
+        if (!ca || !cb) continue;
+        const mx = (ca.x + cb.x) / 2, my = (ca.y + cb.y) / 2, dx = cb.x - ca.x, dy = cb.y - ca.y;
+        ctx.beginPath(); ctx.moveTo(ca.x, ca.y); ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, cb.x, cb.y); ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(122,80,56,0.28)'; ctx.setLineDash([2 * sf, 3 * sf]);
+      for (const c of creatures.values()) {
+        const o = orgPos(byId[c.id].org);
+        if (!o) continue;
+        ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(o[0], o[1]); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+
+    // Landmarks (organisations)
+    for (const [oid, o] of Object.entries(ORGS)) {
+      const p = orgPos(oid);
+      if (!p) continue;
+      if (['forest', 'savannah', 'island'].includes(regionById[o.region].habitat)) ctx.fillStyle = 'rgba(232,222,190,0.92)'; else ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.beginPath(); ctx.ellipse(p[0], p[1] - 2 * sf, 12 * sf, 8 * sf, 0, 0, Math.PI * 2); ctx.fill();
+      drawCairn(ctx, p[0], p[1], sf);
+      if (state.selected && state.selected.kind === 'org' && state.selected.id === oid) ring(p[0], p[1] - 3 * sf, 12 * sf);
+    }
+
+    // Ecotone plants
+    for (const e of eco.values()) {
+      const [px, py] = ecoPoint(e);
+      const emerging = e.people.length > ((prevEco.get(e.key) || {}).people || []).length;
+      const h = drawPlant(ctx, px, py, e.people.length, sf, t, { opp: L.opportunity && emerging && y === MAX_YEAR });
+      e.hit = [px, py - h / 2, Math.max(14 * sf, h / 2 + 6 * sf)];
+      e.emerging = emerging;
+      if (state.selected && state.selected.kind === 'eco' && state.selected.id === e.key) ring(px, py - h / 2, h / 2 + 10 * sf);
+    }
+
+    // Creatures, back to front.
+    const s = 9 * sf;
+    const list = [...creatures.values()].sort((a, b) => a.y - b.y);
+    for (const c of list) {
+      const p = byId[c.id];
+      const look = personLook(p);
+      const age = t - c.born;
+      const grow = reduceMotion ? 1 : Math.min(1, age / 700);
+      const isNew = p.since === y && !p.you;
+      const sz = s * (isNew ? 0.75 : 1) * (0.2 + 0.8 * grow);
+      if (L.dormancy && c.dormant) {
+        ctx.strokeStyle = 'rgba(143,140,132,0.8)'; ctx.lineWidth = 1 * sf; ctx.setLineDash([2 * sf, 2 * sf]);
+        ctx.beginPath(); ctx.arc(c.x, c.y, sz * 1.9, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      drawCrab(ctx, c.x, c.y, sz, { ...look, facing: c.facing, phase: c.phase, walking: c.walking, dormant: c.dormant });
+      if (c.dormant) drawSleep(ctx, c.x, c.y, sz, t + c.phase * 500);
+      if (isNew) drawSparkle(ctx, c.x + sz * 1.1, c.y - sz * 1.3, sz, t);
+      if (L.opportunity && y === MAX_YEAR && p.attending) drawFlag(ctx, c.x - sz * 0.3, c.y, sz);
+      const sel = state.selected && state.selected.kind === 'person' && state.selected.id === c.id;
+      const hov = state.hover && state.hover.kind === 'person' && state.hover.id === c.id;
+      if (sel || hov) ring(c.x + sz * 0.3, c.y + sz * 0.1, sz * 2, sel ? 1 : 0.5);
+      c.hitR = sz * 1.8;
+    }
+
+    // Screen-space labels
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const labelAlpha = T.k < 1.9 ? 1 : Math.max(0, 1 - (T.k - 1.9) / 0.7);
+    if (labelAlpha > 0) {
+      ctx.globalAlpha = labelAlpha;
+      for (const r of REGIONS) {
+        if (r.rCur < 20) continue;
+        const [sx, sy] = toScreen(r.cx, r.cy - r.rCur * LABEL_AT[r.habitat]);
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+        haloText(r.name.toUpperCase(), sx, sy, '600 11.5px Inter, sans-serif', HAB[r.habitat].edge);
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+        let cap = `${HAB[r.habitat].label} · ${r.stats.n} ${r.stats.n === 1 ? 'person' : 'people'}`;
+        if (L.dormancy && r.stats.dormant.length) cap += ` · ${r.stats.dormant.length} quiet`;
+        haloText(cap, sx, sy + 16, 'italic 400 14px Newsreader, Georgia, serif', '#6b7788');
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (L.opportunity && y === MAX_YEAR) {
+      const r = regionById.halt;
+      if (r.rCur > 20) {
+        const [sx, sy] = toScreen(r.cx, r.cy + r.rCur * 1.3);
+        haloText(`${EVENT.name} · 14 Nov`, sx, sy + 16, '600 12px Inter, sans-serif', '#a85a0c');
+      }
+    }
+    // Ecotone labels
+    if (T.k >= 0.6) {
+      for (const e of eco.values()) {
+        if (!e.hit) continue;
+        const [sx, sy] = toScreen(e.hit[0], e.hit[1] + e.hit[2] + 4 * sf);
+        haloText(e.emerging ? 'Emerging ecotone' : 'Ecotone', sx, sy + 12, 'italic 400 13px Newsreader, Georgia, serif', '#3c5949');
+      }
+    }
+    // Landmark labels
+    if (T.k >= 0.95) {
+      for (const [oid, o] of Object.entries(ORGS)) {
+        const p = orgPos(oid);
+        if (!p) continue;
+        const [sx, sy] = toScreen(p[0], p[1] + 4 * sf);
+        haloText(o.name, sx, sy + 12, '500 10.5px Inter, sans-serif', '#7a6f55');
+      }
+    }
+    // Name tags
+    const showAll = L.names || T.k >= 1.6;
+    for (const c of list) {
+      const p = byId[c.id];
+      const sel = state.selected && state.selected.kind === 'person' && state.selected.id === c.id;
+      if (!(showAll || sel || (p.you && T.k >= 0.55))) continue;
+      const [sx, sy] = toScreen(c.x + 0.3 * s, c.y + s * 1.25);
+      const label = p.you ? 'You' : (T.k >= 2.2 || sel ? p.name : p.name.split(' ')[0]);
+      haloText(label, sx, sy + 11, `${p.you || sel ? 600 : 500} 11px Inter, sans-serif`, c.dormant ? '#8f8c84' : '#13233a');
+    }
+  }
+
+  function ring(x, y, r, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#376fb7'; ctx.lineWidth = 1.6 / T.k * 1.2;
+    ctx.setLineDash([4 / T.k, 3 / T.k]);
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+
+  function orgPos(oid) {
+    const o = ORGS[oid];
+    if (!o) return null;
+    const r = regionById[o.region];
+    const present = PEOPLE.some((p) => p.org === oid && p.since <= state.year);
+    if (!present || r.rCur < 20) return null;
+    const rr = r.rCur * blobR(r, o.a) * o.fr;
+    return [r.cx + Math.cos(o.a) * rr, r.cy + Math.sin(o.a) * rr];
+  }
+
+  // ───────────────────────── Hit testing ─────────────────────────
+  function hitTest(sx, sy) {
+    const [wx, wy] = toWorld(sx, sy);
+    const list = [...creatures.values()].sort((a, b) => b.y - a.y);
+    for (const c of list) if (Math.hypot(c.x - wx, c.y - wy) <= (c.hitR || 12)) return { kind: 'person', id: c.id };
+    for (const e of eco.values()) if (e.hit && Math.hypot(e.hit[0] - wx, e.hit[1] - wy) <= e.hit[2]) return { kind: 'eco', id: e.key };
+    const sf = sizeFactor();
+    for (const oid of Object.keys(ORGS)) {
+      const p = orgPos(oid);
+      if (p && Math.hypot(p[0] - wx, p[1] - 3 * sf - wy) <= 11 * sf) return { kind: 'org', id: oid };
+    }
+    for (const r of REGIONS) {
+      if (r.rCur < 2) continue;
+      const a = Math.atan2(wy - r.cy, wx - r.cx);
+      if (Math.hypot(wx - r.cx, wy - r.cy) <= r.rCur * blobR(r, a) * (r.habitat === 'island' ? 1.4 : 1.1)) return { kind: 'region', id: r.id };
+    }
+    return null;
+  }
+
+  // ───────────────────────── Pointer & keyboard ─────────────────────────
+  const tip = document.getElementById('tip');
+  const pointers = new Map();
+  let drag = null, pinch = null;
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    canvas.setPointerCapture(e.pointerId);
+    const rect = canvas.getBoundingClientRect();
+    pointers.set(e.pointerId, [e.clientX - rect.left, e.clientY - rect.top]);
+    if (pointers.size === 1) drag = { x: e.clientX, y: e.clientY, moved: 0 };
+    if (pointers.size === 2) {
+      const [p1, p2] = [...pointers.values()];
+      pinch = { d: Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) };
+      drag = null;
+    }
+    cam = null;
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+    if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [sx, sy]);
+    if (pinch && pointers.size === 2) {
+      const [p1, p2] = [...pointers.values()];
+      const d = Math.hypot(p1[0] - p2[0], p1[1] - p2[1]);
+      zoomAt((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, d / pinch.d);
+      pinch.d = d;
+      return;
+    }
+    if (drag) {
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
+      drag.x = e.clientX; drag.y = e.clientY;
+      T.x += dx; T.y += dy;
+      if (drag.moved > 4) { canvas.classList.add('is-dragging'); tip.hidden = true; }
+      return;
+    }
+    const hit = hitTest(sx, sy);
+    state.hover = hit;
+    canvas.classList.toggle('is-over', !!hit && hit.kind !== 'region');
+    if (hit && hit.kind !== 'region') {
+      tip.innerHTML = tipHTML(hit);
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      tip.style.left = Math.min(sx + 14, W - tw - 8) + 'px';
+      tip.style.top = (sy + 16) + 'px';
+    } else tip.hidden = true;
+  });
+  function endPointer(e) {
+    const rect = canvas.getBoundingClientRect();
+    const wasClick = drag && drag.moved <= 4 && pointers.size === 1;
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    canvas.classList.remove('is-dragging');
+    if (wasClick) select(hitTest(e.clientX - rect.left, e.clientY - rect.top), false);
+    if (!pointers.size) drag = null;
+  }
+  canvas.addEventListener('pointerup', endPointer);
+  canvas.addEventListener('pointercancel', (e) => { pointers.delete(e.pointerId); drag = null; pinch = null; });
+  canvas.addEventListener('pointerleave', () => { tip.hidden = true; state.hover = null; });
+  canvas.addEventListener('dblclick', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    zoomAt(e.clientX - rect.left, e.clientY - rect.top, 1.8);
+  });
+
+  stage.addEventListener('keydown', (e) => {
+    const step = 60;
+    const k = { '+': () => zoomAt(W / 2, H / 2, 1.3), '=': () => zoomAt(W / 2, H / 2, 1.3), '-': () => zoomAt(W / 2, H / 2, 1 / 1.3),
+      '0': () => animateTo(fitTransform()), ArrowLeft: () => (T.x += step), ArrowRight: () => (T.x -= step),
+      ArrowUp: () => (T.y += step), ArrowDown: () => (T.y -= step), Escape: () => select(null) }[e.key];
+    if (k) { e.preventDefault(); cam = e.key === '0' ? cam : null; k(); }
+  });
+  document.getElementById('zoomIn').onclick = () => animateTo(zoomTarget(1.5), 300);
+  document.getElementById('zoomOut').onclick = () => animateTo(zoomTarget(1 / 1.5), 300);
+  document.getElementById('zoomFit').onclick = () => animateTo(fitTransform());
+  function zoomTarget(f) {
+    const nk = Math.min(4, Math.max(0.35, T.k * f));
+    return { k: nk, x: W / 2 - (W / 2 - T.x) * (nk / T.k), y: H / 2 - (H / 2 - T.y) * (nk / T.k) };
+  }
+
+  function tipHTML(hit) {
+    const esc = (s) => s.replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+    if (hit.kind === 'person') {
+      const p = byId[hit.id];
+      const extra = isDormant(p, state.year) ? ' · quiet since ' + p.dormantFrom : '';
+      return `<strong>${esc(p.name)}</strong><span>${esc(p.role)} · ${esc(ORGS[p.org].name)}${extra}</span>`;
+    }
+    if (hit.kind === 'eco') {
+      const e = eco.get(hit.id);
+      return `<strong>${e.people.length} ${e.people.length === 1 ? 'person bridges' : 'people bridge'}</strong><span>${esc(regionById[e.a].name)} and ${esc(regionById[e.b].name)}</span>`;
+    }
+    if (hit.kind === 'org') {
+      const n = PEOPLE.filter((p) => p.org === hit.id && p.since <= state.year).length;
+      return `<strong>${esc(ORGS[hit.id].name)}</strong><span>Organisation · ${n} ${n === 1 ? 'person' : 'people'}</span>`;
+    }
+    return '';
+  }
+
+  // ───────────────────────── Selection & panel ─────────────────────────
+  const panel = document.getElementById('panel');
+
+  function select(hit, move = true) {
+    state.selected = hit;
+    renderPanel();
+    if (!hit || !move) return;
+    let x, y;
+    if (hit.kind === 'person') { const c = creatures.get(hit.id); if (c) [x, y] = [c.x, c.y]; }
+    else if (hit.kind === 'region') { const r = regionById[hit.id]; [x, y] = [r.cx, r.cy]; }
+    else if (hit.kind === 'eco') { [x, y] = ecoPoint(eco.get(hit.id)); }
+    else if (hit.kind === 'org') { const p = orgPos(hit.id); if (p) [x, y] = p; }
+    if (x != null) focusOn(x, y, hit.kind === 'region' ? Math.max(1, Math.min(T.k, 1.4)) : Math.max(T.k, 1.6));
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m]));
+
+  function chipHTML(id) {
+    const p = byId[id], y = state.year;
+    const homes = homesAt(p, y);
+    const color = p.you ? '#17375e' : HAB[regionById[homes[0]].habitat].shell;
+    const color2 = homes[1] ? HAB[regionById[homes[1]].habitat].shell : null;
+    const dot = color2 ? `background:linear-gradient(90deg, ${color2} 50%, ${color} 50%)` : `background:${color}`;
+    return `<button type="button" class="chip${isDormant(p, y) ? ' is-dormant' : ''}" data-kind="person" data-id="${id}"><i style="${dot}"></i>${esc(p.name)}</button>`;
+  }
+
+  function renderPanel() {
+    const sel = state.selected, y = state.year;
+    if (!sel) { panel.hidden = true; panel.innerHTML = ''; return; }
+    let html = '';
+    if (sel.kind === 'person') {
+      const p = byId[sel.id], homes = homesAt(p, y), dormant = isDormant(p, y);
+      const nb = neighbours(p.id, y);
+      const pills = [];
+      if (p.you) pills.push('<span class="pill">This is you</span>');
+      pills.push(dormant ? `<span class="pill dormant">Quiet since ${p.dormantFrom}</span>` : '<span class="pill">Active</span>');
+      if (homes.length > 1) pills.push('<span class="pill bridge">Bridge</span>');
+      if (p.since === y && !p.you) pills.push(`<span class="pill new">New in ${y}</span>`);
+      if (p.attending && y === MAX_YEAR) pills.push('<span class="pill opp">Going to HALT</span>');
+      const why = [];
+      const org = ORGS[p.org];
+      why.push(`Works at ${esc(org.name)}, a landmark in ${esc(regionById[org.region].name)}.`);
+      for (const h of homes) {
+        const inH = nb.filter((id) => homesAt(byId[id], y).includes(h)).length;
+        why.push(`${inH} of ${nb.length} connections are in ${esc(regionById[h].name)}.`);
+      }
+      if (homes.length > 1) why.push(`Belongs to two communities, so they spend time in the ecotone between ${esc(regionById[homes[0]].name)} and ${esc(regionById[homes[1]].name)}.`);
+      if (dormant) why.push(`No meaningful contact since ${p.dormantFrom}, so they're resting in their shell. Still connected to ${nb.length} ${nb.length === 1 ? 'person' : 'people'}.`);
+      if (!dormant && !p.you) why.push(`First connected in ${p.since}.`);
+      if (p.attending && y === MAX_YEAR) why.push(`Going to the ${EVENT.name} on ${EVENT.date}.`);
+      html = `<p class="panel-kicker">${homes.length > 1 ? 'Bridge person' : esc(HAB[regionById[homes[0]].habitat].label) + ' dweller'}</p>
+        <div><h2>${esc(p.name)}</h2><p class="role">${esc(p.role)} · ${esc(org.name)}</p></div>
+        <div class="pills">${pills.join('')}</div>
+        <div><h3>Why they live here</h3><ul>${why.map((w) => `<li>${w}</li>`).join('')}</ul></div>
+        <div><h3>Connections · ${nb.length}</h3><div class="chips">${nb.map(chipHTML).join('')}</div></div>`;
+    } else if (sel.kind === 'region') {
+      const r = regionById[sel.id], s = r.stats, h = HAB[r.habitat];
+      const orgs = [...s.orgs].map((o) => `<button type="button" class="chip" data-kind="org" data-id="${o}">${esc(ORGS[o].name)}</button>`);
+      const since = Math.min(...s.members.map((m) => (m.homesSince && m.homesSince[r.id]) || m.since));
+      html = `<p class="panel-kicker">${esc(h.label)} · ${esc(h.desc.toLowerCase())}</p>
+        <h2>${esc(r.name)}</h2>
+        <p class="body">${habitatReason(r, s)}</p>
+        <div class="stats">
+          <div class="stat"><b>${s.n}</b><span>people</span></div>
+          <div class="stat"><b>${s.links}</b><span>links</span></div>
+          <div class="stat"><b>${s.dormant.length}</b><span>quiet</span></div>
+          <div class="stat"><b>${since}</b><span>since</span></div>
+        </div>
+        <div><h3>Organisations</h3><div class="chips">${orgs.join('')}</div></div>
+        <div><h3>People</h3><div class="chips">${s.members.map((m) => chipHTML(m.id)).join('')}</div></div>`;
+    } else if (sel.kind === 'eco') {
+      const e = eco.get(sel.id);
+      const history = [];
+      for (let yy = MIN_YEAR; yy <= y; yy++) {
+        const n = ((ecotonesAt(yy).get(e.key) || {}).people || []).length;
+        if (n && (!history.length || history[history.length - 1][1] !== n)) history.push([yy, n]);
+      }
+      html = `<p class="panel-kicker">${e.emerging ? 'Emerging ecotone' : 'Ecotone'}</p>
+        <h2>${esc(regionById[e.a].name)} ↔ ${esc(regionById[e.b].name)}</h2>
+        <p class="body">${e.people.length} ${e.people.length === 1 ? 'person belongs' : 'people belong'} to both communities. The plant grows as more people bridge them.</p>
+        <div><h3>How it grew</h3><ul>${history.map(([yy, n]) => `<li>${yy}: ${n} ${n === 1 ? 'bridge' : 'bridges'}</li>`).join('')}</ul></div>
+        <div><h3>Bridge people</h3><div class="chips">${e.people.map(chipHTML).join('')}</div></div>`;
+    } else if (sel.kind === 'org') {
+      const o = ORGS[sel.id];
+      const ppl = PEOPLE.filter((p) => p.org === sel.id && p.since <= y);
+      html = `<p class="panel-kicker">Landmark · organisation</p>
+        <h2>${esc(o.name)}</h2>
+        <p class="body">Sits in ${esc(regionById[o.region].name)}. ${ppl.length} ${ppl.length === 1 ? 'person you know works' : 'people you know work'} here.</p>
+        <div><h3>People</h3><div class="chips">${ppl.map((p) => chipHTML(p.id)).join('')}</div></div>`;
+    }
+    panel.innerHTML = `<button type="button" class="panel-close" aria-label="Close">×</button>` + html;
+    panel.hidden = false;
+  }
+
+  document.addEventListener('click', (e) => {
+    const close = e.target.closest('.panel-close');
+    if (close) { select(null); return; }
+    const chip = e.target.closest('[data-kind][data-id]');
+    if (!chip) return;
+    if (state.view === 'cards' && window.matchMedia('(min-width: 721px)').matches) setView('world');
+    select({ kind: chip.dataset.kind, id: chip.dataset.id });
+  });
+
+  // ───────────────────────── Insights, cards, legend ─────────────────────────
+  function insightsFor(y) {
+    const out = [];
+    const vis = REGIONS.filter((r) => r.stats.n);
+    const top = [...vis].sort((a, b) => b.stats.links - a.stats.links)[0];
+    if (top) out.push({ text: `${top.name} is your most connected community: ${top.stats.links} links among ${top.stats.n} people.`, sel: { kind: 'region', id: top.id }, color: HAB[top.habitat].shell });
+    if (y - 3 >= MIN_YEAR) {
+      const growth = vis.map((r) => [r, r.stats.n - membersAt(r.id, y - 3).length]).sort((a, b) => b[1] - a[1])[0];
+      if (growth && growth[1] > 0) {
+        const before = membersAt(growth[0].id, y - 3).length;
+        out.push({ text: before ? `${growth[0].name} has grown fastest since ${y - 3}, from ${before} to ${growth[0].stats.n} people.` : `${growth[0].name} appeared after ${y - 3} and now has ${growth[0].stats.n} people.`, sel: { kind: 'region', id: growth[0].id }, color: HAB[growth[0].habitat].shell });
+      }
+    }
+    const quiet = vis.filter((r) => r.stats.dormant.length >= 2).sort((a, b) => b.stats.dormant.length / b.stats.n - a.stats.dormant.length / a.stats.n)[0];
+    if (quiet) out.push({ text: `${quiet.name} has gone quiet: ${quiet.stats.dormant.length} of ${quiet.stats.n} people haven't been in touch for over a year.`, sel: { kind: 'region', id: quiet.id }, color: '#cbc8bf' });
+    const strongest = [...eco.values()].sort((a, b) => b.people.length - a.people.length)[0];
+    if (strongest) out.push({ text: `${strongest.people.length} ${strongest.people.length === 1 ? 'person bridges' : 'people bridge'} ${regionById[strongest.a].name} and ${regionById[strongest.b].name}${strongest.people.length > ((prevEco.get(strongest.key) || {}).people || []).length ? ', and that link is still growing' : ''}.`, sel: { kind: 'eco', id: strongest.key }, color: '#8fb59a' });
+    const island = regionById.neuro;
+    if (island.stats.n) {
+      const routes = island.stats.out.length;
+      out.push({ text: `${island.name} stays specialised, with ${routes === 0 ? 'no routes' : routes === 1 ? 'one route' : routes + ' routes'} out to the rest of your network.`, sel: { kind: 'region', id: 'neuro' }, color: HAB.island.shell });
+    }
+    if (y === MAX_YEAR) {
+      const going = PEOPLE.filter((p) => p.attending);
+      const quietGoing = going.filter((p) => isDormant(p, y));
+      out.push({ text: `The ${EVENT.name} on 14 November brings together ${going.length} people you know${quietGoing.length ? `, including ${quietGoing.map((p) => p.name).join(', ')}, who you haven't spoken to since ${quietGoing[0].dormantFrom}` : ''}.`, sel: { kind: 'region', id: 'halt' }, color: '#f68620' });
+    }
+    return out;
+  }
+
+  function renderInsights() {
+    const y = state.year;
+    document.getElementById('insightsTitle').textContent = `What the map says in ${y}`;
+    const list = insightsFor(y);
+    const ul = document.getElementById('insights');
+    ul.innerHTML = list.map((it, i) => `<li><button type="button" data-insight="${i}"><i style="background:${it.color}"></i><span>${esc(it.text)}</span></button></li>`).join('');
+    ul.querySelectorAll('[data-insight]').forEach((b) => {
+      b.onclick = () => {
+        const it = list[+b.dataset.insight];
+        if (state.view === 'cards' && window.matchMedia('(min-width: 721px)').matches) setView('world');
+        select(it.sel);
+      };
+    });
+  }
+
+  function renderCards() {
+    const y = state.year;
+    const cards = document.getElementById('cards');
+    const regions = REGIONS.filter((r) => r.stats.n).sort((a, b) => b.stats.n - a.stats.n);
+    let html = regions.map((r) => {
+      const h = HAB[r.habitat], s = r.stats;
+      return `<article class="card" style="--hab:${h.shell};--hab-ink:${h.edge}">
+        <div class="card-top"><em>${h.label}</em><span>${s.n} people${s.dormant.length ? ` · ${s.dormant.length} quiet` : ''}</span></div>
+        <h3>${esc(r.name)}</h3>
+        <p>${habitatReason(r, s)}</p>
+        <div class="chips">${s.members.map((m) => chipHTML(m.id)).join('')}</div>
+      </article>`;
+    }).join('');
+    html += [...eco.values()].map((e) => `<article class="card" style="--hab:#8fb59a;--hab-ink:#3c5949">
+        <div class="card-top"><em>${e.people.length > ((prevEco.get(e.key) || {}).people || []).length ? 'Emerging ecotone' : 'Ecotone'}</em><span>${e.people.length} ${e.people.length === 1 ? 'bridge' : 'bridges'}</span></div>
+        <h3>${esc(regionById[e.a].name)} ↔ ${esc(regionById[e.b].name)}</h3>
+        <p>People who belong to both communities.</p>
+        <div class="chips">${e.people.map(chipHTML).join('')}</div>
+      </article>`).join('');
+    cards.innerHTML = html;
+  }
+
+  function renderLegend() {
+    const items = [
+      { t: 'Active', d: 'Walks around its community', f: (c) => drawCrab(c, 16, 18, 8, { shell: HAB.forest.shell, ink: HAB.forest.ink, facing: 1, phase: 1, walking: true }) },
+      { t: 'Quiet', d: 'No contact for a year or more, tucked in its shell', f: (c) => { drawCrab(c, 18, 20, 8, { shell: HAB.savannah.shell, ink: HAB.savannah.ink, facing: 1, dormant: true }); drawSleep(c, 18, 20, 8, 0); } },
+      { t: 'Bridge', d: 'Two-tone shell, walks between two communities', f: (c) => drawCrab(c, 16, 18, 8, { shell: HAB.forest.shell, shell2: HAB.reef.shell, ink: HAB.forest.ink, facing: 1, phase: 2 }) },
+      { t: 'New this year', d: 'Smaller, with a sparkle', f: (c) => { drawCrab(c, 16, 20, 6, { shell: HAB.reef.shell, ink: HAB.reef.ink, facing: 1, phase: 0 }); drawSparkle(c, 24, 10, 6, 0); } },
+      { t: 'Ecotone plant', d: 'Grows as more people bridge two communities', f: (c) => drawPlant(c, 17, 32, 3, 0.95, 0, {}) },
+      { t: 'Landmark', d: 'An organisation people work at', f: (c) => drawCairn(c, 20, 26, 1.8) }
+    ];
+    const el = document.getElementById('legend');
+    el.innerHTML = items.map((it, i) => `<div class="legend-item"><canvas width="80" height="68" data-l="${i}" aria-hidden="true"></canvas><div><b>${it.t}</b><span>${it.d}</span></div></div>`).join('');
+    el.querySelectorAll('canvas').forEach((cv) => {
+      const c = cv.getContext('2d');
+      c.scale(2, 2);
+      items[+cv.dataset.l].f(c);
+    });
+    document.getElementById('habLegend').innerHTML = Object.values(HAB).map((h) =>
+      `<span class="hab"><i style="background:${h.fill};border-color:${h.edge}"></i><em>${h.label}</em></span>`).join('');
+  }
+
+  // ───────────────────────── Controls ─────────────────────────
+  const yearInput = document.getElementById('year');
+  const yearOut = document.getElementById('yearOut');
+  document.getElementById('ticks').innerHTML = Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, i) => {
+    const y = MIN_YEAR + i;
+    return `<span${y === MAX_YEAR ? ' class="now"' : ''}>${y === MAX_YEAR ? 'Now' : "'" + String(y).slice(2)}</span>`;
+  }).join('');
+
+  function setYear(y) {
+    state.year = y;
+    yearInput.value = y;
+    yearOut.innerHTML = `${y}<small>${y === MAX_YEAR ? 'Now' : 'History'}</small>`;
+    computeYear();
+  }
+  yearInput.addEventListener('input', () => { stopPlay(); setYear(+yearInput.value); });
+
+  let playTimer = null;
+  const playBtn = document.getElementById('play');
+  const playIcon = document.getElementById('playIcon');
+  function stopPlay() {
+    clearTimeout(playTimer); playTimer = null;
+    playIcon.innerHTML = '<path d="M4 2.5v11l9-5.5z"/>';
+    playBtn.setAttribute('aria-label', 'Play history');
+  }
+  function stepPlay() {
+    if (state.year >= MAX_YEAR) { stopPlay(); return; }
+    setYear(state.year + 1);
+    playTimer = setTimeout(stepPlay, 1400);
+  }
+  playBtn.onclick = () => {
+    if (playTimer) { stopPlay(); return; }
+    playIcon.innerHTML = '<path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/>';
+    playBtn.setAttribute('aria-label', 'Pause history');
+    if (state.year >= MAX_YEAR) setYear(MIN_YEAR);
+    playTimer = setTimeout(stepPlay, 1400);
+  };
+
+  document.querySelectorAll('.toggle').forEach((b) => {
+    b.onclick = () => {
+      const k = b.dataset.layer;
+      state.layers[k] = !state.layers[k];
+      b.setAttribute('aria-pressed', String(state.layers[k]));
+      renderUI();
+    };
+  });
+
+  function setView(v) {
+    state.view = v;
+    document.getElementById('viewWorld').setAttribute('aria-pressed', String(v === 'world'));
+    document.getElementById('viewCards').setAttribute('aria-pressed', String(v === 'cards'));
+    stage.hidden = v !== 'world';
+    document.getElementById('cards').hidden = v !== 'cards';
+    if (v === 'world') requestAnimationFrame(resize);
+  }
+  document.getElementById('viewWorld').onclick = () => setView('world');
+  document.getElementById('viewCards').onclick = () => setView('cards');
+
+  function renderUI() {
+    const note = document.getElementById('layerNote');
+    if (state.layers.opportunity && state.year !== MAX_YEAR) {
+      note.textContent = 'Opportunity shows what is coming up, so it only appears when the timeline is on Now.';
+      note.hidden = false;
+    } else note.hidden = true;
+    renderInsights();
+    renderCards();
+    renderPanel();
+  }
+
+  // ───────────────────────── Loop ─────────────────────────
+  let raf = 0, last = 0;
+  function frame(t) {
+    const dt = Math.min(0.05, (t - last) / 1000 || 0);
+    last = t;
+    update(dt, t);
+    draw(t);
+    raf = requestAnimationFrame(frame);
+  }
+  function start() { if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+  function stop() { cancelAnimationFrame(raf); raf = 0; }
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stop(); if (playTimer) stopPlay(); } else start();
+  });
+
+  new ResizeObserver(() => resize()).observe(stage);
+  renderLegend();
+  setYear(MAX_YEAR);
+  for (const r of REGIONS) r.rCur = r.rTarget;
+  resize();
+  Object.assign(T, fitTransform());
+  fitted = true;
+  start();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(renderLegend);
+})();
+</script>
