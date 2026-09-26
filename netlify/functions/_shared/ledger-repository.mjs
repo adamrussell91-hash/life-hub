@@ -9,12 +9,14 @@ import {
 } from './ledger-schema.mjs';
 import {
   getJSON,
+  LEDGER_ITEM_PREFIX,
   ledgerItemByPersonKey,
   ledgerItemBySourceKey,
   ledgerItemKey,
   listLedgerItemKeysForPerson,
   setJSON
 } from './professional-blobs.mjs';
+import { isIndexKey, listBlobKeys } from './blobs-list.mjs';
 
 function validationError(code, message) {
   return Object.assign(new Error(message), { status: 400, code });
@@ -105,9 +107,29 @@ export function createLedgerItemRepository(deps = {}) {
     return projectLedgerItem(updated);
   }
 
+  /**
+   * Open promises due between two YYYY-MM-DD dates, inclusive, for the
+   * calendar Due row. Scans records: a few hundred items at most. Add a by-due
+   * index only if this shows up in timings.
+   */
+  async function listDueBetween(from, to, { status = 'open' } = {}) {
+    const keys = (await listBlobKeys(store, LEDGER_ITEM_PREFIX)).filter((key) => !isIndexKey(key));
+    const records = [];
+    for (const key of keys) {
+      const record = parseLedgerItemRecord(await getJSON(store, key));
+      if (!record || !record.due) continue;
+      if (record.due < from || record.due > to) continue;
+      if (status && record.status !== status) continue;
+      records.push(record);
+    }
+    records.sort((a, b) => a.due.localeCompare(b.due) || Date.parse(a.created_at) - Date.parse(b.created_at));
+    return records.map(projectLedgerItem);
+  }
+
   return {
     listForPerson,
     createItem,
-    patchItem
+    patchItem,
+    listDueBetween
   };
 }
