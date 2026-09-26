@@ -249,9 +249,15 @@ function paintKey(inp) {
   const ghosts = Array.isArray(inp?.ghosts)
     ? inp.ghosts.map(ghost => `${ghost?.id}:${ghost?.settled ?? ghost?.status ?? ''}`).join(',')
     : '';
+  // Terms arrive async via hub-prefs. An early mount with [] must remount once they land —
+  // otherwise Week gets T3 labels while Term stays on the empty-terms fallback window.
+  const terms = Array.isArray(inp?.terms)
+    ? inp.terms.map(term => `${term?.term ?? ''}:${term?.starts_on ?? ''}:${term?.ends_on ?? ''}`).join(',')
+    : '';
   return [
     inp?.today ?? '',
     ghosts,
+    terms,
     riverData?.TODAY ?? '',
     riverData?.ZOOMS?.term?.from ?? '',
     riverData?.ZOOMS?.term?.to ?? '',

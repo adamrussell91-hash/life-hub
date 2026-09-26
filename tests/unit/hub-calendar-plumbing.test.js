@@ -55,6 +55,14 @@ test('open-in-hub maps domains and builds full-nav Open in links', () => {
     openInHubLinkHtml({ kind: 'task' }, { hub: 'tasks', routeFor: () => '#/task/x' }),
     ''
   );
+  // Visual-seed foreign chips often have kind only — still get a landing Open in link.
+  const pd = openInHubLinkHtml(
+    { kind: 'professional', id: 'resource-day' },
+    { hub: 'teaching', routeFor: () => null }
+  );
+  assert.match(pd, /Open in Professional/);
+  assert.match(pd, /data-part="open-in-hub"/);
+  assert.match(pd, /href="\/professional\/#\/calendar"/);
 });
 
 test('calendar zoom href/parse per hub; month redirects to week', () => {
