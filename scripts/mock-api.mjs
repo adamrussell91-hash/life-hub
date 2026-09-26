@@ -382,9 +382,16 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           scheduled_lessons: [],
           scope_sequences: [],
           media: [],
-          schedule_anchor_date: getSydneyDateKey(clock.now())
+          schedule_anchor_date: getSydneyDateKey(new Date(clock.now()))
         }
       }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/schedule-projections') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty projections so Professional kit calendar mounts under the mock server.
+      json(response, 200, { ok: true, data: { projections: [] } }, PRIVATE_HEADERS);
       return true;
     }
 

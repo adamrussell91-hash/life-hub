@@ -1,5 +1,5 @@
 /**
- * Professional hub calendar adapter — default filter, band fills, routeFor, mount only.
+ * Professional hub calendar adapter — default filter, band fills, routeFor, mount.
  * No calendar CSS or renderer logic outside packages/design-kit.
  */
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
@@ -10,6 +10,11 @@ import { eventRoute, meetingRoute } from '@/app/router';
 export const PROFESSIONAL_CALENDAR_FILLS = {
   school: 'meetings'
 } as const;
+
+export type ProfessionalCalendarMountOptions = {
+  /** When true, zoom follows `#/calendar/<zoom>`. Home embed uses local zoom. */
+  routeZoom?: boolean;
+};
 
 export function professionalRouteFor(item: unknown): string | null {
   const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
@@ -22,7 +27,10 @@ export function professionalRouteFor(item: unknown): string | null {
   if (type === 'professional_meeting' && id) return meetingRoute(id);
   if (type === 'professional_event' && id) return eventRoute(id);
   if ((type === 'task' || type === 'work_block') && id) return `/tasks/#/task/${encodeURIComponent(id)}`;
-  if (type === 'scheduled_lesson' && id) return `/teaching/lessons/${encodeURIComponent(id)}`;
+  if (type === 'scheduled_lesson' && (record?.lesson_id || id)) {
+    const lessonId = typeof record?.lesson_id === 'string' ? record.lesson_id : id;
+    return `/teaching/lessons/${encodeURIComponent(String(lessonId))}`;
+  }
   if (type === 'knowledge_page' && id) return `/knowledge/#page/${encodeURIComponent(id)}`;
   return null;
 }
@@ -33,9 +41,14 @@ function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 
 let handle: HubCalendarHandle | null = null;
 
-/** Mount the locked kit calendar. Zoom follows `#/calendar/<zoom>`. */
-export function mountProfessionalCalendar(host: HTMLElement): HubCalendarHandle {
+export function mountProfessionalCalendar(
+  host: HTMLElement,
+  options: ProfessionalCalendarMountOptions = {}
+): HubCalendarHandle {
   handle?.destroy();
+  const routeZoom = options.routeZoom === true;
+  let localZoom = 'week';
+
   handle = mountHubCalendar(host, {
     hub: 'professional',
     fills: { ...PROFESSIONAL_CALENDAR_FILLS },
@@ -43,10 +56,22 @@ export function mountProfessionalCalendar(host: HTMLElement): HubCalendarHandle 
     routeFor: professionalRouteFor,
     apiFetch,
     getZoom: () =>
-      parseCalendarZoom({ pathname: location.pathname, hash: location.hash }, 'professional') || 'week',
+      routeZoom
+        ? parseCalendarZoom({ pathname: location.pathname, hash: location.hash }, 'professional') ||
+          'week'
+        : localZoom,
     setZoom: (zoom) => {
-      const href = calendarZoomHref('professional', normalizeCalendarZoom(zoom));
-      if (location.hash !== href) location.hash = href;
+      const next = normalizeCalendarZoom(zoom);
+      if (routeZoom) {
+        const href = calendarZoomHref('professional', next);
+        if (location.hash !== href) location.hash = href;
+      } else {
+        localZoom = next;
+      }
+    },
+    onNavigate: (href) => {
+      if (href.startsWith('#')) location.hash = href;
+      else location.assign(href);
     }
   });
   return handle;

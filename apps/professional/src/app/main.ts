@@ -119,7 +119,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       host.className = 'pro-calendar-host';
       host.style.minWidth = '0';
       shell.canvas.append(host);
-      calendarHandle = mountProfessionalCalendar(host);
+      calendarHandle = mountProfessionalCalendar(host, { routeZoom: true });
       return;
     }
     if (route.name === 'people') {
