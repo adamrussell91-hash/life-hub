@@ -2572,6 +2572,7 @@ export function createChatHandler({
                 const result = await executeClareWork(event.name, event.input ?? {}, {
                   tasks: hubTasks,
                   projects: hubProjects,
+                  goals: hubGoals,
                   lessons: hubLessons,
                   workBlocks: hubWorkBlocks,
                   work_blocks: hubWorkBlocks,

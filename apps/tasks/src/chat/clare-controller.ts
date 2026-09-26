@@ -923,6 +923,30 @@ export function createClareChatController({
         setCalendarGhostBlocksForProposal(cardPendingId, ghostsFromBlocks(rows));
       },
       onClose: (payloadClose: unknown) => runBoundConfirm(payloadClose),
+      onOrphanLink:
+        type === 'review-progress'
+          ? (taskId: string, goalId: string | null, links: Record<string, string | null>) => {
+              const reviewId =
+                typeof payload.reviewId === 'string' && payload.reviewId.trim()
+                  ? payload.reviewId.trim()
+                  : 'weekly_review';
+              void clareWorkChat({
+                tool: 'weekly_review',
+                slug: 'clare',
+                input: {
+                  review_id: reviewId,
+                  advance: false,
+                  orphan_links: links
+                }
+              }).catch((err) => {
+                const message =
+                  err instanceof Error ? err.message : 'Could not save goal link.';
+                showChatError(root, message);
+              });
+              void taskId;
+              void goalId;
+            }
+          : undefined,
       // Confirm-stage Weekly Review: generate proposal via tool runtime — not a second Confirm path.
       onGenerateProposal:
         type === 'review-progress'

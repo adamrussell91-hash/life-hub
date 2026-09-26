@@ -50,6 +50,10 @@ function shapePayload(toolName, cardType, result, pendingId) {
         task_id: change.task_id ?? null,
         title: change.title ?? null
       })),
+      goalsReview: result.state.goals_review ?? [],
+      orphanCompletions: result.state.orphan_completions ?? [],
+      orphanLinks: result.state.orphan_links ?? {},
+      goalChips: (result.state.goals_review ?? []).map((r) => ({ id: r.goal_id, title: r.title })),
       reviewId: result.workflow_id || result.state.id || null
     };
   }

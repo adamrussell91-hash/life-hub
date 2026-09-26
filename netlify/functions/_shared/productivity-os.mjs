@@ -1233,6 +1233,7 @@ export const WEEKLY_REVIEW_STAGES = [
   'upcoming_calendar',
   'waiting',
   'projects',
+  'goals',
   'someday',
   'build_week',
   'confirm'
@@ -1248,6 +1249,9 @@ export function createWeeklyReview(id = `wr_${Date.now()}`) {
     upcoming_calendar_notes: [],
     waiting: [],
     project_health: [],
+    goals_review: [],
+    orphan_completions: [],
+    orphan_links: {},
     someday_due: [],
     schedule: null,
     pending_changes: [],
@@ -1257,6 +1261,62 @@ export function createWeeklyReview(id = `wr_${Date.now()}`) {
     status: 'in_progress',
     updated_at: new Date().toISOString()
   };
+}
+
+function mondayOfKey(key) {
+  const dow = (new Date(`${key}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const d = new Date(`${key}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+/** G-38: active goals with this week's lead-measure counts. */
+export function goalsStageRows(goals = [], projects = [], tasks = [], today, verdicts = {}) {
+  const monday = mondayOfKey(today);
+  const sunday = addDaysKey(monday, 6);
+  return (goals ?? [])
+    .filter((g) => g && g.status === 'active')
+    .map((g) => {
+      const hostedProjects = (projects ?? []).filter((p) => p && p.parent_goal_id === g.id && p.status !== 'archived');
+      const projectIds = new Set(hostedProjects.map((p) => p.id));
+      const hosted = (tasks ?? []).filter((t) =>
+        t && t.bucket !== 'someday' &&
+        (t.parent_goal_id === g.id || (typeof t.parent_project_id === 'string' && projectIds.has(t.parent_project_id)))
+      );
+      const count = hosted.filter((t) => {
+        if (typeof t.completed_at !== 'string') return false;
+        const key = t.completed_at.slice(0, 10);
+        return key >= monday && key <= sunday;
+      }).length + (g.week_log?.[monday]?.manual ?? 0);
+      return {
+        goal_id: g.id,
+        title: g.title,
+        count,
+        per_week: g.lead_measure?.per_week ?? null,
+        verdict: verdicts[g.id] ?? ''
+      };
+    });
+}
+
+/** G-39: completed this week with no goal. */
+export function orphanCompletionsThisWeek(goals = [], projects = [], tasks = [], today) {
+  const monday = mondayOfKey(today);
+  const sunday = addDaysKey(monday, 6);
+  const hostedProjectIds = new Set(
+    (projects ?? [])
+      .filter((p) => p && (goals ?? []).some((g) => g.id === p.parent_goal_id && g.status === 'active'))
+      .map((p) => p.id)
+  );
+  return (tasks ?? [])
+    .filter((t) => {
+      if (!t?.completed_at) return false;
+      const key = String(t.completed_at).slice(0, 10);
+      if (key < monday || key > sunday) return false;
+      if (t.parent_goal_id) return false;
+      if (t.parent_project_id && hostedProjectIds.has(t.parent_project_id)) return false;
+      return true;
+    })
+    .map((t) => ({ task_id: t.id, title: t.title }));
 }
 
 function advanceWeekly(state, stage) {
@@ -1281,6 +1341,9 @@ export function buildWeeklyPendingChanges(state) {
     : {};
   const somedayDecisions = state.someday_decisions && typeof state.someday_decisions === 'object'
     ? state.someday_decisions
+    : {};
+  const orphanLinks = state.orphan_links && typeof state.orphan_links === 'object'
+    ? state.orphan_links
     : {};
 
   const capture = (state.capture?.items ?? [])
@@ -1402,7 +1465,30 @@ export function buildWeeklyPendingChanges(state) {
       confirmable: true
     }));
 
-  return [...capture, ...nextActions, ...waiting, ...someday, ...schedule];
+  const goalLinks = Object.entries(orphanLinks)
+    .filter(([, goalId]) => goalId)
+    .map(([taskId, goalId]) => ({
+      id: `orphan:${taskId}`,
+      kind: 'goal_link',
+      task_id: taskId,
+      summary: `Link completed task → goal ${goalId}`,
+      selected: true,
+      confirmable: true,
+      action: 'set_parent_goal',
+      destination: goalId
+    }));
+  const dismissedOrphans = Object.entries(orphanLinks)
+    .filter(([, goalId]) => goalId === null)
+    .map(([taskId]) => ({
+      id: `orphan-dismiss:${taskId}`,
+      kind: 'goal_link_dismiss',
+      task_id: taskId,
+      summary: `No goal for completed task ${taskId} (this week)`,
+      selected: true,
+      confirmable: true
+    }));
+
+  return [...capture, ...nextActions, ...waiting, ...someday, ...goalLinks, ...dismissedOrphans, ...schedule];
 }
 
 export function runWeeklyReviewStage(state, input) {
@@ -1420,6 +1506,10 @@ export function runWeeklyReviewStage(state, input) {
     someday_decisions: {
       ...(state.someday_decisions && typeof state.someday_decisions === 'object' ? state.someday_decisions : {}),
       ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+    },
+    orphan_links: {
+      ...(state.orphan_links && typeof state.orphan_links === 'object' ? state.orphan_links : {}),
+      ...(input.orphan_links && typeof input.orphan_links === 'object' ? input.orphan_links : {})
     }
   };
   const stage = state.current_stage;
@@ -1456,6 +1546,23 @@ export function runWeeklyReviewStage(state, input) {
         project_health: inspectActiveProjectsHealth(input.projects ?? [], input.tasks ?? [])
       },
       'projects'
+    );
+  }
+  if (stage === 'goals') {
+    const today = input.today_key ?? new Date().toISOString().slice(0, 10);
+    const goalsReview = Array.isArray(input.goals_review)
+      ? input.goals_review
+      : goalsStageRows(input.goals ?? [], input.projects ?? [], input.tasks ?? [], today, input.verdicts ?? {});
+    const orphans = Array.isArray(input.orphan_completions)
+      ? input.orphan_completions
+      : orphanCompletionsThisWeek(input.goals ?? [], input.projects ?? [], input.tasks ?? [], today);
+    return advanceWeekly(
+      {
+        ...state,
+        goals_review: goalsReview,
+        orphan_completions: orphans
+      },
+      'goals'
     );
   }
   if (stage === 'someday') {
