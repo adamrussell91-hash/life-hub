@@ -72,7 +72,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 /* ---------- sources ---------- */
 .cal__sources{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-bottom:var(--space-3)}
 .cal-src{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:var(--weight-medium);padding:3px 10px 3px 8px;border-radius:var(--radius-full);background:var(--glass);border:1px solid var(--line);color:var(--ink)}
-.cal-src i{width:8px;height:8px;border-radius:3px;background:var(--k-stripe)}
+.cal-src i{width:8px;height:8px;border-radius:50%;background:var(--k-stripe)}
 .cal-src--ambient{background:transparent;border-style:dashed;color:var(--muted)}
 .cal-src--corey{color:var(--pastel-peach-ink)}
 
@@ -617,7 +617,7 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
     return { top: y0 + 1, height: Math.max(4, y1 - y0 - 2) };
   }
 
-  // apps/life/js/app/capacity-model.js
+  // packages/design-kit/js/calendar/capacity-model.js
   var CAPACITY = Object.freeze({
     baseline: 80,
     floor: 10,
@@ -789,14 +789,12 @@ ${body ?? ""}`;
     return text;
   }
 
-  // apps/life/js/core/central-node-write.js
+  // packages/design-kit/js/calendar/ghost-writes.js
   var SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   function formatLogDate(dateKey) {
     const [, month, day] = dateKey.split("-").map(Number);
     return `${day} ${SHORT_MONTHS[month - 1]}`;
   }
-
-  // apps/life/js/app/ghost-writes.js
   var GHOST_AGENTS = Object.freeze({
     sara: "Sara",
     hammond: "Hammond",
@@ -806,7 +804,16 @@ ${body ?? ""}`;
     penelope: "Penelope",
     vera: "Vera"
   });
-  var GHOST_KINDS = Object.freeze(["skip_workout", "bedtime", "protect_block", "move_task", "create_task", "draft_message"]);
+  var GHOST_KINDS = Object.freeze([
+    "skip_workout",
+    "bedtime",
+    "protect_block",
+    "move_task",
+    "create_task",
+    "draft_message",
+    "split_task",
+    "goal_rest_weeks"
+  ]);
   var DATE_KEY2 = /^\d{4}-\d{2}-\d{2}$/;
   var HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   function short(dateKey) {
@@ -843,7 +850,7 @@ ${body ?? ""}`;
     if (typeof ghost.id !== "string" || !ghost.id) throw new TypeError("Ghost needs an id");
     if (!(ghost.agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${ghost.agent}`);
     if (!GHOST_KINDS.includes(ghost.kind)) throw new TypeError(`Unknown ghost kind: ${ghost.kind}`);
-    const dated = !["move_task", "create_task", "draft_message"].includes(ghost.kind);
+    const dated = !["move_task", "create_task", "draft_message", "split_task", "goal_rest_weeks"].includes(ghost.kind);
     if (dated && !DATE_KEY2.test(ghost.date ?? "")) throw new TypeError("Ghost needs a date (YYYY-MM-DD)");
     if (ghost.kind === "create_task") {
       if (!oneLine(ghost.title)) throw new TypeError("create_task needs a title");
@@ -862,6 +869,21 @@ ${body ?? ""}`;
     if (ghost.kind === "move_task") {
       if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("move_task needs taskId");
       if (!DATE_KEY2.test(ghost.to ?? "") || !DATE_KEY2.test(ghost.from ?? "")) throw new TypeError("move_task needs from and to dates");
+    }
+    if (ghost.kind === "split_task") {
+      if (typeof ghost.taskId !== "string" || !ghost.taskId) throw new TypeError("split_task needs taskId");
+      if (!Array.isArray(ghost.steps) || ghost.steps.length < 1 || ghost.steps.length > 6 || ghost.steps.some((step) => !oneLine(step))) {
+        throw new TypeError("split_task needs 1\u20136 step titles");
+      }
+    }
+    if (ghost.kind === "goal_rest_weeks") {
+      if (typeof ghost.goalId !== "string" || !ghost.goalId) throw new TypeError("goal_rest_weeks needs goalId");
+      if (!Array.isArray(ghost.weeks) || !ghost.weeks.length || ghost.weeks.some((week) => !DATE_KEY2.test(week ?? ""))) {
+        throw new TypeError("goal_rest_weeks needs weeks (YYYY-MM-DD)");
+      }
+      if (!Array.isArray(ghost.rest_weeks) || ghost.weeks.some((week) => !ghost.rest_weeks.includes(week))) {
+        throw new TypeError("goal_rest_weeks needs rest_weeks containing weeks");
+      }
     }
     return ghost;
   }
@@ -928,7 +950,15 @@ ${body ?? ""}`;
       }
       case "create_task": {
         const title = oneLine(ghost.title);
-        const body = { title, due_date: ghost.due, status: "open", ...ghost.notes ? { notes: oneLine(ghost.notes) } : {}, ...ghost.source ? { source: ghost.source } : {} };
+        const body = {
+          title,
+          due_date: ghost.due,
+          status: "open",
+          ...ghost.notes ? { notes: oneLine(ghost.notes) } : {},
+          ...ghost.source ? { source: ghost.source } : {},
+          ...ghost.goalId ? { parent_goal_id: ghost.goalId } : {},
+          ...ghost.domain ? { domain: ghost.domain } : {}
+        };
         steps.push({ target: "tasks", method: "POST", body });
         steps.push(recentAction(actedOn, who, `added \u201C${title}\u201D due ${short(ghost.due)}`));
         receipt = `${who} \u2192 Tasks: \u201C${title}\u201D, due ${formatDisplayDate(ghost.due)} (the last safe day).`;
@@ -937,6 +967,36 @@ ${body ?? ""}`;
       case "draft_message": {
         steps.push({ target: "draft", to: oneLine(ghost.to), text: String(ghost.text).trim() });
         receipt = `Draft ready for ${oneLine(ghost.to)}. Nothing sent.`;
+        break;
+      }
+      case "split_task": {
+        const parent = oneLine(ghost.title) || ghost.taskId;
+        ghost.steps.forEach((stepTitle, index) => {
+          steps.push({
+            target: "tasks",
+            method: "POST",
+            suffix: `s${index + 1}`,
+            body: {
+              title: oneLine(stepTitle),
+              kind: "step",
+              parent_task_id: ghost.taskId,
+              step_order: index + 1,
+              status: "open",
+              ...ghost.goalId ? { parent_goal_id: ghost.goalId } : {},
+              ...ghost.domain ? { domain: ghost.domain } : {}
+            }
+          });
+        });
+        steps.push(recentAction(actedOn, who, `split \u201C${parent}\u201D into ${ghost.steps.length} steps`));
+        receipt = `${who} \u2192 Tasks: \u201C${parent}\u201D now has ${ghost.steps.length} steps.`;
+        break;
+      }
+      case "goal_rest_weeks": {
+        const title = oneLine(ghost.title) || ghost.goalId;
+        const list = ghost.weeks.map(short).join(", ");
+        steps.push({ target: "tasks", collection: "goals", method: "PATCH", id: ghost.goalId, body: { rest_weeks: [...ghost.rest_weeks] } });
+        steps.push(recentAction(actedOn, who, `planned rest for \u201C${title}\u201D: weeks of ${list}`));
+        receipt = `${who} \u2192 Goals: \u201C${title}\u201D rests the weeks of ${list}. Those weeks won't count as misses.`;
         break;
       }
       default:

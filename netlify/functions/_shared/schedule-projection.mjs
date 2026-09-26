@@ -143,7 +143,8 @@ export function lifeCalendarEventFromProjection(projection) {
       status: projection.status,
       source_ref: projection.source_ref,
       href: projection.href ?? null,
-      all_day: Boolean(projection.all_day)
+      all_day: Boolean(projection.all_day),
+      event_type: projection.event_type ?? null
     },
     body: ''
   };

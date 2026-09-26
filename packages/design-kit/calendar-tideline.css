@@ -55,7 +55,7 @@ img.cal-av{padding:0;background:var(--navy)}
 .cal-src{display:inline-flex;align-items:center;gap:6px;font-size:var(--text-xs);font-weight:var(--weight-medium);padding:3px 10px 3px 8px;border-radius:var(--radius-full);background:var(--glass);border:1px solid var(--line);color:var(--ink);cursor:pointer;font:inherit}
 button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-src:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
-.cal-src i{width:8px;height:8px;border-radius:3px;background:var(--k-stripe);flex:none;box-sizing:border-box}
+.cal-src i{width:8px;height:8px;border-radius:50%;background:var(--k-stripe);flex:none;box-sizing:border-box}
 .cal-src.is-off{color:var(--muted);background:transparent}
 .cal-src.is-off i,.cal-src.is-off .cal-mark{background:transparent;border:1.5px solid currentColor}
 .cal-src.is-off:not(.cal-src--shortcut){text-decoration:line-through;text-decoration-color:color-mix(in srgb,var(--muted) 70%,transparent)}
