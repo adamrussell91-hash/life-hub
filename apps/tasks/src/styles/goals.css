@@ -100,7 +100,24 @@
 .goals-new__dreams { display: flex; flex-wrap: wrap; gap: var(--space-2); width: 100%; margin-bottom: var(--space-2); }
 .goals-new__dream.is-selected { outline: 2px solid var(--wave); }
 
+.goals-checkin-sheet {
+  position: fixed; inset: 0; z-index: 50; background: var(--canvas);
+  padding: var(--space-6); overflow: auto;
+  display: flex; flex-direction: column; gap: var(--space-4);
+}
+.goals-checkin__row, .goals-checkin__stuck, .goals-checkin__card {
+  padding: var(--space-3) var(--space-4);
+  background: var(--glass); border: 1px solid var(--line);
+  border-radius: var(--radius-md); margin-bottom: var(--space-2);
+}
+.goals-checkin__nav { margin-top: var(--space-4); gap: var(--space-2); }
+.hub-chip.is-selected { outline: 2px solid var(--wave); }
+.hammond-strip__checkin { font-size: var(--text-sm); color: var(--muted); margin-top: var(--space-2); }
+.hammond__ai { color: var(--high-sea-ink); }
+.hammond__ask { margin-top: var(--space-3); }
+
 .goal-page { display: grid; grid-template-columns: minmax(0, 1fr) 26rem; gap: var(--space-5); align-items: start; }
+
 
 .goal-page__main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 .goal-page__chain { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); font-size: var(--text-sm); color: var(--muted); margin-bottom: var(--space-2); }

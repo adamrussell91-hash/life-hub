@@ -69,6 +69,7 @@ export async function readForGoal(store, goal, inputs, {
   const reason = force ? 'manual' : staleReason(cached, { today, basis });
   if (!reason) return { read: cached.read, reason: cached.reason ?? 'daily' };
   const dismissed = Array.isArray(cached?.dismissed) ? cached.dismissed : [];
+  const stuck_reason = cached?.stuck_reason ?? null;
   let read = buildGoalRead({
     goal,
     projects: inputs.projects,
@@ -81,7 +82,8 @@ export async function readForGoal(store, goal, inputs, {
     calendarLooked,
     lifeHubLooked,
     cooledKinds,
-    model: null
+    model: null,
+    stuck_reason
   });
   // G-32: one Haiku call per recompute; fall back silently.
   try {
@@ -100,7 +102,8 @@ export async function readForGoal(store, goal, inputs, {
         calendarLooked,
         lifeHubLooked,
         cooledKinds,
-        model
+        model,
+        stuck_reason
       });
     } else if (model?.fallback) {
       read = { ...read, model_fallback: true, verdict_source: 'deterministic' };
@@ -113,7 +116,7 @@ export async function readForGoal(store, goal, inputs, {
     read,
     dismissed,
     reason,
-    stuck_reason: cached?.stuck_reason ?? null
+    stuck_reason
   });
   return { read, reason };
 }

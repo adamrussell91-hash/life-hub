@@ -6,6 +6,8 @@ import { errorMessage } from '@/views/feedback';
 import { el } from '@/views/hub-kit';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { showHubToast } from '../../../../packages/design-kit/js/hub-feedback.js';
+import { checkInProminent, checkInStripLine, openSundayCheckIn } from '@/views/goals-checkin';
+import { sydneyToday } from '@/domain/goal-runway';
 
 function avatar(): HTMLImageElement {
   const img = el('img');
@@ -135,6 +137,19 @@ export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelop
     chips.append(chip);
   }
   body.append(chips);
+  const today = sydneyToday();
+  const checkBtn = el('button', `btn ${checkInProminent(today) ? 'btn--primary' : 'btn--ghost'}`, 'Sunday check-in');
+  checkBtn.type = 'button';
+  checkBtn.dataset.action = 'sunday-checkin';
+  checkBtn.addEventListener('click', () => openSundayCheckIn(host, goals, envelopes, today, onApplied));
+  body.append(checkBtn);
+  void fetch('/api/goal-checkins', { credentials: 'include' })
+    .then((r) => r.json())
+    .then((data) => {
+      const line = checkInStripLine(data?.checkin ?? null, today);
+      if (line) body.append(el('p', 'hammond-strip__checkin', line));
+    })
+    .catch(() => undefined);
   strip.append(avatar(), body, el('span'));
   host.replaceChildren(strip);
 }

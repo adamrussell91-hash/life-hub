@@ -177,6 +177,79 @@ export function protectBlockProposal({ goal, hostedTasks, today, slots = [], cou
   };
 }
 
+/**
+ * G-36: check-in stuck_reason drives the preferred ghost on the next Hammond read.
+ * Uses existing confirmable kinds only (create_task / split_task / protect_block).
+ */
+export function stuckReasonGhost({
+  goal, stuck_reason, hostedTasks = [], tasks = [], today, domain, slots = [], count = 0, perWeek = null
+}) {
+  if (!stuck_reason || typeof stuck_reason !== 'string') return null;
+  const prefix = `goal-${goal.id}-`;
+  const open = hostedTasks.filter(t => isOpen(t) && t.kind !== 'step');
+  const byDue = [...open].sort((a, b) => (a.due_date ?? '9999-12-31').localeCompare(b.due_date ?? '9999-12-31'));
+  const candidate = byDue.find(t => !t.due_date || t.due_date >= today) ?? byDue[0];
+
+  if (stuck_reason === 'too_big') {
+    if (candidate && !tasks.some(t => t && t.parent_task_id === candidate.id)) {
+      return {
+        id: `${prefix}split-${candidate.id}`, agent: 'hammond', kind: 'split_task',
+        taskId: candidate.id, title: candidate.title,
+        steps: [
+          `Get what you need for “${candidate.title}” (10 min)`,
+          'Do a rough first pass (20 min)',
+          `Finish and tick off “${candidate.title}” (10 min)`
+        ],
+        goalId: goal.id, domain: candidate.domain || domain,
+        reason: 'Stuck: too big — split it so the first step fits in a short block'
+      };
+    }
+    return {
+      id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
+      title: `First small step on “${goal.title}”`, due: addDays(today, 2),
+      goalId: goal.id, domain,
+      reason: 'Stuck: too big — start with one small, finishable step'
+    };
+  }
+  if (stuck_reason === 'unclear') {
+    return {
+      id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
+      title: `SMARTER check: what does done look like for “${goal.title}”?`,
+      due: addDays(today, 2), goalId: goal.id, domain,
+      reason: 'Stuck: unclear — tighten Specific / Measurable / Achievable / Relevant / Time-bound / Exciting / Recorded'
+    };
+  }
+  if (stuck_reason === 'boring') {
+    return {
+      id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
+      title: `If it’s after coffee tomorrow, then 10 min on “${goal.title}”`,
+      due: addDays(today, 1), goalId: goal.id, domain,
+      reason: 'Stuck: boring — an if-then cue beats waiting for motivation'
+    };
+  }
+  if (stuck_reason === 'no_time') {
+    const block = protectBlockProposal({ goal, hostedTasks, today, slots, count: count || 0, perWeek: perWeek || 1 });
+    if (block) {
+      return { ...block, reason: 'Stuck: no time — protect a block before the week ends' };
+    }
+    return {
+      id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
+      title: `15-min protect for “${goal.title}”`, due: addDays(today, 1),
+      goalId: goal.id, domain,
+      reason: 'Stuck: no time — book a short protect even without a free calendar slot'
+    };
+  }
+  if (stuck_reason === 'waiting') {
+    return {
+      id: `${prefix}start`, agent: 'hammond', kind: 'create_task',
+      title: `Chase the wait on “${goal.title}”`, due: addDays(today, 1),
+      goalId: goal.id, domain,
+      reason: 'Stuck: waiting on someone — one chase keeps it warm'
+    };
+  }
+  return null;
+}
+
 function addMinutesHhMm(hhmm, minutes) {
   const [h, m] = hhmm.split(':').map(Number);
   const total = (h * 60 + m + minutes) % (24 * 60);
@@ -211,7 +284,8 @@ export function buildGoalRead({
   calendarLooked = false,
   lifeHubLooked = false,
   cooledKinds = new Set(),
-  model = null
+  model = null,
+  stuck_reason = null
 }) {
   const { hostedProjects, hostedTasks } = hostedOf(goal, projects, tasks);
   const stamps = [goal.updated_at, ...hostedTasks.flatMap(t => [t.completed_at, t.updated_at])]
@@ -238,6 +312,13 @@ export function buildGoalRead({
   const block = protectBlockProposal({ goal, hostedTasks, today, slots, count, perWeek });
   if (block && !skip.has(block.id) && !cooledKinds.has('protect_block')) {
     ghosts = [block, ...ghosts];
+  }
+
+  const stuck = stuckReasonGhost({
+    goal, stuck_reason, hostedTasks, tasks, today, domain, slots, count, perWeek
+  });
+  if (stuck && !skip.has(stuck.id) && !cooledKinds.has(stuck.kind)) {
+    ghosts = [stuck, ...ghosts.filter(g => g.id !== stuck.id)];
   }
   ghosts = ghosts.slice(0, MAX_GHOSTS);
 
