@@ -104,5 +104,5 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## Deviations
 
-- **G-17** Year view ships as per-term stacked runways first; `createMotion` Term↔Year zoom blend still required (Term River placers).
-- **G-20** Lead-measure `count/per_week` shows on rows; Life Hub `signal` contribution waits on G-31.
+- **G-17** Year Term↔Year uses `createMotion` placers (Term River rules); phone uses term list.
+- **G-46** Live signed-in UI screenshots for Year / Plan-next-term / all 5 structures blocked by passphrase gate in Cloud Agent; fixtures + prior landing/goal captures attached instead.
