@@ -49,6 +49,9 @@ export type HubViewId =
   | 'day'
   | 'week'
   | 'month'
+  | 'term'
+  | 'year'
+  | 'almanac'
   | 'list'
   | 'search'
   | 'templates'
@@ -79,7 +82,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { id: 'day', label: 'Today', href: '#/day' },
       { id: 'week', label: 'Week', href: '#/week' },
-      { id: 'month', label: 'Month', href: '#/month' },
+      { id: 'term', label: 'Term', href: '#/term' },
+      { id: 'year', label: 'Year', href: '#/year' },
+      { id: 'almanac', label: 'Almanac', href: '#/almanac' },
       { id: 'list', label: 'Backlog', href: '#/list' },
       { id: 'graph', label: 'Graph', href: '#/graph' },
       { id: 'timeline', label: 'Timeline', href: '#/timeline' }
@@ -740,14 +745,27 @@ export function parseHashRoute(): HubViewId {
   if (id === 'constellation' || id === 'orbit' || id === 'branch' || id === 'universe') return 'graph';
   if (id === 'gantt') return 'timeline';
   if (id === 'backlog') return 'list';
+  // Month is not a locked zoom stop — land on Week (preserve ?date= via hash as-is for week).
+  if (id === 'month') {
+    if (typeof location !== 'undefined' && location.hash.startsWith('#/month')) {
+      const rest = location.hash.slice('#/month'.length);
+      const next = `#/week${rest}`;
+      if (location.hash !== next) history.replaceState(null, '', next);
+    }
+    return 'week';
+  }
   return KNOWN_VIEWS.includes(id) ? id : 'board';
 }
 
+// Classic Tasks calendar (week/month) until Step 6. Kit Term/Year/Almanac are a separate surface.
 const CALENDAR_VIEWS = new Set<HubViewId>(['week', 'month']);
+const KIT_CALENDAR_VIEWS = new Set<HubViewId>(['term', 'year', 'almanac']);
 
 /** Shared paint surface — week/month stay on one calendar, query-only changes stay on the same view. */
 export function viewSurface(view: HubViewId): string {
-  return CALENDAR_VIEWS.has(view) ? 'calendar' : view;
+  if (CALENDAR_VIEWS.has(view)) return 'calendar';
+  if (KIT_CALENDAR_VIEWS.has(view)) return 'kit-calendar';
+  return view;
 }
 
 export function isSoftViewChange(from: HubViewId | null, to: HubViewId): boolean {

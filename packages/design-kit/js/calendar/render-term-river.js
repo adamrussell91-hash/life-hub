@@ -24,6 +24,7 @@ import {
   paintSourceFilter,
   readFilterState
 } from './calendar-filter.js';
+import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -988,6 +989,8 @@ function openPop(itemId) {
       + `<div class="tr-pop__acts">`
       + `<button type="button" class="btn btn--primary" data-accept="${escapeHtml(item.id)}" data-label="Accept">Accept</button>`
       + `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(item.id)}">Dismiss</button></div>`;
+  } else {
+    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
   }
   pop.innerHTML = html;
   pop.hidden = false;
@@ -1115,6 +1118,21 @@ function wire(section) {
     const item = target.closest?.('[data-part="item"],[data-part="ghost"]');
     if (item && !item.classList?.contains?.('is-sample')) {
       const id = item.getAttribute('data-id');
+      const row = itemById(id);
+      const hub = input?.hub || 'life';
+      if (row && !ghostFor(row) && isOwnHubItem(row, hub) && typeof input?.routeFor === 'function') {
+        const href = openInHubHref(row, input.routeFor);
+        if (href) {
+          closePop();
+          const loc = doc?.defaultView?.location;
+          if (href.startsWith('#')) {
+            if (loc) loc.hash = href;
+          } else if (loc) {
+            loc.assign(href);
+          }
+          return;
+        }
+      }
       return id === popFor ? closePop() : openPop(id);
     }
     if (!target.closest?.('[data-part="popover"]')) closePop();

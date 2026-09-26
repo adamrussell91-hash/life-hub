@@ -4,6 +4,10 @@ import '../../design-kit/chrome.css';
 import '../../design-kit/rail.css';
 import '../../design-kit/filters.css';
 import '../../design-kit/calendar.css';
+import '../../design-kit/calendar-tideline.css';
+import '../../design-kit/calendar-day-dial.css';
+import '../../design-kit/calendar-almanac.css';
+import '../../design-kit/calendar-term-river.css';
 import '../../design-kit/sign-in.css';
 import '../../design-kit/motion.css';
 import '../../design-kit/view-on-map.css';
@@ -28,6 +32,7 @@ import {
   canonicalizeGraphHash,
   isKnownHashView,
   isSoftViewChange,
+  viewSurface,
   parseEntityPage,
   parseGoalPage,
   parseHashRoute,
@@ -61,6 +66,8 @@ import {
 } from '@/views/dashboard';
 import { renderProjectsView } from '@/views/projects';
 import { renderWeekView, renderMonthView } from '@/views/calendar';
+import { mountTasksCalendar, unmountTasksCalendar } from '@/views/hub-calendar';
+import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { renderPageEditor } from '@/views/page-editor';
 import { renderMapItemPage } from '@/views/map-page';
 import { renderGoalsView } from '@/views/goals';
@@ -73,6 +80,8 @@ import { loadTaskProperties } from '@/services/task-properties';
 import { tasksApi } from '@/services/client-api';
 import { mapsOrSeed } from '@/domain/maps';
 import { getFocus, hydrateFocusFromHash, mergeFocusIntoHash } from '@/domain/focus';
+
+let kitCalendarHandle: HubCalendarHandle | null = null;
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
   canvas.replaceChildren();
@@ -117,6 +126,21 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderWeekView(canvas);
     case 'month':
       return renderMonthView(canvas);
+    case 'term':
+    case 'year':
+    case 'almanac': {
+      if (kitCalendarHandle) {
+        void kitCalendarHandle.syncZoom();
+        return;
+      }
+      canvas.replaceChildren();
+      const host = document.createElement('div');
+      host.className = 'tasks-calendar-host';
+      host.style.minWidth = '0';
+      canvas.append(host);
+      kitCalendarHandle = mountTasksCalendar(host);
+      return;
+    }
     case 'list':
       return renderListView(canvas);
     case 'search':
@@ -175,6 +199,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       if (canvasWrap instanceof HTMLElement) canvasWrap.scrollTop = 0;
       shell.canvas.scrollTop = 0;
       clare.park();
+      // Leaving the kit calendar surface tears the mount down.
+      if (nextView == null || viewSurface(nextView) !== 'kit-calendar') {
+        unmountTasksCalendar();
+        kitCalendarHandle = null;
+      }
     }
 
     const mapItem = parseMapItemPage();

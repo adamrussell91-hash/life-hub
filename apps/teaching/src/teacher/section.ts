@@ -17,6 +17,8 @@ export function sectionFromRoute(match: RouteMatch): TeacherSection | null {
       return 'home';
     case 'teacher-chat':
       return 'chat';
+    case 'teacher-calendar':
+      return 'home';
     case 'teacher-classes':
     case 'teacher-class':
       return 'classes';

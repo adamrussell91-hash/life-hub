@@ -88,7 +88,7 @@ Locked chrome: `packages/design-kit/CALENDAR.md`. Zoom stops: Day · Week · Ter
 | Event source adapters (teaching, tasks, professional, knowledge) + `calendar-sources` | **MOVED** in Step 1 → kit |
 | `load-live-events.js` | **KEEP** in Life — Life record/governance parsers; not kit-portable without injection |
 | Source filter chips (Teaching · Professional · Tasks · Health · Fitness · Corey) | Step 2 — toggles, one filter state, sessionStorage, a11y; never alter capacity/vitals/walls/bands |
-| Hub adapter `{ hub, sources, fills, defaultFilter, routeFor, apiFetch }` | Step 3 — ≤150 lines per hub |
+| Hub adapter `{ hub, sources, fills, defaultFilter, routeFor, apiFetch }` | **MOVED** Step 3 — kit `mount-hub-calendar` + `load-hub-sources` + `open-in-hub`; adapters ≤150 lines in each hub |
 | Default filters / band fills | Teaching: School periods; Professional: meetings; Tasks: After-bell work — Step 4–6 |
 
 ---
