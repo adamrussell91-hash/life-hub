@@ -1,0 +1,18 @@
+---
+description: Before any UI/UX work, read the Cursor UI failure register and run its checks before claiming done.
+globs:
+alwaysApply: true
+---
+
+# UI failure register (mandatory for UI work)
+
+You have repeatedly shipped the same UI mistakes while reporting the work as complete. They are listed in `docs/CURSOR-UI-FAILURES.md`.
+
+When a change touches HTML, CSS, rendering JS, SVG or a layout:
+
+1. Read `docs/CURSOR-UI-FAILURES.md` before writing code.
+2. Before ticking any UI item or saying "done", run the **Check** of every entry that applies. Record the IDs you checked in the progress ledger (e.g. `checked: L1 L2 S1 V4 D1 C1 P1`).
+3. Put your 1440 and 390 screenshots next to the mockup or brief, and write the differences down. Screenshots use real data, not a demo fixture.
+4. If you hit a failure that isn't in the register, add an entry in the same PR.
+
+A plausible screenshot is not evidence. The failure register's checks are.

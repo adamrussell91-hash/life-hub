@@ -42,3 +42,12 @@ Checkpoint reports **only**:
 3. If still missing, Adam may be on an old branch; check `git branch` and pull latest `main`.
 
 Do not guess the overseer role from chat memory — **read `docs/consolidation/OVERSEER.md` every time** before critiquing or checkpointing.
+
+## Cursor UI failure register
+
+When you **write a build brief for Cursor** or **review Cursor's UI work**, use [`docs/CURSOR-UI-FAILURES.md`](docs/CURSOR-UI-FAILURES.md):
+
+- Brief: cite the relevant entry IDs in the brief's failure-modes section, each with a feature-specific check.
+- Review: every new failure becomes an entry in the same PR; a repeat extends that entry's **Seen** line.
+
+Cursor loads it via `.cursor/rules/ui-failure-register.mdc`.
