@@ -13,6 +13,7 @@ import { isValidObservationId } from './observation-schema.mjs';
 import { isValidLinkProposalId } from './link-proposal-schema.mjs';
 import { isValidLedgerItemId } from './ledger-schema.mjs';
 import { isValidRememberFactId } from './remember-schema.mjs';
+import { isValidThreadId } from './thread-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -46,6 +47,8 @@ export const LINK_PROPOSAL_BY_HASH_PREFIX = 'link-proposals/by-hash/';
 export const LEDGER_ITEM_PREFIX = 'ledger-items/records/';
 export const LEDGER_ITEM_BY_PERSON_PREFIX = 'ledger-items/by-person/';
 export const LEDGER_ITEM_BY_SOURCE_PREFIX = 'ledger-items/by-source/';
+
+export const THREAD_PREFIX = 'threads/records/';
 
 export const REMEMBER_FACT_PREFIX = 'remember-facts/records/';
 export const REMEMBER_FACT_BY_PERSON_PREFIX = 'remember-facts/by-person/';
@@ -311,6 +314,17 @@ export async function listLedgerItemKeysForPerson(store, personRef) {
   return (await listBlobKeys(store, `${LEDGER_ITEM_BY_PERSON_PREFIX}${personRef}/`)).filter(
     (key) => !isIndexKey(key)
   );
+}
+
+export function threadKey(id) {
+  if (!isValidThreadId(id)) {
+    throw Object.assign(new Error(`Invalid thread id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_thread_id' });
+  }
+  return `${THREAD_PREFIX}${id}`;
+}
+
+export async function listThreadKeys(store) {
+  return (await listBlobKeys(store, THREAD_PREFIX)).filter((key) => !isIndexKey(key));
 }
 
 function assertValidRememberFactId(id) {
