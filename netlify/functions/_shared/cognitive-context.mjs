@@ -49,7 +49,12 @@ const SECTION_READERS = {
   recent_actions: extractRecentAgentActions
 };
 
-const TOPIC_KEYS = new Set(['task','topic','claim','focus','purpose','problem','conflict','dilemma','audience','framing','entrenchment']);
+// Spec note: web research uses topic terms only. Personal narrative fields
+// (dilemma, conflict, entrenchment, framing, problem, audience) stay out of search queries.
+// Mirror, Witness and Consilium skip the web step entirely: their intake is personal by nature.
+const TOPIC_KEYS = new Set(['task', 'topic', 'claim', 'focus', 'purpose']);
+const NO_WEB_PROTOCOLS = new Set(['mirror', 'witness', 'consilium']);
+const RESEARCH_TIMEOUT_MS = 15_000;
 const STOP = new Set(['about','after','again','also','and','any','are','because','been','before','being','between','but','can','could','for','from','has','have','here','how','into','its','just','like','may','might','more','most','need','not','only','other','our','out','over','really','same','should','some','stay','such','than','that','the','their','them','then','there','they','this','through','too','under','very','want','was','were','what','when','where','whether','which','while','who','why','will','with','would','you','your']);
 
 function extractSubsection(body, name) {
@@ -101,6 +106,8 @@ function stripMedical(text) {
     .trim();
 }
 
+const STRIP_MEDICAL_SECTIONS = new Set(['about_me','this_month','long_term_trends','constraints','recent_actions','cross_agent']);
+
 export function selectCentralNodeEvidence(markdown, protocolId) {
   const specs=PROTOCOL_CENTRAL_NODE_SECTIONS[protocolId]||[];
   const allowMedical=specs.some(s=>s.id==='medical_status');
@@ -117,7 +124,7 @@ export function selectCentralNodeEvidence(markdown, protocolId) {
       if(spec.subsections?.length){
         text=spec.subsections.map(name=>extractSubsection(whole,name)).filter(Boolean).join('\n\n');
       } else text=whole;
-      if(spec.id==='about_me'&&!allowMedical)text=stripMedical(text);
+      if(!allowMedical&&STRIP_MEDICAL_SECTIONS.has(spec.id))text=stripMedical(text);
     }
     if(!text.trim())continue;
     evidence.push({
@@ -139,27 +146,49 @@ export async function readCentralNodeMarkdown(env, fetchImpl=fetch) {
   return client.readBlob(entry.sha);
 }
 
-function parseResearchFindings(text) {
+function isAbsoluteHttps(url) {
+  if(typeof url!=='string'||!url.trim())return false;
+  try {
+    const parsed=new URL(url.trim());
+    return parsed.protocol==='https:';
+  } catch {
+    return false;
+  }
+}
+
+export function parseResearchFindings(text) {
   const findings=[];
   try {
     const start=text.indexOf('{'),end=text.lastIndexOf('}');
     if(start>=0&&end>start){
       const parsed=JSON.parse(text.slice(start,end+1));
       const list=Array.isArray(parsed.findings)?parsed.findings:Array.isArray(parsed)?parsed:[];
-      for(const item of list.slice(0,5)){
+      for(const item of list){
+        if(findings.length>=5)break;
         if(!item||typeof item!=='object')continue;
         const title=typeof item.title==='string'?item.title.trim():'';
         const url=typeof item.url==='string'?item.url.trim():'';
         const excerpt=typeof item.excerpt==='string'?item.excerpt.trim():(typeof item.summary==='string'?item.summary.trim():'');
+        if(!isAbsoluteHttps(url))continue;
         if(title||excerpt)findings.push({title:title||'Finding',url,excerpt:excerpt.slice(0,500)});
       }
     }
-  } catch { /* fall through */ }
-  if(!findings.length&&text.trim())findings.push({title:'Research note',url:'',excerpt:text.trim().slice(0,500)});
-  return findings.slice(0,5);
+  } catch {
+    return [];
+  }
+  return findings;
+}
+
+function withTimeout(promise, ms, label='timeout') {
+  let timer;
+  return Promise.race([
+    promise.finally(()=>{if(timer)clearTimeout(timer);}),
+    new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error(label),{code:'timeout'})),ms);})
+  ]);
 }
 
 export async function researchBrief(session, {model, terms}={}) {
+  if(NO_WEB_PROTOCOLS.has(session?.protocolId))return {evidence:[],unavailable:false};
   const queryTerms=(terms||topicSearchTerms(session)).slice(0,8);
   if(!queryTerms.length||typeof model!=='function')return {evidence:[],unavailable:false};
   const system=[
@@ -172,6 +201,7 @@ export async function researchBrief(session, {model, terms}={}) {
     system,
     user,
     wordBudget:300,
+    maxTokens:4096,
     tools:[{type:'web_search_20250305',name:'web_search'}],
     speaker:'research',
     stage:'research-brief'
@@ -184,7 +214,7 @@ export async function researchBrief(session, {model, terms}={}) {
       kind:'web',
       title:f.title,
       text:f.excerpt,
-      url:f.url||undefined,
+      url:f.url,
       source:'Web research'
     })),
     unavailable:false
@@ -205,31 +235,34 @@ export async function gatherContext(session, env, {
   const evidence=[];
   const unavailable=[];
 
-  try {
+  const cnTask=async()=>{
     const markdown=await readCentralNode(env,fetchImpl);
-    if(markdown)evidence.push(...selectCentralNodeEvidence(markdown,session.protocolId));
-    else unavailable.push('central_node');
-  } catch {
+    if(markdown)return selectCentralNodeEvidence(markdown,session.protocolId);
     unavailable.push('central_node');
-  }
-
-  try {
-    if(typeof retrieveKnowledge==='function'){
-      const kh=await retrieveKnowledge(session,env,fetchImpl);
-      if(Array.isArray(kh?.evidence))evidence.push(...kh.evidence);
-      if(kh?.status==='none'||kh?.status==='unavailable'){/* ok */}
-    }
-  } catch {
-    unavailable.push('knowledge_hub');
-  }
-
-  try {
-    const web=await research(session,{model,terms:topicSearchTerms(session)});
-    if(Array.isArray(web?.evidence))evidence.push(...web.evidence);
+    return [];
+  };
+  const khTask=async()=>{
+    if(typeof retrieveKnowledge!=='function')return [];
+    const kh=await retrieveKnowledge(session,env,fetchImpl);
+    return Array.isArray(kh?.evidence)?kh.evidence:[];
+  };
+  const webTask=async()=>{
+    if(NO_WEB_PROTOCOLS.has(session?.protocolId))return [];
+    const web=await withTimeout(
+      research(session,{model,terms:topicSearchTerms(session)}),
+      RESEARCH_TIMEOUT_MS,
+      'research timeout'
+    );
     if(web?.unavailable)unavailable.push('web');
-  } catch {
-    unavailable.push('web');
-  }
+    return Array.isArray(web?.evidence)?web.evidence:[];
+  };
+
+  const settled=await Promise.allSettled([cnTask(),khTask(),webTask()]);
+  const labels=['central_node','knowledge_hub','web'];
+  settled.forEach((result,i)=>{
+    if(result.status==='fulfilled')evidence.push(...result.value);
+    else if(!unavailable.includes(labels[i]))unavailable.push(labels[i]);
+  });
 
   const status=unavailable.length
     ? `Context partially available. Unavailable: ${unavailable.join(', ')}.`

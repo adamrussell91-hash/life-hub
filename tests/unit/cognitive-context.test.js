@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   PROTOCOL_CENTRAL_NODE_SECTIONS,
   gatherContext,
+  parseResearchFindings,
+  researchBrief,
   selectCentralNodeEvidence,
   topicSearchTerms
 } from '../../netlify/functions/_shared/cognitive-context.mjs';
@@ -24,21 +26,31 @@ Chronic tendon pain in the right shoulder. Detailed imaging notes follow here th
 
 ## 📊 This Month (September 2026)
 Marking load is high.
+### Medical
+This-month medical leak marker: MRI follow-up scheduled.
 
 ## 📈 Long-Term Trends & Patterns
 Sleep debt accumulates on term weeks.
+### Medical
+Trends medical leak marker: neuropathy flare pattern.
 
 ## 🔴 Current Constraints & Priorities
 ### Work
 No evening meetings after 7.
 ### Time
 Protect Wednesday afternoons.
+### Medical
+Constraints medical leak marker: no overhead lifts.
 
 ## 🤝 Cross-Agent Coordination
 - Clare→Hammond: defer travel planning
+### Medical
+Cross-agent medical leak marker: Chadwick noted shoulder limit.
 
 ## 📝 Recent Agent Actions
 - Horizon: mapped career forks
+### Medical
+Recent-actions medical leak marker: rest day after flare.
 
 ## Medical Status
 Summary: shoulder load limit. Do not schedule overhead lifts.
@@ -63,7 +75,7 @@ test('per-protocol Central Node sections and medical exclusion', () => {
   assert.ok(horizon.some(e => e.id.includes('about_me')));
   assert.ok(horizon.some(e => e.id.includes('constraints')));
   assert.equal(horizon.some(e => e.id.includes('medical')), false);
-  assert.equal(horizon.some(e => /tendon pain|imaging notes/i.test(e.text)), false);
+  assert.equal(horizon.some(e => /tendon pain|imaging notes|medical leak marker|MRI follow-up|neuropathy flare|overhead lifts|shoulder limit|rest day after flare/i.test(e.text)), false);
 
   const witness = selectCentralNodeEvidence(sampleNode, 'witness');
   assert.ok(witness.some(e => e.id.includes('medical_status')));
@@ -200,4 +212,93 @@ test('Refinery fake search evidence appears as web ids', async () => {
     })
   });
   assert.ok(s.evidence.some(e => e.id === 'web:1'));
+});
+
+test('medical subsections are stripped from every non-medical protocol section', () => {
+  const horizon = selectCentralNodeEvidence(sampleNode, 'horizon');
+  const blob = horizon.map(e => e.text).join('\n');
+  assert.equal(/medical leak marker|MRI follow-up|neuropathy flare|overhead lifts|shoulder limit|rest day after flare|tendon pain|imaging notes/i.test(blob), false);
+  // Mirror and Witness list medical_status, so they keep Medical subsections elsewhere; only the dedicated summary is constrained.
+  const mirror = selectCentralNodeEvidence(sampleNode, 'mirror');
+  assert.ok(mirror.some(e => e.id.includes('medical_status')));
+  assert.match(mirror.find(e => e.id.includes('medical_status')).text, /shoulder/i);
+});
+
+test('truncated JSON research yields zero evidence; valid JSON yields up to five https findings', () => {
+  assert.deepEqual(parseResearchFindings('{"findings":[{"title":"A","url":"https://example.test/a","excerpt":"ok"'), []);
+  assert.deepEqual(parseResearchFindings('Not JSON at all, just prose about meetings.'), []);
+  const valid = parseResearchFindings(JSON.stringify({
+    findings: [
+      { title: 'One', url: 'https://example.test/1', excerpt: 'a' },
+      { title: 'Two', url: 'http://insecure.test/2', excerpt: 'b' },
+      { title: 'Three', url: 'https://example.test/3', excerpt: 'c' },
+      { title: 'Four', url: '/relative', excerpt: 'd' },
+      { title: 'Five', url: 'https://example.test/5', excerpt: 'e' },
+      { title: 'Six', url: 'https://example.test/6', excerpt: 'f' },
+      { title: 'Seven', url: 'https://example.test/7', excerpt: 'g' }
+    ]
+  }));
+  assert.equal(valid.length, 5);
+  assert.ok(valid.every(f => f.url.startsWith('https://')));
+  assert.equal(valid.some(f => f.url.includes('insecure') || f.url.startsWith('/')), false);
+});
+
+test('Mirror, Witness and Consilium never call web research; queries omit excluded fields', async () => {
+  for (const protocolId of ['mirror', 'witness', 'consilium']) {
+    let researchCalls = 0;
+    await gatherContext({
+      protocolId,
+      intake: {
+        dilemma: 'Disclose a scoring error to the applicant',
+        conflict: 'Rest versus volunteering duty',
+        entrenchment: 'Same framing every review cycle',
+        framing: 'We need tighter agendas',
+        topic: 'Should never search dilemma words',
+        focus: 'Career direction'
+      }
+    }, {}, {
+      readCentralNode: async () => sampleNode,
+      retrieveKnowledge: async () => ({ evidence: [], status: 'none' }),
+      research: async () => { researchCalls += 1; return { evidence: [], unavailable: false }; }
+    });
+    assert.equal(researchCalls, 0, `${protocolId} must skip web research`);
+  }
+  const terms = topicSearchTerms({
+    intake: {
+      task: 'Design a library event',
+      topic: 'Meeting participation',
+      claim: 'Short meetings help',
+      focus: 'Career direction',
+      purpose: 'Evidence for a proposal',
+      dilemma: 'secret-dilemma-token',
+      conflict: 'secret-conflict-token',
+      entrenchment: 'secret-entrench-token',
+      framing: 'secret-framing-token',
+      problem: 'secret-problem-token'
+    }
+  });
+  const joined = terms.join(' ');
+  assert.equal(/secret-dilemma|secret-conflict|secret-entrench|secret-framing|secret-problem/i.test(joined), false);
+  assert.ok(terms.some(t => /library|meeting|participation|career|evidence|proposal|short|meetings|help|design|event/i.test(t)));
+});
+
+test('researchBrief passes maxTokens 4096 and gatherContext runs sources concurrently', async () => {
+  let seenMax = null;
+  const order = [];
+  const session = { protocolId: 'cartographers', intake: { topic: 'Formative assessment', purpose: 'Proposal evidence' } };
+  const result = await gatherContext(session, {}, {
+    readCentralNode: async () => { order.push('cn-start'); await new Promise(r => setTimeout(r, 20)); order.push('cn-end'); return sampleNode; },
+    retrieveKnowledge: async () => { order.push('kh-start'); await new Promise(r => setTimeout(r, 20)); order.push('kh-end'); return { evidence: [], status: 'none' }; },
+    research: async (s, opts) => researchBrief(s, {
+      ...opts,
+      model: async prompt => {
+        seenMax = prompt.maxTokens;
+        order.push('web');
+        return { text: JSON.stringify({ findings: [{ title: 'A', url: 'https://example.test/a', excerpt: 'ok' }] }) };
+      }
+    })
+  });
+  assert.equal(seenMax, 4096);
+  assert.ok(result.evidence.some(e => e.id === 'web:1'));
+  assert.ok(order.indexOf('cn-start') < order.indexOf('kh-end') || order.indexOf('kh-start') < order.indexOf('cn-end'));
 });

@@ -3,7 +3,9 @@ import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
-type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: { id: string; role: string; speaker: string; stage: string; text: string }[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
+type Evidence = { id: string; kind?: string; title: string; text?: string; url?: string };
+type Turn = { id: string; role: string; speaker: string; stage: string; text: string; evidenceIds?: string[] };
+type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
 const ASSET_ROOT = `${import.meta.env.BASE_URL}assets/cognitive-protocols`;
 const voiceAsset: Record<string, string> = {
   "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
@@ -271,23 +273,34 @@ export async function postProtocolAction(payload: ProtocolActionPayload, fetchIm
   return session;
 }
 
-function liveSlotHtml(session: Session, definition: Definition, who: string, role: string, precedingText: string | null): string {
+function sourcesHtml(turn: Turn | null | undefined, evidence: Evidence[] = []): string {
+  const ids = turn?.evidenceIds ?? [];
+  if (!ids.length || !evidence.length) return "";
+  const links = ids
+    .map(id => evidence.find(item => item.id === id))
+    .filter((item): item is Evidence => Boolean(item?.url))
+    .map(item => `<li><a href="${escapeHtml(item.url!)}" rel="noopener noreferrer" target="_blank">${escapeHtml(item.title || item.url!)}</a></li>`);
+  if (!links.length) return "";
+  return `<aside class="protocol-sources"><p class="protocol-sources__label">Sources</p><ul>${links.join("")}</ul></aside>`;
+}
+function liveSlotHtml(session: Session, definition: Definition, who: string, role: string, precedingText: string | null, precedingTurn: Turn | null = null): string {
   const preceding = precedingText ? turnBodyHtml(precedingText) : "";
+  const sources = sourcesHtml(precedingTurn, session.evidence);
   if (session.error) {
-    return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}${sources}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
   }
   if (["queued", "running"].includes(session.status)) {
-    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}${sources}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
   }
-  if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}</div>`;
+  if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}${sources}</div>`;
   const reopen = session.allowedActions.includes("reopen");
   const wrap = session.allowedActions.includes("wrap");
   const close = session.allowedActions.includes("close");
   const confirm = session.allowedActions.includes("confirm") && (reopen || close);
-  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="${reopen ? "Name the element to reopen, or reply" : `Reply to ${escapeHtml(who)}`}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">${confirm ? "Hold with caution" : "Continue"}</button>${reopen ? `<button class="btn btn--ghost" name="action" value="reopen" type="submit">Reopen</button>` : ""}${close ? `<button class="btn btn--ghost" name="action" value="close" type="submit">Close</button>` : ""}${wrap ? `<button class="btn btn--ghost" name="action" value="wrap" type="submit">Wrap to filter</button>` : ""}${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
+  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}${sources}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="${reopen ? "Name the element to reopen, or reply" : `Reply to ${escapeHtml(who)}`}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">${confirm ? "Hold with caution" : "Continue"}</button>${reopen ? `<button class="btn btn--ghost" name="action" value="reopen" type="submit">Reopen</button>` : ""}${close ? `<button class="btn btn--ghost" name="action" value="close" type="submit">Close</button>` : ""}${wrap ? `<button class="btn btn--ghost" name="action" value="wrap" type="submit">Wrap to filter</button>` : ""}${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
 }
-function readTurnCardHtml(turn: Session["transcript"][number], who: string, role: string): string {
-  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}</article>`;
+function readTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
+  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}${sourcesHtml(turn, evidence)}</article>`;
 }
 function joiningCardHtml(who: string, role: string): string {
   return `<div class="protocol-turn-card protocol-turn-card--live">${personaMetaHtml(who, role)}<p>${escapeHtml(who)} is joining the conversation…</p></div>`;
@@ -314,11 +327,12 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const activeVoice = activeSpeakerId && activeSpeakerId !== "you" ? voiceOf(definition, activeSpeakerId) : null;
   const activeRole = activeVoice ? activeVoice.role || VOICE_ROLES[activeVoice.id] || "" : "";
   const activeName = activeVoice ? activeVoice.name : activeSpeakerId === "you" ? "You" : speakerName(session, definition);
-  const precedingText = cardIsLive && turn && turn.speaker !== "you" ? turn.text : null;
+  const precedingTurn = cardIsLive && turn && turn.speaker !== "you" ? turn : null;
+  const precedingText = precedingTurn ? precedingTurn.text : null;
   const cardHtml = cardIsLive
-    ? liveSlotHtml(session, definition, activeName, activeRole, precedingText)
+    ? liveSlotHtml(session, definition, activeName, activeRole, precedingText, precedingTurn)
     : turn
-      ? readTurnCardHtml(turn, activeName, activeRole)
+      ? readTurnCardHtml(turn, activeName, activeRole, session.evidence)
       : joiningCardHtml(activeName, activeRole);
   const portraitHtml = activeVoice
     ? `<div class="protocol-portrait"><img src="${voiceSrc(definition, activeVoice.id)}" alt="${escapeHtml(activeVoice.name)}" width="220" height="220"></div>`

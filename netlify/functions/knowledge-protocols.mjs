@@ -23,7 +23,9 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],
       tools: Array.isArray(prompt.tools) ? prompt.tools : undefined,
-      maxTokens: Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
+      maxTokens: Number(prompt.maxTokens) > 0
+        ? Math.min(8192, Number(prompt.maxTokens))
+        : Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
     })) if (event.type === 'text') text += event.delta ?? '';
   } catch (error) {
     // Sonnet 5 rejects the client's max_tokens assistant-prefill continuation.
