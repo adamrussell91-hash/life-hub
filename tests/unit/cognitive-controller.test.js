@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { catalog, createSession, advance, act, buildPrompt } from '../../netlify/functions/_shared/cognitive-controller.mjs';
+import { catalog, createSession, advance, act, buildPrompt, BURST_WORDS } from '../../netlify/functions/_shared/cognitive-controller.mjs';
 
 const intake = {task:'Design a community library event',focus:'Career direction',constraints:'No relocation',trajectory:'Two years in current role',claim:'Short meetings improve participation',context:'Proposal',audience:'Library committee',topic:'Meeting participation',purpose:'Evidence for a proposal',conflict:'Rest versus volunteering',behaviour:'I volunteered twice',aspirations:'Protect rest',timescale:'weekly',dilemma:'Disclose a scoring error',parties:'Applicant and committee',instance:'Choosing between two venues',timeBoundary:'Yesterday',outcome:'Selected venue A',problem:'Meetings repeatedly overrun despite three agenda changes and a facilitator rotation across two terms',entrenchment:'Three changes have failed and the same people keep reopening the same framing in every review cycle',framing:'We need tighter agendas and stronger chairing so the overrun stops',sources:'Paper A (2020) reports a small experiment. Paper B (2021) reports a contradictory survey.'};
 function start(id, mode, extra={}) { return createSession({id:randomUUID(),owner:'owner',protocolId:id,mode,intake:{...intake,...extra},requestId:randomUUID()}); }
@@ -52,7 +52,7 @@ test('burst continuation re-runs the same step until done or maxBursts',async()=
   assert.match(calls[1].system,/Continuation burst|Continue from that answer/i);
 });
 test('over-budget voice is re-asked then trimmed; length never fails the session',async()=>{
-  const long='word '.repeat(200).trim();
+  const long='word '.repeat(400).trim();
   let attempts=0;
   let s=start('refinery','build');
   s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>{attempts++;return {text:long,question:null,done:true,evidenceIds:[]};}});
@@ -210,6 +210,94 @@ test('cooperative Fates Normal asks across about sixteen user replies',async()=>
   const {s,calls}=await run('fates','normal',{askCycles:true});
   assert.equal(s.status,'completed');
   const replies=s.transcript.filter(t=>t.role==='user').length;
-  assert.ok(replies>=12&&replies<=22,`expected ~16 replies, got ${replies}`);
+  // Final ungated burst closes without asking, so each cycle stop yields one reply not two.
+  assert.ok(replies>=10&&replies<=22,`expected ~12 replies, got ${replies}`);
   assert.ok(calls.filter(c=>c.stage.startsWith('cycle')).length>=6);
+});
+test('Consilium mid-burst answers hit maxBursts without growing the step list',async()=>{
+  let s=start('consilium');
+  const calls=[];
+  const sticky=async p=>{
+    calls.push(p);
+    if(p.stage==='framing')return {text:'Frame the dilemma.',question:'Is the core duty clear?',done:true,evidenceIds:[]};
+    if(p.stage==='map')return {text:'Conflict map.',question:'What remains unsettled?',done:true,evidenceIds:[]};
+    return {text:`${p.speaker} keeps pressing.`,question:'Which duty wins?',done:false,evidenceIds:[],nextSpeaker:'consequence'};
+  };
+  const retrieve=async()=>({evidence:[],status:'none'});
+  s=await advance(s,{model:sticky,retrieve});
+  s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});
+  const stepsBefore=s.steps.length;
+  s=await advance(s,{model:sticky,retrieve});
+  assert.equal(s.status,'waiting');
+  assert.equal(s.continueBurst,true);
+  assert.equal(s.speaker,'principle');
+  for(let i=0;i<5&&s.status==='waiting'&&s.speaker==='principle';i++){
+    s=act(s,{action:'answer',text:`Answer ${i}`,revision:s.revision,requestId:randomUUID()});
+    s=await advance(s,{model:sticky,retrieve});
+  }
+  const principleCalls=calls.filter(c=>c.speaker==='principle'&&c.stage==='dialogue');
+  assert.equal(principleCalls.length,3);
+  assert.match(principleCalls.at(-1).system,/final burst|Close without asking/i);
+  assert.notEqual(s.speaker,'principle');
+  assert.ok(s.steps.length<=stepsBefore+2,`step list grew unboundedly: ${s.steps.length}`);
+  const principleAnswers=s.transcript.filter(t=>t.role==='user'&&t.stage==='dialogue').length;
+  assert.ok(principleAnswers>=2);
+});
+test('wrap is Fates-only before the filter and absent at close',async()=>{
+  for(const id of ['horizon','refinery','cartographers','mirror','consilium','witness','tribunal']){
+    let s=start(id,id==='refinery'?'build':undefined);
+    const calls=[];
+    s=await advance(s,{model:model(calls),retrieve:async()=>({evidence:[],status:'none'})});
+    if(s.status==='waiting')assert.equal(s.allowedActions.includes('wrap'),false,`${id} must not offer wrap`);
+  }
+  let s=start('fates','sprint'); const calls=[];
+  s=await advance(s,{model:model(calls),retrieve:async()=>({evidence:[],status:'none'})});
+  assert.ok(s.allowedActions.includes('wrap'));
+  s=act(s,{action:'wrap',revision:s.revision,requestId:randomUUID()});
+  assert.equal(s.steps[s.cursor].filter,true);
+  assert.equal(s.continueBurst,false);
+  assert.equal(s.burst,0);
+  for(let n=0;n<40&&!(s.status==='waiting'&&s.stage==='close');n++){
+    if(s.status==='queued')s=await advance(s,{model:model(calls),retrieve:async()=>({evidence:[],status:'none'})});
+    else if(s.status==='waiting'){
+      const action=s.allowedActions.includes('close')?'close':s.allowedActions.includes('confirm')?'confirm':'answer';
+      s=act(s,{action,text:'ok',revision:s.revision,requestId:randomUUID()});
+    } else break;
+  }
+  assert.equal(s.stage,'close');
+  assert.equal(s.allowedActions.includes('wrap'),false);
+});
+test('per-protocol burstWords table reaches the built prompt budget',()=>{
+  const samples=[
+    ['fates','sprint','lachesis','briefing',BURST_WORDS.fates],
+    ['horizon',undefined,'ketill','ketill',BURST_WORDS.horizon.ketill],
+    ['refinery','build','builder','builder',BURST_WORDS.refinery],
+    ['cartographers','focused','surveyor','surveyor',BURST_WORDS.cartographers],
+    ['mirror',undefined,'retrospective','retrospective',BURST_WORDS.mirror],
+    ['consilium',undefined,'principle','dialogue',BURST_WORDS.consilium],
+    ['witness',undefined,'patterns','patterns',BURST_WORDS.witness.patterns],
+    ['tribunal','standard','inverter','inverter',BURST_WORDS.tribunal],
+  ];
+  for(const [id,mode,speaker,stage,expected] of samples){
+    const s=start(id,mode);
+    const st=s.steps.find(x=>x.speaker===speaker&&x.stage===stage)||s.steps.find(x=>x.stage===stage)||s.steps.find(x=>x.speaker===speaker);
+    assert.ok(st,`${id} missing step ${speaker}/${stage}`);
+    assert.equal(st.burstWords,expected,`${id} step burstWords`);
+    const p=buildPrompt(s,st);
+    assert.equal(p.wordBudget,expected,`${id} prompt budget`);
+  }
+});
+test('Fates stopBudget caps the first burst at burstWords and never exceeds remaining stop words',()=>{
+  const s=start('fates','sprint');
+  const st=s.steps.find(x=>x.stopWords);
+  assert.equal(st.burstWords,125);
+  assert.equal(st.stopWords,250);
+  const first=buildPrompt(s,st);
+  assert.equal(first.wordBudget,125);
+  s.transcript.push({id:randomUUID(),role:'voice',speaker:st.speaker,stage:st.stage,text:Array(100).fill('word').join(' '),createdAt:new Date().toISOString(),evidenceIds:[]});
+  s.burst=1;
+  const second=buildPrompt(s,st);
+  assert.ok(second.wordBudget<=125);
+  assert.ok(second.wordBudget<=150);
+  assert.equal(second.wordBudget,Math.min(125,250-100));
 });

@@ -9,6 +9,17 @@ const copy=v=>structuredClone(v);
 const words=s=>String(s||'').trim().split(/\s+/u).filter(Boolean).length;
 const stamp=()=>new Date().toISOString();
 const COMPILE=new Set(['map','synthesis','convergence','weave']);
+// Per-protocol non-compile burst budgets (reviewable). Analytic stages get 180; Fates, Consilium dialogue and Tribunal stay short.
+export const BURST_WORDS={
+ fates:90,
+ consilium:90,
+ tribunal:90,
+ mirror:90,
+ refinery:180,
+ cartographers:180,
+ witness:{trace:90,patterns:180,recalibration:180},
+ horizon:{ketill:180,alvar:180,sigrid:90},
+};
 const step=(speaker,stage=speaker,gate=null,extra={})=>{
  const compile=COMPILE.has(stage)||speaker==='weave';
  return {speaker,stage,gate,maxBursts:compile?1:3,burstWords:compile?425:90,...extra};
@@ -18,27 +29,28 @@ function thinTribunal(intake){
  return words(blob)<40||[intake.problem,intake.entrenchment,intake.framing].some(v=>!v||words(v)<8);
 }
 function plan(id,mode,intake){
+ const B=BURST_WORDS;
  if(id==='fates'){
   const perCycle=mode==='long'?4:3,cycles=mode==='long'?3:mode==='normal'?2:1;
   // Gated steps are confirm/verify/reflection only. Ordinary answer checkpoints come from a question in the burst model.
-  const list=[step('lachesis','briefing','answer',{maxBursts:1,burstWords:90}),step('lachesis','briefing','answer',{maxBursts:1,burstWords:90}),step('lachesis','plan','confirm',{maxBursts:1})];
+  const list=[step('lachesis','briefing','answer',{maxBursts:1,burstWords:B.fates}),step('lachesis','briefing','answer',{maxBursts:1,burstWords:B.fates}),step('lachesis','plan','confirm',{maxBursts:1,burstWords:B.fates})];
   for(let c=0;c<cycles;c++){
    for(let t=0;t<perCycle;t++)list.push(step(t%2?'atropos':'clotho',`cycle-${c+1}-${t+1}`,null,{maxBursts:2,burstWords:125,stopWords:250}));
-   if(c<cycles-1)list.push(step('lachesis',`interrogation-${c+1}`,'answer',{maxBursts:1}));
+   if(c<cycles-1)list.push(step('lachesis',`interrogation-${c+1}`,'answer',{maxBursts:1,burstWords:B.fates}));
   }
-  return [...list,step('lachesis','filter','confirm',{maxBursts:1,filter:true}),step('weave','weave',null,{maxBursts:1,burstWords:425}),step('lachesis','close','answer',{maxBursts:1})];
-}
- if(id==='horizon')return [step('ketill','ketill',null,{maxBursts:3}),step('alvar','alvar',null,{maxBursts:3}),step('sigrid','sigrid','answer',{maxBursts:1}),step('controller','map',null,{maxBursts:1,burstWords:425})];
- if(id==='refinery')return ({full:['builder','breaker','reforger'],build:['builder'],break:['breaker'],reforge:['reforger'],'build-break':['builder','breaker'],'break-reforge':['breaker','reforger']})[mode].map(s=>step(s));
- if(id==='cartographers'){
-  if(mode==='interrogation')return ['landscape','contradictions','citation-chain','gaps','methodology','master-synthesis','assumptions','knowledge-map','so-what'].map((s,i)=>step(i===0||i===4?'surveyor':i===1||i===2||i===6?'miner':'cartographer',s,null,s==='master-synthesis'?{maxBursts:1,burstWords:425}:{}));
-  return [...(mode==='direct'?[]:[step('surveyor')]),step('miner'),step('cartographer')];
+  return [...list,step('lachesis','filter','confirm',{maxBursts:1,filter:true,burstWords:B.fates}),step('weave','weave',null,{maxBursts:1,burstWords:425}),step('lachesis','close','answer',{maxBursts:1,burstWords:B.fates})];
  }
- if(id==='mirror')return [...(mode==='deep'?[step('controller','framing','confirm',{maxBursts:1})]:[]),step('retrospective'),step('prospective'),step('present','present','answer',{maxBursts:1}),step('controller','synthesis',null,{maxBursts:1,burstWords:425})];
- if(id==='consilium')return [step('controller','framing','confirm',{maxBursts:1}),step('principle','dialogue')];
- if(id==='witness')return [step('trace','trace','verify',{maxBursts:1}),step('patterns'),step('recalibration')];
- const clarify=thinTribunal(intake||{})?[step('controller','clarify',null,{maxBursts:2,burstWords:90,clarify:true})]:[];
- return [...clarify,step('inverter'),step('scaler'),step('context-shifter'),step('controller','convergence',null,{maxBursts:1,burstWords:425})];
+ if(id==='horizon')return [step('ketill','ketill',null,{maxBursts:3,burstWords:B.horizon.ketill}),step('alvar','alvar',null,{maxBursts:3,burstWords:B.horizon.alvar}),step('sigrid','sigrid','answer',{maxBursts:1,burstWords:B.horizon.sigrid}),step('controller','map',null,{maxBursts:1,burstWords:425})];
+ if(id==='refinery')return ({full:['builder','breaker','reforger'],build:['builder'],break:['breaker'],reforge:['reforger'],'build-break':['builder','breaker'],'break-reforge':['breaker','reforger']})[mode].map(s=>step(s,s,null,{burstWords:B.refinery}));
+ if(id==='cartographers'){
+  if(mode==='interrogation')return ['landscape','contradictions','citation-chain','gaps','methodology','master-synthesis','assumptions','knowledge-map','so-what'].map((s,i)=>step(i===0||i===4?'surveyor':i===1||i===2||i===6?'miner':'cartographer',s,null,s==='master-synthesis'?{maxBursts:1,burstWords:425}:{burstWords:B.cartographers}));
+  return [...(mode==='direct'?[]:[step('surveyor',undefined,null,{burstWords:B.cartographers})]),step('miner',undefined,null,{burstWords:B.cartographers}),step('cartographer',undefined,null,{burstWords:B.cartographers})];
+ }
+ if(id==='mirror')return [...(mode==='deep'?[step('controller','framing','confirm',{maxBursts:1,burstWords:B.mirror})]:[]),step('retrospective',undefined,null,{burstWords:B.mirror}),step('prospective',undefined,null,{burstWords:B.mirror}),step('present','present','answer',{maxBursts:1,burstWords:B.mirror}),step('controller','synthesis',null,{maxBursts:1,burstWords:425})];
+ if(id==='consilium')return [step('controller','framing','confirm',{maxBursts:1,burstWords:B.consilium}),step('principle','dialogue',null,{burstWords:B.consilium})];
+ if(id==='witness')return [step('trace','trace','verify',{maxBursts:1,burstWords:B.witness.trace}),step('patterns',undefined,null,{burstWords:B.witness.patterns}),step('recalibration',undefined,null,{burstWords:B.witness.recalibration})];
+ const clarify=thinTribunal(intake||{})?[step('controller','clarify',null,{maxBursts:2,burstWords:B.tribunal,clarify:true})]:[];
+ return [...clarify,step('inverter',undefined,null,{burstWords:B.tribunal}),step('scaler',undefined,null,{burstWords:B.tribunal}),step('context-shifter',undefined,null,{burstWords:B.tribunal}),step('controller','convergence',null,{maxBursts:1,burstWords:425})];
 }
 export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},requestId}){
  const def=catalog.find(d=>d.id===protocolId);if(!def)throw fault(400,'validation_error','Unknown protocol.');
@@ -55,6 +67,14 @@ export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},r
 function add(s,role,speaker,stage,text,evidenceIds=[],extra={}){if(s.transcript.length>=MAX_TURNS)throw fault(413,'session_limit','Session reached its 500-turn limit.');s.transcript.push({id:randomUUID(),role,speaker,stage,text,createdAt:stamp(),evidenceIds,...extra});}
 export function canFinish(s){const min=s.mode==='extended'?2:1;return ['principle','consequence','virtue'].every(v=>(s.dialogueCounts[v]||0)>=min&&(s.answered[v]||0)>=1);}
 function atFilter(s){return s.checkpoint&&s.steps[s.cursor]?.filter;}
+// wrap is Fates-only and only before the filter (not at filter, reopen, weave or close).
+function canWrap(s){
+ if(s.protocolId!=='fates'||s.checkpoint?.kind!=='answer')return false;
+ const st=s.steps[s.cursor];
+ if(!st||st.filter||st.stage==='weave'||st.stage==='close'||String(st.stage).startsWith('reopen'))return false;
+ const fi=s.steps.findIndex(x=>x.filter);
+ return fi>=0&&s.cursor<fi;
+}
 function refresh(s){
  const waiting=s.status==='waiting',filter=atFilter(s);
  let actions;
@@ -63,7 +83,7 @@ function refresh(s){
   else if(s.checkpoint.kind==='reflection')actions=['reflect'];
   else if(filter)actions=[...(s.reopens<2?['confirm','reopen','close']:['confirm','close'])];
   else if(s.checkpoint.kind==='confirm')actions=['confirm','correct'];
-  else actions=['answer','decline','wrap'];
+  else {actions=['answer','decline'];if(canWrap(s))actions.push('wrap');}
   if(s.protocolId==='consilium'&&s.stage==='dialogue'&&canFinish(s))actions.push('finish');
   actions.push('pause','cancel');
  } else if(s.status==='paused')actions=['resume','cancel'];
@@ -81,7 +101,7 @@ function nextDialogue(s,candidate){
  const min=Math.min(...voices.map(v=>s.dialogueCounts[v]||0));let next=voices.includes(candidate)?candidate:voices.find(v=>(s.dialogueCounts[v]||0)===min);
  if(!total&&next==='virtue')next='principle';
  if((s.dialogueCounts[next]||0)>min+1)next=voices.find(v=>(s.dialogueCounts[v]||0)===min);
- return step(next,'dialogue');
+ return step(next,'dialogue',null,{burstWords:BURST_WORDS.consilium});
 }
 function jumpToFilter(s){
  const i=s.steps.findIndex(st=>st.filter);
@@ -99,7 +119,7 @@ export function act(current,{action,text,revision,requestId}){
  if(action==='cancel'){s.status='cancelled';s.lease=null;return refresh(s);}
  if(action==='resume'){s.status=s.resumeStatus==='waiting'?'waiting':'queued';return refresh(s);}
  if(action==='retry'){s.status='queued';s.lease=null;return refresh(s);}
- if(action==='wrap'){add(s,'user','you',s.stage,text?.trim()||'Wrap to the filter.');jumpToFilter(s);s.checkpoint=null;s.status='queued';return refresh(s);}
+ if(action==='wrap'){add(s,'user','you',s.stage,text?.trim()||'Wrap to the filter.');jumpToFilter(s);s.continueBurst=false;s.burst=0;s.checkpoint=null;s.status='queued';return refresh(s);}
  if(action==='reopen'){
   add(s,'user','you',s.stage,text.trim());
   const filterTurn=[...s.transcript].reverse().find(t=>t.stage==='filter'&&t.role==='voice');
@@ -123,10 +143,16 @@ export function act(current,{action,text,revision,requestId}){
   s.cursor++;s.burst=0;s.continueBurst=false;
  } else if(s.protocolId==='consilium'&&s.stage==='dialogue'){
   s.answered[s.speaker]=(s.answered[s.speaker]||0)+1;
-  s.steps.push(action==='finish'?step('controller','map','reflection',{maxBursts:1,burstWords:425}):nextDialogue(s,s.nextSpeaker));
-  s.continueBurst=false;s.burst=0;
+  // continueBurst is the source of truth: mid-burst answers stay on the same dialogue step.
+  if(s.continueBurst){s.continueBurst=false;}
+  else {
+   s.steps.push(action==='finish'?step('controller','map','reflection',{maxBursts:1,burstWords:425}):nextDialogue(s,s.nextSpeaker));
+   s.burst=0;s.continueBurst=false;
+  }
  } else if(s.stage==='clarify'&&text?.trim()){
   s.intake.clarifications=[s.intake.clarifications,text.trim()].filter(Boolean).join('\n');
+  s.continueBurst=false;
+ } else if(s.continueBurst){
   s.continueBurst=false;
  } else s.continueBurst=false;
  s.checkpoint=null;s.status='queued';return refresh(s);
@@ -134,7 +160,8 @@ export function act(current,{action,text,revision,requestId}){
 function stopBudget(s,st,stage){
  if(st.stopWords){
   const used=s.transcript.filter(t=>t.role==='voice'&&t.stage===stage).reduce((n,t)=>n+words(t.text),0);
-  return Math.max(1,st.stopWords-used);
+  const remaining=st.stopWords-used;
+  return Math.max(1,Math.min(st.burstWords||90,remaining));
  }
  return st.burstWords||90;
 }
@@ -144,7 +171,7 @@ export function buildPrompt(s,currentStep){
  const isolated=s.protocolId==='tribunal'&&speaker!=='controller';
  const previous=isolated?[]:s.transcript;
  const maxBursts=currentStep.maxBursts??3,burst=(s.burst||0)+1,finalBurst=burst>=maxBursts;
- const budget=s.protocolId==='consilium'&&stage==='dialogue'?100:s.protocolId==='tribunal'&&s.mode==='quick'&&speaker!=='controller'?100:stopBudget(s,currentStep,stage);
+ const budget=stopBudget(s,currentStep,stage);
  const knownContext=s.evidence.filter(e=>e.kind==='knowledge'||e.kind==='knowledge_hub_note'||e.kind==='central_node'||String(e.kind||'').startsWith('web'));
  const continuation=burst>1?`Continuation burst ${burst} of ${maxBursts}. The user answered your previous question. Continue from that answer. Do not repeat prior analysis.`:`Burst ${burst} of ${maxBursts}. Default length about ${budget} words.`;
  const closeRule=finalBurst&&!gate?'This is your final burst for this step. Close without asking a question.':'';
@@ -280,8 +307,10 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   }
   s.burst=(s.burst||0)+1;
   const maxBursts=st.maxBursts??3;
-  const done=result.done!==false;
   const hardGate=st.gate&&st.gate!=='answer';
+  // Final ungated burst must close without asking, even if the model ignored the prompt.
+  if(s.burst>=maxBursts&&!st.gate)question=null;
+  const done=result.done!==false||(!question&&!st.gate);
   const mayContinue=!hardGate&&question&&!done&&s.burst<maxBursts;
   let output=result.text;if(question&&!output.includes(question))output+=`\n\n${question}`;
   add(s,st.speaker==='controller'?'controller':'voice',st.speaker,st.stage,output,result.evidenceIds,{trimmed:result.trimmed||undefined,done,nextSpeaker:result.nextSpeaker});
