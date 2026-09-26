@@ -6,8 +6,15 @@
 import { fetchEntityOverview } from '@/api/entities';
 import { fetchPersonBrief } from '@/api/people-brief';
 import {
+  acceptLinkProposal,
+  declineLinkProposal,
+  fetchLinkProposals,
   fetchOrgCrestUrl,
   fetchPeopleDirectory,
+  fetchPersonLedger,
+  patchLedgerItem,
+  runClareLedgerScan,
+  runLinkInference,
   signOrgCrest,
   updateOrganisation,
   uploadSignedCrest,
@@ -120,7 +127,7 @@ function matchesFilters(row: DirectoryPersonRow, query: DirectoryQueryState): bo
     if (row.organisation?.current !== false && !row.organisations.some((o) => !o.current)) return false;
   }
   if (query.warmth !== 'all' && row.warmth_band !== query.warmth) return false;
-  if (query.hasOpen && row.open_item_count <= 0 && row.you_owe_count <= 0) return false;
+  if (query.hasOpen && row.open_item_count <= 0 && row.you_owe_count <= 0 && row.they_owe_count <= 0 && !(row.pending_proposal_count ?? 0)) return false;
   return true;
 }
 
@@ -407,7 +414,7 @@ export async function renderPeoplePage(
       pills.append(pill);
     }
     if (query.hasOpen) {
-      const pill = el('button', 'people-page__pill', 'Has open items ✕') as HTMLButtonElement;
+      const pill = el('button', 'people-page__pill', 'Needs you ✕') as HTMLButtonElement;
       pill.type = 'button';
       pill.addEventListener('click', () => {
         query = { ...query, hasOpen: false };
@@ -422,12 +429,20 @@ export async function renderPeoplePage(
   function rowSignal(row: DirectoryPersonRow): { primary: string; secondary: string } {
     const model = personModels.get(row.id);
     const youOwe = model?.youOweCount ?? row.you_owe_count;
-    const open = model?.openItemCount ?? row.open_item_count;
-    if (youOwe > 0 || open > 0) {
-      return { primary: `You owe ${youOwe || open}`, secondary: model?.next?.title ?? row.next_label ?? '' };
+    const theyOwe = model?.theyOweCount ?? row.they_owe_count;
+    const proposals = model?.pendingProposalCount ?? row.pending_proposal_count ?? 0;
+    if (youOwe > 0) {
+      return { primary: `You owe ${youOwe}`, secondary: model?.next?.title ?? row.next_label ?? '' };
     }
-    if (row.warmth_band === 'cold') return { primary: '', secondary: 'cold' };
-    if (row.warmth_band === 'cooling') return { primary: '', secondary: 'cooling' };
+    if (theyOwe > 0) {
+      return { primary: `Owes you ${theyOwe}`, secondary: model?.next?.title ?? row.next_label ?? '' };
+    }
+    if (proposals > 0) {
+      return { primary: `Needs you ${proposals}`, secondary: '' };
+    }
+    const band = model?.warmthBand ?? row.warmth_band;
+    if (band === 'cold') return { primary: '', secondary: 'cold' };
+    if (band === 'cooling') return { primary: '', secondary: 'cooling' };
     return { primary: '', secondary: row.next_label ?? '' };
   }
 
@@ -546,21 +561,63 @@ export async function renderPeoplePage(
     if (arcHost) setSectionState(arcHost, 'loading');
 
     try {
-      const [overview, brief] = await Promise.all([
-        fetchEntityOverview(personRef(id)),
-        fetchPersonBrief(id).catch(() => null)
+      const ref = personRef(id);
+      const [overview, brief, proposalsRes, ledgerRes] = await Promise.all([
+        fetchEntityOverview(ref),
+        fetchPersonBrief(id).catch(() => null),
+        fetchLinkProposals(ref, { status: 'pending' }).catch(() => ({ proposals: [], count: 0 })),
+        fetchPersonLedger(ref).catch(() => null)
       ]);
       if (!isCurrent() || selectedId !== id) return;
-      const model = buildPersonModel({ overview, brief });
+
+      const ledgerForModel = ledgerRes
+        ? {
+            you_owe: (ledgerRes.you_owe ?? []).map((item) => ({
+              id: item.id,
+              direction: 'you_owe' as const,
+              text: item.text,
+              sourceLabel: item.source_label ?? 'task',
+              href: item.href ?? null,
+              derived: item.derived,
+              author: item.author,
+              status: item.status
+            })),
+            they_owe: (ledgerRes.they_owe ?? []).map((item) => ({
+              id: item.id,
+              direction: 'they_owe' as const,
+              text: item.text,
+              sourceLabel: item.source_label ?? 'task',
+              href: item.href ?? null,
+              derived: item.derived,
+              author: item.author,
+              status: item.status
+            })),
+            you_owe_count: ledgerRes.you_owe_count,
+            they_owe_count: ledgerRes.they_owe_count,
+            open_item_count: ledgerRes.open_item_count
+          }
+        : null;
+
+      const model = buildPersonModel({
+        overview,
+        brief,
+        ledger: ledgerForModel,
+        proposals: (proposalsRes.proposals ?? []).map((p) => ({
+          id: p.id,
+          chip_label: p.chip_label,
+          reason: p.reason,
+          status: p.status
+        }))
+      });
       personModels.set(id, model);
 
-      // Patch directory open counts from the same model (V4).
       if (directory) {
         const row = directory.people.find((p) => p.id === id);
         if (row) {
           row.open_item_count = model.openItemCount;
           row.you_owe_count = model.youOweCount;
           row.they_owe_count = model.theyOweCount;
+          row.pending_proposal_count = model.pendingProposalCount;
           row.role_line = model.roleLine;
           row.warmth = model.warmth;
           row.warmth_band = model.warmthBand;
@@ -570,33 +627,86 @@ export async function renderPeoplePage(
       if (headerHost) {
         headerHost.replaceChildren();
         const row = el('div', 'people-pane__header');
-        row.append(
-          warmthRing(
-            model.warmth,
-            model.initials,
-            'lg',
-            model.organisation
-              ? {
-                  monogram: model.organisation.monogram,
-                  orgRef: model.organisation.ref,
-                  logoKey:
-                    directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
-                    null
-                }
-              : undefined
-          )
+        const ring = warmthRing(
+          model.warmth,
+          model.initials,
+          'lg',
+          model.organisation
+            ? {
+                monogram: model.organisation.monogram,
+                orgRef: model.organisation.ref,
+                logoKey:
+                  directory?.organisations.find((o) => o.ref === model.organisation?.ref)?.logo_key ??
+                  null
+              }
+            : undefined
         );
+        ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
+        row.append(ring);
         const stack = el('div', 'people-pane__header-stack');
         stack.append(el('h2', 'people-pane__name', model.displayName));
         const chips = el('div', 'people-pane__chips');
         for (const chip of model.chips) {
-          const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
-          if (chip.orgMonogram) {
-            c.prepend(crestNode(chip.orgMonogram, 'sm'));
+          if (chip.kind === 'proposal' && chip.proposalId) {
+            const c = el('span', 'people-pane__chip people-pane__chip--proposal');
+            c.append(document.createTextNode(chip.label + ' '));
+            const accept = el('button', 'people-pane__chip-act', '✓') as HTMLButtonElement;
+            accept.type = 'button';
+            accept.setAttribute('aria-label', 'Accept link proposal');
+            accept.title = 'Accept';
+            const decline = el('button', 'people-pane__chip-act', '✕') as HTMLButtonElement;
+            decline.type = 'button';
+            decline.setAttribute('aria-label', 'Decline link proposal');
+            decline.title = 'Decline';
+            const pid = chip.proposalId;
+            accept.addEventListener('click', () => {
+              void (async () => {
+                try {
+                  await acceptLinkProposal(pid);
+                  await loadPersonSections(id);
+                } catch (err) {
+                  window.alert(err instanceof Error ? err.message : 'Accept failed.');
+                }
+              })();
+            });
+            decline.addEventListener('click', () => {
+              void (async () => {
+                try {
+                  await declineLinkProposal(pid);
+                  await loadPersonSections(id);
+                } catch (err) {
+                  window.alert(err instanceof Error ? err.message : 'Decline failed.');
+                }
+              })();
+            });
+            c.append(accept, decline);
+            chips.append(c);
+          } else {
+            const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
+            if (chip.title) c.title = chip.title;
+            if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
+            chips.append(c);
           }
-          chips.append(c);
         }
         stack.append(chips);
+        const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
+        checkLinks.type = 'button';
+        checkLinks.addEventListener('click', () => {
+          void (async () => {
+            checkLinks.disabled = true;
+            checkLinks.textContent = 'Checking…';
+            try {
+              await runLinkInference();
+              await loadPersonSections(id);
+            } catch (err) {
+              window.alert(err instanceof Error ? err.message : 'Check for links failed.');
+            } finally {
+              checkLinks.disabled = false;
+              checkLinks.textContent = 'Check for links';
+            }
+          })();
+        });
+        stack.append(checkLinks);
         row.append(stack);
         const edit = el('button', 'btn btn--secondary', 'Edit') as HTMLButtonElement;
         edit.type = 'button';
@@ -616,11 +726,7 @@ export async function renderPeoplePage(
           const card = el('div', 'people-pane__next');
           const when = formatDisplayDate(model.next.detail);
           card.append(
-            el(
-              'p',
-              undefined,
-              `${model.next.title}${when ? ` · ${when}` : ''}`
-            )
+            el('p', undefined, `${model.next.title}${when ? ` · ${when}` : ''}`)
           );
           nextHost.append(card);
         }
@@ -628,31 +734,48 @@ export async function renderPeoplePage(
 
       if (ledgerHost) {
         ledgerHost.replaceChildren();
+        const reading = el('p', 'people-pane__clare-status');
+        reading.hidden = true;
+        reading.textContent = 'Clare is reading…';
+        ledgerHost.append(reading);
+
         const grid = el('div', 'people-pane__ledger');
         const you = el('div');
-        you.append(el('div', 'people-pane__ledger-h people-pane__ledger-h--you', 'You owe them'));
+        you.append(
+          el(
+            'div',
+            'people-pane__ledger-h people-pane__ledger-h--you',
+            `You owe ${model.displayName.split(' ')[0] ?? 'them'}`
+          )
+        );
         if (model.ledgerYouOwe.length === 0) {
           you.append(el('p', 'people-pane__empty', 'Nothing open.'));
         } else {
           for (const item of model.ledgerYouOwe) {
-            const li = el('div', 'people-pane__li');
-            li.append(el('div', undefined, item.text));
-            li.append(el('div', 'people-pane__row-sub', item.sourceLabel));
-            you.append(li);
+            you.append(renderLedgerItem(item, id));
           }
         }
         const them = el('div');
-        them.append(el('div', 'people-pane__ledger-h people-pane__ledger-h--them', 'They owe you'));
-        them.append(el('p', 'people-pane__empty', 'Nothing to confirm'));
+        them.append(
+          el(
+            'div',
+            'people-pane__ledger-h people-pane__ledger-h--them',
+            `${model.displayName.split(' ')[0] ?? 'They'} owe you`
+          )
+        );
+        if (model.ledgerTheyOwe.length === 0) {
+          them.append(el('p', 'people-pane__empty', 'Nothing to confirm'));
+        } else {
+          for (const item of model.ledgerTheyOwe) {
+            them.append(renderLedgerItem(item, id));
+          }
+        }
         grid.append(you, them);
         ledgerHost.append(grid);
       }
 
       if (rememberHost) {
         setSectionState(rememberHost, 'empty', "Ann hasn't found anything yet. Run now");
-        const run = rememberHost.querySelector('p');
-        // "Run now" is Phase 5 — keep the empty copy visible (I3).
-        void run;
       }
 
       if (arcHost) {
@@ -698,6 +821,52 @@ export async function renderPeoplePage(
     }
   }
 
+  function renderLedgerItem(
+    item: {
+      id: string;
+      text: string;
+      sourceLabel: string;
+      derived?: boolean;
+    },
+    personId: string
+  ): HTMLElement {
+    const li = el('div', 'people-pane__li');
+    const text = el('div', 'people-pane__li-text', item.text);
+    text.contentEditable = item.derived ? 'false' : 'true';
+    if (!item.derived) {
+      text.addEventListener('blur', () => {
+        const next = text.textContent?.trim() ?? '';
+        if (!next || next === item.text) return;
+        void patchLedgerItem({ id: item.id, text: next }).then(() => loadPersonSections(personId));
+      });
+    }
+    li.append(text);
+    li.append(el('div', 'people-page__row-sub', item.sourceLabel));
+    const acts = el('div', 'people-pane__li-acts');
+    if (!item.derived) {
+      const done = el('button', 'people-pane__li-act', 'Done') as HTMLButtonElement;
+      done.type = 'button';
+      done.title = 'Mark done';
+      done.addEventListener('click', () => {
+        void patchLedgerItem({ id: item.id, status: 'done' }).then(() => loadPersonSections(personId));
+      });
+      const dismiss = el('button', 'people-pane__li-act', 'Dismiss') as HTMLButtonElement;
+      dismiss.type = 'button';
+      dismiss.title = 'Dismiss';
+      dismiss.addEventListener('click', () => {
+        void patchLedgerItem({ id: item.id, status: 'dismissed' }).then(() => loadPersonSections(personId));
+      });
+      acts.append(done, dismiss);
+    }
+    const toComms = el('button', 'people-pane__li-act', '→ Comms') as HTMLButtonElement;
+    toComms.type = 'button';
+    toComms.disabled = true;
+    toComms.title = 'Needs Communications';
+    acts.append(toComms);
+    li.append(acts);
+    return li;
+  }
+
   function mountPaneSkeleton(): void {
     pane.replaceChildren();
     if (!selectedId) {
@@ -726,8 +895,38 @@ export async function renderPeoplePage(
 
     const ledger = sectionHost('', 'The ledger');
     ledger.root.setAttribute('data-section', 'ledger');
+    const ledgerH2 = ledger.root.querySelector('.people-pane__h2');
     const sub = el('span', 'people-pane__h2-sub', 'from tasks, notes, emails');
-    ledger.root.querySelector('.people-pane__h2')?.append(sub);
+    const clareBtn = el('button', 'people-pane__clare-btn', 'Clare') as HTMLButtonElement;
+    clareBtn.type = 'button';
+    clareBtn.title = 'Ask Clare to read this person’s tasks and notes';
+    clareBtn.setAttribute('aria-label', 'Ask Clare to update the ledger');
+    clareBtn.addEventListener('click', () => {
+      if (!selectedId) return;
+      const status = ledger.body.querySelector('.people-pane__clare-status') as HTMLElement | null;
+      void (async () => {
+        if (status) {
+          status.hidden = false;
+          status.textContent = 'Clare is reading…';
+        }
+        clareBtn.disabled = true;
+        try {
+          await runClareLedgerScan({
+            person_ref: personRef(selectedId),
+            display_name: personModels.get(selectedId)?.displayName
+          });
+          await loadPersonSections(selectedId);
+        } catch (err) {
+          if (status) {
+            status.hidden = false;
+            status.textContent = err instanceof Error ? err.message : 'Clare could not read right now.';
+          }
+        } finally {
+          clareBtn.disabled = false;
+        }
+      })();
+    });
+    ledgerH2?.append(sub, clareBtn);
     setSectionState(ledger.body, 'loading');
     pane.append(ledger.root);
 
@@ -899,7 +1098,7 @@ export async function renderPeoplePage(
     const openCb = document.createElement('input');
     openCb.type = 'checkbox';
     openCb.checked = query.hasOpen;
-    open.append(openCb, document.createTextNode(' Has open items'));
+    open.append(openCb, document.createTextNode(' Needs you (open items or link proposals)'));
 
     const apply = el('button', 'btn btn--primary', 'Apply') as HTMLButtonElement;
     apply.type = 'button';

@@ -1,11 +1,11 @@
 import { formatEntityRef } from './entity-ref.mjs';
-import { classifyRelationshipState } from './relationship-state.mjs';
+import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
 /**
- * People redesign Phase 1 — directory rows assembled from
- * `loadAllPeopleWithRelationships` output. No new storage; open-item counts
- * stay 0 here until the selected person's brief/overview fills
- * `buildPersonModel` (client) — Phase 4 ledger enrichment lands later.
+ * People redesign Phase 1–3 — directory rows assembled from
+ * `loadAllPeopleWithRelationships` output. Warmth from Phase 3 score.
+ * Open-item / proposal counts stay 0 here until the selected person's
+ * brief/ledger/proposals fill them (V4 patches client-side too).
  */
 
 const ORG_LINK_TYPES = new Set(['employee_at', 'member_of']);
@@ -48,20 +48,17 @@ function orgMonogram(name) {
     .toUpperCase();
 }
 
-function effectiveLinkDate(link) {
-  return link.occurred_at ?? link.valid_from ?? link.created_at ?? null;
-}
-
 function isCurrentLink(link) {
   return link.status === 'current' || (!link.valid_to && link.status !== 'ended' && link.status !== 'archived');
 }
 
 /**
  * @param {Array<{ person: object, relationships: Array<{ link: object, endpoint: object, direction: string }> }>} peopleWithRelationships
- * @param {{ now?: Date|string }} [options]
+ * @param {{ now?: Date|string, proposalCounts?: Record<string, number> }} [options]
  */
 export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
   const nowIso = options.now instanceof Date ? options.now.toISOString() : options.now ?? new Date().toISOString();
+  const proposalCounts = options.proposalCounts ?? {};
   const organisationsByRef = new Map();
   const people = [];
 
@@ -73,7 +70,6 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     const currentOrgLinks = [];
     const formerOrgLinks = [];
     const proRoles = [];
-    const proDates = [];
 
     for (const entry of relationships ?? []) {
       const { link, endpoint } = entry;
@@ -99,19 +95,17 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
           label: human || ROLE_LABELS[role] || role,
           current: isCurrentLink(link)
         });
-        const d = effectiveLinkDate(link);
-        if (d) proDates.push(d);
       }
     }
 
-    proDates.sort((a, b) => Date.parse(b) - Date.parse(a));
-    const last = proDates[0] ?? null;
-    const prev = proDates[1] ?? null;
-    const state = classifyRelationshipState({
-      lastMeaningfulInteraction: last,
-      previousMeaningfulInteraction: prev,
-      upcomingInteraction: null,
-      activeSharedContexts: proRoles.filter((r) => r.current).length + currentOrgLinks.length,
+    const touchpoints = touchpointsFromOverview({
+      relationships: relationships ?? [],
+      timeline: [],
+      linkedRecords: {}
+    });
+    const warmthResult = warmthFor({
+      touchpoints,
+      relationships: relationships ?? [],
       personCreatedAt: person.created_at,
       now: nowIso
     });
@@ -125,15 +119,7 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
           : `Formerly ${primaryOrg.display_name}`
         : 'No relationship on record');
 
-    // Provisional warmth from relationship-state bands (Phase 3 replaces with score).
-    const warmth =
-      state.state === 'active' || state.state === 'reactivated'
-        ? 70
-        : state.state === 'cooling'
-          ? 40
-          : state.state === 'new'
-            ? 55
-            : 15;
+    const pendingProposals = proposalCounts[personRef] ?? proposalCounts[person.id] ?? 0;
 
     people.push({
       id: person.id,
@@ -158,13 +144,16 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
         logo_key: o.logo_key,
         current: o.current
       })),
-      warmth,
-      warmth_band: state.state === 'dormant' ? 'cold' : state.state === 'cooling' ? 'cooling' : 'warm',
-      relationship_state: state.state,
-      relationship_reasons: state.reasons,
+      warmth: warmthResult.warmth,
+      warmth_band: warmthResult.band,
+      warmth_tier: warmthResult.tier,
+      warmth_feed_note: warmthResult.feedNote,
+      relationship_state: warmthResult.state,
+      relationship_reasons: warmthResult.reasons,
       open_item_count: 0,
       you_owe_count: 0,
       they_owe_count: 0,
+      pending_proposal_count: pendingProposals,
       next_label: null,
       created_at: person.created_at,
       updated_at: person.updated_at

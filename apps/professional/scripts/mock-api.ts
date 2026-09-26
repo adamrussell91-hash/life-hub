@@ -384,6 +384,7 @@ export function createMockApi() {
             open_item_count: 0,
             you_owe_count: 0,
             they_owe_count: 0,
+            pending_proposal_count: 0,
             next_label: null,
             created_at: String(p.created_at ?? '2020-01-01T00:00:00.000Z'),
             updated_at: String(p.updated_at ?? '2020-01-01T00:00:00.000Z')
@@ -404,6 +405,31 @@ export function createMockApi() {
           counts: { people: rows.length, organisations: organisations.size }
         }
       });
+    }
+
+    if (path === '/api/people/link-proposals' && method === 'GET') {
+      return json(200, { ok: true, data: { proposals: [], count: 0 } });
+    }
+
+    if (path === '/api/people/link-proposals' && method === 'POST') {
+      return json(200, { ok: true, data: { created: 0, skipped: 0, proposals: [], proposal: null } });
+    }
+
+    if (path === '/api/people/ledger' && method === 'GET') {
+      return json(200, {
+        ok: true,
+        data: {
+          you_owe: [],
+          they_owe: [],
+          you_owe_count: 0,
+          they_owe_count: 0,
+          open_item_count: 0
+        }
+      });
+    }
+
+    if (path === '/api/people/ledger' && method === 'POST') {
+      return json(200, { ok: true, data: { created: [], count: 0, note: 'Clare found nothing new to add.' } });
     }
 
     if (path === '/api/people/brief' && method === 'GET') {

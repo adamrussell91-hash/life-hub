@@ -2648,6 +2648,106 @@
   color: var(--ink);
 }
 
+.people-pane__chip--proposal {
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+}
+
+.people-pane__chip-act {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: var(--text-xs);
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.people-pane__chip-act:hover,
+.people-pane__chip-act:focus-visible {
+  color: var(--high-sea-ink);
+}
+
+.people-pane__check-links {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+.people-pane__clare-btn {
+  margin-left: auto;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  border-radius: 99px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.people-pane__clare-btn:hover,
+.people-pane__clare-btn:focus-visible {
+  border-color: var(--high-sea);
+  color: var(--high-sea-ink);
+}
+
+.people-pane__clare-status {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.people-pane__h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.people-pane__li {
+  position: relative;
+  max-height: 56px;
+  overflow: hidden;
+}
+
+.people-pane__li-text {
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.people-pane__li-acts {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: none;
+  gap: 4px;
+}
+
+.people-pane__li:hover .people-pane__li-acts,
+.people-pane__li:focus-within .people-pane__li-acts {
+  display: flex;
+}
+
+.people-pane__li-act {
+  border: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-2xs);
+  padding: 2px 6px;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.people-pane__li-act:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .people-pane__box {
   padding: 16px 18px;
   border-radius: var(--radius-md);

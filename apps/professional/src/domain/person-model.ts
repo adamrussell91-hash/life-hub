@@ -1,17 +1,24 @@
 /**
- * People redesign Phase 1 — one model for directory row signals and the
- * person pane (failure register V4).
+ * People redesign — one model for directory row signals and the person pane (V4).
+ * Phases 1–4: warmth score, ledger counts, pending proposals.
  */
 
 import type { EntityOverview, PersonBrief, RelationshipLink } from '@/domain/types';
-import { classifyRelationshipState, type RelationshipState } from '@/domain/relationship-state';
+import type { RelationshipState } from '@/domain/relationship-state';
+import {
+  touchpointsFromOverview,
+  warmthFor,
+  type WarmthBand
+} from '@/domain/warmth-score';
 
-export type WarmthBand = 'warm' | 'cooling' | 'cold';
+export type { WarmthBand };
 
 export interface PersonModelChip {
-  kind: 'relationship' | 'organisation' | 'warmth';
+  kind: 'relationship' | 'organisation' | 'warmth' | 'proposal';
   label: string;
   orgMonogram?: string | null;
+  proposalId?: string;
+  title?: string;
 }
 
 export interface PersonModelLedgerItem {
@@ -20,6 +27,16 @@ export interface PersonModelLedgerItem {
   text: string;
   sourceLabel: string;
   href: string | null;
+  derived?: boolean;
+  author?: string;
+  status?: string;
+}
+
+export interface PersonModelProposal {
+  id: string;
+  chip_label: string;
+  reason: string;
+  status: string;
 }
 
 export interface PersonModelArcPoint {
@@ -38,13 +55,16 @@ export interface PersonModel {
   chips: PersonModelChip[];
   warmth: number;
   warmthBand: WarmthBand;
+  warmthFeedNote: string;
   relationshipState: RelationshipState;
   relationshipReasons: string[];
   openItemCount: number;
   youOweCount: number;
   theyOweCount: number;
+  pendingProposalCount: number;
   ledgerYouOwe: PersonModelLedgerItem[];
   ledgerTheyOwe: PersonModelLedgerItem[];
+  proposals: PersonModelProposal[];
   next: { title: string; detail: string; href: string | null } | null;
   arcPoints: PersonModelArcPoint[];
   organisation: {
@@ -95,25 +115,22 @@ function isCurrent(link: RelationshipLink): boolean {
   return link.status === 'current' || (!link.valid_to && link.status !== 'ended' && link.status !== 'archived');
 }
 
-function effectiveDate(link: RelationshipLink): string | null {
-  return link.occurred_at ?? link.valid_from ?? null;
-}
-
-function stateToWarmth(state: RelationshipState): { warmth: number; band: WarmthBand } {
-  if (state === 'active' || state === 'reactivated') return { warmth: 70, band: 'warm' };
-  if (state === 'cooling') return { warmth: 40, band: 'cooling' };
-  if (state === 'new') return { warmth: 55, band: 'warm' };
-  return { warmth: 15, band: 'cold' };
-}
-
 export interface BuildPersonModelInput {
   overview: EntityOverview;
   brief?: PersonBrief | null;
+  ledger?: {
+    you_owe?: PersonModelLedgerItem[];
+    they_owe?: PersonModelLedgerItem[];
+    you_owe_count?: number;
+    they_owe_count?: number;
+    open_item_count?: number;
+  } | null;
+  proposals?: PersonModelProposal[] | null;
   now?: string;
 }
 
 export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
-  const { overview, brief = null } = input;
+  const { overview, brief = null, ledger = null, proposals = null } = input;
   const entity = overview.entity;
   if (entity.kind !== 'person') {
     throw new Error('buildPersonModel requires a person overview');
@@ -130,21 +147,18 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
       e.endpoint.kind === 'organisation'
   );
 
-  const proDates = pro
-    .map((e) => effectiveDate(e.link))
-    .filter((d): d is string => Boolean(d))
-    .sort((a, b) => Date.parse(b) - Date.parse(a));
+  const touchpoints = touchpointsFromOverview({
+    timeline: overview.timeline ?? [],
+    linkedRecords: overview.linked_records as Parameters<typeof touchpointsFromOverview>[0]['linkedRecords'],
+    relationships: all
+  });
 
-  const state = classifyRelationshipState({
-    lastMeaningfulInteraction: proDates[0] ?? null,
-    previousMeaningfulInteraction: proDates[1] ?? null,
-    upcomingInteraction: brief?.header.next_interaction?.start ?? null,
-    activeSharedContexts:
-      pro.filter((e) => isCurrent(e.link)).length + orgs.filter((e) => isCurrent(e.link)).length,
+  const warmthResult = warmthFor({
+    touchpoints,
+    relationships: all as unknown as Parameters<typeof warmthFor>[0]['relationships'],
     personCreatedAt: entity.created_at,
     now: input.now
   });
-  const { warmth, band } = stateToWarmth(state.state);
 
   const chips: PersonModelChip[] = [];
   for (const entry of pro.filter((e) => isCurrent(e.link))) {
@@ -169,10 +183,23 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
       orgMonogram: orgMonogram(name)
     });
   }
+  // D1: band word only; number lives in tooltip (title).
+  const bandWord =
+    warmthResult.band === 'warm' ? 'Warming' : warmthResult.band === 'cooling' ? 'Cooling' : 'Cold';
   chips.push({
     kind: 'warmth',
-    label: `${band === 'warm' ? 'Warming' : band === 'cooling' ? 'Cooling' : 'Cold'} · ${warmth}`
+    label: bandWord,
+    title: `${warmthResult.warmth} · ${warmthResult.feedNote}`
   });
+
+  const pendingProposals = (proposals ?? []).filter((p) => p.status === 'pending');
+  for (const p of pendingProposals) {
+    chips.push({
+      kind: 'proposal',
+      label: p.chip_label,
+      proposalId: p.id
+    });
+  }
 
   const roleLine =
     chips.find((c) => c.kind === 'relationship')?.label ??
@@ -180,13 +207,41 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
       ? `${isCurrent(primaryOrg.link) ? 'At' : 'Formerly'} ${primaryOrg.endpoint.display_label}`
       : 'No relationship on record');
 
-  const ledgerYouOwe: PersonModelLedgerItem[] = (brief?.open_loops ?? []).map((loop) => ({
-    id: loop.ref,
-    direction: 'you_owe' as const,
-    text: loop.label,
-    sourceLabel: 'task',
-    href: loop.href
-  }));
+  let ledgerYouOwe: PersonModelLedgerItem[];
+  let ledgerTheyOwe: PersonModelLedgerItem[];
+
+  if (ledger) {
+    ledgerYouOwe = (ledger.you_owe ?? []).map((item) => ({
+      id: item.id,
+      direction: 'you_owe' as const,
+      text: item.text,
+      sourceLabel: item.sourceLabel ?? (item as { source_label?: string }).source_label ?? 'task',
+      href: item.href ?? null,
+      derived: item.derived,
+      author: item.author,
+      status: item.status
+    }));
+    ledgerTheyOwe = (ledger.they_owe ?? []).map((item) => ({
+      id: item.id,
+      direction: 'they_owe' as const,
+      text: item.text,
+      sourceLabel: item.sourceLabel ?? (item as { source_label?: string }).source_label ?? 'task',
+      href: item.href ?? null,
+      derived: item.derived,
+      author: item.author,
+      status: item.status
+    }));
+  } else {
+    ledgerYouOwe = (brief?.open_loops ?? []).map((loop) => ({
+      id: loop.ref,
+      direction: 'you_owe' as const,
+      text: loop.label,
+      sourceLabel: 'task',
+      href: loop.href,
+      derived: true
+    }));
+    ledgerTheyOwe = [];
+  }
 
   const next = brief?.header.next_interaction
     ? {
@@ -206,6 +261,10 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
     }))
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
+  const youOweCount = ledger?.you_owe_count ?? ledgerYouOwe.length;
+  const theyOweCount = ledger?.they_owe_count ?? ledgerTheyOwe.length;
+  const openItemCount = ledger?.open_item_count ?? youOweCount + theyOweCount + pendingProposals.length;
+
   return {
     id: entity.id,
     ref: entity.ref,
@@ -213,15 +272,18 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
     initials: monogram(entity.display_name),
     roleLine,
     chips,
-    warmth,
-    warmthBand: band,
-    relationshipState: state.state,
-    relationshipReasons: state.reasons,
-    openItemCount: ledgerYouOwe.length,
-    youOweCount: ledgerYouOwe.length,
-    theyOweCount: 0,
+    warmth: warmthResult.warmth,
+    warmthBand: warmthResult.band,
+    warmthFeedNote: warmthResult.feedNote,
+    relationshipState: warmthResult.state as RelationshipState,
+    relationshipReasons: warmthResult.reasons,
+    openItemCount,
+    youOweCount,
+    theyOweCount,
+    pendingProposalCount: pendingProposals.length,
     ledgerYouOwe,
-    ledgerTheyOwe: [],
+    ledgerTheyOwe,
+    proposals: pendingProposals,
     next,
     arcPoints,
     organisation: primaryOrg

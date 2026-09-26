@@ -131,6 +131,35 @@ describe('buildPersonModel', () => {
     expect(model.ledgerYouOwe[0]?.text).toBe('Set up mentoring meeting');
     expect(model.chips.some((c) => /mentee/i.test(c.label))).toBe(true);
     expect(model.organisation?.displayName).toBe('St. Aloysius College');
+    const warmthChip = model.chips.find((c) => c.kind === 'warmth');
+    expect(warmthChip?.label).toMatch(/Warming|Cooling|Cold/);
+    expect(warmthChip?.label).not.toMatch(/\d/);
+    expect(warmthChip?.title).toMatch(String(model.warmth));
+  });
+
+  it('uses one warmth number for band and state (Phase 3 V4)', () => {
+    const model = buildPersonModel({ overview: overviewFixture(), brief: briefFixture() });
+    expect(typeof model.warmth).toBe('number');
+    expect(model.warmthBand).toMatch(/warm|cooling|cold/);
+    expect(model.warmthFeedNote).toContain('Based on meetings');
+  });
+
+  it('counts pending proposals in openItemCount (Phase 2 V4)', () => {
+    const model = buildPersonModel({
+      overview: overviewFixture(),
+      brief: briefFixture(),
+      proposals: [
+        {
+          id: 'linkprop_00000000-0000-4000-8000-000000000099',
+          chip_label: 'Mentee? · from Project: Accreditation Mentor',
+          reason: 'from Project: Accreditation Mentor',
+          status: 'pending'
+        }
+      ]
+    });
+    expect(model.pendingProposalCount).toBe(1);
+    expect(model.openItemCount).toBe(2);
+    expect(model.chips.some((c) => c.kind === 'proposal')).toBe(true);
   });
 
   it('handles missing brief with empty ledger', () => {

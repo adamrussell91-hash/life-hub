@@ -104,6 +104,26 @@ describe('renderPeoplePage (W2 real entry)', () => {
             mutual_connections: []
           });
         }
+        if (url.includes('/api/people/link-proposals')) {
+          return jsonResponse({ proposals: [], count: 0 });
+        }
+        if (url.includes('/api/people/ledger')) {
+          return jsonResponse({
+            you_owe: [
+              {
+                id: 'derived:tasks:task:t1',
+                text: 'Set up mentoring meeting',
+                source_label: 'task',
+                derived: true,
+                status: 'open'
+              }
+            ],
+            they_owe: [],
+            you_owe_count: 1,
+            they_owe_count: 0,
+            open_item_count: 1
+          });
+        }
         return jsonResponse({});
       })
     );
