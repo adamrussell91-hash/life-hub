@@ -126,6 +126,15 @@ function chipFromEvent(event) {
     : start + (Number(record.duration_min) || 60) / 60;
   const kind = eventKind(record);
   const isClass = record.type === 'scheduled_lesson' || record.isClass === true;
+  const filterKey = kind === 'teaching' || isClass
+    ? (isClass || record.type === 'scheduled_lesson' ? 'classes' : 'events')
+    : kind === 'professional'
+      ? (record.type === 'professional_meeting' ? 'meetings' : 'pd')
+      : kind === 'task'
+        ? 'tasks'
+        : kind === 'health' || kind === 'fitness' || kind === 'corey'
+          ? kind
+          : null;
   return {
     id: record.id || event.path,
     date: record.date,
@@ -138,6 +147,7 @@ function chipFromEvent(event) {
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
     source: record.type,
+    filterKey,
     ...(workout?.skipped ? { skipped: true } : {})
   };
 }

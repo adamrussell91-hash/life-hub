@@ -11,6 +11,12 @@ import { applyHubPillsThumb } from '../hub-motion.js';
 import { acceptPlan } from './ghost-writes.js';
 import { ALMANAC_RULES, ALMANAC_WANTS } from './almanac-rules.js';
 import { getSydneyDateKey } from '../sydney-clock.js';
+import {
+  countByFilterKey,
+  countHidden,
+  paintSourceFilter,
+  readFilterState
+} from './calendar-filter.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const WANT_WHY = Object.fromEntries(ALMANAC_WANTS.map(want => [want.id, want.why]));
@@ -636,6 +642,19 @@ function paint(doc, host, view, options) {
   const askMark = el('span', 'alm-av', ask);
   askMark.textContent = 'H';
   ask.append(doc.createTextNode('What am I forgetting?'));
+
+  const filterState = readFilterState(options?.hub || 'life');
+  const beadItems = (view.lines ?? []).flatMap((line) => line.steps ?? []);
+  const sources = el('div', 'cal__sources', root, { 'data-part': 'sources' });
+  paintSourceFilter(doc, sources, {
+    hub: options?.hub || 'life',
+    state: filterState,
+    counts: countByFilterKey(beadItems),
+    hidden: countHidden(beadItems, filterState),
+    onChange: () => {
+      if (session) paint(doc, host, current ?? view, { ...options, hub: options?.hub || 'life' });
+    }
+  });
 
   const card = el('div', 'alm__card', root, { 'data-part': 'card' });
   const top = el('div', 'alm-top', card, { 'data-part': 'summary' });

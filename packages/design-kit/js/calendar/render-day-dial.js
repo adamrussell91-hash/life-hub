@@ -17,6 +17,13 @@ import { clock12, holidayRun, lightsOutFor, tomorrow as tomorrowBrief, tonight a
 import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
 import { buildTidelineModel, isSchoolHoliday, toHour } from './tideline-model.js';
 import { getSydneyMinutesOfDay } from '../sydney-clock.js';
+import {
+  countByFilterKey,
+  countHidden,
+  isItemVisible,
+  paintSourceFilter,
+  readFilterState
+} from './calendar-filter.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -287,6 +294,20 @@ function mount({ entrance = false } = {}) {
   el('button', 'hub-pills__btn is-active', 'Dial', viewPills, { type: 'button', 'aria-pressed': 'true' });
   el('button', 'hub-pills__btn', 'Linear', viewPills, { type: 'button', 'aria-pressed': 'false', title: 'The Tideline one-day view', 'data-linear': '' });
 
+  const filterState = readFilterState(input?.hub || 'life');
+  const dayChips = (model.days.find((day) => day.date === state.day)?.chips ?? []).concat(
+    model.days.find((day) => day.date === state.day)?.due?.map((due) => ({ ...due, kind: 'task', filterKey: 'tasks' })) ?? []
+  );
+  const sources = el('div', 'cal__sources', undefined, root, { 'data-part': 'sources' });
+  paintSourceFilter(doc, sources, {
+    hub: input?.hub || 'life',
+    state: filterState,
+    counts: countByFilterKey(dayChips),
+    hidden: countHidden(dayChips, filterState),
+    ambient: model.ambient,
+    onChange: () => mount({ entrance: false })
+  });
+
   const card = el('div', 'dd__card', undefined, root, { 'data-part': 'card' });
   const body = el('div', 'dd__body', undefined, card);
   const cell = el('div', 'dd__dialcell', undefined, body, { 'data-part': 'dial-cell' });
@@ -311,6 +332,14 @@ function mount({ entrance = false } = {}) {
   ensureHatch(svg);
   mountDial(size);
   mountSide(side);
+  for (const chip of dayChips) {
+    if (isItemVisible(chip, filterState)) continue;
+    const arc = nodes.get(`arc:${chip.id}`);
+    if (arc) {
+      arc.setAttribute('visibility', 'hidden');
+      arc.classList?.add?.('is-filter-hidden');
+    }
+  }
 
   nodes.set('__toast', el('div', 'dd-toast', '', root, { role: 'status', 'aria-live': 'polite', 'data-part': 'toast' }));
   nodes.set('__pop', el('div', 'dd-pop', '', root, { role: 'dialog', 'data-part': 'popover', hidden: '' }));
