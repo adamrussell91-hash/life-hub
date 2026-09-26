@@ -59,6 +59,14 @@ export function createPeopleLedgerHandler(deps = {}) {
             const items = await ledgerRepo.listDueBetween(from, to);
             return withCors(okResponse(200, { items }), request, env);
           }
+          if (url.searchParams.has('source_refs')) {
+            const refs = url.searchParams.get('source_refs').split(',').map((ref) => ref.trim()).filter(Boolean);
+            if (!refs.length || refs.length > 20 || refs.some((ref) => !parseEntityRef(ref))) {
+              return withCors(errorResponse(400, 'invalid_source_refs', 'source_refs must be 1–20 entity refs.', false), request, env);
+            }
+            const items = await ledgerRepo.listForSources(refs);
+            return withCors(okResponse(200, { items }), request, env);
+          }
           const personRef = url.searchParams.get('person_ref');
           if (!personRef || !parseEntityRef(personRef)) {
             return withCors(

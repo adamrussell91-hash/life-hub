@@ -135,3 +135,21 @@ test('listDueBetween returns open items due in range, ordered by due date', asyn
   const withDone = await repo.listDueBetween('2026-09-21', '2026-09-27', { status: null });
   assert.equal(withDone.length, 3);
 });
+
+test('listForSources finds items made in or checked in the given records', async () => {
+  const store = memoryStore();
+  let n = 0;
+  const repo = createLedgerItemRepository({
+    store,
+    now: () => '2026-09-26T00:00:00.000Z',
+    generateId: () => `ledger_00000000-0000-4000-8000-00000000002${++n}`
+  });
+  const OTHER = 'professional:communication:communication_00000000-0000-4000-8000-000000000009';
+  await repo.createItem({ person_ref: PERSON, direction: 'you_owe', text: 'Quote bank', author: 'adam', comm_ref: COMM });
+  const { item: checked } = await repo.createItem({ person_ref: PERSON, direction: 'they_owe', text: 'Redraft', author: 'adam', comm_ref: OTHER });
+  await repo.patchItem(checked.id, { status: 'done', checked_in_ref: COMM });
+  await repo.createItem({ person_ref: PERSON, direction: 'you_owe', text: 'Unrelated', author: 'adam', comm_ref: OTHER });
+
+  const items = await repo.listForSources([COMM]);
+  assert.deepEqual(items.map((item) => item.text).sort(), ['Quote bank', 'Redraft']);
+});

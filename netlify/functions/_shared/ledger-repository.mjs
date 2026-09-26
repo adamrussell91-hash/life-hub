@@ -126,10 +126,27 @@ export function createLedgerItemRepository(deps = {}) {
     return records.map(projectLedgerItem);
   }
 
+  /** Items made in (comm_ref) or checked in (checked_in_ref) any of these records. */
+  async function listForSources(refs, { status = null } = {}) {
+    const wanted = new Set(refs);
+    const keys = (await listBlobKeys(store, LEDGER_ITEM_PREFIX)).filter((key) => !isIndexKey(key));
+    const records = [];
+    for (const key of keys) {
+      const record = parseLedgerItemRecord(await getJSON(store, key));
+      if (!record) continue;
+      if (!wanted.has(record.comm_ref) && !wanted.has(record.checked_in_ref)) continue;
+      if (status && record.status !== status) continue;
+      records.push(record);
+    }
+    records.sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
+    return records.map(projectLedgerItem);
+  }
+
   return {
     listForPerson,
     createItem,
     patchItem,
-    listDueBetween
+    listDueBetween,
+    listForSources
   };
 }
