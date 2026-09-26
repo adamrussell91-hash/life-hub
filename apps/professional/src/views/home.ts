@@ -115,6 +115,7 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
   const categoryTotals = new Map<string, number>();
   const priorityTotals = new Map<string, number>();
   for (const event of events) {
+    if (event.event_type !== 'professional_development') continue;
     if (event.occurrence_state !== 'completed') continue;
     if (event.hours == null) continue;
     const key = sydneyDateKey(event.start);

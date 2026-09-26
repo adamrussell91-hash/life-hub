@@ -1,13 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { assertValidTimeZone } from './wall-time.mjs';
+import { validateBlocks } from './communication-schema.mjs';
 
 // Event records for Professional Hub (`professional-hub-content`).
 // Relationships (venue, provider, related Knowledge, learning Tasks) live only
 // as Universal Links — never store Organisation/Task/page/link IDs here.
 
-export const EVENT_SCHEMA_VERSION = 1;
+export const EVENT_SCHEMA_VERSION = 2;
+const READABLE_EVENT_VERSIONS = new Set([1, 2]);
 
-export const EVENT_TYPES = new Set(['professional_development']);
+export const EVENT_TYPES = new Set(['professional_development', 'general']);
+export const TALKS_MAX = 40;
 
 export const EVENT_OCCURRENCE_STATES = new Set([
   'scheduled',
@@ -134,6 +137,28 @@ function validateCertificateInput(raw) {
   return { name, issued_at, reference };
 }
 
+export function validateTalks(value) {
+  if (!Array.isArray(value) || value.length > TALKS_MAX) {
+    throw validationError('invalid_talks', `talks must be an array of at most ${TALKS_MAX}.`);
+  }
+  return value.map((talk) => {
+    const hours = talk?.hours ?? null;
+    const time = talk?.time ?? null;
+    if (!talk || typeof talk.id !== 'string' || typeof talk.title !== 'string' || !talk.title.trim()
+      || (time !== null && (typeof time !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)))
+      || (hours !== null && (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0 || hours > 24))) {
+      throw validationError('invalid_talks', 'talks need id, title, time HH:MM or null, and hours 0–24 or null.');
+    }
+    return {
+      id: talk.id,
+      time,
+      title: talk.title.trim().slice(0, 300),
+      presenter: typeof talk.presenter === 'string' && talk.presenter.trim() ? talk.presenter.trim().slice(0, 200) : null,
+      hours
+    };
+  });
+}
+
 const STORED_KEYS = new Set([
   'schema_version',
   'id',
@@ -151,7 +176,9 @@ const STORED_KEYS = new Set([
   'attendance_state',
   'certificate',
   'created_at',
-  'updated_at'
+  'updated_at',
+  'talks',
+  'blocks'
 ]);
 
 export function parseEventRecord(raw) {
@@ -159,7 +186,7 @@ export function parseEventRecord(raw) {
   for (const key of Object.keys(raw)) {
     if (!STORED_KEYS.has(key)) return null;
   }
-  if (raw.schema_version !== EVENT_SCHEMA_VERSION) return null;
+  if (!READABLE_EVENT_VERSIONS.has(raw.schema_version)) return null;
   if (!isValidEventId(raw.id)) return null;
   if (typeof raw.title !== 'string') return null;
   if (!EVENT_TYPES.has(raw.event_type)) return null;
@@ -197,7 +224,9 @@ export function parseEventRecord(raw) {
     attendance_state: raw.attendance_state ?? null,
     certificate: certificate,
     created_at: raw.created_at,
-    updated_at: raw.updated_at
+    updated_at: raw.updated_at,
+    talks: Array.isArray(raw.talks) ? raw.talks : [],
+    blocks: Array.isArray(raw.blocks) ? raw.blocks : []
   };
 }
 
@@ -300,7 +329,10 @@ const UPDATE_KEYS = new Set([
   'all_day',
   'start',
   'end',
-  'time_zone'
+  'time_zone',
+  'event_type',
+  'talks',
+  'blocks'
 ]);
 
 export function validateEventFieldUpdate(input) {
@@ -364,6 +396,12 @@ export function validateEventFieldUpdate(input) {
       trimBounded(input.time_zone, 'time_zone', 120, { allowEmpty: false })
     );
   }
+  if (input.event_type !== undefined) {
+    if (!EVENT_TYPES.has(input.event_type)) throw validationError('invalid_event_type', 'event_type is not a permitted value.');
+    patch.event_type = input.event_type;
+  }
+  if (input.talks !== undefined) patch.talks = validateTalks(input.talks);
+  if (input.blocks !== undefined) patch.blocks = validateBlocks(input.blocks);
   if (!Object.keys(patch).length) {
     throw validationError('empty_update', 'Update requires at least one field.');
   }
@@ -433,7 +471,9 @@ export function projectEvent(record, incompleteLinks = null) {
     attendance_state: record.attendance_state ?? null,
     certificate: record.certificate ?? null,
     created_at: record.created_at,
-    updated_at: record.updated_at
+    updated_at: record.updated_at,
+    talks: record.talks ?? [],
+    blocks: record.blocks ?? []
   };
   if (incompleteLinks) {
     projection.incomplete_links = incompleteLinks;

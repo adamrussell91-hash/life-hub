@@ -197,6 +197,41 @@ describe('renderHomeView', () => {
     expect(canvas.textContent).toMatch(/goal is a placeholder/);
   });
 
+  it('accreditation hours ignore non-PD events', async () => {
+    const completed = {
+      schema_version: 2,
+      start: '2026-09-18T00:00:00.000Z',
+      end: '2026-09-18T05:00:00.000Z',
+      time_zone: 'Australia/Sydney',
+      all_day: false,
+      occurrence_state: 'completed',
+      location_text: null,
+      accreditation_category: 'Workshop',
+      attendance_state: 'attended',
+      certificate: null,
+      created_at: '2026-09-01T10:00:00.000Z',
+      updated_at: '2026-09-18T05:00:00.000Z'
+    };
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes('/api/meetings')) return Response.json({ ok: true, data: { meetings: [] } });
+      return Response.json({
+        ok: true,
+        data: {
+          events: [
+            { ...completed, id: 'event_00000000-0000-4000-8000-000000000021', title: 'PD day', event_type: 'professional_development', hours: 6 },
+            { ...completed, id: 'event_00000000-0000-4000-8000-000000000022', title: 'HALT medal ceremony', event_type: 'general', hours: 2 }
+          ]
+        }
+      });
+    });
+
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    expect(canvas.querySelector('[data-part="accreditation-progress"]')?.textContent).toContain('6');
+    expect(canvas.querySelector('[data-part="accreditation-progress"]')?.textContent).not.toContain('8');
+  });
+
   it('totals priority-area hours separately from the event type', async () => {
     const completed = {
       schema_version: 1,
