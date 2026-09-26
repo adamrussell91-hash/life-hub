@@ -923,7 +923,7 @@ function paint(doc, host, view, options) {
     const x = X(view.today);
     const pillW = 52;
     const minX = 0;
-    const maxX = Math.max(minX, (props?.w ?? 800) - pillW);
+    const maxX = Math.max(minX, ALM.width - pillW);
     const pillX = Math.min(maxX, Math.max(minX, x - pillW / 2));
     s('line', { x1: x, x2: x, y1: 16, y2: 640 }, today);
     s('rect', { x: pillX, y: 0, width: pillW, height: 18, rx: 9 }, today);
