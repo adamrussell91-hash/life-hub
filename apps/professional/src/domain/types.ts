@@ -230,6 +230,13 @@ export interface FollowUpOperationProjection {
   pending_intent_ids: string[];
 }
 
+export interface AgendaItem {
+  id: string;
+  text: string;
+  source: 'clare' | 'carried' | 'you';
+  done?: boolean;
+}
+
 export interface CommunicationRecord {
   schema_version: number;
   id: string;
@@ -243,6 +250,46 @@ export interface CommunicationRecord {
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
   follow_up_operation?: FollowUpOperationProjection | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  time_zone?: string | null;
+  purpose_tag?: string | null;
+  agenda?: AgendaItem[];
+  blocks?: unknown[];
+}
+
+export interface ThreadGoal {
+  id: string;
+  text: string;
+  progress: number | null;
+  note: string | null;
+}
+
+export interface ThreadRecord {
+  schema_version: number;
+  id: string;
+  kind: 'general' | 'case';
+  title: string;
+  purpose_tag: string | null;
+  goals: ThreadGoal[];
+  status: 'open' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LedgerItem {
+  id: string;
+  person_ref: string;
+  direction: 'you_owe' | 'they_owe';
+  text: string;
+  task_ref: string | null;
+  comm_ref: string | null;
+  due: string | null;
+  checked_in_ref: string | null;
+  status: 'open' | 'done' | 'dismissed';
+  author: 'clare' | 'adam';
+  created_at: string;
+  updated_at: string;
 }
 
 export type MeetingState =
