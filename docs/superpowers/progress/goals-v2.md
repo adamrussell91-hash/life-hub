@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 18/46 (39%)**
+**Progress: 20/46 (43%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -34,14 +34,14 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M3: Landing page (Term Runway)
 
-- [x] **G-13** Runway filters by term + Ongoing group — 
-- [x] **G-14** Lane cap (term only) + park-one / add-as-parked — 
-- [x] **G-15** New goal form: sphere / term / life area chips — 
-- [x] **G-16** Plan next term (card-swipe) — 
-- [ ] **G-17** Year pill + Term↔Year zoom — —
-- [x] **G-18** Direction strip — 
-- [x] **G-19** Active-projects meter — 
-- [ ] **G-20** Week cell count + lead measure figure — —
+- [x] **G-13** Runway filters by term + Ongoing group — `cd99ab06`
+- [x] **G-14** Lane cap (term only) + park-one / add-as-parked — `cd99ab06`
+- [x] **G-15** New goal form: sphere / term / life area chips — `cd99ab06`
+- [x] **G-16** Plan next term (card-swipe) — `cd99ab06`
+- [x] **G-17** Year pill + Term↔Year zoom — `0e8d5a7c`
+- [x] **G-18** Direction strip — `cd99ab06`
+- [x] **G-19** Active-projects meter — `cd99ab06`
+- [x] **G-20** Week cell count + lead measure figure — `0e8d5a7c`
 
 ## M4: Goal page
 
