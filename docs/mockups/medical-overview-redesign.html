@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medical Overview Mockups</title>
+<style>
+:root{--ink:#0f2350;--ink2:#51607e;--mute:#8a93a8;--bg:#faf8f3;--card:#fff;--line:#e8e3d8;--navy:#14295c;
+--hi:#c2410c;--hiBg:#fdeee4;--ok:#15803d;--okBg:#e7f5ec;--gi:#2563eb;--liver:#b45309;--mind:#7c3aed;--acute:#94a3b8;--fut:#0e7490}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,Inter,system-ui,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 16px 80px}
+h1{font-size:34px;margin:0 0 4px}h2{font-size:26px;margin:0}.eyebrow{font:600 12px/1 system-ui;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.lede{color:var(--ink2);max-width:760px}.concept{margin-top:56px;border-top:2px solid var(--line);padding-top:28px}
+.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0 20px}.why div{background:#f1eee6;border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink2)}.why b{color:var(--ink)}
+.frame{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 10px 30px -18px rgba(15,35,80,.35);overflow:hidden}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:#f1eee6;color:var(--ink2)}
+.hi{background:var(--hiBg);color:var(--hi)}.ok{background:var(--okBg);color:var(--ok)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.bug{background:#fff7d6;border:1px dashed #d4a300;border-radius:10px;padding:12px 14px;font-size:13px;margin-top:18px}
+/* ---------- A: weighted timeline ---------- */
+.A{display:grid;grid-template-columns:70px 1fr;gap:0 18px}
+.A .axis{position:relative}.A .rail{position:relative;border-left:2px solid var(--line);padding-left:22px}
+.A .sec{font:700 11px/1 system-ui;letter-spacing:.14em;color:var(--mute);margin:18px 0 10px}
+.A .sec.fut{color:var(--fut)}.A .todayline{display:flex;align-items:center;gap:10px;margin:18px 0 6px -30px;font:700 12px system-ui;color:var(--gi)}
+.A .todayline:before{content:"";width:14px;height:14px;border-radius:50%;background:var(--gi);box-shadow:0 0 0 5px #dbe6fd}
+.A .todayline:after{content:"";flex:1;border-top:2px solid var(--gi)}
+.ev{position:relative;margin:8px 0}.ev:before{content:"";position:absolute;left:-29px;top:14px;width:12px;height:12px;border-radius:50%;background:var(--c,#cbd5e1);border:2px solid #fff}
+.ev.major{background:#fff;border:1px solid var(--line);border-left:5px solid var(--c);border-radius:14px;padding:14px 16px}
+.ev.major .t{font-size:18px;font-weight:700}.ev .m{font-size:13px;color:var(--ink2)}
+.ev.minor{display:flex;gap:10px;align-items:baseline;padding:2px 0;font-size:13.5px;color:var(--ink2)}.ev.minor:before{width:8px;height:8px;top:7px;left:-27px}
+.ev.fut{border-style:dashed;background:#f5fbfc}.cd{float:right;font:700 13px system-ui;color:var(--fut)}
+.episode{background:#f6f4ef;border-radius:12px;padding:10px 14px;margin:8px 0;position:relative}.episode:before{content:"";position:absolute;left:-30px;top:12px;bottom:12px;width:6px;border-radius:4px;background:var(--acute)}
+.episode summary{cursor:pointer;font-weight:600;font-size:14px;list-style:none}.episode ol{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--ink2)}
+.labs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px}
+.lab{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px}.lab b{font-size:16px}.lab .n{color:var(--mute)}
+.bar{height:6px;border-radius:4px;background:linear-gradient(90deg,#e2e8f0 0 20%,#c7ecd3 20% 60%,#fde2d0 60%);position:relative;margin-top:6px}.bar i{position:absolute;top:-3px;width:3px;height:12px;background:var(--ink);border-radius:2px}
+.zoom{display:flex;gap:6px;margin-bottom:10px}.zoom span{font-size:12px;padding:4px 10px;border-radius:8px;background:#f1eee6}.zoom .on{background:var(--navy);color:#fff}
+/* ---------- B: lanes ---------- */
+.B{overflow-x:auto}.B svg{min-width:900px;width:100%;height:auto;display:block}
+.B text{font-family:system-ui}
+/* ---------- C: brief ---------- */
+.C{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+.tile{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff}.tile h3{margin:0 0 8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.now{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;background:linear-gradient(135deg,#14295c,#1e3a8a);color:#fff;border:0}
+.now .k{font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.1em}.now .v{font-size:22px;font-weight:700}.now .s{font-size:13px;opacity:.85}
+.meter{display:flex;gap:4px;margin-top:6px}.meter i{flex:1;height:8px;border-radius:3px;background:rgba(255,255,255,.2)}.meter i.f{background:#fbbf24}
+.next li{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}.next ul{list-style:none;margin:0;padding:0}.next .when{color:var(--fut);font-weight:700;white-space:nowrap}
+.thread{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.thread:last-child{border:0}
+.thread .nm{font-weight:700}.thread .st{font-size:12.5px;color:var(--ink2)}
+.ledger{grid-column:1/-1}.ledger table{width:100%;border-collapse:collapse;font-size:13.5px}.ledger td{padding:7px 6px;border-bottom:1px solid var(--line)}.ledger tr.minor td{color:var(--mute);font-size:12.5px}
+@media(max-width:760px){.C{grid-template-columns:1fr}.A{grid-template-columns:1fr}.A .axis{display:none}h1{font-size:26px}}
+</style>
+</head>
+<body><div class="wrap">
+<div class="eyebrow">Life Hub · Body › Medical</div>
+<h1>Medical Overview — 3 redesigns</h1>
+<p class="lede">Static mockups using your real entries (lab numbers partly illustrative). Each one fixes the four complaints: <b>everything looks equally important</b>, <b>no future</b>, <b>no mini lab view</b>, <b>Sara's notes disappearing</b>. Scroll for A → B → C, then the recommendation at the bottom.</p>
+
+<div class="bug"><b>Why your 26 Sep cold update is invisible (found in code, not a design issue):</b> <code>resolveMedicalLogCandidate</code> in <code>medical-normalize.js</code> fuzzy-matches Sara's new note to the 24/09 "Sore throat, sniffles, poor sleep" record and, because it's ≤3 days away (<code>APPEND_DATE_SLOP_DAYS</code>), <b>merges it into that record and keeps the old date</b>. So it's in the notes of the 24/09 card, not a new dot. And the page <i>can</i> show future events (<code>medical-model.js</code> splits future/past) — but Sara writes MRCP, colonoscopy, March review, Stelara dose etc. as prose inside a note instead of as dated records, and <code>follow_up_date</code> is only shown in the side sheet. All 3 designs need the same data fix: <b>episodes</b> (a note appends a dated entry to an episode rather than overwriting) + <b>planned items</b> as real future records + a <b>weight</b> field (major / routine / minor).</div>
+
+<!-- ================= A ================= -->
+<section class="concept">
+<div class="eyebrow">Concept A</div><h2>Weighted River — the timeline, done properly</h2>
+<div class="why"><div><b>Size = importance.</b> Specialist visits, infusions, bloods get full cards. Symptoms shrink to one-line whispers.</div><div><b>Episodes cluster.</b> A cold is one collapsible band ("Head cold · day 4 · 3 notes") instead of 3 cards.</div><div><b>Future above Today</b> with countdowns, dashed = planned.</div><div><b>Mini lab panel</b> inside the bloods card with range bars (same as Body/Bloods).</div></div>
+<div class="frame">
+<div class="zoom"><span>Weeks</span><span class="on">Months</span><span>Years</span><span style="margin-left:auto">Show minor ▾</span></div>
+<div class="A"><div class="axis"></div><div class="rail">
+<div class="sec fut">UPCOMING</div>
+<div class="ev major fut" style="--c:var(--fut)"><span class="cd">~Mar 2027</span><div class="t">Gastro review — Dr Chris Keily</div><div class="m">Planned · after colonoscopy</div></div>
+<div class="ev major fut" style="--c:var(--fut)"><span class="cd">Feb 2027</span><div class="t">Colonoscopy</div><div class="m">Planned · date to book</div></div>
+<div class="ev minor" style="--c:var(--fut)"><b>Early Dec</b>&nbsp;Repeat bloods before travel</div>
+<div class="ev major fut" style="--c:var(--fut)"><span class="cd">in 26 days</span><div class="t">Stelara 90mg — maintenance dose</div><div class="m">~22 Oct · 8-weekly · auto-scheduled from 27 Aug</div></div>
+<div class="ev major fut" style="--c:var(--liver)"><span class="cd" style="color:var(--hi)">to book</span><div class="t">MRCP — liver / bile ducts</div><div class="m">Ordered 24 Sep · exclude PSC</div></div>
+<div class="todayline">TODAY · SAT 26 SEP</div>
+<details class="episode" open><summary>🤧 Head cold · 23 → 26 Sep · <span class="pill">ongoing · day 4</span> <span class="pill">3 notes</span></summary>
+<ol><li><b>26 Sep</b> still congested, throat better, sleep poor</li><li><b>24 Sep</b> sore throat, sniffles — script</li><li><b>23 Sep</b> run down, possible viral</li></ol></details>
+<div class="ev major" style="--c:var(--gi)"><div class="t">Gastro follow-up — biologics &amp; liver</div><div class="m">24 Sep · Dr Chris Keily · Northern Gastroenterology</div>
+<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><span class="pill ok">Calprotectin 15 ↓ from 244</span><span class="pill hi">GGT still main concern</span><span class="pill">MRCP ordered</span></div></div>
+<div class="ev major" style="--c:var(--liver)"><div class="t">Bloods — comprehensive panel</div><div class="m">17 Sep · Pathology · <b>38 in range</b>, 2 flagged</div>
+<div class="labs">
+<div class="lab"><span class="n">GGT</span><br><b style="color:var(--hi)">233</b> <span class="n">U/L · ref &lt;60</span><div class="bar"><i style="left:92%"></i></div></div>
+<div class="lab"><span class="n">ALT</span><br><b style="color:var(--hi)">68</b> <span class="n">U/L · ref &lt;45 · ↓</span><div class="bar"><i style="left:70%"></i></div></div>
+<div class="lab"><span class="n">CRP</span><br><b style="color:var(--ok)">2</b> <span class="n">mg/L · ref &lt;5</span><div class="bar"><i style="left:32%"></i></div></div>
+<div class="lab"><span class="n">Ferritin</span><br><b style="color:var(--ok)">84</b> <span class="n">µg/L</span><div class="bar"><i style="left:45%"></i></div></div></div></div>
+<div class="ev minor" style="--c:var(--mind)"><b>4 Sep</b>&nbsp;Therapy · Kate Semple</div>
+<div class="sec">AUGUST</div>
+<div class="ev major" style="--c:var(--gi)"><div class="t">Stelara 90mg — first SC maintenance</div><div class="m">27 Aug · painful at site · cramping attributed to breakfast/anxiety</div></div>
+<div class="ev minor" style="--c:var(--mind)"><b>6 Aug</b>&nbsp;Dr Hook · My ADHD Centre</div>
+</div></div></div>
+</section>
+
+<!-- ================= B ================= -->
+<section class="concept">
+<div class="eyebrow">Concept B</div><h2>Condition Lanes — a horizontal health "subway map"</h2>
+<div class="why"><div><b>One lane per condition thread</b> (IBD, Liver, Mind, Acute). You see the story of each, not a pile of cards.</div><div><b>Biomarker ribbons</b> sit inside their lane: calprotectin falls, GGT stays high, against a shaded normal band.</div><div><b>Today is a vertical line</b>; the right side is the future — planned doses and procedures as hollow markers.</div><div><b>Pinch/drag to zoom</b> weeks ↔ years. Colds are thin grey bars — visible, but quiet.</div></div>
+<div class="frame B">
+<svg viewBox="0 0 1000 400" role="img" aria-label="Condition lane timeline mockup">
+<defs><pattern id="p" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#bfe3ea" stroke-width="1"/></pattern></defs>
+<rect x="640" y="30" width="360" height="360" fill="url(#p)" opacity=".5"/>
+<g font-size="11" fill="#8a93a8">
+<text x="140" y="22">JUN</text><text x="240" y="22">JUL</text><text x="340" y="22">AUG</text><text x="440" y="22">SEP</text><text x="690" y="22">OCT</text><text x="780" y="22">DEC</text><text x="870" y="22">FEB</text><text x="945" y="22">MAR '27</text></g>
+<line x1="640" y1="28" x2="640" y2="392" stroke="#2563eb" stroke-width="2"/><text x="646" y="44" font-size="11" font-weight="700" fill="#2563eb">TODAY</text>
+<!-- lane labels -->
+<g font-size="13" font-weight="700" fill="#0f2350"><text x="10" y="80">IBD / Crohn's</text><text x="10" y="180">Liver</text><text x="10" y="270">Mind</text><text x="10" y="345">Acute</text></g>
+<g font-size="11" fill="#51607e"><text x="10" y="96">Stelara · remission</text><text x="10" y="196">GGT high · MRCP</text><text x="10" y="286">therapy · ADHD</text><text x="10" y="361">colds, minor</text></g>
+<g stroke="#e8e3d8"><line x1="120" y1="130" x2="1000" y2="130"/><line x1="120" y1="230" x2="1000" y2="230"/><line x1="120" y1="310" x2="1000" y2="310"/></g>
+<!-- IBD lane -->
+<rect x="120" y="56" width="880" height="16" rx="8" fill="#dbe6fd" opacity=".6"/>
+<path d="M150 118 L260 112 L380 100 L500 120" fill="none" stroke="#2563eb" stroke-width="2"/><text x="150" y="112" font-size="10" fill="#51607e">calprotectin 244</text><text x="470" y="113" font-size="10" font-weight="700" fill="#15803d">15 ✓</text>
+<circle cx="245" cy="64" r="9" fill="#2563eb"/><text x="228" y="50" font-size="10" fill="#0f2350">Induction</text>
+<circle cx="365" cy="64" r="9" fill="#2563eb"/><text x="352" y="50" font-size="10" fill="#0f2350">SC #1</text>
+<rect x="490" y="55" width="18" height="18" rx="4" fill="#0f2350"/><text x="478" y="50" font-size="10" fill="#0f2350">Gastro</text>
+<circle cx="700" cy="64" r="9" fill="#fff" stroke="#2563eb" stroke-width="2.5"/><text x="686" y="50" font-size="10" fill="#0e7490">SC #2</text>
+<circle cx="790" cy="64" r="9" fill="#fff" stroke="#2563eb" stroke-width="2.5"/>
+<circle cx="880" cy="64" r="9" fill="#fff" stroke="#2563eb" stroke-width="2.5"/><text x="858" y="92" font-size="10" fill="#0e7490">Colonoscopy</text>
+<rect x="946" y="55" width="18" height="18" rx="4" fill="#fff" stroke="#0f2350" stroke-width="2.5"/><text x="930" y="92" font-size="10" fill="#0e7490">Review</text>
+<!-- Liver lane -->
+<rect x="120" y="198" width="880" height="22" fill="#e7f5ec"/><text x="126" y="214" font-size="9" fill="#15803d">normal range</text>
+<path d="M300 170 L480 160" fill="none" stroke="#b45309" stroke-width="2.5"/><circle cx="300" cy="170" r="4" fill="#b45309"/><circle cx="480" cy="160" r="5" fill="#c2410c"/><text x="440" y="152" font-size="10" font-weight="700" fill="#c2410c">GGT 233</text>
+<path d="M300 185 L480 192" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3 3"/><text x="400" y="200" font-size="9" fill="#b45309">ALT ↓</text>
+<rect x="660" y="160" width="18" height="18" rx="4" fill="#fff" stroke="#b45309" stroke-width="2.5"/><text x="684" y="174" font-size="10" fill="#c2410c">MRCP · to book</text>
+<circle cx="770" cy="170" r="7" fill="#fff" stroke="#b45309" stroke-width="2.5"/><text x="760" y="156" font-size="10" fill="#0e7490">bloods</text>
+<!-- Mind lane -->
+<g fill="#7c3aed"><circle cx="255" cy="270" r="6"/><circle cx="350" cy="270" r="6" opacity=".6"/><circle cx="455" cy="270" r="6"/></g>
+<text x="250" y="256" font-size="10" fill="#51607e">Kate</text><text x="338" y="256" font-size="10" fill="#51607e">Dr Hook</text><text x="445" y="256" font-size="10" fill="#51607e">Kate</text>
+<!-- Acute lane -->
+<rect x="200" y="338" width="30" height="8" rx="4" fill="#cbd5e1"/><rect x="612" y="336" width="28" height="12" rx="6" fill="#94a3b8"/><text x="560" y="330" font-size="10" fill="#51607e">head cold · day 4 →</text>
+<!-- tooltip -->
+<g transform="translate(470,236)"><rect width="0" height="0"/></g>
+</svg>
+<p style="font-size:13px;color:var(--ink2);margin:10px 0 0">Tap any marker → the same detail sheet you have today, with the mini lab panel from A. Solid = happened, hollow = planned, square = specialist visit.</p>
+</div>
+</section>
+
+<!-- ================= C ================= -->
+<section class="concept">
+<div class="eyebrow">Concept C</div><h2>Health Brief — Now · Next · Threads · Ledger</h2>
+<div class="why"><div><b>Answers "what do I need to know right now"</b> before any history.</div><div><b>Active episodes</b> live in the hero (cold day 4, Stelara cycle meter).</div><div><b>Threads</b> = one row per condition with its key metric sparkline + last/next event.</div><div><b>Ledger</b> keeps full history compact; minor rows greyed. Sara writes to threads, not loose cards.</div></div>
+<div class="frame C">
+<div class="tile now">
+<div><div class="k">Active episode</div><div class="v">🤧 Head cold · day 4</div><div class="s">Throat better · congestion + poor sleep persist (26 Sep)</div></div>
+<div><div class="k">Stelara cycle</div><div class="v">Week 5 of 8</div><div class="meter"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i></div><div class="s">Next dose ~22 Oct</div></div>
+<div><div class="k">Watch</div><div class="v" style="color:#fbbf24">GGT 233 ↑</div><div class="s">MRCP ordered — not booked yet</div></div>
+</div>
+<div class="tile next"><h3>Next</h3><ul>
+<li><span>📞 Book MRCP</span><span class="when" style="color:var(--hi)">action</span></li>
+<li><span>💉 Stelara 90mg SC</span><span class="when">26 days</span></li>
+<li><span>🩸 Repeat bloods (pre-travel)</span><span class="when">early Dec</span></li>
+<li><span>🔬 Colonoscopy</span><span class="when">Feb 2027</span></li>
+<li><span>🩺 Gastro review · Dr Keily</span><span class="when">Mar 2027</span></li></ul></div>
+<div class="tile"><h3>Threads</h3>
+<div class="thread"><div><div class="nm"><span class="dot" style="background:var(--gi)"></span> IBD / Crohn's</div><div class="st">Mucosal healing on Stelara · last: gastro 24 Sep</div></div>
+<svg viewBox="0 0 130 34"><rect y="22" width="130" height="12" fill="#e7f5ec"/><polyline points="4,6 40,10 80,4 124,28" fill="none" stroke="#2563eb" stroke-width="2"/><circle cx="124" cy="28" r="3" fill="#15803d"/></svg></div>
+<div class="thread"><div><div class="nm"><span class="dot" style="background:var(--liver)"></span> Liver</div><div class="st">GGT high, ALT improving · MRCP next</div></div>
+<svg viewBox="0 0 130 34"><rect y="24" width="130" height="10" fill="#e7f5ec"/><polyline points="4,10 64,6 124,4" fill="none" stroke="#c2410c" stroke-width="2"/><circle cx="124" cy="4" r="3" fill="#c2410c"/></svg></div>
+<div class="thread"><div><div class="nm"><span class="dot" style="background:var(--mind)"></span> Mind</div><div class="st">Therapy ~monthly · last 4 Sep</div></div>
+<svg viewBox="0 0 130 34"><g fill="#7c3aed"><circle cx="20" cy="17" r="4"/><circle cx="62" cy="17" r="4" opacity=".5"/><circle cx="104" cy="17" r="4"/></g></svg></div>
+</div>
+<div class="tile ledger"><h3>Ledger <span class="pill" style="float:right">major only ▾</span></h3><table>
+<tr><td>24 Sep</td><td><b>Gastro follow-up — biologics &amp; liver</b></td><td><span class="pill ok">calpro 15</span></td></tr>
+<tr class="minor"><td>23–26 Sep</td><td>Head cold episode · 3 notes</td><td></td></tr>
+<tr><td>17 Sep</td><td><b>Bloods — comprehensive</b></td><td><span class="pill">38 in</span> <span class="pill hi">GGT</span> <span class="pill hi">ALT</span></td></tr>
+<tr class="minor"><td>4 Sep</td><td>Therapy · Kate Semple</td><td></td></tr>
+<tr><td>27 Aug</td><td><b>Stelara 90mg · SC #1</b></td><td></td></tr>
+</table></div>
+</div>
+</section>
+
+<section class="concept">
+<div class="eyebrow">Recommendation</div><h2>Ship A as the page, steal C's hero strip, save B for "Years" zoom</h2>
+<p class="lede">A is the smallest change from today's code (same vertical list, <code>pack()</code> + Today marker already exist) and fixes every complaint. C's "Now" strip on top gives instant status. B is the most stunning but the most work — it's a natural fit for the Years zoom level later.</p>
+<p class="lede"><b>Data changes needed for any of them:</b> (1) <code>weight</code>: major / routine / minor on each medical record (Sara sets it; default from record_type); (2) <code>episode_id</code> + dated sub-notes so updates append instead of silently merging; (3) Sara must emit planned items (MRCP, doses, colonoscopy) as future-dated records, and Stelara's next dose auto-derives from cadence; (4) reuse the Body/Bloods lab row renderer for the mini lab panel instead of the current "38 in" text chips.</p>
+</section>
+</div></body></html>
