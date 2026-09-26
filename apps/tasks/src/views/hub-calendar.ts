@@ -72,23 +72,6 @@ let handle: HubCalendarHandle | null = null;
 
 /** Mount the locked kit calendar. Zoom follows `#/day|week|term|year|almanac`. */
 export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
-  // #region agent log
-  try {
-    void fetch('/api/_agent-debug', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        hypothesisId: 'H3-H5',
-        location: 'hub-calendar.ts:mountTasksCalendar',
-        message: 'mounting kit calendar',
-        data: { hash: location.hash, pathname: location.pathname }
-      })
-    });
-  } catch {
-    /* ignore */
-  }
-  // #endregion
   handle?.destroy();
   handle = mountHubCalendar(host, {
     hub: 'tasks',

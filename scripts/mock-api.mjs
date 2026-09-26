@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { appendFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,19 +34,6 @@ import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blo
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
-
-// #region agent log
-function agentLog(payload) {
-  try {
-    appendFileSync(
-      '/opt/cursor/logs/debug.log',
-      `${JSON.stringify({ timestamp: Date.now(), ...payload })}\n`
-    );
-  } catch {
-    // ignore debug log failures
-  }
-}
-// #endregion
 const FIXTURE_FILES = [
   { path: 'config/agents.yml', source: 'config/agents.yml' },
   { path: 'config/targets.yml', source: 'config/targets.yml' },
@@ -160,35 +146,6 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
   return async function handleMockApi(request, response) {
     const url = new URL(request.url, 'http://localhost');
     if (!url.pathname.startsWith('/api/')) return false;
-
-    // #region agent log
-    if (url.pathname === '/api/_agent-debug' && request.method === 'POST') {
-      const body = await readJson(request);
-      agentLog(body && typeof body === 'object' ? body : { message: 'client-debug', data: body });
-      json(response, 200, { ok: true });
-      return true;
-    }
-    if (
-      url.pathname.startsWith('/api/tasks') ||
-      url.pathname === '/api/work-blocks' ||
-      url.pathname === '/api/templates' ||
-      url.pathname === '/api/clare' ||
-      url.pathname === '/api/task-properties' ||
-      url.pathname.startsWith('/api/workflow-state') ||
-      url.pathname === '/api/planning-profile' ||
-      url.pathname.startsWith('/api/areas') ||
-      url.pathname.startsWith('/api/goals') ||
-      url.pathname.startsWith('/api/maps') ||
-      url.pathname.startsWith('/api/programs')
-    ) {
-      agentLog({
-        hypothesisId: 'H1-H2',
-        location: 'mock-api.mjs:handleMockApi',
-        message: 'tasks-related api hit',
-        data: { method: request.method, pathname: url.pathname, search: url.search }
-      });
-    }
-    // #endregion
 
     if (!isLocalRequest(request)) {
       error(response, 403, 'forbidden', 'This local API accepts localhost requests only.', false);
@@ -685,14 +642,6 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
     if (url.pathname === '/api/work-blocks' && request.method === 'GET') {
       if (!readSession(request)) return unauthenticated(response);
       // Empty work blocks so Tasks kit calendar mounts under the mock server.
-      // #region agent log
-      agentLog({
-        hypothesisId: 'H2',
-        location: 'mock-api.mjs:work-blocks',
-        message: 'empty work-blocks 200',
-        data: { pathname: url.pathname }
-      });
-      // #endregion
       json(response, 200, { ok: true, data: { work_blocks: [] } }, PRIVATE_HEADERS);
       return true;
     }
@@ -721,14 +670,6 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
           const task = await taskStore.get(taskKey(taskId), { type: 'json' });
           if (task && typeof task === 'object') tasks.push(task);
         }
-        // #region agent log
-        agentLog({
-          hypothesisId: 'H2',
-          location: 'mock-api.mjs:tasks-bound',
-          message: 'tasks index present',
-          data: { count: tasks.length }
-        });
-        // #endregion
         json(response, 200, { ok: true, data: { tasks } });
         return true;
       }
@@ -737,15 +678,22 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         json(response, 200, { ok: true, data: { projects: [] } }, PRIVATE_HEADERS);
         return true;
       }
-      // #region agent log
-      agentLog({
-        hypothesisId: 'H2',
-        location: 'mock-api.mjs:tasks-empty',
-        message: 'empty tasks 200 unbound',
-        data: { pathname: url.pathname }
-      });
-      // #endregion
       json(response, 200, { ok: true, data: { tasks: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/templates' && request.method === 'GET') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty templates so Tasks Clare boot (listTemplates) does not 503 under the mock server.
+      json(response, 200, {
+        ok: true,
+        data: {
+          frameworks: [],
+          excursion_templates: [],
+          task_templates: [],
+          project_templates: []
+        }
+      }, PRIVATE_HEADERS);
       return true;
     }
 
@@ -753,14 +701,6 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         url.pathname === '/api/clare' ||
         /^\/api\/(projects|areas|goals|programs|maps|templates|stall)(\/|$|\?)/.test(url.pathname)) {
       if (!readSession(request)) return unauthenticated(response);
-      // #region agent log
-      agentLog({
-        hypothesisId: 'H1',
-        location: 'mock-api.mjs:tasks-unbound-503',
-        message: 'returning tasks_blobs_unbound 503',
-        data: { method: request.method, pathname: url.pathname }
-      });
-      // #endregion
       error(response, 503, 'tasks_blobs_unbound', 'Tasks content store is not bound.', true);
       return true;
     }

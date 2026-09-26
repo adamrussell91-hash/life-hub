@@ -732,6 +732,8 @@ export function isKnownHashView(hash = location.hash): boolean {
   if (id === 'gantt') return true;
   if (id === 'constellation') return true;
   if (id === 'backlog') return true;
+  // Month is not a rail stop — still a known deep link; parseHashRoute redirects to week.
+  if (id === 'month') return true;
   if (parseEntityPage(hash)) return true;
   if (parseGoalPage(hash)) return true;
   if (parseNewExcursionPage(hash)) return true;
