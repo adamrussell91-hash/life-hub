@@ -417,12 +417,13 @@ function precisionRank(visit) {
 }
 
 function buildHealthBrief(visits, bloods, today) {
+  // Cycle meter needs a dose row with cadence — not a visit whose notes merely mention Stelara.
   const stelara = visits
-    .filter(visit => /stelara|ustekinumab/i.test(`${visit.title} ${visit.notes}`))
-    .filter(visit => !visit.virtual && visit.date <= today)
+    .filter(visit => /stelara|ustekinumab/i.test(visit.title || ''))
+    .filter(visit => !visit.virtual && visit.date <= today && visit.cadence_days)
     .sort(compareNewest)[0];
   let cycle = null;
-  if (stelara?.cadence_days) {
+  if (stelara) {
     const elapsed = daysBetween(stelara.date, today);
     const week = Math.min(8, Math.max(1, Math.floor(elapsed / 7) + 1));
     cycle = {

@@ -292,6 +292,34 @@ test('MO-07 cadence virtual dose from last Stelara 27/08 + 56d', () => {
   assert.ok(model.visits.some(v => v.virtual && v.date === '2026-10-22'));
 });
 
+test('Health Brief cycle prefers Stelara dose title over notes that mention Stelara', () => {
+  const model = buildMedicalModel({
+    today: '2026-09-26',
+    events: [
+      visit({
+        id: 'stelara-1',
+        date: '2026-08-27',
+        title: 'Stelara 90mg SC',
+        record_type: 'Prescription',
+        cadence_days: 56,
+        weight: 'major'
+      }),
+      visit({
+        id: 'gastro',
+        date: '2026-09-24',
+        title: 'Gastro follow-up — biologics & liver',
+        record_type: 'Consultation',
+        weight: 'major',
+        notes: 'Calprotectin 15 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Stelara; liver imaging next'
+      })
+    ]
+  });
+  assert.ok(model.brief.cycle);
+  assert.equal(model.brief.cycle.week, 5);
+  assert.equal(model.brief.cycle.of, 8);
+  assert.equal(model.brief.cycle.nextDate, '2026-10-22');
+});
+
 test('MO-17 buildThreadModel maps IBD Liver Mind Acute', () => {
   const threads = buildThreadModel([
     {
