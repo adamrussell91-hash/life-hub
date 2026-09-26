@@ -54,6 +54,13 @@ export function resetSomedayViewFilters(): void {
   editingSomedayId = null;
 }
 
+function isSomedayReviewNow(
+  item: Task,
+  todayKey = new Date().toISOString().slice(0, 10)
+): boolean {
+  return isReviewDue(item, todayKey) || !item.review_at;
+}
+
 export function groupSomedayForReview(
   items: Task[],
   todayKey = new Date().toISOString().slice(0, 10)
@@ -61,7 +68,7 @@ export function groupSomedayForReview(
   const reviewNow: Task[] = [];
   const parked: Task[] = [];
   for (const item of items) {
-    if (isReviewDue(item, todayKey) || !item.review_at) reviewNow.push(item);
+    if (isSomedayReviewNow(item, todayKey)) reviewNow.push(item);
     else parked.push(item);
   }
   return { reviewNow, parked };
@@ -511,8 +518,8 @@ type SomedaySession = {
   wheelCard: HTMLElement;
 };
 
-function reviewBucket(task: Task, todayKey = new Date().toISOString().slice(0, 10)): 'review' | 'parked' {
-  return isReviewDue(task, todayKey) || !task.review_at ? 'review' : 'parked';
+function somedayFiltersActive(): boolean {
+  return somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim());
 }
 
 function visibleSomedayItems(items: Task[]): Task[] {
@@ -564,11 +571,6 @@ function syncSomedayChrome(session: SomedaySession): void {
   session.root.insertBefore(buildOdysseyCta(target), session.wheelCard);
 }
 
-function markFiltersActive(session: SomedaySession): void {
-  const active = somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim());
-  session.filtersToggle.classList.toggle('is-set', active);
-}
-
 function scrollHostFor(canvas: HTMLElement): HTMLElement {
   const wrap = canvas.closest('.hub-canvas');
   return wrap instanceof HTMLElement ? wrap : canvas;
@@ -591,7 +593,7 @@ function mountSomedaySession(
   items: Task[],
   allTasks: Task[],
   projects: Project[]
-): SomedaySession {
+): void {
   const root = el('div', 'someday-view');
   const wash = el('div', 'someday-wash');
   wash.setAttribute('aria-hidden', 'true');
@@ -616,7 +618,7 @@ function mountSomedaySession(
     id: 'someday',
     ariaLabel: 'Filters',
     className: 'hub-filters--inline',
-    active: somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim())
+    active: somedayFiltersActive()
   });
 
   const session: SomedaySession = {
@@ -631,14 +633,18 @@ function mountSomedaySession(
     wheelCard
   };
 
+  const refreshFilters = () => {
+    session.filtersToggle.classList.toggle('is-set', somedayFiltersActive());
+    paintSomedayList(session);
+  };
+
   const search = createHubSearch({
     placeholder: 'Filter someday ideas…',
     ariaLabel: 'Filter someday ideas',
     value: somedayQuery,
     onInput: (value) => {
       somedayQuery = value;
-      markFiltersActive(session);
-      paintSomedayList(session);
+      refreshFilters();
     }
   });
   filters.panel.append(
@@ -651,8 +657,7 @@ function mountSomedaySession(
       value: somedayDomain,
       onChange: (value) => {
         somedayDomain = value as TaskDomain | 'all';
-        markFiltersActive(session);
-        paintSomedayList(session);
+        refreshFilters();
       }
     }).el,
     createHubFilter({
@@ -667,8 +672,7 @@ function mountSomedaySession(
       value: somedayKind,
       onChange: (value) => {
         somedayKind = value as SomedayKindFilter;
-        markFiltersActive(session);
-        paintSomedayList(session);
+        refreshFilters();
       }
     }).el
   );
@@ -698,11 +702,22 @@ function mountSomedaySession(
   canvas.replaceChildren(root);
   syncSomedayChrome(session);
   paintSomedayList(session);
-  return session;
 }
 
-function somedayCardHandlers(session: SomedaySession, item: Task, flagged: boolean): SomedayCardHandlers {
-  const refreshCard = () => replaceSomedayCard(session, item.id, flagged);
+function buildSomedayCard(session: SomedaySession, item: Task, flagged: boolean): HTMLElement {
+  const card = renderSomedayCard(
+    item,
+    flagged,
+    session.projects,
+    session.allTasks,
+    somedayCardHandlers(session, item)
+  );
+  card.dataset.somedayId = item.id;
+  return card;
+}
+
+function somedayCardHandlers(session: SomedaySession, item: Task): SomedayCardHandlers {
+  const refreshCard = () => replaceSomedayCard(session, item.id);
   return {
     open: openSomedayId === item.id,
     editing: editingSomedayId === item.id,
@@ -738,36 +753,44 @@ function applySomedayCardChange(session: SomedaySession, item: Task, next: Task 
     paintSomedayList(session);
     return;
   }
-  const prevBucket = reviewBucket(item);
-  const nextBucket = reviewBucket(next);
+
+  const movedBucket = isSomedayReviewNow(item) !== isSomedayReviewNow(next);
   session.items = session.items.map((entry) => (entry.id === next.id ? next : entry));
   session.allTasks = session.allTasks.map((entry) => (entry.id === next.id ? next : entry));
   syncSomedayChrome(session);
-  if (prevBucket !== nextBucket) {
-    paintSomedayList(session);
-    return;
-  }
-  replaceSomedayCard(session, next.id, nextBucket === 'review');
+  if (movedBucket) paintSomedayList(session);
+  else replaceSomedayCard(session, next.id);
 }
 
-function replaceSomedayCard(session: SomedaySession, itemId: string, flagged: boolean): void {
+function replaceSomedayCard(session: SomedaySession, itemId: string): void {
   const item = session.items.find((entry) => entry.id === itemId);
-  const existing = [...session.listHost.querySelectorAll<HTMLElement>('.someday-card')].find(
-    (card) => card.dataset.somedayId === itemId
+  const existing = session.listHost.querySelector<HTMLElement>(
+    `.someday-card[data-someday-id="${CSS.escape(itemId)}"]`
   );
   if (!item || !existing) {
     paintSomedayList(session);
     return;
   }
-  const card = renderSomedayCard(
-    item,
-    flagged,
-    session.projects,
-    session.allTasks,
-    somedayCardHandlers(session, item, flagged)
-  );
-  card.dataset.somedayId = item.id;
-  existing.replaceWith(card);
+  existing.replaceWith(buildSomedayCard(session, item, isSomedayReviewNow(item)));
+}
+
+function appendSomedayCards(
+  host: HTMLElement,
+  title: string,
+  items: Task[],
+  flagged: boolean,
+  session: SomedaySession,
+  sweepNote?: string
+): void {
+  if (!items.length) return;
+  const group = el('section', 'someday-group');
+  const heading = el('h2', 'someday-group__title', title);
+  if (sweepNote) heading.append(el('span', 'someday-group__sweep', sweepNote));
+  group.append(heading);
+  const grid = el('div', 'someday-grid');
+  for (const item of items) grid.append(buildSomedayCard(session, item, flagged));
+  group.append(grid);
+  host.append(group);
 }
 
 function paintSomedayList(session: SomedaySession): void {
@@ -786,55 +809,16 @@ function paintSomedayList(session: SomedaySession): void {
           : 'No someday ideas match those filters.'
       )
     );
-    host.scrollTop = scrollTop;
-    return;
+  } else {
+    const { reviewNow, parked } = groupSomedayForReview(visible);
+    let sweepNote: string | undefined;
+    if (reviewNow.length === 1) sweepNote = 'The Sweep found 1 dream ready for another look.';
+    else if (reviewNow.length > 1) {
+      sweepNote = `The Sweep found ${reviewNow.length} dreams ready for another look.`;
+    }
+    appendSomedayCards(session.listHost, 'Review now', reviewNow, true, session, sweepNote);
+    appendSomedayCards(session.listHost, 'Parked', parked, false, session);
   }
 
-  const { reviewNow, parked } = groupSomedayForReview(visible);
-  if (reviewNow.length) {
-    const group = el('section', 'someday-group');
-    const heading = el('h2', 'someday-group__title', 'Review now');
-    const sweepNote = el(
-      'span',
-      'someday-group__sweep',
-      reviewNow.length === 1
-        ? 'The Sweep found 1 dream ready for another look.'
-        : `The Sweep found ${reviewNow.length} dreams ready for another look.`
-    );
-    heading.append(sweepNote);
-    group.append(heading);
-    const grid = el('div', 'someday-grid');
-    for (const item of reviewNow) {
-      const card = renderSomedayCard(
-        item,
-        true,
-        session.projects,
-        session.allTasks,
-        somedayCardHandlers(session, item, true)
-      );
-      card.dataset.somedayId = item.id;
-      grid.append(card);
-    }
-    group.append(grid);
-    session.listHost.append(group);
-  }
-  if (parked.length) {
-    const group = el('section', 'someday-group');
-    group.append(el('h2', 'someday-group__title', 'Parked'));
-    const grid = el('div', 'someday-grid');
-    for (const item of parked) {
-      const card = renderSomedayCard(
-        item,
-        false,
-        session.projects,
-        session.allTasks,
-        somedayCardHandlers(session, item, false)
-      );
-      card.dataset.somedayId = item.id;
-      grid.append(card);
-    }
-    group.append(grid);
-    session.listHost.append(group);
-  }
   host.scrollTop = scrollTop;
 }
