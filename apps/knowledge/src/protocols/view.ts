@@ -134,7 +134,12 @@ const localCatalog: Definition[] = [
     id: protocolId, name, description, motif, defaultMode,
     modes: (modes as string[]).map(label => {
       const modeId = label.toLowerCase();
-      return { id: modeId, label, description: source?.modes.find(mode => mode.id === modeId)?.description ?? label };
+      const sourceMode = source?.modes.find(mode => mode.id === modeId);
+      // Only keep a distinct description; otherwise mirror the local label so modeHintText omits it.
+      const description = sourceMode && sourceMode.description.trim() !== sourceMode.label.trim()
+        ? sourceMode.description
+        : label;
+      return { id: modeId, label, description };
     }),
     intake: [{ id: "prompt", label: "What would you like to examine?", required: true, type: "textarea" }],
     voices: (voices as string[]).map((voiceName, index) => {
