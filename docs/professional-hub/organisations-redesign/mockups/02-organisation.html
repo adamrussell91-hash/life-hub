@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Organisations — one organisation</title>
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="people.css"><link rel="stylesheet" href="orgs.css">
+<style>
+  .canvas { gap: 16px; padding-top: 26px; }
+  .switch { display: flex; align-items: center; gap: 8px; }
+  .switch .back { font-size: var(--text-sm); font-weight: 600; color: var(--wave); margin-right: 8px; }
+  .switch .cr { padding: 3px; border-radius: 10px; opacity: .55; }
+  .switch .cr.on { opacity: 1; background: #fff; box-shadow: 0 0 0 2px var(--wave); }
+
+  .hdr { display: flex; align-items: center; gap: 20px; }
+  .hdr .page-title { font-size: 30px; margin: 0; }
+  .hdr .meta { font-size: var(--text-sm); color: var(--muted); margin: 4px 0 10px; }
+  .hdr .rchip { font-size: var(--text-xs); padding: 5px 12px; }
+
+  .main { display: grid; grid-template-columns: 1fr 470px; gap: 16px; }
+  .side { display: flex; flex-direction: column; gap: 16px; }
+  .box { padding: 16px 18px; border-radius: var(--radius-md); background: rgba(255,255,255,0.82); border: 1px solid var(--line); box-shadow: var(--elev-1); }
+  .box-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .box-h .h2 { font-size: var(--text-base); }
+  .box-h .sub { margin-left: auto; }
+
+  /* Who you know: the org chart */
+  .chart { position: relative; }
+  .seg { display: inline-flex; background: var(--cotton); border-radius: 10px; padding: 3px; }
+  .seg span { font-size: var(--text-2xs); font-weight: 600; padding: 5px 10px; border-radius: 8px; color: var(--muted); }
+  .seg span.on { background: #fff; color: var(--ink); box-shadow: var(--elev-1); }
+  .hl { display: flex; gap: 6px; align-items: center; margin-bottom: 14px; }
+  .hl .lbl { font-size: var(--text-2xs); color: var(--muted); font-weight: 600; margin-right: 2px; }
+  .hl span.p { font-size: var(--text-2xs); font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); background: #fff; }
+  .hl span.p.on { background: var(--pastel-blue); color: var(--pastel-blue-ink); border-color: transparent; }
+  .lead { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--cotton); }
+  .lead .t { font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); margin-bottom: 10px; display: flex; gap: 8px; }
+  .lead .t b { color: var(--ink); letter-spacing: 0; text-transform: none; font-weight: 600; }
+  .lead .row { gap: 20px; }
+  .trunk { height: 18px; margin: 0 auto; width: 2px; background: var(--shallow); opacity: .5; }
+  .facs { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; border-top: 2px solid rgba(167,171,185,.5); padding-top: 12px; position: relative; }
+  .fac { display: flex; flex-direction: column; gap: 8px; padding: 10px 8px; border-radius: 12px; position: relative; }
+  .fac::before { content: ""; position: absolute; top: -14px; left: 50%; width: 2px; height: 12px; background: rgba(167,171,185,.5); }
+  .fac.mine { background: var(--pastel-blue); }
+  .fac .ft { font-size: var(--text-2xs); font-weight: 700; color: var(--depth); display: flex; justify-content: space-between; }
+  .fac .ft i { font-style: normal; color: var(--muted); font-weight: 600; }
+  .fac .node .avatar { width: 22px; height: 22px; font-size: 8px; }
+  .fac .dots { gap: 5px; }
+  .fac .dot { width: 15px; height: 15px; }
+  .lead .node .nm { overflow: visible; }
+  .gone { margin-top: 14px; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: 12px; }
+  .gone .dots .dot { width: 12px; height: 12px; }
+  .dot.y9 { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--wave); }
+  .tip { position: absolute; background: #fff; border-radius: 12px; box-shadow: var(--elev-4); padding: 10px 12px; width: 230px; z-index: 3; font-size: var(--text-xs); }
+  .tip b { display: block; font-size: var(--text-sm); color: var(--ink); }
+  .chart-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+
+  /* Ann's read */
+  .annread p { margin: 0 0 12px; font-size: var(--text-sm); line-height: 1.5; color: var(--ink); }
+  .threads { display: flex; flex-direction: column; gap: 7px; }
+  .thread { display: flex; gap: 10px; font-size: var(--text-xs); align-items: baseline; }
+  .thread .k { width: 78px; flex: 0 0 78px; font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); }
+  .thread .v { flex: 1; color: var(--ink); }
+  .thread .src { margin-left: auto; }
+
+  /* Opportunities */
+  .op { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
+  .op:last-child { border-bottom: 0; padding-bottom: 0; }
+  .op .d { width: 46px; flex: 0 0 46px; text-align: center; border-radius: 10px; background: var(--cotton); padding: 5px 0; }
+  .op .d b { display: block; font-size: var(--text-md); color: var(--depth); line-height: 1.1; }
+  .op .d span { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+  .op.hot .d { background: var(--pastel-gold); }
+  .op .t { font-size: var(--text-sm); font-weight: 600; color: var(--ink); line-height: 1.3; }
+  .op .sub { margin-top: 2px; line-height: 1.35; }
+
+  .arc svg { width: 100%; height: 132px; display: block; }
+</style></head>
+<body><div class="screen">
+<aside class="hub-rail"></aside>
+<main class="canvas">
+  <div class="switch">
+    <span class="back">← Organisations</span>
+    <span class="cr on"><span class="crest md c-sac">SAC</span></span><span class="cr"><span class="crest md c-tcc">TCC</span></span><span class="cr"><span class="crest md c-hta">HTA</span></span><span class="cr"><span class="crest md c-acu">ACU</span></span><span class="cr"><span class="crest md c-halt">HALT</span></span><span class="cr"><span class="crest md c-nesa">NESA</span></span><span class="cr"><span class="crest md c-jea">JEA</span></span>
+    <span class="spacer" style="flex:1"></span>
+    <span class="btn btn-outline">Compare with…</span><span class="btn btn-outline">Edit</span>
+  </div>
+
+  <div class="hdr">
+    <span class="crest xl c-sac">SAC</span>
+    <div class="stack">
+      <h1 class="page-title">St. Aloysius College</h1>
+      <div class="meta">Kirribilli · Jesuit, Years 3–12 · you know 82 people here · first contact Jun 2023</div>
+      <div class="rchips">
+        <span class="rchip r-work"><b>Workplace</b><span class="yr">HSIE teacher · Term 1 2025–now</span></span>
+                <span class="rchip r-event"><b>Event venue</b><span class="yr">4 events · first as Trinity staff</span></span>
+        <span class="rchip r-pd"><b>PD provider</b><span class="yr">Ignatian formation</span></span>
+        <span class="rchip r-apply"><b>Applied</b><span class="yr">Sep 2024 · hired</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+    <section class="box chart">
+      <div class="box-h"><span class="h2">How St. Aloysius is run</span><span class="sub" style="margin-left:0">82 people you know · 7 layers</span>
+        <span style="margin-left:auto" class="seg"><span class="on">Flow</span><span>People list</span></span></div>
+      <div class="hl"><span class="lbl">Highlight</span><span class="p on">Your reporting line</span><span class="p">Who decides on HSIE</span><span class="spacer" style="flex:1"></span>
+        <div class="legend">
+          <span><svg width="26" height="8"><path d="M0 4H20" stroke="#a7abb9" stroke-width="1.5"/><path d="M19 0L26 4L19 8z" fill="#a7abb9"/></svg>reports to</span>
+          <span><svg width="26" height="8"><path d="M0 4H20" stroke="#424860" stroke-width="1.5" stroke-dasharray="4 3"/><path d="M19 0L26 4L19 8z" fill="#424860"/></svg>outside body</span>
+          <span><svg width="26" height="8"><path d="M7 0L0 4L7 8z" fill="#a7abb9"/><path d="M5 4H21" stroke="#a7abb9" stroke-width="1.5"/><path d="M19 0L26 4L19 8z" fill="#a7abb9"/></svg>shared</span>
+          <span><svg width="22" height="8"><path d="M0 4H22" stroke="#376fb7" stroke-width="1.5" stroke-dasharray="2 3"/></svg>works with</span>
+          <span><i style="border:1.5px dashed var(--shallow)"></i>not met</span></div></div>
+      <div class="flow" data-flow="sac" style="height:452px"></div>
+      <div class="chart-foot"><span class="sub">Every organisation draws its own layers. The roles and reporting lines come from what you or Clare add, and you can change them in place.</span><span class="src">Edit structure →</span></div>
+    </section>
+
+    <div class="side">
+      <section class="box annread">
+        <div class="box-h"><span class="avatar ann">AO</span><span class="h2">Ann's read</span><span class="sub">updated 07:00 today · 23 sources</span></div>
+        <p><b>A Jesuit school with a tall top and a wide middle.</b> Formally, the Rector answers to the Board and to Jesuit Education Australia. Day to day, decisions about HSIE are made by Anh Nguyen (Deputy, Teaching &amp; Learning), not by the Principal. Your reporting line to the top is four steps, and everyone on it is warm except Mark Hartley. Positions of responsibility for 2027 open next month. The Deputy (Staff) runs that process, and you haven't met them.</p>
+        <div class="threads">
+          <div class="thread"><span class="k">Real power</span><span class="v">Curriculum and staffing sit with Anh Nguyen</span><span class="src">minutes · 3 meetings</span></div>
+          <div class="thread"><span class="k">Your line</span><span class="v">Sarah Lin → Anh Nguyen → Mark Hartley → Fr Ross</span><span class="src">structure</span></div>
+          <div class="thread"><span class="k">Gap</span><span class="v">Deputy (Staff), Business Manager, the Board</span><span class="src">structure</span></div>
+          <div class="thread"><span class="k">Culture</span><span class="v">Ignatian formation is expected of anyone going for leadership</span><span class="src">staff handbook</span></div>
+        </div>
+      </section>
+
+      <section class="box">
+        <div class="box-h"><span class="h2">Potential opportunities</span><span class="sub">here · next 3 weeks</span></div>
+        <div class="op hot"><div class="d"><b>16</b><span>Oct</span></div><div class="stack"><span class="t">2027 positions of responsibility advertised</span><span class="sub">Includes Leader of Learning, HSIE. Applications go to the Deputy (Staff). <span class="src">staff bulletin 18 Sep</span></span></div></div>
+        <div class="op"><div class="d"><b>20</b><span>Oct</span></div><div class="stack"><span class="t">JEA Ignatian Leadership Program, 2027 cohort</span><span class="sub">Nominations go through the Principal. Two staff are funded each year. <span class="src">JEA · Ann</span></span></div></div>
+        <div class="op"><div class="d"><b>T4</b><span>2026</span></div><div class="stack"><span class="t">Staff study support: up to $3,000 a year</span><span class="sub">The college co-funds postgraduate study. It stacks with the UNSW M.Ed scholarship. <span class="src">staff handbook</span></span></div></div>
+      </section>
+    </div>
+  </div>
+
+  <section class="box arc">
+    <div class="box-h"><span class="h2">Your time with St. Aloysius</span><span class="sub" style="margin-left:0">1 yr 9 mo as staff · you first came here in Jun 2023 as Trinity staff</span><span class="sub">hover any mark for its source</span></div>
+    <svg viewBox="0 0 1240 132" preserveAspectRatio="none">
+      <g font-family="Inter" font-size="10" font-weight="700" fill="#6b7788" letter-spacing=".08em">
+        <text x="0" y="34">WORK</text><text x="0" y="66">EVENTS</text><text x="0" y="98">ROLES</text>
+      </g>
+      <g stroke="rgba(23,55,94,.08)"><line x1="120" y1="30" x2="1220" y2="30"/><line x1="120" y1="62" x2="1220" y2="62"/><line x1="120" y1="94" x2="1220" y2="94"/></g>
+      <!-- people you know here, cumulative -->
+      <path d="M230 112 L642 110 L697 86 L807 58 L945 44 L1148 30 L1148 112 Z" fill="#376fb7" opacity=".07"/>
+      <path d="M230 112 L642 110 L697 86 L807 58 L945 44 L1148 30" fill="none" stroke="#376fb7" stroke-width="1.5" opacity=".5"/>
+      <text x="1154" y="27" font-family="Inter" font-size="11" fill="#376fb7" font-weight="600">82 people</text>
+      <!-- work -->
+      <path d="M587 24 L593 30 L587 36 L581 30Z" fill="#a85a0c"/><text x="547" y="18" font-family="Inter" font-size="11" fill="#6b7788">Applied · Sep 24</text>
+      <rect x="670" y="24" width="478" height="12" rx="6" fill="#17375e"/><text x="680" y="33.5" font-family="Inter" font-size="10.5" fill="#fff" font-weight="600">HSIE teacher · since Term 1 2025</text>
+      <!-- events -->
+      <circle cx="230" cy="62" r="5.5" fill="#f68620"/><text x="242" y="66" font-family="Inter" font-size="11" fill="#6b7788">HALT state conference: your first visit, with Trinity</text>
+      <circle cx="725" cy="62" r="5.5" fill="#f68620"/><text x="735" y="54" font-family="Inter" font-size="11" fill="#6b7788">Ignatian induction</text>
+      <circle cx="890" cy="62" r="5.5" fill="#f68620"/><text x="900" y="54" font-family="Inter" font-size="11" fill="#6b7788">Open day</text>
+      <circle cx="1055" cy="62" r="5.5" fill="#f68620"/><text x="1010" y="54" font-family="Inter" font-size="11" fill="#6b7788">HSIE PD</text>
+      <circle cx="1168" cy="62" r="5.5" fill="none" stroke="#f68620" stroke-width="2" stroke-dasharray="3 2"/><text x="1178" y="66" font-family="Inter" font-size="11" fill="#a85a0c">9 Oct</text>
+      <!-- roles -->
+      <rect x="697" y="89" width="451" height="10" rx="5" fill="#dceafa"/><text x="707" y="97" font-family="Inter" font-size="10" fill="#294c71" font-weight="600">Year 9 History team</text>
+      <!-- now + axis -->
+      <line x1="1148" y1="10" x2="1148" y2="118" stroke="#f68620" stroke-width="1" stroke-dasharray="3 3"/>
+      <g font-family="Inter" font-size="10.5" fill="#a7abb9" font-weight="600"><text x="120" y="130">2023</text><text x="395" y="130">2024</text><text x="670" y="130">2025</text><text x="945" y="130">2026</text><text x="1136" y="130" fill="#f68620">now</text></g>
+    </svg>
+  </section>
+</main>
+<span class="tag">02 — one organisation. A flowchart of how it is run: its own layers, with arrows to who each role reports to. Your reporting line is in bold. Ann reads the organisation as a whole. Opportunities are institution-sized.</span>
+</div><script src="rail.js"></script><script>
+window.FLOWS = { sac: {
+  nodes: [
+    { id: 'jea', kind: 'ext', x: 0, y: 0, w: 190, tag: 'Owner · outside body', name: 'Jesuit Education Australia' },
+    { id: 'board', kind: 'ghost', x: 300, y: 0, w: 170, role: 'College Board', note: 'Chair: not met' },
+    { id: 'rector', kind: 'person', cls: 'onpath', x: 300, y: 52, w: 170, warm: 'w', av: 'a4', ini: 'RJ', name: 'Fr Ross Jones SJ', role: 'Rector' },
+    { id: 'principal', kind: 'person', cls: 'onpath', x: 300, y: 130, w: 170, warm: 'c', av: 'a1', ini: 'MH', name: 'Mark Hartley', role: 'Principal' },
+    { id: 'deptl', kind: 'person', cls: 'onpath', x: 70, y: 196, w: 200, warm: 'w', av: 'a2', ini: 'AN', name: 'Anh Nguyen', role: 'Deputy · Teaching & Learning' },
+    { id: 'depstaff', kind: 'ghost', x: 312, y: 196, w: 150, role: 'Deputy · Staff', note: 'hires for PoR roles' },
+    { id: 'dirstud', kind: 'person', x: 494, y: 196, w: 150, warm: 'k', av: 'a6', ini: 'PD', name: 'Paula Doyle', role: 'Director of Students' },
+    { id: 'busmgr', kind: 'ghost', x: 668, y: 196, w: 150, role: 'Business Manager' },
+    { id: 'hsie', kind: 'person', cls: 'onpath', x: 0, y: 268, w: 128, warm: 'w', av: 'a3', ini: 'SL', name: 'Sarah Lin', role: 'Head of HSIE' },
+    { id: 'eng', kind: 'person', x: 136, y: 268, w: 128, warm: 'w', av: 'a3', ini: 'CS', name: 'Claire Smith', role: 'Head of English' },
+    { id: 'heads', kind: 'group', x: 272, y: 268, w: 190, name: 'Other heads of faculty', count: '4', mix: '1,2,1' },
+    { id: 'yearco', kind: 'group', x: 494, y: 268, w: 150, name: 'Year coordinators', count: '6', mix: '2,3,1' },
+    { id: 'support', kind: 'group', x: 668, y: 268, w: 150, name: 'Support & admin', count: '9', mix: '4,3,2' },
+    { id: 'hsieteam', kind: 'group', cls: 'mine', here: 'You are here', x: 0, y: 350, w: 200, name: 'HSIE teachers', count: '15', mix: '8,4,1', me: true },
+    { id: 'engteam', kind: 'group', x: 208, y: 350, w: 110, name: 'English', count: '11', mix: '4,4,3' },
+    { id: 'teachers', kind: 'group', x: 326, y: 350, w: 136, name: 'Other faculties', count: '30', mix: '10,11,9' },
+    { id: 'pastoral', kind: 'group', x: 494, y: 350, w: 150, name: 'Pastoral & chaplaincy', count: '6', mix: '3,2,1' }
+  ],
+  edges: [
+    ['board', 'jea', 'governs'], ['rector', 'board'], ['principal', 'rector', 'line', true],
+    ['deptl', 'principal', 'line'], ['depstaff', 'principal'], ['dirstud', 'principal'], ['busmgr', 'principal'],
+    ['hsie', 'deptl', 'line'], ['eng', 'deptl'], ['heads', 'deptl'], ['yearco', 'dirstud'], ['yearco', 'depstaff'], ['support', 'busmgr'],
+    ['hsieteam', 'hsie', 'line'], ['engteam', 'eng'], ['teachers', 'heads'], ['pastoral', 'yearco'],
+    ['pastoral', 'teachers', 'dotted']
+  ]
+} };
+</script>
+<script src="flow.js"></script><script src="orgchart.js"></script></body></html>
