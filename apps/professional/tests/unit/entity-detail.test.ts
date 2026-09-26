@@ -148,6 +148,83 @@ describe('renderPersonPage', () => {
     expect(canvas.querySelector('.entity-detail__self-indicator')?.textContent).toBe('Self');
   });
 
+  it('renders imported profile facts and source material in a safe Profile tab', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          entity: {
+            ...personOverview().entity,
+            professional_profile: {
+              schema_version: 1,
+              source: {
+                system: 'notion',
+                page_url: 'https://www.notion.so/seth',
+                properties: { 'AI summary': 'Knows the program', 'Future field': 'Preserved' }
+              },
+              summary: 'Knows the program',
+              contact: {
+                email: 'seth@example.com',
+                phone: '+61 400 000 000',
+                linkedin_url: 'https://www.linkedin.com/in/seth'
+              },
+              last_contacted: '2026-09-20',
+              current_workplace: ['Example University'],
+              references: {
+                communications: [{ label: 'Planning note', source_url: null, hub_href: null }],
+                books: [{ label: 'A book', source_url: 'javascript:alert(1)', hub_href: null }],
+                podcasts: [],
+                notes: []
+              },
+              body_markdown: '<em>Imported body remains text</em>'
+            }
+          }
+        })
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+
+    expect(canvas.querySelector('.professional-profile__summary')?.textContent).toBe('Knows the program');
+    expect(canvas.querySelector<HTMLAnchorElement>('a[href="mailto:seth@example.com"]')?.textContent).toBe('seth@example.com');
+    expect(canvas.querySelector<HTMLAnchorElement>('a[href="tel:+61400000000"]')?.textContent).toBe('+61 400 000 000');
+    expect(canvas.querySelector<HTMLAnchorElement>('a[href="https://www.linkedin.com/in/seth"]')?.textContent).toBe('LinkedIn');
+
+    clickTab(canvas, 'Profile');
+    expect(canvas.textContent).toContain('Planning note');
+    expect(canvas.textContent).toContain('A book');
+    expect(canvas.textContent).toContain('<em>Imported body remains text</em>');
+    expect(canvas.querySelector('em')).toBeNull();
+    expect(canvas.querySelector<HTMLAnchorElement>('a[href^="javascript:"]')).toBeNull();
+    expect(canvas.querySelector('details')?.textContent).toContain('Future field');
+  });
+
+  it('does not turn an unsafe imported LinkedIn value into a live link', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(200, {
+        ok: true,
+        data: personOverview({
+          entity: {
+            ...personOverview().entity,
+            professional_profile: {
+              schema_version: 1,
+              source: { system: 'notion', page_url: null, properties: {} },
+              summary: null,
+              contact: { email: null, phone: null, linkedin_url: 'javascript:alert(1)' },
+              last_contacted: null,
+              current_workplace: [],
+              references: { communications: [], books: [], podcasts: [], notes: [] },
+              body_markdown: null
+            }
+          }
+        })
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderPersonPage(canvas, PERSON_ID);
+    expect(canvas.querySelector<HTMLAnchorElement>('a[href^="javascript:"]')).toBeNull();
+  });
+
   it('separates current relationships (Overview tab) from historical relationships (History tab)', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
@@ -230,7 +307,7 @@ describe('renderPersonPage', () => {
     expect(applicationLink?.getAttribute('href')).toMatch(/#\/application\//);
   });
 
-  it('exposes a back link to People, a 7-tab bar, identity edit, and no archive/delete/create-link controls', async () => {
+  it('exposes a back link to People, an 8-tab bar, identity edit, and no archive/delete/create-link controls', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -243,7 +320,7 @@ describe('renderPersonPage', () => {
     for (const forbidden of ['archive', 'delete', 'create-link', 'lifecycle']) {
       expect(canvas.innerHTML.toLowerCase()).not.toMatch(new RegExp(`data-${forbidden}|class="[^"]*${forbidden}`));
     }
-    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(7);
+    expect(canvas.querySelectorAll('button[role="tab"]').length).toBe(8);
   });
 
   it('shows a clear empty state when there are no relationships at all', async () => {
@@ -257,7 +334,7 @@ describe('renderPersonPage', () => {
     expect(canvas.textContent).toMatch(/No historical relationships/);
   });
 
-  it('renders a 7-tab tab bar (Overview/Timeline/Shared Work/Network/History/Observations/Evidence) with Overview active initially', async () => {
+  it('renders an 8-tab tab bar including Profile, with Overview active initially', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse(200, { ok: true, data: personOverview() }));
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
@@ -266,6 +343,7 @@ describe('renderPersonPage', () => {
     const tabs = [...canvas.querySelectorAll('[role="tab"]')];
     expect(tabs.map((t) => t.textContent)).toEqual([
       'Overview',
+      'Profile',
       'Timeline',
       'Shared Work',
       'Network',

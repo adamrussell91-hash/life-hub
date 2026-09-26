@@ -20,6 +20,7 @@
     "validate:fixtures": "node scripts/validate-fixtures.mjs",
     "forecast:report": "node scripts/forecast-report.mjs",
     "import:mind": "node scripts/import-mind-notion.mjs",
+    "import:professional-people": "node scripts/import-professional-people.mjs",
     "chadwick-voice": "bash tools/voice-lab/launch.sh --no-open"
   },
   "dependencies": {
