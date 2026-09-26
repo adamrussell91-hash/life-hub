@@ -14,6 +14,8 @@ import '../../design-kit/calendar-day-dial.css';
 import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
+import '../styles/tasks-engine.css';
+import '../styles/block-page.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';

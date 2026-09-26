@@ -1,0 +1,75 @@
+/* Copied from apps/tasks/src/styles/cards.css (page-editor "+" and palette).
+   Keep in step with that file; Professional doesn't import all of cards.css. */
+.block-page {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.page-editor__add {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.page-editor__add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: var(--hub-glass-fill);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: 1;
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+}
+
+.page-editor__add-btn:hover {
+  border-color: var(--wave);
+  color: var(--marine);
+}
+
+.page-editor__add-btn:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.page-editor__insert {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + var(--space-2));
+  z-index: 20;
+  display: grid;
+  gap: var(--space-3);
+  width: min(22rem, calc(100vw - 2rem));
+  max-height: 24rem;
+  overflow: auto;
+  padding: var(--space-3);
+  transform: translateX(-50%);
+  background: var(--hub-glass-fill);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-3);
+  backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
+  -webkit-backdrop-filter: blur(var(--hub-glass-blur)) saturate(115%);
+}
+
+.page-editor__insert-family {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.page-editor__insert-label {
+  margin: 0;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}

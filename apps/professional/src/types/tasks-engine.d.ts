@@ -16,3 +16,23 @@ export function mountBlockInsert(
   host: HTMLElement,
   options: { onInsert: (type: InsertMenuValue) => void }
 ): BlockInsertHandle;
+
+export type Block = { id: string; block_type: string; content?: unknown; [key: string]: unknown };
+
+export type BlockCanvasHandle = {
+  update(blocks: Block[]): void;
+  insertType(type: InsertMenuValue): void;
+  dispose(): void;
+};
+
+export function mountBlockCanvas(
+  host: HTMLElement,
+  options: {
+    blocks: Block[];
+    onChange: (blocks: Block[]) => void;
+    idFactory: () => string;
+    editable?: boolean;
+  }
+): BlockCanvasHandle;
+
+export function nextBlockIdFactory(prefix: string, blocks: Block[]): () => string;
