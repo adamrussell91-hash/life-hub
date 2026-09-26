@@ -229,6 +229,7 @@ describe('excursions dashboard', () => {
         open_task_count: 0,
         done_task_count: 0,
         all_tasks_done: false,
+        end_passed: true,
         ready_to_close: true
       }
     });

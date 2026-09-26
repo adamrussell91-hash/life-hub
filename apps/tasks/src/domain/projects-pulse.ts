@@ -164,7 +164,12 @@ export function classifyProjectLifecycle(
   if (project.status === 'stalled' || stallIds.has(project.id)) return 'stalled';
 
   const variance = computeProjectVariance(project, tasks, now);
-  if (variance.ready_to_close || (variance.slip_days != null && variance.slip_days > 0)) {
+  // Past end or slip → attention; ready_to_close (all open work done) too.
+  if (
+    variance.ready_to_close ||
+    variance.end_passed ||
+    (variance.slip_days != null && variance.slip_days > 0)
+  ) {
     return 'needs_attention';
   }
 
@@ -525,7 +530,14 @@ export function findRetroCandidate(
   cards: ProjectPulseCard[],
   now: Date = new Date()
 ): RetroCandidate | null {
-  const ready = cards.find((card) => card.readyToClose && card.lifecycle !== 'completed');
+  // Close-out only when the pulse card says ready (no open work) — never on
+  // end-date alone while tasks remain.
+  const ready = cards.find(
+    (card) =>
+      card.readyToClose &&
+      card.lifecycle !== 'completed' &&
+      card.openTaskCount === 0
+  );
   if (ready) {
     return {
       project: ready.project,

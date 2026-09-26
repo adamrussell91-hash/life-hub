@@ -12,6 +12,12 @@ export type ProjectVariance = {
   open_task_count: number;
   done_task_count: number;
   all_tasks_done: boolean;
+  /** Calendar end is today or earlier (derived or stored). */
+  end_passed: boolean;
+  /**
+   * Safe to prompt a close-out retro / Complete: nothing left open.
+   * A past end date with open work is attention, not close-out.
+   */
   ready_to_close: boolean;
 };
 
@@ -47,10 +53,14 @@ export function computeProjectVariance(
     );
   }
 
-  const endPassed =
+  const end_passed =
     Boolean(current) && current!.getTime() <= from.getTime() + 24 * 60 * 60 * 1000;
   const all_tasks_done = child.length > 0 && open_task_count === 0;
-  const ready_to_close = !isProjectArchived(project.status) && (all_tasks_done || endPassed);
+  // Close-out only when open work is gone. Past end + open tasks stays attention.
+  const ready_to_close =
+    !isProjectArchived(project.status) &&
+    open_task_count === 0 &&
+    (all_tasks_done || end_passed);
 
   return {
     project_id: project.id,
@@ -61,6 +71,7 @@ export function computeProjectVariance(
     open_task_count,
     done_task_count,
     all_tasks_done,
+    end_passed,
     ready_to_close
   };
 }
