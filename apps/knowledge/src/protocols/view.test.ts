@@ -160,6 +160,22 @@ describe("lightingStage", () => {
     expect(lightingStage(4, 10)).toBe("golden-hour");
   });
 
+  it("uses all nine sunrise-to-night stages for Fates", () => {
+    expect([
+      ...Array.from({ length: 9 }, (_, index) => lightingStage(index, 9, "fates")),
+    ]).toEqual([
+      "sunrise",
+      "early-morning",
+      "late-morning",
+      "midday",
+      "early-afternoon",
+      "late-afternoon",
+      "sunset",
+      "blue-hour",
+      "night",
+    ]);
+  });
+
   it("uses six dawn-to-night stages for Cartographers", () => {
     expect(lightingStage(0, 12, "cartographers")).toBe("dawn");
     expect(lightingStage(2, 12, "cartographers")).toBe("sunrise");
