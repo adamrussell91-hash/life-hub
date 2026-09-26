@@ -68,6 +68,15 @@ test('Tideline Hammond tray wires Review to a pending-changes panel', () => {
   assert.doesNotMatch(src, /function reviewNextGhost/);
 });
 
+test('Tideline and hub mount suppress load/refresh entrance flash', () => {
+  const tideline = readFileSync(join(root, 'packages/design-kit/js/calendar/render-tideline.js'), 'utf8');
+  const mount = readFileSync(join(root, 'packages/design-kit/js/calendar/mount-hub-calendar.js'), 'utf8');
+  assert.match(tideline, /function paintKey/);
+  assert.match(tideline, /mount\(\{\s*entrance:\s*false\s*\}\)/);
+  assert.match(mount, /let ready = false/);
+  assert.match(mount, /if \(!destroyed && ready\) schedulePaint/);
+});
+
 test('open-in-hub maps domains and builds full-nav Open in links', () => {
   assert.equal(hubDomainForItem({ kind: 'task' }), 'tasks');
   assert.equal(hubDomainForItem({ source: 'professional_meeting' }), 'professional');

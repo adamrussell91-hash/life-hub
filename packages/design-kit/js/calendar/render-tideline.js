@@ -95,6 +95,49 @@ let popFor = null;
 let nowHour = 18;
 let wired = false;
 let filterState = null;
+/** Host this session is mounted on — data refresh reuses it without replaying entrance. */
+let mountedFor = null;
+let playedEntrance = false;
+let entranceGuardUntil = 0;
+let lastPaintKey = null;
+let repaintTimer = 0;
+
+const ENTRANCE_GUARD_MS = 7 * CAL.enterStagger + CAL.enterMs + 120;
+const perfNow = () => root?.defaultView?.performance?.now?.() ?? Date.now();
+
+/** Stamp of inputs that require a re-layout (not a soft echo). */
+function paintKey(inp) {
+  const week = Array.isArray(inp?.week) ? inp.week.join(',') : '';
+  const ghosts = Array.isArray(inp?.ghosts)
+    ? inp.ghosts.map((ghost) => `${ghost?.id}:${ghost?.settled ?? ghost?.status ?? ''}`).join(',')
+    : '';
+  const events = Array.isArray(inp?.events)
+    ? inp.events.map((event) => {
+      const record = event?.record && typeof event.record === 'object' ? event.record : event;
+      return `${record?.id ?? event?.id ?? ''}:${record?.date ?? event?.date ?? ''}:${record?.title ?? event?.title ?? ''}`;
+    }).join(',')
+    : '';
+  const terms = Array.isArray(inp?.terms)
+    ? inp.terms.map((term) => `${term?.term ?? ''}:${term?.starts_on ?? ''}:${term?.ends_on ?? ''}`).join(',')
+    : '';
+  return [
+    week,
+    inp?.today ?? '',
+    ghosts,
+    events,
+    terms,
+    inp?.dayProfile ? JSON.stringify(inp.dayProfile) : '',
+    state.phone ? state.phoneDay : 'desk'
+  ].join('|');
+}
+
+function repaintAfter(ms) {
+  clearTimeout(repaintTimer);
+  repaintTimer = setTimeout(() => {
+    repaintTimer = 0;
+    if (mountedFor === host && input) mount({ entrance: false });
+  }, Math.max(0, ms));
+}
 
 const clamp01 = value => Math.min(1, Math.max(0, value));
 const fadeIn = (height, [from, to]) => clamp01((height - from) / (to - from));
@@ -384,12 +427,42 @@ function ghostsForPaint(list) {
 
 export function renderTideline(doc, calendarHost, nextInput) {
   root = doc;
-  host = calendarHost;
   input = nextInput;
-  mount();
+  // Prefer a direct child check — happy-dom does not support `:scope > …`.
+  const shellAlive = Boolean(
+    calendarHost?.firstElementChild?.getAttribute?.('data-part') === 'tideline' ||
+      calendarHost?.querySelector?.('[data-part="tideline"]')
+  );
+  const fresh = mountedFor !== calendarHost || !shellAlive;
+  host = calendarHost;
+  const key = paintKey(input);
+
+  if (fresh) {
+    clearTimeout(repaintTimer);
+    repaintTimer = 0;
+    mountedFor = calendarHost;
+    playedEntrance = false;
+    entranceGuardUntil = 0;
+    lastPaintKey = key;
+    playedEntrance = true;
+    mount({ entrance: true });
+    return;
+  }
+
+  // Soft echo (hashchange / unchanged sources): keep the chart.
+  if (key === lastPaintKey) return;
+
+  if (perfNow() < entranceGuardUntil || engine?.busy?.()) {
+    // Entrance owns the grid — paint this data once it has finished.
+    repaintAfter(Math.max(16, entranceGuardUntil - perfNow() + 16));
+    return;
+  }
+
+  lastPaintKey = key;
+  mount({ entrance: false });
 }
 
-function mount() {
+function mount({ entrance = false } = {}) {
   engine?.dispose();
   nodes.clear();
   popFor = null;
@@ -506,11 +579,16 @@ function mount() {
   for (const [id, node] of nodes) {
     if (id.startsWith('chip:')) engine.place(id, { opacity: 1, scale: 1, solid: node.classList?.contains?.('is-ghost') ? 0 : 1 });
   }
-  days.forEach((date, index) => engine.enter(`col:${date}`, { opacity: 1, y: 0 }, {
-    from: { opacity: 0, y: CAL.enterRise },
-    delay: index * CAL.enterStagger,
-    duration: CAL.enterMs
-  }));
+  if (entrance) {
+    days.forEach((date, index) => engine.enter(`col:${date}`, { opacity: 1, y: 0 }, {
+      from: { opacity: 0, y: CAL.enterRise },
+      delay: index * CAL.enterStagger,
+      duration: CAL.enterMs
+    }));
+    entranceGuardUntil = perfNow() + ENTRANCE_GUARD_MS;
+  } else {
+    days.forEach((date) => engine.place(`col:${date}`, { opacity: 1, y: 0 }));
+  }
   const raf = view?.requestAnimationFrame;
   if (typeof raf === 'function') raf(() => { applyHubPillsThumb(zoom); applyHubPillsThumb(focus); });
   if (!wired) {
@@ -521,6 +599,7 @@ function mount() {
   }
   applySettled();
   applyTidelineFilter({ replay: false });
+  lastPaintKey = paintKey(input);
   publish(view);
   watchPhone(view);
 }
@@ -1201,7 +1280,7 @@ function wire(section) {
     const day = target.closest('[data-day]');
     if (day) {
       state.phoneDay = day.dataset.day;
-      mount();
+      mount({ entrance: false });
       return;
     }
     const shift = target.closest('[data-shift]');
@@ -1309,6 +1388,6 @@ function watchPhone(view) {
   if (!query || typeof query.addEventListener !== 'function' || host.dataset.tidelineMq) return;
   host.dataset.tidelineMq = '1';
   query.addEventListener('change', () => {
-    if (host.isConnected !== false) mount();
+    if (host.isConnected !== false) mount({ entrance: false });
   });
 }

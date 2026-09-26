@@ -51,6 +51,8 @@ export function mountHubCalendar(host, adapter) {
   else writeFilterState(hub, defaultFilterForHub(hub));
 
   let destroyed = false;
+  /** Suppress onChange paints until the first loadAll finishes — mid-source paints remounted with entrance flash. */
+  let ready = false;
   let selectedDate = adapter.today || getSydneyDateKey(adapter.now ?? new Date());
   let dayLayout = 'dial';
   let ghosts = [];
@@ -102,7 +104,8 @@ export function mountHubCalendar(host, adapter) {
     loadLife: adapter.loadLife,
     today: adapter.today,
     onChange: () => {
-      if (!destroyed) schedulePaint();
+      // After initial load: retry / late source updates re-paint. During loadAll: wait for the batch.
+      if (!destroyed && ready) schedulePaint();
     }
   });
 
@@ -276,12 +279,14 @@ export function mountHubCalendar(host, adapter) {
   void loader.loadAll().then(async () => {
     if (destroyed) return;
     await loadGhosts(currentZoom());
+    ready = true;
     if (!destroyed) paint();
   });
 
   return {
     destroy() {
       destroyed = true;
+      ready = false;
       view?.removeEventListener?.('hashchange', onHashOrPop);
       view?.removeEventListener?.('popstate', onHashOrPop);
       unmountDayDial();
@@ -290,8 +295,12 @@ export function mountHubCalendar(host, adapter) {
       host.replaceChildren();
     },
     reload() {
+      ready = false;
       ghostsKey = '';
-      return loader.loadAll().then(() => loadGhosts(currentZoom())).then(() => schedulePaint());
+      return loader.loadAll().then(() => loadGhosts(currentZoom())).then(() => {
+        ready = true;
+        schedulePaint();
+      });
     },
     /** Re-read zoom from the router and paint in place (Back/Forward / soft route). */
     syncZoom() {
