@@ -103,6 +103,32 @@ test('dismissing records the id and writes nothing else', async () => {
   assert.equal(github.commits.length, 0);
 });
 
+test('accept uses the cached proposal when a fresh read would omit it', async () => {
+  const { handler, store } = harness();
+  store.data.set(goalReadKey('g1'), {
+    read: {
+      ghosts: [{
+        id: 'goal-g1-start',
+        agent: 'hammond',
+        kind: 'create_task',
+        title: 'First step: Study at Cambridge',
+        due: '2026-11-06',
+        goalId: 'g1',
+        domain: 'other',
+        reason: 'Nothing is open under this goal'
+      }]
+    },
+    dismissed: []
+  });
+  const response = await handler(post({ id: 'goal-g1-start', decision: 'accept' }));
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.match(body.receipt, /First step: Study at Cambridge/);
+  const created = [...store.data.values()].find(value => value && value.title === 'First step: Study at Cambridge');
+  assert.equal(created.parent_goal_id, 'g1');
+  assert.equal(store.data.get(goalReadKey('g1'))?.read ?? null, null);
+});
+
 test('a proposal that no longer applies is a 404', async () => {
   const { handler } = harness();
   assert.equal((await handler(post({ id: 'goal-g1-move-t1', decision: 'accept' }))).status, 404);

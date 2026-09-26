@@ -184,9 +184,16 @@ function paintTaskPage(
     }, 400);
   };
 
+  let committedTitle = task.title;
   bindEditablePageTitle(header, task.title, {
-    onChange: (value) => persist({ title: value }),
-    current: () => current.title
+    onDraft: (value) => {
+      current = { ...current, title: value };
+    },
+    onCommit: (value) => {
+      committedTitle = value;
+      persist({ title: value });
+    },
+    current: () => committedTitle
   });
 
   const page = el('div', 'page-editor');
@@ -400,9 +407,16 @@ function paintProjectPage(
     }, 400);
   };
 
+  let committedTitle = project.title;
   bindEditablePageTitle(header, project.title, {
-    onChange: (value) => persist({ title: value }),
-    current: () => current.title
+    onDraft: (value) => {
+      current = { ...current, title: value };
+    },
+    onCommit: (value) => {
+      committedTitle = value;
+      persist({ title: value });
+    },
+    current: () => committedTitle
   });
 
   const page = el('div', 'page-editor');

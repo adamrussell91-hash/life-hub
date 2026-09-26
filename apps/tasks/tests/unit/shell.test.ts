@@ -238,7 +238,7 @@ describe('view surfaces', () => {
     const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
     renderPageHeader(refs, { eyebrow: 'Dashboard', title: 'Plan Year 5/6 Pathfinders STEAM extension course' });
     bindEditablePageTitle(refs.pageHeader, 'Plan Year 5/6 Pathfinders STEAM extension course', {
-      onChange: vi.fn(),
+      onCommit: vi.fn(),
       current: () => 'Plan Year 5/6 Pathfinders STEAM extension course'
     });
 

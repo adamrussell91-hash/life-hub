@@ -36,7 +36,14 @@
 .goals-zoom-host { min-width: 0; }
 .runway--zoom { padding: var(--space-5) var(--space-6); overflow: hidden; }
 .runway-zoom__plot { position: relative; min-height: 12rem; }
-.runway-zoom__axis { position: relative; height: 1.75rem; margin-bottom: var(--space-3); margin-left: 12.5rem; margin-right: 10rem; }
+.runway-zoom__axis {
+  position: relative;
+  height: 1.75rem;
+  margin-bottom: var(--space-3);
+  margin-left: calc(12.5rem + var(--space-2));
+  margin-right: calc(10rem + var(--space-2));
+  overflow: hidden;
+}
 .runway-zoom__tick { position: absolute; top: 0; font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); color: var(--muted); text-align: center; overflow: hidden; white-space: nowrap; }
 .runway-zoom__tick.is-holiday { color: var(--shallow); opacity: 0.7; }
 .runway-zoom__tick.is-now { color: var(--high-sea-ink); }
@@ -46,7 +53,18 @@
 .runway-zoom__lane-label small { margin-left: auto; font-size: var(--text-sm); font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--muted); }
 .runway-zoom__row { display: grid; grid-template-columns: 12.5rem minmax(0, 1fr) 10rem; gap: var(--space-2); align-items: center; text-decoration: none; color: inherit; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); min-height: 2.75rem; }
 .runway-zoom__info { min-width: 0; }
-.runway-zoom__track { position: relative; height: 1.5rem; min-width: 0; }
+.runway-zoom__track { position: relative; height: 1.5rem; min-width: 0; overflow: hidden; }
+.goals-direction,
+.hammond-strip,
+.goals-zoom-host,
+.runway--zoom,
+.goal-page,
+.goal-card,
+.goal-page__meta-card {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
 .runway-zoom__bar { position: absolute; top: 0.35rem; height: 0.5rem; border-radius: var(--radius-xs); background: var(--line); opacity: 0.55; pointer-events: none; }
 .runway-zoom__track .cell { position: absolute; top: 0.125rem; }
 .runway__row--life .runway-zoom__bar { background: var(--pastel-sage); }

@@ -207,8 +207,12 @@ export function bindEditablePageTitle(
   header: HTMLElement | undefined,
   value: string,
   handlers: {
-    onChange: (value: string) => void;
+    /** Last saved title. Esc restores this. Not the in-progress draft. */
     current: () => string;
+    /** Local draft only. Must not start a network save. */
+    onDraft?: (value: string) => void;
+    /** One save, after blur or Enter. */
+    onCommit?: (value: string) => void;
   }
 ): void {
   if (!header) return;
@@ -220,21 +224,45 @@ export function bindEditablePageTitle(
   input.rows = 1;
   input.setAttribute('aria-label', 'Edit title');
   input.title = 'Edit title';
-  input.addEventListener('input', () => {
+
+  const draft = () => {
     const cleaned = input.value.replace(/[\r\n]+/g, ' ');
     if (input.value !== cleaned) input.value = cleaned;
     fitTitleField(input);
     const next = cleaned.trim();
-    if (next) handlers.onChange(next);
+    if (next) handlers.onDraft?.(next);
+    return next;
+  };
+
+  const commit = () => {
+    const next = draft();
+    if (!next) {
+      input.value = handlers.current();
+      handlers.onDraft?.(handlers.current());
+      fitTitleField(input);
+      return;
+    }
+    if (next === handlers.current()) return;
+    handlers.onCommit?.(next);
+  };
+
+  input.addEventListener('input', () => {
+    draft();
   });
   input.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      input.blur();
+      return;
+    }
+    if (event.key !== 'Escape') return;
     event.preventDefault();
-    input.blur();
+    input.value = handlers.current();
+    handlers.onDraft?.(handlers.current());
+    fitTitleField(input);
   });
   input.addEventListener('blur', () => {
-    if (!input.value.trim()) input.value = handlers.current();
-    fitTitleField(input);
+    commit();
   });
   existing.replaceWith(input);
   fitTitleField(input);
