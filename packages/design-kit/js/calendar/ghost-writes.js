@@ -38,7 +38,7 @@ export const GHOST_AGENTS = Object.freeze({
 });
 
 export const GHOST_KINDS = Object.freeze([
-  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks'
+  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm'
 ]);
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
@@ -98,6 +98,12 @@ export function validateGhost(ghost) {
     if (!oneLine(ghost.to) || !String(ghost.text ?? '').trim()) throw new TypeError('draft_message needs to and text');
   }
   if (ghost.kind === 'bedtime' && !HHMM.test(ghost.time ?? '')) throw new TypeError('bedtime needs time HH:MM');
+  if (ghost.kind === 'book_comm') {
+    if (!HHMM.test(ghost.time ?? '')) throw new TypeError('book_comm needs time HH:MM');
+    if (!Number.isInteger(ghost.duration_min) || ghost.duration_min < 5 || ghost.duration_min > 240) throw new TypeError('book_comm needs duration_min 5–240');
+    if (!oneLine(ghost.title)) throw new TypeError('book_comm needs a title');
+    if (!Array.isArray(ghost.person_refs) || !ghost.person_refs.length) throw new TypeError('book_comm needs at least one person');
+  }
   if (ghost.kind === 'protect_block') {
     if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
       throw new TypeError('protect_block needs start < end (HH:MM)');
@@ -244,6 +250,24 @@ export function acceptPlan(ghost, { today = null } = {}) {
       steps.push({ target: 'tasks', collection: 'goals', method: 'PATCH', id: ghost.goalId, body: { rest_weeks: [...ghost.rest_weeks] } });
       steps.push(recentAction(actedOn, who, `planned rest for “${title}”: weeks of ${list}`));
       receipt = `${who} → Goals: “${title}” rests the weeks of ${list}. Those weeks won't count as misses.`;
+      break;
+    }
+    case 'book_comm': {
+      steps.push({
+        target: 'professional',
+        action: 'create_communication',
+        date: ghost.date,
+        time: ghost.time,
+        duration_min: ghost.duration_min,
+        time_zone: ghost.time_zone || 'Australia/Sydney',
+        title: oneLine(ghost.title),
+        channel: ghost.channel || 'in_person',
+        purpose_tag: ghost.purpose_tag ?? null,
+        thread_ref: ghost.thread_ref ?? null,
+        person_refs: [...ghost.person_refs]
+      });
+      steps.push(recentAction(actedOn, who, `booked “${oneLine(ghost.title)}” ${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.time)}${why}`));
+      receipt = `${who} → Calendar: “${oneLine(ghost.title)}”, ${weekday(ghost.date)} ${formatDisplayDate(ghost.date)} at ${clock12(ghost.time)}.`;
       break;
     }
     default:
