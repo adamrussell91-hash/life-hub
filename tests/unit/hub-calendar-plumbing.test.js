@@ -47,6 +47,23 @@ test('Pages hub calendar adapters prefix getApiBaseUrl (not same-origin /api)', 
   }
 });
 
+test('Life events loader batches /api/repo/files like Life sync-repository', () => {
+  const src = readFileSync(join(root, 'packages/design-kit/js/calendar/load-life-events.js'), 'utf8');
+  assert.match(src, /MAX_BATCH_FILES\s*=\s*50/);
+  assert.match(src, /batchLifeFileRequests/);
+  assert.match(src, /for \(const batch of batchLifeFileRequests/);
+});
+
+test('Tideline Hammond tray wires Review, Dismiss all, and portrait src', () => {
+  const src = readFileSync(join(root, 'packages/design-kit/js/calendar/render-tideline.js'), 'utf8');
+  assert.match(src, /data-action': 'review'/);
+  assert.match(src, /data-action': 'dismiss-all'/);
+  assert.match(src, /\/assets\/agents\/hammond\.jpg/);
+  assert.match(src, /function reviewNextGhost/);
+  assert.match(src, /function dismissAll/);
+  assert.match(src, /agentAvatarNode/);
+});
+
 test('open-in-hub maps domains and builds full-nav Open in links', () => {
   assert.equal(hubDomainForItem({ kind: 'task' }), 'tasks');
   assert.equal(hubDomainForItem({ source: 'professional_meeting' }), 'professional');
