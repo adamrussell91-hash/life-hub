@@ -1,5 +1,5 @@
 import { listScanProposals, runCareerScan, keepScanProposal, binScanProposal } from '@/api/career';
-import { careerCardRoute, careerFutureRoute } from '@/app/router';
+import { careerFutureRoute } from '@/app/router';
 import type { buildCareerModel } from '@/domain/career-model';
 
 type CareerModel = ReturnType<typeof buildCareerModel>;
@@ -257,6 +257,3 @@ function renderCard(
   card.append(actions);
   return card;
 }
-
-// Silence unused import when card route used later for kept chip
-void careerCardRoute;

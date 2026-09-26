@@ -164,7 +164,23 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 5: Skills scan
 
-**Status:** pending
+**Status:** done (core) / 5.6 partial (2026-09-26)
+**Checked:** W1 W2 V4 I3 R3 I4 agent-context-integrity (prompt only sees input refs)
+
+- `career-scan-service.mjs`: Sunday 17:00 Sydney gate, source_refs hash dedupe, list/bin/keep, run-now (10 min rate limit)
+- Keep creates achievement + `evidenced_by` / `witnessed_by` / `supports_future` in one server op
+- `career-scan-tick-scheduled.mjs` hourly cron
+- `career-prompts.mjs` `skillsScan` + Ann voice
+- Skills scan panel: source chips, title edit, APST/future tags, STAR details, Keep/Edit/Bin, Run scan now
+- Named tests: `career-scan-service.test.js`
+
+**5.6 partial:** Inverse “Career evidence” lists on Tasks/Teaching detail not added this commit (Phase 0 said yes needed). Hub source gather beyond Professional meetings is thin until Tasks/Teaching/Knowledge stores are bound in the scan pass.
+
+**diff vs mockup:** Empty scan shows next-Sunday copy. Multi-hub source harvest needs live stores.
+
+**Must:** Keep/bin/run-now endpoints; Sunday gate; panel empty state.
+**Must-not:** Model writes links without Keep.
+**Verify:** scan service unit tests; Career shell still loads.
 
 ---
 
