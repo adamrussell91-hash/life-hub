@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Organisations — compare side by side</title>
+<link rel="stylesheet" href="base.css"><link rel="stylesheet" href="people.css"><link rel="stylesheet" href="orgs.css">
+<style>
+  .canvas { gap: 16px; padding-top: 26px; }
+  .switch { display: flex; align-items: center; gap: 10px; }
+  .switch .back { font-size: var(--text-sm); font-weight: 600; color: var(--wave); margin-right: 6px; }
+  .pick { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px 5px 6px; border-radius: 12px; background: #fff; border: 1px solid var(--line); font-size: var(--text-sm); font-weight: 600; }
+  .vs { font-size: var(--text-xs); color: var(--muted); font-weight: 600; }
+  .addorg { padding: 7px 12px; border-radius: 12px; border: 1px dashed var(--shallow); font-size: var(--text-xs); color: var(--muted); font-weight: 600; }
+  .seg { display: inline-flex; background: rgba(255,255,255,0.7); border: 1px solid var(--line); border-radius: 12px; padding: 3px; }
+  .seg span { font-size: var(--text-xs); font-weight: 600; padding: 6px 12px; border-radius: 9px; color: var(--muted); }
+  .seg span.on { background: var(--navy); color: #fff; }
+
+  .stage { flex: 1; min-height: 0; display: grid; grid-template-columns: 440px 150px 440px 1fr; position: relative; }
+  svg.ghosts { position: absolute; left: 0; top: 0; width: calc(440px + 150px + 440px); height: 100%; pointer-events: none; z-index: 2; overflow: visible; }
+  .panel { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .panel .ph { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+  .panel .ph h3 { margin: 0; font-size: var(--text-md); color: var(--depth); }
+  .grp { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 6px 10px; border-radius: 12px; }
+  .grp.lead { background: var(--cotton); }
+  .grp .gl { width: 74px; flex: 0 0 74px; font-size: var(--text-2xs); font-weight: 700; color: var(--depth); }
+  .grp .gl i { display: block; font-style: normal; font-weight: 500; color: var(--muted); }
+  .grp .dots { flex: 1; gap: 4px; }
+  .grp .dot { width: 11px; height: 11px; }
+  .port { display: flex; align-items: center; gap: 7px; padding: 4px 8px; border-radius: 99px; background: #fff; border: 1px solid var(--line); white-space: nowrap; }
+  .port .avatar { width: 24px; height: 24px; font-size: 8px; }
+  .port .nm { font-size: var(--text-2xs); font-weight: 600; }
+  .port .rl { font-size: 10px; color: var(--muted); }
+  .port.hollow { border-style: dashed; background: transparent; }
+  .port.hollow .avatar { background: transparent; color: var(--depth); border: 1.5px dashed var(--depth); }
+  .left .port { margin-left: auto; }
+  .ports { display: flex; flex-direction: column; gap: 4px; }
+  .left .ports { margin-left: auto; align-items: flex-end; }
+  .quiet { font-size: var(--text-xs); color: var(--muted); padding: 8px 10px; border-top: 1px dashed var(--line); margin-top: auto; }
+
+  .gives { margin-left: 18px; padding: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .gives .h2 { font-size: var(--text-base); }
+  .give { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .give:last-of-type { border-bottom: 0; }
+  .num { width: 22px; height: 22px; flex: 0 0 22px; border-radius: 99px; color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; }
+  .give .t { font-size: var(--text-sm); color: var(--ink); line-height: 1.4; }
+  .give .t b { font-weight: 650; }
+  .give .foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .mini-btn { font-size: var(--text-2xs); font-weight: 700; padding: 5px 10px; border-radius: 8px; background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .give.top { background: var(--pastel-gold); margin: 0 -18px; padding: 12px 18px; border-radius: 0; border-bottom: 0; }
+  .give.top .mini-btn { background: var(--navy); color: #fff; border-color: transparent; }
+  .rule { font-size: var(--text-2xs); color: var(--muted); line-height: 1.45; margin-top: auto; padding-top: 10px; border-top: 1px dashed var(--line); }
+</style></head>
+<body><div class="screen">
+<aside class="hub-rail"></aside>
+<main class="canvas">
+  <div class="title-row">
+    <h1 class="page-title">Compare</h1>
+    <div class="switch" style="margin-left:8px">
+      <span class="pick"><span class="crest md c-sac">SAC</span>St. Aloysius College</span><span class="vs">and</span>
+      <span class="pick"><span class="crest md c-tcc">TCC</span>Trinity Catholic College</span>
+      <span class="addorg">+ add a third</span>
+    </div>
+    <span class="spacer"></span>
+    <div class="legend" style="gap:16px"><span><i style="background:var(--link-moved);border-radius:2px;height:3px;width:18px"></i>moved between them</span><span><i style="background:var(--link-know);border-radius:2px;height:3px;width:18px"></i>know each other</span><span><i style="background:var(--link-event);border-radius:2px;height:3px;width:18px"></i>met at an event</span></div>
+    <div class="seg"><span class="on">Useful links · 5</span><span>All links · 27</span></div>
+  </div>
+
+  <div class="stage">
+    <svg class="ghosts"></svg>
+
+    <section class="card panel left">
+      <div class="ph"><span class="crest lg c-sac">SAC</span><div class="stack"><h3>St. Aloysius College</h3><div class="rchips" style="margin-top:4px"><span class="rchip r-work"><b>Workplace</b><span class="yr">2025–now</span></span></div></div><span class="sub" style="margin-left:auto">82 people · 7 layers</span></div>
+      <div class="flow" data-flow="sac" style="height:640px; margin-top:8px"></div>
+      <div class="quiet">Business Manager, Support, Pastoral: no useful links to Trinity</div>
+    </section>
+
+    <div></div>
+
+    <section class="card panel right">
+      <div class="ph"><span class="crest lg c-tcc">TCC</span><div class="stack"><h3>Trinity Catholic College</h3><div class="rchips" style="margin-top:4px"><span class="rchip r-past"><b>Workplace</b><span class="yr">2021–24</span></span><span class="rchip r-prac"><b>Placement</b><span class="yr">2020</span></span></div></div><span class="sub" style="margin-left:auto">64 people · 5 layers</span></div>
+      <div class="flow" data-flow="tcc" style="height:640px; margin-top:8px"></div>
+      <div class="quiet">A flatter, system-run school: the Principal answers to the diocese, and faculties are led by Leaders of Learning.</div>
+    </section>
+
+    <aside class="card gives">
+      <span class="h2">What these links give you</span>
+      <span class="sub" style="margin-bottom:6px">Only links that get you somewhere</span>
+      <div class="give top"><span class="num" style="background:var(--link-know)">1</span><div class="stack"><span class="t"><b>Henry is your warmest way back into Trinity's HSIE faculty, not you.</b> You and Bianca have gone cold. Henry saw her in August. They studied together.</span><div class="foot"><span class="src">note 17 Sep · Remember</span><span class="mini-btn" style="margin-left:auto">Ask Henry</span></div></div></div>
+      <div class="give"><span class="num" style="background:var(--link-moved)">2</span><div class="stack"><span class="t"><b>You left 14 HSIE colleagues at Trinity.</b> 12 are cold now, but 2 are going to the HTA conference on 17 Oct.</span><div class="foot"><span class="src">Events</span><span class="mini-btn" style="margin-left:auto">See who</span></div></div></div>
+      <div class="give"><span class="num" style="background:var(--link-event)">3</span><div class="stack"><span class="t"><b>Your only route to Trinity's leadership</b> is Fr Ross. He met Caroline Grey at the 2025 Catholic principals' forum.</span><div class="foot"><span class="src">Event · Jun 2025</span></div></div></div>
+      <div class="give"><span class="num" style="background:var(--link-moved)">4</span><div class="stack"><span class="t"><b>Claire taught English at Trinity from 2019 to 2022.</b> She can vouch for you in both places, and knows 9 of the people you know there.</span><div class="foot"><span class="src">links · employee_at</span></div></div></div>
+      <div class="give"><span class="num" style="background:var(--link-event)">5</span><div class="stack"><span class="t"><b>Anh Nguyen and Trinity's Assistant Principal (Learning)</b> sit on the same HSC curriculum panel. It's a peer route if you want to compare how the two schools run Stage 6.</span><div class="foot"><span class="src">Event · CSNSW panel</span></div></div></div>
+      <div class="rule">22 more links are hidden because they don't lead anywhere new: both ends are already warm, or nothing connects them to a goal or opportunity. Switch to <b>All links</b> to see them.</div>
+    </aside>
+
+    <span hidden data-link="s-henry|t-bianca|know|strong|1"></span>
+    <span hidden data-link="s-you|t-you|moved|strong|2"></span>
+    <span hidden data-link="s-ross|t-grey|event||3"></span>
+    <span hidden data-link="s-claire|t-english|moved||4"></span>
+    <span hidden data-link="s-anh|t-ap|event||5"></span>
+  </div>
+</main>
+<span class="tag">03 — compare side by side. Each organisation keeps its own shape. Ghost lines join people who connect them. A link shows only when it gets you somewhere, and its number matches the reason on the right.</span>
+</div><script src="rail.js"></script><script>
+const port = (id, cls, av, ini, nm, rl) => `<span class="port ${cls}" id="${id}"><span class="avatar ${av}">${ini}</span><span class="stack"><span class="nm">${nm}</span><span class="rl">${rl}</span></span></span>`;
+window.FLOWS = {
+  sac: { nodes: [
+    { id: 's-ross', kind: 'person', x: 200, y: 0, w: 204, warm: 'w', av: 'a4', ini: 'RJ', name: 'Fr Ross Jones SJ', role: 'Rector' },
+    { id: 's-principal', kind: 'person', x: 200, y: 84, w: 204, warm: 'c', av: 'a1', ini: 'MH', name: 'Mark Hartley', role: 'Principal' },
+    { id: 's-dirstud', kind: 'person', x: 0, y: 172, w: 150, warm: 'k', av: 'a6', ini: 'PD', name: 'Paula Doyle', role: 'Director of Students' },
+    { id: 's-anh', kind: 'person', x: 204, y: 172, w: 200, warm: 'w', av: 'a2', ini: 'AN', name: 'Anh Nguyen', role: 'Deputy · Teaching & Learning' },
+    { id: 's-yearco', kind: 'group', x: 0, y: 266, w: 140, name: 'Year coordinators', count: '6', mix: '2,3,1' },
+    { id: 's-sarah', kind: 'person', x: 146, y: 266, w: 122, warm: 'w', av: 'a3', ini: 'SL', name: 'Sarah Lin', role: 'Head of HSIE' },
+    { id: 's-claire', kind: 'person', x: 274, y: 266, w: 130, warm: 'w', av: 'a3', ini: 'CS', name: 'Claire Smith', role: 'Head of English' },
+    { id: 's-hsie', kind: 'group', cls: 'mine', x: 130, y: 370, w: 274, name: 'HSIE teachers', count: '15', mix: '8,4,1', me: true,
+      ports: port('s-you', '', 'a1', 'AR', 'You', 'since 2025') + port('s-henry', '', 'a1', 'HM', 'Henry McLennan', 'warm') },
+    { id: 's-other', kind: 'group', x: 0, y: 530, w: 404, name: 'Other faculties · each reports to Anh Nguyen through its head', count: '34', mix: '12,12,10' }
+  ], edges: [['s-principal', 's-ross'], ['s-dirstud', 's-principal'], ['s-anh', 's-principal'], ['s-yearco', 's-dirstud'],
+    ['s-sarah', 's-anh'], ['s-claire', 's-anh'], ['s-hsie', 's-sarah']] },
+  tcc: { nodes: [
+    { id: 't-cedp', kind: 'ext', x: 210, y: 0, w: 194, tag: 'Employer · outside body', name: 'Catholic Education Parramatta' },
+    { id: 't-grey', kind: 'person', x: 0, y: 84, w: 176, warm: 'k', av: 'a6', ini: 'CG', name: 'Caroline Grey', role: "Principal · never met" },
+    { id: 't-ap', kind: 'person', x: 0, y: 172, w: 196, warm: 'c', av: 'a5', ini: 'LV', name: 'Luca Verdi', role: 'Asst Principal · Learning' },
+    { id: 't-apw', kind: 'ghost', x: 212, y: 172, w: 192, role: 'Asst Principal · Wellbeing' },
+    { id: 't-english', kind: 'group', x: 0, y: 266, w: 130, name: 'English', count: '9', mix: '0,3,6' },
+    { id: 't-chris', kind: 'person', x: 134, y: 266, w: 172, warm: 'k', av: 'a4', ini: 'CW', name: 'Chris Walsh', role: 'Leader of Learning, HSIE' },
+    { id: 't-lol', kind: 'group', x: 314, y: 266, w: 90, name: 'Others', count: '5', mix: '0,2,3' },
+    { id: 't-hsie', kind: 'group', x: 0, y: 370, w: 290, name: 'HSIE', count: '13', mix: '1,2,10', portsLeft: true,
+      ports: port('t-you', 'hollow', '', 'AR', 'You, 2021–24', 'left 14 colleagues') + port('t-bianca', '', 'a3', 'BG', 'Bianca Gambrill', 'cold · 5 mo') },
+    { id: 't-other', kind: 'group', x: 0, y: 530, w: 404, name: 'Other faculties and wellbeing · each under its Leader of Learning', count: '30', mix: '2,6,22' }
+  ], edges: [['t-grey', 't-cedp', 'governs'], ['t-ap', 't-grey'], ['t-apw', 't-grey'], ['t-english', 't-ap'], ['t-chris', 't-ap'], ['t-lol', 't-ap'],
+    ['t-hsie', 't-chris']] }
+};
+</script>
+<script src="flow.js"></script><script src="orgchart.js"></script></body></html>
