@@ -23,7 +23,13 @@ export async function readExport(exportDir) {
   const csvName = entries.find((name) => /Communications .*_all\.csv$/i.test(name)) ?? entries.find((name) => /^Communications .*\.csv$/i.test(name));
   if (!csvName) throw new Error('No Communications CSV found in export directory.');
   const pages = new Map();
-  for (const name of entries.filter((entry) => entry.endsWith('.md'))) { const id = pageIdFromFilename(name); if (id) pages.set(id, await fs.readFile(path.join(exportDir, name), 'utf8')); }
+  const pagesByTitle = new Map();
+  for (const name of entries.filter((entry) => entry.endsWith('.md'))) {
+    const id = pageIdFromFilename(name); if (!id) continue;
+    const page = { id, name, body: await fs.readFile(path.join(exportDir, name), 'utf8') };
+    pages.set(id, page);
+    pagesByTitle.set(name.replace(/\s+[a-f0-9]{32}\.md$/i, '').trim().toLowerCase(), page);
+  }
   const rows = parseCsv(await fs.readFile(path.join(exportDir, csvName), 'utf8'));
-  return { csvName, rows, pages };
+  return { csvName, rows, pages, pagesByTitle };
 }
