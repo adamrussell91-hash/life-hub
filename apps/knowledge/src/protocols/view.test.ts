@@ -44,6 +44,21 @@ describe("protocol conversation view", () => {
     expect(statusLabel(session({ status: "queued" }))).toBe("thinking");
   });
 
+  it("renders wrap and reopen when allowedActions includes them", () => {
+    const wrapHtml = sessionView(session({ allowedActions: ["answer", "wrap", "cancel"] }), definition);
+    expect(wrapHtml).toContain('value="wrap"');
+    expect(wrapHtml).toContain("Wrap to filter");
+    const filterHtml = sessionView(session({
+      stage: "filter",
+      allowedActions: ["confirm", "reopen", "close", "cancel"],
+      checkpoint: { kind: "confirm", question: "Hold with caution, reopen, or close?" }
+    }), definition);
+    expect(filterHtml).toContain('value="reopen"');
+    expect(filterHtml).toContain('value="close"');
+    expect(filterHtml).toContain("Hold with caution");
+    expect(filterHtml).toContain("Name the element to reopen");
+  });
+
   it("gives each thinking persona an in-world status line", () => {
     const horizon = {
       ...definition,

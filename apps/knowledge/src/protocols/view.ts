@@ -280,7 +280,11 @@ function liveSlotHtml(session: Session, definition: Definition, who: string, rol
     return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
   }
   if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}</div>`;
-  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="Reply to ${escapeHtml(who)}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">Continue</button>${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
+  const reopen = session.allowedActions.includes("reopen");
+  const wrap = session.allowedActions.includes("wrap");
+  const close = session.allowedActions.includes("close");
+  const confirm = session.allowedActions.includes("confirm") && (reopen || close);
+  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="${reopen ? "Name the element to reopen, or reply" : `Reply to ${escapeHtml(who)}`}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">${confirm ? "Hold with caution" : "Continue"}</button>${reopen ? `<button class="btn btn--ghost" name="action" value="reopen" type="submit">Reopen</button>` : ""}${close ? `<button class="btn btn--ghost" name="action" value="close" type="submit">Close</button>` : ""}${wrap ? `<button class="btn btn--ghost" name="action" value="wrap" type="submit">Wrap to filter</button>` : ""}${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
 }
 function readTurnCardHtml(turn: Session["transcript"][number], who: string, role: string): string {
   return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}</article>`;
@@ -423,9 +427,9 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     const data = new FormData(form);
     const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
     const kind = currentSession.checkpoint?.kind;
-    const action = submitter?.name === "action" ? String(submitter.value) : (["verify", "confirm"].includes(kind ?? "") ? "confirm" : kind === "reflection" ? "reflect" : "answer");
+    const action = submitter?.name === "action" ? String(submitter.value) : (["verify", "confirm"].includes(kind ?? "") || currentSession.allowedActions.includes("close") ? "confirm" : kind === "reflection" ? "reflect" : "answer");
     const text = String(data.get("reply") ?? "");
-    if (["answer", "correct", "reflect"].includes(action) && !text.trim()) return;
+    if (["answer", "correct", "reflect", "reopen"].includes(action) && !text.trim()) return;
     const prior = currentSession;
     currentSession = {
       ...prior,
