@@ -174,7 +174,7 @@ test('professional calendar: foreign Open in Hub; Accept {id,decision}', async (
   try {
     const tasks = page.locator('[data-part="sources"] button[data-filter="tasks"]').first();
     if (await tasks.count() && (await tasks.getAttribute('aria-pressed')) !== 'true') await tasks.click();
-    const foreign = page.locator('.cal-chip.k-task, .cal-chip.is-class').first();
+    const foreign = page.locator('.cal-chip.k-task:not(.is-filter-hidden):not([hidden]), .cal-chip.is-class:not(.is-filter-hidden):not([hidden])').first();
     if (await foreign.count()) {
       await foreign.click();
       await page.locator('[data-part="open-in-hub"]').waitFor({ timeout: 5000 });
