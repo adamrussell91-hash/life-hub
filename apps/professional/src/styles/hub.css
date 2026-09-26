@@ -1290,9 +1290,16 @@
 .pro-home__calendar-host .hub-calendar,
 .pro-calendar-host .hub-calendar,
 .pro-home__calendar-host .cal,
-.pro-calendar-host .cal {
+.pro-calendar-host .cal,
+.pro-home__calendar-host .dd,
+.pro-calendar-host .dd,
+.pro-home__calendar-host .tr,
+.pro-calendar-host .tr,
+.pro-home__calendar-host .alm,
+.pro-calendar-host .alm {
   width: 100%;
   max-width: none;
+  min-width: 0;
   box-sizing: border-box;
 }
 

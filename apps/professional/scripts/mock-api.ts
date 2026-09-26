@@ -1405,10 +1405,13 @@ export function createMockApi() {
           {
             id,
             agent: 'hammond',
-            kind: 'calendar_block',
+            kind: 'protect_block',
             label: 'Protect marking block',
             meta: 'Tue 16:00–18:00 · clears a collision',
             date: today,
+            start: '16:00',
+            end: '18:00',
+            title: 'Protect marking block',
             chip: {
               id,
               title: 'Protect marking block',

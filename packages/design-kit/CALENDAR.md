@@ -45,6 +45,12 @@ Nav pills: Day · Week · Term · Year · Almanac (`.hub-pills`). Selected tab i
 
 Do not replace these five with Day / Week / Month. Month is not a zoom stop in this lock. Legacy `#/month` (Tasks) redirects to Week.
 
+### Layout width (locked)
+
+Every zoom stop fills the hub **page content column** (`width: 100%`; no artificial `max-width` on the mount / `.cal` / `.dd` / `.tr` / `.alm`).
+
+`.hub-calendar__workspace` is a **single column**. Secondary chrome (`.hub-calendar__rail` — locks, next actions, day agenda, compose) stacks **under** the calendar. Do not put a side column beside Day / Week / Term / Year / Almanac that pinches the grid. Day Dial’s own `.dd__side` (tonight / tomorrow) stays inside the dial card — that is Dial chrome, not a hub side rail.
+
 ---
 
 ## Tideline object

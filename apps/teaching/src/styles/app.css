@@ -2689,6 +2689,24 @@ a:hover {
 .home-dashboard__calendar,
 .class-page__calendar-host {
   min-width: 0;
+  width: 100%;
+  max-width: none;
+}
+
+.home-dashboard__calendar .hub-calendar-mount,
+.class-page__calendar-host .hub-calendar-mount,
+.home-dashboard__calendar .cal,
+.class-page__calendar-host .cal,
+.home-dashboard__calendar .dd,
+.class-page__calendar-host .dd,
+.home-dashboard__calendar .tr,
+.class-page__calendar-host .tr,
+.home-dashboard__calendar .alm,
+.class-page__calendar-host .alm {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .home-dashboard__calendar-narrow {
