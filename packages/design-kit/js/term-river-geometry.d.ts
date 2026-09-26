@@ -1,0 +1,22 @@
+export const TR: {
+  labelW: number;
+  padR: number;
+  axis: { tiers: number; weekLabel: number; weekDate: number; h: number };
+  lanes: Record<string, number>;
+  load: number;
+  bar: { h: number; rx: number; gap: number };
+  point: number;
+  minWeekLabel: number;
+  zoomMs: number;
+  revealMs: number;
+  toastInMs: number;
+  toastRise: number;
+  toastHoldMs: number;
+  popMs: number;
+  popRise: number;
+  popWidth: number;
+  popGap: number;
+  saveLatencyMs: number;
+  font: string;
+  barFont: string;
+};

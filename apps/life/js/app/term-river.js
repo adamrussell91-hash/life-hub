@@ -19,6 +19,7 @@ export const LANES = Object.freeze([
   Object.freeze({ id: 'body', label: 'Body', sub: 'capacity from your logs' })
 ]);
 
+import { weekLabel } from '../../../../packages/design-kit/js/school-time.js';
 import { CAPACITY } from './capacity-model.js';
 
 const STUDY = /\b(uow|unsw|master|thesis|essay|assessment|elective|lecture|reading|conferral|graduation|university)\b/i;
@@ -92,16 +93,15 @@ export function weeklyLoad({ from, to, terms, commitments = [], capacityFor }) {
   });
 }
 
-/** Week label for the axis: "T4 W3", "Hol W1", or the date when there are no terms. */
+/**
+ * Week label for the axis: "T4 W3", "Hol W1", or dd/mm when there are no terms.
+ * Uses the kit weekLabel. A Mon–Sun week that hands over from holiday into term
+ * prefers the term label (T4 W1), matching the axis in the Term River reference.
+ */
 export function riverWeekLabel(week, terms) {
-  const t = terms.find(x => week <= x.ends_on && key(ms(week) + 6 * DAY) >= x.starts_on);
-  if (t) {
-    const n = Math.floor((ms(week) - (ms(t.starts_on) - ((weekday(t.starts_on) + 6) % 7) * DAY)) / (7 * DAY)) + 1;
-    return `T${t.term} W${n}`;
+  for (let i = 0; i < 7; i++) {
+    const label = weekLabel(key(ms(week) + i * DAY), terms ?? []);
+    if (label?.startsWith('T')) return label;
   }
-  const prev = [...terms].filter(x => x.ends_on < week).sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
-  if (!prev) return `${week.slice(8)}/${week.slice(5, 7)}`;
-  const firstHolMonday = ms(prev.ends_on) + DAY + ((8 - weekday(key(ms(prev.ends_on) + DAY))) % 7) * DAY;
-  const n = Math.floor((ms(week) - firstHolMonday) / (7 * DAY)) + 1;
-  return n >= 1 ? `Hol W${n}` : `${week.slice(8)}/${week.slice(5, 7)}`;
+  return weekLabel(week, terms ?? []) ?? `${week.slice(8)}/${week.slice(5, 7)}`;
 }

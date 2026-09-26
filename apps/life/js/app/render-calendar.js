@@ -2,6 +2,7 @@ import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
 import { renderTideline } from './render-tideline.js';
 import { renderAlmanac, unmountAlmanac } from './render-almanac.js';
 import { renderDayDial, unmountDayDial } from './render-day-dial.js';
+import { renderTermRiver, unmountTermRiver } from './render-term-river.js';
 import { candidateForLog, inferMealSlot, isWritableCalendarType, slugForLog } from './calendar-write.js';
 import {
   blockStyle,
@@ -87,6 +88,7 @@ export function renderCalendar(root, model, {
   const host = root.querySelector('#life-calendar-host') ?? dashboard;
   if (view === 'almanac') {
     unmountDayDial();
+    unmountTermRiver();
     dayLayout = 'dial';
     host.style.minWidth = '0';
     if (host.parentElement) host.parentElement.style.minWidth = '0';
@@ -97,6 +99,7 @@ export function renderCalendar(root, model, {
   unmountAlmanac();
 
   const weekDates = (model.weekDays ?? []).map(day => day.date);
+  const terms = calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null;
   const tidelineInput = {
     events,
     visual: calendarVisual,
@@ -107,7 +110,7 @@ export function renderCalendar(root, model, {
     today: model.date,
     now,
     dayProfile: planningProfile?.day_profile ?? null,
-    terms: calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null,
+    terms,
     onShiftRange,
     onSelectDate,
     onSwitchView: next => {
@@ -115,6 +118,21 @@ export function renderCalendar(root, model, {
       onSwitchView?.(next);
     }
   };
+
+  if (view === 'term' || view === 'year') {
+    unmountDayDial();
+    dayLayout = 'dial';
+    host.style.minWidth = '0';
+    if (host.parentElement) host.parentElement.style.minWidth = '0';
+    dashboard.removeAttribute('hidden');
+    renderTermRiver(root, host, {
+      ...tidelineInput,
+      zoom: view,
+      terms
+    });
+    return;
+  }
+  unmountTermRiver();
 
   if (view === 'day') {
     host.style.minWidth = '0';
