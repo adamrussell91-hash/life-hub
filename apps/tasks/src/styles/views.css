@@ -6732,7 +6732,9 @@ body.is-universe-fullscreen .page-header {
 
 .dashboard-overview__grid--week {
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 17rem);
+  /* L2: content cards hug height — never stretch This week to Projects */
   align-items: start;
+  grid-auto-rows: max-content;
 }
 
 .dashboard-overview__grid--week .dashboard-heat {
@@ -6749,16 +6751,14 @@ body.is-universe-fullscreen .page-header {
   }
 }
 
-.dashboard-overview__grid--week .dashboard-overview__tile {
-  min-height: 0;
-  height: max-content;
-}
-
 .dashboard-overview__tile {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  min-height: 100%;
+  /* L2: no min-height — equal-height stretch left empty white under sparse week agenda */
+  min-height: 0;
+  height: max-content;
+  align-self: start;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -6767,6 +6767,9 @@ body.is-universe-fullscreen .page-header {
 .hub-card.dashboard-overview__tile {
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
+  min-height: 0;
+  height: max-content;
+  align-self: start;
 }
 
 .dashboard-overview__tile--week,
