@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 0/46 (0%)**
+**Progress: 1/46 (2%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -16,7 +16,7 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M1: Data and API
 
-- [ ] **G-01** Goal schema: `term`, `term_history`, `life_area` — —
+- [x] **G-01** Goal schema: `term`, `term_history`, `life_area` — _(pending commit)_
 - [ ] **G-02** Sphere derived from area at read time — —
 - [ ] **G-03** Goal delete cascades — —
 - [ ] **G-04** `POST /api/goals/plan-term` — —
