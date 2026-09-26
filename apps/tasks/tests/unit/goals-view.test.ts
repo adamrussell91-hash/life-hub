@@ -104,12 +104,27 @@ describe('goals landing', () => {
     const canvas = document.createElement('div');
     await renderGoalsView(canvas, '2026-11-04');
     expect(canvas.querySelector('[data-part="year-zoom"]')).toBeTruthy();
+    expect(canvas.querySelector('.runway--phone')).toBeNull();
     expect(canvas.querySelector('[data-hub-count]')?.textContent).toMatch(/\d+\/\d+/);
     const yearBtn = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Year');
     expect(yearBtn).toBeTruthy();
     yearBtn!.click();
+    expect(yearBtn!.classList.contains('is-active')).toBe(true);
+    expect(yearBtn!.getAttribute('aria-pressed')).toBe('true');
+    const term4 = [...canvas.querySelectorAll('button')].find((b) => b.textContent === 'Term 4');
+    expect(term4?.classList.contains('is-active')).toBe(false);
     expect(canvas.querySelector('[data-part="year-zoom"]')).toBeTruthy();
     expect(canvas.querySelector('.goals-summary')?.textContent).toContain('year view');
+  });
+
+  it('Plan next term opens even with no active term goals', async () => {
+    vi.mocked(tasksApi.listGoals).mockResolvedValue([
+      goal({ id: 'og', title: 'Ongoing craft', term: null, status: 'active', sphere: 'life' })
+    ]);
+    const canvas = document.createElement('div');
+    await renderGoalsView(canvas, '2026-11-04');
+    canvas.querySelector<HTMLButtonElement>('[data-action="plan-next-term"]')!.click();
+    expect(canvas.querySelector('.goals-plan-sheet')?.textContent).toContain('Ongoing craft');
   });
 
   it('shows a clear empty state when no school terms are set', async () => {

@@ -311,6 +311,28 @@ export function createMockApi({ seed }: MockApiOptions) {
       return json(200, { ok: true, data: { read: null, reason: 'first' } });
     }
 
+    if (path === '/api/goal-checkins') {
+      const store = (globalThis as { __goalCheckins?: Record<string, unknown> }).__goalCheckins ?? {};
+      (globalThis as { __goalCheckins?: Record<string, unknown> }).__goalCheckins = store;
+      if (method === 'GET') {
+        const date = url.searchParams.get('date');
+        const checkin = date ? store[date] ?? store.latest ?? null : store.latest ?? null;
+        return json(200, { ok: true, data: { checkin } });
+      }
+      if (method === 'POST') {
+        const row = {
+          date: typeof body?.date === 'string' ? body.date : '',
+          moved: Array.isArray(body?.moved) ? body.moved : [],
+          stuck: Array.isArray(body?.stuck) ? body.stuck : [],
+          moves_planned: Number(body?.moves_planned) || 0,
+          saved_at: new Date().toISOString()
+        };
+        if (row.date) store[row.date] = row;
+        store.latest = row;
+        return json(200, { ok: true, data: { checkin: row } });
+      }
+    }
+
     if (path === '/api/calendar-ghosts' && method === 'POST') {
       return json(200, { ok: true, receipt: 'Mock: nothing written.', writes: 'applied' });
     }

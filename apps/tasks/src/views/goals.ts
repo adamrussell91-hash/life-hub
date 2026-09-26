@@ -176,7 +176,9 @@ export function paintGoals(
 
   plan.addEventListener('click', () => {
     if (!term) return;
-    openPlanNextTerm(canvas, data.goals, term, reload);
+    openPlanNextTerm(canvas, data.goals, term, reload, {
+      onNewGoal: () => add.click()
+    });
   });
   add.addEventListener('click', () => {
     if (canvas.querySelector('.goals-new')) return;
@@ -517,9 +519,10 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   link.setAttribute('tabindex', '0');
   link.setAttribute('aria-label', `${row.goal.title}. Open goal.`);
   const info = el('div', 'runway__goal');
-  const title = el('p', 'runway__goal-title', row.goal.title);
-  title.setAttribute('data-hub-morph', 'title');
-  title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
+  const title = el('p', 'runway__goal-title');
+  const titleText = el('span', 'runway__goal-title-text', row.goal.title);
+  titleText.setAttribute('data-hub-morph', 'title');
+  title.append(titleText, el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
   const dream = row.goal.parent_someday_id ? data.tasks.find((t) => t.id === row.goal.parent_someday_id) : undefined;
   const meta = el('p', 'runway__goal-meta');
   if (row.thisWeek.perWeek !== null) {
@@ -537,11 +540,11 @@ function renderRow(row: RunwayRow, sphere: GoalSphere, data: GoalsData, overlay:
   if (dream) meta.append(document.createTextNode(` · ✦ ${dream.title}`));
   info.append(title, meta);
   link.append(info);
-  link.addEventListener('click', () => rememberGoalMorph(title));
+  link.addEventListener('click', () => rememberGoalMorph(titleText));
   link.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     event.preventDefault();
-    rememberGoalMorph(title);
+    rememberGoalMorph(titleText);
     window.location.hash = goalPageHash(row.goal.id);
   });
   for (const cell of row.cells) {

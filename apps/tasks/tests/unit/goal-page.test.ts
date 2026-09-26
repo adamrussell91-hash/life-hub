@@ -100,17 +100,25 @@ describe('goal page', () => {
     const canvas = document.createElement('div');
     const header = document.createElement('header');
     const title = document.createElement('h1');
-    title.className = 'page-header__title';
-    title.textContent = 'HA evidence';
+    title.className = 'page-header__title hub-kinetic';
+    // Simulate kinetic doubling that used to corrupt textContent on edit.
+    const sr = document.createElement('span');
+    sr.className = 'hub-kinetic__sr';
+    sr.textContent = 'HA evidence';
+    const vis = document.createElement('span');
+    vis.textContent = 'HA evidence';
+    title.append(sr, vis);
     header.append(title);
     await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
 
-    expect(title.classList.contains('hub-inline-edit')).toBe(true);
-    title.click();
-    const input = title.querySelector('input')!;
-    input.value = 'Renamed goal';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: 'Renamed goal' });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('HA evidence');
+    expect(header.querySelector('.hub-kinetic')).toBeNull();
+    input.value = 'Study at Cambridge';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(tasksApi.updateGoal).toHaveBeenCalledWith('g1', { title: 'Study at Cambridge' });
+    expect(input.value).toBe('Study at Cambridge');
 
     expect(canvas.querySelector('[data-chip="sphere"]')?.textContent).toMatch(/Professional/i);
     expect(canvas.querySelector('[data-chip="status"]')?.textContent).toMatch(/Active/i);
@@ -119,7 +127,8 @@ describe('goal page', () => {
     expect(canvas.querySelector('[data-chip="due-date"]')?.textContent).toMatch(/20\/03\/27/);
     expect(canvas.querySelector('[data-slot="description-preview"]')?.textContent).toContain('First line');
     expect(canvas.querySelector('[data-slot="tags"]')).toBeTruthy();
-    expect(canvas.querySelector('[data-slot="life-wall"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-slot="life-wall"]')?.textContent).toMatch(/Life Wall/);
+    expect(canvas.querySelector('.goal-page__meta-card')).toBeTruthy();
 
     vi.mocked(tasksApi.getGoal).mockResolvedValueOnce(
       goal({ ...G, sphere: 'life', life_area: 'health' })
@@ -138,5 +147,18 @@ describe('goal page', () => {
     expect(window.confirm).toHaveBeenCalled();
     expect(offerTimedUndo).toHaveBeenCalled();
     expect(tasksApi.deleteGoal).toHaveBeenCalledWith('g1');
+  });
+
+  it('G-06 rename keeps spaces exactly when seeded from goal.title', async () => {
+    vi.mocked(tasksApi.getGoal).mockResolvedValueOnce(goal({ ...G, title: 'Study at Cambridge' }));
+    const canvas = document.createElement('div');
+    const header = document.createElement('header');
+    const title = document.createElement('h1');
+    title.className = 'page-header__title hub-kinetic';
+    title.textContent = 'Study at CambridgeStudy at Cambridge';
+    header.append(title);
+    await renderGoalPage(canvas, 'g1', '2026-11-04', undefined, { header });
+    const input = header.querySelector<HTMLTextAreaElement>('.page-header__title-input')!;
+    expect(input.value).toBe('Study at Cambridge');
   });
 });
