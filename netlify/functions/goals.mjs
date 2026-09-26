@@ -1,5 +1,6 @@
 import { createTasksCollectionHandler } from './_shared/tasks-collection.mjs';
 import { GOAL_INPUT_KEYS, normalizeGoalRecord, ensureGoalSphere } from './_shared/goal-record.mjs';
+import { cascadeGoalDelete } from './_shared/goal-delete.mjs';
 import { listJSON } from './_shared/tasks-blobs.mjs';
 
 export const config = { path: '/api/goals' };
@@ -39,6 +40,9 @@ export function createGoalsHandler(deps = {}) {
       const ensured = ensureGoalSphere(existing, await areasById(store));
       if (!ensured._sphere_derived) return patch;
       return { ...patch, sphere: ensured.sphere };
+    },
+    async onDelete({ id, store }) {
+      await cascadeGoalDelete(store, id);
     },
     create(body, id, timestamp) {
       const title = typeof body.title === 'string' ? body.title.trim() : '';
