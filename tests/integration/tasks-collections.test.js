@@ -6,6 +6,7 @@ import { createGoalsHandler } from '../../netlify/functions/goals.mjs';
 import { createMapsHandler } from '../../netlify/functions/maps.mjs';
 import { createProgramsHandler } from '../../netlify/functions/programs.mjs';
 import { createProjectsHandler } from '../../netlify/functions/projects.mjs';
+import { createTasksHandler } from '../../netlify/functions/tasks.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -72,6 +73,7 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
   assert.equal(createdArea.status, 201);
   const area = (await createdArea.json()).data;
   assert.match(area.id, /^area_/);
+  assert.deepEqual(area.tags, []);
 
   const createdGoal = await createGoalsHandler(deps)(
     request({
@@ -83,6 +85,17 @@ test('projects, areas, and goals use the Life session and share the Tasks store'
   assert.equal(createdGoal.status, 201);
   const goal = (await createdGoal.json()).data;
   assert.equal(goal.parent_area_id, area.id);
+  // The Goals page reads goal.tags.length; a missing array crashes the whole view.
+  assert.deepEqual(goal.tags, []);
+
+  const taggedGoal = await createGoalsHandler(deps)(
+    request({
+      method: 'POST',
+      url: 'https://api.adam-russell.com/api/goals',
+      body: { title: 'Tagged', tags: ['term-3', 42, ' ', 'marking'] }
+    })
+  );
+  assert.deepEqual((await taggedGoal.json()).data.tags, ['term-3', 'marking']);
 
   const createdProject = await createProjectsHandler(deps)(
     request({
@@ -210,4 +223,75 @@ test('Projects list returns stored records including milestones', async () => {
   const response = await handler(request({ url: 'https://api.adam-russell.com/api/projects' }));
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.projects, [stored]);
+});
+
+test('goals keep v2 fields on create and patch, and legacy goals list with defaults', async () => {
+  const store = memoryStore({
+    'goals/goal_legacy': {
+      schema_version: 1, id: 'goal_legacy', title: 'Old', status: 'active',
+      created_at: '2026-08-01T00:00:00.000Z', updated_at: '2026-08-01T00:00:00.000Z'
+    },
+    'goals/_index': ['goal_legacy']
+  });
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+
+  const created = await createGoalsHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/goals',
+    body: {
+      title: 'HA evidence', sphere: 'professional', structure: 'floor_target_stretch',
+      frame: { floor_target_stretch: { unit: 'standards', floor: 3, target: 5, stretch: 7, current: 3 } },
+      lead_measure: { label: '1 write-up', per_week: 1 }, secret: 'dropped'
+    }
+  }));
+  assert.equal(created.status, 201);
+  const goal = (await created.json()).data;
+  assert.equal(goal.sphere, 'professional');
+  assert.equal(goal.frame.floor_target_stretch.target, 5);
+  assert.deepEqual(goal.lead_measure, { label: '1 write-up', per_week: 1 });
+  assert.equal('secret' in goal, false);
+
+  const patched = await createGoalsHandler(deps)(request({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/goals?id=${goal.id}`,
+    body: { rest_weeks: ['2026-11-09', 'bad'], sphere: 'nope' }
+  }));
+  const next = (await patched.json()).data;
+  assert.deepEqual(next.rest_weeks, ['2026-11-09']);
+  assert.equal(next.sphere, 'life');
+
+  const listed = await createGoalsHandler(deps)(request({ url: 'https://api.adam-russell.com/api/goals' }));
+  const legacy = (await listed.json()).data.goals.find(item => item.id === 'goal_legacy');
+  assert.deepEqual(legacy.tags, []);
+  assert.equal(legacy.structure, 'woop');
+});
+
+test('tasks POST keeps parent_goal_id, steps and tags', async () => {
+  const store = memoryStore();
+  const deps = { env, now: () => Date.parse('2026-08-01T01:00:00Z'), getContentStore: async () => store };
+  const parent = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'Write up 6.3', domain: 'other', parent_goal_id: 'goal_ha', tags: ['apst', 4] }
+  }))).json()).data;
+  assert.equal(parent.parent_goal_id, 'goal_ha');
+  assert.deepEqual(parent.tags, ['apst']);
+  assert.equal(parent.kind, 'task');
+
+  const step = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'Pull 3 examples', domain: 'other', kind: 'step', parent_task_id: parent.id, step_order: 1, parent_goal_id: 'goal_ha' }
+  }))).json()).data;
+  assert.equal(step.kind, 'step');
+  assert.equal(step.parent_task_id, parent.id);
+  assert.equal(step.step_order, 1);
+
+  const orphan = (await (await createTasksHandler(deps)(request({
+    method: 'POST',
+    url: 'https://api.adam-russell.com/api/tasks',
+    body: { title: 'No parent', domain: 'life', kind: 'step' }
+  }))).json()).data;
+  assert.equal(orphan.kind, 'task');
+  assert.equal(orphan.parent_goal_id, null);
 });

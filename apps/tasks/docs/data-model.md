@@ -16,7 +16,7 @@ Area / Category
 | Entity | Role |
 |--------|------|
 | **Area** | Broad life/work bucket (Teaching, Life, …). |
-| **Goal** | Outcome under an area. |
+| **Goal** | Short-to-medium-term outcome in a sphere (Life / Work / Professional). Chooses a structure (WOOP, SMARTER, OKR, Lead/lag, Floor·target·stretch), carries a weekly lead measure, rest weeks, an if-then trigger, a 2-minute next start and milestones. Hosts projects (`project.parent_goal_id`) and tasks (`task.parent_goal_id`). Can grow from a Someday dream (`parent_someday_id`). `@`-taggable as `tasks:goal:<id>`. |
 | **Project** | Deliverable arc under a goal. Carries `milestones[]` inline. |
 | **Task** | Actionable work on the board, day/week views, and backlog. |
 | **Step** | Checklist item under a task (`kind: "step"`, `parent_task_id`). |
@@ -70,6 +70,8 @@ Steps stay with their parent in the task editor. Someday items live on `#/someda
 |----------|----------------|
 | Areas | `GET/POST /api/areas`, `PATCH/DELETE /api/areas/:id` |
 | Goals | `GET/POST /api/goals`, `PATCH/DELETE /api/goals/:id` |
+| Goal reads | `GET /api/goal-reads[?goal_id=]`, `POST /api/goal-reads { goal_id }` (Hammond; cached per goal, daily + on change) |
+| Goal proposals | `POST /api/calendar-ghosts { id: 'goal-…', decision }` |
 | Projects | existing — now accepts `parent_goal_id`, `tags` |
 | Tasks | existing — now accepts `kind`, `bucket`, `step_order` |
 

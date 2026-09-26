@@ -17,6 +17,7 @@ import '../styles/daily-dial.css';
 import '../styles/lesson-engine.css';
 import '../styles/graph.css';
 import '../styles/backlog.css';
+import '../styles/goals.css';
 import 'katex/dist/katex.min.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
@@ -29,6 +30,7 @@ import {
   isSoftViewChange,
   parseCapacityShareToken,
   parseEntityPage,
+  parseGoalPage,
   parseHashRoute,
   parseMapItemPage,
   parseNewExcursionPage,
@@ -65,6 +67,7 @@ import { renderWeekView, renderMonthView } from '@/views/calendar';
 import { renderPageEditor } from '@/views/page-editor';
 import { renderMapItemPage } from '@/views/map-page';
 import { renderGoalsView } from '@/views/goals';
+import { renderGoalPage } from '@/views/goal-page';
 import { renderSomedayView } from '@/views/someday';
 import { renderPropertiesView } from '@/views/properties';
 import { renderTermDatesView } from '@/views/term-dates';
@@ -177,7 +180,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (redirected && redirected !== location.hash) {
       history.replaceState(null, '', redirected);
     }
-    const nextView = isKnownHashView() && !parseEntityPage() && !parseMapItemPage() && !parseNewExcursionPage() && !parseSomedaySubPage()
+    const nextView = isKnownHashView() && !parseEntityPage() && !parseGoalPage() && !parseMapItemPage() && !parseNewExcursionPage() && !parseSomedaySubPage()
       ? parseHashRoute()
       : null;
     const soft = !opts?.force && nextView !== null && isSoftViewChange(lastView, nextView);
@@ -215,6 +218,19 @@ async function bootApp(root: HTMLElement): Promise<void> {
         await renderMapItemPage(shell.canvas, mapItem);
       } catch (err) {
         renderLoadError(shell.canvas, err, () => void paint({ force: true }), 'Could not open card');
+      }
+      return;
+    }
+    const goalPage = parseGoalPage();
+    if (goalPage) {
+      resetPaint();
+      renderPrimaryNav(shell.railNav, 'goals');
+      const goal = await tasksApi.getGoal(goalPage.id).catch(() => null);
+      renderPageHeader(shell, { eyebrow: 'Goals', title: goal?.title ?? 'Goal' });
+      try {
+        await renderGoalPage(shell.canvas, goalPage.id);
+      } catch (err) {
+        renderLoadError(shell.canvas, err, () => void paint({ force: true }), 'Could not open goal');
       }
       return;
     }

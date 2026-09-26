@@ -314,6 +314,17 @@ export function createMockApi({ seed }: MockApiOptions) {
       }
     }
 
+    if (path === '/api/goal-reads') {
+      if (method === 'GET' && !url.searchParams.get('goal_id')) {
+        return json(200, { ok: true, data: { reads: [] } });
+      }
+      return json(200, { ok: true, data: { read: null, reason: 'first' } });
+    }
+
+    if (path === '/api/calendar-ghosts' && method === 'POST') {
+      return json(200, { ok: true, receipt: 'Mock: nothing written.', writes: 'applied' });
+    }
+
     if (path === '/api/maps') {
       if (method === 'GET') {
         if (id) {

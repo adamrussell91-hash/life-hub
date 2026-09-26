@@ -67,6 +67,9 @@ export function hrefForHubRef(ref) {
   if (ref?.hub === 'tasks' && ref.kind === 'project') {
     return `/tasks/#/project/${encodeURIComponent(ref.id)}`;
   }
+  if (ref?.hub === 'tasks' && ref.kind === 'goal') {
+    return `/tasks/#/goal/${encodeURIComponent(ref.id)}`;
+  }
   if (ref?.hub === 'tasks' && ref.kind === 'program') {
     return `/tasks/#/programs?id=${encodeURIComponent(ref.id)}`;
   }
@@ -82,6 +85,7 @@ export function hrefForHubRef(ref) {
 export function labelForHubRef(ref) {
   if (ref?.hub === 'teaching' && ref.kind === 'unit') return `Teaching unit ${ref.id}`;
   if (ref?.hub === 'tasks' && ref.kind === 'project') return `Tasks project ${ref.id}`;
+  if (ref?.hub === 'tasks' && ref.kind === 'goal') return `Tasks goal ${ref.id}`;
   if (ref?.hub === 'life' && ref.kind === 'decision') return `Decision ${ref.id}`;
   return ref?.id ?? '';
 }
