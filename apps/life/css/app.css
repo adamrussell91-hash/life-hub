@@ -7691,7 +7691,10 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   .medical-toolbar__add {
     min-width: 2.5rem;
     padding-inline: 0.65rem;
-    font-size: 0;
+  }
+  /* Phone: icon-only; aria-label names the control. */
+  .medical-toolbar__add-label {
+    display: none;
   }
   .medical-toolbar__add::before {
     content: "+";
