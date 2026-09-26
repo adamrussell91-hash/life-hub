@@ -152,7 +152,6 @@ export function renderCalendar(root, model, {
         calendar.className = 'hub-calendar hub-calendar--workspace';
         host.replaceChildren(calendar);
       }
-      calendar.replaceChildren();
       calendar.className = 'hub-calendar hub-calendar--workspace';
       // Linear: the Tideline one-day view (same object as the phone week).
       const selected = model.selectedDate && weekDates.includes(model.selectedDate)
@@ -190,8 +189,8 @@ export function renderCalendar(root, model, {
 
   const mode = VIEWS.some(item => item.id === view) ? view : 'week';
   if (mode === 'week') {
-    calendar.replaceChildren();
     calendar.className = 'hub-calendar hub-calendar--workspace';
+    // Tideline owns the host — do not wipe shell here (that forced entrance remount flash).
     renderTideline(root, calendar, tidelineInput);
     dashboard.removeAttribute('hidden');
     return;
