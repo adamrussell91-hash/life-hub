@@ -17,11 +17,11 @@ A goal in Adam's words: **short to medium term, often grown from a Someday dream
 | `#/goal/:id`, the goal page | Mockup B | A big goal card whose shape follows the goal's **structure** (WOOP, SMARTER, OKR, Lead/lag, Floor·target·stretch). The if-then trigger and the 2-minute start. The projects, tasks and milestones the goal hosts, plus its @ tags. Hammond's panel on the right. |
 | Hammond | The Hammond parts of Mockup C | Reads each goal once a day and again whenever the goal or its hosted work changes. He writes a short verdict and proposes changes as **ghosts**. Nothing is written until Adam confirms. |
 
-Out of scope, each in its own follow-on:
+Out of scope in v1 — **done in Goals v2** (`docs/superpowers/plans/2026-09-26-goals-v2-complete.md`):
 
-- `protect_block` proposals ("block Tue P5"). These need the Life capacity model, which reads GitHub. They get their own follow-on, which adds a `slots` input to `buildGoalRead`.
-- A Haiku rewrite of Hammond's verdict, and content-aware step splits. v1 is deterministic, like `ghost-proposer.js`.
-- The Sunday check-in flow, and the "Ask Hammond about this goal…" chat box. The Tasks chat view has no deep link that picks the agent and fills in a prompt. Both land together once that exists.
+- ~~`protect_block` proposals ("block Tue P5").~~ **Done — G-30** (calendar slots → `protect_block` ghost).
+- ~~A Haiku rewrite of Hammond's verdict, and content-aware step splits.~~ **Done — G-32** (model verdict + split steps; deterministic fallback).
+- ~~The Sunday check-in flow, and the "Ask Hammond about this goal…" chat box.~~ **Done — G-36 / G-37** (check-in) and **G-35** (Ask Hammond deep link).
 
 ## Data model
 
