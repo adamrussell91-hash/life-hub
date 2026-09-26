@@ -695,17 +695,49 @@
   flex: 1;
 }
 
-.someday-hero {
+.someday-view {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
-.someday-hero__icon {
-  font-size: var(--text-xl);
-  line-height: 1;
+/* Soft kit pastel rainbow — watermark across the content width, not a hero emoji. */
+.someday-wash {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 6.5rem;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--pastel-peach) 70%, transparent),
+    color-mix(in srgb, var(--pastel-gold) 70%, transparent),
+    color-mix(in srgb, var(--pastel-sage) 70%, transparent),
+    color-mix(in srgb, var(--pastel-blue) 70%, transparent),
+    color-mix(in srgb, var(--pastel-lilac) 70%, transparent)
+  );
+  opacity: 0.28;
+  -webkit-mask-image: linear-gradient(180deg, #000 10%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 10%, transparent 100%);
+}
+
+.someday-view > :not(.someday-wash) {
+  position: relative;
+  z-index: 1;
+}
+
+.someday-toolbar {
+  margin-bottom: 0;
+}
+
+.someday-view .someday-group {
+  margin-bottom: 0;
+}
+
+.someday-view > .empty-state {
+  margin: 0;
 }
 
 .someday-cta,
@@ -713,10 +745,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
   text-decoration: none;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
 }
 
 .someday-cta {

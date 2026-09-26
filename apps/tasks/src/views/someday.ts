@@ -27,6 +27,7 @@ import {
   createHubField,
   createHubFilter,
   createHubSearch,
+  createHubToolbar,
   domainFilterOptions,
   el,
   labeledField
@@ -392,7 +393,7 @@ function renderSomedayCard(
 
 /** Someday / Maybe holding pen — off the active board until promoted. Dreams stay even once promoted. */
 export async function renderSomedayView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading someday ideas…', '.someday-hero');
+  showViewLoading(canvas, 'Loading someday ideas…', '.someday-view');
   try {
     const [allTasks, projects] = await Promise.all([tasksApi.listTasks(), tasksApi.listProjects()]);
     let items = somedayTasks(allTasks);
@@ -421,11 +422,11 @@ function paintSomeday(
   const searchPos = restoreSearch
     ? (document.activeElement as HTMLInputElement).selectionStart
     : null;
-  canvas.replaceChildren();
 
-  const hero = el('div', 'someday-hero');
-  hero.append(el('span', 'someday-hero__icon', '🌈'));
-  canvas.append(hero);
+  const root = el('div', 'someday-view');
+  const wash = el('div', 'someday-wash');
+  wash.setAttribute('aria-hidden', 'true');
+  root.append(wash);
 
   if (items.length > 0) {
     const odysseyTarget = items[0];
@@ -443,7 +444,7 @@ function paintSomeday(
     ctaChevron.innerHTML =
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
     odysseyCta.append(ctaIcon, ctaBody, ctaChevron);
-    canvas.append(odysseyCta);
+    root.append(odysseyCta);
   }
 
   const coverage = computeLifeCoverage(items);
@@ -461,11 +462,13 @@ function paintSomeday(
   wheelChevron.innerHTML =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
   wheelCard.append(wheelIcon, wheelBody, wheelChevron);
-  canvas.append(wheelCard);
+  root.append(wheelCard);
 
+  const toolbar = createHubToolbar('someday-toolbar');
   const filters = createCollapsibleFilters({
     id: 'someday',
     ariaLabel: 'Filters',
+    className: 'hub-filters--inline',
     active: somedayDomain !== 'all' || somedayKind !== 'all' || Boolean(somedayQuery.trim())
   });
   const search = createHubSearch({
@@ -506,7 +509,6 @@ function paintSomeday(
       }
     }).el
   );
-  canvas.append(filters.root);
 
   const addForm = el('form', 'someday-add hub-toolbar');
   const title = createHubSearch({
@@ -533,6 +535,11 @@ function paintSomeday(
   const submit = el('button', 'btn btn--decisive', 'Park it');
   submit.type = 'submit';
   addForm.append(title.el, labeledField('Category', kind, 'hub-field hub-field--compact'), originWrap, submit);
+  const plus = createPlusAdd({
+    ariaLabel: 'Add a someday idea',
+    panel: addForm,
+    className: 'plus-add--inline'
+  });
   addForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     submit.disabled = true;
@@ -550,19 +557,16 @@ function paintSomeday(
       kind.value = '';
       origin.input.value = '';
       originWrap.hidden = true;
+      plus.close();
       setItems([created, ...items]);
     } catch (err) {
-      canvas.append(el('p', 'empty-state', errorMessage(err)));
+      root.append(el('p', 'empty-state', errorMessage(err)));
     } finally {
       submit.disabled = false;
     }
   });
-  canvas.append(
-    createPlusAdd({
-      ariaLabel: 'Add a someday idea',
-      panel: addForm
-    }).root
-  );
+  toolbar.append(filters.root, plus.root);
+  root.append(toolbar);
 
   const query = somedayQuery.trim().toLowerCase();
   const visible = items.filter((item) => {
@@ -579,13 +583,14 @@ function paintSomeday(
   });
 
   if (visible.length === 0) {
-    canvas.append(
+    root.append(
       el(
         'p',
         'empty-state',
         items.length === 0 ? 'Nothing in Someday / Maybe yet.' : 'No someday ideas match those filters.'
       )
     );
+    canvas.replaceChildren(root);
     return;
   }
 
@@ -647,7 +652,7 @@ function paintSomeday(
       );
     }
     group.append(grid);
-    canvas.append(group);
+    root.append(group);
   }
   if (parked.length) {
     const group = el('section', 'someday-group');
@@ -659,8 +664,10 @@ function paintSomeday(
       );
     }
     group.append(grid);
-    canvas.append(group);
+    root.append(group);
   }
+
+  canvas.replaceChildren(root);
 
   if (restoreSearch) {
     const field = canvas.querySelector<HTMLInputElement>('[aria-label="Filter someday ideas"]');

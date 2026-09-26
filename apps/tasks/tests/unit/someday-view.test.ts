@@ -150,6 +150,15 @@ describe('renderSomedayView', () => {
     expect(wheelLink?.getAttribute('href')).toBe('#/someday/wheel');
     const odysseyCta = canvas.querySelector<HTMLAnchorElement>('.someday-cta');
     expect(odysseyCta?.getAttribute('href')).toBe(`#/someday/odyssey/${dream.id}`);
+    expect(canvas.querySelector('.someday-hero')).toBeNull();
+    expect(canvas.querySelector('.someday-wash')).toBeTruthy();
+    expect(canvas.textContent).not.toContain('🌈');
+    const toolbar = canvas.querySelector('.someday-toolbar');
+    expect(toolbar?.querySelector('.hub-filters__toggle')).toBeTruthy();
+    expect(toolbar?.querySelector('.plus-add__btn')?.getAttribute('aria-label')).toBe('Add a someday idea');
+    expect(toolbar?.querySelector('.hub-filters')?.nextElementSibling?.classList.contains('plus-add')).toBe(
+      true
+    );
     canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
     const branch = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
       (btn) => btn.textContent === 'Branch it'
