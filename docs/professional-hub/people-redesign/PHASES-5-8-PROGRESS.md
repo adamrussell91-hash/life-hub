@@ -51,3 +51,10 @@ Branch: `cursor/people-redesign-phases-5-8-db42` · base `main` @ #505 merge.
 
 ## Screens
 `docs/professional-hub/people-redesign/screens/phase-5-8/` and store `media/people-redesign/`
+
+checked: D5 I1 I3 S3 V3 R2 L2 D1 D2 V4
+
+Mock verification (Seth Example, not live Henry — D3 pending live):
+- Today strip slots render; Ask card after `who knows Standard 5?`
+- Remember empty + Run now; phone 390 directory + person
+- Ask no longer writes prose into `#/people?q=` (hash remount wipe fixed)

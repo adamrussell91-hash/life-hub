@@ -450,12 +450,26 @@ export function createMockApi() {
     if (path === '/api/people/ask' && method === 'POST') {
       const question = String((body as { question?: string } | null)?.question ?? '').trim();
       if (/\?$/.test(question) || /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(question)) {
+        const first = [...people.values()].find((p) => !p.is_self);
+        const peopleOut = first
+          ? [
+              {
+                id: first.id,
+                ref: `shared:person:${first.id}`,
+                display_name: first.display_name,
+                reason: 'Mock match for Ask demo',
+                source: 'mock'
+              }
+            ]
+          : [];
         return json(200, {
           ok: true,
           data: {
             mode: 'ask',
-            answer: "I don't know enough about who knows that yet.",
-            people: [],
+            answer: peopleOut.length
+              ? `${peopleOut[0].display_name} — ${peopleOut[0].reason}.`
+              : "I don't know enough about who knows that yet.",
+            people: peopleOut,
             filter: null,
             source: 'mock'
           }
@@ -468,14 +482,65 @@ export function createMockApi() {
     }
 
     if (path === '/api/people/today' && method === 'GET') {
-      const now = new Date();
-      const dayKey = now.toISOString().slice(0, 10);
+      const dayKey = '2026-09-28';
+      const personRef = url.searchParams.get('person_ref');
+      const displayName = url.searchParams.get('display_name') || 'Henry';
+      const first = displayName.split(/\s+/)[0] || 'them';
+      const hasMeet = url.searchParams.get('has_meet_item') === '1';
+      const slots = [
+        {
+          id: 'meeting:briefing',
+          kind: 'meeting',
+          title: 'Staff briefing',
+          start_minutes: 490,
+          end_minutes: 520,
+          start_label: '8:10am',
+          people: [{ ref: null, display_name: 'Fr Ross' }]
+        },
+        {
+          id: 'lesson:p3',
+          kind: 'lesson',
+          title: 'Year 9 History',
+          start_minutes: 680,
+          end_minutes: 720,
+          start_label: '11:20am',
+          people: []
+        },
+        {
+          id: 'free:785',
+          kind: 'free',
+          title: 'Free',
+          start_minutes: 785,
+          end_minutes: 860,
+          start_label: '1:05pm',
+          people: personRef ? [{ ref: personRef, display_name: displayName }] : [],
+          suggested: Boolean(personRef && hasMeet),
+          suggestion_note:
+            personRef && hasMeet ? `You usually meet ${first} after lunch` : null
+        },
+        {
+          id: 'meeting:halt',
+          kind: 'meeting',
+          title: 'HALT committee',
+          start_minutes: 930,
+          end_minutes: 990,
+          start_label: '3:30pm',
+          people: [{ ref: null, display_name: 'Emma' }]
+        }
+      ];
       return json(200, {
         ok: true,
         data: {
           day_key: dayKey,
-          slots: [],
-          suggestion: null
+          slots,
+          suggestion:
+            personRef && hasMeet
+              ? {
+                  slot_id: 'free:785',
+                  note: `You usually meet ${first} after lunch`,
+                  person_ref: personRef
+                }
+              : null
         }
       });
     }

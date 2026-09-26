@@ -1289,16 +1289,20 @@ export async function renderPeoplePage(
     window.clearTimeout(searchTimer);
     searchTimer = window.setTimeout(() => {
       const value = search.value;
+      const askLike =
+        /\?$/.test(value.trim()) ||
+        /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(value.trim());
+      if (askLike && value.trim().length >= 4) {
+        // Keep Ask prose out of the directory hash — hashchange remounts the page
+        // and would wipe the answer card (V3 one box, but Ask is not a name filter).
+        void runAsk(value.trim());
+        return;
+      }
       query = { ...query, q: value };
       applyQueryToHash();
-      const askLike = /\?$/.test(value.trim()) || /^(who|whom|whose|which|what|where|how many|do i know|anyone|anybody)\b/i.test(value.trim());
-      if (askLike && value.trim().length >= 4) {
-        void runAsk(value.trim());
-      } else {
-        askResult = null;
-        renderAskCard();
-        renderDirectory();
-      }
+      askResult = null;
+      renderAskCard();
+      renderDirectory();
     }, 280);
   });
 
