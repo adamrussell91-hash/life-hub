@@ -28,7 +28,6 @@ import {
   canonicalizeGraphHash,
   isKnownHashView,
   isSoftViewChange,
-  parseCapacityShareToken,
   parseEntityPage,
   parseGoalPage,
   parseHashRoute,
@@ -54,8 +53,6 @@ import { renderSomedayWheelView } from '@/views/someday-wheel';
 import { renderSomedayOdysseyView } from '@/views/someday-odyssey';
 import { renderArchiveView } from '@/views/archive';
 import { renderProgramsView } from '@/views/programs';
-import { renderStressView } from '@/views/stress';
-import { renderCoreyView, renderPublicCapacityView } from '@/views/corey';
 import {
   renderDayView,
   renderListView,
@@ -134,10 +131,6 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
       return renderArchiveView(canvas);
     case 'programs':
       return renderProgramsView(canvas);
-    case 'stress':
-      return renderStressView(canvas);
-    case 'corey':
-      return renderCoreyView(canvas);
     case 'properties':
       return renderPropertiesView(canvas);
     case 'term-dates':
@@ -145,16 +138,6 @@ async function renderActiveView(view: HubViewId, canvas: HTMLElement): Promise<v
   }
 }
 
-async function bootPublicCapacity(root: HTMLElement, token: string): Promise<void> {
-  root.replaceChildren();
-  const shell = renderHubShell(root, {});
-  shell.logoutButton?.remove();
-  renderPageHeader(shell, {
-    eyebrow: 'Shared',
-    title: 'Capacity'
-  });
-  await renderPublicCapacityView(shell.canvas, token);
-}
 
 async function bootApp(root: HTMLElement): Promise<void> {
   const shell = renderHubShell(root, {
@@ -194,12 +177,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
       clare.park();
     }
 
-    const share = parseCapacityShareToken();
-    if (share) {
-      resetPaint();
-      await bootPublicCapacity(root, share);
-      return;
-    }
     const mapItem = parseMapItemPage();
     if (mapItem) {
       resetPaint();
@@ -338,15 +315,6 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
 async function boot(root: HTMLElement): Promise<void> {
   root.replaceChildren();
-  const share = parseCapacityShareToken();
-  if (share) {
-    await bootPublicCapacity(root, share);
-    window.addEventListener('hashchange', () => {
-      void boot(root);
-    });
-    return;
-  }
-
   try {
     const session = await fetchSession();
     if (!session.authenticated) {

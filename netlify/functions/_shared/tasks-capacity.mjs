@@ -75,15 +75,3 @@ export function buildCapacitySnapshot(tasks, from = new Date(), horizonDays = 14
   };
 }
 
-export function toCoreyPublicView(snapshot) {
-  return {
-    generated_at: snapshot.generated_at,
-    headlines: snapshot.headlines,
-    overall: snapshot.overall,
-    days: snapshot.days.map(day => ({
-      date_key: day.date_key,
-      weekday: day.weekday,
-      level: day.level
-    }))
-  };
-}

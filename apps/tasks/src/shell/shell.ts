@@ -56,8 +56,6 @@ export type HubViewId =
   | 'excursions'
   | 'archive'
   | 'programs'
-  | 'stress'
-  | 'corey'
   | 'properties'
   | 'term-dates';
 
@@ -104,14 +102,6 @@ const NAV_SECTIONS: NavSection[] = [
       { id: 'excursions', label: 'Excursions', href: '#/excursions' },
       { id: 'programs', label: 'Programs', href: '#/programs' },
       { id: 'archive', label: 'Archive', href: '#/archive' }
-    ]
-  },
-  {
-    id: 'network',
-    title: 'Network',
-    items: [
-      { id: 'stress', label: 'Network', href: '#/stress' },
-      { id: 'corey', label: 'Corey', href: '#/corey' }
     ]
   },
   {
@@ -735,7 +725,6 @@ export function canonicalizeGanttHash(hash = location.hash): string | null {
 export function isKnownHashView(hash = location.hash): boolean {
   const id = hashViewId(hash);
   if (id === 'gantt') return true;
-  if (id === 'capacity') return true;
   if (id === 'constellation') return true;
   if (id === 'backlog') return true;
   if (parseEntityPage(hash)) return true;
@@ -765,10 +754,3 @@ export function isSoftViewChange(from: HubViewId | null, to: HubViewId): boolean
   return from !== null && viewSurface(from) === viewSurface(to);
 }
 
-/** Public Corey share: `#/capacity/<token>` */
-export function parseCapacityShareToken(): string | null {
-  const hash = location.hash.replace(/^#\/?/, '');
-  const parts = hash.split('/');
-  if (parts[0] === 'capacity' && parts[1]) return parts[1];
-  return null;
-}

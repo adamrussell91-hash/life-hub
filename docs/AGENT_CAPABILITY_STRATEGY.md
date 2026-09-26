@@ -431,3 +431,62 @@ This assessment is based on public documentation and repositories accessed on 6 
 - [LangGraph persistence](https://docs.langchain.com/oss/javascript/langgraph/persistence)
 - [Letta memory](https://docs.letta.com/agent-sdk/memory/)
 - [Mem0 open source](https://docs.mem0.ai/open-source/overview)
+
+## Retired: Tasks Hub Network / Corey pages (2026-09-26)
+
+The Tasks Hub had a "Network" sidebar group — a StressFlag inbox page and a
+Corey capacity-share page — built ahead of any agent automation actually
+consuming it. Removed because: its rule-based detection duplicated
+`apps/tasks/src/domain/pinch.ts` (which is live, actionable, and rendered on
+Dashboard/Calendar), and its cross-agent routing had no consumer —
+`networkBriefing` in `domain/network-desk.ts` was never called outside its
+own unit test. Full history: `git show 4f0c54a831826e834fda77be7dd42786c70d3743:apps/tasks/src/views/stress.ts`.
+
+**What's worth reusing when agent automation is actually built:**
+
+1. **The StressFlag shape** — a typed event a source agent raises with a
+   specific, textured description (not "things are busy") and a
+   `routed_to` list of downstream agents:
+   ```ts
+   type StressFlag = {
+     id: string;
+     source_project_or_task_id: string | null;
+     pattern_description: string;   // specific, e.g. "Ethics Olympiad and
+                                     // Da Vinci Decathlon overlapping in the
+                                     // same fortnight"
+     pattern_kind: 'overlapping_excursions' | 'dense_pinch' | 'missed_deadlines' | 'intuitive';
+     raised_by: string;             // e.g. "Clare DeMind"
+     routed_to: string[];           // e.g. ["General Hammond", "Penelope Rose Quillian", "Dr Vera Lenz"]
+     recurrence_note: string | null;
+     fingerprint: string;           // de-dupe key
+     created_at: string;
+   };
+   ```
+   Reuse this shape for any future typed event bus between agents rather than
+   inventing a new one — it was designed against spec §5.8 of
+   `apps/tasks/docs/specs/task-project-manager-hub-spec.md`.
+
+2. **The routing idea (Clare → Hammond → Penelope → Vera) was directionally
+   right, but a shared read-only inbox page was the wrong destination.**
+   When each of those agents has a real home to write into — Hammond's
+   year-on-year trend board, Penelope's diary, Vera's mental-health log —
+   route flags there directly instead of building a shared inbox page again.
+   Don't resurrect the inbox page pattern.
+
+3. **The detection math already lives on and is already reused** —
+   don't reimplement it. `netlify/functions/_shared/tasks-stress.mjs`
+   (`detectOverlappingExcursions`, `detectDensePinches`,
+   `detectMissedDeadlines`) and `_shared/tasks-capacity.mjs`
+   (`buildCapacitySnapshot`) are still live, called from
+   `domain-retrieval.mjs`/`domain-analysis.mjs` for the assistant's
+   "open loops" / focus digest. Any future automation that needs to know
+   about pinch points or overlapping excursions should call these, not
+   duplicate them.
+
+4. **The Corey capacity-share pattern is worth keeping as a pattern, not as
+   code:** a rotating public token backing a redacted view (`toCoreyPublicView`
+   stripped task titles, kept only day-level busy/free labels). If a future
+   feature needs to share a read-only, redacted view of Life Hub state with
+   someone outside the system, this token-rotation approach
+   (`ensure_share` / `rotate_share` actions, `meta/capacity_share` blob key)
+   is the reference implementation to crib from — see the commit in Step 1.

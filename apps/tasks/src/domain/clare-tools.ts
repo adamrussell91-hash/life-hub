@@ -9,7 +9,6 @@ import { resolveTimeZoneInput } from '@/domain/hub-prefs';
 import { HUB_TZ, hubWeekdayLong, searchEntities, toHubDateKey } from '@/domain/queries';
 import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
-import type { StressFlag } from '@/schemas/stress';
 import type { TransitMap } from '@/schemas/map';
 
 export const CLARE_CHECK_CLOCK_TOOL = 'check_clock';
@@ -19,12 +18,11 @@ export const CLARE_UPDATE_PROTOCOL_TOOL = 'update_protocol';
 export const AGENT_SEARCH_TOOL = 'search_board';
 export const AGENT_GET_TASK_TOOL = 'get_task';
 export const AGENT_GET_PROJECT_TOOL = 'get_project';
-export const AGENT_LIST_INBOX_TOOL = 'list_inbox';
 export const AGENT_LIST_MAPS_TOOL = 'list_maps';
 export const AGENT_GET_MAP_TOOL = 'get_map';
 export const AGENT_READ_REPO_FILE_TOOL = 'read_repo_file';
 
-/** Shared tool surface for Clare, Hammond, Penelope, and Vera. */
+/** Shared tool surface for Clare and Hammond. */
 export const CLARE_AGENT_TOOLS: AnthropicTool[] = [
   {
     name: CLARE_CHECK_CLOCK_TOOL,
@@ -102,20 +100,6 @@ export const CLARE_AGENT_TOOLS: AnthropicTool[] = [
     }
   },
   {
-    name: AGENT_LIST_INBOX_TOOL,
-    description: 'List StressFlags in a network inbox (Hammond / Penelope / Vera).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        agent: {
-          type: 'string',
-          enum: ['General Hammond', 'Penelope Rose Quillian', 'Dr Vera Lenz']
-        }
-      },
-      additionalProperties: false
-    }
-  },
-  {
     name: AGENT_LIST_MAPS_TOOL,
     description: 'List transit maps (id + title).',
     input_schema: { type: 'object', properties: {}, additionalProperties: false }
@@ -166,7 +150,6 @@ export type ClareToolRuntime = {
   listProjects?: () => Promise<Project[]> | Project[];
   getTask?: (id: string) => Promise<Task | null> | Task | null;
   getProject?: (id: string) => Promise<Project | null> | Project | null;
-  listInbox?: (agent: string) => Promise<StressFlag[]> | StressFlag[];
   listMaps?: () => Promise<TransitMap[]> | TransitMap[];
   getMap?: (id: string) => Promise<TransitMap | null> | TransitMap | null;
   repo?: RepoClient | null;
@@ -294,26 +277,6 @@ export function createClareToolHandler(runtime: ClareToolRuntime) {
       if (!project) return { ok: false, note: `Project not found: ${id}` };
       return { ok: true, project };
     }
-    if (name === AGENT_LIST_INBOX_TOOL) {
-      const agent =
-        typeof input.agent === 'string' && input.agent.trim()
-          ? input.agent.trim()
-          : inboxForSlug(runtime.agentSlug);
-      if (!agent || !runtime.listInbox) {
-        return { ok: false, note: 'No inbox for this agent.' };
-      }
-      const flags = await runtime.listInbox(agent);
-      return {
-        agent,
-        flags: flags.slice(0, 30).map((flag) => ({
-          id: flag.id,
-          pattern_description: flag.pattern_description,
-          pattern_kind: flag.pattern_kind,
-          recurrence_note: flag.recurrence_note,
-          source_project_or_task_id: flag.source_project_or_task_id
-        }))
-      };
-    }
     if (name === AGENT_LIST_MAPS_TOOL) {
       const maps = (await runtime.listMaps?.()) ?? [];
       return {
@@ -352,11 +315,5 @@ export function createClareToolHandler(runtime: ClareToolRuntime) {
   };
 }
 
-function inboxForSlug(slug: AgentProtocolSlug | undefined): string | null {
-  if (slug === 'hammond') return 'General Hammond';
-  if (slug === 'penelope') return 'Penelope Rose Quillian';
-  if (slug === 'vera') return 'Dr Vera Lenz';
-  return null;
-}
 
 export { compactTask, compactProject };

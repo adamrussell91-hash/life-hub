@@ -14,7 +14,7 @@ export type AgentProtocolDoc = {
 
 export const MAX_PROTOCOL_CHARS = 24_000;
 
-const SLUGS = new Set<AgentProtocolSlug>(['clare', 'hammond', 'penelope', 'vera']);
+const SLUGS = new Set<AgentProtocolSlug>(['clare', 'hammond']);
 
 export function isAgentProtocolSlug(value: string): value is AgentProtocolSlug {
   return SLUGS.has(value as AgentProtocolSlug);

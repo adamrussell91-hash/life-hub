@@ -299,44 +299,6 @@ export const tasksApi = {
       moved_task_ids: string[];
     }>('/api/stall', { action: 'resolve', ...input }),
 
-  listStressFlags: () =>
-    apiGet<{
-      flags: import('@/schemas/stress').StressFlag[];
-      judgment?: import('@/domain/intuitive-scan').IntuitiveScanMeta | null;
-    }>('/api/stress-flags').then((r) => r.flags),
-
-  loadStressFlags: () =>
-    apiGet<{
-      flags: import('@/schemas/stress').StressFlag[];
-      judgment: import('@/domain/intuitive-scan').IntuitiveScanMeta | null;
-    }>('/api/stress-flags').then((r) => ({
-      flags: r.flags,
-      judgment: r.judgment ?? null
-    })),
-
-  listAgentInbox: (inbox: string) =>
-    apiGet<{ flags: import('@/schemas/stress').StressFlag[]; inbox: string }>(
-      `/api/stress-flags?inbox=${encodeURIComponent(inbox)}`
-    ).then((r) => r.flags),
-
-  scanStressFlags: () =>
-    apiPost<{
-      raised: import('@/schemas/stress').StressFlag[];
-      skipped: number;
-      patterns: number;
-    }>('/api/stress-flags', { action: 'scan' }),
-
-  scanIntuitiveFlags: () =>
-    apiPost<{
-      raised: import('@/schemas/stress').StressFlag[];
-      skipped: number;
-      judged: number;
-      model: string | null;
-      ran_at: string;
-      skipped_ai: boolean;
-      reason: string | null;
-    }>('/api/stress-flags', { action: 'intuitive_scan' }),
-
   assessPriorities: (body?: { mode?: 'floor' | 'full'; apply?: boolean }) =>
     apiPost<import('@/domain/priority-assess').PriorityAssessResult>('/api/priority-assess', {
       mode: body?.mode ?? 'full',
@@ -345,45 +307,6 @@ export const tasksApi = {
       if (result.tasks?.length) notifyTasksChanged(result.tasks);
       return result;
     }),
-
-  raiseStressFlag: (body: {
-    pattern_description: string;
-    pattern_kind?: string;
-    source_project_or_task_id?: string | null;
-    fingerprint?: string;
-  }) =>
-    apiPost<import('@/schemas/stress').StressFlag>('/api/stress-flags', {
-      action: 'raise',
-      ...body
-    }),
-
-  getCapacity: () =>
-    apiGet<{
-      snapshot: import('@/domain/capacity').CapacitySnapshot;
-      share: import('@/schemas/capacity').CapacityShare | null;
-    }>('/api/capacity'),
-
-  ensureCapacityShare: () =>
-    apiPost<{ share: import('@/schemas/capacity').CapacityShare }>('/api/capacity', {
-      action: 'ensure_share'
-    }),
-
-  rotateCapacityShare: () =>
-    apiPost<{ share: import('@/schemas/capacity').CapacityShare }>('/api/capacity', {
-      action: 'rotate_share'
-    }),
-
-  getPublicCapacity: (token: string) =>
-    apiGet<{
-      generated_at: string;
-      headlines: string[];
-      overall: import('@/domain/capacity').CapacityLevel;
-      days: Array<{
-        date_key: string;
-        weekday: string;
-        level: import('@/domain/capacity').CapacityLevel;
-      }>;
-    }>(`/api/capacity?token=${encodeURIComponent(token)}`),
 
   /** Shared by the stall review loop and Corey's closure loop (same ReviewLog store). */
   listReviewLogs: () =>

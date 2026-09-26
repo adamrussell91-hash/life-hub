@@ -4,7 +4,6 @@ import { resolve } from 'node:path';
 import * as keys from '@/storage/keys';
 import { createTasksStore, seedIfEmpty, type KvAdapter } from '@/services/store';
 import type { SeedData } from '@/services/types';
-import { buildCapacitySnapshot, toCoreyPublicView } from '@/domain/capacity';
 import { computeProjectVariance, formatSlip } from '@/domain/closure';
 
 function memoryKv(): KvAdapter {
@@ -25,30 +24,6 @@ function memoryKv(): KvAdapter {
 const seed = JSON.parse(
   readFileSync(resolve(process.cwd(), 'fixtures/seed.json'), 'utf8')
 ) as SeedData;
-
-describe('capacity (Corey)', () => {
-  it('builds headlines without exposing task titles in the public view', () => {
-    const snapshot = buildCapacitySnapshot(seed.tasks, new Date('2026-08-16T12:00:00'), 14);
-    expect(snapshot.days.length).toBe(14);
-    expect(snapshot.headlines.length).toBeGreaterThan(0);
-    const pub = toCoreyPublicView(snapshot);
-    const blob = JSON.stringify(pub);
-    expect(blob).not.toContain('Finish lesson pack');
-    expect(blob).not.toContain('florist');
-    expect(pub.days[0]).not.toHaveProperty('open_task_count');
-  });
-
-  it('issues a share token and serves public capacity', async () => {
-    const kv = memoryKv();
-    await seedIfEmpty(kv, keys, seed);
-    const store = createTasksStore(kv, keys);
-    const share = await store.ensureCapacityShare();
-    expect(share.token.length).toBeGreaterThan(8);
-    const view = await store.getPublicCapacityByToken(share.token);
-    expect(view?.headlines.length).toBeGreaterThan(0);
-    expect(await store.getPublicCapacityByToken('nope')).toBeNull();
-  });
-});
 
 describe('closure loop', () => {
   it('computes slip vs baseline for the wrap demo project', () => {

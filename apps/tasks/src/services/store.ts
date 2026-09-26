@@ -19,8 +19,6 @@ import {
   ReviewLogSchema
 } from '@/schemas/templates';
 import { ClareCalibrationSchema, ClareNegotiationLogSchema } from '@/schemas/clare';
-import { DEFAULT_STRESS_ROUTE, StressFlagSchema } from '@/schemas/stress';
-import { CapacityShareSchema } from '@/schemas/capacity';
 import { TransitMapSchema } from '@/schemas/map';
 import { ProgramSchema } from '@/schemas/program';
 import { AreaSchema } from '@/schemas/area';
@@ -105,15 +103,6 @@ import { PageBlockSchema } from '@/schemas/page-block';
 import { lifeContextToPromptBlock } from '@/domain/life-context';
 import { buildClareBriefing } from '@/domain/clare-desk';
 import { DEFAULT_STALL_WEEKS, findStallCandidates, outcomeProjectStatus } from '@/domain/stall';
-import { agentSlug, detectStressPatterns } from '@/domain/stress';
-import { buildIntuitiveDigest } from '@/domain/intuitive-digest';
-import { parseIntuitiveScanMeta } from '@/domain/intuitive-scan';
-import {
-  defaultIntuitiveJudge,
-  judgmentToPatterns,
-  type IntuitiveJudge
-} from '@/ai/intuitive-judge';
-import { buildCapacitySnapshot, toCoreyPublicView } from '@/domain/capacity';
 import { computeProjectVariance, deriveProjectEndDate } from '@/domain/closure';
 import type { IndexDoc, SeedData, TasksStore } from './types';
 
@@ -139,11 +128,6 @@ export interface KeyBuilders {
   agentActionLogKey: (id: string) => string;
   reviewLogKey: (id: string) => string;
   reviewLogsIndexKey: () => string;
-  capacityShareKey: () => string;
-  intuitiveScanMetaKey: () => string;
-  stressFlagKey: (id: string) => string;
-  stressFlagsIndexKey: () => string;
-  agentInboxKey: (agentSlug: string) => string;
   clareCalibrationKey: (domain: string) => string;
   clareCalibrationsIndexKey: () => string;
   clareNegotiationLogKey: (id: string) => string;
@@ -1071,7 +1055,6 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         listProjects: () => this.listProjects(),
         getTask: (id: string) => this.getTask(id),
         getProject: (id: string) => this.getProject(id),
-        listInbox: (agent: string) => this.listAgentInbox(agent),
         listMaps: () => this.listMaps(),
         getMap: async (id: string) => {
           const maps = await this.listMaps();
@@ -1436,173 +1419,6 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
       return { project, review, moved_task_ids };
     },
 
-    async listStressFlags() {
-      return listByIndex(kv, keys.stressFlagsIndexKey(), keys.stressFlagKey, (raw) =>
-        StressFlagSchema.parse(raw)
-      );
-    },
-
-    async listAgentInbox(agent) {
-      const slug = agentSlug(agent);
-      const doc = await kv.getJSON<IndexDoc>(keys.agentInboxKey(slug));
-      const ids = doc?.ids ?? [];
-      const flags: Awaited<ReturnType<TasksStore['listStressFlags']>> = [];
-      for (const id of ids) {
-        const raw = await kv.getJSON(keys.stressFlagKey(id));
-        if (raw) flags.push(StressFlagSchema.parse(raw));
-      }
-      return flags;
-    },
-
-    async raiseStressFlag(input) {
-      const stamp = nowIso();
-      const fingerprint =
-        input.fingerprint ??
-        `manual:${input.pattern_description.slice(0, 80)}:${stamp.slice(0, 10)}`;
-      const existing = await this.listStressFlags();
-      const dup = existing.find((f) => f.fingerprint === fingerprint);
-      if (dup) return dup;
-
-      const flag = StressFlagSchema.parse({
-        schema_version: 1,
-        id: newId('sf'),
-        source_project_or_task_id: input.source_project_or_task_id ?? null,
-        pattern_description: input.pattern_description,
-        pattern_kind: input.pattern_kind ?? 'manual',
-        raised_by: 'Clare DeMind',
-        routed_to: DEFAULT_STRESS_ROUTE,
-        recurrence_note: null,
-        fingerprint,
-        created_at: stamp
-      });
-
-      await kv.setJSON(keys.stressFlagKey(flag.id), flag);
-      const ids = await readIndex(kv, keys.stressFlagsIndexKey());
-      ids.push(flag.id);
-      await writeIndex(kv, keys.stressFlagsIndexKey(), ids);
-
-      // Write-on-create into each agent inbox (DECISIONS.md — no sync fan-out yet).
-      for (const agent of flag.routed_to) {
-        const slug = agentSlug(agent);
-        const inboxIds = await readIndex(kv, keys.agentInboxKey(slug));
-        if (!inboxIds.includes(flag.id)) {
-          inboxIds.push(flag.id);
-          await writeIndex(kv, keys.agentInboxKey(slug), inboxIds);
-        }
-      }
-
-      const log = AgentActionLogSchema.parse({
-        schema_version: 1,
-        id: newId('aal'),
-        agent: 'Clare DeMind',
-        action: 'create',
-        entity_type: 'stress_flag',
-        entity_id: flag.id,
-        reason: `StressFlag: ${flag.pattern_description}`,
-        created_at: stamp
-      });
-      await kv.setJSON(keys.agentActionLogKey(log.id), log);
-
-      return flag;
-    },
-
-    async scanAndRaiseStressFlags(options = {}) {
-      const now = options.now ?? new Date();
-      const [projects, tasks, existing] = await Promise.all([
-        this.listProjects(),
-        this.listTasks(),
-        this.listStressFlags()
-      ]);
-      const patterns = detectStressPatterns(projects, tasks, now);
-      const known = new Set(existing.map((f) => f.fingerprint));
-      const raised = [];
-      let skipped = 0;
-      for (const pattern of patterns) {
-        if (known.has(pattern.fingerprint)) {
-          skipped += 1;
-          continue;
-        }
-        const flag = await this.raiseStressFlag({
-          pattern_description: pattern.pattern_description,
-          pattern_kind: pattern.pattern_kind,
-          source_project_or_task_id: pattern.source_project_or_task_id,
-          fingerprint: pattern.fingerprint
-        });
-        known.add(flag.fingerprint);
-        raised.push(flag);
-      }
-      return { raised, skipped, patterns: patterns.length };
-    },
-
-    async getIntuitiveScanMeta() {
-      return parseIntuitiveScanMeta(await kv.getJSON(keys.intuitiveScanMetaKey()));
-    },
-
-    async runIntuitiveScan(options = {}) {
-      const now = options.now ?? new Date();
-      const ran_at = nowIso();
-      const judge: IntuitiveJudge | null =
-        options.judge === undefined ? defaultIntuitiveJudge() : options.judge;
-      if (!judge) {
-        const result = {
-          raised: [],
-          skipped: 0,
-          judged: 0,
-          model: null,
-          ran_at,
-          skipped_ai: true,
-          reason: 'no_api_key'
-        };
-        await kv.setJSON(keys.intuitiveScanMetaKey(), result);
-        return result;
-      }
-
-      const [projects, tasks, existing] = await Promise.all([
-        this.listProjects(),
-        this.listTasks(),
-        this.listStressFlags()
-      ]);
-      const digest = buildIntuitiveDigest(projects, tasks, now);
-      const judgment = await judge(digest);
-      const patterns = judgmentToPatterns(judgment);
-      const known = new Set(existing.map((flag) => flag.fingerprint));
-      const raised = [];
-      let skipped = 0;
-      for (const pattern of patterns) {
-        if (known.has(pattern.fingerprint)) {
-          skipped += 1;
-          continue;
-        }
-        const flag = await this.raiseStressFlag({
-          pattern_description: pattern.pattern_description,
-          pattern_kind: pattern.pattern_kind,
-          source_project_or_task_id: pattern.source_project_or_task_id,
-          fingerprint: pattern.fingerprint
-        });
-        known.add(flag.fingerprint);
-        raised.push(flag);
-      }
-      const result = {
-        raised,
-        skipped,
-        judged: patterns.length,
-        model: judgment.model,
-        ran_at,
-        skipped_ai: false,
-        reason: null
-      };
-      await kv.setJSON(keys.intuitiveScanMetaKey(), {
-        ran_at: result.ran_at,
-        model: result.model,
-        raised: result.raised.length,
-        skipped: result.skipped,
-        judged: result.judged,
-        skipped_ai: result.skipped_ai,
-        reason: result.reason
-      });
-      return result;
-    },
-
     async applyPriorityAssessments(options = {}) {
       const mode = options.mode === 'floor' ? 'floor' : 'full';
       const now = options.now ?? new Date();
@@ -1616,54 +1432,6 @@ export function createTasksStore(kv: KvAdapter, keys: KeyBuilders): TasksStore {
         updated.push(await this.updateTask(change.id, { priority: change.suggested as Task['priority'] }));
       }
       return { ...preview, applied: true, tasks: updated };
-    },
-
-    async getCapacitySnapshot(now = new Date()) {
-      const tasks = await this.listTasks();
-      return buildCapacitySnapshot(tasks, now, 14);
-    },
-
-    async getCapacityShare() {
-      const raw = await kv.getJSON(keys.capacityShareKey());
-      return raw ? CapacityShareSchema.parse(raw) : null;
-    },
-
-    async ensureCapacityShare() {
-      const existing = await this.getCapacityShare();
-      if (existing?.enabled) return existing;
-      const stamp = nowIso();
-      const share = CapacityShareSchema.parse({
-        schema_version: 1,
-        id: newId('cap'),
-        token: crypto.randomUUID().replace(/-/g, ''),
-        enabled: true,
-        created_at: stamp,
-        rotated_at: null
-      });
-      await kv.setJSON(keys.capacityShareKey(), share);
-      return share;
-    },
-
-    async rotateCapacityShare() {
-      const existing = await this.getCapacityShare();
-      const stamp = nowIso();
-      const share = CapacityShareSchema.parse({
-        schema_version: 1,
-        id: existing?.id ?? newId('cap'),
-        token: crypto.randomUUID().replace(/-/g, ''),
-        enabled: true,
-        created_at: existing?.created_at ?? stamp,
-        rotated_at: stamp
-      });
-      await kv.setJSON(keys.capacityShareKey(), share);
-      return share;
-    },
-
-    async getPublicCapacityByToken(token) {
-      const share = await this.getCapacityShare();
-      if (!share || !share.enabled || share.token !== token) return null;
-      const snapshot = await this.getCapacitySnapshot();
-      return toCoreyPublicView(snapshot);
     },
 
     async getProjectVariance(projectId) {
