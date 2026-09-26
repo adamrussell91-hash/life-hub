@@ -282,11 +282,27 @@ describe('renderHomeView', () => {
     await renderHomeView(canvas);
     const strip = canvas.querySelector('.pro-home__yearstrip');
     const body = canvas.querySelector('.pro-home__body');
+    const lede = canvas.querySelector('.pro-home__lede');
     expect(strip).toBeTruthy();
     expect(body).toBeTruthy();
-    expect(strip?.nextElementSibling).toBe(body);
+    expect(lede).toBeTruthy();
+    expect(lede?.contains(strip!)).toBe(true);
+    expect(lede?.nextElementSibling).toBe(body);
     expect(canvas.querySelector('.pro-home__side .pro-home__yearstrip')).toBeNull();
     expect(canvas.querySelector('.pro-home__side .pro-home__progress')).toBeTruthy();
+  });
+
+  it('keeps Priority areas in the lede rail and calendar full-width below', async () => {
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    const lede = canvas.querySelector('.pro-home__lede');
+    const side = canvas.querySelector('.pro-home__side');
+    const body = canvas.querySelector('.pro-home__body');
+    const calendarHost = canvas.querySelector('.pro-home__calendar-host');
+    expect(lede?.contains(side!)).toBe(true);
+    expect(body?.contains(calendarHost!)).toBe(true);
+    expect(body?.contains(side!)).toBe(false);
+    expect(calendarHost?.querySelector('[data-part="hub-calendar-mount"]')).toBeTruthy();
   });
 
   it('plots a clickable year-strip mark for each meeting and event', async () => {

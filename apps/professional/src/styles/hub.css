@@ -1197,16 +1197,37 @@
   margin-bottom: var(--space-4);
 }
 
-.pro-home__body {
+/* Year strip + Priority areas share a top row. Calendar below is full canvas
+ * width — the old body grid (1fr|20rem) left a tall empty strip beside the
+ * week view under the short accreditation card. */
+.pro-home__lede {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 20rem;
+  grid-template-columns: minmax(0, 1fr) min(20rem, 34%);
   gap: var(--space-4);
   align-items: start;
   margin-bottom: var(--space-4);
 }
 
-.pro-home__calendar-host {
+.pro-home__body {
+  display: block;
+  margin-bottom: var(--space-4);
+}
+
+.pro-home__calendar-host,
+.pro-calendar-host {
+  width: 100%;
   min-width: 0;
+}
+
+.pro-home__calendar-host .hub-calendar-mount,
+.pro-calendar-host .hub-calendar-mount,
+.pro-home__calendar-host .hub-calendar,
+.pro-calendar-host .hub-calendar,
+.pro-home__calendar-host .cal,
+.pro-calendar-host .cal {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .pro-home__progress,
@@ -1221,13 +1242,16 @@
 
 .pro-home__yearstrip {
   padding: var(--space-3) var(--space-5);
-  margin-bottom: var(--space-4);
+  margin-bottom: 0;
+  min-width: 0;
 }
 
 .pro-home__side {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  min-width: 0;
+  width: 100%;
 }
 
 .pro-home__card-title {
@@ -1531,7 +1555,7 @@
 }
 
 @media (max-width: 900px) {
-  .pro-home__body {
+  .pro-home__lede {
     grid-template-columns: minmax(0, 1fr);
   }
 }
