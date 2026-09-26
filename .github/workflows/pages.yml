@@ -23,7 +23,17 @@ jobs:
         with:
           node-version: 22
       - run: npm ci --ignore-scripts
-      - run: npm test
+      - name: Run tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.log
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-test-output
+          path: test-output.log
+          if-no-files-found: ignore
       - run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
