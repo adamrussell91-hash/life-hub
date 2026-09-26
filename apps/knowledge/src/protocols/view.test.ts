@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, expect, it, vi } from "vitest";
-import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
+import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, ProtocolRequestError, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
 
 const definition = {
   id: "fates",
@@ -57,6 +57,34 @@ describe("protocol conversation view", () => {
     expect(filterHtml).toContain('value="close"');
     expect(filterHtml).toContain("Hold with caution");
     expect(filterHtml).toContain("Name the element to reopen");
+  });
+
+  it("shows a summary card and download control on completed runs", () => {
+    const html = sessionView(session({
+      status: "completed",
+      checkpoint: null,
+      allowedActions: [],
+      summary: { title: "Library event", keyFinding: "Audience first", summary: "Clotho and Atropos diverged on proof." }
+    }), definition);
+    expect(html).toContain("protocol-summary");
+    expect(html).toContain("Library event");
+    expect(html).toContain("Audience first");
+    expect(html).toContain("Download as markdown");
+  });
+
+  it("renders Past runs rows with resume for waiting sessions", async () => {
+    const { pastRunsHtml } = await import("./view");
+    const defs = [{ id: "horizon", name: "The Horizon Council", description: "", motif: "", defaultMode: "full", modes: [], intake: [], voices: [] }];
+    const html = pastRunsHtml([
+      { id: "sess-past", protocolId: "horizon", mode: "full", status: "waiting", title: "Career forks", updatedAt: "2026-09-26T00:00:00.000Z" }
+    ], "", defs, { hasMore: true });
+    expect(html).toContain("Past runs");
+    expect(html).toContain("The Horizon Council");
+    expect(html).toContain("Career forks");
+    expect(html).toContain('data-protocol-resume-run="sess-past"');
+    expect(html).toContain('data-protocol-open-run="sess-past"');
+    expect(html).toContain("Load more");
+    expect(html).toContain('data-protocol-past-more');
   });
 
   it("gives each thinking persona an in-world status line", () => {
@@ -161,6 +189,60 @@ describe("postProtocolAction", () => {
 
     await expect(postProtocolAction({ sessionId: "sess-1", revision: 3, requestId: "request-3", action: "answer", text: "My reply" }, fetchImpl)).rejects.toThrow("The session has ended.");
   });
+
+  it("preserves frequency_justification_required and accepts a justified resubmit", async () => {
+    let createCalls = 0;
+    const fetchImpl = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      createCalls += 1;
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      if (!body.intake?.frequencyJustification) {
+        return new Response(JSON.stringify({
+          error: {
+            code: "frequency_justification_required",
+            message: "Last Horizon review was 2026-06-01. Another review before 2026-08-30 needs a frequency justification."
+          }
+        }), { status: 400 });
+      }
+      return new Response(JSON.stringify({
+        data: {
+          session: {
+            id: "sess-h",
+            protocolId: "horizon",
+            mode: "full",
+            status: "waiting",
+            stage: "ketill",
+            speaker: "ketill",
+            revision: 1,
+            transcript: [],
+            checkpoint: { kind: "answer", question: "Which fork?" },
+            allowedActions: ["answer", "cancel"],
+            error: null
+          }
+        }
+      }), { status: 200 });
+    }) as unknown as typeof fetch;
+
+    await expect(postProtocolAction({
+      protocolId: "horizon", mode: "full", intake: { focus: "Career" }, requestId: "r1"
+    }, fetchImpl)).rejects.toMatchObject({
+      name: "ProtocolRequestError",
+      code: "frequency_justification_required",
+      message: expect.stringContaining("2026-06-01")
+    });
+
+    const session = await postProtocolAction({
+      protocolId: "horizon",
+      mode: "full",
+      intake: {
+        focus: "Career",
+        frequencyJustification: "Last Horizon review was 2026-06-01. Another review before 2026-08-30 needs a frequency justification."
+      },
+      requestId: "r2"
+    }, fetchImpl);
+    expect(session.id).toBe("sess-h");
+    expect(createCalls).toBe(2);
+    expect(ProtocolRequestError).toBeTypeOf("function");
+  });
 });
 
 describe("lightingStage", () => {
@@ -255,5 +337,34 @@ describe("detectForks", () => {
     expect(result?.branches).toHaveLength(2);
     expect(result?.branches[0]).toEqual({ label: "Fork 1", body: "take the job. Closes off academia." });
     expect(result?.branches[1]).toEqual({ label: "Fork 2", body: "pursue a PhD. Opens research paths." });
+  });
+});
+
+describe("protocol sources", () => {
+  it("renders a Sources list for cited evidence urls on a voice turn", () => {
+    const html = sessionView(session({
+      status: "completed",
+      checkpoint: null,
+      transcript: [{
+        id: "t1",
+        role: "voice",
+        speaker: "lachesis",
+        stage: "briefing",
+        text: "The literature points here.",
+        evidenceIds: ["web:1", "web:2"]
+      }],
+      evidence: [
+        { id: "web:1", title: "Participation study", url: "https://example.test/a" },
+        { id: "web:2", title: "No link note", text: "local only" },
+        { id: "web:3", title: "Unused", url: "https://example.test/c" }
+      ]
+    }), definition);
+    expect(html).toContain("Sources");
+    expect(html).toContain('href="https://example.test/a"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain("Participation study");
+    expect(html).not.toContain("https://example.test/c");
+    expect(html).not.toContain("No link note");
   });
 });

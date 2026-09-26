@@ -185,6 +185,16 @@ describe('renderHomeView', () => {
     const fill = canvas.querySelector('.pro-home__progress-fill') as HTMLElement;
     expect(fill.style.width).toBe('6%');
     expect(canvas.textContent).not.toMatch(/Priority areas/);
+    const progress = canvas.querySelector('.pro-home__progress');
+    expect(progress?.classList.contains('is-expanded')).toBe(false);
+    const toggle = canvas.querySelector('.pro-home__progress-toggle') as HTMLButtonElement;
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+    // Caption stays in the reveal until expanded.
+    expect(progress?.querySelector('.pro-home__progress-head .pro-home__progress-caption')).toBeNull();
+    toggle?.click();
+    expect(progress?.classList.contains('is-expanded')).toBe(true);
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(canvas.textContent).toMatch(/goal is a placeholder/);
   });
 
   it('totals priority-area hours separately from the event type', async () => {
@@ -249,6 +259,11 @@ describe('renderHomeView', () => {
     const canvas = document.createElement('div');
     await renderHomeView(canvas);
     expect(canvas.textContent).toMatch(/10 hrs/);
+    const progress = canvas.querySelector('.pro-home__progress');
+    expect(progress?.classList.contains('is-expanded')).toBe(false);
+    // Breakdown lives in the reveal; expand before asserting chips.
+    (canvas.querySelector('.pro-home__progress-toggle') as HTMLButtonElement)?.click();
+    expect(progress?.classList.contains('is-expanded')).toBe(true);
     const chips = [...canvas.querySelectorAll('.pro-home__chip-tag')].map((node) => node.textContent);
     expect(chips).toContain('Workshop · 6 hrs');
     expect(chips).toContain('Course · 4 hrs');
@@ -282,11 +297,27 @@ describe('renderHomeView', () => {
     await renderHomeView(canvas);
     const strip = canvas.querySelector('.pro-home__yearstrip');
     const body = canvas.querySelector('.pro-home__body');
+    const lede = canvas.querySelector('.pro-home__lede');
     expect(strip).toBeTruthy();
     expect(body).toBeTruthy();
-    expect(strip?.nextElementSibling).toBe(body);
+    expect(lede).toBeTruthy();
+    expect(lede?.contains(strip!)).toBe(true);
+    expect(lede?.nextElementSibling).toBe(body);
     expect(canvas.querySelector('.pro-home__side .pro-home__yearstrip')).toBeNull();
     expect(canvas.querySelector('.pro-home__side .pro-home__progress')).toBeTruthy();
+  });
+
+  it('keeps Priority areas in the lede rail and calendar full-width below', async () => {
+    const canvas = document.createElement('div');
+    await renderHomeView(canvas);
+    const lede = canvas.querySelector('.pro-home__lede');
+    const side = canvas.querySelector('.pro-home__side');
+    const body = canvas.querySelector('.pro-home__body');
+    const calendarHost = canvas.querySelector('.pro-home__calendar-host');
+    expect(lede?.contains(side!)).toBe(true);
+    expect(body?.contains(calendarHost!)).toBe(true);
+    expect(body?.contains(side!)).toBe(false);
+    expect(calendarHost?.querySelector('[data-part="hub-calendar-mount"]')).toBeTruthy();
   });
 
   it('plots a clickable year-strip mark for each meeting and event', async () => {

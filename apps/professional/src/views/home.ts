@@ -109,7 +109,7 @@ function statusChip(state: EventOccurrenceState): HTMLElement {
 
 function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElement {
   const card = el('section', 'pro-home__progress');
-  card.append(el('h2', 'pro-home__card-title', 'Accreditation progress'));
+  card.setAttribute('data-part', 'accreditation-progress');
 
   let hoursThisYear = 0;
   const categoryTotals = new Map<string, number>();
@@ -128,19 +128,32 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
     }
   }
 
+  const head = el('div', 'pro-home__progress-head');
+  const titleRow = el('div', 'pro-home__progress-title-row');
+  titleRow.append(el('h2', 'pro-home__card-title', 'Accreditation progress'));
+  const toggle = el('button', 'pro-home__progress-toggle');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'pro-home-progress-details');
+  toggle.setAttribute('aria-label', 'Show PD breakdown');
+  toggle.innerHTML =
+    '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4"/></svg>';
+  titleRow.append(toggle);
+  head.append(titleRow);
+
   const top = el('div', 'pro-home__progress-top');
   top.append(
     el('span', 'pro-home__progress-value', `${hoursThisYear} hrs`),
     el('span', 'pro-home__progress-of', `of ${ACCREDITATION_TARGET_HOURS}`)
   );
-  card.append(top);
-  card.append(el('p', 'pro-home__progress-caption', `Logged in ${today.year} · goal is a placeholder`));
+  head.append(top);
 
   const barTrack = el('div', 'pro-home__progress-bar');
   const fill = el('div', 'pro-home__progress-fill');
   fill.style.width = `${Math.min(100, (hoursThisYear / ACCREDITATION_TARGET_HOURS) * 100)}%`;
   barTrack.append(fill);
-  card.append(barTrack);
+  head.append(barTrack);
+  card.append(head);
 
   function hourChips(totals: Map<string, number>, tone: string, limit?: number): HTMLElement {
     const chips = el('div', 'pro-home__progress-chips');
@@ -152,11 +165,26 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
     return chips;
   }
 
-  if (categoryTotals.size) card.append(hourChips(categoryTotals, 'blue', 4));
+  // Caption + breakdown live in the expand panel so the contracted card
+  // matches Year-at-a-glance height in the lede row.
+  const reveal = el('div', 'pro-home__progress-reveal');
+  reveal.id = 'pro-home-progress-details';
+  const inner = el('div', 'pro-home__progress-reveal-inner');
+  inner.append(el('p', 'pro-home__progress-caption', `Logged in ${today.year} · goal is a placeholder`));
+  if (categoryTotals.size) inner.append(hourChips(categoryTotals, 'blue', 4));
   if (priorityTotals.size) {
-    card.append(el('p', 'pro-home__progress-caption', 'Priority areas'));
-    card.append(hourChips(priorityTotals, 'sage'));
+    inner.append(el('p', 'pro-home__progress-caption', 'Priority areas'));
+    inner.append(hourChips(priorityTotals, 'sage'));
   }
+  reveal.append(inner);
+  card.append(reveal);
+
+  const setOpen = (open: boolean): void => {
+    card.classList.toggle('is-expanded', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Hide PD breakdown' : 'Show PD breakdown');
+  };
+  toggle.addEventListener('click', () => setOpen(!card.classList.contains('is-expanded')));
 
   return card;
 }
@@ -344,18 +372,19 @@ export async function renderHomeView(canvas: HTMLElement): Promise<void> {
     canvas.append(actions);
 
     const today = sydneyParts(new Date());
-    canvas.append(renderYearStrip(today, events, meetings));
+
+    const lede = el('div', 'pro-home__lede');
+    lede.append(renderYearStrip(today, events, meetings));
+    const side = el('div', 'pro-home__side');
+    side.append(renderAccreditation(today, events));
+    lede.append(side);
+    canvas.append(lede);
 
     const body = el('div', 'pro-home__body');
     unmountProfessionalCalendar();
     const calendarHost = el('div', 'pro-home__calendar-host');
-    calendarHost.style.minWidth = '0';
     body.append(calendarHost);
     mountProfessionalCalendar(calendarHost, { routeZoom: false });
-
-    const side = el('div', 'pro-home__side');
-    side.append(renderAccreditation(today, events));
-    body.append(side);
 
     canvas.append(body);
     canvas.append(renderTimeline(events));

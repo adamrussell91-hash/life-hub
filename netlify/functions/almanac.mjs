@@ -16,6 +16,8 @@ import { createGitHubClient, GitHubClientError, GitHubConfigurationError } from 
 import { decodeBlob } from './_shared/decode-blob.mjs';
 import { parseDateRange } from './_shared/repo-policy.mjs';
 import { defaultGetTasksStore, getJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
+import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
+import { lastCompletedRun, horizonCompletedDateKey, isHorizonReviewStepId } from './_shared/cognitive-horizon.mjs';
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { addDays, almanacSummary, leadLines } from '../../packages/design-kit/js/lead-lines.js';
@@ -396,7 +398,8 @@ export function buildAlmanac({
   logs = [],
   blocks = [],
   lessons = [],
-  professionalEvents = []
+  professionalEvents = [],
+  horizonCadence = null
 }) {
   const dates = dateKeys(from, to);
   const logEvents = (logs ?? []).filter(event => event?.record && (event.record.type === 'sleep' || event.record.type === 'diary') && event.record.date <= today);
@@ -455,8 +458,17 @@ export function buildAlmanac({
   for (let year = startYear; year <= endYear; year += 1) addTag(tags, dstStart(year), 'dst-start');
 
   const merged = mergeAnchors(anchors, terms, extras);
+  if (horizonCadence?.lastCompletedAt) {
+    merged.push({
+      id: 'horizon-council',
+      title: 'Horizon Council',
+      kind: 'event',
+      tags: ['horizon-review'],
+      sub: 'Quarterly cognitive review'
+    });
+  }
   const doneIds = new Set(done.map(row => row.stepId));
-  const lines = leadLines(merged, ALMANAC_RULES, { today, terms, done: doneIds }).map(line => ({
+  const lines = leadLines(merged, ALMANAC_RULES, { today, terms, done: doneIds, horizon: horizonCadence }).map(line => ({
     ...line,
     steps: line.steps.map(step => ({ ...step, actionId: `alm-${step.id}` }))
   }));
@@ -546,6 +558,7 @@ export async function readAlmanac({
   terms = [],
   lessons = [],
   professionalEvents = [],
+  horizon = null,
   warn = console.warn
 }) {
   const anchors = parseAlmanacAnchors(await readFile(ALMANAC_ANCHORS_PATH) ?? '', { warn });
@@ -587,7 +600,8 @@ export async function readAlmanac({
     logs,
     blocks,
     lessons,
-    professionalEvents
+    professionalEvents,
+    horizonCadence: horizon
   });
 }
 
@@ -639,12 +653,15 @@ export function ghostsForAlmanacAction(id, view) {
   const stepId = id.slice('alm-'.length);
   const step = view.lines.flatMap(line => line.steps).find(item => item.id === stepId);
   if (!step) return null;
+  const horizonReview = isHorizonReviewStepId(stepId);
+  let due = step.lastSafe;
+  if (horizonReview && view.today && due < view.today) due = view.today;
   return [{
     id,
     agent: 'hammond',
     kind: 'create_task',
-    title: step.title,
-    due: step.lastSafe,
+    title: horizonReview ? 'Run the Horizon Council review' : step.title,
+    due,
     source: `almanac:${stepId}`
   }];
 }
@@ -691,6 +708,22 @@ function isDonePath(url) {
   return url.pathname === '/api/almanac/done';
 }
 
+export async function loadHorizonAlmanacContext(env = process.env, {
+  getCognitiveStore = defaultGetCognitiveStore,
+  owner = env.COGNITIVE_OWNER_ID || 'operator'
+} = {}) {
+  try {
+    const store = await getCognitiveStore(env);
+    if (!store) return null;
+    const last = await lastCompletedRun(store, owner, 'horizon');
+    if (!last?.completedAt) return null;
+    return { lastCompletedAt: horizonCompletedDateKey(last.completedAt) };
+  } catch (error) {
+    console.warn(`almanac: horizon cadence unavailable (${error instanceof Error ? error.message : 'error'})`);
+    return null;
+  }
+}
+
 export function createAlmanacHandler({
   env = process.env,
   fetchImpl = fetch,
@@ -699,6 +732,7 @@ export function createAlmanacHandler({
   createGitHubClient: createClient = createGitHubClient,
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
+  getCognitiveStore = defaultGetCognitiveStore,
   loadLessons = async () => [],
   loadProfessionalEvents = async () => []
 } = {}) {
@@ -771,11 +805,12 @@ export function createAlmanacHandler({
           return jsonResponse(400, fail(400, 'invalid_date_range', 'Provide from and to as YYYY-MM-DD.').payload, PRIVATE_CACHE);
         }
         const opened = await open();
-        const [terms, lessons, professionalEvents, tasked] = await Promise.all([
+        const [terms, lessons, professionalEvents, tasked, horizon] = await Promise.all([
           readSchoolTerms(tasksStore),
           loadLessons(env),
           loadProfessionalEvents(env),
-          readAlmanacTasked(tasksStore)
+          readAlmanacTasked(tasksStore),
+          loadHorizonAlmanacContext(env, { getCognitiveStore })
         ]);
         const view = await readAlmanac({
           readFile: path => opened.readFile(path),
@@ -785,7 +820,8 @@ export function createAlmanacHandler({
           to: url.searchParams.get('to'),
           terms,
           lessons,
-          professionalEvents
+          professionalEvents,
+          horizon
         });
         return jsonResponse(200, { ok: true, ...view, tasked }, PRIVATE_CACHE);
       }

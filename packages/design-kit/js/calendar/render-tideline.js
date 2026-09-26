@@ -30,6 +30,13 @@ import {
 import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
+/** Site-root portraits used across hubs (umbrella `dist/assets/agents/`). */
+const AGENT_AVATAR_SRC = {
+  hammond: '/assets/agents/hammond.jpg',
+  sara: '/assets/agents/sara.jpg',
+  clare: '/assets/agents/clare.png',
+  chadwick: '/assets/agents/chadwick.jpg'
+};
 /** Design spec: expanded band remembered per session. Life default; other hubs pass `hub` later. */
 export const BAND_SESSION_KEY = 'life.calendar.band';
 const ICON = {
@@ -152,6 +159,88 @@ function agentName(agent) {
   return GHOST_AGENTS[agent] || 'Hammond';
 }
 
+function agentAvatarClass(agent, sizeClass = '') {
+  const parts = ['cal-av'];
+  if (sizeClass) parts.push(sizeClass);
+  if (agent === 'sara') parts.push('cal-av--sara');
+  else if (agent === 'clare') parts.push('cal-av--clare');
+  return parts.join(' ');
+}
+
+/** Portrait when the hub ships the asset; letter fallback only if missing. */
+function agentAvatarNode(agent, sizeClass = '') {
+  const cls = agentAvatarClass(agent, sizeClass);
+  const src = AGENT_AVATAR_SRC[agent];
+  if (!src) {
+    return el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' });
+  }
+  const img = el('img', cls, undefined, null, {
+    src,
+    alt: '',
+    'aria-hidden': 'true',
+    decoding: 'async'
+  });
+  img.addEventListener?.('error', () => {
+    img.replaceWith?.(el('span', cls, AGENT_INITIAL[agent] || '?', null, { 'aria-hidden': 'true' }));
+  });
+  return img;
+}
+
+/** Pending ghosts split by current filter — shared by tray label, Apply, Review, Dismiss. */
+function pendingGhostPartition() {
+  const visible = [];
+  let hidden = 0;
+  if (!model) return { visible, hidden };
+  for (const ghost of model.ghosts) {
+    if (state.settled.has(ghost.id) || ghost.settled === 'accepted') continue;
+    if (isItemVisible(ghost.chip || ghost, filterState)) visible.push(ghost);
+    else hidden += 1;
+  }
+  return { visible, hidden };
+}
+
+function pendingVisibleGhosts() {
+  return pendingGhostPartition().visible;
+}
+
+function applyAllLabel(visibleCount, hiddenCount) {
+  return hiddenCount ? `Apply ${visibleCount} · ${hiddenCount} hidden` : 'Apply all';
+}
+
+/** Review = step through each visible pending ghost (open its chip popover). */
+function reviewNextGhost() {
+  const pending = pendingVisibleGhosts();
+  if (!pending.length) {
+    closePop();
+    showToast('<b>Nothing to review.</b> No pending proposals in this filter.');
+    return;
+  }
+  const current = popFor
+    ? pending.findIndex((ghost) => ghost.id === popFor || ghost.overItem === popFor)
+    : -1;
+  const ghost = pending[current >= 0 ? (current + 1) % pending.length : 0];
+  const chipId = ghost.overItem || ghost.id;
+  const chip = nodes.get(`chip:${chipId}`) || nodes.get(`due:${ghost.taskId}`);
+  chip?.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  openPop(chipId);
+}
+
+async function dismissAll() {
+  const pending = pendingVisibleGhosts().filter((ghost) => ghost.kind !== 'bedtime');
+  const plans = await Promise.all(
+    pending.map(async (ghost, index) => {
+      await wait(index * CAL.applyAllStagger);
+      return dismiss(ghost.id, { quiet: true });
+    })
+  );
+  const done = plans.filter(Boolean);
+  if (done.length) {
+    showToast(
+      `<b>${done.length} proposal${done.length === 1 ? '' : 's'} dismissed.</b> Nothing written.`
+    );
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -258,21 +347,17 @@ function mount() {
   filterState = readFilterState(input?.hub || 'life');
   if (model.tray) {
     const tray = el('div', 'cal__tray', undefined, section, { 'data-part': 'tray' });
-    el('span', 'cal-av', AGENT_INITIAL[model.tray.agent] || 'H', tray, { 'aria-hidden': 'true' });
+    tray.append(agentAvatarNode(model.tray.agent));
     el('span', '', `<b>${model.tray.headline}</b> <span class="cal__tray-detail">· ${model.tray.detail}</span>`, tray);
     el('span', 'cal__spacer', undefined, tray);
-    const visibleGhosts = model.ghosts.filter(
-      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
-    );
-    const hiddenGhosts = model.ghosts.filter(
-      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
-    ).length;
-    const applyLabel = hiddenGhosts
-      ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
-      : 'Apply all';
-    el('button', 'btn btn--primary', applyLabel, tray, { type: 'button', 'data-action': 'apply-all', 'data-part': 'apply-all' });
-    el('button', 'btn btn--secondary', 'Review', tray, { type: 'button' });
-    el('button', 'btn btn--ghost', 'Dismiss', tray, { type: 'button' });
+    const { visible, hidden } = pendingGhostPartition();
+    el('button', 'btn btn--primary', applyAllLabel(visible.length, hidden), tray, {
+      type: 'button',
+      'data-action': 'apply-all',
+      'data-part': 'apply-all'
+    });
+    el('button', 'btn btn--secondary', 'Review', tray, { type: 'button', 'data-action': 'review', 'data-part': 'review' });
+    el('button', 'btn btn--ghost', 'Dismiss', tray, { type: 'button', 'data-action': 'dismiss-all', 'data-part': 'dismiss-all' });
   }
 
   const strip = el('div', 'cal-strip', undefined, section, { 'data-part': 'day-strip', role: 'group', 'aria-label': 'Day' });
@@ -355,15 +440,8 @@ function paintTidelineSources(host = nodes.get('__sources')) {
       paintTidelineSources(host);
       const apply = host.parentElement?.querySelector?.('[data-part="apply-all"]');
       if (apply) {
-        const visibleGhosts = model.ghosts.filter(
-          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
-        );
-        const hiddenGhosts = model.ghosts.filter(
-          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
-        ).length;
-        apply.textContent = hiddenGhosts
-          ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
-          : 'Apply all';
+        const { visible, hidden } = pendingGhostPartition();
+        apply.textContent = applyAllLabel(visible.length, hidden);
       }
     }
   });
@@ -831,9 +909,9 @@ async function accept(ghostId, { quiet = false } = {}) {
   return { receipt };
 }
 
-async function dismiss(ghostId) {
+async function dismiss(ghostId, { quiet = false } = {}) {
   const ghost = pendingGhost(ghostId);
-  if (!ghost) return;
+  if (!ghost) return null;
   state.busy.add(ghostId);
   armButtons(ghostId, true);
   let result;
@@ -842,14 +920,14 @@ async function dismiss(ghostId) {
   } catch (error) {
     state.busy.delete(ghostId);
     armButtons(ghostId, false);
-    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
-    return;
+    if (!quiet) showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+    return null;
   }
   state.busy.delete(ghostId);
   if (result.status !== 200 || result.payload?.ok === false) {
     armButtons(ghostId, false);
-    showToast(`<b>Not saved.</b> ${escapeHtml(errorText(result.payload, 'Could not dismiss that change.'))}`);
-    return;
+    if (!quiet) showToast(`<b>Not saved.</b> ${escapeHtml(errorText(result.payload, 'Could not dismiss that change.'))}`);
+    return null;
   }
   state.settled.set(ghostId, { outcome: 'dismissed', ghost });
   paintDismissed(ghost);
@@ -858,18 +936,14 @@ async function dismiss(ghostId) {
   const note = ghost.overItem && ghost.agent === 'sara'
     ? 'Sara notes the “no”, so she asks less often.'
     : `${who} notes the “no”, so it asks less often.`;
-  showToast(`<b>${escapeHtml(receipt)}</b> ${note}`);
+  if (!quiet) showToast(`<b>${escapeHtml(receipt)}</b> ${note}`);
   const live = nodes.get('__live');
   if (live) live.textContent = receipt;
+  return { receipt };
 }
 
 async function applyAll() {
-  const pending = model.ghosts.filter(
-    (ghost) =>
-      !state.settled.has(ghost.id) &&
-      ghost.settled !== 'accepted' &&
-      isItemVisible(ghost.chip || ghost, filterState)
-  );
+  const pending = pendingVisibleGhosts();
   const plans = await Promise.all(pending.map(async (ghost, index) => {
     await wait(index * CAL.applyAllStagger);
     return accept(ghost.id, { quiet: true });
@@ -970,6 +1044,14 @@ function wire(section) {
     if (!target.closest?.('[data-part="chip-popover"]')) closePop();
     if (target.closest?.('[data-action="apply-all"]')) {
       void applyAll();
+      return;
+    }
+    if (target.closest?.('[data-action="review"]')) {
+      reviewNextGhost();
+      return;
+    }
+    if (target.closest?.('[data-action="dismiss-all"]')) {
+      void dismissAll();
       return;
     }
     const day = target.closest?.('[data-day]');
