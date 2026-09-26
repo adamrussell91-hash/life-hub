@@ -75,6 +75,8 @@ export function createLedgerItemRepository(deps = {}) {
       sources: validated.sources,
       task_ref: validated.task_ref,
       comm_ref: validated.comm_ref,
+      due: validated.due ?? null,
+      checked_in_ref: null,
       author: validated.author,
       status: 'open',
       source_key: validated.source_key,
