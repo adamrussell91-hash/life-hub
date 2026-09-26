@@ -51,6 +51,12 @@
 .goal-page__meta { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); color: var(--muted); }
 .goal-page__pair { display: grid; grid-template-columns: 1.15fr 1fr; gap: var(--space-4); }
 .goal-card { padding: var(--space-5) var(--space-6); }
+.runway, .goal-card, .goals-new {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+}
 .goal-card__eyebrow { font-size: var(--text-2xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-2); }
 .goal-field { width: 100%; font: inherit; color: inherit; background: rgba(255, 255, 255, 0.55); border: 1px solid var(--line); border-radius: var(--radius-xs); padding: var(--space-1) var(--space-2); }
 textarea.goal-field { resize: vertical; min-height: 3.5rem; }
