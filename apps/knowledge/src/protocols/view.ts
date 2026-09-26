@@ -23,11 +23,13 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 /** Named lighting stages across the transcript so far, opening to closing. */
 export const LIGHTING_STAGES = ["sunrise", "morning", "golden-hour", "blue-hour", "just-after-dusk"] as const;
+export const FATES_LIGHTING_STAGES = ["sunrise", "early-morning", "late-morning", "midday", "early-afternoon", "late-afternoon", "sunset", "blue-hour", "night"] as const;
 export const CARTOGRAPHERS_LIGHTING_STAGES = ["dawn", "sunrise", "midday", "golden-hour", "twilight", "night"] as const;
 export const MIRROR_LIGHTING_STAGES = ["sunrise", "morning", "midday", "golden-hour", "twilight", "night"] as const;
 export const WITNESS_LIGHTING_STAGES = ["sunrise", "morning", "midday", "golden-hour", "night"] as const;
 export const TRIBUNAL_LIGHTING_STAGES = ["midday", "golden-hour", "blue-hour"] as const;
 const LIGHTING_BY_PROTOCOL: Record<string, readonly string[]> = {
+  fates: FATES_LIGHTING_STAGES,
   cartographers: CARTOGRAPHERS_LIGHTING_STAGES,
   mirror: MIRROR_LIGHTING_STAGES,
   witness: WITNESS_LIGHTING_STAGES,
