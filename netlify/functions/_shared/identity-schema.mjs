@@ -152,7 +152,7 @@ export function parseOrganisationRecord(raw) {
   if (!ORGANISATION_LIFECYCLE_STATUSES.has(raw.lifecycle_status)) return null;
   if (!isNullableString(raw.retention_reason)) return null;
   if (!isNullableString(raw.retention_review_at)) return null;
-  // logo_key may be absent on pre-crest records — treat as null (people-redesign Phase 1).
+  // logo_key may be absent on pre-crest records — treat as null (People + Orgs crest).
   if (raw.logo_key !== undefined && !isNullableString(raw.logo_key)) return null;
   if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
   return { ...raw, aliases: [...raw.aliases], logo_key: raw.logo_key ?? null };

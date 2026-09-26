@@ -133,8 +133,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
     shell.pageHeader.classList.remove('page-header--people-redesign');
     if (route.name === 'organisations') {
-      renderPageHeader(shell, viewChrome('organisations'));
-      renderOrganisationsView(shell.canvas);
+      // Page owns its single Organisations h1 (People pattern).
+      renderPageHeader(shell, { eyebrow: '', title: '' });
+      await renderOrganisationsView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'relationships') {
@@ -257,11 +260,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'organisation') {
-      renderPageHeader(shell, { eyebrow: 'Organisations', title: 'Loading…' });
+      // Detail page owns its org title h1.
+      renderPageHeader(shell, { eyebrow: '', title: '' });
       await renderOrganisationPage(shell.canvas, route.id, {
-        onTitleReady: (title) => {
-          if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Organisations', title });
+        onTitleReady: () => {
+          /* title rendered in-page */
         },
         isCurrent: () => generation === routeGeneration
       });

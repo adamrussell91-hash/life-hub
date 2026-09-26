@@ -9,7 +9,7 @@
       "sort_name": "Example, Seth",
       "aliases": [],
       "lifecycle_status": "active",
-      "is_self": false,
+      "is_self": true,
       "retention_reason": null,
       "retention_review_at": null,
       "created_at": "2023-01-01T00:00:00.000Z",
