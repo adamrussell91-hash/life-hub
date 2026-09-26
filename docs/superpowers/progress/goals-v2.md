@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 37/46 (80%)**
+**Progress: 40/46 (87%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -77,9 +77,9 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M9: Weekly review
 
-- [ ] **G-38** Goals stage — —
-- [ ] **G-39** Tasks completed with no goal — —
-- [ ] **G-40** Pending changes / confirm — —
+- [x] **G-38** Goals stage — — — `1a4e2865`
+- [x] **G-39** Tasks completed with no goal — — — `1a4e2865`
+- [x] **G-40** Pending changes / confirm — — — `1a4e2865`
 
 ## M10: Motion, accessibility and polish
 
