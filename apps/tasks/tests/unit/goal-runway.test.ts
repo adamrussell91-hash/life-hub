@@ -1,11 +1,16 @@
 // apps/tasks/tests/unit/goal-runway.test.ts
 import { describe, expect, it } from 'vitest';
-import { buildRunway, cellState, currentTerm, flattenTerms, sydneyDateKey, termWeeks, weekCount } from '@/domain/goal-runway';
+import {
+  buildRunway, buildYearRunway, cellState, currentTerm, flattenTerms, goalYearSpan,
+  sydneyDateKey, termWeeks, weekCount, yearWeeks
+} from '@/domain/goal-runway';
 import type { SchoolTerm } from '@/domain/school-time';
 import { goal, task } from './goal-fixtures';
 
 const T4: SchoolTerm = { term: 4, starts_on: '2026-10-12', ends_on: '2026-12-18' };
 const T3: SchoolTerm = { term: 3, starts_on: '2026-07-20', ends_on: '2026-09-25' };
+const T2: SchoolTerm = { term: 2, starts_on: '2026-04-27', ends_on: '2026-07-03' };
+const T1: SchoolTerm = { term: 1, starts_on: '2026-01-28', ends_on: '2026-04-09' };
 
 describe('goal runway', () => {
   it('flattens hub prefs terms in date order and picks the current or next term', () => {
@@ -47,22 +52,65 @@ describe('goal runway', () => {
   });
 
   it('builds lanes in sphere order with slots, rows, parked goals and a week summary', () => {
+    const term4 = { year: 2026, term: 4 as const };
     const goals = [
-      goal({ id: 'w1', title: 'Marking', sphere: 'work', lead_measure: { label: '2 blocks', per_week: 1 } }),
-      goal({ id: 'l1', title: 'Recomp', sphere: 'life', lead_measure: { label: '4 sessions', per_week: 1 },
+      goal({ id: 'w1', title: 'Marking', sphere: 'work', term: term4, lead_measure: { label: '2 blocks', per_week: 1 } }),
+      goal({ id: 'l1', title: 'Recomp', sphere: 'life', term: term4, lead_measure: { label: '4 sessions', per_week: 1 },
         milestones: [{ id: 'm', title: 'DEXA', due_date: '2026-11-05', status: 'open' }] }),
-      goal({ id: 'l2', title: 'Parked one', sphere: 'life', status: 'parked' })
+      goal({ id: 'l2', title: 'Parked one', sphere: 'life', status: 'parked', term: term4 }),
+      goal({ id: 'l3', title: 'Always on', sphere: 'life', term: null, lead_measure: { label: 'walk', per_week: 1 } })
     ];
     const tasks = [task({ id: 't', title: 'Mark 8', parent_goal_id: 'w1', status: 'done', completed_at: '2026-11-03T01:00:00.000Z' })];
     const runway = buildRunway({ goals, projects: [], tasks, term: T4, today: '2026-11-04', crunchWeeks: ['2026-11-16'], proposedRest: { l1: ['2026-11-23'] } });
     expect(runway.lanes.map((l) => l.sphere)).toEqual(['life', 'work', 'professional']);
     expect(runway.lanes[0]!.slotsUsed).toBe(1);
+    expect(runway.lanes[0]!.ongoing.map((r) => r.goal.id)).toEqual(['l3']);
     expect(runway.lanes[0]!.parked.map((g) => g.id)).toEqual(['l2']);
     const recomp = runway.lanes[0]!.rows[0]!;
     expect(recomp.cells.find((c) => c.monday === '2026-11-02')).toMatchObject({ milestone: true, isNow: true, state: 'empty' });
     expect(recomp.cells.find((c) => c.monday === '2026-11-23')?.proposed).toBe(true);
     expect(runway.weeks.find((w) => w.monday === '2026-11-16')?.isCrunch).toBe(true);
-    expect(runway.weekSummary).toEqual({ done: 1, total: 2 });
+    expect(runway.weekSummary).toEqual({ done: 1, total: 3 });
     expect(runway.nowWeek).toBe(4);
+  });
+
+  it('lane cap ignores Ongoing goals', () => {
+    const term4 = { year: 2026, term: 4 as const };
+    const goals = [
+      goal({ id: 'a', title: 'A', sphere: 'work', term: term4 }),
+      goal({ id: 'b', title: 'B', sphere: 'work', term: term4 }),
+      goal({ id: 'c', title: 'C', sphere: 'work', term: term4 }),
+      goal({ id: 'o', title: 'Ongoing', sphere: 'work', term: null })
+    ];
+    const runway = buildRunway({ goals, projects: [], tasks: [], term: T4, today: '2026-11-04' });
+    expect(runway.lanes[1]!.slotsUsed).toBe(3);
+    expect(runway.lanes[1]!.ongoing).toHaveLength(1);
+  });
+
+  it('year weeks cover all terms with holiday gaps and carried goals span continuously', () => {
+    const terms = [T1, T2, T3, T4];
+    const weeks = yearWeeks(terms, '2026-11-04');
+    expect(weeks.length).toBeGreaterThan(30);
+    expect(weeks.some((w) => w.holiday)).toBe(true);
+    expect(weeks.some((w) => w.label.startsWith('T4'))).toBe(true);
+    const carried = goal({
+      id: 'c',
+      title: 'Carry',
+      sphere: 'life',
+      term: { year: 2026, term: 4 },
+      term_history: [{ year: 2026, term: 3, outcome: 'carried', at: '2026-09-26T00:00:00.000Z' }]
+    });
+    expect(goalYearSpan(carried, terms)).toEqual({ from: T3.starts_on, to: T4.ends_on });
+    const year = buildYearRunway({
+      goals: [carried],
+      projects: [],
+      tasks: [],
+      terms,
+      year: '2026',
+      today: '2026-11-04'
+    });
+    expect(year?.weeks.length).toBe(weeks.length);
+    expect(year?.lanes[0]!.rows[0]!.span).toEqual({ from: T3.starts_on, to: T4.ends_on });
+    expect(year?.lanes[0]!.rows[0]!.cells.some((c) => c.state === 'holiday')).toBe(true);
   });
 });

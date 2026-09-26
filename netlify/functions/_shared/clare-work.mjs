@@ -291,7 +291,7 @@ export function clareWorkSchemas() {
       follow_up_at: { type: 'string' },
       waiting_on: { type: 'string' }
     }),
-    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → someday → build → confirm. confirm:true builds a stored Confirm proposal — it does not persist writes until Adam confirms via /api/chat/confirm.', {
+    tool('weekly_review', 'Create or advance Clare weekly review stages. Deterministic capture → calendars → waiting → projects → goals → someday → build → confirm. confirm:true builds a stored Confirm proposal — it does not persist writes until Adam confirms via /api/chat/confirm.', {
       review_id: { type: 'string', description: 'Stable weekly review workflow id. Resume with the same id.' },
       state: { type: 'object', description: 'Optional in-memory state. Prefer review_id so the store is the source of truth.' },
       dump_text: { type: 'string', description: 'Capture-stage brain dump text.' },
@@ -327,6 +327,11 @@ export function clareWorkSchemas() {
           },
           required: ['action']
         }
+      },
+      orphan_links: {
+        type: 'object',
+        description: 'G-39 Map of completed task_id → goal_id (or null for “No goal, that\'s fine”). Goes through pending-changes on confirm.',
+        additionalProperties: { type: ['string', 'null'] }
       },
       selected_changes: {
         type: 'array',
@@ -1803,6 +1808,24 @@ function writesFromWeeklyPendingChanges(selected, state, tasks, stamp) {
       ));
       continue;
     }
+    if (change.kind === 'goal_link') {
+      const existing = findTask(tasks, change.task_id);
+      if (!existing) return { ok: false, error: 'goal_link_task_not_found', detail: change.task_id };
+      const goalId = String(change.destination ?? '').trim();
+      if (!goalId) return { ok: false, error: 'goal_link_missing_goal', detail: change.id };
+      const record = buildTaskRecord({ parent_goal_id: goalId }, existing, stamp);
+      writes.push(writeEntry(
+        `tasks:task:${record.id}`,
+        'overwrite',
+        record,
+        `weekly review link → goal ${goalId} — ${existing.title}`
+      ));
+      continue;
+    }
+    if (change.kind === 'goal_link_dismiss') {
+      // No task write — Adam confirmed "no goal, that's fine" for this week.
+      continue;
+    }
   }
 
   const scheduleIds = new Set(selected.filter((c) => c.kind === 'schedule_block').map((c) => c.id));
@@ -2065,6 +2088,10 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       someday_decisions: {
         ...(state.someday_decisions && typeof state.someday_decisions === 'object' ? state.someday_decisions : {}),
         ...(input.someday_decisions && typeof input.someday_decisions === 'object' ? input.someday_decisions : {})
+      },
+      orphan_links: {
+        ...(state.orphan_links && typeof state.orphan_links === 'object' ? state.orphan_links : {}),
+        ...(input.orphan_links && typeof input.orphan_links === 'object' ? input.orphan_links : {})
       }
     };
 
@@ -2086,6 +2113,8 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         next_action_titles: state.next_action_titles,
         waiting_decisions: state.waiting_decisions,
         someday_decisions: state.someday_decisions,
+        orphan_links: state.orphan_links,
+        goals: ctx.goals ?? input.goals ?? [],
         past_notes: input.past_notes
           ?? (state.current_stage === 'past_calendar'
             ? calendarNotesFromCtx({ lessons, workBlocks, tasks, todayKey, past: true })
@@ -2131,7 +2160,8 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
       const built = writesFromWeeklyPendingChanges(selected, state, tasks, stamp);
       if (!built.ok) return deny(built.error, { detail: built.detail ?? null });
       const writes = built.writes;
-      if (!writes.length) {
+      const onlyDismissals = selected.length > 0 && selected.every((c) => c.kind === 'goal_link_dismiss');
+      if (!writes.length && !onlyDismissals) {
         return deny('no_selected_weekly_changes');
       }
       // Do NOT set awaiting_confirm here. That status means a durable pending action
@@ -2143,6 +2173,21 @@ export async function executeClareWork(name, input = {}, ctx = {}) {
         pending_action_id: null,
         updated_at: stamp
       });
+      if (onlyDismissals && !writes.length) {
+        state = await saveWorkflowState(tasksStore, reviewId, {
+          ...state,
+          status: 'complete',
+          updated_at: stamp
+        });
+        return ok({
+          stages: WEEKLY_REVIEW_STAGES,
+          state,
+          workflow_state_key: workflowStateKey(reviewId),
+          workflow_kind: 'weekly_review',
+          workflow_id: reviewId,
+          dismissed_orphans_only: true
+        });
+      }
       const proposal = propose(
         `Weekly review confirm (${writes.length} change${writes.length === 1 ? '' : 's'})`,
         writes,

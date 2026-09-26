@@ -205,7 +205,7 @@ async function bootApp(root: HTMLElement): Promise<void> {
       const goal = await tasksApi.getGoal(goalPage.id).catch(() => null);
       renderPageHeader(shell, { eyebrow: 'Goals', title: goal?.title ?? 'Goal' });
       try {
-        await renderGoalPage(shell.canvas, goalPage.id);
+        await renderGoalPage(shell.canvas, goalPage.id, undefined, undefined, { header: shell.pageHeader });
       } catch (err) {
         renderLoadError(shell.canvas, err, () => void paint({ force: true }), 'Could not open goal');
       }

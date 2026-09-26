@@ -11,6 +11,8 @@ vi.mock('@/services/client-api', () => ({
   tasksApi: {
     listTasks: vi.fn(),
     listProjects: vi.fn(),
+    listGoals: vi.fn(),
+    getHubPrefs: vi.fn(),
     getTask: vi.fn(),
     createTask: vi.fn(),
     updateTask: vi.fn(),
@@ -108,8 +110,11 @@ function goal(partial: Partial<Goal> & Pick<Goal, 'id' | 'title'>): Goal {
 beforeEach(() => {
   resetSomedayViewFilters();
   document.querySelectorAll('.hub-menu').forEach((node) => node.remove());
+  document.querySelectorAll('.promote-goal-panel').forEach((node) => node.remove());
   vi.mocked(tasksApi.listTasks).mockReset();
   vi.mocked(tasksApi.listProjects).mockReset();
+  vi.mocked(tasksApi.listGoals).mockReset();
+  vi.mocked(tasksApi.getHubPrefs).mockReset();
   vi.mocked(tasksApi.getTask).mockReset();
   vi.mocked(tasksApi.createTask).mockReset();
   vi.mocked(tasksApi.updateTask).mockReset();
@@ -117,6 +122,8 @@ beforeEach(() => {
   vi.mocked(tasksApi.createProject).mockReset();
   vi.mocked(tasksApi.updateProject).mockReset();
   vi.mocked(tasksApi.createGoal).mockReset();
+  vi.mocked(tasksApi.listGoals).mockResolvedValue([]);
+  vi.mocked(tasksApi.getHubPrefs).mockResolvedValue({ school_terms: [] } as never);
 });
 
 describe('renderSomedayView', () => {
@@ -302,6 +309,15 @@ describe('renderSomedayView', () => {
       (btn) => btn.textContent === 'Promote to goal'
     );
     promoteGoalButton!.click();
+
+    await vi.waitFor(() => {
+      expect(document.querySelector('.promote-goal-panel')).toBeTruthy();
+    });
+    const save = [...document.querySelectorAll<HTMLButtonElement>('.promote-goal-panel button')].find(
+      (btn) => btn.textContent === 'Create goal'
+    );
+    expect(save).toBeTruthy();
+    save!.click();
 
     await vi.waitFor(() => {
       expect(tasksApi.createGoal).toHaveBeenCalledWith(

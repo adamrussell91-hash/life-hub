@@ -35,6 +35,7 @@ import { createPlusAdd } from '@/views/plus-add';
 import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import type { TaskDomain } from '@/schemas/task';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { openPromoteToGoalPopover } from '@/views/promote-to-goal';
 
 let somedayDomain: TaskDomain | 'all' = 'all';
 let somedayKind: SomedayKindFilter = 'all';
@@ -237,15 +238,10 @@ function renderSomedayCard(
       id: 'goal',
       label: 'Promote to goal',
       onSelect: () => {
-        void tasksApi
-          .createGoal({ title: task.title, description: task.description, parent_someday_id: task.id })
-          .then((goal) =>
-            tasksApi.updateTask(task.id, {
-              linked_goal_ids: [...somedayLinkedGoalIds(task), goal.id]
-            })
-          )
-          .then((next) => handlers.onChange(next))
-          .catch((err) => window.alert(errorMessage(err)));
+        const menuBtn = document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : document.body;
+        void openPromoteToGoalPopover(menuBtn, task, (next) => handlers.onChange(next));
       }
     },
     {
@@ -272,8 +268,14 @@ function renderSomedayCard(
   const linkedProjects = somedayLinkedProjectIds(task).length;
   const linkedGoals = somedayLinkedGoalIds(task).length;
   if (linkedProjects) metaParts.push(`${linkedProjects} linked project${linkedProjects === 1 ? '' : 's'}`);
-  if (linkedGoals) metaParts.push(`${linkedGoals} linked goal${linkedGoals === 1 ? '' : 's'}`);
   if (metaParts.length) card.append(el('p', 'hierarchy-meta', metaParts.join(' · ')));
+  if (linkedGoals) {
+    const grownRow = el('p', 'someday-card__grown-row');
+    const grown = el('a', 'someday-card__grown', `${linkedGoals} goal${linkedGoals === 1 ? '' : 's'} grown`) as HTMLAnchorElement;
+    grown.href = linkedGoals === 1 ? `#/goal/${somedayLinkedGoalIds(task)[0]}` : '#/goals';
+    grownRow.append(grown);
+    card.append(grownRow);
+  }
 
   const chipsRow = el('div', 'someday-card__chips');
   const maturity = task.maturity ?? null;

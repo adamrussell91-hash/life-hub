@@ -98,16 +98,24 @@ export type LifeCoverageArea = {
   label: string;
   count: number;
   avgMaturity: number;
+  /** Active Life goals tagged with this life_area (G-28). */
+  goalCount: number;
 };
 
 /** One row per fixed life area, in LIFE_AREAS order, including zero-count (unlit) areas. */
-export function computeLifeCoverage(somedayItems: Task[]): LifeCoverageArea[] {
+export function computeLifeCoverage(
+  somedayItems: Task[],
+  goals: Array<{ status?: string; sphere?: string; life_area?: string | null }> = []
+): LifeCoverageArea[] {
   return LIFE_AREAS.map((area) => {
     const items = somedayItems.filter((task) => task.life_area === area.id);
     const avgMaturity = items.length
       ? items.reduce((sum, task) => sum + maturityWeight(task.maturity), 0) / items.length
       : 0;
-    return { id: area.id, label: area.label, count: items.length, avgMaturity };
+    const goalCount = goals.filter(
+      (g) => g.status === 'active' && g.sphere === 'life' && g.life_area === area.id
+    ).length;
+    return { id: area.id, label: area.label, count: items.length, avgMaturity, goalCount };
   });
 }
 

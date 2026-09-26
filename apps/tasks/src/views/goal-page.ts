@@ -1,4 +1,4 @@
-import { normalizeGoal, type Goal } from '@/schemas/goal';
+import { normalizeGoal, type Goal, type GoalCurrentSource, type GoalLifeArea, type GoalSphere, type GoalTerm } from '@/schemas/goal';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { SchoolTerm } from '@/domain/school-time';
@@ -11,7 +11,22 @@ import { renderGoalFrame, type GoalPatch } from '@/views/goal-frame';
 import { startFocusStrip } from '@/views/focus-strip';
 import { directTasks, hostedProjects, hostedTasks, isOpenTask, projectProgress, SPHERE_DOMAIN, SPHERE_LABEL } from '@/domain/goal-hosting';
 import { cellState, currentTerm, flattenTerms, sydneyToday, termWeeks, weekCount } from '@/domain/goal-runway';
+import { buildGoalChain } from '@/domain/goal-chain';
+import { takeGoalMorph } from '@/domain/goal-morph';
+import { LIFE_AREAS } from '@/domain/someday';
+import { DEFAULT_PLANNING_DIRECTION } from '@/schemas/planning-direction';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { enhanceInlineEdit, createTagList } from '../../design-kit/js/hub-inline-edit.js';
+import {
+  createMorphingClosedFieldPopover,
+  createMorphingNotePopover,
+  createMorphingValuesPopover
+} from '../../design-kit/js/morphing-popover.js';
+import { offerTimedUndo } from '../../design-kit/js/hub-feedback.js';
+import { createDisclosureCard } from '../../design-kit/js/hub-surfaces.js';
+import { morphFromRect, runMorphTransform } from '../../design-kit/js/morphing-dialog.js';
+import { renderCardMenu } from '@/views/card-menu';
+import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { mountHammondPanel } from '@/views/hammond-goal';
 
 const STRUCTURES: Array<{ id: Goal['structure']; label: string }> = [
@@ -27,26 +42,45 @@ const STATUSES: Array<{ id: Goal['status']; label: string }> = [
   { id: 'achieved', label: 'Achieved' },
   { id: 'dropped', label: 'Dropped' }
 ];
+const SPHERE_OPTIONS = (Object.keys(SPHERE_LABEL) as GoalSphere[]).map((id) => ({
+  value: id,
+  label: SPHERE_LABEL[id]
+}));
 
-export type GoalPageState = { goal: Goal; projects: Project[]; tasks: Task[]; terms: SchoolTerm[]; today: string };
+export type GoalPageState = {
+  goal: Goal;
+  projects: Project[];
+  tasks: Task[];
+  terms: SchoolTerm[];
+  today: string;
+  direction: import('@/schemas/planning-direction').PlanningDirection;
+};
 /** Hook for Hammond's column. Defaults to the live panel. */
 export type HammondMount = (host: HTMLElement, state: GoalPageState, reload: () => void) => void;
+export type GoalPageOptions = { header?: HTMLElement };
 
 export async function renderGoalPage(
   canvas: HTMLElement,
   goalId: string,
   today = sydneyToday(),
-  mountHammond: HammondMount = (host, state, reload) => mountHammondPanel(host, state.goal, reload)
+  mountHammond: HammondMount = (host, state, reload) => mountHammondPanel(host, state.goal, reload),
+  options: GoalPageOptions = {}
 ): Promise<void> {
   showViewLoading(canvas, 'Loading goal…', '.goal-page');
   try {
-    const [goal, projects, tasks, prefs] = await Promise.all([
+    const [goal, projects, tasks, prefs, direction] = await Promise.all([
       tasksApi.getGoal(goalId),
       tasksApi.listProjects(),
       tasksApi.listTasks(),
-      tasksApi.getHubPrefs()
+      tasksApi.getHubPrefs(),
+      tasksApi.getPlanningDirection().catch(() => DEFAULT_PLANNING_DIRECTION)
     ]);
-    paint(canvas, { goal, projects, tasks, terms: flattenTerms(prefs), today }, mountHammond);
+    paint(
+      canvas,
+      { goal, projects, tasks, terms: flattenTerms(prefs), today, direction },
+      mountHammond,
+      options
+    );
   } catch (err) {
     canvas.replaceChildren(el('p', 'empty-state', errorMessage(err, 'Could not load this goal.')));
   }
@@ -60,35 +94,259 @@ function card(title: string, className = 'glass-tile goal-card'): { root: HTMLEl
   return { root, head };
 }
 
-function paint(canvas: HTMLElement, state: GoalPageState, mountHammond: HammondMount): void {
-  const { goal, projects, tasks, terms, today } = state;
-  const reload = () => void renderGoalPage(canvas, goal.id, today, mountHammond);
+function closedChip(spec: {
+  title: string;
+  value: string;
+  label: string;
+  choices: Array<{ value: string; label: string }>;
+  onSave: (value: string) => void;
+}): HTMLElement {
+  const trigger = el('button', 'hub-chip morphing-popover__trigger', spec.label) as HTMLButtonElement;
+  trigger.type = 'button';
+  trigger.dataset.chip = spec.title.toLowerCase().replace(/\s+/g, '-');
+  const popover = createMorphingClosedFieldPopover({
+    root: document,
+    trigger,
+    title: spec.title,
+    supporting: 'Closed list. Save writes it.',
+    options: spec.choices,
+    value: spec.value,
+    onSave(value) {
+      trigger.textContent = spec.choices.find((c) => c.value === value)?.label ?? value;
+      spec.onSave(value);
+    }
+  });
+  return popover.el;
+}
+
+function termValue(goal: Goal): string {
+  return goal.term ? `${goal.term.year}-${goal.term.term}` : 'ongoing';
+}
+
+function termChoices(today: string, terms: SchoolTerm[]): Array<{ value: string; label: string }> {
+  const year = Number(today.slice(0, 4));
+  const years = new Set<number>([year]);
+  for (const t of terms) years.add(Number(t.starts_on.slice(0, 4)));
+  const choices: Array<{ value: string; label: string }> = [{ value: 'ongoing', label: 'Ongoing' }];
+  for (const y of [...years].sort()) {
+    for (const n of [1, 2, 3, 4] as const) {
+      choices.push({ value: `${y}-${n}`, label: `${y} · Term ${n}` });
+    }
+  }
+  return choices;
+}
+
+function parseTermValue(value: string): GoalTerm | null {
+  if (value === 'ongoing') return null;
+  const match = /^(\d{4})-([1-4])$/.exec(value);
+  if (!match) return null;
+  return { year: Number(match[1]), term: Number(match[2]) as 1 | 2 | 3 | 4 };
+}
+
+function descriptionPreview(text: string): string {
+  const lines = text.trim().split(/\n+/).filter(Boolean);
+  if (!lines.length) return 'Add a description';
+  return lines.slice(0, 2).join(' · ');
+}
+
+function paint(
+  canvas: HTMLElement,
+  state: GoalPageState,
+  mountHammond: HammondMount,
+  options: GoalPageOptions = {}
+): void {
+  const { goal, projects, tasks, terms, today, direction } = state;
+  const reload = () => void renderGoalPage(canvas, goal.id, today, mountHammond, options);
   const save = (patch: GoalPatch | Partial<Goal>) =>
     tasksApi
       .updateGoal(goal.id, patch)
-      .then((next) => paint(canvas, { ...state, goal: normalizeGoal(next) }, mountHammond))
+      .then((next) => paint(canvas, { ...state, goal: normalizeGoal(next) }, mountHammond, options))
       .catch((err) => window.alert(errorMessage(err)));
+
+  // G-06: title in the page header is editable inline.
+  const headerTitle =
+    options.header?.querySelector<HTMLElement>('.page-header__title') ??
+    options.header?.querySelector<HTMLElement>('h1');
+  if (headerTitle) {
+    headerTitle.textContent = goal.title;
+    headerTitle.setAttribute('aria-label', 'Goal title');
+    headerTitle.setAttribute('data-hub-morph', 'title');
+    enhanceInlineEdit(headerTitle, {
+      onCommit: (value) => {
+        const next = value.trim();
+        if (!next || next === goal.title) return;
+        void save({ title: next });
+      }
+    });
+  }
 
   canvas.replaceChildren();
   const hosted = hostedTasks(goal, tasks, projects);
   const dream = goal.parent_someday_id ? tasks.find((t) => t.id === goal.parent_someday_id) : undefined;
 
+  // G-21 chain breadcrumb
+  const chain = el('nav', 'goal-page__chain');
+  chain.setAttribute('aria-label', 'Goal chain');
+  const segments = buildGoalChain({ goal, projects, tasks, direction: direction ?? DEFAULT_PLANNING_DIRECTION });
+  segments.forEach((seg, i) => {
+    if (i > 0) chain.append(el('span', 'goal-page__chain-sep', '→'));
+    if (seg.href && !seg.muted) {
+      const link = el('a', 'goal-page__chain-link', seg.label) as HTMLAnchorElement;
+      link.href = seg.href;
+      chain.append(link);
+    } else {
+      chain.append(el('span', `goal-page__chain-link${seg.muted ? ' is-muted' : ''}`, seg.label));
+    }
+  });
+
   const meta = el('div', 'goal-page__meta');
-  const line = [SPHERE_LABEL[goal.sphere], dream ? `From ✦ ${dream.title}` : null, goal.due_date ? `due ${formatDisplayDate(goal.due_date)}` : null]
-    .filter(Boolean)
-    .join(' · ');
-  const metaActions = el('div', 'row');
+  const chips = el('div', 'goal-page__chips row');
+  chips.append(
+    closedChip({
+      title: 'Sphere',
+      value: goal.sphere,
+      label: SPHERE_LABEL[goal.sphere],
+      choices: SPHERE_OPTIONS,
+      onSave: (value) => void save({ sphere: value as GoalSphere, ...(value !== 'life' ? { life_area: null } : {}) })
+    }),
+    closedChip({
+      title: 'Status',
+      value: goal.status,
+      label: STATUSES.find((s) => s.id === goal.status)?.label ?? goal.status,
+      choices: STATUSES.map((s) => ({ value: s.id, label: s.label })),
+      onSave: (value) => void save({ status: value as Goal['status'] })
+    }),
+    closedChip({
+      title: 'Term',
+      value: termValue(goal),
+      label: goal.term ? `${goal.term.year} · Term ${goal.term.term}` : 'Ongoing',
+      choices: termChoices(today, terms),
+      onSave: (value) => void save({ term: parseTermValue(value) })
+    })
+  );
+  if (goal.sphere === 'life') {
+    chips.append(
+      closedChip({
+        title: 'Life area',
+        value: goal.life_area ?? '',
+        label: LIFE_AREAS.find((a) => a.id === goal.life_area)?.label ?? 'Life area',
+        choices: [{ value: '', label: 'None' }, ...LIFE_AREAS.map((a) => ({ value: a.id, label: a.label }))],
+        onSave: (value) => void save({ life_area: (value || null) as GoalLifeArea | null })
+      }),
+      closedChip({
+        title: 'Signal',
+        value: goal.signal?.row ?? '',
+        label: goal.signal ? `Signal · ${goal.signal.row}` : 'Life Hub signal',
+        choices: [
+          { value: '', label: 'None' },
+          { value: 'weight', label: 'Weight' },
+          { value: 'fat', label: 'Body fat' },
+          { value: 'ratio', label: 'Shoulder:waist' },
+          { value: 'lift', label: 'Lift' }
+        ],
+        onSave: (value) =>
+          void save({
+            signal: value
+              ? { source: 'binding_goal', row: value as 'weight' | 'fat' | 'ratio' | 'lift' }
+              : null
+          })
+      })
+    );
+  }
+
+  const duePopover = createMorphingValuesPopover({
+    root: document,
+    label: goal.due_date ? formatDisplayDate(goal.due_date) : 'Due date',
+    title: 'Due date',
+    supporting: 'dd/mm/yy. Clear the field to remove it.',
+    fields: [{ name: 'due', type: 'date', label: 'Due', value: goal.due_date ?? '' }],
+    submitLabel: 'Save',
+    triggerClass: 'hub-chip morphing-popover__trigger',
+    onSubmit(values) {
+      const next = typeof values.due === 'string' && values.due ? values.due : null;
+      duePopover.setTriggerLabel(next ? formatDisplayDate(next) : 'Due date');
+      void save({ due_date: next });
+    }
+  });
+  duePopover.trigger.dataset.chip = 'due-date';
+  chips.append(duePopover.el);
+
+  const descPreview = el('p', 'goal-page__description', descriptionPreview(goal.description ?? ''));
+  descPreview.dataset.slot = 'description-preview';
+  const descApi = createMorphingNotePopover({
+    root: document,
+    label: 'Edit description',
+    title: 'Description',
+    value: goal.description ?? '',
+    rows: 4,
+    triggerClass: 'btn btn--ghost',
+    onDone(value) {
+      descPreview.textContent = descriptionPreview(value);
+      void save({ description: value });
+    }
+  });
+  const descHost = el('div', 'goal-page__desc');
+  descHost.dataset.slot = 'description';
+  descHost.append(descPreview, descApi.el);
+
+  const tags = createTagList({
+    tags: goal.tags ?? [],
+    addLabel: 'Add tag',
+    onChange: (next) => void save({ tags: next })
+  });
+  tags.el.dataset.slot = 'tags';
+
+  const lifeWall = mountLifeWallEditor({
+    title: goal.title,
+    wall: goal.life_wall,
+    suggest: () => {
+      const end = goal.due_date;
+      const start = goal.created_at.slice(0, 10);
+      return end ? { starts_on: start, ends_on: end } : null;
+    },
+    onCommit: (wall) => void save({ life_wall: wall })
+  });
+  lifeWall.el.dataset.slot = 'life-wall';
+
+  const metaActions = el('div', 'row goal-page__actions');
   const back = el('a', 'btn btn--secondary', '← Runway');
   back.href = '#/goals';
   const focus = el('button', 'btn btn--primary', 'Give it 25 min now');
   focus.type = 'button';
   focus.addEventListener('click', () => startFocusStrip(canvas, { minutes: 25, label: `Focus: ${goal.title}` }));
-  metaActions.append(
-    createHubPills({ label: 'Status', items: STATUSES, value: goal.status, onSelect: (status) => void save({ status }) }),
-    back,
-    focus
-  );
-  meta.append(el('span', '', line), metaActions);
+  const menu = renderCardMenu(`${goal.title} card menu`, [
+    {
+      id: 'delete',
+      label: 'Delete',
+      danger: true,
+      onSelect: () => {
+        const message = `Delete ‘${goal.title}’? Its projects and tasks stay and are unlinked.`;
+        if (!window.confirm(message)) return;
+        offerTimedUndo({
+          message: `Deleting ‘${goal.title}’…`,
+          durationMs: 5000,
+          onUndo: () => undefined,
+          onCommit: () => {
+            void tasksApi.deleteGoal(goal.id).then(() => {
+              location.hash = '#/goals';
+            });
+          }
+        });
+      }
+    }
+  ]);
+  metaActions.append(back, focus, menu);
+
+  const metaLeft = el('div', 'goal-page__meta-left');
+  metaLeft.append(chain);
+  if (dream) {
+    const chip = el('a', 'goal-page__dream-chip', `✦ ${dream.title}`) as HTMLAnchorElement;
+    chip.href = `#/someday`;
+    chip.title = 'Source dream on Someday';
+    metaLeft.append(chip);
+  }
+  metaLeft.append(chips, descHost, tags.el, lifeWall.el);
+  meta.append(metaLeft, metaActions);
 
   const page = el('div', 'goal-page');
   const main = el('div', 'goal-page__main');
@@ -96,11 +354,30 @@ function paint(canvas: HTMLElement, state: GoalPageState, mountHammond: HammondM
   page.append(main, aside);
   canvas.append(meta, page);
 
-  // 1. Structure card + lead measure
+  // G-23 Structure card with morph + Details disclosure for other structures
   const structure = card('Structure');
+  const frameHost = el('div', 'goal-frame-host');
+  frameHost.append(renderGoalFrame(goal, (patch) => void save(patch)));
+  if (goal.structure === 'okr' || goal.structure === 'floor_target_stretch') {
+    frameHost.append(currentSourcePicker(goal, hosted, save));
+  }
+  const details = otherStructureDetails(goal, save);
   structure.root.append(
-    createHubPills({ label: 'Structure', items: STRUCTURES, value: goal.structure, onSelect: (id) => void save({ structure: id }) }),
-    renderGoalFrame(goal, (patch) => void save(patch)),
+    createHubPills({
+      label: 'Structure',
+      items: STRUCTURES,
+      value: goal.structure,
+      onSelect: (id) => {
+        runMorphTransform({
+          from: structure.root,
+          update: () => undefined,
+          to: () => structure.root
+        });
+        void save({ structure: id as Goal['structure'] });
+      }
+    }),
+    frameHost,
+    details,
     leadMeasure(goal, hosted, terms, today, save)
   );
   main.append(structure.root);
@@ -123,6 +400,109 @@ function paint(canvas: HTMLElement, state: GoalPageState, mountHammond: HammondM
   mountTagAnythingSection(tagHost, `tasks:goal:${goal.id}`);
 
   mountHammond(aside, state, reload);
+
+  // G-22 Row → page morph
+  const origin = takeGoalMorph();
+  if (origin && headerTitle) {
+    requestAnimationFrame(() => morphFromRect(origin, headerTitle));
+  }
+}
+
+const CURRENT_SOURCE_LABEL: Record<GoalCurrentSource, string> = {
+  typed: 'Typed',
+  tasks: 'Tasks done',
+  signal: 'Life Hub signal'
+};
+
+function completedHostedCount(hosted: Task[]): number {
+  return hosted.filter((t) => t.status === 'done' || Boolean(t.completed_at)).length;
+}
+
+function currentSourcePicker(goal: Goal, hosted: Task[], save: (p: Partial<Goal>) => void): HTMLElement {
+  const wrap = el('div', 'goal-current-source');
+  wrap.append(el('span', 'goal-frame__label', "Where does ‘current’ come from?"));
+  const source = goal.current_source ?? 'typed';
+  wrap.append(
+    closedChip({
+      title: 'Current source',
+      value: source,
+      label: CURRENT_SOURCE_LABEL[source],
+      choices: (Object.keys(CURRENT_SOURCE_LABEL) as GoalCurrentSource[]).map((id) => ({
+        value: id,
+        label: CURRENT_SOURCE_LABEL[id]
+      })),
+      onSave: (value) => {
+        const next = value as GoalCurrentSource;
+        const patch: Partial<Goal> = { current_source: next };
+        if (next === 'tasks' && (goal.structure === 'floor_target_stretch' || goal.structure === 'okr')) {
+          const n = completedHostedCount(hosted);
+          if (goal.structure === 'floor_target_stretch') {
+            patch.frame = {
+              ...goal.frame,
+              floor_target_stretch: {
+                unit: goal.frame.floor_target_stretch?.unit ?? '',
+                floor: goal.frame.floor_target_stretch?.floor ?? null,
+                target: goal.frame.floor_target_stretch?.target ?? null,
+                stretch: goal.frame.floor_target_stretch?.stretch ?? null,
+                current: n
+              }
+            };
+          }
+        }
+        void save(patch);
+      }
+    })
+  );
+  if (source === 'typed') {
+    wrap.append(el('span', 'meta', 'Typed value stays editable in the fields above.'));
+  } else if (source === 'tasks') {
+    wrap.append(el('span', 'meta', `${completedHostedCount(hosted)} hosted tasks done`));
+  } else {
+    wrap.append(el('span', 'meta', goal.signal ? `Signal: ${goal.signal.row}` : 'Pick a Life Hub signal on this goal (Life only).'));
+  }
+  return wrap;
+}
+
+function otherStructureDetails(goal: Goal, save: (p: GoalPatch) => void): HTMLElement {
+  const others = STRUCTURES.filter((s) => s.id !== goal.structure);
+  const filled = others.filter((s) => structureHasContent(goal, s.id));
+  if (!filled.length) {
+    const empty = el('div', 'goal-details-empty');
+    empty.hidden = true;
+    return empty;
+  }
+  const disc = createDisclosureCard({
+    title: 'Details',
+    meta: `${filled.length} other structure${filled.length === 1 ? '' : 's'} with content`,
+    className: 'goal-details'
+  });
+  for (const s of filled) {
+    const block = el('div', 'goal-details__block');
+    block.append(el('p', 'goal-frame__label', s.label));
+    const preview = el('div', 'goal-details__preview');
+    preview.append(renderGoalFrame({ ...goal, structure: s.id }, save));
+    block.append(preview);
+    disc.body.append(block);
+  }
+  return disc.el;
+}
+
+function structureHasContent(goal: Goal, structure: Goal['structure']): boolean {
+  const f = goal.frame;
+  switch (structure) {
+    case 'woop':
+      return Boolean(f.woop && Object.values(f.woop).some((v) => String(v || '').trim()));
+    case 'smarter':
+      return Boolean(f.smarter && Object.values(f.smarter).some((v) => String(v || '').trim()));
+    case 'okr':
+      return Boolean(f.okr?.objective?.trim() || (f.okr?.key_results?.length ?? 0) > 0);
+    case 'lead_lag':
+      return Boolean(f.lead_lag?.lag?.trim());
+    case 'floor_target_stretch': {
+      const x = f.floor_target_stretch;
+      return Boolean(x && (x.unit?.trim() || x.floor != null || x.target != null || x.stretch != null || x.current != null));
+    }
+  }
 }
 
 function leadMeasure(goal: Goal, hosted: Task[], terms: SchoolTerm[], today: string, save: (p: GoalPatch) => void): HTMLElement {
