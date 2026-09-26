@@ -146,7 +146,19 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 4: Futures
 
-**Status:** pending
+**Status:** done (2026-09-26)
+**Checked:** S3 I4 D2 V4 W1 W2 P1
+
+- Add-a-future sheet (opaque `--paper`, S3): paste ad → Ann draft (`career-futures?action=draft` + `career-prompts` / `career-future-draft`) with offline heuristic fallback → edit → save
+- Future detail panel on `#/career/future/<id>`: readiness ring, criteria with green/amber/red dots + supporting chips, Make it a stepping stone (`origin: 'gap'` + `stone_for`), stones list with Add to Tasks / Link existing, fading Keep/Park, Edit future sheet
+- Model: criteria carry coverage + supporting cards; futures expose stones sorted undated-last
+- Named tests: `tests/unit/career-future-draft.test.js`; existing `career-model` / Career shell
+
+**diff vs mockup:** People who got there stays Phase 7 stub. Link existing searches tasks (Professional entity search); project/goal/program picker expands when those kinds are searchable here.
+
+**Must:** Add future sheet drafts and saves; selected future shows criteria + stones.
+**Must-not:** Auto-write supports_future without Adam confirming (still Phase 5 scan).
+**Verify:** draft parse test; Career shell still renders.
 
 ---
 

@@ -12,6 +12,7 @@ import type { CareerOverview } from '@/domain/types';
 import { isValidApplicationId } from '@/domain/ids';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
+import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -52,21 +53,37 @@ function renderRiver(
   });
 }
 
-function renderFuturePanel(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
+function renderFuturePanel(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  selectedFutureId: string | null,
+  onReload: () => void
+): void {
+  if (selectedFutureId) {
+    const future = model.futures.find((f) => f.id === selectedFutureId);
+    if (future) {
+      const wrap = el('div', 'career-page__panel-host');
+      host.append(wrap);
+      renderFutureDetail(wrap, future, { onChanged: onReload });
+      return;
+    }
+  }
+
   const panel = el('section', 'career-page__panel career-page__futures');
   surface(panel);
-  panel.append(el('h2', 'career-page__heading', 'Futures'));
+  const head = el('div', 'career-page__section-head');
+  head.append(el('h2', 'career-page__heading', 'Futures'));
+  const add = el('button', 'btn btn--secondary', 'Add a future') as HTMLButtonElement;
+  add.type = 'button';
+  add.addEventListener('click', () => openAddFutureSheet(document.body, onReload));
+  head.append(add);
+  panel.append(head);
+
   const active = model.futures.filter((f) => f.status === 'active');
   if (!active.length) {
     panel.append(
       el('p', 'empty-state', 'No futures yet. Add a target role to start a branch.')
     );
-    const add = el('button', 'btn btn--secondary', 'Add a future') as HTMLButtonElement;
-    add.type = 'button';
-    add.addEventListener('click', () => {
-      panel.append(el('p', 'career-page__note', 'Add-a-future sheet lands in Phase 4.'));
-    });
-    panel.append(add);
   } else {
     const list = el('ul', 'career-page__future-list');
     for (const future of active) {
@@ -264,6 +281,10 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   const selectedFutureId =
     route.name === 'career-future' && 'id' in route ? route.id : null;
 
+  const reload = () => {
+    void renderCareerView(canvas);
+  };
+
   canvas.replaceChildren();
   const page = el('div', 'career-page');
 
@@ -273,7 +294,7 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   renderRiver(page, model, selectedFutureId);
 
   const columns = el('div', 'career-page__columns');
-  renderFuturePanel(columns, model);
+  renderFuturePanel(columns, model, selectedFutureId, reload);
   renderSkillsScan(columns, model);
   page.append(columns);
 

@@ -35,12 +35,32 @@ export function draftFuture(body: Record<string, unknown>, options: { signal?: A
   return apiPost('/api/career-futures?action=draft', body, { signal: options.signal });
 }
 
+export function updateFuture(
+  id: string,
+  body: Record<string, unknown>,
+  options: { signal?: AbortSignal } = {}
+) {
+  return apiPatch(`/api/career-futures?id=${encodeURIComponent(id)}`, body, {
+    signal: options.signal
+  });
+}
+
 export function listStones(options: { signal?: AbortSignal } = {}) {
   return apiGet('/api/career-stones', { signal: options.signal });
 }
 
 export function createStone(body: Record<string, unknown>, options: { signal?: AbortSignal } = {}) {
   return apiPost('/api/career-stones', body, { signal: options.signal });
+}
+
+export function updateStone(
+  id: string,
+  body: Record<string, unknown>,
+  options: { signal?: AbortSignal } = {}
+) {
+  return apiPatch(`/api/career-stones?id=${encodeURIComponent(id)}`, body, {
+    signal: options.signal
+  });
 }
 
 export function listScanProposals(options: { signal?: AbortSignal } = {}) {

@@ -292,6 +292,40 @@ export function buildCareerModel(
   const futureModels = visibleFutures.map((future) => {
     const supports = effectiveSupports.get(future.id) ?? [];
     const readiness = readinessPercent(future.criteria, supports);
+    const byCriterion = new Map<string, number>();
+    const supportersByCriterion = new Map<string, Array<{ id: string; title: string; strength: string }>>();
+    for (const link of supports) {
+      for (const id of link.criterion_ids ?? []) {
+        const next = criterionCoverage(link.strength);
+        const prev = byCriterion.get(id) ?? 0;
+        if (next > prev) byCriterion.set(id, next);
+        const sourceId = (link as { source_id?: string }).source_id;
+        if (sourceId) {
+          const card = achievements.find((a) => a.id === sourceId);
+          const list = supportersByCriterion.get(id) ?? [];
+          list.push({
+            id: sourceId,
+            title: card?.title ?? sourceId,
+            strength: link.strength ?? 'some'
+          });
+          supportersByCriterion.set(id, list);
+        }
+      }
+    }
+    const criteriaModels = (future.criteria ?? []).map((c) => {
+      const coverage = byCriterion.get(c.id) ?? 0;
+      const supporting = (supportersByCriterion.get(c.id) ?? [])
+        .sort((a, b) => criterionCoverage(b.strength) - criterionCoverage(a.strength))
+        .slice(0, 2);
+      return {
+        id: c.id,
+        text: c.text,
+        order: c.order,
+        source: c.source,
+        coverage,
+        supporting
+      };
+    });
     const ownStones = stoneModels.filter(
       (s) => s.future_ids.includes(future.id) && !s.shared && !s.done
     );
@@ -331,6 +365,7 @@ export function buildCareerModel(
       (newestSupport
         ? daysSince(newestSupport, nowMs) > FADING_MS
         : daysSince(future.created_at, nowMs) > FADING_MS);
+    const fading_since = newestSupport || future.created_at || null;
 
     return {
       id: future.id,
@@ -340,7 +375,7 @@ export function buildCareerModel(
       suggested_reason: future.suggested_reason ?? null,
       lane_order: future.lane_order,
       colour_slot: future.colour_slot,
-      criteria: future.criteria,
+      criteria: criteriaModels,
       readiness,
       readiness_label: readiness == null ? 'Add criteria' : `${readiness}%`,
       arrival_date: arrivalDate,
@@ -348,7 +383,17 @@ export function buildCareerModel(
       split_date: splitDate,
       split_label: roughTermLabel(splitDate, { estimated: false }),
       fading,
-      aliases: future.aliases ?? []
+      fading_since,
+      aliases: future.aliases ?? [],
+      target_date: future.target_date ?? null,
+      stones: stoneModels
+        .filter((s) => s.future_ids.includes(future.id))
+        .sort((a, b) => {
+          if (!a.target_term_start && !b.target_term_start) return 0;
+          if (!a.target_term_start) return 1;
+          if (!b.target_term_start) return -1;
+          return a.target_term_start.localeCompare(b.target_term_start);
+        })
     };
   });
 

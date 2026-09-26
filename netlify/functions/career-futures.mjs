@@ -2,6 +2,7 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { createCareerRepository } from './_shared/career-repository.mjs';
 import { isValidFutureId } from './_shared/career-schema.mjs';
+import { draftFutureFromAnn } from './_shared/career-future-draft.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 
@@ -36,21 +37,21 @@ export function createCareerFuturesHandler(deps = {}) {
         }
         if (request.method === 'POST') {
           const body = await readJsonObject(request);
-          // draft: return Ann criteria without saving (Phase 4 wires the model call)
           if (url.searchParams.get('action') === 'draft' || body?.action === 'draft') {
-            return withCors(
-              okResponse(200, {
-                draft: {
-                  title: typeof body?.title === 'string' ? body.title.trim() : '',
-                  where: null,
-                  aliases: [],
-                  criteria: [],
-                  note: 'Ann draft criteria land in Phase 4.'
-                }
-              }),
-              request,
-              env
-            );
+            const apiKey =
+              typeof env?.ANTHROPIC_API_KEY === 'string' ? env.ANTHROPIC_API_KEY : '';
+            const draft = await (deps.draftFutureFromAnn ?? draftFutureFromAnn)({
+              title: typeof body?.title === 'string' ? body.title : '',
+              description:
+                typeof body?.description === 'string'
+                  ? body.description
+                  : typeof body?.ad === 'string'
+                    ? body.ad
+                    : '',
+              apiKey,
+              fetchImpl: deps.fetchImpl
+            });
+            return withCors(okResponse(200, { draft }), request, env);
           }
           const future = await repo.createFuture(body);
           return withCors(okResponse(201, { future }), request, env);
