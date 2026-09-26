@@ -16,6 +16,15 @@ import {
 import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
 import { buildTidelineModel, movedCaption, toHour } from './tideline-model.js';
 import { getSydneyMinutesOfDay } from '../sydney-clock.js';
+import {
+  applyItemVisibility,
+  countByFilterKey,
+  countHidden,
+  isItemVisible,
+  paintSourceFilter,
+  readFilterState,
+  writeFilterState
+} from './calendar-filter.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 /** Design spec: expanded band remembered per session. Life default; other hubs pass `hub` later. */
@@ -75,6 +84,7 @@ let toastTimer = 0;
 let popFor = null;
 let nowHour = 18;
 let wired = false;
+let filterState = null;
 
 const clamp01 = value => Math.min(1, Math.max(0, value));
 const fadeIn = (height, [from, to]) => clamp01((height - from) / (to - from));
@@ -234,12 +244,22 @@ function mount() {
     'aria-pressed': String(state.expanded === index)
   }));
 
+  filterState = readFilterState(input?.hub || 'life');
   if (model.tray) {
     const tray = el('div', 'cal__tray', undefined, section, { 'data-part': 'tray' });
     el('span', 'cal-av', AGENT_INITIAL[model.tray.agent] || 'H', tray, { 'aria-hidden': 'true' });
     el('span', '', `<b>${model.tray.headline}</b> <span class="cal__tray-detail">· ${model.tray.detail}</span>`, tray);
     el('span', 'cal__spacer', undefined, tray);
-    el('button', 'btn btn--primary', 'Apply all', tray, { type: 'button', 'data-action': 'apply-all', 'data-part': 'apply-all' });
+    const visibleGhosts = model.ghosts.filter(
+      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
+    );
+    const hiddenGhosts = model.ghosts.filter(
+      (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
+    ).length;
+    const applyLabel = hiddenGhosts
+      ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
+      : 'Apply all';
+    el('button', 'btn btn--primary', applyLabel, tray, { type: 'button', 'data-action': 'apply-all', 'data-part': 'apply-all' });
     el('button', 'btn btn--secondary', 'Review', tray, { type: 'button' });
     el('button', 'btn btn--ghost', 'Dismiss', tray, { type: 'button' });
   }
@@ -257,11 +277,8 @@ function mount() {
   }
 
   const sources = el('div', 'cal__sources', undefined, section, { 'data-part': 'sources' });
-  for (const source of model.sources) {
-    const mark = source.id === 'corey' ? '<span class="cal-mark"></span>' : '<i></i>';
-    el('span', `cal-src k-${source.id}${source.id === 'corey' ? ' cal-src--corey' : ''}`, `${mark}${source.label} ${source.count}`, sources);
-  }
-  el('span', 'cal-src cal-src--ambient', `Ambient: ${model.ambient}`, sources, { 'data-part': 'ambient' });
+  nodes.set('__sources', sources);
+  paintTidelineSources(sources);
 
   const card = el('div', 'cal__card', undefined, section, { 'data-part': 'card' });
   const grid = el('div', 'cal__grid', undefined, card);
@@ -298,8 +315,90 @@ function mount() {
     wire(section);
   }
   applySettled();
+  applyTidelineFilter({ replay: false });
   publish(view);
   watchPhone(view);
+}
+
+function tidelineFilterItems() {
+  const chips = model.days.flatMap((day) => day.chips);
+  const dues = model.days.flatMap((day) => day.due.map((due) => ({ ...due, kind: 'task', filterKey: 'tasks' })));
+  const ghosts = model.ghosts.filter((ghost) => !ghost.overItem).map((ghost) => ghost.chip || ghost);
+  return [...chips, ...dues, ...ghosts];
+}
+
+function paintTidelineSources(host = nodes.get('__sources')) {
+  if (!host || !model) return;
+  const items = tidelineFilterItems();
+  const counts = countByFilterKey(items);
+  const hidden = countHidden(items, filterState);
+  paintSourceFilter(root, host, {
+    hub: input?.hub || 'life',
+    state: filterState,
+    counts,
+    hidden,
+    ambient: model.ambient,
+    onChange: (next) => {
+      filterState = next;
+      applyTidelineFilter({ replay: true });
+      paintTidelineSources(host);
+      const apply = host.parentElement?.querySelector?.('[data-part="apply-all"]');
+      if (apply) {
+        const visibleGhosts = model.ghosts.filter(
+          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && isItemVisible(ghost.chip || ghost, filterState)
+        );
+        const hiddenGhosts = model.ghosts.filter(
+          (ghost) => !state.settled.has(ghost.id) && ghost.settled !== 'accepted' && !isItemVisible(ghost.chip || ghost, filterState)
+        ).length;
+        apply.textContent = hiddenGhosts
+          ? `Apply ${visibleGhosts.length} · ${hiddenGhosts} hidden`
+          : 'Apply all';
+      }
+    }
+  });
+}
+
+function applyTidelineFilter({ replay = false } = {}) {
+  if (!model) return;
+  const reduced = root?.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches === true;
+  const entries = [];
+  for (const day of model.days) {
+    for (const chip of day.chips) entries.push({ id: `chip:${chip.id}`, item: chip });
+    for (const due of day.due) entries.push({ id: `due:${due.id}`, item: { ...due, kind: 'task', filterKey: 'tasks' } });
+  }
+  applyItemVisibility(nodes, entries, filterState, {
+    reducedMotion: reduced || !replay,
+    engine: replay ? engine : null
+  });
+  const visibleChips = model.days.flatMap((day) => day.chips).filter((chip) => isItemVisible(chip, filterState));
+  const empty = nodes.get('__empty-filter');
+  const card = host?.querySelector?.('[data-part="card"]');
+  if (!visibleChips.length && countHidden(tidelineFilterItems(), filterState) > 0) {
+    if (!empty && card) {
+      const note = el(
+        'p',
+        'cal-empty-filter',
+        `Nothing shown · ${countHidden(tidelineFilterItems(), filterState)} hidden by your filter · Show all`,
+        card,
+        { 'data-part': 'empty-filter' }
+      );
+      note.addEventListener('click', () => {
+        const all = Object.fromEntries(
+          ['classes', 'events', 'pd', 'meetings', 'tasks', 'health', 'fitness', 'corey'].map((id) => [id, true])
+        );
+        filterState = all;
+        writeFilterState(input?.hub || 'life', all);
+        applyTidelineFilter({ replay: true });
+        paintTidelineSources();
+      });
+      nodes.set('__empty-filter', note);
+    } else if (empty) {
+      empty.hidden = false;
+      empty.textContent = `Nothing shown · ${countHidden(tidelineFilterItems(), filterState)} hidden by your filter · Show all`;
+    }
+  } else if (empty) {
+    empty.hidden = true;
+  }
 }
 
 function dayByDate(date) {
@@ -716,7 +815,12 @@ async function dismiss(ghostId) {
 }
 
 async function applyAll() {
-  const pending = model.ghosts.filter(ghost => !state.settled.has(ghost.id) && ghost.settled !== 'accepted');
+  const pending = model.ghosts.filter(
+    (ghost) =>
+      !state.settled.has(ghost.id) &&
+      ghost.settled !== 'accepted' &&
+      isItemVisible(ghost.chip || ghost, filterState)
+  );
   const plans = await Promise.all(pending.map(async (ghost, index) => {
     await wait(index * CAL.applyAllStagger);
     return accept(ghost.id, { quiet: true });

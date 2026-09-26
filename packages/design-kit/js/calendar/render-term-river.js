@@ -17,6 +17,13 @@ import { applyHubPillsThumb } from '../hub-motion.js';
 import { LANES, byLane, deriveRiverZooms, riverWeekLabel, weeklyLoad, weeksBetween } from './term-river.js';
 import { forecastSeries } from './capacity-model.js';
 import { acceptPlan } from './ghost-writes.js';
+import {
+  countByFilterKey,
+  countHidden,
+  isItemVisible,
+  paintSourceFilter,
+  readFilterState
+} from './calendar-filter.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -391,10 +398,36 @@ function mount({ entrance = false } = {}) {
   }
   nodes.set('zoom', zoom);
 
+  const filterState = readFilterState(input?.hub || 'life');
+  const riverItems = (input?.events ?? []).map((event) => event.record || event).filter(Boolean);
+  const sources = el('div', 'cal__sources', undefined, root, { 'data-part': 'sources' });
+  paintSourceFilter(doc, sources, {
+    hub: input?.hub || 'life',
+    state: filterState,
+    counts: countByFilterKey(riverItems.map((record) => ({
+      kind: record.type === 'scheduled_lesson' ? 'teaching' : record.type?.startsWith('professional') ? 'professional' : record.kind || record.type,
+      source: record.type,
+      isClass: record.type === 'scheduled_lesson',
+      filterKey: undefined
+    }))),
+    hidden: countHidden(riverItems, filterState),
+    onChange: () => mount({ entrance: false })
+  });
+
   const card = el('div', 'tr__card', undefined, root, { 'data-part': 'card' });
   if (state.phone) mountList(card);
   else mountChart(card);
   mountLegend(card);
+  for (const [id, node] of nodes) {
+    if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
+    const itemId = id.split(':')[1];
+    const item = riverItems.find((record) => record.id === itemId);
+    if (item && !isItemVisible(item, filterState)) {
+      node.setAttribute?.('visibility', 'hidden');
+      if (node.style) node.style.opacity = '0';
+      node.classList?.add?.('is-filter-hidden');
+    }
+  }
 
   nodes.set('__toast', el('div', 'tr-toast', '', root, { role: 'status', 'aria-live': 'polite', 'data-part': 'toast' }));
   nodes.set('__pop', el('div', 'tr-pop', '', root, { role: 'dialog', 'data-part': 'popover', hidden: '' }));

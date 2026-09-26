@@ -184,6 +184,7 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/render-almanac.js',
   'packages/design-kit/js/calendar/render-term-river.js',
   'packages/design-kit/js/calendar/calendar-sources.js',
+  'packages/design-kit/js/calendar/calendar-filter.js',
   'packages/design-kit/js/calendar/teaching-calendar.js',
   'packages/design-kit/js/calendar/tasks-calendar.js',
   'packages/design-kit/js/calendar/professional-calendar.js',
