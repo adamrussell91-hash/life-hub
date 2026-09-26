@@ -324,6 +324,15 @@ export interface MeetingRecord {
   incomplete_links?: IncompleteLinksProjection | null;
   preparation_operation?: FollowUpOperationProjection | null;
   follow_up_operation?: FollowUpOperationProjection | null;
+  purpose?: string | null;
+  blocks?: unknown[];
+  decisions?: MeetingDecision[];
+}
+
+export interface MeetingDecision {
+  id: string;
+  text: string;
+  agenda_heading: string | null;
 }
 
 export type EventOccurrenceState = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
@@ -339,7 +348,7 @@ export interface EventRecord {
   schema_version: number;
   id: string;
   title: string;
-  event_type: 'professional_development' | string;
+  event_type: 'professional_development' | 'general' | string;
   start: string;
   end: string;
   time_zone: string;
@@ -355,6 +364,26 @@ export interface EventRecord {
   updated_at: string;
   incomplete_links?: IncompleteLinksProjection | null;
   learning_operation?: FollowUpOperationProjection | null;
+  talks?: EventTalk[];
+  blocks?: unknown[];
+}
+
+export interface EventTalk {
+  id: string;
+  time: string | null;
+  title: string;
+  presenter: string | null;
+  hours: number | null;
+}
+
+export interface PdGroupRecord {
+  schema_version: number;
+  id: string;
+  shape: 'series' | 'program';
+  title: string;
+  provider: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ApplicationPipelineStatus =

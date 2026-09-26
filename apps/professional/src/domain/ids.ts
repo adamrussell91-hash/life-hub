@@ -14,6 +14,7 @@ const MEETING_ID_PATTERN = /^meeting_[0-9a-f-]{36}$/;
 const EVENT_ID_PATTERN = /^event_[0-9a-f-]{36}$/;
 const APPLICATION_ID_PATTERN = /^application_[0-9a-f-]{36}$/;
 const THREAD_ID_PATTERN = /^thread_[0-9a-f-]{36}$/;
+const PD_GROUP_ID_PATTERN = /^pd_group_[0-9a-f-]{36}$/;
 
 export function isValidPersonId(id: string): boolean {
   return PERSON_ID_PATTERN.test(id);
@@ -41,6 +42,10 @@ export function isValidApplicationId(id: string): boolean {
 
 export function isValidThreadId(id: string): boolean {
   return THREAD_ID_PATTERN.test(id);
+}
+
+export function isValidPdGroupId(id: string): boolean {
+  return PD_GROUP_ID_PATTERN.test(id);
 }
 
 export function personRef(id: string): string {

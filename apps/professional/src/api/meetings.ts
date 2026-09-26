@@ -1,5 +1,5 @@
 import { apiGet, apiPatch, apiPost, ApiClientError } from './client';
-import type { MeetingRecord } from '@/domain/types';
+import type { MeetingDecision, MeetingRecord } from '@/domain/types';
 
 export interface MeetingLinkInput {
   source_ref?: string;
@@ -50,7 +50,15 @@ export function createMeeting(
 
 export function updateMeeting(
   id: string,
-  patch: { title?: string; location_text?: string | null; agenda?: string | null; notes?: string | null },
+  patch: {
+    title?: string;
+    location_text?: string | null;
+    agenda?: string | null;
+    notes?: string | null;
+    purpose?: string | null;
+    blocks?: unknown[];
+    decisions?: MeetingDecision[];
+  },
   options: { signal?: AbortSignal } = {}
 ): Promise<{ meeting: MeetingRecord }> {
   const params = new URLSearchParams({ id });
