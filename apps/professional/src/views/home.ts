@@ -128,22 +128,18 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
     }
   }
 
-  const hasDetails = categoryTotals.size > 0 || priorityTotals.size > 0;
-
   const head = el('div', 'pro-home__progress-head');
   const titleRow = el('div', 'pro-home__progress-title-row');
   titleRow.append(el('h2', 'pro-home__card-title', 'Accreditation progress'));
-  if (hasDetails) {
-    const toggle = document.createElement('button');
-    toggle.type = 'button';
-    toggle.className = 'pro-home__progress-toggle';
-    toggle.setAttribute('aria-expanded', 'false');
-    toggle.setAttribute('aria-controls', 'pro-home-progress-details');
-    toggle.setAttribute('aria-label', 'Show PD breakdown');
-    toggle.innerHTML =
-      '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4"/></svg>';
-    titleRow.append(toggle);
-  }
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'pro-home__progress-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'pro-home-progress-details');
+  toggle.setAttribute('aria-label', 'Show PD breakdown');
+  toggle.innerHTML =
+    '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2.5 4 5 6.5 7.5 4"/></svg>';
+  titleRow.append(toggle);
   head.append(titleRow);
 
   const top = el('div', 'pro-home__progress-top');
@@ -152,7 +148,6 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
     el('span', 'pro-home__progress-of', `of ${ACCREDITATION_TARGET_HOURS}`)
   );
   head.append(top);
-  head.append(el('p', 'pro-home__progress-caption', `Logged in ${today.year} · goal is a placeholder`));
 
   const barTrack = el('div', 'pro-home__progress-bar');
   const fill = el('div', 'pro-home__progress-fill');
@@ -171,27 +166,26 @@ function renderAccreditation(today: YmdParts, events: EventRecord[]): HTMLElemen
     return chips;
   }
 
-  if (hasDetails) {
-    // Kit scroll-hide pattern: grid 0fr ↔ 1fr for smooth expand/contract.
-    const reveal = el('div', 'pro-home__progress-reveal');
-    reveal.id = 'pro-home-progress-details';
-    const inner = el('div', 'pro-home__progress-reveal-inner');
-    if (categoryTotals.size) inner.append(hourChips(categoryTotals, 'blue', 4));
-    if (priorityTotals.size) {
-      inner.append(el('p', 'pro-home__progress-caption', 'Priority areas'));
-      inner.append(hourChips(priorityTotals, 'sage'));
-    }
-    reveal.append(inner);
-    card.append(reveal);
-
-    const toggle = titleRow.querySelector('.pro-home__progress-toggle') as HTMLButtonElement;
-    const setOpen = (open: boolean): void => {
-      card.classList.toggle('is-expanded', open);
-      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-      toggle.setAttribute('aria-label', open ? 'Hide PD breakdown' : 'Show PD breakdown');
-    };
-    toggle.addEventListener('click', () => setOpen(!card.classList.contains('is-expanded')));
+  // Caption + breakdown live in the expand panel so the contracted card
+  // matches Year-at-a-glance height in the lede row.
+  const reveal = el('div', 'pro-home__progress-reveal');
+  reveal.id = 'pro-home-progress-details';
+  const inner = el('div', 'pro-home__progress-reveal-inner');
+  inner.append(el('p', 'pro-home__progress-caption', `Logged in ${today.year} · goal is a placeholder`));
+  if (categoryTotals.size) inner.append(hourChips(categoryTotals, 'blue', 4));
+  if (priorityTotals.size) {
+    inner.append(el('p', 'pro-home__progress-caption', 'Priority areas'));
+    inner.append(hourChips(priorityTotals, 'sage'));
   }
+  reveal.append(inner);
+  card.append(reveal);
+
+  const setOpen = (open: boolean): void => {
+    card.classList.toggle('is-expanded', open);
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    toggle.setAttribute('aria-label', open ? 'Hide PD breakdown' : 'Show PD breakdown');
+  };
+  toggle.addEventListener('click', () => setOpen(!card.classList.contains('is-expanded')));
 
   return card;
 }
