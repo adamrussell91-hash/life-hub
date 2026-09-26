@@ -81,8 +81,6 @@ const ENERGY_ICON =
 type PulseContext = {
   projects: Project[];
   archivedProjects: Project[];
-  archivedCards: ProjectPulseCard[];
-  titleById: Map<string, string>;
   tasks: Task[];
   goals: Goal[];
   cards: ProjectPulseCard[];
@@ -96,8 +94,10 @@ function projectsForMix(ctx: PulseContext): Project[] {
 }
 
 function cardsForBoard(ctx: PulseContext): ProjectPulseCard[] {
-  if (lifecycleFilter === 'completed') return ctx.archivedCards;
-  return ctx.cards;
+  if (lifecycleFilter !== 'completed') return ctx.cards;
+  return ctx.archivedProjects.map((project) =>
+    buildProjectPulseCard(project, ctx.tasks, ctx.stallIds, ctx.now)
+  );
 }
 
 function svgIcon(markup: string): HTMLElement {
@@ -128,11 +128,10 @@ function reviewLogTitle(
   review: { outcome: string; project_id: string; merge_into_project_id?: string | null },
   titleById: Map<string, string>
 ): string {
-  const name = titleById.get(review.project_id);
-  const label = name ?? 'Unknown project';
+  const label = titleById.get(review.project_id) ?? 'Unknown project';
   if (review.outcome === 'frankensteined' && review.merge_into_project_id) {
     const into = titleById.get(review.merge_into_project_id);
-    return into ? `frankensteined · ${label} → ${into}` : `frankensteined · ${label}`;
+    if (into) return `frankensteined · ${label} → ${into}`;
   }
   return `${review.outcome} · ${label}`;
 }
@@ -285,7 +284,10 @@ function renderProjectBoardCard(
   top.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
   article.append(top);
 
-  const desc = card.project.arc_summary || card.project.description;
+  const desc =
+    card.project.arc_summary ||
+    card.project.description ||
+    (card.lifecycle === 'completed' ? card.project.review_summary : null);
   if (desc) article.append(el('p', 'pcard__desc', desc));
 
   if (card.lifecycle === 'stalled') {
@@ -298,8 +300,6 @@ function renderProjectBoardCard(
   }
 
   if (card.lifecycle === 'completed') {
-    const desc = card.project.arc_summary || card.project.description || card.project.review_summary;
-    if (desc) article.append(el('p', 'pcard__desc', desc));
     const actions = el('div', 'pcard__row pcard__actions');
     const open = el('button', 'btn btn--ghost', 'Open page');
     open.type = 'button';
@@ -493,9 +493,7 @@ function renderBoard(
       el(
         'p',
         'empty-state',
-        lifecycleFilter === 'completed'
-          ? 'No completed projects yet.'
-          : 'No projects match.'
+        lifecycleFilter === 'completed' ? 'No completed projects yet.' : 'No projects match.'
       )
     );
     return grid;
@@ -691,14 +689,9 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   const stallCandidates = findStallCandidates(projects, tasks, now);
   const stallIds = new Set(stallCandidates.map((item) => item.project.id));
   const cards = projects.map((project) => buildProjectPulseCard(project, tasks, stallIds, now));
-  const archivedCards = archivedProjects.map((project) =>
-    buildProjectPulseCard(project, tasks, stallIds, now)
-  );
   const ctx: PulseContext = {
     projects,
     archivedProjects,
-    archivedCards,
-    titleById,
     tasks,
     goals,
     cards,
@@ -740,8 +733,6 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   function dropProject(projectId: string): void {
     ctx.projects = ctx.projects.filter((project) => project.id !== projectId);
     ctx.archivedProjects = ctx.archivedProjects.filter((project) => project.id !== projectId);
-    ctx.archivedCards = ctx.archivedCards.filter((card) => card.project.id !== projectId);
-    ctx.titleById.delete(projectId);
     ctx.tasks = ctx.tasks.filter((task) => task.parent_project_id !== projectId);
     ctx.cards = ctx.cards.filter((card) => card.project.id !== projectId);
     ctx.stallIds.delete(projectId);
@@ -752,7 +743,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
 
   function acceptProject(created: Project): void {
     ctx.projects = [created, ...ctx.projects];
-    ctx.titleById.set(created.id, created.title);
+    titleById.set(created.id, created.title);
     const card = buildProjectPulseCard(created, ctx.tasks, ctx.stallIds, ctx.now);
     ctx.cards = [card, ...ctx.cards];
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) {
@@ -873,7 +864,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
                 : ` · ${review.slip_days}d vs baseline`;
         const row = el('article', 'task-row');
         row.append(
-          el('h3', 'task-row__title', reviewLogTitle(review, ctx.titleById)),
+          el('h3', 'task-row__title', reviewLogTitle(review, titleById)),
           el('p', 'task-row__desc', `${review.reason}${slip}`)
         );
         logStack.append(row);

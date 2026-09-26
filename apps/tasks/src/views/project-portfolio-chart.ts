@@ -132,20 +132,15 @@ export function renderProjectPortfolioChart(
     circle.setAttribute('stroke-width', String(stroke));
     circle.setAttribute('stroke-dasharray', segment.dasharray);
     circle.setAttribute('stroke-dashoffset', String(segment.dashoffset));
-    circle.setAttribute('pointer-events', 'stroke');
     circle.dataset.lifecycle = segment.key;
     if (options.onSelect) {
-      circle.style.cursor = 'pointer';
       circle.setAttribute('tabindex', '0');
       circle.setAttribute('role', 'button');
       circle.setAttribute('aria-label', `Show ${segment.label} projects · ${segment.value}`);
       const toggle = (): void => {
         options.onSelect?.(selected === segment.key ? 'all' : (segment.key as ProjectLifecycle));
       };
-      circle.addEventListener('click', (event) => {
-        event.preventDefault();
-        toggle();
-      });
+      circle.addEventListener('click', toggle);
       circle.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         event.preventDefault();
