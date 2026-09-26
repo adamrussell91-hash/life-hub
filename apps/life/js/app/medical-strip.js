@@ -305,11 +305,24 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
 
     drawRibbons(root, svg, lane, zoom, width, y0, colour);
     const labelBoxes = [];
-    const markers = lane.events || [];
-    for (const event of markers) {
-      if (!event.date || !isCalendarDate(event.date)) continue;
-      const x = dateToX(event.date, zoom, width);
-      if (x < GUTTER - 8 || x > width - PAD_R + 8) continue;
+    // Reserve axis TODAY label so event labels do not eat it.
+    labelBoxes.push({
+      x: xToday + 2,
+      y: AXIS_H - 22,
+      w: 48,
+      h: 14
+    });
+    // Prefer biomarker last-point labels; event titles yield on collision.
+    const ribbonBoxes = collectRibbonLabelBoxes(lane, zoom, width, y0);
+    for (const box of ribbonBoxes) labelBoxes.push(box);
+
+    const markers = [...(lane.events || [])]
+      .filter(event => event.date && isCalendarDate(event.date))
+      .map(event => ({ event, x: dateToX(event.date, zoom, width) }))
+      .filter(({ x }) => x >= GUTTER - 8 && x <= width - PAD_R + 8)
+      .sort((a, b) => a.x - b.x);
+
+    for (const { event, x } of markers) {
       const shape = drawMarker(root, svg, event, x, y0 + 40, colour, hooks);
       const lab = placeLabel(root, svg, event, x, y0 + 40, width, labelBoxes);
       if (lab) labelBoxes.push(lab);
@@ -323,6 +336,37 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   });
 
   return svg;
+}
+
+function collectRibbonLabelBoxes(lane, zoom, width, y0) {
+  const boxes = [];
+  const groups = new Map();
+  for (const point of lane.markers || []) {
+    if (!point.date || point.value == null) continue;
+    const key = point.key || point.label;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(point);
+  }
+  let offset = 0;
+  for (const [, points] of groups) {
+    const last = points[points.length - 1];
+    if (!last?.date || !isCalendarDate(last.date)) {
+      offset += 18;
+      continue;
+    }
+    const x = dateToX(last.date, zoom, width);
+    const text = `${last.value} ${last.status === 'Normal' ? '✓' : '↑'}`;
+    const approxW = text.length * 6.2;
+    const lx = Math.min(width - PAD_R, x + 6);
+    boxes.push({
+      x: lx,
+      y: y0 + 58 + offset - 14,
+      w: approxW,
+      h: 12
+    });
+    offset += 18;
+  }
+  return boxes;
 }
 
 function drawAxis(root, svg, zoom, width) {
@@ -467,26 +511,28 @@ function drawMarker(root, svg, event, x, y, colour, hooks) {
 }
 
 function placeLabel(root, svg, event, x, y, width, existing) {
-  const short = String(event.title || '').split(/[—-]/)[0].trim().slice(0, 18);
+  const short = String(event.title || '').split(/[—-]/)[0].trim().slice(0, 14);
   if (!short) return null;
   const nearRight = x > width - PAD_R - 60;
-  let above = true;
+  const nearLeft = x < GUTTER + 40;
   let ty = y - 14;
   const approxW = short.length * 6.2;
-  const box = {
-    x: nearRight ? x - approxW : x - approxW / 2,
-    y: ty - 10,
+  const makeBox = (topY) => ({
+    x: nearRight ? x - approxW : nearLeft ? x : x - approxW / 2,
+    y: topY - 10,
     w: approxW,
     h: 12
-  };
+  });
   const collides = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
-  if (existing.some(prev => collides(box, prev))) {
-    above = false;
+  const inBounds = (box) => box.x >= GUTTER - 4 && box.x + box.w <= width - PAD_R + 4;
+
+  let box = makeBox(ty);
+  if (!inBounds(box) || existing.some(prev => collides(box, prev))) {
     ty = y + 22;
-    box.y = ty - 10;
+    box = makeBox(ty);
   }
-  if (existing.some(prev => collides(box, prev))) {
-    // Hide; reveal via tip on hover/focus.
+  if (!inBounds(box) || existing.some(prev => collides(box, prev))) {
+    // Hide; reveal via tip on hover/focus (MO-21).
     return null;
   }
   const text = svgEl(root, 'text');
@@ -494,7 +540,7 @@ function placeLabel(root, svg, event, x, y, width, existing) {
   text.setAttribute('y', String(ty));
   text.setAttribute('fill', 'var(--ink)');
   text.setAttribute('font-size', '10');
-  text.setAttribute('text-anchor', nearRight ? 'end' : 'middle');
+  text.setAttribute('text-anchor', nearRight ? 'end' : nearLeft ? 'start' : 'middle');
   text.textContent = short;
   text.classList.add('medical-strip__label');
   svg.append(text);

@@ -7904,7 +7904,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
   backdrop-filter: none;
 }
 .medical-sheet[hidden] { display: none; }
-.medical-sheet h2 { margin: 0.2rem 0 0.4rem; font-size: var(--text-lg); }
+.medical-sheet h2 { margin: 0.2rem 0 0.4rem; font-size: var(--text-md); font-weight: var(--weight-semibold); }
 .medical-sheet__notes { margin: 0 0 var(--space-3); color: var(--orca); font-size: var(--text-md); }
 .medical-sheet__line { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
 .medical-sheet__episode {
@@ -7985,7 +7985,7 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
     border-radius: var(--radius-full);
     background: var(--cotton);
     color: var(--ink);
-    font-size: var(--text-lg);
+    font-size: var(--text-md);
     cursor: pointer;
   }
 }

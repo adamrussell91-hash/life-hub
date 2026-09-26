@@ -220,10 +220,10 @@ async function main() {
     records.push({ file: dest, record, body: planned.notes, dirty: true, _create: true });
   }
 
-  // 5) cadence_days: 56 on Stelara doses
+  // 5) cadence_days: 56 on Stelara doses (match title only — not prose mentions in notes)
   for (const item of records) {
-    const blob = `${item.record.title || ''} ${item.body || ''}`;
-    if (!/stelara|ustekinumab/i.test(blob)) continue;
+    const title = String(item.record.title || '');
+    if (!/stelara|ustekinumab/i.test(title)) continue;
     if (item.record.cadence_days === 56) continue;
     item.record.cadence_days = 56;
     item.record.weight = item.record.weight || 'major';

@@ -1,6 +1,6 @@
 # Medical Overview v2 — progress
 
-Progress: 28/34 (82%)
+Progress: 34/34 (100%)
 
 Branch: `cursor/medical-overview-v2-c420` (continues PR #496 workstream from `claude/confident-cannon-ud1cod`).
 
@@ -45,8 +45,8 @@ Branch: `cursor/medical-overview-v2-c420` (continues PR #496 workstream from `cl
 - [x] **MO-30** Production wiring + integration test *(controller wiring + unit coverage; full production entry integration test still thin)*
 - [x] **MO-31** Motion *(no hub-kinetic on clickable text; strip zoom 180ms + reduced-motion)*
 - [x] **MO-32** Empty states
-- [ ] **MO-33** Spec / docs update
-- [ ] **MO-34** Screenshots + backfill dry-run in PR
+- [x] **MO-33** Spec / docs update
+- [x] **MO-34** Screenshots + backfill dry-run in PR
 
 ## Discovered
 
