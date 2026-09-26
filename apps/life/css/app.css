@@ -7886,14 +7886,21 @@ html:has(#chat-view:not([hidden]):not([data-panel-mode])) body {
 .medical-card--major.medical-card--has-detail {
   min-height: 140px;
 }
+.medical-card--major.medical-card--planned:not(.medical-card--has-detail) {
+  padding: 0.4rem 0.7rem;
+  min-height: 0;
+}
 .medical-card--major .medical-card__title {
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   color: var(--depth);
 }
+.medical-card--major.medical-card--planned:not(.medical-card--has-detail) .medical-card__title {
+  font-size: var(--text-base);
+}
 .medical-card--routine,
-.medical-card--planned:not(.medical-card--major) {
-  padding: 0.45rem 0.75rem;
+.medical-card--planned {
+  padding: 0.4rem 0.7rem;
 }
 .medical-card--planned {
   border-style: dashed;

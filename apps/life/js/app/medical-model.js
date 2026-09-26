@@ -472,9 +472,15 @@ function buildHealthBrief(visits, bloods, today) {
 function extractVerdict(notes) {
   const text = String(notes || '').trim();
   if (!text) return null;
-  const dash = text.match(/—\s*(.+)$/m) || text.match(/-\s*(.+)$/m);
+  // Prefer a trailing Sara-style line that starts with an em dash.
+  const lines = text.split(/\n/).map(line => line.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const m = lines[i].match(/^—\s*(.+)$/) || lines[i].match(/^-\s*(.+)$/);
+    if (m) return m[1].trim().slice(0, 160);
+  }
+  const dash = text.match(/—\s*([^—\n]+)\s*$/);
   if (dash) return dash[1].trim().slice(0, 160);
-  return text.split(/\n/)[0].trim().slice(0, 160);
+  return lines[0].slice(0, 160);
 }
 
 function labSummary(bloods) {
