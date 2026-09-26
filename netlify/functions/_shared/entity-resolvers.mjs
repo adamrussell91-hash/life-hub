@@ -8,11 +8,13 @@ import {
   isValidApplicationId,
   parseApplicationRecord
 } from './application-schema.mjs';
+import { isValidThreadId, parseThreadRecord, threadDisplayLabel } from './thread-schema.mjs';
 import {
   communicationKey,
   meetingKey,
   eventKey,
   applicationKey,
+  threadKey,
   defaultGetProfessionalStore,
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
@@ -235,6 +237,24 @@ export async function resolveMeeting(
   };
 }
 
+export async function resolveThread(id, accessContext, { getStore = defaultGetProfessionalStore } = {}) {
+  if (!isValidThreadId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'professional', kind: 'thread', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseThreadRecord(await getProfessionalJSON(store, threadKey(id)));
+  if (!record) throw endpointNotFoundError();
+  return {
+    ref,
+    kind: 'thread',
+    display_label: threadDisplayLabel(record),
+    supporting_label: record.kind === 'case' ? 'case' : 'thread',
+    href: `/professional/#/thread/${encodeURIComponent(id)}`,
+    lifecycle_status: record.status,
+    visibility: 'operator'
+  };
+}
+
 export async function resolveEvent(
   id,
   accessContext,
@@ -290,6 +310,7 @@ export const RESOLVER_SLOTS = Object.freeze({
   'tasks:program': resolveTasksProgram,
   'professional:communication': resolveCommunication,
   'professional:meeting': resolveMeeting,
+  'professional:thread': resolveThread,
   'professional:event': resolveEvent,
   'professional:application': resolveApplication,
   'knowledge:page': resolveKnowledgePage,

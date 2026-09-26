@@ -21,7 +21,7 @@ export const ENTITY_REF_NAMESPACES = new Set([
 // a real workflow (implementation programme, "Absolute exclusions" #11).
 export const ENTITY_REF_KINDS = {
   shared: new Set(['person', 'organisation']),
-  professional: new Set(['communication', 'meeting', 'event', 'application']),
+  professional: new Set(['communication', 'meeting', 'event', 'application', 'thread']),
   tasks: new Set(['task', 'project', 'program', 'goal']),
   // `class` and `student_reference` are Slice 8's own additions — Slice 11
   // deliberately deferred both pending this privacy-scoped work (see

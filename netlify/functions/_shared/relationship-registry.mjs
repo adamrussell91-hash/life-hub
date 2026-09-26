@@ -189,6 +189,18 @@ const REGISTRY = new Map([
     })
   ],
   [
+    'in_thread',
+    declaration({
+      key: 'in_thread',
+      sourceKinds: ['professional:communication', 'professional:meeting', 'professional:event'],
+      targetKinds: ['professional:thread'],
+      inverseLabel: 'thread_member',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  [
     'follow_up',
     declaration({
       key: 'follow_up',
