@@ -19,15 +19,17 @@ import { createEventRepository } from '../netlify/functions/_shared/event-reposi
 import { createThreadRepository } from '../netlify/functions/_shared/thread-repository.mjs';
 import { createLedgerItemRepository } from '../netlify/functions/_shared/ledger-repository.mjs';
 import { resolveEntity as defaultResolveEntity } from '../netlify/functions/_shared/entity-resolvers.mjs';
+import { createNetlifyCliStore } from './lib/notion-comms/netlify-cli-store.mjs';
 
-const args = process.argv.slice(2); const value = (flag) => args[args.indexOf(flag) + 1]; const exportDir = value('--export'); const apply = args.includes('--apply');
+const args = process.argv.slice(2); const value = (flag) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; }; const exportDir = value('--export'); const apply = args.includes('--apply');
 if (!exportDir) throw new Error('Usage: node scripts/import-notion-comms.mjs --export <directory> [--report <path>] [--apply --confirm IMPORT]');
 if (apply && value('--confirm') !== 'IMPORT') throw new Error('Refusing to write without --confirm IMPORT.');
 const token = process.env.NETLIFY_BLOBS_TOKEN ?? '';
-if (!token) throw new Error('NETLIFY_BLOBS_TOKEN is required to access the private Hub stores.');
 const options = (name) => ({ name, siteID: UMBRELLA_BLOBS_SITE_ID, token });
-const professionalStore = getStore(options(PROFESSIONAL_CONTENT_STORE));
-const universalStore = getStore(options(UNIVERSAL_LINK_CONTENT_STORE));
+const cliTransport = value('--transport') === 'netlify-cli';
+if (!token && !cliTransport) throw new Error('NETLIFY_BLOBS_TOKEN is required, or use --transport netlify-cli with an authenticated CLI session.');
+const professionalStore = cliTransport ? createNetlifyCliStore({ name: PROFESSIONAL_CONTENT_STORE, siteID: UMBRELLA_BLOBS_SITE_ID }) : getStore(options(PROFESSIONAL_CONTENT_STORE));
+const universalStore = cliTransport ? createNetlifyCliStore({ name: UNIVERSAL_LINK_CONTENT_STORE, siteID: UMBRELLA_BLOBS_SITE_ID }) : getStore(options(UNIVERSAL_LINK_CONTENT_STORE));
 
 async function listKeys(store, prefix) {
   const keys = []; let page = await store.list({ prefix });
@@ -57,8 +59,16 @@ const reportPath = value('--report') ?? path.join(os.tmpdir(), 'notion-comms-imp
 if (!apply) { console.log(`Preview complete. Report: ${reportPath}`); process.exit(0); }
 const resolveEntity = (ref, context) => defaultResolveEntity(ref, context, { getStore: async () => (typeof ref === 'string' ? ref.startsWith('shared:') : ref?.namespace === 'shared') ? universalStore : professionalStore });
 const repoDeps = { store: professionalStore, resolveEntity, getUniversalLinkStore: async () => universalStore };
-const result = await applyImportPlan(plan, {
-  identityRepo: createIdentityRepository({ store: universalStore }), communicationRepo: createCommunicationRepository(repoDeps), meetingRepo: createMeetingRepository(repoDeps), eventRepo: createEventRepository(repoDeps), threadRepo: createThreadRepository({ store: professionalStore }), ledgerRepo: createLedgerItemRepository({ store: professionalStore }),
-  setMap: (key, map) => professionalStore.setJSON(key, map), log: () => {}
-});
-console.log(JSON.stringify({ applied: true, records: result.createdRecords, people: result.createdPeople, reportPath }));
+const progress = { person: 0, record: 0, thread: 0, promise: 0 };
+try {
+  const result = await applyImportPlan(plan, {
+    identityRepo: createIdentityRepository({ store: universalStore }), communicationRepo: createCommunicationRepository(repoDeps), meetingRepo: createMeetingRepository(repoDeps), eventRepo: createEventRepository(repoDeps), threadRepo: createThreadRepository({ store: professionalStore }), ledgerRepo: createLedgerItemRepository({ store: professionalStore }),
+    setMap: (key, map) => professionalStore.setJSON(key, map), log: (stage) => { progress[stage] += 1; }
+  });
+  console.log(JSON.stringify({ applied: true, records: result.createdRecords, people: result.createdPeople, reportPath }));
+} catch (error) {
+  // Counts and a bounded error code are safe to report; source text and
+  // private record data are never placed in terminal output.
+  console.error(JSON.stringify({ applied: false, progress, error: { code: error?.code ?? null, message: String(error?.message ?? 'Import failed.').slice(0, 240) } }));
+  process.exitCode = 1;
+}
