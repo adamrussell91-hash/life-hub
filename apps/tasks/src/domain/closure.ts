@@ -53,9 +53,13 @@ export function computeProjectVariance(
   const end_passed =
     current != null && current.getTime() <= from.getTime() + 24 * 60 * 60 * 1000;
   const all_tasks_done = child.length > 0 && open_task_count === 0;
+  // Close-out = work finished. Past end alone is not enough for a standard
+  // project (still planning / unfinished). Excursions may close when the
+  // event day has passed and nothing is left open.
   const ready_to_close =
     !isProjectArchived(project.status) &&
-    (all_tasks_done || (end_passed && open_task_count === 0));
+    (all_tasks_done ||
+      (end_passed && open_task_count === 0 && project.type === 'excursion'));
 
   return {
     project_id: project.id,

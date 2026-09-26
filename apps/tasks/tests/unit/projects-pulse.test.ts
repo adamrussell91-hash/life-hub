@@ -236,5 +236,20 @@ describe('project lifecycle mix', () => {
     expect(unfinished.lifecycle).toBe('needs_attention');
     expect(unfinished.readyToClose).toBe(false);
     expect(findRetroCandidate([unfinished], now)).toBeNull();
+
+    const emptyPastEnd = buildProjectPulseCard(
+      project({
+        id: 'proj_aotfw_empty',
+        title: 'Artist of the Floating World',
+        type: 'standard',
+        baseline_end_date: '2026-07-01',
+        current_end_date: '2026-07-15'
+      }),
+      [],
+      new Set(),
+      now
+    );
+    expect(emptyPastEnd.readyToClose).toBe(false);
+    expect(findRetroCandidate([emptyPastEnd], now)).toBeNull();
   });
 });

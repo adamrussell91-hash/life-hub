@@ -87,6 +87,28 @@ describe('closure loop', () => {
     expect(variance.ready_to_close).toBe(false);
   });
 
+  it('does not mark a standard project ready_to_close on past end with no tasks', () => {
+    const emptyPast = seed.projects.find((p) => p.id === 'proj_aotfw')!;
+    const variance = computeProjectVariance(emptyPast, [], new Date('2026-09-26T12:00:00'));
+    expect(variance.end_passed).toBe(true);
+    expect(variance.open_task_count).toBe(0);
+    expect(variance.all_tasks_done).toBe(false);
+    expect(variance.ready_to_close).toBe(false);
+  });
+
+  it('allows an excursion to close when the event day has passed and nothing is open', () => {
+    const trip = seed.projects.find((p) => p.id === 'proj_ex_ethics_seed')!;
+    const past = {
+      ...trip,
+      current_end_date: '2026-08-01',
+      baseline_end_date: '2026-08-01'
+    };
+    const variance = computeProjectVariance(past, [], new Date('2026-08-16T12:00:00'));
+    expect(past.type).toBe('excursion');
+    expect(variance.end_passed).toBe(true);
+    expect(variance.ready_to_close).toBe(true);
+  });
+
   it('closes a project and writes a ReviewLog with planned-vs-actual', async () => {
     const kv = memoryKv();
     await seedIfEmpty(kv, keys, seed);
