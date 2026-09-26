@@ -3604,6 +3604,87 @@
   min-width: 0;
 }
 
+.career-page__river-mount {
+  min-width: 0;
+  width: 100%;
+}
+
+.career-river {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.career-river__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.career-river__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.career-river__svg-host {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  touch-action: none;
+  background: transparent;
+}
+
+.career-river__svg {
+  display: block;
+  max-width: 100%;
+}
+
+.career-river__axis-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.career-river__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.career-river__chip {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--glass);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  box-shadow: inset 3px 0 0 var(--chip-color, var(--line));
+}
+
+.career-river__chip.is-selected {
+  border-color: var(--chip-color, var(--high-sea));
+  background: color-mix(in srgb, var(--chip-color, var(--high-sea)) 12%, var(--paper));
+}
+
+.career-river__chip--suggested {
+  border-style: dotted;
+}
+
+.career-river__chip--fading {
+  color: var(--career-fading);
+}
+
+.career-river__chip--parked {
+  box-shadow: none;
+  color: var(--muted);
+}
+
 .career-page__river-empty {
   padding: var(--space-5);
   min-height: 12rem;

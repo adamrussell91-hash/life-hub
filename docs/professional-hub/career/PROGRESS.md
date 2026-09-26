@@ -127,7 +127,20 @@ Plan: `BUILD-PLAN.md`. Plan wins over mockup.
 
 ## Phase 3: River
 
-**Status:** pending
+**Status:** done (2026-09-26)
+**Checked:** L1 V2 V3 C1 C3 C4 R1 S4 P1 W2
+
+- `career-river-geometry.ts` — piecewise 40/60 scale, clamp, clustering, branch polyline, height formula
+- `career-river.ts` — full-bleed SVG river: trunk, roles band, Now line, futures/stones, clusters, fork marker, legend, zoom pills (±3 / Whole / Next 3), −/+, Back to now; phone Zoom sheet; ctrl+wheel / Safari gesture / pointer pinch; drag pan; hover/lock highlight; keyboard on legend
+- Wired into `career.ts`; `#/career/future/<id>` selects the branch
+- Trunk dots carry `future_ids` for supports_future hover colour
+- Named tests: `career-river-geometry.test.ts`, `applications-career.test.ts` (expects `.career-river__svg`)
+
+**diff vs mockup:** Real river is full-bleed with zoom (plan wins). Empty data shows trunk + Now only — honest empty. Role band uses overview employment (current link status). Term labels still use month→term maths until hub-prefs terms are passed in (Phase 4+ can wire `school-time`).
+
+**Must:** River full width; zoom pills; ResizeObserver; orientation flip at 720.
+**Must-not:** River inside a padded max-width card; plain wheel zooms.
+**Verify:** unit geometry tests; Career shell renders `.career-river__svg`.
 
 ---
 

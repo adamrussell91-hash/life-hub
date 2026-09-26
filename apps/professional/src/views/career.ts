@@ -1,10 +1,17 @@
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { getCareer } from '@/api/career';
-import { applicationRoute, careerApplicationNewRoute, careerCardRoute, careerFutureRoute } from '@/app/router';
+import {
+  applicationRoute,
+  careerApplicationNewRoute,
+  careerCardRoute,
+  careerFutureRoute,
+  parseRoute
+} from '@/app/router';
 import { buildCareerModel } from '@/domain/career-model';
 import type { CareerOverview } from '@/domain/types';
 import { isValidApplicationId } from '@/domain/ids';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+import { mountCareerRiver } from '@/views/career-river';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -24,16 +31,25 @@ function surface(node: HTMLElement): void {
   node.style.boxShadow = 'var(--elev-1)';
 }
 
-function renderRiverPlaceholder(host: HTMLElement): void {
+function renderRiver(
+  host: HTMLElement,
+  model: ReturnType<typeof buildCareerModel>,
+  selectedFutureId: string | null
+): void {
   const section = el('section', 'career-page__river');
   section.setAttribute('aria-label', 'Career river');
-  const inner = el('div', 'career-page__river-empty');
-  surface(inner);
-  inner.append(
-    el('p', 'empty-state', 'The river arrives in Phase 3 — full width, with zoom.')
-  );
-  section.append(inner);
+  const mount = el('div', 'career-page__river-mount');
+  section.append(mount);
   host.append(section);
+  mountCareerRiver(mount, model, {
+    selectedFutureId,
+    onSelectFuture: (id) => {
+      if (id) location.hash = careerFutureRoute(id);
+      else if (parseRoute(location.hash).name === 'career-future') {
+        location.hash = '#/career';
+      }
+    }
+  });
 }
 
 function renderFuturePanel(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
@@ -180,7 +196,11 @@ function renderSkillsLedger(host: HTMLElement, model: ReturnType<typeof buildCar
   const filters = el('div', 'career-page__ledger-filters');
   filters.append(el('button', 'hub-pills__btn is-active', 'All') as HTMLButtonElement);
   for (const future of model.futures.filter((f) => f.status === 'active')) {
-    const chip = el('button', 'hub-pills__btn', future.title.split(' ')[0] || future.title) as HTMLButtonElement;
+    const chip = el(
+      'button',
+      'hub-pills__btn',
+      future.title.split(' ')[0] || future.title
+    ) as HTMLButtonElement;
     chip.type = 'button';
     filters.append(chip);
   }
@@ -240,13 +260,17 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
     scan: overview.scan
   });
 
+  const route = parseRoute(location.hash);
+  const selectedFutureId =
+    route.name === 'career-future' && 'id' in route ? route.id : null;
+
   canvas.replaceChildren();
   const page = el('div', 'career-page');
 
   const stats = el('p', 'career-page__stats', model.stats_line);
   page.append(stats);
 
-  renderRiverPlaceholder(page);
+  renderRiver(page, model, selectedFutureId);
 
   const columns = el('div', 'career-page__columns');
   renderFuturePanel(columns, model);

@@ -138,6 +138,7 @@ export type CareerModelOverview = {
     selection_criteria?: Array<{ id: string }>;
   }>;
   supports_future?: Array<{
+    source_id?: string;
     target_id?: string;
     future_id?: string;
     criterion_ids?: string[];
@@ -164,7 +165,12 @@ export type CareerModelOverview = {
     kind?: string;
     lifecycle_status?: string | null;
   }>;
-  employment?: Array<{ valid_from?: string | null; role?: string | null }>;
+  employment?: Array<{
+    valid_from?: string | null;
+    valid_to?: string | null;
+    role?: string | null;
+    label?: string | null;
+  }>;
   ghost_paths?: unknown[];
   scan?: { pending_count?: number; last_run_at?: string | null };
   moves?: Array<{
@@ -369,13 +375,24 @@ export function buildCareerModel(
     };
   });
 
+  const futuresByAchievement = new Map<string, string[]>();
+  for (const link of supportsFuture) {
+    const sourceId = link.source_id;
+    const futureId = link.target_id || link.future_id;
+    if (!sourceId || !futureId) continue;
+    const list = futuresByAchievement.get(sourceId) ?? [];
+    list.push(futureId);
+    futuresByAchievement.set(sourceId, list);
+  }
+
   const trunkItems = achievements
     .filter((a) => a.lifecycle_status === 'active')
     .map((a) => ({
       id: a.id,
       title: a.title,
       occurred_on: a.occurred_on,
-      date_precision: a.date_precision
+      date_precision: a.date_precision,
+      future_ids: futuresByAchievement.get(a.id) ?? []
     }));
 
   const yearsBehind = (() => {

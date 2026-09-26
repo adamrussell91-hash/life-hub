@@ -365,11 +365,14 @@ describe('renderCareerView', () => {
     const canvas = document.createElement('div');
     await renderCareerView(canvas);
     expect(canvas.querySelector('.career-page')).toBeTruthy();
+    expect(canvas.querySelector('.career-river')).toBeTruthy();
+    expect(canvas.querySelector('.career-river__svg')).toBeTruthy();
     expect(canvas.textContent).toMatch(/Skills scan/);
     expect(canvas.textContent).toMatch(/Skills ledger/);
     expect(canvas.textContent).toMatch(/Applications/);
     expect(canvas.textContent).toMatch(/Futures/);
     expect(canvas.textContent).toMatch(/No skill cards yet/);
+    expect(canvas.textContent).not.toMatch(/Phase 3/);
   });
 
   it('links application items to Career application routes', async () => {
