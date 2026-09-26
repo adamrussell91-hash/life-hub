@@ -14,6 +14,7 @@ import {
   renderClassesIndex,
   renderClassPage
 } from '@/teacher/sections/classes';
+import { unmountTeachingCalendar } from '@/teacher/hub-calendar';
 import type { CurriculumResponse } from '@/teacher/nav';
 import type { Block } from '@/schemas/block';
 import type { Class, ScheduledLesson, Subject, Unit, Year } from '@/schemas';
@@ -162,9 +163,26 @@ describe('classes section', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canvas = document.createElement('div');
+    document.body.append(canvas);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input);
+        const ok = (data: unknown) =>
+          ({ ok: true, status: 200, json: async () => ({ ok: true, data }) }) as Response;
+        if (path.includes('/api/curriculum')) return ok(curriculum);
+        if (path.includes('/api/calendar-ghosts')) {
+          return { ok: true, status: 200, json: async () => ({ ghosts: [] }) } as Response;
+        }
+        return ok({ tasks: [], work_blocks: [], pages: [] });
+      })
+    );
   });
 
   afterEach(() => {
+    unmountTeachingCalendar();
+    canvas.remove();
+    vi.unstubAllGlobals();
     closeScheduleOverflow();
     document.querySelectorAll('.entity-banner__dialog').forEach((el) => el.remove());
   });
@@ -222,7 +240,7 @@ describe('classes section', () => {
 
     expect(canvas.querySelector('.class-page__teaching-today')).toBeNull();
     expect(canvas.querySelector('[data-class-section="unit-progress"]')).toBeNull();
-    expect(canvas.querySelector('.class-calendar')).not.toBeNull();
+    expect(canvas.querySelector('[data-part="hub-calendar-mount"].class-calendar')).not.toBeNull();
     expect(canvas.querySelector('.unit-sequence')).not.toBeNull();
     expect(canvas.querySelector('a.seq__lesson-link[href="/lessons/lesson_aotfw_008"]')).not.toBeNull();
 
@@ -276,7 +294,9 @@ describe('classes section', () => {
     expect(canvas.querySelector('.entity-banner__title')?.textContent).toBe(
       'English Advanced 12ENA6'
     );
-    expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('.entity-page-title__status')?.textContent).toBe('Saved');
+    });
   });
 
   it('opens a lesson from the unit sequence', () => {
@@ -289,14 +309,14 @@ describe('classes section', () => {
     expect(navigate).toHaveBeenCalledWith('/lessons/lesson_aotfw_008');
   });
 
-  it('calls onCreateLesson from calendar add controls', () => {
+  it('calls onCreateLesson from calendar add controls', async () => {
     const onCreateLesson = vi.fn();
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1', { onCreateLesson });
 
-    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="week"]')?.click();
-    const add = canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]');
-    expect(add).not.toBeNull();
-    add?.click();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-calendar-quick-add]')).not.toBeNull();
+    });
+    canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]')?.click();
     expect(onCreateLesson).toHaveBeenCalledTimes(1);
   });
 
@@ -360,7 +380,7 @@ describe('classes section', () => {
   it('opens the student class page in a new tab from View as student', () => {
     renderClassPage(canvas, curriculum, 'class_2026_12engadv1');
     const link = canvas.querySelector<HTMLAnchorElement>('.class-page__view-as-student');
-    expect(link?.getAttribute('href')).toBe('/s/classes/class_2026_12engadv1');
+    expect(link?.getAttribute('href')).toMatch(/\/s\/classes\/class_2026_12engadv1$/);
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.rel).toContain('noopener');
     link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));

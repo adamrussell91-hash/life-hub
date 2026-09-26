@@ -119,37 +119,48 @@ describe('class page calendar cleanup', () => {
 
   beforeEach(() => {
     canvas = document.createElement('div');
+    document.body.append(canvas);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL) => {
+        const path = String(input);
+        const ok = (data: unknown) =>
+          ({ ok: true, status: 200, json: async () => ({ ok: true, data }) }) as Response;
+        if (path.includes('/api/curriculum')) return ok(curriculumWithTrashedUnit());
+        if (path.includes('/api/calendar-ghosts')) {
+          return { ok: true, status: 200, json: async () => ({ ghosts: [] }) } as Response;
+        }
+        return ok({ tasks: [], work_blocks: [], pages: [] });
+      })
+    );
   });
 
   afterEach(() => {
+    canvas.remove();
+    vi.unstubAllGlobals();
     document.querySelectorAll('.entity-banner__dialog').forEach((element) => element.remove());
   });
 
-  it('uses a full width calendar with one visible add control and compact dates', () => {
+  it('uses kit calendar with one nav quick-add and no standing Add column', async () => {
     const onScheduleUnit = vi.fn();
     renderClassPage(canvas, curriculumWithTrashedUnit(), 'class_2026_12engadv1', {
       onScheduleUnit
     });
 
-    expect(canvas.querySelector('[data-calendar="rail"]')).toBeNull();
+    await vi.waitFor(() => {
+      expect(canvas.querySelector('[data-part="hub-calendar-mount"].class-calendar')).not.toBeNull();
+      expect(canvas.querySelector('[data-part="tideline"]')).not.toBeNull();
+    });
+
     expect(canvas.querySelector('.calendar-compose-card')).toBeNull();
     expect(canvas.querySelector('.calendar-compose')).toBeNull();
     expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
-    expect(canvas.textContent).not.toContain('Introduction to An Artist of the Floating World');
-    expect(
-      canvas.querySelector<HTMLElement>('.hub-calendar__workspace')?.style.gridTemplateColumns
-    ).toBe('minmax(0, 1fr)');
+    expect(canvas.querySelector('[data-calendar-view="month"]')).toBeNull();
 
     const add = canvas.querySelector<HTMLButtonElement>('[data-calendar-quick-add]');
     expect(add).not.toBeNull();
     add?.click();
     expect(onScheduleUnit).toHaveBeenCalledTimes(1);
-
-    expect(canvas.querySelector('.class-calendar__week-heading > .icon-plus-btn')).toBeNull();
-
-    canvas.querySelector<HTMLButtonElement>('[data-calendar-view="month"]')?.click();
-    const today = canvas.querySelector<HTMLElement>('.class-calendar__day[data-today="true"]');
-    expect(today?.querySelector('.class-calendar__day-num')?.textContent).toBe('17');
   });
 
   it('does not render a trashed unit, its sequence link, or its scheduled lesson', () => {

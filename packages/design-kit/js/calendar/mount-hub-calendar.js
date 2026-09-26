@@ -26,7 +26,12 @@ import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from './hu
  *   today?: string,
  *   now?: Date,
  *   rootClass?: string,
- *   onNavigate?: (href: string) => void
+ *   onNavigate?: (href: string) => void,
+ *   onReschedule?: (item: unknown, patch: { date: string, start_time?: string | null }) => void | Promise<void>,
+ *   onQuickAdd?: () => void,
+ *   quickAddLabel?: string,
+ *   classId?: string,
+ *   eventFilter?: (event: unknown) => boolean
  * }} HubCalendarAdapter
  */
 
@@ -136,6 +141,21 @@ export function mountHubCalendar(host, adapter) {
     });
   }
 
+  function scopedEvents() {
+    let events = loader.getEvents();
+    if (typeof adapter.eventFilter === 'function') {
+      events = events.filter((event) => adapter.eventFilter(event));
+    } else if (adapter.classId) {
+      const classId = adapter.classId;
+      events = events.filter((event) => {
+        const record = event && typeof event === 'object' ? event.record : null;
+        if (record?.type === 'scheduled_lesson') return record.class_id === classId;
+        return true;
+      });
+    }
+    return events;
+  }
+
   function sharedInput(zoom) {
     const today = adapter.today || getSydneyDateKey(adapter.now ?? new Date());
     const week = weekFor(selectedDate);
@@ -146,7 +166,11 @@ export function mountHubCalendar(host, adapter) {
       defaultFilter: adapter.defaultFilter ?? defaultFilterForHub(hub),
       routeFor: adapter.routeFor,
       apiFetch: adapter.apiFetch,
-      events: loader.getEvents(),
+      onNavigate: adapter.onNavigate,
+      onReschedule: adapter.onReschedule,
+      onQuickAdd: adapter.onQuickAdd,
+      quickAddLabel: adapter.quickAddLabel,
+      events: scopedEvents(),
       ghosts,
       week,
       today,

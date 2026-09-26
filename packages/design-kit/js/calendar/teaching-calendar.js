@@ -24,7 +24,8 @@ export function teachingEventsFromCurriculum(data) {
         lesson_id: typeof row.lesson_id === 'string' ? row.lesson_id : undefined,
         class_id: typeof row.class_id === 'string' ? row.class_id : undefined,
         date: row.date,
-        time: TIME_KEY.test(row.start_time) ? row.start_time : undefined,
+        // Untimed lessons still fill the School band (default first period).
+        time: TIME_KEY.test(row.start_time) ? row.start_time : '09:00',
         duration_min: 60,
         title: titles.get(row.lesson_id) || row.lesson_id || 'Lesson',
         class_title: classTitles.get(row.class_id),

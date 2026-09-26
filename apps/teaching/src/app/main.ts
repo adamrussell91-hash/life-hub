@@ -511,7 +511,7 @@ function renderTeacherCalendarRoute(token: number): void {
     host.className = 'teacher-calendar-host';
     host.style.minWidth = '0';
     refs.canvas.append(host);
-    calendarHandle = mountTeachingCalendar(host);
+    calendarHandle = mountTeachingCalendar(host, { routeZoom: true });
   });
 }
 

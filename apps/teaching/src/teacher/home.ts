@@ -1,17 +1,13 @@
 import { navigate } from '@/app/router';
+import { withAppBase } from '@/app/base-path';
 import type { Class, Subject, Year } from '@/schemas';
-import {
-  buildClassCalendarModel,
-  shiftYearMonth,
-  yearMonthFromDate
-} from '@/schedule/class-calendar-model';
 import { resolveScheduleToday } from '@/schedule/today';
-import { applyCalendarPresentation } from '@/teacher/calendar-presentation';
 import { classDisplayTitle, classEyebrow } from '@/teacher/class-heading';
 import {
-  renderClassCalendar,
-  type ScheduleCalendarView
-} from '@/teacher/class-calendar';
+  mountTeachingCalendar,
+  TEACHING_CALENDAR_MIN_EMBED_PX,
+  unmountTeachingCalendar
+} from '@/teacher/hub-calendar';
 import { renderPageHeader } from '@/teacher/page-header';
 import { openBlankLesson } from '@/teacher/create/blank-lesson';
 import { patchScheduledLesson } from '@/teacher/schedule-api';
@@ -43,7 +39,6 @@ export function renderTeacherHome(
 
   renderPageHeader(canvas, { eyebrow: 'Workspace', title: 'Dashboard' });
 
-  const classesById = new Map(curriculum.classes.map((cls) => [cls.id, cls]));
   const yearsById = new Map(curriculum.years.map((year) => [year.id, year]));
   const subjectsById = new Map(curriculum.subjects.map((subject) => [subject.id, subject]));
   const scheduleToday = resolveScheduleToday(curriculum.schedule_anchor_date);
@@ -88,16 +83,7 @@ export function renderTeacherHome(
 
   const calendarHost = document.createElement('div');
   calendarHost.className = 'home-dashboard__calendar';
-
-  let selectedDate = scheduleToday;
-  let viewMonth = yearMonthFromDate(scheduleToday);
-  let calendarView: ScheduleCalendarView = 'week';
-  let monthDelta = 0;
-  let selectedScheduledId: string | null = null;
-
-  const lessonTitles = new Map(
-    curriculum.lessons.map((lesson) => [lesson.id, lesson.title] as const)
-  );
+  calendarHost.style.minWidth = '0';
 
   const openCalendarAdd = (): void => {
     openBlankLesson({
@@ -106,57 +92,59 @@ export function renderTeacherHome(
     });
   };
 
-  const paintCalendar = (): void => {
-    const model = buildClassCalendarModel({
-      scheduled: curriculum.scheduled_lessons,
-      lessonTitles,
-      today: scheduleToday,
-      selectedDate,
-      viewMonth
-    });
-    renderClassCalendar(calendarHost, model, {
-      view: calendarView,
-      onViewChange: (next) => {
-        calendarView = next;
-        monthDelta = 0;
-        paintCalendar();
-      },
-      onSelectDate: (date, options = {}) => {
-        selectedDate = date;
-        viewMonth = yearMonthFromDate(date);
-        monthDelta = 0;
-        selectedScheduledId = options.scheduledId ?? null;
-        paintCalendar();
-      },
-      onShiftMonth: (delta) => {
-        viewMonth = shiftYearMonth(viewMonth, delta);
-        monthDelta = delta;
-        paintCalendar();
-      },
-      monthDelta,
-      onNavigate: navigate,
-      chipMeta: (lesson) => {
-        const cls = lesson.classId ? classesById.get(lesson.classId) : undefined;
-        return cls ? classEyebrow(cls) : undefined;
-      },
-      selectedScheduledId,
-      onRescheduleLesson: (scheduledId, patch) => {
-        void patchScheduledLesson(scheduledId, patch).then((updated) => {
-          curriculum.scheduled_lessons = curriculum.scheduled_lessons.map((row) =>
-            row.id === updated.id ? updated : row
-          );
-          selectedDate = updated.date;
-          selectedScheduledId = updated.id;
-          paintCalendar();
-        });
-      }
-    });
-    applyCalendarPresentation(calendarHost, {
-      onAdd: openCalendarAdd,
-      addLabel: 'Create lesson'
-    });
+  const mountOpts = {
+    today: scheduleToday,
+    onQuickAdd: openCalendarAdd,
+    quickAddLabel: 'Create lesson',
+    onReschedule: (scheduledId: string, patch: { date?: string; start_time?: string | null }) => {
+      void patchScheduledLesson(scheduledId, patch).then((updated) => {
+        curriculum.scheduled_lessons = curriculum.scheduled_lessons.map((row) =>
+          row.id === updated.id ? updated : row
+        );
+      });
+    }
   };
-  paintCalendar();
+
+  const paintCalendarHost = (): void => {
+    unmountTeachingCalendar();
+    calendarHost.replaceChildren();
+    const width = calendarHost.clientWidth || calendarHost.getBoundingClientRect().width;
+    if (width > 0 && width < TEACHING_CALENDAR_MIN_EMBED_PX) {
+      const note = document.createElement('p');
+      note.className = 'home-dashboard__calendar-narrow';
+      note.textContent = 'Calendar needs more width — open the full page.';
+      const link = document.createElement('a');
+      link.className = 'home-dashboard__calendar-link btn btn--secondary';
+      link.href = withAppBase('/calendar');
+      link.textContent = 'Open calendar';
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        navigate('/calendar');
+      });
+      calendarHost.append(note, link);
+      return;
+    }
+    mountTeachingCalendar(calendarHost, mountOpts);
+  };
+
+  // Defer measure so the host has a laid-out width.
+  queueMicrotask(paintCalendarHost);
+  const ro =
+    typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(() => {
+          const linked = Boolean(calendarHost.querySelector('.home-dashboard__calendar-link'));
+          const width = calendarHost.clientWidth || calendarHost.getBoundingClientRect().width;
+          const shouldLink = width > 0 && width < TEACHING_CALENDAR_MIN_EMBED_PX;
+          const mounted = Boolean(calendarHost.querySelector('[data-part="hub-calendar-mount"]'));
+          if (shouldLink === linked && (shouldLink || mounted)) return;
+          paintCalendarHost();
+        })
+      : null;
+  ro?.observe(calendarHost);
+  disposers.push(() => {
+    ro?.disconnect();
+    unmountTeachingCalendar();
+  });
 
   const openCreateClass = (): void => {
     openCreateModal({

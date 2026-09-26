@@ -135,19 +135,29 @@ function chipFromEvent(event) {
         : kind === 'health' || kind === 'fitness' || kind === 'corey'
           ? kind
           : null;
+  const classMeta = isClass
+    ? record.period
+      ? `P${record.period} · ${record.focus || record.title || ''}`.trim()
+      : record.class_title && record.title && record.class_title !== record.title
+        ? `${record.class_title} · ${clockMeta(start, end)}`
+        : record.class_title || clockMeta(start, end)
+    : clockMeta(start, end);
   return {
     id: record.id || event.path,
     date: record.date,
     start,
     end,
     kind,
-    title: isClass ? (record.class_title || record.title || 'Class') : (record.title || kind),
-    meta: workout?.meta ?? (isClass && record.period ? `P${record.period} · ${record.focus || record.title || ''}`.trim() : clockMeta(start, end)),
+    // Prefer lesson title for class chips; class name stays in meta.
+    title: isClass ? (record.title || record.class_title || 'Class') : (record.title || kind),
+    meta: workout?.meta ?? classMeta,
     isClass,
     protected: record.protected === true || kind === 'corey',
     provider: record.provider || record.clinician || '',
     source: record.type,
     filterKey,
+    lesson_id: typeof record.lesson_id === 'string' ? record.lesson_id : undefined,
+    class_id: typeof record.class_id === 'string' ? record.class_id : undefined,
     ...(workout?.skipped ? { skipped: true } : {})
   };
 }

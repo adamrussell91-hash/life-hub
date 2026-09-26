@@ -10,9 +10,11 @@ import {
   bandTargets,
   baseHeights,
   blockGeometry,
+  hourForY,
   SLEEP_STRIP_PX,
   yForHour
 } from '../calendar-bands.js';
+import { hoursToDueTime, snapHours } from '../time-grid.js';
 import { acceptPlan, GHOST_AGENTS } from './ghost-writes.js';
 import { buildTidelineModel, movedCaption, toHour } from './tideline-model.js';
 import { getSydneyMinutesOfDay } from '../sydney-clock.js';
@@ -219,6 +221,14 @@ function mount() {
   el('div', 'cal__period', `<b>${model.period.title}</b><span>${model.period.range}</span>`, nav, { 'data-part': 'period' });
   el('button', 'cal__round', ICON.next, nav, { type: 'button', 'aria-label': 'Next week', 'data-shift': '1' });
   el('button', 'btn btn--secondary', 'Today', nav, { type: 'button', 'data-today': '1' });
+  if (typeof input.onQuickAdd === 'function') {
+    el('button', 'icon-plus-btn cal__quick-add', '+', nav, {
+      type: 'button',
+      'aria-label': input.quickAddLabel || 'Add',
+      'data-part': 'quick-add',
+      'data-calendar-quick-add': ''
+    });
+  }
   const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
   for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
     el('button', `hub-pills__btn${name === 'Week' ? ' is-active' : ''}`, name, zoom, {
@@ -469,7 +479,11 @@ function mountBody(grid, date) {
   body.style.height = `${model.total + SLEEP_STRIP_PX}px`;
   nodes.set(`colbody:${date}`, body);
   bands.forEach((band, index) => {
-    if (band.id === 'school' && day.school) nodes.set(`bg:${date}:${index}`, el('div', 'cal-bg cal-bg--school', undefined, body, { 'data-band': String(index) }));
+    if (band.id === 'school' && day.school) {
+      const attrs = { 'data-band': String(index) };
+      if (input?.fills?.school) attrs['data-fill'] = String(input.fills.school);
+      nodes.set(`bg:${date}:${index}`, el('div', 'cal-bg cal-bg--school', undefined, body, attrs));
+    }
     if (band.id === 'yours') nodes.set(`bg:${date}:${index}`, el('div', 'cal-bg cal-bg--yours', undefined, body, { 'data-band': String(index) }));
     nodes.set(`line:${date}:${index}`, el('div', 'cal-line', undefined, body));
   });
@@ -492,6 +506,11 @@ function mountBody(grid, date) {
     const node = el('div', 'cal-wall', `<span class="cal-wall__pill" title="${wall.label}" aria-label="${wall.label}">${ICON.lock}<span class="cal-wall__first">${first}</span>${more}</span>`, body, { 'data-part': 'wall' });
     node.style.height = `${model.total}px`;
   }
+}
+
+function chipIsMovable(chip) {
+  if (!chip || chip.ghost || typeof input?.onReschedule !== 'function') return false;
+  return chip.source === 'scheduled_lesson' || chip.source === 'task' || chip.isClass === true;
 }
 
 function mountChip(body, chip) {
@@ -517,8 +536,15 @@ function mountChip(body, chip) {
     'aria-label': `${chip.title}. ${chip.meta}`,
     'data-start': String(chip.start),
     'data-end': String(chip.end),
-    'data-has-actions': acts ? '1' : ''
+    'data-has-actions': acts ? '1' : '',
+    ...(chip.source ? { 'data-source': chip.source } : {}),
+    ...(chip.lesson_id ? { 'data-lesson-id': chip.lesson_id } : {}),
+    ...(chip.class_id ? { 'data-class-id': chip.class_id } : {})
   });
+  if (chipIsMovable(chip)) {
+    node.draggable = true;
+    node.dataset.movable = '1';
+  }
   const proposal = model.ghosts.find(item => item.overItem === chip.id && !state.settled.has(item.id));
   if (proposal && typeof node.insertAdjacentHTML === 'function') {
     node.classList.add('has-proposal');
@@ -528,6 +554,28 @@ function mountChip(body, chip) {
     node.setAttribute('aria-label', `${chip.title}. ${chip.meta}. Proposal: ${proposal.label}. Open for details.`);
   }
   nodes.set(`chip:${chip.id}`, node);
+}
+
+function navigateHref(href) {
+  if (!href) return;
+  if (typeof input?.onNavigate === 'function') {
+    input.onNavigate(href);
+    return;
+  }
+  const loc = root.defaultView?.location;
+  if (!loc) return;
+  if (href.startsWith('#')) loc.hash = href;
+  else loc.assign(href);
+}
+
+function dropPatchFromEvent(event, body) {
+  const date = body?.dataset?.date;
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const rect = body.getBoundingClientRect?.();
+  if (!rect) return { date, start_time: null };
+  const y = event.clientY - rect.top;
+  const hour = snapHours(hourForY(bands, heights, y));
+  return { date, start_time: hoursToDueTime(hour) };
 }
 
 export function layout(nextHeights) {
@@ -899,6 +947,10 @@ function wire(section) {
       void dismiss(dismissButton.dataset.dismiss);
       return;
     }
+    if (target.closest?.('[data-part="quick-add"]')) {
+      input?.onQuickAdd?.();
+      return;
+    }
     const chip = target.closest?.('.cal-chip');
     if (chip) {
       const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chip.dataset.id);
@@ -907,12 +959,7 @@ function wire(section) {
         const href = openInHubHref(item, input.routeFor);
         if (href) {
           closePop();
-          const loc = root.defaultView?.location;
-          if (href.startsWith('#')) {
-            if (loc) loc.hash = href;
-          } else if (loc) {
-            loc.assign(href);
-          }
+          navigateHref(href);
           return;
         }
       }
@@ -966,6 +1013,49 @@ function wire(section) {
       openPop(event.target.dataset.id);
       event.preventDefault();
     }
+  });
+  section.addEventListener?.('dragstart', event => {
+    const chip = event.target?.closest?.('.cal-chip[data-movable="1"]');
+    if (!chip || typeof input?.onReschedule !== 'function') return;
+    event.dataTransfer?.setData('text/calendar-chip-id', chip.dataset.id || '');
+    event.dataTransfer?.setData('text/scheduled-id', chip.dataset.id || '');
+    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+    chip.classList.add('is-dragging');
+  });
+  section.addEventListener?.('dragend', event => {
+    event.target?.closest?.('.cal-chip')?.classList?.remove?.('is-dragging');
+    section.querySelectorAll?.('.cal-body.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+  });
+  section.addEventListener?.('dragover', event => {
+    if (typeof input?.onReschedule !== 'function') return;
+    const body = event.target?.closest?.('.cal-body[data-date]');
+    if (!body) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    section.querySelectorAll?.('.cal-body.is-drop-target').forEach((node) => {
+      if (node !== body) node.classList.remove('is-drop-target');
+    });
+    body.classList.add('is-drop-target');
+  });
+  section.addEventListener?.('dragleave', event => {
+    const body = event.target?.closest?.('.cal-body[data-date]');
+    if (body && !body.contains(event.relatedTarget)) body.classList.remove('is-drop-target');
+  });
+  section.addEventListener?.('drop', event => {
+    if (typeof input?.onReschedule !== 'function') return;
+    const body = event.target?.closest?.('.cal-body[data-date]');
+    const chipId =
+      event.dataTransfer?.getData('text/calendar-chip-id') ||
+      event.dataTransfer?.getData('text/scheduled-id');
+    if (!body || !chipId) return;
+    event.preventDefault();
+    body.classList.remove('is-drop-target');
+    const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chipId);
+    const patch = dropPatchFromEvent(event, body);
+    if (!item || !patch) return;
+    Promise.resolve(input.onReschedule(item, patch)).then(() => {
+      void input?.onSourcesChanged?.();
+    });
   });
 }
 
