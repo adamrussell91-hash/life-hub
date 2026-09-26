@@ -29,19 +29,19 @@ Locked chrome: `packages/design-kit/CALENDAR.md`. Zoom stops: Day · Week · Ter
 | Time grid (day/week columns, hour gutter, now line) | `renderTimeGrid` | **MOVED** → kit Tideline / Day Dial Linear |
 | Month grid + weekday heads | `renderMonthGrid` | **DROPPED** — Month not a zoom stop |
 | Drag-reschedule tasks onto a day/hour | `chip.draggable`, `wireDropTarget`, `dropTask` | **KEEP** — port onto Tideline chips (task due / work-block create when Plan work on) |
-| Plan-work mode (drag creates work block) | `planWorkMode` + `createWorkBlock` | **KEEP** — Tasks band / planning chrome around the object |
-| Pinch points + pressure strips | `detectPinchPoints`, `renderPressureStrips`, column `data-pinch` | **KEEP** — hub chrome around Tideline (CALENDAR.md allows pinch) |
+| Plan-work mode (drag creates work block) | `planWorkMode` + `createWorkBlock` | **KEEP** — `hub-calendar-chrome.ts` around the kit; Plan work · on flips drag → `createWorkBlock` |
+| Pinch points + pressure strips | `detectPinchPoints`, `renderPressureStrips`, column `data-pinch` | **KEEP** — `hub-calendar-chrome.ts` over Tideline |
 | Live capacity remaining text | `liveCapacityText` | **KEEP** / align with kit `capacity-model` header (do not fork a second capacity truth) |
 | Quick-add / compose (rail standing compose on Day) | `renderStandingCompose`, `renderQuickAdd` | Standing Add column **DROPPED** (lock). Compose itself **KEEP** as kit compose / ghost Accept path, not a permanent week Add column |
-| Agenda list on Day rail | `renderAgenda` | **KEEP** as optional Day rail chrome, not a second calendar skin |
+| Agenda list on Day rail | `renderAgenda` | **KEEP** — Day rail in `hub-calendar-chrome.ts` |
 | Task editor in preview pane | `renderTaskEditor` / `openBacklogTask` | **KEEP** |
 | Month bloom drawer | `toggleBloom`, `renderBloomDrawer` | **DROPPED** with Month stop (drawer only exists on month cells). Overflow "+N more" behaviour on Tideline/phone follows the lock, not a parallel bloom skin |
 | Daily Dial (`views/daily-dial.ts`) on Today | `dashboard.ts` `mountDailyDial` | **MOVED** → kit Day Dial for calendar Day stop. Tasks Today page may keep other widgets; calendar Day must be the locked Dial |
 | Ghost work-block preview | `setCalendarGhostBlocks*` | **KEEP** — unify with kit ghost Accept/Dismiss (`POST { id, decision }` only) |
-| Planning lens + layer pills | `sessionFilters.planningLens` / layers | **KEEP** as Tasks planning chrome around the object |
+| Planning lens + layer pills | `sessionFilters.planningLens` / layers | **KEEP** — `hub-calendar-chrome.ts` planning pills |
 | Filters (done, dates, search) | calendar meta pills | **KEEP** where they are Tasks product; source chips become the shared kit filter (Step 2) |
-| Keyboard shortcuts (A add, go-to, …) | `bindCalendarKeys` | **KEEP** where they do not invent chrome the lock forbids |
-| Rail widgets (locks, next actions, dump, quick links, deep hours) | week rail helpers | **KEEP** as Tasks chrome beside Tideline — not a second week grid |
+| Keyboard shortcuts (A add, go-to, …) | `bindCalendarKeys` | **KEEP** — D/W/A/T/G/? in chrome; Month (M) omitted (lock forbids Month stop) |
+| Rail widgets (locks, next actions, dump, quick links, deep hours) | week rail helpers | **KEEP** — locks / next actions / dump / quick links in chrome; deep-hours **DROPPED** (duplicated kit capacity header) |
 | Month-only strips (horizon breadcrumb, stall banner, project pulse, domain activity) | month body | **MOVED** — these are product chrome; host on Tasks surfaces that still need them (Projects/Dashboard), not inside a forbidden Month stop |
 | Classic `.hub-calendar` CSS paint | design-kit `calendar.css` | **MOVED** → Tideline/Almanac/Dial/River CSS for calendar routes; classic CSS may remain until unused |
 

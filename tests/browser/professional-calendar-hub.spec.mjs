@@ -7,10 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { calendarHubArtifactsDir } from './calendar-hub-artifacts.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
-const OUT = path.join('/opt/cursor/artifacts', 'professional-calendar-hub');
+const OUT = calendarHubArtifactsDir('professional-calendar-hub');
 fs.mkdirSync(OUT, { recursive: true });
 
 let browser;
@@ -122,6 +123,94 @@ test('professional calendar: reduced-motion + 390', async () => {
   try {
     assert.equal(errors.length, 0, errors.join('\n'));
     await page.screenshot({ path: path.join(OUT, 'week-390-default.png') });
+  } finally {
+    await context.close();
+  }
+});
+
+
+const frames = (page, ms, probe) =>
+  page.evaluate(
+    async ({ ms, probe }) => {
+      const f = new Function(`return (${probe})`)();
+      const out = [];
+      const t0 = performance.now();
+      while (performance.now() - t0 < ms) {
+        await new Promise((r) => requestAnimationFrame(r));
+        out.push(f());
+      }
+      return out;
+    },
+    { ms, probe: probe.toString() }
+  );
+
+test('professional calendar: filter toggle; capacity unchanged; no remount', async () => {
+  const { context, page } = await openProfessionalCalendar();
+  try {
+    const chip = page.locator('[data-part="sources"] button[data-filter="pd"]').first();
+    await chip.waitFor();
+    const before = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return { caps: [...root.querySelectorAll('[data-part="capacity"]')].map((n) => n.dataset.pct) };
+    });
+    await chip.click();
+    const after = await page.evaluate(() => {
+      const root = document.querySelector('[data-part="tideline"]');
+      return { caps: [...root.querySelectorAll('[data-part="capacity"]')].map((n) => n.dataset.pct), still: Boolean(root) };
+    });
+    assert.deepEqual(after.caps, before.caps);
+    assert.ok(after.still);
+  } finally {
+    await context.close();
+  }
+});
+
+test('professional calendar: foreign Open in Hub; Accept {id,decision}', async () => {
+  const { context, page } = await openProfessionalCalendar();
+  const posts = [];
+  page.on('request', (req) => {
+    if (req.method() === 'POST' && req.url().includes('/api/calendar-ghosts')) posts.push(req.postData() || '');
+  });
+  try {
+    const tasks = page.locator('[data-part="sources"] button[data-filter="tasks"]').first();
+    if (await tasks.count() && (await tasks.getAttribute('aria-pressed')) !== 'true') await tasks.click();
+    const foreign = page.locator('.cal-chip.k-task:not(.is-filter-hidden):not([hidden]), .cal-chip.is-class:not(.is-filter-hidden):not([hidden])').first();
+    if (await foreign.count()) {
+      await foreign.click();
+      await page.locator('[data-part="open-in-hub"]').waitFor({ timeout: 5000 });
+      assert.match(await page.locator('[data-part="open-in-hub"]').textContent(), /Open in/);
+    }
+    const accepted = await page.evaluate(async () => {
+      const id = document.querySelector('[data-accept]')?.getAttribute('data-accept');
+      if (!id || !window.__tideline?.accept) return false;
+      await window.__tideline.accept(id);
+      return true;
+    });
+    if (accepted) {
+      await page.waitForTimeout(400);
+      assert.ok(posts.length >= 1);
+      assert.deepEqual(Object.keys(JSON.parse(posts.at(-1))).sort(), ['decision', 'id']);
+    }
+  } finally {
+    await context.close();
+  }
+});
+
+test('professional calendar: Term tier bars; Term↔Year tween; Back/Forward', async () => {
+  const { context, page } = await openProfessionalCalendar({ hash: '#/calendar/term' });
+  try {
+    await page.locator('[data-part="term-river"]').waitFor({ timeout: 15000 });
+    assert.match((await page.locator('[data-part="period"]').textContent()) || '', /Term|T3|T4|→/i);
+    await page.locator('[data-part="zoom-pills"] button[data-zoom="year"]').click();
+    const f = await frames(page, 800, () => ({ t: window.__termRiver?.blend?.() ?? 0 }));
+    const blends = f.map((v) => v.t).filter((t) => typeof t === 'number');
+    if (blends.length >= 10) assert.ok(new Set(blends.map((t) => t.toFixed(3))).size >= 8);
+    await page.goBack();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /#\/calendar\/term/);
+    await page.goForward();
+    await page.waitForTimeout(400);
+    assert.match(page.url(), /#\/calendar\/year/);
   } finally {
     await context.close();
   }

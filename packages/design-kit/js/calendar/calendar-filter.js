@@ -71,7 +71,7 @@ export function filterKeyForItem(item) {
   if (!item || typeof item !== 'object') return null;
   if (item.filterKey && ALL_IDS.includes(item.filterKey)) return item.filterKey;
   const kind = item.kind || item.chip?.kind;
-  const source = item.source || item.record?.type || item.chip?.source;
+  const source = item.source || item.type || item.record?.type || item.chip?.source;
   const isClass = item.isClass === true || item.chip?.isClass === true || source === 'scheduled_lesson';
   if (kind === 'teaching' || source === 'scheduled_lesson' || isClass) {
     return isClass || source === 'scheduled_lesson' ? 'classes' : 'events';
@@ -79,7 +79,7 @@ export function filterKeyForItem(item) {
   if (kind === 'professional' || source === 'professional_meeting' || source === 'professional_event') {
     return source === 'professional_meeting' ? 'meetings' : 'pd';
   }
-  if (kind === 'task' || source === 'task' || source === 'work_block') return 'tasks';
+  if (kind === 'task' || source === 'task' || source === 'work_block' || source === 'deadline') return 'tasks';
   if (kind === 'health' || source === 'medical') return 'health';
   if (kind === 'fitness' || source === 'workout') return 'fitness';
   if (kind === 'corey') return 'corey';
@@ -132,18 +132,34 @@ export function paintSourceFilter(doc, host, opts) {
   if (host.dataset) host.dataset.part = 'sources';
   else host.setAttribute?.('data-part', 'sources');
 
+  const summary = doc.createElement('span');
+  summary.className = 'cal-src-summary';
+  if (summary.dataset) summary.dataset.part = 'filter-summary';
+  else summary.setAttribute?.('data-part', 'filter-summary');
+  summary.textContent = hidden > 0 ? `Filters · ${hidden} hidden` : 'Filters';
+  attach(host, summary);
+
+  const row = doc.createElement('div');
+  row.className = 'cal__sources-row';
+  if (row.dataset) row.dataset.part = 'sources-row';
+  attach(host, row);
+
   const addBtn = (id, label, pressed, count, extraClass = '') => {
+    const shortcut = extraClass.includes('cal-src--shortcut');
     const btn = doc.createElement('button');
     btn.type = 'button';
     btn.className = `cal-src k-${id}${pressed ? '' : ' is-off'}${id === 'corey' ? ' cal-src--corey' : ''}${extraClass}`;
     btn.setAttribute('aria-pressed', String(pressed));
     if (btn.dataset) btn.dataset.filter = id;
     else btn.setAttribute('data-filter', id);
-    const mark = doc.createElement(id === 'corey' ? 'span' : 'i');
-    if (id === 'corey') mark.className = 'cal-mark';
+    if (!shortcut) {
+      const mark = doc.createElement(id === 'corey' ? 'span' : 'i');
+      if (id === 'corey') mark.className = 'cal-mark';
+      attach(btn, mark);
+    }
     const text = doc.createElement('span');
-    text.textContent = ` ${label}${count != null ? ` ${count}` : ''}`;
-    attach(btn, mark, text);
+    text.textContent = `${label}${count != null ? ` ${count}` : ''}`;
+    attach(btn, text);
     btn.addEventListener('click', () => {
       if (id === 'all') {
         const next = Object.fromEntries(ALL_IDS.map((k) => [k, true]));
@@ -161,7 +177,7 @@ export function paintSourceFilter(doc, host, opts) {
       writeFilterState(hub, next);
       onChange(next);
     });
-    attach(host, btn);
+    attach(row, btn);
   };
 
   addBtn('all', 'All', ALL_IDS.every((id) => state[id]), null, ' cal-src--shortcut');
@@ -177,7 +193,7 @@ export function paintSourceFilter(doc, host, opts) {
     if (amb.dataset) amb.dataset.part = 'ambient';
     else amb.setAttribute?.('data-part', 'ambient');
     amb.textContent = `Ambient: ${ambient}`;
-    attach(host, amb);
+    attach(row, amb);
   }
 
   const line = doc.createElement('button');

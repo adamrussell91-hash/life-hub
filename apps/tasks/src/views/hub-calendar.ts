@@ -1,12 +1,17 @@
 /**
  * Tasks hub calendar adapter — default filter, band fills, routeFor, mount only.
- * No calendar CSS or renderer logic outside packages/design-kit.
+ * KEEP chrome (plan-work, lens, agenda, pinch, keys, rail) lives in hub-calendar-chrome.ts.
  */
 import { defaultFilterForHub } from '../../design-kit/js/calendar/calendar-filter.js';
 import { calendarZoomHref, normalizeCalendarZoom, parseCalendarZoom } from '../../design-kit/js/calendar/hub-calendar-zoom.js';
 import { mountHubCalendar, type HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { taskPageHash } from '@/domain/cards';
 import { tasksApi } from '@/services/client-api';
+import {
+  isPlanWorkMode,
+  mountTasksCalendarChrome,
+  type TasksChromeMount
+} from '@/views/hub-calendar-chrome';
 
 export const TASKS_CALENDAR_FILLS = {
   after: 'work'
@@ -53,6 +58,20 @@ async function rescheduleItem(
   const id = itemId(item);
   if (!id || !patch.date) return;
   const type = itemType(item);
+  if (isPlanWorkMode() && (type === 'task' || type === 'deadline')) {
+    const row = item && typeof item === 'object' ? (item as Record<string, unknown>) : null;
+    const record = row?.record && typeof row.record === 'object' ? (row.record as Record<string, unknown>) : null;
+    await tasksApi.createWorkBlock({
+      title: String(record?.title || row?.title || 'Work block'),
+      date: patch.date,
+      start_time: patch.start_time || '09:00',
+      duration_minutes: Number(record?.estimated_duration ?? 60),
+      task_id: id,
+      status: 'confirmed',
+      source: 'manual'
+    });
+    return;
+  }
   if (type === 'work_block') {
     await tasksApi.updateWorkBlock(id, {
       date: patch.date,
@@ -69,11 +88,14 @@ async function rescheduleItem(
 }
 
 let handle: HubCalendarHandle | null = null;
+let chrome: TasksChromeMount | null = null;
 
-/** Mount the locked kit calendar. Zoom follows `#/day|week|term|year|almanac`. */
+/** Mount the locked kit calendar with Tasks KEEP chrome around it. */
 export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
   handle?.destroy();
-  handle = mountHubCalendar(host, {
+  chrome?.destroy();
+  chrome = mountTasksCalendarChrome(host);
+  handle = mountHubCalendar(chrome.calendarHost, {
     hub: 'tasks',
     fills: { ...TASKS_CALENDAR_FILLS },
     defaultFilter: defaultFilterForHub('tasks'),
@@ -85,6 +107,7 @@ export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
     setZoom: (zoom) => {
       const href = calendarZoomHref('tasks', normalizeCalendarZoom(zoom));
       if (location.hash !== href) location.hash = href;
+      void chrome?.refresh({ zoom: normalizeCalendarZoom(zoom) });
     },
     onNavigate: (href) => {
       if (href.startsWith('#')) location.hash = href;
@@ -97,4 +120,6 @@ export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
 export function unmountTasksCalendar(): void {
   handle?.destroy();
   handle = null;
+  chrome?.destroy();
+  chrome = null;
 }

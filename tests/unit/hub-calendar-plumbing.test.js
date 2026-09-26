@@ -55,6 +55,14 @@ test('open-in-hub maps domains and builds full-nav Open in links', () => {
     openInHubLinkHtml({ kind: 'task' }, { hub: 'tasks', routeFor: () => '#/task/x' }),
     ''
   );
+  // Visual-seed foreign chips often have kind only — still get a landing Open in link.
+  const pd = openInHubLinkHtml(
+    { kind: 'professional', id: 'resource-day' },
+    { hub: 'teaching', routeFor: () => null }
+  );
+  assert.match(pd, /Open in Professional/);
+  assert.match(pd, /data-part="open-in-hub"/);
+  assert.match(pd, /href="\/professional\/#\/calendar"/);
 });
 
 test('calendar zoom href/parse per hub; month redirects to week', () => {
@@ -87,11 +95,11 @@ test('hub source loader surfaces per-source error with Retry copy, never silent 
         json: async () => ({ ok: false })
       };
     }
-    if (path.includes('tasks') || path.includes('work-blocks') || path.includes('planning') || path.includes('workflow')) {
+    if (path.includes('tasks') || path.includes('work-blocks') || path.includes('planning') || path.includes('workflow') || path.includes('hub-prefs')) {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ ok: true, data: { tasks: [], work_blocks: [] } })
+        json: async () => ({ ok: true, data: { tasks: [], work_blocks: [], school_terms: [] } })
       };
     }
     if (path.includes('knowledge')) {

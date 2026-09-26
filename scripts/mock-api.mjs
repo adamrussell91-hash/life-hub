@@ -31,9 +31,30 @@ import {
 } from '../netlify/functions/almanac.mjs';
 import { GitHubClientError } from '../netlify/functions/_shared/github-client.mjs';
 import { taskKey, TASKS_INDEX_KEY } from '../netlify/functions/_shared/tasks-blobs.mjs';
+import { DEFAULT_PLANNING_PROFILE } from '../netlify/functions/planning-profile.mjs';
 
 const PASSPHRASE = 'life-hub-local';
 const PRIVATE_HEADERS = { 'Cache-Control': 'private, no-store' };
+const PLANNING_PROFILE_KEY = 'meta/planning_profile';
+
+const DEFAULT_HUB_PREFS = {
+  schema_version: 1,
+  timezone: 'Australia/Sydney',
+  updated_at: null,
+  dismissed_insight_ids: [],
+  school_terms: [
+    {
+      year: 2026,
+      terms: [
+        { term: 1, starts_on: '2026-02-02', ends_on: '2026-04-02' },
+        { term: 2, starts_on: '2026-04-22', ends_on: '2026-07-03' },
+        { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
+        { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
+      ]
+    }
+  ],
+  marking_default_minutes_per_script: 10
+};
 const FIXTURE_FILES = [
   { path: 'config/agents.yml', source: 'config/agents.yml' },
   { path: 'config/targets.yml', source: 'config/targets.yml' },
@@ -523,6 +544,32 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         }
         for (const task of seeded.tasks) taskData.set(taskKey(task.id), task);
         taskData.set(TASKS_INDEX_KEY, seeded.tasks.map(task => task.id));
+        // Seed hub-prefs terms (year-nested) so every hub loads real T3/T4 windows.
+        const visualTerms = (() => {
+          try {
+            const visual = JSON.parse(seeded.files.get(CALENDAR_VISUAL_PATH) || '{}');
+            return Array.isArray(visual.school_terms) ? visual.school_terms : null;
+          } catch {
+            return null;
+          }
+        })();
+        const prefs = {
+          ...DEFAULT_HUB_PREFS,
+          ...(taskData.get(HUB_PREFS_KEY) && typeof taskData.get(HUB_PREFS_KEY) === 'object'
+            ? taskData.get(HUB_PREFS_KEY)
+            : {}),
+          school_terms: [
+            {
+              year: 2026,
+              terms: visualTerms ?? DEFAULT_HUB_PREFS.school_terms[0].terms
+            }
+          ],
+          updated_at: seeded.now
+        };
+        taskData.set(HUB_PREFS_KEY, prefs);
+        if (!taskData.has(PLANNING_PROFILE_KEY)) {
+          taskData.set(PLANNING_PROFILE_KEY, { ...DEFAULT_PLANNING_PROFILE });
+        }
         json(response, 200, { ok: true, data: { now: seeded.now, ...seeded.counts } });
       } catch (seedError) {
         error(response, 500, 'seed_failed', seedError instanceof Error ? seedError.message : 'Calendar visual seed failed.', true);
@@ -637,6 +684,60 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
         error(response, conflict ? 409 : 503, conflict ? 'write_conflict' : 'github_unavailable', 'The repository is temporarily unavailable.', !conflict);
       }
       return true;
+    }
+
+    if (url.pathname === '/api/hub-prefs') {
+      if (!readSession(request)) return unauthenticated(response);
+      if (request.method === 'GET') {
+        const current = taskData.get(HUB_PREFS_KEY);
+        const prefs =
+          current && typeof current === 'object' && !Array.isArray(current)
+            ? { ...DEFAULT_HUB_PREFS, ...current }
+            : { ...DEFAULT_HUB_PREFS };
+        json(response, 200, { ok: true, data: prefs }, PRIVATE_HEADERS);
+        return true;
+      }
+      if (request.method === 'PATCH' || request.method === 'PUT') {
+        const body = await readJson(request);
+        const current = taskData.get(HUB_PREFS_KEY);
+        const prefs = {
+          ...DEFAULT_HUB_PREFS,
+          ...(current && typeof current === 'object' ? current : {}),
+          ...(body && typeof body === 'object' ? body : {}),
+          updated_at: getSydneyTimestamp(new Date(clock.now()))
+        };
+        taskData.set(HUB_PREFS_KEY, prefs);
+        json(response, 200, { ok: true, data: prefs }, PRIVATE_HEADERS);
+        return true;
+      }
+      return methodNotAllowed(response, 'GET, PATCH, PUT');
+    }
+
+    if (url.pathname === '/api/planning-profile') {
+      if (!readSession(request)) return unauthenticated(response);
+      if (request.method === 'GET') {
+        const current = taskData.get(PLANNING_PROFILE_KEY);
+        const profile =
+          current && typeof current === 'object' && !Array.isArray(current)
+            ? { ...DEFAULT_PLANNING_PROFILE, ...current }
+            : { ...DEFAULT_PLANNING_PROFILE };
+        json(response, 200, { ok: true, data: profile }, PRIVATE_HEADERS);
+        return true;
+      }
+      if (request.method === 'PATCH' || request.method === 'PUT') {
+        const body = await readJson(request);
+        const current = taskData.get(PLANNING_PROFILE_KEY);
+        const profile = {
+          ...DEFAULT_PLANNING_PROFILE,
+          ...(current && typeof current === 'object' ? current : {}),
+          ...(body && typeof body === 'object' ? body : {}),
+          updated_at: getSydneyTimestamp(new Date(clock.now()))
+        };
+        taskData.set(PLANNING_PROFILE_KEY, profile);
+        json(response, 200, { ok: true, data: profile }, PRIVATE_HEADERS);
+        return true;
+      }
+      return methodNotAllowed(response, 'GET, PATCH, PUT');
     }
 
     if (url.pathname === '/api/work-blocks' && request.method === 'GET') {

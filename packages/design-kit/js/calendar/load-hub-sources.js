@@ -11,6 +11,8 @@ import {
 } from './tasks-calendar.js';
 import { professionalEventsFromProjections } from './professional-calendar.js';
 import { knowledgeEventsFromPages } from './knowledge-calendar.js';
+import { loadLifeCalendarEvents } from './load-life-events.js';
+import { resolveSchoolTerms } from './school-terms.js';
 
 export const HUB_SOURCE_IDS = Object.freeze([
   'teaching',
@@ -48,6 +50,7 @@ async function readOkJson(apiFetch, path) {
  * @param {{
  *   apiFetch: (path: string, init?: RequestInit) => Promise<Response>,
  *   loadLife?: () => Promise<unknown[]>,
+ *   today?: string,
  *   onChange?: () => void
  * }} opts
  */
@@ -56,11 +59,16 @@ export function createHubSourceLoader(opts) {
   const apiFetch = opts.apiFetch;
   const onChange = typeof opts.onChange === 'function' ? opts.onChange : () => {};
   const loadLife = typeof opts.loadLife === 'function' ? opts.loadLife : null;
+  const today = typeof opts.today === 'string' ? opts.today : null;
 
   /** @type {Record<string, { status: string, events: unknown[], error: string | null, meta: unknown }>} */
   const buckets = Object.fromEntries(HUB_SOURCE_IDS.map((id) => [id, emptyBucket()]));
   /** @type {Record<string, Promise<void> | null>} */
   const inflight = Object.fromEntries(HUB_SOURCE_IDS.map((id) => [id, null]));
+  /** @type {{ hubPrefs: unknown, visual: unknown, terms: unknown[] }} */
+  let hubContext = { hubPrefs: null, visual: null, terms: [] };
+  /** @type {Promise<void> | null} */
+  let contextInflight = null;
 
   function notify() {
     onChange();
@@ -69,6 +77,31 @@ export function createHubSourceLoader(opts) {
   function setBucket(id, next) {
     buckets[id] = { ...buckets[id], ...next };
     notify();
+  }
+
+  function refreshTerms() {
+    hubContext.terms = resolveSchoolTerms({
+      hubPrefs: hubContext.hubPrefs,
+      planningProfile: buckets.tasks?.meta?.planningProfile,
+      visual: hubContext.visual
+    });
+  }
+
+  async function loadHubContext() {
+    if (contextInflight) return contextInflight;
+    contextInflight = (async () => {
+      try {
+        const prefsPayload = await readOkJson(apiFetch, '/api/hub-prefs').catch(() => null);
+        if (prefsPayload?.data) hubContext.hubPrefs = prefsPayload.data;
+      } catch {
+        /* terms fall through to planning-profile / visual */
+      }
+      refreshTerms();
+      notify();
+    })().finally(() => {
+      contextInflight = null;
+    });
+    return contextInflight;
   }
 
   async function loadTeaching() {
@@ -130,6 +163,7 @@ export function createHubSourceLoader(opts) {
             weekMission: missionPayload.data ?? null
           }
         });
+        refreshTerms();
       } catch {
         setBucket('tasks', {
           status: 'error',
@@ -199,15 +233,21 @@ export function createHubSourceLoader(opts) {
   }
 
   async function loadLifeSource() {
-    if (!loadLife) {
-      setBucket('life', { status: 'unavailable', events: [], error: null });
-      return;
-    }
     if (inflight.life) return inflight.life;
     setBucket('life', { status: 'loading', error: null });
     inflight.life = (async () => {
       try {
-        const events = await loadLife();
+        let events;
+        if (loadLife) {
+          events = await loadLife();
+        } else {
+          const result = await loadLifeCalendarEvents(apiFetch, today ? { today } : {});
+          events = result.events;
+          if (result.visual) {
+            hubContext.visual = result.visual;
+            refreshTerms();
+          }
+        }
         setBucket('life', {
           status: 'live',
           events: Array.isArray(events) ? events : [],
@@ -236,9 +276,10 @@ export function createHubSourceLoader(opts) {
 
   return {
     loadAll() {
-      return Promise.all(HUB_SOURCE_IDS.map((id) => loaders[id]()));
+      return Promise.all([loadHubContext(), ...HUB_SOURCE_IDS.map((id) => loaders[id]())]);
     },
     retry(sourceId) {
+      if (sourceId === 'context') return loadHubContext();
       const load = loaders[sourceId];
       if (!load) return Promise.resolve();
       return load();
@@ -261,6 +302,13 @@ export function createHubSourceLoader(opts) {
     },
     getMeta(sourceId) {
       return buckets[sourceId]?.meta ?? null;
+    },
+    getTerms() {
+      refreshTerms();
+      return hubContext.terms;
+    },
+    getVisual() {
+      return hubContext.visual;
     },
     /** Map kit statuses onto Life's legacy sourceStatus keys. */
     legacySourceStatus() {
