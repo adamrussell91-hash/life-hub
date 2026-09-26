@@ -128,7 +128,7 @@ describe('hub shell chrome', () => {
     const sections = [
       ...refs.railNav.querySelectorAll('.hub-rail__list--desktop .hub-rail__section')
     ].map((el) => el.querySelector('span')?.textContent);
-    expect(sections).toEqual(['Views', 'Plan', 'Work', 'Network', 'Tools']);
+    expect(sections).toEqual(['Views', 'Plan', 'Work', 'Tools']);
 
     const links = [...refs.railNav.querySelectorAll('.hub-rail__list--desktop .hub-rail__link')];
     expect(links.some((link) => link.textContent === 'Orbit')).toBe(false);

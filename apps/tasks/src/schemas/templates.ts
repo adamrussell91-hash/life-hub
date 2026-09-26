@@ -85,7 +85,7 @@ export const AgentActionLogSchema = z.object({
   id: z.string().min(1),
   agent: z.string(),
   action: z.enum(['create', 'update', 'delete']),
-  entity_type: z.enum(['task', 'project', 'milestone', 'template', 'stress_flag']),
+  entity_type: z.enum(['task', 'project', 'milestone', 'template']),
   entity_id: z.string(),
   reason: z.string(),
   created_at: z.string()

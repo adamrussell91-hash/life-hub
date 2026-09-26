@@ -2,18 +2,6 @@ import { addDays, formatDisplayDate, parseDue, startOfDay, tasksForDay, toDateKe
 
 const FORTNIGHT_MS = 14 * 24 * 60 * 60 * 1000;
 
-export const DEFAULT_STRESS_ROUTE = [
-  'General Hammond',
-  'Penelope Rose Quillian',
-  'Dr Vera Lenz'
-];
-
-export function agentSlug(agent) {
-  return String(agent)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '');
-}
 
 function excursionAnchor(project) {
   if (!project || project.type !== 'excursion') return null;
@@ -82,10 +70,3 @@ export function detectMissedDeadlines(tasks, from = new Date()) {
   }];
 }
 
-export function detectStressPatterns(projects, tasks, from = new Date()) {
-  return [
-    ...detectOverlappingExcursions(projects),
-    ...detectDensePinches(tasks, from),
-    ...detectMissedDeadlines(tasks, from)
-  ];
-}

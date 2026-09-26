@@ -1,4 +1,4 @@
-export type RailSectionId = 'plan' | 'views' | 'work' | 'network' | 'tools';
+export type RailSectionId = 'plan' | 'views' | 'work' | 'tools';
 
 export interface RailDisclosureState {
   isOpen(id: RailSectionId): boolean;
