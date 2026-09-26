@@ -54,6 +54,11 @@ export function createPeopleLedgerHandler(deps = {}) {
 
       try {
         if (request.method === 'GET') {
+          if (url.searchParams.has('due_from')) {
+            const { from, to } = parseDueRangeQuery(url.searchParams);
+            const items = await ledgerRepo.listDueBetween(from, to);
+            return withCors(okResponse(200, { items }), request, env);
+          }
           const personRef = url.searchParams.get('person_ref');
           if (!personRef || !parseEntityRef(personRef)) {
             return withCors(
