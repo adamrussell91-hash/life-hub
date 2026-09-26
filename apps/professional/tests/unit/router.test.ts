@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { organisationRoute, parseRoute, personBriefRoute, personRoute, railHighlightFor, threadRoute } from '@/app/router';
+import {
+  organisationRoute,
+  parseRoute,
+  personBriefRoute,
+  personRoute,
+  railHighlightFor,
+  threadRoute
+} from '@/app/router';
 
 const VALID_PERSON_ID = 'person_00000000-0000-4000-8000-000000000001';
 const VALID_ORG_ID = 'organisation_00000000-0000-4000-8000-000000000002';
@@ -121,5 +128,10 @@ describe('calendar comms routes', () => {
     const id = 'pd_group_00000000-0000-4000-8000-000000000001';
     expect(parseRoute(`#/pd-group/${id}`)).toEqual({ name: 'pd-group', id });
     expect(parseRoute('#/pd-group/nope').name).toBe('not-found');
+  });
+
+  it('parses the 10-second log route', () => {
+    expect(parseRoute('#/log')).toEqual({ name: 'log' });
+    expect(railHighlightFor({ name: 'log' })).toBe('calendar');
   });
 });

@@ -15,6 +15,7 @@ import '../../design-kit/calendar-almanac.css';
 import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
 import '../styles/walk-in.css';
+import '../styles/quick-log.css';
 import '../styles/tasks-engine.css';
 import '../styles/block-page.css';
 import '../styles/comm-page.css';
@@ -51,6 +52,7 @@ import {
 import { renderCareerView } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
+import { renderQuickLog } from '@/views/quick-log';
 import { personRoute } from '@/app/router';
 
 function renderNotFound(canvas: HTMLElement, hash: string): void {
@@ -257,6 +259,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'career') {
       renderPageHeader(shell, viewChrome('career'));
       await renderCareerView(shell.canvas);
+      return;
+    }
+    if (route.name === 'log') {
+      renderPageHeader(shell, { eyebrow: 'Calendar', title: 'Log a comm' });
+      await renderQuickLog(shell.canvas);
       return;
     }
     if (route.name === 'network-ecology') {

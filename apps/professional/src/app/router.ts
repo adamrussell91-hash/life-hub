@@ -36,6 +36,7 @@ export type Route =
   | { name: 'event'; id: string }
   | { name: 'thread'; id: string }
   | { name: 'pd-group'; id: string }
+  | { name: 'log' }
   | { name: 'applications' }
   | { name: 'application-new' }
   | { name: 'application'; id: string }
@@ -76,6 +77,7 @@ export function parseRoute(hash: string = location.hash): Route {
   if (segments.length === 1 && segments[0] === 'applications') return { name: 'applications' };
   if (segments.length === 1 && segments[0] === 'career') return { name: 'career' };
   if (segments.length === 1 && segments[0] === 'network-ecology') return { name: 'network-ecology' };
+  if (segments.length === 1 && segments[0] === 'log') return { name: 'log' };
 
   if (segments.length === 2 && segments[0] === 'communication' && segments[1] === 'new') {
     return { name: 'communication-new' };
@@ -175,7 +177,8 @@ export function railHighlightFor(route: Route): RailViewId | null {
     route.name === 'event' ||
     route.name === 'event-new' ||
     route.name === 'thread' ||
-    route.name === 'pd-group'
+    route.name === 'pd-group' ||
+    route.name === 'log'
   ) {
     return 'calendar';
   }

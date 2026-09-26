@@ -173,21 +173,27 @@ function syncMobileChrome(shellRoot: HTMLElement, active: RailViewId | null): vo
         current: active === 'home'
       },
       {
+        id: 'log',
+        label: 'Log',
+        paths: RAIL_ICON_PATHS.communications,
+        href: '#/log',
+        current: active === 'calendar' && location.hash.startsWith('#/log')
+      },
+      {
         id: 'people',
         label: 'People',
         paths: RAIL_ICON_PATHS.people,
         href: '#/people',
         current: active === 'people'
-      },
+      }
+    ],
+    more: [
       {
         id: 'organisations',
         label: 'Organisations',
         paths: RAIL_ICON_PATHS.organisations,
-        href: '#/organisations',
-        current: active === 'organisations'
-      }
-    ],
-    more: [
+        href: '#/organisations'
+      },
       {
         id: 'relationships',
         label: 'Relationships',
