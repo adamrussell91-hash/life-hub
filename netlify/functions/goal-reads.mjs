@@ -5,6 +5,12 @@ import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { defaultGetTasksStore, getJSON, listJSON, setJSON, TASK_PREFIX } from './_shared/tasks-blobs.mjs';
 import { normalizeGoalRecord } from './_shared/goal-record.mjs';
 import { basisUpdatedAt, buildGoalRead, termsFromHubPrefs } from './_shared/goal-read.mjs';
+import {
+  currentTermRef,
+  goalMatchesTermFilter,
+  parseTermQuery,
+  termRefsFromHubPrefs
+} from './_shared/goal-term-filter.mjs';
 import { getSydneyDateKey } from '../../apps/life/js/core/time.js';
 
 export const config = { path: '/api/goal-reads' };
@@ -29,7 +35,9 @@ export async function loadGoalInputs(store) {
     goals: records(goals).map(normalizeGoalRecord),
     projects: records(projects),
     tasks: records(tasks),
-    terms: termsFromHubPrefs(prefs)
+    terms: termsFromHubPrefs(prefs),
+    termRefs: termRefsFromHubPrefs(prefs),
+    prefs
   };
 }
 
@@ -52,6 +60,16 @@ export async function readForGoal(store, goal, inputs, { today, force = false })
   return { read, reason };
 }
 
+/** Active goals for the landing strip: selected term, or current term + Ongoing. */
+export function goalsForTermFilter(goals, { termQuery, termRefs, today }) {
+  const explicit = parseTermQuery(termQuery);
+  const selected = explicit ?? currentTermRef(termRefs, today);
+  const includeOngoing = !explicit;
+  return goals.filter(goal =>
+    goal.status === 'active' && goalMatchesTermFilter(goal, selected, { includeOngoing })
+  );
+}
+
 export function createGoalReadsHandler(deps = {}) {
   const now = deps.now ?? Date.now;
   return createOperatorHandler(async (request, context) => {
@@ -60,14 +78,20 @@ export function createGoalReadsHandler(deps = {}) {
       const today = getSydneyDateKey(new Date(now()));
       if (request.method === 'GET') {
         const inputs = await loadGoalInputs(store);
-        const goalId = new URL(request.url).searchParams.get('goal_id');
+        const url = new URL(request.url);
+        const goalId = url.searchParams.get('goal_id');
         if (goalId) {
           const goal = inputs.goals.find(item => item.id === goalId);
           if (!goal) return withCors(errorResponse(404, 'not_found', 'Goal not found', false), request, env);
           return withCors(okResponse(200, await readForGoal(store, goal, inputs, { today })), request, env);
         }
+        const filtered = goalsForTermFilter(inputs.goals, {
+          termQuery: url.searchParams.get('term'),
+          termRefs: inputs.termRefs,
+          today
+        });
         const reads = [];
-        for (const goal of inputs.goals.filter(item => item.status === 'active')) {
+        for (const goal of filtered) {
           reads.push(await readForGoal(store, goal, inputs, { today }));
         }
         return withCors(okResponse(200, { reads }), request, env);
