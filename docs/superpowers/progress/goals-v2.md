@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 28/46 (61%)**
+**Progress: 29/46 (63%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -59,7 +59,7 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M6: Retire Areas
 
-- [ ] **G-29** calendar.ts + hammond-horizons.ts use sphere — —
+- [x] **G-29** calendar.ts + hammond-horizons.ts use sphere — `f5e7fe09`
 
 ## M7: Hammond, the smarter version
 
