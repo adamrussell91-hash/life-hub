@@ -170,3 +170,70 @@ test('list sort is occurred_at desc then id', () => {
     ['communication_c', 'communication_b', 'communication_a']
   );
 });
+
+const V1 = {
+  schema_version: 1,
+  id: 'communication_00000000-0000-4000-8000-000000000001',
+  direction: 'outbound',
+  channel: 'in_person',
+  occurred_at: '2026-10-14T00:50:00.000Z',
+  subject: 'Declan essay feedback',
+  summary: '',
+  status: 'completed',
+  created_at: '2026-10-01T00:00:00.000Z',
+  updated_at: '2026-10-01T00:00:00.000Z'
+};
+
+test('comm schema is v2 and v1 records read with empty v2 fields', () => {
+  assert.equal(COMMUNICATION_SCHEMA_VERSION, 2);
+  const parsed = parseCommunicationRecord(V1);
+  assert.equal(parsed.scheduled_start, null);
+  assert.equal(parsed.scheduled_end, null);
+  assert.equal(parsed.time_zone, null);
+  assert.equal(parsed.purpose_tag, null);
+  assert.deepEqual(parsed.agenda, []);
+  assert.deepEqual(parsed.blocks, []);
+  assert.deepEqual(projectCommunication(parsed).blocks, []);
+});
+
+test('create accepts a scheduled window and purpose tag', () => {
+  const input = validateCommunicationCreateInput({
+    direction: 'outbound',
+    channel: 'in_person',
+    occurred_at: '2026-10-14T00:50:00.000Z',
+    scheduled_start: '2026-10-14T00:50:00.000Z',
+    scheduled_end: '2026-10-14T01:05:00.000Z',
+    time_zone: 'Australia/Sydney',
+    purpose_tag: 'Feedback'
+  });
+  assert.equal(input.scheduled_end, '2026-10-14T01:05:00.000Z');
+  assert.equal(input.purpose_tag, 'feedback');
+  assert.throws(
+    () => validateCommunicationCreateInput({
+      direction: 'outbound', channel: 'in_person', occurred_at: '2026-10-14T00:50:00.000Z',
+      scheduled_start: '2026-10-14T01:05:00.000Z', scheduled_end: '2026-10-14T00:50:00.000Z'
+    }),
+    { code: 'invalid_scheduled_window' }
+  );
+  assert.throws(
+    () => validateCommunicationCreateInput({
+      direction: 'outbound', channel: 'in_person', occurred_at: '2026-10-14T00:50:00.000Z', time_zone: 'Mars/Base'
+    }),
+    { code: 'invalid_time_zone' }
+  );
+});
+
+test('update accepts agenda and blocks; blocks are sanitised', () => {
+  const patch = validateCommunicationFieldUpdate({
+    agenda: [{ id: 'ag_1', text: 'What went well', source: 'clare' }],
+    blocks: [{ id: 'block_1', block_type: 'rich_text', content: { html: '<p>ok</p><script>x()</script>' } }]
+  });
+  assert.equal(patch.agenda[0].source, 'clare');
+  assert.equal(patch.blocks[0].content.html, '<p>ok</p>');
+  assert.throws(() => validateCommunicationFieldUpdate({ agenda: [{ id: 'a', text: 'x', source: 'bob' }] }), {
+    code: 'invalid_agenda'
+  });
+  assert.throws(() => validateCommunicationFieldUpdate({ blocks: [{ block_type: 'rich_text' }] }), {
+    code: 'invalid_blocks'
+  });
+});
