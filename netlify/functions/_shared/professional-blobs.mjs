@@ -14,6 +14,7 @@ import { isValidLinkProposalId } from './link-proposal-schema.mjs';
 import { isValidLedgerItemId } from './ledger-schema.mjs';
 import { isValidRememberFactId } from './remember-schema.mjs';
 import { isValidThreadId } from './thread-schema.mjs';
+import { isValidPdGroupId } from './pd-group-schema.mjs';
 
 // Storage adapter for Professional Hub content (`professional-hub-content`).
 // Brand-new umbrella store — opens directly on the umbrella site, no
@@ -49,6 +50,8 @@ export const LEDGER_ITEM_BY_PERSON_PREFIX = 'ledger-items/by-person/';
 export const LEDGER_ITEM_BY_SOURCE_PREFIX = 'ledger-items/by-source/';
 
 export const THREAD_PREFIX = 'threads/records/';
+
+export const PD_GROUP_PREFIX = 'pd-groups/records/';
 
 export const REMEMBER_FACT_PREFIX = 'remember-facts/records/';
 export const REMEMBER_FACT_BY_PERSON_PREFIX = 'remember-facts/by-person/';
@@ -325,6 +328,17 @@ export function threadKey(id) {
 
 export async function listThreadKeys(store) {
   return (await listBlobKeys(store, THREAD_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
+export function pdGroupKey(id) {
+  if (!isValidPdGroupId(id)) {
+    throw Object.assign(new Error(`Invalid PD group id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_pd_group_id' });
+  }
+  return `${PD_GROUP_PREFIX}${id}`;
+}
+
+export async function listPdGroupKeys(store) {
+  return (await listBlobKeys(store, PD_GROUP_PREFIX)).filter((key) => !isIndexKey(key));
 }
 
 function assertValidRememberFactId(id) {
