@@ -204,6 +204,47 @@ One spec, one plan, ordered so the page exists before the agent work:
 
 Do not ship a Notion-dependent runtime. Do not split Sara’s authority into a later spec.
 
+## v2 (2026-09-26) — Health Brief + Threads strip + Weighted River
+
+**Plan:** `docs/superpowers/plans/2026-09-26-medical-overview-v2.md`  
+**Mockups:** `docs/mockups/medical-overview-redesign.html`  
+**Progress:** `docs/superpowers/progress/medical-v2.md`
+
+### Layout (desktop ≥ 1024px)
+
+1. Unchanged page header (HISTORY / Medical Overview / ← Body / date pill)
+2. **Three equal cards:** Health Brief · Active Episode · Next
+3. **Health Threads strip** (full content width): IBD / Liver / Mind / Acute lanes, pinchable zoom, TODAY line
+4. Toolbar (search · Type · Practitioner · density · Show minor · Places · Add)
+5. **Weighted River:** UPCOMING → TODAY → past; major / routine / minor weights; episode `<details>` bands; mini lab panel via Bloods `markerRow({ compact: true })`
+
+Phone (< 720px): cards stack Brief → Episode → Next; strip accordion starts collapsed; river rail kept.
+
+### Data rules (v2)
+
+| Field | Notes |
+|-------|--------|
+| `weight` | `major` \| `routine` \| `minor` — inferred when omitted |
+| `record_type: Symptom` + lane `symptom` | Feeling language without visit/provider words |
+| `status` | `planned` \| `to_book` \| `booked` \| `done` |
+| `date_precision` | `day` \| `month` \| `tbd` |
+| `cadence_days` | e.g. Stelara = 56 → virtual next dose in the model (never stored) |
+| `task_id` | Link to Tasks Hub when Next “Add to Tasks” runs |
+| `episode.{status,started,resolved}` | Active episode card + river band; auto soft-resolve after 7 quiet days |
+
+**Vanishing-note fix:** `resolveMedicalLogCandidate` no longer merges a different-day Symptom/episode update onto the matched visit’s date. Same-day appends still merge. Visit date slop (±3 days) remains only for non-Symptom, non-episode visits.
+
+**Sara:** medical protocol rewritten so every health statement lands as the right record; `create_task` available restricted to `domain: health`. Symptom / episode appends save immediately; new visits and planned items still Confirm (batched when multiple).
+
+**Backfill:** `node scripts/medical-v2-backfill.mjs` (dry-run) / `--write` for Adam.
+
+### Testing (v2)
+
+- `tests/unit/medical-normalize.test.js` — MO-01…05
+- `tests/unit/medical-model.test.js` — MO-06/07/17, upcoming order
+- `tests/unit/medical-v2-behaviour.test.js` — Sara payload fixtures
+- `tests/unit/render-medical.test.js` / `medical-controller.test.js` — brief/strip/river wiring, show-minor, Add to Tasks
+
 ## Testing
 
 - `tests/unit/medical-csv-import.test.js` — date parse, range → `date_end`, skip Follow Up stubs, skip Files, cost parse, lane inference, dedupe, unknown type warn
@@ -216,3 +257,5 @@ Do not ship a Notion-dependent runtime. Do not split Sara’s authority into a l
 ## Files (expected)
 
 `js/core/validate.js`, `js/core/records.js`, `js/core/search.js`, `js/core/central-node-write.js`, `scripts/import-notion-history.mjs`, `scripts/lib/medical-csv-import.mjs`, `js/app/medical-model.js`, `js/app/render-medical.js`, `js/app/medical-controller.js`, `js/app/render-body.js`, `js/app/app-controller.js`, `index.html`, `css/app.css`, `config/sara-protocol.md`, `central-node.md` (Constraints pointer), unit tests, service worker cache bump on the same path other Life Hub UI changes use.
+
+v2 also: `js/app/medical-brief.js`, `js/app/medical-strip.js`, `scripts/medical-v2-backfill.mjs`, `netlify/functions/_shared/chat-schema.mjs` medical fields, Sara `tasks.create` capability.

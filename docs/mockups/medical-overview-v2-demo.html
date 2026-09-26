@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en-AU" data-hub="life">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0A1536">
+  <title>Life Hub · Medical Overview v2 (fixture)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <!-- Same kit stack as apps/life/index.html — no parallel mockup palette. -->
+  <link rel="stylesheet" href="/packages/design-kit/tokens.css">
+  <link rel="stylesheet" href="/packages/design-kit/overlays.css">
+  <link rel="stylesheet" href="/packages/design-kit/actions.css">
+  <link rel="stylesheet" href="/packages/design-kit/filters.css">
+  <link rel="stylesheet" href="/packages/design-kit/motion.css">
+  <link rel="stylesheet" href="/packages/design-kit/hub-interactions.css">
+  <link rel="stylesheet" href="/packages/design-kit/rail.css">
+  <link rel="stylesheet" href="/packages/design-kit/mobile.css">
+  <link rel="stylesheet" href="/apps/life/css/app.css">
+</head>
+<body>
+  <div class="app-shell" id="app" data-state="ready">
+    <aside class="desktop-rail hub-rail" aria-label="Life Hub navigation">
+      <header class="brand">
+        <span class="brand-copy">
+          <a class="hub-rail__brand" href="#">Life Hub</a>
+          <span class="hub-rail__tagline">Private dashboard</span>
+        </span>
+      </header>
+      <nav class="rail-nav" aria-label="Primary">
+        <div class="hub-rail__majors">
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
+            </span>
+            <span>Home</span>
+          </a>
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3.2V16H7.5A2.5 2.5 0 0 1 5 13.5v-7Z"/></svg>
+            </span>
+            <span>Chat</span>
+          </a>
+          <a class="nav-item hub-rail__link" href="#">
+            <span class="nav-glyph" aria-hidden="true">
+              <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M8 3.5v4M16 3.5v4M4 10h16"/></svg>
+            </span>
+            <span>Calendar</span>
+          </a>
+        </div>
+        <p class="hub-rail__section">Hubs</p>
+        <div class="hub-stack">
+          <div class="hub-row is-active is-open" data-hub="life">
+            <span class="hub-label">
+              <span class="nav-glyph" aria-hidden="true">
+                <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"/></svg>
+              </span>
+              <span>Life</span>
+            </span>
+          </div>
+          <div class="hub-panel is-open" data-hub-panel="life">
+            <div class="hub-panel-inner">
+              <a class="hub-nav-item is-active" href="#" aria-current="page">
+                <span class="nav-glyph" aria-hidden="true">
+                  <svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="3"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg>
+                </span>
+                <span>Body</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </aside>
+
+    <div class="page-frame">
+      <header class="topbar page-header">
+        <div class="page-header__copy">
+          <p class="eyebrow page-header__eyebrow">History</p>
+          <div class="page-header__title-row">
+            <h1 class="page-header__title" id="page-title">Medical Overview</h1>
+          </div>
+        </div>
+        <div class="topbar-actions page-header__actions">
+          <div class="hub-utilities">
+            <button class="hub-icon-btn" type="button" aria-label="Refresh" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+            </button>
+            <button class="hub-icon-btn" type="button" aria-label="Sign out" title="Sign out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 7V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1"/><path d="M15 12H3"/><path d="m7 8-4 4 4 4"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main id="main-content">
+        <section id="body-medical-dashboard" class="dashboard" aria-label="Medical Overview">
+          <div class="bloods-top">
+            <button type="button" id="medical-back" class="btn btn--secondary">← Body</button>
+            <button type="button" id="medical-today" class="btn btn--ghost">Today</button>
+          </div>
+          <div id="medical-brief-row" class="medical-brief-row" aria-label="Health brief"></div>
+          <div id="medical-strip" class="medical-strip" aria-label="Health threads"></div>
+          <div class="medical-toolbar">
+            <label class="hub-search">
+              <span class="visually-hidden">Search visits</span>
+              <svg class="hub-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="4.25" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M10.2 10.2 13 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+              <input id="medical-search" class="hub-search__input" type="search" placeholder="Search visits" autocomplete="off">
+            </label>
+            <button type="button" id="medical-filters" class="btn btn--ghost medical-toolbar__filters-btn" aria-expanded="false" aria-controls="medical-filters-panel">Filters</button>
+            <div id="medical-filters-panel" class="medical-toolbar__filters-panel">
+              <div id="medical-type-host"></div>
+              <div id="medical-provider-host"></div>
+              <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
+            </div>
+            <div id="medical-density" class="hub-pills medical-toolbar__density" role="group" aria-label="Timeline pack density" hidden>
+              <button type="button" class="hub-pills__btn" data-medical-density="weeks">Weeks</button>
+              <button type="button" class="hub-pills__btn is-active" data-medical-density="months">Months</button>
+              <button type="button" class="hub-pills__btn" data-medical-density="years">Years</button>
+            </div>
+            <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
+            <button type="button" id="medical-add" class="btn btn--primary medical-toolbar__add" aria-label="Add visit">Add</button>
+          </div>
+          <div id="medical-chips" class="hub-chips"></div>
+          <p id="medical-empty" class="metric-caption" hidden></p>
+          <div class="medical-layout">
+            <div id="medical-timeline" class="medical-timeline" aria-label="Medical timeline"></div>
+            <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview" hidden></aside>
+          </div>
+          <button type="button" id="medical-sheet-close" class="medical-sheet__close" aria-label="Close details">×</button>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script type="module">
+    import { buildMedicalModel } from '/apps/life/js/app/medical-model.js';
+    import { renderMedical } from '/apps/life/js/app/render-medical.js';
+
+    try {
+      localStorage.setItem('life-hub-medical-strip-open', '1');
+    } catch (_) { /* ignore */ }
+
+    const cold = { id: 'ep-head-cold', title: 'Head cold', status: 'active', started: '2026-09-23' };
+    const today = '2026-09-26';
+    const events = [
+      {
+        record: {
+          type: 'medical', id: 'mrcp', date: '2026-09-26', title: 'MRCP — liver / bile ducts',
+          record_type: 'Imaging', lane: 'imaging', weight: 'major', status: 'to_book', date_precision: 'tbd',
+          notes: 'Ordered 24/09/26'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'colo', date: '2027-02-01', title: 'Colonoscopy',
+          record_type: 'Surgery/Hospital', lane: 'hospital', weight: 'major', status: 'planned', date_precision: 'month'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'bloods-dec', date: '2026-12-01', title: 'Repeat bloods',
+          record_type: 'Lab Work', lane: 'lab', weight: 'routine', status: 'planned', date_precision: 'month'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'gastro-mar', date: '2027-03-01', title: 'Gastro review',
+          record_type: 'Consultation', lane: 'appointment', weight: 'routine', status: 'planned', date_precision: 'month',
+          provider: 'Dr Chris Keily'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 's26', date: '2026-09-26', title: 'Still congested, throat better',
+          record_type: 'Symptom', lane: 'symptom', weight: 'minor', episode: cold,
+          notes: 'still congested, throat better — sleep poor'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 's24', date: '2026-09-24', title: 'Sore throat, sniffles, poor sleep',
+          record_type: 'Symptom', lane: 'symptom', weight: 'minor', episode: cold,
+          notes: 'Sore throat, sniffles'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 's23', date: '2026-09-23', title: 'Feeling run down',
+          record_type: 'Symptom', lane: 'symptom', weight: 'minor', episode: cold,
+          notes: 'possible viral'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'gastro', date: '2026-09-24', title: 'Gastro follow-up — biologics & liver',
+          record_type: 'Consultation', lane: 'appointment', weight: 'major', provider: 'Dr Chris Keily',
+          notes: 'Calprotectin 15 ↓ — GGT still main concern — MRCP ordered\n— Stay the course on Stelara; liver imaging next'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'kate', date: '2026-09-04', title: 'Therapy · Kate Semple',
+          record_type: 'Appointment', lane: 'therapy', weight: 'routine', provider: 'Kate Semple'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'hook', date: '2026-08-06', title: 'Dr Hook · My ADHD Centre',
+          record_type: 'Appointment', lane: 'appointment', weight: 'routine', provider: 'Dr Hook'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'stelara', date: '2026-08-27', title: 'Stelara 90mg SC',
+          record_type: 'Prescription', lane: 'prescription', weight: 'major', cadence_days: 56,
+          notes: 'first maintenance dose'
+        }
+      },
+      {
+        record: {
+          type: 'medical', id: 'bloods-visit', date: '2026-09-17', title: 'Bloods — comprehensive panel',
+          record_type: 'Lab Work', lane: 'lab', weight: 'major'
+        }
+      },
+      {
+        record: {
+          type: 'bloods', id: 'bloods-1', date: '2026-09-17',
+          markers: [
+            { key: 'ggt', label: 'GGT', value: 233, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 },
+            { key: 'alt', label: 'ALT', value: 68, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 40 },
+            { key: 'calprotectin', label: 'Calprotectin', value: 15, status: 'Normal', unit: 'ug/g', ref_low: 0, ref_high: 50 },
+            { key: 'crp', label: 'CRP', value: 2, status: 'Normal', unit: 'mg/L', ref_low: 0, ref_high: 5 }
+          ]
+        }
+      },
+      {
+        record: {
+          type: 'bloods', id: 'bloods-0', date: '2026-05-19',
+          markers: [
+            { key: 'calprotectin', label: 'Calprotectin', value: 244, status: 'High', unit: 'ug/g', ref_low: 0, ref_high: 50 },
+            { key: 'ggt', label: 'GGT', value: 180, status: 'High', unit: 'U/L', ref_low: 0, ref_high: 50 }
+          ]
+        }
+      }
+    ];
+
+    // No default selection — phone sheet is a fixed overlay and would hide the page.
+    let selectedId = null;
+    let showMinor = true;
+    const root = document;
+
+    function paint() {
+      const model = buildMedicalModel({
+        events, today, selectedId, showMinor, density: 'months'
+      });
+      renderMedical(root, model, {
+        onSelect: id => { selectedId = id; paint(); },
+        onShowMinor: v => { showMinor = v; paint(); },
+        onSearch() {},
+        onTypeChange() {},
+        onProviderChange() {},
+        onDensityChange() {},
+        onToday() {},
+        onAdd() {},
+        onClose() { selectedId = null; paint(); },
+        onEdit() {},
+        onSave() {},
+        onCancel() {},
+        onAddToTasks() {},
+        onJumpUpcoming() {
+          document.querySelector('.medical-upcoming')?.scrollIntoView({ block: 'start' });
+        },
+        onOpenEpisode() {
+          document.querySelector('details.medical-band')?.setAttribute('open', '');
+          document.querySelector('details.medical-band')?.scrollIntoView({ block: 'center' });
+        }
+      });
+      document.getElementById('body-medical-dashboard').hidden = false;
+    }
+    paint();
+    window.__medicalDemo = { paint, setSelected(id) { selectedId = id; paint(); } };
+  </script>
+</body>
+</html>

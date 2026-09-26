@@ -1,8 +1,41 @@
-import { formatDisplayDate } from '../core/time.js';
-import { normalizeMedicalFields } from './medical-normalize.js';
+import { formatDisplayDate, daysBetween, isCalendarDate } from '../core/time.js';
+import { inferWeight, normalizeMedicalFields } from './medical-normalize.js';
 
 export const MEDICAL_DENSITIES = ['weeks', 'months', 'years'];
 export const DEFAULT_MEDICAL_DENSITY = 'months';
+
+/* Kit palette only — no mockup hex (Tailwind blue/violet). */
+export const MEDICAL_THREAD_COLOURS = {
+  IBD: '#376fb7',   /* --wave */
+  Liver: '#f68620', /* --high-sea */
+  Mind: '#244f7c',  /* --navy-2 */
+  Acute: '#a7abb9'  /* --shallow */
+};
+
+const THREAD_RULES = [
+  {
+    thread: 'IBD',
+    test: (visit, bloods) =>
+      /gastro|stelara|ustekinumab|calprotectin|crohn|ibd|biologic/i.test(visitBlob(visit))
+      || hasMarker(bloods, /calprotectin/i)
+  },
+  {
+    thread: 'Liver',
+    test: (visit, bloods) =>
+      /\bggt\b|\balt\b|mrcp|liver|psc|bile/i.test(visitBlob(visit))
+      || hasMarker(bloods, /\bggt\b|\balt\b/i)
+  },
+  {
+    thread: 'Mind',
+    test: visit =>
+      visit.lane === 'therapy'
+      || /therap|psycholog|psychiatr|adhd(?:\s+centre)?|kate semple|hook|vera|mind/i.test(visitBlob(visit))
+  },
+  {
+    thread: 'Acute',
+    test: visit => visit.record_type === 'Symptom' || visit.lane === 'symptom'
+  }
+];
 
 export function mapsUrl(visit) {
   if (!visit || visit.location_kind !== 'place' || !visit.location) return null;
@@ -38,6 +71,13 @@ export function buildMedicalPayload(fields, { notes } = {}) {
   };
 }
 
+export function isPlannedVisit(visit, today) {
+  if (!visit) return false;
+  if (visit.status === 'planned' || visit.status === 'to_book') return true;
+  if (visit.virtual) return true;
+  return Boolean(today && visit.date && visit.date > today);
+}
+
 export function buildMedicalModel({
   events = [],
   query = '',
@@ -46,27 +86,46 @@ export function buildMedicalModel({
   density = DEFAULT_MEDICAL_DENSITY,
   selectedId = null,
   expandedYears = [],
-  today
+  today,
+  showMinor = false
 } = {}) {
   if (!today) throw new RangeError('Medical display date is unavailable');
   const selectedDensity = MEDICAL_DENSITIES.includes(density) ? density : DEFAULT_MEDICAL_DENSITY;
   const bloodsByDate = new Map();
+  const bloodsList = [];
   const records = [];
 
   for (const event of events) {
     const record = event?.record;
-    if (record?.type === 'bloods') bloodsByDate.set(record.date, record);
+    if (record?.type === 'bloods') {
+      bloodsByDate.set(record.date, record);
+      bloodsList.push(record);
+    }
     if (record?.type === 'medical') records.push({ record, event });
   }
 
-  const medical = records.map(({ record, event }) => decorateVisit(record, event, bloodsByDate.get(record.date)));
+  let medical = records.map(({ record, event }) =>
+    decorateVisit(record, event, bloodsByDate.get(record.date), today)
+  );
+  medical = medical.concat(deriveVirtualDoses(medical, today));
 
-  const filtered = medical.filter(visit => matches(visit, query, recordType, provider));
+  const activeEpisode = newestActiveEpisode(medical, today);
+  const filtered = medical.filter(visit => {
+    if (!matches(visit, query, recordType, provider)) return false;
+    if (visit.weight === 'minor' && !showMinor) {
+      const inActive = activeEpisode
+        && visit.episode?.id
+        && visit.episode.id === activeEpisode.id;
+      if (!inActive) return false;
+    }
+    return true;
+  });
+
   const future = filtered
-    .filter(visit => visit.date > today)
-    .sort(compareSoonest);
+    .filter(visit => isPlannedVisit(visit, today) || visit.date > today)
+    .sort(compareUpcoming);
   const past = filtered
-    .filter(visit => visit.date <= today)
+    .filter(visit => !isPlannedVisit(visit, today) && visit.date <= today)
     .sort(compareNewest);
 
   const selected = filtered.find(visit => visit.id === selectedId) ?? null;
@@ -74,13 +133,17 @@ export function buildMedicalModel({
   if (selected?.date) openYears.add(selected.date.slice(0, 4));
 
   const items = [
-    ...pack(future, selectedDensity, openYears),
+    ...(future.length ? [{ kind: 'upcoming' }] : []),
+    ...packUpcoming(future, selectedDensity, openYears),
     { kind: 'today', date: today },
     ...pack(past, selectedDensity, openYears)
   ];
 
   const recordTypes = unique(medical.map(visit => visit.record_type).filter(Boolean));
   const providers = unique(medical.map(visit => visit.provider).filter(Boolean));
+  const nextItems = buildNextItems(medical, today);
+  const brief = buildHealthBrief(medical, bloodsList, today);
+  const threads = buildThreadModel(medical, bloodsList, today);
 
   return {
     today,
@@ -91,13 +154,84 @@ export function buildMedicalModel({
     selected,
     items,
     visits: filtered,
+    allVisits: medical,
     recordTypes,
     providers,
-    count: filtered.length
+    count: filtered.length,
+    showMinor,
+    activeEpisode,
+    nextItems,
+    brief,
+    threads
   };
 }
 
-function decorateVisit(record, event, bloods) {
+/** Thread lanes for the Health Threads strip (MO-17). */
+export function buildThreadModel(visits = [], bloods = [], today) {
+  if (!today) throw new RangeError('Medical display date is unavailable');
+  const bloodsByDate = new Map(bloods.map(b => [b.date, b]));
+  const lanes = THREAD_RULES.map(rule => {
+    const events = [];
+    for (const visit of visits) {
+      if (!rule.test(visit, bloodsByDate.get(visit.date))) continue;
+      events.push({
+        id: visit.id,
+        date: visit.date,
+        title: visit.title,
+        planned: isPlannedVisit(visit, today),
+        virtual: Boolean(visit.virtual),
+        kind: visit.record_type === 'Consultation' || /specialist|gastro|hepat/i.test(visit.title || '')
+          ? 'specialist'
+          : visit.record_type === 'Symptom'
+            ? 'symptom'
+            : 'event',
+        episode: visit.episode,
+        visit
+      });
+    }
+    const markers = collectThreadMarkers(rule.thread, bloods);
+    return {
+      id: rule.thread,
+      label: rule.thread,
+      colour: MEDICAL_THREAD_COLOURS[rule.thread],
+      events,
+      markers
+    };
+  }).filter(lane => lane.events.length || lane.markers.length);
+
+  return { today, lanes };
+}
+
+function collectThreadMarkers(thread, bloods) {
+  const keys = thread === 'IBD'
+    ? [/calprotectin/i]
+    : thread === 'Liver'
+      ? [/\bggt\b/i, /\balt\b/i]
+      : [];
+  if (!keys.length) return [];
+  const points = [];
+  for (const panel of bloods) {
+    for (const marker of panel.markers || []) {
+      const label = `${marker.key || ''} ${marker.label || ''}`;
+      if (!keys.some(re => re.test(label))) continue;
+      points.push({
+        date: panel.date,
+        key: marker.key,
+        label: marker.label || marker.key,
+        value: marker.value,
+        status: marker.status,
+        ref_low: marker.ref_low,
+        ref_high: marker.ref_high
+      });
+    }
+  }
+  return points.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function decorateVisit(record, event, bloods, today) {
+  const weight = record.weight && ['major', 'routine', 'minor'].includes(record.weight)
+    ? record.weight
+    : inferWeight({ ...record, lab: bloods, notes: record.notes || event?.body });
   const visit = {
     id: record.id,
     date: record.date,
@@ -106,6 +240,11 @@ function decorateVisit(record, event, bloods) {
     title: record.title,
     record_type: record.record_type,
     lane: record.lane || 'appointment',
+    weight,
+    status: record.status ?? null,
+    date_precision: record.date_precision ?? null,
+    cadence_days: record.cadence_days ?? null,
+    task_id: record.task_id ?? null,
     provider: record.provider ?? null,
     location: record.location ?? null,
     location_kind: record.location_kind ?? (record.location ? 'place' : 'unknown'),
@@ -114,12 +253,236 @@ function decorateVisit(record, event, bloods) {
     cost_aud: record.cost_aud ?? null,
     insurance_status: record.insurance_status ?? null,
     episode: record.episode ?? null,
-    displayDate: formatDisplayDate(record.date),
+    displayDate: null,
     lab: labSummary(bloods),
-    mapsUrl: null
+    bloods,
+    mapsUrl: null,
+    virtual: false,
+    planned: false
   };
+  visit.planned = isPlannedVisit(visit, today);
   visit.mapsUrl = mapsUrl(visit);
+  visit.displayDate = formatMedicalDisplayDate(visit);
   return visit;
+}
+
+/** Precision-aware river/meta date: never print a day for month/tbd (MO-06). */
+export function formatMedicalDisplayDate(visit) {
+  if (!visit) return '';
+  if (visit.status === 'to_book' || visit.date_precision === 'tbd') return 'To book';
+  if (visit.date_precision === 'month' && visit.date) {
+    const [y, m] = String(visit.date).split('-').map(Number);
+    const mon = MONTHS_SHORT[m - 1] || '';
+    return mon ? `${mon} ${y}` : formatDisplayDate(visit.date);
+  }
+  if (!visit.date) return '';
+  const day = formatDisplayDate(visit.date);
+  return visit.virtual ? `~${day}` : day;
+}
+
+/**
+ * Cadence-derived virtual next dose (MO-07). Never written to storage.
+ * Last Stelara 27/08 cadence 56 → ~22/10. Real record within ±7 days suppresses it.
+ */
+export function deriveVirtualDoses(visits, today) {
+  const virtuals = [];
+  const byMed = new Map();
+  for (const visit of visits) {
+    if (!visit.cadence_days || visit.cadence_days <= 0) continue;
+    if (visit.planned || (today && visit.date > today)) continue;
+    const key = medicationKey(visit);
+    const existing = byMed.get(key);
+    if (!existing || visit.date > existing.date) byMed.set(key, visit);
+  }
+  for (const [, last] of byMed) {
+    const nextDate = addDays(last.date, last.cadence_days);
+    if (!nextDate) continue;
+    const suppressed = visits.some(visit => {
+      if (medicationKey(visit) !== medicationKey(last)) return false;
+      if (!isCalendarDate(visit.date) || !isCalendarDate(nextDate)) return false;
+      return Math.abs(daysBetween(visit.date, nextDate)) <= 7;
+    });
+    if (suppressed) continue;
+    const virtual = {
+      ...last,
+      id: `virtual-${last.id}-${nextDate}`,
+      date: nextDate,
+      status: 'planned',
+      date_precision: 'day',
+      planned: true,
+      virtual: true,
+      record_type: 'Dose',
+      title: last.title,
+      notes: `~${formatDisplayDate(nextDate)} · auto from cadence ${last.cadence_days}d`,
+      lab: null,
+      bloods: null,
+      task_id: null
+    };
+    virtual.displayDate = formatMedicalDisplayDate(virtual);
+    virtuals.push(virtual);
+  }
+  return virtuals;
+}
+
+function medicationKey(visit) {
+  const blob = `${visit.title || ''} ${visit.notes || ''}`.toLowerCase();
+  if (/stelara|ustekinumab/.test(blob)) return 'stelara';
+  if (/humira|adalimumab/.test(blob)) return 'humira';
+  return (visit.title || visit.id || 'med').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+function addDays(dateKey, days) {
+  if (!isCalendarDate(dateKey) || !Number.isFinite(days)) return null;
+  const [y, m, d] = dateKey.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  const yy = dt.getUTCFullYear();
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(dt.getUTCDate()).padStart(2, '0');
+  const key = `${yy}-${mm}-${dd}`;
+  return isCalendarDate(key) ? key : null;
+}
+
+function newestActiveEpisode(visits, today) {
+  const byId = new Map();
+  for (const visit of visits) {
+    const ep = visit.episode;
+    if (!ep?.id) continue;
+    const status = ep.status || 'active';
+    const lastDate = visit.date;
+    const existing = byId.get(ep.id);
+    if (!existing) {
+      byId.set(ep.id, {
+        id: ep.id,
+        title: ep.title,
+        status,
+        started: ep.started || lastDate,
+        resolved: ep.resolved || null,
+        lastDate,
+        entries: [visit]
+      });
+    } else {
+      existing.entries.push(visit);
+      if (lastDate > existing.lastDate) existing.lastDate = lastDate;
+      if (ep.started && (!existing.started || ep.started < existing.started)) {
+        existing.started = ep.started;
+      }
+      if (status === 'resolved') {
+        existing.status = 'resolved';
+        existing.resolved = ep.resolved || lastDate;
+      }
+    }
+  }
+
+  let best = null;
+  for (const ep of byId.values()) {
+    // Auto-resolve after 7 days with no new entry (soft: resolved?).
+    if (ep.status === 'active' && today && ep.lastDate && isCalendarDate(ep.lastDate)) {
+      if (daysBetween(ep.lastDate, today) > 7) {
+        ep.status = 'resolved?';
+        ep.resolved = addDays(ep.lastDate, 7);
+      }
+    }
+    if (ep.status !== 'active') continue;
+    if (!best || ep.lastDate > best.lastDate) best = ep;
+  }
+  if (best) {
+    best.dayNumber = best.started && today && isCalendarDate(best.started)
+      ? Math.max(1, daysBetween(best.started, today) + 1)
+      : 1;
+    best.entries.sort(compareNewest);
+  }
+  return best;
+}
+
+function buildNextItems(visits, today) {
+  const planned = visits.filter(visit => isPlannedVisit(visit, today));
+  const actions = planned.filter(visit =>
+    visit.status === 'to_book' || visit.date_precision === 'tbd'
+  );
+  const dated = planned.filter(visit => !actions.includes(visit));
+  const sortDated = (a, b) => {
+    const pa = precisionRank(a);
+    const pb = precisionRank(b);
+    if (pa !== pb) return pa - pb;
+    return compareSoonest(a, b);
+  };
+  return [...actions.sort(compareSoonest), ...dated.sort(sortDated)].slice(0, 8);
+}
+
+function precisionRank(visit) {
+  if (visit.status === 'to_book' || visit.date_precision === 'tbd') return 0;
+  if (visit.date_precision === 'month') return 2;
+  return 1;
+}
+
+function buildHealthBrief(visits, bloods, today) {
+  // Cycle meter needs a dose row with cadence — not a visit whose notes merely mention Stelara.
+  const stelara = visits
+    .filter(visit => /stelara|ustekinumab/i.test(visit.title || ''))
+    .filter(visit => !visit.virtual && visit.date <= today && visit.cadence_days)
+    .sort(compareNewest)[0];
+  let cycle = null;
+  if (stelara) {
+    const elapsed = daysBetween(stelara.date, today);
+    const week = Math.min(8, Math.max(1, Math.floor(elapsed / 7) + 1));
+    cycle = {
+      label: 'Stelara',
+      week,
+      of: Math.round(stelara.cadence_days / 7) || 8,
+      lastDate: stelara.date,
+      cadence_days: stelara.cadence_days,
+      nextDate: addDays(stelara.date, stelara.cadence_days)
+    };
+  }
+
+  const watch = [];
+  const latestBloods = [...bloods].sort((a, b) => b.date.localeCompare(a.date))[0];
+  if (latestBloods?.markers) {
+    for (const marker of latestBloods.markers) {
+      if (marker.status !== 'High' && marker.status !== 'Low') continue;
+      watch.push({
+        key: marker.key,
+        label: marker.label || marker.key,
+        value: marker.value,
+        status: marker.status,
+        arrow: marker.status === 'High' ? '↑' : '↓',
+        ref_low: marker.ref_low,
+        ref_high: marker.ref_high,
+        date: latestBloods.date
+      });
+      if (watch.length >= 2) break;
+    }
+  }
+
+  const verdictVisit = visits
+    .filter(visit =>
+      visit.notes
+      && visit.date <= today
+      && !visit.planned
+      && !visit.virtual
+      && visit.status !== 'to_book'
+      && visit.status !== 'planned'
+      && visit.record_type !== 'Symptom'
+    )
+    .sort(compareNewest)[0];
+  const verdict = extractVerdict(verdictVisit?.notes) || null;
+
+  return { cycle, watch, verdict };
+}
+
+function extractVerdict(notes) {
+  const text = String(notes || '').trim();
+  if (!text) return null;
+  // Prefer a trailing Sara-style line that starts with an em dash.
+  const lines = text.split(/\n/).map(line => line.trim()).filter(Boolean);
+  for (let i = lines.length - 1; i >= 0; i -= 1) {
+    const m = lines[i].match(/^—\s*(.+)$/) || lines[i].match(/^-\s*(.+)$/);
+    if (m) return m[1].trim().slice(0, 160);
+  }
+  const dash = text.match(/—\s*([^—\n]+)\s*$/);
+  if (dash) return dash[1].trim().slice(0, 160);
+  return lines[0].slice(0, 160);
 }
 
 function labSummary(bloods) {
@@ -135,7 +498,8 @@ function labSummary(bloods) {
       label: marker.label || marker.key,
       status: marker.status,
       value: marker.value
-    }))
+    })),
+    markers: bloods.markers
   };
 }
 
@@ -152,16 +516,45 @@ function matches(visit, query, recordType, provider) {
 }
 
 function compareSoonest(a, b) {
-  return a.date.localeCompare(b.date) || String(a.time ?? '').localeCompare(String(b.time ?? '')) || a.title.localeCompare(b.title);
+  return a.date.localeCompare(b.date)
+    || String(a.time ?? '').localeCompare(String(b.time ?? ''))
+    || a.title.localeCompare(b.title);
+}
+
+/** Upcoming river: soonest nearest to TODAY → descending date toward Today. */
+function compareUpcoming(a, b) {
+  return b.date.localeCompare(a.date)
+    || String(b.time ?? '').localeCompare(String(a.time ?? ''))
+    || a.title.localeCompare(b.title);
 }
 
 function compareNewest(a, b) {
-  return b.date.localeCompare(a.date) || String(b.time ?? '').localeCompare(String(a.time ?? '')) || a.title.localeCompare(b.title);
+  return b.date.localeCompare(a.date)
+    || String(b.time ?? '').localeCompare(String(a.time ?? ''))
+    || a.title.localeCompare(b.title);
 }
 
 function pack(visits, density, expandedYears) {
   if (density === 'years') return collapseYears(visits, expandedYears);
   return withHeadings(toItems(visits), density);
+}
+
+/** Upcoming: TO BOOK group first, then dated month/week headings (MO-06). */
+function packUpcoming(visits, density, expandedYears) {
+  const toBook = [];
+  const dated = [];
+  for (const visit of visits) {
+    if (visit.status === 'to_book' || visit.date_precision === 'tbd') toBook.push(visit);
+    else dated.push(visit);
+  }
+  const out = [];
+  if (toBook.length) {
+    out.push({ kind: 'heading', label: 'To book', date: null, toBook: true });
+    out.push(...toItems(toBook));
+  }
+  if (density === 'years') out.push(...collapseYears(dated, expandedYears));
+  else out.push(...withHeadings(toItems(dated), density));
+  return out;
 }
 
 function collapseYears(visits, expandedYears) {
@@ -190,7 +583,7 @@ function withHeadings(items, density) {
     const date = item.kind === 'visit'
       ? item.visit.date
       : item.kind === 'band'
-        ? item.visits[0]?.date
+        ? bandAnchorDate(item.visits)
         : null;
     if (date) {
       const label = headingFor(date, density);
@@ -204,6 +597,14 @@ function withHeadings(items, density) {
   return out;
 }
 
+function bandAnchorDate(visits = []) {
+  let max = '';
+  for (const visit of visits) {
+    if (visit?.date && visit.date > max) max = visit.date;
+  }
+  return max || visits[0]?.date || null;
+}
+
 function headingFor(date, density) {
   const [year, month] = String(date).split('-');
   if (!year) return '';
@@ -214,34 +615,56 @@ function headingFor(date, density) {
 }
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/**
+ * Group by episode.id globally (not contiguous runs). Intervening visits
+ * (e.g. Gastro between cold notes) must not split an active episode band.
+ * Band sits at its latest entry date so an active cold lands under TODAY.
+ */
 function toItems(visits) {
-  const items = [];
-  let run = [];
-  const flush = () => {
-    if (!run.length) return;
-    if (run.length >= 2 && run[0].episode?.id && run.every(visit => visit.episode?.id === run[0].episode.id)) {
-      items.push({ kind: 'band', episode: run[0].episode, visits: run });
-    } else {
-      for (const visit of run) items.push({ kind: 'visit', visit });
-    }
-    run = [];
-  };
-
+  const byEpisode = new Map();
   for (const visit of visits) {
     const id = visit.episode?.id;
-    if (!id) {
-      flush();
-      items.push({ kind: 'visit', visit });
+    if (!id) continue;
+    if (!byEpisode.has(id)) byEpisode.set(id, []);
+    byEpisode.get(id).push(visit);
+  }
+  const banded = new Map();
+  for (const [id, group] of byEpisode) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort(compareNewest);
+    banded.set(id, {
+      kind: 'band',
+      episode: sorted[0].episode,
+      visits: sorted
+    });
+  }
+
+  const items = [];
+  const emitted = new Set();
+  for (const visit of visits) {
+    const id = visit.episode?.id;
+    if (id && banded.has(id)) {
+      if (emitted.has(id)) continue;
+      emitted.add(id);
+      items.push(banded.get(id));
       continue;
     }
-    if (run.length && run[0].episode?.id !== id) flush();
-    run.push(visit);
+    items.push({ kind: 'visit', visit });
   }
-  flush();
   return items;
 }
 
 function unique(values) {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
+}
+
+function visitBlob(visit) {
+  return `${visit.title || ''} ${visit.notes || ''} ${visit.provider || ''} ${visit.lane || ''} ${visit.record_type || ''}`;
+}
+
+function hasMarker(bloods, re) {
+  if (!bloods?.markers) return false;
+  return bloods.markers.some(marker => re.test(`${marker.key || ''} ${marker.label || ''}`));
 }

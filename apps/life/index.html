@@ -959,6 +959,8 @@
             <button type="button" id="medical-back" class="btn btn--secondary quiet-button bloods-back">← Body</button>
             <button type="button" id="medical-today" class="btn btn--ghost">Today</button>
           </div>
+          <div id="medical-brief-row" class="medical-brief-row" aria-label="Health brief"></div>
+          <div id="medical-strip" class="medical-strip" aria-label="Health threads"></div>
           <div class="medical-toolbar">
             <label class="hub-search">
               <span class="visually-hidden">Search visits</span>
@@ -968,21 +970,25 @@
               </svg>
               <input id="medical-search" class="hub-search__input" type="search" placeholder="Search visits" autocomplete="off" aria-label="Search visits">
             </label>
-            <div id="medical-type-host"></div>
-            <div id="medical-provider-host"></div>
-            <div id="medical-density" class="hub-pills" role="group" aria-label="Timeline zoom">
+            <button type="button" id="medical-filters" class="btn btn--ghost medical-toolbar__filters-btn" aria-expanded="false" aria-controls="medical-filters-panel">Filters</button>
+            <div id="medical-filters-panel" class="medical-toolbar__filters-panel">
+              <div id="medical-type-host"></div>
+              <div id="medical-provider-host"></div>
+              <button type="button" id="medical-show-minor" class="btn btn--ghost" aria-pressed="false">Show minor</button>
+            </div>
+            <div id="medical-density" class="hub-pills medical-toolbar__density" role="group" aria-label="Timeline pack density" hidden>
               <button type="button" class="hub-pills__btn" data-medical-density="weeks" aria-pressed="false">Weeks</button>
               <button type="button" class="hub-pills__btn is-active" data-medical-density="months" aria-pressed="true">Months</button>
               <button type="button" class="hub-pills__btn" data-medical-density="years" aria-pressed="false">Years</button>
             </div>
             <button type="button" id="medical-places" class="btn btn--secondary">Places</button>
-            <button type="button" id="medical-add" class="btn btn--primary">Add</button>
+            <button type="button" id="medical-add" class="btn btn--primary medical-toolbar__add" aria-label="Add visit">Add</button>
           </div>
           <div id="medical-chips" class="hub-chips"></div>
           <p id="medical-empty" class="metric-caption" hidden></p>
           <div class="medical-layout">
             <div id="medical-timeline" class="medical-timeline" aria-label="Medical timeline"></div>
-            <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview"></aside>
+            <aside id="medical-sheet" class="medical-sheet" aria-label="Medical overview" hidden></aside>
           </div>
           <button type="button" id="medical-sheet-close" class="medical-sheet__close" aria-label="Close details">×</button>
         </section>

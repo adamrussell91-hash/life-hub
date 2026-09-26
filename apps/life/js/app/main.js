@@ -157,6 +157,7 @@ const bodyController = createBodyController({
 });
 const medicalController = createMedicalController({
   chatApi,
+  tasksApi,
   getDate: () => controller.getDisplayDate?.() ?? null,
   onRecordWritten: notifyLogged
 });

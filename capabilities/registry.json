@@ -321,7 +321,8 @@
     "tasks.create": {
       "file": "tasks/create-task.json",
       "agents": [
-        "clare"
+        "clare",
+        "sara"
       ],
       "risk": "confirm",
       "surfaces": [

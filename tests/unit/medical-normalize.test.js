@@ -4,8 +4,11 @@ import { load } from 'js-yaml';
 import {
   coerceCalendarDate,
   inferRecordType,
+  inferWeight,
+  joinOrCreateEpisode,
   laneFor,
   locationKindFor,
+  MEDICAL_RECORD_TYPES,
   mergeMedicalFields,
   normalizeMedicalFields,
   parseMedicalEventTolerant,
@@ -39,7 +42,8 @@ test('normalizes empty placeholders and infers required medical enums', () => {
     title: 'Stelara injection',
     record_type: 'Prescription',
     lane: 'prescription',
-    location_kind: 'unknown'
+    location_kind: 'unknown',
+    weight: 'major'
   });
 });
 
@@ -285,4 +289,121 @@ Old note
 `, 'data/body/2026/08/2026-08-27-medical-stelara.md', load);
   assert.equal(parsed.record.title, 'Stelara injection');
   assert.equal(parsed.body, 'Old note');
+});
+
+test('MO-01 schema accepts Symptom weight status cadence task_id episode fields', () => {
+  assert.ok(MEDICAL_RECORD_TYPES.includes('Symptom'));
+  const result = validateLogEntry({
+    type: 'medical',
+    date: '2026-09-26',
+    notes: 'throat sore',
+    fields: {
+      title: 'Sore throat',
+      record_type: 'Symptom',
+      weight: 'minor',
+      status: 'planned',
+      date_precision: 'day',
+      cadence_days: 56,
+      task_id: 'task-1',
+      episode: {
+        id: 'ep-cold',
+        title: 'Head cold',
+        status: 'active',
+        started: '2026-09-23'
+      }
+    }
+  }, { id: 'sym-1', now: '2026-09-26T10:00:00+10:00' });
+  assert.equal(result.valid, true, JSON.stringify(result.errors));
+  assert.equal(result.record.weight, 'minor');
+  assert.equal(result.record.lane, 'symptom');
+  assert.equal(result.record.episode.status, 'active');
+  assert.equal(result.record.cadence_days, 56);
+  assert.equal(result.record.task_id, 'task-1');
+});
+
+test('MO-02 inferWeight covers major routine minor rows', () => {
+  assert.equal(inferWeight({ record_type: 'Surgery/Hospital', title: 'Admission' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Imaging', title: 'MRI' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Referral', title: 'MRCP referral' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Consultation', title: 'Gastro specialist', provider: 'Dr Keily' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Lab Work', title: 'Bloods panel', lab: true }), 'major');
+  assert.equal(inferWeight({ record_type: 'Prescription', title: 'Stelara injection' }), 'major');
+  assert.equal(inferWeight({ record_type: 'Appointment', title: 'GP review' }), 'routine');
+  assert.equal(inferWeight({ record_type: 'Vaccination', title: 'Flu shot' }), 'routine');
+  assert.equal(inferWeight({ record_type: 'Symptom', title: 'Sore throat' }), 'minor');
+});
+
+test('MO-03 inferRecordType maps symptom language without visit words', () => {
+  assert.equal(inferRecordType('', 'Sore throat', 'my throat is sore'), 'Symptom');
+  assert.equal(inferRecordType('', 'Run down', 'feeling tired and run down'), 'Symptom');
+  assert.equal(inferRecordType('', 'GP visit', 'sore throat at the doctor'), 'Appointment');
+});
+
+test('MO-04 joinOrCreateEpisode joins active episode within 7 days', () => {
+  const joined = joinOrCreateEpisode(
+    { title: 'Still congested', record_type: 'Symptom', date: '2026-09-26' },
+    {
+      today: '2026-09-26',
+      activeEpisodes: [{ id: 'ep-cold', title: 'Head cold', status: 'active', started: '2026-09-23' }]
+    }
+  );
+  assert.equal(joined.id, 'ep-cold');
+  assert.equal(joined.title, 'Head cold');
+
+  const fresh = joinOrCreateEpisode(
+    { title: 'Sore throat', record_type: 'Symptom', date: '2026-09-26' },
+    { today: '2026-09-26', activeEpisodes: [] }
+  );
+  assert.equal(fresh.status, 'active');
+  assert.equal(fresh.started, '2026-09-26');
+  assert.match(fresh.id, /^ep-/);
+});
+
+test('MO-05 different-day symptom update creates new record in same episode', async () => {
+  const yaml = `---
+schema_version: 1
+id: "sore-24"
+type: "medical"
+date: "2026-09-24"
+time: "09:00"
+created_at: "2026-09-24T09:00:00+10:00"
+updated_at: "2026-09-24T09:00:00+10:00"
+source: "chat"
+title: "Sore throat, sniffles, poor sleep"
+record_type: "Symptom"
+lane: "symptom"
+weight: "minor"
+episode:
+  id: "ep-head-cold"
+  title: "Head cold"
+  status: "active"
+  started: "2026-09-23"
+---
+Sore throat, sniffles, poor sleep
+`;
+  const client = {
+    resolveTree: async () => ({
+      tree: [{
+        type: 'blob',
+        path: 'data/body/2026/09/2026-09-24-medical-sore-throat-sniffles-poor-sleep-0900.md',
+        sha: 'sha-cold'
+      }]
+    }),
+    readBlob: async () => new TextEncoder().encode(yaml).buffer
+  };
+  const resolved = await resolveMedicalLogCandidate(client, {
+    type: 'medical',
+    date: '2026-09-26',
+    notes: 'still congested, throat better',
+    fields: { title: 'Still congested, throat better', record_type: 'Symptom' }
+  }, {
+    today: '2026-09-26',
+    loadYaml: load,
+    decodeBlob: bytes => new TextDecoder().decode(bytes)
+  });
+
+  assert.equal(resolved.date, '2026-09-26');
+  assert.equal(resolved.fields.episode.id, 'ep-head-cold');
+  assert.notEqual(resolved.date, '2026-09-24');
+  assert.equal(resolved.notes, 'still congested, throat better');
 });

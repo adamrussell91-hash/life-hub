@@ -386,13 +386,17 @@ function validateFragrance(record, errors) {
 
 const MEDICAL_RECORD_TYPES = [
   'Appointment', 'Consultation', 'Lab Work', 'Test Result', 'Imaging',
-  'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination'
+  'Surgery/Hospital', 'Prescription', 'Referral', 'Vaccination', 'Symptom'
 ];
 const MEDICAL_LANES = [
   'hospital', 'lab', 'imaging', 'prescription', 'referral', 'vaccine',
-  'dental', 'therapy', 'eye', 'appointment'
+  'dental', 'therapy', 'eye', 'appointment', 'symptom'
 ];
 const LOCATION_KINDS = ['place', 'telehealth', 'unknown'];
+const MEDICAL_WEIGHTS = ['major', 'routine', 'minor'];
+const MEDICAL_STATUSES = ['planned', 'to_book', 'booked', 'done'];
+const DATE_PRECISIONS = ['day', 'month', 'tbd'];
+const EPISODE_STATUSES = ['active', 'resolved'];
 
 function coerceMedicalEnums(record) {
   const title = typeof record.title === 'string' ? record.title.trim() : '';
@@ -408,9 +412,20 @@ function coerceMedicalEnums(record) {
   if (record.cost_aud != null && (typeof record.cost_aud !== 'number' || !Number.isFinite(record.cost_aud))) {
     delete record.cost_aud;
   }
+  if (record.cadence_days != null && (typeof record.cadence_days !== 'number' || !Number.isFinite(record.cadence_days))) {
+    delete record.cadence_days;
+  }
   if (record.date_end != null && !isCalendarDate(record.date_end)) delete record.date_end;
   if (record.follow_up_date != null && !isCalendarDate(record.follow_up_date)) delete record.follow_up_date;
   if (record.episode != null && record.episode === '') delete record.episode;
+  if (record.weight != null && !MEDICAL_WEIGHTS.includes(record.weight)) delete record.weight;
+  if (record.status != null && !MEDICAL_STATUSES.includes(record.status)) delete record.status;
+  if (record.date_precision != null && !DATE_PRECISIONS.includes(record.date_precision)) {
+    delete record.date_precision;
+  }
+  if (record.task_id != null && (typeof record.task_id !== 'string' || record.task_id.trim() === '')) {
+    delete record.task_id;
+  }
 }
 
 function validateMedical(record, errors) {
@@ -419,11 +434,16 @@ function validateMedical(record, errors) {
   enumeration(record, 'record_type', MEDICAL_RECORD_TYPES, errors, true);
   enumeration(record, 'lane', MEDICAL_LANES, errors, true);
   enumeration(record, 'location_kind', LOCATION_KINDS, errors);
+  enumeration(record, 'weight', MEDICAL_WEIGHTS, errors);
+  enumeration(record, 'status', MEDICAL_STATUSES, errors);
+  enumeration(record, 'date_precision', DATE_PRECISIONS, errors);
   optionalString(record, 'provider', errors);
   optionalString(record, 'location', errors);
   optionalString(record, 'notes', errors);
   optionalString(record, 'insurance_status', errors);
+  optionalString(record, 'task_id', errors);
   finiteNumber(record, 'cost_aud', errors, { minimum: 0 });
+  finiteNumber(record, 'cadence_days', errors, { minimum: 1 });
   if (record.date_end != null && !isCalendarDate(record.date_end)) {
     errors.push('date_end must be a valid calendar date in YYYY-MM-DD form');
   }
@@ -439,6 +459,15 @@ function validateMedical(record, errors) {
       }
       if (typeof record.episode.title !== 'string' || record.episode.title.trim() === '') {
         errors.push('episode title must be a non-empty string');
+      }
+      if (record.episode.status != null && !EPISODE_STATUSES.includes(record.episode.status)) {
+        errors.push('episode status must be active or resolved');
+      }
+      if (record.episode.started != null && !isCalendarDate(record.episode.started)) {
+        errors.push('episode started must be YYYY-MM-DD');
+      }
+      if (record.episode.resolved != null && !isCalendarDate(record.episode.resolved)) {
+        errors.push('episode resolved must be YYYY-MM-DD');
       }
     }
   }
