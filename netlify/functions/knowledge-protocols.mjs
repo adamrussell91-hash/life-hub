@@ -3,6 +3,7 @@ import { ID_RE } from './_shared/cognitive-controller.mjs';
 import { createCognitiveService } from './_shared/cognitive-service.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { createAnthropicClient } from './_shared/anthropic-client.mjs';
+import { gatherContext, topicSearchTerms } from './_shared/cognitive-context.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
@@ -21,6 +22,7 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
     for await (const event of client.streamMessage({
       system: prompt.system,
       messages: [{ role: 'user', content: prompt.user }],
+      tools: Array.isArray(prompt.tools) ? prompt.tools : undefined,
       maxTokens: Math.min(4096, Math.max(1024, (prompt.wordBudget || 200) * 3))
     })) if (event.type === 'text') text += event.delta ?? '';
   } catch (error) {
@@ -34,6 +36,8 @@ export async function defaultModel(prompt, env, fetchImpl = fetch) {
 const STOP = new Set(['about','after','again','also','and','any','are','because','been','before','being','between','but','can','could','for','from','has','have','here','how','into','its','just','like','may','might','more','most','need','not','only','other','our','out','over','really','same','should','some','stay','such','than','that','the','their','them','then','there','they','this','through','too','under','very','want','was','were','what','when','where','whether','which','while','who','why','will','with','would','you','your']);
 
 export function searchableTerms(session) {
+  const topic = topicSearchTerms(session);
+  if (topic.length) return topic;
   return Object.values(session?.intake ?? {})
     .join(' ')
     .toLowerCase()
@@ -55,6 +59,15 @@ function termHits(haystack, term) {
   return false;
 }
 
+function pageBodyText(page) {
+  if (!page || typeof page !== 'object') return '';
+  if (typeof page.body === 'string' && page.body.trim()) return page.body;
+  if (typeof page.content === 'string' && page.content.trim()) return page.content;
+  if (typeof page.markdown === 'string' && page.markdown.trim()) return page.markdown;
+  if (typeof page.text === 'string' && page.text.trim()) return page.text;
+  return '';
+}
+
 export async function defaultRetrieve(session, env, fetchImpl = fetch) {
   const terms = searchableTerms(session);
   if (!terms.length) return { evidence: [], status: 'none' };
@@ -69,17 +82,37 @@ export async function defaultRetrieve(session, env, fetchImpl = fetch) {
     }).filter(({ row, score }) => typeof row?.id === 'string' && score >= 2)
       .sort((left, right) => right.score - left.score)
       .slice(0, 6);
-    const evidence = ranked.map(({ row }) => ({
-      id: `knowledge:${row.id}`,
-      kind: 'knowledge_hub_note',
-      title: typeof row.title === 'string' && row.title ? row.title : row.id,
-      text: typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '',
-      source: 'Knowledge Hub archive'
-    }));
+    const top = ranked.slice(0, 3);
+    const evidence = [];
+    for (const { row } of top) {
+      let text = typeof row.excerpt === 'string' ? row.excerpt.slice(0, 700) : '';
+      try {
+        const page = await readKnowledgeFile(`pages/${row.id}.json`, { env, fetchImpl });
+        const body = pageBodyText(page);
+        if (body) text = body.slice(0, 4000);
+      } catch { /* keep excerpt */ }
+      evidence.push({
+        id: `knowledge:${row.id}`,
+        kind: 'knowledge_hub_note',
+        title: typeof row.title === 'string' && row.title ? row.title : row.id,
+        text,
+        source: 'Knowledge Hub archive'
+      });
+    }
     return evidence.length ? { evidence, status: 'grounded' } : { evidence: [], status: 'none' };
   } catch {
-    return { evidence: [], status: 'none' };
+    return { evidence: [], status: 'unavailable' };
   }
+}
+
+export async function defaultGatherContext(session, env, fetchImpl = fetch, deps = {}) {
+  return gatherContext(session, env, {
+    fetchImpl,
+    retrieveKnowledge: deps.retrieveKnowledge ?? defaultRetrieve,
+    model: deps.model ?? (prompt => defaultModel(prompt, env, fetchImpl)),
+    readCentralNode: deps.readCentralNode,
+    research: deps.research
+  });
 }
 
 export function protocolRunUrl(request) {
@@ -103,10 +136,11 @@ export async function defaultInvokeProtocolRun(request, sessionId, env = {}, fet
 async function serviceFor(env, deps) {
   const store = deps.getStore ? await deps.getStore(env) : await defaultGetCognitiveStore(env);
   if (!store) throw Object.assign(new Error('Protocol session storage is not configured.'), { status: 503, code: 'cognitive_store_unbound' });
+  const retrieve = deps.retrieve ?? ((session) => defaultGatherContext(session, env, deps.fetchImpl ?? fetch, deps));
   return createCognitiveService({
     store,
     model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)),
-    retrieve: deps.retrieve ?? (session => defaultRetrieve(session, env, deps.fetchImpl))
+    retrieve
   });
 }
 
