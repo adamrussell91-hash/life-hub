@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 5/46 (11%)**
+**Progress: 12/46 (26%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -24,13 +24,13 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M2: Basic editing on the goal page
 
-- [ ] **G-06** Rename (inline edit) — —
-- [ ] **G-07** Sphere / Status / Term / Life area chips — —
-- [ ] **G-08** Due date chip — —
-- [ ] **G-09** Description popover — —
-- [ ] **G-10** Tags — —
-- [ ] **G-11** Delete with confirm + undo — —
-- [ ] **G-12** Life Wall editor — —
+- [x] **G-06** Rename (inline edit) —
+- [x] **G-07** Sphere / Status / Term / Life area chips —
+- [x] **G-08** Due date chip —
+- [x] **G-09** Description popover —
+- [x] **G-10** Tags —
+- [x] **G-11** Delete with confirm + undo —
+- [x] **G-12** Life Wall editor —
 
 ## M3: Landing page (Term Runway)
 
