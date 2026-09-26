@@ -395,6 +395,20 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/events') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty PD events so Professional home can mount the kit calendar embed.
+      json(response, 200, { ok: true, data: { events: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
+    if (url.pathname === '/api/meetings') {
+      if (!readSession(request)) return unauthenticated(response);
+      // Empty meetings so Professional home can mount the kit calendar embed.
+      json(response, 200, { ok: true, data: { meetings: [] } }, PRIVATE_HEADERS);
+      return true;
+    }
+
     if (url.pathname === '/api/search' ||
         url.pathname === '/api/outcomes' ||
         url.pathname.startsWith('/api/outcomes/') ||
