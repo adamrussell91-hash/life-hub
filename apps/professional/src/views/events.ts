@@ -1111,9 +1111,7 @@ export async function renderEventDetailView(
       statusMessage:
         record.learning_operation?.status === 'committed'
           ? `Learning Task ${record.learning_operation.task_id}`
-          : record.learning_operation?.status === 'incomplete'
-            ? 'Learning task link is incomplete. Retry the existing link. Do not create a second task until this one lands.'
-            : null,
+          : null,
       onSubmit: async (input) => {
         try {
           const result = await linkEventTask(record.id, {

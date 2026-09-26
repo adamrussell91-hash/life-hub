@@ -2167,6 +2167,10 @@
   font-size: var(--text-base);
 }
 
+.task-link-panel__state{margin:0;font-size:var(--text-sm);color:var(--muted)}
+.task-link-panel__state[data-link-state="linked"]{color:var(--success)}
+.task-link-panel__state[data-link-state="stuck"]{color:var(--high-sea-ink)}
+
 .event-detail__cancel {
   color: var(--danger);
 }
