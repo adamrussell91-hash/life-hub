@@ -81,6 +81,8 @@ export interface OrganisationRecord {
   lifecycle_status: string;
   retention_reason: string | null;
   retention_review_at: string | null;
+  /** R2 object key for crest image; null until uploaded. */
+  logo_key?: string | null;
   created_at: string;
   updated_at: string;
 }

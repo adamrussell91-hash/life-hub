@@ -580,6 +580,167 @@ export function createMockApi() {
       });
     }
 
+    if (path === '/api/organisations/directory' && method === 'GET') {
+      const self =
+        [...people.values()].find((p) => p.is_self) ?? [...people.values()][0] ?? null;
+      const selfRef = self ? `shared:person:${self.id}` : null;
+      const orgs = [...organisations.values()].map((org) => {
+        const ref = `shared:organisation:${org.id}`;
+        const orgRels = relationships.filter(
+          (r) => r.source_ref === ref || r.target_ref === ref
+        );
+        const chips: Array<{
+          kind: string;
+          label: string;
+          detail: string;
+          filterBucket: string;
+        }> = [];
+        const peopleMap = new Map<
+          string,
+          {
+            id: string;
+            display_name: string;
+            warmth_band: 'warm' | 'cooling' | 'cold';
+            warmth: number;
+            first_link_at: string | null;
+          }
+        >();
+
+        for (const rel of orgRels) {
+          const type =
+            rel.relationship_type === 'works_at' ? 'employee_at' : rel.relationship_type;
+          const personRef =
+            rel.source_ref.startsWith('shared:person:')
+              ? rel.source_ref
+              : rel.target_ref.startsWith('shared:person:')
+                ? rel.target_ref
+                : null;
+          const personId = personRef?.split(':')[2] ?? null;
+          const person = personId ? people.get(personId) : null;
+          const current = rel.status === 'current' || !rel.valid_to;
+
+          if (person && personId) {
+            if (!peopleMap.has(personId)) {
+              peopleMap.set(personId, {
+                id: personId,
+                display_name: person.display_name,
+                warmth_band: current ? 'warm' : 'cold',
+                warmth: current ? 72 : 18,
+                first_link_at: rel.valid_from
+              });
+            }
+          }
+
+          if (selfRef && personRef === selfRef) {
+            if (type === 'employee_at') {
+              chips.push({
+                kind: current ? 'workplace' : 'workplace_former',
+                label: 'Workplace',
+                detail: current ? '2023–now' : '2018–21',
+                filterBucket: 'work'
+              });
+            }
+            if (type === 'studied_at') {
+              chips.push({
+                kind: 'studied',
+                label: 'Studied',
+                detail: '2018–21',
+                filterBucket: 'study'
+              });
+            }
+            if (type === 'placement_at') {
+              chips.push({
+                kind: 'placement',
+                label: 'Placement',
+                detail: '2020',
+                filterBucket: 'study'
+              });
+            }
+            if (type === 'member_of') {
+              chips.push({
+                kind: 'member',
+                label: 'Member',
+                detail: 'since 2022',
+                filterBucket: 'bodies'
+              });
+            }
+          }
+        }
+
+        // Mirror production deriveOrganisationChips dedupe (kind:label).
+        const seenChip = new Set<string>();
+        const dedupedChips = chips.filter((c) => {
+          const key = `${c.kind}:${c.label}`;
+          if (seenChip.has(key)) return false;
+          seenChip.add(key);
+          return true;
+        });
+        chips.length = 0;
+        chips.push(...dedupedChips);
+
+        const peopleList = [...peopleMap.values()];
+        const warmth_spread = {
+          warm: peopleList.filter((p) => p.warmth_band === 'warm').length,
+          cooling: peopleList.filter((p) => p.warmth_band === 'cooling').length,
+          cold: peopleList.filter((p) => p.warmth_band === 'cold').length,
+          total: peopleList.length
+        };
+        const arc_points = peopleList
+          .filter((p) => p.first_link_at)
+          .sort((a, b) => String(a.first_link_at).localeCompare(String(b.first_link_at)))
+          .map((p, i) => ({ id: p.id, at: p.first_link_at as string, label: String(i + 1) }));
+
+        const monogram = org.display_name
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 3)
+          .map((w) => w[0])
+          .join('')
+          .toUpperCase();
+
+        return {
+          id: org.id,
+          ref,
+          display_name: org.display_name,
+          legal_name: org.legal_name,
+          logo_key: (org as { logo_key?: string | null }).logo_key ?? null,
+          monogram: monogram || 'ORG',
+          chips,
+          people_count: peopleList.length,
+          people: peopleList,
+          warmth_spread,
+          arc_points,
+          is_current_workplace: chips.some((c) => c.kind === 'workplace'),
+          first_touch_at: peopleList[0]?.first_link_at ?? org.created_at ?? null,
+          last_activity_at: org.updated_at ?? new Date().toISOString(),
+          timeline_lanes: chips
+            .filter((c) => c.kind === 'workplace' || c.kind === 'studied')
+            .map((c, i) => ({
+              id: `lane_${i}`,
+              kind: c.kind === 'workplace' ? 'work_study' : 'work_study',
+              label: c.label,
+              start: '2023-01-15T00:00:00.000Z',
+              end: c.kind === 'studied' ? '2021-12-15T00:00:00.000Z' : null
+            })),
+          created_at: (org.created_at as string) ?? '2020-01-01T00:00:00.000Z',
+          updated_at: (org.updated_at as string) ?? '2025-01-01T00:00:00.000Z'
+        };
+      });
+
+      const peopleIds = new Set(orgs.flatMap((o) => o.people.map((p) => p.id)));
+      return json(200, {
+        ok: true,
+        data: {
+          organisations: orgs,
+          counts: { organisations: orgs.length, people: peopleIds.size }
+        }
+      });
+    }
+
+    if (path === '/api/organisations/crest' && method === 'GET') {
+      return json(200, { ok: true, data: { url: null, logo_key: null } });
+    }
+
     if (path === '/api/entities' && method === 'PATCH') {
       const ref = url.searchParams.get('ref');
       const action = url.searchParams.get('action') ?? 'update';
