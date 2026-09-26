@@ -262,7 +262,15 @@ function buildSvg(root, model, lanes, zoom, width, hooks) {
   path.setAttribute('stroke', 'var(--line)');
   path.setAttribute('stroke-width', '1');
   pattern.append(path);
-  defs.append(pattern);
+  const plotClip = svgEl(root, 'clipPath');
+  plotClip.setAttribute('id', 'medical-strip-plot');
+  const plotRect = svgEl(root, 'rect');
+  plotRect.setAttribute('x', String(GUTTER));
+  plotRect.setAttribute('y', String(AXIS_H));
+  plotRect.setAttribute('width', String(Math.max(0, width - GUTTER - PAD_R)));
+  plotRect.setAttribute('height', String(Math.max(0, height - AXIS_H)));
+  plotClip.append(plotRect);
+  defs.append(pattern, plotClip);
   svg.append(defs);
 
   const xToday = dateToX(model.today, zoom, width);
@@ -467,12 +475,18 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour, railY) {
   const laneTop = y0 + 6;
   const laneBottom = y0 + LANE_H - 4;
   const plotH = Math.max(10, Math.min(16, laneBottom - railY - 2));
+  const xMin = GUTTER;
+  const xMax = width - PAD_R;
+  const g = svgEl(root, 'g');
+  g.setAttribute('clip-path', 'url(#medical-strip-plot)');
+  g.setAttribute('data-role', 'ribbons');
   let ribbonIndex = 0;
   for (const [, points] of groups) {
-    const ys = points.map(p => Number(p.value)).filter(Number.isFinite);
+    const sorted = [...points].sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const ys = sorted.map(p => Number(p.value)).filter(Number.isFinite);
     if (!ys.length) continue;
-    const refLow = Number(points[0].ref_low);
-    const refHigh = Number(points[0].ref_high);
+    const refLow = Number(sorted[0].ref_low);
+    const refHigh = Number(sorted[0].ref_high);
     const min = Math.min(...ys, Number.isFinite(refLow) ? refLow : Infinity);
     const max = Math.max(...ys, Number.isFinite(refHigh) ? refHigh : -Infinity);
     const bandY = Math.min(laneBottom - plotH, railY + 4 + ribbonIndex * 2);
@@ -482,42 +496,89 @@ function drawRibbons(root, svg, lane, zoom, width, y0, colour, railY) {
       const yHigh = bandY + plotH - Math.max(tLow, tHigh) * plotH;
       const yLow = bandY + plotH - Math.min(tLow, tHigh) * plotH;
       const band = svgEl(root, 'rect');
-      band.setAttribute('x', String(GUTTER));
+      band.setAttribute('data-role', 'ribbon-band');
+      band.setAttribute('x', String(xMin));
       band.setAttribute('y', String(Math.max(laneTop, yHigh)));
-      band.setAttribute('width', String(Math.max(0, width - GUTTER - PAD_R)));
+      band.setAttribute('width', String(Math.max(0, xMax - xMin)));
       band.setAttribute('height', String(Math.max(2, Math.min(plotH, yLow - yHigh))));
       band.setAttribute('fill', 'color-mix(in srgb, var(--success) 18%, transparent)');
-      svg.append(band);
+      g.append(band);
     }
-    const pathParts = [];
-    points.forEach((point, i) => {
+    const coords = sorted.map(point => {
       const x = dateToX(point.date, zoom, width);
       const t = max === min ? 0.5 : (Number(point.value) - min) / (max - min);
       const y = bandY + plotH - t * plotH;
-      pathParts.push(`${i ? 'L' : 'M'}${x} ${y}`);
-      if (i === points.length - 1) {
-        const status = point.status === 'Normal' ? '✓' : '↑';
-        const lab = svgEl(root, 'text');
-        lab.setAttribute('data-strip-ribbon-label', '1');
-        lab.setAttribute('x', String(Math.min(width - PAD_R, x + 6)));
-        lab.setAttribute('y', String(Math.max(laneTop + 8, y - 2)));
-        lab.setAttribute('fill', colour);
-        lab.setAttribute('font-size', '10');
-        lab.setAttribute('font-weight', '700');
-        lab.textContent = `${point.value} ${status}`;
-        svg.append(lab);
-      }
+      return { x, y, point };
     });
+    const pathParts = [];
+    for (let i = 0; i < coords.length; i += 1) {
+      const cur = coords[i];
+      const prev = coords[i - 1];
+      if (!prev) {
+        if (cur.x >= xMin && cur.x <= xMax) pathParts.push(`M${cur.x} ${cur.y}`);
+        continue;
+      }
+      const seg = clipSegment(prev.x, prev.y, cur.x, cur.y, xMin, xMax);
+      if (!seg) continue;
+      if (!pathParts.length || seg.startFresh) pathParts.push(`M${seg.x1} ${seg.y1}`);
+      pathParts.push(`L${seg.x2} ${seg.y2}`);
+    }
     if (pathParts.length) {
       const line = svgEl(root, 'path');
+      line.setAttribute('data-role', 'ribbon-line');
       line.setAttribute('d', pathParts.join(' '));
       line.setAttribute('fill', 'none');
       line.setAttribute('stroke', colour);
       line.setAttribute('stroke-width', '2');
-      svg.append(line);
+      g.append(line);
+    }
+    const last = coords.at(-1);
+    if (last && last.x >= xMin - 4 && last.x <= xMax + 4) {
+      const status = last.point.status === 'Normal' ? '✓' : '↑';
+      const lab = svgEl(root, 'text');
+      lab.setAttribute('data-strip-ribbon-label', '1');
+      lab.setAttribute('x', String(Math.min(xMax, Math.max(xMin, last.x) + 6)));
+      lab.setAttribute('y', String(Math.max(laneTop + 8, last.y - 2)));
+      lab.setAttribute('fill', colour);
+      lab.setAttribute('font-size', '10');
+      lab.setAttribute('font-weight', '700');
+      lab.textContent = `${last.point.value} ${status}`;
+      svg.append(lab);
     }
     ribbonIndex += 1;
   }
+  if (g.childNodes.length) svg.append(g);
+}
+
+/** Clip a polyline segment to the plot x-range; returns null if wholly outside. */
+function clipSegment(x1, y1, x2, y2, xMin, xMax) {
+  if ((x1 < xMin && x2 < xMin) || (x1 > xMax && x2 > xMax)) return null;
+  let ax = x1;
+  let ay = y1;
+  let bx = x2;
+  let by = y2;
+  let startFresh = false;
+  if (ax < xMin) {
+    const t = (xMin - x1) / (x2 - x1);
+    ay = y1 + t * (y2 - y1);
+    ax = xMin;
+    startFresh = true;
+  } else if (ax > xMax) {
+    const t = (xMax - x1) / (x2 - x1);
+    ay = y1 + t * (y2 - y1);
+    ax = xMax;
+    startFresh = true;
+  }
+  if (bx < xMin) {
+    const t = (xMin - x1) / (x2 - x1);
+    by = y1 + t * (y2 - y1);
+    bx = xMin;
+  } else if (bx > xMax) {
+    const t = (xMax - x1) / (x2 - x1);
+    by = y1 + t * (y2 - y1);
+    bx = xMax;
+  }
+  return { x1: ax, y1: ay, x2: bx, y2: by, startFresh };
 }
 
 function drawMarker(root, svg, event, x, y, colour, hooks) {
