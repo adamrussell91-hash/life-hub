@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
-import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { umbrellaSessionSecret } from './http.mjs';
 import { knowledgeR2Config } from './knowledge-r2.mjs';
 
@@ -9,8 +9,33 @@ function keyFor(owner, id) {
   return `${PREFIX}/${encodeURIComponent(owner)}/${id}.json`;
 }
 
+function indexKeyFor(owner, id) {
+  return `${PREFIX}/${encodeURIComponent(owner)}/index/${id}.json`;
+}
+
+function indexPrefix(owner) {
+  return `${PREFIX}/${encodeURIComponent(owner)}/index/`;
+}
+
 function etagOf(value) {
   return `"${randomUUID()}"`;
+}
+
+export function sessionIndexRow(value) {
+  return {
+    id: value.id,
+    protocolId: value.protocolId,
+    mode: value.mode,
+    status: value.status,
+    stage: value.stage,
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    completedAt: value.completedAt || null,
+    title: value.summary?.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
+    summary: typeof value.summary?.summary === 'string'
+      ? value.summary.summary
+      : (typeof value.summary?.keyFinding === 'string' ? value.summary.keyFinding : (typeof value.summary === 'string' ? value.summary : null))
+  };
 }
 
 export function createMemoryCognitiveStore() {
@@ -28,12 +53,15 @@ export function createMemoryCognitiveStore() {
       rows.set(key, next);
       return { value: structuredClone(next.value), etag: next.etag };
     },
-    async list(owner, limit = 50) {
+    async list(owner, limit = 1000, offset = 0) {
       return [...rows.entries()]
-        .filter(([key]) => key.startsWith(`${PREFIX}/${encodeURIComponent(owner)}/`))
+        .filter(([key]) => key.startsWith(`${PREFIX}/${encodeURIComponent(owner)}/`) && !key.includes('/index/'))
         .map(([, row]) => ({ value: structuredClone(row.value), etag: row.etag }))
         .sort((a, b) => String(b.value.updatedAt).localeCompare(String(a.value.updatedAt)))
-        .slice(0, limit);
+        .slice(offset, offset + limit);
+    },
+    async delete(owner, id) {
+      rows.delete(keyFor(owner, id));
     }
   };
 }
@@ -65,6 +93,14 @@ function decrypt(text, secret) {
 
 export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }) {
   if (!client || !bucket) throw new TypeError('R2 client and bucket are required.');
+  async function putIndex(owner, value) {
+    await client.send(new PutObjectCommand({
+      Bucket: bucket,
+      Key: indexKeyFor(owner, value.id),
+      Body: encrypt(sessionIndexRow(value), encryptionSecret),
+      ContentType: 'application/json'
+    }));
+  }
   return {
     async read(owner, id) {
       try {
@@ -85,17 +121,50 @@ export function createR2CognitiveStore({ client, bucket, encryptionSecret = '' }
           ...(expectedEtag === null ? { IfNoneMatch: '*' } : { IfMatch: expectedEtag })
         };
         const result = await client.send(new PutObjectCommand(input));
+        await putIndex(owner, value);
         return { value: structuredClone(value), etag: result.ETag };
       } catch (error) {
         if (error?.$metadata?.httpStatusCode === 412) return null;
         throw error;
       }
     },
-    async list() {
-      // Session discovery is deliberately kept out of a shared object bucket.
-      // The client resumes opaque IDs it already owns; server-side listings can
-      // be added once a private index has a separately reviewed retention policy.
-      return [];
+    async delete(owner, id) {
+      // Index rows are deleted with the session so the Past runs list cannot retain orphans.
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: keyFor(owner, id) }));
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: indexKeyFor(owner, id) }));
+    },
+    async list(owner, limit = 1000, offset = 0) {
+      // Past runs list from encrypted per-session index objects under .../<owner>/index/.
+      // Full session bodies stay out of the list path. Index rows are written on every
+      // commit and deleted when the session is deleted.
+      const keys = [];
+      let ContinuationToken;
+      do {
+        const page = await client.send(new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: indexPrefix(owner),
+          ContinuationToken
+        }));
+        for (const item of page.Contents || []) {
+          if (item?.Key) keys.push(item.Key);
+        }
+        ContinuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+      } while (ContinuationToken);
+
+      const rows = [];
+      for (const Key of keys) {
+        try {
+          const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key }));
+          const value = decrypt(await bodyText(result.Body), encryptionSecret);
+          if (value?.id) rows.push({ value, etag: result.ETag });
+        } catch (error) {
+          if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NoSuchKey') continue;
+          throw error;
+        }
+      }
+      return rows
+        .sort((a, b) => String(b.value.updatedAt || '').localeCompare(String(a.value.updatedAt || '')))
+        .slice(offset, offset + limit);
     }
   };
 }

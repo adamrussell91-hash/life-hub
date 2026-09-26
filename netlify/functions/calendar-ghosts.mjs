@@ -24,11 +24,13 @@ import { acceptPlan, dismissPlan, validateGhost, GHOST_AGENTS } from '../../apps
 import { ghostId, ghostSemanticKey } from '../../apps/life/js/app/ghost-proposer.js';
 import {
   ghostsForAlmanacAction,
+  loadHorizonAlmanacContext,
   loadProfessionalEventsFromBlobs,
   loadTeachingLessonsFromBlobs,
   readAlmanac,
   readSchoolTerms
 } from './almanac.mjs';
+import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { mergeTask } from './tasks.mjs';
 import { normalizeTaskRecord } from './_shared/task-shape.mjs';
 import { applyDueDatePriorityFloor } from './_shared/task-priority-assess.mjs';
@@ -512,7 +514,7 @@ async function settleAlmanac(opened, plans, { nowIso }) {
 }
 
 async function runAlmanacGhostDecision({
-  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = []
+  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = [], horizon = null
 }) {
   if (decision.decision === 'dismiss') return applied({ receipt: 'Dismissed. Nothing written.' });
 
@@ -525,7 +527,8 @@ async function runAlmanacGhostDecision({
       today,
       terms,
       lessons,
-      professionalEvents
+      professionalEvents,
+      horizon
     });
     const ghosts = ghostsForAlmanacAction(decision.id, view);
     if (!ghosts) return fail(404, 'ghost_not_found', 'No pending ghost matches this id.');
@@ -658,11 +661,11 @@ async function runGoalGhostDecision({ open, commit, tasksStore, decision, today,
  * GitHub commit (or the mock equivalent). Tasks run only after that commit.
  */
 export async function runGhostDecision({
-  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = []
+  open, commit, tasksStore, decision, today, nowIso, lessons = [], professionalEvents = [], horizon = null
 }) {
   if (typeof decision.id === 'string' && decision.id.startsWith('alm-')) {
     return runAlmanacGhostDecision({
-      open, commit, tasksStore, decision, today, nowIso, lessons, professionalEvents
+      open, commit, tasksStore, decision, today, nowIso, lessons, professionalEvents, horizon
     });
   }
   if (typeof decision.id === 'string' && decision.id.startsWith('goal-')) {
@@ -720,6 +723,7 @@ export function createCalendarGhostsHandler({
   createGitHubClient: createClient = createGitHubClient,
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
+  getCognitiveStore = defaultGetCognitiveStore,
   loadLessons = loadTeachingLessonsFromBlobs,
   loadProfessionalEvents = loadProfessionalEventsFromBlobs
 } = {}) {
@@ -859,10 +863,12 @@ export function createCalendarGhostsHandler({
       const instant = new Date(now());
       let lessons = [];
       let professionalEvents = [];
+      let horizon = null;
       if (decision.id.startsWith('alm-')) {
-        [lessons, professionalEvents] = await Promise.all([
+        [lessons, professionalEvents, horizon] = await Promise.all([
           loadLessons(env),
-          loadProfessionalEvents(env)
+          loadProfessionalEvents(env),
+          loadHorizonAlmanacContext(env, { getCognitiveStore })
         ]);
       }
       const result = await runGhostDecision({
@@ -873,7 +879,8 @@ export function createCalendarGhostsHandler({
         today: getSydneyDateKey(instant),
         nowIso: getSydneyTimestamp(instant),
         lessons,
-        professionalEvents
+        professionalEvents,
+        horizon
       });
       return jsonResponse(result.status, result.payload, PRIVATE_CACHE);
     } catch (error) {

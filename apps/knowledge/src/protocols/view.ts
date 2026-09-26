@@ -3,7 +3,9 @@ import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
-type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: { id: string; role: string; speaker: string; stage: string; text: string }[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean } };
+type Evidence = { id: string; kind?: string; title: string; text?: string; url?: string };
+type Turn = { id: string; role: string; speaker: string; stage: string; text: string; evidenceIds?: string[] };
+type Session = { id: string; status: string; stage: string; speaker: string | null; revision: number; transcript: Turn[]; evidence?: Evidence[]; checkpoint: null | { kind: string; question: string }; allowedActions: string[]; error: null | { message: string; retryable: boolean }; protocolId?: string; mode?: string; summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[]; forHammond?: string | null } };
 const ASSET_ROOT = `${import.meta.env.BASE_URL}assets/cognitive-protocols`;
 const voiceAsset: Record<string, string> = {
   "fates:clotho": "fates-clotho-spinner", "fates:atropos": "fates-atropos-cutter", "fates:lachesis": "fates-lachesis-measurer", "fates:weave": "fates-the-weave-witness",
@@ -123,6 +125,75 @@ async function catalog() {
   return body.data.catalog as Definition[];
 }
 
+async function listPastRuns(offset = 0, limit = 20) {
+  if (USE_LOCAL_DATA) return [];
+  const response = await fetch(`${API_BASE}/protocols?list=1&limit=${limit}&offset=${offset}`, { credentials: "include" });
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body?.data?.sessions) ? body.data.sessions : [];
+}
+
+function formatRunDate(iso: string) {
+  try {
+    return new Intl.DateTimeFormat("en-AU", { day: "2-digit", month: "2-digit", year: "2-digit" }).format(new Date(iso));
+  } catch {
+    return iso.slice(0, 10);
+  }
+}
+
+export function protocolDisplayName(id: string, definitions: Definition[] = []) {
+  return definitions.find(d => d.id === id)?.name || id;
+}
+
+export function pastRunsHtml(runs: Array<Record<string, unknown>>, filterId: string, definitions: Definition[] = [], { hasMore = false } = {}) {
+  const filtered = filterId ? runs.filter(run => run.protocolId === filterId) : runs;
+  const options = ["", "fates", "horizon", "refinery", "cartographers", "mirror", "consilium", "witness", "tribunal"]
+    .map(id => `<option value="${id}" ${id === filterId ? "selected" : ""}>${id ? escapeHtml(protocolDisplayName(id, definitions)) : "All protocols"}</option>`)
+    .join("");
+  const rows = filtered.length
+    ? filtered.map(run => {
+      const resumable = run.status === "waiting" || run.status === "paused";
+      return `<li class="protocol-past__row">
+        <button type="button" class="protocol-past__open" data-protocol-open-run="${escapeHtml(String(run.id))}">
+          <span>${escapeHtml(formatRunDate(String(run.updatedAt || run.createdAt || "")))}</span>
+          <span>${escapeHtml(protocolDisplayName(String(run.protocolId || ""), definitions))}</span>
+          <span>${escapeHtml(String(run.title || "Untitled"))}</span>
+          <span>${escapeHtml(String(run.mode || ""))}</span>
+          <span>${escapeHtml(String(run.status || ""))}</span>
+        </button>
+        ${resumable ? `<button type="button" class="btn btn--ghost" data-protocol-resume-run="${escapeHtml(String(run.id))}">Resume</button>` : ""}
+      </li>`;
+    }).join("")
+    : `<li class="protocol-past__empty">No past runs yet.</li>`;
+  const more = hasMore ? `<button type="button" class="btn btn--ghost" data-protocol-past-more>Load more</button>` : "";
+  return `<section class="protocol-past" aria-label="Past runs"><header class="protocol-past__header"><h2>Past runs</h2><label>Filter by protocol<select data-protocol-past-filter>${options}</select></label></header><ul class="protocol-past__list">${rows}</ul>${more}</section>`;
+}
+
+function downloadMarkdown(session: Session & { summary?: { title?: string; keyFinding?: string; summary?: string; openQuestions?: string[] }; protocolId?: string; mode?: string }) {
+  const lines = [
+    `# ${session.summary?.title || session.protocolId || "Protocol run"}`,
+    "",
+    `- Protocol: ${session.protocolId || ""}`,
+    `- Mode: ${session.mode || ""}`,
+    `- Status: ${session.status}`,
+    session.summary?.keyFinding ? `- Key finding: ${session.summary.keyFinding}` : "",
+    "",
+    session.summary?.summary || "",
+    "",
+    ...(session.summary?.openQuestions || []).map(q => `- ${q}`),
+    "",
+    "## Transcript",
+    ...session.transcript.map(turn => `### ${turn.speaker} (${turn.stage})\n\n${turn.text}`)
+  ].filter(line => line !== undefined);
+  const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${session.protocolId || "protocol"}-${session.id || "run"}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function cardArt(id: string) {
   const paths: Record<string, string> = {
     fates: '<path d="M42 18C86 44 34 72 78 102S30 158 74 190"/><path d="M78 18C34 44 86 72 42 102s48 56 4 88"/><circle cx="60" cy="102" r="24"/><path d="M49 102h22M60 91v22"/>',
@@ -152,13 +223,19 @@ function cards(definitions: Definition[]) {
   </article>`).join("");
 }
 
-function intake(definition: Definition) {
-  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label><button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form><p class="protocol-intake__error" data-protocol-error hidden role="status"></p><p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
+function intake(definition: Definition, gateMessage = "") {
+  const freq = gateMessage
+    ? `<label>Reason for another review within this quarter<textarea name="frequencyJustification" required placeholder="Why run Horizon again inside this quarter?">${escapeHtml(gateMessage)}</textarea></label>`
+    : "";
+  const error = gateMessage
+    ? `<p class="protocol-intake__error" data-protocol-error role="status">${escapeHtml(gateMessage)}</p>`
+    : `<p class="protocol-intake__error" data-protocol-error hidden role="status"></p>`;
+  return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label>${freq}<button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form>${error}<p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
 }
 
-function compactIntake(definition: Definition, prompt: string) {
+function compactIntake(definition: Definition, prompt: string, extra: Record<string, string> = {}) {
   const required: Record<string, string[]> = { fates: ["task"], horizon: ["focus"], refinery: ["claim", "context", "audience"], cartographers: ["topic", "purpose"], mirror: ["conflict"], consilium: ["dilemma", "parties", "constraints"], witness: ["instance"], tribunal: ["problem", "entrenchment", "framing"] };
-  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]));
+  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]).concat(Object.entries(extra).filter(([, v]) => v.trim())));
 }
 
 export const PROTOCOL_POLL_MS = 400;
@@ -231,9 +308,23 @@ type ProtocolActionPayload = Record<string, unknown> & {
   action?: string;
 };
 
+export class ProtocolRequestError extends Error {
+  code: string;
+  constructor(message: string, code = "protocol_failed") {
+    super(message);
+    this.name = "ProtocolRequestError";
+    this.code = code;
+  }
+}
+
 function protocolErrorMessage(payload: unknown): string {
   const message = (payload as { error?: { message?: unknown } } | null)?.error?.message;
   return typeof message === "string" && message.trim() ? message : "The protocol request could not be completed.";
+}
+
+function protocolErrorCode(payload: unknown): string {
+  const code = (payload as { error?: { code?: unknown } } | null)?.error?.code;
+  return typeof code === "string" && code.trim() ? code : "protocol_failed";
 }
 
 function sessionFromProtocolPayload(payload: unknown): Session | null {
@@ -265,29 +356,40 @@ export async function postProtocolAction(payload: ProtocolActionPayload, fetchIm
     }
   }
 
-  if (!response.ok) throw new Error(protocolErrorMessage(body));
+  if (!response.ok) throw new ProtocolRequestError(protocolErrorMessage(body), protocolErrorCode(body));
   const session = sessionFromProtocolPayload(body);
-  if (!session) throw new Error("The protocol returned an invalid session.");
+  if (!session) throw new ProtocolRequestError("The protocol returned an invalid session.");
   return session;
 }
 
-function liveSlotHtml(session: Session, definition: Definition, who: string, role: string, precedingText: string | null): string {
+function sourcesHtml(turn: Turn | null | undefined, evidence: Evidence[] = []): string {
+  const ids = turn?.evidenceIds ?? [];
+  if (!ids.length || !evidence.length) return "";
+  const links = ids
+    .map(id => evidence.find(item => item.id === id))
+    .filter((item): item is Evidence => Boolean(item?.url))
+    .map(item => `<li><a href="${escapeHtml(item.url!)}" rel="noopener noreferrer" target="_blank">${escapeHtml(item.title || item.url!)}</a></li>`);
+  if (!links.length) return "";
+  return `<aside class="protocol-sources"><p class="protocol-sources__label">Sources</p><ul>${links.join("")}</ul></aside>`;
+}
+function liveSlotHtml(session: Session, definition: Definition, who: string, role: string, precedingText: string | null, precedingTurn: Turn | null = null): string {
   const preceding = precedingText ? turnBodyHtml(precedingText) : "";
+  const sources = sourcesHtml(precedingTurn, session.evidence);
   if (session.error) {
-    return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}${sources}<p>${escapeHtml(session.error.message)}</p>${session.allowedActions.includes("retry") ? `<button class="btn btn--primary" data-protocol-action="retry" type="button">Retry this voice</button>` : ""}</div>`;
   }
   if (["queued", "running"].includes(session.status)) {
-    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
+    return `<div class="protocol-turn-card protocol-turn-card--live protocol-turn-card--listening" data-protocol-composer>${personaMetaHtml(who, role)}${preceding}${sources}<p aria-live="polite">${escapeHtml(thinkingStatus(definition, session.speaker, who))}</p>${session.id ? `<button class="btn btn--ghost" data-protocol-action="cancel" type="button">End session</button>` : ""}</div>`;
   }
-  if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}</div>`;
+  if (!session.checkpoint) return `<div class="protocol-turn-card protocol-turn-card--live" data-protocol-composer>${preceding}${sources}</div>`;
   const reopen = session.allowedActions.includes("reopen");
   const wrap = session.allowedActions.includes("wrap");
   const close = session.allowedActions.includes("close");
   const confirm = session.allowedActions.includes("confirm") && (reopen || close);
-  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="${reopen ? "Name the element to reopen, or reply" : `Reply to ${escapeHtml(who)}`}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">${confirm ? "Hold with caution" : "Continue"}</button>${reopen ? `<button class="btn btn--ghost" name="action" value="reopen" type="submit">Reopen</button>` : ""}${close ? `<button class="btn btn--ghost" name="action" value="close" type="submit">Close</button>` : ""}${wrap ? `<button class="btn btn--ghost" name="action" value="wrap" type="submit">Wrap to filter</button>` : ""}${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
+  return `<form class="protocol-turn-card protocol-turn-card--live protocol-reply" data-protocol-reply data-protocol-composer data-checkpoint="${escapeHtml(session.checkpoint.question)}">${personaMetaHtml(who, role)}${preceding}${sources}<label class="protocol-reply__field"><span class="protocol-reply__visually-hidden">Reply to ${escapeHtml(who)}</span><textarea name="reply" placeholder="${reopen ? "Name the element to reopen, or reply" : `Reply to ${escapeHtml(who)}`}" autofocus></textarea></label><div class="protocol-reply__actions"><button class="btn btn--primary" type="submit">${confirm ? "Hold with caution" : "Continue"}</button>${reopen ? `<button class="btn btn--ghost" name="action" value="reopen" type="submit">Reopen</button>` : ""}${close ? `<button class="btn btn--ghost" name="action" value="close" type="submit">Close</button>` : ""}${wrap ? `<button class="btn btn--ghost" name="action" value="wrap" type="submit">Wrap to filter</button>` : ""}${session.allowedActions.includes("uncertain") ? `<button class="btn btn--ghost" name="action" value="uncertain" type="submit">Continue with uncertainty</button>` : ""}${session.allowedActions.includes("cancel") ? `<button class="btn btn--ghost" name="action" value="cancel" type="submit">End session</button>` : ""}</div></form>`;
 }
-function readTurnCardHtml(turn: Session["transcript"][number], who: string, role: string): string {
-  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}</article>`;
+function readTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
+  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}${sourcesHtml(turn, evidence)}</article>`;
 }
 function joiningCardHtml(who: string, role: string): string {
   return `<div class="protocol-turn-card protocol-turn-card--live">${personaMetaHtml(who, role)}<p>${escapeHtml(who)} is joining the conversation…</p></div>`;
@@ -314,18 +416,19 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const activeVoice = activeSpeakerId && activeSpeakerId !== "you" ? voiceOf(definition, activeSpeakerId) : null;
   const activeRole = activeVoice ? activeVoice.role || VOICE_ROLES[activeVoice.id] || "" : "";
   const activeName = activeVoice ? activeVoice.name : activeSpeakerId === "you" ? "You" : speakerName(session, definition);
-  const precedingText = cardIsLive && turn && turn.speaker !== "you" ? turn.text : null;
+  const precedingTurn = cardIsLive && turn && turn.speaker !== "you" ? turn : null;
+  const precedingText = precedingTurn ? precedingTurn.text : null;
   const cardHtml = cardIsLive
-    ? liveSlotHtml(session, definition, activeName, activeRole, precedingText)
+    ? liveSlotHtml(session, definition, activeName, activeRole, precedingText, precedingTurn)
     : turn
-      ? readTurnCardHtml(turn, activeName, activeRole)
+      ? readTurnCardHtml(turn, activeName, activeRole, session.evidence)
       : joiningCardHtml(activeName, activeRole);
   const portraitHtml = activeVoice
     ? `<div class="protocol-portrait"><img src="${voiceSrc(definition, activeVoice.id)}" alt="${escapeHtml(activeVoice.name)}" width="220" height="220"></div>`
     : activeSpeakerId === "you"
       ? `<div class="protocol-portrait protocol-portrait--you" aria-hidden="true">You</div>`
       : "";
-  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
+  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${(session as Session & { summary?: { title?: string; keyFinding?: string; summary?: string } }).summary && isLatest ? `<aside class="protocol-summary" aria-label="Run summary"><h2>${escapeHtml((session as Session & { summary?: { title?: string } }).summary?.title || "Summary")}</h2><p>${escapeHtml((session as Session & { summary?: { keyFinding?: string } }).summary?.keyFinding || "")}</p><p>${escapeHtml((session as Session & { summary?: { summary?: string } }).summary?.summary || "")}</p></aside>` : ""}${renderScrubber(session, index, isLatest, definition)}</section>`;
 }
 export function applySession(root: HTMLElement, session: Session, definition: Definition, viewingIndex?: number) {
   const total = session.transcript.length;
@@ -342,17 +445,42 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let definitions = localCatalog;
   let selected: Definition | null = null;
   let currentSession: Session | null = null;
+  let pastRuns: Array<Record<string, unknown>> = [];
+  let pastFilter = "";
+  let pastOffset = 0;
+  let pastHasMore = false;
+  const PAST_PAGE = 20;
   let pollTimer: number | null = null;
   let viewingIndex: number | null = null;
+  let frequencyGate: string | null = null;
+  let lastPrompt = "";
+  let lastMode = "";
   const effectiveIndex = () => {
     const total = currentSession?.transcript.length ?? 0;
     if (total === 0) return 0;
     return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
   };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
+  const refreshPastRuns = async ({ append = false } = {}) => {
+    if (USE_LOCAL_DATA) return;
+    const offset = append ? pastOffset : 0;
+    const page = await listPastRuns(offset, PAST_PAGE);
+    pastRuns = append ? [...pastRuns, ...page] : page;
+    pastOffset = pastRuns.length;
+    pastHasMore = page.length >= PAST_PAGE;
+    if (!selected && !currentSession) paint();
+  };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
-    else host.innerHTML = selected ? intake(selected) : `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div></section>`;
+    else if (selected) {
+      host.innerHTML = intake(selected, frequencyGate ?? "");
+      const prompt = host.querySelector<HTMLTextAreaElement>('textarea[name="prompt"]');
+      const mode = host.querySelector<HTMLSelectElement>('select[name="mode"]');
+      if (prompt && lastPrompt) prompt.value = lastPrompt;
+      if (mode && lastMode) mode.value = lastMode;
+    } else {
+      host.innerHTML = `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+    }
   };
   const poll = async () => {
     if (!currentSession?.id || USE_LOCAL_DATA) return;
@@ -362,6 +490,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const body = await response.json();
       currentSession = body.data.session;
       paint();
+      if (currentSession.status === "completed") void refreshPastRuns();
       if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, PROTOCOL_POLL_MS);
     } catch {
       if (currentSession) {
@@ -398,10 +527,40 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       return;
     }
     const begin = target.closest<HTMLButtonElement>("[data-protocol-begin]");
-    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; paint(); return; }
-    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; paint(); return; }
+    if (begin) { selected = definitions.find(d => d.id === begin.dataset.protocolBegin) ?? null; currentSession = null; viewingIndex = null; frequencyGate = null; lastPrompt = ""; lastMode = ""; paint(); return; }
+    if (target.closest("[data-protocol-close]")) { stopPolling(); selected = null; currentSession = null; viewingIndex = null; frequencyGate = null; paint(); void refreshPastRuns(); return; }
+    if (target.closest("[data-protocol-past-more]")) { void refreshPastRuns({ append: true }); return; }
+    if (target.closest("[data-protocol-download]") && currentSession) { downloadMarkdown(currentSession); return; }
+    const openRun = target.closest<HTMLButtonElement>("[data-protocol-open-run]")?.dataset.protocolOpenRun
+      || target.closest<HTMLButtonElement>("[data-protocol-resume-run]")?.dataset.protocolResumeRun;
+    if (openRun) {
+      void (async () => {
+        try {
+          const response = await fetch(`${API_BASE}/protocols?sessionId=${encodeURIComponent(openRun)}`, { credentials: "include" });
+          const body = await response.json().catch(() => null);
+          const session = sessionFromProtocolPayload(body);
+          if (!session) return;
+          selected = definitions.find(d => d.id === session.protocolId) ?? definitions.find(d => d.id === String((body as { data?: { session?: { protocolId?: string } } })?.data?.session?.protocolId)) ?? selected;
+          if (!selected && session.protocolId) selected = definitions.find(d => d.id === session.protocolId) || null;
+          currentSession = session;
+          viewingIndex = null;
+          if (target.closest("[data-protocol-resume-run]") && ["waiting", "paused"].includes(session.status) && session.allowedActions.includes("resume")) {
+            await postAction({ sessionId: session.id, revision: session.revision, requestId: crypto.randomUUID(), action: "resume" });
+          } else paint();
+        } catch { /* leave library visible */ }
+      })();
+      return;
+    }
+    const filter = target.closest<HTMLSelectElement>("[data-protocol-past-filter]");
+    if (filter && event.type === "click") return;
     const action = target.closest<HTMLButtonElement>("[data-protocol-action]")?.dataset.protocolAction;
     if (action && currentSession) void postAction({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action });
+  };
+  host.onchange = event => {
+    const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
+    if (!filter) return;
+    pastFilter = filter.value;
+    paint();
   };
   host.onsubmit = async event => {
     const form = event.target as HTMLFormElement;
@@ -410,13 +569,23 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       if (USE_LOCAL_DATA || !selected) return;
       const data = new FormData(form);
       const prompt = String(data.get("prompt") ?? "").trim();
+      const justification = String(data.get("frequencyJustification") ?? "").trim();
+      lastPrompt = prompt;
+      lastMode = String(data.get("mode") ?? selected.defaultMode);
       currentSession = { id: "", status: "queued", stage: "briefing", speaker: selected.voices[0]?.id ?? null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
       viewingIndex = null;
       paint();
       try {
-        await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: compactIntake(selected, prompt), requestId: crypto.randomUUID() });
+        const intakePayload = compactIntake(selected, prompt, justification ? { frequencyJustification: justification } : {});
+        await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: intakePayload, requestId: crypto.randomUUID() });
+        frequencyGate = null;
       } catch (reason) {
         currentSession = null;
+        if (reason instanceof ProtocolRequestError && reason.code === "frequency_justification_required") {
+          frequencyGate = reason.message;
+          paint();
+          return;
+        }
         paint();
         const error = host.querySelector<HTMLElement>("[data-protocol-error]");
         if (error) { error.textContent = reason instanceof Error ? reason.message : "The protocol could not start."; error.hidden = false; }
@@ -447,5 +616,6 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   paint();
   void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);
+  void refreshPastRuns().catch(() => undefined);
   return stopPolling;
 }

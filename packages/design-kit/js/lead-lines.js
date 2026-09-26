@@ -92,11 +92,17 @@ export function leadLine(anchor, rules, ctx) {
   const steps = [];
   for (const rule of rules) {
     if (!applies(rule, anchor, ctx)) continue;
+    const by = typeof rule.by === 'function' ? rule.by(anchor, ctx) : rule.by ?? null;
     let lastSafe;
-    if (rule.by) lastSafe = rule.by;
+    if (by) lastSafe = by;
     else if (end && Number.isFinite(rule.leadDays)) lastSafe = addDays(end, -rule.leadDays);
     else continue;
-    const id = `${anchor.id}:${rule.id}`;
+    if (!KEY.test(lastSafe ?? '')) continue;
+    let id;
+    if (typeof rule.stepId === 'function') id = rule.stepId(anchor, ctx);
+    else if (typeof rule.stepId === 'string' && rule.stepId) id = rule.stepId;
+    else id = `${anchor.id}:${rule.id}`;
+    if (!id) continue;
     steps.push({
       id,
       ruleId: rule.id,
@@ -104,7 +110,7 @@ export function leadLine(anchor, rules, ctx) {
       lastSafe,
       daysLeft: daysBetween(today, lastSafe),
       status: stepStatus(lastSafe, today, { done: done.has(id), windowOpen: windowOpen && !done.has(id) }),
-      why: rule.why ?? null
+      why: typeof rule.why === 'function' ? rule.why(anchor, ctx) : rule.why ?? null
     });
   }
   steps.sort((a, b) => (a.lastSafe < b.lastSafe ? -1 : a.lastSafe > b.lastSafe ? 1 : 0));
