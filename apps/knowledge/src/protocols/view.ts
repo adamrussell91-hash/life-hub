@@ -107,6 +107,17 @@ function speakerColor(definition: Definition, speakerId: string): string {
   return SPEAKER_PALETTE[(index < 0 ? 0 : index) % SPEAKER_PALETTE.length];
 }
 
+const LOCAL_VOICE_IDS: Record<string, string[]> = {
+  fates: ["lachesis", "clotho", "atropos", "weave"],
+  horizon: ["ketill", "alvar", "sigrid"],
+  refinery: ["builder", "breaker", "reforger"],
+  cartographers: ["surveyor", "miner", "cartographer"],
+  mirror: ["retrospective", "prospective", "present"],
+  consilium: ["principle", "consequence", "virtue"],
+  witness: ["trace", "patterns", "recalibration"],
+  tribunal: ["inverter", "scaler", "context-shifter"],
+};
+
 const localCatalog: Definition[] = [
   ["fates", "The Three Fates", "Live dialectic across generative, critical and strategic voices.", "Greek threads", "normal", ["Normal", "Sprint", "Long"], ["Lachesis", "Clotho", "Atropos", "The Weave"]],
   ["horizon", "The Horizon Council", "Map present trajectories against a desired future.", "Norse long hall", "full", ["Full", "Brief"], ["Ketill", "Alvar", "Sigrid"]],
@@ -123,15 +134,11 @@ const localCatalog: Definition[] = [
     id: protocolId, name, description, motif, defaultMode,
     modes: (modes as string[]).map(label => {
       const modeId = label.toLowerCase();
-      const sourceMode = source?.modes.find(mode => mode.id === modeId);
-      const description = sourceMode && sourceMode.description.trim() !== sourceMode.label.trim()
-        ? sourceMode.description
-        : label;
-      return { id: modeId, label, description };
+      return { id: modeId, label, description: source?.modes.find(mode => mode.id === modeId)?.description ?? label };
     }),
     intake: [{ id: "prompt", label: "What would you like to examine?", required: true, type: "textarea" }],
     voices: (voices as string[]).map((voiceName, index) => {
-      const voiceId = ({ fates: ["lachesis", "clotho", "atropos", "weave"], horizon: ["ketill", "alvar", "sigrid"], refinery: ["builder", "breaker", "reforger"], cartographers: ["surveyor", "miner", "cartographer"], mirror: ["retrospective", "prospective", "present"], consilium: ["principle", "consequence", "virtue"], witness: ["trace", "patterns", "recalibration"], tribunal: ["inverter", "scaler", "context-shifter"] } as Record<string, string[]>)[protocolId][index];
+      const voiceId = LOCAL_VOICE_IDS[protocolId][index];
       return { id: voiceId, name: voiceName, role: source?.voices.find(voice => voice.id === voiceId)?.role ?? "" };
     }),
   };
@@ -231,7 +238,7 @@ function cardArt(id: string) {
 function voiceChipHtml(protocolId: string, voice: Definition["voices"][number]): string {
   const name = escapeHtml(voice.name);
   const role = voice.role.trim();
-  if (!role) return name;
+  if (!role) return `<span class="protocol-card__voice">${name}</span>`;
   const tipId = `protocol-voice-tip-${protocolId}-${voice.id}`;
   const roleHtml = escapeHtml(role);
   return `<span class="protocol-card__voice" tabindex="0" aria-describedby="${tipId}">${name}<span class="agent-protocol-pills__tip" id="${tipId}" role="tooltip">${roleHtml}</span><span class="protocol-card__voice-role">${roleHtml}</span></span>`;
@@ -245,7 +252,7 @@ function cards(definitions: Definition[]) {
         <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><span class="protocol-card__description">${escapeHtml(d.description)}</span>
       </button>
       <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
-        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join('<span class="protocol-card__voice-sep" aria-hidden="true"> · </span>')}</p></div>
+        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join("")}</p></div>
         <div class="protocol-card__actions"><button class="btn btn--ghost" data-protocol-flip type="button">Back</button><button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button></div>
       </section>
     </div>
@@ -543,11 +550,9 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   };
   host.onchange = event => {
     const select = (event.target as HTMLElement).closest<HTMLSelectElement>("select[name='mode']");
-    if (!select || !selected) return;
-    const mode = selected.modes.find(entry => entry.id === select.value);
-    const hint = host.querySelector<HTMLElement>("[data-protocol-mode-hint]");
-    if (!hint) return;
-    const text = modeHintText(mode);
+    const hint = select && selected ? host.querySelector<HTMLElement>("[data-protocol-mode-hint]") : null;
+    if (!select || !hint || !selected) return;
+    const text = modeHintText(selected.modes.find(entry => entry.id === select.value));
     hint.textContent = text;
     hint.hidden = !text;
   };

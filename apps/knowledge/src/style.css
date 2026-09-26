@@ -803,7 +803,12 @@
   display: inline-block;
 }
 
-.protocol-card__voice .agent-protocol-pills__tip {
+.protocol-card__voice:not(:last-child)::after {
+  content: " · ";
+}
+
+.protocol-card__voice .agent-protocol-pills__tip,
+.protocol-card__voice-role {
   text-transform: none;
   letter-spacing: var(--tracking-normal);
   font-weight: var(--weight-regular);
@@ -2276,8 +2281,8 @@ body.is-universe-fullscreen .local-banner {
     gap: 0.35rem;
   }
 
-  .protocol-card__voice-sep {
-    display: none;
+  .protocol-card__voice:not(:last-child)::after {
+    content: none;
   }
 
   .protocol-card__voice-role {
@@ -2285,10 +2290,7 @@ body.is-universe-fullscreen .local-banner {
     margin-top: 0.15rem;
     color: color-mix(in srgb, var(--pastel-gold) 70%, var(--paper));
     font-size: var(--text-2xs);
-    font-weight: var(--weight-regular);
-    letter-spacing: var(--tracking-normal);
     line-height: var(--leading-snug);
-    text-transform: none;
   }
 
   .agent-protocol-pills .hub-pills__btn {
