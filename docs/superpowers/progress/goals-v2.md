@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 40/46 (87%)**
+**Progress: 44/46 (96%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -83,10 +83,10 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M10: Motion, accessibility and polish
 
-- [ ] **G-41** Every §4 animation + reduced motion — —
-- [ ] **G-42** Keyboard access — —
-- [ ] **G-43** Phone (< 720px) — —
-- [ ] **G-44** Empty and first-run states — —
+- [x] **G-41** Every §4 animation + reduced motion — — — `36dd2fe5`
+- [x] **G-42** Keyboard access — — — `36dd2fe5`
+- [x] **G-43** Phone (< 720px) — — — `36dd2fe5`
+- [x] **G-44** Empty and first-run states — — — `36dd2fe5`
 
 ## M11: Docs and ship
 
