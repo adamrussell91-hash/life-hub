@@ -1,0 +1,416 @@
+/* Comm page (Plan 2, Task 17) — ported from docs/professional-hub/calendar/mockups/index.html
+   (.phase, .tick, .who-tag, .agenda, .live-strip, .ledger, .pr, .switch, .pcard),
+   renamed to the classes this view uses and re-tokenised (design-kit tokens only). */
+
+.card {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  box-shadow: var(--elev-1);
+}
+
+.card h3 {
+  font-size: var(--text-md);
+  color: var(--depth);
+  margin: 0 0 var(--space-3);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 1.5rem;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  background: var(--cotton);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip--comm {
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+}
+
+.comm-page {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.comm-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .comm-page__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.comm-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-5);
+}
+
+.comm-page__chips {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.comm-page__when {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.comm-page__thread {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0;
+}
+
+.comm-page__thread a {
+  color: var(--navy);
+  font-weight: var(--weight-semibold);
+  text-decoration: none;
+}
+
+.comm-page__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.comm-page__rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Phase switcher ── */
+.comm-page__phase {
+  display: inline-flex;
+  background: var(--cotton);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  gap: 2px;
+}
+
+.comm-page__phase-btn {
+  border: 0;
+  background: transparent;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.comm-page__phase-btn[aria-pressed="true"] {
+  background: #fff;
+  color: var(--depth);
+  box-shadow: var(--elev-1);
+}
+
+.comm-page[data-phase="during"] .comm-page__phase-btn[aria-pressed="true"] {
+  background: var(--high-sea);
+  color: var(--paper);
+}
+
+.comm-page__phase-note {
+  font-size: var(--text-xs);
+  color: var(--muted);
+  margin: 0;
+  flex: 1 0 100%;
+}
+
+/* ── People rail ── */
+.pcard {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: #fff;
+  border: 1px solid var(--line);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+}
+
+.pcard.is-ghost {
+  border-style: dashed;
+  background: transparent;
+  font-weight: var(--weight-regular);
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pcard__role {
+  font-size: var(--text-2xs);
+  color: var(--muted);
+}
+
+/* ── Carried ticks ── */
+.tick {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tick:first-child {
+  border-top: 0;
+}
+
+.tick__box {
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: var(--radius-xs);
+  border: 1.5px solid var(--line);
+  flex: 0 0 1.125rem;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  font-size: var(--text-2xs);
+  color: #fff;
+  background: #fff;
+}
+
+.tick.is-done .tick__box {
+  background: var(--success);
+  border-color: var(--success);
+}
+
+.tick.is-done .tick__text {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.tick__text {
+  flex: 1;
+  font-size: var(--text-sm);
+}
+
+.who-tag {
+  font-size: 0.625rem;
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+}
+
+.who-me {
+  background: var(--warning-surface);
+  color: var(--high-sea-ink);
+}
+
+.who-them {
+  background: var(--pastel-blue);
+  color: var(--pastel-blue-ink);
+}
+
+/* ── Agenda ── */
+.agenda {
+  counter-reset: ag;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agenda__item {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.agenda__item::before {
+  counter-increment: ag;
+  content: counter(ag);
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: var(--radius-xs);
+  background: var(--cotton);
+  display: grid;
+  place-items: center;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  color: var(--muted);
+  flex: 0 0 1.375rem;
+}
+
+.agenda__item.is-done {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.agenda__from {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.agenda__add {
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-family: var(--font-ui);
+}
+
+/* ── Live strip ── */
+.live-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--depth);
+  color: var(--on-dark);
+}
+
+.live-strip__rec {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-xs);
+}
+
+.live-strip__rec::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--high-sea);
+  box-shadow: 0 0 0 4px var(--warning-surface);
+}
+
+/* ── Summary + ledger ── */
+.comm-page__summary-text {
+  width: 100%;
+  min-height: 6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  padding: var(--space-3);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.ledger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 620px) {
+  .ledger {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ledger__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ledger__head {
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-1);
+}
+
+.ledger__head.is-me {
+  color: var(--high-sea-ink);
+}
+
+.ledger__head.is-them {
+  color: var(--pastel-blue-ink);
+}
+
+.ledger__row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  border: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.switch {
+  width: 34px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--line);
+  position: relative;
+  flex: 0 0 34px;
+  cursor: pointer;
+  border: 0;
+}
+
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: #fff;
+  box-shadow: var(--elev-1);
+  transition: left 0.15s;
+}
+
+.switch[aria-checked="true"] {
+  background: var(--success);
+}
+
+.switch[aria-checked="true"]::after {
+  left: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch::after {
+    transition: none;
+  }
+}

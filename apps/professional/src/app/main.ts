@@ -16,6 +16,7 @@ import '../../design-kit/calendar-term-river.css';
 import '../styles/hub.css';
 import '../styles/tasks-engine.css';
 import '../styles/block-page.css';
+import '../styles/comm-page.css';
 
 import { startHubMotion } from '../../design-kit/js/hub-motion.js';
 import { fetchSession, logout, messageForSignInFailure, renderSignIn } from '@/auth/gate';
@@ -30,10 +31,8 @@ import { renderPeoplePage } from '@/views/people';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
-import {
-  renderCommunicationDetailView,
-  renderCommunicationNewView
-} from '@/views/communications';
+import { renderCommunicationNewView } from '@/views/communications';
+import { renderCommPage } from '@/views/comm-page';
 import {
   renderMeetingDetailView,
   renderMeetingNewView
@@ -164,11 +163,11 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'communication') {
-      renderPageHeader(shell, { eyebrow: 'Communications', title: 'Loading…' });
-      await renderCommunicationDetailView(shell.canvas, route.id, {
+      renderPageHeader(shell, { eyebrow: 'Calendar · Comm', title: 'Loading…' });
+      await renderCommPage(shell.canvas, route.id, {
         onTitleReady: (title) => {
           if (generation !== routeGeneration) return;
-          renderPageHeader(shell, { eyebrow: 'Communications', title });
+          renderPageHeader(shell, { eyebrow: 'Calendar · Comm', title });
         },
         isCurrent: () => generation === routeGeneration
       });

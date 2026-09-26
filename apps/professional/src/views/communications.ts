@@ -345,71 +345,85 @@ export async function renderCommunicationDetailView(
       canvas.append(incomplete);
     }
 
-    const followUp = el('section', 'communication-detail__follow-up');
-    followUp.append(el('h2', undefined, 'Follow up'));
-    const followUpStatus = el('p', 'communication-form__status');
-    followUpStatus.hidden = true;
-    const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
-    followUpBtn.type = 'button';
-
-    let followUpRetry: AutoRetryHandle | null = null;
-
-    function paintFollowUpFromOperation(operation: FollowUpOperationProjection): void {
-      followUpStatus.hidden = false;
-      if (operation.status === 'committed') {
-        followUpStatus.textContent = `Follow up Task ${operation.task_id}.`;
-        followUpBtn.textContent = 'Create follow up Task';
-        followUpBtn.disabled = true;
-        followUpBtn.hidden = true;
-        return;
-      }
-      followUpBtn.hidden = true;
-      followUpBtn.disabled = true;
-      followUpStatus.textContent = 'Linking follow up…';
-      followUpRetry?.stop();
-      followUpRetry = createAutoRetry({
-        run: async () => {
-          if (!followUp.isConnected) {
-            followUpRetry?.stop();
-            return;
-          }
-          const result = await retryFollowUpTask(record.id);
-          paint(result.communication);
-        },
-        onState: (state, error) => {
-          if (state === 'stuck') {
-            const reason = error instanceof Error && error.message ? error.message : 'Tasks did not answer.';
-            followUpStatus.textContent = `● Follow up still linking. ${reason} It keeps trying.`;
-          }
-        }
-      });
-    }
-
-    if (record.follow_up_operation) {
-      paintFollowUpFromOperation(record.follow_up_operation);
-    }
-
-    followUpBtn.addEventListener('click', async () => {
-      followUpBtn.disabled = true;
-      followUpStatus.hidden = true;
-      try {
-        const result = await createFollowUpTask(record.id, {
-          title: `Follow up: ${labelFor(record)}`
-        });
-        paint(result.communication);
-      } catch (err) {
-        if (isFollowUpIncompleteError(err)) {
-          await load();
-          return;
-        }
-        followUpStatus.hidden = false;
-        followUpStatus.textContent = err instanceof ApiClientError ? err.message : 'Follow up failed.';
-        followUpBtn.disabled = false;
-      }
-    });
-    followUp.append(followUpBtn, followUpStatus);
+    const followUp = buildFollowUpSection(record, paint, load);
     canvas.append(followUp);
   }
 
   await load();
+}
+
+/**
+ * The follow-up Task section (auto-retrying link, Plan 1) — shared between
+ * the legacy detail view above and the comm page's After face (Plan 2,
+ * Task 17), which appends this unchanged rather than re-implementing it.
+ */
+export function buildFollowUpSection(
+  record: CommunicationRecord,
+  paint: (next: CommunicationRecord) => void,
+  load: () => Promise<void>
+): HTMLElement {
+  const followUp = el('section', 'communication-detail__follow-up');
+  followUp.append(el('h2', undefined, 'Follow up'));
+  const followUpStatus = el('p', 'communication-form__status');
+  followUpStatus.hidden = true;
+  const followUpBtn = el('button', 'btn btn--secondary', 'Create follow up Task') as HTMLButtonElement;
+  followUpBtn.type = 'button';
+
+  let followUpRetry: AutoRetryHandle | null = null;
+
+  function paintFollowUpFromOperation(operation: FollowUpOperationProjection): void {
+    followUpStatus.hidden = false;
+    if (operation.status === 'committed') {
+      followUpStatus.textContent = `Follow up Task ${operation.task_id}.`;
+      followUpBtn.textContent = 'Create follow up Task';
+      followUpBtn.disabled = true;
+      followUpBtn.hidden = true;
+      return;
+    }
+    followUpBtn.hidden = true;
+    followUpBtn.disabled = true;
+    followUpStatus.textContent = 'Linking follow up…';
+    followUpRetry?.stop();
+    followUpRetry = createAutoRetry({
+      run: async () => {
+        if (!followUp.isConnected) {
+          followUpRetry?.stop();
+          return;
+        }
+        const result = await retryFollowUpTask(record.id);
+        paint(result.communication);
+      },
+      onState: (state, error) => {
+        if (state === 'stuck') {
+          const reason = error instanceof Error && error.message ? error.message : 'Tasks did not answer.';
+          followUpStatus.textContent = `● Follow up still linking. ${reason} It keeps trying.`;
+        }
+      }
+    });
+  }
+
+  if (record.follow_up_operation) {
+    paintFollowUpFromOperation(record.follow_up_operation);
+  }
+
+  followUpBtn.addEventListener('click', async () => {
+    followUpBtn.disabled = true;
+    followUpStatus.hidden = true;
+    try {
+      const result = await createFollowUpTask(record.id, {
+        title: `Follow up: ${labelFor(record)}`
+      });
+      paint(result.communication);
+    } catch (err) {
+      if (isFollowUpIncompleteError(err)) {
+        await load();
+        return;
+      }
+      followUpStatus.hidden = false;
+      followUpStatus.textContent = err instanceof ApiClientError ? err.message : 'Follow up failed.';
+      followUpBtn.disabled = false;
+    }
+  });
+  followUp.append(followUpBtn, followUpStatus);
+  return followUp;
 }

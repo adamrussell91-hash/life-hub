@@ -7,6 +7,7 @@ export interface UniversalLinkRecord {
   relationship_type: string;
   status: string;
   role?: string | null;
+  created_at?: string;
 }
 
 export interface UniversalLinkEntry {
