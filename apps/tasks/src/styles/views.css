@@ -5438,7 +5438,7 @@ html.is-map-fullscreen .map-page .map-preview {
   gap: var(--space-3);
 }
 
-/* Locks / next actions / dump sit under the kit (not a right column). */
+/* Locks / next actions / dump sit under the kit (not a right column). Kit owns full-width (#516). */
 .tasks-calendar-chrome__workspace.hub-calendar__workspace {
   gap: var(--space-4);
   width: 100%;

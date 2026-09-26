@@ -12,6 +12,7 @@ const kitCalendarCss = readFileSync(
 describe('Tasks week calendar chrome', () => {
   it('stacks locks under the calendar instead of a right rail column', () => {
     expect(chromeSrc).toMatch(/tasks-calendar-chrome__below/);
+    // Kit owns full-width workspace (#516); Tasks must not reintroduce a side column.
     expect(kitCalendarCss).toMatch(
       /\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/
     );
