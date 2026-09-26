@@ -17,5 +17,6 @@ placeholder data.
 | `01-directory-split` | Directory list grouped by organisation on the left, the selected person on the right |
 | `02-crest-wall` | "Needs you" strip, then organisations as crest tiles; a person opens in a drawer |
 | `03-relationship-lanes` | People grouped by what they are to you: mentees, leaders, colleagues, gone quiet |
+| `04-directory-plus` | Option A plus a Today strip (who you see next school day), warmth rings, the ledger (who owes whom), Remember, relationship arc, Ask search, and filter/sort/group. The sort menu is shown open |
 
 Render: `./generate-fonts.sh && ./render.sh` (headless Chromium, 1680 wide).

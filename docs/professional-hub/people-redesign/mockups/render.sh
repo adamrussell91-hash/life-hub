@@ -29,3 +29,4 @@ render() {
 render 01-directory-split.html     01-directory-split.png
 render 02-crest-wall.html          02-crest-wall.png
 render 03-relationship-lanes.html  03-relationship-lanes.png
+render 04-directory-plus.html      04-directory-plus.png
