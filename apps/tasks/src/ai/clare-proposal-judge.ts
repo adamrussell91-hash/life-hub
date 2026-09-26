@@ -11,9 +11,7 @@ import { createEmbedBlock } from '@/blocks/create-block';
 
 const AGENT_NAMES: Record<AgentProtocolSlug, string> = {
   clare: 'Clare DeMind',
-  hammond: 'General Hammond',
-  penelope: 'Penelope Rose Quillian',
-  vera: 'Dr Vera Lenz'
+  hammond: 'General Hammond'
 };
 
 /** Hard shell shared by every Tasks Hub chat agent. Live protocol is injected per turn. */

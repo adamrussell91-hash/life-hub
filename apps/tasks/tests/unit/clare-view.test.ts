@@ -16,7 +16,6 @@ vi.mock('@/services/client-api', () => ({
     proposeWithClare: vi.fn(),
     acceptClareProposal: vi.fn(),
     acceptClareBatch: vi.fn(),
-    listAgentInbox: vi.fn()
   }
 }));
 
@@ -131,8 +130,7 @@ describe('Clare protocol controls', () => {
     });
     vi.mocked(tasksApi.listClareCalibrations).mockResolvedValue([]);
     vi.mocked(tasksApi.briefWithClare).mockResolvedValue(briefing);
-    vi.mocked(tasksApi.listAgentInbox).mockResolvedValue([]);
-    streamChat.mockImplementation(() => chatStreamFromText('Got it.'));
+        streamChat.mockImplementation(() => chatStreamFromText('Got it.'));
   });
 
   it('renders five one-sentence hover cards on real protocol controls', async () => {
@@ -140,12 +138,10 @@ describe('Clare protocol controls', () => {
     await renderClareView(canvas);
 
     const faces = [...canvas.querySelectorAll<HTMLImageElement>('#agent-picker img')];
-    expect(faces).toHaveLength(4);
+    expect(faces).toHaveLength(2);
     expect(faces.map((img) => img.getAttribute('src'))).toEqual([
       '/assets/agents/clare.png',
-      '/assets/agents/hammond.jpg',
-      '/assets/agents/penelope.jpg',
-      '/assets/agents/vera.jpg'
+      '/assets/agents/hammond.jpg'
     ]);
     expect(canvas.querySelector('.chat-agent-hero')).toBeNull();
     expect(canvas.textContent).not.toMatch(/same chat window as life hub/i);
@@ -289,12 +285,17 @@ describe('Clare protocol controls', () => {
     expect(canvas.querySelector<HTMLElement>('#chat-view')?.style.getPropertyValue('--agent-accent')).toBe(
       '#2D2D2D'
     );
-    expect(canvas.textContent).toMatch(/Hammond can/);
+    // Network protocol tray retired — empty protocols hide the "Hammond can" eyebrow.
+    expect(canvas.querySelector('#chat-protocols')?.hidden ?? true).toBe(true);
     expect(canvas.querySelector<HTMLTextAreaElement>('#chat-input')?.placeholder).toMatch(/running/i);
     expect(canvas.querySelector('#chat-domain')).toBeNull();
     expect(canvas.querySelector<HTMLElement>('.clare-prefs__skip')?.hidden).toBe(true);
 
-    canvas.querySelector<HTMLButtonElement>('[data-protocol-id="whats-running"]')!.click();
+    const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
+    dump.value = 'What is overlapping?';
+    canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
+      new Event('submit', { bubbles: true, cancelable: true })
+    );
     await vi.waitFor(() =>
       expect(tasksApi.streamDumpWithClare).toHaveBeenCalledWith(
         expect.objectContaining({ agent_slug: 'hammond' })
@@ -343,7 +344,7 @@ describe('Clare protocol controls', () => {
     vi.mocked(tasksApi.streamDumpWithClare).mockReturnValue(pendingStream.stream);
     const canvas = document.createElement('main');
     await renderClareView(canvas);
-    canvas.querySelector<HTMLButtonElement>('[data-agent-slug="vera"]')!.click();
+    canvas.querySelector<HTMLButtonElement>('[data-agent-slug="hammond"]')!.click();
     const dump = canvas.querySelector<HTMLTextAreaElement>('#chat-input')!;
     dump.value = 'Hold this';
     canvas.querySelector<HTMLFormElement>('#chat-form')!.dispatchEvent(
@@ -351,7 +352,7 @@ describe('Clare protocol controls', () => {
     );
     await vi.waitFor(() => expect(canvas.querySelector('.chat-message--status')).toBeTruthy());
     const line = canvas.querySelector('.chat-message--status')?.textContent ?? '';
-    expect(CHAT_AGENTS.find((agent) => agent.slug === 'vera')?.waitLines).toContain(line);
+    expect(CHAT_AGENTS.find((agent) => agent.slug === 'hammond')?.waitLines).toContain(line);
     expect(CHAT_AGENTS.find((agent) => agent.slug === 'clare')?.waitLines).not.toContain(line);
     pendingStream.resolve({
       voice: 'Sit with the pattern.',
@@ -360,7 +361,7 @@ describe('Clare protocol controls', () => {
       notes: [],
       toolkit: null,
       mutations: [],
-      agent: 'vera'
+      agent: 'hammond'
     });
     await vi.runOnlyPendingTimersAsync();
     await Promise.resolve();

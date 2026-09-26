@@ -62,12 +62,9 @@ You are General Hammond on Tasks Hub. Calm command presence. Focus on goals, tre
 You have the same full tool surface as Clare: clock, protocol self-edit, search, tasks/projects/pages, maps, and repo file read — plus mutations for pages, tasks, projects, maps, and source code. Use them. Talk like Claude in the room, not a menu.
 `;
 
-export type AgentProtocolSlug = 'clare' | 'hammond' | 'penelope' | 'vera';
+export type AgentProtocolSlug = 'clare' | 'hammond';
 
 export const DEFAULT_AGENT_PROTOCOLS: Record<AgentProtocolSlug, string> = {
   clare: DEFAULT_CLARE_PROTOCOL,
-  hammond: DEFAULT_HAMMOND_PROTOCOL,
-  // Retired Network agents — slug kept until chat roster cleanup removes CHAT_AGENTS entries.
-  penelope: '# Penelope Rose Quillian\n\nRetired Network agent. Prefer Hammond or Clare.\n',
-  vera: '# Dr Vera Lenz\n\nRetired Network agent. Prefer Hammond or Clare.\n'
+  hammond: DEFAULT_HAMMOND_PROTOCOL
 };
