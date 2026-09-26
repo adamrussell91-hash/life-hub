@@ -46,8 +46,44 @@ test('professional calendar merge emits one row per projection_id', () => {
 });
 
 import { projectEventSchedule, projectCommunicationSchedule } from '../../netlify/functions/_shared/schedule-projection.mjs';
-import { professionalEventsFromProjections as kitProfessionalEventsFromProjections } from '../../packages/design-kit/js/calendar/professional-calendar.js';
+import {
+  professionalEventsFromProjections as kitProfessionalEventsFromProjections,
+  promiseEventsFromLedger
+} from '../../packages/design-kit/js/calendar/professional-calendar.js';
 import { filterKeyForItem } from '../../packages/design-kit/js/calendar/calendar-filter.js';
+
+test('comm projections become professional_communication rows with pin', () => {
+  const [row] = kitProfessionalEventsFromProjections([projectCommunicationSchedule({
+    id: 'communication_00000000-0000-4000-8000-000000000002',
+    subject: 'Email Amy W.',
+    channel: 'email',
+    status: 'completed',
+    occurred_at: '2026-09-20T23:10:00.000Z',
+    scheduled_start: null,
+    scheduled_end: null,
+    time_zone: null
+  })]);
+  assert.equal(row.record.type, 'professional_communication');
+  assert.equal(row.record.pin, true);
+  assert.equal(row.record.channel, 'email');
+  assert.equal(row.record.date, '2026-09-21');
+  assert.equal(row.record.time, '09:10');
+});
+
+test('promiseEventsFromLedger makes dated ledger rows and flags late ones', () => {
+  const rows = promiseEventsFromLedger([
+    { id: 'ledger_a', direction: 'you_owe', text: 'Email Denielle the summary', due: '2026-09-23', status: 'open' },
+    { id: 'ledger_b', direction: 'they_owe', text: 'Kathleen: T4 dates', due: '2026-09-30', status: 'open' }
+  ], '2026-09-26');
+  assert.equal(rows[0].record.type, 'ledger_item');
+  assert.equal(rows[0].record.date, '2026-09-23');
+  assert.equal(rows[0].record.late, true);
+  assert.equal(rows[0].record.days_late, 3);
+  assert.equal(rows[0].record.title, 'You owe · Email Denielle the summary · 3 days late');
+  assert.equal(rows[1].record.late, false);
+  assert.equal(rows[1].record.title, 'Owed to you · Kathleen: T4 dates');
+});
+
 
 test('timed comms project as blocks; logged comms as pins', () => {
   const base = {

@@ -9,7 +9,11 @@ import {
   tasksEventsFromWorkBlocks,
   scheduleDiffActiveProposed
 } from './tasks-calendar.js';
-import { professionalEventsFromProjections } from './professional-calendar.js';
+import {
+  professionalEventsFromProjections,
+  promiseEventsFromLedger,
+  sydneyTodayKey
+} from './professional-calendar.js';
 import { knowledgeEventsFromPages } from './knowledge-calendar.js';
 import { loadLifeCalendarEvents } from './load-life-events.js';
 import { resolveSchoolTerms } from './school-terms.js';
@@ -193,7 +197,10 @@ export function createHubSourceLoader(opts) {
           return;
         }
         if (!response.ok || payload?.ok !== true) throw new Error('request_failed');
-        const events = professionalEventsFromProjections(payload.data?.projections ?? []);
+        const events = [
+          ...professionalEventsFromProjections(payload.data?.projections ?? []),
+          ...promiseEventsFromLedger(payload.data?.promises ?? [], today ?? sydneyTodayKey())
+        ];
         setBucket('professional', { status: 'live', events, error: null });
       } catch {
         setBucket('professional', {

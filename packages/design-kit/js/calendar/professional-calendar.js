@@ -16,7 +16,12 @@ export function professionalEventsFromProjections(projections) {
 
 function lifeEventFromProjection(projection) {
   if (!projection?.start) return null;
-  const type = projection.kind === 'meeting' ? 'professional_meeting' : 'professional_event';
+  const type =
+    projection.kind === 'meeting'
+      ? 'professional_meeting'
+      : projection.kind === 'communication'
+        ? 'professional_communication'
+        : 'professional_event';
   const start = new Date(projection.start);
   if (Number.isNaN(start.getTime())) return null;
   const tz = projection.time_zone || 'Australia/Sydney';
@@ -58,8 +63,52 @@ function lifeEventFromProjection(projection) {
       source_ref: projection.source_ref,
       href: projection.href ?? null,
       all_day: Boolean(projection.all_day),
-      event_type: projection.event_type ?? null
+      event_type: projection.event_type ?? null,
+      pin: projection.pin === true,
+      channel: projection.channel ?? null
     },
     body: ''
   };
+}
+
+function daysBetween(fromKey, toKey) {
+  return Math.round((Date.parse(`${toKey}T00:00:00Z`) - Date.parse(`${fromKey}T00:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * Open People-ledger promises as Due-row rows.
+ * @param {Array<{id:string,direction:string,text:string,due:string|null,status:string}>} items
+ * @param {string} todayKey YYYY-MM-DD in Sydney
+ */
+export function promiseEventsFromLedger(items, todayKey) {
+  const out = [];
+  for (const item of items ?? []) {
+    if (!item?.due || item.status !== 'open') continue;
+    const late = item.due < todayKey;
+    const daysLate = late ? daysBetween(item.due, todayKey) : 0;
+    const lead = item.direction === 'they_owe' ? 'Owed to you' : 'You owe';
+    const tail = late ? ` · ${daysLate} day${daysLate === 1 ? '' : 's'} late` : '';
+    out.push({
+      path: `ledger:${item.id}`,
+      record: {
+        type: 'ledger_item',
+        id: item.id,
+        date: item.due,
+        title: `${lead} · ${item.text}${tail}`,
+        direction: item.direction,
+        late,
+        days_late: daysLate
+      }
+    });
+  }
+  return out;
+}
+
+export function sydneyTodayKey(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Sydney',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(date);
 }
