@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 24/46 (52%)**
+**Progress: 28/46 (61%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -52,10 +52,10 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M5: Someday ↔ Goals
 
-- [ ] **G-25** Promote to goal popover — —
-- [ ] **G-26** Grow a goal from a dream — —
-- [ ] **G-27** Source dream chip + N goals grown — —
-- [ ] **G-28** Life coverage counts goals by life_area — —
+- [x] **G-25** Promote to goal popover — 
+- [x] **G-26** Grow a goal from a dream — 
+- [x] **G-27** Source dream chip + N goals grown — 
+- [x] **G-28** Life coverage counts goals by life_area — 
 
 ## M6: Retire Areas
 
