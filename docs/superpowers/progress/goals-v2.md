@@ -1,6 +1,6 @@
 # Goals v2 progress ledger
 
-**Progress: 20/46 (43%)**
+**Progress: 24/46 (52%)**
 
 Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2-complete.md`
 
@@ -45,10 +45,10 @@ Branch: `goals/v2-complete` · Plan: `docs/superpowers/plans/2026-09-26-goals-v2
 
 ## M4: Goal page
 
-- [ ] **G-21** Chain breadcrumb — —
-- [ ] **G-22** Row → page morph — —
-- [ ] **G-23** Structure switch morph + Details disclosure — —
-- [ ] **G-24** Linked measure for current — —
+- [x] **G-21** Chain breadcrumb — 
+- [x] **G-22** Row → page morph — 
+- [x] **G-23** Structure switch morph + Details disclosure — 
+- [x] **G-24** Linked measure for current — 
 
 ## M5: Someday ↔ Goals
 
