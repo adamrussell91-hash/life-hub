@@ -164,7 +164,11 @@ export function classifyProjectLifecycle(
   if (project.status === 'stalled' || stallIds.has(project.id)) return 'stalled';
 
   const variance = computeProjectVariance(project, tasks, now);
-  if (variance.ready_to_close || (variance.slip_days != null && variance.slip_days > 0)) {
+  if (
+    variance.ready_to_close ||
+    variance.end_passed ||
+    (variance.slip_days != null && variance.slip_days > 0)
+  ) {
     return 'needs_attention';
   }
 
@@ -525,7 +529,9 @@ export function findRetroCandidate(
   cards: ProjectPulseCard[],
   now: Date = new Date()
 ): RetroCandidate | null {
-  const ready = cards.find((card) => card.readyToClose && card.lifecycle !== 'completed');
+  const ready = cards.find(
+    (card) => card.readyToClose && card.lifecycle !== 'completed'
+  );
   if (ready) {
     return {
       project: ready.project,

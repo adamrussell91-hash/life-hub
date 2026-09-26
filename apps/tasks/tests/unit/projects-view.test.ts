@@ -179,12 +179,9 @@ describe('projects view rebuild', () => {
     expect(legend.some((text) => text?.includes('Planning') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Not started') && text.includes('1'))).toBe(true);
     expect(legend.some((text) => text?.includes('Stalled') && text.includes('1'))).toBe(true);
-    // The full (non-compact) chart lists every lifecycle bucket even at
-    // zero, so "Completed" still appears here — just never with a real
-    // count, since renderProjectsView filters archived/completed projects
-    // out before lifecycle classification runs (see the board-lanes test,
-    // where an empty bucket gets no lane at all).
-    expect(legend.some((text) => text?.includes('Completed') && text.includes('0'))).toBe(true);
+    // Completed counts archived/completed projects (still filtered off the
+    // default board — click Completed on the mix to list them).
+    expect(legend.some((text) => text?.includes('Completed') && text.includes('1'))).toBe(true);
   });
 
   it('still paints when a stored project omitted milestones', async () => {
@@ -282,14 +279,98 @@ describe('projects view rebuild', () => {
     expect(lanes).toContain('Planning');
     expect(lanes).toContain('Not started');
     expect(lanes).toContain('Stalled');
-    // No Completed lane — archived/completed projects are filtered out
-    // before this view classifies anything (see the mix-chart test above).
+    // No Completed lane on the default board — archived projects stay in
+    // the mix count and appear when the Completed slice is selected.
     expect(lanes).not.toContain('Completed');
 
     const open = canvas.querySelector<HTMLButtonElement>('[data-project-id="proj_go"] .btn');
     expect(open?.textContent).toBe('Open page');
     open?.click();
     expect(location.hash).toBe('#/project/proj_go');
+  });
+
+  it('lists completed projects when the mix Completed slice is selected', async () => {
+    const canvas = document.createElement('main');
+    document.body.append(canvas);
+    await renderProjectsView(canvas);
+
+    const completed = [...canvas.querySelectorAll<HTMLButtonElement>('.projects-chart__slice')].find((btn) =>
+      btn.textContent?.includes('Completed')
+    );
+    expect(completed).not.toBeUndefined();
+    completed?.click();
+    await vi.waitFor(() => {
+      const titles = [...canvas.querySelectorAll('.pcard__title')].map((node) => node.textContent);
+      expect(titles).toContain('Term 2 wrap');
+      expect(titles).not.toContain('HSC Tool');
+      expect(canvas.querySelector('.projects-chart__slice.is-active')?.textContent).toMatch(/Completed/);
+    });
+
+    const open = canvas.querySelector<HTMLButtonElement>('[data-project-id="proj_done"] .btn');
+    expect(open?.textContent).toBe('Open page');
+    open?.click();
+    expect(location.hash).toBe('#/project/proj_done');
+  });
+
+  it('shows human project titles in the review log, not raw ids', async () => {
+    vi.mocked(tasksApi.listReviewLogs).mockResolvedValue([
+      {
+        schema_version: 1,
+        id: 'rev_closed',
+        project_id: 'proj_done',
+        outcome: 'closed',
+        reason: 'Wrapped the term.',
+        merge_into_project_id: null,
+        baseline_end_date: null,
+        current_end_date: null,
+        slip_days: 0,
+        created_at: '2026-08-10T00:00:00.000Z'
+      },
+      {
+        schema_version: 1,
+        id: 'rev_missing',
+        project_id: 'proj_deleted_elsewhere',
+        outcome: 'completed',
+        reason: 'Gone from store.',
+        merge_into_project_id: null,
+        baseline_end_date: null,
+        current_end_date: null,
+        slip_days: null,
+        created_at: '2026-08-11T00:00:00.000Z'
+      }
+    ]);
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    const titles = [...canvas.querySelectorAll('.task-row__title')].map((node) => node.textContent);
+    expect(titles.some((text) => text === 'closed · Term 2 wrap')).toBe(true);
+    expect(titles.some((text) => text === 'completed · Unknown project')).toBe(true);
+    expect(canvas.textContent).not.toMatch(/proj_done/);
+    expect(canvas.textContent).not.toMatch(/proj_deleted_elsewhere/);
+  });
+
+  it('does not prompt close-out retro for a project that still has open work past its end', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      project({
+        id: 'proj_accreditation',
+        title: 'Accreditation Mentoring',
+        baseline_end_date: '2026-07-01',
+        current_end_date: '2026-07-15',
+        status: 'active'
+      })
+    ]);
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({
+        id: 't_open',
+        title: 'Still mentoring',
+        parent_project_id: 'proj_accreditation',
+        status: 'open',
+        due_date: '2026-07-10'
+      })
+    ]);
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    expect(canvas.textContent).not.toMatch(/Close-out retro/);
+    expect(canvas.textContent).toMatch(/Accreditation Mentoring/);
   });
 
   it('takes Add next action to the project page instead of doing nothing', async () => {

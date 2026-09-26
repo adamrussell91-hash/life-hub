@@ -6797,6 +6797,7 @@ body.is-universe-fullscreen .page-header {
 
 .projects-mix__seg {
   cursor: pointer;
+  pointer-events: stroke;
   transition: stroke-width 160ms ease, opacity 160ms ease;
 }
 

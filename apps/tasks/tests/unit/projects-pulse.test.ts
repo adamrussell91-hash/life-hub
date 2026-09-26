@@ -213,5 +213,28 @@ describe('project lifecycle mix', () => {
     const retro = findRetroCandidate([ready], now);
     expect(retro?.project.id).toBe('proj_close_demo');
     expect(retro?.title).toBe('Close-out retro');
+
+    const unfinished = buildProjectPulseCard(
+      project({
+        id: 'proj_accreditation',
+        title: 'Accreditation Mentoring',
+        baseline_end_date: '2026-07-01',
+        current_end_date: '2026-07-15'
+      }),
+      [
+        task({
+          id: 't_open',
+          title: 'Still mentoring',
+          parent_project_id: 'proj_accreditation',
+          status: 'open',
+          due_date: '2026-07-10'
+        })
+      ],
+      new Set(),
+      now
+    );
+    expect(unfinished.lifecycle).toBe('needs_attention');
+    expect(unfinished.readyToClose).toBe(false);
+    expect(findRetroCandidate([unfinished], now)).toBeNull();
   });
 });

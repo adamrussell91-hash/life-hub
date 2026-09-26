@@ -80,6 +80,7 @@ const ENERGY_ICON =
 
 type PulseContext = {
   projects: Project[];
+  archivedProjects: Project[];
   tasks: Task[];
   goals: Goal[];
   cards: ProjectPulseCard[];
@@ -87,6 +88,17 @@ type PulseContext = {
   stallCandidates: StallCandidate[];
   now: Date;
 };
+
+function projectsForMix(ctx: PulseContext): Project[] {
+  return [...ctx.projects, ...ctx.archivedProjects];
+}
+
+function cardsForBoard(ctx: PulseContext): ProjectPulseCard[] {
+  if (lifecycleFilter !== 'completed') return ctx.cards;
+  return ctx.archivedProjects.map((project) =>
+    buildProjectPulseCard(project, ctx.tasks, ctx.stallIds, ctx.now)
+  );
+}
 
 function svgIcon(markup: string): HTMLElement {
   const wrap = el('span', 'pcard__icon');
@@ -110,6 +122,18 @@ function renderStatusChart(
     })
   );
   return tile;
+}
+
+function reviewLogTitle(
+  review: { outcome: string; project_id: string; merge_into_project_id?: string | null },
+  titleById: Map<string, string>
+): string {
+  const label = titleById.get(review.project_id) ?? 'Unknown project';
+  if (review.outcome === 'frankensteined' && review.merge_into_project_id) {
+    const into = titleById.get(review.merge_into_project_id);
+    if (into) return `frankensteined · ${label} → ${into}`;
+  }
+  return `${review.outcome} · ${label}`;
 }
 
 function renderRoadmap(ctx: PulseContext, onZoom: (zoom: RoadmapZoom) => void): HTMLElement {
@@ -260,7 +284,10 @@ function renderProjectBoardCard(
   top.append(el('span', `status-badge status-badge--${card.lifecycle}`, LIFECYCLE_LABEL[card.lifecycle]));
   article.append(top);
 
-  const desc = card.project.arc_summary || card.project.description;
+  const desc =
+    card.project.arc_summary ||
+    card.project.description ||
+    (card.lifecycle === 'completed' ? card.project.review_summary : null);
   if (desc) article.append(el('p', 'pcard__desc', desc));
 
   if (card.lifecycle === 'stalled') {
@@ -268,6 +295,19 @@ function renderProjectBoardCard(
     const jump = el('a', 'pcard__jump', 'Review below ↓');
     jump.href = '#stalled-queue';
     article.append(jump);
+    attachProjectBoardMenu(top, card, confirmHost, boardActions);
+    return article;
+  }
+
+  if (card.lifecycle === 'completed') {
+    const actions = el('div', 'pcard__row pcard__actions');
+    const open = el('button', 'btn btn--ghost', 'Open page');
+    open.type = 'button';
+    open.addEventListener('click', () => {
+      location.hash = projectPageHash(card.project.id);
+    });
+    actions.append(open);
+    article.append(actions);
     attachProjectBoardMenu(top, card, confirmHost, boardActions);
     return article;
   }
@@ -437,18 +477,25 @@ function renderBoard(
   confirmHost: HTMLElement,
   actions: ProjectBoardActions
 ): HTMLElement {
-  const visible = ctx.cards.filter((card) => {
+  const visible = cardsForBoard(ctx).filter((card) => {
     if (!matchesProjectQuery(card.project, projectQuery)) return false;
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) return false;
     return true;
   });
   const groups = groupPulseCards(visible, groupBy, ctx.goals, ctx.now);
   const grid = el('div', 'projects-board');
+  grid.id = 'projects-board';
   grid.style.gridTemplateColumns = groups.length
     ? `repeat(${groups.length}, minmax(0, 1fr))`
     : 'minmax(0, 1fr)';
   if (!groups.length) {
-    grid.append(el('p', 'empty-state', 'No projects match.'));
+    grid.append(
+      el(
+        'p',
+        'empty-state',
+        lifecycleFilter === 'completed' ? 'No completed projects yet.' : 'No projects match.'
+      )
+    );
     return grid;
   }
   for (const group of groups) {
@@ -634,17 +681,36 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     return;
   }
 
+  const titleById = new Map(projects.map((project) => [project.id, project.title]));
+  const archivedProjects = projects.filter((project) => isProjectArchived(project.status));
   projects = projects.filter((project) => !isProjectArchived(project.status));
 
   const now = new Date();
   const stallCandidates = findStallCandidates(projects, tasks, now);
   const stallIds = new Set(stallCandidates.map((item) => item.project.id));
   const cards = projects.map((project) => buildProjectPulseCard(project, tasks, stallIds, now));
-  const ctx: PulseContext = { projects, tasks, goals, cards, stallIds, stallCandidates, now };
+  const ctx: PulseContext = {
+    projects,
+    archivedProjects,
+    tasks,
+    goals,
+    cards,
+    stallIds,
+    stallCandidates,
+    now
+  };
   const retro = findRetroCandidate(cards, now);
-  const mergeTargets = projects.filter((project) => !isProjectArchived(project.status) && project.status !== 'stalled');
+  const mergeTargets = projects.filter((project) => project.status !== 'stalled');
 
   const reload = () => void renderProjectsView(canvas);
+
+  function selectLifecycle(id: ProjectLifecycle | 'all'): void {
+    lifecycleFilter = id;
+    paint();
+    requestAnimationFrame(() => {
+      canvas.querySelector('#projects-board')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
 
   function mountRoadmap(): HTMLElement {
     return renderRoadmap(ctx, (zoom) => {
@@ -656,19 +722,17 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
   function refreshPulse(): void {
     const host = canvas.querySelector('.projects-pulse');
     if (!host) return;
-    const nextMix = projectLifecycleMix(ctx.projects, ctx.tasks, ctx.stallIds, ctx.now);
+    const nextMix = projectLifecycleMix(projectsForMix(ctx), ctx.tasks, ctx.stallIds, ctx.now);
     const nextRunning = runningProjectCount(nextMix);
     host.replaceChildren(
-      renderStatusChart(nextMix, nextRunning, (id) => {
-        lifecycleFilter = id;
-        paint();
-      }),
+      renderStatusChart(nextMix, nextRunning, selectLifecycle),
       mountRoadmap()
     );
   }
 
   function dropProject(projectId: string): void {
     ctx.projects = ctx.projects.filter((project) => project.id !== projectId);
+    ctx.archivedProjects = ctx.archivedProjects.filter((project) => project.id !== projectId);
     ctx.tasks = ctx.tasks.filter((task) => task.parent_project_id !== projectId);
     ctx.cards = ctx.cards.filter((card) => card.project.id !== projectId);
     ctx.stallIds.delete(projectId);
@@ -679,6 +743,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
 
   function acceptProject(created: Project): void {
     ctx.projects = [created, ...ctx.projects];
+    titleById.set(created.id, created.title);
     const card = buildProjectPulseCard(created, ctx.tasks, ctx.stallIds, ctx.now);
     ctx.cards = [card, ...ctx.cards];
     if (lifecycleFilter !== 'all' && card.lifecycle !== lifecycleFilter) {
@@ -701,7 +766,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       : null;
     const scrollTop = canvas.scrollTop;
     const tension = tensionDismissed ? null : findPortfolioTension(ctx.cards, ctx.tasks, ctx.now);
-    const nextMix = projectLifecycleMix(ctx.projects, ctx.tasks, ctx.stallIds, ctx.now);
+    const nextMix = projectLifecycleMix(projectsForMix(ctx), ctx.tasks, ctx.stallIds, ctx.now);
     const nextRunning = runningProjectCount(nextMix);
     const forecastItems = buildProjectForecast(ctx.cards, ctx.stallCandidates, ctx.now);
 
@@ -735,7 +800,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       id: 'projects',
       ariaLabel: 'Filters',
       className: 'hub-filters--inline',
-      active: Boolean(projectQuery.trim())
+      active: Boolean(projectQuery.trim()) || lifecycleFilter !== 'all'
     });
     filters.panel.append(search.el);
     const groupByRow = el('div', 'projects-groupby');
@@ -777,10 +842,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
 
     const pulse = el('div', 'projects-pulse');
     pulse.append(
-      renderStatusChart(nextMix, nextRunning, (id) => {
-        lifecycleFilter = id;
-        paint();
-      }),
+      renderStatusChart(nextMix, nextRunning, selectLifecycle),
       mountRoadmap()
     );
     canvas.append(pulse);
@@ -792,7 +854,6 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
       canvas.append(el('h2', 'section-title', 'Review log'));
       const logStack = el('div', 'task-stack');
       for (const review of [...reviews].reverse().slice(0, 8)) {
-        const proj = projects.find((project) => project.id === review.project_id);
         const slip =
           review.slip_days === null || review.slip_days === undefined
             ? ''
@@ -803,7 +864,7 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
                 : ` · ${review.slip_days}d vs baseline`;
         const row = el('article', 'task-row');
         row.append(
-          el('h3', 'task-row__title', `${review.outcome} · ${proj?.title ?? review.project_id}`),
+          el('h3', 'task-row__title', reviewLogTitle(review, titleById)),
           el('p', 'task-row__desc', `${review.reason}${slip}`)
         );
         logStack.append(row);

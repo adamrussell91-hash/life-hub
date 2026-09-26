@@ -12,6 +12,9 @@ export type ProjectVariance = {
   open_task_count: number;
   done_task_count: number;
   all_tasks_done: boolean;
+  /** Calendar end is today or earlier (derived or stored). */
+  end_passed: boolean;
+  /** Close-out only when nothing is open — past end with open work is attention. */
   ready_to_close: boolean;
 };
 
@@ -47,10 +50,12 @@ export function computeProjectVariance(
     );
   }
 
-  const endPassed =
-    Boolean(current) && current!.getTime() <= from.getTime() + 24 * 60 * 60 * 1000;
+  const end_passed =
+    current != null && current.getTime() <= from.getTime() + 24 * 60 * 60 * 1000;
   const all_tasks_done = child.length > 0 && open_task_count === 0;
-  const ready_to_close = !isProjectArchived(project.status) && (all_tasks_done || endPassed);
+  const ready_to_close =
+    !isProjectArchived(project.status) &&
+    (all_tasks_done || (end_passed && open_task_count === 0));
 
   return {
     project_id: project.id,
@@ -61,6 +66,7 @@ export function computeProjectVariance(
     open_task_count,
     done_task_count,
     all_tasks_done,
+    end_passed,
     ready_to_close
   };
 }
