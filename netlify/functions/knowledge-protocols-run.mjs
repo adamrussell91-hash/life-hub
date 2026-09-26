@@ -2,7 +2,7 @@ import { createCognitiveService } from './_shared/cognitive-service.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
 import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared/http.mjs';
 import { createSessionOriginHandler } from './_shared/operator-gate.mjs';
-import { defaultModel } from './knowledge-protocols.mjs';
+import { defaultModel, defaultGatherContext } from './knowledge-protocols.mjs';
 
 export const config = { path: '/api/knowledge/protocols/run', background: true };
 function owner(env) { return env.COGNITIVE_OWNER_ID || 'operator'; }
@@ -14,7 +14,8 @@ export function createKnowledgeProtocolsRunHandler(deps = {}) {
     try {
       const store = deps.getStore ? await deps.getStore(env) : await defaultGetCognitiveStore(env);
       if (!store) throw Object.assign(new Error('Protocol session storage is not configured.'), { status: 503, code: 'cognitive_store_unbound' });
-      const service = createCognitiveService({ store, model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)), retrieve: deps.retrieve ?? (() => ({ evidence: [], status: 'No matching Knowledge Hub notes were retrieved.' })) });
+      const retrieve = deps.retrieve ?? ((session) => defaultGatherContext(session, env, deps.fetchImpl ?? fetch, deps));
+      const service = createCognitiveService({ store, model: deps.model ?? (prompt => defaultModel(prompt, env, deps.fetchImpl)), retrieve });
       return withCors(okResponse(200, { session: await service.run(owner(env), sessionId) }), request, env);
     } catch (error) { return withCors(errorResponse(error.status ?? 502, error.code ?? 'protocol_run_failed', error.message, error.status >= 500), request, env); }
   }, deps);
