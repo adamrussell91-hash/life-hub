@@ -24,3 +24,7 @@ apps/*/.ua/
 # Production records live in the private data repo, never this public repo.
 /data/mind/
 /data/governance/
+*.notion-export/
+notion-export*/
+Export-*.zip
+notion-comms-import-report*

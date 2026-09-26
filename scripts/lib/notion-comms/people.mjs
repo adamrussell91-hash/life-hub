@@ -1,0 +1,2 @@
+export function normaliseName(value = '') { return value.toLowerCase().replace(/\b(mr|ms|mrs|dr)\.?\s*/g, '').replace(/\s+/g, ' ').trim(); }
+export function matchPerson(name, people) { const key = normaliseName(name); const matches = people.filter((person) => [person.display_name, ...(person.aliases ?? [])].some((label) => normaliseName(label) === key || (/^[^ ]+ [A-Z]\.$/.test(label) && normaliseName(label).split(' ')[0] === key.split(' ')[0]))); return matches.length === 1 ? { match: matches[0] } : matches.length ? { ambiguous: matches } : { match: null }; }
