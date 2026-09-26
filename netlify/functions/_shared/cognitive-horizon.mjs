@@ -12,10 +12,19 @@ export async function lastCompletedRun(store, owner, protocolId) {
   let best = null;
   for (const row of (await store.list(owner, 1000, 0)) ?? []) {
     const value = row?.value;
-    if (value?.protocolId !== protocolId || value?.status !== 'completed' || !value?.updatedAt) continue;
-    if (!best || String(value.updatedAt) > String(best.updatedAt)) best = value;
+    if (value?.protocolId !== protocolId || value?.status !== 'completed') continue;
+    const completedAt = value.completedAt || value.updatedAt;
+    if (!completedAt) continue;
+    if (!best || String(completedAt) > String(best.completedAt)) {
+      best = { id: value.id, completedAt };
+    }
   }
-  return best ? { id: best.id, completedAt: best.updatedAt } : null;
+  return best;
+}
+
+/** Almanac / ghost step ids for Horizon are `horizon-review:<SydneyDate>`. */
+export function isHorizonReviewStepId(stepId) {
+  return typeof stepId === 'string' && (stepId === 'horizon-review' || stepId.startsWith('horizon-review:'));
 }
 
 export function horizonCompletedDateKey(completedAt) {

@@ -17,7 +17,7 @@ import { decodeBlob } from './_shared/decode-blob.mjs';
 import { parseDateRange } from './_shared/repo-policy.mjs';
 import { defaultGetTasksStore, getJSON, readTaskIndex, taskKey } from './_shared/tasks-blobs.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
-import { lastCompletedRun, horizonCompletedDateKey } from './_shared/cognitive-horizon.mjs';
+import { lastCompletedRun, horizonCompletedDateKey, isHorizonReviewStepId } from './_shared/cognitive-horizon.mjs';
 import { parseEventDocument } from '../../apps/life/js/core/records.js';
 import { getSydneyDateKey, getSydneyTimestamp } from '../../apps/life/js/core/time.js';
 import { addDays, almanacSummary, leadLines } from '../../packages/design-kit/js/lead-lines.js';
@@ -654,12 +654,12 @@ export function ghostsForAlmanacAction(id, view) {
   const step = view.lines.flatMap(line => line.steps).find(item => item.id === stepId);
   if (!step) return null;
   let due = step.lastSafe;
-  if (stepId === 'horizon-review' && view.today && due < view.today) due = view.today;
+  if (isHorizonReviewStepId(stepId) && view.today && due < view.today) due = view.today;
   return [{
     id,
     agent: 'hammond',
     kind: 'create_task',
-    title: stepId === 'horizon-review' ? 'Run the Horizon Council review' : step.title,
+    title: isHorizonReviewStepId(stepId) ? 'Run the Horizon Council review' : step.title,
     due,
     source: `almanac:${stepId}`
   }];

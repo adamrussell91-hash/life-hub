@@ -30,6 +30,7 @@ export function sessionIndexRow(value) {
     stage: value.stage,
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
+    completedAt: value.completedAt || null,
     title: value.summary?.title || value.intake?.task || value.intake?.focus || value.intake?.claim || value.protocolId,
     summary: typeof value.summary?.summary === 'string'
       ? value.summary.summary

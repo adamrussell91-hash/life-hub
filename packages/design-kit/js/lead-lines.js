@@ -98,7 +98,10 @@ export function leadLine(anchor, rules, ctx) {
     else if (end && Number.isFinite(rule.leadDays)) lastSafe = addDays(end, -rule.leadDays);
     else continue;
     if (!KEY.test(lastSafe ?? '')) continue;
-    const id = typeof rule.stepId === 'string' && rule.stepId ? rule.stepId : `${anchor.id}:${rule.id}`;
+    const id = typeof rule.stepId === 'function'
+      ? rule.stepId(anchor, ctx)
+      : (typeof rule.stepId === 'string' && rule.stepId ? rule.stepId : `${anchor.id}:${rule.id}`);
+    if (!id) continue;
     steps.push({
       id,
       ruleId: rule.id,

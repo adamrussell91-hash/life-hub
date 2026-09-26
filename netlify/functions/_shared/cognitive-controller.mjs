@@ -94,7 +94,7 @@ function refresh(s){
  if(s.protocolId==='mirror'&&['waiting','completed'].includes(s.status)&&!s.allowedActions.includes('correct'))s.allowedActions.push('correct');
  s.updatedAt=stamp();if(Buffer.byteLength(JSON.stringify(s))>MAX_BYTES)throw fault(413,'session_limit','Session storage limit reached. Download this session and start a new one.');return s;
 }
-export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','summary','writeBack'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
+export function publicSession(s){const keys=['id','protocolId','mode','intake','revision','status','stage','speaker','transcript','evidence','evidenceStatus','checkpoint','allowedActions','error','createdAt','updatedAt','completedAt','summary','writeBack','lastReviewDate','cadenceUnknown'];return Object.fromEntries(keys.map(k=>[k,copy(s[k])]).filter(([,v])=>v!==undefined));}
 function nextDialogue(s,candidate){
  const voices=['principle','consequence','virtue'],max=s.mode==='extended'?24:12,total=Object.values(s.dialogueCounts).reduce((a,b)=>a+b,0);
  if(total>=max&&canFinish(s))return step('controller','map','reflection',{maxBursts:1,burstWords:425});
@@ -130,7 +130,7 @@ export function act(current,{action,text,revision,requestId}){
  }
  if(action==='close'&&atFilter(s)){add(s,'user','you',s.stage,text?.trim()||'Close the filter.');s.cursor++;s.burst=0;s.continueBurst=false;s.checkpoint=null;s.status='queued';return refresh(s);}
  add(s,'user','you',s.stage,text?.trim()||({confirm:'Confirmed.',uncertain:'Uncertain; proceed with reduced confidence.',decline:'Explicitly declined.',finish:'Ready for the convergence and conflict map.'}[action]));
- if(action==='reflect'){s.status='completed';s.checkpoint=null;return refresh(s);}
+ if(action==='reflect'){s.status='completed';s.checkpoint=null;if(!s.completedAt)s.completedAt=stamp();return refresh(s);}
  if(action==='correct'){
   if(s.protocolId==='witness'){s.cursor=0;s.burst=0;s.verification=null;}
   else if(s.protocolId==='mirror'){s.intake.conflict=text.trim();s.steps=plan(s.protocolId,s.mode,s.intake);s.cursor=0;s.burst=0;add(s,'controller','controller','correction','The prior reading is superseded. Restarting from the corrected conflict.');}
@@ -332,10 +332,11 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
    s.cursor++;s.burst=0;s.continueBurst=false;
    if(s.protocolId==='consilium'&&st.stage==='dialogue')s.steps.push(nextDialogue(s,result.nextSpeaker));
   }
-  if(s.cursor>=s.steps.length&&s.status==='running')s.status='completed';
+  if(s.cursor>=s.steps.length&&s.status==='running'){s.status='completed';if(!s.completedAt)s.completedAt=stamp();}
   if(oneStage&&s.status==='running')s.status='queued';
   s=refresh(s);await onProgress(s);
   if(oneStage)break;
  }
- if(s.status==='running')s.status='completed';return refresh(s);
+ if(s.status==='running'){s.status='completed';if(!s.completedAt)s.completedAt=stamp();}
+ return refresh(s);
 }

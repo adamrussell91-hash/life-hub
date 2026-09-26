@@ -84,27 +84,35 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
         throw fault(409, 'session_exists', 'That session ID is already in use.');
       }
       let lastReviewDate = null;
+      let cadenceUnknown = false;
       if (input?.protocolId === 'horizon') {
-        const last = await lastCompletedRun(store, owner, 'horizon');
-        if (last) {
-          lastReviewDate = horizonCompletedDateKey(last.completedAt);
-          const today = getSydneyDateKey(new Date(now()));
-          if (horizonNeedsJustification(last.completedAt, today)) {
-            const justification = typeof input?.intake?.frequencyJustification === 'string'
-              ? input.intake.frequencyJustification.trim()
-              : '';
-            if (!justification) {
-              throw fault(
-                400,
-                'frequency_justification_required',
-                `Last Horizon review was ${lastReviewDate}. Another review before ${horizonNextReviewDue(last.completedAt)} needs a frequency justification.`
-              );
+        try {
+          const last = await lastCompletedRun(store, owner, 'horizon');
+          if (last) {
+            lastReviewDate = horizonCompletedDateKey(last.completedAt);
+            const today = getSydneyDateKey(new Date(now()));
+            if (horizonNeedsJustification(last.completedAt, today)) {
+              const justification = typeof input?.intake?.frequencyJustification === 'string'
+                ? input.intake.frequencyJustification.trim()
+                : '';
+              if (!justification) {
+                throw fault(
+                  400,
+                  'frequency_justification_required',
+                  `Last Horizon review was ${lastReviewDate}. Another review before ${horizonNextReviewDue(last.completedAt)} needs a frequency justification.`
+                );
+              }
             }
           }
+        } catch (error) {
+          if (error?.code === 'frequency_justification_required') throw error;
+          console.warn(`horizon cadence gate unavailable (${error instanceof Error ? error.message : 'error'}); allowing run`);
+          cadenceUnknown = true;
         }
       }
       const session = createSession({ ...input, id, owner });
       if (lastReviewDate) session.lastReviewDate = lastReviewDate;
+      if (cadenceUnknown) session.cadenceUnknown = true;
       session.requests[input.requestId] = { type: 'create' };
       const written = await store.write(owner, id, session, null);
       if (!written) return publicSession((await read(owner, id)).value);
