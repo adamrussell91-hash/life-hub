@@ -92,9 +92,9 @@ function renderPanel(host: HTMLElement, goal: Goal, envelope: GoalReadEnvelope, 
     if (read.ghosts.length === 0) root.append(el('p', 'hammond__why', 'Nothing to propose right now. Keep going.'));
     read.ghosts.forEach((ghost) => root.append(confirmCard(ghost, onApplied)));
   }
-  const ask = el('a', 'btn btn--ghost hammond__ask', 'Ask Hammond about this goal…') as HTMLAnchorElement;
+  const ask = el('a', 'btn btn--secondary hammond__ask', 'Ask Hammond about this goal…') as HTMLAnchorElement;
   const move = goal.next_start ? ` Next move: ${goal.next_start}.` : '';
-  ask.href = `#/clare?agent=hammond&prompt=${encodeURIComponent(`Help me with “${goal.title}”.${move}`)}`;
+  ask.href = `#/clare?agent=hammond&prompt=${encodeURIComponent(`Help me with ${goal.title}.${move}`)}`;
   root.append(ask);
   host.replaceChildren(root);
 }
@@ -156,8 +156,8 @@ export function renderHammondStrip(host: HTMLElement, envelopes: GoalReadEnvelop
   checkBtn.dataset.action = 'sunday-checkin';
   checkBtn.addEventListener('click', () => openSundayCheckIn(host, goals, envelopes, today, onApplied));
   body.append(checkBtn);
-  void fetch('/api/goal-checkins', { credentials: 'include' })
-    .then((r) => r.json())
+  void tasksApi
+    .getGoalCheckins()
     .then((data) => {
       const line = checkInStripLine(data?.checkin ?? null, today);
       if (line) body.append(el('p', 'hammond-strip__checkin', line));

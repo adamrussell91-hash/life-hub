@@ -1,14 +1,14 @@
 /**
  * G-17 Term ↔ Year zoom for the Goals runway.
- * Same rules as Term River: layout via buildTimeScale placers, one createMotion blend,
- * no remount mid-zoom. Phone (<720) uses a term list instead.
+ * Same rules as Term River: layout via placers, one createMotion blend,
+ * no remount mid-zoom. Phone (<720) uses a term list instead — remount on resize.
  */
 import type { Goal, GoalSphere } from '@/schemas/goal';
 import type { Project } from '@/schemas/project';
 import type { Task } from '@/schemas/task';
 import type { SchoolTerm } from '@/domain/school-time';
 import { addDaysKey } from '@/domain/school-time';
-import { buildYearRunway, type YearRunway } from '@/domain/goal-runway';
+import { buildYearRunway, type YearRunway, type RunwayWeek, type RunwayRow } from '@/domain/goal-runway';
 import { goalPageHash } from '@/domain/cards';
 import { LANE_CAP } from '@/domain/goal-hosting';
 import { createMotion, EASE } from '../../design-kit/js/hub-motion-engine.js';
@@ -39,9 +39,12 @@ const STRUCTURE_CHIP: Record<Goal['structure'], string> = {
 
 const ZOOM_MS = 500;
 const LABEL_W = 200;
-const PAD_R = 16;
+/** Move column (~10rem) — plot must end before it (Term River rule 3). */
+const PAD_R = 160;
+/** Below this school-week width, axis shows months (Term River rule 5). */
+const MIN_WEEK_LABEL = 46;
 
-type Placer = (X: (d: string) => number, weekW: number) => void;
+type Placer = (X: (d: string) => number, weekW: number, mode: 'term' | 'year') => void;
 
 export type YearZoomHandle = {
   setMode: (mode: 'term' | 'year') => void;
@@ -51,8 +54,26 @@ export type YearZoomHandle = {
   blend: () => number;
 };
 
-function prefersPhone(): boolean {
+export function prefersPhone(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(max-width: 719px)').matches;
+}
+
+function shortWeekLabel(label: string): string {
+  return label.replace(/^Hol W/, 'H').replace(/^T\d W/, 'W');
+}
+
+function monthsInRange(from: string, to: string): string[] {
+  const out: string[] = [];
+  let key = `${from.slice(0, 7)}-01`;
+  const end = to.slice(0, 7);
+  while (key.slice(0, 7) <= end) {
+    out.push(key);
+    const [y, m] = key.split('-').map(Number);
+    const nextM = m === 12 ? 1 : m! + 1;
+    const nextY = m === 12 ? y! + 1 : y!;
+    key = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+  }
+  return out;
 }
 
 function scaleFor(
@@ -67,6 +88,10 @@ function scaleFor(
   const x0 = unit.x(from);
   const span = Math.max(1, unit.x(addDaysKey(to, 1)) - x0);
   return (d: string) => LABEL_W + ((unit.x(d) - x0) / span) * plotW;
+}
+
+function termWeeksOnly(yearData: YearRunway, focus: SchoolTerm): RunwayWeek[] {
+  return yearData.weeks.filter((w) => w.monday >= focus.starts_on && w.monday <= focus.ends_on);
 }
 
 export function mountYearZoom(
@@ -89,14 +114,63 @@ export function mountYearZoom(
   });
   if (!yearData) return null;
 
-  if (prefersPhone()) {
-    return mountPhoneYearList(host, yearData, data, overlay, initialMode);
-  }
+  let media = typeof matchMedia === 'function' ? matchMedia('(max-width: 719px)') : null;
+  let disposed = false;
+  let currentMode: 'term' | 'year' = initialMode;
+  let inner: YearZoomHandle | null = null;
 
+  const remount = () => {
+    if (disposed) return;
+    inner?.dispose();
+    if (prefersPhone()) {
+      inner = mountPhoneYearList(host, yearData, overlay, focus, currentMode);
+    } else {
+      inner = mountDesktopZoom(host, yearData, overlay, focus, currentMode);
+    }
+  };
+
+  remount();
+
+  const onMedia = () => remount();
+  media?.addEventListener?.('change', onMedia);
+
+  return {
+    get el() {
+      return inner!.el;
+    },
+    mode: () => currentMode,
+    blend: () => inner!.blend(),
+    setMode(next) {
+      if (next === currentMode) return;
+      currentMode = next;
+      if (prefersPhone()) {
+        remount();
+      } else {
+        inner?.setMode(next);
+      }
+    },
+    dispose() {
+      disposed = true;
+      media?.removeEventListener?.('change', onMedia);
+      media = null;
+      inner?.dispose();
+      inner = null;
+    }
+  };
+}
+
+function mountDesktopZoom(
+  host: HTMLElement,
+  yearData: YearRunway,
+  overlay: YearZoomOverlay,
+  focus: SchoolTerm,
+  initialMode: 'term' | 'year'
+): YearZoomHandle {
   host.replaceChildren();
   const root = el('section', 'glass-tile runway runway--zoom');
   root.setAttribute('data-part', 'year-zoom');
   root.setAttribute('aria-label', initialMode === 'year' ? 'Year runway' : 'Term runway');
+  root.classList.remove('runway--phone');
 
   const plot = el('div', 'runway-zoom__plot');
   const placers: Placer[] = [];
@@ -108,14 +182,77 @@ export function mountYearZoom(
   const axis = el('div', 'runway-zoom__axis');
   plot.append(axis);
 
-  for (const week of yearData.weeks) {
+  const focusWeeks = termWeeksOnly(yearData, focus);
+  // Term mode: W1…Wn only. Year mode: all year weeks with fit/fallback.
+  const termTicks = focusWeeks.map((week, i) => ({
+    ...week,
+    label: `W${i + 1}`,
+    short: `W${i + 1}`
+  }));
+  const yearTicks = yearData.weeks.map((week) => ({
+    ...week,
+    short: shortWeekLabel(week.label)
+  }));
+
+  const tickEls: Array<{
+    el: HTMLElement;
+    term?: (typeof termTicks)[0];
+    year: (typeof yearTicks)[0];
+  }> = [];
+
+  for (const week of yearTicks) {
     const tick = el('span', `runway-zoom__tick${week.holiday ? ' is-holiday' : ''}${week.isNow ? ' is-now' : ''}`);
-    tick.textContent = week.label;
     tick.title = week.monday;
     axis.append(tick);
-    placers.push((X, weekW) => {
-      tick.style.left = `${X(week.monday)}px`;
-      tick.style.width = `${Math.max(12, weekW)}px`;
+    const termMatch = termTicks.find((t) => t.monday === week.monday);
+    tickEls.push({ el: tick, term: termMatch, year: week });
+    placers.push((X, weekW, zoomMode) => {
+      const inTerm = Boolean(termMatch);
+      if (zoomMode === 'term' && !inTerm) {
+        tick.style.opacity = '0';
+        tick.style.pointerEvents = 'none';
+        return;
+      }
+      const label = zoomMode === 'term' && termMatch ? termMatch.label : week.label;
+      const short = zoomMode === 'term' && termMatch ? termMatch.short : week.short;
+      const x = X(week.monday);
+      const own = Math.max(12, weekW);
+      tick.style.left = `${x}px`;
+      tick.style.width = `${own}px`;
+      if (zoomMode === 'year' && weekW < MIN_WEEK_LABEL) {
+        tick.style.opacity = '0';
+        tick.textContent = '';
+        return;
+      }
+      const room = own - 4;
+      const useFull = label.length * 7 <= room;
+      const useShort = short.length * 7 <= room;
+      tick.textContent = useFull ? label : useShort ? short : '';
+      tick.style.opacity = tick.textContent ? '1' : '0';
+      tick.style.pointerEvents = 'auto';
+    });
+  }
+
+  // Month labels (year mode only, when weeks are too narrow)
+  const monthEls: HTMLElement[] = [];
+  for (const month of monthsInRange(yearData.from, yearData.to)) {
+    const name = new Intl.DateTimeFormat('en-AU', { month: 'short', timeZone: 'UTC' }).format(
+      new Date(`${month}T00:00:00Z`)
+    );
+    const tick = el('span', 'runway-zoom__tick runway-zoom__tick--month');
+    tick.textContent = name;
+    tick.hidden = true;
+    axis.append(tick);
+    monthEls.push(tick);
+    placers.push((X, weekW, zoomMode) => {
+      if (zoomMode !== 'year' || weekW >= MIN_WEEK_LABEL) {
+        tick.hidden = true;
+        return;
+      }
+      tick.hidden = false;
+      tick.style.left = `${X(month)}px`;
+      tick.style.width = '3rem';
+      tick.style.opacity = '1';
     });
   }
 
@@ -142,12 +279,15 @@ export function mountYearZoom(
     for (const { row, ongoing } of allRows) {
       const rowEl = el('a', `runway-zoom__row runway__row--${lane.sphere}`) as HTMLAnchorElement;
       rowEl.href = goalPageHash(row.goal.id);
+      rowEl.setAttribute('tabindex', '0');
+      rowEl.setAttribute('aria-label', `${row.goal.title}. Open goal.`);
       if (ongoing) rowEl.classList.add('runway__row--ongoing');
 
       const info = el('div', 'runway-zoom__info');
-      const title = el('p', 'runway__goal-title', row.goal.title);
-      title.setAttribute('data-hub-morph', 'title');
-      title.append(el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
+      const title = el('p', 'runway__goal-title');
+      const titleText = el('span', 'runway__goal-title-text', row.goal.title);
+      titleText.setAttribute('data-hub-morph', 'title');
+      title.append(titleText, el('span', 'runway__chip', STRUCTURE_CHIP[row.goal.structure]));
       if (ongoing) title.append(el('span', 'runway__chip runway__chip--ongoing', 'Ongoing'));
       const leadFig = el('p', 'runway__goal-meta runway__lead-fig');
       if (row.thisWeek.perWeek !== null) {
@@ -175,14 +315,23 @@ export function mountYearZoom(
 
       for (const cell of row.cells) {
         if (cell.state === 'holiday') continue;
+        const inFocus = cell.monday >= focus.starts_on && cell.monday <= focus.ends_on;
         const mark = el('i', `cell cell--${cell.state}`);
         mark.classList.toggle('is-now', cell.isNow);
         mark.classList.toggle('is-proposed', cell.proposed);
         mark.classList.toggle('has-milestone', cell.milestone);
         mark.title = `${cell.monday}: ${cell.state}${cell.count ? ` (${cell.count})` : ''}`;
         track.append(mark);
-        placers.push((X, weekW) => {
-          mark.style.left = `${X(cell.monday) + Math.max(0, (weekW - 20) / 2)}px`;
+        placers.push((X, weekW, zoomMode) => {
+          if (zoomMode === 'term' && !inFocus) {
+            mark.style.opacity = '0';
+            return;
+          }
+          mark.style.opacity = '1';
+          const size = Math.min(20, Math.max(12, weekW - 4));
+          mark.style.width = `${size}px`;
+          mark.style.height = `${size}px`;
+          mark.style.left = `${X(cell.monday) + Math.max(0, (weekW - size) / 2)}px`;
         });
       }
 
@@ -193,7 +342,14 @@ export function mountYearZoom(
       }
 
       rowEl.append(info, track, move);
-      rowEl.addEventListener('click', () => rememberGoalMorph(title));
+      const go = () => rememberGoalMorph(titleText);
+      rowEl.addEventListener('click', go);
+      rowEl.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        go();
+        window.location.hash = goalPageHash(row.goal.id);
+      });
       rowsHost.append(rowEl);
     }
 
@@ -224,7 +380,10 @@ export function mountYearZoom(
     const X = (d: string) => A(d) + (B(d) - A(d)) * blendT;
     const schoolWeek = focus.starts_on;
     const weekW = X(addDaysKey(schoolWeek, 7)) - X(schoolWeek);
-    for (const place of placers) place(X, weekW);
+    const zoomMode: 'term' | 'year' = blendT < 0.5 ? 'term' : 'year';
+    for (const place of placers) place(X, weekW, zoomMode);
+    void tickEls;
+    void monthEls;
   };
 
   engine = createMotion({ apply });
@@ -258,12 +417,15 @@ export function mountYearZoom(
 function mountPhoneYearList(
   host: HTMLElement,
   yearData: YearRunway,
-  data: YearZoomData,
-  _overlay: YearZoomOverlay,
+  overlay: YearZoomOverlay,
+  focus: SchoolTerm,
   mode: 'term' | 'year'
 ): YearZoomHandle {
   host.replaceChildren();
   const wrap = el('section', 'glass-tile runway runway--year runway--phone runway--year-list');
+  wrap.setAttribute('data-part', 'year-zoom');
+  wrap.append(el('h2', 'runway-phone__period', mode === 'year' ? yearData.year : `Term ${focus.term}`));
+
   if (mode === 'year') {
     for (const term of yearData.terms) {
       const block = el('div', 'runway__year-term');
@@ -271,51 +433,75 @@ function mountPhoneYearList(
       const goals = yearData.lanes.flatMap((l) =>
         [...l.rows, ...l.ongoing]
           .filter((r) => !r.goal.term || r.goal.term.term === term.term)
-          .map((r) => r.goal)
+          .map((r) => ({ goal: r.goal, row: r }))
       );
       if (!goals.length) {
         block.append(el('p', 'runway__empty', 'No goals this term.'));
       } else {
-        for (const goal of goals) {
-          const link = el('a', 'runway-phone__card') as HTMLAnchorElement;
-          link.href = goalPageHash(goal.id);
-          link.append(el('p', 'runway__goal-title', goal.title));
-          block.append(link);
+        for (const { goal, row } of goals) {
+          block.append(phoneCard(goal, row, overlay));
         }
       }
       wrap.append(block);
     }
   } else {
     for (const lane of yearData.lanes) {
-      for (const row of [...lane.rows, ...lane.ongoing]) {
-        const link = el('a', 'runway-phone__card') as HTMLAnchorElement;
-        link.href = goalPageHash(row.goal.id);
-        link.append(el('p', 'runway__goal-title', row.goal.title));
-        const now = row.cells.find((c) => c.isNow);
-        if (now) {
-          const mark = el('i', `cell cell--${now.state}`);
-          link.append(mark);
-        }
-        link.append(el('p', 'runway__move', row.move?.title ?? 'Add a next start'));
-        wrap.append(link);
+      wrap.append(el('h3', 'runway-phone__lane', lane.label));
+      const rows = [...lane.rows, ...lane.ongoing];
+      if (!rows.length) {
+        wrap.append(el('p', 'runway__empty', 'No active goals in this lane.'));
+        continue;
+      }
+      for (const row of rows) {
+        wrap.append(phoneCard(row.goal, row, overlay));
       }
     }
   }
   host.append(wrap);
-  let current = mode;
   return {
     el: wrap,
-    mode: () => current,
-    blend: () => (current === 'year' ? 1 : 0),
-    setMode(next) {
-      if (next === current) return;
-      current = next;
-      mountPhoneYearList(host, yearData, data, _overlay, next);
+    mode: () => mode,
+    blend: () => (mode === 'year' ? 1 : 0),
+    setMode() {
+      /* parent remounts on mode change */
     },
     dispose() {
       /* phone list has no engine */
     }
   };
+}
+
+function phoneCard(
+  goal: Goal,
+  row: RunwayRow,
+  overlay: YearZoomOverlay
+): HTMLAnchorElement {
+  const link = el('a', 'runway-phone__card') as HTMLAnchorElement;
+  link.href = goalPageHash(goal.id);
+  link.setAttribute('tabindex', '0');
+  const title = el('p', 'runway__goal-title', goal.title);
+  title.setAttribute('data-hub-morph', 'title');
+  link.append(title);
+  const now = row.cells.find((c) => c.isNow);
+  if (now) {
+    const mark = el('i', `cell cell--${now.state}`);
+    mark.classList.add('is-now');
+    link.append(mark);
+  }
+  const move = el('p', 'runway__move');
+  move.append(el('b', '', 'Move'), document.createTextNode(row.move?.title ?? 'Add a next start'));
+  if (overlay.proposalGoalIds.has(goal.id)) {
+    move.append(el('span', 'is-proposal', ' · Hammond has a proposal'));
+  }
+  link.append(move);
+  link.addEventListener('click', () => rememberGoalMorph(title));
+  link.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    rememberGoalMorph(title);
+    window.location.hash = goalPageHash(goal.id);
+  });
+  return link;
 }
 
 export type { GoalSphere };

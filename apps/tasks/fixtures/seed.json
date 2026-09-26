@@ -117,9 +117,27 @@
       "description": "Build and stabilise the MindWorks program across the year.",
       "parent_area_id": "area_teaching",
       "status": "active",
-      "tags": ["academic"],
+      "sphere": "work",
+      "structure": "lead_lag",
+      "term": {
+        "year": 2026,
+        "term": 4
+      },
+      "lead_measure": {
+        "label": "2 blocks / week",
+        "per_week": 2
+      },
+      "next_start": "Draft the Term 4 showcase brief",
+      "week_log": {
+        "2026-11-02": {
+          "manual": 1
+        }
+      },
+      "tags": [
+        "academic"
+      ],
       "created_at": "2026-08-01T00:00:00.000Z",
-      "updated_at": "2026-08-01T00:00:00.000Z"
+      "updated_at": "2026-11-04T00:00:00.000Z"
     },
     {
       "schema_version": 1,
@@ -128,9 +146,69 @@
       "description": "Complete the literature review arc.",
       "parent_area_id": "area_life",
       "status": "active",
-      "tags": ["study"],
+      "sphere": "life",
+      "life_area": "learn",
+      "structure": "woop",
+      "term": null,
+      "lead_measure": {
+        "label": "3 papers / week",
+        "per_week": 3
+      },
+      "next_start": "Annotate the next chapter",
+      "tags": [
+        "study"
+      ],
       "created_at": "2026-08-01T00:00:00.000Z",
       "updated_at": "2026-08-01T00:00:00.000Z"
+    },
+    {
+      "schema_version": 1,
+      "id": "goal_ha_evidence",
+      "title": "HA evidence pack",
+      "description": "Floor \u00b7 target \u00b7 stretch for the portfolio write-up.",
+      "parent_area_id": null,
+      "status": "active",
+      "sphere": "professional",
+      "structure": "floor_target_stretch",
+      "term": {
+        "year": 2026,
+        "term": 4
+      },
+      "lead_measure": {
+        "label": "1 write-up / week",
+        "per_week": 1
+      },
+      "next_start": "Open the spreadsheet",
+      "week_log": {
+        "2026-11-02": {
+          "manual": 1
+        }
+      },
+      "tags": [
+        "term-4"
+      ],
+      "created_at": "2026-10-12T00:00:00.000Z",
+      "updated_at": "2026-11-04T00:00:00.000Z"
+    },
+    {
+      "schema_version": 1,
+      "id": "goal_half_marathon",
+      "title": "Half marathon base",
+      "description": "Parked until summer.",
+      "parent_area_id": "area_life",
+      "status": "parked",
+      "sphere": "life",
+      "life_area": "health",
+      "structure": "smarter",
+      "term": {
+        "year": 2026,
+        "term": 4
+      },
+      "tags": [
+        "fitness"
+      ],
+      "created_at": "2026-08-01T00:00:00.000Z",
+      "updated_at": "2026-10-01T00:00:00.000Z"
     }
   ],
   "projects": [
@@ -140,7 +218,10 @@
       "title": "MindWorks",
       "description": "Multi-term academic initiative.",
       "parent_goal_id": "goal_mindworks",
-      "tags": ["academic", "term-3"],
+      "tags": [
+        "academic",
+        "term-3"
+      ],
       "arc_summary": "Build and stabilise MindWorks across the year.",
       "type": "academic_program",
       "milestones": [
@@ -178,8 +259,10 @@
       "title": "Masters reading notes",
       "description": "Literature notes that stopped moving mid-year.",
       "parent_goal_id": "goal_masters",
-      "tags": ["study"],
-      "arc_summary": "Quiet since June — seed for stall detection.",
+      "tags": [
+        "study"
+      ],
+      "arc_summary": "Quiet since June \u2014 seed for stall detection.",
       "type": "standard",
       "milestones": [
         {
@@ -250,7 +333,7 @@
       "id": "proj_close_demo",
       "title": "Term 2 marking wrap",
       "description": "Seed project ready for closure (all tasks done, slipped past baseline).",
-      "arc_summary": "Finished — due for retrospective.",
+      "arc_summary": "Finished \u2014 due for retrospective.",
       "type": "standard",
       "milestones": [],
       "status": "active",
@@ -270,9 +353,12 @@
       "schema_version": 1,
       "id": "proj_aotfw",
       "title": "Artist of the Floating World",
-      "description": "Year 12 English Advanced unit — planning, lessons, and marking.",
+      "description": "Year 12 English Advanced unit \u2014 planning, lessons, and marking.",
       "parent_goal_id": null,
-      "tags": ["teaching", "english"],
+      "tags": [
+        "teaching",
+        "english"
+      ],
       "arc_summary": "Deliver the AOTFW unit and close Term 2 marking.",
       "type": "standard",
       "milestones": [],
@@ -346,7 +432,7 @@
       "schema_version": 1,
       "id": "task_demo_weekly_review",
       "title": "Weekly teaching review",
-      "description": "Repeat every Monday — spawns the next instance when marked done.",
+      "description": "Repeat every Monday \u2014 spawns the next instance when marked done.",
       "domain": "teaching",
       "framework_used": "fw_timeboxing",
       "estimated_duration": 30,
@@ -375,7 +461,7 @@
       "schema_version": 1,
       "id": "task_demo_backlog",
       "title": "Sort fragrance research notes",
-      "description": "Backlog — no due date yet.",
+      "description": "Backlog \u2014 no due date yet.",
       "domain": "life",
       "framework_used": "fw_timeboxing",
       "estimated_duration": 45,
@@ -485,7 +571,7 @@
       "schema_version": 1,
       "id": "task_demo_pinch_email",
       "title": "Send parent update email",
-      "description": "Seed pinch — same day as lesson pack.",
+      "description": "Seed pinch \u2014 same day as lesson pack.",
       "domain": "teaching",
       "framework_used": null,
       "estimated_duration": 25,
@@ -511,7 +597,7 @@
       "schema_version": 1,
       "id": "task_demo_pinch_filing",
       "title": "File excursion permission slips",
-      "description": "Seed pinch — low-priority shrink candidate.",
+      "description": "Seed pinch \u2014 low-priority shrink candidate.",
       "domain": "other",
       "framework_used": null,
       "estimated_duration": 40,
@@ -536,7 +622,7 @@
       "schema_version": 1,
       "id": "task_demo_pinch_calls",
       "title": "Return three parent calls",
-      "description": "Seed pinch — pushes Aug 17 over the watch threshold.",
+      "description": "Seed pinch \u2014 pushes Aug 17 over the watch threshold.",
       "domain": "teaching",
       "framework_used": null,
       "estimated_duration": 45,
@@ -686,7 +772,7 @@
       "schema_version": 1,
       "id": "task_demo_outline_units",
       "title": "Outline MindWorks units",
-      "description": "Child of the lesson pack — branch-view depth.",
+      "description": "Child of the lesson pack \u2014 branch-view depth.",
       "kind": "step",
       "bucket": "active",
       "step_order": 1,
@@ -715,7 +801,7 @@
       "schema_version": 1,
       "id": "task_someday_podcast",
       "title": "Start a teaching podcast",
-      "description": "Maybe — park until there is bandwidth after Term 3.",
+      "description": "Maybe \u2014 park until there is bandwidth after Term 3.",
       "kind": "task",
       "bucket": "someday",
       "step_order": 0,
@@ -749,7 +835,7 @@
       "schema_version": 1,
       "id": "task_someday_cambridge",
       "title": "Study at Cambridge",
-      "description": "A long-held one — worth incubating rather than actioning yet.",
+      "description": "A long-held one \u2014 worth incubating rather than actioning yet.",
       "kind": "task",
       "bucket": "someday",
       "step_order": 0,
@@ -826,7 +912,7 @@
     {
       "schema_version": 1,
       "id": "task_demo_walk_done",
-      "title": "Evening walk — done",
+      "title": "Evening walk \u2014 done",
       "description": "Seed completion for a done task.",
       "domain": "health",
       "framework_used": null,
@@ -847,6 +933,54 @@
       "recurrence_rule": null,
       "attachments": [],
       "source": "manual"
+    },
+    {
+      "schema_version": 1,
+      "id": "task_mw_block_1",
+      "title": "MindWorks Term 4 block",
+      "domain": "teaching",
+      "status": "done",
+      "parent_goal_id": "goal_mindworks",
+      "parent_project_id": "proj_mindworks",
+      "completed_at": "2026-11-03T10:00:00.000Z",
+      "due_date": "2026-11-05",
+      "created_at": "2026-10-20T00:00:00.000Z",
+      "updated_at": "2026-11-03T10:00:00.000Z",
+      "tags": [],
+      "priority": "medium",
+      "estimated_duration": 45
+    },
+    {
+      "schema_version": 1,
+      "id": "task_ha_writeup",
+      "title": "Write up 6.3",
+      "domain": "other",
+      "status": "done",
+      "parent_goal_id": "goal_ha_evidence",
+      "parent_project_id": null,
+      "completed_at": "2026-11-04T09:00:00.000Z",
+      "due_date": "2026-11-06",
+      "created_at": "2026-10-20T00:00:00.000Z",
+      "updated_at": "2026-11-04T09:00:00.000Z",
+      "tags": [],
+      "priority": "high",
+      "estimated_duration": 30
+    },
+    {
+      "schema_version": 1,
+      "id": "task_ha_next",
+      "title": "Collect student voice",
+      "domain": "other",
+      "status": "open",
+      "parent_goal_id": "goal_ha_evidence",
+      "parent_project_id": null,
+      "completed_at": null,
+      "due_date": "2026-11-12",
+      "created_at": "2026-11-04T00:00:00.000Z",
+      "updated_at": "2026-11-04T00:00:00.000Z",
+      "tags": [],
+      "priority": "medium",
+      "estimated_duration": 20
     }
   ]
 }
