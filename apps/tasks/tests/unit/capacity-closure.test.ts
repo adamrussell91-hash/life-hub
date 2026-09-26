@@ -59,9 +59,32 @@ describe('closure loop', () => {
       new Date('2026-08-16T12:00:00')
     );
     expect(variance.all_tasks_done).toBe(true);
+    expect(variance.end_passed).toBe(true);
     expect(variance.ready_to_close).toBe(true);
     expect(variance.slip_days).toBe(17);
     expect(formatSlip(17)).toMatch(/past baseline/);
+  });
+
+  it('does not mark ready_to_close when the end has passed but open tasks remain', () => {
+    const unfinished = seed.projects.find((p) => p.id === 'proj_close_demo')!;
+    const openWork = [
+      {
+        ...seed.tasks.find((t) => t.parent_project_id === 'proj_close_demo')!,
+        id: 'task_still_open',
+        status: 'open' as const,
+        completed_at: null,
+        due_date: '2026-08-01'
+      }
+    ];
+    const variance = computeProjectVariance(
+      unfinished,
+      openWork,
+      new Date('2026-08-16T12:00:00')
+    );
+    expect(variance.end_passed).toBe(true);
+    expect(variance.open_task_count).toBe(1);
+    expect(variance.all_tasks_done).toBe(false);
+    expect(variance.ready_to_close).toBe(false);
   });
 
   it('closes a project and writes a ReviewLog with planned-vs-actual', async () => {

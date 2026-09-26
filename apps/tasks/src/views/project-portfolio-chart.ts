@@ -136,7 +136,7 @@ export function renderProjectPortfolioChart(
     if (options.onSelect) {
       circle.setAttribute('tabindex', '0');
       circle.setAttribute('role', 'button');
-      circle.setAttribute('aria-label', `${segment.label} · ${segment.value}`);
+      circle.setAttribute('aria-label', `Show ${segment.label} projects · ${segment.value}`);
       const toggle = (): void => {
         options.onSelect?.(selected === segment.key ? 'all' : (segment.key as ProjectLifecycle));
       };
