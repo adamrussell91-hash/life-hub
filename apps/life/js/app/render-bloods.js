@@ -10,7 +10,35 @@ import {
   markerVisual
 } from './bloods-charts.js';
 import { renderBiochemistryGroups } from './bloods-instruments.js';
+import { statusTone } from './bloods-model.js';
 import { formatDisplayDate } from '../core/time.js';
+
+/** Shape a raw bloods panel marker for `markerRow` (medical mini-lab reuse). */
+export function markerFromRawBloodsMarker(raw, { date } = {}) {
+  if (!raw) return null;
+  const key = String(raw.key || 'marker');
+  const status = raw.status ?? null;
+  const value = raw.value ?? null;
+  const qualitative = value == null || raw.unit === 'Qualitative';
+  return {
+    key,
+    label: raw.label || key,
+    qualitative,
+    chartKind: qualitative ? 'none' : 'meter',
+    statusTone: statusTone(status, key),
+    latest: {
+      date: date || raw.date || null,
+      value: qualitative ? null : value,
+      unit: raw.unit ?? null,
+      status,
+      ref_low: raw.ref_low ?? null,
+      ref_high: raw.ref_high ?? null,
+      notes: raw.notes ?? null
+    },
+    lastDeltaLabel: null,
+    series: []
+  };
+}
 
 export function renderBloods(root, model, { onRangeChange } = {}) {
   const dashboard = root.querySelector('#body-bloods-dashboard');
@@ -368,9 +396,13 @@ function hasTrend(marker) {
   return marker.chartKind === 'line' || marker.chartKind === 'zoned';
 }
 
-function markerRow(root, marker) {
+/**
+ * Lab marker row (Body Bloods). Pass `{ compact: true }` for Medical Overview
+ * mini-lab panels: no explainer, meter-only (no trend charts), no delta column.
+ */
+export function markerRow(root, marker, { compact = false } = {}) {
   const row = root.createElement('div');
-  row.className = 'bloods-row';
+  row.className = compact ? 'bloods-row bloods-row--compact' : 'bloods-row';
   row.id = `bloods-marker-${marker.key}`;
   row.dataset.bloodsMarker = marker.key;
   const tone = marker.statusTone || 'first';
@@ -383,7 +415,8 @@ function markerRow(root, marker) {
   const label = root.createElement('span');
   label.className = 'bloods-row__label';
   label.textContent = marker.label;
-  name.append(dot, label, infoButton(root, marker));
+  if (compact) name.append(dot, label);
+  else name.append(dot, label, infoButton(root, marker));
   row.append(name);
 
   const value = root.createElement('p');
@@ -408,7 +441,15 @@ function markerRow(root, marker) {
 
   const meter = root.createElement('div');
   meter.className = 'bloods-row__meter';
-  const visual = markerVisual(root, marker, {});
+  const visualMarker = compact && !marker.qualitative
+    ? { ...marker, chartKind: 'meter' }
+    : marker;
+  let visual = null;
+  try {
+    visual = markerVisual(root, visualMarker, {});
+  } catch {
+    visual = null;
+  }
   if (visual) {
     const chart = visual.querySelector?.('.bloods-meter') ?? visual;
     if (chart?.dataset) chart.dataset.status = tone;
@@ -426,10 +467,12 @@ function markerRow(root, marker) {
   meter.append(foot);
   row.append(meter);
 
-  const delta = root.createElement('p');
-  delta.className = 'bloods-row__delta';
-  delta.textContent = marker.lastDeltaLabel || (marker.latest?.date ? formatDisplayDate(marker.latest.date) : '');
-  row.append(delta);
+  if (!compact) {
+    const delta = root.createElement('p');
+    delta.className = 'bloods-row__delta';
+    delta.textContent = marker.lastDeltaLabel || (marker.latest?.date ? formatDisplayDate(marker.latest.date) : '');
+    row.append(delta);
+  }
   return row;
 }
 

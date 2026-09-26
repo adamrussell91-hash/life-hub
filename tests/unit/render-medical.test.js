@@ -117,6 +117,10 @@ function fakeRoot() {
   const dashboard = el('section');
   dashboard.id = 'body-medical-dashboard';
   dashboard.hidden = true;
+  const brief = el('div');
+  brief.id = 'medical-brief-row';
+  const strip = el('div');
+  strip.id = 'medical-strip';
   const timeline = el('div');
   timeline.id = 'medical-timeline';
   const sheet = el('div');
@@ -138,18 +142,25 @@ function fakeRoot() {
     btn.textContent = value;
     density.append(btn);
   }
+  const showMinor = el('button');
+  showMinor.id = 'medical-show-minor';
+  showMinor.type = 'button';
+  showMinor.textContent = 'Show minor';
   const chips = el('div');
   chips.id = 'medical-chips';
   const empty = el('p');
   empty.id = 'medical-empty';
   const map = {
     '#body-medical-dashboard': dashboard,
+    '#medical-brief-row': brief,
+    '#medical-strip': strip,
     '#medical-timeline': timeline,
     '#medical-sheet': sheet,
     '#medical-search': search,
     '#medical-type-host': typeHost,
     '#medical-provider-host': providerHost,
     '#medical-density': density,
+    '#medical-show-minor': showMinor,
     '#medical-chips': chips,
     '#medical-empty': empty
   };
@@ -186,6 +197,11 @@ function sampleModel(overrides = {}) {
     recordTypes: ['Appointment'],
     providers: ['Dr Chris Keily'],
     count: 1,
+    showMinor: false,
+    brief: overrides.brief ?? { cycle: null, watch: [], verdict: null },
+    nextItems: overrides.nextItems ?? [],
+    threads: overrides.threads ?? { today: '2026-08-20', lanes: [] },
+    activeEpisode: overrides.activeEpisode ?? null,
     items: [
       { kind: 'today', date: '2026-08-20' },
       { kind: 'visit', visit },
@@ -231,7 +247,7 @@ test('renderMedical wraps an episode band and shows a Maps link in the sheet', (
     selected: visit,
     items: [
       { kind: 'today', date: '2026-08-20' },
-      { kind: 'band', episode: { id: 'crohns', title: "Crohn's diagnosis" }, visits: [visit] }
+      { kind: 'band', episode: { id: 'crohns', title: "Crohn's diagnosis", status: 'active' }, visits: [visit] }
     ]
   }));
   assert.match(root.querySelector('#medical-timeline').textContent, /Crohn's diagnosis/);
@@ -244,7 +260,7 @@ test('renderMedical wraps an episode band and shows a Maps link in the sheet', (
   assert.ok(sheet.querySelector('.view-on-map'));
 });
 
-test('renderMedical shows lab chips on a lab card', () => {
+test('renderMedical shows compact mini-lab rows on a major lab card', () => {
   const root = fakeRoot();
   renderMedical(root, sampleModel({
     items: [{
@@ -256,16 +272,27 @@ test('renderMedical shows lab chips on a lab card', () => {
         title: 'May panel',
         record_type: 'Lab Work',
         lane: 'lab',
+        weight: 'major',
         provider: '4Cyte',
         location_kind: 'unknown',
         notes: '',
         mapsUrl: null,
-        lab: { inRange: 12, total: 14, flags: [{ label: 'γ-GT', status: 'High' }] }
+        lab: {
+          inRange: 12,
+          total: 14,
+          flags: [{ label: 'γ-GT', status: 'High', key: 'ggt', value: 233 }],
+          markers: [
+            { key: 'ggt', label: 'γ-GT', status: 'High', value: 233, ref_low: 0, ref_high: 60 },
+            { key: 'alt', label: 'ALT', status: 'Normal', value: 30, ref_low: 0, ref_high: 45 }
+          ]
+        }
       }
     }]
   }));
-  assert.match(root.querySelector('#medical-timeline').textContent, /12 in/);
-  assert.match(root.querySelector('#medical-timeline').textContent, /High/);
+  const text = root.querySelector('#medical-timeline').textContent;
+  assert.match(text, /γ-GT/);
+  assert.match(text, /\+12 in range/);
+  assert.equal(text.includes('12 in') && !text.includes('+12 in range'), false);
 });
 
 test('renderMedical asks for a bloods snapshot when the selected visit has labs', () => {
@@ -279,10 +306,11 @@ test('renderMedical asks for a bloods snapshot when the selected visit has labs'
     title: 'May panel',
     record_type: 'Lab Work',
     lane: 'lab',
+    weight: 'major',
     location_kind: 'unknown',
     notes: '',
     mapsUrl: null,
-    lab: { inRange: 12, total: 14, flags: [] }
+    lab: { inRange: 12, total: 14, flags: [], markers: [] }
   };
   renderMedical(root, sampleModel({ selected }), {
     renderLabSnapshot: (nextHost, nextVisit) => {
@@ -294,11 +322,32 @@ test('renderMedical asks for a bloods snapshot when the selected visit has labs'
   assert.equal(host.id, 'medical-bloods-host');
 });
 
+test('renderMedical paints Health Brief / strip hosts and upcoming heading', () => {
+  const root = fakeRoot();
+  renderMedical(root, sampleModel({
+    brief: { cycle: null, watch: [], verdict: null },
+    nextItems: [],
+    threads: { today: '2026-08-20', lanes: [] },
+    activeEpisode: null,
+    items: [
+      { kind: 'upcoming' },
+      { kind: 'today', date: '2026-08-20' }
+    ]
+  }));
+  assert.match(root.querySelector('#medical-brief-row').textContent, /Health Brief/);
+  assert.match(root.querySelector('#medical-brief-row').textContent, /Next/);
+  assert.match(root.querySelector('#medical-strip').textContent, /Health Threads/);
+  assert.match(root.querySelector('#medical-timeline').textContent, /Upcoming/);
+});
+
 test('renderMedical paints kit zoom pills and year rows', () => {
   const root = fakeRoot();
   let year = null;
   renderMedical(root, sampleModel({
     density: 'years',
+    brief: { cycle: null, watch: [], verdict: null },
+    nextItems: [],
+    threads: { today: '2026-08-20', lanes: [] },
     items: [
       { kind: 'year', year: '2026', count: 2, caption: '2 visits', expanded: false, items: [] },
       { kind: 'today', date: '2026-08-20' }
@@ -322,6 +371,9 @@ test('renderMedical expands a year into nested visit cards', () => {
   const root = fakeRoot();
   renderMedical(root, sampleModel({
     density: 'years',
+    brief: { cycle: null, watch: [], verdict: null },
+    nextItems: [],
+    threads: { today: '2026-08-20', lanes: [] },
     items: [{
       kind: 'year',
       year: '2026',
