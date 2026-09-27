@@ -5,7 +5,7 @@ import { constants } from 'node:fs';
 
 const root = new URL('../../', import.meta.url);
 
-test('Teaching, Knowledge, Tasks, and Professional SPAs live under apps/', async () => {
+test('Teaching, Knowledge, Tasks, Professional, and Travel SPAs live under apps/', async () => {
   for (const path of [
     'apps/teaching/index.html',
     'apps/teaching/src/app/main.ts',
@@ -16,7 +16,10 @@ test('Teaching, Knowledge, Tasks, and Professional SPAs live under apps/', async
     'apps/tasks/src/app/main.ts',
     'apps/professional/index.html',
     'apps/professional/src/app/main.ts',
-    'apps/professional/src/app/router.ts'
+    'apps/professional/src/app/router.ts',
+    'apps/travel/index.html',
+    'apps/travel/src/app/main.ts',
+    'apps/travel/src/app/router.ts'
   ]) {
     await access(new URL(path, root), constants.F_OK);
   }
