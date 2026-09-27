@@ -404,6 +404,31 @@ async function loadProfessionalData({ env = process.env, fetchImpl = fetch, now 
   return data;
 }
 
+// `communications.json`: Adam's Notion Communications, copied as plain rows
+// (`notion_id`, `title`, `method`, `date_start`, `date_end`, `attendees`, …).
+// Read-only, cached separately from people so a 3MB comms file never
+// delays the People/Organisations load. Missing token or file → [].
+let communicationsCache = null; // { repo, expiresAt, rows }
+
+export function resetGithubCommunicationsCache() {
+  communicationsCache = null;
+}
+
+export async function listGithubCommunications({ env = process.env, fetchImpl = fetch, now = () => Date.now() } = {}) {
+  const token = professionalDataToken(env);
+  if (!token) return [];
+  const repo = professionalDataRepo(env);
+  if (communicationsCache && communicationsCache.repo === repo && communicationsCache.expiresAt > now()) {
+    return communicationsCache.rows;
+  }
+  const raw = await fetchDataFile(repo, token, fetchImpl, 'communications.json');
+  const rows = Array.isArray(raw)
+    ? raw.filter((row) => row && typeof row === 'object' && isNonEmptyString(row.notion_id))
+    : [];
+  communicationsCache = { repo, expiresAt: now() + CACHE_TTL_MS, rows };
+  return rows;
+}
+
 export async function getGithubPerson(id, options = {}) {
   const data = await loadProfessionalData(options);
   return data?.peopleById.get(id) ?? null;
