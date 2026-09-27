@@ -1846,11 +1846,88 @@ export function createMockApi() {
           href: `/professional/#/event/${event.id}`
         }));
       const pendingScan = [...scanProposals.values()].filter((p) => p.status === 'pending');
+      // Seeded from life-hub-data relationships.json (Adam / derived:person:adam-russell)
+      // so local Career river shows the real past role band during development.
+      const employmentItems = [
+        {
+          ref: 'shared:organisation:org_kooringal',
+          kind: 'organisation',
+          display_label: 'Kooringal High School',
+          role: 'English Teacher',
+          valid_from: '2012-12-02',
+          valid_to: '2014-12-19',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_xavier',
+          kind: 'organisation',
+          display_label: 'Xavier High School',
+          role: 'English/HSIE Teacher',
+          valid_from: '2015-01-26',
+          valid_to: '2018-10-01',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_all_areas',
+          kind: 'organisation',
+          display_label: 'All Areas Education',
+          role: 'Senior Education Project Officer',
+          valid_from: '2018-10-01',
+          valid_to: '2019-05-03',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_st_josephs',
+          kind: 'organisation',
+          display_label: "St Joseph's High School",
+          role: 'HSIE and Business Studies Teacher',
+          valid_from: '2019-05-01',
+          valid_to: '2019-12-31',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_st_pius',
+          kind: 'organisation',
+          display_label: 'St Pius X High School',
+          role: 'English Teacher',
+          valid_from: '2021-01-25',
+          valid_to: '2024-08-16',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_st_pius',
+          kind: 'organisation',
+          display_label: 'St Pius X High School',
+          role: 'Psychology Teacher',
+          valid_from: '2023-01-23',
+          valid_to: '2024-08-16',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_mcauley',
+          kind: 'organisation',
+          display_label: 'Catherine McAuley Catholic College',
+          role: 'English Teacher',
+          valid_from: '2024-08-19',
+          valid_to: '2024-12-20',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_aloysius',
+          kind: 'organisation',
+          display_label: "St Aloysius' College",
+          role: 'Gifted Education Teacher',
+          valid_from: '2025-01-22',
+          valid_to: null,
+          link_status: 'current'
+        }
+      ];
       return json(200, {
         ok: true,
         data: {
           applications: { status: 'ok', items: appItems },
-          employment: { status: 'ok', items: [] },
+          employment: { status: 'ok', items: employmentItems },
+          employment_items: employmentItems,
           professional_development: { status: 'ok', items: pdItems },
           people: { status: 'ok', items: [] },
           organisations: { status: 'ok', items: [] },
