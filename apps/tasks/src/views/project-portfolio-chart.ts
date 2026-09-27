@@ -10,6 +10,8 @@ import { el } from '@/views/hub-kit';
 export type ProjectPortfolioChartOptions = {
   running: number;
   compact?: boolean;
+  /** Compact charts can print their own “What’s the mix?” line. Off when the host card already has an eyebrow. */
+  question?: boolean;
   href?: string;
   onActivate?: () => void;
   active?: boolean;
@@ -94,7 +96,9 @@ export function renderProjectPortfolioChart(
       ? 'project-pulse-chart project-pulse-chart--compact projects-mix'
       : 'project-pulse-chart projects-mix'
   );
-  if (compact) wrap.append(el('p', 'projects-mix__question', 'What’s the mix?'));
+  if (compact && options.question !== false) {
+    wrap.append(el('p', 'projects-mix__question', 'What’s the mix?'));
+  }
 
   const row = el('div', 'projects-mix__row');
   const donutHost = el('div', 'projects-mix__donut');
