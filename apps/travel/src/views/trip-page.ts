@@ -1,0 +1,403 @@
+import type { City, Trip } from '@/types';
+import { getTrip } from '@/api/travel';
+import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems } from '@/model/day';
+import { renderScene } from '@/scenes';
+import { renderWorldMap } from '@/components/world-map';
+import { renderDayMap, type DayMapHandle } from '@/components/day-map';
+import { renderDayList } from '@/views/day-list';
+import { renderAddForm } from '@/components/add-form';
+import { renderTakeMeHome } from '@/components/take-me-home';
+import { renderShareSheet } from '@/components/share-sheet';
+import { formatInZone, zonedToInstant } from '@/lib/time';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { Marker } from 'maplibre-gl';
+
+export interface TripPageOptions {
+  cityId?: string;
+  date?: string;
+  isCurrent: () => boolean;
+}
+
+const PENELOPE_KEY = 'lifehub.travel.penelope';
+
+function writePenelopeHandoff(trip: Trip, cityId: string, date: string, prompt: string): void {
+  const city = trip.cities.find((c) => c.id === cityId);
+  const dayItems = trip.items.filter((item) => item.city_id === cityId && item.date === date && !item.private);
+  const checkinLines = trip.checkins
+    .filter((c) => c.city_id === cityId)
+    .map((c) => `Checked in: ${c.label}`);
+  const context = [
+    `City: ${city?.name ?? cityId}`,
+    ...dayItems.map((item) => `${item.time ?? 'Time to set'} — ${item.title}`),
+    ...checkinLines
+  ].join('\n');
+  const payload = {
+    date,
+    city: city?.name ?? cityId,
+    prompt,
+    context,
+    expires: Date.now() + 10 * 60_000
+  };
+  try {
+    localStorage.setItem(PENELOPE_KEY, JSON.stringify(payload));
+  } catch {
+    /* ignore quota errors */
+  }
+  location.href = '/#/mind';
+}
+
+/** Trip page (§5.1): world map, city chips, still to book, city scene and
+ * day view. */
+export async function renderTripPage(canvas: HTMLElement, tripId: string, options: TripPageOptions): Promise<void> {
+  canvas.replaceChildren();
+  let trip: Trip;
+  let version: string;
+  try {
+    const envelope = await getTrip(tripId);
+    trip = envelope.trip;
+    version = envelope.version;
+  } catch {
+    const err = document.createElement('p');
+    err.className = 'empty-state';
+    err.textContent = 'This trip changed somewhere else. Reload to see the latest.';
+    canvas.append(err);
+    return;
+  }
+  if (!options.isCurrent()) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'wrap';
+
+  const top = document.createElement('div');
+  top.className = 'top';
+  const crumb = document.createElement('p');
+  crumb.className = 'crumb';
+  crumb.innerHTML = 'Life › Future map › <b>Travel</b>';
+  const titleBlock = document.createElement('div');
+  const h1 = document.createElement('h1');
+  h1.textContent = trip.title;
+  const sub = document.createElement('p');
+  sub.className = 'sub';
+  sub.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)}`;
+  titleBlock.append(crumb, h1, sub);
+  const acts = document.createElement('div');
+  acts.className = 'acts';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'btn';
+  addBtn.textContent = '+ Add';
+  const publicBtn = document.createElement('button');
+  publicBtn.type = 'button';
+  publicBtn.className = 'btn ghost';
+  publicBtn.textContent = 'Public link';
+  acts.append(addBtn, publicBtn);
+  top.append(titleBlock, acts);
+  wrap.append(top);
+
+  const worldHost = document.createElement('div');
+  wrap.append(worldHost);
+  const worldMap = renderWorldMap(worldHost, trip);
+
+  const chips = document.createElement('div');
+  chips.className = 'chips';
+  wrap.append(chips);
+
+  const todoRows = buildTodo(trip, new Date().toISOString().slice(0, 10));
+  const tobook = document.createElement('details');
+  tobook.className = 'tobook';
+  const summary = document.createElement('summary');
+  summary.innerHTML = `Still to book <span class="count">${todoRows.length}</span>`;
+  const ul = document.createElement('ul');
+  for (const row of todoRows) {
+    const li = document.createElement('li');
+    const link = document.createElement('a');
+    link.href = `#/trip/${encodeURIComponent(tripId)}/${encodeURIComponent(row.city_id)}/${row.date}`;
+    link.innerHTML = `<span class="w">${row.when_label}</span><b>${row.title}</b><span class="d">${row.detail}</span>`;
+    li.append(link);
+    ul.append(li);
+  }
+  tobook.append(summary, ul);
+  wrap.append(tobook);
+
+  const citySection = document.createElement('div');
+  citySection.className = 'city';
+  wrap.append(citySection);
+
+  canvas.append(wrap);
+
+  let dayMapHandle: DayMapHandle | null = null;
+  let selectedCityId = options.cityId ?? trip.cities[0]?.id ?? '';
+  let selectedDate = options.date ?? '';
+
+  function updateChips(): void {
+    chips.replaceChildren();
+    for (const city of trip.cities) {
+      const hasTodo = todoRows.some((r) => r.city_id === city.id);
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      if (city.id === selectedCityId) chip.classList.add('is-on');
+      chip.innerHTML = `<b>${city.name}</b><span>${formatDisplayDate(city.start_date)}–${formatDisplayDate(city.end_date)}</span>${hasTodo ? '<span class="todo-dot"></span>' : ''}`;
+      chip.addEventListener('click', () => selectCity(city.id));
+      chips.append(chip);
+    }
+  }
+
+  function renderCityScene(): void {
+    citySection.replaceChildren();
+    citySection.style.setProperty('--city', '');
+    const cityOrNull = trip.cities.find((c) => c.id === selectedCityId);
+    if (!cityOrNull) return;
+    const city = cityOrNull;
+    citySection.style.setProperty('--city', city.accent.color);
+    citySection.style.setProperty('--city-soft', city.accent.soft);
+    citySection.style.setProperty('--city-ink', city.accent.ink);
+
+    const scene = document.createElement('div');
+    scene.className = 'scene';
+    scene.innerHTML = renderScene(city.scene, city.accent);
+    const titleDiv = document.createElement('div');
+    titleDiv.className = 'title';
+    const eyebrow = document.createElement('p');
+    eyebrow.className = 'eyebrow';
+    eyebrow.textContent = city.name;
+    const h2 = document.createElement('h2');
+    h2.textContent = city.title;
+    const factsRow = document.createElement('div');
+    factsRow.className = 'facts';
+    const nowSpan = document.createElement('span');
+    nowSpan.textContent = `${formatInZone(new Date(), city.tz)} there now`;
+    factsRow.append(nowSpan);
+    for (const fact of city.facts) {
+      const f = document.createElement('span');
+      f.textContent = fact;
+      factsRow.append(f);
+    }
+    titleDiv.append(eyebrow, h2, factsRow);
+    scene.append(titleDiv);
+
+    const dates = daysForCity(trip, city.id);
+    if (!selectedDate || !dates.includes(selectedDate)) selectedDate = dates[0] ?? '';
+    const dayBar = document.createElement('div');
+    dayBar.className = 'daybar';
+    for (const date of dates) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'daybtn';
+      if (date === selectedDate) btn.classList.add('is-on');
+      const label = new Date(date + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+      const dayNum = new Date(date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+      btn.innerHTML = `${label}<small>${dayNum}</small>`;
+      btn.addEventListener('click', () => {
+        selectedDate = date;
+        renderDay();
+      });
+      dayBar.append(btn);
+    }
+    scene.append(dayBar);
+    citySection.append(scene);
+
+    const day = document.createElement('div');
+    day.className = 'day';
+    const listCol = document.createElement('div');
+    listCol.className = 'listcol';
+    const mapCol = document.createElement('div');
+    mapCol.className = 'mapcol';
+    const mapBox = document.createElement('div');
+    mapBox.className = 'mapbox';
+    mapBox.style.height = '480px';
+    mapBox.style.position = 'relative';
+    const mapInner = document.createElement('div');
+    mapInner.style.position = 'absolute';
+    mapInner.style.inset = '0';
+    const mapTools = document.createElement('div');
+    mapTools.className = 'map-tools';
+    const homeBtn = document.createElement('button');
+    homeBtn.type = 'button';
+    homeBtn.className = 'btn ghost';
+    homeBtn.textContent = 'Take me home';
+    homeBtn.addEventListener('click', () => {
+      const host = document.createElement('div');
+      document.body.append(host);
+      renderTakeMeHome(
+        host,
+        { home: homeBaseForNight(trip, selectedDate), date: selectedDate, onAddStay: () => { host.remove(); openForm(undefined, city.id, selectedDate); } },
+        city.driver_phrase
+      );
+    });
+    const whereBtn = document.createElement('button');
+    whereBtn.type = 'button';
+    whereBtn.className = 'btn ghost';
+    whereBtn.textContent = 'Where am I?';
+    whereBtn.addEventListener('click', () => {
+      if (!dayMapHandle) return;
+      startWhereAmI(dayMapHandle.map, mapBox, city, selectedDate, trip);
+    });
+    const fullBtn = document.createElement('button');
+    fullBtn.type = 'button';
+    fullBtn.className = 'btn ghost';
+    fullBtn.textContent = 'Full screen';
+    fullBtn.addEventListener('click', () => {
+      const on = mapBox.classList.toggle('is-fullscreen');
+      fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+      dayMapHandle?.map.resize();
+      if (on) {
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+            mapBox.classList.remove('is-fullscreen');
+            fullBtn.textContent = 'Full screen';
+            dayMapHandle?.map.resize();
+            document.removeEventListener('keydown', onKey);
+          }
+        };
+        document.addEventListener('keydown', onKey);
+      }
+    });
+    mapTools.append(homeBtn, whereBtn, fullBtn);
+    mapBox.append(mapInner, mapTools);
+    mapCol.append(mapBox);
+    day.append(listCol, mapCol);
+    citySection.append(day);
+
+    function renderDay(): void {
+      updateChips();
+      renderDayBarState();
+      renderDayList(listCol, trip, city.id, selectedDate, {
+        selectedId: null,
+        onSelect: (itemId) => dayMapHandle?.selectStop(itemId),
+        onEdit: (item) => openForm(item),
+        onAddAt: (cityId, date) => openForm(undefined, cityId, date),
+        onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt)
+      });
+      dayMapHandle?.destroy();
+      const dayItems = trip.items.filter((item) => item.city_id === city.id && item.date === selectedDate);
+      dayMapHandle = renderDayMap(mapInner, city, dayItems, { cooperativeGestures: window.innerWidth < 720 });
+      dayMapHandle.onSelect((itemId) => {
+        listCol.querySelectorAll('.stop').forEach((el) => el.classList.remove('is-on'));
+        listCol.querySelector(`[data-item-id="${itemId}"]`)?.classList.add('is-on');
+      });
+    }
+    function renderDayBarState(): void {
+      dayBar.querySelectorAll('.daybtn').forEach((btn, i) => btn.classList.toggle('is-on', dates[i] === selectedDate));
+    }
+    renderDay();
+  }
+
+  function selectCity(cityId: string): void {
+    selectedCityId = cityId;
+    selectedDate = '';
+    worldMap.selectCity(cityId);
+    updateChips();
+    renderCityScene();
+  }
+
+  worldMap.onSelect((cityId) => selectCity(cityId));
+
+  function openForm(item?: (typeof trip.items)[number], cityId?: string, date?: string): void {
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderAddForm(formHost, {
+      trip,
+      tripId,
+      version,
+      editing: item,
+      cityId: cityId ?? selectedCityId,
+      date: date ?? selectedDate,
+      onSaved: (updated, nextVersion) => {
+        trip = updated;
+        version = nextVersion;
+        formHost.remove();
+        renderCityScene();
+      },
+      onClose: () => formHost.remove()
+    });
+  }
+  addBtn.addEventListener('click', () => openForm());
+
+  publicBtn.addEventListener('click', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    renderShareSheet(host, {
+      tripId,
+      existingUrl: trip.share.enabled ? undefined : null
+    });
+  });
+
+  updateChips();
+  selectCity(selectedCityId);
+}
+
+function startWhereAmI(
+  map: import('maplibre-gl').Map,
+  mapBox: HTMLElement,
+  city: City,
+  date: string,
+  trip: Trip
+): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today < trip.start_date) {
+    window.alert('The trip has not started yet — location is not needed.');
+    return;
+  }
+  if (!navigator.geolocation) {
+    window.alert('Location is off. Turn it on in Settings › Safari › Location.');
+    return;
+  }
+  mapBox.querySelector('.where-note')?.remove();
+  const note = document.createElement('p');
+  note.className = 'where-note';
+  note.textContent = 'Finding you…';
+  mapBox.append(note);
+
+  const dayItems = orderDayItems(
+    trip.items.filter((item) => item.city_id === city.id && item.date === date)
+  );
+  const now = new Date();
+  const next = dayItems.find((item) => {
+    if (!item.time || !itemPlace(item)) return false;
+    return zonedToInstant(item.date, item.time, city.tz) >= now;
+  });
+
+  let meMarker: Marker | null = null;
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      if (!meMarker) {
+        const el = document.createElement('div');
+        el.className = 'where-dot';
+        meMarker = new Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+      } else {
+        meMarker.setLngLat([longitude, latitude]);
+      }
+      if (next) {
+        const place = itemPlace(next)!;
+        const metres = haversineMetres(
+          { lat: latitude, lon: longitude },
+          { lat: place.lat, lon: place.lon }
+        );
+        const mins = Math.max(1, Math.round((metres * 1.3) / 80));
+        note.textContent = `You're about ${Math.round(metres)} m from ${next.title}, ≈ ${mins} min walk`;
+      } else {
+        note.textContent = 'No more timed stops today.';
+      }
+    },
+    () => {
+      note.textContent = 'Location is off. Turn it on in Settings › Safari › Location.';
+      navigator.geolocation.clearWatch(watchId);
+    },
+    { enableHighAccuracy: true }
+  );
+}
+
+function haversineMetres(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number }
+): number {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
+}

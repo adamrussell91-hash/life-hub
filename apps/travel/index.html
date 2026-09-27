@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en" data-hub="life">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Travel · Life Hub</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800&family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+    />
+    <script>
+      (function () {
+        var key = 'life-hub-spa-redirect';
+        var redirect = sessionStorage.getItem(key);
+        if (!redirect) return;
+        if (redirect === '/travel' || redirect.indexOf('/travel/') === 0) {
+          sessionStorage.removeItem(key);
+          history.replaceState(null, '', redirect);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>
