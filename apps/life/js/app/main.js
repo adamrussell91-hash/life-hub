@@ -48,7 +48,7 @@ import { createSkincareApi } from './skincare-api.js';
 import { createKnowledgeApi } from './knowledge-api.js';
 import { createTasksApi } from './tasks-api.js';
 import { createScheduleApi } from './schedule-api.js';
-import { renderFutureMap } from './render-future-map.js';
+import { renderFutureMap, loadFutureMapTrips } from './render-future-map.js';
 import { createHubMapApi } from './hub-map-api.js';
 import { createHubMapController } from './hub-map-controller.js';
 import { createTeachingApi } from './teaching-api.js';
@@ -188,6 +188,7 @@ controller = createAppController({
   tasksApi,
   scheduleApi,
   renderFutureMap,
+  loadFutureMapTrips,
   skincareController,
   skincareRoutines: SKINCARE_ROUTINES,
   getCurrentRoutineKey: currentRoutineKey,

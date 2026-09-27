@@ -112,6 +112,7 @@ export function createAppController(dependencies) {
     tasksApi,
     scheduleApi,
     renderFutureMap,
+    loadFutureMapTrips,
     skincareController,
     skincareRoutines,
     getCurrentRoutineKey,
@@ -813,9 +814,15 @@ export function createAppController(dependencies) {
     if (name === 'body') renderBodySection();
     if (name === 'body-bloods') renderBloodsSection();
     if (name === 'body-medical') renderMedicalSection();
-    if (name === 'mind') renderMindSection();
+    if (name === 'mind') {
+      renderMindSection();
+      consumeTravelPenelopeHandoff();
+    }
     if (name === 'central-node') renderCentralNodeSection();
-    if (name === 'future-map') void loadFutureMap();
+    if (name === 'future-map') {
+      void loadFutureMap();
+      void loadFutureMapTrips?.(root, { fetchImpl: apiFetch });
+    }
     if (name === 'hub-map') void hubMap?.open();
     if (name === 'home') void loadHubPulse();
     const lifeDomain = name !== 'home' && name !== 'chat' && name !== 'calendar';
@@ -1051,6 +1058,58 @@ export function createAppController(dependencies) {
       futureMapStatus = 'error';
       futureMapError = 'Could not load the future map.';
       paintFutureMap();
+    }
+  }
+
+  /** Travel → Mind hand-off (TR-46). Prefill Penelope, do not send. */
+  function consumeTravelPenelopeHandoff() {
+    let raw;
+    try {
+      raw = localStorage.getItem('lifehub.travel.penelope');
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    try {
+      localStorage.removeItem('lifehub.travel.penelope');
+    } catch {
+      /* ignore */
+    }
+    let payload;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!payload || typeof payload !== 'object') return;
+    if (typeof payload.expires === 'number' && Date.now() > payload.expires) return;
+
+    const weekday = (() => {
+      try {
+        return new Date(`${payload.date}T12:00:00Z`).toLocaleDateString('en-GB', {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          timeZone: 'UTC'
+        });
+      } catch {
+        return payload.date || '';
+      }
+    })();
+    const prefill = `Travel diary for ${weekday} in ${payload.city || 'this city'}. ${payload.prompt || ''}`.trim();
+    const context = typeof payload.context === 'string' ? payload.context.trim() : '';
+    const composerText = context ? `${prefill}\n\n${context}` : prefill;
+
+    chatSelectAgent?.('penelope');
+    const slot = root.querySelector('#mind-dashboard');
+    if (slot && chatPanel && !chatPanel.isOpen?.()) {
+      chatPanel.open(slot, agentColour?.(latestResult?.agentsConfig, 'penelope'));
+      chatClearUnread?.();
+    }
+    const input = root.querySelector('#chat-input');
+    if (input) {
+      input.value = composerText;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
     }
   }
 
