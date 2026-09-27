@@ -111,3 +111,7 @@ Branch: `cursor/travel-v1-2710` (cloud agent naming; brief asked for `travel/v1`
 ## Diff vs mockup
 
 - TR-06 / TR-23–27 / TR-38–43: functional Tideline port; pixel parity vs mockup not screenshot-verified in this pass (P1 / TR-62 deferred to live umbrella).
+
+## hub-ui-guardian
+
+- PASS on local Vite trip surface after D5 (`formatDisplayDate`) + I2 (`.stop` role=button / tabIndex=0 / Enter·Space). Checked: L1 L2 L5 S2 S3 V1 V4 R1 R2 T1 I2 D5.
