@@ -10,7 +10,18 @@ Mockup: `docs/mockups/travel/travel-planner.html`, built on the real Notion book
 2. **Travel theming with whimsy.** When you're flying there's a plane flying. On a train, a train chugs along the line saying choo choo. Each city gets its own illustrated, animated scene and colour: KL's Petronas Towers and a Grab scooter, the Istanbul ferry and gulls, the Glenfinnan viaduct with a train and a Highland cow, a London bus, a Rome Vespa, Seoul snow.
 3. **A real itinerary, not a paragraph of ideas.** Each day is timed stops you can follow: where, when, how to get to the next one, and what it costs.
 4. **One currency.** Prices show in AUD. The local currency only appears in soft-landing money tips ("RM10 is about A$3.50").
-5. **No separate trusted-contact view.** There is one public link. It shows the route, city, day plans and last check-in, and hides booking codes, costs, health details and the diary. It can be turned off.
+5. **Grown-up display type.** Archivo Expanded (800) for the page title, city titles and ticket codes. Playful comes from motion and illustration, not a cartoon font.
+6. **Zoomable maps.** Pinch, ctrl/⌘-scroll or +/− on every map. Drag to pan once zoomed. Double-click zooms in. Full screen on phones. Pins and labels stay the same size as you zoom.
+7. **Add anything.** **Add** in the header and **+ Add to <day>** under each day open one form for a thing to do, food, stay, flight or train. It has:
+   - a day picker across the whole trip, which creates the day if needed
+   - a place search, or **Pick on map** to drop a pin
+   - cost in any currency, shown as ≈ A$
+   - booked, need to book, or just an idea
+   - a private booking reference
+   - "This is where I'm sleeping", which powers Take me home
+
+   You can also **paste a confirmation email** to fill the form. Every item has **Edit** and **Remove**.
+8. **No separate trusted-contact view.** There is one public link. It shows the route, city, day plans and last check-in, and hides booking codes, costs, health details and the diary. It can be turned off.
 
 Rejected in this round: the daylight strip ("am I a beaver?") and the "Bob's view" mode.
 
@@ -47,6 +58,7 @@ Rejected in this round: the daylight strip ("am I a beaver?") and the "Bob's vie
 - Maps: real vector tiles (MapLibre with OpenStreetMap data) with offline download per city. Shanghai is gone, but Korea still needs a Naver or Kakao hand-off for walking directions.
 - Scenes: authored SVG per city, animation off for reduced motion.
 - Exchange rates: live rate at booking time, stored with the booking.
+- Adding: the form writes trip items to `life-hub-data`. Place search uses a real geocoder. Pasted and forwarded confirmation emails are parsed by the agent runtime into the same form for Adam to check before saving. The mockup keeps additions in this browser only.
 
 ## Build order
 

@@ -1,6 +1,6 @@
 <title>Round the World Trip</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bagel+Fat+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800&family=Inter:wght@400;500;600;700&display=swap">
 <style>
 :root {
   color-scheme: light;
@@ -14,7 +14,7 @@
   --radius-xs: .375rem; --radius-sm: .875rem; --radius-md: 1.25rem; --radius-lg: 1.5rem;
   --elev-1: 0 1px 2px rgba(10,21,54,.06); --elev-2: 0 6px 20px rgba(10,21,54,.12);
   --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-fun: "Bagel Fat One", "Arial Rounded MT Bold", ui-rounded, system-ui, sans-serif;
+  --font-fun: Archivo, "Helvetica Neue", Arial, sans-serif;
   /* map */
   --map-land: #f4ecdc; --map-water: #a9d3e6; --map-park: #cfe3c4; --map-road: #ffffff;
   /* current city accent (set per city) */
@@ -38,7 +38,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; justify-content: space-between; margin-bottom: 14px; }
 .crumb { font-size: .75rem; color: var(--muted); }
 .crumb b { color: var(--ink); }
-.top h1 { font-family: var(--font-fun); font-weight: 400; font-size: 2.25rem; line-height: 1.05; letter-spacing: .01em; margin-top: 4px; color: var(--navy); }
+.top h1 { font-family: var(--font-fun); font-weight: 800; font-stretch: 125%; font-size: 2.1rem; line-height: 1.05; letter-spacing: -.02em; margin-top: 4px; color: var(--navy); }
 .top .sub { color: var(--muted); font-size: .8125rem; margin-top: 4px; }
 .top .acts { display: flex; gap: 8px; flex-wrap: wrap; }
 .count { background: var(--high-sea); color: var(--depth); border-radius: 999px; padding: 1px 7px; font-size: .75rem; }
@@ -57,7 +57,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .world .stop { cursor: pointer; }
 .world .stop:hover circle, .world .stop.is-on circle { fill: var(--high-sea); }
 .world .mover path { fill: var(--navy); }
-.world .puff { font: 400 20px var(--font-fun); fill: #3c5949; }
+.world .puff { font: 800 20px var(--font-fun); font-stretch: 125%; fill: #3c5949; }
 .world-foot { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; justify-content: space-between; align-items: end; gap: 8px; flex-wrap: wrap; pointer-events: none; }
 .world-foot > * { pointer-events: auto; }
 .status-chip { background: rgba(251,248,242,.94); border-radius: var(--radius-sm); padding: 8px 12px; font-size: .8125rem; box-shadow: var(--elev-1); max-width: 520px; }
@@ -91,7 +91,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .scene svg.art { position: absolute; inset: 0; width: 100%; height: 100%; }
 .scene .title { position: absolute; left: 20px; top: 16px; right: 20px; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.18); }
 .scene .title .eyebrow { color: rgba(255,255,255,.9); }
-.scene h2 { font-family: var(--font-fun); font-weight: 400; font-size: 2.6rem; line-height: 1; letter-spacing: .01em; margin-top: 4px; }
+.scene h2 { font-family: var(--font-fun); font-weight: 800; font-stretch: 125%; font-size: 2.5rem; line-height: 1; letter-spacing: -.02em; margin-top: 4px; }
 .scene .facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .scene .facts span { background: rgba(0,0,0,.22); backdrop-filter: blur(4px); border-radius: 999px; padding: 3px 10px; font-size: .75rem; font-weight: 500; }
 .daybar { background: var(--city-soft); padding: 10px 12px; display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
@@ -110,7 +110,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .mapbox > svg { display: block; width: 100%; height: auto; max-height: 70vh; }
 .map-tools { position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 6px; align-items: end; }
 .map-tools .btn { box-shadow: var(--elev-2); }
-.map-note { position: absolute; left: 10px; bottom: 10px; right: 10px; background: rgba(251,248,242,.95); border-radius: var(--radius-sm); padding: 8px 12px; font-size: .8125rem; box-shadow: var(--elev-1); }
+.map-note { position: absolute; left: 10px; bottom: 10px; right: 58px; background: rgba(251,248,242,.95); border-radius: var(--radius-sm); padding: 8px 12px; font-size: .8125rem; box-shadow: var(--elev-1); }
 .map-note b { font-weight: 600; }
 .pin { cursor: pointer; }
 .pin circle.b { stroke: #fff; stroke-width: 2.5; }
@@ -124,7 +124,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .edge-lbl { font: 600 11px var(--font-ui); fill: var(--ink); paint-order: stroke; stroke: var(--map-land); stroke-width: 4px; }
 .me { fill: #2f7cf6; stroke: #fff; stroke-width: 3; }
 .me-ring { fill: #2f7cf6; opacity: .2; }
-.dragon { font: 400 22px var(--font-fun); fill: #3c5949; }
+.dragon { font: 800 20px var(--font-fun); font-stretch: 125%; fill: #3c5949; }
 
 .list { display: grid; gap: 0; }
 .stop { display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
@@ -161,7 +161,7 @@ details.tobook[open] summary::after { content: "Hide"; }
 .ticket .band { display: flex; justify-content: space-between; padding: 8px 14px; background: var(--navy); color: #fff; font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
 .ticket.is-train .band { background: #2f5d46; }
 .ticket .body { padding: 10px 14px 6px; display: grid; grid-template-columns: auto 1fr auto; gap: 2px 12px; align-items: center; }
-.ticket .iata { font-family: var(--font-fun); font-size: 1.9rem; line-height: 1; color: var(--navy); }
+.ticket .iata { font-family: var(--font-fun); font-weight: 800; font-stretch: 125%; letter-spacing: -.01em; font-size: 1.8rem; line-height: 1; color: var(--navy); }
 .ticket.is-train .iata { color: #2f5d46; }
 .ticket .flight { position: relative; height: 26px; overflow: hidden; }
 .ticket .flight::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px dashed #b9c0cc; }
@@ -238,6 +238,55 @@ details.tobook[open] summary::after { content: "Hide"; }
 @keyframes blink { 0% { opacity: 1; } 100% { opacity: .35; } }
 @keyframes pulse { 0% { r: 9; opacity: .35; } 100% { r: 26; opacity: 0; } }
 .me-ring { animation: pulse 1.8s ease-out infinite; }
+/* zoom */
+.world > svg, .mapbox > svg { touch-action: pan-y; cursor: grab; }
+.is-zoomed > svg { touch-action: none; }
+.world > svg:active, .mapbox > svg:active { cursor: grabbing; }
+.picking > svg { cursor: crosshair; }
+.zoom-ctl { position: absolute; right: 10px; bottom: 10px; display: flex; flex-direction: column; background: var(--paper); border-radius: var(--radius-sm); box-shadow: var(--elev-2); overflow: hidden; }
+.world .zoom-ctl { top: 12px; bottom: auto; right: 12px; }
+.zoom-ctl button { border: 0; background: none; width: 38px; height: 38px; font-size: 1.25rem; font-weight: 600; color: var(--ink); display: grid; place-items: center; }
+.zoom-ctl button + button { border-top: 1px solid var(--line); }
+.zoom-ctl button:hover { background: var(--cotton); }
+.zoom-ctl svg { width: 16px; height: 16px; }
+.mapbox.is-full { position: fixed; inset: 0; z-index: 15; border-radius: 0; padding-top: env(safe-area-inset-top, 0px); }
+.mapbox.is-full > svg { max-height: none; height: 100%; }
+body.map-open { overflow: hidden; }
+.map-note.pick { background: var(--depth); color: #fff; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.map-note.pick .mini { color: #fff; border-color: rgba(255,255,255,.4); }
+/* add + edit */
+.mini { border: 1px solid var(--line); background: transparent; border-radius: var(--radius-xs); padding: 2px 8px; font-size: .6875rem; font-weight: 600; color: var(--muted); margin-left: auto; }
+.mini:hover { color: var(--ink); border-color: rgba(23,55,94,.3); }
+.add-row { margin: 10px 0 0 46px; border: 1.5px dashed rgba(23,55,94,.25); background: transparent; border-radius: var(--radius-md); padding: 12px; font-weight: 600; font-size: .875rem; color: var(--city-ink); }
+.add-row:hover { background: var(--city-soft); border-color: var(--city); }
+.addform h3 { margin-bottom: 12px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; background: var(--shore); padding: 4px; border-radius: var(--radius-sm); }
+.seg button { flex: 1 1 auto; white-space: nowrap; border: 0; background: none; padding: 7px 10px; border-radius: .625rem; font-size: .8125rem; font-weight: 600; color: var(--muted); }
+.seg button[aria-checked="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--elev-1); }
+.paste { margin-top: 10px; font-size: .8125rem; }
+.paste summary { cursor: pointer; font-weight: 600; color: var(--wave); }
+.paste textarea { margin-top: 8px; }
+.fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin-top: 14px; }
+.fgrid .full { grid-column: 1 / -1; }
+.fgrid label, .fgrid .full { display: grid; gap: 4px; font-size: .75rem; font-weight: 600; color: var(--muted); }
+.fgrid label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 500; font-size: .8125rem; }
+.flabel { font-size: .75rem; font-weight: 600; color: var(--muted); }
+.addform input:not([type=checkbox]), .addform select, .addform textarea { width: 100%; font: 500 .875rem var(--font-ui); color: var(--ink); background: var(--cotton); border: 1px solid var(--line); border-radius: .625rem; padding: 9px 10px; min-width: 0; }
+.addform input:focus, .addform select:focus, .addform textarea:focus { outline: 2px solid var(--wave); outline-offset: 0; }
+.addform [aria-invalid="true"] { border-color: var(--high-sea-ink); }
+.place-row { display: flex; gap: 6px; }
+.place-row .btn { flex: none; }
+.sugg { display: flex; flex-wrap: wrap; gap: 6px; }
+.sugg button { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 4px 10px; font-size: .75rem; font-weight: 500; color: var(--ink); }
+.sugg button:hover { border-color: var(--city); }
+.pinned { font-size: .75rem; color: var(--ink); font-weight: 500; }
+.aud { font-size: .75rem; color: var(--pastel-sage-ink); font-weight: 600; }
+.hint { font-size: .75rem; color: var(--muted); font-weight: 500; }
+.danger { color: #9b2c2c !important; margin-left: auto; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+[hidden] { display: none !important; }
+@media (max-width: 480px) { .fgrid { grid-template-columns: 1fr; } .place-row { flex-wrap: wrap; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -260,6 +309,7 @@ details.tobook[open] summary::after { content: "Hide"; }
       <div class="sub num" id="subline">1 Dec 2026 – 10 Jan 2027 · 7 cities · 2 trains · 6 flights</div>
     </div>
     <div class="acts">
+      <button class="btn" type="button" id="btn-add"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>
       <button class="btn ghost" type="button" id="btn-share"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>Public link</button>
     </div>
   </header>
@@ -313,6 +363,7 @@ const I = {
   doc: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/></svg>',
   home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg>',
   locate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>',
+  expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
   syringe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m18 2 4 4M17 7l-9 9-3 1 1-3 9-9zM14 4l6 6M9 11l2 2"/></svg>'
 };
 
@@ -380,7 +431,7 @@ const SCENES = {
       <rect x="-150" y="8" width="66" height="22" rx="3" fill="#2f5d46"/><rect x="-80" y="8" width="66" height="22" rx="3" fill="#2f5d46"/>
       <path d="M-10 8h40l12 10v12h-52z" fill="#1f3f30"/><rect x="26" y="-2" width="8" height="10" fill="#1f3f30"/>
       <g fill="#f6e7a8"><rect x="-144" y="13" width="10" height="7"/><rect x="-128" y="13" width="10" height="7"/><rect x="-112" y="13" width="10" height="7"/><rect x="-74" y="13" width="10" height="7"/><rect x="-58" y="13" width="10" height="7"/><rect x="-42" y="13" width="10" height="7"/></g>
-      <text x="48" y="-14" font-family="Bagel Fat One, sans-serif" font-size="22" fill="#fff">CHOO CHOO</text>
+      <text x="48" y="-14" font-family="Archivo, sans-serif" font-weight="800" font-stretch="125%" font-size="22" fill="#fff">CHOO CHOO</text>
     </g></g>
     <!-- highland cow -->
     <g transform="translate(700,178)"><ellipse cx="0" cy="18" rx="40" ry="22" fill="#c66a2c"/><rect x="-30" y="30" width="8" height="22" fill="#9a4f1f"/><rect x="18" y="30" width="8" height="22" fill="#9a4f1f"/><circle cx="-40" cy="8" r="16" fill="#c66a2c"/><path d="M-54-2c-14-2-18-10-16-16 4 8 10 10 16 8M-26-2c14-2 18-10 16-16-4 8-10 10-16 8" fill="#f2e6cf"/><path d="M-54 2c6 8 22 8 28 0-4 10-24 10-28 0z" fill="#9a4f1f"/></g>
@@ -562,7 +613,7 @@ const CITIES = [
   {
     id: 'LON', name: 'London', title: 'Mind the gap', dates: '13 – 19 Dec', tz: 0, color: '#c23b4a', soft: '#f6dde0', ink: '#7d1f2b', scene: 'LON',
     facts: ['7°, drizzle', 'Pounds · £10 ≈ A$20', '11 h behind Sydney', 'Sunset 15:51'],
-    bbox: { n: 51.531, s: 51.489, w: -0.185, e: -0.100 },
+    bbox: { n: 51.531, s: 51.487, w: -0.198, e: -0.100 },
     home: null,
     water: [], rivers: [[[51.4830, -0.190], [51.4832, -0.160], [51.4850, -0.145], [51.4870, -0.130], [51.4945, -0.1225], [51.5007, -0.1218], [51.5070, -0.1195], [51.5095, -0.1120], [51.5098, -0.1040], [51.5078, -0.0950]]],
     parks: [[[51.5125, -0.190], [51.5130, -0.153], [51.5035, -0.151], [51.5020, -0.190]], [[51.5070, -0.1470], [51.5050, -0.1400], [51.5020, -0.1430], [51.5040, -0.1490]], [[51.5040, -0.1400], [51.5035, -0.1290], [51.5010, -0.1290], [51.5015, -0.1390]]],
@@ -677,7 +728,7 @@ const TODO = [
 
 // ---------------- Helpers ----------------
 const $ = s => document.querySelector(s);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function toast(msg) {
   let t = $('.toast');
   if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
@@ -686,10 +737,80 @@ function toast(msg) {
 function localProj(b, W) {
   const latc = (b.n + b.s) / 2, kx = Math.cos(latc * Math.PI / 180);
   const k = W / ((b.e - b.w) * kx);
-  return { W, H: (b.n - b.s) * k, p: (lat, lon) => [(lon - b.w) * kx * k, (b.n - lat) * k] };
+  return { W, H: (b.n - b.s) * k, p: (lat, lon) => [(lon - b.w) * kx * k, (b.n - lat) * k], inv: (x, y) => [b.n - y / k, b.w + x / (kx * k)] };
 }
 const gmaps = (lat, lon, name) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}%20${lat},${lon}`;
 const nmaps = (lat, lon, name) => `https://map.naver.com/p/search/${encodeURIComponent(name)}`;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clone = o => JSON.parse(JSON.stringify(o));
+const timeOf = s => { const raw = s.t && s.t !== '??' ? s.t : s.ticket ? s.ticket.dep : s.checkin ? s.checkin[0] : ''; const m = /(\d{1,2}:\d{2})/.exec(raw || ''); return m ? m[1].padStart(5, '0') : null; };
+
+// ---------------- Zoom and pan (world and day maps) ----------------
+// Counter-scaled marks carry class "cs" plus data-x/data-y so pins and labels keep their size.
+function zoomable(svg, host, { view, onChange } = {}) {
+  const vb = svg.viewBox.baseVal, base = { x: 0, y: 0, w: vb.width, h: vb.height };
+  const v = view ? { ...view } : { ...base };
+  const minW = base.w / 10;
+  let moved = false;
+  function apply() {
+    v.w = Math.min(base.w, Math.max(minW, v.w)); v.h = v.w * base.h / base.w;
+    v.x = Math.min(base.w - v.w, Math.max(0, v.x)); v.y = Math.min(base.h - v.h, Math.max(0, v.y));
+    svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+    const k = v.w / base.w;
+    svg.querySelectorAll('.cs').forEach(el => el.setAttribute('transform', `translate(${el.dataset.x},${el.dataset.y}) scale(${k})`));
+    host.classList.toggle('is-zoomed', k < .999);
+    onChange && onChange(k, { ...v });
+  }
+  const toSvg = (cx, cy) => { const pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy; return pt.matrixTransform(svg.getScreenCTM().inverse()); };
+  function zoomAt(f, sx, sy) { const nw = Math.min(base.w, Math.max(minW, v.w * f)); const r = nw / v.w; v.x = sx - (sx - v.x) * r; v.y = sy - (sy - v.y) * r; v.w = nw; apply(); }
+  const center = () => [v.x + v.w / 2, v.y + v.h / 2];
+  host.addEventListener('wheel', e => {
+    if (!(e.ctrlKey || e.metaKey)) return;
+    e.preventDefault(); const p = toSvg(e.clientX, e.clientY); zoomAt(Math.exp(e.deltaY * .012), p.x, p.y);
+  }, { passive: false });
+  const ptrs = new Map(); let pinch = null;
+  svg.addEventListener('pointerdown', e => {
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); moved = false;
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()];
+      const m = toSvg((a.x + b.x) / 2, (a.y + b.y) / 2);
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), w: v.w, m };
+    }
+  });
+  svg.addEventListener('pointermove', e => {
+    const p = ptrs.get(e.pointerId); if (!p) return;
+    const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (ptrs.size === 2 && pinch) {
+      p.x = e.clientX; p.y = e.clientY;
+      const [a, b] = [...ptrs.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      zoomAt((pinch.w * pinch.d / d) / v.w, pinch.m.x, pinch.m.y); moved = true; return;
+    }
+    const zoomed = v.w < base.w * .999;
+    if (ptrs.size === 1 && (e.pointerType === 'mouse' || zoomed)) {
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      if (!moved) svg.setPointerCapture(e.pointerId);
+      moved = true;
+      const s = v.w / svg.getBoundingClientRect().width;
+      v.x -= dx * s; v.y -= dy * s; p.x = e.clientX; p.y = e.clientY; apply();
+    }
+  });
+  const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; };
+  svg.addEventListener('pointerup', up); svg.addEventListener('pointercancel', up);
+  svg.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+  svg.addEventListener('dblclick', e => { const p = toSvg(e.clientX, e.clientY); zoomAt(.5, p.x, p.y); });
+  const ctl = document.createElement('div');
+  ctl.className = 'zoom-ctl';
+  ctl.innerHTML = '<button type="button" data-z="in" aria-label="Zoom in">+</button><button type="button" data-z="out" aria-label="Zoom out">−</button><button type="button" data-z="reset" aria-label="Show everything"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>';
+  ctl.addEventListener('click', e => {
+    const z = e.target.closest('button')?.dataset.z; if (!z) return;
+    if (z === 'reset') { Object.assign(v, base); apply(); return; }
+    const [cx, cy] = center(); zoomAt(z === 'in' ? .6 : 1 / .6, cx, cy);
+  });
+  host.appendChild(ctl);
+  apply();
+  return { zoomTo(lat, lon, P, w) { const [x, y] = P.p(lat, lon); v.w = w; v.h = w * base.h / base.w; v.x = x - v.w / 2; v.y = y - v.h / 2; apply(); }, toSvg };
+}
 
 // ---------------- World map ----------------
 const NS = 'http://www.w3.org/2000/svg';
@@ -697,29 +818,31 @@ function svgEl(tag, attrs, parent) { const e = document.createElementNS(NS, tag)
 const world = $('#world');
 const G = GEO.world;
 world.setAttribute('viewBox', `0 0 ${G.w} ${G.h}`);
-svgEl('path', { d: G.graticule, class: 'grat' }, world);
-svgEl('path', { d: G.land, class: 'land' }, world);
-const legEls = G.legs.map(l => svgEl('path', { d: l.d, class: `leg ${l.mode === 'train' ? 'train' : ''} ${l.booked ? '' : 'todo'}` }, world));
+svgEl('path', { d: G.graticule, class: 'grat', 'vector-effect': 'non-scaling-stroke' }, world);
+svgEl('path', { d: G.land, class: 'land', 'vector-effect': 'non-scaling-stroke' }, world);
+const legEls = G.legs.map(l => svgEl('path', { d: l.d, class: `leg ${l.mode === 'train' ? 'train' : ''} ${l.booked ? '' : 'todo'}`, 'vector-effect': 'non-scaling-stroke' }, world));
 const CITY_OF = { SYD: null, KUL: 'KUL', IST: 'IST', EDI: 'SCO', FTW: 'SCO', LON: 'LON', ROM: 'ROM', SEL: 'SEL' };
 const LABEL_OFF = { SYD: [12, 22, 'start'], KUL: [12, 22, 'start'], IST: [12, 6, 'start'], EDI: [12, 4, 'start'], FTW: [-12, -8, 'end'], LON: [12, 20, 'start'], ROM: [12, 18, 'start'], SEL: [12, 6, 'start'] };
 const NAMES = { SYD: 'Sydney', KUL: 'Kuala Lumpur', IST: 'Istanbul', EDI: 'Edinburgh', FTW: 'Fort William', LON: 'London', ROM: 'Rome', SEL: 'Seoul' };
 const worldStops = {};
 for (const [k, [x, y]] of Object.entries(G.pts)) {
-  const g = svgEl('g', { class: 'stop', tabindex: 0, role: 'button', 'aria-label': NAMES[k] }, world);
-  svgEl('circle', { cx: x, cy: y, r: 7 }, g);
+  const g = svgEl('g', { class: 'stop cs', 'data-x': x, 'data-y': y, transform: `translate(${x},${y})`, tabindex: 0, role: 'button', 'aria-label': NAMES[k] }, world);
+  svgEl('circle', { cx: 0, cy: 0, r: 7 }, g);
   const [dx, dy, anchor] = LABEL_OFF[k];
-  svgEl('text', { x: x + dx, y: y + dy, 'text-anchor': anchor }, g).textContent = NAMES[k];
+  svgEl('text', { x: dx, y: dy, 'text-anchor': anchor }, g).textContent = NAMES[k];
   const go = () => CITY_OF[k] ? selectCity(CITY_OF[k], true) : selectCity('KUL', true, '1');
   g.addEventListener('click', go);
   g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
   worldStops[k] = g;
 }
 const mover = svgEl('g', { class: 'mover' }, world);
-const moverPlane = svgEl('path', { d: 'M16 21h-2l-5-8H3.5a1.5 1.5 0 0 1 0-3H9l5-8h2l-2.5 8H19l1.5-2H22l-1 3.5 1 3.5h-1.5L19 13h-5.5z', transform: 'translate(-12,-12) scale(1.4)' }, mover);
+const moverPlane = svgEl('path', { d: 'M16 21h-2l-5-8H3.5a1.5 1.5 0 0 1 0-3H9l5-8h2l-2.5 8H19l1.5-2H22l-1 3.5 1 3.5h-1.5L19 13h-5.5z' }, mover);
 const moverTrain = svgEl('g', { visibility: 'hidden' }, mover);
 svgEl('path', { d: 'M2 8h11v9H2zM13 11h6l4 3v3H13zM6 3h3v5H6z', transform: 'translate(-14,-14) scale(1.2)' }, moverTrain);
 const puff = svgEl('text', { class: 'puff', x: 14, y: -16, visibility: 'hidden' }, mover);
 puff.textContent = 'choo choo!';
+let worldK = 1;
+zoomable(world, $('.world'), { onChange: k => { worldK = k; } });
 
 const LEG_TEXT = [
   '<b>Tue 1 Dec · SYD → KUL.</b> Batik Air OD120, overnight. Booked.',
@@ -732,14 +855,13 @@ const LEG_TEXT = [
   '<b>Sun 10 Jan · Seoul → Sydney, together.</b> Not booked yet.'
 ];
 let anim = { leg: 0, t0: 0, raf: 0 };
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function placeMover(i, f) {
   const el = legEls[i], L = el.getTotalLength();
   const p = el.getPointAtLength(f * L), q = el.getPointAtLength(Math.min(L, f * L + 1));
   const ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
   const isTrain = G.legs[i].mode === 'train';
-  mover.setAttribute('transform', `translate(${p.x},${p.y})`);
-  moverPlane.setAttribute('transform', `rotate(${ang}) translate(-12,-12) scale(1.4)`);
+  mover.setAttribute('transform', `translate(${p.x},${p.y}) scale(${worldK})`);
+  moverPlane.setAttribute('transform', `rotate(${ang}) translate(-17,-17) scale(1.4)`);
   moverPlane.setAttribute('visibility', isTrain ? 'hidden' : 'visible');
   moverTrain.setAttribute('visibility', isTrain ? 'visible' : 'hidden');
   puff.setAttribute('visibility', isTrain && (Date.now() / 400 | 0) % 2 ? 'visible' : 'hidden');
@@ -750,12 +872,8 @@ function frame(ts) {
   const i = anim.leg, len = legEls[i].getTotalLength();
   const dur = G.legs[i].mode === 'train' ? 2600 : Math.max(1600, len * 7);
   const f = Math.min(1, (ts - anim.t0) / dur);
-  const ease = f < .5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
-  placeMover(i, ease);
-  if (f >= 1) {
-    anim.leg = (i + 1) % legEls.length; anim.t0 = ts + 500;
-    $('#world-status').innerHTML = LEG_TEXT[anim.leg];
-  }
+  placeMover(i, f < .5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+  if (f >= 1) { anim.leg = (i + 1) % legEls.length; anim.t0 = ts + 500; $('#world-status').innerHTML = LEG_TEXT[anim.leg]; }
   anim.raf = requestAnimationFrame(frame);
 }
 function replay() {
@@ -765,6 +883,70 @@ function replay() {
   anim.raf = requestAnimationFrame(frame);
 }
 $('#btn-replay').addEventListener('click', replay);
+
+// ---------------- Trip dates and your additions ----------------
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const RANGES = [['KUL', 1, 3], ['IST', 4, 7], ['SCO', 8, 12], ['LON', 13, 19], ['ROM', 20, 22], ['SEL', 23, 41]];
+const DATES = Array.from({ length: 41 }, (_, i) => {
+  const d = new Date(2026, 11, 1 + i), n = i + 1;
+  return { n, city: RANGES.find(r => n >= r[1] && n <= r[2])[0], id: d.getMonth() === 0 ? 'j' + d.getDate() : String(d.getDate()), label: `${WD[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}` };
+});
+const dateOf = (city, dayId) => DATES.find(x => x.id === dayId && x.city === city) || DATES.find(x => x.id === dayId);
+const PHRASE = {
+  KUL: ['Tolong hantar saya ke alamat ini.', 'Please take me to this address.'],
+  IST: ['Beni bu adrese götürür müsünüz, lütfen?', 'Can you take me to this address, please?'],
+  ROM: ['Mi porti a questo indirizzo, per favore.', 'Please take me to this address.'],
+  SEL: ['이 주소로 가 주세요.', 'Please take me to this address.']
+};
+const LOCAL_CUR = { KUL: 'MYR', IST: 'TRY', SCO: 'GBP', LON: 'GBP', ROM: 'EUR', SEL: 'KRW' };
+const EXTRA_PLACES = {
+  KUL: [['Merdeka Square', 3.1479, 101.6934], ['Islamic Arts Museum', 3.1421, 101.6897], ['Perdana Botanical Gardens', 3.1437, 101.6847], ['Thean Hou Temple', 3.1216, 101.6875]],
+  IST: [['Topkapı Palace', 41.0115, 28.9834], ['Basilica Cistern', 41.0084, 28.9779], ['Süleymaniye Mosque', 41.0162, 28.9639], ['Karaköy Güllüoğlu (baklava)', 41.0233, 28.9774]],
+  SCO: [['Inverness', 57.4778, -4.2247], ['Glencoe', 56.6826, -5.1023], ['Edinburgh Castle', 55.9486, -3.1999]],
+  LON: [['Premier Inn London Kensington (Earl’s Court)', 51.4925, -0.1930], ['Natural History Museum', 51.4967, -0.1764], ['British Museum', 51.5194, -0.1270], ['Borough Market', 51.5055, -0.0910], ['Covent Garden', 51.5117, -0.1240]],
+  ROM: [['Spanish Steps', 41.9060, 12.4828], ['Piazza Navona', 41.8992, 12.4731], ['Campo de’ Fiori', 41.8956, 12.4722]],
+  SEL: [['Lotte Hotel Seoul', 37.5652, 126.9812], ['Gwangjang Market', 37.5700, 126.9996], ['Changdeokgung', 37.5794, 126.9910], ['Hongdae', 37.5563, 126.9220]]
+};
+
+// Keep a pristine copy of the built-in plan, then layer your additions on top.
+CITIES.forEach(c => c.days.forEach(d => d.stops.forEach((s, i) => { s.id = s.id || `${c.id}-${d.id}-${i}`; })));
+const BASE = Object.fromEntries(CITIES.map(c => [c.id, { days: clone(c.days), home: clone(c.home) }]));
+const STORE_KEY = 'lifehub-travel-mock-v1';
+let user = { added: [], removed: [] };
+try { user = JSON.parse(localStorage.getItem(STORE_KEY)) || user; } catch (e) {}
+const saveUser = () => { try { localStorage.setItem(STORE_KEY, JSON.stringify(user)); } catch (e) {} };
+
+function ensureDay(c, dayId) {
+  let d = c.days.find(x => x.id === dayId);
+  if (!d) {
+    const info = dateOf(c.id, dayId);
+    d = { id: dayId, label: info.label, sub: 'Added', stops: [] };
+    c.days.push(d);
+    c.days.sort((a, b) => dateOf(c.id, a.id).n - dateOf(c.id, b.id).n);
+  }
+  return d;
+}
+function insertStop(d, s) {
+  const t = timeOf(s) || '99:99';
+  let idx = d.stops.findIndex(x => { const xt = timeOf(x); return xt && xt > t; });
+  if (idx < 0) { idx = d.stops.length; if (d.stops[idx - 1]?.pen) idx--; }
+  d.stops.splice(idx, 0, s);
+}
+function rebuild() {
+  CITIES.forEach(c => {
+    c.days = clone(BASE[c.id].days); c.home = clone(BASE[c.id].home);
+    c.days.forEach(d => { d.stops = d.stops.filter(s => !user.removed.includes(s.id)); });
+  });
+  user.added.forEach(({ city, day, stop }) => {
+    const c = CITIES.find(x => x.id === city); if (!c) return;
+    insertStop(ensureDay(c, day), clone(stop));
+    if (stop.homeBase && stop.lat != null) c.home = { name: stop.name, addr: stop.addr || stop.name, phone: '', lat: stop.lat, lon: stop.lon, phrase: PHRASE[city] };
+  });
+}
+function findStop(id) {
+  for (const c of CITIES) for (const d of c.days) { const s = d.stops.find(x => x.id === id); if (s) return { c, d, s }; }
+  return null;
+}
 
 // ---------------- Chips, to-book ----------------
 const chips = $('#chips');
@@ -787,7 +969,7 @@ const dUntil = Math.ceil((new Date(2026, 11, 1, 22, 15) - new Date()) / 864e5);
 if (dUntil > 0) $('#subline').textContent = `1 Dec 2026 – 10 Jan 2027 · leave in ${dUntil} days · 6 cities, 1 Highland train`;
 
 // ---------------- City view ----------------
-let cur = { city: null, day: null, stop: null, me: false };
+let cur = { city: null, day: null, stop: null, me: false, pick: null, views: {} };
 function selectCity(id, scroll, dayId) {
   const c = CITIES.find(x => x.id === id);
   cur.city = c; cur.me = false;
@@ -797,11 +979,10 @@ function selectCity(id, scroll, dayId) {
   chips.querySelectorAll('.chip').forEach(b => b.classList.toggle('is-on', b.dataset.city === id));
   Object.entries(worldStops).forEach(([k, g]) => g.classList.toggle('is-on', CITY_OF[k] === id));
   const now = new Date(Date.now() + (c.tz * 60 + new Date().getTimezoneOffset()) * 6e4);
-  const hhmm = now.toTimeString().slice(0, 5);
   $('#city').innerHTML = `
     <div class="scene">${SCENES[c.scene]}
       <div class="title"><div class="eyebrow num">${c.name} · ${c.dates}</div><h2>${c.title}</h2>
-        <div class="facts num"><span>${hhmm} there now</span>${c.facts.map(f => `<span>${f}</span>`).join('')}</div></div>
+        <div class="facts num"><span>${now.toTimeString().slice(0, 5)} there now</span>${c.facts.map(f => `<span>${f}</span>`).join('')}</div></div>
     </div>
     <div class="daybar" role="tablist" aria-label="Days in ${c.name}">${c.days.map(d => `<button type="button" role="tab" class="daybtn" data-day="${d.id}">${d.label}<small>${d.sub}</small></button>`).join('')}</div>
     <div class="day" id="day"></div>`;
@@ -810,40 +991,46 @@ function selectCity(id, scroll, dayId) {
   if (scroll) $('#city').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
 }
 
+function tagsFor(s) {
+  return [s.booked ? '<span class="tag booked">Booked</span>' : '', s.todo ? '<span class="tag todo">Not booked</span>' : '', s.idea ? '<span class="tag idea">Idea</span>' : '', s.kind === 'med' ? '<span class="tag med">Private</span>' : ''].join('');
+}
 function selectDay(id) {
   const c = cur.city, d = c.days.find(x => x.id === id) || c.days[0];
-  cur.day = d; cur.stop = null; cur.me = false;
+  if (cur.day !== d) cur.stop = null;
+  cur.day = d; cur.me = false;
   $('#city').querySelectorAll('.daybtn').forEach(b => { const on = b.dataset.day === d.id; b.classList.toggle('is-on', on); b.setAttribute('aria-selected', on); });
   let n = 0;
   const items = d.stops.map((s, i) => {
     if (s.checkin) return `<div class="checkin num">${s.checkin[2]} · <b>${s.checkin[0]} ${s.checkin[1]}</b> · ${sydneyTime(s.checkin[0], c.tz)} Sydney<span style="margin-left:auto">Bob and Corey${c.id === 'SEL' ? ' → Bob only' : ''}</span></div>`;
     if (s.pen) return `<div class="pen"><div class="av" aria-hidden="true">P</div><div><em>Penelope · tonight</em>${esc(s.pen)}<br><button class="btn" type="button" data-pen>Tell Penelope</button></div></div>`;
-    if (s.ticket) return ticketHtml(s.ticket);
+    if (s.ticket) return ticketHtml(s.ticket, s.id);
     const pinned = s.lat != null && !s.nopin;
     if (pinned) n++;
     s._n = pinned ? n : null; s._i = i;
     const dotCls = s.kind === 'stay' ? 'stay' : (s.off || !pinned) ? 'off' : '';
     const dot = s.kind === 'stay' ? I.bed : s.kind === 'med' ? I.syringe : pinned ? n : '·';
-    const tags = [s.booked ? '<span class="tag booked">Booked</span>' : '', s.todo ? '<span class="tag todo">Not booked</span>' : '', s.idea ? '<span class="tag idea">Idea</span>' : '', s.kind === 'med' ? '<span class="tag med">Private</span>' : ''].join('');
     const link = pinned ? `<a class="maps-link" href="${c.id === 'SEL' ? nmaps(s.lat, s.lon, s.name) : gmaps(s.lat, s.lon, s.name)}" target="_blank" rel="noopener">Directions in ${c.id === 'SEL' ? 'Naver Map' : 'Google Maps'} ↗</a>` : '';
     const go = s.go ? `<div class="go">${I[s.go[0]]}<span><b>${s.go[1]} min</b> · ${esc(s.go[2])}${s.go[3] ? ` · ${price(s.go[3], s.go[4])}` : ''}</span></div>` : '';
     const cardCls = s.kind === 'med' ? 'card med-card' : s.todo ? 'card gap-card' : 'card';
     return `<div class="stop" data-i="${i}"><div class="rail"><button class="dot ${dotCls}" type="button" aria-label="Show on map">${dot}</button><div class="line"></div></div>
-      <div><div class="${cardCls}" tabindex="0"><div class="row1"><span class="t num">${s.t === '??' ? 'Time to set' : s.t}</span>${s.off ? `<span class="t" style="color:var(--muted)">${esc(s.off)}</span>` : ''}</div>
-      <h3>${esc(s.name)}</h3><p>${esc(s.note || '')}</p>
-      <div class="meta">${tags}${s.amt ? price(s.amt, s.cur) : ''}${s.extra ? `<span style="color:var(--muted)">${esc(s.extra)}</span>` : ''}${link}</div></div>${go}</div></div>`;
+      <div><div class="${cardCls}" tabindex="0"><div class="row1"><span class="t num">${s.t === '??' || !s.t ? 'Time to set' : s.t}</span>${s.off ? `<span class="t" style="color:var(--muted)">${esc(s.off)}</span>` : ''}</div>
+      <h3>${esc(s.name)}</h3>${s.note ? `<p>${esc(s.note)}</p>` : ''}
+      <div class="meta">${tagsFor(s)}${s.amt ? price(s.amt, s.cur) : ''}${s.extra ? `<span style="color:var(--muted)">${esc(s.extra)}</span>` : ''}${link}<button class="mini" type="button" data-edit="${s.id}">Edit</button></div></div>${go}</div></div>`;
   });
   const landing = d.landing && LANDING[c.id] ? `<details class="card landing" open><summary><span><span class="k">Soft landing</span>${LANDING[c.id].title}</span></summary><dl>${LANDING[c.id].rows.map(([ic, txt]) => `<dt>${I[ic]}</dt><dd>${txt}</dd>`).join('')}</dl></details>` : '';
-  $('#day').innerHTML = `<div class="mapcol"><div class="mapbox" id="mapbox"></div></div><div class="list">${landing}${items.join('')}</div>`;
+  const add = `<button class="add-row" type="button" data-add>+ Add to ${esc(d.label)}</button>`;
+  $('#day').innerHTML = `<div class="mapcol"><div class="mapbox" id="mapbox"></div></div><div class="list">${landing}${items.join('')}${add}</div>`;
   drawMap();
-  $('#day').querySelectorAll('.stop').forEach(el => {
+  $('#day').querySelectorAll('.stop[data-i]').forEach(el => {
     const i = +el.dataset.i;
     const pick = () => selectStop(i, false);
-    el.querySelector('.card').addEventListener('click', e => { if (!e.target.closest('a')) pick(); });
-    el.querySelector('.card').addEventListener('keydown', e => { if (e.key === 'Enter') pick(); });
+    el.querySelector('.card').addEventListener('click', e => { if (!e.target.closest('a, button')) pick(); });
+    el.querySelector('.card').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('card')) pick(); });
     el.querySelector('.dot').addEventListener('click', pick);
   });
   $('#day').querySelectorAll('[data-pen]').forEach(b => b.addEventListener('click', () => toast('Opens Penelope with today’s plan and check-ins loaded. She drafts the entry in your voice and files it to this day once you confirm.')));
+  $('#day').querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openForm({ editId: b.dataset.edit })));
+  $('#day [data-add]').addEventListener('click', () => openForm({ city: c.id, day: d.id }));
 }
 
 function sydneyTime(t, tz) {
@@ -852,19 +1039,20 @@ function sydneyTime(t, tz) {
   return `${String(s).padStart(2, '0')}:${String(m).padStart(2, '0')}${next ? ' (next day)' : ''}`;
 }
 
-function ticketHtml(k) {
+function ticketHtml(k, id) {
   const v = k.mode === 'plane' ? I.planeR : I.trainR;
+  const status = k.booked ? '<span class="tag booked">Booked</span>' : k.idea ? '<span class="tag idea">Idea</span>' : '<span class="tag todo">Not booked</span>';
   return `<div class="stop"><div class="rail"><span class="dot off" aria-hidden="true">${k.mode === 'plane' ? I.plane : I.train}</span><div class="line"></div></div><div>
     <div class="card ticket ${k.mode === 'train' ? 'is-train' : ''}">
       <div class="band"><span>${esc(k.band)}</span><span class="num">${esc(k.code)}</span></div>
-      <div class="body num"><span class="iata">${k.from}</span><span class="flight" aria-hidden="true"><span class="v">${v}</span></span><span class="iata">${k.to}</span>
-        <span class="hm">Departs<b>${k.dep}</b></span><span></span><span class="hm r">Arrives<b>${k.arr}</b></span></div>
+      <div class="body num"><span class="iata">${esc(k.from)}</span><span class="flight" aria-hidden="true"><span class="v">${v}</span></span><span class="iata">${esc(k.to)}</span>
+        <span class="hm">Departs<b>${esc(k.dep)}</b></span><span></span><span class="hm r">Arrives<b>${esc(k.arr)}</b></span></div>
       <div class="perf" aria-hidden="true"></div>
-      <div class="meta"><span class="tag booked">Booked</span>${k.amt ? price(k.amt, k.cur) : '<span class="price" style="color:var(--muted)">Paid</span>'}<span style="color:var(--muted)">${esc(k.meta)}</span><a class="maps-link" href="#" data-ticket>Open ticket</a></div>
+      <div class="meta">${status}${k.amt ? price(k.amt, k.cur) : ''}<span style="color:var(--muted)">${esc(k.meta)}</span>${k.booked ? '<a class="maps-link" href="#" data-ticket>Open ticket</a>' : ''}<button class="mini" type="button" data-edit="${id}">Edit</button></div>
     </div></div></div>`;
 }
 
-// ---------------- City map ----------------
+// ---------------- Day map ----------------
 function drawMap() {
   const c = cur.city, d = cur.day, box = $('#mapbox');
   const P = localProj(c.bbox, 600);
@@ -872,53 +1060,65 @@ function drawMap() {
   const inB = (lat, lon) => lat <= c.bbox.n && lat >= c.bbox.s && lon >= c.bbox.w && lon <= c.bbox.e;
   const clampPt = (lat, lon) => { const [x, y] = P.p(lat, lon); return [Math.min(W - pad, Math.max(pad, x)), Math.min(H - pad, Math.max(pad, y))]; };
   const line = pts => 'M' + pts.map(([la, lo]) => P.p(la, lo).map(v => v.toFixed(1)).join(',')).join('L');
+  const cs = (x, y, inner, cls = '', attrs = '') => `<g class="cs ${cls}" data-x="${x.toFixed(1)}" data-y="${y.toFixed(1)}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})" ${attrs}>${inner}</g>`;
+  const NSS = 'vector-effect="non-scaling-stroke"';
   let s = `<svg viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" role="img" aria-label="Map of ${esc(d.label)} in ${esc(c.name)}">`;
-  s += `<rect width="100%" height="100%" fill="${c.regional ? 'var(--map-water)' : 'var(--map-land)'}"/>`;
-  if (c.regional) s += `<path d="${GEO.scot.land}" fill="var(--map-land)" stroke="#d9ccb2" stroke-width="1"/>`;
+  s += `<rect width="${W}" height="${H}" fill="${c.regional ? 'var(--map-water)' : 'var(--map-land)'}"/>`;
+  if (c.regional) s += `<path d="${GEO.scot.land}" fill="var(--map-land)" stroke="#d9ccb2" stroke-width="1" ${NSS}/>`;
   c.parks.forEach(p => s += `<path d="${line(p)}Z" fill="var(--map-park)"/>`);
   c.water.forEach(p => s += `<path d="${line(p)}Z" fill="var(--map-water)"/>`);
   c.rivers.forEach(p => s += `<path d="${line(p)}" fill="none" stroke="var(--map-water)" stroke-width="${c.id === 'LON' || c.id === 'ROM' ? 16 : 6}" stroke-linecap="round" stroke-linejoin="round"/>`);
-  c.transit.forEach(t => s += `<path d="${line(t.pts)}" fill="none" stroke="${t.color}" stroke-width="${c.regional ? 3 : 3.5}" ${t.dash ? 'stroke-dasharray="6 5"' : ''} stroke-linecap="round" stroke-linejoin="round" opacity=".75"/>`);
-  c.transit.forEach(t => { const [la, lo] = t.pts[Math.floor(t.pts.length / 2)]; const [x, y] = P.p(la, lo); if (!c.regional) s += `<text class="transit-lbl" x="${x + 8}" y="${y - 6}" fill="${t.color}">${esc(t.name)}</text>`; });
-  c.labels.forEach(([txt, la, lo, kind]) => { const [x, y] = P.p(la, lo); s += `<text class="lbl ${kind || ''}" x="${x}" y="${y}" text-anchor="middle">${esc(txt)}</text>`; });
-  // route
+  c.transit.forEach(t => s += `<path d="${line(t.pts)}" fill="none" stroke="${t.color}" stroke-width="3.5" ${t.dash ? 'stroke-dasharray="6 5"' : ''} stroke-linecap="round" stroke-linejoin="round" opacity=".75" ${NSS}/>`);
+  if (!c.regional) c.transit.forEach(t => { const [la, lo] = t.pts[Math.floor(t.pts.length / 2)]; const [x, y] = P.p(la, lo); s += cs(x, y, `<text class="transit-lbl" x="8" y="-6" fill="${t.color}">${esc(t.name)}</text>`); });
+  c.labels.forEach(([txt, la, lo, kind]) => { const [x, y] = P.p(la, lo); s += cs(x, y, `<text class="lbl ${kind || ''}" text-anchor="middle">${esc(txt)}</text>`); });
   const pts = d.stops.filter(x => x.lat != null && !x.nopin);
   if (pts.length > 1) {
     const r = pts.map(x => clampPt(x.lat, x.lon));
-    s += `<path id="route" d="M${r.map(p => p.map(v => v.toFixed(1)).join(',')).join('L')}" fill="none" stroke="var(--city)" stroke-width="3" stroke-dasharray="${d.train ? '9 5' : '1 7'}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    s += `<path id="route" d="M${r.map(p => p.map(v => v.toFixed(1)).join(',')).join('L')}" fill="none" stroke="var(--city)" stroke-width="3" stroke-dasharray="${d.train ? '9 5' : '1 7'}" stroke-linecap="round" stroke-linejoin="round" ${NSS}/>`;
   }
-  // home
-  if (c.home) { const [x, y] = clampPt(c.home.lat, c.home.lon); s += `<g transform="translate(${x},${y})"><rect x="-13" y="-13" width="26" height="26" rx="8" fill="var(--navy)" stroke="#fff" stroke-width="2.5"/><g transform="translate(-8,-8)" color="#fff">${I.bed.replace('<svg ', '<svg width="16" height="16" ')}</g></g>`; }
-  // pins (reverse so #1 sits on top)
+  if (c.home) { const [x, y] = clampPt(c.home.lat, c.home.lon); s += cs(x, y, `<rect x="-13" y="-13" width="26" height="26" rx="8" fill="var(--navy)" stroke="#fff" stroke-width="2.5"/><g transform="translate(-8,-8)" color="#fff">${I.bed.replace('<svg ', '<svg width="16" height="16" ')}</g>`); }
   const pinHtml = [];
   pts.forEach(x => {
-    if (x.kind === 'stay' && c.home && Math.abs(x.lat - c.home.lat) < 1e-3) return;
+    if (x.kind === 'stay' && c.home && Math.abs(x.lat - c.home.lat) < 1e-3 && Math.abs(x.lon - c.home.lon) < 1e-3) return;
     const off = !inB(x.lat, x.lon);
     const [px, py] = clampPt(x.lat, x.lon);
     const col = x.kind === 'med' ? '#5d4e70' : x.kind === 'stay' ? 'var(--navy)' : off ? '#6b7788' : 'var(--city)';
-    let g = `<g class="pin" data-i="${x._i}" transform="translate(${px},${py})" tabindex="0" role="button" aria-label="${esc(x.name)}"><circle class="halo" r="22"/><circle class="b" r="13" fill="${col}"/><text text-anchor="middle" y="4">${x._n ?? ''}</text></g>`;
-    if (off) { const right = px > W / 2; g += `<text class="edge-lbl" x="${px + (right ? -18 : 18)}" y="${py + 4}" text-anchor="${right ? 'end' : 'start'}">${esc(x.off || x.name)} →</text>`; }
-    pinHtml.push(g);
+    let inner = `<circle class="halo" r="22"/><circle class="b" r="13" fill="${col}"/><text text-anchor="middle" y="4">${x._n ?? ''}</text>`;
+    if (off) { const right = px > W / 2; inner += `<text class="edge-lbl" x="${right ? -18 : 18}" y="4" text-anchor="${right ? 'end' : 'start'}">${esc(x.off || x.name)} →</text>`; }
+    pinHtml.push(cs(px, py, inner, 'pin', `data-i="${x._i}" tabindex="0" role="button" aria-label="${esc(x.name)}"`));
   });
   s += pinHtml.reverse().join('');
   if (d.train) s += `<g id="mapTrain"><circle r="15" fill="#2f5d46" stroke="#fff" stroke-width="2.5"/><g transform="translate(-10,-10)" color="#fff" fill="#fff">${I.trainR.replace('<svg ', '<svg width="20" height="20" ')}</g><text class="dragon" x="18" y="-12">choo choo</text></g>`;
-  if (cur.me && d.me) { const m = pts.find(x => x._n === d.me) || pts[0]; const [x, y] = clampPt(m.lat + 0.0006, m.lon - 0.0008); s += `<circle class="me-ring" cx="${x}" cy="${y}" r="9"/><circle class="me" cx="${x}" cy="${y}" r="8"/>`; }
+  if (cur.me && d.me) { const m = pts.find(x => x._n === d.me) || pts[0]; const [x, y] = clampPt(m.lat + 0.0006, m.lon - 0.0008); s += cs(x, y, `<circle class="me-ring" r="9"/><circle class="me" r="8"/>`); }
   s += '</svg>';
-  const tools = `<div class="map-tools">${c.home ? `<button class="btn" type="button" id="btn-home">${I.home}Take me home</button>` : `<button class="btn ghost" type="button" id="btn-home">${I.home}No bed booked</button>`}${d.me ? `<button class="btn ghost" type="button" id="btn-me">${I.locate}${cur.me ? 'Hide me' : 'Where am I?'}</button>` : ''}</div>`;
+  const tools = `<div class="map-tools">${c.home ? `<button class="btn" type="button" id="btn-home">${I.home}Take me home</button>` : `<button class="btn ghost" type="button" id="btn-home">${I.home}No bed booked</button>`}${d.me ? `<button class="btn ghost" type="button" id="btn-me">${I.locate}${cur.me ? 'Hide me' : 'Where am I?'}</button>` : ''}<button class="btn ghost" type="button" id="btn-full">${I.expand}<span>${box.classList.contains('is-full') ? 'Close map' : 'Full screen'}</span></button></div>`;
   let note = '';
-  if (cur.me && d.me) {
+  if (cur.pick) note = `<div class="map-note pick">Tap the map where <b>${esc(cur.pick.values.name || 'it')}</b> is. <button class="mini" type="button" id="pick-cancel">Cancel</button></div>`;
+  else if (cur.me && d.me) {
     const i = pts.findIndex(x => x._n === d.me); const nx = pts[i + 1] || pts[i];
     note = `<div class="map-note">Preview: you’re near <b>${esc(pts[i].name)}</b>. Next is <b>${esc(nx.name)}</b>, ${pts[i].go ? pts[i].go[1] + ' min ' + (pts[i].go[0] === 'walk' ? 'walk' : 'by ' + pts[i].go[0]) : 'nearby'}.</div>`;
-  } else if (!pts.some(x => inB(x.lat, x.lon))) {
-    note = `<div class="map-note">Nothing pinned on this day yet.</div>`;
-  }
+  } else if (!pts.some(x => inB(x.lat, x.lon))) note = `<div class="map-note">Nothing pinned on this day yet. Add something and it shows up here.</div>`;
   box.innerHTML = s + tools + note;
+  box.classList.toggle('picking', !!cur.pick);
+  const svg = box.querySelector('svg');
+  const key = c.id + '/' + d.id;
+  cur.mapK = 1;
+  const z = zoomable(svg, box, { view: cur.views[key], onChange: (k, v) => { cur.mapK = k; cur.views[key] = v; } });
   box.querySelectorAll('.pin').forEach(p => {
     const go = () => selectStop(+p.dataset.i, true);
     p.addEventListener('click', go); p.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
   });
+  svg.addEventListener('click', e => {
+    if (!cur.pick) return;
+    const pt = z.toSvg(e.clientX, e.clientY); const [lat, lon] = P.inv(pt.x, pt.y);
+    const draft = cur.pick; cur.pick = null;
+    draft.values.lat = +lat.toFixed(5); draft.values.lon = +lon.toFixed(5); draft.values.placeLabel = 'Dropped pin';
+    drawMap(); openForm(draft);
+  });
   $('#btn-home').addEventListener('click', openHome);
   $('#btn-me')?.addEventListener('click', () => { cur.me = !cur.me; drawMap(); });
+  $('#btn-full').addEventListener('click', () => { box.classList.toggle('is-full'); document.body.classList.toggle('map-open', box.classList.contains('is-full')); drawMap(); });
+  $('#pick-cancel')?.addEventListener('click', e => { e.stopPropagation(); const draft = cur.pick; cur.pick = null; drawMap(); openForm(draft); });
   if (d.train) runMapTrain();
   if (cur.stop != null) markStop(cur.stop);
 }
@@ -931,14 +1131,14 @@ function runMapTrain() {
     if (!t0) t0 = ts;
     const f = reduce ? .35 : ((ts - t0) % 9000) / 9000;
     const p = route.getPointAtLength(f * L);
-    tr.setAttribute('transform', `translate(${p.x},${p.y})`);
+    tr.setAttribute('transform', `translate(${p.x},${p.y}) scale(${cur.mapK || 1})`);
     if (!reduce) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
 }
 
 function markStop(i) {
-  document.querySelectorAll('.stop').forEach(el => el.classList.toggle('is-on', +el.dataset.i === i));
+  document.querySelectorAll('.stop[data-i]').forEach(el => el.classList.toggle('is-on', +el.dataset.i === i));
   document.querySelectorAll('.pin').forEach(el => el.classList.toggle('is-on', +el.dataset.i === i));
 }
 function selectStop(i, fromMap) {
@@ -948,19 +1148,22 @@ function selectStop(i, fromMap) {
 }
 
 // ---------------- Sheets ----------------
-function sheet(html) {
+function sheet(html, { keep } = {}) {
   const back = document.createElement('div');
   back.className = 'sheet-back';
-  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}<div class="row"><button class="btn ghost" type="button" data-close>Close</button></div></div>`;
-  back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) back.remove(); });
-  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { back.remove(); document.removeEventListener('keydown', esc); } });
+  back.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}${keep ? '' : '<div class="row"><button class="btn ghost" type="button" data-close>Close</button></div>'}</div>`;
+  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  back.addEventListener('click', e => { if (e.target === back || e.target.closest('[data-close]')) close(); });
+  document.addEventListener('keydown', onKey);
   document.body.appendChild(back);
-  back.querySelector('button')?.focus();
+  back.querySelector('input, select, button')?.focus();
+  back.close = close;
   return back;
 }
 function openHome() {
   const c = cur.city, h = c.home;
-  if (!h) { sheet(`<h3>No bed booked in ${c.name} yet</h3><p>Once you add a stay, this button shows the address in the local language, a line to show the driver, and directions from wherever you are.</p>`); return; }
+  if (!h) { sheet(`<h3>No bed booked in ${c.name} yet</h3><p>Add a stay and tick “This is where I’m sleeping”. This button then shows the address in the local language, a line to show the driver, and directions from wherever you are.</p><div class="row"><button class="btn" type="button" id="home-add">Add a stay</button></div>`); $('#home-add').addEventListener('click', () => { $('.sheet-back').remove(); openForm({ city: c.id, day: cur.day.id, type: 'stay' }); }); return; }
   const link = c.id === 'SEL' ? nmaps(h.lat, h.lon, h.name) : `https://www.google.com/maps/dir/?api=1&destination=${h.lat},${h.lon}`;
   sheet(`<h3>Take me home</h3><p>Show this screen to a driver, or open directions.</p>
     <div class="driver"><div class="big">${esc(h.name)}</div><div class="addr">${esc(h.addr)}</div>${h.phone ? `<div class="addr num" style="opacity:.8">${esc(h.phone)}</div>` : ''}
@@ -978,7 +1181,168 @@ $('#btn-share').addEventListener('click', () => {
 });
 document.addEventListener('click', e => { if (e.target.closest('[data-ticket]')) { e.preventDefault(); toast('Opens the saved ticket or booking PDF, available offline.'); } });
 
+// ---------------- Add / edit form ----------------
+const TYPES = [['do', 'Thing to do'], ['food', 'Food'], ['stay', 'Stay'], ['flight', 'Flight'], ['train', 'Train']];
+const SAMPLE_EMAIL = `Your booking is confirmed – Premier Inn London Kensington (Earl’s Court)
+Address: 11 Knaresborough Place, London SW5 0TJ
+Check-in: Sun 13 Dec 2026 from 15:00
+Nights: 7
+Total paid: £742.00
+Booking reference: PI-4471-XK
+Free cancellation until 13:00, 12 Dec 2026`;
+
+function valuesFromStop(s, c, d) {
+  const status = s.booked || s.ticket?.booked ? 'booked' : s.idea || s.ticket?.idea ? 'idea' : 'todo';
+  const base = { date: d.id, city: c.id, status, note: s.note || '', ref: s.ref || '', link: s.link || '' };
+  if (s.ticket) {
+    const k = s.ticket;
+    return { ...base, type: k.mode === 'train' ? 'train' : 'flight', name: k.band, code: k.code, from: k.from, to: k.to, t: timeOf({ t: k.dep }) || '', arr: k.arr, amt: k.amt || '', cur: k.cur || 'AUD', note: k.meta || '' };
+  }
+  return { ...base, type: s.kind === 'stay' ? 'stay' : s.kind === 'food' ? 'food' : 'do', name: s.name, t: s.t && s.t !== '??' ? s.t : '', lat: s.lat, lon: s.lon, placeLabel: s.lat != null ? s.name : '', amt: s.amt || '', cur: s.cur || 'AUD', nights: s.nights || '', addr: s.addr || '', cancel: s.cancel || '', homeBase: !!s.homeBase || (s.kind === 'stay' && c.home && s.lat === c.home.lat) };
+}
+
+function openForm(opts = {}) {
+  let editing = null, v;
+  if (opts.editId) {
+    const f = findStop(opts.editId); if (!f) return;
+    editing = { id: opts.editId, userAdded: user.added.some(a => a.stop.id === opts.editId) };
+    v = valuesFromStop(f.s, f.c, f.d);
+  } else if (opts.values) { v = opts.values; editing = opts.editing || null; }
+  else {
+    const c = CITIES.find(x => x.id === (opts.city || cur.city.id));
+    v = { type: opts.type || 'do', city: c.id, date: opts.day || cur.day?.id || c.days[0].id, status: 'idea', cur: 'AUD', homeBase: true };
+  }
+  const dateOpts = DATES.map(x => `<option value="${x.city}|${x.id}" ${x.city === v.city && x.id === v.date ? 'selected' : ''}>${x.label} · ${CITIES.find(c => c.id === x.city).name}</option>`).join('');
+  const curOpts = ['AUD', 'MYR', 'TRY', 'GBP', 'EUR', 'KRW', 'CAD'].map(k => `<option ${k === (v.cur || 'AUD') ? 'selected' : ''}>${k}</option>`).join('');
+  const bk = sheet(`
+    <form class="addform" id="addform" novalidate>
+      <h3>${editing ? 'Edit' : 'Add to the trip'}</h3>
+      <div class="seg" role="radiogroup" aria-label="What are you adding">${TYPES.map(([k, l]) => `<button type="button" role="radio" data-type="${k}" aria-checked="${k === v.type}">${l}</button>`).join('')}</div>
+      ${editing ? '' : `<details class="paste"><summary>Paste a confirmation email instead</summary>
+        <label for="f-paste" class="sr">Confirmation email</label><textarea id="f-paste" rows="6">${esc(SAMPLE_EMAIL)}</textarea>
+        <div class="row" style="margin-top:6px"><button class="btn ghost" type="button" id="f-parse">Fill from email</button><span class="hint">Example email. The real app reads forwarded emails too.</span></div></details>`}
+      <div class="fgrid">
+        <label class="full"><span id="l-name">What</span><input id="f-name" required autocomplete="off" value="${esc(v.name || '')}"></label>
+        <label><span>Day</span><select id="f-date">${dateOpts}</select></label>
+        <label><span id="l-time">Time</span><input id="f-time" type="time" value="${esc(v.t || '')}"></label>
+        <div class="full only-place"><span class="flabel">Where</span>
+          <div class="place-row"><input id="f-place" placeholder="Search places in this city" autocomplete="off" value="${esc(v.placeLabel || '')}" aria-label="Where"><button class="btn ghost" type="button" id="f-pick">${I.locate}Pick on map</button></div>
+          <div class="sugg" id="f-sugg"></div>
+          <div class="pinned" id="f-pinned"></div></div>
+        <label class="only-ticket"><span>From</span><input id="f-from" placeholder="LHR" value="${esc(v.from || '')}"></label>
+        <label class="only-ticket"><span>To</span><input id="f-to" placeholder="FCO" value="${esc(v.to || '')}"></label>
+        <label class="only-ticket"><span>Arrives</span><input id="f-arr" placeholder="16:40" value="${esc(v.arr || '')}"></label>
+        <label class="only-ticket"><span>Flight or train number</span><input id="f-code" placeholder="BA548" value="${esc(v.code || '')}"></label>
+        <label class="only-stay"><span>Nights</span><input id="f-nights" type="number" min="1" value="${esc(v.nights || '')}"></label>
+        <label class="only-stay full"><span>Address</span><input id="f-addr" value="${esc(v.addr || '')}"></label>
+        <label class="only-stay full"><span>Free cancellation until</span><input id="f-cancel" placeholder="e.g. 13:00, 12 Dec" value="${esc(v.cancel || '')}"></label>
+        <label class="only-stay full check"><input id="f-home" type="checkbox" ${v.homeBase ? 'checked' : ''}> <span>This is where I’m sleeping (powers Take me home)</span></label>
+        <label><span>Cost</span><input id="f-amt" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(v.amt || '')}"></label>
+        <label><span>Currency</span><select id="f-cur">${curOpts}</select></label>
+        <div class="full aud" id="f-aud" aria-live="polite"></div>
+        <div class="full"><span class="flabel">Status</span><div class="seg small" role="radiogroup" aria-label="Status">${[['booked', 'Booked'], ['todo', 'Need to book'], ['idea', 'Just an idea']].map(([k, l]) => `<button type="button" role="radio" data-status="${k}" aria-checked="${k === v.status}">${l}</button>`).join('')}</div></div>
+        <label class="only-booking full"><span>Booking reference (private)</span><input id="f-ref" value="${esc(v.ref || '')}"></label>
+        <label class="full"><span>Notes</span><textarea id="f-note" rows="2">${esc(v.note || '')}</textarea></label>
+      </div>
+      <p class="hint">Mockup: saved on this device only. The real app saves to your Life Hub.</p>
+      <div class="row"><button class="btn city" type="submit">${editing ? 'Save changes' : 'Add to trip'}</button><button class="btn ghost" type="button" data-close>Cancel</button>${editing ? '<button class="btn ghost danger" type="button" id="f-del">Remove</button>' : ''}</div>
+    </form>`, { keep: true });
+
+  const form = bk.querySelector('#addform');
+  let type = v.type, status = v.status, lat = v.lat, lon = v.lon;
+  const q = s => form.querySelector(s);
+  function syncType() {
+    form.querySelectorAll('[data-type]').forEach(b => b.setAttribute('aria-checked', b.dataset.type === type));
+    const ticket = type === 'flight' || type === 'train';
+    form.querySelectorAll('.only-ticket').forEach(el => el.hidden = !ticket);
+    form.querySelectorAll('.only-place').forEach(el => el.hidden = ticket);
+    form.querySelectorAll('.only-stay').forEach(el => el.hidden = type !== 'stay');
+    form.querySelectorAll('.only-booking').forEach(el => el.hidden = type === 'do' || type === 'food');
+    q('#l-name').textContent = { do: 'What', food: 'Where to eat', stay: 'Hotel or place to stay', flight: 'Airline', train: 'Train operator' }[type];
+    q('#l-time').textContent = type === 'stay' ? 'Check-in time' : ticket ? 'Departs' : 'Time';
+  }
+  function syncStatus() { form.querySelectorAll('[data-status]').forEach(b => b.setAttribute('aria-checked', b.dataset.status === status)); }
+  function syncPin() { q('#f-pinned').innerHTML = lat != null ? `<span class="tag booked">Pinned</span> <span class="num">${(+lat).toFixed(4)}, ${(+lon).toFixed(4)}</span>` : '<span class="hint">No pin yet. Search, or pick on the map.</span>'; }
+  function syncAud() { const a = +q('#f-amt').value, k = q('#f-cur').value; q('#f-aud').textContent = a && k !== 'AUD' ? `Shows in the plan as ≈ ${aud(Math.round(a * RATE[k]))}` : ''; }
+  const cityNow = () => q('#f-date').value.split('|')[0];
+  function suggest() {
+    const term = q('#f-place').value.trim().toLowerCase(), city = cityNow();
+    const c = CITIES.find(x => x.id === city);
+    const seen = new Set(), all = [];
+    c.days.forEach(d => d.stops.forEach(s => { if (s.lat != null && !seen.has(s.name)) { seen.add(s.name); all.push([s.name, s.lat, s.lon]); } }));
+    (EXTRA_PLACES[city] || []).forEach(p => { if (!seen.has(p[0])) all.push(p); });
+    const hits = term ? all.filter(p => p[0].toLowerCase().includes(term)).slice(0, 6) : [];
+    q('#f-sugg').innerHTML = hits.map((p, i) => `<button type="button" data-s="${i}">${esc(p[0])}</button>`).join('') + (term && !hits.length ? '<span class="hint">No match here. Use “Pick on map”. The real app searches every place.</span>' : '');
+    q('#f-sugg').querySelectorAll('[data-s]').forEach(b => b.addEventListener('click', () => {
+      const p = hits[+b.dataset.s]; lat = p[1]; lon = p[2]; q('#f-place').value = p[0];
+      if (!q('#f-name').value) q('#f-name').value = p[0];
+      q('#f-sugg').innerHTML = ''; syncPin();
+    }));
+  }
+  form.querySelectorAll('[data-type]').forEach(b => b.addEventListener('click', () => { type = b.dataset.type; syncType(); }));
+  form.querySelectorAll('[data-status]').forEach(b => b.addEventListener('click', () => { status = b.dataset.status; syncStatus(); }));
+  q('#f-place').addEventListener('input', suggest);
+  q('#f-amt').addEventListener('input', syncAud); q('#f-cur').addEventListener('change', syncAud);
+  q('#f-date').addEventListener('change', () => { if (!q('#f-cur').dataset.touched && !q('#f-amt').value) q('#f-cur').value = LOCAL_CUR[cityNow()] || 'AUD'; });
+  q('#f-cur').addEventListener('change', () => { q('#f-cur').dataset.touched = '1'; });
+  const collect = () => {
+    const [city, date] = q('#f-date').value.split('|');
+    return { type, status, city, date, name: q('#f-name').value.trim(), t: q('#f-time').value, lat, lon, placeLabel: q('#f-place').value, from: q('#f-from').value.trim().toUpperCase(), to: q('#f-to').value.trim().toUpperCase(), arr: q('#f-arr').value.trim(), code: q('#f-code').value.trim(), nights: q('#f-nights').value, addr: q('#f-addr').value.trim(), cancel: q('#f-cancel').value.trim(), homeBase: q('#f-home').checked, amt: q('#f-amt').value, cur: q('#f-cur').value, ref: q('#f-ref').value.trim(), note: q('#f-note').value.trim() };
+  };
+  q('#f-pick').addEventListener('click', () => {
+    const vals = collect(); bk.close();
+    selectCity(vals.city, true, vals.date);
+    ensureDay(cur.city, vals.date);
+    cur.pick = { values: vals, editing }; drawMap();
+    $('#mapbox').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+  });
+  q('#f-parse')?.addEventListener('click', () => {
+    const t = q('#f-paste').value;
+    const m = (re) => (re.exec(t) || [])[1];
+    const name = m(/confirmed\s*[–-]\s*(.+)/i), addr = m(/Address:\s*(.+)/i), day = m(/Check-in:\s*\w+\s+(\d{1,2})\s+Dec/i), time = m(/Check-in:.*?(\d{1,2}:\d{2})/i);
+    const nights = m(/Nights:\s*(\d+)/i), total = m(/£\s*([\d,.]+)/), ref = m(/reference:\s*(\S+)/i), cancel = m(/cancellation until\s*(.+)/i);
+    if (!name) { toast('Couldn’t find a booking in that text. Try the Fill-in fields below.'); return; }
+    type = 'stay'; status = 'booked'; syncType(); syncStatus();
+    q('#f-name').value = name.trim(); q('#f-addr').value = addr || ''; q('#f-time').value = time ? time.padStart(5, '0') : '';
+    q('#f-nights').value = nights || ''; q('#f-amt').value = total ? total.replace(/,/g, '') : ''; q('#f-cur').value = 'GBP'; q('#f-ref').value = ref || ''; q('#f-cancel').value = cancel || '';
+    if (day) { const opt = [...q('#f-date').options].find(o => o.value.endsWith('|' + String(+day))); if (opt) q('#f-date').value = opt.value; }
+    const hit = Object.values(EXTRA_PLACES).flat().find(p => name.toLowerCase().includes(p[0].toLowerCase().split(' (')[0].toLowerCase()));
+    if (hit) { lat = hit[1]; lon = hit[2]; q('#f-place').value = hit[0]; }
+    syncPin(); syncAud(); bk.querySelector('details.paste').open = false;
+    toast('Filled from the email. Check it, then add it.');
+  });
+  q('#f-del')?.addEventListener('click', () => {
+    if (editing.userAdded) user.added = user.added.filter(a => a.stop.id !== editing.id);
+    else user.removed.push(editing.id);
+    saveUser(); bk.close(); refresh(); toast('Removed from the trip');
+  });
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const x = collect();
+    if (!x.name) { q('#f-name').focus(); q('#f-name').setAttribute('aria-invalid', 'true'); toast('Give it a name first.'); return; }
+    const id = editing?.id && editing.userAdded ? editing.id : 'u' + Date.now().toString(36);
+    const amt = x.amt ? +x.amt : 0;
+    let stop;
+    if (x.type === 'flight' || x.type === 'train') {
+      stop = { id, t: x.t, ticket: { mode: x.type === 'flight' ? 'plane' : 'train', band: x.name, code: x.code, from: x.from || '???', to: x.to || '???', dep: x.t || 'Time to set', arr: x.arr || '—', meta: x.note, amt, cur: x.cur, booked: x.status === 'booked', idea: x.status === 'idea' }, ref: x.ref };
+    } else {
+      stop = { id, t: x.t || '??', name: x.name, note: x.type === 'stay' ? [x.addr, x.cancel && `Free cancellation until ${x.cancel}`, x.note].filter(Boolean).join(' · ') : x.note, kind: x.type === 'stay' ? 'stay' : x.type === 'food' ? 'food' : 'sight', lat: x.lat ?? undefined, lon: x.lon ?? undefined, nopin: x.lat == null, amt, cur: x.cur, booked: x.status === 'booked', todo: x.status === 'todo', idea: x.status === 'idea', ref: x.ref, extra: x.type === 'stay' && x.nights ? `${x.nights} night${x.nights > 1 ? 's' : ''}` : '', nights: x.nights, addr: x.addr, cancel: x.cancel, homeBase: x.type === 'stay' && x.homeBase };
+    }
+    if (editing && !editing.userAdded) user.removed.push(editing.id);
+    user.added = user.added.filter(a => a.stop.id !== id);
+    user.added.push({ city: x.city, day: x.date, stop });
+    saveUser(); bk.close();
+    rebuild(); selectCity(x.city, false, x.date);
+    const f = findStop(id); if (f && f.s._i != null) selectStop(f.s._i, true);
+    toast(editing ? 'Saved' : `Added to ${dateOf(x.city, x.date).label}`);
+  });
+  syncType(); syncStatus(); syncPin(); syncAud();
+}
+function refresh() { rebuild(); selectCity(cur.city.id, false, cur.day.id); }
+$('#btn-add').addEventListener('click', () => openForm({ city: cur.city.id, day: cur.day.id }));
+
 // ---------------- Boot ----------------
+rebuild();
 selectCity('KUL', false, '2');
 replay();
 </script>
