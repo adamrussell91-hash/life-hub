@@ -1,4 +1,5 @@
 import { formatEntityRef } from './entity-ref.mjs';
+import { isImportedStudentPerson } from './github-professional-data.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
@@ -65,6 +66,8 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
 
   for (const { person, relationships } of peopleWithRelationships) {
     if (!person || person.is_self) continue;
+    // Prefer hide, not badge — Communications students are not network colleagues.
+    if (isImportedStudentPerson(person)) continue;
     if (person.lifecycle_status === 'deleted' || person.lifecycle_status === 'deidentified') continue;
 
     const personRef = person.ref ?? formatEntityRef({ namespace: 'shared', kind: 'person', id: person.id });

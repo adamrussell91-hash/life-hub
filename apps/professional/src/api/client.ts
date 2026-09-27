@@ -24,7 +24,9 @@ export interface ApiRequestOptions {
   signal?: AbortSignal;
 }
 
-const RETRYABLE_CODES = new Set(['invalid_response', 'network_error', 'timeout']);
+// Do not retry `timeout`: each attempt already waited ~20s, and three
+// stacked timeouts left Network Ecology on "Loading…" for ~60s.
+const RETRYABLE_CODES = new Set(['invalid_response', 'network_error']);
 const RETRY_ATTEMPTS = 3;
 
 function isApiResult<T>(value: unknown): value is ApiResult<T> {

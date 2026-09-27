@@ -88,3 +88,41 @@ test('parseOrgCrestSignRequest accepts PNG under 512KB and rejects oversized', (
   });
   assert.ok(svg.value);
 });
+
+test('assemblePeopleDirectory hides Communications students even if collection leaked one', async () => {
+  const studentId = 'person_00000000-0000-4000-8000-000000000099';
+  const data = assemblePeopleDirectory(
+    [
+      {
+        person: {
+          id: PERSON_ID,
+          display_name: 'Henry McLennan',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-09-01T00:00:00.000Z',
+          updated_at: '2026-09-20T00:00:00.000Z',
+          original_category: 'People (Professional Relationship Management)',
+          ref: `shared:person:${PERSON_ID}`
+        },
+        relationships: []
+      },
+      {
+        person: {
+          id: studentId,
+          display_name: 'Year 10 Student',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-09-01T00:00:00.000Z',
+          updated_at: '2026-09-20T00:00:00.000Z',
+          original_category: 'Student (Communications database)',
+          ref: `shared:person:${studentId}`
+        },
+        relationships: []
+      }
+    ],
+    { now: '2026-09-26T12:00:00.000Z' }
+  );
+  assert.equal(data.people.length, 1);
+  assert.equal(data.people[0].display_name, 'Henry McLennan');
+  assert.ok(!data.people.some((p) => p.display_name === 'Year 10 Student'));
+});

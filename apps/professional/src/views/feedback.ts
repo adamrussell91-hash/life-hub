@@ -17,7 +17,8 @@ function el<K extends keyof HTMLElementTagNameMap>(
 export function errorMessage(err: unknown): string {
   if (err instanceof ApiClientError) {
     if (err.code === 'unauthenticated' || err.status === 401) return 'Your session expired. Refresh and sign in again.';
-    if (err.code === 'network_error' || err.code === 'timeout') return 'Could not reach the network.';
+    if (err.code === 'timeout') return 'This took too long to load. Try again.';
+    if (err.code === 'network_error') return 'Could not reach the network.';
     if (err.status === 404 || err.code === 'entity_not_found') return 'Not found.';
     if (typeof err.status === 'number' && err.status >= 500) return 'The server could not complete this request.';
     return err.message || 'Request failed.';

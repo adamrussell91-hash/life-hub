@@ -126,3 +126,31 @@ test('dedupeIdentityRows drops URL-only labels that cannot be recovered', () => 
   );
   assert.equal(out.length, 0);
 });
+
+test('dedupeIdentityRows keeps same-source people that share a display name', () => {
+  const out = dedupeIdentityRows(
+    [
+      {
+        person: { id: 'person_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', display_name: 'Test Person' },
+        relationships: [],
+        _source: 'blob'
+      },
+      {
+        person: { id: 'person_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', display_name: 'Test Person' },
+        relationships: [],
+        _source: 'blob'
+      }
+    ],
+    (row) => row.person,
+    (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
+    (row) => row._source
+  );
+  assert.equal(out.length, 2);
+  assert.deepEqual(
+    out.map((r) => r.person.id).sort(),
+    [
+      'person_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      'person_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+    ].sort()
+  );
+});

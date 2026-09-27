@@ -10,8 +10,13 @@ import {
   personKey
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
-import { listGithubPersonCandidates, listGithubRelationshipEntries } from './github-professional-data.mjs';
-import { dedupeIdentityRows } from './identity-display-name.mjs';
+import {
+  isImportedStudentPerson,
+  listGithubImportedStudentPeople,
+  listGithubPersonCandidates,
+  listGithubRelationshipEntries
+} from './github-professional-data.mjs';
+import { dedupeIdentityRows, identityNameKey } from './identity-display-name.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -26,6 +31,29 @@ const PEOPLE_BATCH_SIZE = 10;
 
 function personIdFromKey(key) {
   return key.startsWith(PERSON_PREFIX) ? key.slice(PERSON_PREFIX.length) : null;
+}
+
+
+function personIdFromRef(ref) {
+  if (typeof ref !== 'string') return null;
+  const parts = ref.split(':');
+  return parts.length === 3 && parts[0] === 'shared' && parts[1] === 'person' ? parts[2] : null;
+}
+
+/** Drop Communications students and Blob name-twins of GitHub students. */
+function isNetworkExcludedPerson(person, studentIds, studentNameKeys) {
+  if (!person) return true;
+  if (isImportedStudentPerson(person) || studentIds.has(person.id)) return true;
+  const key = identityNameKey(person.display_name);
+  return Boolean(key && studentNameKeys.has(key));
+}
+
+function withoutStudentPersonEndpoints(relationships, studentIds) {
+  return (relationships ?? []).filter((entry) => {
+    if (entry?.endpoint?.kind !== 'person') return true;
+    const id = personIdFromRef(entry.endpoint.ref);
+    return !id || !studentIds.has(id);
+  });
 }
 
 /**
@@ -55,16 +83,24 @@ function personIdFromKey(key) {
  * it per organisation).
  *
  * Also merges the GitHub-canonical Professional import (Notion People +
- * workspace owner — Communications students are excluded by
- * `listGithubPersonCandidates`). Search and Person pages already fall
- * back to that import; People Home / cohorts / network ecology previously
- * scanned Blobs only and therefore could not see anyone imported, or who
- * the operator is. Same derived id → Blob record wins. Same human under
- * different ids (Blob UUID vs `derivePersonId(legacy_id)`) → identity-name
- * dedupe keeps the richer twin (usually GitHub, which carries
- * `employee_at`). A missing or unbound GitHub token degrades to the
- * Blob-only set, same as
+ * workspace owner). Communications-database students are excluded by
+ * `listGithubPersonCandidates`, and Blob name-twins of those students are
+ * dropped before identity dedupe so they never appear on People / Ecology
+ * network surfaces. Search and Person pages already fall back to that
+ * import; People Home / cohorts / network ecology previously scanned Blobs
+ * only and therefore could not see anyone imported, or who the operator
+ * is. Same derived id → Blob record wins. Same human under different ids
+ * (Blob UUID vs `derivePersonId(legacy_id)`) → identity-name dedupe keeps
+ * the richer twin (usually GitHub, which carries `employee_at`). A missing
+ * or unbound GitHub token degrades to the Blob-only set, same as
  * entity-search.mjs.
+ *
+ * Blobs `listForEntity` runs only for identity-dedupe survivors. GitHub
+ * rows are hydrated first (in-memory after one Contents/blob fetch) so
+ * `preferIdentityTwin` still sees their relationship counts; discarded
+ * Blob twins never pay the membership scan. That N× scan was hanging
+ * Network Ecology when hundreds of relationship-empty Blob copies sat
+ * beside the import.
  */
 export async function loadAllPeopleWithRelationships({
   store,
@@ -87,22 +123,26 @@ export async function loadAllPeopleWithRelationships({
   const personKeys = await listAuthoritativePersonKeys(store);
   const ids = [...new Set(personKeys.map(personIdFromKey).filter(Boolean))];
 
-  const results = await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
-    const record = parsePersonRecord(await getJSON(store, personKey(id)));
-    if (!record) return null;
-    const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
+  const githubStudents = await listGithubImportedStudentPeople(github);
+  const studentIds = new Set(githubStudents.map((p) => p.id));
+  const studentNameKeys = new Set(
+    githubStudents.map((p) => identityNameKey(p.display_name)).filter(Boolean)
+  );
 
-    const { outgoing, incoming } = await repo.listForEntity(ref, accessContext, { includeArchived: true });
-    const relationships = [
-      ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
-      ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
-    ];
+  // Cheap Blob pass: person JSON only. listForEntity waits until after
+  // identity dedupe so discarded twins never hit the membership scan.
+  // Also drop Blob twins of Communications students before dedupe / scan.
+  const nativeStubs = (
+    await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
+      const record = parsePersonRecord(await getJSON(store, personKey(id)));
+      if (!record) return null;
+      if (isNetworkExcludedPerson(record, studentIds, studentNameKeys)) return null;
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
+      return { person: { ...record, ref }, relationships: [], _source: 'blob' };
+    })
+  ).filter(Boolean);
 
-    return { person: { ...record, ref }, relationships, _source: 'blob' };
-  });
-
-  const native = results.filter(Boolean);
-  const nativeIds = new Set(native.map((row) => row.person.id));
+  const nativeIds = new Set(nativeStubs.map((row) => row.person.id));
   const githubPeople = await listGithubPersonCandidates(github);
   const endpointCache = new Map();
 
@@ -121,6 +161,7 @@ export async function loadAllPeopleWithRelationships({
     }
   }
 
+  // Hydrate GitHub before dedupe so relationship counts inform twin preference.
   const imported = await mapBounded(
     githubPeople.filter((record) => !nativeIds.has(record.id)),
     PEOPLE_BATCH_SIZE,
@@ -137,11 +178,33 @@ export async function loadAllPeopleWithRelationships({
     }
   );
 
-  const merged = dedupeIdentityRows(
-    [...native, ...imported],
+  const survivors = dedupeIdentityRows(
+    [...nativeStubs, ...imported],
     (row) => row.person,
-    (row, person) => ({ person, relationships: row.relationships }),
-    (row) => (row._source === 'github' ? 'github' : 'blob')
+    (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
+    (row) => row._source
   );
-  return merged;
+
+  return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
+    if (row._source === 'github') {
+      return {
+        person: row.person,
+        relationships: withoutStudentPersonEndpoints(row.relationships, studentIds)
+      };
+    }
+
+    const { outgoing, incoming } = await repo.listForEntity(row.person.ref, accessContext, {
+      includeArchived: true
+    });
+    return {
+      person: row.person,
+      relationships: withoutStudentPersonEndpoints(
+        [
+          ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
+          ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
+        ],
+        studentIds
+      )
+    };
+  });
 }
