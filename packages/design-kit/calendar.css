@@ -482,6 +482,33 @@
   position: static;
 }
 
+/* Brain dump — Sort it stays on its own row so the resize grip never covers it. */
+.calendar-dump__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.calendar-dump__input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 3.5rem;
+  max-height: 10rem;
+  margin-bottom: 0;
+}
+
+.calendar-dump__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
 .hub-calendar__rail[hidden] {
   display: none;
 }

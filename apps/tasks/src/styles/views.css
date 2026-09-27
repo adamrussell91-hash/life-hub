@@ -5473,6 +5473,7 @@ html.is-map-fullscreen .map-page .map-preview {
  * Tasks only places the strip full-width under the calendar. */
 .tasks-calendar-chrome__below .calendar-locks {
   grid-column: 1 / -1;
+  min-width: 0;
 }
 
 @media (max-width: 720px) {
@@ -5612,7 +5613,8 @@ html.is-map-fullscreen .map-page .map-preview {
 .calendar-cap-dot--slammed { background: var(--danger); }
 
 /* .calendar-locks* — kit owns week strip (calendar.css). Do not reintroduce
- * a flex column + nowrap ellipsis here; that spilled FRI across SAT/SUN. */
+ * a flex column + nowrap ellipsis here; that spilled FRI across SAT/SUN.
+ * Dump actions row also lives in the kit. */
 
 .calendar-next-actions__list {
   display: flex;
@@ -5664,13 +5666,10 @@ html.is-map-fullscreen .map-page .map-preview {
 }
 
 .calendar-dump__form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  /* Kit owns gap + actions row so the resize grip never covers Sort it. */
+  font-family: inherit;
 }
 .calendar-dump__input {
-  resize: vertical;
-  min-height: 3.5rem;
   font-family: inherit;
 }
 .calendar-dump__results {

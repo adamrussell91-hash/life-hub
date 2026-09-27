@@ -42,11 +42,24 @@ describe('Tasks week calendar chrome', () => {
     expect(kitCalendarCss).toMatch(
       /\.hub-calendar__rail\s+\.calendar-lock-row__task\s*\{[^}]*white-space:\s*normal/
     );
+    expect(chromeSrc).toMatch(/displayLockTitle/);
     expect(chromeSrc).toMatch(/taskLabel\.title\s*=\s*lock\.title/);
     // Tasks must not reintroduce nowrap ellipsis that fights kit containment.
     expect(viewsCss).not.toMatch(
       /\.calendar-lock-row__task\s*\{[^}]*white-space:\s*nowrap/
     );
+  });
+
+  it('keeps Sort it off the brain-dump resize grip', () => {
+    expect(kitCalendarCss).toMatch(/\.calendar-dump__actions/);
+    expect(chromeSrc).toMatch(/calendar-dump__actions/);
+  });
+
+  it('collapses repeated words in lock titles', async () => {
+    const { displayLockTitle } = await import('@/views/hub-calendar-chrome');
+    expect(displayLockTitle('about about Fletcher')).toBe('about Fletcher');
+    expect(displayLockTitle('Meeting about about progress')).toBe('Meeting about progress');
+    expect(displayLockTitle('Good night')).toBe('Good night');
   });
 
   it('patches locks in place on refresh (Someday #514 pattern — not full rail remount)', () => {
