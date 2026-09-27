@@ -2,9 +2,60 @@
  * In-memory mock of umbrella endpoints Professional needs for local Vite
  * development: session, entities search/overview, and Communications.
  * Synthetic fixtures only — no production data, no AI providers.
+ * When a sibling life-hub-data checkout is present, Notion communications.json
+ * is merged into Comms/Meetings lists the same way production Functions do.
  */
 import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import seedData from '../fixtures/seed.json' with { type: 'json' };
+
+const MOCK_DIR = path.dirname(fileURLToPath(import.meta.url));
+const NOTION_COMMS_CANDIDATES = [
+  path.resolve(MOCK_DIR, '../../../../life-hub-data/data/professional/communications.json'),
+  '/agent/repos/life-hub-data/data/professional/communications.json'
+];
+
+type NotionListCaches = {
+  communications: CommunicationRecord[];
+  meetings: Record<string, unknown>[];
+};
+
+let notionListCaches: NotionListCaches | null | undefined;
+
+async function loadNotionListCaches(): Promise<NotionListCaches | null> {
+  if (notionListCaches !== undefined) return notionListCaches;
+  const filePath = NOTION_COMMS_CANDIDATES.find((candidate) => existsSync(candidate));
+  if (!filePath) {
+    notionListCaches = null;
+    return null;
+  }
+  try {
+    const {
+      projectNotionCommunicationListRecord,
+      projectNotionMeetingListRecord
+    } = await import('../../../netlify/functions/_shared/schedule-projection.mjs');
+    const rows = JSON.parse(readFileSync(filePath, 'utf8')) as unknown[];
+    if (!Array.isArray(rows)) {
+      notionListCaches = null;
+      return null;
+    }
+    const now = () => Date.now();
+    notionListCaches = {
+      communications: rows
+        .map((row) => projectNotionCommunicationListRecord(row))
+        .filter(Boolean) as CommunicationRecord[],
+      meetings: rows
+        .map((row) => projectNotionMeetingListRecord(row, { now }))
+        .filter(Boolean) as Record<string, unknown>[]
+    };
+    return notionListCaches;
+  } catch {
+    notionListCaches = null;
+    return null;
+  }
+}
 
 const LOCAL_PASSPHRASE = 'professional-hub-local';
 
@@ -1376,7 +1427,11 @@ export function createMockApi() {
           }
         });
       }
-      const list = [...communications.values()].sort((a, b) => {
+      const notion = await loadNotionListCaches();
+      const byId = new Map<string, CommunicationRecord>();
+      for (const row of notion?.communications ?? []) byId.set(row.id, row);
+      for (const row of communications.values()) byId.set(row.id, row);
+      const list = [...byId.values()].sort((a, b) => {
         const delta = Date.parse(b.occurred_at) - Date.parse(a.occurred_at);
         return delta !== 0 ? delta : a.id < b.id ? 1 : -1;
       });
@@ -1587,11 +1642,15 @@ export function createMockApi() {
         }
         return json(200, { ok: true, data: { meeting } });
       }
+      const notion = await loadNotionListCaches();
+      const byId = new Map<string, Record<string, unknown>>();
+      for (const row of notion?.meetings ?? []) byId.set(String(row.id), row);
+      for (const row of meetings.values()) byId.set(String(row.id), row);
       return json(200, {
         ok: true,
         data: {
-          meetings: [...meetings.values()].sort(
-            (a, b) => Date.parse(String(a.scheduled_start)) - Date.parse(String(b.scheduled_start))
+          meetings: [...byId.values()].sort(
+            (a, b) => Date.parse(String(b.scheduled_start)) - Date.parse(String(a.scheduled_start))
           )
         }
       });
