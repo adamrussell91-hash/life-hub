@@ -171,3 +171,45 @@ export function branchColour(slot: number): string {
   const i = Math.max(1, Math.min(6, slot | 0)) - 1;
   return BRANCH_COLOUR_VARS[i]!;
 }
+
+export type EmploymentSpan = {
+  valid_from: string;
+  valid_to?: string | null;
+};
+
+/**
+ * Greedy interval lanes so concurrent roles (same school, overlapping dates)
+ * stack instead of painting on one overlapping line.
+ * Returns one lane index per input item (stable order).
+ */
+export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
+  const indexed = jobs.map((job, index) => {
+    const start = yearFraction(job.valid_from);
+    const end = job.valid_to ? yearFraction(job.valid_to) : Number.POSITIVE_INFINITY;
+    return { index, start, end: Number.isFinite(end) ? end : Number.POSITIVE_INFINITY };
+  });
+  indexed.sort((a, b) => a.start - b.start || a.end - b.end);
+  const laneEnds: number[] = [];
+  const lanes = new Array<number>(jobs.length).fill(0);
+  for (const job of indexed) {
+    if (!Number.isFinite(job.start)) {
+      lanes[job.index] = 0;
+      continue;
+    }
+    let lane = laneEnds.findIndex((end) => end <= job.start + 1e-6);
+    if (lane < 0) {
+      lane = laneEnds.length;
+      laneEnds.push(job.end);
+    } else {
+      laneEnds[lane] = job.end;
+    }
+    lanes[job.index] = lane;
+  }
+  return lanes;
+}
+
+/** Extra SVG height for stacked role-band lanes under the trunk (desktop). */
+export function roleBandExtraPx(laneCount: number): number {
+  if (laneCount <= 0) return 0;
+  return 22 + Math.max(0, laneCount - 1) * 16;
+}

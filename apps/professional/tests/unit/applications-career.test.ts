@@ -367,12 +367,95 @@ describe('renderCareerView', () => {
     expect(canvas.querySelector('.career-page')).toBeTruthy();
     expect(canvas.querySelector('.career-river')).toBeTruthy();
     expect(canvas.querySelector('.career-river__svg')).toBeTruthy();
+    expect(canvas.querySelector('.career-page__work')).toBeTruthy();
     expect(canvas.textContent).toMatch(/Skills scan/);
     expect(canvas.textContent).toMatch(/Skills ledger/);
     expect(canvas.textContent).toMatch(/Applications/);
     expect(canvas.textContent).toMatch(/Futures/);
     expect(canvas.textContent).toMatch(/No skill cards yet/);
     expect(canvas.textContent).not.toMatch(/Phase 3/);
+  });
+
+  it('renders work history from employment periods without collapsing stacked roles', async () => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/applications')) {
+        return Response.json({ ok: true, data: { applications: [] } });
+      }
+      return Response.json({
+        ok: true,
+        data: {
+          applications: { status: 'ok', items: [] },
+          employment: {
+            status: 'ok',
+            items: [
+              {
+                display_label: 'St Pius X High School',
+                role: 'English Teacher',
+                valid_from: '2021-01-25',
+                valid_to: '2024-08-16',
+                link_status: 'ended'
+              },
+              {
+                display_label: 'St Pius X High School',
+                role: 'Psychology Teacher',
+                valid_from: '2023-01-23',
+                valid_to: '2024-08-16',
+                link_status: 'ended'
+              },
+              {
+                display_label: "St Aloysius' College",
+                role: 'Gifted Education Teacher',
+                valid_from: '2025-01-22',
+                valid_to: null,
+                link_status: 'current'
+              }
+            ]
+          },
+          employment_items: [
+            {
+              display_label: 'St Pius X High School',
+              role: 'English Teacher',
+              valid_from: '2021-01-25',
+              valid_to: '2024-08-16'
+            },
+            {
+              display_label: 'St Pius X High School',
+              role: 'Psychology Teacher',
+              valid_from: '2023-01-23',
+              valid_to: '2024-08-16'
+            },
+            {
+              display_label: "St Aloysius' College",
+              role: 'Gifted Education Teacher',
+              valid_from: '2025-01-22',
+              valid_to: null
+            }
+          ],
+          professional_development: { status: 'ok', items: [] },
+          people: { status: 'ok', items: [] },
+          organisations: { status: 'ok', items: [] },
+          deferred: [],
+          achievements: [],
+          futures: [],
+          stones: [],
+          scan: { pending_count: 0, last_run_at: null }
+        }
+      });
+    });
+    const canvas = document.createElement('div');
+    await renderCareerView(canvas);
+    const work = canvas.querySelector('.career-page__work');
+    expect(work).toBeTruthy();
+    expect(work?.textContent).toMatch(/English Teacher/);
+    expect(work?.textContent).toMatch(/Psychology Teacher/);
+    expect(work?.textContent).toMatch(/Gifted Education Teacher/);
+    expect(work?.textContent).toMatch(/St Pius X/);
+    expect(work?.textContent).toMatch(/Aloysius/);
+    expect(work?.querySelectorAll('.relationship-timeline__entry').length).toBe(3);
+    expect(canvas.querySelector('.career-river__svg-host')?.getAttribute('style') || '').toMatch(
+      /pan-y/
+    );
   });
 
   it('links application items to Career application routes', async () => {
