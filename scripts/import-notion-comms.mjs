@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline/promises';
 import { getStore } from '@netlify/blobs';
 import { readExport } from './lib/notion-comms/read-export.mjs';
 import { readLiveBatch } from './lib/notion-comms/read-live-batch.mjs';
+import { loadHubPeople } from './lib/notion-comms/load-people.mjs';
 import { parseRow } from './lib/notion-comms/parse-row.mjs';
 import { buildImportPlan } from './lib/notion-comms/plan.mjs';
 import { applyImportPlan } from './lib/notion-comms/apply.mjs';
@@ -52,8 +53,7 @@ async function loadImportMap() {
   return map;
 }
 async function loadPeople() {
-  const records = await Promise.all((await listAuthoritativePersonKeys(universalStore)).map((key) => getIdentityJSON(universalStore, key)));
-  return records.map(parsePersonRecord).filter(Boolean).map((person) => ({ display_name: person.display_name, aliases: person.aliases, ref: `shared:person:${person.id}` }));
+  return loadHubPeople({ store: universalStore, listKeys: listAuthoritativePersonKeys, getJSON: getIdentityJSON, parse: parsePersonRecord });
 }
 
 const source = liveInput ? await readLiveBatch(liveInput) : await readExport(exportDir);
