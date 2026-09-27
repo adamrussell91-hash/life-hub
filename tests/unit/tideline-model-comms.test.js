@@ -11,9 +11,10 @@ const events = [
   { path: 'ledger:a', record: { type: 'ledger_item', id: 'ledger_a', date: '2026-09-23', title: 'You owe · Email Grace · 3 days late', direction: 'you_owe', late: true } }
 ];
 
-function build(inputEvents) {
+function build(inputEvents, visual = null) {
   return buildTidelineModel({
     events: inputEvents,
+    visual,
     week: WEEK,
     today: '2026-09-26',
     nowHour: 12,
@@ -38,4 +39,50 @@ test('comms are comm chips; pins stay short; non-PD events are event chips; prom
   assert.equal(ceremony.filterKey, 'events');
   const wed = model.days.find((day) => day.date === '2026-09-23');
   assert.deepEqual(wed.due.map((due) => [due.kind, due.filterKey, due.late]), [['promise', 'promises', true]]);
+});
+
+test('covering Life visual still keeps Professional overlays and ledger promises', () => {
+  const model = build(
+    [
+      ...events,
+      {
+        path: 'p:meet',
+        record: {
+          type: 'professional_meeting',
+          id: 'm1',
+          date: '2026-09-22',
+          time: '10:00',
+          duration_min: 45,
+          title: 'Seth planning'
+        }
+      },
+      {
+        path: 'p:pd',
+        record: {
+          type: 'professional_event',
+          id: 'e2',
+          date: '2026-09-22',
+          time: '15:00',
+          duration_min: 60,
+          title: 'Warlight PL',
+          event_type: 'professional_development'
+        }
+      }
+    ],
+    {
+      ITEMS: [{ id: 'life-meds', date: '2026-09-22', start: '07:00', end: '07:15', kind: 'health', title: 'Meds' }],
+      DUE: [],
+      WALLS: [],
+      FREE: []
+    }
+  );
+  assert.ok(model.visual, 'visual covers the week');
+  const chips = model.days.flatMap((day) => day.chips);
+  assert.equal(chips.some((chip) => chip.id === 'life-meds'), true);
+  assert.equal(chips.find((chip) => chip.id === 'c1')?.filterKey, 'comms');
+  assert.equal(chips.find((chip) => chip.id === 'm1')?.filterKey, 'meetings');
+  assert.equal(chips.find((chip) => chip.id === 'e1')?.filterKey, 'events');
+  assert.equal(chips.find((chip) => chip.id === 'e2')?.filterKey, 'pd');
+  const wed = model.days.find((day) => day.date === '2026-09-23');
+  assert.deepEqual(wed.due.map((due) => [due.kind, due.filterKey]), [['promise', 'promises']]);
 });
