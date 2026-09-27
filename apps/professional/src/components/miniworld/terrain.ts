@@ -646,6 +646,10 @@ export function drawRegionBody(
   else if (r.habitat === 'sandbank') drawSandbank(c, r);
 }
 
+// Hard ceiling on per-route decoration so a bad layout can never turn one
+// frame into an unbounded loop (see layout.ts MAX_ATTRACTION_GAIN).
+const MAX_ROUTE_STEPS = 400;
+
 function frac(n: number): number {
   return n - Math.floor(n);
 }
@@ -730,7 +734,7 @@ export function drawSandbar(
   const w = 9 + 4 * count;
   stroke(SEA.wetSand, w + 5);
   stroke(SEA.sand, w);
-  const steps = Math.floor(R.len / 10);
+  const steps = Math.min(Math.floor(R.len / 10), MAX_ROUTE_STEPS);
   const mang: Circle[] = [];
   const roots: [number, number, number, number, number][] = [];
   for (let i = 1; i < steps; i += 1) {
@@ -789,7 +793,7 @@ export function drawShoal(
     c.stroke();
     return;
   }
-  const steps = Math.floor(R.len / 26);
+  const steps = Math.min(Math.floor(R.len / 26), MAX_ROUTE_STEPS);
   const rocks: Circle[] = [];
   for (let i = 0; i <= steps; i += 1) {
     const j = frac(Math.sin(i * 78.233 + A.cy + B.cx) * 43758.5);

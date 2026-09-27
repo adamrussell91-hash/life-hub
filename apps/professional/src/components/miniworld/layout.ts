@@ -34,6 +34,8 @@ export interface WorldLayout {
 }
 
 const MAX_RADIUS = 260;
+const MAX_ATTRACTION_GAIN = 0.2;
+const MAX_STEP = 60;
 const COLLIDE_PAD = 40;
 
 function mulberry32(seed: number): () => number {
@@ -127,6 +129,7 @@ function buildWeights(
 
   // Shared people: count across current + all timeline years (max).
   const countShared = (clusters: NetworkEcologyCluster[]) => {
+    const snapshot = new Map<string, number>();
     const membership = new Map<string, string[]>();
     for (const c of clusters) {
       if (!ids.has(c.id)) continue;
@@ -141,9 +144,12 @@ function buildWeights(
       for (let i = 0; i < sorted.length; i += 1) {
         for (let j = i + 1; j < sorted.length; j += 1) {
           const key = `${sorted[i]}|${sorted[j]}`;
-          shared.set(key, (shared.get(key) ?? 0) + 1);
+          snapshot.set(key, (snapshot.get(key) ?? 0) + 1);
         }
       }
+    }
+    for (const [key, count] of snapshot) {
+      shared.set(key, Math.max(shared.get(key) ?? 0, count));
     }
   };
 
@@ -260,7 +266,10 @@ export function layoutCommunities(api: WorldApi): WorldLayout {
         const w = pairWeight(a.id, b.id, shared, cross);
         if (w > 0) {
           const target = pa.r + pb.r + 80;
-          const force = ((dist - target) / dist) * 0.02 * w * alpha;
+          // Gain is capped: an uncapped 0.02 * w overshoots once w > ~50 and
+          // the layout diverges (coordinates reached 1e147 and froze the
+          // browser drawing sandbars across them).
+          const force = ((dist - target) / dist) * Math.min(0.02 * w, MAX_ATTRACTION_GAIN) * alpha;
           pa.vx += dx * force;
           pa.vy += dy * force;
           pb.vx -= dx * force;
@@ -287,6 +296,11 @@ export function layoutCommunities(api: WorldApi): WorldLayout {
       }
       p.vx -= p.x * 0.002 * alpha;
       p.vy -= p.y * 0.002 * alpha;
+      const speed = Math.hypot(p.vx, p.vy);
+      if (speed > MAX_STEP) {
+        p.vx = (p.vx / speed) * MAX_STEP;
+        p.vy = (p.vy / speed) * MAX_STEP;
+      }
       p.x += p.vx;
       p.y += p.vy;
       p.vx *= 0.6;
@@ -294,9 +308,13 @@ export function layoutCommunities(api: WorldApi): WorldLayout {
     }
   }
 
-  const result: LayoutPosition[] = communities.map((c) => {
+  const settled = [...pos.values()].every((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  const result: LayoutPosition[] = communities.map((c, i) => {
     const p = pos.get(c.id)!;
-    return { id: c.id, x: p.x, y: p.y, radius: c.radius };
+    if (settled) return { id: c.id, x: p.x, y: p.y, radius: c.radius };
+    const angle = (i / n) * Math.PI * 2;
+    const dist = 320 + c.radius;
+    return { id: c.id, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, radius: c.radius };
   });
 
   let minX = Infinity;
