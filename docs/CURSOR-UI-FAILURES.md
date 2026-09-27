@@ -25,6 +25,8 @@
 
 **L6 · Chip text wraps inside a rounded pill.** **Seen:** Organisations wall #508 (the NSW HALT "Member" chip wrapped to 3 centred lines). **Rule:** A chip is one line: `white-space: nowrap`, the detail truncates with an ellipsis at `max-width: 100%`, and the full text goes in `title`. Long detail belongs on the detail page, not the tile. **Check:** every chip has `getClientRects().length === 1` at 390 and 1440.
 
+**L7 · Week lock titles spill across day columns.** **Seen:** Tasks Almanac/Week chrome “This week's locks” (Friday title over SAT/SUN for ~30s while calendar sources stalled). **Rule:** A 7-column locks grid uses `minmax(0, 1fr)` tracks; each `.calendar-lock-row` is a grid item with `min-width: 0`, `overflow: hidden`, and the task text wraps/clamps *inside* its day cell (`line-clamp`, `white-space: normal`). Full title in `title`. Do not “fix” by single-line ellipsis alone while the cell can still grow. First calendar paint must not wait on every foreign hub source — skeleton within ~1s, then progressive sources. **Check:** at 1440 a long Friday title’s `getBoundingClientRect().right` stays left of the Saturday cell’s left; Almanac shows `data-part="almanac-loading"` (or settled chart) within 2s of navigation, never a blank host for tens of seconds.
+
 ## S: Surfaces and CSS scope
 
 **S1 · Styles scoped to another page's container.** **Seen:** Medical v2 mini lab panel. The bloods meter CSS was scoped to `#body-bloods-dashboard`, so the reused `markerRow()` rendered as floating black dots. **Rule:** When you reuse a component somewhere new, grep its CSS for ID/parent-scoped selectors and rescope them to the component class. **Check:** screenshot the reused component in its new home next to its original home; they match.

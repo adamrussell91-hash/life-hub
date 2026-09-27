@@ -38,8 +38,19 @@ function emptyBucket() {
   return { status: 'pending', events: [], error: null, meta: null };
 }
 
-async function readOkJson(apiFetch, path) {
-  const response = await apiFetch(path);
+/** Cap a hung cross-hub fetch so one source cannot block the calendar for ~30s. */
+const SOURCE_FETCH_MS = 12_000;
+
+function withSourceTimeout(init) {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
+    return init;
+  }
+  if (init?.signal) return init;
+  return { ...(init || {}), signal: AbortSignal.timeout(SOURCE_FETCH_MS) };
+}
+
+async function readOkJson(apiFetch, path, init) {
+  const response = await apiFetch(path, withSourceTimeout(init));
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.ok !== true) {
     const err = new Error('request_failed');
@@ -186,7 +197,7 @@ export function createHubSourceLoader(opts) {
     setBucket('professional', { status: 'loading', error: null });
     inflight.professional = (async () => {
       try {
-        const response = await apiFetch('/api/schedule-projections');
+        const response = await apiFetch('/api/schedule-projections', withSourceTimeout());
         const payload = await response.json().catch(() => null);
         if (response.status === 401 || response.status === 403) {
           setBucket('professional', {

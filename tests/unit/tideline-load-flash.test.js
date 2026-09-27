@@ -27,11 +27,13 @@ test('source: Tideline skips entrance replay and identical re-paints', () => {
   assert.match(src, /entranceGuardUntil/);
 });
 
-test('source: mount-hub-calendar waits for loadAll before onChange paints', () => {
+test('source: mount-hub-calendar gates onChange until first paint, with a budget', () => {
   const src = readFileSync(join(rootDir, 'packages/design-kit/js/calendar/mount-hub-calendar.js'), 'utf8');
   assert.match(src, /let ready = false/);
   assert.match(src, /if \(!destroyed && ready\) schedulePaint/);
   assert.match(src, /ready = true/);
+  assert.match(src, /FIRST_PAINT_MS/);
+  assert.match(src, /paintLoading/);
 });
 
 test('identical re-render keeps the same tideline shell node', () => {

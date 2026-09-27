@@ -160,9 +160,11 @@ function renderLocksWidget(tasks: Task[], weekDates: string[]): HTMLElement {
     row.type = 'button';
     row.disabled = !lock;
     const day = new Date(`${date}T12:00:00`);
+    const taskLabel = el('span', 'calendar-lock-row__task', lock ? lock.title : 'Nothing due');
+    if (lock) taskLabel.title = lock.title;
     row.append(
       el('span', 'calendar-lock-row__day', day.toLocaleDateString('en-AU', { weekday: 'short' }).toUpperCase()),
-      el('span', 'calendar-lock-row__task', lock ? lock.title : 'Nothing due')
+      taskLabel
     );
     if (lock) {
       row.addEventListener('click', () => {
@@ -244,7 +246,10 @@ export type TasksChromeMount = {
 /**
  * Wrap a host with Tasks KEEP chrome around the kit calendar mount point.
  */
-export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
+export function mountTasksCalendarChrome(
+  host: HTMLElement,
+  opts?: { zoom?: string; today?: string }
+): TasksChromeMount {
   host.replaceChildren();
   const root = el('div', 'tasks-calendar-chrome');
   root.dataset.part = 'tasks-calendar-chrome';
@@ -264,10 +269,11 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
 
   const ac = new AbortController();
   let tasks: Task[] = [];
-  let todayKey = new Date().toISOString().slice(0, 10);
+  let todayKey = opts?.today || new Date().toISOString().slice(0, 10);
   /** Skip / patch rail when content is unchanged — mirror Someday #514 (shell once, patch lists). */
   let railSignature = '';
   let railZoom = '';
+  const initialZoom = opts?.zoom || 'week';
 
   async function loadTasks() {
     try {
@@ -452,8 +458,8 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
     paintRail(opts?.zoom || 'week');
   }
 
-  // Load once after mount — do not paint an empty locks strip first (that was the flash).
-  void refresh();
+  // Load once after mount with the real zoom — Almanac must not show week locks.
+  void refresh({ zoom: initialZoom });
 
   return {
     root,

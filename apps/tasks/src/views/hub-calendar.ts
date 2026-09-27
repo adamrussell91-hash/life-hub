@@ -38,7 +38,15 @@ export function tasksRouteFor(item: unknown): string | null {
 
 function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   // Pages host has no /api — Functions live on api.adam-russell.com (same as api/client).
-  return fetch(`${getApiBaseUrl()}${path}`, { credentials: 'include', ...(init ?? {}) });
+  const next: RequestInit = { credentials: 'include', ...(init ?? {}) };
+  if (
+    !next.signal &&
+    typeof AbortSignal !== 'undefined' &&
+    typeof AbortSignal.timeout === 'function'
+  ) {
+    next.signal = AbortSignal.timeout(20_000);
+  }
+  return fetch(`${getApiBaseUrl()}${path}`, next);
 }
 
 function itemType(item: unknown): string {
@@ -96,7 +104,9 @@ let chrome: TasksChromeMount | null = null;
 export function mountTasksCalendar(host: HTMLElement): HubCalendarHandle {
   handle?.destroy();
   chrome?.destroy();
-  chrome = mountTasksCalendarChrome(host);
+  const initialZoom =
+    parseCalendarZoom({ pathname: location.pathname, hash: location.hash }, 'tasks') || 'week';
+  chrome = mountTasksCalendarChrome(host, { zoom: initialZoom });
   handle = mountHubCalendar(chrome.calendarHost, {
     hub: 'tasks',
     fills: { ...TASKS_CALENDAR_FILLS },
