@@ -4,11 +4,15 @@ import { formatEntityRef } from './entity-ref.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
 
 // Read-only bridge onto the private `life-hub-data` repository's imported
-// Professional directory (350 people / 18 organisations / 74 relationships,
-// migrated from Notion — see docs/migrations/professional-import.md). This
-// data's canonical home is GitHub, not `universal-link-content` Blobs — the
-// user explicitly chose not to duplicate it into Netlify storage. Every
-// function here is read-only: this module never writes to GitHub.
+// Professional directory (`data/professional/{people,organisations,
+// relationships}.json`, migrated from Notion — see
+// docs/migrations/professional-import.md). people.json also carries
+// Communications-database student rows; Professional People / Network
+// Ecology list paths exclude those via `listGithubPersonCandidates`.
+// This data's canonical home is GitHub, not `universal-link-content`
+// Blobs — the user explicitly chose not to duplicate it into Netlify
+// storage. Every function here is read-only: this module never writes to
+// GitHub.
 //
 // IDs are deterministic, not random. A native Person/Organisation gets a
 // `crypto.randomUUID()` id at creation time (identity-schema.mjs). This
@@ -33,6 +37,14 @@ const LEGACY_IMPORT_TIMESTAMP = '2026-09-15T00:00:00.000Z';
 export const PROFESSIONAL_DATA_REPO_ENV = 'PROFESSIONAL_GITHUB_REPOSITORY';
 export const PROFESSIONAL_DATA_TOKEN_ENV = 'GITHUB_TOKEN';
 export const DEFAULT_PROFESSIONAL_DATA_REPO = 'adamrussell91-hash/life-hub-data';
+
+/** Notion Communications-database student rows co-imported into people.json. */
+export const STUDENT_ORIGINAL_CATEGORY = 'Student (Communications database)';
+
+/** True for imported student contacts — not Professional Network adults. */
+export function isImportedStudentPerson(rowOrRecord) {
+  return rowOrRecord?.original_category === STUDENT_ORIGINAL_CATEGORY;
+}
 
 export function professionalDataRepo(env = process.env) {
   const configured = typeof env?.[PROFESSIONAL_DATA_REPO_ENV] === 'string'
@@ -224,6 +236,11 @@ function normalizePeople(rows) {
     if (!record) continue;
     const professionalProfile = parseProfessionalProfile(row.professional_profile);
     if (professionalProfile) record.professional_profile = professionalProfile;
+    // Preserve import provenance so list paths can exclude Communications
+    // students without inventing a new Notion property.
+    if (typeof row.original_category === 'string' && row.original_category) {
+      record.original_category = row.original_category;
+    }
     byId.set(id, record);
     idByLegacyId.set(row.legacy_id, id);
   }
@@ -395,7 +412,11 @@ export async function getGithubOrganisation(id, options = {}) {
 
 export async function listGithubPersonCandidates(options = {}) {
   const data = await loadProfessionalData(options);
-  return data ? [...data.peopleById.values()] : [];
+  if (!data) return [];
+  // Professional People, Network Ecology, and entity search all feed from
+  // this list — adults only. Direct getGithubPerson still resolves a
+  // student by id if something already holds their ref.
+  return [...data.peopleById.values()].filter((record) => !isImportedStudentPerson(record));
 }
 
 export async function getGithubActiveSelfPerson(options = {}) {
