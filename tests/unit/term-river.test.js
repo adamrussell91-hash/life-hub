@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LANES, byLane, deriveRiverZooms, laneFor, riverWeekLabel, weeklyLoad, weeksBetween } from '../../apps/life/js/app/term-river.js';
+import {
+  LANES,
+  byLane,
+  deriveRiverZooms,
+  laneFor,
+  mergeRiverItems,
+  riverItemsFromHubEvents,
+  riverWeekLabel,
+  weeklyLoad,
+  weeksBetween
+} from '../../apps/life/js/app/term-river.js';
 
 const TERMS = [
   { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
@@ -82,4 +92,31 @@ test('deriveRiverZooms: after a term ends, picks the next term', () => {
   const zooms = deriveRiverZooms(TERMS, '2026-10-01');
   assert.equal(zooms.term.from, '2026-10-13');
   assert.equal(zooms.term.to, '2026-12-17');
+});
+
+test('hub overlays become river points even when visual.RIVER.ITEMS is empty (Year blank bug)', () => {
+  const hub = riverItemsFromHubEvents([
+    { path: 't:1', record: { type: 'scheduled_lesson', id: 'lesson-1', date: '2026-02-03', time: '09:00', title: 'Y12 English', isClass: true } },
+    { path: 'p:1', record: { type: 'professional_communication', id: 'comm-1', date: '2026-02-04', time: '08:40', title: 'Email Nadia' } },
+    { path: 'p:2', record: { type: 'professional_meeting', id: 'meet-1', date: '2026-02-05', time: '10:00', title: 'Seth planning' } },
+    { path: 'p:3', record: { type: 'professional_event', id: 'pd-1', date: '2026-02-06', time: '15:00', title: 'Warlight PL', event_type: 'professional_development' } },
+    { path: 'task:1', record: { type: 'task', id: 'task-1', date: '2026-02-07', title: 'Mark drafts' } },
+    { path: 'life:1', record: { type: 'calendar_block', id: 'corey-1', date: '2026-02-07', kind: 'corey', title: 'Tea + TV', time: '19:30', end_time: '21:30' } },
+    { path: 'log:1', record: { type: 'meal', id: 'meal-1', date: '2026-02-07', title: 'Lunch' } }
+  ]);
+  assert.equal(hub.some((item) => item.id === 'lesson-1' && item.filterKey === 'classes'), true);
+  assert.equal(hub.some((item) => item.id === 'comm-1' && item.filterKey === 'comms'), true);
+  assert.equal(hub.some((item) => item.id === 'meet-1' && item.filterKey === 'meetings'), true);
+  assert.equal(hub.some((item) => item.id === 'pd-1' && item.filterKey === 'pd'), true);
+  assert.equal(hub.some((item) => item.id === 'task-1' && item.filterKey === 'tasks'), true);
+  assert.equal(hub.some((item) => item.id === 'corey-1' && laneFor(item) === 'corey'), true);
+  assert.equal(hub.some((item) => item.id === 'meal-1'), false, 'meals stay off the river');
+
+  const merged = mergeRiverItems(
+    [{ id: 'comm-1', title: 'visual wins', date: '2026-02-04', shape: 'point' }],
+    hub
+  );
+  assert.equal(merged.find((item) => item.id === 'comm-1')?.title, 'visual wins');
+  assert.ok(merged.length >= 6, 'visual + remaining hub overlays');
+  assert.equal(mergeRiverItems([], hub).length, hub.length, 'empty visual still paints hub overlays');
 });
