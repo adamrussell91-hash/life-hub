@@ -4014,7 +4014,8 @@
 
 .orgs-wall__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(0, 1fr));
+  /* Phone: one column. auto-fill + minmax(0,1fr) piles zero-width tracks (L1). */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
   min-width: 0;
 }
@@ -4022,6 +4023,10 @@
 @media (min-width: 720px) {
   .orgs-wall__grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .orgs-tile--home {
+    grid-column: span 2;
   }
 }
 
@@ -4052,7 +4057,7 @@
 }
 
 .orgs-tile--home {
-  grid-column: span 2;
+  grid-column: span 1;
 }
 
 .orgs-tile__head {
@@ -4210,6 +4215,7 @@
 .orgs-time__svg svg {
   display: block;
   min-width: 28rem;
+  height: auto;
 }
 
 .orgs-page__sheet {

@@ -234,12 +234,13 @@ export function renderOrganisationTimelineSvg(input: {
   const layout = layoutOrganisationTimeline(input);
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('preserveAspectRatio', 'xMinYMid meet');
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', String(layout.height));
   svg.setAttribute('role', 'img');
   svg.setAttribute('aria-label', 'Your time with this organisation');
   svg.style.height = `${layout.height}px`;
+  svg.style.minWidth = `${Math.max(layout.width, 448)}px`;
   svg.classList.add('orgs-time-svg');
 
   // People area behind lanes (A4).

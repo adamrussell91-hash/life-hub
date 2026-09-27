@@ -208,7 +208,8 @@ export async function renderOrganisationPage(
     opps.heading.append(el('span', 'people-pane__h2-sub', 'here · next 3 weeks'));
     opps.body.append(el('p', 'people-pane__empty', 'No opportunities yet.'));
 
-    // Your time with … — shared 2019→now domain when people spark uses it (A4).
+    // Your time with … — shared 2019→now domain; width from host so labels
+    // are not squashed at 390 (C1 / preserveAspectRatio meet + minWidth).
     setSectionState(time.body, 'ready');
     const domainStart =
       model.peopleSteps[0]?.at &&
@@ -219,20 +220,22 @@ export async function renderOrganisationPage(
           ? model.timelineLanes[0].start
           : ORG_SPARK_DOMAIN_START;
     const domainEnd = new Date().toISOString();
+    const wrap = el('div', 'orgs-time__svg');
+    time.body.append(wrap);
+    const measured = Math.max(wrap.clientWidth || 0, 448);
     const svg = renderOrganisationTimelineSvg({
       lanes: model.timelineLanes,
       peopleSteps: model.peopleSteps,
       domainStart,
-      domainEnd
+      domainEnd,
+      width: measured
     });
-    const wrap = el('div', 'orgs-time__svg');
     wrap.append(svg);
     if (model.timelineLanes.length === 0 && model.peopleSteps.length === 0) {
-      time.body.append(
+      time.body.prepend(
         el('p', 'people-pane__empty', 'No timeline marks yet — links and events will appear here.')
       );
     }
-    time.body.append(wrap);
   } catch (err) {
     if (!isCurrent()) return;
     title.textContent = 'Organisations';

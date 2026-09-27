@@ -265,7 +265,7 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 - [x] Undated people omitted from spark; tile `aria-label` includes undated count
 - [x] Unit: different orgs → different path; shared-scale x; spark text = `2019`/`now` only
 - Checks: C5 C1 C2 D1 W2
-- Screens: `screens/fix-01/wall-aloysius-trinity-1440.png`, `…-390.png`
+- Screens: `screens/fix-01/live-wall-1440.png`, `live-wall-390.png` (plus harness wall PNGs)
 - Diff vs mockup: see `screens/fix-01/DIFF.md` (1 dated person on Aloysius; Trinity empty)
 
 ### A2. Warmth from People source (D6, V4)
@@ -280,13 +280,13 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 
 - [x] Work/roles `end: null` → bar to domain end (now); events stay points
 - [x] Unit: bar right edge = now x
-- Screen: `screens/fix-01/aloysius-timeline-1440.png`
+- Screen: `screens/fix-01/live-aloysius-1440.png`, `live-aloysius-timeline-390.png`
 
 ### A4. Timeline labels + people area (C1, C3)
 
 - [x] Labels inside bars (or beside when too long); axis row below; stepped people area; count label; no per-person dots
 - [x] getBBox non-overlap at 900 and 390; height = rows×32+24
-- Screens: timeline 1440 / 390
+- Screens: timeline live 1440 / 390 (`live-aloysius-*.png`); `preserveAspectRatio=xMinYMid meet` + minWidth so 390 scrolls instead of squashing (C1)
 
 ### A5. Dead buttons / roadmap copy (I3, P4)
 
@@ -299,7 +299,8 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 ### A6. Chip one-line ellipsis (L6)
 
 - [x] `.orgs-rchip` nowrap + detail ellipsis; `title` = full text
-- Screens: `halt-chip-1440.png`, `halt-chip-390.png`
+- Screens: live wall HALT chip; `getClientRects().length === 1` at 1440 and 390
+- Harness: `halt-chip-1440.png`, `halt-chip-390.png`
 
 ### A7. Filter / chip counts (D4, V4)
 
@@ -317,4 +318,6 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 ### Part A status
 
 - [x] A1–A8 ticked with checks + screens
+- [x] hub-ui-guardian **PASS** (r3; L1 phone wall one-column; C1 timeline meet+scroll)
+- Failure-register checked: L1 L6 S2 S4 V4 C1 C2 C3 C5 C6 D1 D3 D4 D5 D6 I3 W2 P1 P3 P4
 - [ ] Part B — not started (do not mark PR ready)

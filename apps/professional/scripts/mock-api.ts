@@ -679,6 +679,17 @@ export function createMockApi() {
     }
 
     if (path === '/api/organisations/directory' && method === 'GET') {
+      // Optional Fix 01 real-data overlay (local screenshots only; path via env).
+      const fix01Path = process.env.ORGS_FIX01_DIRECTORY_JSON;
+      if (fix01Path) {
+        try {
+          const { readFileSync } = await import('node:fs');
+          const body = JSON.parse(readFileSync(fix01Path, 'utf8'));
+          if (body?.data?.organisations) return json(200, body);
+        } catch {
+          /* fall through to synthetic directory */
+        }
+      }
       const self =
         [...people.values()].find((p) => p.is_self) ?? [...people.values()][0] ?? null;
       const selfRef = self ? `shared:person:${self.id}` : null;
