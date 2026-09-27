@@ -8,7 +8,7 @@ alwaysApply: true
 
 Project skills live in `.cursor/skills/`. Read `.cursor/skills/README.md` for the pinned upstream SHA and overrides.
 
-Authority, in order: Adam's request, Ponytail and project guardrails, the design kit, `docs/consolidation/plan.md`, first-pass correctness, agent-context integrity, then these skills.
+Authority, in order: Adam's request, the UX fix standard (for anything visual or interactive), Ponytail and project guardrails, the design kit, `docs/consolidation/plan.md`, first-pass correctness, agent-context integrity, then these skills.
 
 ## Activation
 
