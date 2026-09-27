@@ -15,6 +15,9 @@ export type RailViewId =
   | 'people'
   | 'organisations'
   | 'relationships'
+  | 'communications'
+  | 'meetings'
+  | 'events'
   | 'applications'
   | 'career'
   | 'network-ecology';

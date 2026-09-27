@@ -3,21 +3,20 @@ import { createFuture, createStone, draftFuture, updateFuture } from '@/api/care
 import { searchEntities } from '@/api/entities';
 import { createTask, createUniversalLink } from '@/api/universal-links';
 import { careerCardRoute, careerFutureRoute } from '@/app/router';
-import type { buildCareerModel } from '@/domain/career-model';
+import type { CareerFutureModel } from '@/domain/career-model';
 import { selectGhostPaths } from '@/domain/career-ghost-paths';
 import { branchColour } from '@/domain/career-river-geometry';
 
-type CareerModel = ReturnType<typeof buildCareerModel>;
-type FutureModel = CareerModel['futures'][number];
+type FutureModel = CareerFutureModel;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className?: string,
-  text?: string
+  className?: string | null,
+  text?: string | null
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text != null) node.textContent = text;
   return node;
 }
 

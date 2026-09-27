@@ -3,19 +3,17 @@ import { listApplications, updateApplication, getApplication } from '@/api/appli
 import { createStone } from '@/api/career';
 import { createTask } from '@/api/universal-links';
 import { applicationRoute } from '@/app/router';
-import type { buildCareerModel } from '@/domain/career-model';
+import type { CareerModel } from '@/domain/career-model';
 import type { ApplicationRecord } from '@/domain/types';
-
-type CareerModel = ReturnType<typeof buildCareerModel>;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className?: string,
-  text?: string
+  className?: string | null,
+  text?: string | null
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text != null) node.textContent = text;
   return node;
 }
 
