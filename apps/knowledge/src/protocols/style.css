@@ -82,6 +82,8 @@
 .protocol-turn-card { width:100%; max-width:44rem; margin:0 auto; flex:0 0 auto; padding:clamp(1.5rem,3vw,2.25rem) clamp(1.5rem,3vw,2rem); border:1px solid rgba(228,201,138,.35); border-radius:var(--radius-lg); background:linear-gradient(160deg,rgba(20,16,28,.72),rgba(14,12,22,.88)); box-shadow:0 30px 60px rgba(0,0,0,.5); backdrop-filter:blur(10px); animation:protocol-turn-in .45s ease both; }
 /* End-of-council: stack from the top so summary + synthesis share one scrollport. */
 .protocol-session.is-complete .protocol-turn-card-slot { justify-content:flex-start; padding-top:var(--space-2); }
+/* Completed paint must not start at opacity 0 — screenshots and settle reads need the solid card. */
+.protocol-session.is-complete .protocol-turn-card { animation:none; }
 .protocol-turn-card__meta { margin:0 0 var(--space-1); color:#e4c98a; font-size:var(--text-xs); letter-spacing:.16em; text-transform:uppercase; }
 .protocol-turn-card__role { margin:0 0 var(--space-3); color:#a89f8a; font-size:var(--text-xs); }
 .protocol-turn-card p { margin:0 0 var(--space-3); font-size:clamp(1.05rem,1.4vw,1.2rem); line-height:1.65; font-family:var(--font-display); color:#f3ecdd; }
