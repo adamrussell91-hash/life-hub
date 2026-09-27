@@ -296,7 +296,9 @@ export async function renderOrganisationsView(
   );
   const oppsBody = el('div', 'orgs-opps__body');
   oppsBody.append(el('p', 'orgs-opps__empty', 'No opportunities yet.'));
-  opps.append(oppsH, oppsBody);
+  const addOppWall = el('button', 'btn btn--ghost', 'Add opportunity') as HTMLButtonElement;
+  addOppWall.type = 'button';
+  opps.append(oppsH, oppsBody, addOppWall);
 
   const bar = el('div', 'orgs-page__bar');
   const seg = el('div', 'orgs-page__seg');
@@ -497,6 +499,68 @@ export async function renderOrganisationsView(
         window.alert(err instanceof Error ? err.message : 'Could not create organisation.');
       }
     });
+  });
+
+  addOppWall.addEventListener('click', () => {
+    if (!models.length) return;
+    const sheetEl = el('div', 'orgs-page__sheet');
+    sheetEl.setAttribute('role', 'dialog');
+    sheetEl.setAttribute('aria-label', 'Add opportunity');
+    const inner = el('div', 'orgs-page__sheet-inner');
+    inner.append(el('h2', undefined, 'Add opportunity'));
+    const orgSel = document.createElement('select');
+    for (const m of models) {
+      const opt = document.createElement('option');
+      opt.value = m.ref;
+      opt.textContent = m.displayName;
+      orgSel.append(opt);
+    }
+    const titleIn = document.createElement('input');
+    titleIn.type = 'text';
+    titleIn.placeholder = 'Title';
+    titleIn.className = 'orgs-page__input';
+    const status = el('p', 'orgs-page__meta', '');
+    const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
+    save.type = 'button';
+    save.addEventListener('click', () => {
+      void import('@/api/opportunities').then(async ({ createOpportunity, listOpportunities }) => {
+        try {
+          await createOpportunity({
+            organisation_ref: orgSel.value,
+            kind: 'other',
+            title: titleIn.value.trim(),
+            found_by: 'adam'
+          });
+          sheetEl.remove();
+          const res = await listOpportunities({});
+          const open = (res.opportunities || []).filter((o) => o.status === 'open').slice(0, 4);
+          oppsBody.replaceChildren();
+          if (!open.length) {
+            oppsBody.append(el('p', 'orgs-opps__empty', 'No opportunities yet.'));
+          } else {
+            for (const o of open) {
+              oppsBody.append(el('div', 'orgs-opp__t', o.title));
+            }
+          }
+        } catch (err) {
+          status.textContent = err instanceof Error ? err.message : 'Save failed.';
+        }
+      });
+    });
+    const close = el('button', 'btn btn--ghost', 'Close') as HTMLButtonElement;
+    close.type = 'button';
+    close.addEventListener('click', () => sheetEl.remove());
+    for (const [lab, control] of [
+      ['Organisation', orgSel],
+      ['Title', titleIn]
+    ] as Array<[string, HTMLElement]>) {
+      const l = el('label', 'orgs-page__field');
+      l.append(document.createTextNode(lab), control);
+      inner.append(l);
+    }
+    inner.append(status, save, close);
+    sheetEl.append(inner);
+    root.append(sheetEl);
   });
 
   const mq = window.matchMedia(PHONE_MQ);

@@ -98,11 +98,57 @@ describe('renderOrganisationsView (W2)', () => {
   });
 });
 
-describe('organisation page A5 empty states', () => {
+describe('organisation page A5 / Part B wired controls', () => {
   const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
-    globalThis.fetch = vi.fn().mockResolvedValue(jsonResponse(200, directoryPayload));
+    globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/organisations/directory')) {
+        return jsonResponse(200, directoryPayload);
+      }
+      if (url.includes('/api/org-structure')) {
+        return jsonResponse(200, {
+          ok: true,
+          data: {
+            organisation_ref: `shared:organisation:${ORG_ID}`,
+            units: [],
+            positions: [],
+            links: [],
+            graph: {
+              organisation_ref: `shared:organisation:${ORG_ID}`,
+              nodes: [],
+              edges: [],
+              members_by_unit: {},
+              memberships_by_person: {},
+              member_person_ids: [],
+              member_count: 0,
+              cycles: []
+            }
+          }
+        });
+      }
+      if (url.includes('/api/opportunities')) {
+        return jsonResponse(200, { ok: true, data: { opportunities: [] } });
+      }
+      if (url.includes('/api/organisation-read')) {
+        return jsonResponse(200, {
+          ok: true,
+          data: {
+            read: {
+              organisation_ref: `shared:organisation:${ORG_ID}`,
+              summary: '',
+              threads: [],
+              generated_at: null,
+              updated_at: null,
+              status: 'empty',
+              error: null
+            }
+          }
+        });
+      }
+      return jsonResponse(404, { ok: false, error: { code: 'not_found', message: 'missing' } });
+    });
     location.hash = `#/organisations/${ORG_ID}`;
   });
 
@@ -111,15 +157,22 @@ describe('organisation page A5 empty states', () => {
     vi.restoreAllMocks();
   });
 
-  it('omits disabled Compare/Edit/Add structure/Run now and roadmap copy', async () => {
+  it('wires Compare/Edit/Add structure/Run now live with no roadmap copy (I3/P4)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderOrganisationPage(canvas, ORG_ID);
     expect(canvas.querySelectorAll('button[disabled]').length).toBe(0);
-    expect(canvas.textContent).not.toMatch(/Compare with|Add structure|Run now/);
+    expect(canvas.textContent).toMatch(/Compare with/);
+    expect(canvas.textContent).toMatch(/Add structure/);
+    expect(canvas.textContent).toMatch(/Run now/);
+    expect(canvas.textContent).toContain('Add opportunity');
     expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);
     expect(canvas.textContent).toContain("Ann hasn't read Example University yet.");
     expect(canvas.textContent).toContain('No opportunities yet.');
+    const compare = canvas.querySelector('a.btn') as HTMLAnchorElement | null;
+    expect(compare?.href || compare?.getAttribute('href') || '').toContain(
+      '#/organisations/compare'
+    );
     canvas.remove();
   });
 });

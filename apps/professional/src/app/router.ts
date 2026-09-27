@@ -30,6 +30,7 @@ export type Route =
   | { name: 'person'; id: string }
   | { name: 'person-brief'; id: string }
   | { name: 'organisations' }
+  | { name: 'organisations-compare' }
   | { name: 'organisation'; id: string }
   | { name: 'relationships' }
   | { name: 'communications' }
@@ -84,6 +85,9 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'not-found', path };
   }
   if (segments.length === 1 && segments[0] === 'organisations') return { name: 'organisations' };
+  if (segments.length === 2 && segments[0] === 'organisations' && segments[1] === 'compare') {
+    return { name: 'organisations-compare' };
+  }
   if (segments.length === 2 && segments[0] === 'organisations') {
     const id = safeDecode(segments[1]!);
     if (id && isValidOrganisationId(id)) return { name: 'organisation', id };

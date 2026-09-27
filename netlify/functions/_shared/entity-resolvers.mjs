@@ -32,8 +32,25 @@ import {
   getJSON as getProfessionalJSON
 } from './professional-blobs.mjs';
 import { taskKey, getJSON as getTasksJSON, defaultGetTasksStore } from './tasks-blobs.mjs';
-import { displayLabelFor, isValidOrganisationId, isValidPersonId, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
-import { defaultGetUniversalLinkStore, getJSON as getIdentityJSON, organisationKey, personKey } from './universal-link-blobs.mjs';
+import {
+  displayLabelFor,
+  isValidOrganisationId,
+  isValidPersonId,
+  isValidPositionId,
+  isValidUnitId,
+  parseOrganisationRecord,
+  parsePersonRecord,
+  parsePositionRecord,
+  parseUnitRecord
+} from './identity-schema.mjs';
+import {
+  defaultGetUniversalLinkStore,
+  getJSON as getIdentityJSON,
+  organisationKey,
+  personKey,
+  positionKey,
+  unitKey
+} from './universal-link-blobs.mjs';
 import { getGithubOrganisation, getGithubPerson } from './github-professional-data.mjs';
 import { classKey, defaultGetContentStore as defaultGetTeachingStore, getJSON as getTeachingJSON } from './teaching-blobs.mjs';
 import {
@@ -172,6 +189,48 @@ export async function resolveOrganisation(id, accessContext, { getStore = defaul
     display_label: displayLabelFor(record),
     supporting_label: null,
     href: organisationHref(id),
+    lifecycle_status: record.lifecycle_status,
+    visibility: 'operator'
+  };
+}
+
+export async function resolveUnit(id, accessContext, { getStore = defaultGetUniversalLinkStore } = {}) {
+  if (!isValidUnitId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'shared', kind: 'unit', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parseUnitRecord(await getIdentityJSON(store, unitKey(id)));
+  if (!record) throw endpointNotFoundError();
+  if (record.lifecycle_status === 'deleted' || record.lifecycle_status === 'archived') {
+    throw endpointNotFoundError();
+  }
+  return {
+    ref,
+    kind: 'unit',
+    display_label: record.name,
+    supporting_label: record.unit_kind,
+    href: null,
+    lifecycle_status: record.lifecycle_status,
+    visibility: 'operator'
+  };
+}
+
+export async function resolvePosition(id, accessContext, { getStore = defaultGetUniversalLinkStore } = {}) {
+  if (!isValidPositionId(id)) throw endpointNotFoundError();
+  const ref = formatEntityRef({ namespace: 'shared', kind: 'position', id });
+  if (!isVisibilityAllowed(accessContext, 'operator')) throw endpointNotFoundError();
+  const store = await getStore();
+  const record = parsePositionRecord(await getIdentityJSON(store, positionKey(id)));
+  if (!record) throw endpointNotFoundError();
+  if (record.lifecycle_status === 'deleted' || record.lifecycle_status === 'archived') {
+    throw endpointNotFoundError();
+  }
+  return {
+    ref,
+    kind: 'position',
+    display_label: record.title,
+    supporting_label: record.is_head ? 'head' : null,
+    href: null,
     lifecycle_status: record.lifecycle_status,
     visibility: 'operator'
   };
@@ -401,6 +460,8 @@ export async function resolveSteppingStone(
 export const RESOLVER_SLOTS = Object.freeze({
   'shared:person': resolvePerson,
   'shared:organisation': resolveOrganisation,
+  'shared:unit': resolveUnit,
+  'shared:position': resolvePosition,
   'tasks:task': resolveTask,
   'tasks:project': resolveTasksProject,
   'tasks:goal': resolveTasksGoal,
