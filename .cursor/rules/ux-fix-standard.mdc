@@ -1,0 +1,72 @@
+---
+description: UX/UI fix standard. A reported visual or interaction issue is a symptom of the surface; assess and fix the surface, not the single pixel named.
+globs:
+alwaysApply: true
+---
+
+# UX/UI fix standard
+
+This rule outranks Ponytail for any task that changes what a user sees or touches. Ponytail limits code volume. It does not limit UX quality. "Smallest diff" is never the goal of a UI fix; "the surface is actually right" is.
+
+## What Adam's report means
+
+When Adam reports a UI or UX issue ("this is cramped", "button looks off", "this is confusing", "mobile is broken"), he is naming **one visible symptom of a surface that is not good enough**. He is not specifying the fix, and he is not saying everything else on the page is fine.
+
+The unit of work is the **whole surface**: the page, panel, modal, or flow the symptom lives on, at desktop and 390px.
+
+A fix that makes the named symptom technically go away while the surface is still visibly mediocre is a failed fix.
+
+## Banned fix patterns
+
+These are the incremental non-fixes. Do not ship them as the answer to a UX report:
+
+- Nudging one value (padding, margin, font-size, gap, z-index) when the layout structure is the actual problem.
+- Adding a one-off class, `!important`, or inline style to override the kit instead of fixing why the kit isn't applied.
+- Fixing the instance Adam named while identical siblings (other cards, other rows, other hubs using the same component) keep the same defect.
+- Hiding, truncating, or shrinking content so it stops overflowing, instead of designing for the real content length.
+- Fixing desktop only, or mobile only.
+- Adding a media query patch for one width instead of making the layout genuinely responsive.
+- Rewording one label when the flow itself is confusing.
+- Declaring done from reading CSS without looking at the render.
+
+## Required procedure
+
+### 1. Look before touching code
+
+Open the real page (dev server or live umbrella) in the browser. Screenshot the affected surface at **desktop (~1280px) and 390px**, in each relevant state (empty, populated, long content, loading, error, hover/focus/open). Do this before editing anything.
+
+### 2. Audit the whole surface, not the symptom
+
+With the screenshots in front of you, list **every** problem on that surface, not only the one Adam named. Check against:
+
+- **Design kit fidelity**: tokens, type scale, radii, buttons, and chrome from `css/tokens.css`, `css/overlays.css`, `css/chrome.css`, `snippets/`. Any invented value is a defect.
+- **Hierarchy**: is the most important thing the most prominent? Is it obvious what to do next?
+- **Spacing and alignment**: consistent rhythm, aligned edges, no orphaned or crammed elements.
+- **Density**: not cramped, not a sea of empty space.
+- **Responsive**: no horizontal scroll, no overlap, touch targets at least 44px, nothing clipped at 390px.
+- **Content resilience**: long names, empty lists, many items, missing data.
+- **States**: hover, focus-visible, active, disabled, loading, empty, error all exist and look intentional.
+- **Consistency**: does this match how the same pattern looks and behaves elsewhere in the hub?
+- **Interaction**: every control does something obvious, gives feedback, and can be undone or cancelled where expected.
+
+### 3. Find the root, then fix at the right level
+
+For each issue, decide where it actually lives: the shared component, the kit, the layout structure, or this one instance. Fix it at the **highest correct level** so every sibling gets the fix. Grep for other usages of the component or pattern and check them.
+
+Restructuring layout, replacing a hand-rolled pattern with the kit component, or rewriting a small section of markup is **in scope** when that is what the surface needs. That is not scope creep; it is the fix.
+
+Still in bounds: stay on the reported surface and its shared components. Don't redesign unrelated pages, don't invent new visual language, and don't change product behaviour Adam didn't ask about. If the right fix is genuinely large (a new component, a flow change), say so and propose it rather than shipping a token patch.
+
+### 4. Verify by looking again
+
+Re-screenshot the same surfaces, states, and both viewports. Compare before and after. Check the siblings you touched. If it still looks mediocre, you are not done. Iterate.
+
+## Report format
+
+- **Reported:** what Adam said
+- **Found:** every issue on the surface, including ones he didn't mention
+- **Root cause:** where each one actually lived
+- **Fixed:** what changed and at what level (kit / component / layout / instance)
+- **Siblings checked:** other places using the same pattern
+- **Evidence:** before and after screenshots at desktop and 390px
+- **Not fixed:** anything deliberately left, with the reason (too large, needs Adam's decision)
