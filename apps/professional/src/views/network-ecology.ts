@@ -3,6 +3,7 @@
  * Fetches `/api/network-ecology/world` via apiGet (W1) and hosts the canvas.
  */
 
+import { ApiClientError } from '@/api/client';
 import { fetchNetworkEcologyWorld } from '@/api/network-ecology';
 import { asWorldApi, type WorldModel } from '@/components/miniworld/model';
 import { mountWorldCanvas, type MiniworldSelection, type WorldCanvasHandle } from '@/components/miniworld/world-canvas';
@@ -12,6 +13,13 @@ import { mountCards } from '@/components/miniworld/cards';
 import { mountTimeline } from '@/components/miniworld/timeline';
 import { mountInsights } from '@/components/miniworld/insights';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
+
+const WORLD_BUILD_POLL_MS = 4_000;
+const WORLD_BUILD_POLL_ATTEMPTS = 45;
+
+function isWorldBuilding(error: unknown): boolean {
+  return error instanceof ApiClientError && error.code === 'world_building';
+}
 
 export interface NetworkEcologyOptions {
   isCurrent?: () => boolean;
@@ -33,14 +41,25 @@ export async function renderNetworkEcologyView(
   showViewLoading(root, 'Loading network ecology…');
 
   let world;
-  try {
-    world = await fetchNetworkEcologyWorld();
-  } catch (error) {
-    if (!isCurrent()) return;
-    renderLoadError(root, error, () => {
-      void renderNetworkEcologyView(root, options);
-    });
-    return;
+  // With no stored snapshot yet the server answers `world_building` while a
+  // background function builds it; poll until it lands.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      world = await fetchNetworkEcologyWorld();
+      break;
+    } catch (error) {
+      if (!isCurrent()) return;
+      if (isWorldBuilding(error) && attempt < WORLD_BUILD_POLL_ATTEMPTS) {
+        showViewLoading(root, 'Building your network map for the first time. This can take a minute…');
+        await new Promise((resolve) => setTimeout(resolve, WORLD_BUILD_POLL_MS));
+        if (!isCurrent()) return;
+        continue;
+      }
+      renderLoadError(root, error, () => {
+        void renderNetworkEcologyView(root, options);
+      });
+      return;
+    }
   }
   if (!isCurrent()) return;
 

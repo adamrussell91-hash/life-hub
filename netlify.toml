@@ -45,9 +45,10 @@ included_files = [
   timeout = 26
 
 # Network Ecology assembles the full professional graph (GitHub import +
-# Blobs). Default 10s is too tight once people.json needs the git-blob
-# fallback and identity dedupe has run; fail visibly under 26s instead of
-# leaving the SPA on "Loading…" through client retries.
+# Blobs). NOTE: the live deploy still reports the 10s default for every
+# function, so these lines are not relied on — `/world` serves a Blob
+# snapshot rebuilt by the `network-ecology-world-build` background function
+# (see netlify/functions/_shared/network-ecology-snapshot.mjs).
 [functions.network-ecology-world]
   timeout = 26
 
