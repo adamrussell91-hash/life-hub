@@ -809,12 +809,14 @@ export interface RelationshipRegistryResponse {
  * `classifyHabitat`/`computeBridgePeople` (confirmed by direct read of
  * those modules, not inferred).
  */
-export type HabitatType = 'forest' | 'reef' | 'savannah' | 'wetland' | 'island';
+export type HabitatType = 'forest' | 'reef' | 'savannah' | 'wetland' | 'island' | 'sandbank';
 
 export interface NetworkEcologyNode {
   ref: string;
   kind: 'person' | 'organisation';
   display_name: string;
+  last_contacted?: string | null;
+  is_self?: boolean;
 }
 
 export interface NetworkEcologyEdge {
@@ -823,12 +825,25 @@ export interface NetworkEcologyEdge {
   relationship_type: string;
 }
 
+/** Dated link (current or ended) for miniworld timeline replay. */
+export interface NetworkEcologyLink {
+  source_ref: string;
+  target_ref: string;
+  relationship_type: string;
+  role: string | null;
+  valid_from: string | null;
+  valid_to: string | null;
+  status: string;
+}
+
 export interface NetworkEcologyCluster {
   id: string;
   kind: 'organisation' | 'event';
   label: string;
   member_refs: string[];
   habitat: HabitatType | null;
+  since?: number | null;
+  event_date?: string | null;
 }
 
 export interface NetworkEcologyBridgePerson {
@@ -838,12 +853,27 @@ export interface NetworkEcologyBridgePerson {
   description: string;
 }
 
+export interface NetworkEcologyTimelineYear {
+  clusters: NetworkEcologyCluster[];
+  bridge_people: NetworkEcologyBridgePerson[];
+}
+
+export interface NetworkEcologyUpcomingEvent {
+  ref: string;
+  title: string;
+  date: string | null;
+  attendee_refs: string[];
+}
+
 /** `GET /api/network-ecology/world`. */
 export interface NetworkEcologyWorld {
   nodes: NetworkEcologyNode[];
   edges: NetworkEcologyEdge[];
   clusters: NetworkEcologyCluster[];
   bridge_people: NetworkEcologyBridgePerson[];
+  links?: NetworkEcologyLink[];
+  timeline?: Record<string, NetworkEcologyTimelineYear>;
+  upcoming_events?: NetworkEcologyUpcomingEvent[];
 }
 
 /** `GET /api/network-ecology/history?date=` (Phase 4, Feature 4.6 — History

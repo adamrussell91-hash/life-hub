@@ -36,6 +36,19 @@ export const SAVANNAH_MAX_DENSITY = 0.2;
 export const ISLAND_MAX_BRIDGE_RATIO = 0.1;
 export const ISLAND_MAX_SIZE = 5;
 export const EVENT_WINDOW_DAYS = 30;
+/** Sandbank: ≤4 people, every membership `valid_from` known and within this age. */
+export const SANDBANK_MAX_SIZE = 4;
+export const SANDBANK_MAX_AGE_DAYS = 365;
+
+/** Habitats the miniworld always draws as landforms (never null on a cluster). */
+export const HABITAT_KINDS = Object.freeze([
+  'wetland',
+  'sandbank',
+  'island',
+  'forest',
+  'reef',
+  'savannah'
+]);
 
 const DAY_MS = 86_400_000;
 
@@ -102,6 +115,27 @@ export function computeOrganisationClusterStats(organisationGroups, currentProfe
     ).length;
     const bridgeRatio = size > 0 ? bridgeMemberCount / size : 0;
 
+    // Sandbank candidacy: every member has a known valid_from within the
+    // last SANDBANK_MAX_AGE_DAYS. A missing valid_from disqualifies the
+    // whole cluster (truthfulness: never invent a start date).
+    const isSandbankCandidate =
+      size > 0 &&
+      size <= SANDBANK_MAX_SIZE &&
+      group.members.every((m) => {
+        const vf = m.link?.valid_from;
+        if (!vf || typeof vf !== 'string') return false;
+        const age = daysBetween(vf, nowMs);
+        return Number.isFinite(age) && age >= 0 && age <= SANDBANK_MAX_AGE_DAYS;
+      });
+
+    const sinceYears = group.members
+      .map((m) => {
+        const ms = m.link?.valid_from ? Date.parse(m.link.valid_from) : NaN;
+        return Number.isFinite(ms) ? new Date(ms).getUTCFullYear() : null;
+      })
+      .filter((y) => y != null);
+    const since = sinceYears.length ? Math.min(...sinceYears) : null;
+
     return {
       kind: 'organisation',
       id: group.ref,
@@ -111,57 +145,47 @@ export function computeOrganisationClusterStats(organisationGroups, currentProfe
       density,
       avgDurationDays,
       roleDiversity,
-      bridgeRatio
+      bridgeRatio,
+      isSandbankCandidate,
+      since
     };
   });
 }
 
 /**
- * Classification priority — first match wins, most-specific/temporal
- * signal first, broad catch-all last:
+ * Classification priority — first match wins (Network Ecology miniworld
+ * BUILD-PLAN.md, Adam-approved order):
  *
- *   1. Wetland — event clusters ONLY, never an organisation cluster no
- *      matter its stats (SOURCE-BRIEF.md section 32's "grows before the
- *      event and recedes afterwards" is a fundamentally different, TIME-
- *      WINDOWED signal from the other five habitats' cluster-internal
- *      stats, so it is checked first and short-circuits everything else
- *      for that cluster kind).
- *   2. Island — small AND barely bridging. Checked before Forest/Reef so a
- *      small, dense, isolated clique (e.g. a 3-person team with high
- *      internal density) reads as Island rather than Forest/Reef — brief
- *      section 33's "specialisation and isolation" is the more specific,
- *      defining trait of a small self-contained cluster than sheer
- *      density is.
- *   3. Forest — dense AND long-lived (section 28: "mature, dense... long
- *      duration").
- *   4. Reef — dense AND role-diverse (section 29: "diversity, overlap and
- *      relational complexity"), independent of how long-lived it is.
- *   5. Savannah — large AND sparse, the broad catch-all for a big loose
- *      network (section 31: "broad, dispersed... moderate density").
- *   6. Unclassified (`null`) — a genuinely ungrouped cluster matching none
- *      of the above. Required, not an error (BUILD-PLAN.md Phase 4:
- *      "explicit 'no habitat forced' case for a genuinely ungrouped
- *      cluster").
+ *   1. Wetland — event clusters ONLY (time-windowed gathering).
+ *   2. Sandbank — small new organisation community (≤4, every membership
+ *      started within the last year).
+ *   3. Island — small AND barely bridging.
+ *   4. Forest — dense AND long-lived.
+ *   5. Reef — dense AND role-diverse.
+ *   6. Savannah — large AND sparse (explicit rule).
+ *   7. Savannah (catch-all) — organisation clusters that match no rule
+ *      still need a landform (Open decision 1). Undersized / missing
+ *      clusters still return `null` (not a community).
  */
 export function classifyHabitat(cluster) {
   if (!cluster || !Number.isFinite(cluster.size) || cluster.size < HABITAT_MIN_CLUSTER_SIZE) return null;
 
-  // 1. Wetland — event clusters only. The caller is expected to have
-  // already gated candidacy on size + window before constructing an
-  // event-kind cluster object at all (see network-ecology-world.mjs), but
-  // `inWindow` is still checked explicitly here too so this function stays
-  // self-contained and directly fixture-testable without needing the full
-  // assembly pipeline.
+  // 1. Wetland — event clusters only.
   if (cluster.kind === 'event') {
     return cluster.inWindow ? 'wetland' : null;
   }
 
-  // 2. Island
+  // 2. Sandbank — new organisation community.
+  if (cluster.isSandbankCandidate === true) {
+    return 'sandbank';
+  }
+
+  // 3. Island
   if (cluster.size <= ISLAND_MAX_SIZE && cluster.bridgeRatio <= ISLAND_MAX_BRIDGE_RATIO) {
     return 'island';
   }
 
-  // 3. Forest
+  // 4. Forest
   if (
     cluster.density >= FOREST_MIN_DENSITY &&
     cluster.avgDurationDays >= FOREST_MIN_DURATION_DAYS &&
@@ -170,7 +194,7 @@ export function classifyHabitat(cluster) {
     return 'forest';
   }
 
-  // 4. Reef
+  // 5. Reef
   if (
     cluster.density >= REEF_MIN_DENSITY &&
     cluster.roleDiversity >= REEF_MIN_ROLE_DIVERSITY &&
@@ -179,13 +203,13 @@ export function classifyHabitat(cluster) {
     return 'reef';
   }
 
-  // 5. Savannah
+  // 6. Savannah (explicit large/sparse rule)
   if (cluster.size >= SAVANNAH_MIN_SIZE && cluster.density <= SAVANNAH_MAX_DENSITY) {
     return 'savannah';
   }
 
-  // 6. Unclassified
-  return null;
+  // 7. Savannah catch-all — every organisation community gets a landform.
+  return 'savannah';
 }
 
 function joinWithAnd(labels) {

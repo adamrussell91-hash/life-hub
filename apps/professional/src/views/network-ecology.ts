@@ -1,587 +1,324 @@
-import {
-  fetchNetworkEcologyEgo,
-  fetchNetworkEcologyHistory,
-  fetchNetworkEcologyWorld,
-  fetchSelfPerson
-} from '@/api/network-ecology';
-import {
-  HABITAT_META,
-  HABITAT_ORDER,
-  bridgeMarkerColor,
-  habitatFillColor,
-  mountNetworkGraph,
-  type GraphEdge,
-  type GraphHandle,
-  type GraphNode,
-  type HabitatType
-} from '@/components/network-graph-canvas';
-import { organisationRoute, personRoute } from '@/app/router';
-import { parseSharedRef } from '@/domain/ids';
-import { renderLoadError, showViewLoading } from '@/views/feedback';
-import type { NetworkEcologyCluster, NetworkEcologyEdge, NetworkEcologyNode } from '@/domain/types';
-
 /**
- * Network Ecology (Phase 4, Features 4.1 World View / 4.3 EGO recentre /
- * 4.4 Your Network / 4.7 Opportunity-Dormancy overlay).
- *
- * DATA-AVAILABILITY DECISIONS this view depends on (verified against
- * `netlify/functions/_shared/network-ecology-world.mjs` and
- * `network-graph.mjs` directly, not assumed):
- *
- * 1. `GET /api/network-ecology/world` returns `clusters` (habitat per
- *    CLUSTER, with a `member_refs` list) and `bridge_people`, but
- *    `GET /api/network-ecology/ego` returns ONLY `{ nodes, edges }` —
- *    `assembleEgoGraph` never computes clusters/bridge people for a
- *    neighbourhood subgraph. So habitat tinting and the bridge-person
- *    marker are only ever drawn in World View here; EGO mode (recentre)
- *    and Your Network mode render the same canvas component with
- *    `habitat`/`isBridge` simply left unset on every node — an honest
- *    reflection of what the server actually returns, not a bug. The
- *    legend (which only makes sense where habitats are actually drawn)
- *    is shown for World View only for the same reason.
- *
- * 2. Opportunity/Dormancy overlay (Feature 4.7): `NetworkEcologyEdge` is
- *    `{ source_ref, target_ref, relationship_type }` — no date field of
- *    any kind. `classifyRelationshipState`
- *    (`apps/professional/src/domain/relationship-state.ts`, ported to
- *    `netlify/functions/_shared/relationship-state.mjs`) is this
- *    codebase's ONE existing dormancy/opportunity classifier, and it
- *    needs `lastMeaningfulInteraction`, `previousMeaningfulInteraction`,
- *    `upcomingInteraction`, `activeSharedContexts` and `personCreatedAt`
- *    per relationship — none of which a graph edge or node carries, and
- *    which `people-home-signals.mjs`'s own `classifyCurrentProfessionalRelationships`
- *    only manages to compute by cross-referencing the WHOLE population's
- *    professional_relationship links (grouped by pair, sorted by
- *    effective date) plus Meetings/Events for `upcomingInteraction`. This
- *    is not a "smallest correct fix" away — porting that whole pipeline
- *    into `network-ecology-world.mjs` for every edge of every `/world`
- *    and `/ego` response, and extending it to cover `employee_at`/
- *    `member_of` links `classifyRelationshipState` was never designed
- *    for, is real, out-of-proportion work. Adding just a bare
- *    `valid_from` to each edge (which the underlying Universal Link does
- *    have — see `universal-link-repository.mjs`) was considered and
- *    rejected: a link's `valid_from` is when the relationship was
- *    RECORDED, not when the two people last actually interacted, so
- *    treating an old `valid_from` as "dormant" would misinform rather
- *    than inform. Documented scope cut per PHASE-1-PROGRESS.md: the
- *    toggle below renders a clearly-labeled "not enough data yet" note
- *    instead of fabricating a dormancy/opportunity signal.
+ * Network Ecology miniworld view (BUILD-PLAN Phases 3–5).
+ * Fetches `/api/network-ecology/world` via apiGet (W1) and hosts the canvas.
  */
+
+import { fetchNetworkEcologyWorld } from '@/api/network-ecology';
+import { asWorldApi, type WorldModel } from '@/components/miniworld/model';
+import { mountWorldCanvas, type MiniworldSelection, type WorldCanvasHandle } from '@/components/miniworld/world-canvas';
+import { mountPanel } from '@/components/miniworld/panel';
+import { mountKey } from '@/components/miniworld/key';
+import { mountCards } from '@/components/miniworld/cards';
+import { mountTimeline } from '@/components/miniworld/timeline';
+import { mountInsights } from '@/components/miniworld/insights';
+import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 export interface NetworkEcologyOptions {
   isCurrent?: () => boolean;
 }
 
-type ViewMode = 'world' | 'ego' | 'your-network' | 'history';
-type EdgeLayer = 'organisation' | 'relationship';
-
-/**
- * Feature 4.6 — History mode. SCOPING DECISION (delegated by Adam for this
- * build, documented per the task's own instruction): the mockup/brief's
- * radial time-scrubber UI (dragging through a year-circle) is replaced
- * with a plain `<input type="date">` + "Recompute" button — same
- * underlying point-in-time recomputation
- * (`GET /api/network-ecology/history?date=`), a plainer interaction, given
- * this build's remaining budget. Recompute is a full server-side
- * recompute-on-read per request (see `_shared/network-ecology-history.mjs`'s
- * own doc comment: "no new persisted store"), so it is deliberately never
- * triggered by typing/changing the date input alone — only by the
- * explicit "Recompute" click, exactly the plan's own note about the
- * "full-recompute approach" the History scrubber needs.
- */
-function todayDateInputValue(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+function prefersReducedMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/** Formats the server's echoed `date` (an ISO instant) as a plain reading
- * date, e.g. "15 March 2025" — UTC, matching how the server's own
- * `parseHistoryDate` interprets a bare `YYYY-MM-DD` input (UTC midnight),
- * so the displayed date never shifts by a day relative to what was typed. */
-function formatHistoryDate(iso: string): string {
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    parsed
-  );
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  className?: string,
-  text?: string
-): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function checkboxLabel(text: string, checked: boolean): { label: HTMLLabelElement; input: HTMLInputElement } {
-  const label = el('label', 'network-ecology__toggle');
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.checked = checked;
-  label.append(input, document.createTextNode(` ${text}`));
-  return { label, input };
-}
-
-/** `employee_at`/`member_of` are the organisation layer; `professional_relationship`
- * is the relationship layer — exactly the split Feature 4.4's two checkboxes name. */
-function edgeLayer(relationshipType: string): EdgeLayer {
-  return relationshipType === 'professional_relationship' ? 'relationship' : 'organisation';
-}
-
-/**
- * World View's clusters carry habitat per CLUSTER with a `member_refs`
- * list; the canvas component tags habitat per NODE. A node that belongs to
- * more than one cluster (a person in two organisations, say) keeps the
- * FIRST habitat assigned as `clusters` is walked in the server's own
- * returned order (organisation clusters before event clusters) — an
- * arbitrary but deterministic tie-break, since the source data has no
- * notion of a "primary" habitat for a node in two clusters simultaneously.
- */
-function buildHabitatByRef(clusters: NetworkEcologyCluster[]): Map<string, HabitatType> {
-  const map = new Map<string, HabitatType>();
-  for (const cluster of clusters) {
-    if (!cluster.habitat) continue;
-    for (const ref of cluster.member_refs) {
-      if (!map.has(ref)) map.set(ref, cluster.habitat);
-    }
-  }
-  return map;
-}
-
-function toGraphNodes(
-  nodes: NetworkEcologyNode[],
-  habitatByRef: Map<string, HabitatType>,
-  bridgeRefs: Set<string>
-): GraphNode[] {
-  return nodes.map((n) => ({
-    id: n.ref,
-    kind: n.kind,
-    label: n.display_name,
-    habitat: habitatByRef.get(n.ref) ?? null,
-    isBridge: bridgeRefs.has(n.ref)
-  }));
-}
-
-function toGraphEdges(edges: NetworkEcologyEdge[]): GraphEdge[] {
-  return edges.map((e) => ({
-    source: e.source_ref,
-    target: e.target_ref,
-    relationshipType: e.relationship_type,
-    layer: edgeLayer(e.relationship_type)
-  }));
+function isPhone(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(max-width: 719px)').matches;
 }
 
 export async function renderNetworkEcologyView(
-  canvas: HTMLElement,
+  root: HTMLElement,
   options: NetworkEcologyOptions = {}
 ): Promise<void> {
   const isCurrent = options.isCurrent ?? (() => true);
-  const reducedMotion =
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false;
+  showViewLoading(root, 'Loading network ecology…');
 
-  canvas.replaceChildren();
-
-  const root = el('div', 'network-ecology');
-
-  const modePills = el('div', 'hub-pills network-ecology__modes');
-  modePills.setAttribute('role', 'tablist');
-  modePills.setAttribute('aria-label', 'Network Ecology view');
-  const worldModeBtn = el('button', 'hub-pills__btn', 'World View');
-  worldModeBtn.type = 'button';
-  worldModeBtn.setAttribute('role', 'tab');
-  const yourNetworkModeBtn = el('button', 'hub-pills__btn', 'Your Network');
-  yourNetworkModeBtn.type = 'button';
-  yourNetworkModeBtn.setAttribute('role', 'tab');
-  const historyModeBtn = el('button', 'hub-pills__btn', 'History');
-  historyModeBtn.type = 'button';
-  historyModeBtn.setAttribute('role', 'tab');
-  modePills.append(worldModeBtn, yourNetworkModeBtn, historyModeBtn);
-
-  const toolbar = el('div', 'network-ecology__toolbar');
-
-  const backButton = el('button', 'btn btn--secondary network-ecology__back', 'Back to World View');
-  backButton.type = 'button';
-  backButton.hidden = true;
-
-  const { label: orgLayerLabel, input: orgLayerCheckbox } = checkboxLabel('Show organisation links', true);
-  const { label: relLayerLabel, input: relLayerCheckbox } = checkboxLabel('Show relationship links', true);
-  orgLayerLabel.hidden = true;
-  relLayerLabel.hidden = true;
-
-  const { label: overlayLabel, input: overlayCheckbox } = checkboxLabel('Show opportunity & dormancy', false);
-
-  // Mycelium layer (Phase 5, brief section 37) — World View only, per the
-  // brief's own framing: it reveals the raw Universal Link graph beneath
-  // the HABITAT terrain, and only World View draws habitat terrain at all
-  // (EGO/Your Network/History either never carry `habitat`, or — History —
-  // are a different recomputed snapshot; none is "the terrain" this toggle
-  // fades). No new fetch: it only changes how the already-fetched
-  // `nodes`/`edges` are drawn (`network-graph-canvas.ts`'s `myceliumMode`
-  // render switch).
-  const { label: myceliumLabel, input: myceliumCheckbox } = checkboxLabel('Mycelium — show raw connections', false);
-  let myceliumEnabled = false;
-
-  toolbar.append(backButton, orgLayerLabel, relLayerLabel, overlayLabel, myceliumLabel);
-
-  const historyBar = el('div', 'network-ecology__history-bar');
-  historyBar.hidden = true;
-  const historyDateLabel = el('label', 'network-ecology__history-date-label', 'Date');
-  const historyDateInput = document.createElement('input');
-  historyDateInput.type = 'date';
-  historyDateInput.className = 'network-ecology__history-date';
-  historyDateInput.value = todayDateInputValue();
-  historyDateLabel.append(historyDateInput);
-  const historyRecomputeBtn = el('button', 'btn btn--primary network-ecology__recompute', 'Recompute');
-  historyRecomputeBtn.type = 'button';
-  const historyAsOf = el(
-    'p',
-    'network-ecology__history-as-of',
-    'Choose a date and click Recompute to see the network as of that date.'
-  );
-  historyBar.append(historyDateLabel, historyRecomputeBtn, historyAsOf);
-
-  const overlayNote = el(
-    'p',
-    'network-ecology__overlay-note empty-state',
-    'Not enough data yet: relationship links do not currently carry last-interaction dates, so Opportunity & Dormancy cannot be computed here. Showing the network without this overlay — see PHASE-1-PROGRESS.md for the full reasoning.'
-  );
-  overlayNote.hidden = true;
-
-  const statusHost = el('div', 'network-ecology__status');
-  statusHost.hidden = true;
-
-  const stage = el('div', 'network-ecology__stage');
-  const graphHost = el('div', 'network-ecology__graph-host');
-  graphHost.setAttribute('role', 'img');
-  graphHost.setAttribute('aria-label', 'Network graph');
-  const panel = el('aside', 'network-ecology__panel');
-  panel.setAttribute('aria-label', 'Selected node');
-  panel.hidden = true;
-  stage.append(graphHost, panel);
-
-  // Chosen treatment (documented per the task's "your call"): the legend
-  // STAYS visible when Mycelium is on, dimmed via a CSS class, with an
-  // explicit note rather than hiding outright — habitats are still
-  // faintly drawn (see `network-graph-canvas.ts`'s faded halo), so an
-  // entirely-hidden legend would describe less than what's still on
-  // screen.
-  const myceliumNote = el(
-    'p',
-    'network-ecology__mycelium-note empty-state',
-    'Habitat view paused — showing the raw Universal Link structure beneath the terrain (Mycelium layer, brief section 37).'
-  );
-  myceliumNote.hidden = true;
-
-  const legend = el('div', 'network-ecology__legend');
-  legend.setAttribute('aria-label', 'Habitat legend');
-
-  root.append(modePills, toolbar, historyBar, overlayNote, statusHost, stage, myceliumNote, legend);
-  canvas.append(root);
-
-  let mode: ViewMode = 'world';
-  let graphHandle: GraphHandle | null = null;
-  let fetchToken = 0;
-  let egoNodesRaw: GraphNode[] = [];
-  let egoEdgesRaw: GraphEdge[] = [];
-
-  function destroyGraph(): void {
-    graphHandle?.destroy();
-    graphHandle = null;
-    graphHost.replaceChildren();
-  }
-
-  function updateChrome(): void {
-    const isWorldish = mode === 'world' || mode === 'ego';
-    worldModeBtn.classList.toggle('is-active', isWorldish);
-    worldModeBtn.setAttribute('aria-selected', String(isWorldish));
-    yourNetworkModeBtn.classList.toggle('is-active', mode === 'your-network');
-    yourNetworkModeBtn.setAttribute('aria-selected', String(mode === 'your-network'));
-    historyModeBtn.classList.toggle('is-active', mode === 'history');
-    historyModeBtn.setAttribute('aria-selected', String(mode === 'history'));
-    backButton.hidden = mode !== 'ego';
-    orgLayerLabel.hidden = mode !== 'your-network';
-    relLayerLabel.hidden = mode !== 'your-network';
-    historyBar.hidden = mode !== 'history';
-    // Mycelium is World View only (see the toggle's own doc comment above).
-    myceliumLabel.hidden = mode !== 'world';
-    // History mode's clusters DO carry a classified habitat (organisation
-    // clusters only — see `_shared/network-ecology-history.mjs`'s own
-    // scoping note), so the legend is just as meaningful there as in World
-    // View.
-    legend.hidden = mode !== 'world' && mode !== 'history';
-    updateMyceliumChrome();
-  }
-
-  function updateMyceliumChrome(): void {
-    const active = myceliumEnabled && mode === 'world';
-    myceliumNote.hidden = !active;
-    legend.classList.toggle('network-ecology__legend--dimmed', active);
-  }
-
-  function showPanel(node: GraphNode | null): void {
-    panel.replaceChildren();
-    if (!node) {
-      panel.hidden = true;
-      return;
-    }
-    panel.hidden = false;
-    panel.append(el('h2', 'network-ecology__panel-name', node.label));
-    panel.append(el('p', 'network-ecology__panel-kind', node.kind === 'organisation' ? 'Organisation' : 'Person'));
-    if (node.isBridge) {
-      panel.append(
-        el('p', 'network-ecology__panel-bridge', 'Bridge person — connects two or more habitats (see legend).')
-      );
-    }
-
-    const parsed = parseSharedRef(node.id);
-    if (parsed) {
-      const link = el(
-        'a',
-        'network-ecology__panel-link',
-        parsed.kind === 'person' ? 'View full profile' : 'View organisation'
-      );
-      link.href = parsed.kind === 'person' ? personRoute(parsed.id) : organisationRoute(parsed.id);
-      panel.append(link);
-    }
-
-    const canRecentre = node.kind === 'person' && (mode === 'world' || mode === 'ego');
-    if (canRecentre) {
-      const recentre = el('button', 'btn btn--primary network-ecology__recentre', 'Recentre here');
-      recentre.type = 'button';
-      recentre.addEventListener('click', () => {
-        void loadEgo(node.id, node.label);
-      });
-      panel.append(recentre);
-    }
-  }
-
-  function currentYourNetworkEdges(): GraphEdge[] {
-    return egoEdgesRaw.filter((e) => {
-      if (e.layer === 'organisation') return orgLayerCheckbox.checked;
-      if (e.layer === 'relationship') return relLayerCheckbox.checked;
-      return true;
+  let world;
+  try {
+    world = await fetchNetworkEcologyWorld();
+  } catch (error) {
+    if (!isCurrent()) return;
+    renderLoadError(root, error, () => {
+      void renderNetworkEcologyView(root, options);
     });
+    return;
+  }
+  if (!isCurrent()) return;
+
+  const api = asWorldApi(world);
+  const reduceMotion = prefersReducedMotion();
+  const nowYear = new Date().getUTCFullYear();
+  let year = nowYear;
+  let isNow = true;
+  let layers = { names: false, mycelium: false, opportunity: false, dormancy: false };
+  let viewMode: 'world' | 'cards' = isPhone() ? 'cards' : 'world';
+
+  root.replaceChildren();
+  const page = document.createElement('div');
+  page.className = 'network-ecology miniworld';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'miniworld__toolbar';
+
+  const seg = document.createElement('div');
+  seg.className = 'miniworld__seg';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'View');
+  const worldBtn = document.createElement('button');
+  worldBtn.type = 'button';
+  worldBtn.textContent = 'World';
+  worldBtn.setAttribute('aria-pressed', viewMode === 'world' ? 'true' : 'false');
+  const cardsBtn = document.createElement('button');
+  cardsBtn.type = 'button';
+  cardsBtn.textContent = 'Communities';
+  cardsBtn.setAttribute('aria-pressed', viewMode === 'cards' ? 'true' : 'false');
+  seg.append(worldBtn, cardsBtn);
+
+  const findMe = document.createElement('button');
+  findMe.type = 'button';
+  findMe.className = 'btn btn--secondary';
+  findMe.textContent = 'Find me';
+
+  const layersWrap = document.createElement('div');
+  layersWrap.className = 'miniworld__layers';
+  layersWrap.setAttribute('role', 'group');
+  layersWrap.setAttribute('aria-label', 'Layers');
+  const layersLabel = document.createElement('span');
+  layersLabel.className = 'miniworld__layers-label';
+  layersLabel.textContent = 'Show';
+  layersWrap.append(layersLabel);
+  const layerButtons = new Map<keyof typeof layers, HTMLButtonElement>();
+  for (const [key, label] of [
+    ['names', 'Names'],
+    ['mycelium', 'Mycelium'],
+    ['opportunity', 'Opportunity'],
+    ['dormancy', 'Dormancy']
+  ] as const) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'miniworld__toggle';
+    btn.dataset.layer = key;
+    btn.setAttribute('aria-pressed', 'false');
+    btn.textContent = label;
+    layerButtons.set(key, btn);
+    layersWrap.append(btn);
   }
 
-  function mountOrUpdateGraph(nodes: GraphNode[], edges: GraphEdge[]): void {
-    if (graphHandle) {
-      graphHandle.setData(nodes, edges);
-      return;
+  toolbar.append(seg, findMe, layersWrap);
+  const layerNote = document.createElement('p');
+  layerNote.className = 'miniworld__layer-note';
+  layerNote.hidden = true;
+
+  const mobileNote = document.createElement('p');
+  mobileNote.className = 'miniworld__mobile-note';
+  mobileNote.textContent =
+    'The world map needs a bigger screen. On a phone you get the same communities as cards, and the timeline still works.';
+
+  const mapHost = document.createElement('div');
+  mapHost.className = 'miniworld__map-host';
+
+  const cardsHost = document.createElement('div');
+  const below = document.createElement('div');
+  below.className = 'miniworld__below';
+  const insightsHost = document.createElement('div');
+  below.append(insightsHost);
+
+  page.append(toolbar, layerNote, mobileNote, mapHost, cardsHost, below);
+  root.append(page);
+
+  const empty = !(api.clusters?.length || api.nodes?.some((n) => n.kind === 'person'));
+  if (empty) {
+    const emptyEl = document.createElement('p');
+    emptyEl.className = 'miniworld__empty';
+    emptyEl.textContent = 'No communities yet';
+    page.prepend(emptyEl);
+  }
+
+  let canvas: WorldCanvasHandle | null = null;
+  let model: WorldModel | null = null;
+
+  const panel = mountPanel(mapHost, {
+    onClose: () => {
+      canvas?.setSelection(null);
+      panel.render(null, model!);
+    },
+    onShowTheirWorld: (ref) => canvas?.showTheirWorld(ref)
+  });
+  const key = mountKey(mapHost);
+  const cards = mountCards(cardsHost, {
+    onSelectCommunity: (id) => {
+      select({ kind: 'community', id });
+      if (!isPhone()) {
+        viewMode = 'world';
+        syncViewMode();
+        canvas?.focusRef('community', id);
+      }
     }
-    graphHost.replaceChildren();
-    graphHandle = mountNetworkGraph(graphHost, nodes, edges, {
-      reducedMotion,
-      myceliumMode: myceliumEnabled && mode === 'world',
-      onNodeSelect: (node) => showPanel(node)
-    });
-  }
+  });
 
-  function renderLegend(): void {
-    legend.replaceChildren();
-    for (const habitat of HABITAT_ORDER) {
-      const meta = HABITAT_META[habitat];
-      const item = el('div', 'network-ecology__legend-item');
-      const swatch = el('span', 'network-ecology__legend-swatch');
-      swatch.style.background = habitatFillColor(habitat);
-      item.append(swatch, el('span', 'network-ecology__legend-label', meta.label));
-      legend.append(item);
+  const years = Object.keys(api.timeline ?? {})
+    .map(Number)
+    .filter((y) => Number.isFinite(y));
+  const minYear = years.length ? Math.min(...years, 2015) : Math.max(2015, nowYear - 5);
+  const timeline = mountTimeline(page, {
+    minYear,
+    maxYear: nowYear,
+    reduceMotion,
+    onYear: (y, nowFlag) => {
+      year = y;
+      isNow = nowFlag;
+      canvas?.setYear(y, nowFlag);
+      syncFromModel();
+      updateLayerAvailability();
     }
-    // Mangrove is not a classified cluster habitat (see
-    // `habitat-classification.mjs` — only forest/reef/savannah/wetland/
-    // island are ever returned) — it names the bridge-person MARKER style
-    // instead, so its legend entry is deliberately described differently
-    // from the five fill swatches above it, not merely another swatch.
-    const mangrove = el('div', 'network-ecology__legend-item');
-    const marker = el('span', 'network-ecology__legend-marker');
-    marker.style.borderColor = bridgeMarkerColor();
-    mangrove.append(
-      marker,
-      el(
-        'span',
-        'network-ecology__legend-label',
-        'Mangrove — bridge people, marked with a ring on the person node itself, not a cluster fill.'
-      )
-    );
-    legend.append(mangrove);
-  }
+  });
+  // Move timeline before below
+  page.insertBefore(timeline.el, below);
+  const noteEl = page.querySelector('.miniworld__timeline-note');
+  if (noteEl) page.insertBefore(noteEl, below);
 
-  async function loadWorld(): Promise<void> {
-    mode = 'world';
-    updateChrome();
-    showPanel(null);
-    destroyGraph();
-    showViewLoading(statusHost, 'Loading world view…');
-    statusHost.hidden = false;
-    const token = ++fetchToken;
-    try {
-      const world = await fetchNetworkEcologyWorld();
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = true;
-      statusHost.replaceChildren();
-      const habitatByRef = buildHabitatByRef(world.clusters);
-      const bridgeRefs = new Set(world.bridge_people.map((b) => b.ref));
-      const nodes = toGraphNodes(world.nodes, habitatByRef, bridgeRefs);
-      const edges = toGraphEdges(world.edges);
-      renderLegend();
-      mountOrUpdateGraph(nodes, edges);
-    } catch (err) {
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = false;
-      renderLoadError(statusHost, err, () => void loadWorld());
-    }
-  }
-
-  async function loadEgo(ref: string, label: string): Promise<void> {
-    mode = 'ego';
-    updateChrome();
-    showPanel(null);
-    showViewLoading(statusHost, `Loading the network around ${label}…`);
-    statusHost.hidden = false;
-    const token = ++fetchToken;
-    try {
-      const ego = await fetchNetworkEcologyEgo(ref, 2);
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = true;
-      statusHost.replaceChildren();
-      const nodes = toGraphNodes(ego.nodes, new Map(), new Set());
-      const edges = toGraphEdges(ego.edges);
-      mountOrUpdateGraph(nodes, edges);
-    } catch (err) {
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = false;
-      renderLoadError(statusHost, err, () => void loadEgo(ref, label));
-    }
-  }
-
-  async function loadYourNetwork(): Promise<void> {
-    mode = 'your-network';
-    updateChrome();
-    showPanel(null);
-    destroyGraph();
-    showViewLoading(statusHost, 'Finding your network…');
-    statusHost.hidden = false;
-    const token = ++fetchToken;
-    try {
-      const selfResponse = await fetchSelfPerson();
-      if (!isCurrent() || token !== fetchToken) return;
-      if (!selfResponse.self) {
-        statusHost.replaceChildren();
-        statusHost.append(
-          el(
-            'p',
-            'empty-state',
-            'No self person is set up yet. Mark yourself in People before Your Network can show your own neighbourhood.'
-          )
-        );
-        const link = el('a', 'btn btn--secondary', 'Go to People');
-        link.href = '#/people';
-        statusHost.append(link);
-        statusHost.hidden = false;
+  const insights = mountInsights(insightsHost, {
+    onFocus: (insight) => {
+      if (insight.focus.kind === 'open-sea') {
+        select({ kind: 'open-sea', id: 'open-sea' });
+        canvas?.focusRef('open-sea', 'open-sea');
         return;
       }
+      select({ kind: insight.focus.kind, id: insight.focus.id } as MiniworldSelection);
+      canvas?.focusRef(insight.focus.kind, insight.focus.id);
+    }
+  });
 
-      const ego = await fetchNetworkEcologyEgo(selfResponse.self.ref, 2);
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = true;
-      statusHost.replaceChildren();
-      egoNodesRaw = toGraphNodes(ego.nodes, new Map(), new Set());
-      egoEdgesRaw = toGraphEdges(ego.edges);
-      mountOrUpdateGraph(egoNodesRaw, currentYourNetworkEdges());
-    } catch (err) {
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = false;
-      renderLoadError(statusHost, err, () => void loadYourNetwork());
+  function select(sel: MiniworldSelection): void {
+    canvas?.setSelection(sel);
+    if (model) panel.render(sel, model);
+  }
+
+  function syncFromModel(): void {
+    model = canvas?.getModel() ?? null;
+    if (!model) return;
+    key.render(model);
+    cards.render(model);
+    insights.render(model);
+    if (model.notes.noStartDateCount > 0 && !isNow) {
+      timeline.setNote(
+        `${model.notes.noStartDateCount} people have no start date, so they only appear at Now.`
+      );
+    } else if (!isNow && layers.dormancy) {
+      timeline.setNote('Dormancy uses your last contact date, so it only shows at Now.');
+    } else {
+      timeline.setNote(null);
     }
   }
 
-  async function loadHistory(dateValue: string): Promise<void> {
-    mode = 'history';
-    updateChrome();
-    showPanel(null);
-    destroyGraph();
-    showViewLoading(statusHost, `Loading the network as of ${dateValue}…`);
-    statusHost.hidden = false;
-    const token = ++fetchToken;
-    try {
-      const history = await fetchNetworkEcologyHistory(dateValue);
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = true;
-      statusHost.replaceChildren();
-      const habitatByRef = buildHabitatByRef(history.clusters);
-      const bridgeRefs = new Set(history.bridge_people.map((b) => b.ref));
-      const nodes = toGraphNodes(history.nodes, habitatByRef, bridgeRefs);
-      const edges = toGraphEdges(history.edges);
-      renderLegend();
-      mountOrUpdateGraph(nodes, edges);
-      // Show the queried date clearly, unambiguously, from the SERVER's
-      // own echoed `date` — never just the raw input value — so what is
-      // displayed always matches exactly what the server actually
-      // computed against.
-      historyAsOf.textContent = `Showing network as of ${formatHistoryDate(history.date)}.`;
-    } catch (err) {
-      if (!isCurrent() || token !== fetchToken) return;
-      statusHost.hidden = false;
-      renderLoadError(statusHost, err, () => void loadHistory(dateValue));
+  function updateLayerAvailability(): void {
+    const dormBtn = layerButtons.get('dormancy')!;
+    dormBtn.disabled = !isNow;
+    if (!isNow && layers.dormancy) {
+      layers.dormancy = false;
+      dormBtn.setAttribute('aria-pressed', 'false');
+      canvas?.setLayers({ dormancy: false });
+      layerNote.hidden = false;
+      layerNote.textContent = 'Dormancy uses your last contact date, so it only shows at Now.';
+    } else if (layers.opportunity && model && !(model.upcomingEvents?.length)) {
+      layerNote.hidden = false;
+      layerNote.textContent = 'No upcoming events with people you know';
+    } else {
+      layerNote.hidden = true;
+      layerNote.textContent = '';
     }
   }
 
-  worldModeBtn.addEventListener('click', () => {
-    if (mode === 'world') return;
-    void loadWorld();
-  });
-  yourNetworkModeBtn.addEventListener('click', () => {
-    if (mode === 'your-network') return;
-    void loadYourNetwork();
-  });
-  historyModeBtn.addEventListener('click', () => {
-    if (mode === 'history') return;
-    // Switching INTO History mode never fetches by itself — only the
-    // explicit "Recompute" click does (see the module-level doc comment
-    // above `todayDateInputValue`). Reset to a clean prompt state instead.
-    mode = 'history';
-    updateChrome();
-    showPanel(null);
-    destroyGraph();
-    statusHost.hidden = true;
-    statusHost.replaceChildren();
-    historyAsOf.textContent = 'Choose a date and click Recompute to see the network as of that date.';
-  });
-  historyRecomputeBtn.addEventListener('click', () => {
-    void loadHistory(historyDateInput.value);
-  });
-  backButton.addEventListener('click', () => void loadWorld());
+  function syncViewMode(): void {
+    const phone = isPhone();
+    const showMap = !phone && viewMode === 'world';
+    mapHost.hidden = !showMap;
+    cards.setVisible(phone || viewMode === 'cards');
+    worldBtn.setAttribute('aria-pressed', viewMode === 'world' ? 'true' : 'false');
+    cardsBtn.setAttribute('aria-pressed', viewMode === 'cards' ? 'true' : 'false');
+    worldBtn.hidden = phone;
+    if (phone) viewMode = 'cards';
+  }
 
-  // Layer checkboxes filter the ALREADY-FETCHED edge set client-side —
-  // never a new fetch (Feature 4.4's explicit requirement).
-  orgLayerCheckbox.addEventListener('change', () => {
-    if (mode !== 'your-network' || !graphHandle) return;
-    graphHandle.setData(egoNodesRaw, currentYourNetworkEdges());
+  worldBtn.addEventListener('click', () => {
+    viewMode = 'world';
+    syncViewMode();
   });
-  relLayerCheckbox.addEventListener('change', () => {
-    if (mode !== 'your-network' || !graphHandle) return;
-    graphHandle.setData(egoNodesRaw, currentYourNetworkEdges());
+  cardsBtn.addEventListener('click', () => {
+    viewMode = 'cards';
+    syncViewMode();
+  });
+  findMe.addEventListener('click', () => {
+    canvas?.findMe();
+    const me = model?.people.find((p) => p.isSelf);
+    if (me) select({ kind: 'person', id: me.ref });
   });
 
-  overlayCheckbox.addEventListener('change', () => {
-    overlayNote.hidden = !overlayCheckbox.checked;
-  });
+  for (const [keyName, btn] of layerButtons) {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      const next = !layers[keyName];
+      layers[keyName] = next;
+      btn.setAttribute('aria-pressed', next ? 'true' : 'false');
+      canvas?.setLayers({ [keyName]: next });
+      updateLayerAvailability();
+      if (keyName === 'opportunity' && next && model && !model.upcomingEvents.length) {
+        layerNote.hidden = false;
+        layerNote.textContent = 'No upcoming events with people you know';
+      }
+    });
+  }
 
-  myceliumCheckbox.addEventListener('change', () => {
-    if (mode !== 'world') return;
-    myceliumEnabled = myceliumCheckbox.checked;
-    graphHandle?.setMyceliumMode(myceliumEnabled);
-    updateMyceliumChrome();
-  });
+  timeline.setEnabled(!empty);
+  if (!empty) {
+    canvas = mountWorldCanvas(mapHost, api, {
+      reduceMotion,
+      onSelect: (sel) => {
+        if (model) panel.render(sel, model);
+      },
+      onModelChange: (m) => {
+        model = m;
+        key.render(m);
+        cards.render(m);
+        insights.render(m);
+      }
+    });
+    syncFromModel();
+  } else {
+    cards.render({
+      year: nowYear,
+      isNow: true,
+      communities: [],
+      people: [],
+      ecotones: [],
+      steppingStones: [],
+      landmarks: [],
+      openSea: { people: [], buoys: [] },
+      upcomingEvents: [],
+      insights: [],
+      bridgePeople: [],
+      notes: { noStartDateCount: 0, dormancyOnlyAtNow: false, lastContactUnknownCount: 0 },
+      keyCounts: {}
+    });
+  }
 
-  updateChrome();
-  await loadWorld();
+  syncViewMode();
+  updateLayerAvailability();
+
+  const onResize = () => {
+    syncViewMode();
+    canvas?.resize();
+  };
+  window.addEventListener('resize', onResize);
+
+  // Cleanup when root is replaced by router: MutationObserver light touch —
+  // professional router replaces children; destroy when page leaves DOM.
+  const obs = new MutationObserver(() => {
+    if (!root.contains(page)) {
+      canvas?.destroy();
+      timeline.destroy();
+      window.removeEventListener('resize', onResize);
+      obs.disconnect();
+    }
+  });
+  obs.observe(root, { childList: true });
 }

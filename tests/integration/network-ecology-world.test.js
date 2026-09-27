@@ -373,3 +373,236 @@ test('W2: stubbed GitHub professional_relationship appears as a world edge', asy
   assert.ok(body.nodes.some((n) => n.ref === aliceRef));
   assert.ok(body.nodes.some((n) => n.ref === bobRef));
 });
+
+// --- Miniworld data contract (BUILD-PLAN Phase 1) ------------------------
+
+test('miniworld: response includes links, timeline, upcoming_events; nodes carry last_contacted and is_self', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  const alice = await makePerson(store, {
+    display_name: 'Alice',
+    is_self: true,
+    professional_profile: undefined
+  });
+  // Attach last_contacted via professional_profile on the stored record.
+  const { ref: _a, ...aliceRec } = alice;
+  await store.setJSON(personKey(alice.id), {
+    ...aliceRec,
+    professional_profile: {
+      schema_version: 1,
+      source: { system: 'notion', page_url: null, properties: {} },
+      summary: null,
+      contact: { email: null, phone: null, linkedin_url: null },
+      last_contacted: '2025-06-01',
+      current_workplace: [],
+      references: { communications: [], books: [], podcasts: [], notes: [] },
+      body_markdown: null
+    }
+  });
+  const bob = await makePerson(store, { display_name: 'Bob' });
+  const org = await makeOrganisation(store, { display_name: 'UNSW' });
+
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: org.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2018-01-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: bob.ref,
+    targetRef: org.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2020-01-01T00:00:00.000Z'
+  });
+  // Ended professional_relationship — must still appear in `links`.
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: bob.ref,
+    relationshipType: 'professional_relationship',
+    role: 'mentor',
+    validFrom: '2019-01-01T00:00:00.000Z',
+    validTo: '2021-06-01T00:00:00.000Z'
+  });
+
+  const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
+  const response = await handler(request({ url: URL_BASE }));
+  assert.equal(response.status, 200);
+  const body = (await response.json()).data;
+
+  assert.ok(Array.isArray(body.links));
+  assert.ok(Array.isArray(body.upcoming_events));
+  assert.ok(body.timeline && typeof body.timeline === 'object');
+
+  const aliceNode = body.nodes.find((n) => n.ref === alice.ref);
+  assert.equal(aliceNode.is_self, true);
+  assert.equal(aliceNode.last_contacted, '2025-06-01');
+
+  const bobNode = body.nodes.find((n) => n.ref === bob.ref);
+  assert.equal(bobNode.is_self, false);
+  assert.equal(bobNode.last_contacted, null);
+
+  const ended = body.links.find(
+    (l) =>
+      l.relationship_type === 'professional_relationship' &&
+      l.status === 'ended' &&
+      ((l.source_ref === alice.ref && l.target_ref === bob.ref) ||
+        (l.source_ref === bob.ref && l.target_ref === alice.ref))
+  );
+  assert.ok(ended, 'ended link must appear in links with dates');
+  assert.ok(ended.valid_from);
+  assert.ok(ended.valid_to);
+
+  const orgCluster = body.clusters.find((c) => c.id === org.ref);
+  assert.ok(orgCluster);
+  assert.ok(orgCluster.habitat, 'habitat must never be null on a community');
+  assert.equal(orgCluster.since, 2018);
+
+  // Timeline spans from earliest valid_from year (floor 2015) to now.
+  assert.ok(body.timeline['2018'], 'timeline includes year of earliest link');
+  assert.ok(body.timeline['2026'], 'timeline includes current year');
+  assert.deepEqual(
+    body.timeline['2026'].clusters.map((c) => c.id).sort(),
+    body.clusters.filter((c) => c.kind === 'organisation').map((c) => c.id).sort()
+  );
+});
+
+test('miniworld: sandbank rule classifies a small new org; person keeps both cluster memberships', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  const alice = await makePerson(store, { display_name: 'Alice' });
+  const bob = await makePerson(store, { display_name: 'Bob' });
+  const carol = await makePerson(store, { display_name: 'Carol' });
+  const newOrg = await makeOrganisation(store, { display_name: 'Fresh Startup' });
+  const oldOrg = await makeOrganisation(store, { display_name: 'Old School' });
+
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: newOrg.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2026-06-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: bob.ref,
+    targetRef: newOrg.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2026-07-01T00:00:00.000Z'
+  });
+  // Alice also in Old School with Carol (island, not sandbank — old dates).
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: oldOrg.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2019-01-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: carol.ref,
+    targetRef: oldOrg.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2019-01-01T00:00:00.000Z'
+  });
+
+  const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
+  const body = (await (await handler(request({ url: URL_BASE }))).json()).data;
+
+  const fresh = body.clusters.find((c) => c.id === newOrg.ref);
+  assert.equal(fresh.habitat, 'sandbank');
+
+  const old = body.clusters.find((c) => c.id === oldOrg.ref);
+  assert.ok(old.member_refs.includes(alice.ref));
+  assert.ok(fresh.member_refs.includes(alice.ref), 'Alice keeps both cluster memberships');
+});
+
+test('miniworld: privacy — archived person never appears in links, timeline, or upcoming_events', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  const alice = await makePerson(store, { display_name: 'Alice' });
+  const hiddenBob = await makePerson(store, { display_name: 'Hidden Bob' });
+  const org = await makeOrganisation(store, { display_name: 'UNSW' });
+  const meeting = await makeMeeting(professionalStore, {
+    title: 'Secret Meet',
+    scheduled_start: '2026-10-01T00:00:00.000Z'
+  });
+  const meetingRef = formatEntityRef({ namespace: 'professional', kind: 'meeting', id: meeting.id });
+
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: org.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2020-01-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: hiddenBob.ref,
+    targetRef: org.ref,
+    relationshipType: 'employee_at',
+    validFrom: '2020-01-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: alice.ref,
+    targetRef: hiddenBob.ref,
+    relationshipType: 'professional_relationship',
+    role: 'mentor',
+    validFrom: '2020-01-01T00:00:00.000Z'
+  });
+  await makeLink(store, {
+    sourceRef: meetingRef,
+    targetRef: alice.ref,
+    relationshipType: 'attendee',
+    resolveEntity: makeResolveEntity(store, null, professionalStore)
+  });
+  await makeLink(store, {
+    sourceRef: meetingRef,
+    targetRef: hiddenBob.ref,
+    relationshipType: 'attendee',
+    resolveEntity: makeResolveEntity(store, null, professionalStore)
+  });
+
+  const { ref: _hb, ...hiddenRec } = hiddenBob;
+  await store.setJSON(personKey(hiddenBob.id), { ...hiddenRec, lifecycle_status: 'archived' });
+
+  const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
+  const body = (await (await handler(request({ url: URL_BASE }))).json()).data;
+
+  assert.ok(!body.links.some((l) => l.source_ref === hiddenBob.ref || l.target_ref === hiddenBob.ref));
+  for (const year of Object.keys(body.timeline)) {
+    const yearBody = body.timeline[year];
+    assert.ok(!yearBody.clusters.some((c) => c.member_refs.includes(hiddenBob.ref)));
+    assert.ok(!yearBody.bridge_people.some((p) => p.ref === hiddenBob.ref));
+  }
+  for (const ev of body.upcoming_events) {
+    assert.ok(!ev.attendee_refs.includes(hiddenBob.ref));
+  }
+});
+
+test('miniworld: upcoming_events lists future meetings with visible attendees only', async () => {
+  const store = memoryStore();
+  const professionalStore = memoryStore();
+  const alice = await makePerson(store, { display_name: 'Alice' });
+  const bob = await makePerson(store, { display_name: 'Bob' });
+  const meeting = await makeMeeting(professionalStore, {
+    title: 'PD Day',
+    scheduled_start: '2026-10-10T00:00:00.000Z'
+  });
+  const meetingRef = formatEntityRef({ namespace: 'professional', kind: 'meeting', id: meeting.id });
+  const resolve = makeResolveEntity(store, null, professionalStore);
+
+  await makeLink(store, {
+    sourceRef: meetingRef,
+    targetRef: alice.ref,
+    relationshipType: 'attendee',
+    resolveEntity: resolve
+  });
+  await makeLink(store, {
+    sourceRef: meetingRef,
+    targetRef: bob.ref,
+    relationshipType: 'attendee',
+    resolveEntity: resolve
+  });
+
+  const handler = createNetworkEcologyWorldHandler(baseDeps(store, professionalStore));
+  const body = (await (await handler(request({ url: URL_BASE }))).json()).data;
+  const ev = body.upcoming_events.find((e) => e.ref === meetingRef);
+  assert.ok(ev);
+  assert.equal(ev.title, 'PD Day');
+  assert.equal(ev.date, '2026-10-10');
+  assert.deepEqual(ev.attendee_refs.sort(), [alice.ref, bob.ref].sort());
+});

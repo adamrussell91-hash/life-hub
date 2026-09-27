@@ -35,7 +35,7 @@ import {
  * the deliberately simpler choice the task text explicitly permits.
  */
 
-export type HabitatType = 'forest' | 'reef' | 'savannah' | 'wetland' | 'island';
+export type HabitatType = 'forest' | 'reef' | 'savannah' | 'wetland' | 'island' | 'sandbank';
 
 export interface GraphNode {
   id: string;
@@ -199,10 +199,17 @@ export const HABITAT_META: Record<HabitatType, HabitatMeta> = {
     accentVar: '--pastel-lilac',
     accentFallback: '#e8e0f1',
     label: 'Island — specialised, isolated'
+  },
+  sandbank: {
+    fillVar: '--sand',
+    fillFallback: '#f0cfac',
+    accentVar: '--pastel-gold',
+    accentFallback: '#f1e2b6',
+    label: 'Sandbank — a new community just forming'
   }
 };
 
-export const HABITAT_ORDER: HabitatType[] = ['forest', 'reef', 'savannah', 'wetland', 'island'];
+export const HABITAT_ORDER: HabitatType[] = ['forest', 'reef', 'savannah', 'wetland', 'island', 'sandbank'];
 
 export function habitatFillColor(habitat: HabitatType): string {
   const meta = HABITAT_META[habitat];

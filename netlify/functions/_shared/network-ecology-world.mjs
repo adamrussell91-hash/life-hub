@@ -1,4 +1,4 @@
-// Network Ecology I/O assembly (Phase 4, Features 4.1-data/4.2/4.5-text).
+// Network Ecology I/O assembly (Phase 4 + miniworld data contract).
 // Everything in this file does real I/O (Blobs reads via the injected
 // repositories) — the PURE classification/graph logic it calls lives in
 // `habitat-classification.mjs` and `network-graph.mjs`/`introduction-paths.mjs`,
@@ -50,6 +50,20 @@ import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 
 const DAY_MS = 86_400_000;
+const TRAVERSABLE_LINK_TYPES = new Set(['employee_at', 'member_of', 'professional_relationship']);
+const TIMELINE_FLOOR_YEAR = 2015;
+const UPCOMING_EVENT_DAYS = 60;
+
+// Same predicate as `network-ecology-history.mjs` — inlined here to avoid a
+// circular import (history already imports `filterVisiblePeople` from this
+// module). Keep the two in lockstep.
+function isLinkActiveAsOf(link, cutoffMs) {
+  const validFromMs = link?.valid_from ? Date.parse(link.valid_from) : NaN;
+  if (Number.isFinite(validFromMs) && validFromMs > cutoffMs) return false;
+  const validToMs = link?.valid_to ? Date.parse(link.valid_to) : NaN;
+  if (Number.isFinite(validToMs) && validToMs < cutoffMs) return false;
+  return true;
+}
 
 function isVisiblePerson(person) {
   return person?.lifecycle_status !== 'archived';
@@ -76,69 +90,216 @@ async function loadVisiblePeople(deps) {
   return filterVisiblePeople(peopleWithRelationships);
 }
 
-function extractCurrentProfessionalRelationshipLinks(peopleWithRelationships) {
+function toIsoDateOnly(value) {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const ms = Date.parse(trimmed);
+  if (!Number.isFinite(ms)) return null;
+  const d = new Date(ms);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
+function personLastContacted(person) {
+  return toIsoDateOnly(person?.last_contacted ?? person?.professional_profile?.last_contacted ?? null);
+}
+
+function enrichNodes(graphNodes, peopleWithRelationships) {
+  const byRef = new Map(peopleWithRelationships.map((entry) => [entry.person.ref, entry.person]));
+  return [...graphNodes.values()].map((node) => {
+    if (node.kind !== 'person') {
+      return { ...node, last_contacted: null, is_self: false };
+    }
+    const person = byRef.get(node.ref);
+    return {
+      ...node,
+      last_contacted: personLastContacted(person),
+      is_self: person?.is_self === true
+    };
+  });
+}
+
+function extractProfessionalRelationshipLinks(peopleWithRelationships, { currentOnly = true, isLinkIncluded } = {}) {
   const seen = new Map();
   for (const { relationships } of peopleWithRelationships) {
     for (const { link } of relationships) {
-      if (link.status !== 'current') continue;
       if (link.relationship_type !== 'professional_relationship') continue;
+      if (isLinkIncluded) {
+        if (!isLinkIncluded(link)) continue;
+      } else if (currentOnly && link.status !== 'current') {
+        continue;
+      }
       if (!seen.has(link.id)) {
-        seen.set(link.id, { id: link.id, source_ref: link.source_ref, target_ref: link.target_ref, role: link.role ?? null });
+        seen.set(link.id, {
+          id: link.id,
+          source_ref: link.source_ref,
+          target_ref: link.target_ref,
+          role: link.role ?? null
+        });
       }
     }
   }
   return [...seen.values()];
 }
 
-function buildOrganisationClusters(peopleWithRelationships, now) {
-  // Reuses `people-cohorts.mjs`'s exact Dynamic Cohorts grouping helper —
-  // the same ">= 2 currently-linked people" organisation clusters Dynamic
-  // Cohorts (Phase 2, Feature 2.4) already computes — rather than a
-  // second, possibly-subtly-different pass over `peopleWithRelationships`.
-  const groups = groupCurrentOrganisationMembers(peopleWithRelationships);
-  const links = extractCurrentProfessionalRelationshipLinks(peopleWithRelationships);
-  const stats = computeOrganisationClusterStats(groups, links, { now });
+/** Every traversable link (current and ended) between visible endpoints. */
+function extractAllTraversableLinks(peopleWithRelationships, visibleRefs) {
+  const seen = new Map();
+  for (const { relationships } of peopleWithRelationships) {
+    for (const { link } of relationships) {
+      if (!TRAVERSABLE_LINK_TYPES.has(link.relationship_type)) continue;
+      if (link.status !== 'current' && link.status !== 'ended') continue;
+      if (!visibleRefs.has(link.source_ref) || !visibleRefs.has(link.target_ref)) continue;
+      if (seen.has(link.id)) continue;
+      seen.set(link.id, {
+        source_ref: link.source_ref,
+        target_ref: link.target_ref,
+        relationship_type: link.relationship_type,
+        role: link.role ?? null,
+        valid_from: link.valid_from ?? null,
+        valid_to: link.valid_to ?? null,
+        status: link.status
+      });
+    }
+  }
+  return [...seen.values()];
+}
 
+function earliestValidFromYear(peopleWithRelationships) {
+  let earliest = null;
+  for (const { relationships } of peopleWithRelationships) {
+    for (const { link } of relationships) {
+      if (!TRAVERSABLE_LINK_TYPES.has(link.relationship_type)) continue;
+      if (!link.valid_from) continue;
+      const ms = Date.parse(link.valid_from);
+      if (!Number.isFinite(ms)) continue;
+      const year = new Date(ms).getUTCFullYear();
+      if (earliest == null || year < earliest) earliest = year;
+    }
+  }
+  return earliest;
+}
+
+function mapOrganisationClusters(peopleWithRelationships, cutoff, { nowForStats } = {}) {
+  const cutoffMs = cutoff.getTime();
+  const isLinkIncluded = (link) => isLinkActiveAsOf(link, cutoffMs);
+  const groups = groupCurrentOrganisationMembers(peopleWithRelationships, { isLinkIncluded });
+  const links = extractProfessionalRelationshipLinks(peopleWithRelationships, { isLinkIncluded });
+  const stats = computeOrganisationClusterStats(groups, links, { now: nowForStats ?? cutoff });
   const clusters = stats.map((s) => ({
     id: s.id,
     kind: 'organisation',
     label: s.label,
     member_refs: s.member_refs,
-    habitat: classifyHabitat(s)
+    habitat: classifyHabitat(s),
+    since: s.since,
+    event_date: null
   }));
-
   const bridgePeople = computeBridgePeople(groups);
   return { clusters, bridgePeople };
 }
 
-async function buildEventClusters({ professionalStore, universalLinkStore, resolveEntity, createRepository, now, visiblePersonRefs }) {
-  if (!professionalStore) return [];
+function buildOrganisationClusters(peopleWithRelationships, now) {
+  return mapOrganisationClusters(peopleWithRelationships, now instanceof Date ? now : new Date(now), {
+    nowForStats: now
+  });
+}
 
+function buildTimeline(peopleWithRelationships, now) {
+  const nowDate = now instanceof Date ? now : new Date(now);
+  const currentYear = nowDate.getUTCFullYear();
+  const earliest = earliestValidFromYear(peopleWithRelationships);
+  const startYear = Math.max(TIMELINE_FLOOR_YEAR, earliest ?? currentYear);
+  const timeline = {};
+
+  for (let year = startYear; year <= currentYear; year += 1) {
+    const cutoff =
+      year === currentYear
+        ? nowDate
+        : new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
+    const { clusters, bridgePeople } = mapOrganisationClusters(peopleWithRelationships, cutoff);
+    timeline[String(year)] = {
+      clusters,
+      bridge_people: bridgePeople
+    };
+  }
+
+  return timeline;
+}
+
+async function listMeetingEventCandidates(professionalStore) {
+  if (!professionalStore) return [];
   const meetingRepo = createMeetingRepository({ store: professionalStore });
   const eventRepo = createEventRepository({ store: professionalStore });
   const [meetings, events] = await Promise.all([meetingRepo.listMeetings(), eventRepo.listEvents()]);
+  return [
+    ...meetings.map((m) => ({
+      kind: 'meeting',
+      id: m.id,
+      title: m.title,
+      scheduledStart: m.scheduled_start
+    })),
+    ...events.map((e) => ({
+      kind: 'event',
+      id: e.id,
+      title: e.title,
+      scheduledStart: e.start
+    }))
+  ];
+}
 
-  // Handled gracefully, per the task's own note: `attendee`'s registry
-  // declaration currently only allows `sourceKinds: ['professional:meeting']`
-  // (Phase 3 finding), so `events` attendee links may not exist in
-  // practice yet — an empty `events` attendee result here is expected, not
-  // an error, and simply yields zero event-derived candidate clusters for
-  // Events (Meetings can still produce Wetland clusters normally).
+async function attendeeRefsFor(
+  candidate,
+  { universalLinkStore, resolveEntity, createRepository, visiblePersonRefs }
+) {
+  const ref = formatEntityRef({ namespace: 'professional', kind: candidate.kind, id: candidate.id });
+  if (!ref) return { ref: null, attendeeRefs: [] };
+
   const linkRepo = (createRepository ?? createUniversalLinkRepository)({
     store: universalLinkStore,
     resolveEntity: resolveEntity ?? defaultResolveEntity
   });
   const accessContext = createAccessContext({ workflow: 'life' });
 
+  let outgoing = [];
+  try {
+    ({ outgoing } = await linkRepo.listForEntity(ref, accessContext, {}));
+  } catch {
+    return { ref, attendeeRefs: [] };
+  }
+
+  const attendeeRefs = [
+    ...new Set(
+      outgoing
+        .filter(
+          (entry) =>
+            entry.link.status === 'current' &&
+            entry.link.relationship_type === 'attendee' &&
+            entry.endpoint.kind === 'person'
+        )
+        .map((entry) => entry.endpoint.ref)
+        .filter((personRef) => visiblePersonRefs.has(personRef))
+    )
+  ];
+  return { ref, attendeeRefs };
+}
+
+async function buildEventClusters({
+  professionalStore,
+  universalLinkStore,
+  resolveEntity,
+  createRepository,
+  now,
+  visiblePersonRefs
+}) {
+  const candidates = await listMeetingEventCandidates(professionalStore);
+  if (!candidates.length) return [];
+
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   const windowMs = EVENT_WINDOW_DAYS * DAY_MS;
   const windowStart = nowMs - windowMs;
   const windowEnd = nowMs + windowMs;
-
-  const candidates = [
-    ...meetings.map((m) => ({ kind: 'meeting', id: m.id, title: m.title, scheduledStart: m.scheduled_start })),
-    ...events.map((e) => ({ kind: 'event', id: e.id, title: e.title, scheduledStart: e.start }))
-  ];
 
   const clusters = [];
   for (const candidate of candidates) {
@@ -146,66 +307,91 @@ async function buildEventClusters({ professionalStore, universalLinkStore, resol
     if (!Number.isFinite(startMs)) continue;
     if (startMs < windowStart || startMs > windowEnd) continue;
 
-    const ref = formatEntityRef({ namespace: 'professional', kind: candidate.kind, id: candidate.id });
-    if (!ref) continue;
+    const { ref, attendeeRefs } = await attendeeRefsFor(candidate, {
+      universalLinkStore,
+      resolveEntity,
+      createRepository,
+      visiblePersonRefs
+    });
+    if (!ref || attendeeRefs.length < HABITAT_MIN_CLUSTER_SIZE) continue;
 
-    let outgoing = [];
-    try {
-      ({ outgoing } = await linkRepo.listForEntity(ref, accessContext, {}));
-    } catch {
-      // The meeting/event itself is somehow inaccessible to this read —
-      // skip this one candidate cluster rather than failing the whole
-      // world-graph assembly over it.
-      continue;
-    }
-
-    const attendeeRefs = [
-      ...new Set(
-        outgoing
-          .filter(
-            (entry) =>
-              entry.link.status === 'current' &&
-              entry.link.relationship_type === 'attendee' &&
-              entry.endpoint.kind === 'person'
-          )
-          .map((entry) => entry.endpoint.ref)
-          // Privacy: an attendee's own visibility is re-checked against the
-          // SAME visible-person universe every other node/edge in this
-          // module is checked against — never trusted solely because the
-          // attendee-link resolver happened to return it.
-          .filter((personRef) => visiblePersonRefs.has(personRef))
-      )
-    ];
-
-    if (attendeeRefs.length < HABITAT_MIN_CLUSTER_SIZE) continue;
+    const eventDate = toIsoDateOnly(candidate.scheduledStart);
+    const since = eventDate ? Number(eventDate.slice(0, 4)) : null;
 
     clusters.push({
       id: ref,
       kind: 'event',
       label: candidate.title || (candidate.kind === 'meeting' ? 'Meeting' : 'Event'),
       member_refs: attendeeRefs,
-      habitat: classifyHabitat({ kind: 'event', size: attendeeRefs.length, inWindow: true })
+      habitat: classifyHabitat({ kind: 'event', size: attendeeRefs.length, inWindow: true }),
+      since,
+      event_date: eventDate
     });
   }
 
   return clusters;
 }
 
+async function buildUpcomingEvents({
+  professionalStore,
+  universalLinkStore,
+  resolveEntity,
+  createRepository,
+  now,
+  visiblePersonRefs
+}) {
+  const candidates = await listMeetingEventCandidates(professionalStore);
+  if (!candidates.length) return [];
+
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  const windowEnd = nowMs + UPCOMING_EVENT_DAYS * DAY_MS;
+  const upcoming = [];
+
+  for (const candidate of candidates) {
+    const startMs = Date.parse(candidate.scheduledStart);
+    if (!Number.isFinite(startMs)) continue;
+    if (startMs < nowMs || startMs > windowEnd) continue;
+
+    const { ref, attendeeRefs } = await attendeeRefsFor(candidate, {
+      universalLinkStore,
+      resolveEntity,
+      createRepository,
+      visiblePersonRefs
+    });
+    if (!ref || attendeeRefs.length === 0) continue;
+
+    upcoming.push({
+      ref,
+      title: candidate.title || (candidate.kind === 'meeting' ? 'Meeting' : 'Event'),
+      date: toIsoDateOnly(candidate.scheduledStart),
+      attendee_refs: attendeeRefs
+    });
+  }
+
+  upcoming.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  return upcoming;
+}
+
 /**
- * `GET /api/network-ecology/world` data layer. Full graph: every visible
- * person/organisation node, every current `professional_relationship`/
- * `employee_at`/`member_of` edge between two visible nodes, every
- * candidate organisation/event cluster with its classified habitat
- * (`null` when genuinely unclassified — never forced), and Bridge People.
+ * `GET /api/network-ecology/world` data layer. Full graph plus miniworld
+ * fields: dated `links`, per-node `last_contacted`/`is_self`, `timeline`,
+ * `upcoming_events`, and clusters that always carry a habitat landform.
  */
 export async function assembleWorldGraph(deps = {}) {
   const peopleWithRelationships = await loadVisiblePeople(deps);
   const graph = buildRelationshipGraph(peopleWithRelationships);
 
   const now = deps.now ?? new Date();
-  const { clusters: organisationClusters, bridgePeople } = buildOrganisationClusters(peopleWithRelationships, now);
+  const { clusters: organisationClusters, bridgePeople } = buildOrganisationClusters(
+    peopleWithRelationships,
+    now
+  );
 
   const visiblePersonRefs = new Set(peopleWithRelationships.map((entry) => entry.person.ref));
+  // Organisation nodes from the graph must count as visible endpoints for
+  // link disclosure (they are already filtered at resolution time).
+  const visibleRefs = new Set([...visiblePersonRefs, ...[...graph.nodes.keys()].filter((ref) => graph.nodes.get(ref)?.kind === 'organisation')]);
+
   const eventClusters = await buildEventClusters({
     professionalStore: deps.professionalStore,
     universalLinkStore: deps.store,
@@ -215,15 +401,40 @@ export async function assembleWorldGraph(deps = {}) {
     visiblePersonRefs
   });
 
+  const clusters = [...organisationClusters, ...eventClusters];
+  const timeline = buildTimeline(peopleWithRelationships, now);
+  // Current year in the timeline must equal today's organisation clusters
+  // (events are Now-only wetlands; timeline years stay organisation-only
+  // like `/history`).
+  const currentYear = String((now instanceof Date ? now : new Date(now)).getUTCFullYear());
+  if (timeline[currentYear]) {
+    timeline[currentYear] = {
+      clusters: organisationClusters,
+      bridge_people: bridgePeople
+    };
+  }
+
+  const upcomingEvents = await buildUpcomingEvents({
+    professionalStore: deps.professionalStore,
+    universalLinkStore: deps.store,
+    resolveEntity: deps.resolveEntity,
+    createRepository: deps.createRepository,
+    now,
+    visiblePersonRefs
+  });
+
   return {
-    nodes: [...graph.nodes.values()],
+    nodes: enrichNodes(graph.nodes, peopleWithRelationships),
     edges: graph.edges.map((edge) => ({
       source_ref: edge.source_ref,
       target_ref: edge.target_ref,
       relationship_type: edge.relationship_type
     })),
-    clusters: [...organisationClusters, ...eventClusters],
-    bridge_people: bridgePeople
+    links: extractAllTraversableLinks(peopleWithRelationships, visibleRefs),
+    clusters,
+    bridge_people: bridgePeople,
+    timeline,
+    upcoming_events: upcomingEvents
   };
 }
 
