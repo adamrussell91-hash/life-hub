@@ -3,22 +3,28 @@ import type { CareerModel } from '@/domain/career-model';
 import type { TimelineEntry } from '@/domain/types';
 import { yearFraction } from '@/domain/career-river-geometry';
 
+function plural(n: number, unit: string): string {
+  return n === 1 ? `1 ${unit}` : `${n} ${unit}s`;
+}
+
 function durationPhrase(from: string, to: string | null | undefined, nowIso: string): string {
   const start = yearFraction(from);
   const end = yearFraction(to || nowIso);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return '';
   const years = end - start;
   if (years < 1 / 12) return 'under a month';
-  if (years < 1) {
-    const months = Math.max(1, Math.round(years * 12));
-    return months === 1 ? '1 month' : `${months} months`;
-  }
+  if (years < 1) return plural(Math.max(1, Math.round(years * 12)), 'month');
   const whole = Math.floor(years);
   const months = Math.round((years - whole) * 12);
-  if (months <= 0) return whole === 1 ? '1 year' : `${whole} years`;
-  const y = whole === 1 ? '1 year' : `${whole} years`;
-  const m = months === 1 ? '1 month' : `${months} months`;
-  return `${y} ${m}`;
+  if (months <= 0) return plural(whole, 'year');
+  return `${plural(whole, 'year')} ${plural(months, 'month')}`;
+}
+
+function jobLabel(job: CareerModel['employment'][number]): string {
+  const workplace = (job.display_label || job.label || '').trim();
+  const role = (job.role || '').trim();
+  if (role && workplace) return `${role} · ${workplace}`;
+  return role || workplace || 'Role';
 }
 
 /**
@@ -29,31 +35,26 @@ export function employmentToTimeline(
   employment: CareerModel['employment'],
   nowIso: string
 ): TimelineEntry[] {
-  const dated = employment
+  return employment
     .filter((job) => Boolean(job.valid_from))
     .slice()
-    .sort((a, b) => String(a.valid_from).localeCompare(String(b.valid_from)));
-
-  return dated.map((job, index) => {
-    const workplace = (job.display_label || job.label || '').trim();
-    const role = (job.role || '').trim();
-    const label =
-      role && workplace ? `${role} · ${workplace}` : role || workplace || 'Role';
-    const duration = durationPhrase(job.valid_from!, job.valid_to, nowIso);
-    const open = !job.valid_to;
-    return {
-      id: `employment-${index}-${job.valid_from}-${role}`,
-      kind: 'period',
-      date: job.valid_from!,
-      end_date: open ? null : job.valid_to!,
-      label,
-      context_key: duration || null,
-      source_ref: job.ref || `employment:${index}`,
-      target_ref: job.ref || `employment:${index}`,
-      href: null,
-      context_href: null
-    };
-  });
+    .sort((a, b) => String(a.valid_from).localeCompare(String(b.valid_from)))
+    .map((job, index) => {
+      const role = (job.role || '').trim();
+      const ref = job.ref || `employment:${index}`;
+      return {
+        id: `employment-${index}-${job.valid_from}-${role}`,
+        kind: 'period',
+        date: job.valid_from!,
+        end_date: job.valid_to || null,
+        label: jobLabel(job),
+        context_key: durationPhrase(job.valid_from!, job.valid_to, nowIso) || null,
+        source_ref: ref,
+        target_ref: ref,
+        href: null,
+        context_href: null
+      };
+    });
 }
 
 /** Readable Work history — reuses relationship-timeline (not SVG pills). */

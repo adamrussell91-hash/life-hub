@@ -4292,16 +4292,13 @@
   font-size: var(--text-sm);
 }
 
-.career-page__work {
+.career-page__work,
+.career-page__work-timeline {
   min-width: 0;
 }
 
 .career-page__work .career-page__section-head {
   margin-bottom: var(--space-3);
-}
-
-.career-page__work-timeline {
-  min-width: 0;
 }
 
 .career-page__work-timeline .relationship-timeline__year:first-child {
