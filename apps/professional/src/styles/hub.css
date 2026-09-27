@@ -4655,6 +4655,9 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .career-river__toolbar {
@@ -4662,6 +4665,9 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+  /* Toolbar buttons stay selectable for a11y copy; drag surface is the SVG host. */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .career-river__pills {
@@ -4677,11 +4683,28 @@
   /* pan-y: page scroll works; river pan arms only along the time axis */
   touch-action: pan-y;
   background: transparent;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.career-river__svg-host.is-panning {
+  cursor: grabbing;
 }
 
 .career-river__svg {
   display: block;
   max-width: 100%;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.career-river__axis-year {
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
 .career-river__axis-note {

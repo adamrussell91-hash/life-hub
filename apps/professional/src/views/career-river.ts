@@ -1,5 +1,6 @@
 import {
   assignEmploymentLanes,
+  axisYearTicks,
   branchColour,
   branchPolyline,
   clampZoom,
@@ -418,11 +419,11 @@ export function mountCareerRiver(
       })
     );
 
-    // Now line + label
+    // Now line + label (top of dashed line — bottom row is for year axis ticks)
     const nowLine =
       state!.orientation === 'horizontal'
-        ? `M${nowU * lengthPx} 24 L${nowU * lengthPx} ${height - 24}`
-        : `M24 ${(1 - nowU) * lengthPx} L${width - 24} ${(1 - nowU) * lengthPx}`;
+        ? `M${nowU * lengthPx} 24 L${nowU * lengthPx} ${height - 28}`
+        : `M28 ${(1 - nowU) * lengthPx} L${width - 24} ${(1 - nowU) * lengthPx}`;
     svg.appendChild(
       svgEl('path', {
         d: nowLine,
@@ -434,12 +435,13 @@ export function mountCareerRiver(
       })
     );
     const nowText = svgEl('text', {
-      x: state!.orientation === 'horizontal' ? nowU * lengthPx + 6 : 28,
-      y: state!.orientation === 'horizontal' ? height - 10 : (1 - nowU) * lengthPx - 6,
+      x: state!.orientation === 'horizontal' ? nowU * lengthPx + 6 : 32,
+      y: state!.orientation === 'horizontal' ? 34 : (1 - nowU) * lengthPx - 8,
       fill: 'var(--ink)',
       'font-size': 11,
       'font-family': 'inherit',
-      'font-weight': 600
+      'font-weight': 600,
+      'data-part': 'now-label'
     });
     const nowTerm =
       model.futures[0]?.split_label?.replace(/^~/, '') ||
@@ -451,6 +453,53 @@ export function mountCareerRiver(
       })();
     nowText.textContent = `Now · ${nowTerm}`;
     svg.appendChild(nowText);
+
+    // Year / axis row — same job as Tasks timeline term/week axis labels.
+    for (const year of axisYearTicks(state!.zoom)) {
+      const u = timeToUnit(year, state!.zoom, nowYear);
+      if (u < -0.02 || u > 1.02) continue;
+      if (isHorizontal) {
+        const x = u * lengthPx;
+        svg.appendChild(
+          svgEl('line', {
+            x1: x,
+            y1: height - 26,
+            x2: x,
+            y2: height - 22,
+            stroke: 'var(--line)',
+            'stroke-width': 1,
+            'data-part': 'axis-tick'
+          })
+        );
+        const label = svgEl('text', {
+          x,
+          y: height - 8,
+          fill: 'var(--muted)',
+          'font-size': 11,
+          'font-family': 'inherit',
+          'font-variant-numeric': 'tabular-nums',
+          'text-anchor': 'middle',
+          'data-part': 'axis-year',
+          class: 'career-river__axis-year'
+        });
+        label.textContent = String(year);
+        svg.appendChild(label);
+      } else {
+        const y = (1 - u) * lengthPx;
+        const label = svgEl('text', {
+          x: 6,
+          y: y + 4,
+          fill: 'var(--muted)',
+          'font-size': 10,
+          'font-family': 'inherit',
+          'font-variant-numeric': 'tabular-nums',
+          'data-part': 'axis-year',
+          class: 'career-river__axis-year'
+        });
+        label.textContent = String(year);
+        svg.appendChild(label);
+      }
+    }
 
     // Branch paths + labels
     const labelBoxes: Array<{ x: number; y: number; w: number; h: number; el: SVGElement }> = [];
@@ -741,21 +790,34 @@ export function mountCareerRiver(
 
   // Allow vertical page scroll over the river; only steal gestures for
   // ctrl/meta zoom, pinch, or a clear pan along the time axis (medical-strip pattern).
+  // Anti-select: Safari click-drag must pan/zoom, not highlight page copy (Tasks gantt/map pattern).
   svgHost.style.touchAction = 'pan-y';
+
+  const onSelectStart = (event: Event) => {
+    event.preventDefault();
+  };
+  const clearNativeSelection = () => {
+    const sel = globalThis.getSelection?.();
+    if (sel && sel.rangeCount) sel.removeAllRanges();
+  };
 
   const onWheel = (event: WheelEvent) => {
     if (!(event.ctrlKey || event.metaKey)) return;
     event.preventDefault();
+    clearNativeSelection();
     const span = state!.zoom.to - state!.zoom.from;
     const factor = event.deltaY > 0 ? 1.08 : 1 / 1.08;
     const mid = (state!.zoom.from + state!.zoom.to) / 2;
     setZoom({ from: mid - (span * factor) / 2, to: mid + (span * factor) / 2 });
   };
   svgHost.addEventListener('wheel', onWheel, { passive: false });
+  svgHost.addEventListener('selectstart', onSelectStart);
+  host.addEventListener('selectstart', onSelectStart);
 
   // Safari gesture events (non-standard)
   const onGestureStart = (event: Event) => {
     event.preventDefault?.();
+    clearNativeSelection();
     state!.pinch = {
       dist0: 1,
       from0: state!.zoom.from,
@@ -775,6 +837,12 @@ export function mountCareerRiver(
 
   const pointers = new Map<number, { x: number; y: number }>();
   const onPointerDown = (event: PointerEvent) => {
+    // Mouse: kill native text-selection start (Safari blue highlight). Touch keeps
+    // default so vertical page scroll still works until the gesture arms as pan.
+    if (event.pointerType === 'mouse' && event.button === 0) {
+      event.preventDefault();
+    }
+    clearNativeSelection();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size === 2) {
       svgHost.setPointerCapture?.(event.pointerId);
@@ -800,6 +868,7 @@ export function mountCareerRiver(
     if (!pointers.has(event.pointerId)) return;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size === 2 && state!.pinch?.dist0) {
+      clearNativeSelection();
       const pts = [...pointers.values()];
       const dist = Math.hypot(pts[0]!.x - pts[1]!.x, pts[0]!.y - pts[1]!.y);
       if (dist > 0) {
@@ -824,8 +893,11 @@ export function mountCareerRiver(
           return;
         }
         state!.drag.armed = true;
+        clearNativeSelection();
+        svgHost.classList.add('is-panning');
         svgHost.setPointerCapture?.(event.pointerId);
       }
+      clearNativeSelection();
       const delta = horizontal ? dx : dy;
       const plot = Math.max(1, horizontal ? state!.width - 200 : 400);
       const yearShift =
@@ -839,7 +911,10 @@ export function mountCareerRiver(
   const onPointerEnd = (event: PointerEvent) => {
     pointers.delete(event.pointerId);
     if (pointers.size < 2) state!.pinch = null;
-    if (pointers.size === 0) state!.drag = null;
+    if (pointers.size === 0) {
+      state!.drag = null;
+      svgHost.classList.remove('is-panning');
+    }
   };
   svgHost.addEventListener('pointerdown', onPointerDown);
   svgHost.addEventListener('pointermove', onPointerMove);
@@ -851,6 +926,8 @@ export function mountCareerRiver(
       mq.removeEventListener?.('change', onMq);
       ro.disconnect();
       svgHost.removeEventListener('wheel', onWheel);
+      svgHost.removeEventListener('selectstart', onSelectStart);
+      host.removeEventListener('selectstart', onSelectStart);
       svgHost.removeEventListener('gesturestart', onGestureStart as EventListener);
       svgHost.removeEventListener('gesturechange', onGestureChange as EventListener);
       svgHost.removeEventListener('pointerdown', onPointerDown);
