@@ -39,3 +39,57 @@ test('comms are comm chips; pins stay short; non-PD events are event chips; prom
   const wed = model.days.find((day) => day.date === '2026-09-23');
   assert.deepEqual(wed.due.map((due) => [due.kind, due.filterKey, due.late]), [['promise', 'promises', true]]);
 });
+
+test('covering Life visual still keeps Professional overlays and ledger promises', () => {
+  const visual = {
+    ITEMS: [{ id: 'life-meds', date: '2026-09-22', start: '07:00', end: '07:15', kind: 'health', title: 'Meds' }],
+    DUE: [],
+    WALLS: [],
+    FREE: []
+  };
+  const model = buildTidelineModel({
+    events: [
+      ...events,
+      {
+        path: 'p:meet',
+        record: {
+          type: 'professional_meeting',
+          id: 'm1',
+          date: '2026-09-22',
+          time: '10:00',
+          duration_min: 45,
+          title: 'Seth planning'
+        }
+      },
+      {
+        path: 'p:pd',
+        record: {
+          type: 'professional_event',
+          id: 'e2',
+          date: '2026-09-22',
+          time: '15:00',
+          duration_min: 60,
+          title: 'Warlight PL',
+          event_type: 'professional_development'
+        }
+      }
+    ],
+    visual,
+    week: WEEK,
+    today: '2026-09-26',
+    nowHour: 12,
+    terms: [
+      { term: 3, starts_on: '2026-07-21', ends_on: '2026-09-25' },
+      { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
+    ]
+  });
+  assert.ok(model.visual, 'visual covers the week');
+  const chips = model.days.flatMap((day) => day.chips);
+  assert.equal(chips.some((chip) => chip.id === 'life-meds'), true);
+  assert.equal(chips.find((chip) => chip.id === 'c1')?.filterKey, 'comms');
+  assert.equal(chips.find((chip) => chip.id === 'm1')?.filterKey, 'meetings');
+  assert.equal(chips.find((chip) => chip.id === 'e1')?.filterKey, 'events');
+  assert.equal(chips.find((chip) => chip.id === 'e2')?.filterKey, 'pd');
+  const wed = model.days.find((day) => day.date === '2026-09-23');
+  assert.deepEqual(wed.due.map((due) => [due.kind, due.filterKey]), [['promise', 'promises']]);
+});

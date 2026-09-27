@@ -210,6 +210,22 @@ function recordForItem(events, item) {
   return (events ?? []).find(event => event.path === path)?.record ?? null;
 }
 
+/**
+ * Hub schedule rows that Life's calendar-visual file never paints.
+ * When visualCovers is true, chipsFromVisual used to keep only visual.ITEMS +
+ * calendar_block — dropping Professional / Teaching / Tasks overlays so
+ * Comms / Meetings / Events filter chips read 0 on Professional Calendar.
+ */
+const HUB_OVERLAY_SOURCES = new Set([
+  'professional_meeting',
+  'professional_event',
+  'professional_communication',
+  'scheduled_lesson',
+  'task',
+  'work_block',
+  'deadline'
+]);
+
 function chipsFromVisual(visual, date, events) {
   const chips = [];
   for (const item of visual.ITEMS ?? []) {
@@ -226,12 +242,16 @@ function chipsFromVisual(visual, date, events) {
   // Accept writes (bedtime wind-down, protect blocks) land as Life calendar_block
   // records. The visual ITEMS file does not grow; merge those in so an accepted
   // proposal stays a solid arc and a plain row after reload.
+  // Also merge hub overlay chips (Professional / Teaching / timed Tasks) so a
+  // covering Life visual does not hide schedule-projections and sibling feeds.
   for (const event of events ?? []) {
     const chip = chipFromEvent(event);
-    if (!chip || chip.date !== date || chip.source !== 'calendar_block') continue;
+    if (!chip || chip.date !== date) continue;
+    const overlay = HUB_OVERLAY_SOURCES.has(chip.source);
+    if (chip.source !== 'calendar_block' && !overlay) continue;
     if (chips.some(existing =>
       existing.id === chip.id
-      || (Math.abs(existing.start - chip.start) < 1e-6 && Math.abs(existing.end - chip.end) < 1e-6)
+      || (!overlay && Math.abs(existing.start - chip.start) < 1e-6 && Math.abs(existing.end - chip.end) < 1e-6)
     )) continue;
     chips.push(chip);
   }
@@ -256,19 +276,8 @@ function appendGhostChips(chips, ghosts, date) {
   return chips;
 }
 
-function dueFor(visual, events, date, useVisual) {
-  if (useVisual) {
-    return (visual.DUE ?? []).filter(item => item.date === date).map(item => {
-      const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
-      const actual = task?.record?.date;
-      if (typeof actual === 'string' && actual !== item.date) return { ...item, moved: true, movedTo: actual };
-      return item;
-    });
-  }
-  const tasks = (events ?? [])
-    .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
-    .map(event => ({ id: event.record.id || event.path, date, title: event.record.title || 'Task', kind: 'task', filterKey: 'tasks' }));
-  const promises = (events ?? [])
+function promiseDuesFromEvents(events, date) {
+  return (events ?? [])
     .filter(event => event.record?.type === 'ledger_item' && event.record.date === date)
     .map(event => ({
       id: event.record.id,
@@ -279,6 +288,23 @@ function dueFor(visual, events, date, useVisual) {
       direction: event.record.direction,
       late: event.record.late === true
     }));
+}
+
+function dueFor(visual, events, date, useVisual) {
+  const promises = promiseDuesFromEvents(events, date);
+  if (useVisual) {
+    const visualDue = (visual.DUE ?? []).filter(item => item.date === date).map(item => {
+      const task = (events ?? []).find(event => event.record?.type === 'task' && event.record.id === item.id);
+      const actual = task?.record?.date;
+      if (typeof actual === 'string' && actual !== item.date) return { ...item, moved: true, movedTo: actual };
+      return item;
+    });
+    const seen = new Set(visualDue.map(item => item.id));
+    return [...visualDue, ...promises.filter(item => !seen.has(item.id))];
+  }
+  const tasks = (events ?? [])
+    .filter(event => event.record?.type === 'task' && event.record.date === date && !event.record.time)
+    .map(event => ({ id: event.record.id || event.path, date, title: event.record.title || 'Task', kind: 'task', filterKey: 'tasks' }));
   return [...tasks, ...promises];
 }
 

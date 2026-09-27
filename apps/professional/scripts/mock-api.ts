@@ -160,7 +160,12 @@ export function createMockApi() {
   );
   const relationships = [...(seedData.relationships as RelationshipSeed[])];
   const observations = new Map<string, Record<string, unknown>>();
-  const communications = new Map<string, CommunicationRecord>();
+  const communications = new Map<string, CommunicationRecord>(
+    ((seedData as { communications?: CommunicationRecord[] }).communications ?? []).map((comm) => [
+      comm.id,
+      { ...comm }
+    ])
+  );
   const followUpOperations = new Map<string, NonNullable<CommunicationRecord['follow_up_operation']>>();
   const meetings = new Map<string, Record<string, unknown>>(
     ((seedData as { meetings?: Record<string, unknown>[] }).meetings ?? []).map((meeting) => [
@@ -1536,8 +1541,27 @@ export function createMockApi() {
           time_zone: event.time_zone,
           all_day: Boolean(event.all_day),
           status: event.occurrence_state,
+          event_type: typeof event.event_type === 'string' ? event.event_type : null,
           href: `/professional/#/event/${event.id}`
-        }))
+        })),
+        ...[...communications.values()].map((comm) => {
+          const start = comm.scheduled_start ?? comm.occurred_at;
+          const pin = !comm.scheduled_start || !comm.scheduled_end;
+          return {
+            projection_id: `proj_comm_${String(comm.id).slice(-12)}`,
+            source_ref: `professional:communication:${comm.id}`,
+            kind: 'communication',
+            title: comm.subject || String(comm.channel || 'comm').replace(/_/g, ' '),
+            start,
+            end: pin ? start : comm.scheduled_end,
+            time_zone: comm.time_zone || 'Australia/Sydney',
+            all_day: false,
+            status: comm.status,
+            channel: comm.channel,
+            pin,
+            href: `/professional/#/communication/${comm.id}`
+          };
+        })
       ];
       return json(200, { ok: true, data: { projections, promises: [] } });
     }
