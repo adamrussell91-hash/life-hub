@@ -685,19 +685,22 @@ function mountHead(grid, date) {
   const day = dayByDate(date);
   const tag = day.tag;
   const head = el('div', `cal-head${date === model.today ? ' is-today' : ''}${day.over ? ' is-over' : ''}`, undefined, grid, { 'data-part': 'day-head', 'data-date': date });
-  const over = day.over ? '<span class="cal-over" data-part="over-flag">over</span>' : '';
-  const tagHtml = tag ? `<span class="cal-tag${tag.tone === 'term' ? ' cal-tag--term' : ''}">${tag.text}</span>` : '';
-  el('div', 'cal-head__name', `<span class="cal-head__dow">${DOW(date)}</span><span class="cal-head__num">${DOM_NUM(date)}</span>${over}${tagHtml}`, head);
+  // Date stays above the capacity bar so bars align across the week.
+  // over / tags / vitals sit in .cal-head__chips at the bottom of the square.
+  el('div', 'cal-head__name', `<span class="cal-head__dow">${DOW(date)}</span><span class="cal-head__num">${DOM_NUM(date)}</span>`, head);
   const cap = el('div', `cal-cap${day.cap?.forecast ? ' is-forecast' : ''}`, undefined, head, { 'data-part': 'capacity', 'data-pct': String(day.cap?.pct ?? '') });
   css(cap, '--cap', capColour(day.cap?.pct ?? 0));
   el('div', 'cal-cap__bar', `<span class="cal-cap__fill" style="width:${day.cap?.pct ?? 0}%"></span>`, cap);
   el('div', 'cal-cap__text', `<b>${day.cap?.pct ?? ''}%</b> · ${day.cap?.note ?? ''}`, cap);
+  const chips = el('div', 'cal-head__chips', undefined, head, { 'data-part': 'day-chips' });
+  if (day.over) el('span', 'cal-over', 'over', chips, { 'data-part': 'over-flag' });
+  if (tag) el('span', `cal-tag${tag.tone === 'term' ? ' cal-tag--term' : ''}`, tag.text, chips);
   const bits = [];
   if (day.sleep != null) bits.push(`<span>${ICON.moon}${day.sleep}h</span>`);
   if (day.energy) bits.push(`<span class="${day.energy === 'low' ? 'is-low' : ''}">${ICON.bolt}${day.energy}</span>`);
   if (day.meals) bits.push(`<span>${ICON.fork}${day.meals}</span>`);
   if (day.symptom) bits.push(`<span class="is-symptom">● ${day.symptom}</span>`);
-  el('div', 'cal-vit', bits.join('') || '<span>nothing logged yet</span>', head, { 'data-part': 'vitals' });
+  el('div', 'cal-vit', bits.join('') || '<span>nothing logged yet</span>', chips, { 'data-part': 'vitals' });
   nodes.set(`colhead:${date}`, head);
 }
 
