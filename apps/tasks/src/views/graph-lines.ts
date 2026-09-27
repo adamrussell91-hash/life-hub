@@ -18,6 +18,7 @@ import {
   TRANSIT_G,
   branchPath,
   fitText,
+  measureText,
   terminusWidth,
   transitStep,
   transitTerminusX,
@@ -26,6 +27,7 @@ import {
 } from '../../../life/js/app/chart-kit/transit-lines.js';
 import { el } from '@/views/hub-kit';
 import { drawIn, popIn, svgEl, token } from '@/views/graph-svg';
+import { backlogHrefFromGraph } from '@/shell/shell';
 
 export type LinesMount = {
   root: HTMLElement;
@@ -100,6 +102,32 @@ export function lineLabelX(x: number, viewWidth: number): { x: number; anchor: '
   const maxX = Math.max(pad, viewWidth - pad);
   const clamped = Math.min(Math.max(x, pad), maxX);
   return { x: clamped, anchor: clamped > viewWidth / 2 ? 'end' : 'start' };
+}
+
+/**
+ * Keep station title/sub labels inside the SVG. Middle-anchored text at padL
+ * otherwise paints past x=0 and is clipped by `.graph-page { overflow: hidden }`.
+ */
+export function stationLabelPlacement(
+  x: number,
+  viewWidth: number,
+  textWidth: number,
+  prefer: 'middle' | 'start' | 'end' = 'middle'
+): { x: number; anchor: 'start' | 'middle' | 'end' } {
+  const pad = 8;
+  const maxX = Math.max(pad, viewWidth - pad);
+  if (prefer === 'end') {
+    if (x - textWidth < pad) return { x: Math.min(Math.max(x, pad), maxX), anchor: 'start' };
+    return { x: Math.min(Math.max(x, pad), maxX), anchor: 'end' };
+  }
+  if (prefer === 'start') {
+    if (x + textWidth > maxX) return { x: maxX, anchor: 'end' };
+    return { x: Math.max(x, pad), anchor: 'start' };
+  }
+  const half = textWidth / 2;
+  if (x - half < pad) return { x: Math.max(pad, x), anchor: 'start' };
+  if (x + half > maxX) return { x: maxX, anchor: 'end' };
+  return { x, anchor: 'middle' };
 }
 
 export function lineViewWidth(clientWidth: number): number {
@@ -498,12 +526,31 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     st.branch.stations.forEach((bs, j) => {
       const x = bx + g.branchElbow + bstep * (j + 0.6);
       const grp = paintStation(branch, bs, x, by, col, true, input);
-      const t1 = svgEl('text', { class: 'lbl', x, y: by + 22, 'text-anchor': 'middle', 'data-part': 'station-title' }, grp);
-      t1.textContent = fitText(bs.title, '500 13px Inter, ui-sans-serif, sans-serif', bstep - 10);
+      const titleFont = '500 13px Inter, ui-sans-serif, sans-serif';
+      const titleText = fitText(bs.title, titleFont, bstep - 10);
+      const titlePlace = stationLabelPlacement(x, width, measureText(titleText, titleFont), 'middle');
+      const t1 = svgEl(
+        'text',
+        { class: 'lbl', x: titlePlace.x, y: by + 22, 'text-anchor': titlePlace.anchor, 'data-part': 'station-title' },
+        grp
+      );
+      t1.textContent = titleText;
       t1.style.fill = 'var(--ink)';
       t1.style.fontWeight = '500';
       t1.style.fontSize = '13px';
-      const t2 = svgEl('text', { class: subClass(bs.tone), x, y: by + 37, 'text-anchor': 'middle', 'data-part': 'station-sub' }, grp);
+      const subFont = '400 12px Inter, ui-sans-serif, sans-serif';
+      const subPlace = stationLabelPlacement(x, width, measureText(bs.sub, subFont), 'middle');
+      const t2 = svgEl(
+        'text',
+        {
+          class: subClass(bs.tone),
+          x: subPlace.x,
+          y: by + 37,
+          'text-anchor': subPlace.anchor,
+          'data-part': 'station-sub'
+        },
+        grp
+      );
       t2.textContent = bs.sub;
       popIn(grp, base + 900 + j * 80, 'pop', input.reducedMotion);
     });
@@ -552,27 +599,32 @@ function renderHorizontal(line: LineModel, host: HTMLElement, width: number, inp
     const x = xs[i]!;
     const grp = paintStation(svg, st, x, y, col, false, input);
     const up = !alt || i % 2 === 0;
+    const titleFont = '500 13px Inter, ui-sans-serif, sans-serif';
+    const titleText = fitText(st.title, titleFont, (alt ? step * 2 : step) - 14);
+    const titlePlace = stationLabelPlacement(x, width, measureText(titleText, titleFont), 'middle');
     const title = svgEl(
       'text',
       {
         class: 'lbl',
-        x,
+        x: titlePlace.x,
         y: up ? y + g.labelY : y + g.subY,
-        'text-anchor': 'middle',
+        'text-anchor': titlePlace.anchor,
         'data-part': 'station-title'
       },
       grp
     );
-    title.textContent = fitText(st.title, '500 13px Inter, ui-sans-serif, sans-serif', (alt ? step * 2 : step) - 14);
-    const subAnchor = st.branch ? 'end' : 'middle';
+    title.textContent = titleText;
+    const subFont = '400 12px Inter, ui-sans-serif, sans-serif';
+    const subPrefer = st.branch ? 'end' : 'middle';
     const subX = st.branch ? x - 14 : x;
+    const subPlace = stationLabelPlacement(subX, width, measureText(st.sub, subFont), subPrefer);
     const sub = svgEl(
       'text',
       {
         class: subClass(st.tone),
-        x: subX,
+        x: subPlace.x,
         y: up ? y + g.subY : y + g.subY + 16,
-        'text-anchor': subAnchor,
+        'text-anchor': subPlace.anchor,
         'data-part': 'station-sub'
       },
       grp
@@ -887,7 +939,9 @@ export function mountLinesView(host: HTMLElement, first: LinesInput): LinesMount
       stage.append(el('p', 'empty-state', "Give tasks a project and they'll appear as lines."));
     }
     const loose = input.tasks.filter((t) => !t.parent_project_id && t.status !== 'done' && t.status !== 'dead');
-    foot.innerHTML = loose.length ? `${loose.length} tasks without a project · <a href="#/list">Open Backlog</a>` : '';
+    foot.innerHTML = loose.length
+      ? `${loose.length} tasks without a project · <a href="${backlogHrefFromGraph()}">Open Backlog</a>`
+      : '';
     lastWidth = width;
     entrancePlayed = true;
   };

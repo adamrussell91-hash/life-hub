@@ -69,7 +69,7 @@
 
 ## C: Charts and SVG
 
-**C1 · Labels collide or clip.** **Seen:** Goals runway "Move clipped" (PAD_R); Medical strip labels cut by the TODAY line or truncated, and overlapping value labels; Organisations #508 (56 overlapping count labels on the St. Aloysius tile, the role label clipped at the timeline's top edge, and axis labels under the people line), with C1 ticked in the ledger. **Rule:** Reserve gutters in the maths; run a collision pass (flip, then hide-to-tooltip); anchor `end` near the right edge; axis labels get their own row. **Check:** a DOM test using `getBBox` shows no label box intersecting another or crossing the SVG edge, at 390 and 1440.
+**C1 · Labels collide or clip.** **Seen:** Goals runway "Move clipped" (PAD_R); Medical strip labels cut by the TODAY line or truncated, and overlapping value labels; Organisations #508 (56 overlapping count labels on the St. Aloysius tile, the role label clipped at the timeline's top edge, and axis labels under the people line), with C1 ticked in the ledger; Tasks Graph Lines station titles/subs middle-anchored at `padL` clipped past SVG x=0 (2026-09). **Rule:** Reserve gutters in the maths; run a collision pass (flip, then hide-to-tooltip); anchor `end` near the right edge; axis labels get their own row. **Check:** a DOM test using `getBBox` shows no label box intersecting another or crossing the SVG edge, at 390 and 1440.
 
 **C2 · A decorative band standing in for data.** **Seen:** Medical strip: the normal-range band was drawn full width, but the value line was never drawn. **Rule:** A chart item is done when the **data mark** renders from real values; the reference band is secondary. **Check:** the screenshot shows the line passing through the actual numbers.
 
