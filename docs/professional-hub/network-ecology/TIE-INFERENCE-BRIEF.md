@@ -12,10 +12,11 @@ before it becomes a link.
 
 This brief builds one **tie inference agent** that runs two ways:
 
-1. **Kick-off run (one-off, holistic):** a local CLI reads **every source**
-   (see "Sources" below). It builds one evidence file per pair of people, and
-   classifies each candidate pair once, using all of that pair's evidence
-   together. It fills the proposal queue.
+1. **Kick-off run (one-off, holistic): done by Codex, not this build.** See
+   `docs/superpowers/plans/2026-09-27-tie-inference-kickoff-codex.md`. Codex
+   writes the source adapters and candidate logic in
+   `netlify/functions/_shared/tie-inference/`, classifies the pairs itself,
+   and Adam confirms them from a review sheet.
 2. **Update automation (nightly):** a scheduled function re-reads the sources,
    classifies only pairs that are new or have new evidence, and adds or
    refreshes proposals.
@@ -197,38 +198,30 @@ A pair is re-classified only when its evidence count has grown by at least 2,
 or 50%, since `last_classified_count`. This keeps nightly runs cheap. The
 kick-off and the nightly run both read and write this same state.
 
-## Phase 0: health report (read-only; do first)
+## Phase 0: check the kick-off landed (read-only; do first)
 
-`scripts/tie-inference-health.mjs` prints, without writing anything:
-- counts of comms, meetings and events, and how many have ≥ 2 linked people;
-- how many roster names are found in record bodies, and how many name matches
-  were ambiguous (with the ambiguous names only, never record text);
-- evidence items per source, and which adapters were skipped and why;
-- the number of candidate pairs at each rule, and how many pairs draw on 1, 2
-  or 3+ sources;
-- how many would be skipped (already linked, declined, record too large);
-- whether a proposal accepted for a GitHub-imported person (derived id)
-  resolves on both people's pages. **If it doesn't, stop and report it.** Every
-  confirmed tie depends on this.
+The Codex kick-off's `node scripts/ties-kickoff.mjs health` already reports
+source and pair counts. Before building, confirm:
+- `_shared/tie-inference/` exists on `main` with its tests passing;
+- the `'ties'` proposer is in `link-proposal-schema.mjs`;
+- a kick-off link accepted for a GitHub-imported person (derived id) shows
+  on both people's pages and as a line in Ecology.
 
-Paste the output (counts only) into the PR.
+**If any of these fails, stop and report it.**
 
-## Phase 1: kick-off CLI
+## Phase 1: reuse the kick-off code
 
-`scripts/infer-ties.mjs`:
-- **Previews by default:** runs stages 1 and 2 and prints a report, but writes
-  no proposals. `--apply` writes them.
-- `--limit N` caps the Claude calls (default 400). Pairs are classified
-  strongest evidence first, so a capped run still covers the best pairs.
-- `--sources comms,meetings,…` limits the adapters (default: all). `--since YYYY-MM-DD`
-  limits records by date.
-- Opens the stores the way `scripts/copy-hub-blobs.mjs` does. Never prints the
-  token.
-- The report goes to `os.tmpdir()` or a `--report` path outside the repo. It
-  holds counts, pair names, reasons and record refs. It **never holds record
-  text**.
-- Safe to run twice: the second run with no new records makes no Claude calls
-  and no new proposals.
+The Codex kick-off leaves the source adapters, `candidates.mjs`,
+`excerpts.mjs` and `verdict.mjs` in `netlify/functions/_shared/tie-inference/`,
+along with `_ties/declined-pairs.json`. **Reuse them; don't rewrite them.**
+This build adds:
+- `classify.mjs`: the Claude call (Stage 2), whose output goes through the
+  same `verdict.mjs` validator Codex's verdicts did;
+- the run state in `_ties/state.json`, seeded on the first nightly run from
+  the proposals that already exist, so kick-off pairs aren't re-classified.
+
+For the Claude call, use `anthropic-client.mjs` at low effort, and put the
+fixed instructions first so they can be cached.
 
 ## Phase 2: nightly maintenance
 
