@@ -52,3 +52,203 @@ and are reopened:
 ## Out of this PR
 
 - Phase 6 / 8 → People PRs
+
+## Fix 01: Phase 0
+
+Branch: `cursor/organisations-fix-01`. Investigated 27/09/26 against
+fresh `origin/main` + local `life-hub-data` `data/professional/{organisations,people,relationships}.json`,
+assembled with the same rules as `github-professional-data.mjs`
+(`LEGACY_IMPORT_TIMESTAMP = 2026-09-15T00:00:00.000Z` stamped on every
+synthetic link's `created_at`) and `assembleOrganisationsDirectory` /
+`assemblePeopleDirectory` / `warmthFor()`. No Blob store was bound in this
+environment; Organisations on the live umbrella also loads GitHub for these
+records. **No Part A code changes in this commit.**
+
+### 1. `first_link_at` — St. Aloysius and Trinity
+
+Directory rule (unchanged): `valid_from || occurred_at || created_at`.
+
+**St. Aloysius College — 56 people**
+
+| Field source | Count |
+|---|---|
+| `valid_from` | 1 |
+| `occurred_at` | 0 |
+| `created_at` | 55 |
+
+Only Adam has a real `valid_from` (`2025-01-22`). Everyone else falls through
+to `created_at` = the import stamp `2026-09-15T00:00:00.000Z`. So **55/56
+are import timestamps, not "when Adam got to know them".**
+
+| Person | `first_link_at` | Field |
+|---|---|---|
+| Adam Russell | 2025-01-22 | `valid_from` |
+| Alison DeSousa | 2026-09-15T00:00:00.000Z | `created_at` |
+| Carmel Cordaro | 2026-09-15T00:00:00.000Z | `created_at` |
+| Carolyn Muir | 2026-09-15T00:00:00.000Z | `created_at` |
+| Chris Dobell-Brown | 2026-09-15T00:00:00.000Z | `created_at` |
+| Claire Smith | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dallas Davies | 2026-09-15T00:00:00.000Z | `created_at` |
+| Daniel Heyman | 2026-09-15T00:00:00.000Z | `created_at` |
+| Daniel Levitt | 2026-09-15T00:00:00.000Z | `created_at` |
+| Daniel Ronchetti | 2026-09-15T00:00:00.000Z | `created_at` |
+| David Comito | 2026-09-15T00:00:00.000Z | `created_at` |
+| Dr Georgia Macbeth | 2026-09-15T00:00:00.000Z | `created_at` |
+| Eileen Quinane | 2026-09-15T00:00:00.000Z | `created_at` |
+| Elizabeth Phipps | 2026-09-15T00:00:00.000Z | `created_at` |
+| Erin Webb | 2026-09-15T00:00:00.000Z | `created_at` |
+| Felipe Basioli | 2026-09-15T00:00:00.000Z | `created_at` |
+| Fr Ross Jones SJ | 2026-09-15T00:00:00.000Z | `created_at` |
+| Grant Smith | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hamish Bragg | 2026-09-15T00:00:00.000Z | `created_at` |
+| Hanna Lucas | 2026-09-15T00:00:00.000Z | `created_at` |
+| Heidi Quinn | 2026-09-15T00:00:00.000Z | `created_at` |
+| Isabella Talliano | 2026-09-15T00:00:00.000Z | `created_at` |
+| Jennifer Walker | 2026-09-15T00:00:00.000Z | `created_at` |
+| Joe El-Khoury | 2026-09-15T00:00:00.000Z | `created_at` |
+| John Browne | 2026-09-15T00:00:00.000Z | `created_at` |
+| John Powell | 2026-09-15T00:00:00.000Z | `created_at` |
+| John Tzantzaris | 2026-09-15T00:00:00.000Z | `created_at` |
+| Joseph Histon | 2026-09-15T00:00:00.000Z | `created_at` |
+| Joseph Lee | 2026-09-15T00:00:00.000Z | `created_at` |
+| Joshua Levy | 2026-09-15T00:00:00.000Z | `created_at` |
+| Justyn Ambrose | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kate Quinane | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kathleen Esser | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kelly Ryu | 2026-09-15T00:00:00.000Z | `created_at` |
+| Lisa Gascoigne | 2026-09-15T00:00:00.000Z | `created_at` |
+| Marcel Kennedy | 2026-09-15T00:00:00.000Z | `created_at` |
+| Martin Corcoran | 2026-09-15T00:00:00.000Z | `created_at` |
+| Matt Fanning | 2026-09-15T00:00:00.000Z | `created_at` |
+| Michelle O'Connor | 2026-09-15T00:00:00.000Z | `created_at` |
+| Mitchell Chriss | 2026-09-15T00:00:00.000Z | `created_at` |
+| Natalie Shih | 2026-09-15T00:00:00.000Z | `created_at` |
+| Nick Lah | 2026-09-15T00:00:00.000Z | `created_at` |
+| Nina Radice | 2026-09-15T00:00:00.000Z | `created_at` |
+| Paul Monteleone | 2026-09-15T00:00:00.000Z | `created_at` |
+| Phillip Merchant | 2026-09-15T00:00:00.000Z | `created_at` |
+| Pier Milanoli | 2026-09-15T00:00:00.000Z | `created_at` |
+| Richard Steele | 2026-09-15T00:00:00.000Z | `created_at` |
+| Seth Fitisemanu | 2026-09-15T00:00:00.000Z | `created_at` |
+| Simone Salle | 2026-09-15T00:00:00.000Z | `created_at` |
+| Sinclair Watson | 2026-09-15T00:00:00.000Z | `created_at` |
+| Sophie Unsworth | 2026-09-15T00:00:00.000Z | `created_at` |
+| Sue Gough | 2026-09-15T00:00:00.000Z | `created_at` |
+| Tamara Dabic | 2026-09-15T00:00:00.000Z | `created_at` |
+| Thierry King | 2026-09-15T00:00:00.000Z | `created_at` |
+| Tom Spencer | 2026-09-15T00:00:00.000Z | `created_at` |
+| Vanessa Wadih | 2026-09-15T00:00:00.000Z | `created_at` |
+
+**Trinity Catholic College — 20 people**
+
+| Field source | Count |
+|---|---|
+| `valid_from` | 0 |
+| `occurred_at` | 0 |
+| `created_at` | 20 |
+
+**All 20 are import timestamps.**
+
+| Person | `first_link_at` | Field |
+|---|---|---|
+| Bianca Gambrill | 2026-09-15T00:00:00.000Z | `created_at` |
+| Cait Grey | 2026-09-15T00:00:00.000Z | `created_at` |
+| Carmel Wright | 2026-09-15T00:00:00.000Z | `created_at` |
+| Cherie Borger | 2026-09-15T00:00:00.000Z | `created_at` |
+| Helen Davies | 2026-09-15T00:00:00.000Z | `created_at` |
+| Jonathan Reynolds | 2026-09-15T00:00:00.000Z | `created_at` |
+| Jordan Fulmer | 2026-09-15T00:00:00.000Z | `created_at` |
+| Justine Webb | 2026-09-15T00:00:00.000Z | `created_at` |
+| Kerrie Sellers | 2026-09-15T00:00:00.000Z | `created_at` |
+| Natalie Adams | 2026-09-15T00:00:00.000Z | `created_at` |
+| Olivia Slevin | 2026-09-15T00:00:00.000Z | `created_at` |
+| Rachel Logan | 2026-09-15T00:00:00.000Z | `created_at` |
+| Rachel Moore | 2026-09-15T00:00:00.000Z | `created_at` |
+| Renai Thirlway | 2026-09-15T00:00:00.000Z | `created_at` |
+| Robert Emery | 2026-09-15T00:00:00.000Z | `created_at` |
+| Ruby Wyker | 2026-09-15T00:00:00.000Z | `created_at` |
+| Simon Pearse | 2026-09-15T00:00:00.000Z | `created_at` |
+| Stephanie Strachan | 2026-09-15T00:00:00.000Z | `created_at` |
+| Tania Hough | 2026-09-15T00:00:00.000Z | `created_at` |
+| Taylah Grainger | 2026-09-15T00:00:00.000Z | `created_at` |
+
+**A1 / A8 implication:** a tile spark / people line that trusts `first_link_at`
+as-is will stack almost everyone on 15/09/26. Header "first Jan 2025" on
+St. Aloysius is Adam's own `valid_from`, not the organisation's first touch
+with other people. Directory people count is **56**, not the build-plan's 82.
+
+### 2. Warmth bands — St. Aloysius (defect A2)
+
+| Source | warm | cooling | cold | total |
+|---|---|---|---|---|
+| Organisations directory (`assembleOrganisationsDirectory`) | 0 | 0 | 56 | 56 |
+| People `warmthFor()` for the same 56 ids (full person relationship set; empty timeline / no meetings — same inputs People directory uses, and People page until overview loads richer touchpoints) | 0 | 0 | 56 | 56 |
+
+**Band counts currently match (both all cold).** They do **not** prove A2 is
+absent: the org directory still calls `warmthFor()` with touchpoints from
+**only the single person→org link** and `timeline: []` (A2 cause in
+`FIX-BRIEF-01.md`). People uses the person's full relationship list (and the
+person page later patches from overview meetings/events when those exist). On
+this GitHub dataset there are no meeting/event/comms touchpoints and 55/56
+Aloysius people have only that one org link, so both paths score cold. The
+architectural second computation remains; do not restyle the bar warmer.
+
+### 3. Relationship-type counts (all organisations)
+
+From `life-hub-data` `relationships.json` (250 rows). Directory org count
+from the same store: **114** (brief said 112).
+
+| Type | Count in `relationships.json` |
+|---|---|
+| `employee_at` | 246 |
+| `member_of` | 4 |
+| `venue` | 0 |
+| `provider` | 0 |
+| `applies_to` | 0 |
+| `presenter` | 0 |
+| `studied_at` | 0 |
+| `placement_at` | 0 |
+
+Also: `professional_relationship` = 0 in this file.
+`github-professional-data.mjs` `normalizeRelationships` only imports
+`employee_at`, `member_of`, and `professional_relationship` into the runtime
+graph — so even if venue/provider/etc. were added to the JSON later, they
+would still not reach the directory until that importer is extended.
+
+**Wall filter chip counts** (orgs whose derived chips hit each
+`filterBucket`, as `chipMatchesFilter` does):
+
+| Filter | Count |
+|---|---|
+| All | 114 |
+| Work | 8 |
+| Study & placement | **0** |
+| Events & PD | **0** |
+| Professional bodies | 4 |
+| Prospects | **0** |
+
+**Why Events & PD / Study & placement / Prospects are 0:** there are **no**
+`venue`, `provider`, `presenter`, `studied_at`, `placement_at`, or
+`applies_to` links in the store. Chip derivation cannot invent Event venue /
+PD provider / Studied / Placement / Applied chips. St. Aloysius has no Event
+venue chip because no venue links exist (A7 — data absence, not a missed
+derivation on present links). Work = 8 is Adam's `employee_at` workplaces;
+bodies = 4 is his `member_of` orgs.
+
+### 4. Adam → St. Aloysius links
+
+Exactly **one** link in `relationships.json`:
+
+| Role | `valid_from` | `valid_to` |
+|---|---|---|
+| Gifted Education Teacher | 2025-01-22 | `null` (open / current) |
+
+Directory chips for St. Aloysius: **Workplace · Gifted Education Teacher · 2025–now**.
+Timeline lane from the assembler: `kind: work_study`, `start: 2025-01-22`,
+`end: null`.
+
+### Phase 0 status
+
+- [x] Items 1–4 answered with real numbers
+- [ ] Part A (A1–A8) — **not started** (stop here per brief)
+- [ ] Part B — **not started**
