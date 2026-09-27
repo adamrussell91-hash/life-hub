@@ -50,6 +50,7 @@ import {
 } from '@/views/applications';
 import { renderCareerView } from '@/views/career';
 import { renderOrganisationPage } from '@/views/organisation-page';
+import { renderOrganisationsCompare } from '@/views/organisations-compare';
 import { renderNetworkEcologyView } from '@/views/network-ecology';
 import { renderQuickLog } from '@/views/quick-log';
 import { personRoute } from '@/app/router';
@@ -156,6 +157,13 @@ async function bootApp(root: HTMLElement): Promise<void> {
       // Page owns its single Organisations h1 (People pattern).
       renderPageHeader(shell, { eyebrow: '', title: '' });
       await renderOrganisationsView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'organisations-compare') {
+      renderPageHeader(shell, { eyebrow: '', title: '' });
+      await renderOrganisationsCompare(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;

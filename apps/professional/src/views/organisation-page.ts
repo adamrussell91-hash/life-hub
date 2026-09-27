@@ -1,6 +1,5 @@
 /**
- * Organisations redesign Phase 1 — organisation page skeleton + Your time with …
- * FIX-BRIEF-01 A3–A5, A8: ongoing bars, timeline labels, no dead buttons / roadmap copy.
+ * Organisations page — Phases 1–5 + 7 (FIX-BRIEF-01 Part B).
  */
 
 import {
@@ -10,8 +9,26 @@ import {
   uploadSignedCrest,
   type DirectoryOrganisationRow
 } from '@/api/organisations-directory';
+import {
+  createOpportunity,
+  dismissOpportunity,
+  listOpportunities,
+  type OpportunityRecord
+} from '@/api/opportunities';
+import { fetchOrgStructure, type OrgStructurePayload } from '@/api/org-structure';
+import {
+  fetchOrganisationRead,
+  runOrganisationReadNow,
+  type OrganisationRead
+} from '@/api/organisation-read';
 import { organisationsRoute } from '@/app/router';
+import { openStructureEditor } from '@/components/org-structure-editor';
 import { crestNode, el, sectionHost, setSectionState } from '@/components/org-ui';
+import {
+  layoutOrgFlowchart,
+  renderFlowchartSvg,
+  renderStructureOutline
+} from '@/domain/org-flowchart';
 import {
   buildOrganisationModel,
   type OrganisationModel
@@ -90,8 +107,101 @@ async function uploadCrest(model: OrganisationModel, file: File): Promise<void> 
   await updateOrganisation(model.ref, { logo_key: signed.attachment.r2_key });
 }
 
+function closesLabel(opp: OpportunityRecord): string {
+  if (opp.closes_precision === 'none' || !opp.closes_on) return '';
+  if (opp.closes_precision === 'month') {
+    const [y, m] = opp.closes_on.split('-');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const mi = Number(m) - 1;
+    return `closes ${months[mi] ?? m} ${y}`;
+  }
+  const d = new Date(opp.closes_on);
+  if (Number.isNaN(d.getTime())) return '';
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const yy = String(d.getUTCFullYear()).slice(-2);
+  return `closes ${dd}/${mm}/${yy}`;
+}
+
+function openAddOpportunitySheet(opts: {
+  organisationRef: string;
+  organisationName: string;
+  onSaved: () => void;
+  onClose: () => void;
+}): HTMLElement {
+  const sheet = el('div', 'orgs-page__sheet');
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', 'Add opportunity');
+  const inner = el('div', 'orgs-page__sheet-inner');
+  inner.append(el('h2', undefined, 'Add opportunity'));
+  const title = document.createElement('input');
+  title.type = 'text';
+  title.placeholder = 'Title';
+  const kind = document.createElement('select');
+  for (const k of [
+    'scholarship',
+    'pd',
+    'program',
+    'role',
+    'call_for_presenters',
+    'grant',
+    'event',
+    'other'
+  ]) {
+    const o = document.createElement('option');
+    o.value = k;
+    o.textContent = k;
+    kind.append(o);
+  }
+  const closes = document.createElement('input');
+  closes.type = 'month';
+  const url = document.createElement('input');
+  url.type = 'url';
+  url.placeholder = 'https://…';
+  const status = el('p', 'orgs-page__meta', '');
+  const save = el('button', 'btn btn--primary', 'Save') as HTMLButtonElement;
+  save.type = 'button';
+  save.addEventListener('click', () => {
+    void (async () => {
+      save.disabled = true;
+      try {
+        await createOpportunity({
+          organisation_ref: opts.organisationRef,
+          kind: kind.value as OpportunityRecord['kind'],
+          title: title.value.trim(),
+          summary: '',
+          closes_on: closes.value ? `${closes.value}-01` : null,
+          closes_precision: closes.value ? 'month' : 'none',
+          url: url.value.trim() || null,
+          found_by: 'adam'
+        });
+        opts.onSaved();
+      } catch (err) {
+        status.textContent = err instanceof Error ? err.message : 'Save failed.';
+        save.disabled = false;
+      }
+    })();
+  });
+  const close = el('button', 'btn btn--ghost', 'Close') as HTMLButtonElement;
+  close.type = 'button';
+  close.addEventListener('click', opts.onClose);
+  for (const [lab, control] of [
+    ['Title', title],
+    ['Kind', kind],
+    ['Closes', closes],
+    ['Link', url]
+  ] as Array<[string, HTMLElement]>) {
+    const l = el('label', 'orgs-page__field');
+    l.append(document.createTextNode(lab), control);
+    inner.append(l);
+  }
+  inner.append(status, save, close);
+  sheet.append(inner);
+  return sheet;
+}
+
 /**
- * Real entry point for `#/organisations/<id>` (W2). Replaces generic entity detail (P3).
+ * Real entry point for `#/organisations/<id>` (W2).
  */
 export async function renderOrganisationPage(
   canvas: HTMLElement,
@@ -100,6 +210,7 @@ export async function renderOrganisationPage(
 ): Promise<void> {
   const isCurrent = options.isCurrent ?? (() => true);
   const query = parseOrgsQuery(hashQuery());
+  const lineParam = new URLSearchParams(hashQuery().replace(/^\?/, '')).get('line');
 
   canvas.replaceChildren();
   canvas.classList.add('orgs-page', 'orgs-page--detail');
@@ -111,8 +222,13 @@ export async function renderOrganisationPage(
   back.href = organisationsRoute(null, serializeOrgsQuery(query));
   back.textContent = '← Organisations';
   const switchSpacer = el('span', 'orgs-page__spacer');
-  // A5: Compare / Edit land with Phases 7 and 2 — don't render disabled stubs.
-  switchBar.append(back, switchSpacer);
+  const compareBtn = document.createElement('a');
+  compareBtn.className = 'btn btn--ghost';
+  compareBtn.textContent = 'Compare with…';
+  compareBtn.href = `#/organisations/compare?ids=${encodeURIComponent(organisationId)}`;
+  const editBtn = el('button', 'btn btn--ghost', 'Edit') as HTMLButtonElement;
+  editBtn.type = 'button';
+  switchBar.append(back, switchSpacer, compareBtn, editBtn);
 
   const hdr = el('header', 'orgs-page__hdr');
   const hdrStack = el('div', 'orgs-page__hdr-stack');
@@ -140,6 +256,306 @@ export async function renderOrganisationPage(
   setSectionState(opps.body, 'loading');
   setSectionState(time.body, 'loading');
 
+  let model: OrganisationModel | null = null;
+  let structure: OrgStructurePayload | null = null;
+  let directoryPeople: Array<{ id: string; display_name: string }> = [];
+  let selfPersonRef: string | null = null;
+  let editorSheet: HTMLElement | null = null;
+
+  async function patchHowSection(): Promise<void> {
+    if (!model || !isCurrent()) return;
+    setSectionState(how.body, 'ready');
+    how.body.replaceChildren();
+
+    try {
+      structure = await fetchOrgStructure(model.id);
+    } catch {
+      structure = null;
+    }
+
+    const hasStructure = Boolean(structure && structure.units.length > 0);
+    const toolbar = el('div', 'orgs-how__toolbar');
+    const addStructure = el('button', 'btn btn--ghost', hasStructure ? 'Edit structure' : 'Add structure') as HTMLButtonElement;
+    addStructure.type = 'button';
+    addStructure.addEventListener('click', () => openEditor());
+    toolbar.append(addStructure);
+
+    if (!hasStructure || !structure) {
+      const howEmpty = el('div', 'orgs-how__empty');
+      howEmpty.append(
+        el('p', 'people-pane__empty', 'No structure yet. Add units to show how this organisation is run.'),
+        addStructure
+      );
+      how.body.append(howEmpty);
+      return;
+    }
+
+    // Highlight control (V2) — URL ?line=
+    const hl = el('div', 'orgs-how__hl');
+    hl.append(el('span', 'orgs-how__hl-lbl', 'Highlight'));
+    const yourLines = lineParam || 'your_lines';
+    const pills: Array<{ id: string; label: string }> = [
+      { id: 'your_lines', label: 'Your lines' }
+    ];
+    if (selfPersonRef && structure.graph.memberships_by_person[selfPersonRef]) {
+      for (const m of structure.graph.memberships_by_person[selfPersonRef]) {
+        const unit = structure.units.find((u) => `shared:unit:${u.id}` === m.unit_ref);
+        pills.push({
+          id: selfPersonRef,
+          label: m.role ? `as ${m.role}` : unit?.name || 'role'
+        });
+      }
+    }
+    // Deduplicate pill ids for menu — use role labels uniquely
+    const seen = new Set<string>();
+    for (const p of pills) {
+      const key = p.label;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const btn = el('button', `orgs-how__pill${yourLines === p.id || (p.id === 'your_lines' && !lineParam) ? ' is-active' : ''}`, p.label) as HTMLButtonElement;
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        const params = new URLSearchParams(hashQuery().replace(/^\?/, ''));
+        if (p.id === 'your_lines') params.delete('line');
+        else params.set('line', p.id);
+        const q = params.toString();
+        location.hash = `#/organisations/${organisationId}${q ? `?${q}` : ''}`;
+      });
+      hl.append(btn);
+    }
+
+    const viewToggle = el('div', 'orgs-how__seg');
+    const isPhone = window.matchMedia('(max-width: 719px)').matches;
+    let view: 'outline' | 'flow' | 'people' = isPhone ? 'outline' : 'flow';
+    const outlineBtn = el('button', 'orgs-how__seg-btn', 'Outline') as HTMLButtonElement;
+    const flowBtn = el('button', 'orgs-how__seg-btn', 'Flow') as HTMLButtonElement;
+    const peopleBtn = el('button', 'orgs-how__seg-btn', 'People list') as HTMLButtonElement;
+    outlineBtn.type = flowBtn.type = peopleBtn.type = 'button';
+    viewToggle.append(outlineBtn, flowBtn, peopleBtn);
+
+    const host = el('div', 'orgs-how__host');
+    how.body.append(toolbar, hl, viewToggle, host);
+
+    async function paintView(): Promise<void> {
+      if (!structure) return;
+      outlineBtn.classList.toggle('is-active', view === 'outline');
+      flowBtn.classList.toggle('is-active', view === 'flow');
+      peopleBtn.classList.toggle('is-active', view === 'people');
+      host.replaceChildren();
+      if (view === 'outline') {
+        host.append(renderStructureOutline(structure, selfPersonRef));
+        return;
+      }
+      if (view === 'people') {
+        const list = el('div', 'orgs-people-list');
+        const ids = structure.graph.member_person_ids;
+        for (const id of ids) {
+          const p = directoryPeople.find((x) => x.id === id);
+          const a = document.createElement('a');
+          a.href = `#/people/${encodeURIComponent(id)}`;
+          a.textContent = p?.display_name || id;
+          list.append(a);
+        }
+        if (selfPersonRef) {
+          const youCount = structure.graph.memberships_by_person[selfPersonRef]?.length ?? 0;
+          if (youCount) {
+            how.heading.querySelector('.orgs-how__you')?.remove();
+            how.heading.append(
+              el('span', 'people-pane__h2-sub orgs-how__you', `You · ${youCount} roles`)
+            );
+          }
+        }
+        host.append(list);
+        return;
+      }
+      // Flow
+      const wrap = el('div', 'orgs-flow__box');
+      host.append(wrap);
+      try {
+        const layout = await layoutOrgFlowchart(structure, {
+          selfPersonRef,
+          highlightLine: lineParam || 'your_lines',
+          compact: isPhone
+        });
+        wrap.append(renderFlowchartSvg(layout));
+      } catch (err) {
+        wrap.append(
+          el(
+            'p',
+            'people-pane__empty',
+            err instanceof Error ? err.message : 'Could not layout flowchart.'
+          )
+        );
+      }
+    }
+
+    outlineBtn.addEventListener('click', () => {
+      view = 'outline';
+      void paintView();
+    });
+    flowBtn.addEventListener('click', () => {
+      view = 'flow';
+      void paintView();
+    });
+    peopleBtn.addEventListener('click', () => {
+      view = 'people';
+      void paintView();
+    });
+
+    await paintView();
+  }
+
+  function openEditor(): void {
+    if (!model) return;
+    editorSheet?.remove();
+    editorSheet = openStructureEditor({
+      organisationRef: model.ref,
+      organisationName: model.displayName,
+      structure,
+      people: directoryPeople,
+      onSaved: async () => {
+        editorSheet?.remove();
+        editorSheet = null;
+        await patchHowSection();
+      },
+      onClose: () => {
+        editorSheet?.remove();
+        editorSheet = null;
+      }
+    });
+    root.append(editorSheet);
+  }
+
+  editBtn.addEventListener('click', () => openEditor());
+
+  async function patchAnn(): Promise<void> {
+    if (!model) return;
+    setSectionState(ann.body, 'ready');
+    ann.body.replaceChildren();
+    let read: OrganisationRead | null = null;
+    try {
+      const res = await fetchOrganisationRead(model.ref);
+      read = res.read?.generated_at ? res.read : null;
+    } catch {
+      read = null;
+    }
+    if (!read) {
+      ann.body.append(
+        el('p', 'people-pane__empty', `Ann hasn't read ${model.displayName} yet.`)
+      );
+      const run = el('button', 'btn btn--primary', 'Run now') as HTMLButtonElement;
+      run.type = 'button';
+      run.addEventListener('click', () => {
+        void (async () => {
+          run.disabled = true;
+          try {
+            await runOrganisationReadNow(
+              model!.ref,
+              structure
+                ? {
+                    structure: structure.graph,
+                    memberships: selfPersonRef
+                      ? structure.graph.memberships_by_person[selfPersonRef] || []
+                      : [],
+                    warmth_by_unit: {},
+                    observations: [],
+                    meetings: [],
+                    opportunities: []
+                  }
+                : undefined
+            );
+            await patchAnn();
+          } catch (err) {
+            ann.body.append(
+              el(
+                'p',
+                'people-pane__empty',
+                err instanceof Error ? err.message : 'Run failed.'
+              )
+            );
+          }
+        })();
+      });
+      ann.body.append(run);
+      return;
+    }
+    if (read.status === 'failed') {
+      ann.body.append(
+        el('p', 'people-pane__empty', read.error || 'Ann’s read failed.')
+      );
+      return;
+    }
+    ann.body.append(el('p', 'orgs-ann__summary', read.summary || ''));
+    const threads = el('div', 'orgs-ann__threads');
+    for (const t of read.threads || []) {
+      const row = el('div', 'orgs-ann__thread');
+      row.append(el('span', 'orgs-ann__k', t.key.replace(/_/g, ' ')));
+      row.append(el('span', 'orgs-ann__v', t.text));
+      if (t.sources?.[0]) {
+        const src = t.sources[0];
+        const label = src.excerpt || src.url || src.ref || 'source';
+        row.append(el('span', 'orgs-ann__src', label));
+      }
+      threads.append(row);
+    }
+    ann.body.append(threads);
+  }
+
+  async function patchOpps(): Promise<void> {
+    if (!model) return;
+    setSectionState(opps.body, 'ready');
+    opps.body.replaceChildren();
+    opps.heading.querySelector('.people-pane__h2-sub')?.remove();
+    opps.heading.append(el('span', 'people-pane__h2-sub', 'here · next 6 weeks'));
+
+    let items: OpportunityRecord[] = [];
+    try {
+      const res = await listOpportunities({ organisationRef: model.ref });
+      items = res.opportunities ?? [];
+    } catch {
+      items = [];
+    }
+    const open = items.filter((o) => o.status === 'open' || o.status === 'interested');
+
+    const addBtn = el('button', 'btn btn--ghost', 'Add opportunity') as HTMLButtonElement;
+    addBtn.type = 'button';
+    addBtn.addEventListener('click', () => {
+      const sheet = openAddOpportunitySheet({
+        organisationRef: model!.ref,
+        organisationName: model!.displayName,
+        onSaved: () => {
+          sheet.remove();
+          void patchOpps();
+        },
+        onClose: () => sheet.remove()
+      });
+      root.append(sheet);
+    });
+
+    if (!open.length) {
+      opps.body.append(el('p', 'people-pane__empty', 'No opportunities yet.'), addBtn);
+      return;
+    }
+
+    const list = el('div', 'orgs-opps__list');
+    for (const opp of open.slice(0, 8)) {
+      const row = el('div', 'orgs-opp');
+      row.append(el('div', 'orgs-opp__t', opp.title));
+      const sub = closesLabel(opp);
+      if (sub) row.append(el('div', 'orgs-opp__sub', sub));
+      const actions = el('div', 'orgs-opp__actions');
+      const dismiss = el('button', 'btn btn--ghost', 'Dismiss') as HTMLButtonElement;
+      dismiss.type = 'button';
+      dismiss.addEventListener('click', () => {
+        void dismissOpportunity(opp.id).then(() => patchOpps());
+      });
+      actions.append(dismiss);
+      row.append(actions);
+      list.append(row);
+    }
+    opps.body.append(list, addBtn);
+  }
+
   try {
     const directory = await fetchOrganisationsDirectory();
     if (!isCurrent()) return;
@@ -153,7 +569,21 @@ export async function renderOrganisationPage(
       return;
     }
 
-    const model = rowToModel(row);
+    model = rowToModel(row);
+    directoryPeople = row.people.map((p) => ({ id: p.id, display_name: p.display_name }));
+    const selfRow = directory.organisations
+      .flatMap((o) => o.people)
+      .find((p) => (p as { is_self?: boolean }).is_self);
+    // Directory may not flag is_self on people; use first workplace person with Adam pattern from self employment chips
+    selfPersonRef = null;
+    for (const p of row.people) {
+      if ((p as { is_self?: boolean }).is_self) {
+        selfPersonRef = `shared:person:${p.id}`;
+        break;
+      }
+    }
+    void selfRow;
+
     options.onTitleReady?.(model.displayName);
     title.textContent = model.displayName;
     how.heading.textContent = `How ${model.displayName} is run`;
@@ -167,7 +597,7 @@ export async function renderOrganisationPage(
       orgRef: model.ref,
       logoKey: model.logoKey,
       onUpload: (file) => {
-        void uploadCrest(model, file)
+        void uploadCrest(model!, file)
           .then(() => {
             if (isCurrent()) location.reload();
           })
@@ -189,27 +619,11 @@ export async function renderOrganisationPage(
       chipsHost.append(chip);
     }
 
-    // How it is run — empty until Phase 3; no disabled "Add structure" (A5 / I3).
-    setSectionState(how.body, 'ready');
-    const howEmpty = el('div', 'orgs-how__empty');
-    howEmpty.append(
-      el('p', 'people-pane__empty', 'No structure yet. Add units to show how this organisation is run.')
-    );
-    how.body.append(howEmpty);
+    await patchHowSection();
+    await patchAnn();
+    await patchOpps();
 
-    // Ann's read — empty until Phase 5; no disabled "Run now" (A5).
-    setSectionState(ann.body, 'ready');
-    ann.body.append(
-      el('p', 'people-pane__empty', `Ann hasn't read ${model.displayName} yet.`)
-    );
-
-    // Opportunities — honest empty; Add arrives with Phase 4 (A5).
-    setSectionState(opps.body, 'ready');
-    opps.heading.append(el('span', 'people-pane__h2-sub', 'here · next 3 weeks'));
-    opps.body.append(el('p', 'people-pane__empty', 'No opportunities yet.'));
-
-    // Your time with … — shared 2019→now domain; width from host so labels
-    // are not squashed at 390 (C1 / preserveAspectRatio meet + minWidth).
+    // Your time with …
     setSectionState(time.body, 'ready');
     const domainStart =
       model.peopleSteps[0]?.at &&
