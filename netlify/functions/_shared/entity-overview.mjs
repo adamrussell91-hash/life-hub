@@ -13,6 +13,7 @@ import {
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries } from './github-professional-data.mjs';
 import { findActiveSelfPerson } from './career-overview.mjs';
+import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
@@ -117,6 +118,12 @@ function currentOrganisationContexts(relationships) {
 function overviewEntity(record, canonicalRef) {
   const redacted = redactIdentityRecord(record);
   const { professional_profile: ignoredProfile, ...entity } = redacted;
+  // Same cleaner as directory / displayLabelFor — Blobs twins sometimes
+  // leak `p/` into display_name; never hand that to the person pane.
+  const cleanedName = cleanIdentityDisplayName(entity.display_name);
+  if (cleanedName && cleanedName !== entity.display_name) {
+    entity.display_name = cleanedName;
+  }
   if (record.kind !== 'person' || redacted.lifecycle_status === 'deidentified' || redacted.lifecycle_status === 'deleted') {
     return { ref: canonicalRef, ...entity };
   }

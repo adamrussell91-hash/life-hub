@@ -464,7 +464,7 @@ describe('renderHomeView', () => {
       release = resolve;
     });
     const baseFetch = defaultFetchMock();
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
       await gate;
       return baseFetch(input);
     });
