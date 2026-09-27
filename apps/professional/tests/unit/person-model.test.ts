@@ -167,4 +167,13 @@ describe('buildPersonModel', () => {
     expect(model.openItemCount).toBe(0);
     expect(model.ledgerYouOwe).toEqual([]);
   });
+
+  it('strips Notion p/ debris from display name and initials', () => {
+    const overview = overviewFixture();
+    if (overview.entity.kind !== 'person') throw new Error('expected person');
+    overview.entity.display_name = 'p/Carmel Cordaro';
+    const model = buildPersonModel({ overview, brief: null });
+    expect(model.displayName).toBe('Carmel Cordaro');
+    expect(model.initials).toBe('CC');
+  });
 });

@@ -407,7 +407,9 @@ export function createMockApi() {
       const rows = [...people.values()]
         .filter((p) => !p.is_self && !['deleted', 'deidentified'].includes(p.lifecycle_status))
         .map((p) => {
-          const parts = p.display_name.trim().split(/\s+/);
+          // Mirror production cleaner so polluted seed names don't break local chrome.
+          const displayName = String(p.display_name ?? '').replace(/^p\//i, '').trim() || p.display_name;
+          const parts = displayName.trim().split(/\s+/);
           const initials =
             parts.length <= 1
               ? (parts[0] ?? '?').slice(0, 2).toUpperCase()
@@ -415,14 +417,14 @@ export function createMockApi() {
           return {
             id: p.id,
             ref: `shared:person:${p.id}`,
-            display_name: p.display_name,
+            display_name: displayName,
             initials,
             role_line: 'No relationship on record',
             relationship_roles: [],
             organisation: null,
             organisations: [],
-            warmth: 50,
-            warmth_band: 'warm',
+            warmth: 18,
+            warmth_band: 'cold' as const,
             relationship_state: 'active',
             relationship_reasons: [],
             open_item_count: 0,
@@ -434,10 +436,19 @@ export function createMockApi() {
             updated_at: String(p.updated_at ?? '2020-01-01T00:00:00.000Z')
           };
         });
+      // Match production hermit-name collapse for local chrome checks.
+      const byName = new Map<string, (typeof rows)[number]>();
+      for (const row of rows) {
+        const key = row.display_name.toLowerCase().trim();
+        if (!byName.has(key)) byName.set(key, row);
+      }
+      const peopleRows = [...byName.values()].sort((a, b) =>
+        a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' })
+      );
       return json(200, {
         ok: true,
         data: {
-          people: rows,
+          people: peopleRows,
           organisations: [...organisations.values()].map((o) => ({
             ref: `shared:organisation:${o.id}`,
             id: o.id,
@@ -446,7 +457,7 @@ export function createMockApi() {
             monogram: o.display_name.slice(0, 3).toUpperCase(),
             current: true
           })),
-          counts: { people: rows.length, organisations: organisations.size }
+          counts: { people: peopleRows.length, organisations: organisations.size }
         }
       });
     }

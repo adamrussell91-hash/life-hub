@@ -30,6 +30,7 @@ import {
   type TodayStripResponse
 } from '@/api/people-directory';
 import { mountAddPersonForm } from '@/components/add-person-form';
+import { mountIdentityEditor } from '@/components/person-identity-editor';
 import { peopleRoute, peopleTiesRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
 import {
@@ -43,6 +44,7 @@ import {
   type DirectoryQueryState,
   type DirectorySort
 } from '@/domain/directory-query';
+import { cleanIdentityDisplayName } from '@/domain/identity-display-name';
 import { buildPersonModel, type PersonModel } from '@/domain/person-model';
 import { renderRelationshipArcSvg } from '@/domain/relationship-arc';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
@@ -318,12 +320,14 @@ export async function renderPeoplePage(
   const search = document.createElement('input');
   search.type = 'search';
   search.className = 'people-page__search';
-  search.placeholder = 'Search name or organisation — or ask Ann a question';
+  // Shorter than the full Ann ask copy so the field does not clip at desktop.
+  search.placeholder = 'Search people or organisations';
   search.value = query.q;
-  search.setAttribute('aria-label', 'Search or ask about people');
+  search.setAttribute('aria-label', 'Search people or organisations, or ask Ann a question');
+  search.title = 'Search name or organisation — or ask Ann a question';
   const addBtn = el('button', 'btn btn--primary', 'Add person') as HTMLButtonElement;
   addBtn.type = 'button';
-  const tiesLink = el('a', 'btn btn--ghost people-page__ties-link', 'Ties to confirm') as HTMLAnchorElement;
+  const tiesLink = el('a', 'btn btn--secondary people-page__ties-link', 'Ties to confirm') as HTMLAnchorElement;
   tiesLink.href = peopleTiesRoute();
   titleRow.append(h1, count, spacer, search, tiesLink, addBtn);
 
@@ -463,8 +467,9 @@ export async function renderPeoplePage(
       return { primary: `Needs you ${proposals}`, secondary: '' };
     }
     const band = model?.warmthBand ?? row.warmth_band;
-    if (band === 'cold') return { primary: '', secondary: 'cold' };
-    if (band === 'cooling') return { primary: '', secondary: 'cooling' };
+    // Match person-pane chip casing (Cold / Cooling), not raw band tokens.
+    if (band === 'cold') return { primary: '', secondary: 'Cold' };
+    if (band === 'cooling') return { primary: '', secondary: 'Cooling' };
     return { primary: '', secondary: row.next_label ?? '' };
   }
 
@@ -671,78 +676,91 @@ export async function renderPeoplePage(
         ring.title = `${model.warmth} · ${model.warmthFeedNote}`;
         row.append(ring);
         const stack = el('div', 'people-pane__header-stack');
-        stack.append(el('h2', 'people-pane__name', model.displayName));
-        const chips = el('div', 'people-pane__chips');
-        for (const chip of model.chips) {
-          if (chip.kind === 'proposal' && chip.proposalId) {
-            const c = el('span', 'people-pane__chip people-pane__chip--proposal');
-            c.append(document.createTextNode(chip.label + ' '));
-            const accept = el('button', 'people-pane__chip-act', '✓') as HTMLButtonElement;
-            accept.type = 'button';
-            accept.setAttribute('aria-label', 'Accept link proposal');
-            accept.title = 'Accept';
-            const decline = el('button', 'people-pane__chip-act', '✕') as HTMLButtonElement;
-            decline.type = 'button';
-            decline.setAttribute('aria-label', 'Decline link proposal');
-            decline.title = 'Decline';
-            const pid = chip.proposalId;
-            accept.addEventListener('click', () => {
-              void (async () => {
-                try {
-                  await acceptLinkProposal(pid);
-                  await loadPersonSections(id);
-                } catch (err) {
-                  window.alert(err instanceof Error ? err.message : 'Accept failed.');
-                }
-              })();
-            });
-            decline.addEventListener('click', () => {
-              void (async () => {
-                try {
-                  await declineLinkProposal(pid);
-                  await loadPersonSections(id);
-                } catch (err) {
-                  window.alert(err instanceof Error ? err.message : 'Decline failed.');
-                }
-              })();
-            });
-            c.append(accept, decline);
-            chips.append(c);
-          } else {
-            const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
-            if (chip.title) c.title = chip.title;
-            if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
-            chips.append(c);
-          }
-        }
-        stack.append(chips);
-        const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
-        checkLinks.type = 'button';
-        checkLinks.addEventListener('click', () => {
-          void (async () => {
-            checkLinks.disabled = true;
-            checkLinks.textContent = 'Checking…';
-            try {
-              await runLinkInference();
-              await loadPersonSections(id);
-            } catch (err) {
-              window.alert(err instanceof Error ? err.message : 'Check for links failed.');
-            } finally {
-              checkLinks.disabled = false;
-              checkLinks.textContent = 'Check for links';
+        const nameRow = el('div', 'people-pane__name-row');
+        nameRow.append(el('h2', 'people-pane__name', model.displayName));
+        const personEntity = overview.entity;
+        if (personEntity.kind === 'person') {
+          const cleaned = cleanIdentityDisplayName(personEntity.display_name) || personEntity.display_name;
+          const editor = mountIdentityEditor(
+            cleaned === personEntity.display_name
+              ? personEntity
+              : { ...personEntity, display_name: cleaned },
+            () => {
+              void loadPersonSections(id);
             }
-          })();
-        });
-        stack.append(checkLinks);
-        row.append(stack);
-        const edit = el('button', 'btn btn--secondary', 'Edit') as HTMLButtonElement;
-        edit.type = 'button';
-        edit.addEventListener('click', () => {
-          const disc = pane.querySelector('.people-pane__full') as HTMLDetailsElement | null;
-          if (disc) disc.open = true;
-        });
-        row.append(edit);
-        headerHost.append(row);
+          );
+          editor.button.classList.add('people-pane__edit');
+          nameRow.append(editor.button);
+          stack.append(nameRow);
+          const chips = el('div', 'people-pane__chips');
+          for (const chip of model.chips) {
+            if (chip.kind === 'proposal' && chip.proposalId) {
+              const c = el('span', 'people-pane__chip people-pane__chip--proposal');
+              c.append(document.createTextNode(chip.label + ' '));
+              const accept = el('button', 'people-pane__chip-act', '✓') as HTMLButtonElement;
+              accept.type = 'button';
+              accept.setAttribute('aria-label', 'Accept link proposal');
+              accept.title = 'Accept';
+              const decline = el('button', 'people-pane__chip-act', '✕') as HTMLButtonElement;
+              decline.type = 'button';
+              decline.setAttribute('aria-label', 'Decline link proposal');
+              decline.title = 'Decline';
+              const pid = chip.proposalId;
+              accept.addEventListener('click', () => {
+                void (async () => {
+                  try {
+                    await acceptLinkProposal(pid);
+                    await loadPersonSections(id);
+                  } catch (err) {
+                    window.alert(err instanceof Error ? err.message : 'Accept failed.');
+                  }
+                })();
+              });
+              decline.addEventListener('click', () => {
+                void (async () => {
+                  try {
+                    await declineLinkProposal(pid);
+                    await loadPersonSections(id);
+                  } catch (err) {
+                    window.alert(err instanceof Error ? err.message : 'Decline failed.');
+                  }
+                })();
+              });
+              c.append(accept, decline);
+              chips.append(c);
+            } else {
+              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
+              if (chip.title) c.title = chip.title;
+              if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
+              chips.append(c);
+            }
+          }
+          stack.append(chips);
+          const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
+          checkLinks.type = 'button';
+          checkLinks.addEventListener('click', () => {
+            void (async () => {
+              checkLinks.disabled = true;
+              checkLinks.textContent = 'Checking…';
+              try {
+                await runLinkInference();
+                await loadPersonSections(id);
+              } catch (err) {
+                window.alert(err instanceof Error ? err.message : 'Check for links failed.');
+              } finally {
+                checkLinks.disabled = false;
+                checkLinks.textContent = 'Check for links';
+              }
+            })();
+          });
+          stack.append(checkLinks);
+          row.append(stack);
+          headerHost.append(row, editor.form);
+        } else {
+          stack.append(nameRow);
+          row.append(stack);
+          headerHost.append(row);
+        }
       }
 
       if (nextHost) {
@@ -811,7 +829,7 @@ export async function renderPeoplePage(
           )
         );
         if (model.ledgerTheyOwe.length === 0) {
-          them.append(el('p', 'people-pane__empty', 'Nothing to confirm'));
+          them.append(el('p', 'people-pane__empty', 'Nothing to confirm.'));
         } else {
           for (const item of model.ledgerTheyOwe) {
             them.append(renderLedgerItem(item, id));
@@ -1048,7 +1066,7 @@ export async function renderPeoplePage(
     ledger.root.setAttribute('data-section', 'ledger');
     const ledgerH2 = ledger.root.querySelector('.people-pane__h2');
     const sub = el('span', 'people-pane__h2-sub', 'from tasks, notes, emails');
-    const clareBtn = el('button', 'people-pane__clare-btn', 'Clare') as HTMLButtonElement;
+    const clareBtn = el('button', 'people-pane__clare-btn', 'Ask Clare') as HTMLButtonElement;
     clareBtn.type = 'button';
     clareBtn.title = 'Ask Clare to read this person’s tasks and notes';
     clareBtn.setAttribute('aria-label', 'Ask Clare to update the ledger');
@@ -1382,8 +1400,10 @@ export async function renderPeoplePage(
   }
 
   function renderTodayStrip(): void {
+    todayStrip.classList.remove('people-page__today--compact');
     todayStrip.replaceChildren();
     if (!todayData) {
+      todayStrip.classList.add('people-page__today--compact');
       todayStrip.append(el('p', 'people-pane__empty', 'No day loaded yet.'));
       return;
     }
@@ -1425,7 +1445,10 @@ export async function renderPeoplePage(
       renderTodayStrip();
     } catch {
       if (!isCurrent()) return;
-      todayStrip.replaceChildren(el('p', 'people-pane__empty', 'Today strip unavailable.'));
+      todayStrip.classList.add('people-page__today--compact');
+      todayStrip.replaceChildren(
+        el('p', 'people-pane__empty people-page__today-unavailable', 'Today strip unavailable.')
+      );
     }
   }
 

@@ -183,6 +183,20 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
+  it('Edit opens the identity form (I3), not only Full record', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderPeoplePage(canvas, { selectedId: PERSON_ID });
+    const edit = canvas.querySelector<HTMLButtonElement>('button.people-pane__edit, [aria-label="Edit Henry McLennan"]');
+    expect(edit).toBeTruthy();
+    const form = canvas.querySelector<HTMLFormElement>('form[aria-label="Edit person"]');
+    expect(form).toBeTruthy();
+    expect(form?.hidden).toBe(true);
+    edit!.click();
+    expect(form?.hidden).toBe(false);
+    expect(form?.querySelector('input[aria-label="Name"]')).toBeTruthy();
+  });
+
   it('Remember empty offers Run now; Today strip mounts (Phases 5–7)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);

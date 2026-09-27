@@ -5,6 +5,7 @@
 
 import type { EntityOverview, PersonBrief, RelationshipLink } from '@/domain/types';
 import type { RelationshipState } from '@/domain/relationship-state';
+import { cleanIdentityDisplayName } from '@/domain/identity-display-name';
 import {
   touchpointsFromOverview,
   warmthFor,
@@ -265,11 +266,14 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
   const theyOweCount = ledger?.they_owe_count ?? ledgerTheyOwe.length;
   const openItemCount = ledger?.open_item_count ?? youOweCount + theyOweCount + pendingProposals.length;
 
+  // Match directory cleaning — never surface Notion `p/` debris in the pane.
+  const displayName = cleanIdentityDisplayName(entity.display_name) || entity.display_name;
+
   return {
     id: entity.id,
     ref: entity.ref,
-    displayName: entity.display_name,
-    initials: monogram(entity.display_name),
+    displayName,
+    initials: monogram(displayName),
     roleLine,
     chips,
     warmth: warmthResult.warmth,
