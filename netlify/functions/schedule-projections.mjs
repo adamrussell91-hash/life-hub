@@ -5,7 +5,12 @@ import { createEventRepository } from './_shared/event-repository.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
 import { createLedgerItemRepository } from './_shared/ledger-repository.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
-import { mergeScheduleProjections, projectCommunicationSchedule } from './_shared/schedule-projection.mjs';
+import {
+  mergeScheduleProjections,
+  projectCommunicationSchedule,
+  projectNotionCommunicationSchedule
+} from './_shared/schedule-projection.mjs';
+import { listGithubCommunications } from './_shared/github-professional-data.mjs';
 import {
   resolveMeeting,
   resolveEvent,
@@ -31,6 +36,7 @@ export function createScheduleProjectionsHandler(deps = {}) {
   const createEvents = deps.createEventRepository ?? createEventRepository;
   const createCommunications = deps.createCommunicationRepository ?? createCommunicationRepository;
   const createLedger = deps.createLedgerItemRepository ?? createLedgerItemRepository;
+  const loadGithubCommunications = deps.listGithubCommunications ?? listGithubCommunications;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
 
   return createOperatorHandler(
@@ -84,14 +90,23 @@ export function createScheduleProjectionsHandler(deps = {}) {
         const today = new Date(scheduleNow());
         const from = sydneyDateKey(new Date(today.getTime() - 30 * 86_400_000));
         const to = sydneyDateKey(new Date(today.getTime() + 120 * 86_400_000));
-        const [meetingProjections, eventProjections, communications, promises] = await Promise.all([
+        const [meetingProjections, eventProjections, communications, promises, notionComms] = await Promise.all([
           meetingRepo.listScheduleProjections(),
           eventRepo.listScheduleProjections(),
           commRepo.listCommunications(),
-          ledgerRepo.listDueBetween(from, to)
+          ledgerRepo.listDueBetween(from, to),
+          // Notion comms copied into life-hub-data. Unbound token or a
+          // GitHub failure leaves the calendar on Blob records only.
+          loadGithubCommunications({ env }).catch(() => [])
         ]);
         const commProjections = communications.map(projectCommunicationSchedule);
-        const projections = mergeScheduleProjections([meetingProjections, eventProjections, commProjections]);
+        const notionCommProjections = notionComms.map(projectNotionCommunicationSchedule).filter(Boolean);
+        const projections = mergeScheduleProjections([
+          notionCommProjections,
+          meetingProjections,
+          eventProjections,
+          commProjections
+        ]);
         return withCors(okResponse(200, { projections, promises }), request, env);
       } catch (error) {
         const status = Number.isInteger(error?.status) ? error.status : 500;

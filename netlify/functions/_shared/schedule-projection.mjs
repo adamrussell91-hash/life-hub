@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { formatEntityRef } from './entity-ref.mjs';
+import { wallLocalToUtcIso } from './wall-time.mjs';
 
 // Shared schedule projection contract for Professional Meetings and Events
 // (and future domain owners). Life calendar merges these projections; source
@@ -97,6 +98,67 @@ export function projectCommunicationSchedule(record) {
     channel: record.channel,
     pin,
     href: `/professional/#/communication/${encodeURIComponent(record.id)}`
+  };
+}
+
+const NOTION_METHOD_CHANNELS = {
+  'In-person Meeting': 'in_person',
+  'Phone Call': 'phone',
+  Email: 'email',
+  'Video Call': 'video',
+  'Text Message': 'message',
+  Chat: 'message',
+  Mail: 'other'
+};
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A `communications.json` row (Notion Communications, in life-hub-data) as a
+ * calendar comm. A date-only row pins at 09:00 Sydney; a timed row without a
+ * later end is a pin at its time. No date → null (not placed). Opens the
+ * Notion page, since there is no hub comm page for it.
+ */
+export function projectNotionCommunicationSchedule(row) {
+  const notionId = typeof row?.notion_id === 'string' ? row.notion_id.replace(/-/g, '') : '';
+  if (!/^[0-9a-f]{32}$/i.test(notionId)) return null;
+  const rawStart = typeof row.date_start === 'string' ? row.date_start.trim() : '';
+  if (!rawStart) return null;
+
+  let start;
+  let end = null;
+  if (DATE_ONLY.test(rawStart)) {
+    try {
+      start = wallLocalToUtcIso(`${rawStart}T09:00`, 'Australia/Sydney');
+    } catch {
+      return null;
+    }
+  } else {
+    const startMs = Date.parse(rawStart);
+    if (!Number.isFinite(startMs)) return null;
+    start = new Date(startMs).toISOString();
+    const endMs = typeof row.date_end === 'string' && !DATE_ONLY.test(row.date_end) ? Date.parse(row.date_end) : NaN;
+    if (Number.isFinite(endMs) && endMs > startMs) end = new Date(endMs).toISOString();
+  }
+
+  const source_ref = communicationSourceRef(`notion_${notionId}`);
+  const channel = NOTION_METHOD_CHANNELS[row.method] ?? 'other';
+  const title =
+    [row.title, row.meeting_type, row.method].find((value) => typeof value === 'string' && value.trim())?.trim() ??
+    'Comm';
+  return {
+    projection_id: deriveProjectionId(source_ref),
+    source_ref,
+    kind: 'communication',
+    title,
+    start,
+    end: end ?? start,
+    time_zone: 'Australia/Sydney',
+    all_day: false,
+    status: 'completed',
+    channel,
+    pin: end === null,
+    href: `https://www.notion.so/${notionId}`
   };
 }
 
