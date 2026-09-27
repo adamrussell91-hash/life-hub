@@ -54,6 +54,12 @@ interface CommunicationRecord {
   status: 'completed' | 'received';
   created_at: string;
   updated_at: string;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  time_zone?: string | null;
+  purpose_tag?: string | null;
+  agenda?: unknown[];
+  blocks?: unknown[];
   incomplete_links?: {
     operation_id: string;
     status: string;
