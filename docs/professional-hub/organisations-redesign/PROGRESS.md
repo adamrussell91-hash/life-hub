@@ -361,15 +361,20 @@ PR: draft (do not mark ready until ledger + guardian + pre-pr-check).
 | Phase | Status | IDs checked | W2 entry | Diff vs mockup |
 |---|---|---|---|---|
 | 2 Structure | [x] | D4 P3 V4 I3 W2 | `org-structure` handler + editor | Empty until structure entered (no GitHub units seed) |
-| 3 Flowchart | [x] | S4 V2 V3 V4 R1 D4 Perf | org page How section | Kit surfaces; ELK order not drag-pin |
-| 4 Opportunities | [x] | D1 D2 I3 I4 S3 V4 | `/api/opportunities` | Empty until manual add |
+| 3 Flowchart | [x] | S4 V1 V2 V3 V4 R1 C1 C4 I2 D4 Perf | org page How section | Kit surfaces; ELK order not drag-pin; collapse + vacant buttons |
+| 4 Opportunities | [x] | D1 D2 I3 I4 S3 V4 W2 | Add to Applications / Events + dismiss | Empty until manual add; org page actions live |
 | 5 Ann's read | [x] | I3 D5 L2 context-integrity | Run now → organisation-read | Scheduled tick deferred; Run now live |
-| 7 Compare | [x] | D4 V4 R2 P3 | `#/organisations/compare` | Bridges empty without cross-org UL links |
+| 7 Compare | [x] | D4 V4 R2 P3 | `#/organisations/compare` + org-bridges POST | Marcel→Bianca warm→cold bridge live |
 
 ### Part B status
 
 - [x] Phases 2→3→4→5→7 implemented
-- [ ] hub-ui-guardian **PASS** (pending)
-- [ ] Screens in `screens/fix-01/part-b-*` + DIFF
-- [ ] `npm run pre-pr-check` exit 0
-- [ ] PR stays **draft** until above ticked
+- [x] hub-ui-guardian **PASS** (r2 — all r1 HIGHs closed)
+- [x] Screens in `screens/fix-01/part-b-*` + `DIFF-part-b.md`
+- [x] `npm run pre-pr-check` exit 0
+- [x] PR stays **draft** until Adam marks ready
+
+Failure-register checked (Part B): L1 L2 L5 L6 S2 S3 S4 V1 V2 V3 V4 R1 R2 C1 C4 D1 D4 D5 I2 I3 I4 W1 W2 P1 P3 P4
+Live evidence: Aloysius structure + Flow/Outline; vacant → editor; unit collapse; Add to Applications/Events; Compare Marcel→Bianca.
+Guardian: `/cursor/stores/self/internal/orgs-fix-01-part-b-guardian-r2.md` (via store symlink).
+elkjs: separate `elk.bundled-*.js` chunk (not main bundle).
