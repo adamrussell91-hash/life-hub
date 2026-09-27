@@ -147,7 +147,6 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
   - Hammond's Sunday Weekly Review prep;
   - Sara's Monday health scan;
   - Chadwick's Monday research refresh;
-  - Hyaluronica's Wednesday skin check;
   - Hammond's monthly Goal Audit prep.
 
   The setup table is in `config/automations/README.md`.
@@ -160,3 +159,31 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 5. **Knowledge URL-watch check.** Weekly scheduled run of the existing `url-watch.mjs` checker. It was last run by hand on 20 Sep.
 6. **In-app sweep heartbeat.** The Central Node page and Home show "Daily sweep missed" when the newest `Daily Sweep` governance entry is more than a day old. The automations check this weekly; the app would catch it the same morning.
 7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving. Let `career-scan` retry on the 18:00 and 19:00 ticks when the 17:00 run fails.
+
+**Clare / Tasks (Netlify scheduled functions; Tasks data is in Blobs)**
+
+8. **Morning Sweep ready at 06:45.** Precompute Clare's Morning Sweep and store it, so the Tasks desk opens instantly. Read-only.
+9. **Deadline runway (daily).** A task due within 48 hours with no work block gets a proposed calendar ghost through the existing ghost queue. Adam accepts or dismisses it.
+10. **Waiting-on follow-ups (daily).** An item waiting on someone for more than N days gets a follow-up draft on the calendar, the same pattern as `promise-nudges`. Never sent automatically.
+
+**Professional / People (app-side; people edits, links, ledger and Remember live in Blobs. `data/professional/*.json` is only the original Notion import, so Cursor must not edit it)**
+
+Already running: tie inference 13:20 daily, Remember 07:00 and 16:00, promise nudges 07:00, career skills scan Sun 17:00.
+
+11. **Nightly link inference.** `runLinkInferencePass` (person ↔ task / meeting / comms link proposals) only runs when the People page asks for it. Schedule it nightly, only for people with new material since the last run. The output is proposals in "Links to confirm" and nothing auto-links. Clare's "people sweep" in `persona.mjs` is prompt text only and gets replaced by this.
+12. **Weekly profile refresh (people research).** For the ~10 most active contacts whose profile has not been checked in 90 days, search public professional information (current role, organisation, recent publications or appointments) and propose profile updates as confirm cards with sources. Guardrails:
+    - never students (reuse the Communications-students exclusion);
+    - never the people About Me says are invisible;
+    - public professional information only, no personal life;
+    - nothing auto-applied.
+13. **Search** needs no automation. It stays on demand in the People / relational search pages.
+
+**Event triggers (write-hooks in app code, not crons)**
+
+14. **Task created or edited that names a person:** run link inference for that person only, which gives a proposal.
+15. **Meeting or communication logged:** run the Remember pass for its attendees and extract promises into the ledger.
+16. **Medical log that conflicts with Constraints:** queue `cnp_auto_constraints` immediately rather than waiting for Monday's Sara scan.
+17. **Task done that belongs to a Hammond goal:** add a goal check-in entry.
+18. **Term start or end (Almanac):** Ann and Clare term-setup brief and a teaching-load line to Hammond.
+
+Dropped: Hyaluronica's weekly skin check (Adam, 27 Sep).
