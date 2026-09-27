@@ -1,0 +1,777 @@
+<title>Daylight Trip Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Life Hub design-kit tokens (packages/design-kit/tokens.css), copied for a standalone mockup. */
+:root {
+  color-scheme: light;
+  --cotton: #f5f1e9; --paper: #fbf8f2; --depth: #0a1536; --marine: #142b51; --navy: #17375e;
+  --navy-2: #244f7c; --wave: #376fb7; --high-sea: #f68620; --high-sea-ink: #a85a0c;
+  --shore: #eae7da; --sand: #f0cfac; --ink: #13233a; --muted: #6b7788; --line: rgba(23,55,94,.10);
+  --pastel-blue: #dceafa; --pastel-blue-ink: #294c71; --pastel-sage: #dfe9e1; --pastel-sage-ink: #3c5949;
+  --pastel-peach: #f2dfd0; --pastel-peach-ink: #7a5038; --pastel-gold: #f1e2b6; --pastel-gold-ink: #6c581f;
+  --pastel-lilac: #e8e0f1; --pastel-lilac-ink: #5d4e70;
+  --danger: #9b2c2c; --success: #2f7a4f; --success-surface: rgba(47,122,79,.1);
+  --on-dark: rgba(255,255,255,.92); --on-dark-muted: rgba(255,255,255,.66); --on-dark-line: rgba(255,255,255,.16);
+  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-2xs: .6875rem; --text-xs: .75rem; --text-sm: .8125rem; --text-base: .9375rem;
+  --text-md: 1.0625rem; --text-lg: 1.3125rem; --text-xl: 2rem; --text-2xl: 2.625rem;
+  --radius-xs: .375rem; --radius-sm: .875rem; --radius-md: 1.25rem; --radius-lg: 1.5rem; --radius-full: 999px;
+  --elev-1: 0 1px 2px rgba(10,21,54,.06); --elev-2: 0 4px 14px rgba(10,21,54,.08);
+}
+* { box-sizing: border-box; }
+body { background: var(--cotton); color: var(--ink); font-family: var(--font-ui); font-size: var(--text-base); line-height: 1.5; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 96px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--wave); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* Header */
+.head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px 24px; margin-bottom: 16px; }
+.crumb { font-size: var(--text-xs); color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.crumb b { color: var(--ink); font-weight: 600; }
+.head h1 { font-size: var(--text-xl); letter-spacing: -.02em; line-height: 1.15; margin-top: 4px; }
+.head .sub { color: var(--muted); font-size: var(--text-sm); margin-top: 4px; }
+.modes { display: inline-flex; background: var(--shore); border-radius: var(--radius-sm); padding: 4px; gap: 2px; flex-wrap: wrap; }
+.modes button { border: 0; background: none; padding: 8px 14px; border-radius: .625rem; font-size: var(--text-sm); font-weight: 500; color: var(--muted); }
+.modes button[aria-pressed="true"] { background: var(--paper); color: var(--ink); box-shadow: var(--elev-1); }
+.mock-note { font-size: var(--text-xs); color: var(--muted); margin: 0 0 16px; }
+
+/* Daylight strip */
+.strip { background: var(--depth); color: var(--on-dark); border-radius: var(--radius-lg); padding: 18px 18px 14px; }
+.strip-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: baseline; }
+.strip-top h2 { font-size: var(--text-md); font-weight: 600; }
+.strip-top p { margin: 0; font-size: var(--text-xs); color: var(--on-dark-muted); }
+.strip svg { display: block; width: 100%; height: auto; margin-top: 12px; overflow: visible; }
+.strip svg .col { cursor: pointer; }
+.strip svg .col:hover .hit, .strip svg .col.is-sel .hit { fill: rgba(255,255,255,.08); }
+.strip svg .col.is-sel .frame { stroke: #fff; stroke-width: 1.2; }
+.readout { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--on-dark-line); font-size: var(--text-sm); }
+.readout .where { font-weight: 600; }
+.readout .light { color: var(--sand); text-align: right; }
+.readout .what { color: var(--on-dark-muted); grid-column: 1 / -1; font-size: var(--text-xs); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: var(--text-xs); color: var(--on-dark-muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 8px; border-radius: 2px; display: inline-block; }
+.sw.booked { background: var(--sand); }
+.sw.open { background: repeating-linear-gradient(135deg, rgba(240,207,172,.55) 0 2px, transparent 2px 5px); outline: 1px dashed rgba(240,207,172,.8); }
+.sw.bob { background: var(--pastel-blue); height: 3px; }
+.sw.corey { background: linear-gradient(90deg, var(--pastel-lilac) 0 45%, transparent 45% 55%, var(--pastel-lilac) 55%); height: 3px; }
+
+/* Layout */
+.grid { display: grid; gap: 20px; margin-top: 20px; }
+@media (min-width: 960px) {
+  .grid { grid-template-columns: 360px 1fr; align-items: start; }
+  .side { position: sticky; top: 16px; }
+}
+.panel { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 18px; }
+.panel h2 { font-size: var(--text-md); font-weight: 600; }
+.panel .lede { font-size: var(--text-sm); color: var(--muted); margin: 4px 0 12px; }
+
+/* Open items */
+.gaps { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.gaps li { display: grid; grid-template-columns: 52px 1fr; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.gaps li:first-child { border-top: 0; }
+.gaps .when { font-size: var(--text-xs); color: var(--muted); font-weight: 600; line-height: 1.3; padding-top: 2px; }
+.gaps .t { font-size: var(--text-sm); font-weight: 600; }
+.gaps .d { font-size: var(--text-xs); color: var(--muted); }
+.gaps button.jump { border: 0; background: none; padding: 0; text-align: left; }
+.gaps button.jump:hover .t { text-decoration: underline; }
+.pill { display: inline-block; font-size: var(--text-2xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--radius-xs); vertical-align: 1px; margin-left: 4px; }
+.pill.hard { background: var(--pastel-peach); color: var(--pastel-peach-ink); }
+.pill.med { background: var(--pastel-lilac); color: var(--pastel-lilac-ink); }
+.pill.check { background: var(--pastel-gold); color: var(--pastel-gold-ink); }
+.paid { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: var(--text-sm); }
+.paid .row { display: flex; justify-content: space-between; gap: 12px; }
+.paid .row span:last-child { font-weight: 600; }
+
+/* Flow */
+.flow { display: grid; gap: 28px; }
+.chapter > header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.chapter h2 { font-size: var(--text-lg); letter-spacing: -.01em; }
+.chapter .clock { font-size: var(--text-xs); color: var(--muted); }
+.days { display: grid; gap: 10px; }
+.day { display: grid; grid-template-columns: 56px 1fr; gap: 12px; scroll-margin-top: 16px; }
+.day .date { font-size: var(--text-xs); color: var(--muted); font-weight: 600; line-height: 1.25; padding-top: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.day .date b { display: block; font-size: var(--text-lg); color: var(--ink); letter-spacing: -.01em; }
+.day .date i { display: block; font-style: normal; margin-top: 6px; color: var(--high-sea-ink); font-size: var(--text-2xs); letter-spacing: .02em; text-transform: none; }
+.day.is-flash .stack > :first-child { box-shadow: 0 0 0 2px var(--wave); }
+.stack { display: grid; gap: 8px; min-width: 0; }
+
+.entry { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 14px 16px; }
+.entry .k { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.entry h3 { font-size: var(--text-md); font-weight: 600; margin-top: 4px; }
+.entry .m { font-size: var(--text-sm); color: var(--muted); margin-top: 2px; }
+.entry .foot { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: var(--text-sm); }
+.entry .foot .warn { color: var(--high-sea-ink); font-weight: 500; }
+
+/* Ticket */
+.ticket { padding: 0; overflow: hidden; }
+.ticket .band { display: flex; justify-content: space-between; padding: 10px 16px; background: var(--pastel-blue); color: var(--pastel-blue-ink); font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.ticket .body { padding: 12px 16px; display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: center; }
+.ticket .iata { font-size: var(--text-xl); font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+.ticket .path { height: 2px; background: repeating-linear-gradient(90deg, var(--shallow, #a7abb9) 0 6px, transparent 6px 10px); position: relative; }
+.ticket .path::after { content: ""; position: absolute; left: 50%; top: -4px; width: 10px; height: 10px; transform: translateX(-50%) rotate(45deg); border-top: 2px solid var(--navy); border-right: 2px solid var(--navy); }
+.ticket .tm { font-size: var(--text-sm); color: var(--muted); }
+.ticket .tm b { color: var(--ink); font-size: var(--text-md); }
+.ticket .tm.r { text-align: right; }
+.ticket .perf { border-top: 2px dashed var(--line); margin: 0 12px; position: relative; }
+.ticket .perf::before, .ticket .perf::after { content: ""; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--cotton); border: 1px solid var(--line); }
+.ticket .perf::before { left: -21px; } .ticket .perf::after { right: -21px; }
+.ticket .foot { margin: 0; padding: 10px 16px 12px; border-top: 0; }
+
+/* Gap */
+.gap { background: transparent; border: 1.5px dashed rgba(168,90,12,.45); }
+.gap .k { color: var(--high-sea-ink); }
+.gap ul { margin: 8px 0 0; padding-left: 18px; font-size: var(--text-sm); }
+
+/* Soft landing */
+.landing { background: var(--pastel-sage); border-color: transparent; }
+.landing .k { color: var(--pastel-sage-ink); }
+.landing h3 { color: var(--ink); }
+.landing dl { display: grid; grid-template-columns: 84px 1fr; gap: 8px 12px; margin: 12px 0 0; font-size: var(--text-sm); }
+.landing dt { font-weight: 600; color: var(--pastel-sage-ink); }
+.landing dd { margin: 0; }
+.landing .src { font-size: var(--text-xs); color: var(--pastel-sage-ink); margin-top: 10px; }
+
+/* Check-in with two clocks */
+.checkin { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-md); background: var(--pastel-blue); color: var(--pastel-blue-ink); font-size: var(--text-sm); }
+.checkin .clocks { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.checkin .clocks b { color: var(--ink); font-size: var(--text-md); }
+.checkin .who { margin-left: auto; font-size: var(--text-xs); text-align: right; }
+
+/* Idea */
+.idea { font-size: var(--text-sm); color: var(--muted); padding: 2px 4px 2px 16px; border-left: 2px dotted var(--shallow, #a7abb9); }
+.idea b { color: var(--ink); font-weight: 500; }
+
+/* Stelara */
+.med { background: var(--pastel-lilac); border-color: transparent; }
+.med .k { color: var(--pastel-lilac-ink); }
+.opts { display: grid; gap: 8px; margin-top: 10px; }
+.opt { background: var(--paper); border-radius: var(--radius-sm); padding: 10px 12px; font-size: var(--text-sm); }
+.opt b { display: block; }
+.opt.rec { box-shadow: inset 0 0 0 1.5px var(--pastel-lilac-ink); }
+
+/* Penelope */
+.pen { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 12px 14px; display: grid; grid-template-columns: 32px 1fr; gap: 10px; }
+.pen .av { width: 32px; height: 32px; border-radius: 50%; background: var(--pastel-peach); color: var(--pastel-peach-ink); display: grid; place-items: center; font-weight: 700; font-size: var(--text-sm); }
+.pen .q { font-size: var(--text-sm); }
+.pen .q em { font-style: normal; color: var(--muted); font-size: var(--text-xs); display: block; }
+.pen .acts { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.btn { border: 0; border-radius: var(--radius-sm); padding: 8px 14px; font-size: var(--text-sm); font-weight: 600; background: var(--navy); color: #fff; }
+.btn.ghost { background: var(--shore); color: var(--ink); }
+.btn.orange { background: var(--high-sea); color: var(--depth); }
+.logged { font-size: var(--text-sm); background: var(--cotton); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; }
+.logged em { font-style: normal; font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; font-weight: 600; }
+
+/* Now card (travelling mode) */
+.now { background: var(--marine); color: var(--on-dark); border-radius: var(--radius-lg); padding: 18px; display: grid; gap: 12px; }
+.now .eyebrow { color: var(--on-dark-muted); }
+.now h2 { font-size: var(--text-lg); }
+.now ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; font-size: var(--text-sm); }
+.now ol li.done { color: var(--on-dark-muted); text-decoration: line-through; }
+.now .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.now .btn { background: var(--paper); color: var(--ink); }
+.now .btn.orange { background: var(--high-sea); color: var(--depth); }
+.sheet { background: var(--paper); color: var(--ink); border-radius: var(--radius-md); padding: 14px; font-size: var(--text-sm); }
+.sheet textarea { width: 100%; min-height: 70px; margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 8px 10px; font: inherit; background: var(--cotton); color: var(--ink); resize: vertical; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--depth); color: var(--on-dark); padding: 10px 16px; border-radius: var(--radius-sm); font-size: var(--text-sm); box-shadow: var(--elev-2); max-width: calc(100% - 32px); }
+
+/* Bob's view */
+.bob { max-width: 560px; margin: 20px auto 0; display: grid; gap: 14px; }
+.bob .card { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px; }
+.bob .big { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
+.bob .safe { display: flex; gap: 10px; align-items: center; color: var(--success); font-weight: 600; font-size: var(--text-md); }
+.bob .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 4px var(--success-surface); flex: none; }
+.bob .row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: var(--text-md); padding: 10px 0; border-top: 1px solid var(--line); }
+.bob .row:first-of-type { border-top: 0; }
+.bob .row span:last-child { font-weight: 600; text-align: right; }
+.bob .row small { grid-column: 1 / -1; color: var(--muted); font-size: var(--text-sm); }
+.bob .plan { font-size: var(--text-md); }
+.bob .plan ol { padding-left: 20px; margin: 8px 0 0; display: grid; gap: 6px; }
+.bob .privacy { font-size: var(--text-xs); color: var(--muted); text-align: center; }
+
+@media (max-width: 520px) {
+  .head h1 { font-size: 1.625rem; }
+  .day { grid-template-columns: 1fr; gap: 4px; }
+  .day .date { padding-top: 0; display: flex; gap: 8px; align-items: baseline; }
+  .day .date b { display: inline; font-size: var(--text-md); }
+  .day .date i { display: inline; margin: 0; }
+  .ticket .iata { font-size: 1.625rem; }
+  .landing dl { grid-template-columns: 1fr; gap: 2px; }
+  .landing dd { margin-bottom: 8px; }
+  .checkin { flex-wrap: wrap; }
+  .checkin .who { margin-left: 0; text-align: left; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .day.is-flash .stack > :first-child { transition: box-shadow .3s; }
+}
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div>
+      <div class="crumb">Life <span aria-hidden="true">›</span> Future map <span aria-hidden="true">›</span> <b>Travel</b></div>
+      <h1>London, Scotland &amp; Seoul</h1>
+      <div class="sub num">Tue 1 Dec 2026 – Sun 10 Jan 2027 · 41 days · alone until Seoul, then with Corey</div>
+    </div>
+    <div class="modes" role="group" aria-label="View">
+      <button type="button" id="mode-plan" data-mode="plan" aria-pressed="true">Planning</button>
+      <button type="button" id="mode-travel" data-mode="travel" aria-pressed="false">On the day</button>
+      <button type="button" id="mode-bob" data-mode="bob" aria-pressed="false">Bob’s view</button>
+    </div>
+  </header>
+  <p class="mock-note">Mockup. Flights and hotels come from your Notion trip page. Booking references stay hidden. Transport, SIM and money notes are drafts to check before you go. Nothing is sent.</p>
+
+  <!-- Owner views -->
+  <div id="owner">
+    <section class="strip" aria-labelledby="strip-h">
+      <div class="strip-top">
+        <h2 id="strip-h">Your trip as daylight</h2>
+        <p class="num">Each column is one day. The lit part runs from local sunrise to sunset, midnight to midnight.</p>
+      </div>
+      <svg id="strip" role="img" aria-label="Daylight for each day of the trip, 1 December to 10 January"></svg>
+      <div class="readout num" id="readout" aria-live="polite"></div>
+      <div class="legend">
+        <span><i class="sw booked"></i>Booked</span>
+        <span><i class="sw open"></i>Not booked yet</span>
+        <span><i class="sw bob"></i>Bob watching</span>
+        <span><i class="sw corey"></i>Corey watching, then with you</span>
+      </div>
+    </section>
+
+    <div id="now-slot"></div>
+
+    <div class="grid">
+      <aside class="side">
+        <section class="panel" aria-labelledby="gaps-h">
+          <h2 id="gaps-h">Still open</h2>
+          <p class="lede">Ordered by what goes wrong first. Tap one to jump to that day.</p>
+          <ul class="gaps" id="gaps"></ul>
+          <div class="paid num">
+            <div class="eyebrow" style="margin-bottom:6px">Paid so far</div>
+            <div class="row"><span>Flights, KL + Istanbul hotels, Edinburgh</span><span>A$1,068.53</span></div>
+            <div class="row"><span>Inverlochy Castle</span><span>£225.00</span></div>
+            <div class="row"><span>ScotRail to Fort William</span><span>CA$92.54</span></div>
+          </div>
+        </section>
+      </aside>
+
+      <main class="flow" id="flow">
+
+        <!-- SYDNEY -->
+        <section class="chapter">
+          <header><h2>Leaving Sydney</h2><span class="clock num">AEDT · UTC+11</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-01">
+              <div class="date">Tue<b class="num">1 Dec</b></div>
+              <div class="stack">
+                <div class="entry ticket">
+                  <div class="band"><span>Batik Air Malaysia · A330</span><span class="num">OD120</span></div>
+                  <div class="body num">
+                    <span class="iata">SYD</span><span class="path" aria-hidden="true"></span><span class="iata">KUL</span>
+                    <span class="tm">Tue 1 Dec<br><b>22:15</b></span><span></span><span class="tm r">Wed 2 Dec · T1<br><b>04:10</b></span>
+                  </div>
+                  <div class="perf" aria-hidden="true"></div>
+                  <div class="entry foot num"><span>Economy · 7 kg cabin + 20 kg checked · no meal</span><span>Trip.com · ticket saved</span></div>
+                </div>
+                <div class="idea">Be at the airport by <b>19:15</b>. Eat before you board: no meal on this flight.</div>
+                <div class="checkin num"><div class="clocks"><span>Boarded</span><b>22:00</b><span>Sydney</span></div><div class="who">Bob · Corey</div></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- KUALA LUMPUR -->
+        <section class="chapter">
+          <header><h2>Kuala Lumpur</h2><span class="clock num">MYT · UTC+8 · Sydney is 3 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-02">
+              <div class="date">Wed<b class="num">2 Dec</b><i>Land in the dark</i></div>
+              <div class="stack">
+                <div class="entry landing">
+                  <div class="k"><span>Soft landing · KLIA Terminal 1</span><span class="num">04:10 → bed by 15:00</span></div>
+                  <h3>Eleven hours before the room is ready</h3>
+                  <dl>
+                    <dt>Phone</dt><dd>Install a Malaysia eSIM in Sydney. Switch it on after landing and turn Australian roaming off. The SIM counters in arrivals are a backup.</dd>
+                    <dt>Getting in</dt><dd>The KLIA Ekspres to KL Sentral takes 28 minutes, with the first trains from about 05:00. Then take a Grab to Jalan Conlay, about 15 minutes.</dd>
+                    <dt>Money</dt><dd>Ringgit (MYR). Tap your card almost everywhere and pay Grab in the app. Take a little cash from an arrivals ATM for street food.</dd>
+                    <dt>If not ready</dt><dd>Early check-in is requested but not confirmed. Leave your bag at the Royale Chulan desk and have breakfast near the hotel.</dd>
+                    <dt>Outside</dt><dd>Dark until 07:03. It's 31°C but the humidity makes it feel like 40°C. Keep a compact umbrella in your cabin bag.</dd>
+                    <dt>Paperwork</dt><dd>Malaysia Digital Arrival Card, due between 29 Nov and 1 Dec.</dd>
+                  </dl>
+                </div>
+                <div class="entry">
+                  <div class="k"><span>Stay · 2 nights</span><span class="num">A$154.26</span></div>
+                  <h3>Royale Chulan Kuala Lumpur</h3>
+                  <div class="m">No. 5 Jalan Conlay · Superior King · check in after 15:00 · out Fri 4 Dec by 12:00</div>
+                  <div class="foot num"><span class="warn">Free cancellation until Sat 28 Nov, 23:59</span><span>+60 3 2688 9688</span></div>
+                </div>
+                <div class="idea">Idea: <b>KLCC park walk</b> in the morning, <b>Central Market and SugarBomb</b> in the evening if you have the energy.</div>
+                <div class="checkin num"><div class="clocks"><span>Safe in KL</span><b>18:00</b><span>KL</span><span>·</span><b>21:00</b><span>Sydney</span></div><div class="who">Bob · Corey</div></div>
+                <div class="pen">
+                  <div class="av" aria-hidden="true">P</div>
+                  <div>
+                    <div class="q"><em>Penelope · tonight</em>You landed before sunrise with a whole day to fill before the room. What did you end up doing with it?</div>
+                    <div class="acts"><button class="btn" type="button" data-pen>Talk to Penelope</button><button class="btn ghost" type="button" data-pen-voice>Voice note</button></div>
+                    <div class="logged" data-logged hidden><em>Diary · Wed 2 Dec · Kuala Lumpur · example</em>Didn't sleep on the plane at all. Got to the hotel at seven and they said three o'clock, so I sat in the lobby and had a coffee I didn't need. The heat hits you the second you walk out. Went to Central Market anyway. Tired but glad I'm here.</div>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <article class="day" id="d-2026-12-04">
+              <div class="date">Fri<b class="num">4 Dec</b><i>Different terminal</i></div>
+              <div class="stack">
+                <div class="idea">You leave from <b>KLIA Terminal 2</b>, not the Terminal 1 you landed at. Leave the hotel by <b>06:30</b>.</div>
+                <div class="entry ticket">
+                  <div class="band"><span>AirAsia X · nonstop 11 h 30 m</span><span class="num">D7 604</span></div>
+                  <div class="body num">
+                    <span class="iata">KUL</span><span class="path" aria-hidden="true"></span><span class="iata">SAW</span>
+                    <span class="tm">T2<br><b>09:35</b></span><span></span><span class="tm r">Sabiha Gökçen<br><b>16:05</b></span>
+                  </div>
+                  <div class="perf" aria-hidden="true"></div>
+                  <div class="entry foot num"><span>Economy Promo · 7 kg cabin · no seat · no meal</span><span>Expedia · A$428.71</span></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ISTANBUL -->
+        <section class="chapter">
+          <header><h2>Istanbul</h2><span class="clock num">TRT · UTC+3 · Sydney is 8 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-04b">
+              <div class="date">Fri<b class="num">4 Dec</b><i>Land at dusk</i></div>
+              <div class="stack">
+                <div class="entry landing">
+                  <div class="k"><span>Soft landing · Sabiha Gökçen</span><span class="num">16:05 · sunset 16:36</span></div>
+                  <h3>You land on the Asian side</h3>
+                  <dl>
+                    <dt>Phone</dt><dd>Install a Türkiye eSIM before you leave KL.</dd>
+                    <dt>Getting in</dt><dd>The Havabüs to Taksim takes 60 to 90 minutes in Friday traffic. From Taksim, take a short BiTaksi ride to Tomtom. Don't hail a taxi on the street.</dd>
+                    <dt>Money</dt><dd>Turkish lira. Cards work in most places. Buy an Istanbulkart at a station machine for trams, metro and ferries.</dd>
+                    <dt>Outside</dt><dd>You arrive in the dark. It's 10°C but feels like 6°C in the wind off the Bosphorus. Pack a jumper in your 7 kg cabin bag, because your KL clothes won't be enough.</dd>
+                  </dl>
+                </div>
+                <div class="entry">
+                  <div class="k"><span>Stay · 4 nights</span><span class="num">A$296.94</span></div>
+                  <h3>The Story Hotel Pera</h3>
+                  <div class="m">Tomtom, Kumbaracı Ykş. No: 66, Beyoğlu · check in after 14:00 · out Tue 8 Dec by 12:00</div>
+                  <div class="foot"><span>Non-refundable, can’t be changed</span><span>Reservation saved</span></div>
+                </div>
+                <div class="checkin num"><div class="clocks"><span>Check in at breakfast</span><b>08:30</b><span>Istanbul</span><span>·</span><b>16:30</b><span>Sydney</span></div><div class="who">Your bedtime here is 05:00 for Bob</div></div>
+              </div>
+            </article>
+            <article class="day" id="d-2026-12-05">
+              <div class="date">Sat<b class="num">5 Dec</b></div>
+              <div class="stack">
+                <div class="idea">Idea: the <b>Grand Bazaar and Spice Market</b>, plus <b>Nishane</b> and the fragrance shops. Posting from here costs about A$80 to A$120 per kg, so carry bulky things to London and post them from there.</div>
+                <div class="pen">
+                  <div class="av" aria-hidden="true">P</div>
+                  <div><div class="q"><em>Penelope · tonight</em>What’s the one thing from today you’d tell Corey about first?</div>
+                  <div class="acts"><button class="btn" type="button" data-pen>Talk to Penelope</button></div></div>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- SCOTLAND -->
+        <section class="chapter">
+          <header><h2>Scotland</h2><span class="clock num">GMT · UTC+0 · Sydney is 11 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-08">
+              <div class="date">Tue<b class="num">8 Dec</b><i>Gap</i></div>
+              <div class="stack">
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · Istanbul → Edinburgh</span><span>Check out 12:00 · check in 15:00</span></div>
+                  <h3>Getting from Istanbul to Edinburgh</h3>
+                  <ul>
+                    <li>Compare a direct IST or SAW → EDI flight with going via London. Going via London adds a train north the same day.</li>
+                    <li>Taking only a 7 kg cabin bag keeps budget-airline fees down.</li>
+                    <li>You need a UK ETA before you board.</li>
+                  </ul>
+                </div>
+                <div class="entry">
+                  <div class="k"><span>Stay · 1 night</span><span class="num">A$188.62</span></div>
+                  <h3>Hub by Premier Inn Edinburgh Haymarket</h3>
+                  <div class="m">Torphichen Street · check in from 15:00 · out Wed 9 Dec by 12:00</div>
+                  <div class="foot"><span class="warn">Booked for 2 adults, but it’s just you</span><span>Non-refundable</span></div>
+                </div>
+              </div>
+            </article>
+            <article class="day" id="d-2026-12-09">
+              <div class="date">Wed<b class="num">9 Dec</b><i>Early start</i></div>
+              <div class="stack">
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · Haymarket → Glasgow Queen St</span><span class="num">about 50 min</span></div>
+                  <h3>A train that gets you to Queen Street before 08:22</h3>
+                  <ul><li>ScotRail runs every 15 minutes. Aim for about 07:15 from Haymarket, which is a 3-minute walk from the hotel.</li></ul>
+                </div>
+                <div class="entry ticket">
+                  <div class="band" style="background:var(--pastel-sage);color:var(--pastel-sage-ink)"><span>ScotRail · West Highland Line</span><span>Train</span></div>
+                  <div class="body num">
+                    <span class="iata">GLQ</span><span class="path" aria-hidden="true"></span><span class="iata">FTW</span>
+                    <span class="tm">Queen Street<br><b>08:22</b></span><span></span><span class="tm r">Fort William<br><b>12:12</b></span>
+                  </div>
+                  <div class="perf" aria-hidden="true"></div>
+                  <div class="entry foot num"><span>3 h 50 m · sit on the left for Loch Lomond</span><span>CA$92.54</span></div>
+                </div>
+                <div class="entry landing">
+                  <div class="k"><span>Soft landing · Fort William</span><span class="num">12:12 · sunset 15:46</span></div>
+                  <h3>Three and a half hours of light left</h3>
+                  <dl>
+                    <dt>Getting there</dt><dd>Inverlochy is about 3 miles out of town. Book a taxi from the train, because the station has few.</dd>
+                    <dt>Phone</dt><dd>Signal is patchy on the line. Download the day offline before you leave Glasgow.</dd>
+                    <dt>Money</dt><dd>Pounds. Contactless works everywhere.</dd>
+                    <dt>Outside</dt><dd>It's 5°C but feels like −3°C. Drop your bag and go straight out while it's light.</dd>
+                  </dl>
+                </div>
+                <div class="entry">
+                  <div class="k"><span>Stay · 1 night · B&amp;B</span><span class="num">£225.00</span></div>
+                  <h3>Inverlochy Castle Hotel</h3>
+                  <div class="m">Torlundy, Fort William · Ghillie’s Closet</div>
+                  <div class="foot"><span>Non-refundable</span><span>01397 702 177</span></div>
+                </div>
+                <div class="checkin num"><div class="clocks"><span>Safe</span><b>20:00</b><span>Fort William</span><span>·</span><b>07:00</b><span>Thu, Sydney</span></div><div class="who">Bob · Corey</div></div>
+              </div>
+            </article>
+            <article class="day" id="d-2026-12-10">
+              <div class="date">Thu<b class="num">10 Dec</b><i>3 nights open</i></div>
+              <div class="stack">
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · 10 to 13 Dec</span><span>No bed after Inverlochy</span></div>
+                  <h3>Three nights in the Highlands, then south</h3>
+                  <ul>
+                    <li>Take the Fort William → Mallaig line in the morning. It's your top-priority rail trip.</li>
+                    <li>Inverness for 2 nights puts you on the Kyle Line at 08:55.</li>
+                    <li>Take the Caledonian Sleeper or LNER to London on 12 or 13 Dec.</li>
+                  </ul>
+                </div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- LONDON -->
+        <section class="chapter">
+          <header><h2>London</h2><span class="clock num">GMT · UTC+0 · Sydney is 11 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-13">
+              <div class="date">Sun<b class="num">13 Dec</b><i>Sunset 15:51</i></div>
+              <div class="stack">
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · 13 to 20 Dec</span><span>7 nights</span></div>
+                  <h3>A London base for a week</h3>
+                  <ul>
+                    <li>South Kensington is close to the Royal Albert Hall. Covent Garden is closer to the West End.</li>
+                    <li>Royal Albert Hall: Anna Lapwood’s Christmas Organ Spectacular is around 18 Dec. The Christmas programme is on sale now.</li>
+                    <li>Post parcels home from here. It's the cheapest place on the trip.</li>
+                  </ul>
+                </div>
+                <div class="checkin num"><div class="clocks"><span>Each night</span><b>21:00</b><span>London</span><span>·</span><b>08:00</b><span>Sydney</span></div><div class="who">Bob · Corey</div></div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ROME -->
+        <section class="chapter">
+          <header><h2>Rome</h2><span class="clock num">CET · UTC+1 · Sydney is 10 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-20">
+              <div class="date">Sun<b class="num">20 Dec</b><i>Replaces Shanghai</i></div>
+              <div class="stack">
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · London → Rome → Seoul</span><span>Must land in Seoul by 23 Dec</span></div>
+                  <h3>Two nights in Rome, then fly to Seoul</h3>
+                  <ul>
+                    <li>A London → Rome flight on 20 Dec, and 2 nights in Rome.</li>
+                    <li>Fly Rome → Seoul on the evening of 22 Dec. There are direct flights of about 12 hours.</li>
+                    <li>Check whether the new EU entry rules (EES, and ETIAS if it has started) apply to you by then.</li>
+                  </ul>
+                </div>
+                <div class="idea"><b>21 Dec is the solstice</b>, the shortest day of the year, and you'll be in Rome for it: 07:35 to 16:42.</div>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <!-- SEOUL -->
+        <section class="chapter">
+          <header><h2>Seoul, with Corey</h2><span class="clock num">KST · UTC+9 · Sydney is 2 h ahead</span></header>
+          <div class="days">
+            <article class="day" id="d-2026-12-23">
+              <div class="date">Wed<b class="num">23 Dec</b><i>Honeymoon</i></div>
+              <div class="stack">
+                <div class="entry med">
+                  <div class="k"><span>Medication · Stelara</span><span>Due day 1 or 2 in Korea</span></div>
+                  <h3>Getting your injection to Seoul</h3>
+                  <div class="opts">
+                    <div class="opt rec"><b>Corey brings it from Sydney (recommended)</b>It stays refrigerated at home until Corey leaves and only travels about 11 hours in a medical cool bag. Corey carries your script and a letter from Dr Keily. Book a Seoul room with a fridge.</div>
+                    <div class="opt"><b>You carry it for three weeks</b>It would go through six hotels and several budget flights. Only an option if the pharmacist confirms how long it can stay at room temperature.</div>
+                    <div class="opt"><b>Move the dose</b>Dr Keily would have to agree to give it before 1 Dec or after 10 Jan.</div>
+                  </div>
+                  <div class="foot"><span class="warn">Ask Dr Keily and your pharmacist in October</span><span>Private: Bob never sees this</span></div>
+                </div>
+                <div class="entry landing">
+                  <div class="k"><span>Soft landing · Incheon</span><span>Meet Corey</span></div>
+                  <h3>Korea runs on its own apps</h3>
+                  <dl>
+                    <dt>Phone</dt><dd>Get a Korea eSIM. Install Naver Map or KakaoMap, because Google Maps won't give walking directions here. Add KakaoT for taxis and Papago to translate.</dd>
+                    <dt>Getting in</dt><dd>The AREX express runs from Incheon to Seoul Station in about 45 minutes.</dd>
+                    <dt>Money</dt><dd>Won (KRW). Cards work almost everywhere. Buy a T-money card at a convenience store and top it up with cash.</dd>
+                    <dt>Outside</dt><dd>Highs of 2 to 5°C and lows around −6°C. It's the coldest dry air of the trip.</dd>
+                    <dt>Paperwork</dt><dd>Check whether K-ETA still exempts Australians in December 2026.</dd>
+                  </dl>
+                  <div class="src">From here Corey stops watching the trip and shares it with you. Bob keeps watching.</div>
+                </div>
+                <div class="entry gap">
+                  <div class="k"><span>Not booked · 23 Dec to 10 Jan</span><span>18 nights + flights home</span></div>
+                  <h3>The honeymoon itself</h3>
+                  <ul><li>A Seoul base, the Christmas and New Year plans, anywhere else in Korea, and both flights home on 10 Jan.</li></ul>
+                </div>
+                <div class="checkin num"><div class="clocks"><span>Daily</span><b>18:00</b><span>Seoul</span><span>·</span><b>20:00</b><span>Sydney</span></div><div class="who">Bob only</div></div>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Bob's view -->
+  <div id="bobview" class="bob" hidden>
+    <p class="mock-note" style="text-align:center;margin:0">What Bob sees on his link, previewed at 09:40 Wed 2 Dec, Sydney time. All times are shown in his time.</p>
+    <div class="card">
+      <div class="safe"><span class="dot" aria-hidden="true"></span>Adam checked in safe</div>
+      <p class="big" style="margin:10px 0 0">He’s in Kuala Lumpur. He landed early this morning and he’s at his hotel.</p>
+      <p style="margin:6px 0 0;color:var(--muted)" class="num">Checked in 9:40am your time (6:40am there)</p>
+    </div>
+    <div class="card num">
+      <div class="row"><span>Where he should be now</span><span>Royale Chulan hotel, KL</span></div>
+      <div class="row"><span>Next check-in</span><span>9:00pm tonight</span><small>That’s 6:00pm in Kuala Lumpur.</small></div>
+      <div class="row"><span>Next flight</span><span>Fri 4 Dec, 12:35pm</span><small>Kuala Lumpur to Istanbul. Lands at 12:05am Saturday your time.</small></div>
+      <div class="row"><span>Meets Corey</span><span>Wed 23 Dec, Seoul</span></div>
+    </div>
+    <div class="card plan">
+      <strong>If a check-in is missed</strong>
+      <ol>
+        <li>Wait two hours. He may just be asleep or without signal.</li>
+        <li>Send him a message.</li>
+        <li>Call Corey. Corey has the hotel numbers.</li>
+      </ol>
+    </div>
+    <p class="privacy">Bob sees where Adam planned to be, what he has confirmed and what has changed. He doesn't see booking codes, costs, health details or the diary.</p>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---- Trip days: local sunrise/sunset (approximate) and booking state ----
+  const stops = [
+    { code: 'SYD', name: 'Sydney', from: 0, to: 0, rise: '05:40', set: '19:52', state: 'booked', note: 'OD120 departs 22:15' },
+    { code: 'KUL', name: 'Kuala Lumpur', from: 1, to: 2, rise: '07:03', set: '19:00', state: 'booked', note: 'Royale Chulan, booked' },
+    { code: 'IST', name: 'Istanbul', from: 3, to: 6, rise: '08:14', set: '16:36', state: 'booked', note: 'Story Hotel Pera, booked' },
+    { code: 'EDI', name: 'Edinburgh', from: 7, to: 7, rise: '08:31', set: '15:41', state: 'part', note: 'Bed booked, flight from Istanbul not booked' },
+    { code: 'FTW', name: 'Fort William', from: 8, to: 8, rise: '08:45', set: '15:46', state: 'booked', note: 'Train and Inverlochy booked' },
+    { code: 'HLD', name: 'Highlands', from: 9, to: 11, rise: '08:52', set: '15:30', state: 'open', note: 'No bed booked' },
+    { code: 'LON', name: 'London', from: 12, to: 18, rise: '08:00', set: '15:52', state: 'open', note: 'No bed booked' },
+    { code: 'ROM', name: 'Rome', from: 19, to: 21, rise: '07:35', set: '16:42', state: 'open', note: 'Replaces Shanghai, not booked' },
+    { code: 'SEL', name: 'Seoul', from: 22, to: 39, rise: '07:45', set: '17:20', state: 'open', note: 'With Corey, not booked' },
+    { code: 'HOME', name: 'Flying home', from: 40, to: 40, rise: '07:47', set: '17:25', state: 'open', note: 'Flight home not booked' }
+  ];
+  const anchors = { 0: 'd-2026-12-01', 1: 'd-2026-12-02', 3: 'd-2026-12-04b', 4: 'd-2026-12-05', 7: 'd-2026-12-08', 8: 'd-2026-12-09', 9: 'd-2026-12-10', 12: 'd-2026-12-13', 19: 'd-2026-12-20', 22: 'd-2026-12-23' };
+  const travelDays = new Set([0, 3, 7, 8, 12, 19, 21, 40]);
+  const N = 41;
+  const start = new Date(2026, 11, 1);
+  const days = [];
+  for (let i = 0; i < N; i++) {
+    const s = stops.find(x => i >= x.from && i <= x.to);
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    days.push({ i, date: d, stop: s });
+  }
+  const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+  const fmtDur = m => `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} m`;
+  const fmtDate = d => d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  let sel = 1;
+  // ---- Strip ----
+  const svg = document.getElementById('strip');
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; };
+  let cols = [];
+  let drawnFor = null;
+  function draw() {
+    const narrow = svg.parentElement.clientWidth < 640;
+    if (drawnFor === narrow) return;
+    drawnFor = narrow;
+    svg.replaceChildren();
+    const FS = narrow ? 11 : 7;           // label size in viewBox units
+    const L = narrow ? 24 : 26, CW = 10, TOP = 4, H = narrow ? 150 : 72, W = L + N * CW + 2;
+    const yOf = m => TOP + (m / 1440) * H;
+    const watchY = TOP + H + 10;
+    const labelY = watchY + 14 + FS;
+    svg.setAttribute('viewBox', `0 0 ${W} ${labelY + 4}`);
+
+    const defs = el('defs', {});
+    const pat = el('pattern', { id: 'hatch', width: 4, height: 4, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 4, height: 4, fill: '#142b51' }, pat);
+    el('rect', { width: 1.6, height: 4, fill: 'rgba(240,207,172,.7)' }, pat);
+    const grad = el('linearGradient', { id: 'sun', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: '0', 'stop-color': '#f1e2b6' }, grad);
+    el('stop', { offset: '.5', 'stop-color': '#f0cfac' }, grad);
+    el('stop', { offset: '1', 'stop-color': '#f1e2b6' }, grad);
+
+    (narrow ? [0, 12, 24] : [0, 6, 12, 18, 24]).forEach(h => {
+      const y = yOf(h * 60);
+      el('line', { x1: L - 3, x2: W, y1: y, y2: y, stroke: 'rgba(255,255,255,.08)', 'stroke-width': .5 });
+      const t = el('text', { x: L - 5, y: y + FS * .35, 'text-anchor': 'end', 'font-size': FS * .85, fill: 'rgba(255,255,255,.55)', 'font-family': 'Inter, sans-serif' });
+      t.textContent = String(h).padStart(2, '0');
+    });
+
+    cols = [];
+    days.forEach(d => {
+      const x = L + d.i * CW;
+      const g = el('g', { class: 'col', tabindex: 0, role: 'button', 'aria-label': `${fmtDate(d.date)}, ${d.stop.name}` });
+      el('rect', { class: 'hit', x, y: 0, width: CW, height: labelY + 4, fill: 'transparent' }, g);
+      el('rect', { x: x + 1, y: TOP, width: CW - 2, height: H, rx: 1.5, fill: '#142b51' }, g);
+      const r = mins(d.stop.rise), s = mins(d.stop.set);
+      const open = d.stop.state !== 'booked';
+      el('rect', {
+        class: 'frame', x: x + 1, y: yOf(r), width: CW - 2, height: yOf(s) - yOf(r), rx: 1.5,
+        fill: open ? 'url(#hatch)' : 'url(#sun)',
+        stroke: open ? 'rgba(240,207,172,.8)' : 'none', 'stroke-dasharray': open ? '2 1.5' : 'none', 'stroke-width': .7
+      }, g);
+      if (travelDays.has(d.i)) el('circle', { cx: x + CW / 2, cy: TOP + H - 5, r: 1.6, fill: '#fff' }, g);
+      if (d.i === 22 || d.i === 23) el('circle', { cx: x + CW / 2, cy: TOP + 5, r: 1.8, fill: '#e8e0f1' }, g);
+      g.addEventListener('click', () => select(d.i, true));
+      g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(d.i, true); } });
+      cols.push(g);
+    });
+
+    const x0 = L + 1, xEnd = L + N * CW - 1, xSeoul = L + 22 * CW;
+    el('line', { x1: x0, x2: xEnd, y1: watchY, y2: watchY, stroke: '#dceafa', 'stroke-width': 1.6, 'stroke-linecap': 'round' });
+    el('line', { x1: x0, x2: xSeoul - 2, y1: watchY + 5, y2: watchY + 5, stroke: '#e8e0f1', 'stroke-width': 1.6, 'stroke-dasharray': '3 2' });
+    el('line', { x1: xSeoul, x2: xEnd, y1: watchY + 5, y2: watchY + 5, stroke: '#e8e0f1', 'stroke-width': 3, 'stroke-linecap': 'round' });
+
+    stops.forEach(s => {
+      const span = s.to - s.from + 1;
+      const cx = L + (s.from + span / 2) * CW;
+      el('line', { x1: L + s.from * CW + 1, x2: L + (s.to + 1) * CW - 1, y1: labelY - FS - 2, y2: labelY - FS - 2, stroke: 'rgba(255,255,255,.25)', 'stroke-width': .6 });
+      if (span >= (narrow ? 3 : 2) && s.code !== 'HOME') {
+        const t = el('text', { x: cx, y: labelY, 'text-anchor': 'middle', 'font-size': FS, 'font-weight': 600, fill: 'rgba(255,255,255,.8)', 'font-family': 'Inter, sans-serif' });
+        t.textContent = s.code;
+      }
+    });
+    if (typeof sel === 'number') cols.forEach((c, k) => c.classList.toggle('is-sel', k === sel));
+  }
+  draw();
+  window.addEventListener('resize', draw);
+
+  const readout = document.getElementById('readout');
+  function select(i, jump) {
+    sel = i;
+    cols.forEach((c, k) => c.classList.toggle('is-sel', k === i));
+    const d = days[i];
+    const light = mins(d.stop.set) - mins(d.stop.rise);
+    const who = i >= 22 ? 'Bob watching · Corey with you' : 'Bob and Corey watching';
+    readout.innerHTML = `<span class="where">${fmtDate(d.date)} · ${d.stop.name}</span><span class="light">${d.stop.rise}–${d.stop.set} · ${fmtDur(light)}</span><span class="what">${d.stop.note} · ${who}</span>`;
+    if (jump) {
+      let a = null;
+      for (let k = i; k >= 0 && !a; k--) a = anchors[k];
+      const node = a && document.getElementById(a);
+      if (node && !document.getElementById('owner').hidden) {
+        node.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+        node.classList.add('is-flash'); setTimeout(() => node.classList.remove('is-flash'), 1400);
+      }
+    }
+  }
+  select(1, false);
+
+  // ---- Open items ----
+  const gaps = [
+    { when: 'Oct', t: 'Stelara plan with Dr Keily', d: 'Due your first or second day in Korea', tag: ['med', 'Health'], day: 22 },
+    { when: 'Before 8 Dec', t: 'UK ETA', d: 'Needed before you fly to Edinburgh', tag: ['check', 'Entry'], day: 7 },
+    { when: '8 Dec', t: 'Istanbul → Edinburgh', d: 'Check out 12:00, check in 15:00', tag: ['hard', 'No way there'], day: 7 },
+    { when: '9 Dec', t: 'Early train to Glasgow', d: 'Must reach Queen St before 08:22', tag: ['hard', 'Tight'], day: 8 },
+    { when: '10–13 Dec', t: 'Highlands beds + trip south', d: '3 nights with nowhere to sleep', tag: ['hard', 'No bed'], day: 9 },
+    { when: '13–20 Dec', t: 'London base + Albert Hall', d: '7 nights, and shows are selling', tag: ['hard', 'No bed'], day: 12 },
+    { when: '20–22 Dec', t: 'London → Rome → Seoul', d: 'Land in Seoul by 23 Dec', tag: ['hard', 'Deadline'], day: 19 },
+    { when: '23 Dec', t: 'Seoul stay with a fridge', d: 'For the Stelara', tag: ['med', 'Health'], day: 22 },
+    { when: '10 Jan', t: 'Flights home', d: 'For you and Corey', tag: ['hard', 'Not booked'], day: 40 },
+    { when: '28 Nov', t: 'Royale Chulan free cancellation ends', d: 'Keep it, or change it before 23:59', tag: ['check', 'Deadline'], day: 1 },
+    { when: '29 Nov', t: 'Malaysia Digital Arrival Card', d: 'Due in the 3 days before you land', tag: ['check', 'Entry'], day: 1 }
+  ];
+  const ul = document.getElementById('gaps');
+  gaps.forEach(g => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="when num">${g.when}</span><button type="button" class="jump"><span class="t">${g.t}</span><span class="pill ${g.tag[0]}">${g.tag[1]}</span><br><span class="d">${g.d}</span></button>`;
+    li.querySelector('button').addEventListener('click', () => select(g.day, true));
+    ul.appendChild(li);
+  });
+
+  // ---- Penelope ----
+  document.querySelectorAll('[data-pen], [data-pen-voice]').forEach(b => b.addEventListener('click', () => {
+    const logged = b.closest('.pen').querySelector('[data-logged]');
+    if (logged) { logged.hidden = false; toast('Example entry. Penelope asks, drafts in your voice, and files it to this day once you confirm.'); }
+    else toast('This would open Penelope on the Mind tab with the day’s plan and check-ins already loaded.');
+  }));
+
+  // ---- Toast ----
+  let tt;
+  function toast(msg) {
+    let t = document.querySelector('.toast');
+    if (!t) { t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    t.textContent = msg; t.hidden = false;
+    clearTimeout(tt); tt = setTimeout(() => { t.hidden = true; }, 3800);
+  }
+
+  // ---- On the day ----
+  const nowSlot = document.getElementById('now-slot');
+  function renderNow() {
+    nowSlot.innerHTML = `
+      <section class="now" style="margin-top:20px" aria-labelledby="now-h">
+        <div class="eyebrow num">Preview · Wed 2 Dec · 06:10 Kuala Lumpur · 09:10 Sydney</div>
+        <h2 id="now-h">You’re through arrivals at KLIA Terminal 1</h2>
+        <ol class="num">
+          <li class="done">Land 04:10</li>
+          <li><b>KLIA Ekspres</b> to KL Sentral, 28 min, platform signposted from arrivals</li>
+          <li><b>Grab</b> to Royale Chulan, No. 5 Jalan Conlay, about 15 min</li>
+          <li>Leave your bag at the desk. The room is ready from 15:00.</li>
+        </ol>
+        <div class="acts">
+          <button class="btn" type="button" id="btn-safe">I’m safe</button>
+          <button class="btn orange" type="button" id="btn-broke">Something broke</button>
+        </div>
+        <div id="broke" hidden></div>
+      </section>`;
+    document.getElementById('btn-safe').addEventListener('click', e => {
+      e.currentTarget.textContent = 'Checked in 06:12';
+      e.currentTarget.disabled = true;
+      toast('Bob and Corey would see “safe in KL” at 9:12am Sydney time. Mockup: nothing is sent.');
+    });
+    document.getElementById('btn-broke').addEventListener('click', () => {
+      const b = document.getElementById('broke');
+      b.hidden = !b.hidden;
+      b.innerHTML = `<div class="sheet"><b>What happened?</b> Type it, or paste the airline’s message or a screenshot.
+        <textarea id="broke-text" aria-label="What happened">The KLIA Ekspres isn't running yet and my phone has no data.</textarea>
+        <p style="margin:8px 0 0;color:var(--muted)">Built second. It reads today's bookings, the local time, your check-ins and what's next, then gives you two or three options with cost and time. You pick one, then approve any change to the plan or message to Bob and Corey.</p></div>`;
+    });
+  }
+
+  // ---- Modes ----
+  const owner = document.getElementById('owner'), bob = document.getElementById('bobview');
+  document.querySelectorAll('.modes button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.modes button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    const m = b.dataset.mode;
+    owner.hidden = m === 'bob'; bob.hidden = m !== 'bob';
+    if (m === 'travel') { renderNow(); select(1, false); } else { nowSlot.innerHTML = ''; }
+    try { localStorage.setItem('travel-mode', m); } catch (e) {}
+  }));
+  try { const m = localStorage.getItem('travel-mode'); if (m && m !== 'plan') document.querySelector(`[data-mode="${m}"]`)?.click(); } catch (e) {}
+})();
+</script>
