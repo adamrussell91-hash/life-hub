@@ -38,8 +38,18 @@ function parseFrontmatter(text, loadYaml) {
   }
 }
 
+const LIFE_FETCH_MS = 12_000;
+
+function withLifeTimeout(init) {
+  if (typeof AbortSignal === 'undefined' || typeof AbortSignal.timeout !== 'function') {
+    return init;
+  }
+  if (init?.signal) return init;
+  return { ...(init || {}), signal: AbortSignal.timeout(LIFE_FETCH_MS) };
+}
+
 async function readOkJson(apiFetch, path, init) {
-  const response = await apiFetch(path, init);
+  const response = await apiFetch(path, withLifeTimeout(init));
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.ok !== true) {
     const err = new Error('request_failed');

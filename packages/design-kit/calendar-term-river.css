@@ -10,7 +10,9 @@
   --tr-corey-wash:color-mix(in srgb,var(--pastel-peach) 28%,transparent);
   --tr-gold-line:color-mix(in srgb,var(--pastel-gold-ink) 70%,#fff);
   --tr-health-line:color-mix(in srgb,var(--sand),var(--ink) 38%);
-  position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size
+  position:relative;font-family:var(--font-ui);color:var(--ink);min-width:0;contain:inline-size;
+  /* Nav + sources stay visible; do not clip the Year/Term chart at the host top. */
+  overflow:visible
 }
 .tr__nav{display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap}
 .tr__round{width:2.25rem;height:2.25rem;border-radius:var(--radius-full);border:1px solid var(--line);background:var(--glass);display:inline-grid;place-items:center;color:var(--navy);cursor:pointer}

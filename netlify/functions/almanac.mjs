@@ -192,16 +192,22 @@ export function parseSchoolTerms(value, { warn = console.warn } = {}) {
   return terms.sort((a, b) => a.starts_on.localeCompare(b.starts_on));
 }
 
+/** Bounded Blob concurrency — a serial walk of every task was ~30s on real latency. */
+const TASKED_BATCH = 10;
+
 export async function readAlmanacTasked(tasksStore, { warn = console.warn } = {}) {
   if (typeof tasksStore !== 'function') return [];
   try {
     const store = await tasksStore();
     const index = await readTaskIndex(store);
     const out = [];
-    for (const id of index) {
-      const task = await getJSON(store, taskKey(id));
-      const source = typeof task?.source === 'string' ? task.source : '';
-      if (source.startsWith('almanac:')) out.push(source.slice('almanac:'.length));
+    for (let i = 0; i < index.length; i += TASKED_BATCH) {
+      const slice = index.slice(i, i + TASKED_BATCH);
+      const rows = await Promise.all(slice.map((id) => getJSON(store, taskKey(id))));
+      for (const task of rows) {
+        const source = typeof task?.source === 'string' ? task.source : '';
+        if (source.startsWith('almanac:')) out.push(source.slice('almanac:'.length));
+      }
     }
     return [...new Set(out)];
   } catch (error) {
@@ -530,20 +536,28 @@ function pathDate(path, pattern) {
 }
 
 async function readMatching(paths, readFile, predicate, warn) {
+  const matched = paths.filter(predicate);
   const events = [];
-  for (const path of paths.filter(predicate)) {
-    let text;
-    try {
-      text = await readFile(path);
-    } catch (error) {
-      warn(`almanac: ignoring ${path} (${error instanceof Error ? error.message : 'unreadable'})`);
-      continue;
-    }
-    if (typeof text !== 'string') continue;
-    try {
-      events.push(parseEventDocument(text, path, loadYaml));
-    } catch (error) {
-      warn(`almanac: ignoring ${path} (${error instanceof Error ? error.message : 'invalid record'})`);
+  // Parallel blob reads in small batches — serial GitHub decode was a second hang.
+  for (let i = 0; i < matched.length; i += TASKED_BATCH) {
+    const slice = matched.slice(i, i + TASKED_BATCH);
+    const texts = await Promise.all(
+      slice.map(async (path) => {
+        try {
+          return { path, text: await readFile(path) };
+        } catch (error) {
+          warn(`almanac: ignoring ${path} (${error instanceof Error ? error.message : 'unreadable'})`);
+          return { path, text: null };
+        }
+      })
+    );
+    for (const { path, text } of texts) {
+      if (typeof text !== 'string') continue;
+      try {
+        events.push(parseEventDocument(text, path, loadYaml));
+      } catch (error) {
+        warn(`almanac: ignoring ${path} (${error instanceof Error ? error.message : 'invalid record'})`);
+      }
     }
   }
   return events;

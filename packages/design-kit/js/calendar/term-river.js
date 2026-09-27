@@ -21,6 +21,86 @@ export const LANES = Object.freeze([
 
 import { addDaysKey, weekLabel } from '../school-time.js';
 import { CAPACITY } from './capacity-model.js';
+import { filterKeyForItem } from './calendar-filter.js';
+
+/** Life log types never become river points (same set as Tideline chips). */
+const LOG_TYPES = new Set([
+  'meal', 'diary', 'sleep', 'skincare', 'heart', 'weight',
+  'composition', 'measurements', 'bloods', 'fragrance'
+]);
+
+/**
+ * Hub schedule rows Life's visual.RIVER never paints. Convert them to river points/bars
+ * so Term/Year chips and the grid share one source of truth (same class as Tideline #541).
+ */
+export function riverItemsFromHubEvents(events) {
+  const out = [];
+  for (const event of events ?? []) {
+    const record = event?.record ?? event;
+    if (!record || typeof record !== 'object') continue;
+    const type = record.type;
+    if (!type || LOG_TYPES.has(type) || type === 'knowledge_page' || type === 'ledger_item') continue;
+    if (type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) continue;
+    if (type === 'workout' && record.status === 'completed') continue;
+
+    const id = record.id || event.path;
+    if (!id) continue;
+
+    if (type === 'project' || (record.kind === 'project' && (record.start_date || record.from))) {
+      const from = record.start_date || record.from;
+      const to = record.due_date || record.to || record.end_date;
+      if (!from || !to) continue;
+      const item = {
+        id,
+        title: record.title || 'Project',
+        type: 'project',
+        from,
+        to,
+        shape: 'bar',
+        source: type
+      };
+      const key = filterKeyForItem(item);
+      if (key) item.filterKey = key;
+      out.push(item);
+      continue;
+    }
+
+    const date = record.date || record.due_date;
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+
+    const item = {
+      id,
+      title: record.title || type,
+      type,
+      date,
+      shape: 'point',
+      source: type
+    };
+    if (typeof record.time === 'string') item.start = record.time;
+    if (typeof record.end_time === 'string') item.end = record.end_time;
+    if (record.kind) item.kind = record.kind;
+    if (record.event_type) item.event_type = record.event_type;
+    if (type === 'scheduled_lesson' || record.isClass === true) item.isClass = true;
+    if (record.protected === true) item.protected = true;
+    if (record.with) item.with = record.with;
+    const key = filterKeyForItem(item);
+    if (key) item.filterKey = key;
+    out.push(item);
+  }
+  return out;
+}
+
+/** Visual RIVER.ITEMS first (shape wins); hub overlays fill ids the visual never painted. */
+export function mergeRiverItems(visualItems, hubItems) {
+  const seen = new Set();
+  const out = [];
+  for (const item of [...(visualItems ?? []), ...(hubItems ?? [])]) {
+    if (!item?.id || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+  }
+  return out;
+}
 
 const TERM_HOLIDAY_FACTOR = 0.65;
 const YEAR_HOLIDAY_FACTOR = 0.5;
