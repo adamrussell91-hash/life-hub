@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import { createInterface } from 'node:readline/promises';
 import { getStore } from '@netlify/blobs';
 import { readExport } from './lib/notion-comms/read-export.mjs';
+import { readLiveBatch } from './lib/notion-comms/read-live-batch.mjs';
 import { parseRow } from './lib/notion-comms/parse-row.mjs';
 import { buildImportPlan } from './lib/notion-comms/plan.mjs';
 import { applyImportPlan } from './lib/notion-comms/apply.mjs';
@@ -24,8 +25,9 @@ import { createAccessContext } from '../netlify/functions/_shared/entity-access.
 import { resolveEntity as defaultResolveEntity } from '../netlify/functions/_shared/entity-resolvers.mjs';
 import { createNetlifyCliStore } from './lib/notion-comms/netlify-cli-store.mjs';
 
-const args = process.argv.slice(2); const value = (flag) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; }; const exportDir = value('--export'); const apply = args.includes('--apply');
-if (!exportDir) throw new Error('Usage: node scripts/import-notion-comms.mjs --export <directory> [--report <path>] [--apply [--yes]]');
+const args = process.argv.slice(2); const value = (flag) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; }; const exportDir = value('--export'); const liveInput = value('--live-input'); const apply = args.includes('--apply');
+if (Boolean(exportDir) === Boolean(liveInput)) throw new Error('Usage: node scripts/import-notion-comms.mjs (--export <directory> | --live-input <private-json>) [--report <path>] [--apply [--yes]]');
+if (liveInput && path.resolve(liveInput).startsWith(`${path.resolve(process.cwd())}${path.sep}`)) throw new Error('--live-input must be outside this public repository.');
 if (apply && !args.includes('--yes')) { const input = createInterface({ input: process.stdin, output: process.stdout }); const confirmation = await input.question('Type IMPORT to write the planned records: '); input.close(); if (confirmation.trim() !== 'IMPORT') throw new Error('Refusing to write without typing IMPORT.'); }
 const token = process.env.NETLIFY_BLOBS_TOKEN ?? '';
 const options = (name) => ({ name, siteID: UMBRELLA_BLOBS_SITE_ID, token });
@@ -54,8 +56,8 @@ async function loadPeople() {
   return records.map(parsePersonRecord).filter(Boolean).map((person) => ({ display_name: person.display_name, aliases: person.aliases, ref: `shared:person:${person.id}` }));
 }
 
-const source = await readExport(exportDir);
-const rows = source.rows.flatMap((row, index) => source.matches[index] ? [parseRow(row, source.matches[index].body, source.matches[index].id)] : []);
+const source = liveInput ? await readLiveBatch(liveInput) : await readExport(exportDir);
+const rows = liveInput ? source.rows : source.rows.flatMap((row, index) => source.matches[index] ? [parseRow(row, source.matches[index].body, source.matches[index].id)] : []);
 const plan = buildImportPlan({ rows, people: await loadPeople(), importMap: await loadImportMap(), todayKey: new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' }) });
 const countsBy = (items, key) => items.reduce((counts, item) => ({ ...counts, [item[key]]: (counts[item[key]] ?? 0) + 1 }), {});
 const byKind = countsBy(plan.records, 'kind'); const byStatus = countsBy(plan.promises, 'status');

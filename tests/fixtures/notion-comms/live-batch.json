@@ -1,0 +1,19 @@
+{
+  "relationNames": {
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "Sam K."
+  },
+  "pages": [
+    {
+      "id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "properties": {
+        "Meeting Title": "Fixture check-in",
+        "Meeting Type": "Case Management",
+        "Communication Method": "Email",
+        "date:Date:start": "2026-09-01",
+        "date:Date:is_datetime": 0,
+        "Attendees": ["https://app.notion.com/p/Sam-K-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]
+      },
+      "body": "# Fixture check-in\n\nFixture body"
+    }
+  ]
+}
