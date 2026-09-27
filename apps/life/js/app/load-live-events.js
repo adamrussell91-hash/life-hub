@@ -7,6 +7,7 @@ import {
   NUTRITION_CHALLENGES_PATH,
   parseNutritionChallenges
 } from '../core/nutrition-challenges.js';
+import { PENDING_CN_PATCHES_PATH, parsePendingCnPatches } from '../core/pending-cn-patches.js';
 
 const TARGETS_PATH = 'config/targets.yml';
 const AGENTS_PATH = 'config/agents.yml';
@@ -105,6 +106,7 @@ export async function loadLiveEvents({
       governanceLogMarkdown: parsedFiles.governanceLogMarkdown,
       weekFlags: parsedFiles.weekFlags,
       nutritionChallenges: parsedFiles.nutritionChallenges,
+      pendingCnPatches: parsedFiles.pendingCnPatches,
       researchBriefs: parsedFiles.researchBriefs,
       calendarVisual: parsedFiles.calendarVisual,
       warnings: [...warnings, ...parsedFiles.warnings],
@@ -161,6 +163,9 @@ function createValidator(loadYaml) {
         parseNutritionChallenges(file.content);
       } else if (file.path === WEEK_FLAGS_PATH) {
         parseWeekFlags(file.content);
+      } else if (file.path === PENDING_CN_PATCHES_PATH) {
+        // Tolerant parse: a corrupt queue reads as empty, never as a sync failure.
+        parsePendingCnPatches(file.content);
       } else if (file.path.startsWith('data/research/') && file.path.endsWith('.json')) {
         JSON.parse(file.content);
       } else if (file.path === CALENDAR_VISUAL_PATH) {
@@ -196,6 +201,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
   let governanceLogMarkdown = null;
   let weekFlags = null;
   let nutritionChallenges = null;
+  let pendingCnPatches = [];
   const researchBriefs = [];
   let calendarVisual = null;
 
@@ -216,6 +222,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     else if (entry.kind === 'governance_log') governanceLogMarkdown = entry.value;
     else if (entry.kind === 'week_flags') weekFlags = entry.value;
     else if (entry.kind === 'nutrition_challenges') nutritionChallenges = entry.value;
+    else if (entry.kind === 'pending_cn_patches') pendingCnPatches = entry.value;
     else if (entry.kind === 'research_brief') researchBriefs.push(entry.value);
     else if (entry.kind === 'calendar_visual') calendarVisual = entry.value;
     else if (entry.kind === 'event') events.push(entry.value);
@@ -232,6 +239,7 @@ function parseFiles(files, loadYaml, parsed = new Map()) {
     governanceLogMarkdown,
     weekFlags,
     nutritionChallenges,
+    pendingCnPatches,
     researchBriefs,
     calendarVisual,
     warnings
@@ -258,6 +266,9 @@ function parseFile(file, loadYaml) {
     if (file.path === CENTRAL_NODE_PATH) return { kind: 'central_node', value: file.content };
     if (file.path === GOVERNANCE_LOG_PATH) return { kind: 'governance_log', value: file.content };
     if (file.path === WEEK_FLAGS_PATH) return { kind: 'week_flags', value: parseWeekFlags(file.content) };
+    if (file.path === PENDING_CN_PATCHES_PATH) {
+      return { kind: 'pending_cn_patches', value: parsePendingCnPatches(file.content) };
+    }
     if (file.path === NUTRITION_CHALLENGES_PATH) {
       return { kind: 'nutrition_challenges', value: parseNutritionChallenges(file.content) };
     }

@@ -39,6 +39,7 @@ import {
   removePendingCnPatchById,
   findPendingCnPatchById
 } from './_shared/cn-patch-queue.mjs';
+import { isQueuedPatchStale } from '../../apps/life/js/core/central-node-patch.js';
 import {
   PENDING_ACTIONS_PATH,
   parsePendingActions,
@@ -427,6 +428,16 @@ export function createChatConfirmHandler({
         400,
         'auto_class_rejected',
         'Auto-class Central Node patches cannot be confirmed via this endpoint.',
+        false,
+        PRIVATE_CACHE
+      );
+    }
+
+    if (storedPatch && isQueuedPatchStale(content, stored)) {
+      return errorResponse(
+        409,
+        'patch_stale',
+        'That part of Central Node changed after this was proposed. Discard it and let the agent propose it again.',
         false,
         PRIVATE_CACHE
       );

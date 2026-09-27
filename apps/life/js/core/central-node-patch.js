@@ -198,3 +198,28 @@ export function applyCentralNodePatch(content, patch) {
 
   return null;
 }
+
+/** Body text of one section (no heading, no trailing rule), or null when the section is missing. */
+export function readCentralNodeSectionBody(content, section) {
+  if (typeof content !== 'string') return null;
+  const heading = SECTION_HEADING[section];
+  if (!heading) return null;
+  const span = findSectionSpan(content, heading);
+  if (!span) return null;
+  return content.slice(span.headingEnd, span.contentEnd).trim();
+}
+
+const normalizeSectionText = text => String(text ?? '').replace(/\s+/g, ' ').trim();
+
+/**
+ * A queued whole-section rewrite carries the section body it was written
+ * against. If that section has changed since, confirming would silently undo
+ * the newer edit, so the patch is stale and must be re-proposed.
+ */
+export function isQueuedPatchStale(content, entry) {
+  if (!entry || typeof entry.base_section_text !== 'string') return false;
+  if (!['replace_section', 'condense'].includes(entry.patch?.op)) return false;
+  const current = readCentralNodeSectionBody(content, entry.patch.section);
+  if (current == null) return true;
+  return normalizeSectionText(current) !== normalizeSectionText(entry.base_section_text);
+}

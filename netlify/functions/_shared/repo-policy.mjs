@@ -1,6 +1,7 @@
 import { daysBetween, isCalendarDate } from '../../../apps/life/js/core/time.js';
 import { GOVERNANCE_LOG_PATH } from '../../../apps/life/js/core/governance-log.js';
 import { WEEK_FLAGS_PATH } from '../../../apps/life/js/core/open-loops.js';
+import { PENDING_CN_PATCHES_PATH } from '../../../apps/life/js/core/pending-cn-patches.js';
 import { isTemplatePath } from './workout-templates.mjs';
 
 export const RESEARCH_PATH = /^data\/research\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/;
@@ -11,7 +12,8 @@ export const CONFIG_PATHS = new Set([
   'central-node.md',
   GOVERNANCE_LOG_PATH,
   'data/nutrition/challenges.json',
-  WEEK_FLAGS_PATH
+  WEEK_FLAGS_PATH,
+  PENDING_CN_PATCHES_PATH
 ]);
 const EVENT_PATH = /^data\/(?<domain>nutrition|fitness|body|mind|skincare|calendar)\/(?<year>\d{4})\/(?<month>\d{2})\/(?<date>\d{4}-\d{2}-\d{2})-(?<name>[a-z0-9]+(?:-[a-z0-9]+)*)\.md$/;
 // Ghost workout updates live at records/YYYY/MM/DD/<slug>.md, not under data/.

@@ -4225,3 +4225,112 @@ test('Brisket catalogued promoted draft appears as a named dynamic tool', async 
 
   assert.ok(receivedArgs?.tools.some(tool => tool.name === 'track_morning_weigh_in'));
 });
+
+function cnWriteFetch(puts) {
+  const cnSha = '9'.repeat(40);
+  const cn = [
+    '# Purpose',
+    'Purpose body.',
+    '## 🔴 Current Constraints & Priorities',
+    '- Existing rule',
+    "## ⚡ Today's Status (Saturday 1 August 2026)",
+    '**Flags:** Quiet day.',
+    '## 🤝 Cross-Agent Coordination',
+    '*One-line directives only.*',
+    '## 📝 Recent Agent Actions',
+    '*48-hour rolling window.*'
+  ].join('\n');
+  return async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url, body: JSON.parse(options.body) });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({ tree: [{ path: 'central-node.md', type: 'blob', sha: cnSha, size: cn.length }] });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(cn, 'utf8').toString('base64') });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+}
+
+test('Sara coordinate_request_cn_write lands a signed Cross-Agent line in central-node.md', async () => {
+  const puts = [];
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: cnWriteFetch(puts),
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        const result = JSON.parse(await args.executeTools({
+          id: 'call_cn',
+          name: 'coordinate_request_cn_write',
+          input: {
+            section: 'cross_agent',
+            op: 'append_line',
+            text: '- Sara→Chadwick: light loading until the cold clears.',
+            summary: 'Light loading',
+            reason: 'Head cold logged today'
+          }
+        }));
+        assert.equal(result.status, 'applied');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, tell Chadwick to keep it light',
+    priorAgentSlug: 'sara'
+  }))));
+
+  const cnPut = puts.find(put => put.url.includes('central-node.md'));
+  assert.ok(cnPut, 'expected a central-node.md write');
+  assert.match(Buffer.from(cnPut.body.content, 'base64').toString('utf8'), /Sara→Chadwick: light loading until the cold clears\./);
+  assert.ok(!puts.some(put => put.url.includes('cn-loans.json')));
+  assert.ok(events.some(event => event.type === 'central_node_patched'));
+});
+
+test('Sara coordinate_request_cn_write queues a Constraints change and shows a Confirm card', async () => {
+  const puts = [];
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl: cnWriteFetch(puts),
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        const result = JSON.parse(await args.executeTools({
+          id: 'call_cn',
+          name: 'coordinate_request_cn_write',
+          input: {
+            section: 'constraints',
+            op: 'append_line',
+            text: '- Follow-up booked.',
+            summary: 'Add booked follow-up',
+            reason: 'Booking confirmed today'
+          }
+        }));
+        assert.equal(result.status, 'awaiting_confirm');
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Sara, add the follow-up to my constraints',
+    priorAgentSlug: 'sara'
+  }))));
+
+  assert.ok(!puts.some(put => put.url.includes('central-node.md')), 'Constraints must wait for Confirm');
+  const queuePut = puts.find(put => put.url.includes('pending-cn-patches.json'));
+  assert.ok(queuePut, 'expected the pending queue write');
+  const queue = JSON.parse(Buffer.from(queuePut.body.content, 'base64').toString('utf8'));
+  assert.equal(queue[0].slug, 'sara');
+  const card = events.find(event => event.type === 'cn_patch_proposal');
+  assert.ok(card, 'expected a Confirm card in chat');
+  assert.equal(card.id, queue[0].id);
+});

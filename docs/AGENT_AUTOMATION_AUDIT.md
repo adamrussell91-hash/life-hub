@@ -30,9 +30,24 @@ Constraints edits are confirm-class, which is correct. But nothing turns the swe
 
 **Fix:** have the sweep (or a Sara hook, §4) write confirm-class candidates into `pending-cn-patches.json`. Hammond's prompt and `/api/chat-confirm` already surface and apply that queue, so Adam gets one tap instead of a governance paragraph.
 
+**Status: fixed (app side).** It turned out the queue was only visible inside a live Hammond chat turn. Now:
+- `data/hammond/pending-cn-patches.json` syncs to the Life app.
+- Every queued patch shows as a Confirm / Discard card in **Central Node → Needs you**. Each card shows who proposed it, the evidence, and a preview of the new section text.
+- Cards confirm by id through the existing `/api/chat/confirm`.
+- A queued whole-section rewrite carries `base_section_text`. Confirm refuses it with `patch_stale` if that section changed after it was proposed, so an old rewrite can't silently undo a newer edit.
+
+The daily sweep's instructions live in `life-hub-data/config/hammond-daily-sweep.md` and need a matching change so it writes to this queue.
+
 ### 2.2 `coordinate_request_cn_write` is a dead end, and it tells the agent it succeeded
 Every agent has this tool. For auto-risk patches it only appends a "loan" to `data/os/cn-loans.json` and returns `CN loan applied`. Nothing reads that file and `central-node.md` is never touched (`netlify/functions/_shared/capabilities/shortcuts.mjs` `handleCoordinateRequestCnWrite`). The file doesn't exist in `life-hub-data`, so it has never been used. If an agent does use it, it will tell Adam it wrote to Central Node when it did not.
 **Fix:** apply auto-risk loans with `applyCentralNodePatch` in the same call, or send them through the pending-patch queue. Otherwise remove the capability.
+
+**Status: fixed.**
+- The tool now takes `summary` / `text` / `field` / `match`, the same shape as Hammond's patches.
+- A signed line (Cross-Agent `Name→…`, Recent Actions `Name…`), a Today's Status field, or a This Week line is written to `central-node.md` straight away.
+- Constraints (every op) and every other Confirm-class change go to the pending queue, show a Confirm card in chat and on the Central Node page, and the tool returns `awaiting_confirm`.
+- Repeat proposals are de-duplicated.
+- The `cn-loans.json` ledger is no longer written.
 
 ### 2.3 Teaching lesson-editor AI jobs have no runner
 `apps/teaching/src/teacher/ai-panel.ts` → `POST /api/ai/jobs` creates `status: working, phase: queued` and nothing processes it. `ai-jobs-tick` just expires it after 10 min. `runTeachingAnnTurn` (`_shared/teaching-ann-turn.mjs`) exists but is only called from tests. `apps/teaching/src/ai/client.ts` still points at a non-existent `/api/ai/chat` (dead code).

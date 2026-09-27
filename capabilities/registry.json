@@ -194,7 +194,7 @@
       "risk": "auto",
       "surfaces": [
         "central_node",
-        "governance_log"
+        "confirm_card"
       ],
       "tool_name": "coordinate_request_cn_write"
     },

@@ -52,14 +52,16 @@ import {
   researchExpiresAt
 } from '../../netlify/functions/_shared/capabilities/stores.mjs';
 import { classifyCentralNodePatchRisk } from '../../apps/life/js/core/central-node-patch.js';
+import { PENDING_CN_PATCHES_PATH, parsePendingCnPatches } from '../../apps/life/js/core/pending-cn-patches.js';
 
 function mockCtx(agentSlug = 'brisket') {
   const files = new Map();
   const shaByPath = new Map();
   const writes = [];
+  let blobCounter = 0;
   const client = {
     async writeFile({ path, content, message, sha }) {
-      const next = `sha_${writes.length + 1}`;
+      const next = `sha_${++blobCounter}`;
       writes.push({ path, message, sha });
       files.set(path, content);
       shaByPath.set(path, next);
@@ -513,44 +515,135 @@ test('track_open_challenge returns Confirm proposal', async () => {
   assert.match(validated.proposal.writes[0].path, /^data\/challenges\//);
 });
 
-test('coordinate_request_cn_write auto-applies low-risk loan without Confirm', async () => {
-  const { ctx, writes } = mockCtx();
-  assert.equal(
-    classifyCentralNodePatchRisk({ section: 'todays_status', op: 'upsert_field' }),
-    'auto'
+const CN_SEED = readFileSync(new URL('../../central-node.md', import.meta.url), 'utf8');
+
+async function seededCnCtx(agentSlug) {
+  const mock = mockCtx(agentSlug);
+  await mock.ctx.client.writeFile({ path: 'central-node.md', content: CN_SEED, message: 'seed' });
+  mock.writes.length = 0;
+  return mock;
+}
+
+function fileText(ctx, path) {
+  const entry = ctx.repoTree.find(item => item.path === path);
+  return entry ? ctx.readBlob(entry.sha) : null;
+}
+
+test('coordinate_request_cn_write writes a signed Cross-Agent line into central-node.md', async () => {
+  const { ctx, writes } = await seededCnCtx('sara');
+  const result = await executeShortcut(
+    'coordinate_request_cn_write',
+    {
+      section: 'cross_agent',
+      op: 'append_line',
+      text: '- Sara\u2192Chadwick: keep loading light this week.',
+      summary: 'Light loading this week',
+      reason: 'Head cold logged 26 Sep'
+    },
+    ctx
   );
+  assert.equal(result.kind, 'cn_applied');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, 'central-node.md');
+  assert.notEqual(writes[0].path, CN_LOANS_PATH);
+  assert.match(await fileText(ctx, 'central-node.md'), /Sara\u2192Chadwick: keep loading light this week\./);
+});
+
+test('coordinate_request_cn_write upserts a Today\'s Status field directly', async () => {
+  const { ctx, writes } = await seededCnCtx('brisket');
+  assert.equal(classifyCentralNodePatchRisk({ section: 'todays_status', op: 'upsert_field' }), 'auto');
   const result = await executeShortcut(
     'coordinate_request_cn_write',
     {
       section: 'todays_status',
       op: 'upsert_field',
-      path: 'Flags',
-      value: 'sugar challenge open',
-      reason: 'track open'
+      field: 'Flags',
+      text: '**Flags:** Sugar challenge open.',
+      summary: 'Flag sugar challenge',
+      reason: 'Challenge opened today'
     },
     ctx
   );
-  assert.equal(result.kind, 'loan_auto');
-  assert.equal(result.loan.risk, 'auto');
-  assert.equal(writes[0].path, CN_LOANS_PATH);
+  assert.equal(result.kind, 'cn_applied');
+  assert.equal(writes[0].path, 'central-node.md');
+  assert.match(await fileText(ctx, 'central-node.md'), /\*\*Flags:\*\* Sugar challenge open\./);
 });
 
-test('coordinate_request_cn_write high-risk loan needs Confirm', async () => {
-  const { ctx, writes } = mockCtx();
+test('coordinate_request_cn_write refuses an auto line signed by another agent', async () => {
+  const { ctx, writes } = await seededCnCtx('brisket');
   const result = await executeShortcut(
     'coordinate_request_cn_write',
     {
-      section: 'purpose',
-      op: 'replace_section',
-      value: 'nope',
-      reason: 'should confirm'
+      section: 'cross_agent',
+      op: 'append_line',
+      text: '- Hammond\u2192Chadwick: rest day.',
+      summary: 'Rest day',
+      reason: 'impersonation'
     },
     ctx
   );
-  assert.equal(result.kind, 'loan_confirm');
+  assert.equal(result.kind, 'error');
+  assert.match(result.error, /Brisket\u2192/);
   assert.equal(writes.length, 0);
-  const validated = validateProposeActionInput(result.proposal, { agentSlug: 'brisket' });
-  assert.equal(validated.ok, true);
+});
+
+test('coordinate_request_cn_write queues every Constraints change for Confirm, even append_line', async () => {
+  const { ctx, writes } = await seededCnCtx('sara');
+  const before = await fileText(ctx, 'central-node.md');
+  const result = await executeShortcut(
+    'coordinate_request_cn_write',
+    {
+      section: 'constraints',
+      op: 'append_line',
+      text: '- New lab result on file.',
+      summary: 'Add new lab result',
+      reason: 'Specialist visit 24 Sep'
+    },
+    ctx
+  );
+  assert.equal(result.kind, 'cn_patch_queued');
+  assert.equal(result.status, 'awaiting_confirm');
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, PENDING_CN_PATCHES_PATH);
+  assert.equal(await fileText(ctx, 'central-node.md'), before);
+  const queue = parsePendingCnPatches(await fileText(ctx, PENDING_CN_PATCHES_PATH));
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].id, result.id);
+  assert.equal(queue[0].slug, 'sara');
+  assert.equal(queue[0].createdAt, '2026-08-31');
+  assert.equal(queue[0].evidence, 'Specialist visit 24 Sep');
+  assert.equal(queue[0].patch.section, 'constraints');
+});
+
+test('coordinate_request_cn_write queues a section rewrite with its base text and dedupes a repeat', async () => {
+  const { ctx, writes } = await seededCnCtx('hammond');
+  const input = {
+    section: 'this_month',
+    op: 'replace_section',
+    text: '**Upcoming:**\n- Conferral 30 Sep.',
+    summary: 'Refresh This Month',
+    reason: 'Month rolled'
+  };
+  const first = await executeShortcut('coordinate_request_cn_write', input, ctx);
+  assert.equal(first.kind, 'cn_patch_queued');
+  const queue = parsePendingCnPatches(await fileText(ctx, PENDING_CN_PATCHES_PATH));
+  assert.match(queue[0].base_section_text, /Upcoming/);
+  const again = await executeShortcut('coordinate_request_cn_write', input, ctx);
+  assert.equal(again.kind, 'cn_patch_queued');
+  assert.equal(again.already_queued, true);
+  assert.equal(again.id, first.id);
+  assert.equal(writes.length, 1);
+});
+
+test('coordinate_request_cn_write rejects a patch missing its body', async () => {
+  const { ctx, writes } = await seededCnCtx('brisket');
+  const result = await executeShortcut(
+    'coordinate_request_cn_write',
+    { section: 'purpose', op: 'replace_section', summary: 'x', reason: 'y' },
+    ctx
+  );
+  assert.equal(result.kind, 'error');
+  assert.equal(writes.length, 0);
 });
 
 test('research TTL is per-domain', () => {

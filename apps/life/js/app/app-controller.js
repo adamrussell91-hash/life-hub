@@ -1715,12 +1715,21 @@ export function createAppController(dependencies) {
       quiet: syncQuiet,
       onOpenSection: showSection,
       storage: localStorage,
-      onLoopsChange: () => paintCentralNode()
+      onLoopsChange: () => paintCentralNode(),
+      onPatchAction: resolvePendingCnPatch
     });
     renderGovernance?.(root, latestResult.governanceLogMarkdown);
     (packCnBoardFn ?? packCnBoard)(root);
     const button = root.querySelector('#central-node-chat-button');
     button?.style?.setProperty('--agent-accent', agentColour?.(latestResult.agentsConfig, CENTRAL_NODE_AGENT_SLUG));
+  }
+
+  // Queued Central Node patches confirm by id: the server re-reads the stored
+  // patch, so the page never resubmits patch text it only displayed.
+  async function resolvePendingCnPatch({ id, act }) {
+    if (!chatApi?.confirm || typeof id !== 'string' || !id) throw new Error('confirm_unavailable');
+    await chatApi.confirm({ kind: act === 'confirm' ? 'cn_patch' : 'cn_patch_dismiss', id, slug: 'hammond' });
+    await refresh({ manual: true, force: true });
   }
 
   function renderCentralNodeSection() {

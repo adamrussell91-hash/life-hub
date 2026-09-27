@@ -99,3 +99,17 @@ test('formatPendingCnPatchesForPrompt renders a bounded, human-readable list', (
 test('formatPendingCnPatchesForPrompt returns empty string for an empty queue', () => {
   assert.equal(formatPendingCnPatchesForPrompt([]), '');
 });
+
+test('findDuplicatePendingCnPatch matches the same edit regardless of summary wording', async () => {
+  const { findDuplicatePendingCnPatch } = await import('../../netlify/functions/_shared/cn-patch-queue.mjs');
+  const queued = {
+    id: 'cnp_one',
+    createdAt: '2026-09-26',
+    slug: 'sara',
+    patch: { section: 'constraints', op: 'append_line', payload: { summary: 'Add result', text: '- New result' } }
+  };
+  const same = { section: 'constraints', op: 'append_line', payload: { summary: 'Different words', text: '- New result' } };
+  const other = { section: 'constraints', op: 'append_line', payload: { summary: 'Add result', text: '- Another result' } };
+  assert.equal(findDuplicatePendingCnPatch([queued], same)?.id, 'cnp_one');
+  assert.equal(findDuplicatePendingCnPatch([queued], other), null);
+});

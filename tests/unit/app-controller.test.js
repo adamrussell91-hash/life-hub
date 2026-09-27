@@ -310,6 +310,7 @@ function harness(options = {}) {
       documentRoot.querySelector('#app-status').textContent = `Loaded ${model.date}`;
     },
     tasksApi: options.tasksApi,
+    ...(options.chatApi ? { chatApi: options.chatApi } : {}),
     renderWarnings() {},
     renderUnavailable(documentRoot, message) {
       documentRoot.querySelector('#unavailable-panel').hidden = false;
@@ -328,8 +329,10 @@ function harness(options = {}) {
     },
     fitnessTemplateLibrary: options.fitnessTemplateLibrary,
     buildCentralNodeModel: input => ({ date: input.date, source: input, kind: 'central-node' }),
-    renderCentralNode(documentRoot, model) {
+    renderCentralNode(documentRoot, model, renderOptions) {
       calls.centralNodeRenders = (calls.centralNodeRenders ?? 0) + 1;
+      calls.lastCentralNodeModel = model;
+      calls.lastCentralNodeOptions = renderOptions;
       documentRoot.querySelector('#central-node-dashboard').hidden = false;
     },
     renderGovernance(...args) {
@@ -1157,6 +1160,40 @@ test('clicking the Central Node nav item shows the dashboard and builds/renders 
   assert.equal(state.root.querySelector('#home-dashboard').hidden, true);
   assert.equal(state.calls.centralNodeRenders, 1);
   assert.equal(state.controller.getCurrentSection(), 'central-node');
+});
+
+test('Central Node confirms a queued patch by id through chatApi and refreshes the board', async () => {
+  const confirms = [];
+  const state = harness({
+    chatApi: {
+      async confirm(request) {
+        confirms.push(request);
+        return { summary: 'Refresh Constraints' };
+      }
+    }
+  });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  const syncsBefore = state.calls.syncs;
+
+  const onPatchAction = state.calls.lastCentralNodeOptions?.onPatchAction;
+  assert.equal(typeof onPatchAction, 'function');
+  await onPatchAction({ id: 'cnp_abc123', act: 'confirm' });
+  await onPatchAction({ id: 'cnp_other', act: 'dismiss' });
+
+  assert.deepEqual(confirms, [
+    { kind: 'cn_patch', id: 'cnp_abc123', slug: 'hammond' },
+    { kind: 'cn_patch_dismiss', id: 'cnp_other', slug: 'hammond' }
+  ]);
+  assert.ok(state.calls.syncs > syncsBefore, 'expected a refresh after resolving the patch');
+});
+
+test('Central Node passes the synced pending patch queue into the board model', async () => {
+  const queue = [{ id: 'cnp_q', createdAt: '2026-08-01', slug: 'hammond', patch: { section: 'this_month', op: 'replace_section', payload: { summary: 'Roll', text: 'x' } } }];
+  const state = harness({ liveResult: { ...liveData(), pendingCnPatches: queue } });
+  await state.controller.start();
+  state.root.centralNodeNavigation.dispatchEvent(new Event('click'));
+  assert.deepEqual(state.calls.lastCentralNodeModel.source.pendingCnPatches, queue);
 });
 
 test('packs the central node board after rendering governance', async () => {

@@ -61,6 +61,7 @@ test('repository path policy rejects noncanonical and nonallowlisted paths', () 
     'data/calendar/2026/09/2026-09-26-dinner-out-a-show-1800.md',
     'data/fitness/templates/chest-and-curls.md',
     'data/remember/week-flags.json',
+    'data/hammond/pending-cn-patches.json',
     'data/research/2026-08-01-knee-load.json',
     'records/2026/09/24/workout-1815.md'
   ]) assert.equal(isAllowedRepositoryPath(path), true, path);

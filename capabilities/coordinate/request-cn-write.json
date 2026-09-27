@@ -7,9 +7,9 @@
   ],
   "risk": "auto",
   "kind": "capacity",
-  "prompt_one_liner": "Ask Hammond in-band for a specific Central Node write you cannot make directly. Low-risk ops apply automatically (loan inherits lower risk).",
+  "prompt_one_liner": "Write to Central Node. Your own signed Cross-Agent / Recent Actions line, a Today's Status field or a This Week line applies now. Constraints and every other change queue as a Confirm card for Adam on the Central Node page.",
   "surfaces": [
     "central_node",
-    "governance_log"
+    "confirm_card"
   ]
 }
