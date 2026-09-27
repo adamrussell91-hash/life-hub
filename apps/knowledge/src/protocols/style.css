@@ -13,6 +13,10 @@
 .protocol-card__front,.protocol-card__back { position:absolute; inset:0; overflow:visible; border:1px solid color-mix(in srgb,var(--protocol-ink) 32%,transparent); border-radius:var(--radius-md); box-shadow:var(--elev-2); backface-visibility:hidden; -webkit-backface-visibility:hidden; transform:rotateY(0deg) translateZ(1px); }
 .protocol-card__back-media { position:absolute; inset:0; overflow:hidden; border-radius:inherit; pointer-events:none; }
 .protocol-card__back-media img { width:100%; height:100%; object-fit:cover; opacity:.58; mix-blend-mode:screen; }
+/* Tip chrome lives here so Thinking does not depend on chat-rail CSS for hide/show. */
+.protocol-card__front .agent-protocol-pills__tip,
+.protocol-card__voice .agent-protocol-pills__tip,
+.protocol-portrait .agent-protocol-pills__tip { position:absolute; z-index:5; padding:var(--space-2) var(--space-3); border:1px solid rgba(228,201,138,.35); border-radius:var(--radius-sm); background:rgba(14,12,22,.94); color:#e9dfca; font-family:var(--font-ui); font-size:var(--text-xs); line-height:1.4; letter-spacing:normal; text-transform:none; white-space:normal; opacity:0; visibility:hidden; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.45); }
 .protocol-card__front .protocol-card__type-tip { left:50%; right:auto; top:auto; bottom:calc(100% + 0.5rem); transform:translateX(-50%); max-width:18rem; }
 .protocol-card__front:hover .protocol-card__type-tip,
 .protocol-card__front:focus-visible .protocol-card__type-tip { opacity:1; visibility:visible; }
@@ -109,7 +113,7 @@
 @keyframes protocol-turn-in { from { opacity:0; transform:translateY(.75rem); } to { opacity:1; transform:none; } }
 @keyframes protocol-deal { from { opacity:0; transform:translateY(1.25rem) rotateX(4deg); } to { opacity:1; transform:none; } }
 @media (max-width:72rem) { .protocol-library { padding-inline:var(--space-4); }.protocol-library__grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.protocol-card,.protocol-card__inner { min-height:23rem; } }
-@media (max-width:38rem) { .protocol-library__grid { grid-template-columns:1fr; }.protocol-card,.protocol-card__inner { min-height:21rem; }.protocol-intake { padding:var(--space-4); }.protocol-intake__content { padding:var(--space-4); }.protocol-card__front strong { font-size:1.7rem; }.protocol-portrait { width:5.5rem; height:5.5rem; margin:0 var(--space-4) -1.5rem 0; }.protocol-turn-card-slot { padding:0 var(--space-4); }.protocol-turn-card { padding:var(--space-4); } }
+@media (max-width:38rem) { .protocol-library__grid { grid-template-columns:1fr; }.protocol-card,.protocol-card__inner { min-height:21rem; }.protocol-intake { padding:var(--space-4); }.protocol-intake__content { padding:var(--space-4); }.protocol-card__front strong { font-size:1.7rem; }.protocol-portrait { width:5.5rem; height:5.5rem; margin:0 var(--space-4) -1.5rem 0; }.protocol-session.is-complete .protocol-portrait { margin-bottom:var(--space-2); }.protocol-session > header { flex-wrap:wrap; gap:var(--space-2); }.protocol-turn-card-slot { padding:0 var(--space-4) var(--space-3); }.protocol-turn-card { padding:var(--space-4); } }
 @media (prefers-reduced-motion:reduce) { .protocol-card,.protocol-card__inner,.protocol-turn-card,.protocol-portrait img,.protocol-dot { animation:none; transition:none; }.protocol-session.is-listening .protocol-portrait img { animation:none; } }
 .protocol-past { margin-top:clamp(2rem,4vw,3.5rem); padding:clamp(1rem,2vw,1.5rem); border-top:1px solid color-mix(in srgb,var(--navy) 18%,transparent); }
 .protocol-past__header { display:flex; flex-wrap:wrap; align-items:end; justify-content:space-between; gap:var(--space-3); margin-bottom:var(--space-4); }
