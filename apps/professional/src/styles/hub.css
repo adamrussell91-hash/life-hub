@@ -4711,8 +4711,78 @@
 
 .career-river__axis-year {
   fill: var(--muted);
+  font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
+}
+
+.career-river__axis-tick {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-opacity: 0.55;
+  pointer-events: none;
+}
+
+.career-river__year-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+.career-river__frame-label {
+  fill: var(--muted);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.career-river__now-line {
+  stroke: var(--wave);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  stroke-opacity: 0.9;
+  pointer-events: none;
+}
+
+.career-river__now-label {
+  fill: var(--navy);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.career-river__trunk {
+  pointer-events: none;
+}
+
+.career-river__trunk-cap {
+  fill: var(--paper);
+  stroke: var(--navy);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.career-river__role-bar {
+  fill: color-mix(in srgb, var(--cotton) 55%, white);
+  stroke: color-mix(in srgb, var(--navy) 28%, var(--line));
+  stroke-width: 1.5;
+  pointer-events: auto;
+}
+
+.career-river__role-label {
+  fill: var(--ink);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  pointer-events: none;
+}
+
+.career-river__role-label--below {
+  fill: var(--muted);
+  font-weight: var(--weight-semibold);
 }
 
 .career-river__axis-note {

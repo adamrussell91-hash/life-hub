@@ -7,14 +7,18 @@ import {
   clusterMarks,
   pathFromPoints,
   riverHeightPx,
+  ROLE_LANE_HEIGHT_PX,
   roleBandExtraPx,
   timeToUnit,
+  truncateRiverLabel,
   yearFraction,
   type RiverOrientation,
   type RiverZoom
 } from '@/domain/career-river-geometry';
 import type { CareerModel } from '@/domain/career-model';
 import { careerFutureRoute } from '@/app/router';
+
+const ROLE_BAR_HEIGHT_PX = 18;
 
 type RiverState = {
   zoom: RiverZoom;
@@ -94,6 +98,21 @@ function shortName(title: string): string {
     return parts.slice(0, 2).join(' ');
   }
   return parts[0]!;
+}
+
+function jobTip(job: CareerModel['employment'][number]): string {
+  return (
+    [job.role, job.display_label || job.label]
+      .map((part) => (part || '').trim())
+      .filter(Boolean)
+      .join(' · ') || 'Role'
+  );
+}
+
+function jobRoleLabel(job: CareerModel['employment'][number]): string {
+  const role = (job.role || '').trim();
+  if (role) return shortName(role);
+  return shortName((job.display_label || job.label || 'Role').trim());
 }
 
 /**
@@ -329,34 +348,93 @@ export function mountCareerRiver(
       'aria-label': 'Career river'
     });
 
-    // Headers
+    // Frame: What happened / What could (mockup + Tasks axis job)
     const pastLabel = svgEl('text', {
-      x: state!.orientation === 'horizontal' ? 8 : midPx,
-      y: state!.orientation === 'horizontal' ? 18 : height - 12,
-      fill: 'var(--muted)',
-      'font-size': 11,
-      'font-family': 'inherit'
+      x: isHorizontal ? 8 : 8,
+      y: isHorizontal ? 18 : height - 10,
+      class: 'career-river__frame-label',
+      'text-anchor': 'start',
+      'data-part': 'frame-past'
     });
     pastLabel.textContent = 'What happened';
     svg.appendChild(pastLabel);
     const futureLabel = svgEl('text', {
-      x:
-        state!.orientation === 'horizontal'
-          ? Math.min(width - 8, nowU * lengthPx + 12)
-          : midPx,
-      y: state!.orientation === 'horizontal' ? 18 : 18,
-      fill: 'var(--muted)',
-      'font-size': 11,
-      'font-family': 'inherit',
-      'text-anchor': state!.orientation === 'horizontal' ? 'start' : 'middle'
+      x: isHorizontal ? Math.min(width - 8, nowU * lengthPx + 12) : 8,
+      y: 18,
+      class: 'career-river__frame-label',
+      'text-anchor': 'start',
+      'data-part': 'frame-future'
     });
     futureLabel.textContent = 'What could';
     svg.appendChild(futureLabel);
 
-    // Role band (desktop): stacked bars only — Work list below is the reading surface.
+    // Year grid + axis ruler (Tasks gantt ticks / grid)
+    const yearTicks = axisYearTicks(state!.zoom);
+    for (const year of yearTicks) {
+      const u = timeToUnit(year, state!.zoom, nowYear);
+      if (u < -0.02 || u > 1.02) continue;
+      if (isHorizontal) {
+        const x = u * lengthPx;
+        svg.appendChild(
+          svgEl('line', {
+            x1: x,
+            y1: 28,
+            x2: x,
+            y2: height - 28,
+            class: 'career-river__year-grid',
+            'data-part': 'year-grid'
+          })
+        );
+        svg.appendChild(
+          svgEl('line', {
+            x1: x,
+            y1: height - 26,
+            x2: x,
+            y2: height - 20,
+            class: 'career-river__axis-tick',
+            'data-part': 'axis-tick'
+          })
+        );
+        const label = svgEl('text', {
+          x,
+          y: height - 8,
+          'text-anchor': 'middle',
+          'data-part': 'axis-year',
+          class: 'career-river__axis-year'
+        });
+        label.textContent = String(year);
+        svg.appendChild(label);
+      } else {
+        const y = (1 - u) * lengthPx;
+        svg.appendChild(
+          svgEl('line', {
+            x1: 28,
+            y1: y,
+            x2: width - 12,
+            y2: y,
+            class: 'career-river__year-grid',
+            'data-part': 'year-grid'
+          })
+        );
+        const label = svgEl('text', {
+          x: 6,
+          y: y + 4,
+          'data-part': 'axis-year',
+          class: 'career-river__axis-year'
+        });
+        label.textContent = String(year);
+        svg.appendChild(label);
+      }
+    }
+
+    // Role band: labeled duration bars (Tasks gantt-bar-text parity). Work list = dates detail.
+    const roleLabelBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+    const employmentAll = model.employment.filter(
+      (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
+    );
+    const lanesAll = isHorizontal ? employmentLanes : assignEmploymentLanes(employmentAll);
     if (isHorizontal) {
-      const bandBaseY = midPx + 20;
-      const laneH = 14;
+      const bandBaseY = midPx + 22;
       for (let index = 0; index < employmentJobs.length; index++) {
         const job = employmentJobs[index]!;
         const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
@@ -367,31 +445,116 @@ export function mountCareerRiver(
         );
         const x0 = Math.max(0, Math.min(lengthPx, u0 * lengthPx));
         const x1 = Math.max(0, Math.min(lengthPx, u1 * lengthPx));
-        if (x1 - x0 < 4) continue;
+        const barW = x1 - x0;
+        if (barW < 4) continue;
+        const lane = employmentLanes[index] ?? 0;
+        const y = bandBaseY + lane * ROLE_LANE_HEIGHT_PX;
+        const group = svgEl('g', {
+          class: 'career-river__role',
+          'data-part': 'role-span'
+        });
         const bar = svgEl('rect', {
           x: x0,
-          y: bandBaseY + (employmentLanes[index] ?? 0) * laneH,
-          width: x1 - x0,
-          height: 8,
-          fill: 'var(--line)',
-          stroke: 'var(--ink)',
-          'stroke-width': 0.5,
-          'stroke-opacity': 0.25,
-          rx: 2
+          y,
+          width: barW,
+          height: ROLE_BAR_HEIGHT_PX,
+          rx: ROLE_BAR_HEIGHT_PX / 2,
+          class: 'career-river__role-bar',
+          'data-part': 'role-bar'
         });
-        const tip =
-          [job.role, job.display_label || job.label]
-            .map((part) => (part || '').trim())
-            .filter(Boolean)
-            .join(' · ') || 'Role';
+        const tip = jobTip(job);
         const title = svgEl('title');
         title.textContent = tip;
         bar.appendChild(title);
-        svg.appendChild(bar);
+        group.appendChild(bar);
+
+        const padX = 8;
+        const inside = truncateRiverLabel(jobRoleLabel(job), barW - padX * 2);
+        let labelText = inside;
+        let lx = x0 + padX;
+        let ly = y + ROLE_BAR_HEIGHT_PX / 2 + 4;
+        let place: 'inside' | 'below' = 'inside';
+        if (!inside) {
+          place = 'below';
+          labelText = truncateRiverLabel(jobRoleLabel(job), Math.min(140, lengthPx - x0));
+          lx = x0 + 2;
+          ly = y + ROLE_BAR_HEIGHT_PX + 12;
+        }
+        if (labelText) {
+          const approxW = Math.min(barW, labelText.length * 6.2);
+          const box = { x: lx, y: ly - 10, w: approxW, h: 12 };
+          const hits = roleLabelBoxes.some(
+            (b) =>
+              !(box.x + box.w < b.x || b.x + b.w < box.x || box.y + box.h < b.y || b.y + b.h < box.y)
+          );
+          if (!hits) {
+            const label = svgEl('text', {
+              x: lx,
+              y: ly,
+              class:
+                place === 'inside'
+                  ? 'career-river__role-label'
+                  : 'career-river__role-label career-river__role-label--below',
+              'data-part': 'role-label'
+            });
+            label.textContent = labelText;
+            label.setAttribute('title', tip);
+            group.appendChild(label);
+            roleLabelBoxes.push(box);
+          }
+        }
+        svg.appendChild(group);
+      }
+    } else {
+      // Phone: labeled ticks beside the trunk so 390 is not mute grey.
+      for (let index = 0; index < employmentAll.length; index++) {
+        const job = employmentAll[index]!;
+        const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
+        const u1 = timeToUnit(
+          yearFraction(job.valid_to || model.now),
+          state!.zoom,
+          nowYear
+        );
+        const y0 = Math.max(0, Math.min(lengthPx, (1 - u1) * lengthPx));
+        const y1 = Math.max(0, Math.min(lengthPx, (1 - u0) * lengthPx));
+        if (y1 - y0 < 6) continue;
+        const lane = lanesAll[index] ?? 0;
+        const x = midPx + 16 + lane * 10;
+        const group = svgEl('g', {
+          class: 'career-river__role career-river__role--vertical',
+          'data-part': 'role-span'
+        });
+        const bar = svgEl('rect', {
+          x: x - 3,
+          y: y0,
+          width: 6,
+          height: y1 - y0,
+          rx: 3,
+          class: 'career-river__role-bar',
+          'data-part': 'role-bar'
+        });
+        const tip = jobTip(job);
+        const title = svgEl('title');
+        title.textContent = tip;
+        bar.appendChild(title);
+        group.appendChild(bar);
+        const labelText = truncateRiverLabel(jobRoleLabel(job), width - x - 16);
+        if (labelText) {
+          const label = svgEl('text', {
+            x: x + 8,
+            y: (y0 + y1) / 2 + 4,
+            class: 'career-river__role-label career-river__role-label--below',
+            'data-part': 'role-label'
+          });
+          label.textContent = labelText;
+          label.setAttribute('title', tip);
+          group.appendChild(label);
+        }
+        svg.appendChild(group);
       }
     }
 
-    // Trunk
+    // Trunk spine — career so far (thick navy path ending at Now)
     const trunkStart = Math.min(
       ...[
         nowYear - 1,
@@ -413,13 +576,25 @@ export function mountCareerRiver(
       svgEl('path', {
         d: pathFromPoints(trunkPts),
         fill: 'none',
-        stroke: '#17375e',
+        stroke: 'var(--navy)',
         'stroke-width': state!.orientation === 'vertical' ? 11 : 13,
-        'stroke-linecap': 'round'
+        'stroke-linecap': 'round',
+        class: 'career-river__trunk',
+        'data-part': 'trunk'
+      })
+    );
+    const trunkTip = trunkPts[trunkPts.length - 1]!;
+    svg.appendChild(
+      svgEl('circle', {
+        cx: trunkTip.x,
+        cy: trunkTip.y,
+        r: 5,
+        class: 'career-river__trunk-cap',
+        'data-part': 'trunk-cap'
       })
     );
 
-    // Now line + label (top of dashed line — bottom row is for year axis ticks)
+    // Now marker (Tasks gantt-today weight) — label at top; years keep the bottom row
     const nowLine =
       state!.orientation === 'horizontal'
         ? `M${nowU * lengthPx} 24 L${nowU * lengthPx} ${height - 28}`
@@ -428,19 +603,14 @@ export function mountCareerRiver(
       svgEl('path', {
         d: nowLine,
         fill: 'none',
-        stroke: 'var(--ink)',
-        'stroke-width': 1,
-        'stroke-dasharray': '4 4',
-        'stroke-opacity': '0.45'
+        class: 'career-river__now-line',
+        'data-part': 'now-line'
       })
     );
     const nowText = svgEl('text', {
       x: state!.orientation === 'horizontal' ? nowU * lengthPx + 6 : 32,
       y: state!.orientation === 'horizontal' ? 34 : (1 - nowU) * lengthPx - 8,
-      fill: 'var(--ink)',
-      'font-size': 11,
-      'font-family': 'inherit',
-      'font-weight': 600,
+      class: 'career-river__now-label',
       'data-part': 'now-label'
     });
     const nowTerm =
@@ -453,53 +623,6 @@ export function mountCareerRiver(
       })();
     nowText.textContent = `Now · ${nowTerm}`;
     svg.appendChild(nowText);
-
-    // Year / axis row — same job as Tasks timeline term/week axis labels.
-    for (const year of axisYearTicks(state!.zoom)) {
-      const u = timeToUnit(year, state!.zoom, nowYear);
-      if (u < -0.02 || u > 1.02) continue;
-      if (isHorizontal) {
-        const x = u * lengthPx;
-        svg.appendChild(
-          svgEl('line', {
-            x1: x,
-            y1: height - 26,
-            x2: x,
-            y2: height - 22,
-            stroke: 'var(--line)',
-            'stroke-width': 1,
-            'data-part': 'axis-tick'
-          })
-        );
-        const label = svgEl('text', {
-          x,
-          y: height - 8,
-          fill: 'var(--muted)',
-          'font-size': 11,
-          'font-family': 'inherit',
-          'font-variant-numeric': 'tabular-nums',
-          'text-anchor': 'middle',
-          'data-part': 'axis-year',
-          class: 'career-river__axis-year'
-        });
-        label.textContent = String(year);
-        svg.appendChild(label);
-      } else {
-        const y = (1 - u) * lengthPx;
-        const label = svgEl('text', {
-          x: 6,
-          y: y + 4,
-          fill: 'var(--muted)',
-          'font-size': 10,
-          'font-family': 'inherit',
-          'font-variant-numeric': 'tabular-nums',
-          'data-part': 'axis-year',
-          class: 'career-river__axis-year'
-        });
-        label.textContent = String(year);
-        svg.appendChild(label);
-      }
-    }
 
     // Branch paths + labels
     const labelBoxes: Array<{ x: number; y: number; w: number; h: number; el: SVGElement }> = [];
