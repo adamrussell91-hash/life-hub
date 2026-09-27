@@ -36,13 +36,13 @@ import { renderPeoplePage } from '@/views/people';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
-import { renderCommunicationNewView } from '@/views/communications';
+import { renderCommunicationNewView, renderCommunicationsView } from '@/views/communications';
 import { renderCommPage } from '@/views/comm-page';
 import { renderThreadPage } from '@/views/thread-page';
 import { renderPdGroupPage } from '@/views/pd-group-page';
-import { renderMeetingNewView } from '@/views/meetings';
+import { renderMeetingNewView, renderMeetingsView } from '@/views/meetings';
 import { renderMeetingPage } from '@/views/meeting-page';
-import { renderEventNewView } from '@/views/events';
+import { renderEventNewView, renderEventsView } from '@/views/events';
 import { renderEventPage } from '@/views/event-page';
 import {
   renderApplicationDetailView,
@@ -163,6 +163,27 @@ async function bootApp(root: HTMLElement): Promise<void> {
     if (route.name === 'relationships') {
       renderPageHeader(shell, viewChrome('relationships'));
       renderRelationshipsView(shell.canvas);
+      return;
+    }
+    if (route.name === 'communications') {
+      renderPageHeader(shell, { eyebrow: '', title: '' });
+      await renderCommunicationsView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'meetings') {
+      renderPageHeader(shell, { eyebrow: '', title: '' });
+      await renderMeetingsView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'events') {
+      renderPageHeader(shell, { eyebrow: '', title: '' });
+      await renderEventsView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'communication-new') {
