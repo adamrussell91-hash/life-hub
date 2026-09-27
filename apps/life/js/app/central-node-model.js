@@ -75,6 +75,52 @@ function statusProseForDisplay(markdown, events, date) {
   return live;
 }
 
+const PATCH_PROPOSERS = {
+  'hammond-sweep': "Hammond's daily sweep"
+};
+
+function patchProposer(slug) {
+  if (PATCH_PROPOSERS[slug]) return PATCH_PROPOSERS[slug];
+  const name = String(slug ?? '').trim();
+  return name ? `${name.charAt(0).toUpperCase()}${name.slice(1)}` : 'An agent';
+}
+
+const PATCH_SECTION_LABELS = {
+  about_me: 'About Me',
+  constraints: 'Constraints & Priorities',
+  todays_status: "Today's Status",
+  this_week: 'This Week',
+  this_month: 'This Month',
+  long_term_trends: 'Long-Term Trends',
+  cross_agent: 'Cross-Agent Coordination',
+  recent_actions: 'Recent Agent Actions',
+  purpose: 'Purpose',
+  writing_rules: 'Writing Rules',
+  agent_directory: 'Agent Directory'
+};
+
+/** Queued Confirm-class Central Node patches, newest first, as Needs-you cards. */
+export function buildPendingPatchCards(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter(entry => typeof entry?.patch?.payload?.summary === 'string' && entry.patch.payload.summary.trim())
+    .map(entry => {
+      const payload = entry.patch.payload;
+      return {
+        id: entry.id,
+        summary: payload.summary.trim(),
+        proposer: patchProposer(entry.slug),
+        section: PATCH_SECTION_LABELS[entry.patch.section] ?? String(entry.patch.section ?? ''),
+        op: String(entry.patch.op ?? ''),
+        createdAt: entry.createdAt,
+        evidence: typeof entry.evidence === 'string' ? entry.evidence.trim() : '',
+        text: typeof payload.text === 'string' ? payload.text : '',
+        match: typeof payload.match === 'string' ? payload.match : ''
+      };
+    })
+    .reverse();
+}
+
 export function buildCentralNodeModel({
   events,
   targetsConfig,
@@ -84,7 +130,8 @@ export function buildCentralNodeModel({
   inverseLinks,
   urlWatches,
   hubSignals,
-  hiddenLoopIds
+  hiddenLoopIds,
+  pendingCnPatches
 }) {
   if (!date) throw new RangeError('Central Node display date is unavailable');
   const markdown = sanitizeCentralNode(centralNodeMarkdown ?? '', date);
@@ -169,6 +216,7 @@ export function buildCentralNodeModel({
     ],
     openLoops: boardLoops.loops,
     needsYou: boardLoops.needsYou,
+    pendingPatches: buildPendingPatchCards(pendingCnPatches),
     completeness,
     liveStatus: {
       completeness,

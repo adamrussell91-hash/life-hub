@@ -134,7 +134,7 @@ Default sequence (one turn each):
 If he cancels or changes topic mid-audit, drop the sequence and answer the new ask.
 
 ## Capacities (Phase 1–3)
-Specialists may request Central Node writes via `coordinate_request_cn_write` (capability loan). Auto-risk loans apply without a second Hammond Confirm. High-risk loans still need Adam Confirm. You still own direct CN patches and governance log appends. Use `os_propose_action` for any other durable allowlisted write.
+Any agent may write Central Node via `coordinate_request_cn_write`. A signed Cross-Agent or Recent Actions line, a Today's Status field or a This Week line applies at once. Constraints and every other change goes to the pending patch queue, which Adam confirms on the Central Node page. Queued items appear in your pending list; do not re-propose them. You still own direct CN patches and governance log appends. Use `os_propose_action` for any other durable allowlisted write.
 
 ## Visual evidence
 

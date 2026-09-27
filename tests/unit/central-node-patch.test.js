@@ -4,7 +4,9 @@ import {
   classifyCentralNodePatchRisk,
   applyCentralNodePatch,
   centralNodePatchContentError,
-  CENTRAL_NODE_SECTIONS
+  CENTRAL_NODE_SECTIONS,
+  readCentralNodeSectionBody,
+  isQueuedPatchStale
 } from '../../apps/life/js/core/central-node-patch.js';
 
 const FIXTURE = `# Purpose
@@ -340,4 +342,24 @@ test('apply replace_section preserves section-closing ---', () => {
     next,
     /## 🤝 Cross-Agent Coordination\n- Only this\n---\n## 📝 Recent Agent Actions/
   );
+});
+
+test('readCentralNodeSectionBody returns one section without its heading or trailing rule', () => {
+  const body = readCentralNodeSectionBody(FIXTURE, 'constraints');
+  assert.ok(typeof body === 'string' && body.length > 0);
+  assert.doesNotMatch(body, /^## /m);
+  assert.equal(readCentralNodeSectionBody(FIXTURE, 'not_a_section'), null);
+});
+
+test('isQueuedPatchStale compares a queued rewrite with the live section, ignoring whitespace', () => {
+  const base = readCentralNodeSectionBody(FIXTURE, 'constraints');
+  const entry = {
+    base_section_text: `  ${base.replace(/\n/g, '\n\n')}  `,
+    patch: { section: 'constraints', op: 'replace_section', payload: { summary: 's', text: 't' } }
+  };
+  assert.equal(isQueuedPatchStale(FIXTURE, entry), false);
+  assert.equal(isQueuedPatchStale(FIXTURE, { ...entry, base_section_text: 'something older' }), true);
+  // Append-style patches and entries without a base are never stale.
+  assert.equal(isQueuedPatchStale(FIXTURE, { ...entry, patch: { ...entry.patch, op: 'append_line' }, base_section_text: 'x' }), false);
+  assert.equal(isQueuedPatchStale(FIXTURE, { patch: entry.patch }), false);
 });
