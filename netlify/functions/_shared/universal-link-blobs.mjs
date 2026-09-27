@@ -1,6 +1,12 @@
 import { isIndexKey, listBlobKeys, mapBounded } from './blobs-list.mjs';
 import { hashEntityRef } from './entity-ref.mjs';
-import { isValidEventId, isValidOrganisationId, isValidPersonId } from './identity-schema.mjs';
+import {
+  isValidEventId,
+  isValidOrganisationId,
+  isValidPersonId,
+  isValidPositionId,
+  isValidUnitId
+} from './identity-schema.mjs';
 import { isValidLinkId, isValidOperationId } from './universal-link-schema.mjs';
 
 // Storage adapter for the shared Universal Links / Person / Organisation
@@ -67,6 +73,8 @@ function assertValidEventId(id) {
 
 export const PERSON_PREFIX = 'entities/person/';
 export const ORGANISATION_PREFIX = 'entities/organisation/';
+export const UNIT_PREFIX = 'entities/unit/';
+export const POSITION_PREFIX = 'entities/position/';
 
 export function personKey(id) {
   return `${PERSON_PREFIX}${assertValidPersonId(id)}`;
@@ -74,6 +82,36 @@ export function personKey(id) {
 
 export function organisationKey(id) {
   return `${ORGANISATION_PREFIX}${assertValidOrganisationId(id)}`;
+}
+
+function assertValidUnitId(id) {
+  if (!isValidUnitId(id)) {
+    throw Object.assign(new Error(`Invalid Unit id: ${JSON.stringify(id)}`), { status: 400, code: 'invalid_unit_id' });
+  }
+  return id;
+}
+
+function assertValidPositionId(id) {
+  if (!isValidPositionId(id)) {
+    throw Object.assign(new Error(`Invalid Position id: ${JSON.stringify(id)}`), {
+      status: 400,
+      code: 'invalid_position_id'
+    });
+  }
+  return id;
+}
+
+export function unitKey(id) {
+  return `${UNIT_PREFIX}${assertValidUnitId(id)}`;
+}
+
+export function positionKey(id) {
+  return `${POSITION_PREFIX}${assertValidPositionId(id)}`;
+}
+
+/** Per-organisation index of structure entity ids (Phase 2). */
+export function orgStructureIndexKey(organisationId) {
+  return `org-structure/index/${assertValidOrganisationId(organisationId)}.json`;
 }
 
 // Lists authoritative Person keys directly — never the derived search

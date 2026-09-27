@@ -876,6 +876,357 @@ export function createMockApi() {
       return json(200, { ok: true, data: { url: null, logo_key: null } });
     }
 
+    // --- Org structure / opportunities / Ann read (Part B) ---
+    const structureByOrg = (globalThis as { __orgStructure?: Map<string, unknown> }).__orgStructure
+      ?? ((globalThis as { __orgStructure?: Map<string, unknown> }).__orgStructure = new Map());
+    const opportunitiesStore = (globalThis as { __opportunities?: Map<string, unknown> }).__opportunities
+      ?? ((globalThis as { __opportunities?: Map<string, unknown> }).__opportunities = new Map());
+    const orgReads = (globalThis as { __orgReads?: Map<string, unknown> }).__orgReads
+      ?? ((globalThis as { __orgReads?: Map<string, unknown> }).__orgReads = new Map());
+
+    if (path === '/api/org-structure' && method === 'GET') {
+      const orgId = url.searchParams.get('organisation_id') || url.searchParams.get('id') || '';
+      const existing = structureByOrg.get(orgId) as {
+        units: unknown[];
+        positions: unknown[];
+        links: unknown[];
+        graph: unknown;
+      } | undefined;
+      const organisation_ref = orgId ? `shared:organisation:${orgId}` : null;
+      return json(200, {
+        ok: true,
+        data: existing ?? {
+          organisation_ref,
+          units: [],
+          positions: [],
+          links: [],
+          graph: {
+            organisation_ref,
+            nodes: [],
+            edges: [],
+            members_by_unit: {},
+            memberships_by_person: {},
+            member_person_ids: [],
+            member_count: 0,
+            cycles: []
+          }
+        }
+      });
+    }
+
+    if (path === '/api/org-structure' && method === 'POST') {
+      const action = url.searchParams.get('action') || (body as { action?: string })?.action || 'create_unit';
+      const orgRef =
+        typeof (body as { organisation_ref?: string })?.organisation_ref === 'string'
+          ? (body as { organisation_ref: string }).organisation_ref
+          : '';
+      const orgId = orgRef.replace(/^shared:organisation:/, '');
+      const current = (structureByOrg.get(orgId) as {
+        organisation_ref: string;
+        units: Array<Record<string, unknown>>;
+        positions: Array<Record<string, unknown>>;
+        links: Array<Record<string, unknown>>;
+        graph: Record<string, unknown>;
+      }) || {
+        organisation_ref: orgRef,
+        units: [],
+        positions: [],
+        links: [],
+        graph: {
+          organisation_ref: orgRef,
+          nodes: [],
+          edges: [],
+          members_by_unit: {},
+          memberships_by_person: {},
+          member_person_ids: [],
+          member_count: 0,
+          cycles: []
+        }
+      };
+
+      if (action === 'create_unit') {
+        const id = `unit_${randomUUID()}`;
+        const unit = {
+          schema_version: 1,
+          id,
+          kind: 'unit',
+          name: String((body as { name?: string }).name || '').trim(),
+          organisation_ref: orgRef,
+          unit_kind: (body as { unit_kind?: string }).unit_kind || 'other',
+          order: Number((body as { order?: number }).order) || current.units.length,
+          lifecycle_status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        current.units.push(unit);
+        (current.graph.nodes as unknown[]).push({
+          id: `shared:unit:${id}`,
+          kind: 'unit',
+          ref: `shared:unit:${id}`,
+          name: unit.name,
+          unit_kind: unit.unit_kind,
+          order: unit.order,
+          organisation_ref: orgRef
+        });
+        structureByOrg.set(orgId, current);
+        return json(201, { ok: true, data: { unit } });
+      }
+      if (action === 'create_position') {
+        const id = `position_${randomUUID()}`;
+        const position = {
+          schema_version: 1,
+          id,
+          kind: 'position',
+          title: String((body as { title?: string }).title || '').trim(),
+          organisation_ref: orgRef,
+          unit_ref: (body as { unit_ref?: string | null }).unit_ref ?? null,
+          is_head: Boolean((body as { is_head?: boolean }).is_head),
+          lifecycle_status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        current.positions.push(position);
+        (current.graph.nodes as unknown[]).push({
+          id: `shared:position:${id}`,
+          kind: 'position',
+          ref: `shared:position:${id}`,
+          title: position.title,
+          unit_ref: position.unit_ref,
+          is_head: position.is_head,
+          organisation_ref: orgRef,
+          holder: null
+        });
+        structureByOrg.set(orgId, current);
+        return json(201, { ok: true, data: { position } });
+      }
+      if (action === 'create_link') {
+        const link = {
+          id: `ul_mock_${randomUUID().slice(0, 8)}`,
+          relationship_type: (body as { relationship_type?: string }).relationship_type,
+          source_ref: (body as { source_ref?: string }).source_ref,
+          target_ref: (body as { target_ref?: string }).target_ref,
+          role: (body as { role?: string | null }).role ?? null,
+          status: 'active',
+          valid_from: (body as { valid_from?: string | null }).valid_from ?? null,
+          valid_to: null,
+          metadata: (body as { metadata?: Record<string, unknown> }).metadata ?? {},
+          context_ref: orgRef
+        };
+        current.links.push(link);
+        if (link.relationship_type === 'member_of_unit' && link.source_ref && link.target_ref) {
+          const members = (current.graph.members_by_unit as Record<string, unknown[]>) || {};
+          const list = (members[link.target_ref] as unknown[]) || [];
+          list.push({ person_ref: link.source_ref, role: link.role, link_id: link.id });
+          members[link.target_ref] = list;
+          current.graph.members_by_unit = members;
+          const byPerson = (current.graph.memberships_by_person as Record<string, unknown[]>) || {};
+          const plist = (byPerson[link.source_ref] as unknown[]) || [];
+          plist.push({ unit_ref: link.target_ref, role: link.role, link_id: link.id });
+          byPerson[link.source_ref] = plist;
+          current.graph.memberships_by_person = byPerson;
+          const personId = String(link.source_ref).replace(/^shared:person:/, '');
+          const ids = new Set((current.graph.member_person_ids as string[]) || []);
+          ids.add(personId);
+          current.graph.member_person_ids = [...ids];
+          current.graph.member_count = ids.size;
+          // Derived reports_to to unit head if present
+          const head = current.positions.find(
+            (p) => p.is_head && p.unit_ref === link.target_ref
+          );
+          if (head) {
+            (current.graph.edges as unknown[]).push({
+              id: `derived:member:${link.id}:shared:position:${head.id}`,
+              source: link.source_ref,
+              target: `shared:position:${head.id}`,
+              kind: 'reports_to',
+              flag: 'derived',
+              via: link.target_ref
+            });
+          }
+        }
+        structureByOrg.set(orgId, current);
+        return json(201, { ok: true, data: { link, created: true } });
+      }
+      return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
+    }
+
+    if (path === '/api/opportunities' && method === 'GET') {
+      const orgRef = url.searchParams.get('organisation_ref');
+      let list = [...opportunitiesStore.values()] as Array<Record<string, unknown>>;
+      if (orgRef) list = list.filter((o) => o.organisation_ref === orgRef);
+      return json(200, { ok: true, data: { opportunities: list } });
+    }
+
+    if (path === '/api/opportunities' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      if (action === 'add_to_applications' || action === 'add_to_events') {
+        const id = url.searchParams.get('id') || '';
+        const existing = opportunitiesStore.get(id) as Record<string, unknown> | undefined;
+        if (!existing) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Opportunity not found.' } });
+        }
+        existing.status = action === 'add_to_applications' ? 'applied' : 'interested';
+        existing.updated_at = new Date().toISOString();
+        opportunitiesStore.set(id, existing);
+        if (action === 'add_to_applications') {
+          return json(200, {
+            ok: true,
+            data: {
+              opportunity: existing,
+              application_intent: { position_title: existing.title },
+              application: { id: `application_${randomUUID()}`, title: existing.title },
+              created: true
+            }
+          });
+        }
+        return json(200, {
+          ok: true,
+          data: {
+            opportunity: existing,
+            event: { id: `event_${randomUUID()}`, title: existing.title },
+            created: true
+          }
+        });
+      }
+      const id = `opportunity_${randomUUID()}`;
+      const now = new Date().toISOString();
+      const record = {
+        id,
+        organisation_ref: (body as { organisation_ref?: string }).organisation_ref,
+        kind: (body as { kind?: string }).kind || 'other',
+        title: String((body as { title?: string }).title || '').trim(),
+        summary: (body as { summary?: string | null }).summary ?? null,
+        closes_on: (body as { closes_on?: string | null }).closes_on ?? null,
+        closes_precision: (body as { closes_precision?: string }).closes_precision || 'none',
+        url: (body as { url?: string | null }).url ?? null,
+        sources: [],
+        found_by: (body as { found_by?: string }).found_by || 'adam',
+        status: 'open',
+        created_at: now,
+        updated_at: now
+      };
+      opportunitiesStore.set(id, record);
+      return json(201, { ok: true, data: { opportunity: record, created: true } });
+    }
+
+    if (path === '/api/org-bridges' && method === 'POST') {
+      const orgA = (body as { orgA?: { people?: Array<{ id: string; display_name?: string; warmth_band?: string }> } })
+        ?.orgA;
+      const orgB = (body as { orgB?: { people?: Array<{ id: string; display_name?: string; warmth_band?: string }> } })
+        ?.orgB;
+      const rels =
+        (
+          body as {
+            professionalRelationships?: Array<{ source_id: string; target_id: string }>;
+          }
+        ).professionalRelationships || [];
+      const warmth =
+        (body as { warmthByPerson?: Record<string, string> }).warmthByPerson || {};
+      const names =
+        (body as { displayNames?: Record<string, string> }).displayNames || {};
+      const bridges: Array<Record<string, unknown>> = [];
+      let hidden = 0;
+      let n = 1;
+      for (const rel of rels) {
+        const nearBand = warmth[rel.source_id] || 'cold';
+        const farBand = warmth[rel.target_id] || 'cold';
+        if (nearBand === 'warm' && (farBand === 'cold' || !farBand)) {
+          bridges.push({
+            kind: 'know_each_other',
+            person_a_id: rel.source_id,
+            person_b_id: rel.target_id,
+            number: n++,
+            rule: 1,
+            reason: `${names[rel.source_id] || 'Someone'} is your warmest way into ${
+              (orgB as { name?: string } | undefined)?.name || 'the other organisation'
+            }, toward ${names[rel.target_id] || 'someone'}.`
+          });
+        } else {
+          hidden += 1;
+        }
+      }
+      // moved: same id in both orgs
+      const aIds = new Set((orgA?.people || []).map((p) => p.id));
+      for (const p of orgB?.people || []) {
+        if (!aIds.has(p.id)) continue;
+        if ((warmth[p.id] || 'cold') === 'cold') {
+          bridges.push({
+            kind: 'moved',
+            person_a_id: p.id,
+            person_b_id: p.id,
+            number: n++,
+            rule: 3,
+            reason: `Your move links cold former colleagues around an upcoming event.`
+          });
+        } else {
+          hidden += 1;
+        }
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          bridges,
+          hidden_count: hidden,
+          hidden_label: hidden ? `${hidden} more hidden` : null
+        }
+      });
+    }
+
+    if (path === '/api/opportunities' && method === 'PATCH') {
+      const id = url.searchParams.get('id') || '';
+      const existing = opportunitiesStore.get(id) as Record<string, unknown> | undefined;
+      if (!existing) {
+        return json(404, { ok: false, error: { code: 'not_found', message: 'Opportunity not found.' } });
+      }
+      const action = url.searchParams.get('action');
+      if (action === 'dismiss') existing.status = 'dismissed';
+      Object.assign(existing, body || {});
+      existing.updated_at = new Date().toISOString();
+      opportunitiesStore.set(id, existing);
+      return json(200, { ok: true, data: { opportunity: existing } });
+    }
+
+    if (path === '/api/organisation-read' && method === 'GET') {
+      const orgRef = url.searchParams.get('organisation_ref') || '';
+      const read = orgReads.get(orgRef) || {
+        organisation_ref: orgRef,
+        summary: '',
+        threads: [],
+        generated_at: null,
+        updated_at: null,
+        status: 'empty',
+        error: null
+      };
+      return json(200, { ok: true, data: { read } });
+    }
+
+    if (path === '/api/organisation-read' && method === 'POST') {
+      const orgRef = (body as { organisation_ref?: string })?.organisation_ref || '';
+      const now = new Date().toISOString();
+      const read = {
+        organisation_ref: orgRef,
+        summary:
+          'A working map of how this organisation runs for you, based on the structure and links on file.',
+        threads: [
+          {
+            key: 'your_lines',
+            text: 'Your memberships set the lines Ann tracks.',
+            sources: [],
+            author: 'ann'
+          }
+        ],
+        generated_at: now,
+        updated_at: now,
+        status: 'ready',
+        error: null
+      };
+      orgReads.set(orgRef, read);
+      return json(200, {
+        ok: true,
+        data: { read, created: true, request_preview: { has_structure: true, membership_count: 0 } }
+      });
+    }
+
     if (path === '/api/entities' && method === 'PATCH') {
       const ref = url.searchParams.get('ref');
       const action = url.searchParams.get('action') ?? 'update';

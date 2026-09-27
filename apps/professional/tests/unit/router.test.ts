@@ -22,6 +22,7 @@ describe('parseRoute', () => {
     expect(parseRoute('#/home')).toEqual({ name: 'home' });
     expect(parseRoute('#/people')).toEqual({ name: 'people', id: null });
     expect(parseRoute('#/organisations')).toEqual({ name: 'organisations' });
+    expect(parseRoute('#/organisations/compare')).toEqual({ name: 'organisations-compare' });
     expect(parseRoute('#/relationships')).toEqual({ name: 'relationships' });
   });
 
