@@ -1,5 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import { isCalendarDate, daysBetween } from '../../../apps/life/js/core/time.js';
+import {
+  PENDING_CN_PATCHES_PATH,
+  isValidPendingCnPatchEntry,
+  parsePendingCnPatches
+} from '../../../apps/life/js/core/pending-cn-patches.js';
 
 // Confirm-class Central Node patches (Trends/Month rewrites, condense, etc.)
 // previously lived only in one HTTP response's SSE stream + the browser DOM --
@@ -7,7 +12,7 @@ import { isCalendarDate, daysBetween } from '../../../apps/life/js/core/time.js'
 // them a small durable home so a Weekly Review's most important output (the
 // stuff that's actually high-risk, and therefore never auto-applies) survives
 // past one turn. Modelled on skincare-store.mjs's GitHub-blob JSON pattern.
-export const PENDING_CN_PATCHES_PATH = 'data/hammond/pending-cn-patches.json';
+export { PENDING_CN_PATCHES_PATH, parsePendingCnPatches };
 export const MAX_PENDING_CN_PATCHES = 20;
 export const PENDING_CN_PATCH_TTL_DAYS = 30;
 
@@ -15,26 +20,7 @@ export function createPendingCnPatchId() {
   return `cnp_${randomBytes(6).toString('hex')}`;
 }
 
-function isValidEntry(value) {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    && typeof value.id === 'string' && value.id.trim() !== ''
-    && typeof value.createdAt === 'string'
-    && typeof value.slug === 'string' && value.slug.trim() !== ''
-    && value.patch && typeof value.patch === 'object' && !Array.isArray(value.patch);
-}
-
-/** Tolerant parse -- missing/corrupt/malformed content is an empty queue, never a thrown error. */
-export function parsePendingCnPatches(text) {
-  if (typeof text !== 'string' || text.trim() === '') return [];
-  let parsed;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter(isValidEntry);
-}
+const isValidEntry = isValidPendingCnPatchEntry;
 
 export function serializePendingCnPatches(list) {
   return JSON.stringify(Array.isArray(list) ? list : [], null, 2);
@@ -58,6 +44,21 @@ export function findPendingCnPatchById(list, id) {
   const base = Array.isArray(list) ? list : [];
   if (typeof id !== 'string' || id.trim() === '') return null;
   return base.find(entry => entry.id === id) ?? null;
+}
+
+/** Same section, op and payload body -- a re-proposal of an edit already waiting on Adam. */
+export function findDuplicatePendingCnPatch(list, patch) {
+  const base = Array.isArray(list) ? list : [];
+  if (!patch || typeof patch !== 'object') return null;
+  const body = candidate => JSON.stringify([
+    candidate?.section,
+    candidate?.op,
+    candidate?.payload?.field ?? null,
+    candidate?.payload?.text ?? null,
+    candidate?.payload?.match ?? null
+  ]);
+  const key = body(patch);
+  return base.find(entry => body(entry.patch) === key) ?? null;
 }
 
 /** Mechanical age-based purge -- a proposal nobody acted on for a month is noise, not memory. */

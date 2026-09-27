@@ -5004,6 +5004,12 @@ main { max-width: 76rem; margin: 0 auto; }
 }
 .cn-needs { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: var(--space-grid); }
 .cn-needs .confirm-card { margin: 0; }
+.cn-patch-card__evidence { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.cn-patch-card__preview { margin: var(--space-2) 0 0; font-size: var(--text-sm); }
+.cn-patch-card__preview > summary { cursor: pointer; color: var(--marine); font-weight: var(--weight-semibold); }
+.cn-patch-card__text { margin-top: var(--space-2); max-height: 18rem; overflow: auto; overflow-wrap: anywhere; font-size: var(--text-sm); color: var(--depth); }
+.cn-patch-card__status { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--muted); }
+.cn-patch-card__status[hidden] { display: none; }
 .cn-tile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-3); }
 .cn-chart { width: 100%; height: auto; display: block; }
 .cn-chart text { font-family: var(--font-ui); fill: var(--muted); font-size: 9px; }

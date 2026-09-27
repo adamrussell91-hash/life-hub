@@ -626,3 +626,36 @@ exercises: []
   assert.equal(event.record.type, 'workout');
   assert.equal(event.record.status, 'skipped');
 });
+
+test('exposes queued Central Node patches when the pending queue is in the sync batch', async () => {
+  const queue = [{
+    id: 'cnp_abc123',
+    createdAt: '2026-08-01',
+    slug: 'hammond-sweep',
+    patch: { section: 'constraints', op: 'replace_section', payload: { summary: 'Refresh Constraints', text: '- x' } }
+  }, { id: '', note: 'malformed entries are dropped' }];
+  const files = [raw('data/hammond/pending-cn-patches.json', JSON.stringify(queue))];
+  const sync = async ({ validateFile }) => {
+    assert.deepEqual(validateFile(files[0]), { valid: true });
+    return {
+      files, warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+      changed: true, freshness: 'confirmed'
+    };
+  };
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+
+  assert.equal(result.pendingCnPatches.length, 1);
+  assert.equal(result.pendingCnPatches[0].id, 'cnp_abc123');
+});
+
+test('pendingCnPatches defaults to an empty queue when the file is absent', async () => {
+  const sync = async () => ({
+    files: [], warnings: [], commitSha: 'c'.repeat(40), manifestId: 'range',
+    changed: true, freshness: 'confirmed'
+  });
+
+  const result = await loadLiveEvents({ sync, loadYaml: load, date: '2026-08-01', backfill: false });
+
+  assert.deepEqual(result.pendingCnPatches, []);
+});

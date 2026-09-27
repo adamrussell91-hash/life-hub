@@ -544,3 +544,74 @@ test('Answer on a Needs you card opens Hammond chat', () => {
   answer.click();
   assert.equal(opened, 1);
 });
+
+const PENDING_PATCH = {
+  id: 'cnp_abc123',
+  summary: 'Update Constraints after the 24 Sep visit',
+  proposer: "Hammond's daily sweep",
+  section: 'Constraints & Priorities',
+  op: 'replace_section',
+  createdAt: '2026-09-26',
+  evidence: 'Visit on 24 Sep recorded a new result.',
+  text: '### Medical Status\n- New constraint text.',
+  match: ''
+};
+
+test('renderCentralNode shows a queued Central Node patch as a Confirm card with its evidence and new text', () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({ pendingPatches: [PENDING_PATCH] }));
+  const card = root._needs.children[0];
+  assert.equal(card.dataset.patchId, 'cnp_abc123');
+  assert.match(card.textContent, /Hammond's daily sweep proposes/);
+  assert.match(card.textContent, /Update Constraints after the 24 Sep visit/);
+  assert.match(card.textContent, /proposed 26\/09\/26/);
+  assert.match(card.textContent, /Visit on 24 Sep recorded a new result\./);
+  assert.match(card.textContent, /Show the new Constraints & Priorities/);
+  assert.match(card.textContent, /New constraint text\./);
+  assert.ok(card.querySelector('[data-act="cn-patch-confirm"]'));
+  assert.ok(card.querySelector('[data-act="cn-patch-dismiss"]'));
+  assert.doesNotMatch(root._needs.textContent, /Nothing waiting on you/);
+  assert.match(root._supporting.textContent, /1 thing need you/);
+});
+
+test('Confirm on a queued patch card calls onPatchAction with its id and reports the save', async () => {
+  const root = fakeCentralNodeRoot();
+  const calls = [];
+  renderCentralNode(root, baseModel({ pendingPatches: [PENDING_PATCH] }), {
+    onPatchAction: async request => { calls.push(request); }
+  });
+  const card = root._needs.children[0];
+  const confirm = card.querySelector('[data-act="cn-patch-confirm"]');
+  confirm.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, [{ id: 'cnp_abc123', act: 'confirm' }]);
+  const status = card.querySelector('[data-cn="patch-status"]');
+  assert.equal(status.hidden, false);
+  assert.equal(status.textContent, 'Saved to Central Node.');
+});
+
+test('a stale queued patch shows the server reason and re-enables the buttons', async () => {
+  const root = fakeCentralNodeRoot();
+  renderCentralNode(root, baseModel({ pendingPatches: [PENDING_PATCH] }), {
+    onPatchAction: async () => {
+      throw Object.assign(new Error('That part of Central Node changed after this was proposed.'), { code: 'patch_stale' });
+    }
+  });
+  const card = root._needs.children[0];
+  const confirm = card.querySelector('[data-act="cn-patch-confirm"]');
+  confirm.click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(confirm.disabled, false);
+  assert.match(card.querySelector('[data-cn="patch-status"]').textContent, /changed after this was proposed/);
+});
+
+test('Discard on a queued patch card asks to dismiss it', async () => {
+  const root = fakeCentralNodeRoot();
+  const calls = [];
+  renderCentralNode(root, baseModel({ pendingPatches: [PENDING_PATCH] }), {
+    onPatchAction: async request => { calls.push(request); }
+  });
+  root._needs.children[0].querySelector('[data-act="cn-patch-dismiss"]').click();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(calls, [{ id: 'cnp_abc123', act: 'dismiss' }]);
+});

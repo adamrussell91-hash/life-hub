@@ -2020,3 +2020,77 @@ test('body confirm accepts every supported tape field in one record', async () =
   assert.equal(response.status, 200);
   assert.equal(payload.data.path, 'data/body/2026/08/2026-08-01-measurements-0743.md');
 });
+
+function queuedRewriteFetch({ baseSectionText, calls }) {
+  const cnSha = 'f'.repeat(40);
+  const queueSha = 'e'.repeat(40);
+  const queue = [{
+    id: 'cnp_rewrite',
+    createdAt: '2026-09-26',
+    slug: 'hammond-sweep',
+    evidence: 'Visit on 24 Sep.',
+    base_section_text: baseSectionText,
+    patch: {
+      section: 'constraints',
+      op: 'replace_section',
+      payload: { summary: 'Rewrite Constraints', text: '- Taper finished\n- Keep surplus' }
+    }
+  }];
+  return async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) {
+      return Response.json({
+        tree: [
+          { path: 'central-node.md', type: 'blob', sha: cnSha },
+          { path: PENDING_QUEUE_PATH, type: 'blob', sha: queueSha }
+        ]
+      });
+    }
+    if (url.includes(`/git/blobs/${cnSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(CN_FIXTURE, 'utf8').toString('base64') });
+    }
+    if (url.includes(`/git/blobs/${queueSha}`)) {
+      return Response.json({ encoding: 'base64', content: Buffer.from(JSON.stringify(queue), 'utf8').toString('base64') });
+    }
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not used' }, { status: 404 });
+  };
+}
+
+test('cn_patch confirm refuses a queued section rewrite once that section has changed since it was proposed', async () => {
+  const calls = [];
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl: queuedRewriteFetch({ baseSectionText: '- Steroid taper active', calls }),
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch', slug: 'hammond', id: 'cnp_rewrite' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.equal(payload.error.code, 'patch_stale');
+  assert.equal(calls.some(call => call.options?.method === 'PUT'), false);
+});
+
+test('cn_patch confirm applies a queued section rewrite when the section still matches its base text', async () => {
+  const calls = [];
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl: queuedRewriteFetch({ baseSectionText: '- Steroid taper active\n- Keep surplus', calls }),
+    now: () => Date.parse('2026-08-01T06:00:00Z')
+  });
+
+  const response = await handler(request({ kind: 'cn_patch', slug: 'hammond', id: 'cnp_rewrite' }));
+
+  assert.equal(response.status, 200);
+  const cnPut = calls.find(call => call.options?.method === 'PUT' && call.url.includes('central-node.md'));
+  const written = Buffer.from(JSON.parse(cnPut.options.body).content, 'base64').toString('utf8');
+  assert.match(written, /Taper finished/);
+  assert.doesNotMatch(written, /Steroid taper active/);
+});

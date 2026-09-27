@@ -88,7 +88,7 @@ function renderMarkdown(root, selector, prose, emptyText) {
 
 function renderSupporting(root, model) {
   const deposits = model.deposits?.length ?? 0;
-  const needs = model.needsYou?.length ?? 0;
+  const needs = (model.needsYou?.length ?? 0) + (model.pendingPatches?.length ?? 0);
   const loops = model.openLoops?.length ?? 0;
   const bits = [];
   if (deposits) bits.push(`${deposits} deposit${deposits === 1 ? '' : 's'} since the last sweep`);
@@ -97,12 +97,82 @@ function renderSupporting(root, model) {
   setText(root.querySelector('[data-central-node="supporting"]'), bits.join('. ') || 'No new deposits since the last run.');
 }
 
+function patchPreviewText(patch) {
+  if (patch.op === 'delete_lines') return patch.match ? `Removes lines containing: ${patch.match}` : '';
+  return patch.text;
+}
+
+function renderPendingPatch(root, host, patch) {
+  const card = root.createElement('section');
+  card.className = 'confirm-card cn-patch-card';
+  card.setAttribute('role', 'region');
+  card.setAttribute('aria-label', 'Confirm Central Node change');
+  card.dataset.patchId = patch.id;
+  const eyebrow = root.createElement('p');
+  eyebrow.className = 'page-header__eyebrow';
+  eyebrow.textContent = `${patch.proposer} proposes`;
+  const title = root.createElement('h2');
+  title.className = 'page-header__title';
+  title.style.fontSize = 'var(--text-lg)';
+  title.textContent = patch.summary;
+  const support = root.createElement('p');
+  support.className = 'page-header__supporting';
+  const when = isCalendarDate(patch.createdAt) ? ` · proposed ${formatDisplayDate(patch.createdAt)}` : '';
+  support.textContent = `${patch.section}${when}. Nothing changes until you Confirm.`;
+  card.append(eyebrow, title, support);
+  if (patch.evidence) {
+    const evidence = root.createElement('p');
+    evidence.className = 'cn-patch-card__evidence';
+    evidence.textContent = patch.evidence;
+    card.append(evidence);
+  }
+  const preview = patchPreviewText(patch);
+  if (preview) {
+    const details = root.createElement('details');
+    details.className = 'cn-patch-card__preview';
+    const summary = root.createElement('summary');
+    summary.textContent = patch.op === 'replace_section' || patch.op === 'condense'
+      ? `Show the new ${patch.section}`
+      : 'Show the change';
+    const text = root.createElement('div');
+    text.className = 'cn-patch-card__text';
+    if (patch.op === 'delete_lines') text.textContent = preview;
+    else renderInlineMarkdown(root, text, preview, { multiline: true });
+    details.append(summary, text);
+    card.append(details);
+  }
+  const status = root.createElement('p');
+  status.className = 'cn-patch-card__status';
+  status.dataset.cn = 'patch-status';
+  status.setAttribute('aria-live', 'polite');
+  status.hidden = true;
+  const actions = root.createElement('div');
+  actions.className = 'confirm-card__actions';
+  const discard = root.createElement('button');
+  discard.className = 'btn btn--ghost';
+  discard.type = 'button';
+  discard.textContent = 'Discard';
+  discard.dataset.act = 'cn-patch-dismiss';
+  discard.dataset.patchId = patch.id;
+  const confirm = root.createElement('button');
+  confirm.className = 'btn btn--primary';
+  confirm.type = 'button';
+  confirm.textContent = 'Confirm';
+  confirm.dataset.act = 'cn-patch-confirm';
+  confirm.dataset.patchId = patch.id;
+  actions.append(discard, confirm);
+  card.append(status, actions);
+  host.append(card);
+}
+
 function renderNeedsYou(root, model) {
   const host = root.querySelector('#cn-needs');
   if (!host) return;
   host.replaceChildren();
+  const patches = model.pendingPatches ?? [];
+  for (const patch of patches) renderPendingPatch(root, host, patch);
   const items = model.needsYou ?? [];
-  if (!items.length) {
+  if (!items.length && !patches.length) {
     const empty = root.createElement('p');
     empty.className = 'metric-caption';
     empty.textContent = 'Nothing waiting on you.';
@@ -595,7 +665,33 @@ function renderAgents(root, model) {
   });
 }
 
-function bindBoard(root, { storage, onLoopsChange } = {}) {
+const PATCH_ACT_COPY = {
+  'cn-patch-confirm': { busy: 'Saving…', failed: 'Saving that change failed. Try again.' },
+  'cn-patch-dismiss': { busy: 'Discarding…', failed: 'Discarding failed. Try again.' }
+};
+
+async function runPatchAction(button, onPatchAction) {
+  const act = button.dataset.act;
+  const card = button.closest?.('.cn-patch-card');
+  const status = card?.querySelector('[data-cn="patch-status"]');
+  const buttons = [...(card?.querySelectorAll?.('button') ?? [button])];
+  const copy = PATCH_ACT_COPY[act];
+  for (const each of buttons) each.disabled = true;
+  if (status) {
+    status.hidden = false;
+    status.textContent = copy.busy;
+  }
+  try {
+    if (typeof onPatchAction !== 'function') throw new Error('unavailable');
+    await onPatchAction({ id: button.dataset.patchId, act: act === 'cn-patch-confirm' ? 'confirm' : 'dismiss' });
+    if (status) status.textContent = act === 'cn-patch-confirm' ? 'Saved to Central Node.' : 'Discarded.';
+  } catch (error) {
+    for (const each of buttons) each.disabled = false;
+    if (status) status.textContent = error?.code === 'patch_stale' && error.message ? error.message : copy.failed;
+  }
+}
+
+function bindBoard(root, { storage, onLoopsChange, onPatchAction } = {}) {
   const host = root.querySelector('#central-node-dashboard') ?? root;
   if (!host?.addEventListener || host.dataset?.cnBoardBound === '1') return;
   if (host.dataset) host.dataset.cnBoardBound = '1';
@@ -605,6 +701,11 @@ function bindBoard(root, { storage, onLoopsChange } = {}) {
       const tile = about.closest('article');
       const read = tile?.querySelector('.cn-readout');
       if (read) read.textContent = 'Hammond framed this from About Me (work, relationships, life events, goals). The file itself stays collapsed.';
+      return;
+    }
+    const patchButton = event.target.closest?.('[data-act]');
+    if (patchButton && PATCH_ACT_COPY[patchButton.dataset.act]) {
+      void runPatchAction(patchButton, onPatchAction);
       return;
     }
     const answer = event.target.closest?.('[data-act="answer"]');
@@ -643,7 +744,8 @@ export function renderCentralNode(root, model, options = {}) {
   renderMarkdown(root, '[data-central-node="about-me"]', model.sections?.aboutMe, 'No About Me notes yet.');
   bindBoard(root, {
     storage: options.storage ?? globalThis.localStorage,
-    onLoopsChange: options.onLoopsChange
+    onLoopsChange: options.onLoopsChange,
+    onPatchAction: options.onPatchAction
   });
   root.querySelector('#central-node-dashboard')?.removeAttribute('hidden');
 }
