@@ -26,6 +26,7 @@ export type Route =
   | { name: 'home' }
   | { name: 'calendar'; zoom: string; redirectedFrom?: string }
   | { name: 'people'; id: string | null }
+  | { name: 'people-ties' }
   | { name: 'person'; id: string }
   | { name: 'person-brief'; id: string }
   | { name: 'organisations' }
@@ -74,6 +75,9 @@ export function parseRoute(hash: string = location.hash): Route {
     return { name: 'calendar', zoom };
   }
   if (segments.length === 1 && segments[0] === 'people') return { name: 'people', id: null };
+  if (segments.length === 2 && segments[0] === 'people' && segments[1] === 'ties') {
+    return { name: 'people-ties' };
+  }
   if (segments.length === 2 && segments[0] === 'people') {
     const id = safeDecode(segments[1]!);
     if (id && isValidPersonId(id)) return { name: 'people', id };
@@ -222,7 +226,7 @@ export function railHighlightFor(route: Route): RailViewId | null {
   if (route.name === 'events' || route.name === 'event' || route.name === 'event-new') {
     return 'events';
   }
-  if (route.name === 'people' || route.name === 'person' || route.name === 'person-brief') return 'people';
+  if (route.name === 'people' || route.name === 'people-ties' || route.name === 'person' || route.name === 'person-brief') return 'people';
   if (route.name === 'organisations' || route.name === 'organisation') return 'organisations';
   if (route.name === 'relationships') return 'relationships';
   if (
@@ -254,6 +258,11 @@ export function personBriefRoute(id: string): string {
 export function peopleRoute(id: string | null = null, query = ''): string {
   const base = id ? `#/people/${encodeURIComponent(id)}` : '#/people';
   return `${base}${query}`;
+}
+
+/** Ties to confirm — bulk review for proposer `ties`. */
+export function peopleTiesRoute(): string {
+  return '#/people/ties';
 }
 
 export function organisationRoute(id: string, query = ''): string {

@@ -13,6 +13,9 @@ import {
   PROJECT_PREFIX,
   TASK_PREFIX
 } from './tasks-blobs.mjs';
+import { getRelationshipDeclaration } from './relationship-registry.mjs';
+import { recordDeclinedPair } from './tie-inference/state.mjs';
+import { pairKey } from './tie-inference/candidates.mjs';
 
 function selfRefOf(self) {
   if (!self) return null;
@@ -120,8 +123,6 @@ export async function acceptLinkProposal(proposalId, deps = {}) {
   const env = deps.env ?? process.env;
   const professionalStore =
     deps.professionalStore ?? (await (deps.getProfessionalStore ?? defaultGetProfessionalStore)(env));
-  const universalStore =
-    deps.universalStore ?? (await (deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore)(env));
 
   const proposalRepo =
     deps.proposalRepo ??
@@ -130,7 +131,7 @@ export async function acceptLinkProposal(proposalId, deps = {}) {
       now: deps.now
     });
 
-  const proposal = await proposalRepo.getById(proposalId);
+  let proposal = await proposalRepo.getById(proposalId);
   if (proposal.status !== 'pending') {
     throw Object.assign(new Error(`Proposal is already ${proposal.status}.`), {
       status: 400,
@@ -138,10 +139,28 @@ export async function acceptLinkProposal(proposalId, deps = {}) {
     });
   }
 
+  // Optional role override (Ties to confirm review)
+  const roleOverride = deps.role ?? null;
+  if (roleOverride !== null && roleOverride !== undefined) {
+    const decl = getRelationshipDeclaration(proposal.proposed_link.relationship_type);
+    const allowed = decl?.allowed_roles ?? null;
+    if (Array.isArray(allowed) && !allowed.includes(roleOverride)) {
+      throw Object.assign(new Error(`Role ${roleOverride} is not allowed for this relationship.`), {
+        status: 400,
+        code: 'invalid_role'
+      });
+    }
+    proposal = await proposalRepo.updatePendingProposal(proposalId, {
+      proposed_link: { ...proposal.proposed_link, role: roleOverride }
+    });
+  }
+
   const linkRepo =
     deps.linkRepo ??
     createUniversalLinkRepository({
-      store: universalStore,
+      store:
+        deps.universalStore ??
+        (await (deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore)(env)),
       now: deps.now,
       resolveEntity: deps.resolveEntity,
       env,
@@ -151,7 +170,14 @@ export async function acceptLinkProposal(proposalId, deps = {}) {
   const accessContext =
     deps.accessContext ?? createAccessContext({ workflow: 'professional', allowedEntityKinds: [] });
 
-  const { link } = await linkRepo.createLink(proposal.proposed_link, accessContext);
+  // Strip inference-only metadata before writing the Universal Link
+  const proposed = { ...proposal.proposed_link };
+  if (proposed.metadata && typeof proposed.metadata === 'object') {
+    const { tie_pair_key: _tk, evidence_count: _ec, pair_names: _pn, ...rest } = proposed.metadata;
+    proposed.metadata = rest;
+  }
+
+  const { link } = await linkRepo.createLink(proposed, accessContext);
   const updated = await proposalRepo.setStatus(proposalId, 'accepted', {
     resolved_link_id: link?.id ?? null
   });
@@ -168,5 +194,22 @@ export async function declineLinkProposal(proposalId, deps = {}) {
       store: professionalStore,
       now: deps.now
     });
-  return proposalRepo.setStatus(proposalId, 'declined');
+  const proposal = await proposalRepo.getById(proposalId);
+  const updated = await proposalRepo.setStatus(proposalId, 'declined');
+
+  if (proposal.proposer === 'ties') {
+    const meta = proposal.proposed_link?.metadata ?? {};
+    const key =
+      typeof meta.tie_pair_key === 'string'
+        ? meta.tie_pair_key
+        : pairKey(proposal.proposed_link.source_ref, proposal.proposed_link.target_ref);
+    const evidenceCount = Number(meta.evidence_count) || 0;
+    const nowIso =
+      typeof deps.now === 'function'
+        ? deps.now()
+        : new Date().toISOString();
+    await recordDeclinedPair(professionalStore, key, evidenceCount, nowIso);
+  }
+
+  return updated;
 }

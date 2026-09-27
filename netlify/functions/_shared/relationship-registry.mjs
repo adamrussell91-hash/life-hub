@@ -151,7 +151,7 @@ const REGISTRY = new Map([
         'academic_contact', 'research_collaborator', 'recruiter',
         'referee', 'conference_contact', 'introduction', 'other'
       ],
-      metadataKeys: ['human_label']
+      metadataKeys: ['human_label', 'tie_pair_key', 'evidence_count', 'pair_names']
     })
   ],
   [

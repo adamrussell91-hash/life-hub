@@ -47,6 +47,11 @@ export function createPeopleLinkProposalsHandler(deps = {}) {
       try {
         if (request.method === 'GET') {
           const personRef = url.searchParams.get('person_ref');
+          const proposer = url.searchParams.get('proposer');
+          if (!personRef && proposer === 'ties') {
+            const proposals = await proposalRepo.listPendingByProposer('ties');
+            return withCors(okResponse(200, { proposals, count: proposals.length }), request, env);
+          }
           if (!personRef) {
             return withCors(
               errorResponse(400, 'missing_person_ref', 'person_ref query param required.', false),
@@ -84,7 +89,8 @@ export function createPeopleLinkProposalsHandler(deps = {}) {
               ...deps,
               env,
               professionalStore,
-              universalStore
+              universalStore,
+              role: typeof body?.role === 'string' ? body.role : null
             });
             return withCors(okResponse(200, result), request, env);
           }

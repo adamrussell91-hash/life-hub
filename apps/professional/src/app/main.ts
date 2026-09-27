@@ -33,6 +33,7 @@ import {
 } from '@/calendar/hub-calendar';
 import type { HubCalendarHandle } from '../../design-kit/js/calendar/mount-hub-calendar.js';
 import { renderPeoplePage } from '@/views/people';
+import { renderTiesToConfirmView } from '@/views/ties-to-confirm';
 import { renderHomeView } from '@/views/home';
 import { renderOrganisationsView } from '@/views/organisations';
 import { renderRelationshipsView } from '@/views/relationships';
@@ -147,6 +148,14 @@ async function bootApp(root: HTMLElement): Promise<void> {
       renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
       await renderPeoplePage(shell.canvas, {
         selectedId: route.id,
+        isCurrent: () => generation === routeGeneration
+      });
+      return;
+    }
+    if (route.name === 'people-ties') {
+      shell.pageHeader.classList.add('page-header--people-redesign');
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
+      await renderTiesToConfirmView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
