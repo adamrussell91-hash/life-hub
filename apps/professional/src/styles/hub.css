@@ -4310,14 +4310,19 @@
 
 .career-page__work {
   min-width: 0;
-}
-
-.career-page__work .career-page__section-head {
-  margin-bottom: var(--space-3);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-1);
+  padding: var(--space-4);
 }
 
 .career-page__work-timeline {
   min-width: 0;
+}
+
+.career-page__work .career-page__section-head {
+  margin-bottom: var(--space-3);
 }
 
 .career-page__work-timeline .relationship-timeline__year:first-child {

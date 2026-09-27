@@ -185,17 +185,14 @@ export type EmploymentSpan = {
 export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
   const indexed = jobs.map((job, index) => {
     const start = yearFraction(job.valid_from);
-    const end = job.valid_to ? yearFraction(job.valid_to) : Number.POSITIVE_INFINITY;
-    return { index, start, end: Number.isFinite(end) ? end : Number.POSITIVE_INFINITY };
+    const rawEnd = job.valid_to ? yearFraction(job.valid_to) : Infinity;
+    return { index, start, end: Number.isFinite(rawEnd) ? rawEnd : Infinity };
   });
   indexed.sort((a, b) => a.start - b.start || a.end - b.end);
   const laneEnds: number[] = [];
   const lanes = new Array<number>(jobs.length).fill(0);
   for (const job of indexed) {
-    if (!Number.isFinite(job.start)) {
-      lanes[job.index] = 0;
-      continue;
-    }
+    if (!Number.isFinite(job.start)) continue;
     let lane = laneEnds.findIndex((end) => end <= job.start + 1e-6);
     if (lane < 0) {
       lane = laneEnds.length;
@@ -210,6 +207,5 @@ export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
 
 /** Extra SVG height for stacked role-band lanes under the trunk (desktop). */
 export function roleBandExtraPx(laneCount: number): number {
-  if (laneCount <= 0) return 0;
-  return 22 + Math.max(0, laneCount - 1) * 16;
+  return laneCount <= 0 ? 0 : 22 + (laneCount - 1) * 16;
 }

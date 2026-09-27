@@ -28,7 +28,6 @@ type RiverState = {
     from0: number;
     to0: number;
     armed: boolean;
-    axis: 'x' | 'y' | null;
   } | null;
   pinch: { dist0: number; from0: number; to0: number } | null;
 };
@@ -301,24 +300,22 @@ export function mountCareerRiver(
     state!.width = width;
     const futures = model.futures;
     const yearsInView = Math.max(1, state!.zoom.to - state!.zoom.from);
-    const employmentJobs = model.employment.filter((job) => Boolean(job.valid_from));
-    const employmentLanes =
-      state!.orientation === 'horizontal' ? assignEmploymentLanes(employmentJobs as never) : [];
-    const laneCount =
-      employmentLanes.length > 0 ? Math.max(...employmentLanes) + 1 : 0;
-    const bandExtra =
-      state!.orientation === 'horizontal' ? roleBandExtraPx(laneCount) : 0;
+    const isHorizontal = state!.orientation === 'horizontal';
+    const employmentJobs = isHorizontal
+      ? model.employment.filter(
+          (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
+        )
+      : [];
+    const employmentLanes = assignEmploymentLanes(employmentJobs);
+    const laneCount = employmentLanes.length ? Math.max(...employmentLanes) + 1 : 0;
+    const bandExtra = roleBandExtraPx(laneCount);
     const height =
       riverHeightPx(state!.orientation, futures.length, yearsInView) + bandExtra;
-    const labelGutter = state!.orientation === 'horizontal' ? 200 : 48;
-    const lengthPx =
-      state!.orientation === 'horizontal'
-        ? Math.max(100, width - labelGutter)
-        : Math.max(100, height - 80);
-    const midPx =
-      state!.orientation === 'horizontal'
-        ? (height - bandExtra) / 2
-        : width / 2;
+    const labelGutter = isHorizontal ? 200 : 48;
+    const lengthPx = isHorizontal
+      ? Math.max(100, width - labelGutter)
+      : Math.max(100, height - 80);
+    const midPx = isHorizontal ? (height - bandExtra) / 2 : width / 2;
     const nowU = timeToUnit(nowYear, state!.zoom, nowYear);
     const focusId = state!.hoverId || state!.selectedId;
 
@@ -355,14 +352,13 @@ export function mountCareerRiver(
     futureLabel.textContent = 'What could';
     svg.appendChild(futureLabel);
 
-    // Role band (desktop horizontal only) — stacked lanes, collision-safe labels.
-    // Readable Work list lives below the river; SVG shows where/when only.
-    if (state!.orientation === 'horizontal') {
+    // Role band (desktop): stacked bars only — Work list below is the reading surface.
+    if (isHorizontal) {
       const bandBaseY = midPx + 20;
       const laneH = 14;
-      const roleLabelBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
-      employmentJobs.forEach((job, index) => {
-        const u0 = timeToUnit(yearFraction(job.valid_from!), state!.zoom, nowYear);
+      for (let index = 0; index < employmentJobs.length; index++) {
+        const job = employmentJobs[index]!;
+        const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
         const u1 = timeToUnit(
           yearFraction(job.valid_to || model.now),
           state!.zoom,
@@ -370,15 +366,10 @@ export function mountCareerRiver(
         );
         const x0 = Math.max(0, Math.min(lengthPx, u0 * lengthPx));
         const x1 = Math.max(0, Math.min(lengthPx, u1 * lengthPx));
-        if (x1 - x0 < 4) return;
-        const lane = employmentLanes[index] ?? 0;
-        const y = bandBaseY + lane * laneH;
-        const workplace = (job.display_label || job.label || '').trim();
-        const role = (job.role || '').trim();
-        const tip = [role, workplace].filter(Boolean).join(' · ') || 'Role';
+        if (x1 - x0 < 4) continue;
         const bar = svgEl('rect', {
           x: x0,
-          y,
+          y: bandBaseY + (employmentLanes[index] ?? 0) * laneH,
           width: x1 - x0,
           height: 8,
           fill: 'var(--line)',
@@ -387,49 +378,16 @@ export function mountCareerRiver(
           'stroke-opacity': 0.25,
           rx: 2
         });
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        const tip =
+          [job.role, job.display_label || job.label]
+            .map((part) => (part || '').trim())
+            .filter(Boolean)
+            .join(' · ') || 'Role';
+        const title = svgEl('title');
         title.textContent = tip;
         bar.appendChild(title);
         svg.appendChild(bar);
-
-        // Prefer role; fall back to workplace short name when bar is narrow.
-        const span = x1 - x0;
-        let labelText = '';
-        if (span > 72 && role) labelText = shortName(role);
-        else if (span > 96 && workplace) labelText = shortName(workplace);
-        else if (span > 120 && role) labelText = role;
-        if (!labelText) return;
-
-        const approxW = Math.min(span - 8, labelText.length * 6.2);
-        if (approxW < 28) return;
-        let lx = x0 + 4;
-        let ly = y + 7;
-        let collides = false;
-        for (const box of roleLabelBoxes) {
-          if (
-            Math.abs(ly - box.y) < 12 &&
-            !(lx + approxW < box.x || box.x + box.w < lx)
-          ) {
-            collides = true;
-            break;
-          }
-        }
-        if (collides) return;
-        const t = svgEl('text', {
-          x: lx,
-          y: ly,
-          fill: 'var(--muted)',
-          'font-size': 9,
-          'font-family': 'inherit',
-          'font-weight': 600
-        });
-        t.textContent = labelText;
-        const tipNode = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        tipNode.textContent = tip;
-        t.appendChild(tipNode);
-        svg.appendChild(t);
-        roleLabelBoxes.push({ x: lx, y: ly, w: approxW, h: 10 });
-      });
+      }
     }
 
     // Trunk
@@ -834,8 +792,7 @@ export function mountCareerRiver(
         y0: event.clientY,
         from0: state!.zoom.from,
         to0: state!.zoom.to,
-        armed: false,
-        axis: null
+        armed: false
       };
     }
   };
@@ -857,23 +814,19 @@ export function mountCareerRiver(
       const dx = event.clientX - state!.drag.x0;
       const dy = event.clientY - state!.drag.y0;
       if (!state!.drag.armed) {
-        const dist = Math.hypot(dx, dy);
-        if (dist < 8) return;
-        // Horizontal river: only steal if movement is mostly along time (x).
-        // Vertical river: only steal if mostly along time (y). Else leave page scroll.
-        const alongTime = horizontal ? Math.abs(dx) > Math.abs(dy) * 1.35 : Math.abs(dy) > Math.abs(dx) * 1.35;
+        if (Math.hypot(dx, dy) < 8) return;
+        // Steal only when movement is mostly along the time axis; else leave page scroll.
+        const alongTime = horizontal
+          ? Math.abs(dx) > Math.abs(dy) * 1.35
+          : Math.abs(dy) > Math.abs(dx) * 1.35;
         if (!alongTime) {
           state!.drag = null;
           return;
         }
         state!.drag.armed = true;
-        state!.drag.axis = horizontal ? 'x' : 'y';
         svgHost.setPointerCapture?.(event.pointerId);
       }
-      const delta =
-        state!.drag.axis === 'x'
-          ? event.clientX - state!.drag.x0
-          : event.clientY - state!.drag.y0;
+      const delta = horizontal ? dx : dy;
       const plot = Math.max(1, horizontal ? state!.width - 200 : 400);
       const yearShift =
         -(delta / plot) * (state!.drag.to0 - state!.drag.from0) * (horizontal ? 1 : -1);
