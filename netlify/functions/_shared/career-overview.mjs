@@ -128,38 +128,51 @@ export async function assembleCareerOverview(deps = {}) {
       });
       const { outgoing } = await linkRepo.listForEntity(selfRef, accessContext);
       const items = [];
+      // Career river needs the full employee_at period history (BUILD-PLAN §3.3
+      // Roles). Filtering to status=current left only Aloysius and collapsed
+      // multi-role employers (e.g. St Pius X) to one band because seen keyed
+      // on org ref. Dedupe by link id so concurrent/stacked roles survive.
       const seen = new Set();
       for (const entry of outgoing) {
         if (entry.link.relationship_type !== 'employee_at') continue;
-        if (entry.link.status !== 'current') continue;
-        if (seen.has(entry.endpoint.ref)) continue;
-        seen.add(entry.endpoint.ref);
+        if (entry.link.status !== 'current' && entry.link.status !== 'ended') continue;
+        const key = entry.link.id || `${entry.endpoint.ref}|${entry.link.role ?? ''}|${entry.link.valid_from ?? ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
         items.push({
           ...endpointSummary(entry.endpoint),
           role: entry.link.role ?? null,
           valid_from: entry.link.valid_from ?? null,
-          valid_to: entry.link.valid_to ?? null
+          valid_to: entry.link.valid_to ?? null,
+          link_status: entry.link.status
         });
       }
       const githubRows = await listGithubRelationshipEntries('person', self.id, github);
       for (const row of githubRows) {
         if (row.link.relationship_type !== 'employee_at') continue;
-        if (row.link.status !== 'current') continue;
-        if (seen.has(row.otherRef)) continue;
+        if (row.link.status !== 'current' && row.link.status !== 'ended') continue;
+        const key = row.link.id || `${row.otherRef}|${row.link.role ?? ''}|${row.link.valid_from ?? ''}`;
+        if (seen.has(key)) continue;
         try {
           const endpoint = await resolveEntity(row.otherRef, accessContext, github);
-          seen.add(row.otherRef);
+          seen.add(key);
           items.push({
             ...endpointSummary(endpoint),
             role: row.link.role ?? null,
             valid_from: row.link.valid_from ?? null,
-            valid_to: row.link.valid_to ?? null
+            valid_to: row.link.valid_to ?? null,
+            link_status: row.link.status
           });
         } catch (error) {
           if (error?.code === 'endpoint_not_found') continue;
           throw error;
         }
       }
+      items.sort((a, b) => {
+        const aFrom = a.valid_from || '9999-12-31';
+        const bFrom = b.valid_from || '9999-12-31';
+        return aFrom.localeCompare(bFrom) || String(a.role ?? '').localeCompare(String(b.role ?? ''));
+      });
       employment = sectionOk(items);
     }
   } catch (error) {

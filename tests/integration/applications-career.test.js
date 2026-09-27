@@ -700,6 +700,109 @@ test('dual-organisation career regression: employment org and application-only o
   assert.ok(career.organisations.items.some((item) => item.ref === applicationOrgRef));
 });
 
+test('career employment includes ended roles and keeps stacked roles at the same org', async () => {
+  // Regression: Career river role band used to filter status=current only and
+  // dedupe by org ref — Adam's past Career Overview history (and concurrent
+  // St Pius X roles) never reached the page even when relationships.json had them.
+  const professionalStore = memoryStore();
+  const universalStore = memoryStore();
+  const identity = createIdentityRepository({
+    store: universalStore,
+    now: () => '2026-08-01T01:00:00.000Z'
+  });
+  const { ref: pastOrgRef } = await identity.createIdentity({
+    kind: 'organisation',
+    input: { display_name: 'St Pius X High School' }
+  });
+  const { ref: currentOrgRef } = await identity.createIdentity({
+    kind: 'organisation',
+    input: { display_name: "St Aloysius' College" }
+  });
+  const { ref: selfRef } = await identity.createIdentity({
+    kind: 'person',
+    input: { display_name: 'Adam Russell', is_self: true }
+  });
+
+  const resolveEntity = makeResolveEntity({
+    professionalStore,
+    universalStore,
+    tasksStore: memoryStore()
+  });
+  const access = createAccessContext({ workflow: 'life' });
+  const linkRepo = createUniversalLinkRepository({
+    store: universalStore,
+    resolveEntity,
+    now: () => '2026-08-01T01:00:00.000Z'
+  });
+
+  const english = await linkRepo.createLink(
+    {
+      source_ref: selfRef,
+      target_ref: pastOrgRef,
+      relationship_type: 'employee_at',
+      role: 'English Teacher',
+      valid_from: '2021-01-25T00:00:00.000Z',
+      valid_to: null,
+      metadata: {}
+    },
+    access
+  );
+  await linkRepo.endLink(english.link.id, '2024-08-16T00:00:00.000Z', access);
+
+  const psychology = await linkRepo.createLink(
+    {
+      source_ref: selfRef,
+      target_ref: pastOrgRef,
+      relationship_type: 'employee_at',
+      role: 'Psychology Teacher',
+      valid_from: '2023-01-23T00:00:00.000Z',
+      valid_to: null,
+      metadata: {}
+    },
+    access
+  );
+  await linkRepo.endLink(psychology.link.id, '2024-08-16T00:00:00.000Z', access);
+
+  await linkRepo.createLink(
+    {
+      source_ref: selfRef,
+      target_ref: currentOrgRef,
+      relationship_type: 'employee_at',
+      role: 'Gifted Education Teacher',
+      valid_from: '2025-01-22T00:00:00.000Z',
+      valid_to: null,
+      metadata: {}
+    },
+    access
+  );
+
+  const careerHandler = createCareerHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    careerNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => professionalStore,
+    getUniversalLinkStore: async () => universalStore,
+    resolveEntity,
+    createUniversalLinkRepository: () => linkRepo
+  });
+
+  const careerResponse = await careerHandler(
+    request({ url: 'https://api.adam-russell.com/api/career' })
+  );
+  assert.equal(careerResponse.status, 200);
+  const career = (await careerResponse.json()).data;
+  assert.equal(career.employment.status, 'ok');
+  assert.equal(career.employment.items.length, 3);
+
+  const roles = career.employment.items.map((item) => item.role);
+  assert.deepEqual(roles, ['English Teacher', 'Psychology Teacher', 'Gifted Education Teacher']);
+  assert.equal(career.employment.items[0].link_status, 'ended');
+  assert.equal(career.employment.items[1].link_status, 'ended');
+  assert.equal(career.employment.items[2].link_status, 'current');
+  assert.equal(career.employment_items.length, 3);
+  assert.ok(career.employment_items.every((item) => item.valid_from));
+});
+
 test('application create write-boundary failures are incomplete and retryable without duplicate applications', async () => {
   const stepIds = {
     journal: 'application_00000000-0000-4000-8000-0000000000a1',
