@@ -179,6 +179,37 @@ describe('network-ecology miniworld view', () => {
     expect(root.querySelector('.miniworld__timeline')).toBeTruthy();
   });
 
+  it('polls while the server is still building the first snapshot', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      fetchMock
+        .mockImplementationOnce(() =>
+          Promise.resolve(
+            jsonResponse(202, {
+              ok: false,
+              error: { code: 'world_building', message: 'Building', retryable: true }
+            })
+          )
+        )
+        .mockImplementation(() => Promise.resolve(jsonResponse(200, { ok: true, data: worldFixture() })));
+      const done = renderNetworkEcologyView(root);
+      await vi.waitFor(() => expect(root.textContent).toContain('Building your network map'));
+      await vi.advanceTimersByTimeAsync(4_000);
+      await done;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(mountWorldCanvas).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a gateway timeout shows the too-long message after one request', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(new Response('<html>Gateway Timeout</html>', { status: 504 })));
+    await renderNetworkEcologyView(root);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(root.textContent).toContain('This took too long to load');
+  });
+
   it('Find me button calls canvas.findMe', async () => {
     stubWorld();
     await renderNetworkEcologyView(root);
