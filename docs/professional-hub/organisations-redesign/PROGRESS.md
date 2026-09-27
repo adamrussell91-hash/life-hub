@@ -250,5 +250,71 @@ Timeline lane from the assembler: `kind: work_study`, `start: 2025-01-22`,
 ### Phase 0 status
 
 - [x] Items 1–4 answered with real numbers
-- [ ] Part A (A1–A8) — **not started** (stop here per brief)
+- [x] Part A (A1–A8) — see **Fix 01: Part A** below
 - [ ] Part B — **not started**
+
+## Fix 01: Part A (Phase 1R)
+
+Branch: `cursor/organisations-fix-01`. Implemented 27/09/26 against
+Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
+
+### A1. Tile spark by date (C5, C1, C2, D1)
+
+- [x] `renderOrganisationSparkSvg` — shared 2019→now x, step y, axis labels only, last-point dot
+- [x] `first_link_at` = `valid_from || occurred_at` only (never import `created_at`)
+- [x] Undated people omitted from spark; tile `aria-label` includes undated count
+- [x] Unit: different orgs → different path; shared-scale x; spark text = `2019`/`now` only
+- Checks: C5 C1 C2 D1 W2
+- Screens: `screens/fix-01/wall-aloysius-trinity-1440.png`, `…-390.png`
+- Diff vs mockup: see `screens/fix-01/DIFF.md` (1 dated person on Aloysius; Trinity empty)
+
+### A2. Warmth from People source (D6, V4)
+
+- [x] Handler loads people + `buildPersonWarmthById` (same `warmthFor` path as People directory)
+- [x] Test: org bands equal People bands for same ids
+- [x] **Real St. Aloysius spread remains 0 warm / 0 cooling / 56 cold** — ledgered; not restyled
+- Checks: D6 V4
+- Screen: wall tiles show single grey cold segment (honest)
+
+### A3. Ongoing role as bar to now (C6)
+
+- [x] Work/roles `end: null` → bar to domain end (now); events stay points
+- [x] Unit: bar right edge = now x
+- Screen: `screens/fix-01/aloysius-timeline-1440.png`
+
+### A4. Timeline labels + people area (C1, C3)
+
+- [x] Labels inside bars (or beside when too long); axis row below; stepped people area; count label; no per-person dots
+- [x] getBBox non-overlap at 900 and 390; height = rows×32+24
+- Screens: timeline 1440 / 390
+
+### A5. Dead buttons / roadmap copy (I3, P4)
+
+- [x] Compare / Edit / Add structure / Run now not rendered until Part B wires them
+- [x] Opportunities copy: "No opportunities yet." (wall + page)
+- [x] Ann: "Ann hasn't read {org} yet."
+- [x] Test: no `button[disabled]` on org page; no Phase/arrives/is built in rendered text
+- Checks: I3 P4
+
+### A6. Chip one-line ellipsis (L6)
+
+- [x] `.orgs-rchip` nowrap + detail ellipsis; `title` = full text
+- Screens: `halt-chip-1440.png`, `halt-chip-390.png`
+
+### A7. Filter / chip counts (D4, V4)
+
+- [x] Phase 0: venue/study/etc. counts are **0** — data absence, not chip bug
+- [x] Model test: St. Aloysius real links → Workplace only, no Event venue
+- [x] No invented chips
+- Ledger: Events & PD 0, Study & placement 0, Prospects 0 (114 orgs in Phase 0; this evidence pass 113 after identity dedupe)
+
+### A8. Header first date (D5)
+
+- [x] `first_touch_kind: you_started | first_contact`
+- [x] Aloysius meta: **"56 people · you started Jan 2025"**
+- Check: D5; screen in wall/timeline captures
+
+### Part A status
+
+- [x] A1–A8 ticked with checks + screens
+- [ ] Part B — not started (do not mark PR ready)

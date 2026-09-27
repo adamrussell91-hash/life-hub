@@ -1,0 +1,74 @@
+{
+  "counts": {
+    "organisations": 113,
+    "people": 211
+  },
+  "self": {
+    "id": "person_b55f0ac1-5eca-2cfa-248b-124029fd8aaa",
+    "name": "Adam Russell"
+  },
+  "aloysius": {
+    "id": "organisation_44c04351-5d74-6da8-f866-28798e41e9d3",
+    "people_count": 56,
+    "undated_people_count": 55,
+    "warmth_spread": {
+      "warm": 0,
+      "cooling": 0,
+      "cold": 56,
+      "total": 56
+    },
+    "arc_points_len": 1,
+    "arc_points": [
+      {
+        "id": "person_b55f0ac1-5eca-2cfa-248b-124029fd8aaa",
+        "at": "2025-01-22"
+      }
+    ],
+    "first_touch_at": "2025-01-22",
+    "first_touch_kind": "you_started",
+    "you_started_at": "2025-01-22",
+    "chips": [
+      {
+        "kind": "workplace",
+        "label": "Workplace",
+        "detail": "Gifted Education Teacher · 2025–now",
+        "filterBucket": "work"
+      }
+    ],
+    "timeline_lanes": [
+      {
+        "id": "ul_e9fb9448ddc87fd48dbf1e8dad9c29ae1501b41c9fd244f8fd4f54dc3039b484",
+        "kind": "work_study",
+        "label": "Gifted Education Teacher",
+        "start": "2025-01-22",
+        "end": null
+      }
+    ]
+  },
+  "trinity": {
+    "id": "organisation_64c1a2be-b8c5-f864-8816-135f99a7aa36",
+    "people_count": 20,
+    "undated_people_count": 20,
+    "warmth_spread": {
+      "warm": 0,
+      "cooling": 0,
+      "cold": 20,
+      "total": 20
+    },
+    "arc_points_len": 0,
+    "first_touch_at": null,
+    "first_touch_kind": null,
+    "chips": []
+  },
+  "halt": {
+    "name": "NSW HALT Association",
+    "chips": [
+      {
+        "kind": "member",
+        "label": "Member",
+        "detail": "HALT Association NSW Professional Development Committee",
+        "filterBucket": "bodies"
+      }
+    ]
+  }
+}
