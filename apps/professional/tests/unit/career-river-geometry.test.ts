@@ -34,7 +34,7 @@ describe('career-river-geometry', () => {
 
   it('sizes height from the Phase 3 formula', () => {
     expect(riverHeightPx('horizontal', 3, 10)).toBe(Math.max(440, 120 + 3 * 64));
-    expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(900, 10 * 150));
+    expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(640, 10 * 100));
   });
 
   it('emits readable year axis ticks by zoom span', () => {

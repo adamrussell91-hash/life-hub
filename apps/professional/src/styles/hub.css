@@ -4767,9 +4767,10 @@
 }
 
 .career-river__role-bar {
-  fill: color-mix(in srgb, var(--pastel-blue) 70%, var(--paper));
-  stroke: color-mix(in srgb, var(--navy) 40%, var(--line));
-  stroke-width: 1.5;
+  fill: var(--pastel-blue);
+  stroke: var(--navy);
+  stroke-width: 1.25;
+  stroke-opacity: 0.45;
   pointer-events: auto;
 }
 

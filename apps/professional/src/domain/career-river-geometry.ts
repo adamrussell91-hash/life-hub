@@ -78,7 +78,8 @@ export function riverHeightPx(
   if (orientation === 'horizontal') {
     return Math.max(440, 120 + visibleFutures * 64);
   }
-  return Math.min(2400, Math.max(900, yearsInView * 150));
+  // Phone river: denser than 150px/yr so past roles sit near Now in the first viewport.
+  return Math.min(2400, Math.max(640, yearsInView * 100));
 }
 
 export function laneOffset(

@@ -27,6 +27,8 @@ type RiverState = {
   selectedId: string | null;
   hoverId: string | null;
   locked: boolean;
+  /** Last orientation we scrolled Now into view for (phone vertical). */
+  scrolledNowFor: RiverOrientation | null;
   drag: {
     x0: number;
     y0: number;
@@ -134,6 +136,7 @@ export function mountCareerRiver(
       selectedId: options.selectedFutureId ?? null,
       hoverId: null,
       locked: false,
+      scrolledNowFor: null,
       drag: null,
       pinch: null
     };
@@ -522,17 +525,18 @@ export function mountCareerRiver(
         const y1 = Math.max(0, Math.min(lengthPx, (1 - u0) * lengthPx));
         if (y1 - y0 < 6) continue;
         const lane = lanesAll[index] ?? 0;
-        const x = midPx + 16 + lane * 10;
+        const barW = 10;
+        const x = midPx + 18 + lane * (barW + 6);
         const group = svgEl('g', {
           class: 'career-river__role career-river__role--vertical',
           'data-part': 'role-span'
         });
         const bar = svgEl('rect', {
-          x: x - 3,
+          x: x - barW / 2,
           y: y0,
-          width: 6,
+          width: barW,
           height: y1 - y0,
-          rx: 3,
+          rx: barW / 2,
           class: 'career-river__role-bar',
           'data-part': 'role-bar'
         });
@@ -895,6 +899,20 @@ export function mountCareerRiver(
     });
 
     svgHost.replaceChildren(svg);
+
+    // Phone: tall SVG opens on empty future; bring Now (+ past role ticks) into view once.
+    if (!isHorizontal && state!.scrolledNowFor !== 'vertical') {
+      state!.scrolledNowFor = 'vertical';
+      requestAnimationFrame(() => {
+        svg.querySelector('[data-part="now-label"]')?.scrollIntoView({
+          block: 'center',
+          inline: 'nearest',
+          behavior: 'instant' as ScrollBehavior
+        });
+      });
+    } else if (isHorizontal) {
+      state!.scrolledNowFor = 'horizontal';
+    }
 
     if (model.fork) {
       axisNote.textContent = `Last fork · ${model.fork.label ?? ''} · ${model.fork.caption}`;
