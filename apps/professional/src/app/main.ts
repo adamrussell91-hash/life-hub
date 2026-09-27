@@ -112,7 +112,9 @@ async function bootApp(root: HTMLElement): Promise<void> {
 
     if (route.name === 'home') {
       renderPageHeader(shell, viewChrome('home'));
-      await renderHomeView(shell.canvas);
+      await renderHomeView(shell.canvas, {
+        isCurrent: () => generation === routeGeneration
+      });
       return;
     }
     if (route.name === 'calendar') {
@@ -337,7 +339,12 @@ async function bootApp(root: HTMLElement): Promise<void> {
     void paint();
   });
 
-  if (!location.hash || location.hash === '#/') location.hash = '#/home';
+  // replaceState — do not assign location.hash here. Assignment fires
+  // hashchange, which would start a second concurrent paint() while this
+  // await paint() is still running (Home used to double-append chrome).
+  if (!location.hash || location.hash === '#/') {
+    history.replaceState(null, '', '#/home');
+  }
   await paint();
 }
 
