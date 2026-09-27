@@ -6,7 +6,16 @@ import {
   listGithubCommunications,
   resetGithubCommunicationsCache
 } from '../../netlify/functions/_shared/github-professional-data.mjs';
-import { projectNotionCommunicationSchedule } from '../../netlify/functions/_shared/schedule-projection.mjs';
+import {
+  isNotionMeetingMethod,
+  mergeBlobAndNotionRecords,
+  projectNotionCommunicationListRecord,
+  projectNotionCommunicationSchedule,
+  projectNotionMeetingListRecord
+} from '../../netlify/functions/_shared/schedule-projection.mjs';
+import { createCommunicationsHandler } from '../../netlify/functions/communications.mjs';
+import { createMeetingsHandler } from '../../netlify/functions/meetings.mjs';
+import { compareCommunicationsNewestFirst } from '../../netlify/functions/_shared/communication-schema.mjs';
 
 const ID_A = 'a'.repeat(32);
 const ID_B = 'b'.repeat(32);
@@ -173,4 +182,90 @@ test('/api/schedule-projections still answers when the GitHub read fails', async
   const response = await handler(scheduleRequest());
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.projections, []);
+});
+
+test('Notion meeting methods are Meetings; email/phone are Comms list records', () => {
+  assert.equal(isNotionMeetingMethod('In-person Meeting'), true);
+  assert.equal(isNotionMeetingMethod('Video Call'), true);
+  assert.equal(isNotionMeetingMethod('Email'), false);
+
+  assert.equal(projectNotionCommunicationListRecord(row()), null);
+  const email = projectNotionCommunicationListRecord(
+    row({ notion_id: ID_B, method: 'Email', title: 'Note to Sam K.' })
+  );
+  assert.equal(email.id, `notion_${ID_B}`);
+  assert.equal(email.channel, 'email');
+  assert.equal(email.subject, 'Note to Sam K.');
+  assert.equal(email.source, 'notion');
+
+  const meeting = projectNotionMeetingListRecord(row(), { now: () => Date.parse('2026-09-01T00:00:00Z') });
+  assert.equal(meeting.id, `notion_${ID_A}`);
+  assert.equal(meeting.state, 'completed');
+  assert.equal(meeting.title, 'Chat with Sam K.');
+  assert.equal(projectNotionMeetingListRecord(row({ method: 'Email' })), null);
+});
+
+test('mergeBlobAndNotionRecords prefers Blob on id collision', () => {
+  const merged = mergeBlobAndNotionRecords(
+    [{ id: 'notion_aaa', subject: 'blob' }],
+    [{ id: 'notion_aaa', subject: 'notion' }, { id: 'notion_bbb', subject: 'only-notion' }],
+    compareCommunicationsNewestFirst
+  );
+  assert.equal(merged.find((r) => r.id === 'notion_aaa').subject, 'blob');
+  assert.equal(merged.some((r) => r.id === 'notion_bbb'), true);
+});
+
+test('/api/communications list merges Notion email/phone and skips meeting methods', async () => {
+  const handler = createCommunicationsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    communicationNow: () => '2026-08-01T01:00:00.000Z',
+    getContentStore: async () => emptyStore(),
+    getUniversalLinkStore: async () => emptyStore(),
+    getTasksStore: async () => emptyStore(),
+    listGithubCommunications: async () => [
+      row(),
+      row({ notion_id: ID_B, method: 'Email', title: 'Update for Ollie P.' }),
+      row({ notion_id: ID_C, method: 'Phone Call', title: 'Call Ms Lee' })
+    ]
+  });
+  const response = await handler(
+    new Request('https://api.adam-russell.com/api/communications', {
+      headers: { cookie: `life_hub_session=${session}`, origin: 'https://life-hub.adam-russell.com' }
+    })
+  );
+  assert.equal(response.status, 200);
+  const { communications } = (await response.json()).data;
+  assert.equal(communications.length, 2);
+  assert.deepEqual(
+    communications.map((c) => c.channel).sort(),
+    ['email', 'phone']
+  );
+});
+
+test('/api/meetings list merges Notion In-person/Video rows', async () => {
+  const handler = createMeetingsHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    meetingNow: () => '2026-08-01T01:00:00.000Z',
+    meetingListNow: () => Date.parse('2026-09-01T00:00:00Z'),
+    getContentStore: async () => emptyStore(),
+    getUniversalLinkStore: async () => emptyStore(),
+    getTasksStore: async () => emptyStore(),
+    listGithubCommunications: async () => [
+      row(),
+      row({ notion_id: ID_B, method: 'Video Call', title: 'Catch-up with Grace P.' }),
+      row({ notion_id: ID_C, method: 'Email', title: 'Not a meeting' })
+    ]
+  });
+  const response = await handler(
+    new Request('https://api.adam-russell.com/api/meetings', {
+      headers: { cookie: `life_hub_session=${session}`, origin: 'https://life-hub.adam-russell.com' }
+    })
+  );
+  assert.equal(response.status, 200);
+  const { meetings } = (await response.json()).data;
+  assert.equal(meetings.length, 2);
+  assert.ok(meetings.every((m) => m.id.startsWith('notion_')));
+  assert.ok(meetings.some((m) => m.title === 'Catch-up with Grace P.'));
 });

@@ -185,21 +185,25 @@ async function bootApp(root: HTMLElement): Promise<void> {
       return;
     }
     if (route.name === 'communications') {
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      // Network list chrome matches People: Professional Hub eyebrow; page owns h1.
+      shell.pageHeader.classList.add('page-header--people-redesign');
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
       await renderCommunicationsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'meetings') {
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      shell.pageHeader.classList.add('page-header--people-redesign');
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
       await renderMeetingsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });
       return;
     }
     if (route.name === 'events') {
-      renderPageHeader(shell, { eyebrow: '', title: '' });
+      shell.pageHeader.classList.add('page-header--people-redesign');
+      renderPageHeader(shell, { eyebrow: 'Professional Hub', title: '' });
       await renderEventsView(shell.canvas, {
         isCurrent: () => generation === routeGeneration
       });

@@ -116,11 +116,17 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
   return taskPanels;
 }
 
+function notionPageHref(id: string): string | null {
+  const match = /^notion_([0-9a-f]{32})$/i.exec(id);
+  return match ? `https://www.notion.so/${match[1]}` : null;
+}
+
 function toMeetingRow(record: MeetingRecord): ScheduleDbRow {
+  const notionHref = notionPageHref(record.id);
   return {
     id: record.id,
     title: record.title,
-    href: meetingRoute(record.id),
+    href: notionHref ?? meetingRoute(record.id),
     when: record.scheduled_start,
     meta: [record.state.replace(/_/g, ' '), record.location_text ?? ''].filter(Boolean),
     filterTokens: [record.state],

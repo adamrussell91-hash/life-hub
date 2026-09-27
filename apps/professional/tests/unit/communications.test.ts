@@ -64,6 +64,37 @@ describe('renderCommunicationsView', () => {
     expect(canvas.querySelector('.schedule-db__row')).toBeTruthy();
     expect(fetch).toHaveBeenCalled();
   });
+
+  it('links Notion-backed rows to Notion and skips direction filter tokens', async () => {
+    const notionId = 'a'.repeat(32);
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        data: {
+          communications: [
+            {
+              schema_version: 2,
+              id: `notion_${notionId}`,
+              direction: 'outbound',
+              channel: 'email',
+              occurred_at: '2026-09-01T10:00:00.000Z',
+              subject: 'Email to Sam K.',
+              summary: '',
+              status: 'completed',
+              created_at: '2026-09-01T10:00:00.000Z',
+              updated_at: '2026-09-01T10:00:00.000Z',
+              source: 'notion'
+            }
+          ]
+        }
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderCommunicationsView(canvas);
+    const row = canvas.querySelector('.schedule-db__row') as HTMLAnchorElement | null;
+    expect(row?.getAttribute('href')).toBe(`https://www.notion.so/${notionId}`);
+    expect(canvas.textContent).toMatch(/Email to Sam K\./);
+  });
 });
 
 describe('renderCommunicationNewView', () => {

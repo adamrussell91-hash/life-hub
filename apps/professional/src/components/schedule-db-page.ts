@@ -1,6 +1,7 @@
 /**
  * Shared database-list shell for Comms / Meetings / Events.
- * Chrome pattern follows Organisations (title · search · filter pills · sort/group · rows).
+ * Shell owns the Professional Hub eyebrow (People Network pattern); this page
+ * owns h1 · search · filter pills · sort/group · rows.
  * Does not reuse People row rendering (warmth rings, crest, Notion fields).
  */
 
@@ -327,10 +328,10 @@ export async function renderScheduleDbPage(
           a.href = row.href;
           const stack = el('div', 'schedule-db__row-stack');
           stack.append(el('span', 'schedule-db__row-title', row.title));
-          const metaParts = [
-            ...row.meta,
-            formatDisplayDate(row.when) ?? row.when.slice(0, 10)
-          ].filter(Boolean);
+          const whenLabel =
+            formatDisplayDate(row.when) ??
+            (row.when && row.when !== '1970-01-01T00:00:00.000Z' ? row.when.slice(0, 10) : '');
+          const metaParts = [...row.meta, whenLabel].filter(Boolean);
           stack.append(el('span', 'schedule-db__row-meta', metaParts.join(' · ')));
           a.append(stack);
           list.append(a);

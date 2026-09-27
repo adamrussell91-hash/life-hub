@@ -37,15 +37,27 @@ function labelFor(record: CommunicationRecord): string {
   return `${record.direction} ${record.channel.replace(/_/g, ' ')}`;
 }
 
+function notionPageHref(id: string): string | null {
+  const match = /^notion_([0-9a-f]{32})$/i.exec(id);
+  return match ? `https://www.notion.so/${match[1]}` : null;
+}
+
 function toRow(record: CommunicationRecord): ScheduleDbRow {
   const when = record.scheduled_start || record.occurred_at;
+  const notionHref = notionPageHref(record.id);
+  // Notion import has no inbound/outbound — channel filters only.
+  const filterTokens = notionHref
+    ? [record.channel]
+    : [record.direction, record.channel];
   return {
     id: record.id,
     title: labelFor(record),
-    href: communicationRoute(record.id),
+    href: notionHref ?? communicationRoute(record.id),
     when,
-    meta: [record.direction, record.channel.replace(/_/g, ' ')],
-    filterTokens: [record.direction, record.channel],
+    meta: notionHref
+      ? [record.channel.replace(/_/g, ' ')]
+      : [record.direction, record.channel.replace(/_/g, ' ')],
+    filterTokens,
     facetKey: record.channel,
     facetLabel: record.channel.replace(/_/g, ' ')
   };

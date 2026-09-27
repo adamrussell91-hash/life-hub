@@ -2,7 +2,10 @@ import { errorResponse, methodNotAllowed, okResponse, withCors } from './_shared
 import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { readJsonObject } from './_shared/teaching-record-get.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
-import { isValidCommunicationId } from './_shared/communication-schema.mjs';
+import {
+  compareCommunicationsNewestFirst,
+  isValidCommunicationId
+} from './_shared/communication-schema.mjs';
 import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
@@ -11,6 +14,11 @@ import {
   resolveEntity as defaultResolveEntity
 } from './_shared/entity-resolvers.mjs';
 import { parseEntityRef } from './_shared/entity-ref.mjs';
+import { listGithubCommunications } from './_shared/github-professional-data.mjs';
+import {
+  mergeBlobAndNotionRecords,
+  projectNotionCommunicationListRecord
+} from './_shared/schedule-projection.mjs';
 
 export const config = { path: '/api/communications' };
 
@@ -67,6 +75,7 @@ export function createCommunicationsHandler(deps = {}) {
   const createRepository = deps.createCommunicationRepository ?? createCommunicationRepository;
   const baseResolveEntity = deps.resolveEntity ?? defaultResolveEntity;
   const getUniversalLinkStore = deps.getUniversalLinkStore ?? defaultGetUniversalLinkStore;
+  const loadGithubCommunications = deps.listGithubCommunications ?? listGithubCommunications;
 
   return createOperatorHandler(
     async (request, context) => {
@@ -106,7 +115,20 @@ export function createCommunicationsHandler(deps = {}) {
             const communication = await repo.getCommunication(id);
             return withCors(okResponse(200, { communication }), request, env);
           }
-          const communications = await repo.listCommunications();
+          // Blob hub records + Notion Communications from life-hub-data.
+          // Meeting methods are listed on /api/meetings instead.
+          const [blobCommunications, notionRows] = await Promise.all([
+            repo.listCommunications(),
+            loadGithubCommunications({ env }).catch(() => [])
+          ]);
+          const notionCommunications = notionRows
+            .map(projectNotionCommunicationListRecord)
+            .filter(Boolean);
+          const communications = mergeBlobAndNotionRecords(
+            blobCommunications,
+            notionCommunications,
+            compareCommunicationsNewestFirst
+          );
           return withCors(okResponse(200, { communications }), request, env);
         }
 

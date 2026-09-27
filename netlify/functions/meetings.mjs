@@ -12,6 +12,18 @@ import {
 import { parseEntityRef } from './_shared/entity-ref.mjs';
 import { createProfessionalTaskLinkOperationRepository } from './_shared/professional-task-link-operation.mjs';
 import { defaultGetTasksStore } from './_shared/tasks-blobs.mjs';
+import { listGithubCommunications } from './_shared/github-professional-data.mjs';
+import {
+  mergeBlobAndNotionRecords,
+  projectNotionMeetingListRecord
+} from './_shared/schedule-projection.mjs';
+
+function compareMeetingsNewestFirst(a, b) {
+  const aTime = Date.parse(a?.scheduled_start) || 0;
+  const bTime = Date.parse(b?.scheduled_start) || 0;
+  if (aTime !== bTime) return bTime - aTime;
+  return String(a?.id ?? '') < String(b?.id ?? '') ? 1 : String(a?.id ?? '') > String(b?.id ?? '') ? -1 : 0;
+}
 
 export const config = { path: '/api/meetings' };
 
@@ -82,6 +94,8 @@ export function createMeetingsHandler(deps = {}) {
   const getTasksStore = deps.getTasksStore ?? defaultGetTasksStore;
   const createTaskLinkRepository =
     deps.createProfessionalTaskLinkOperationRepository ?? createProfessionalTaskLinkOperationRepository;
+  const loadGithubCommunications = deps.listGithubCommunications ?? listGithubCommunications;
+  const meetingListNow = deps.meetingListNow ?? (() => Date.now());
 
   return createOperatorHandler(
     async (request, context) => {
@@ -138,7 +152,19 @@ export function createMeetingsHandler(deps = {}) {
               env
             );
           }
-          const meetings = await repo.listMeetings();
+          // Blob hub meetings + Notion In-person/Video rows from communications.json.
+          const [blobMeetings, notionRows] = await Promise.all([
+            repo.listMeetings(),
+            loadGithubCommunications({ env }).catch(() => [])
+          ]);
+          const notionMeetings = notionRows
+            .map((row) => projectNotionMeetingListRecord(row, { now: meetingListNow }))
+            .filter(Boolean);
+          const meetings = mergeBlobAndNotionRecords(
+            blobMeetings,
+            notionMeetings,
+            compareMeetingsNewestFirst
+          );
           return withCors(okResponse(200, { meetings }), request, env);
         }
 
