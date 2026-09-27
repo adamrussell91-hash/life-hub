@@ -486,7 +486,7 @@
 .calendar-dump__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
 }
 
@@ -498,7 +498,9 @@
   resize: vertical;
   min-height: 3.5rem;
   max-height: 10rem;
+  /* Clear the native SE resize grip from the Sort it row below. */
   margin-bottom: 0;
+  padding-bottom: var(--space-3);
 }
 
 .calendar-dump__actions {
@@ -507,6 +509,7 @@
   align-items: center;
   gap: var(--space-2);
   flex: 0 0 auto;
+  margin-top: var(--space-1);
 }
 
 .hub-calendar__rail[hidden] {
