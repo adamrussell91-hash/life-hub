@@ -6,11 +6,13 @@ import {
   getGithubActiveSelfPerson,
   getGithubOrganisation,
   getGithubPerson,
+  isImportedStudentPerson,
   isProfessionalDataRepoBound,
   listGithubOrganisationCandidates,
   listGithubPersonCandidates,
   listGithubRelationshipEntries,
-  resetProfessionalDataCache
+  resetProfessionalDataCache,
+  STUDENT_ORIGINAL_CATEGORY
 } from '../../netlify/functions/_shared/github-professional-data.mjs';
 import { isValidOrganisationId, isValidPersonId } from '../../netlify/functions/_shared/identity-schema.mjs';
 import { isValidLinkId } from '../../netlify/functions/_shared/universal-link-schema.mjs';
@@ -301,6 +303,48 @@ test('getGithubActiveSelfPerson returns null when no imported person is self', a
   const { fetchImpl } = memoryFetch({ people: PEOPLE, organisations: ORGANISATIONS, relationships: RELATIONSHIPS });
   const env = { GITHUB_TOKEN: 'token' };
   assert.equal(await getGithubActiveSelfPerson({ env, fetchImpl }), null);
+});
+
+test('listGithubPersonCandidates excludes Communications-database students; getGithubPerson still resolves them', async () => {
+  const { fetchImpl } = memoryFetch({
+    people: [
+      {
+        legacy_id: 'leg-adult',
+        display_name: 'Lauren Stuart',
+        original_category: 'People (Professional Relationship Management)'
+      },
+      {
+        legacy_id: 'leg-student',
+        display_name: 'Year 10 Student',
+        original_category: STUDENT_ORIGINAL_CATEGORY,
+        tags: ['Parent Communication']
+      },
+      {
+        legacy_id: 'leg-owner',
+        display_name: 'Adam Russell',
+        original_category: 'Workspace owner (Career Overview database)',
+        is_self: true
+      }
+    ],
+    organisations: ORGANISATIONS,
+    relationships: []
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const people = await listGithubPersonCandidates({ env, fetchImpl });
+  assert.equal(people.length, 2);
+  assert.ok(people.every((p) => !isImportedStudentPerson(p)));
+  assert.ok(people.some((p) => p.display_name === 'Lauren Stuart'));
+  assert.ok(people.some((p) => p.display_name === 'Adam Russell'));
+  assert.equal(
+    people.find((p) => p.display_name === 'Lauren Stuart').original_category,
+    'People (Professional Relationship Management)'
+  );
+
+  const student = await getGithubPerson(derivePersonId('leg-student'), { env, fetchImpl });
+  assert.ok(student);
+  assert.equal(student.display_name, 'Year 10 Student');
+  assert.equal(student.original_category, STUDENT_ORIGINAL_CATEGORY);
+  assert.equal(isImportedStudentPerson(student), true);
 });
 
 test('a relationship whose legacy id does not resolve to a known person/organisation is dropped, not thrown', async () => {
