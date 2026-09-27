@@ -1,6 +1,6 @@
 import type { Hop, Item, Trip } from '@/types';
 import { formatAud } from '@/lib/money';
-import { formatInZone } from '@/lib/time';
+import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
 import { hopFallback, itemPlace, numberStops, orderDayItems, showArrivalGuide } from '@/model/day';
 import { I } from '@/lib/icons';
 
@@ -239,12 +239,22 @@ export function renderDayList(
     if (item.kind === 'checkin_slot') {
       const row = document.createElement('div');
       row.className = 'checkin';
-      const cityNow = city ? formatInZone(new Date(item.date + 'T' + (item.time ?? '00:00')), city.tz) : '';
-      row.innerHTML = `<b>${item.title}</b> · ${item.time ?? 'Time to set'} ${city?.name ?? ''} · ${cityNow} ${trip.home_tz.includes('Sydney') ? 'Sydney' : trip.home_tz}`;
+      const time = item.time ?? '00:00';
+      const localLabel = item.time ?? 'Time to set';
+      let homeLabel = '';
+      let nextDay = '';
+      if (item.time && city) {
+        const instant = zonedToInstant(item.date, time, city.tz);
+        homeLabel = formatInZone(instant, trip.home_tz);
+        if (dateInZone(instant, trip.home_tz) !== item.date) nextDay = ' (next day)';
+      }
+      const homeName = trip.home_tz.includes('Sydney') ? 'Sydney' : trip.home_tz;
+      const left = document.createElement('span');
+      left.innerHTML = `<b>${item.title}</b> · ${localLabel} ${city?.name ?? ''}${homeLabel ? ` · ${homeLabel} ${homeName}${nextDay}` : ''}`;
       const follower = document.createElement('span');
       follower.style.marginLeft = 'auto';
       follower.textContent = trip.followers_label;
-      row.append(follower);
+      row.append(left, follower);
       list.append(row);
       continue;
     }

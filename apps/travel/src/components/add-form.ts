@@ -27,7 +27,7 @@ export interface AddFormOptions {
   cityId?: string;
   date?: string;
   editing?: Item;
-  onSaved: (trip: Trip) => void;
+  onSaved: (trip: Trip, version: string) => void;
   onClose: () => void;
 }
 
@@ -495,10 +495,10 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     }
 
     try {
-      const trip = editing
+      const saved = editing
         ? await editItem(options.tripId, editing.id, options.version, draft)
         : await addItem(options.tripId, options.version, draft);
-      options.onSaved(trip);
+      options.onSaved(saved.trip, saved.version);
       host.replaceChildren();
     } catch {
       errorNote.hidden = false;

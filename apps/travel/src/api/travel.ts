@@ -21,7 +21,9 @@ export function listTrips(): Promise<{ trips: TripSummary[] }> {
   return apiGet('/api/travel-trips');
 }
 
-export function createTrip(body: { title: string; start_date: string; end_date: string } | { import: TripImport }): Promise<Trip> {
+export function createTrip(
+  body: { title: string; start_date: string; end_date: string } | { import: TripImport }
+): Promise<TripEnvelope> {
   return apiPost('/api/travel-trips', body);
 }
 
@@ -29,7 +31,7 @@ export function getTrip(id: string): Promise<TripEnvelope> {
   return apiGet(`/api/travel-trip?id=${encodeURIComponent(id)}`);
 }
 
-export function patchTrip(id: string, ifVersion: string, patch: Partial<Trip>): Promise<Trip> {
+export function patchTrip(id: string, ifVersion: string, patch: Partial<Trip>): Promise<TripEnvelope> {
   return apiPatch(`/api/travel-trip?id=${encodeURIComponent(id)}`, { if_version: ifVersion, patch });
 }
 
@@ -37,25 +39,30 @@ export function deleteTrip(id: string): Promise<{ id: string; deleted: true }> {
   return apiDelete(`/api/travel-trip?id=${encodeURIComponent(id)}`);
 }
 
-export function addItem(tripId: string, ifVersion: string, item: ItemDraft): Promise<Trip> {
+export function addItem(tripId: string, ifVersion: string, item: ItemDraft): Promise<TripEnvelope> {
   return apiPost(`/api/travel-items?trip=${encodeURIComponent(tripId)}`, { if_version: ifVersion, item });
 }
 
-export function editItem(tripId: string, itemId: string, ifVersion: string, item: ItemDraft): Promise<Trip> {
+export function editItem(
+  tripId: string,
+  itemId: string,
+  ifVersion: string,
+  item: ItemDraft
+): Promise<TripEnvelope> {
   return apiPatch(
     `/api/travel-items?trip=${encodeURIComponent(tripId)}&id=${encodeURIComponent(itemId)}`,
     { if_version: ifVersion, item }
   );
 }
 
-export function removeItem(tripId: string, itemId: string, ifVersion: string): Promise<Trip> {
+export function removeItem(tripId: string, itemId: string, ifVersion: string): Promise<TripEnvelope> {
   return apiDelete(
     `/api/travel-items?trip=${encodeURIComponent(tripId)}&id=${encodeURIComponent(itemId)}`,
     { if_version: ifVersion }
   );
 }
 
-export function addCheckin(tripId: string, cityId: string, label: string): Promise<Trip> {
+export function addCheckin(tripId: string, cityId: string, label: string): Promise<TripEnvelope> {
   return apiPost(`/api/travel-checkins?trip=${encodeURIComponent(tripId)}`, { city_id: cityId, label });
 }
 

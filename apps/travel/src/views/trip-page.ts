@@ -1,6 +1,6 @@
-import type { Trip } from '@/types';
+import type { City, Trip } from '@/types';
 import { getTrip } from '@/api/travel';
-import { buildTodo, daysForCity } from '@/model/day';
+import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems } from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderWorldMap } from '@/components/world-map';
 import { renderDayMap, type DayMapHandle } from '@/components/day-map';
@@ -8,8 +8,8 @@ import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
-import { homeBaseForNight } from '@/model/day';
-import { formatInZone } from '@/lib/time';
+import { formatInZone, zonedToInstant } from '@/lib/time';
+import { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
   cityId?: string;
@@ -224,7 +224,35 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         city.driver_phrase
       );
     });
-    mapTools.append(homeBtn);
+    const whereBtn = document.createElement('button');
+    whereBtn.type = 'button';
+    whereBtn.className = 'btn ghost';
+    whereBtn.textContent = 'Where am I?';
+    whereBtn.addEventListener('click', () => {
+      if (!dayMapHandle) return;
+      startWhereAmI(dayMapHandle.map, mapBox, city, selectedDate, trip);
+    });
+    const fullBtn = document.createElement('button');
+    fullBtn.type = 'button';
+    fullBtn.className = 'btn ghost';
+    fullBtn.textContent = 'Full screen';
+    fullBtn.addEventListener('click', () => {
+      const on = mapBox.classList.toggle('is-fullscreen');
+      fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+      dayMapHandle?.map.resize();
+      if (on) {
+        const onKey = (e: KeyboardEvent) => {
+          if (e.key === 'Escape') {
+            mapBox.classList.remove('is-fullscreen');
+            fullBtn.textContent = 'Full screen';
+            dayMapHandle?.map.resize();
+            document.removeEventListener('keydown', onKey);
+          }
+        };
+        document.addEventListener('keydown', onKey);
+      }
+    });
+    mapTools.append(homeBtn, whereBtn, fullBtn);
     mapBox.append(mapInner, mapTools);
     mapCol.append(mapBox);
     day.append(listCol, mapCol);
@@ -274,8 +302,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       editing: item,
       cityId: cityId ?? selectedCityId,
       date: date ?? selectedDate,
-      onSaved: (updated) => {
+      onSaved: (updated, nextVersion) => {
         trip = updated;
+        version = nextVersion;
         formHost.remove();
         renderCityScene();
       },
@@ -295,4 +324,79 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
 
   updateChips();
   selectCity(selectedCityId);
+}
+
+function startWhereAmI(
+  map: import('maplibre-gl').Map,
+  mapBox: HTMLElement,
+  city: City,
+  date: string,
+  trip: Trip
+): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (today < trip.start_date) {
+    window.alert('The trip has not started yet — location is not needed.');
+    return;
+  }
+  if (!navigator.geolocation) {
+    window.alert('Location is off. Turn it on in Settings › Safari › Location.');
+    return;
+  }
+  mapBox.querySelector('.where-note')?.remove();
+  const note = document.createElement('p');
+  note.className = 'where-note';
+  note.textContent = 'Finding you…';
+  mapBox.append(note);
+
+  const dayItems = orderDayItems(
+    trip.items.filter((item) => item.city_id === city.id && item.date === date)
+  );
+  const now = new Date();
+  const next = dayItems.find((item) => {
+    if (!item.time || !itemPlace(item)) return false;
+    return zonedToInstant(item.date, item.time, city.tz) >= now;
+  });
+
+  let meMarker: Marker | null = null;
+  const watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      if (!meMarker) {
+        const el = document.createElement('div');
+        el.className = 'where-dot';
+        meMarker = new Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+      } else {
+        meMarker.setLngLat([longitude, latitude]);
+      }
+      if (next) {
+        const place = itemPlace(next)!;
+        const metres = haversineMetres(
+          { lat: latitude, lon: longitude },
+          { lat: place.lat, lon: place.lon }
+        );
+        const mins = Math.max(1, Math.round((metres * 1.3) / 80));
+        note.textContent = `You're about ${Math.round(metres)} m from ${next.title}, ≈ ${mins} min walk`;
+      } else {
+        note.textContent = 'No more timed stops today.';
+      }
+    },
+    () => {
+      note.textContent = 'Location is off. Turn it on in Settings › Safari › Location.';
+      navigator.geolocation.clearWatch(watchId);
+    },
+    { enableHighAccuracy: true }
+  );
+}
+
+function haversineMetres(
+  a: { lat: number; lon: number },
+  b: { lat: number; lon: number }
+): number {
+  const R = 6371000;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLon = ((b.lon - a.lon) * Math.PI) / 180;
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.asin(Math.min(1, Math.sqrt(s)));
 }

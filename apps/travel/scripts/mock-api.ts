@@ -125,7 +125,7 @@ export function createMockApi() {
             updated_at: nowIso()
           };
       trips.set(trip.id, trip);
-      return json(201, { ok: true, data: trip });
+      return json(201, { ok: true, data: { trip, version: version(trip) } });
     }
 
     if (path === '/api/travel-trip') {
@@ -140,7 +140,7 @@ export function createMockApi() {
           return json(409, { ok: false, error: { code: 'conflict', message: 'This trip changed somewhere else. Reload to see the latest.' } });
         }
         Object.assign(trip, payload.patch, { updated_at: nowIso() });
-        return json(200, { ok: true, data: trip });
+        return json(200, { ok: true, data: { trip, version: version(trip) } });
       }
       if (method === 'DELETE') {
         trips.delete(id);
@@ -167,7 +167,7 @@ export function createMockApi() {
         } as Item;
         trip.items.push(item);
         trip.updated_at = nowIso();
-        return json(200, { ok: true, data: trip });
+        return json(200, { ok: true, data: { trip, version: version(trip) } });
       }
       if (method === 'PATCH') {
         const itemId = url.searchParams.get('id') ?? '';
@@ -185,7 +185,7 @@ export function createMockApi() {
           updated_at: nowIso()
         } as Item;
         trip.updated_at = nowIso();
-        return json(200, { ok: true, data: trip });
+        return json(200, { ok: true, data: { trip, version: version(trip) } });
       }
       if (method === 'DELETE') {
         const itemId = url.searchParams.get('id') ?? '';
@@ -195,7 +195,7 @@ export function createMockApi() {
         }
         trip.items = trip.items.filter((i) => i.id !== itemId);
         trip.updated_at = nowIso();
-        return json(200, { ok: true, data: trip });
+        return json(200, { ok: true, data: { trip, version: version(trip) } });
       }
     }
 
@@ -211,7 +211,7 @@ export function createMockApi() {
         label: payload.label ?? 'Check-in'
       });
       trip.updated_at = nowIso();
-      return json(200, { ok: true, data: trip });
+      return json(200, { ok: true, data: { trip, version: version(trip) } });
     }
 
     if (path === '/api/travel-share' && method === 'POST') {

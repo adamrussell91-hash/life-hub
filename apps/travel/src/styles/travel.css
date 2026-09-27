@@ -289,6 +289,40 @@ body.map-open { overflow: hidden; }
 [hidden] { display: none !important; }
 @media (max-width: 480px) { .fgrid { grid-template-columns: 1fr; } .place-row { flex-wrap: wrap; } }
 
+.mapbox.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  height: 100dvh !important;
+  border-radius: 0;
+}
+.where-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2b6cff;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 6px rgba(43, 108, 255, 0.35);
+  animation: where-pulse 1.4s ease-out infinite;
+}
+.where-note {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--paper, #fff);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  font-size: var(--text-sm, 0.875rem);
+  max-width: min(280px, 80%);
+}
+@keyframes where-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(43, 108, 255, 0.45); }
+  100% { box-shadow: 0 0 0 14px rgba(43, 108, 255, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

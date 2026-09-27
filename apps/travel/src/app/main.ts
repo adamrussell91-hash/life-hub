@@ -126,6 +126,13 @@ if (app) {
 
   const token = publicToken();
   if (token) {
+    let robots = document.querySelector('meta[name="robots"]');
+    if (!robots) {
+      robots = document.createElement('meta');
+      robots.setAttribute('name', 'robots');
+      document.head.append(robots);
+    }
+    robots.setAttribute('content', 'noindex');
     void renderPublicTrip(app, token);
   } else {
     void boot(app);

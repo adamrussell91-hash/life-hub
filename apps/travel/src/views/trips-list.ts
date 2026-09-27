@@ -96,7 +96,11 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
 
   newTripForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const trip = await createTrip({ title: titleInput.value, start_date: startInput.value, end_date: endInput.value });
+    const { trip } = await createTrip({
+      title: titleInput.value,
+      start_date: startInput.value,
+      end_date: endInput.value
+    });
     location.hash = tripRoute(trip.id);
   });
 
@@ -106,7 +110,7 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
-      const trip = await createTrip({ import: parsed });
+      const { trip } = await createTrip({ import: parsed });
       location.hash = tripRoute(trip.id);
     } catch (err) {
       importError.hidden = false;

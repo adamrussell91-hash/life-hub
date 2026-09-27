@@ -58,6 +58,7 @@ export function renderDayMap(
     attributionControl: false
   });
   map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
+  (host as HTMLElement & { _travelMap?: MapLibreMap })._travelMap = map;
 
   const numbers = numberStops(items);
   const markers = new Map<string, Marker>();
