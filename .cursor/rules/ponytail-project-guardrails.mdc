@@ -22,6 +22,8 @@ Simplicity means the smallest correct implementation of the requested product.
 
 Simplicity does not mean the smallest amount of code regardless of behaviour.
 
+Ponytail does not apply to UX/UI quality. For any visual or interaction fix, `ux-fix-standard.mdc` governs: the unit of work is the whole surface, not the single value that makes the reported symptom disappear.
+
 Before writing code:
 
 1. Understand the requested behaviour fully.
