@@ -17,11 +17,21 @@ const GITHUB_ENV = { GITHUB_TOKEN: 'token' };
 function githubFetch({ people, organisations, relationships }) {
   return async (url) => {
     const href = String(url);
-    const body = (data) => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
-    });
+    // Contents mock must include sha/encoding/size — fetchDataFile (#531) rejects
+    // content-only payloads and would otherwise null the whole professional bridge.
+    const body = (data) => {
+      const text = JSON.stringify(data);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: `sha-${Buffer.byteLength(text)}`,
+          encoding: 'base64',
+          content: Buffer.from(text).toString('base64'),
+          size: Buffer.byteLength(text)
+        })
+      };
+    };
     if (href.endsWith('/data/professional/people.json')) return body(people);
     if (href.endsWith('/data/professional/organisations.json')) return body(organisations);
     if (href.endsWith('/data/professional/relationships.json')) return body(relationships);

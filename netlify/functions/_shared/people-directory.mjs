@@ -1,4 +1,5 @@
 import { formatEntityRef } from './entity-ref.mjs';
+import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
 /**
@@ -120,12 +121,14 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
         : 'No relationship on record');
 
     const pendingProposals = proposalCounts[personRef] ?? proposalCounts[person.id] ?? 0;
+    // Never surface Notion URL / `p/` debris in the directory name or avatar.
+    const displayName = cleanIdentityDisplayName(person.display_name) || person.display_name;
 
     people.push({
       id: person.id,
       ref: personRef,
-      display_name: person.display_name,
-      initials: monogram(person.display_name),
+      display_name: displayName,
+      initials: monogram(displayName),
       role_line: roleLine,
       relationship_roles: proRoles,
       organisation: primaryOrg
