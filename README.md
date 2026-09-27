@@ -79,6 +79,14 @@ Routing is re-evaluated independently for each message rather than pinned for a 
 
 ## Verify
 
+**Before any PR:** agents must run and pass the mandatory gate (same Pages-critical checks Pages cares about):
+
+```bash
+npm run pre-pr-check
+```
+
+See root `AGENTS.md` and `scripts/pre-pr-check.mjs`.
+
 Run the unit and integration suite plus fixture validation:
 
 ```bash

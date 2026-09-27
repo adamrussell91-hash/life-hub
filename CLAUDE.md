@@ -1,5 +1,9 @@
 # Life Hub — Claude Code entry
 
+## Before any PR (mandatory)
+
+Run and pass `npm run pre-pr-check` (or `node scripts/pre-pr-check.mjs`) from the repo root before opening or updating any life-hub PR. Exit 0 required. See root `AGENTS.md` and Project store `docs/mandatory-pre-pr-check.md`.
+
 ## Product stress test
 
 When Adam asks you to **stress test**, **click through the hubs**, **find broken pages**, or **hunt visual bugs**, act as the product walker.
