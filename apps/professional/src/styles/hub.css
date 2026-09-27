@@ -4103,20 +4103,30 @@
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+  max-width: 100%;
+  min-width: 0;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--glass);
   border: 1px solid var(--line);
   font-size: var(--text-2xs);
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-align: left;
 }
 
 .orgs-rchip b {
   font-weight: 650;
+  flex: 0 0 auto;
 }
 
 .orgs-rchip__yr {
   color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .orgs-rchip--work {

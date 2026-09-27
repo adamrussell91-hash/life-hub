@@ -1,5 +1,4 @@
 import { formatEntityRef } from './entity-ref.mjs';
-import { findActiveSelfPerson } from './career-overview.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
