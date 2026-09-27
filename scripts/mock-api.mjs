@@ -430,6 +430,25 @@ export function createMockApi({ root, now = Date.now, sessionMs = SESSION_MS, ex
       return true;
     }
 
+    if (url.pathname === '/api/network-ecology/world') {
+      if (request.method !== 'GET') return methodNotAllowed(response, 'GET');
+      if (!readSession(request)) return unauthenticated(response);
+      try {
+        const fixturePath = resolve(rootPath, 'scripts/fixtures/network-ecology-world-mock.json');
+        const raw = await readFile(fixturePath, 'utf8');
+        json(response, 200, JSON.parse(raw), PRIVATE_HEADERS);
+      } catch (fixtureError) {
+        error(
+          response,
+          500,
+          'fixture_missing',
+          fixtureError instanceof Error ? fixtureError.message : 'Network ecology mock fixture missing.',
+          true
+        );
+      }
+      return true;
+    }
+
     if (url.pathname === '/api/threads') {
       if (!readSession(request)) return unauthenticated(response);
       json(response, 200, { ok: true, data: { threads: [] } }, PRIVATE_HEADERS);

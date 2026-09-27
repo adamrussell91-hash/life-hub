@@ -180,7 +180,9 @@ export async function assembleHistoryGraph(dateInput, deps = {}) {
     kind: 'organisation',
     label: s.label,
     member_refs: s.member_refs,
-    habitat: classifyHabitat(s)
+    habitat: classifyHabitat(s),
+    since: s.since,
+    event_date: null
   }));
 
   const bridgePeople = computeBridgePeople(groups);
