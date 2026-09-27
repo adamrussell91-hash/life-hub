@@ -1,5 +1,6 @@
 import { formatEntityRef } from './entity-ref.mjs';
 import { findActiveSelfPerson } from './career-overview.mjs';
+import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
 /**
@@ -340,13 +341,16 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
       }
     }
 
+    const displayName =
+      cleanIdentityDisplayName(organisation.display_name) || organisation.display_name;
+
     organisations.push({
       id: organisation.id,
       ref,
-      display_name: organisation.display_name,
+      display_name: displayName,
       legal_name: organisation.legal_name ?? null,
       logo_key: organisation.logo_key ?? null,
-      monogram: orgMonogram(organisation.display_name),
+      monogram: orgMonogram(displayName),
       chips,
       people_count: people.length,
       people,

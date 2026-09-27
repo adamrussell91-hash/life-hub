@@ -13,6 +13,7 @@ import {
   listGithubOrganisationCandidates,
   listGithubRelationshipEntries
 } from './github-professional-data.mjs';
+import { dedupeIdentityRows } from './identity-display-name.mjs';
 
 const ORG_BATCH_SIZE = 10;
 
@@ -57,7 +58,7 @@ export async function loadAllOrganisationsWithRelationships({
       ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
       ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
     ];
-    return { organisation: { ...record, ref }, relationships };
+    return { organisation: { ...record, ref }, relationships, _source: 'blob' };
   });
 
   const native = results.filter(Boolean);
@@ -92,9 +93,18 @@ export async function loadAllOrganisationsWithRelationships({
         if (!endpoint) continue;
         relationships.push({ link, endpoint, direction });
       }
-      return { organisation: { ...record, ref, logo_key: record.logo_key ?? null }, relationships };
+      return {
+        organisation: { ...record, ref, logo_key: record.logo_key ?? null },
+        relationships,
+        _source: 'github'
+      };
     }
   );
 
-  return [...native, ...imported];
+  return dedupeIdentityRows(
+    [...native, ...imported],
+    (row) => row.organisation,
+    (row, organisation) => ({ organisation, relationships: row.relationships }),
+    (row) => (row._source === 'github' ? 'github' : 'blob')
+  );
 }

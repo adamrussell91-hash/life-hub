@@ -379,11 +379,19 @@ test('search results interleave native Blob-backed people/organisations with the
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url) => {
     const href = String(url);
-    const body = (data) => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
-    });
+    const body = (data) => {
+      const text = JSON.stringify(data);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: `sha-${Buffer.byteLength(text)}`,
+          encoding: 'base64',
+          content: Buffer.from(text).toString('base64'),
+          size: Buffer.byteLength(text)
+        })
+      };
+    };
     if (href.endsWith('/data/professional/people.json')) {
       return body([{ legacy_id: 'leg-person-1', display_name: 'Example Import Person', sort_name: null, aliases: [] }]);
     }
