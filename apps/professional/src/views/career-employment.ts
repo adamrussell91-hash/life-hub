@@ -62,11 +62,6 @@ export function renderCareerEmployment(host: HTMLElement, model: CareerModel): v
   const section = document.createElement('section');
   section.className = 'career-page__work';
   section.setAttribute('aria-label', 'Work history');
-  section.style.background = 'var(--glass)';
-  section.style.border = '1px solid var(--line)';
-  section.style.borderRadius = 'var(--radius-md)';
-  section.style.boxShadow = 'var(--elev-1)';
-  section.style.padding = 'var(--space-4)';
 
   const head = document.createElement('div');
   head.className = 'career-page__section-head';
