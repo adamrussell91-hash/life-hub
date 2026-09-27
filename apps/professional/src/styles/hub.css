@@ -4873,3 +4873,117 @@
     max-height: 72px;
   }
 }
+
+/* Ties to confirm (Network Ecology tie inference) */
+.ties-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4, 1rem);
+  min-width: 0;
+  max-width: 52rem;
+}
+
+.ties-confirm__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3, 0.75rem);
+}
+
+.ties-confirm__title {
+  margin: 0;
+  font-family: var(--font-display, var(--font-ui));
+  font-size: var(--text-xl);
+  color: var(--ink);
+}
+
+.ties-confirm__count {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.ties-confirm__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.ties-confirm__list[hidden],
+.ties-confirm .empty-state[hidden] {
+  display: none !important;
+}
+
+.ties-confirm__row {
+  padding: var(--space-3, 0.75rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 8px);
+  background: var(--paper);
+  min-width: 0;
+}
+
+.ties-confirm__row:focus {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+.ties-confirm__role-line {
+  margin: 0 0 0.25rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.ties-confirm__names {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+
+.ties-confirm__name {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ties-confirm__role {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-sm);
+  margin-bottom: 0.5rem;
+}
+
+.ties-confirm__role-select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.25rem 0.5rem;
+}
+
+.ties-confirm__reason {
+  margin: 0 0 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.ties-confirm__quotes {
+  margin: 0 0 0.75rem;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.ties-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+@media (max-width: 719px) {
+  .people-page__ties-link {
+    order: 5;
+  }
+}
