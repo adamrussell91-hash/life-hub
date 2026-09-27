@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { IDENTITY_SCHEMA_VERSION, parseOrganisationRecord, parsePersonRecord } from './identity-schema.mjs';
-import { formatEntityRef } from './entity-ref.mjs';
+import { formatEntityRef, parseEntityRef } from './entity-ref.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
 
 // Read-only bridge onto the private `life-hub-data` repository's imported
@@ -423,6 +423,13 @@ export async function listGithubPersonCandidates(options = {}) {
   return [...data.peopleById.values()].filter((record) => !isImportedStudentPerson(record));
 }
 
+/** Communications-database students co-imported into people.json (not colleagues). */
+export async function listGithubImportedStudentPeople(options = {}) {
+  const data = await loadProfessionalData(options);
+  if (!data) return [];
+  return [...data.peopleById.values()].filter(isImportedStudentPerson);
+}
+
 export async function getGithubActiveSelfPerson(options = {}) {
   const people = await listGithubPersonCandidates(options);
   return people.find((record) => record.is_self === true && record.lifecycle_status === 'active') ?? null;
@@ -433,13 +440,27 @@ export async function listGithubOrganisationCandidates(options = {}) {
   return data ? [...data.organisationsById.values()] : [];
 }
 
+function isStudentPersonRef(data, otherRef) {
+  const ref = typeof otherRef === 'string' ? parseEntityRef(otherRef) : otherRef;
+  if (!ref || ref.kind !== 'person') return false;
+  const person = data.peopleById.get(ref.id);
+  return Boolean(person && isImportedStudentPerson(person));
+}
+
 // Returns `{ link, otherRef, direction }` rows for the given kind/id — the
 // same shape entity-overview.mjs's native merge needs before it resolves
 // `otherRef` into a hydrated `endpoint` via the caller's own `resolveEntity`.
+// Network surfaces must not list Communications students as colleagues or
+// org members, so entries whose counterpart is an imported student are
+// dropped here. Direct getGithubPerson still resolves a student by id.
 export async function listGithubRelationshipEntries(kind, id, options = {}) {
   const data = await loadProfessionalData(options);
   if (!data) return [];
-  if (kind === 'person') return data.relationshipsByPersonId.get(id) ?? [];
-  if (kind === 'organisation') return data.relationshipsByOrganisationId.get(id) ?? [];
-  return [];
+  const entries =
+    kind === 'person'
+      ? data.relationshipsByPersonId.get(id) ?? []
+      : kind === 'organisation'
+        ? data.relationshipsByOrganisationId.get(id) ?? []
+        : [];
+  return entries.filter((entry) => !isStudentPersonRef(data, entry.otherRef));
 }

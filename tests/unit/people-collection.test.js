@@ -5,7 +5,9 @@ import { makeLink, makeOrganisation, makePerson, makeResolveEntity, memoryStore 
 import {
   deriveOrganisationId,
   derivePersonId,
-  resetProfessionalDataCache
+  isImportedStudentPerson,
+  resetProfessionalDataCache,
+  STUDENT_ORIGINAL_CATEGORY
 } from '../../netlify/functions/_shared/github-professional-data.mjs';
 import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
@@ -287,4 +289,57 @@ test('does not listForEntity Blob twins discarded by identity dedupe', async () 
   assert.ok(!result.some((row) => row.person.id === discardedTwin.id));
   assert.equal(result.filter((row) => row.person.display_name === 'Natalie Shih').length, 1);
   assert.equal(result.length, 42); // native only + Natalie + 40 github clones
+});
+
+test('excludes GitHub Communications students and Blob name-twins from People collection', async () => {
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  const colleagueBlob = await makePerson(store, { display_name: 'Native Colleague' });
+  const studentTwin = await makePerson(store, { display_name: 'Year 10 Student' });
+  const env = { GITHUB_TOKEN: 'token' };
+  const fetchImpl = githubFetch({
+    people: [
+      {
+        legacy_id: 'leg-adult',
+        display_name: 'Lauren Stuart',
+        original_category: 'People (Professional Relationship Management)'
+      },
+      {
+        legacy_id: 'leg-student',
+        display_name: 'Year 10 Student',
+        original_category: STUDENT_ORIGINAL_CATEGORY
+      }
+    ],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    relationships: [
+      {
+        person_legacy_id: 'leg-adult',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      },
+      {
+        person_legacy_id: 'leg-student',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
+
+  const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
+  assert.ok(result.every((row) => !isImportedStudentPerson(row.person)));
+  assert.ok(!result.some((row) => row.person.display_name === 'Year 10 Student'));
+  assert.ok(!result.some((row) => row.person.id === studentTwin.id));
+  assert.ok(result.some((row) => row.person.id === colleagueBlob.id));
+  assert.ok(result.some((row) => row.person.display_name === 'Lauren Stuart'));
+  assert.equal(
+    result.find((row) => row.person.display_name === 'Lauren Stuart').relationships.length,
+    1
+  );
 });
