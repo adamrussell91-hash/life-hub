@@ -209,3 +209,26 @@ export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
 export function roleBandExtraPx(laneCount: number): number {
   return laneCount <= 0 ? 0 : 22 + (laneCount - 1) * 16;
 }
+
+/**
+ * Integer year ticks for the river axis row (Tasks/medical-strip pattern:
+ * density follows zoom span so labels stay readable).
+ */
+export function axisYearTicks(zoom: RiverZoom): number[] {
+  const span = Math.max(0.1, zoom.to - zoom.from);
+  let step = 1;
+  if (span > 4) step = 2;
+  if (span > 10) step = 3;
+  if (span > 16) step = 5;
+  if (span > 30) step = 10;
+  const start = Math.ceil(zoom.from / step) * step;
+  const end = Math.floor(zoom.to + 1e-9);
+  const years: number[] = [];
+  for (let y = start; y <= end; y += step) {
+    if (y >= zoom.from - 1e-6 && y <= zoom.to + 1e-6) years.push(y);
+  }
+  if (!years.length) {
+    years.push(Math.round((zoom.from + zoom.to) / 2));
+  }
+  return years;
+}

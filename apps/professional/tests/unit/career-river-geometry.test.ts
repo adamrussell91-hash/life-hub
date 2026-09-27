@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignEmploymentLanes,
+  axisYearTicks,
   branchPolyline,
   clampZoom,
   clusterMarks,
@@ -33,6 +34,13 @@ describe('career-river-geometry', () => {
   it('sizes height from the Phase 3 formula', () => {
     expect(riverHeightPx('horizontal', 3, 10)).toBe(Math.max(440, 120 + 3 * 64));
     expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(900, 10 * 150));
+  });
+
+  it('emits readable year axis ticks by zoom span', () => {
+    expect(axisYearTicks({ from: 2023, to: 2026 })).toEqual([2023, 2024, 2025, 2026]);
+    expect(axisYearTicks({ from: 2012, to: 2026 }).every((y) => y % 3 === 0)).toBe(true);
+    expect(axisYearTicks({ from: 2012, to: 2026 }).length).toBeGreaterThan(2);
+    expect(axisYearTicks({ from: 2000, to: 2035 }).every((y) => y % 5 === 0)).toBe(true);
   });
 
   it('clusters marks closer than 10px', () => {

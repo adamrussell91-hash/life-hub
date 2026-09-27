@@ -456,6 +456,16 @@ describe('renderCareerView', () => {
     expect(canvas.querySelector('.career-river__svg-host')?.getAttribute('style') || '').toMatch(
       /pan-y/
     );
+    const years = [...canvas.querySelectorAll('[data-part="axis-year"]')].map(
+      (node) => node.textContent
+    );
+    expect(years.length).toBeGreaterThan(0);
+    expect(years.every((y) => /^\d{4}$/.test(y || ''))).toBe(true);
+    // #536/#544: Work list is the reading surface — no SVG role strings on bars.
+    const svgText = [...canvas.querySelectorAll('.career-river__svg text')]
+      .map((n) => n.textContent || '')
+      .join(' ');
+    expect(svgText).not.toMatch(/English Teacher|Psychology Teacher|Gifted Education/);
   });
 
   it('links application items to Career application routes', async () => {
