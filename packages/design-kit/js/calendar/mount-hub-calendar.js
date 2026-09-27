@@ -51,13 +51,21 @@ export function mountHubCalendar(host, adapter) {
   else writeFilterState(hub, defaultFilterForHub(hub));
 
   let destroyed = false;
-  /** Suppress onChange paints until the first loadAll finishes — mid-source paints remounted with entrance flash. */
+  /**
+   * Suppress onChange paints until the first meaningful paint.
+   * Do not wait for every hub source — a slow Life/Knowledge fetch used to
+   * leave the host blank for ~30s while Tasks chrome (locks) already showed.
+   * Tideline skips entrance on remount; Almanac fetches its own payload.
+   */
   let ready = false;
   let selectedDate = adapter.today || getSydneyDateKey(adapter.now ?? new Date());
   let dayLayout = 'dial';
   let ghosts = [];
   let ghostsKey = '';
   let paintToken = 0;
+  /** First paint budget: show skeleton immediately, then paint with whatever sources have arrived. */
+  const FIRST_PAINT_MS = 1200;
+  const GHOST_BUDGET_MS = 1500;
 
   const shell = doc.createElement('div');
   shell.className = 'hub-calendar-mount';
@@ -72,6 +80,25 @@ export function mountHubCalendar(host, adapter) {
   calendarHost.className = 'hub-calendar hub-calendar--workspace';
   calendarHost.dataset.part = 'calendar-host';
   shell.append(errorsHost, calendarHost);
+
+  function paintLoading() {
+    if (calendarHost.querySelector('[data-part="calendar-loading"]')) return;
+    if (calendarHost.childElementCount) return;
+    const note = doc.createElement('p');
+    note.className = 'hub-calendar__loading';
+    note.dataset.part = 'calendar-loading';
+    note.setAttribute('role', 'status');
+    note.textContent =
+      currentZoom() === 'almanac' ? 'Loading Almanac…' : 'Loading calendar…';
+    calendarHost.append(note);
+  }
+
+  function raceMs(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).catch(() => undefined),
+      new Promise((resolve) => setTimeout(resolve, ms))
+    ]);
+  }
 
   function currentZoom() {
     if (typeof adapter.getZoom === 'function') return normalizeCalendarZoom(adapter.getZoom());
@@ -104,7 +131,7 @@ export function mountHubCalendar(host, adapter) {
     loadLife: adapter.loadLife,
     today: adapter.today,
     onChange: () => {
-      // After initial load: retry / late source updates re-paint. During loadAll: wait for the batch.
+      // After first paint: late sources re-paint (Tideline skips entrance; Almanac stays mounted).
       if (!destroyed && ready) schedulePaint();
     }
   });
@@ -276,12 +303,24 @@ export function mountHubCalendar(host, adapter) {
   view?.addEventListener?.('hashchange', onHashOrPop);
   view?.addEventListener?.('popstate', onHashOrPop);
 
-  void loader.loadAll().then(async () => {
+  paintLoading();
+  void (async () => {
+    const all = loader.loadAll();
+    // Paint on budget — never sit blank while a foreign hub source stalls.
+    await raceMs(all, FIRST_PAINT_MS);
     if (destroyed) return;
-    await loadGhosts(currentZoom());
+    await raceMs(loadGhosts(currentZoom()), GHOST_BUDGET_MS);
     ready = true;
     if (!destroyed) paint();
-  });
+    try {
+      await all;
+    } catch {
+      /* per-source errors live in loader buckets */
+    }
+    if (destroyed) return;
+    await loadGhosts(currentZoom());
+    schedulePaint();
+  })();
 
   return {
     destroy() {
@@ -297,10 +336,19 @@ export function mountHubCalendar(host, adapter) {
     reload() {
       ready = false;
       ghostsKey = '';
-      return loader.loadAll().then(() => loadGhosts(currentZoom())).then(() => {
-        ready = true;
-        schedulePaint();
-      });
+      paintLoading();
+      const all = loader.loadAll();
+      return raceMs(all, FIRST_PAINT_MS)
+        .then(() => raceMs(loadGhosts(currentZoom()), GHOST_BUDGET_MS))
+        .then(() => {
+          ready = true;
+          schedulePaint();
+          return all.finally(() => {
+            if (destroyed) return;
+            ghostsKey = '';
+            return loadGhosts(currentZoom()).then(() => schedulePaint());
+          });
+        });
     },
     /** Re-read zoom from the router and paint in place (Back/Forward / soft route). */
     syncZoom() {

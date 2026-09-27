@@ -1170,21 +1170,84 @@ function bindWatchers(doc, host, isCurrent, repaint) {
 function showUnavailable(doc, host) {
   host.replaceChildren();
   const note = doc.createElement('p');
+  note.className = 'alm__loading';
+  note.dataset.part = 'almanac-unavailable';
   note.textContent = 'Almanac unavailable.';
   host.append(note);
+}
+
+/** Honest loading shell with zoom pills — never a blank host while /api/almanac runs. */
+function showLoading(doc, host, options) {
+  host.replaceChildren();
+  const root = doc.createElement('section');
+  root.className = 'alm alm--loading';
+  root.dataset.part = 'almanac-loading';
+  root.setAttribute('aria-busy', 'true');
+  root.setAttribute('aria-label', 'Almanac');
+  const nav = doc.createElement('header');
+  nav.className = 'alm__nav';
+  nav.dataset.part = 'nav';
+  const period = doc.createElement('div');
+  period.className = 'alm__period';
+  const title = doc.createElement('b');
+  title.textContent = 'The Almanac';
+  const span = doc.createElement('span');
+  span.textContent = 'Loading…';
+  period.append(title, span);
+  const zoom = doc.createElement('div');
+  zoom.className = 'hub-pills';
+  zoom.setAttribute('role', 'group');
+  zoom.setAttribute('aria-label', 'Zoom');
+  zoom.dataset.part = 'zoom-pills';
+  const thumb = doc.createElement('span');
+  thumb.className = 'hub-pills__thumb';
+  zoom.append(thumb);
+  for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = `hub-pills__btn${name === 'Almanac' ? ' is-active' : ''}`;
+    button.setAttribute('aria-pressed', String(name === 'Almanac'));
+    button.dataset.zoom = name.toLowerCase();
+    button.textContent = name;
+    button.addEventListener('click', () => {
+      options?.onSwitchView?.(name.toLowerCase());
+    });
+    zoom.append(button);
+  }
+  nav.append(period, zoom);
+  const note = doc.createElement('p');
+  note.className = 'alm__loading';
+  note.dataset.part = 'almanac-loading-copy';
+  note.setAttribute('role', 'status');
+  note.textContent = 'Loading Almanac…';
+  const card = doc.createElement('div');
+  card.className = 'alm__card alm__skeleton';
+  card.setAttribute('aria-hidden', 'true');
+  root.append(nav, note, card);
+  host.append(root);
+  applyHubPillsThumb(zoom);
 }
 
 async function load(token, doc, host, options) {
   try {
     const today = getSydneyDateKey(options.now ?? new Date());
     if (token !== generation) return;
-    const response = await request(options)(`/api/almanac?from=${today}&to=${addDays(today, 365)}`, {
-      credentials: 'include'
-    });
+    const fetchInit = { credentials: 'include' };
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      fetchInit.signal = AbortSignal.timeout(20_000);
+    }
+    const response = await request(options)(
+      `/api/almanac?from=${today}&to=${addDays(today, 365)}`,
+      fetchInit
+    );
     if (!response.ok) throw new Error('almanac');
     const body = await response.json();
     if (!body?.ok || !Array.isArray(body.lines) || !Array.isArray(body.series)) throw new Error('almanac');
-    await (doc.fonts?.ready ?? Promise.resolve());
+    // Fonts must not gate paint — a stalled webfont left Almanac blank for tens of seconds.
+    await Promise.race([
+      doc.fonts?.ready ?? Promise.resolve(),
+      new Promise((resolve) => setTimeout(resolve, 600))
+    ]);
     if (token !== generation) return;
     session = { token, doc, host, options };
     const view = present(body);
@@ -1219,7 +1282,7 @@ export function renderAlmanac(doc, host, options = {}) {
   const token = ++generation;
   host.style.minWidth = '0';
   if (host.parentElement) host.parentElement.style.minWidth = '0';
-  host.replaceChildren();
+  showLoading(doc, host, options);
   void load(token, doc, host, options);
 }
 

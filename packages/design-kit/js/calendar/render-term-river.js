@@ -14,7 +14,16 @@ import { TR } from '../term-river-geometry.js';
 import { addDaysKey, buildTimeScale } from '../school-time.js';
 import { formatDisplayDate } from '../format-display-date.js';
 import { applyHubPillsThumb } from '../hub-motion.js';
-import { LANES, byLane, deriveRiverZooms, riverWeekLabel, weeklyLoad, weeksBetween } from './term-river.js';
+import {
+  LANES,
+  byLane,
+  deriveRiverZooms,
+  mergeRiverItems,
+  riverItemsFromHubEvents,
+  riverWeekLabel,
+  weeklyLoad,
+  weeksBetween
+} from './term-river.js';
 import { forecastSeries } from './capacity-model.js';
 import { acceptPlan } from './ghost-writes.js';
 import {
@@ -254,10 +263,16 @@ function paintKey(inp) {
   const terms = Array.isArray(inp?.terms)
     ? inp.terms.map(term => `${term?.term ?? ''}:${term?.starts_on ?? ''}:${term?.ends_on ?? ''}`).join(',')
     : '';
+  // Hub overlays (Classes / Comms / …) load with events — must remount when they arrive,
+  // not only when visual.RIVER.ITEMS changes.
+  const events = Array.isArray(inp?.events)
+    ? `${inp.events.length}:${inp.events[0]?.record?.id ?? inp.events[0]?.id ?? ''}:${inp.events[inp.events.length - 1]?.record?.id ?? inp.events[inp.events.length - 1]?.id ?? ''}`
+    : '0';
   return [
     inp?.today ?? '',
     ghosts,
     terms,
+    events,
     riverData?.TODAY ?? '',
     riverData?.ZOOMS?.term?.from ?? '',
     riverData?.ZOOMS?.term?.to ?? '',
@@ -288,7 +303,8 @@ function buildModel() {
   LOGGED = data.LOGGED ?? {};
   PATTERN = data.PATTERN ?? [];
   COMMITMENTS = data.COMMITMENTS ?? [];
-  ITEMS = resolveItems([...(data.ITEMS ?? [])]);
+  // Visual RIVER.ITEMS alone left Term/Year blank while filter chips counted hub events.
+  ITEMS = resolveItems(mergeRiverItems(data.ITEMS ?? [], riverItemsFromHubEvents(input?.events ?? [])));
 
   ALL_DAYS = [];
   for (let date = YEAR.from; date <= YEAR.to; date = addDays(date, 1)) ALL_DAYS.push(date);
@@ -422,9 +438,10 @@ function mount({ entrance = false } = {}) {
     writeFilterState(input?.hub || 'life', next);
     for (const [id, node] of nodes) {
       if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
-      const itemId = id.split(':')[1];
+      const itemId = id.slice(id.indexOf(':') + 1);
       const item =
         filterItems.find((row) => row.id === itemId) ||
+        ITEMS.find((row) => row.id === itemId) ||
         riverItems.find((record) => record.id === itemId);
       if (!item) continue;
       const visible = isItemVisible(item, next);
@@ -455,8 +472,11 @@ function mount({ entrance = false } = {}) {
   mountLegend(card);
   for (const [id, node] of nodes) {
     if (!id.startsWith('item:') && !id.startsWith('bar:') && !id.startsWith('pt:')) continue;
-    const itemId = id.split(':')[1];
-    const item = riverItems.find((record) => record.id === itemId);
+    const itemId = id.slice(id.indexOf(':') + 1);
+    const item =
+      filterItems.find((row) => row.id === itemId) ||
+      ITEMS.find((row) => row.id === itemId) ||
+      riverItems.find((record) => record.id === itemId);
     if (item && !isItemVisible(item, filterState)) {
       node.setAttribute?.('visibility', 'hidden');
       if (node.style) node.style.opacity = '0';
@@ -678,6 +698,7 @@ function mountLaneItems(group, laneId, top, h) {
       'data-id': item.id,
       'aria-label': `${item.title}, ${dd(item.from)} – ${dd(item.to)}`
     }, group);
+    nodes.set(`bar:${item.id}`, rect);
     const text = s('text', { class: 'tr-t-bar', y: y + 13 }, group);
     placers.push(X => {
       const a = X(item.from);
@@ -743,6 +764,7 @@ function mountLaneItems(group, laneId, top, h) {
           'data-id': item.id,
           'aria-label': `${item.title}${item.date ? `, ${dd(item.date)}` : ''}${ghost ? '. Proposal from Hammond.' : ''}`
         }, group);
+    if (!item.sample) nodes.set(`item:${item.id}`, node);
     const chip = ghost ? s('g', { class: 'tr-agent' }, group) : null;
     if (chip) {
       s('circle', { r: 7 }, chip);

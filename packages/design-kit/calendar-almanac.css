@@ -143,6 +143,17 @@
 .alm-list__step.is-done .alm-list__dot{background:var(--pastel-sage);border-color:var(--pastel-sage-ink)}
 .alm-list__step.is-now .alm-list__d{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
 .alm-list__d{color:var(--muted);font-variant-numeric:tabular-nums}
+/* Loading shell — zoom stays usable; chart area is an honest skeleton. */
+.alm__loading{margin:0;padding:var(--space-4) 0;color:var(--muted);font-size:var(--text-sm)}
+.alm__skeleton{min-height:14rem;background:
+  linear-gradient(90deg,
+    color-mix(in srgb,var(--navy) 4%,transparent) 0%,
+    color-mix(in srgb,var(--wave) 10%,transparent) 45%,
+    color-mix(in srgb,var(--navy) 4%,transparent) 100%);
+  background-size:200% 100%;
+  animation:alm-skel 1.4s ease-in-out infinite}
+@keyframes alm-skel{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.alm__skeleton{animation:none}}
 @media (max-width:719px){
   .page{padding:var(--space-4) var(--space-4) var(--space-12)}
   .alm__nav{flex-wrap:nowrap;gap:var(--space-2)}

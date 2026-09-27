@@ -560,9 +560,13 @@ function mount({ entrance = false } = {}) {
 
   const card = el('div', 'cal__card', undefined, section, { 'data-part': 'card' });
   const grid = el('div', 'cal__grid', undefined, card);
-  el('div', 'cal-corner', 'Capacity from your logs', grid);
+  const capCorner = el('div', 'cal-corner', 'Capacity from your logs', grid);
+  capCorner.style.gridColumn = '1';
+  capCorner.style.gridRow = '1';
   for (const date of days) mountHead(grid, date);
-  el('div', 'cal-allday cal-corner', 'Due', grid);
+  const dueCorner = el('div', 'cal-allday cal-corner', 'Due', grid);
+  dueCorner.style.gridColumn = '1';
+  dueCorner.style.gridRow = '2';
   for (const date of days) mountAllDay(grid, date);
   mountBandLabels(grid);
   for (const date of days) mountBody(grid, date);
@@ -681,10 +685,20 @@ function dayByDate(date) {
   return model.days.find(day => day.date === date);
 }
 
+/** 1-based grid column for a day (column 1 is the band/label gutter). */
+function dayGridColumn(date) {
+  const days = state.phone ? [state.phoneDay] : model.week;
+  const index = days.indexOf(date);
+  return index >= 0 ? index + 2 : 2;
+}
+
 function mountHead(grid, date) {
   const day = dayByDate(date);
   const tag = day.tag;
   const head = el('div', `cal-head${date === model.today ? ' is-today' : ''}${day.over ? ' is-over' : ''}`, undefined, grid, { 'data-part': 'day-head', 'data-date': date });
+  // Headers own their day column — never auto-place under a neighbour when a row is sparse.
+  head.style.gridColumn = String(dayGridColumn(date));
+  head.style.gridRow = '1';
   // Date stays above the capacity bar so bars align across the week.
   // over / tags / vitals sit in .cal-head__chips at the bottom of the square.
   el('div', 'cal-head__name', `<span class="cal-head__dow">${DOW(date)}</span><span class="cal-head__num">${DOM_NUM(date)}</span>`, head);
@@ -707,6 +721,8 @@ function mountHead(grid, date) {
 function mountAllDay(grid, date) {
   const day = dayByDate(date);
   const cell = el('div', 'cal-allday', undefined, grid, { 'data-part': 'all-day', 'data-date': date });
+  cell.style.gridColumn = String(dayGridColumn(date));
+  cell.style.gridRow = '2';
   for (const due of day.due) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
@@ -728,6 +744,8 @@ function mountAllDay(grid, date) {
 
 function mountBandLabels(grid) {
   const column = el('div', 'cal-bands', undefined, grid, { 'data-part': 'band-labels' });
+  column.style.gridColumn = '1';
+  column.style.gridRow = '3';
   column.style.height = `${model.total + SLEEP_STRIP_PX}px`;
   bands.forEach((band, index) => {
     const button = el('button', 'cal-band', `<b>${band.label}${ICON.chev}</b><span>${model.subs[band.id] ?? ''}</span>`, column, {
@@ -747,6 +765,8 @@ function mountBandLabels(grid) {
 function mountBody(grid, date) {
   const day = dayByDate(date);
   const body = el('div', `cal-body${day.past ? ' is-past' : ''}`, undefined, grid, { 'data-part': 'day-body', 'data-date': date });
+  body.style.gridColumn = String(dayGridColumn(date));
+  body.style.gridRow = '3';
   body.style.height = `${model.total + SLEEP_STRIP_PX}px`;
   nodes.set(`colbody:${date}`, body);
   bands.forEach((band, index) => {

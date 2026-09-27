@@ -75,6 +75,40 @@ test('Tideline and hub mount suppress load/refresh entrance flash', () => {
   assert.match(tideline, /mount\(\{\s*entrance:\s*false\s*\}\)/);
   assert.match(mount, /let ready = false/);
   assert.match(mount, /if \(!destroyed && ready\) schedulePaint/);
+  // Progressive first paint — do not wait for every foreign hub source.
+  assert.match(mount, /FIRST_PAINT_MS/);
+  assert.match(mount, /paintLoading/);
+  assert.match(mount, /raceMs\(all,\s*FIRST_PAINT_MS\)/);
+});
+
+test('Almanac paints an honest loading shell before /api/almanac returns', () => {
+  const alm = readFileSync(join(root, 'packages/design-kit/js/calendar/render-almanac.js'), 'utf8');
+  assert.match(alm, /function showLoading/);
+  assert.match(alm, /showLoading\(doc,\s*host,\s*options\)/);
+  assert.match(alm, /AbortSignal\.timeout\(20_000\)/);
+  assert.match(alm, /Promise\.race\(\[\s*doc\.fonts/);
+});
+
+test('hub source fetches carry a timeout so one hung API cannot stall loadAll', () => {
+  const src = readFileSync(join(root, 'packages/design-kit/js/calendar/load-hub-sources.js'), 'utf8');
+  assert.match(src, /SOURCE_FETCH_MS\s*=\s*12_000/);
+  assert.match(src, /withSourceTimeout/);
+  assert.match(src, /AbortSignal\.timeout/);
+});
+
+test('Almanac tasked scan batches Blob reads (no serial walk of every task)', () => {
+  const src = readFileSync(join(root, 'netlify/functions/almanac.mjs'), 'utf8');
+  assert.match(src, /TASKED_BATCH\s*=\s*10/);
+  assert.match(src, /Promise\.all\(slice\.map/);
+  assert.match(src, /for \(let i = 0; i < index\.length; i \+= TASKED_BATCH\)/);
+});
+
+test('kit calendar.css contains week locks in-column for every hub', () => {
+  const css = readFileSync(join(root, 'packages/design-kit/calendar.css'), 'utf8');
+  assert.match(css, /\.hub-calendar__rail\s+\.calendar-locks__list\s*\{[^}]*minmax\(0,\s*1fr\)/s);
+  assert.match(css, /\.hub-calendar__rail\s+\.calendar-lock-row\s*\{[^}]*min-width:\s*0/s);
+  assert.match(css, /\.hub-calendar__rail\s+\.calendar-lock-row__task\s*\{[^}]*line-clamp:\s*3/s);
+  assert.match(css, /\.hub-calendar__rail\s+\.calendar-lock-row__task\s*\{[^}]*white-space:\s*normal/s);
 });
 
 test('open-in-hub maps domains and builds full-nav Open in links', () => {

@@ -149,6 +149,14 @@ function renderDayAgenda(tasks: Task[], dateKey: string): HTMLElement {
   return agenda;
 }
 
+/** Collapse accidental repeated words in lock titles ("about about …" → "about …"). */
+export function displayLockTitle(title: string): string {
+  return String(title ?? '')
+    .replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function renderLocksWidget(tasks: Task[], weekDates: string[]): HTMLElement {
   const card = el('section', 'hub-calendar__detail calendar-locks');
   card.dataset.part = 'rail-locks';
@@ -160,9 +168,12 @@ function renderLocksWidget(tasks: Task[], weekDates: string[]): HTMLElement {
     row.type = 'button';
     row.disabled = !lock;
     const day = new Date(`${date}T12:00:00`);
+    const label = lock ? displayLockTitle(lock.title) : 'Nothing due';
+    const taskLabel = el('span', 'calendar-lock-row__task', label);
+    if (lock?.title) taskLabel.title = lock.title;
     row.append(
       el('span', 'calendar-lock-row__day', day.toLocaleDateString('en-AU', { weekday: 'short' }).toUpperCase()),
-      el('span', 'calendar-lock-row__task', lock ? lock.title : 'Nothing due')
+      taskLabel
     );
     if (lock) {
       row.addEventListener('click', () => {
@@ -205,9 +216,11 @@ function renderDumpWidget(onReload: () => void): HTMLElement {
   textarea.rows = 2;
   textarea.placeholder = 'Dump away.';
   textarea.setAttribute('aria-label', 'Brain dump');
+  const actions = el('div', 'calendar-dump__actions');
   const submit = el('button', 'btn btn--primary', 'Sort it');
   submit.type = 'submit';
-  form.append(textarea, submit);
+  actions.append(submit);
+  form.append(textarea, actions);
   const results = el('div', 'calendar-dump__results');
   card.append(form, results);
   form.addEventListener('submit', (event) => {
@@ -244,7 +257,10 @@ export type TasksChromeMount = {
 /**
  * Wrap a host with Tasks KEEP chrome around the kit calendar mount point.
  */
-export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
+export function mountTasksCalendarChrome(
+  host: HTMLElement,
+  opts?: { zoom?: string; today?: string }
+): TasksChromeMount {
   host.replaceChildren();
   const root = el('div', 'tasks-calendar-chrome');
   root.dataset.part = 'tasks-calendar-chrome';
@@ -264,10 +280,11 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
 
   const ac = new AbortController();
   let tasks: Task[] = [];
-  let todayKey = new Date().toISOString().slice(0, 10);
+  let todayKey = opts?.today || new Date().toISOString().slice(0, 10);
   /** Skip / patch rail when content is unchanged — mirror Someday #514 (shell once, patch lists). */
   let railSignature = '';
   let railZoom = '';
+  const initialZoom = opts?.zoom || 'week';
 
   async function loadTasks() {
     try {
@@ -452,8 +469,8 @@ export function mountTasksCalendarChrome(host: HTMLElement): TasksChromeMount {
     paintRail(opts?.zoom || 'week');
   }
 
-  // Load once after mount — do not paint an empty locks strip first (that was the flash).
-  void refresh();
+  // Load once after mount with the real zoom — Almanac must not show week locks.
+  void refresh({ zoom: initialZoom });
 
   return {
     root,
