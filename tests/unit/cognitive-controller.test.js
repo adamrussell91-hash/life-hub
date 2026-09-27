@@ -184,6 +184,49 @@ test('Mirror non-final bursts reject missing in-character questions',async()=>{
     /required in-character question/
   );
 });
+test('Fates non-final Clotho bursts reject missing in-character questions',async()=>{
+  let s=start('fates','sprint');
+  s.cursor=s.steps.findIndex(st=>st.speaker==='clotho');
+  if(s.cursor<0){s.steps=[{speaker:'clotho',stage:'cycle1-clotho',maxBursts:3,burstWords:90}];s.cursor=0;}
+  s.status='queued';s.burst=0;s.retrieved=true;
+  await assert.rejects(
+    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Three threads!!',question:null,done:true,evidenceIds:[]})}),
+    /required in-character question/
+  );
+});
+test('every protocol voice receives a You-are-X-only speaker register in the prompt',()=>{
+  const samples=[
+    ['fates','sprint','lachesis','briefing','You are Lachesis only'],
+    ['fates','sprint','clotho','cycle1-clotho','You are Clotho only'],
+    ['fates','sprint','atropos','cycle1-atropos','You are Atropos only'],
+    ['horizon','full','ketill','ketill','You are Ketill only'],
+    ['horizon','full','alvar','alvar','You are Alvar only'],
+    ['horizon','full','sigrid','sigrid','You are Sigrid only'],
+    ['mirror','quick','retrospective','retrospective','You are Gu Jian only'],
+    ['mirror','quick','prospective','prospective','You are Wang Yuan only'],
+    ['mirror','quick','present','present','You are Zheng Ming only'],
+    ['refinery','full','builder','builder','You are Bezalel the Builder only'],
+    ['refinery','full','breaker','breaker','You are Beruriah the Breaker only'],
+    ['refinery','full','reforger','reforger','You are Nechemya the Reforger only'],
+    ['cartographers','full','surveyor','surveyor','You are Captain Josiah Everly the Surveyor only'],
+    ['cartographers','full','miner','miner','You are Miss Harriet Quarrington the Miner only'],
+    ['cartographers','full','cartographer','cartographer','You are Mr Ambrose Meridith the Cartographer only'],
+    ['consilium','standard','principle','dialogue','You are Gaius Officius the Principle only'],
+    ['consilium','standard','consequence','dialogue','You are Lucius Eventus the Consequence only'],
+    ['consilium','standard','virtue','dialogue','You are Titus Honestus the Virtue only'],
+    ['witness','standard','trace','trace','You are Sati the Trace only'],
+    ['witness','standard','patterns','patterns','You are Pañña the Pattern Match only'],
+    ['witness','standard','recalibration','recalibration','You are Upekkhā the Recalibration only'],
+    ['tribunal','standard','inverter','inverter','You are Counselor Frank Delacorte the Inverter only'],
+    ['tribunal','standard','scaler','scaler','You are Special Master Ruth Abernathy the Scaler only'],
+    ['tribunal','standard','context-shifter','context-shifter','You are Judge Hollis Venable the Context Shifter only'],
+  ];
+  for(const [id,mode,speaker,stage,needle] of samples){
+    const s=start(id,mode);
+    const system=buildPrompt(s,{speaker,stage,maxBursts:3,burstWords:90}).system;
+    assert.match(system,new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),`${id}:${speaker}`);
+  }
+});
 test('Horizon speakers receive their own Norse lives, and other protocols do not',()=>{
   const h=start('horizon');
   const ketill=buildPrompt(h,{speaker:'ketill',stage:'ketill'}).system;

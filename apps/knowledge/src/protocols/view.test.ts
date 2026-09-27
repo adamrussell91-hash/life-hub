@@ -116,6 +116,26 @@ describe("protocol conversation view", () => {
     expect(html).toMatch(/protocol-dot is-current"[^>]*data-protocol-scrub-to="4"/);
   });
 
+  it("exposes hover tips for every catalog voice and protocol type across all eight protocols", async () => {
+    const { catalog } = await import("../../../../config/knowledge/cognitive/definitions.mjs");
+    const { renderProtocols } = await import("./view");
+    const host = document.createElement("div");
+    document.body.append(host);
+    renderProtocols({ host });
+    // Library paint uses localCatalog — force via paint by reading cards from host after first paint.
+    // renderProtocols paints library asynchronously-free on construct.
+    const html = host.innerHTML;
+    expect(catalog).toHaveLength(8);
+    for (const def of catalog) {
+      expect(html).toContain(`protocol-type-tip-${def.id}`);
+      expect(html).toContain(def.name);
+      for (const voice of def.voices) {
+        expect(html).toContain(`protocol-voice-tip-${def.id}-${voice.id}`);
+      }
+    }
+    host.remove();
+  });
+
   it("renders Past runs rows with resume for waiting sessions", async () => {
     const { pastRunsHtml } = await import("./view");
     const defs = [{ id: "horizon", name: "The Horizon Council", description: "", motif: "", defaultMode: "full", modes: [], intake: [], voices: [] }];

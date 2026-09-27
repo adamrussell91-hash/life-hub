@@ -265,12 +265,39 @@ function cardArt(id: string) {
 }
 
 const VOICE_PROFILE_TIPS: Record<string, string> = {
+  // Mirror
   retrospective: "Gu Jian reads the ji — what was chosen and declined over months. Past tense, sample before pattern, one instance is never a trend.",
   prospective: "Wang Yuan reads only aspirations Adam stated. Toward, away from, or neutral — never invents a zhi to fill silence.",
   present: "Zheng Ming rectifies the name of the conflict and asks one seven-day question. He does not choose for you.",
+  // Horizon
   ketill: "Ketill keeps the near horizon — six months to two years. Practical forks, Miðgarðr speech, no plan.",
   alvar: "Alvar works backwards from the far condition. Preconditions and Skuld, not advice.",
   sigrid: "Sigrid classifies each finding as trade-off, drift, or unclassified — one closing ask.",
+  // Fates
+  clotho: "Clotho spins — hot, generative, breathless. Options and Greek sparks; she asks what to spin with.",
+  atropos: "Atropos cuts — dry, evidence-first. Demands definition or a falsification test.",
+  lachesis: "Lachesis measures — level options and decisions. She asks early and stops at the choice.",
+  weave: "The Weave witnesses only — durable threads, tensions, what remains open. No advocacy.",
+  // Refinery
+  builder: "Bezalel builds the affirmative Toulmin case — claim, grounds, warrant, backing, qualifier.",
+  breaker: "Beruriah steelmans the weakest joint. Short, dry, no rebuild.",
+  reforger: "Nechemya rebuilds accounting for each Breaker weakness — repaired or accepted.",
+  // Cartographers
+  surveyor: "Captain Everly maps the terrain — positions, contested edges, neglect. Never ranks.",
+  miner: "Miss Quarrington extracts numbered citation slips. No cross-source synthesis.",
+  cartographer: "Mr Meridith draws relations from Miner slips and leaves unsurveyed ground blank.",
+  // Consilium
+  principle: "Gaius Officius — duty and rights owed, regardless of cost. No consequentialism.",
+  consequence: "Lucius Eventus — who is affected, how badly, how likely. If/then chains.",
+  virtue: "Titus Honestus — what the choice practises in the person. Only stated aspirations.",
+  // Witness
+  trace: "Sati reconstructs the thinking sequence without story or judgement.",
+  patterns: "Pañña — sound thinking is the null hypothesis; baseline before any pattern.",
+  recalibration: "Upekkhā calibrates confidence and one disposition — not a replacement decision.",
+  // Tribunal
+  inverter: "Counselor Delacorte tests whether the problem is a solution to an unnamed problem.",
+  scaler: "Special Master Abernathy runs one downscale and one upscale of the same claim.",
+  "context-shifter": "Judge Venable names a setting where the problem would not arise.",
 };
 
 function voiceChipHtml(protocolId: string, voice: Definition["voices"][number]): string {
