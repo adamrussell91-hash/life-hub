@@ -782,30 +782,28 @@ export function createAppController(dependencies) {
     if (name === 'calendar') {
       const zoom = calendarZoomFromHash(windowTarget.location?.hash);
       if (zoom) calendarView = zoom;
-      // The visual seed lands after the first snapshot. One forced refresh on the
-      // first open picks it up; paint waits so the week is not drawn from stale files.
-      // Ghosts are drawn from GET /api/calendar-ghosts, so that read finishes first too.
+      root.querySelector('#calendar-dashboard')?.removeAttribute('hidden');
+      // Paint the grid immediately from whatever Life already has. Do not hold for a
+      // forced refresh + ghosts — that left only the Schedule chip for tens of seconds
+      // while loadLive / calendar-ghosts drained (kit mounts already progressive-paint).
+      // Tideline skips entrance on remount when fresher data arrives.
+      paintCalendarLoadingIfEmpty();
+      renderCalendarSection();
       if (!calendarWeekSynced) {
         calendarWeekSynced = true;
-        holdCalendarPaint = true;
-        root.querySelector('#calendar-dashboard')?.removeAttribute('hidden');
-        void refresh({ force: true })
-          .then(() => loadCalendarGhostsForView())
-          .finally(() => {
-            holdCalendarPaint = false;
+        void refresh({ force: true }).finally(() => {
+          if (currentSection === 'calendar') renderCalendarSection();
+          void loadCalendarGhostsForView().finally(() => {
             if (currentSection === 'calendar') renderCalendarSection();
           });
+        });
       } else {
         const range = visibleWeekRange();
         const key = range ? `${range.from}|${range.to}` : '';
         if (key && key !== calendarGhostsKey) {
-          holdCalendarPaint = true;
           void loadCalendarGhostsForView().finally(() => {
-            holdCalendarPaint = false;
             if (currentSection === 'calendar') renderCalendarSection();
           });
-        } else {
-          renderCalendarSection();
         }
       }
       void loadHubCalendars();
@@ -1389,6 +1387,25 @@ export function createAppController(dependencies) {
     } finally {
       holdCalendarPaint = false;
     }
+  }
+
+  function paintCalendarLoadingIfEmpty() {
+    const host = root.querySelector('#life-calendar-host');
+    if (!host || typeof host.append !== 'function') return;
+    if (host.querySelector?.('[data-part="calendar-loading"], .hub-calendar, [data-part="tideline"], [data-part="day-dial"], [data-part="term-river"], [data-part="almanac"]')) {
+      return;
+    }
+    if (host.childElementCount) return;
+    const doc = host.ownerDocument || root;
+    const note = typeof doc.createElement === 'function'
+      ? doc.createElement('p')
+      : null;
+    if (!note) return;
+    note.className = 'hub-calendar__loading';
+    note.dataset.part = 'calendar-loading';
+    note.setAttribute('role', 'status');
+    note.textContent = 'Loading calendar…';
+    host.append(note);
   }
 
   function renderCalendarSection({ scrollToDetail = false, monthDelta = 0 } = {}) {

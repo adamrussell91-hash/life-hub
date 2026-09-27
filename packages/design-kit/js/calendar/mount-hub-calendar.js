@@ -304,14 +304,16 @@ export function mountHubCalendar(host, adapter) {
   view?.addEventListener?.('popstate', onHashOrPop);
 
   paintLoading();
+  // First meaningful paint immediately (empty grid / skeleton). Late sources
+  // re-paint via onChange once ready — never wait the full loadAll budget.
+  ready = true;
+  schedulePaint();
   void (async () => {
     const all = loader.loadAll();
-    // Paint on budget — never sit blank while a foreign hub source stalls.
     await raceMs(all, FIRST_PAINT_MS);
     if (destroyed) return;
     await raceMs(loadGhosts(currentZoom()), GHOST_BUDGET_MS);
-    ready = true;
-    if (!destroyed) paint();
+    if (!destroyed) schedulePaint();
     try {
       await all;
     } catch {
@@ -334,15 +336,15 @@ export function mountHubCalendar(host, adapter) {
       host.replaceChildren();
     },
     reload() {
-      ready = false;
       ghostsKey = '';
       paintLoading();
+      ready = true;
+      schedulePaint();
       const all = loader.loadAll();
       return raceMs(all, FIRST_PAINT_MS)
         .then(() => raceMs(loadGhosts(currentZoom()), GHOST_BUDGET_MS))
         .then(() => {
-          ready = true;
-          schedulePaint();
+          if (!destroyed) schedulePaint();
           return all.finally(() => {
             if (destroyed) return;
             ghostsKey = '';

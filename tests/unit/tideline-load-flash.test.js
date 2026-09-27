@@ -27,13 +27,37 @@ test('source: Tideline skips entrance replay and identical re-paints', () => {
   assert.match(src, /entranceGuardUntil/);
 });
 
-test('source: mount-hub-calendar gates onChange until first paint, with a budget', () => {
+test('source: mount-hub-calendar paints immediately, then settles on a budget', () => {
   const src = readFileSync(join(rootDir, 'packages/design-kit/js/calendar/mount-hub-calendar.js'), 'utf8');
   assert.match(src, /let ready = false/);
   assert.match(src, /if \(!destroyed && ready\) schedulePaint/);
   assert.match(src, /ready = true/);
   assert.match(src, /FIRST_PAINT_MS/);
   assert.match(src, /paintLoading/);
+  // Immediate first paint — do not await loadAll before schedulePaint.
+  const boot = src.slice(src.indexOf('paintLoading();'));
+  const firstReady = boot.indexOf('ready = true');
+  const firstSchedule = boot.indexOf('schedulePaint();');
+  const firstAwaitAll = boot.indexOf('await raceMs(all, FIRST_PAINT_MS)');
+  assert.ok(firstReady >= 0 && firstSchedule >= 0 && firstAwaitAll >= 0);
+  assert.ok(firstReady < firstAwaitAll, 'ready before loadAll budget');
+  assert.ok(firstSchedule < firstAwaitAll, 'schedulePaint before loadAll budget');
+});
+
+test('source: Life calendar does not hold first paint for refresh+ghosts', () => {
+  const src = readFileSync(join(rootDir, 'apps/life/js/app/app-controller.js'), 'utf8');
+  assert.match(src, /paintCalendarLoadingIfEmpty/);
+  assert.match(src, /Paint the grid immediately/);
+  // First-open path must call renderCalendarSection before awaiting refresh.
+  const cal = src.slice(src.indexOf("if (name === 'calendar')"));
+  const block = cal.slice(0, cal.indexOf("if (name === 'body')"));
+  assert.match(block, /paintCalendarLoadingIfEmpty\(\)/);
+  assert.match(block, /renderCalendarSection\(\)/);
+  assert.doesNotMatch(block, /holdCalendarPaint\s*=\s*true/);
+  const firstRender = block.indexOf('renderCalendarSection()');
+  const firstRefresh = block.indexOf('refresh({ force: true })');
+  assert.ok(firstRender >= 0 && firstRefresh >= 0);
+  assert.ok(firstRender < firstRefresh, 'paint before forced refresh');
 });
 
 test('identical re-render keeps the same tideline shell node', () => {
