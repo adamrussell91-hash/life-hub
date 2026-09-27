@@ -91,13 +91,23 @@ test('an archived person still appears with their relationship history intact', 
 });
 
 function githubFetch({ people, organisations, relationships }) {
+  // Match #531 Contents shape (sha/encoding/size) so oversized-file blob
+  // fallback stays covered when other suites exercise people-collection.
   return async (url) => {
     const href = String(url);
-    const body = (data) => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
-    });
+    const body = (data) => {
+      const text = JSON.stringify(data);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: `sha-${Buffer.byteLength(text)}`,
+          encoding: 'base64',
+          content: Buffer.from(text).toString('base64'),
+          size: Buffer.byteLength(text)
+        })
+      };
+    };
     if (href.endsWith('/data/professional/people.json')) return body(people);
     if (href.endsWith('/data/professional/organisations.json')) return body(organisations);
     if (href.endsWith('/data/professional/relationships.json')) return body(relationships);
