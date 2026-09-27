@@ -13,6 +13,9 @@ import {
   type PositionedNode
 } from '@/components/network-graph-canvas';
 
+/** d3-force pin: fixed `fx`/`fy` make hit-testing deterministic in tests. */
+type PinnedGraphNode = GraphNode & { fx: number; fy: number };
+
 function mockContext(): CanvasRenderingContext2D {
   return {
     setTransform: vi.fn(),
@@ -108,13 +111,13 @@ describe('computeViewTransform — fit-to-frame stopgap', () => {
   });
 
   it('selects a node when clicking its fitted screen position among a wide spread', () => {
-    const nodes = Array.from({ length: 20 }, (_, i) => ({
+    const nodes: PinnedGraphNode[] = Array.from({ length: 20 }, (_, i) => ({
       id: `n-${i}`,
       kind: 'person' as const,
       label: `N${i}`,
       fx: ((i % 5) - 2) * 800,
       fy: (Math.floor(i / 5) - 2) * 800
-    })) as unknown as GraphNode[];
+    }));
     const onNodeSelect = vi.fn();
     const host = document.createElement('div');
     document.body.append(host);
@@ -122,7 +125,7 @@ describe('computeViewTransform — fit-to-frame stopgap', () => {
     mountNetworkGraph(host, nodes, [], { reducedMotion: true, onNodeSelect });
     const canvasEl = host.querySelector('canvas')!;
     stubRect(canvasEl);
-    const positioned = nodes.map((n) => ({ x: (n as { fx: number }).fx, y: (n as { fy: number }).fy }));
+    const positioned = nodes.map((n) => ({ x: n.fx, y: n.fy }));
     const t = computeViewTransform(positioned, 720, 420, 24);
     const target = positioned[7]!;
     const screen = worldToScreen(target.x, target.y, t);
@@ -207,10 +210,10 @@ describe('mountNetworkGraph', () => {
     // manual `.tick()` calls) so the pinned position is in place before
     // the test dispatches its click, with no timer/animation frame wait.
     // Clicks use screen coordinates after the fit transform.
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'person-a', kind: 'person', label: 'Person A', fx: 60, fy: 80 },
       { id: 'org-b', kind: 'organisation', label: 'Org B', fx: 300, fy: 300 }
-    ] as unknown as GraphNode[];
+    ];
     const onNodeSelect = vi.fn();
     const host = document.createElement('div');
     document.body.append(host);
@@ -235,7 +238,9 @@ describe('mountNetworkGraph', () => {
   });
 
   it('fires onNodeSelect with null when clicking empty canvas space', () => {
-    const nodes = [{ id: 'person-a', kind: 'person', label: 'Person A', fx: 60, fy: 80 }] as unknown as GraphNode[];
+    const nodes: PinnedGraphNode[] = [
+      { id: 'person-a', kind: 'person', label: 'Person A', fx: 60, fy: 80 }
+    ];
     const onNodeSelect = vi.fn();
     const host = document.createElement('div');
     document.body.append(host);
@@ -294,9 +299,9 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
   });
 
   it('fades (does not remove) the habitat halo when myceliumMode is on at mount', () => {
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
-    ] as unknown as GraphNode[];
+    ];
     const host = document.createElement('div');
     document.body.append(host);
     mountNetworkGraph(host, nodes, [], { reducedMotion: true, myceliumMode: true });
@@ -307,9 +312,9 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
   });
 
   it('draws the full habitat halo (unfaded) when myceliumMode is off', () => {
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
-    ] as unknown as GraphNode[];
+    ];
     const host = document.createElement('div');
     document.body.append(host);
     mountNetworkGraph(host, nodes, [], { reducedMotion: true, myceliumMode: false });
@@ -318,10 +323,10 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
   });
 
   it('draws every edge with one plain, low-saturation style regardless of dormancy when myceliumMode is on', () => {
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'a', kind: 'person', label: 'A', fx: 0, fy: 0 },
       { id: 'b', kind: 'person', label: 'B', fx: 100, fy: 0 }
-    ] as unknown as GraphNode[];
+    ];
     const edges: GraphEdge[] = [
       { source: 'a', target: 'b', relationshipType: 'professional_relationship', dormant: true }
     ];
@@ -337,10 +342,10 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
   });
 
   it('habitat-view edges use the accent colour and dormancy-based alpha instead, when myceliumMode is off', () => {
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'a', kind: 'person', label: 'A', fx: 0, fy: 0 },
       { id: 'b', kind: 'person', label: 'B', fx: 100, fy: 0 }
-    ] as unknown as GraphNode[];
+    ];
     const edges: GraphEdge[] = [{ source: 'a', target: 'b', relationshipType: 'professional_relationship', dormant: true }];
     const host = document.createElement('div');
     document.body.append(host);
@@ -351,9 +356,9 @@ describe('mountNetworkGraph — Mycelium mode (Phase 5, brief section 37)', () =
   });
 
   it('setMyceliumMode(true) redraws with the faded halo without touching simulation/selection state', () => {
-    const nodes = [
+    const nodes: PinnedGraphNode[] = [
       { id: 'a', kind: 'person', label: 'A', habitat: 'forest', fx: 50, fy: 50 }
-    ] as unknown as GraphNode[];
+    ];
     const onNodeSelect = vi.fn();
     const host = document.createElement('div');
     document.body.append(host);
