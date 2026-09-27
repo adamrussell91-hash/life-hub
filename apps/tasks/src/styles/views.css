@@ -8054,16 +8054,33 @@ button.column-bar--row.is-active {
 
 /* Projects portfolio — pulse, status mix, lanes */
 
+/* Projects portfolio bento — mix + timeline paired, retro full-width under. */
 .projects-pulse {
   display: grid;
-  grid-template-columns: 16rem minmax(0, 1fr);
-  gap: var(--space-4);
-  margin: var(--space-6) 0;
-  align-items: start;
+  grid-template-columns: minmax(17rem, 20rem) minmax(0, 1fr);
+  gap: var(--hub-tile-gap);
+  margin: var(--space-4) 0;
+  align-items: stretch;
+}
+
+.projects-pulse > .projects-chart,
+.projects-pulse > .projects-roadmap {
+  min-width: 0;
+  height: auto;
+  /* hub-card is display:grid — pack content; align-self:start so neither
+   * card grows a glass void when the sibling is taller. Heights match via
+   * compact mix + short timeline lede, so bottoms still read as a pair. */
+  align-content: start;
+  align-self: start;
+  padding: var(--space-4);
+}
+
+.projects-pulse > .projects-retro {
+  grid-column: 1 / -1;
 }
 
 .projects-chart {
-  width: 16rem;
+  width: auto;
   max-width: 100%;
   padding: var(--space-4);
   gap: var(--space-2);
@@ -8072,6 +8089,19 @@ button.column-bar--row.is-active {
 
 .projects-chart .project-pulse-chart {
   margin-top: var(--space-2);
+}
+
+/* Compact mix: donut + legend side-by-side so the card matches Timeline height. */
+.projects-chart .project-pulse-chart--compact .projects-mix__row {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.projects-chart .project-pulse-chart--compact .projects-mix__legend {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
 }
 
 .pulse-banner {
@@ -8136,7 +8166,7 @@ button.column-bar--row.is-active {
 
 .roadmap-row {
   display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
 }
@@ -8165,9 +8195,13 @@ button.column-bar--row.is-active {
   font-size: var(--text-xs);
   color: var(--ink);
   font-weight: var(--weight-medium);
-  white-space: nowrap;
+  line-height: var(--leading-snug);
+  /* Two lines when the track column can spare the width; title has the full name. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .roadmap-row__track {
@@ -8192,7 +8226,7 @@ button.column-bar--row.is-active {
 
 .roadmap-axis {
   display: grid;
-  grid-template-columns: 8.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr);
   gap: var(--space-3);
   margin-top: var(--space-2);
   border-top: 1px solid var(--line);
@@ -8549,13 +8583,40 @@ button.column-bar--row.is-active {
     grid-template-columns: 1fr;
   }
 
-  /* Side-by-side column is 16rem; once stacked, use the full canvas. */
+  .projects-pulse > .projects-retro {
+    grid-column: auto;
+  }
+
   .projects-chart {
     width: 100%;
+  }
+
+  .roadmap-row,
+  .roadmap-axis {
+    grid-template-columns: minmax(8.5rem, 11rem) minmax(0, 1fr);
   }
 }
 
 @media (max-width: 720px) {
+  .projects-pulse {
+    margin: var(--space-3) 0;
+  }
+
+  .projects-chart .project-pulse-chart--compact .projects-mix__row {
+    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .projects-chart .project-pulse-chart--compact .projects-mix__donut {
+    align-self: center;
+  }
+
+  .roadmap-row,
+  .roadmap-axis {
+    grid-template-columns: minmax(7.5rem, 9.5rem) minmax(0, 1fr);
+  }
+
   /* Group-by row fills the space between the filter and + controls;
    * the secondary tablist inside it shrinks to fit next to Status. */
   .projects-groupby {

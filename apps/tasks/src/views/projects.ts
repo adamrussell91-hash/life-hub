@@ -114,9 +114,13 @@ function renderStatusChart(
   const tile = el('section', 'hub-card projects-chart');
   tile.setAttribute('aria-label', 'Project status mix');
   tile.append(el('p', 'hub-card__eyebrow', 'What’s the mix?'));
+  // Compact donut: the full 218px chart cannot sit beside its legend in the
+  // pulse column, so it stacked and towered over Timeline — leaving a void.
   tile.append(
     renderProjectPortfolioChart(mix, {
       running,
+      compact: true,
+      question: false,
       onSelect,
       selected: lifecycleFilter
     })
@@ -158,7 +162,7 @@ function renderRoadmap(ctx: PulseContext, onZoom: (zoom: RoadmapZoom) => void): 
     el(
       'p',
       'roadmap-lede',
-      'Each bar is calendar time — when the project runs, from start to target. The dashed outline is the original plan. Not a task count.'
+      'Bars = calendar span. Dashed outline is the original plan.'
     )
   );
   const rows = el('div', 'roadmap-rows');
@@ -176,7 +180,9 @@ function renderRoadmap(ctx: PulseContext, onZoom: (zoom: RoadmapZoom) => void): 
       event.preventDefault();
       goToProject();
     });
-    line.append(el('span', 'roadmap-row__label', row.label));
+    const label = el('span', 'roadmap-row__label', row.label);
+    label.title = row.label;
+    line.append(label);
     const track = el('div', 'roadmap-row__track');
     if (row.ghost) {
       const ghost = el('div', 'roadmap-row__ghost');
@@ -840,15 +846,16 @@ export async function renderProjectsView(canvas: HTMLElement): Promise<void> {
     // Goals, which has no equivalent chart).
     canvas.append(renderBoard(ctx, closureConfirmHost, boardActions));
 
+    // One bento: mix + timeline as a paired top row; Due for review spans
+    // the full width underneath with the same tile gap (not a floating island).
     const pulse = el('div', 'projects-pulse');
     pulse.append(
       renderStatusChart(nextMix, nextRunning, selectLifecycle),
       mountRoadmap()
     );
-    canvas.append(pulse);
-
     const retroCard = renderRetro(retro, reload);
-    if (retroCard) canvas.append(retroCard);
+    if (retroCard) pulse.append(retroCard);
+    canvas.append(pulse);
 
     if (reviews.length) {
       canvas.append(el('h2', 'section-title', 'Review log'));
