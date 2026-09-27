@@ -485,8 +485,43 @@ describe('projects view rebuild', () => {
     expect(forecast!.compareDocumentPosition(board!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(board!.compareDocumentPosition(pulse!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(canvas.textContent).not.toContain('Portfolio health');
-    expect(canvas.querySelector('.roadmap-lede')?.textContent).toMatch(/calendar time/);
+    expect(canvas.querySelector('.roadmap-lede')?.textContent).toMatch(/calendar span/);
     expect(canvas.querySelector('.roadmap-axis__kind')?.textContent).toBe('Time');
+    // Compact mix keeps the pulse row content-height with Timeline.
+    expect(chart?.querySelector('.project-pulse-chart--compact')).not.toBeNull();
+    // Due-for-review never floats as a sibling under the pulse — it lives in the bento.
+    expect(canvas.querySelector('.projects-pulse + .projects-retro')).toBeNull();
+    const labels = [...canvas.querySelectorAll<HTMLElement>('.roadmap-row__label')];
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((node) => node.title && node.title === node.textContent)).toBe(true);
+  });
+
+  it('nests the due-for-review retro inside the projects bento', async () => {
+    vi.mocked(tasksApi.listProjects).mockResolvedValue([
+      project({
+        id: 'proj_close',
+        title: 'Term 2 marking wrap',
+        current_end_date: '2026-08-10',
+        baseline_end_date: '2026-08-10'
+      })
+    ]);
+    // ready_to_close needs at least one child task and zero open — not an empty project.
+    vi.mocked(tasksApi.listTasks).mockResolvedValue([
+      task({
+        id: 't_done',
+        title: 'Marks entered',
+        parent_project_id: 'proj_close',
+        status: 'done',
+        completed_at: '2026-08-10T00:00:00.000Z'
+      })
+    ]);
+    const canvas = document.createElement('main');
+    await renderProjectsView(canvas);
+    const pulse = canvas.querySelector('.projects-pulse');
+    const retro = pulse?.querySelector('.projects-retro');
+    expect(retro).not.toBeNull();
+    expect(retro?.textContent).toMatch(/Due for review/);
+    expect(canvas.querySelector('.projects-pulse + .projects-retro')).toBeNull();
   });
 
   it('changes the timeline range without remounting the page', async () => {
