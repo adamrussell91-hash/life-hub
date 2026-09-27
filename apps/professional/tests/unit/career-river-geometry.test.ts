@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assignEmploymentLanes,
   branchPolyline,
   clampZoom,
   clusterMarks,
   riverHeightPx,
+  roleBandExtraPx,
   timeToUnit,
   yearFraction
 } from '@/domain/career-river-geometry';
@@ -67,5 +69,17 @@ describe('career-river-geometry', () => {
   it('yearFraction is mid-year for July', () => {
     expect(yearFraction('2026-07-02')).toBeGreaterThan(2026.4);
     expect(yearFraction('2026-07-02')).toBeLessThan(2026.6);
+  });
+
+  it('stacks concurrent employment into separate lanes', () => {
+    const lanes = assignEmploymentLanes([
+      { valid_from: '2021-01-25', valid_to: '2024-08-16' },
+      { valid_from: '2023-01-23', valid_to: '2024-08-16' },
+      { valid_from: '2024-08-19', valid_to: '2024-12-20' }
+    ]);
+    expect(lanes[0]).toBe(0);
+    expect(lanes[1]).toBe(1);
+    expect(lanes[2]).toBe(0);
+    expect(roleBandExtraPx(2)).toBeGreaterThan(roleBandExtraPx(1));
   });
 });
