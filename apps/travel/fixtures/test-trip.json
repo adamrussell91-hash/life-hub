@@ -1,0 +1,304 @@
+{
+  "id": "trp_testlisbon01",
+  "schema_version": 1,
+  "title": "Test Trip: Lisbon & Porto",
+  "start_date": "2027-03-03",
+  "end_date": "2027-03-07",
+  "home_tz": "Australia/Sydney",
+  "followers_label": "Test Followers",
+  "cities": [
+    {
+      "id": "lis",
+      "name": "Lisbon",
+      "country": "Portugal",
+      "tz": "Europe/Lisbon",
+      "start_date": "2027-03-03",
+      "end_date": "2027-03-05",
+      "title": "Lisbon light",
+      "scene": "generic",
+      "accent": {
+        "color": "#e8743b",
+        "soft": "#fde3d3",
+        "ink": "#8a3a12"
+      },
+      "facts": [
+        "18°, breezy",
+        "Euro · €10 ≈ A$16",
+        "11 h behind Sydney"
+      ],
+      "center": {
+        "lat": 38.7223,
+        "lon": -9.1393
+      },
+      "local_currency": "EUR",
+      "driver_phrase": {
+        "local": "Por favor, leve-me a este endereço.",
+        "english": "Please take me to this address."
+      },
+      "arrival_guide": {
+        "title": "Landing in Lisbon",
+        "rows": [
+          {
+            "icon": "phone",
+            "text": "<b>Phone.</b> Install a Portugal eSIM before departure."
+          },
+          {
+            "icon": "transport",
+            "text": "<b>Getting around.</b> Metro and Uber cover most of the city."
+          },
+          {
+            "icon": "money",
+            "text": "<b>Money.</b> Euro. Cards work almost everywhere."
+          },
+          {
+            "icon": "weather",
+            "text": "<b>Outside.</b> Mild March days, cool evenings."
+          }
+        ]
+      },
+      "directions_app": "google"
+    },
+    {
+      "id": "opo",
+      "name": "Porto",
+      "country": "Portugal",
+      "tz": "Europe/Lisbon",
+      "start_date": "2027-03-05",
+      "end_date": "2027-03-07",
+      "title": "Porto tiles",
+      "scene": "generic",
+      "accent": {
+        "color": "#1e7fa0",
+        "soft": "#d6eef5",
+        "ink": "#12506a"
+      },
+      "facts": [
+        "16°, riverside",
+        "Euro · €10 ≈ A$16",
+        "11 h behind Sydney"
+      ],
+      "center": {
+        "lat": 41.1579,
+        "lon": -8.6291
+      },
+      "local_currency": "EUR",
+      "directions_app": "google"
+    }
+  ],
+  "items": [
+    {
+      "id": "itm_testflight01",
+      "kind": "flight",
+      "city_id": "lis",
+      "date": "2027-03-03",
+      "time": "06:30",
+      "title": "Sydney to Lisbon",
+      "note": "Test flight row",
+      "status": "booked",
+      "carrier": "Test Air",
+      "number": "TA101",
+      "from_code": "SYD",
+      "to_code": "LIS",
+      "depart_time": "06:30",
+      "arrive_time": "18:40",
+      "arrive_date": "2027-03-03",
+      "arrive_city_id": "lis",
+      "source": "Test Booking",
+      "booking_ref": "TEST-123",
+      "cost": {
+        "amount": 1200,
+        "currency": "AUD",
+        "aud": 1200,
+        "rate": 1,
+        "rate_date": "2026-09-27"
+      },
+      "link": "https://example.com/ticket/test-flight",
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_teststay01",
+      "kind": "stay",
+      "city_id": "lis",
+      "date": "2027-03-03",
+      "time": "20:00",
+      "title": "Test Alfama Inn",
+      "note": "Home base for Lisbon nights",
+      "status": "booked",
+      "nights": 2,
+      "check_out_date": "2027-03-05",
+      "check_in_time": "15:00",
+      "home_base": true,
+      "place": {
+        "name": "Test Alfama Inn",
+        "lat": 38.7128,
+        "lon": -9.133,
+        "address": "Rua de Teste 12, Lisbon"
+      },
+      "cancel_until": "2027-02-20",
+      "booking_ref": "TEST-HOTEL-9",
+      "cost": {
+        "amount": 220,
+        "currency": "EUR",
+        "aud": 360,
+        "rate": 1.636,
+        "rate_date": "2026-09-27"
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testtodo01",
+      "kind": "do",
+      "city_id": "lis",
+      "date": "2027-03-04",
+      "time": null,
+      "title": "Book Belém tram tickets",
+      "note": "Still need to book",
+      "status": "todo",
+      "place": {
+        "name": "Belém Tower",
+        "lat": 38.6916,
+        "lon": -9.216
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testfood01",
+      "kind": "food",
+      "city_id": "lis",
+      "date": "2027-03-04",
+      "time": "13:00",
+      "title": "Test pastelaria",
+      "note": "Lunch stop",
+      "status": "planned",
+      "place": {
+        "name": "Pastelaria Teste",
+        "lat": 38.71,
+        "lon": -9.14
+      },
+      "hop": {
+        "mode": "walk",
+        "minutes": 12,
+        "note": "Along the river"
+      },
+      "cost": {
+        "amount": 12,
+        "currency": "EUR",
+        "aud": 20,
+        "rate": 1.636,
+        "rate_date": "2026-09-27"
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testtrain01",
+      "kind": "train",
+      "city_id": "lis",
+      "date": "2027-03-05",
+      "time": "10:30",
+      "title": "Lisbon to Porto",
+      "note": "Intercity test train",
+      "status": "booked",
+      "carrier": "Test Rail",
+      "number": "IC200",
+      "from_code": "LSB",
+      "to_code": "OPO",
+      "depart_time": "10:30",
+      "arrive_time": "13:15",
+      "arrive_date": "2027-03-05",
+      "arrive_city_id": "opo",
+      "booking_ref": "TEST-TRAIN-4",
+      "cost": {
+        "amount": 35,
+        "currency": "EUR",
+        "aud": 57,
+        "rate": 1.636,
+        "rate_date": "2026-09-27"
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_teststay02",
+      "kind": "stay",
+      "city_id": "opo",
+      "date": "2027-03-05",
+      "time": "15:00",
+      "title": "Test Ribeira Stay",
+      "note": "Porto home base",
+      "status": "booked",
+      "nights": 2,
+      "check_out_date": "2027-03-07",
+      "home_base": true,
+      "place": {
+        "name": "Test Ribeira Stay",
+        "lat": 41.1405,
+        "lon": -8.612,
+        "address": "Rua do Teste 3, Porto"
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testmed01",
+      "kind": "med",
+      "city_id": "opo",
+      "date": "2027-03-06",
+      "time": "09:00",
+      "title": "Private test medication stop",
+      "note": "Owner-only private med item",
+      "status": "planned",
+      "private": true,
+      "place": {
+        "name": "Hotel room",
+        "lat": 41.1405,
+        "lon": -8.612
+      },
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testcheckin01",
+      "kind": "checkin_slot",
+      "city_id": "opo",
+      "date": "2027-03-06",
+      "time": "20:00",
+      "title": "Evening check-in",
+      "note": "",
+      "status": "planned",
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    },
+    {
+      "id": "itm_testnoplace01",
+      "kind": "do",
+      "city_id": "opo",
+      "date": "2027-03-06",
+      "time": "11:00",
+      "title": "Write postcards",
+      "note": "No place — stays off the map pins",
+      "status": "idea",
+      "off_map_label": "Anywhere quiet",
+      "created_at": "2026-09-27T10:00:00.000Z",
+      "updated_at": "2026-09-27T10:00:00.000Z"
+    }
+  ],
+  "days": [
+    {
+      "city_id": "lis",
+      "date": "2027-03-04",
+      "subtitle": "Hills and tiles",
+      "penelope_prompt": "What surprised you about Lisbon today?"
+    }
+  ],
+  "checkins": [],
+  "share": {
+    "enabled": false,
+    "created_at": null
+  },
+  "created_at": "2026-09-27T10:00:00.000Z",
+  "updated_at": "2026-09-27T10:00:00.000Z"
+}
