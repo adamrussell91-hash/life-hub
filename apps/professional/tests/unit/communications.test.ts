@@ -8,19 +8,16 @@ import { parseRoute, railHighlightFor, communicationRoute } from '@/app/router';
 const VALID_COMMUNICATION_ID = 'communication_00000000-0000-4000-8000-000000000010';
 
 describe('communication routes', () => {
-  it('parses compose and detail routes; list redirects to calendar', () => {
-    expect(parseRoute('#/communications')).toEqual({
-      name: 'calendar',
-      zoom: 'week',
-      redirectedFrom: 'communications'
-    });
+  it('parses list, compose and detail routes', () => {
+    expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
     expect(parseRoute('#/communication/new')).toEqual({ name: 'communication-new' });
     expect(parseRoute(`#/communication/${VALID_COMMUNICATION_ID}`)).toEqual({
       name: 'communication',
       id: VALID_COMMUNICATION_ID
     });
     expect(parseRoute('#/communication/not-valid').name).toBe('not-found');
-    expect(railHighlightFor({ name: 'communication-new' })).toBe('calendar');
+    expect(railHighlightFor({ name: 'communications' })).toBe('communications');
+    expect(railHighlightFor({ name: 'communication-new' })).toBe('communications');
     expect(communicationRoute(VALID_COMMUNICATION_ID)).toBe(
       `#/communication/${VALID_COMMUNICATION_ID}`
     );
@@ -64,6 +61,7 @@ describe('renderCommunicationsView', () => {
     await renderCommunicationsView(canvas);
     expect(canvas.textContent).toMatch(/Proposal/);
     expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/communication/new');
+    expect(canvas.querySelector('.schedule-db__row')).toBeTruthy();
     expect(fetch).toHaveBeenCalled();
   });
 });

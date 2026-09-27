@@ -34,7 +34,7 @@ const REST: NavItem[] = [
   { id: 'people', label: 'People', href: '#/people' },
   { id: 'organisations', label: 'Organisations', href: '#/organisations' },
   { id: 'relationships', label: 'Relationships', href: '#/relationships' },
-  { id: 'communications', label: 'Communications', href: '#/communications' },
+  { id: 'communications', label: 'Comms', href: '#/communications' },
   { id: 'meetings', label: 'Meetings', href: '#/meetings' },
   { id: 'events', label: 'Events', href: '#/events' },
   { id: 'career', label: 'Career', href: '#/career' },
@@ -156,7 +156,6 @@ export function renderHubShell(root: HTMLElement, options: HubShellOptions = {})
 function buildNavLink(item: NavItem, highlight: RailViewId | null): HTMLAnchorElement {
   const link = document.createElement('a');
   link.className = 'hub-rail__link';
-  if (item.id === 'calendar') link.classList.add('hub-rail__link--sub');
   link.href = item.href;
   if (item.id === highlight) link.setAttribute('aria-current', 'page');
   link.append(railIconFor(item.id), document.createTextNode(item.label));
