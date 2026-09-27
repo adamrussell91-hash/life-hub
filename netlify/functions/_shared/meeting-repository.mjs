@@ -13,6 +13,7 @@ import {
   validateMeetingFieldUpdate,
   validateMeetingRescheduleInput
 } from './meeting-schema.mjs';
+import { mapBounded } from './blobs-list.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import {
@@ -33,6 +34,8 @@ import {
   runLinkIntents,
   simplifyIncomplete
 } from './professional-entity-links.mjs';
+
+const LIST_BATCH_SIZE = 10;
 
 function validationError(code, message) {
   return Object.assign(new Error(message), { status: 400, code });
@@ -107,18 +110,13 @@ export function createMeetingRepository(deps = {}) {
           .filter((id) => isValidMeetingId(id))
       )
     ];
-    const records = [];
-    for (const id of ids) {
-      const record = parseMeetingRecord(await getJSON(professionalStore, meetingKey(id)));
-      if (record) records.push(record);
-    }
+    const records = (
+      await mapBounded(ids, LIST_BATCH_SIZE, async (id) => parseMeetingRecord(await getJSON(professionalStore, meetingKey(id))))
+    ).filter(Boolean);
     records.sort(compareMeetingsSoonestFirst);
-    const projections = [];
-    for (const record of records) {
-      const journal = await loadOpenJournalForMeeting(record.id);
-      projections.push(projectMeeting(record, simplifyIncomplete(journal)));
-    }
-    return projections;
+    return mapBounded(records, LIST_BATCH_SIZE, async (record) =>
+      projectMeeting(record, simplifyIncomplete(await loadOpenJournalForMeeting(record.id)))
+    );
   }
 
   async function listScheduleProjections() {
