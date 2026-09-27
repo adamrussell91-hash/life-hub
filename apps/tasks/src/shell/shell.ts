@@ -585,7 +585,27 @@ export interface PageHeaderConfig {
   eyebrow: string;
   title: string;
   supporting?: string;
+  /** Kit view-return link above the eyebrow (e.g. ← Graph when Backlog opened from Graph). */
+  back?: { href: string; label: string } | null;
   actions?: HTMLElement | null;
+}
+
+/** Backlog hash that remembers the Graph view for a kit page-header return link. */
+export function backlogHrefFromGraph(hash = location.hash): string {
+  const view = graphViewFromHash(hash);
+  const q = new URLSearchParams();
+  q.set('from', 'graph');
+  if (view !== 'lines') q.set('graphView', view);
+  return `#/list?${q.toString()}`;
+}
+
+/** Graph hash to restore when Backlog was opened with `from=graph`. */
+export function graphReturnFromBacklog(hash = location.hash): string | null {
+  const q = new URLSearchParams(hash.split('?')[1] ?? '');
+  if (q.get('from') !== 'graph') return null;
+  const view = q.get('graphView');
+  if (view === 'branch' || view === 'orbit') return `#/graph?view=${view}`;
+  return '#/graph';
 }
 
 function createTitleRow(title: HTMLElement): HTMLElement {
@@ -606,6 +626,23 @@ function restoreHeaderTitle(existing: Element): HTMLElement {
   return heading;
 }
 
+function syncPageHeaderBack(copy: Element, back: PageHeaderConfig['back']): void {
+  const existing = copy.querySelector('.page-header__back');
+  if (!back) {
+    existing?.remove();
+    return;
+  }
+  let link = existing;
+  if (!(link instanceof HTMLAnchorElement)) {
+    existing?.remove();
+    link = document.createElement('a');
+    link.className = 'page-header__back';
+    copy.prepend(link);
+  }
+  link.setAttribute('href', back.href);
+  link.textContent = back.label;
+}
+
 function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boolean {
   const copy = refs.pageHeader.querySelector('.page-header__copy');
   const eyebrow = copy?.querySelector('.page-header__eyebrow');
@@ -615,6 +652,7 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
     return false;
   }
 
+  syncPageHeaderBack(copy, config.back);
   eyebrow.textContent = config.eyebrow;
   const title = restoreHeaderTitle(existingTitle);
   title.textContent = config.title;
@@ -641,7 +679,7 @@ function syncPageHeaderCopy(refs: HubShellRefs, config: PageHeaderConfig): boole
   return true;
 }
 
-/** Kit page header: uppercase eyebrow → h1 → optional supporting → actions. */
+/** Kit page header: optional back → uppercase eyebrow → h1 → optional supporting → actions. */
 export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): void {
   refs.pageHeader.classList.remove('page-header--cover');
   if (syncPageHeaderCopy(refs, config)) return;
@@ -649,6 +687,14 @@ export function renderPageHeader(refs: HubShellRefs, config: PageHeaderConfig): 
   refs.pageHeader.replaceChildren();
   const copy = document.createElement('div');
   copy.className = 'page-header__copy';
+
+  if (config.back) {
+    const back = document.createElement('a');
+    back.className = 'page-header__back';
+    back.href = config.back.href;
+    back.textContent = config.back.label;
+    copy.append(back);
+  }
 
   const eyebrow = document.createElement('p');
   eyebrow.className = 'page-header__eyebrow';
