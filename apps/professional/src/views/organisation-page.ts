@@ -10,6 +10,8 @@ import {
   type DirectoryOrganisationRow
 } from '@/api/organisations-directory';
 import {
+  addOpportunityToApplications,
+  addOpportunityToEvents,
   createOpportunity,
   dismissOpportunity,
   listOpportunities,
@@ -301,18 +303,18 @@ export async function renderOrganisationPage(
       for (const m of structure.graph.memberships_by_person[selfPersonRef]) {
         const unit = structure.units.find((u) => `shared:unit:${u.id}` === m.unit_ref);
         pills.push({
-          id: selfPersonRef,
+          id: `line:${m.unit_ref}`,
           label: m.role ? `as ${m.role}` : unit?.name || 'role'
         });
       }
     }
-    // Deduplicate pill ids for menu — use role labels uniquely
     const seen = new Set<string>();
     for (const p of pills) {
-      const key = p.label;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const btn = el('button', `orgs-how__pill${yourLines === p.id || (p.id === 'your_lines' && !lineParam) ? ' is-active' : ''}`, p.label) as HTMLButtonElement;
+      if (seen.has(p.id)) continue;
+      seen.add(p.id);
+      const active =
+        yourLines === p.id || (p.id === 'your_lines' && (!lineParam || lineParam === 'your_lines'));
+      const btn = el('button', `orgs-how__pill${active ? ' is-active' : ''}`, p.label) as HTMLButtonElement;
       btn.type = 'button';
       btn.addEventListener('click', () => {
         const params = new URLSearchParams(hashQuery().replace(/^\?/, ''));
@@ -325,8 +327,8 @@ export async function renderOrganisationPage(
     }
 
     const viewToggle = el('div', 'orgs-how__seg');
-    const isPhone = window.matchMedia('(max-width: 719px)').matches;
-    let view: 'outline' | 'flow' | 'people' = isPhone ? 'outline' : 'flow';
+    const phoneMq = window.matchMedia('(max-width: 719px)');
+    let view: 'outline' | 'flow' | 'people' = phoneMq.matches ? 'outline' : 'flow';
     const outlineBtn = el('button', 'orgs-how__seg-btn', 'Outline') as HTMLButtonElement;
     const flowBtn = el('button', 'orgs-how__seg-btn', 'Flow') as HTMLButtonElement;
     const peopleBtn = el('button', 'orgs-how__seg-btn', 'People list') as HTMLButtonElement;
@@ -336,6 +338,8 @@ export async function renderOrganisationPage(
     const host = el('div', 'orgs-how__host');
     how.body.append(toolbar, hl, viewToggle, host);
 
+    const collapsedUnits = new Set<string>();
+
     async function paintView(): Promise<void> {
       if (!structure) return;
       outlineBtn.classList.toggle('is-active', view === 'outline');
@@ -343,7 +347,13 @@ export async function renderOrganisationPage(
       peopleBtn.classList.toggle('is-active', view === 'people');
       host.replaceChildren();
       if (view === 'outline') {
-        host.append(renderStructureOutline(structure, selfPersonRef));
+        host.append(
+          renderStructureOutline(
+            structure,
+            selfPersonRef,
+            Object.fromEntries(directoryPeople.map((p) => [p.id, p.display_name]))
+          )
+        );
         return;
       }
       if (view === 'people') {
@@ -368,16 +378,83 @@ export async function renderOrganisationPage(
         host.append(list);
         return;
       }
-      // Flow
+      // Flow + pan/zoom chrome (C4)
       const wrap = el('div', 'orgs-flow__box');
+      const zoomRow = el('div', 'orgs-flow__zoom');
+      const zoomIn = el('button', 'btn btn--ghost', '+') as HTMLButtonElement;
+      const zoomOut = el('button', 'btn btn--ghost', '−') as HTMLButtonElement;
+      const zoomFit = el('button', 'btn btn--ghost', 'Fit') as HTMLButtonElement;
+      zoomIn.type = zoomOut.type = zoomFit.type = 'button';
+      zoomIn.setAttribute('aria-label', 'Zoom in');
+      zoomOut.setAttribute('aria-label', 'Zoom out');
+      zoomFit.setAttribute('aria-label', 'Fit flowchart');
+      zoomRow.append(zoomOut, zoomIn, zoomFit);
+      const stage = el('div', 'orgs-flow__stage');
+      wrap.append(zoomRow, stage);
       host.append(wrap);
+      let scale = 1;
       try {
+        const peopleNames = Object.fromEntries(
+          directoryPeople.map((p) => [p.id, p.display_name])
+        );
         const layout = await layoutOrgFlowchart(structure, {
           selfPersonRef,
           highlightLine: lineParam || 'your_lines',
-          compact: isPhone
+          compact: phoneMq.matches,
+          peopleNames,
+          collapsedUnits
         });
-        wrap.append(renderFlowchartSvg(layout));
+        const svg = renderFlowchartSvg(layout, {
+          collapsedUnits,
+          onToggleUnit: (uref) => {
+            if (collapsedUnits.has(uref)) collapsedUnits.delete(uref);
+            else collapsedUnits.add(uref);
+            void paintView();
+          },
+          onVacantPosition: () => openEditor()
+        });
+        stage.append(svg);
+        const applyZoom = () => {
+          svg.style.transform = `scale(${scale})`;
+          svg.style.transformOrigin = '0 0';
+        };
+        zoomIn.addEventListener('click', () => {
+          scale = Math.min(2.5, scale + 0.15);
+          applyZoom();
+        });
+        zoomOut.addEventListener('click', () => {
+          scale = Math.max(0.4, scale - 0.15);
+          applyZoom();
+        });
+        zoomFit.addEventListener('click', () => {
+          scale = 1;
+          applyZoom();
+          wrap.scrollLeft = 0;
+          wrap.scrollTop = 0;
+        });
+        // Touch pan via native overflow; Pointer Events keep buttons usable without gestures (C4).
+        stage.style.touchAction = 'pan-x pan-y';
+        let pointers = 0;
+        stage.addEventListener('pointerdown', (ev) => {
+          pointers += 1;
+          if (pointers === 1 && ev.target === stage) {
+            stage.setPointerCapture(ev.pointerId);
+          }
+        });
+        stage.addEventListener('pointerup', () => {
+          pointers = Math.max(0, pointers - 1);
+        });
+        // Safari gesture path (non-blocking; buttons remain the primary control).
+        wrap.addEventListener('gesturestart', ((ev: Event) => {
+          ev.preventDefault();
+        }) as EventListener);
+        wrap.addEventListener('gesturechange', ((ev: Event) => {
+          const ge = ev as Event & { scale?: number };
+          if (typeof ge.scale === 'number') {
+            scale = Math.min(2.5, Math.max(0.4, ge.scale));
+            applyZoom();
+          }
+        }) as EventListener);
       } catch (err) {
         wrap.append(
           el(
@@ -402,7 +479,17 @@ export async function renderOrganisationPage(
       void paintView();
     });
 
+    const onPhoneChange = () => {
+      const next = phoneMq.matches ? 'outline' : 'flow';
+      if (view === 'outline' || view === 'flow') {
+        view = next;
+        void paintView();
+      }
+    };
+    phoneMq.addEventListener('change', onPhoneChange);
+
     await paintView();
+    return;
   }
 
   function openEditor(): void {
@@ -544,12 +631,38 @@ export async function renderOrganisationPage(
       const sub = closesLabel(opp);
       if (sub) row.append(el('div', 'orgs-opp__sub', sub));
       const actions = el('div', 'orgs-opp__actions');
+      const toApps = el('button', 'btn btn--ghost', 'Add to Applications') as HTMLButtonElement;
+      toApps.type = 'button';
+      toApps.addEventListener('click', () => {
+        toApps.disabled = true;
+        void addOpportunityToApplications(opp.id)
+          .then(() => {
+            location.hash = '#/applications';
+          })
+          .catch((err) => {
+            window.alert(err instanceof Error ? err.message : 'Could not add to Applications.');
+            toApps.disabled = false;
+          });
+      });
+      const toEvents = el('button', 'btn btn--ghost', 'Add to Events') as HTMLButtonElement;
+      toEvents.type = 'button';
+      toEvents.addEventListener('click', () => {
+        toEvents.disabled = true;
+        void addOpportunityToEvents(opp.id)
+          .then(() => {
+            location.hash = '#/events';
+          })
+          .catch((err) => {
+            window.alert(err instanceof Error ? err.message : 'Could not add to Events.');
+            toEvents.disabled = false;
+          });
+      });
       const dismiss = el('button', 'btn btn--ghost', 'Dismiss') as HTMLButtonElement;
       dismiss.type = 'button';
       dismiss.addEventListener('click', () => {
         void dismissOpportunity(opp.id).then(() => patchOpps());
       });
-      actions.append(dismiss);
+      actions.append(toApps, toEvents, dismiss);
       row.append(actions);
       list.append(row);
     }

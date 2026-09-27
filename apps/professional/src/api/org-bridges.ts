@@ -1,10 +1,8 @@
-import { apiGet } from './client';
+import { apiGet, apiPost } from './client';
 
 /**
  * Thin client for Compare bridges. The pure rule lives in
- * `netlify/functions/_shared/org-bridges.mjs`; when a Compare API is wired,
- * call it here. Until then, callers may import the shared module via the
- * handler once it exists — this wrapper keeps the W1 apiGet surface ready.
+ * `netlify/functions/_shared/org-bridges.mjs`.
  */
 
 export interface OrgBridge {
@@ -25,11 +23,19 @@ export interface OrgBridgesPayload {
   hidden_label: string | null;
 }
 
-/** Optional future endpoint — keeps Compare client on apiGet (W1). */
+/** Optional GET — empty until a server-side directory join exists. */
 export function fetchOrgBridges(
   organisationIds: string[],
   options: { signal?: AbortSignal } = {}
 ): Promise<OrgBridgesPayload> {
   const params = new URLSearchParams({ ids: organisationIds.join(',') });
   return apiGet(`/api/org-bridges?${params.toString()}`, { signal: options.signal });
+}
+
+/** Evaluate bridges from a people/link payload (POST → buildOrgBridges). */
+export function evaluateOrgBridges(
+  body: Record<string, unknown>,
+  options: { signal?: AbortSignal } = {}
+): Promise<OrgBridgesPayload> {
+  return apiPost('/api/org-bridges', body, { signal: options.signal });
 }

@@ -103,6 +103,11 @@ export function createOpportunitiesHandler(deps = {}) {
             const result = await repo.addToApplications(id);
             return withCors(okResponse(200, result), request, env);
           }
+          if (action === 'add_to_events') {
+            const id = readOpportunityId(url);
+            const result = await repo.addToEvents(id);
+            return withCors(okResponse(200, result), request, env);
+          }
           const parsed = await readJsonObject(request);
           if (parsed.error) return withCors(parsed.error, request, env);
           assertNoAccessFields(parsed.value ?? {});

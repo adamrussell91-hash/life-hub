@@ -1058,6 +1058,36 @@ export function createMockApi() {
     }
 
     if (path === '/api/opportunities' && method === 'POST') {
+      const action = url.searchParams.get('action');
+      if (action === 'add_to_applications' || action === 'add_to_events') {
+        const id = url.searchParams.get('id') || '';
+        const existing = opportunitiesStore.get(id) as Record<string, unknown> | undefined;
+        if (!existing) {
+          return json(404, { ok: false, error: { code: 'not_found', message: 'Opportunity not found.' } });
+        }
+        existing.status = action === 'add_to_applications' ? 'applied' : 'interested';
+        existing.updated_at = new Date().toISOString();
+        opportunitiesStore.set(id, existing);
+        if (action === 'add_to_applications') {
+          return json(200, {
+            ok: true,
+            data: {
+              opportunity: existing,
+              application_intent: { position_title: existing.title },
+              application: { id: `application_${randomUUID()}`, title: existing.title },
+              created: true
+            }
+          });
+        }
+        return json(200, {
+          ok: true,
+          data: {
+            opportunity: existing,
+            event: { id: `event_${randomUUID()}`, title: existing.title },
+            created: true
+          }
+        });
+      }
       const id = `opportunity_${randomUUID()}`;
       const now = new Date().toISOString();
       const record = {
@@ -1077,6 +1107,69 @@ export function createMockApi() {
       };
       opportunitiesStore.set(id, record);
       return json(201, { ok: true, data: { opportunity: record, created: true } });
+    }
+
+    if (path === '/api/org-bridges' && method === 'POST') {
+      const orgA = (body as { orgA?: { people?: Array<{ id: string; display_name?: string; warmth_band?: string }> } })
+        ?.orgA;
+      const orgB = (body as { orgB?: { people?: Array<{ id: string; display_name?: string; warmth_band?: string }> } })
+        ?.orgB;
+      const rels =
+        (
+          body as {
+            professionalRelationships?: Array<{ source_id: string; target_id: string }>;
+          }
+        ).professionalRelationships || [];
+      const warmth =
+        (body as { warmthByPerson?: Record<string, string> }).warmthByPerson || {};
+      const names =
+        (body as { displayNames?: Record<string, string> }).displayNames || {};
+      const bridges: Array<Record<string, unknown>> = [];
+      let hidden = 0;
+      let n = 1;
+      for (const rel of rels) {
+        const nearBand = warmth[rel.source_id] || 'cold';
+        const farBand = warmth[rel.target_id] || 'cold';
+        if (nearBand === 'warm' && (farBand === 'cold' || !farBand)) {
+          bridges.push({
+            kind: 'know_each_other',
+            person_a_id: rel.source_id,
+            person_b_id: rel.target_id,
+            number: n++,
+            rule: 1,
+            reason: `${names[rel.source_id] || 'Someone'} is your warmest way into ${
+              (orgB as { name?: string } | undefined)?.name || 'the other organisation'
+            }, toward ${names[rel.target_id] || 'someone'}.`
+          });
+        } else {
+          hidden += 1;
+        }
+      }
+      // moved: same id in both orgs
+      const aIds = new Set((orgA?.people || []).map((p) => p.id));
+      for (const p of orgB?.people || []) {
+        if (!aIds.has(p.id)) continue;
+        if ((warmth[p.id] || 'cold') === 'cold') {
+          bridges.push({
+            kind: 'moved',
+            person_a_id: p.id,
+            person_b_id: p.id,
+            number: n++,
+            rule: 3,
+            reason: `Your move links cold former colleagues around an upcoming event.`
+          });
+        } else {
+          hidden += 1;
+        }
+      }
+      return json(200, {
+        ok: true,
+        data: {
+          bridges,
+          hidden_count: hidden,
+          hidden_label: hidden ? `${hidden} more hidden` : null
+        }
+      });
     }
 
     if (path === '/api/opportunities' && method === 'PATCH') {

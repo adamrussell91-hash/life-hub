@@ -101,3 +101,16 @@ export function addOpportunityToApplications(
   const params = new URLSearchParams({ id, action: 'add_to_applications' });
   return apiPost(`/api/opportunities?${params.toString()}`, {}, { signal: options.signal });
 }
+
+/** Add to Events: creates a provider-linked event and marks the opportunity interested. */
+export function addOpportunityToEvents(
+  id: string,
+  options: { signal?: AbortSignal } = {}
+): Promise<{
+  opportunity: OpportunityRecord;
+  event: unknown;
+  created: boolean;
+}> {
+  const params = new URLSearchParams({ id, action: 'add_to_events' });
+  return apiPost(`/api/opportunities?${params.toString()}`, {}, { signal: options.signal });
+}

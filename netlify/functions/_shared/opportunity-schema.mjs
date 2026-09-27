@@ -437,6 +437,38 @@ export function buildAppliesToApplicationIntent(opportunity) {
   };
 }
 
+/**
+ * Intent shape for Add to Events — creates an event with provider the
+ * organisation (BUILD-PLAN Phase 4). Pure; no I/O.
+ */
+export function buildProviderEventIntent(opportunity, nowIso = new Date().toISOString()) {
+  if (!opportunity?.organisation_ref || !opportunity?.title) {
+    throw validationError('invalid_opportunity', 'Opportunity requires organisation_ref and title.');
+  }
+  const start = opportunity.closes_on
+    ? `${String(opportunity.closes_on).slice(0, 10)}T09:00:00.000Z`
+    : nowIso;
+  const endMs = Date.parse(start) + 60 * 60 * 1000;
+  return {
+    title: opportunity.title,
+    event_type: opportunity.kind === 'pd' ? 'pd' : 'other',
+    start,
+    end: new Date(endMs).toISOString(),
+    time_zone: 'Australia/Sydney',
+    all_day: false,
+    links: [
+      {
+        target_ref: opportunity.organisation_ref,
+        relationship_type: 'provider',
+        metadata: {
+          from_opportunity_id: opportunity.id,
+          opportunity_kind: opportunity.kind
+        }
+      }
+    ]
+  };
+}
+
 export function opportunityIndexRecord(record) {
   return {
     id: record.id,

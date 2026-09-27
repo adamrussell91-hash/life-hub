@@ -6,7 +6,8 @@ import {
   parseOpportunityRecord,
   projectOpportunity,
   validateOpportunityCreateInput,
-  buildAppliesToApplicationIntent
+  buildAppliesToApplicationIntent,
+  buildProviderEventIntent
 } from '../../netlify/functions/_shared/opportunity-schema.mjs';
 
 const OPP_ID = 'opportunity_00000000-0000-4000-8000-000000000001';
@@ -113,4 +114,11 @@ test('buildAppliesToApplicationIntent carries applies_to link', () => {
   assert.equal(intent.links[0].relationship_type, 'applies_to');
   assert.equal(intent.links[0].target_ref, ORG_REF);
   assert.equal(intent.links[0].metadata.from_opportunity_id, OPP_ID);
+});
+
+test('buildProviderEventIntent carries provider link', () => {
+  const intent = buildProviderEventIntent(baseRecord());
+  assert.equal(intent.links[0].relationship_type, 'provider');
+  assert.equal(intent.links[0].target_ref, ORG_REF);
+  assert.ok(intent.title);
 });

@@ -2,6 +2,7 @@ import { isIndexKey, listBlobKeys } from './blobs-list.mjs';
 import {
   OPPORTUNITY_SCHEMA_VERSION,
   buildAppliesToApplicationIntent,
+  buildProviderEventIntent,
   compareOpportunitiesByCloses,
   generateOpportunityId,
   isValidOpportunityId,
@@ -59,6 +60,8 @@ export function createOpportunityRepository(deps = {}) {
   const createApplication =
     deps.createApplication ??
     null; /* optional: inject createApplicationRepository().createApplication */
+  const createEvent =
+    deps.createEvent ?? null; /* optional: inject eventRepository.createEvent */
 
   async function getOpportunity(id) {
     if (!isValidOpportunityId(id)) throw notFound();
@@ -177,13 +180,39 @@ export function createOpportunityRepository(deps = {}) {
     };
   }
 
+  async function addToEvents(id) {
+    const opportunity = await getOpportunity(id);
+    if (opportunity.status === 'dismissed') {
+      throw validationError('opportunity_dismissed', 'Cannot add a dismissed opportunity to Events.');
+    }
+    const intent = buildProviderEventIntent(opportunity);
+    if (!createEvent) {
+      return {
+        opportunity,
+        event_intent: intent,
+        event: null,
+        created: false
+      };
+    }
+    const result = await createEvent(intent);
+    const updated = await patchOpportunity(id, { status: 'interested' });
+    return {
+      opportunity: updated,
+      event_intent: intent,
+      event: result.event ?? result,
+      links: result.links ?? [],
+      created: true
+    };
+  }
+
   return {
     getOpportunity,
     listOpportunities,
     createOpportunity,
     patchOpportunity,
     dismissOpportunity,
-    addToApplications
+    addToApplications,
+    addToEvents
   };
 }
 
