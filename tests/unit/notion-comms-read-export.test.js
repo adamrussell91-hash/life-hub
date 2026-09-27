@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { parseCsv, parseRelations, pageIdFromFilename, matchRowsToPages, readExport } from '../../scripts/lib/notion-comms/read-export.mjs';
 
 test('parseCsv handles a BOM, quoted commas, newlines and escapes', () => {
@@ -27,4 +28,10 @@ test('readExport prefers the complete CSV and matches invented fixture pages', a
   assert.equal(result.rows.length, 6);
   assert.equal(result.unmatchedRows.length, 0);
   assert.equal(result.pageList.length, 6);
+});
+
+test('the CLI reads stdin and refuses --apply unless IMPORT is typed', () => {
+  const result = spawnSync(process.execPath, ['scripts/import-notion-comms.mjs', '--export', 'tests/fixtures/notion-comms', '--apply'], { cwd: process.cwd(), input: 'NO\n', encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Refusing to write without typing IMPORT/);
 });

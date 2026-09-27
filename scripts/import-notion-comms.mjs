@@ -3,6 +3,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs/promises';
+import { createInterface } from 'node:readline/promises';
 import { getStore } from '@netlify/blobs';
 import { readExport } from './lib/notion-comms/read-export.mjs';
 import { parseRow } from './lib/notion-comms/parse-row.mjs';
@@ -25,7 +26,7 @@ import { createNetlifyCliStore } from './lib/notion-comms/netlify-cli-store.mjs'
 
 const args = process.argv.slice(2); const value = (flag) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; }; const exportDir = value('--export'); const apply = args.includes('--apply');
 if (!exportDir) throw new Error('Usage: node scripts/import-notion-comms.mjs --export <directory> [--report <path>] [--apply [--yes]]');
-if (apply && !args.includes('--yes')) { process.stdout.write('Type IMPORT to write the planned records: '); if ((await fs.readFile(0, 'utf8')).trim() !== 'IMPORT') throw new Error('Refusing to write without typing IMPORT.'); }
+if (apply && !args.includes('--yes')) { const input = createInterface({ input: process.stdin, output: process.stdout }); const confirmation = await input.question('Type IMPORT to write the planned records: '); input.close(); if (confirmation.trim() !== 'IMPORT') throw new Error('Refusing to write without typing IMPORT.'); }
 const token = process.env.NETLIFY_BLOBS_TOKEN ?? '';
 const options = (name) => ({ name, siteID: UMBRELLA_BLOBS_SITE_ID, token });
 const cliTransport = value('--transport') === 'netlify-cli';
