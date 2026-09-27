@@ -7,9 +7,12 @@ originating spec.
 
 ## Read first
 
-1. Root `CLAUDE.md`.
-2. `packages/design-kit/AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`.
-3. This file.
+1. Root `AGENTS.md` — **mandatory** `npm run pre-pr-check` before any life-hub PR.
+2. Root `CLAUDE.md`.
+3. `packages/design-kit/AGENTS.md`, `RAIL.md`, `MOBILE.md`, `ICONS.md`.
+4. This file.
+
+Never remove `communications` | `meetings` | `events` from `RailViewId` to silence typecheck.
 
 ## Scope (Slice 4)
 
