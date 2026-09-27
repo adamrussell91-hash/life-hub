@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 
 // Person and Organisation record shapes for the shared identity service
 // (implementation programme, "Entity records"). Both live in the same
@@ -232,7 +233,10 @@ export function redactIdentityRecord(record) {
 }
 
 export function displayLabelFor(record) {
-  return REDACTED_STATUSES.has(record.lifecycle_status) ? TOMBSTONE_LABEL : record.display_name;
+  if (REDACTED_STATUSES.has(record.lifecycle_status)) return TOMBSTONE_LABEL;
+  // Strip Notion URL / `p/` debris so resolvers never project profile-text
+  // pollution as the identity label (People list tangles, org crest names).
+  return cleanIdentityDisplayName(record.display_name) || record.display_name;
 }
 
 // --- Lifecycle event ids ---

@@ -168,3 +168,50 @@ test('merges GitHub-imported people and their org relationships into the collect
   assert.equal(self.relationships[0].endpoint.display_label, 'St. Aloysius College');
   assert.equal(colleague.relationships[0].endpoint.ref, `shared:organisation:${deriveOrganisationId('leg-org-1')}`);
 });
+
+test('dedupes a Blob twin of a GitHub person when ids differ but cleaned names match', async () => {
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  // Polluted Blob label for the same human GitHub imports cleanly as Natalie Shih.
+  const blobTwin = await makePerson(store, {
+    display_name: 'Natalie Shih (https://app.notion.com/p/Natalie-Shih-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)'
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const fetchImpl = githubFetch({
+    people: [
+      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' },
+      { legacy_id: 'leg-other', display_name: 'Someone Else' }
+    ],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    relationships: [
+      {
+        person_legacy_id: 'leg-colleague',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const resolveEntity = async (refInput, accessContext, options = {}) => {
+    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+    if (!ref) throw endpointNotFoundError();
+    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
+    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
+    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
+      return resolveOrganisation(ref.id, accessContext, withGithub);
+    }
+    throw endpointNotFoundError();
+  };
+
+  const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
+  const natalies = result.filter((row) => /natalie shih/i.test(row.person.display_name));
+  assert.equal(natalies.length, 1, 'Blob+GitHub twins must collapse to one row');
+  assert.equal(natalies[0].person.display_name, 'Natalie Shih');
+  assert.equal(natalies[0].person.id, derivePersonId('leg-colleague'));
+  assert.equal(natalies[0].relationships.length, 1);
+  assert.equal(natalies[0].relationships[0].link.relationship_type, 'employee_at');
+  assert.ok(!result.some((row) => row.person.id === blobTwin.id));
+  assert.ok(result.some((row) => row.person.display_name === 'Someone Else'));
+});

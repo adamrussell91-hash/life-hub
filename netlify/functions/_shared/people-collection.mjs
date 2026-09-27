@@ -11,6 +11,7 @@ import {
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { listGithubPersonCandidates, listGithubRelationshipEntries } from './github-professional-data.mjs';
+import { dedupeIdentityRows } from './identity-display-name.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -58,8 +59,11 @@ function personIdFromKey(key) {
  * `listGithubPersonCandidates`). Search and Person pages already fall
  * back to that import; People Home / cohorts / network ecology previously
  * scanned Blobs only and therefore could not see anyone imported, or who
- * the operator is. Blob-backed records win on id collision. A missing or
- * unbound GitHub token degrades to the Blob-only set, same as
+ * the operator is. Same derived id → Blob record wins. Same human under
+ * different ids (Blob UUID vs `derivePersonId(legacy_id)`) → identity-name
+ * dedupe keeps the richer twin (usually GitHub, which carries
+ * `employee_at`). A missing or unbound GitHub token degrades to the
+ * Blob-only set, same as
  * entity-search.mjs.
  */
 export async function loadAllPeopleWithRelationships({
@@ -94,7 +98,7 @@ export async function loadAllPeopleWithRelationships({
       ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
     ];
 
-    return { person: { ...record, ref }, relationships };
+    return { person: { ...record, ref }, relationships, _source: 'blob' };
   });
 
   const native = results.filter(Boolean);
@@ -129,9 +133,15 @@ export async function loadAllPeopleWithRelationships({
         if (!endpoint) continue;
         relationships.push({ link, endpoint, direction });
       }
-      return { person: { ...record, ref }, relationships };
+      return { person: { ...record, ref }, relationships, _source: 'github' };
     }
   );
 
-  return [...native, ...imported];
+  const merged = dedupeIdentityRows(
+    [...native, ...imported],
+    (row) => row.person,
+    (row, person) => ({ person, relationships: row.relationships }),
+    (row) => (row._source === 'github' ? 'github' : 'blob')
+  );
+  return merged;
 }
