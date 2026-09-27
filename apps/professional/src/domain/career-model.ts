@@ -179,13 +179,108 @@ export type CareerModelOverview = {
   }>;
 };
 
+export type CareerStoneModel = {
+  id: string;
+  label: string;
+  target_term_start: string | null;
+  origin: string;
+  done: boolean;
+  future_ids: string[];
+  shared: boolean;
+  helps_count: number;
+  actions: Array<{ kind?: string; lifecycle_status?: string | null }>;
+};
+
+export type CareerCriterionModel = {
+  id: string;
+  text: string;
+  order: number;
+  source: string;
+  coverage: number;
+  supporting: Array<{ id: string; title: string; strength: string }>;
+};
+
+export type CareerFutureModel = {
+  id: string;
+  title: string;
+  where: string | null;
+  status: string;
+  suggested_reason: string | null;
+  lane_order: number;
+  colour_slot: number;
+  criteria: CareerCriterionModel[];
+  readiness: number | null;
+  readiness_label: string;
+  arrival_date: string | null;
+  arrival_label: string | null;
+  split_date: string;
+  split_label: string | null;
+  fading: boolean;
+  fading_since: string | null;
+  aliases: string[];
+  target_date: string | null;
+  stones: CareerStoneModel[];
+};
+
+export type CareerApplicationModel = {
+  id: string;
+  position_title: string;
+  pipeline_status: string;
+  closing_date: string | null;
+  match_percent: number | null;
+  match_label: string | null;
+};
+
+export type CareerTrunkItem = {
+  id: string;
+  title: string;
+  occurred_on: string;
+  date_precision: string;
+  future_ids: string[];
+};
+
+export type CareerWhatIfDelta = {
+  future_id: string;
+  title: string;
+  readiness_delta: number;
+  arrival_before: string | null;
+  arrival_after: string | null;
+};
+
+export type CareerModel = {
+  now: string;
+  stats: {
+    years_behind: number | null;
+    futures_ahead: number;
+    skill_cards: number;
+  };
+  stats_line: string;
+  trunk_items: CareerTrunkItem[];
+  futures: CareerFutureModel[];
+  stones: CareerStoneModel[];
+  shared_stones: CareerStoneModel[];
+  fork: {
+    date: string;
+    label: string | null;
+    futures_count: number;
+    caption: string;
+  } | null;
+  ghost_paths: unknown[];
+  scan: { pending_count?: number; last_run_at?: string | null };
+  ledger: CareerTrunkItem[];
+  applications: CareerApplicationModel[];
+  employment: NonNullable<CareerModelOverview['employment']>;
+  what_if_deltas: CareerWhatIfDelta[];
+  parked_futures: NonNullable<CareerModelOverview['futures']>;
+};
+
 /**
  * @param overview — career payload (achievements, futures, stones, links, applications)
  */
 export function buildCareerModel(
   overview: CareerModelOverview | null | undefined,
   options: { moves?: CareerModelOverview['moves']; now?: string | Date } = {}
-) {
+): CareerModel {
   const nowMs = options.now ? Date.parse(String(options.now)) : Date.now();
   const nowIso = new Date(nowMs).toISOString().slice(0, 10);
   const moves = Array.isArray(options.moves) ? options.moves : overview?.moves ?? [];
@@ -448,14 +543,14 @@ export function buildCareerModel(
     return Math.max(0, Math.floor((nowMs - first) / (365.25 * 24 * 60 * 60 * 1000)));
   })();
 
-  const baseWithoutMoves =
+  const baseWithoutMoves: CareerModel | null =
     moves && moves.length
       ? buildCareerModel({ ...overview, moves: undefined }, { now: options.now, moves: [] })
       : null;
 
-  const whatIfDeltas = baseWithoutMoves
+  const whatIfDeltas: CareerWhatIfDelta[] = baseWithoutMoves
     ? futureModels.map((f) => {
-        const before = baseWithoutMoves.futures.find((x) => x.id === f.id);
+        const before = baseWithoutMoves.futures.find((x: CareerFutureModel) => x.id === f.id);
         const readinessDelta = (f.readiness ?? 0) - (before?.readiness ?? 0);
         return {
           future_id: f.id,

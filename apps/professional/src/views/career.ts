@@ -2,7 +2,7 @@ import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { getCareer } from '@/api/career';
 import { listApplications } from '@/api/applications';
 import { careerCardRoute, careerFutureRoute, parseRoute } from '@/app/router';
-import { buildCareerModel } from '@/domain/career-model';
+import { buildCareerModel, type CareerModel } from '@/domain/career-model';
 import type { CareerOverview } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
@@ -13,7 +13,7 @@ import { renderWhatIfPanel } from '@/views/career-what-if';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className?: string,
+  className?: string | null,
   text?: string
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
@@ -31,7 +31,7 @@ function surface(node: HTMLElement): void {
 
 function renderRiver(
   host: HTMLElement,
-  model: ReturnType<typeof buildCareerModel>,
+  model: CareerModel,
   selectedFutureId: string | null
 ): void {
   const section = el('section', 'career-page__river');
@@ -52,7 +52,7 @@ function renderRiver(
 
 function renderFuturePanel(
   host: HTMLElement,
-  model: ReturnType<typeof buildCareerModel>,
+  model: CareerModel,
   selectedFutureId: string | null,
   onReload: () => void
 ): void {
@@ -105,7 +105,7 @@ function renderFuturePanel(
 
 function renderSkillsScan(
   host: HTMLElement,
-  model: ReturnType<typeof buildCareerModel>,
+  model: CareerModel,
   onReload: () => void
 ): void {
   const wrap = el('div', 'career-page__scan-host');
@@ -124,7 +124,9 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   try {
     overview = await getCareer();
   } catch (error) {
-    renderLoadError(canvas, error, 'Could not load career.');
+    renderLoadError(canvas, error, () => {
+      void renderCareerView(canvas);
+    });
     return;
   }
 
@@ -200,7 +202,7 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   }
 }
 
-function renderSkillsLedger(host: HTMLElement, model: ReturnType<typeof buildCareerModel>): void {
+function renderSkillsLedger(host: HTMLElement, model: CareerModel): void {
   const section = el('section', 'career-page__ledger');
   surface(section);
   const head = el('div', 'career-page__section-head');

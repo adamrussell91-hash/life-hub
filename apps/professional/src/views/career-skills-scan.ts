@@ -1,8 +1,6 @@
 import { listScanProposals, runCareerScan, keepScanProposal, binScanProposal } from '@/api/career';
 import { careerFutureRoute } from '@/app/router';
-import type { buildCareerModel } from '@/domain/career-model';
-
-type CareerModel = ReturnType<typeof buildCareerModel>;
+import type { CareerModel } from '@/domain/career-model';
 
 type ScanProposal = {
   id: string;
@@ -24,12 +22,12 @@ type ScanProposal = {
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className?: string,
-  text?: string
+  className?: string | null,
+  text?: string | null
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text != null) node.textContent = text;
   return node;
 }
 
