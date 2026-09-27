@@ -369,8 +369,21 @@ export function timelineCritical(input: {
   };
 }
 
-/** Planning window. The reference fixture sits inside July 2026 – January 2027. */
+/**
+ * Planning window on the unified Timeline.
+ * Calendar years: two behind today, three ahead — enough past + future that the
+ * axis reads as a real timeline (not the old demo clamp of T3 2026 → Jan 2027).
+ */
+export const TIMELINE_PAST_YEARS = 2;
+export const TIMELINE_FUTURE_YEARS = 3;
+
 export function timelineRange(today: string): { start: string; end: string } {
-  if (today >= '2026-07-20' && today <= '2027-01-31') return { start: '2026-07-20', end: '2027-01-31' };
-  return { start: addDaysKey(today, -60), end: addDaysKey(today, 140) };
+  const year = Number(today.slice(0, 4));
+  if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+    return { start: addDaysKey(today, -60), end: addDaysKey(today, 140) };
+  }
+  return {
+    start: `${year - TIMELINE_PAST_YEARS}-01-01`,
+    end: `${year + TIMELINE_FUTURE_YEARS}-12-31`
+  };
 }

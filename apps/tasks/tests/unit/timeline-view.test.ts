@@ -86,6 +86,16 @@ describe('timeline view', () => {
     expect([...canvas.querySelectorAll('[data-part="view-toggle"] button')].map((button) => button.textContent)).toEqual(['Bars', 'Lines']);
     expect(canvas.querySelector('[data-part="timeline-card"]')).not.toBeNull();
     expect(canvas.querySelector('[data-part="bar"][data-task-id="t3"] [data-part="bar-sub"]')?.textContent).toMatch(/^due /);
+
+    const frame = canvas.querySelector('.tl-frame') as HTMLElement;
+    expect(frame.style.getPropertyValue('--tl-label-w')).toBe('264px');
+    expect(frame.style.getPropertyValue('--tl-load-h')).toBe('128px');
+    const legend = canvas.querySelector('[data-part="load-legend"]') as HTMLElement;
+    expect(legend).not.toBeNull();
+    expect(legend.hidden).toBe(false);
+    expect(legend.textContent).toMatch(/Learning your term rhythm|Term rhythm applied/);
+    expect(legend.style.top).toBe('');
+    expect(canvas.querySelector('[data-part="axis-rule"]')).not.toBeNull();
     canvas.remove();
   });
 });

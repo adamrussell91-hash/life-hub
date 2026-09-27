@@ -6,6 +6,9 @@ import {
   goalProjectCount,
   goalSpan,
   isTimelineExpanded,
+  TIMELINE_FUTURE_YEARS,
+  TIMELINE_PAST_YEARS,
+  timelineRange,
   timelineTaskSpan,
   undatedCount,
   type TlModel
@@ -88,5 +91,18 @@ describe('timeline rows', () => {
     expect(canonicalizeGanttHash('#/board')).toBeNull();
     window.location.hash = '#/gantt?project=p1';
     expect(parseHashRoute()).toBe('timeline');
+  });
+
+  it('spans multiple calendar years around today instead of the old T3–Jan fixture clamp', () => {
+    const range = timelineRange('2026-09-22');
+    expect(range).toEqual({
+      start: `${2026 - TIMELINE_PAST_YEARS}-01-01`,
+      end: `${2026 + TIMELINE_FUTURE_YEARS}-12-31`
+    });
+    expect(range.start < '2026-07-20').toBe(true);
+    expect(range.end > '2027-01-31').toBe(true);
+    expect(Number(range.end.slice(0, 4)) - Number(range.start.slice(0, 4))).toBe(
+      TIMELINE_PAST_YEARS + TIMELINE_FUTURE_YEARS
+    );
   });
 });
