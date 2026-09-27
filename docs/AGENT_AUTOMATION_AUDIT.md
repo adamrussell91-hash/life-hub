@@ -135,3 +135,28 @@ Principle from About Me: the season is comfortable, slow growth, and the hub fai
 4. Sun 18:00 Hammond Weekly Review prep + Mon 06:30 Sara scan.
 5. Clementine CN read (About Me + Constraints + her Cross-Agent lines) + a directory entry.
 6. The rest of §4 in whatever order Adam wants.
+
+---
+
+## 6. Status (27 Sep, end of day)
+
+**Done**
+- §2.1 and §2.2: fixed in this PR (Confirm cards on the Central Node page; `coordinate_request_cn_write` really writes).
+- §4 daily / weekly / monthly runs: written as Cursor Automation instruction files in `life-hub-data/config/` (adamrussell91-hash/life-hub-data#25):
+  - the daily sweep, moved to 04:30 Sydney, closing out yesterday and marking challenge days;
+  - Hammond's Sunday Weekly Review prep;
+  - Sara's Monday health scan;
+  - Chadwick's Monday research refresh;
+  - Hyaluronica's Wednesday skin check;
+  - Hammond's monthly Goal Audit prep.
+
+  The setup table is in `config/automations/README.md`.
+
+**Next up: app-side list (these need code because the data is in Netlify Blobs)**
+1. **Teaching lesson-panel AI runner** (§2.3). Run queued `/api/ai/jobs` lesson jobs in a background function through `runTeachingAnnTurn`. Delete the dead `/api/ai/chat` client in `apps/teaching/src/ai/client.ts`.
+2. **Clare intuitive pass** (§2.4). Schedule the existing `apps/tasks/src/{ai/intuitive-judge,domain/intuitive-scan,domain/intuitive-digest}.ts` as a Netlify scheduled function (Sun ~19:00 Sydney, flags only), or remove the promise from `clare-protocol.md`.
+3. **Ann Sunday teaching forecast.** A scheduled function reads the next 7–14 days of scheduled lessons and marking load from the Teaching store and posts one `Ann→Hammond:` line. That closes the open July handoff.
+4. **Clementine reads Central Node** (§2.5). Load About Me, Constraints and her Cross-Agent lines in `knowledge-clementine-chat`, let her post `Clementine→` lines, and add her to the CN Agent Directory.
+5. **Knowledge URL-watch check.** Weekly scheduled run of the existing `url-watch.mjs` checker. It was last run by hand on 20 Sep.
+6. **In-app sweep heartbeat.** The Central Node page and Home show "Daily sweep missed" when the newest `Daily Sweep` governance entry is more than a day old. The automations check this weekly; the app would catch it the same morning.
+7. **Small cron fixes.** Gate `promise-nudges-scheduled` on the Sydney hour so it stays at 07:00 after daylight saving. Let `career-scan` retry on the 18:00 and 19:00 ticks when the 17:00 run fails.
