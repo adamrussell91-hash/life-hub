@@ -26,7 +26,7 @@ import {
   type OrgsQueryState,
   type OrgsSort
 } from '@/domain/organisations-query';
-import { renderRelationshipArcSvg } from '@/domain/relationship-arc';
+import { renderOrganisationSparkSvg } from '@/domain/organisation-spark';
 import { crestNode, el } from '@/components/org-ui';
 
 export interface OrganisationsPageOptions {
@@ -90,9 +90,11 @@ function rowToModel(row: DirectoryOrganisationRow): OrganisationModel {
       warmthBand: p.warmth_band,
       firstLinkAt: p.first_link_at
     })),
+    undatedPeopleCount: row.undated_people_count,
     arcPoints: row.arc_points,
     timelineLanes: row.timeline_lanes,
     firstTouchAt: row.first_touch_at,
+    firstTouchKind: row.first_touch_kind ?? null,
     lastActivityAt: row.last_activity_at
   });
 }
@@ -199,6 +201,8 @@ function renderTile(model: OrganisationModel, query: OrgsQueryState): HTMLAnchor
   const chips = el('div', 'orgs-rchips');
   for (const c of model.chips) {
     const chip = el('span', chipClass(c.kind));
+    const full = c.detail ? `${c.label} · ${c.detail}` : c.label;
+    chip.title = full;
     chip.append(el('b', undefined, c.label));
     if (c.detail) chip.append(el('span', 'orgs-rchip__yr', c.detail));
     chips.append(chip);
@@ -212,7 +216,31 @@ function renderTile(model: OrganisationModel, query: OrgsQueryState): HTMLAnchor
   count.append(renderSpread(model.warmthSpread));
 
   const spark = el('div', 'orgs-tile__spark');
-  spark.append(renderRelationshipArcSvg(model.arcPoints));
+  const dated = model.arcPoints.length;
+  const undated = model.undatedPeopleCount;
+  const ariaParts = [
+    `${dated} ${dated === 1 ? 'person' : 'people'} with a known start on the 2019–now chart`
+  ];
+  if (undated > 0) {
+    ariaParts.push(
+      `${undated} ${undated === 1 ? 'person' : 'people'} with no known start`
+    );
+  }
+  spark.setAttribute('aria-label', ariaParts.join('. '));
+  const workMarks = model.timelineLanes
+    .filter((l) => l.kind === 'work_study' || l.kind === 'roles')
+    .map((l) => ({ start: l.start, end: l.end }));
+  const eventMarks = model.timelineLanes
+    .filter((l) => l.kind === 'events')
+    .map((l) => ({ at: l.start }));
+  spark.append(
+    renderOrganisationSparkSvg({
+      points: model.arcPoints,
+      workMarks,
+      eventMarks,
+      undatedCount: undated
+    })
+  );
 
   a.append(head, count, spark);
   return a;
@@ -267,13 +295,7 @@ export async function renderOrganisationsView(
     )
   );
   const oppsBody = el('div', 'orgs-opps__body');
-  oppsBody.append(
-    el(
-      'p',
-      'orgs-opps__empty',
-      "No opportunities yet. Add one, or they'll arrive once the sweep is built."
-    )
-  );
+  oppsBody.append(el('p', 'orgs-opps__empty', 'No opportunities yet.'));
   opps.append(oppsH, oppsBody);
 
   const bar = el('div', 'orgs-page__bar');

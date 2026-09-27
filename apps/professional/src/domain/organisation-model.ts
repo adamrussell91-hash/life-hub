@@ -1,9 +1,9 @@
 /**
- * One model for crest tile, header, chips, warmth spread, and arc (V4).
+ * One model for crest tile, header, chips, warmth spread, and spark (V4).
  */
 
 import type { WarmthBand } from './warmth-score';
-import type { ArcPoint } from './relationship-arc';
+import type { SparkPoint } from './organisation-spark';
 
 export type RelationshipChipKind =
   | 'workplace'
@@ -47,6 +47,8 @@ export interface OrganisationPeopleStep {
   personId: string;
 }
 
+export type FirstTouchKind = 'you_started' | 'first_contact';
+
 export interface OrganisationModel {
   id: string;
   ref: string;
@@ -56,13 +58,15 @@ export interface OrganisationModel {
   logoKey: string | null;
   chips: RelationshipChip[];
   peopleCount: number;
+  undatedPeopleCount: number;
   peopleIds: string[];
   warmthSpread: WarmthSpread;
-  /** Mini arc on shared 2019→now scale (tile). */
-  arcPoints: ArcPoint[];
+  /** Mini spark on shared 2019→now scale (tile). */
+  arcPoints: SparkPoint[];
   /** Current workplace tile spans two columns. */
   isCurrentWorkplace: boolean;
   firstTouchAt: string | null;
+  firstTouchKind: FirstTouchKind | null;
   lastActivityAt: string | null;
   timelineLanes: OrganisationTimelineLane[];
   peopleSteps: OrganisationPeopleStep[];
@@ -77,9 +81,11 @@ export interface OrganisationModelInput {
   logoKey?: string | null;
   chips: RelationshipChip[];
   people: Array<{ id: string; warmthBand: WarmthBand; firstLinkAt: string | null }>;
-  arcPoints?: ArcPoint[];
+  undatedPeopleCount?: number;
+  arcPoints?: SparkPoint[];
   timelineLanes?: OrganisationTimelineLane[];
   firstTouchAt?: string | null;
+  firstTouchKind?: FirstTouchKind | null;
   lastActivityAt?: string | null;
   now?: string;
 }
@@ -177,23 +183,30 @@ export function buildOrganisationModel(input: OrganisationModelInput): Organisat
   const warmthSpread = buildWarmthSpread(dedupedPeople);
   const peopleSteps = buildPeopleSteps(dedupedPeople);
   const isCurrentWorkplace = input.chips.some((c) => c.kind === 'workplace');
+  const undatedPeopleCount =
+    input.undatedPeopleCount ?? dedupedPeople.filter((p) => !p.firstLinkAt).length;
 
   const arcPoints =
     input.arcPoints ??
     peopleSteps
       .filter((s) => Date.parse(s.at) >= Date.parse(ARC_DOMAIN_START))
-      .map((s) => ({ id: s.personId, at: s.at, label: String(s.count) }));
+      .map((s) => ({ id: s.personId, at: s.at }));
 
   const firstTouchAt =
     input.firstTouchAt ??
     peopleSteps[0]?.at ??
     null;
+  const firstTouchKind =
+    input.firstTouchKind ?? (firstTouchAt ? 'first_contact' : null);
   const lastActivityAt = input.lastActivityAt ?? now;
 
   const peopleWord = dedupedPeople.length === 1 ? 'person' : 'people';
-  const metaLine = `${dedupedPeople.length} ${peopleWord}${
-    firstTouchAt ? ` · first ${formatMonthYear(firstTouchAt)}` : ''
-  }`;
+  let metaLine = `${dedupedPeople.length} ${peopleWord}`;
+  if (firstTouchAt && firstTouchKind === 'you_started') {
+    metaLine += ` · you started ${formatMonthYear(firstTouchAt)}`;
+  } else if (firstTouchAt) {
+    metaLine += ` · first ${formatMonthYear(firstTouchAt)}`;
+  }
 
   return {
     id: input.id,
@@ -204,11 +217,13 @@ export function buildOrganisationModel(input: OrganisationModelInput): Organisat
     logoKey: input.logoKey ?? null,
     chips: input.chips,
     peopleCount: dedupedPeople.length,
+    undatedPeopleCount,
     peopleIds,
     warmthSpread,
     arcPoints,
     isCurrentWorkplace,
     firstTouchAt,
+    firstTouchKind,
     lastActivityAt,
     timelineLanes: input.timelineLanes ?? [],
     peopleSteps,

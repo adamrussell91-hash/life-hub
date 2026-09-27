@@ -1,5 +1,6 @@
 /**
  * Organisations redesign Phase 1 — organisation page skeleton + Your time with …
+ * FIX-BRIEF-01 A3–A5, A8: ongoing bars, timeline labels, no dead buttons / roadmap copy.
  */
 
 import {
@@ -15,6 +16,7 @@ import {
   buildOrganisationModel,
   type OrganisationModel
 } from '@/domain/organisation-model';
+import { ORG_SPARK_DOMAIN_START } from '@/domain/organisation-spark';
 import { renderOrganisationTimelineSvg } from '@/domain/organisation-timeline';
 import { parseOrgsQuery, serializeOrgsQuery } from '@/domain/organisations-query';
 
@@ -68,9 +70,11 @@ function rowToModel(row: DirectoryOrganisationRow): OrganisationModel {
       warmthBand: p.warmth_band,
       firstLinkAt: p.first_link_at
     })),
+    undatedPeopleCount: row.undated_people_count,
     arcPoints: row.arc_points,
     timelineLanes: row.timeline_lanes,
     firstTouchAt: row.first_touch_at,
+    firstTouchKind: row.first_touch_kind ?? null,
     lastActivityAt: row.last_activity_at
   });
 }
@@ -107,15 +111,8 @@ export async function renderOrganisationPage(
   back.href = organisationsRoute(null, serializeOrgsQuery(query));
   back.textContent = '← Organisations';
   const switchSpacer = el('span', 'orgs-page__spacer');
-  const compareBtn = el('button', 'btn btn--secondary', 'Compare with…') as HTMLButtonElement;
-  compareBtn.type = 'button';
-  compareBtn.disabled = true;
-  compareBtn.title = 'Compare arrives in Phase 7';
-  const editBtn = el('button', 'btn btn--secondary', 'Edit') as HTMLButtonElement;
-  editBtn.type = 'button';
-  editBtn.disabled = true;
-  editBtn.title = 'Structure editor arrives in Phase 2';
-  switchBar.append(back, switchSpacer, compareBtn, editBtn);
+  // A5: Compare / Edit land with Phases 7 and 2 — don't render disabled stubs.
+  switchBar.append(back, switchSpacer);
 
   const hdr = el('header', 'orgs-page__hdr');
   const hdrStack = el('div', 'orgs-page__hdr-stack');
@@ -185,64 +182,60 @@ export async function renderOrganisationPage(
     chipsHost.replaceChildren();
     for (const c of model.chips) {
       const chip = el('span', chipClass(c.kind));
+      const full = c.detail ? `${c.label} · ${c.detail}` : c.label;
+      chip.title = full;
       chip.append(el('b', undefined, c.label));
       if (c.detail) chip.append(el('span', 'orgs-rchip__yr', c.detail));
       chipsHost.append(chip);
     }
 
-    // How it is run — empty until Phase 3 (I3)
+    // How it is run — empty until Phase 3; no disabled "Add structure" (A5 / I3).
     setSectionState(how.body, 'ready');
     const howEmpty = el('div', 'orgs-how__empty');
     howEmpty.append(
       el('p', 'people-pane__empty', 'No structure yet. Add units to show how this organisation is run.')
     );
-    const addStructure = el('button', 'btn btn--secondary', 'Add structure') as HTMLButtonElement;
-    addStructure.type = 'button';
-    addStructure.disabled = true;
-    addStructure.title = 'Structure editor arrives in Phase 2';
-    howEmpty.append(addStructure);
     how.body.append(howEmpty);
 
-    // Ann's read — stub until Phase 5
+    // Ann's read — empty until Phase 5; no disabled "Run now" (A5).
     setSectionState(ann.body, 'ready');
     ann.body.append(
-      el('p', 'people-pane__empty', `Ann reads this organisation daily.`)
+      el('p', 'people-pane__empty', `Ann hasn't read ${model.displayName} yet.`)
     );
-    const runNow = el('button', 'btn btn--ghost', 'Run now') as HTMLButtonElement;
-    runNow.type = 'button';
-    runNow.disabled = true;
-    runNow.title = "Ann's read arrives in Phase 5";
-    ann.body.append(runNow);
 
-    // Opportunities — empty until Phase 4
+    // Opportunities — honest empty; Add arrives with Phase 4 (A5).
     setSectionState(opps.body, 'ready');
     opps.heading.append(el('span', 'people-pane__h2-sub', 'here · next 3 weeks'));
-    opps.body.append(
-      el(
-        'p',
-        'people-pane__empty',
-        "No opportunities yet. Add one, or they'll arrive once the sweep is built."
-      )
-    );
+    opps.body.append(el('p', 'people-pane__empty', 'No opportunities yet.'));
 
-    // Your time with … (Phase 1.5)
+    // Your time with … — shared 2019→now domain; width from host so labels
+    // are not squashed at 390 (C1 / preserveAspectRatio meet + minWidth).
     setSectionState(time.body, 'ready');
-    const domainStart = model.firstTouchAt ?? model.timelineLanes[0]?.start ?? '2019-01-01T00:00:00.000Z';
+    const domainStart =
+      model.peopleSteps[0]?.at &&
+      Date.parse(model.peopleSteps[0].at) < Date.parse(ORG_SPARK_DOMAIN_START)
+        ? model.peopleSteps[0].at
+        : model.timelineLanes[0]?.start &&
+            Date.parse(model.timelineLanes[0].start) < Date.parse(ORG_SPARK_DOMAIN_START)
+          ? model.timelineLanes[0].start
+          : ORG_SPARK_DOMAIN_START;
     const domainEnd = new Date().toISOString();
+    const wrap = el('div', 'orgs-time__svg');
+    time.body.append(wrap);
+    const measured = Math.max(wrap.clientWidth || 0, 448);
     const svg = renderOrganisationTimelineSvg({
       lanes: model.timelineLanes,
       peopleSteps: model.peopleSteps,
       domainStart,
-      domainEnd
+      domainEnd,
+      width: measured
     });
-    const wrap = el('div', 'orgs-time__svg');
     wrap.append(svg);
     if (model.timelineLanes.length === 0 && model.peopleSteps.length === 0) {
-      time.body.append(
+      time.body.prepend(
         el('p', 'people-pane__empty', 'No timeline marks yet — links and events will appear here.')
       );
     }
-    time.body.append(wrap);
   } catch (err) {
     if (!isCurrent()) return;
     title.textContent = 'Organisations';

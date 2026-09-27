@@ -3,12 +3,17 @@ import { createOperatorHandler } from './_shared/operator-gate.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { findActiveSelfPerson } from './_shared/career-overview.mjs';
 import { loadAllOrganisationsWithRelationships } from './_shared/organisations-collection.mjs';
-import { assembleOrganisationsDirectory } from './_shared/organisations-directory.mjs';
+import {
+  assembleOrganisationsDirectory,
+  buildPersonWarmthById
+} from './_shared/organisations-directory.mjs';
+import { loadAllPeopleWithRelationships } from './_shared/people-collection.mjs';
 
 export const config = { path: '/api/organisations/directory' };
 
 export function createOrganisationsDirectoryHandler(deps = {}) {
   const loadOrgs = deps.loadAllOrganisationsWithRelationships ?? loadAllOrganisationsWithRelationships;
+  const loadPeople = deps.loadAllPeopleWithRelationships ?? loadAllPeopleWithRelationships;
   const assemble = deps.assembleOrganisationsDirectory ?? assembleOrganisationsDirectory;
   const findSelf = deps.findActiveSelfPerson ?? findActiveSelfPerson;
   const now = deps.now ?? (() => new Date());
@@ -21,19 +26,26 @@ export function createOrganisationsDirectoryHandler(deps = {}) {
       }
       try {
         const nowValue = now();
-        const [orgsWithRelationships, selfPerson] = await Promise.all([
-          loadOrgs({
-            store,
-            resolveEntity: deps.resolveEntity,
-            createRepository: deps.createRepository,
-            env,
-            fetchImpl: deps.fetchImpl
-          }),
+        const loadArgs = {
+          store,
+          resolveEntity: deps.resolveEntity,
+          createRepository: deps.createRepository,
+          env,
+          fetchImpl: deps.fetchImpl
+        };
+        // A2: warmth from the same People path (full person relationships).
+        const [orgsWithRelationships, peopleWithRelationships, selfPerson] = await Promise.all([
+          loadOrgs(loadArgs),
+          loadPeople(loadArgs),
           findSelf(store, { env, fetchImpl: deps.fetchImpl })
         ]);
+        const nowIso =
+          nowValue instanceof Date ? nowValue.toISOString() : String(nowValue ?? new Date().toISOString());
+        const personWarmthById = buildPersonWarmthById(peopleWithRelationships, nowIso);
         const data = assemble(orgsWithRelationships, {
           now: nowValue,
-          selfPerson
+          selfPerson,
+          personWarmthById
         });
         return withCors(okResponse(200, data), request, env);
       } catch (error) {

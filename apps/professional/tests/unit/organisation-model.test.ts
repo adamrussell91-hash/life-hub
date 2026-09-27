@@ -88,7 +88,7 @@ describe('organisation-timeline', () => {
           kind: 'work_study',
           label: 'English',
           start: '2021-01-01T00:00:00.000Z',
-          end: null
+          end: '2024-01-01T00:00:00.000Z'
         }
       ],
       peopleSteps: [{ at: '2021-01-01T00:00:00.000Z', count: 1, personId: 'a' }],
@@ -97,5 +97,28 @@ describe('organisation-timeline', () => {
     });
     expect(layout.height).toBe(3 * 32 + 24);
     expect(layout.peoplePath.startsWith('M')).toBe(true);
+  });
+
+  it('open-ended work bar runs to now x (A3 / C6)', () => {
+    const domainEnd = '2026-09-26T00:00:00.000Z';
+    const layout = layoutOrganisationTimeline({
+      lanes: [
+        {
+          id: '1',
+          kind: 'work_study',
+          label: 'Gifted Education Teacher',
+          start: '2025-01-28T00:00:00.000Z',
+          end: null
+        }
+      ],
+      peopleSteps: [],
+      domainStart: '2019-01-01T00:00:00.000Z',
+      domainEnd,
+      width: 900
+    });
+    const work = layout.lanes.find((l) => l.id === 'work_study');
+    expect(work?.bars).toHaveLength(1);
+    expect(work?.points).toHaveLength(0);
+    expect(work!.bars[0]!.x + work!.bars[0]!.w).toBeCloseTo(900 - 48, 0);
   });
 });

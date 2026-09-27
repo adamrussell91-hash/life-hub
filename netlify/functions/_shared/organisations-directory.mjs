@@ -1,10 +1,11 @@
 import { formatEntityRef } from './entity-ref.mjs';
-import { findActiveSelfPerson } from './career-overview.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { warmthFor, touchpointsFromOverview } from './warmth-score.mjs';
 
 /**
  * Organisations redesign Phase 1 — directory rows + chip derivation (V4).
+ * FIX-BRIEF-01 A1/A2/A7/A8: real first-link dates, People warmth source,
+ * honest chips, header first-date wording.
  */
 
 function orgMonogram(name) {
@@ -57,9 +58,23 @@ function monthYear(iso) {
 }
 
 /**
+ * Real first-link date only (D1 / A1). Never import `created_at`.
+ * Prefer valid_from / occurred_at; then earliest meeting/event/comm touch
+ * with that person when the caller supplies extras.
+ * @param {object} link
+ * @param {string|null} [extraIso]
+ */
+export function realFirstLinkAt(link, extraIso = null) {
+  const primary = link?.valid_from || link?.occurred_at || null;
+  if (primary) return primary;
+  if (extraIso && Number.isFinite(Date.parse(extraIso))) return extraIso;
+  return null;
+}
+
+/**
  * Derive relationship chips for one organisation from its links.
  * @param {Array<{ link: object, endpoint: object, direction: string }>} relationships
- * @param {{ selfPersonRef?: string|null, nowMs?: number }} [options]
+ * @param {{ selfPersonRef?: string|null, nowMs?: number, presentedYears?: string[] }} [options]
  */
 export function deriveOrganisationChips(relationships, options = {}) {
   const nowMs = options.nowMs ?? Date.now();
@@ -73,11 +88,11 @@ export function deriveOrganisationChips(relationships, options = {}) {
 
   for (const entry of relationships ?? []) {
     const { link, endpoint, direction } = entry;
+    void direction;
     if (!link) continue;
     const type = link.relationship_type;
 
     if (type === 'employee_at' && endpoint?.kind === 'person') {
-      // Incoming employee_at: person → org, so org sees person as endpoint on incoming
       const current = isCurrentLink(link, nowMs);
       const role = link.role ? `${link.role} · ` : '';
       chips.push({
@@ -85,7 +100,6 @@ export function deriveOrganisationChips(relationships, options = {}) {
         label: 'Workplace',
         detail: `${role}${yearSpan(link.valid_from, link.valid_to, nowMs)}`.trim(),
         filterBucket: 'work',
-        // Only mark org-as-workplace when self is the employee
         _selfOnly: selfRef ? endpoint.ref === selfRef : false,
         _personId: endpoint.ref?.split(':')[2] ?? null
       });
@@ -138,17 +152,10 @@ export function deriveOrganisationChips(relationships, options = {}) {
     }
   }
 
-  // Self-presented at events whose provider is this org: need presenter links
-  // on events. Those arrive as event→person; we only see event endpoints here
-  // when the org is provider/venue. Count years when self is among presenters
-  // if the directory pass enriches them — Phase 1 uses provider events + self
-  // presenter scan from options.presentedYears when supplied.
   if (options.presentedYears?.length) {
     for (const y of options.presentedYears) presentedYears.add(String(y));
   }
 
-  // Chips that describe Adam's relationship to the org (self-only), plus
-  // venue/provider/applied which are org-level.
   const selfChips = chips.filter((c) => c._selfOnly);
   const out = selfChips.map(({ _selfOnly, _personId, ...rest }) => rest);
 
@@ -186,7 +193,6 @@ export function deriveOrganisationChips(relationships, options = {}) {
     });
   }
 
-  // Deduplicate by kind+label (keep first / richest detail)
   const seen = new Set();
   return out.filter((c) => {
     const key = `${c.kind}:${c.label}`;
@@ -197,18 +203,68 @@ export function deriveOrganisationChips(relationships, options = {}) {
 }
 
 /**
+ * Build personId → { band, score } from People directory inputs (A2 / V4).
+ * Same touchpoints + warmthFor path as assemblePeopleDirectory.
+ * @param {Array<{ person: object, relationships: Array }>} peopleWithRelationships
+ * @param {string} nowIso
+ */
+export function buildPersonWarmthById(peopleWithRelationships, nowIso) {
+  const map = new Map();
+  for (const { person, relationships } of peopleWithRelationships ?? []) {
+    if (!person?.id) continue;
+    if (person.is_self) continue;
+    if (person.lifecycle_status === 'deleted' || person.lifecycle_status === 'deidentified') {
+      continue;
+    }
+    const touchpoints = touchpointsFromOverview({
+      relationships: relationships ?? [],
+      timeline: [],
+      linkedRecords: {}
+    });
+    const warmthResult = warmthFor({
+      touchpoints,
+      relationships: relationships ?? [],
+      personCreatedAt: person.created_at,
+      now: nowIso
+    });
+    map.set(person.id, { band: warmthResult.band, score: warmthResult.score });
+  }
+  return map;
+}
+
+/**
  * @param {Array<{ organisation: object, relationships: Array }>} orgsWithRelationships
- * @param {{ now?: Date|string, selfPerson?: object|null }} [options]
+ * @param {{
+ *   now?: Date|string,
+ *   selfPerson?: object|null,
+ *   personWarmthById?: Map<string,{band:string,score:number}>|Record<string,{band:string,score:number}>,
+ *   personExtraFirstLinkAt?: Map<string,string>|Record<string,string>
+ * }} [options]
  */
 export function assembleOrganisationsDirectory(orgsWithRelationships, options = {}) {
   const nowIso =
     options.now instanceof Date ? options.now.toISOString() : options.now ?? new Date().toISOString();
   const nowMs = Date.parse(nowIso);
   const selfPerson = options.selfPerson ?? null;
+  const selfId = selfPerson?.id ?? null;
   const selfRef = selfPerson
     ? selfPerson.ref ??
       formatEntityRef({ namespace: 'shared', kind: 'person', id: selfPerson.id })
     : null;
+
+  const warmthLookup = (personId) => {
+    const src = options.personWarmthById;
+    if (!src) return null;
+    if (typeof src.get === 'function') return src.get(personId) ?? null;
+    return src[personId] ?? null;
+  };
+
+  const extraFirstLink = (personId) => {
+    const src = options.personExtraFirstLinkAt;
+    if (!src) return null;
+    if (typeof src.get === 'function') return src.get(personId) ?? null;
+    return src[personId] ?? null;
+  };
 
   const organisations = [];
   let totalPeople = new Set();
@@ -228,7 +284,6 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
 
     const chips = deriveOrganisationChips(relationships, { selfPersonRef: selfRef, nowMs });
 
-    // People linked via person→org relationship types
     const peopleMap = new Map();
     const PERSON_TYPES = new Set([
       'employee_at',
@@ -236,6 +291,8 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
       'studied_at',
       'placement_at'
     ]);
+
+    let youStartedAt = null;
 
     for (const entry of relationships ?? []) {
       const { link, endpoint } = entry;
@@ -245,33 +302,59 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
       if (!personId) continue;
       totalPeople.add(personId);
 
-      const touchpoints = touchpointsFromOverview({
-        relationships: [entry],
-        timeline: [],
-        linkedRecords: {}
-      });
-      const warmthResult = warmthFor({
-        touchpoints,
-        relationships: [entry],
-        personCreatedAt: null,
-        now: nowIso
-      });
+      const fromPeople = warmthLookup(personId);
+      let warmthBand;
+      let warmthScore;
+      if (fromPeople) {
+        warmthBand = fromPeople.band;
+        warmthScore = fromPeople.score;
+      } else {
+        // Fallback when People index not supplied (unit fixtures). Prefer
+        // full-person path via personWarmthById in production (A2).
+        const touchpoints = touchpointsFromOverview({
+          relationships: [entry],
+          timeline: [],
+          linkedRecords: {}
+        });
+        const warmthResult = warmthFor({
+          touchpoints,
+          relationships: [entry],
+          personCreatedAt: null,
+          now: nowIso
+        });
+        warmthBand = warmthResult.band;
+        warmthScore = warmthResult.score;
+      }
 
-      const firstLinkAt = link.valid_from || link.occurred_at || link.created_at || null;
+      const firstLinkAt = realFirstLinkAt(link, extraFirstLink(personId));
+      if (
+        selfRef &&
+        endpoint.ref === selfRef &&
+        firstLinkAt &&
+        (link.relationship_type === 'employee_at' ||
+          link.relationship_type === 'studied_at' ||
+          link.relationship_type === 'placement_at' ||
+          link.relationship_type === 'member_of')
+      ) {
+        if (!youStartedAt || Date.parse(firstLinkAt) < Date.parse(youStartedAt)) {
+          youStartedAt = firstLinkAt;
+        }
+      }
+
       const existing = peopleMap.get(personId);
       if (!existing) {
         peopleMap.set(personId, {
           id: personId,
           display_name: endpoint.display_label ?? 'Person',
-          warmth_band: warmthResult.band,
-          warmth: warmthResult.score,
+          warmth_band: warmthBand,
+          warmth: warmthScore,
           first_link_at: firstLinkAt
         });
       } else {
         const order = { warm: 0, cooling: 1, cold: 2 };
-        if (order[warmthResult.band] < order[existing.warmth_band]) {
-          existing.warmth_band = warmthResult.band;
-          existing.warmth = warmthResult.score;
+        if (order[warmthBand] < order[existing.warmth_band]) {
+          existing.warmth_band = warmthBand;
+          existing.warmth = warmthScore;
         }
         if (
           firstLinkAt &&
@@ -282,12 +365,19 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
       }
     }
 
+    // Self person is not in People warmth map (people-directory skips is_self).
+    // Keep them in the people list for counts; band stays cold unless dated work.
+    if (selfId && selfRef) {
+      // already added via employee_at etc. if linked
+    }
+
     const people = [...peopleMap.values()];
     const warmthSpread = { warm: 0, cooling: 0, cold: 0, total: people.length };
     for (const p of people) {
       warmthSpread[p.warmth_band] += 1;
     }
 
+    const undatedPeopleCount = people.filter((p) => !p.first_link_at).length;
     const peopleSteps = people
       .filter((p) => p.first_link_at)
       .sort((a, b) => Date.parse(a.first_link_at) - Date.parse(b.first_link_at));
@@ -296,13 +386,24 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
     for (const p of peopleSteps) {
       if (seen.has(p.id)) continue;
       seen.add(p.id);
-      arcPoints.push({ id: p.id, at: p.first_link_at, label: String(seen.size) });
+      // No per-point label (A1) — spark uses cumulative count from order.
+      arcPoints.push({ id: p.id, at: p.first_link_at });
     }
 
     const isCurrentWorkplace = chips.some((c) => c.kind === 'workplace');
-    const firstTouchAt = peopleSteps[0]?.first_link_at ?? organisation.created_at ?? null;
 
-    // Timeline lanes from self memberships + events
+    // A8: earliest real person date, or null when everyone is undated.
+    const firstTouchAt = peopleSteps[0]?.first_link_at ?? null;
+    const otherDated = peopleSteps.filter((p) => p.id !== selfId);
+    let firstTouchKind = null;
+    if (otherDated.length > 0) {
+      firstTouchKind = 'first_contact';
+    } else if (youStartedAt) {
+      firstTouchKind = 'you_started';
+    } else if (firstTouchAt) {
+      firstTouchKind = 'first_contact';
+    }
+
     const timelineLanes = [];
     for (const entry of relationships ?? []) {
       const { link, endpoint } = entry;
@@ -354,10 +455,13 @@ export function assembleOrganisationsDirectory(orgsWithRelationships, options = 
       chips,
       people_count: people.length,
       people,
+      undated_people_count: undatedPeopleCount,
       warmth_spread: warmthSpread,
       arc_points: arcPoints,
       is_current_workplace: isCurrentWorkplace,
-      first_touch_at: firstTouchAt,
+      first_touch_at: firstTouchKind === 'you_started' ? youStartedAt : firstTouchAt,
+      first_touch_kind: firstTouchKind,
+      you_started_at: youStartedAt,
       last_activity_at: organisation.updated_at ?? nowIso,
       timeline_lanes: timelineLanes,
       created_at: organisation.created_at,

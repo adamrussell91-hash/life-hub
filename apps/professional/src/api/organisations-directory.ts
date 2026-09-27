@@ -1,7 +1,7 @@
 import { apiGet, apiPatch, apiPost } from './client';
 import type { WarmthBand } from '@/domain/warmth-score';
-import type { RelationshipChip } from '@/domain/organisation-model';
-import type { ArcPoint } from '@/domain/relationship-arc';
+import type { FirstTouchKind, RelationshipChip } from '@/domain/organisation-model';
+import type { SparkPoint } from '@/domain/organisation-spark';
 import type { OrganisationTimelineLane } from '@/domain/organisation-model';
 
 export interface DirectoryOrganisationRow {
@@ -20,10 +20,13 @@ export interface DirectoryOrganisationRow {
     warmth: number;
     first_link_at: string | null;
   }>;
+  undated_people_count?: number;
   warmth_spread: { warm: number; cooling: number; cold: number; total: number };
-  arc_points: ArcPoint[];
+  arc_points: SparkPoint[];
   is_current_workplace: boolean;
   first_touch_at: string | null;
+  first_touch_kind?: FirstTouchKind | null;
+  you_started_at?: string | null;
   last_activity_at: string | null;
   timeline_lanes: OrganisationTimelineLane[];
   created_at: string;
