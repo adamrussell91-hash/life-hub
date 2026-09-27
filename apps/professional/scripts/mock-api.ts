@@ -783,10 +783,25 @@ export function createMockApi() {
           cold: peopleList.filter((p) => p.warmth_band === 'cold').length,
           total: peopleList.length
         };
-        const arc_points = peopleList
+        const undated_people_count = peopleList.filter((p) => !p.first_link_at).length;
+        const datedPeople = peopleList
           .filter((p) => p.first_link_at)
-          .sort((a, b) => String(a.first_link_at).localeCompare(String(b.first_link_at)))
-          .map((p, i) => ({ id: p.id, at: p.first_link_at as string, label: String(i + 1) }));
+          .sort((a, b) => String(a.first_link_at).localeCompare(String(b.first_link_at)));
+        const arc_points = datedPeople.map((p) => ({
+          id: p.id,
+          at: p.first_link_at as string
+        }));
+        const you_started_at =
+          self && peopleList.find((p) => p.id === self.id)?.first_link_at
+            ? peopleList.find((p) => p.id === self.id)!.first_link_at
+            : null;
+        const otherDated = datedPeople.filter((p) => p.id !== self?.id);
+        const first_touch_kind =
+          otherDated.length > 0 ? 'first_contact' : you_started_at ? 'you_started' : null;
+        const first_touch_at =
+          first_touch_kind === 'you_started'
+            ? you_started_at
+            : datedPeople[0]?.first_link_at ?? null;
 
         const monogram = org.display_name
           .split(/\s+/)
@@ -806,10 +821,13 @@ export function createMockApi() {
           chips,
           people_count: peopleList.length,
           people: peopleList,
+          undated_people_count,
           warmth_spread,
           arc_points,
           is_current_workplace: chips.some((c) => c.kind === 'workplace'),
-          first_touch_at: peopleList[0]?.first_link_at ?? org.created_at ?? null,
+          first_touch_at,
+          first_touch_kind,
+          you_started_at,
           last_activity_at: org.updated_at ?? new Date().toISOString(),
           timeline_lanes: chips
             .filter((c) => c.kind === 'workplace' || c.kind === 'studied')
