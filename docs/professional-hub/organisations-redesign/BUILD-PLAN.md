@@ -147,9 +147,11 @@ and `organisation-page.ts` (generic `renderEntityDetail`).
 
 **1.4 Organisation page skeleton.** Header, then the four sections, each with its
 own section host, loading, empty and error states (I3):
-- How it is run: empty until Phase 3, with an "Add structure" button that opens
-  the Phase 2 editor once it exists.
-- Ann's read: "Ann reads this organisation daily", with Run now disabled until Phase 5.
+- How it is run: empty until Phase 3. Its "Add structure" button is only
+  rendered once the Phase 2 editor exists, and then it opens it (P4: no disabled
+  placeholders).
+- Ann's read: "Ann hasn't read <name> yet." Run now is only rendered once Phase 5
+  wires it.
 - Opportunities: empty state until Phase 4.
 - Your time with …: built in this phase.
 
@@ -345,8 +347,8 @@ organisation, sortable by unit, warmth and role, from the same model (V4).
 - **Failure modes:**
   - D1: a month-only close renders "closes Oct 2026".
   - D2: sort order is tested.
-  - I3: an empty strip shows "No opportunities yet. Add one, or they'll arrive
-    once the sweep is built", with Add live.
+  - I3: an empty strip shows "No opportunities yet." with a live **Add
+    opportunity** button. No roadmap copy (P4).
   - I4: the action sits on its own row, and titles don't wrap because of a button.
   - S3: the Add sheet is opaque.
   - V4: the strip count and "See all" count come from one query.
