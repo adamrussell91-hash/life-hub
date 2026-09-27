@@ -72,6 +72,50 @@ describe("protocol conversation view", () => {
     expect(html).toContain("Download as markdown");
   });
 
+  it("keeps synthesis readable: summary inside the scroll slot, council chrome, scrubber synced", () => {
+    const completed = session({
+      status: "completed",
+      speaker: "controller",
+      checkpoint: null,
+      allowedActions: [],
+      summary: { title: "Sick Day, Stolen Time", keyFinding: "Capacity, not values conflict", summary: "The mirror named circumstance." },
+      transcript: [
+        { id: "t1", role: "voice", speaker: "retrospective", stage: "retrospective", text: "One weekend is not a trend." },
+        { id: "t2", role: "user", speaker: "you", stage: "retrospective", text: "That was the only holiday." },
+        { id: "t3", role: "voice", speaker: "prospective", stage: "prospective", text: "No stated aspiration covers this." },
+        { id: "t4", role: "voice", speaker: "present", stage: "present", text: "The name is capacity under illness." },
+        { id: "t5", role: "controller", speaker: "controller", stage: "synthesis", text: "Rejection of the name rest is more precise information about capacity than the question assumed." },
+      ],
+    });
+    const html = sessionView(completed, {
+      ...definition,
+      id: "mirror",
+      name: "The Mirror Council",
+      voices: [
+        { id: "retrospective", name: "Gu Jian the Retrospective", role: "Revealed preferences" },
+        { id: "prospective", name: "Wang Yuan the Prospective", role: "Stated aspirations" },
+        { id: "present", name: "Zheng Ming the Present", role: "Present tension" },
+      ],
+    });
+    expect(html).toContain('data-view-index="4"');
+    expect(html).toContain('data-turn-total="5"');
+    expect(html).toContain("Turn 5 of 5");
+    expect(html).toContain('data-protocol-scrub-index="4"');
+    expect(html).toContain("protocol-portrait--council");
+    expect(html).toContain("Council synthesis");
+    expect(html).toContain("is-complete");
+    expect(html).toContain("protocol-bg__layer");
+    // Summary must live inside the scroll slot, not as a clipped sibling below it.
+    const slotStart = html.indexOf('class="protocol-turn-card-slot"');
+    const slotEnd = html.indexOf("protocol-scrubber");
+    const slot = html.slice(slotStart, slotEnd);
+    expect(slot).toContain("protocol-summary");
+    expect(slot).toContain("Sick Day, Stolen Time");
+    expect(slot).toContain("Rejection of the name rest");
+    expect((html.match(/protocol-dot is-current/g) ?? []).length).toBe(1);
+    expect(html).toMatch(/protocol-dot is-current"[^>]*data-protocol-scrub-to="4"/);
+  });
+
   it("renders Past runs rows with resume for waiting sessions", async () => {
     const { pastRunsHtml } = await import("./view");
     const defs = [{ id: "horizon", name: "The Horizon Council", description: "", motif: "", defaultMode: "full", modes: [], intake: [], voices: [] }];
@@ -116,7 +160,7 @@ describe("protocol conversation view", () => {
     const historical = sessionView(twoTurns, definition, 0);
     expect(historical).toContain("data-turn-id=\"t1\"");
     expect(historical).not.toContain("data-turn-id=\"t2\"");
-    expect(historical).toContain("New reply ↓");
+    expect(historical).toContain("Continue reading ↓");
   });
 
   it("reflects updated session state on re-render", () => {
@@ -141,6 +185,90 @@ describe("protocol conversation view", () => {
     const before = root.innerHTML;
     applySession(root, session(), definition);
     expect(root.innerHTML).toBe(before);
+  });
+});
+
+describe("Thinking library settle (load flash)", () => {
+  it("keeps protocol cards mounted when past runs settle after first paint", async () => {
+    const { renderProtocols } = await import("./view");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("list=1")) {
+        return new Response(JSON.stringify({
+          data: {
+            sessions: [{
+              id: "sess-past",
+              protocolId: "fates",
+              mode: "normal",
+              status: "completed",
+              title: "Library settle",
+              updatedAt: "2026-09-26T00:00:00.000Z",
+              createdAt: "2026-09-26T00:00:00.000Z",
+            }],
+          },
+        }), { status: 200 });
+      }
+      // Catalog unavailable — stay on local cards; only past-runs should patch.
+      return new Response(JSON.stringify({ error: { message: "unavailable" } }), { status: 503 });
+    });
+    const previous = globalThis.fetch;
+    globalThis.fetch = fetchImpl as unknown as typeof fetch;
+    const host = document.createElement("div");
+    try {
+      const stop = renderProtocols({ host });
+      expect(host.querySelector(".protocol-library")).toBeTruthy();
+      expect(host.querySelector(".protocol-library")?.classList.contains("is-settled")).toBe(false);
+      const cardsBefore = [...host.querySelectorAll(".protocol-card")];
+      expect(cardsBefore.length).toBe(8);
+      await vi.waitFor(() => {
+        expect(host.querySelector('[data-protocol-open-run="sess-past"]')).toBeTruthy();
+      });
+      const cardsAfter = [...host.querySelectorAll(".protocol-card")];
+      expect(cardsAfter.length).toBe(8);
+      expect(cardsAfter.every((card, index) => card === cardsBefore[index])).toBe(true);
+      expect(host.querySelector(".protocol-library")?.classList.contains("is-settled")).toBe(true);
+      stop();
+    } finally {
+      globalThis.fetch = previous;
+    }
+  });
+
+  it("does not replay deal when catalog enrich changes the library", async () => {
+    const { renderProtocols } = await import("./view");
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("list=1")) {
+        return new Response(JSON.stringify({ data: { sessions: [] } }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        data: {
+          catalog: [{
+            id: "fates",
+            name: "The Three Fates",
+            description: "Enriched catalogue copy that differs from the local seed.",
+            motif: "Greek threads",
+            defaultMode: "normal",
+            modes: [{ id: "normal", label: "Normal", description: "Normal" }],
+            intake: [],
+            voices: [{ id: "lachesis", name: "Lachesis", role: "" }],
+          }],
+        },
+      }), { status: 200 });
+    });
+    const previous = globalThis.fetch;
+    globalThis.fetch = fetchImpl as unknown as typeof fetch;
+    const host = document.createElement("div");
+    try {
+      const stop = renderProtocols({ host });
+      expect(host.querySelectorAll(".protocol-card").length).toBe(8);
+      await vi.waitFor(() => {
+        expect(host.querySelector(".protocol-library")?.classList.contains("is-settled")).toBe(true);
+      });
+      expect(host.textContent).toContain("Enriched catalogue copy");
+      stop();
+    } finally {
+      globalThis.fetch = previous;
+    }
   });
 });
 
