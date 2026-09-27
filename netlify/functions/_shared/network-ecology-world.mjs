@@ -48,11 +48,13 @@ import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import { createAccessContext } from './entity-access.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
+import { mapBounded } from './blobs-list.mjs';
 
 const DAY_MS = 86_400_000;
 const TRAVERSABLE_LINK_TYPES = new Set(['employee_at', 'member_of', 'professional_relationship']);
 const TIMELINE_FLOOR_YEAR = 2015;
 const UPCOMING_EVENT_DAYS = 60;
+const EVENT_BATCH_SIZE = 10;
 
 // Same predicate as `network-ecology-history.mjs` — inlined here to avoid a
 // circular import (history already imports `filterVisiblePeople` from this
@@ -249,18 +251,9 @@ async function listMeetingEventCandidates(professionalStore) {
   ];
 }
 
-async function attendeeRefsFor(
-  candidate,
-  { universalLinkStore, resolveEntity, createRepository, visiblePersonRefs }
-) {
+async function attendeeRefsFor(candidate, { linkRepo, accessContext }) {
   const ref = formatEntityRef({ namespace: 'professional', kind: candidate.kind, id: candidate.id });
   if (!ref) return { ref: null, attendeeRefs: [] };
-
-  const linkRepo = (createRepository ?? createUniversalLinkRepository)({
-    store: universalLinkStore,
-    resolveEntity: resolveEntity ?? defaultResolveEntity
-  });
-  const accessContext = createAccessContext({ workflow: 'life' });
 
   let outgoing = [];
   try {
@@ -279,40 +272,51 @@ async function attendeeRefsFor(
             entry.endpoint.kind === 'person'
         )
         .map((entry) => entry.endpoint.ref)
-        .filter((personRef) => visiblePersonRefs.has(personRef))
     )
   ];
   return { ref, attendeeRefs };
 }
 
-async function buildEventClusters({
-  professionalStore,
-  universalLinkStore,
-  resolveEntity,
-  createRepository,
-  now,
-  visiblePersonRefs
-}) {
+// Meetings/Events in either the ±EVENT_WINDOW_DAYS wetland window or the
+// next UPCOMING_EVENT_DAYS, with their (unfiltered) attendee refs. Listed
+// once and hydrated in bounded batches: the earlier version listed every
+// Meeting/Event twice and read each candidate's links one at a time, which
+// pushed `/world` past the SPA's 20s abort on real Blob latency.
+async function loadEventAttendance({ professionalStore, universalLinkStore, resolveEntity, createRepository, now }) {
   const candidates = await listMeetingEventCandidates(professionalStore);
   if (!candidates.length) return [];
 
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  const windowStart = nowMs - EVENT_WINDOW_DAYS * DAY_MS;
+  const windowEnd = nowMs + Math.max(EVENT_WINDOW_DAYS, UPCOMING_EVENT_DAYS) * DAY_MS;
+  const inRange = candidates
+    .map((candidate) => ({ candidate, startMs: Date.parse(candidate.scheduledStart) }))
+    .filter(({ startMs }) => Number.isFinite(startMs) && startMs >= windowStart && startMs <= windowEnd);
+  if (!inRange.length) return [];
+
+  const linkRepo = (createRepository ?? createUniversalLinkRepository)({
+    store: universalLinkStore,
+    resolveEntity: resolveEntity ?? defaultResolveEntity
+  });
+  const accessContext = createAccessContext({ workflow: 'life' });
+
+  return mapBounded(inRange, EVENT_BATCH_SIZE, async ({ candidate, startMs }) => ({
+    candidate,
+    startMs,
+    ...(await attendeeRefsFor(candidate, { linkRepo, accessContext }))
+  }));
+}
+
+function buildEventClusters(attendance, { now, visiblePersonRefs }) {
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   const windowMs = EVENT_WINDOW_DAYS * DAY_MS;
   const windowStart = nowMs - windowMs;
   const windowEnd = nowMs + windowMs;
 
   const clusters = [];
-  for (const candidate of candidates) {
-    const startMs = Date.parse(candidate.scheduledStart);
-    if (!Number.isFinite(startMs)) continue;
+  for (const { candidate, startMs, ref, attendeeRefs: allRefs } of attendance) {
     if (startMs < windowStart || startMs > windowEnd) continue;
-
-    const { ref, attendeeRefs } = await attendeeRefsFor(candidate, {
-      universalLinkStore,
-      resolveEntity,
-      createRepository,
-      visiblePersonRefs
-    });
+    const attendeeRefs = allRefs.filter((personRef) => visiblePersonRefs.has(personRef));
     if (!ref || attendeeRefs.length < HABITAT_MIN_CLUSTER_SIZE) continue;
 
     const eventDate = toIsoDateOnly(candidate.scheduledStart);
@@ -332,32 +336,14 @@ async function buildEventClusters({
   return clusters;
 }
 
-async function buildUpcomingEvents({
-  professionalStore,
-  universalLinkStore,
-  resolveEntity,
-  createRepository,
-  now,
-  visiblePersonRefs
-}) {
-  const candidates = await listMeetingEventCandidates(professionalStore);
-  if (!candidates.length) return [];
-
+function buildUpcomingEvents(attendance, { now, visiblePersonRefs }) {
   const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
   const windowEnd = nowMs + UPCOMING_EVENT_DAYS * DAY_MS;
   const upcoming = [];
 
-  for (const candidate of candidates) {
-    const startMs = Date.parse(candidate.scheduledStart);
-    if (!Number.isFinite(startMs)) continue;
+  for (const { candidate, startMs, ref, attendeeRefs: allRefs } of attendance) {
     if (startMs < nowMs || startMs > windowEnd) continue;
-
-    const { ref, attendeeRefs } = await attendeeRefsFor(candidate, {
-      universalLinkStore,
-      resolveEntity,
-      createRepository,
-      visiblePersonRefs
-    });
+    const attendeeRefs = allRefs.filter((personRef) => visiblePersonRefs.has(personRef));
     if (!ref || attendeeRefs.length === 0) continue;
 
     upcoming.push({
@@ -378,10 +364,21 @@ async function buildUpcomingEvents({
  * `upcoming_events`, and clusters that always carry a habitat landform.
  */
 export async function assembleWorldGraph(deps = {}) {
-  const peopleWithRelationships = await loadVisiblePeople(deps);
+  const now = deps.now ?? new Date();
+  // People and Meeting/Event attendance are independent Blob scans — run
+  // them together; visibility filtering of attendees happens afterwards.
+  const [peopleWithRelationships, attendance] = await Promise.all([
+    loadVisiblePeople(deps),
+    loadEventAttendance({
+      professionalStore: deps.professionalStore,
+      universalLinkStore: deps.store,
+      resolveEntity: deps.resolveEntity,
+      createRepository: deps.createRepository,
+      now
+    })
+  ]);
   const graph = buildRelationshipGraph(peopleWithRelationships);
 
-  const now = deps.now ?? new Date();
   const { clusters: organisationClusters, bridgePeople } = buildOrganisationClusters(
     peopleWithRelationships,
     now
@@ -392,14 +389,7 @@ export async function assembleWorldGraph(deps = {}) {
   // link disclosure (they are already filtered at resolution time).
   const visibleRefs = new Set([...visiblePersonRefs, ...[...graph.nodes.keys()].filter((ref) => graph.nodes.get(ref)?.kind === 'organisation')]);
 
-  const eventClusters = await buildEventClusters({
-    professionalStore: deps.professionalStore,
-    universalLinkStore: deps.store,
-    resolveEntity: deps.resolveEntity,
-    createRepository: deps.createRepository,
-    now,
-    visiblePersonRefs
-  });
+  const eventClusters = buildEventClusters(attendance, { now, visiblePersonRefs });
 
   const clusters = [...organisationClusters, ...eventClusters];
   const timeline = buildTimeline(peopleWithRelationships, now);
@@ -414,14 +404,7 @@ export async function assembleWorldGraph(deps = {}) {
     };
   }
 
-  const upcomingEvents = await buildUpcomingEvents({
-    professionalStore: deps.professionalStore,
-    universalLinkStore: deps.store,
-    resolveEntity: deps.resolveEntity,
-    createRepository: deps.createRepository,
-    now,
-    visiblePersonRefs
-  });
+  const upcomingEvents = buildUpcomingEvents(attendance, { now, visiblePersonRefs });
 
   return {
     nodes: enrichNodes(graph.nodes, peopleWithRelationships),
