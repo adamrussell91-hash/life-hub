@@ -116,23 +116,24 @@ function derivePersonPersonLinkId(relationship) {
 
 const GITHUB_FETCH_TIMEOUT_MS = 12_000;
 
-function githubFetchSignal() {
-  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
-    ? AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS)
-    : undefined;
+function githubFetchInit(token, accept) {
+  return {
+    headers: {
+      accept,
+      authorization: `Bearer ${token}`,
+      'user-agent': 'life-hub'
+    },
+    signal:
+      typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS)
+        : undefined
+  };
 }
 
 async function githubJson(url, { token, fetchImpl }) {
   let response;
   try {
-    response = await fetchImpl(url, {
-      headers: {
-        accept: 'application/vnd.github+json',
-        authorization: `Bearer ${token}`,
-        'user-agent': 'life-hub'
-      },
-      signal: githubFetchSignal()
-    });
+    response = await fetchImpl(url, githubFetchInit(token, 'application/vnd.github+json'));
   } catch {
     return null;
   }
@@ -147,14 +148,7 @@ async function githubJson(url, { token, fetchImpl }) {
 async function githubRaw(url, { token, fetchImpl }) {
   let response;
   try {
-    response = await fetchImpl(url, {
-      headers: {
-        accept: 'application/vnd.github.raw',
-        authorization: `Bearer ${token}`,
-        'user-agent': 'life-hub'
-      },
-      signal: githubFetchSignal()
-    });
+    response = await fetchImpl(url, githubFetchInit(token, 'application/vnd.github.raw'));
   } catch {
     return null;
   }

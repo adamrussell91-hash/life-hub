@@ -145,10 +145,10 @@ export async function loadAllPeopleWithRelationships({
     [...nativeStubs, ...imported],
     (row) => row.person,
     (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
-    (row) => (row._source === 'github' ? 'github' : 'blob')
+    (row) => row._source
   );
 
-  const hydrated = await mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
+  return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
     if (row._source === 'github') {
       return { person: row.person, relationships: row.relationships };
     }
@@ -164,6 +164,4 @@ export async function loadAllPeopleWithRelationships({
       ]
     };
   });
-
-  return hydrated;
 }

@@ -116,6 +116,19 @@ function githubFetch({ people, organisations, relationships }) {
   };
 }
 
+function makeGithubResolveEntity(store, env, fetchImpl) {
+  return async (refInput, accessContext, options = {}) => {
+    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+    if (!ref) throw endpointNotFoundError();
+    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
+    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
+    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
+      return resolveOrganisation(ref.id, accessContext, withGithub);
+    }
+    throw endpointNotFoundError();
+  };
+}
+
 test('a person with zero Universal Links of any kind still appears with an empty array', async () => {
   const store = memoryStore();
   const lonely = await makePerson(store, { display_name: 'Lonely' });
@@ -155,16 +168,7 @@ test('merges GitHub-imported people and their org relationships into the collect
       }
     ]
   });
-  const resolveEntity = async (refInput, accessContext, options = {}) => {
-    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
-    if (!ref) throw endpointNotFoundError();
-    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
-    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
-    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
-      return resolveOrganisation(ref.id, accessContext, withGithub);
-    }
-    throw endpointNotFoundError();
-  };
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
 
   const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
   assert.equal(result.length, 3);
@@ -205,16 +209,7 @@ test('dedupes a Blob twin of a GitHub person when ids differ but cleaned names m
       }
     ]
   });
-  const resolveEntity = async (refInput, accessContext, options = {}) => {
-    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
-    if (!ref) throw endpointNotFoundError();
-    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
-    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
-    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
-      return resolveOrganisation(ref.id, accessContext, withGithub);
-    }
-    throw endpointNotFoundError();
-  };
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
 
   const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
   const natalies = result.filter((row) => /natalie shih/i.test(row.person.display_name));
@@ -262,16 +257,7 @@ test('does not listForEntity Blob twins discarded by identity dedupe', async () 
       }
     ]
   });
-  const resolveEntity = async (refInput, accessContext, options = {}) => {
-    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
-    if (!ref) throw endpointNotFoundError();
-    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
-    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
-    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
-      return resolveOrganisation(ref.id, accessContext, withGithub);
-    }
-    throw endpointNotFoundError();
-  };
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
 
   let listForEntityCalls = 0;
   const listedRefs = [];
