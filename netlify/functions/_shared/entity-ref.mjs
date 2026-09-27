@@ -20,7 +20,7 @@ export const ENTITY_REF_NAMESPACES = new Set([
 // that supplies its resolver — do not add speculative entity types ahead of
 // a real workflow (implementation programme, "Absolute exclusions" #11).
 export const ENTITY_REF_KINDS = {
-  shared: new Set(['person', 'organisation']),
+  shared: new Set(['person', 'organisation', 'unit', 'position']),
   professional: new Set([
     'communication',
     'meeting',

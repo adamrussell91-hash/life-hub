@@ -21,8 +21,18 @@ export function generateOrganisationId() {
   return `organisation_${randomUUID()}`;
 }
 
+export function generateUnitId() {
+  return `unit_${randomUUID()}`;
+}
+
+export function generatePositionId() {
+  return `position_${randomUUID()}`;
+}
+
 const PERSON_ID_PATTERN = /^person_[0-9a-f-]{36}$/;
 const ORGANISATION_ID_PATTERN = /^organisation_[0-9a-f-]{36}$/;
+const UNIT_ID_PATTERN = /^unit_[0-9a-f-]{36}$/;
+const POSITION_ID_PATTERN = /^position_[0-9a-f-]{36}$/;
 
 export function isValidPersonId(id) {
   return typeof id === 'string' && PERSON_ID_PATTERN.test(id);
@@ -30,6 +40,14 @@ export function isValidPersonId(id) {
 
 export function isValidOrganisationId(id) {
   return typeof id === 'string' && ORGANISATION_ID_PATTERN.test(id);
+}
+
+export function isValidUnitId(id) {
+  return typeof id === 'string' && UNIT_ID_PATTERN.test(id);
+}
+
+export function isValidPositionId(id) {
+  return typeof id === 'string' && POSITION_ID_PATTERN.test(id);
 }
 
 // Organisation's lifecycle enum intentionally omits `deidentified` — the
@@ -43,6 +61,14 @@ export const PERSON_LIFECYCLE_STATUSES = new Set([
 ]);
 export const ORGANISATION_LIFECYCLE_STATUSES = new Set([
   'active', 'inactive', 'archived', 'retained', 'deleted'
+]);
+
+// Units and positions use the Organisation lifecycle set (no deidentify).
+export const UNIT_LIFECYCLE_STATUSES = ORGANISATION_LIFECYCLE_STATUSES;
+export const POSITION_LIFECYCLE_STATUSES = ORGANISATION_LIFECYCLE_STATUSES;
+
+export const UNIT_KINDS = new Set([
+  'leadership', 'faculty', 'team', 'program', 'board', 'department', 'other'
 ]);
 
 // A record's identifying labels are hidden behind this fixed, non
@@ -282,12 +308,163 @@ export function buildIdentityIndexRecord({ id, kind, displayLabel, sortName = nu
 export function parseIdentityIndexRecord(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   if (raw.schema_version !== IDENTITY_INDEX_SCHEMA_VERSION) return null;
-  if (raw.kind !== 'person' && raw.kind !== 'organisation') return null;
-  if ((raw.kind === 'person' && !isValidPersonId(raw.id)) || (raw.kind === 'organisation' && !isValidOrganisationId(raw.id))) {
+  if (raw.kind !== 'person' && raw.kind !== 'organisation' && raw.kind !== 'unit' && raw.kind !== 'position') {
+    return null;
+  }
+  if (
+    (raw.kind === 'person' && !isValidPersonId(raw.id)) ||
+    (raw.kind === 'organisation' && !isValidOrganisationId(raw.id)) ||
+    (raw.kind === 'unit' && !isValidUnitId(raw.id)) ||
+    (raw.kind === 'position' && !isValidPositionId(raw.id))
+  ) {
     return null;
   }
   if (typeof raw.display_label !== 'string') return null;
-  const statuses = raw.kind === 'person' ? PERSON_LIFECYCLE_STATUSES : ORGANISATION_LIFECYCLE_STATUSES;
+  const statuses =
+    raw.kind === 'person' ? PERSON_LIFECYCLE_STATUSES : ORGANISATION_LIFECYCLE_STATUSES;
   if (!statuses.has(raw.lifecycle_status)) return null;
   return { ...raw };
+}
+
+// --- Unit (org structure container) ---
+
+export function parseUnitRecord(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.schema_version !== IDENTITY_SCHEMA_VERSION) return null;
+  if (!isValidUnitId(raw.id)) return null;
+  if (raw.kind !== 'unit') return null;
+  if (typeof raw.name !== 'string' || !raw.name) return null;
+  if (typeof raw.organisation_ref !== 'string' || !raw.organisation_ref.startsWith('shared:organisation:')) return null;
+  const orgId = raw.organisation_ref.slice('shared:organisation:'.length);
+  if (!isValidOrganisationId(orgId)) return null;
+  if (!UNIT_KINDS.has(raw.unit_kind)) return null;
+  if (typeof raw.order !== 'number' || !Number.isFinite(raw.order)) return null;
+  if (!UNIT_LIFECYCLE_STATUSES.has(raw.lifecycle_status)) return null;
+  if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
+  return { ...raw };
+}
+
+export function validateUnitCreateInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw validationError('invalid_input', 'Unit creation requires a request body object.');
+  }
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  if (!name) throw validationError('name_required', 'name is required for a Unit.');
+  const organisationRef = typeof input.organisation_ref === 'string' ? input.organisation_ref.trim() : '';
+  if (!organisationRef.startsWith('shared:organisation:')) {
+    throw validationError('organisation_ref_required', 'organisation_ref must be a shared:organisation ref.');
+  }
+  const orgId = organisationRef.slice('shared:organisation:'.length);
+  if (!isValidOrganisationId(orgId)) {
+    throw validationError('invalid_organisation_ref', 'organisation_ref id is not a valid Organisation id.');
+  }
+  const unitKind = typeof input.unit_kind === 'string' ? input.unit_kind : input.kind;
+  if (!UNIT_KINDS.has(unitKind)) {
+    throw validationError('invalid_unit_kind', `unit_kind must be one of: ${[...UNIT_KINDS].join(', ')}.`);
+  }
+  const order = input.order === undefined ? 0 : Number(input.order);
+  if (!Number.isFinite(order)) throw validationError('invalid_order', 'order must be a number.');
+  return { name, organisation_ref: organisationRef, unit_kind: unitKind, order };
+}
+
+export function validateUnitFieldUpdate(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw validationError('invalid_input', 'A field update requires a request body object.');
+  }
+  const patch = {};
+  if (input.name !== undefined) {
+    const name = typeof input.name === 'string' ? input.name.trim() : '';
+    if (!name) throw validationError('name_required', 'name cannot be empty.');
+    patch.name = name;
+  }
+  if (input.unit_kind !== undefined || input.kind !== undefined) {
+    const unitKind = typeof (input.unit_kind ?? input.kind) === 'string' ? (input.unit_kind ?? input.kind) : '';
+    if (!UNIT_KINDS.has(unitKind)) {
+      throw validationError('invalid_unit_kind', `unit_kind must be one of: ${[...UNIT_KINDS].join(', ')}.`);
+    }
+    patch.unit_kind = unitKind;
+  }
+  if (input.order !== undefined) {
+    const order = Number(input.order);
+    if (!Number.isFinite(order)) throw validationError('invalid_order', 'order must be a number.');
+    patch.order = order;
+  }
+  return patch;
+}
+
+// --- Position (named role that outlasts its holder) ---
+
+export function parsePositionRecord(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (raw.schema_version !== IDENTITY_SCHEMA_VERSION) return null;
+  if (!isValidPositionId(raw.id)) return null;
+  if (raw.kind !== 'position') return null;
+  if (typeof raw.title !== 'string' || !raw.title) return null;
+  if (typeof raw.organisation_ref !== 'string' || !raw.organisation_ref.startsWith('shared:organisation:')) return null;
+  if (raw.unit_ref !== null && raw.unit_ref !== undefined) {
+    if (typeof raw.unit_ref !== 'string' || !raw.unit_ref.startsWith('shared:unit:')) return null;
+  }
+  if (typeof raw.is_head !== 'boolean') return null;
+  if (!POSITION_LIFECYCLE_STATUSES.has(raw.lifecycle_status)) return null;
+  if (typeof raw.created_at !== 'string' || typeof raw.updated_at !== 'string') return null;
+  return { ...raw, unit_ref: raw.unit_ref ?? null };
+}
+
+export function validatePositionCreateInput(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw validationError('invalid_input', 'Position creation requires a request body object.');
+  }
+  const title = typeof input.title === 'string' ? input.title.trim() : '';
+  if (!title) throw validationError('title_required', 'title is required for a Position.');
+  const organisationRef = typeof input.organisation_ref === 'string' ? input.organisation_ref.trim() : '';
+  if (!organisationRef.startsWith('shared:organisation:')) {
+    throw validationError('organisation_ref_required', 'organisation_ref must be a shared:organisation ref.');
+  }
+  const orgId = organisationRef.slice('shared:organisation:'.length);
+  if (!isValidOrganisationId(orgId)) {
+    throw validationError('invalid_organisation_ref', 'organisation_ref id is not a valid Organisation id.');
+  }
+  let unitRef = null;
+  if (input.unit_ref !== undefined && input.unit_ref !== null) {
+    if (typeof input.unit_ref !== 'string' || !input.unit_ref.startsWith('shared:unit:')) {
+      throw validationError('invalid_unit_ref', 'unit_ref must be a shared:unit ref or null.');
+    }
+    const unitId = input.unit_ref.slice('shared:unit:'.length);
+    if (!isValidUnitId(unitId)) throw validationError('invalid_unit_ref', 'unit_ref id is not a valid Unit id.');
+    unitRef = input.unit_ref;
+  }
+  return {
+    title,
+    organisation_ref: organisationRef,
+    unit_ref: unitRef,
+    is_head: input.is_head === true
+  };
+}
+
+export function validatePositionFieldUpdate(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw validationError('invalid_input', 'A field update requires a request body object.');
+  }
+  const patch = {};
+  if (input.title !== undefined) {
+    const title = typeof input.title === 'string' ? input.title.trim() : '';
+    if (!title) throw validationError('title_required', 'title cannot be empty.');
+    patch.title = title;
+  }
+  if (input.unit_ref !== undefined) {
+    if (input.unit_ref === null) {
+      patch.unit_ref = null;
+    } else if (typeof input.unit_ref === 'string' && input.unit_ref.startsWith('shared:unit:')) {
+      const unitId = input.unit_ref.slice('shared:unit:'.length);
+      if (!isValidUnitId(unitId)) throw validationError('invalid_unit_ref', 'unit_ref id is not a valid Unit id.');
+      patch.unit_ref = input.unit_ref;
+    } else {
+      throw validationError('invalid_unit_ref', 'unit_ref must be a shared:unit ref or null.');
+    }
+  }
+  if (input.is_head !== undefined) {
+    if (typeof input.is_head !== 'boolean') throw validationError('invalid_is_head', 'is_head must be a boolean.');
+    patch.is_head = input.is_head;
+  }
+  return patch;
 }

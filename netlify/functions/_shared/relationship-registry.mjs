@@ -52,6 +52,8 @@ function declaration({
 const ALL_TAGGABLE_KINDS = [
   'shared:person',
   'shared:organisation',
+  'shared:unit',
+  'shared:position',
   'tasks:task',
   'tasks:project',
   'tasks:program',
@@ -563,6 +565,94 @@ const REGISTRY = new Map([
       sourceKinds: ['tasks:task', 'tasks:project', 'tasks:goal', 'tasks:program'],
       targetKinds: ['professional:stepping_stone'],
       inverseLabel: 'has_stone_action',
+      cardinality: 'many_to_many',
+      temporalMode: 'timeless',
+      roleMode: 'none'
+    })
+  ],
+  // Organisations redesign Phase 2 — structure links. Every write sets
+  // context_ref to the organisation. Symmetric keys sort endpoints before
+  // equivalence hashing in org-structure write helpers.
+  [
+    'member_of_unit',
+    declaration({
+      key: 'member_of_unit',
+      sourceKinds: ['shared:person'],
+      targetKinds: ['shared:unit'],
+      inverseLabel: 'has_unit_member',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'optional_text'
+    })
+  ],
+  [
+    'holds_position',
+    declaration({
+      key: 'holds_position',
+      sourceKinds: ['shared:person'],
+      targetKinds: ['shared:position'],
+      inverseLabel: 'held_by',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'optional_text'
+    })
+  ],
+  [
+    'part_of',
+    declaration({
+      key: 'part_of',
+      sourceKinds: ['shared:unit'],
+      targetKinds: ['shared:unit'],
+      inverseLabel: 'contains_unit',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'reports_to',
+    declaration({
+      key: 'reports_to',
+      sourceKinds: ['shared:position', 'shared:unit'],
+      targetKinds: ['shared:position'],
+      inverseLabel: 'has_report',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'none',
+      metadataKeys: ['replaces_default']
+    })
+  ],
+  [
+    'shares_authority_with',
+    declaration({
+      key: 'shares_authority_with',
+      sourceKinds: ['shared:position'],
+      targetKinds: ['shared:position'],
+      inverseLabel: 'shares_authority_with',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'works_with',
+    declaration({
+      key: 'works_with',
+      sourceKinds: ['shared:unit', 'shared:position'],
+      targetKinds: ['shared:unit', 'shared:position'],
+      inverseLabel: 'works_with',
+      cardinality: 'many_to_many',
+      temporalMode: 'period',
+      roleMode: 'none'
+    })
+  ],
+  [
+    'answers_to',
+    declaration({
+      key: 'answers_to',
+      sourceKinds: ['shared:organisation', 'shared:unit', 'shared:position'],
+      targetKinds: ['shared:organisation'],
+      inverseLabel: 'governs',
       cardinality: 'many_to_many',
       temporalMode: 'timeless',
       roleMode: 'none'

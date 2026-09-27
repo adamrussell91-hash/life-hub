@@ -19,6 +19,7 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
   assert.deepEqual(keys, [
     'about_person',
     'answers_criterion',
+    'answers_to',
     'application_action',
     'application_contact',
     'applies_to',
@@ -29,10 +30,13 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'evidenced_by',
     'follow_up',
     'follows_from',
+    'holds_position',
     'in_pd_group',
     'in_thread',
     'learning_for',
     'member_of',
+    'member_of_unit',
+    'part_of',
     'participates_in',
     'placement_at',
     'preparation',
@@ -43,6 +47,8 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'recipient',
     'referee',
     'related_to',
+    'reports_to',
+    'shares_authority_with',
     'stone_action',
     'stone_for',
     'studied_at',
@@ -50,7 +56,8 @@ test('lists the Slice 1–10 relationship declarations with correct inverse labe
     'tagged_with',
     'talk_note',
     'venue',
-    'witnessed_by'
+    'witnessed_by',
+    'works_with'
   ]);
   assert.equal(getRelationshipDeclaration('employee_at').inverse_label, 'employs');
   assert.equal(getRelationshipDeclaration('professional_relationship').inverse_label, 'professional_relationship');
@@ -95,7 +102,9 @@ test('projectRelationshipRegistry exposes every declaration without duplicate_fi
   // Public projection: full registry minus teaching_protected-only keys
   // (participates_in). Includes calendar-comms (in_thread, in_pd_group,
   // talk_note), organisations (#508 studied_at, placement_at), and Career.
-  assert.equal(projected.length, 33);
+  // +7 org-structure keys (member_of_unit, holds_position, part_of,
+  // reports_to, shares_authority_with, works_with, answers_to).
+  assert.equal(projected.length, 40);
   // participates_in (StudentReference membership) is allowed_visibility:
   // ['teaching_protected'] only — the generic, non-workflow-scoped
   // /api/relationship-registry route must never disclose it, even as
