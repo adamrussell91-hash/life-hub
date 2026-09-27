@@ -6,6 +6,7 @@ import { buildCareerModel, type CareerModel } from '@/domain/career-model';
 import type { CareerOverview } from '@/domain/types';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { mountCareerRiver } from '@/views/career-river';
+import { renderCareerEmployment } from '@/views/career-employment';
 import { openAddFutureSheet, renderFutureDetail } from '@/views/career-future-panel';
 import { renderSkillsScanPanel } from '@/views/career-skills-scan';
 import { renderCareerApplications } from '@/views/career-criteria-mirror';
@@ -179,6 +180,7 @@ export async function renderCareerView(canvas: HTMLElement): Promise<void> {
   page.append(stats);
 
   renderRiver(page, model, selectedFutureId);
+  renderCareerEmployment(page, model);
 
   const columns = el('div', 'career-page__columns');
   renderFuturePanel(columns, model, selectedFutureId, reload);

@@ -4292,6 +4292,22 @@
   font-size: var(--text-sm);
 }
 
+.career-page__work {
+  min-width: 0;
+}
+
+.career-page__work .career-page__section-head {
+  margin-bottom: var(--space-3);
+}
+
+.career-page__work-timeline {
+  min-width: 0;
+}
+
+.career-page__work-timeline .relationship-timeline__year:first-child {
+  margin-top: 0;
+}
+
 .career-page__river {
   margin-inline: calc(-1 * var(--space-6, 1.5rem));
   padding-inline: var(--space-6, 1.5rem);
@@ -4327,7 +4343,8 @@
   width: 100%;
   min-width: 0;
   overflow: hidden;
-  touch-action: none;
+  /* pan-y: page scroll works; river pan arms only along the time axis */
+  touch-action: pan-y;
   background: transparent;
 }
 

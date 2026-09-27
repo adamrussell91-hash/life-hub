@@ -170,6 +170,9 @@ export type CareerModelOverview = {
     valid_to?: string | null;
     role?: string | null;
     label?: string | null;
+    display_label?: string | null;
+    link_status?: string | null;
+    ref?: string | null;
   }>;
   ghost_paths?: unknown[];
   scan?: { pending_count?: number; last_run_at?: string | null };
