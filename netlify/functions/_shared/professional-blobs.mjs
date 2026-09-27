@@ -316,6 +316,10 @@ export async function listLinkProposalKeysForPerson(store, personRef) {
   );
 }
 
+export async function listLinkProposalRecordKeys(store) {
+  return (await listBlobKeys(store, LINK_PROPOSAL_PREFIX)).filter((key) => !isIndexKey(key));
+}
+
 export function ledgerItemKey(id) {
   return `${LEDGER_ITEM_PREFIX}${assertValidLedgerItemId(id)}`;
 }

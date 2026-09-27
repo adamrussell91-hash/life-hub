@@ -10,7 +10,7 @@ import { validateRelationshipInput } from './relationship-registry.mjs';
 
 export const LINK_PROPOSAL_SCHEMA_VERSION = 1;
 
-export const LINK_PROPOSAL_PROPOSERS = new Set(['rules', 'clare', 'ann']);
+export const LINK_PROPOSAL_PROPOSERS = new Set(['rules', 'clare', 'ann', 'ties']);
 export const LINK_PROPOSAL_STATUSES = new Set(['pending', 'accepted', 'declined']);
 
 const PROPOSAL_ID_PATTERN = /^linkprop_[0-9a-f-]{36}$/;
@@ -165,7 +165,7 @@ export function validateLinkProposalCreateInput(input) {
   if (!reason) throw validationError('invalid_reason', 'reason must be a non-empty string.');
   if (reason.length > 500) throw validationError('reason_too_long', 'reason must be at most 500 characters.');
   if (!LINK_PROPOSAL_PROPOSERS.has(input.proposer)) {
-    throw validationError('invalid_proposer', 'proposer must be rules, clare, or ann.');
+    throw validationError('invalid_proposer', 'proposer must be rules, clare, ann, or ties.');
   }
   const person_ref = typeof input.person_ref === 'string' ? input.person_ref.trim() : '';
   if (!parseEntityRef(person_ref)) {

@@ -127,12 +127,24 @@ export function runLinkInference(options: { signal?: AbortSignal } = {}): Promis
   return apiPost('/api/people/link-proposals', { action: 'infer' }, { signal: options.signal });
 }
 
-export function acceptLinkProposal(id: string, options: { signal?: AbortSignal } = {}): Promise<unknown> {
-  return apiPost('/api/people/link-proposals', { action: 'accept', id }, { signal: options.signal });
+export function acceptLinkProposal(
+  id: string,
+  options: { signal?: AbortSignal; role?: string } = {}
+): Promise<unknown> {
+  const body: { action: string; id: string; role?: string } = { action: 'accept', id };
+  if (options.role) body.role = options.role;
+  return apiPost('/api/people/link-proposals', body, { signal: options.signal });
 }
 
 export function declineLinkProposal(id: string, options: { signal?: AbortSignal } = {}): Promise<unknown> {
   return apiPost('/api/people/link-proposals', { action: 'decline', id }, { signal: options.signal });
+}
+
+/** Pending proposer:`ties` proposals for the Ties to confirm view. */
+export function fetchTieProposals(
+  options: { signal?: AbortSignal } = {}
+): Promise<{ proposals: LinkProposal[]; count: number }> {
+  return apiGet('/api/people/link-proposals?proposer=ties', { signal: options.signal });
 }
 
 export interface LedgerResponse {

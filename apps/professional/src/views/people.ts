@@ -30,7 +30,7 @@ import {
   type TodayStripResponse
 } from '@/api/people-directory';
 import { mountAddPersonForm } from '@/components/add-person-form';
-import { peopleRoute } from '@/app/router';
+import { peopleRoute, peopleTiesRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
 import {
   activeFilterCount,
@@ -323,7 +323,9 @@ export async function renderPeoplePage(
   search.setAttribute('aria-label', 'Search or ask about people');
   const addBtn = el('button', 'btn btn--primary', 'Add person') as HTMLButtonElement;
   addBtn.type = 'button';
-  titleRow.append(h1, count, spacer, search, addBtn);
+  const tiesLink = el('a', 'btn btn--ghost people-page__ties-link', 'Ties to confirm') as HTMLAnchorElement;
+  tiesLink.href = peopleTiesRoute();
+  titleRow.append(h1, count, spacer, search, tiesLink, addBtn);
 
   const addHost = el('div', 'people-page__add-host');
   addHost.hidden = true;
