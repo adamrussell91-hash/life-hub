@@ -256,7 +256,19 @@ test('resolvePerson/resolveOrganisation fall back to the GitHub-canonical import
   const organisationId = deriveOrganisationId('leg-org-1');
   const fetchImpl = async (url) => {
     const href = String(url);
-    const body = (data) => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') }) });
+    const body = (data) => {
+      const text = JSON.stringify(data);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: `sha-${Buffer.byteLength(text)}`,
+          encoding: 'base64',
+          content: Buffer.from(text).toString('base64'),
+          size: Buffer.byteLength(text)
+        })
+      };
+    };
     if (href.endsWith('/data/professional/people.json')) {
       return body([{ legacy_id: 'leg-person-1', display_name: 'Lauren Stuart', sort_name: null, aliases: [] }]);
     }
@@ -309,7 +321,19 @@ test('resolvePerson still 404s when neither Blobs nor the GitHub import has the 
   resetProfessionalDataCache();
   const store = createMemoryStore();
   const missingId = 'person_00000000-0000-0000-0000-000000000000';
-  const fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({ content: Buffer.from('[]').toString('base64') }) });
+  const fetchImpl = async () => {
+    const text = '[]';
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        sha: 'sha-empty',
+        encoding: 'base64',
+        content: Buffer.from(text).toString('base64'),
+        size: Buffer.byteLength(text)
+      })
+    };
+  };
   await assert.rejects(
     resolvePerson(missingId, tasksContext, { getStore: async () => store, env: { GITHUB_TOKEN: 'token' }, fetchImpl }),
     error => error.status === 404 && error.code === 'endpoint_not_found'

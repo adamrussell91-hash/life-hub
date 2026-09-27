@@ -94,11 +94,19 @@ test('falls back to the GitHub-imported self Person when Blobs have none', async
   resetProfessionalDataCache();
   const fetchImpl = async (url) => {
     const href = String(url);
-    const body = (data) => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ content: Buffer.from(JSON.stringify(data)).toString('base64') })
-    });
+    const body = (data) => {
+      const text = JSON.stringify(data);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sha: `sha-${Buffer.byteLength(text)}`,
+          encoding: 'base64',
+          content: Buffer.from(text).toString('base64'),
+          size: Buffer.byteLength(text)
+        })
+      };
+    };
     if (href.endsWith('/data/professional/people.json')) {
       return body([{ legacy_id: 'leg-self', display_name: 'Adam Russell', is_self: true }]);
     }
