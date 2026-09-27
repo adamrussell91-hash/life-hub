@@ -874,6 +874,8 @@ export interface NetworkEcologyWorld {
   links?: NetworkEcologyLink[];
   timeline?: Record<string, NetworkEcologyTimelineYear>;
   upcoming_events?: NetworkEcologyUpcomingEvent[];
+  /** When the served snapshot was built (ISO). */
+  built_at?: string;
 }
 
 /** `GET /api/network-ecology/history?date=` (Phase 4, Feature 4.6 — History

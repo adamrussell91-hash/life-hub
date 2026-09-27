@@ -58,8 +58,23 @@ export function readPlatformError(body: unknown): ApiErrorBody | null {
   return { code: 'platform_unavailable', message };
 }
 
+// Netlify answers a function killed at its time limit with a 502/504 that is
+// not our envelope. Report that as a timeout (not retried) — retrying it as
+// `invalid_response` tripled the wait on Network Ecology.
+function isGatewayTimeout(status: number): boolean {
+  return status === 502 || status === 504;
+}
+
+function gatewayTimeoutError(response: Response): ApiClientError {
+  return new ApiClientError(
+    { code: 'timeout', message: `The server took too long (HTTP ${response.status})` },
+    response.status
+  );
+}
+
 export async function parseApiResponse<T>(response: Response): Promise<ApiResult<T>> {
   const text = await response.text();
+  if (!text.trim() && isGatewayTimeout(response.status)) throw gatewayTimeoutError(response);
   if (!text.trim()) {
     throw new ApiClientError(
       {
@@ -74,6 +89,7 @@ export async function parseApiResponse<T>(response: Response): Promise<ApiResult
   try {
     body = JSON.parse(text);
   } catch {
+    if (isGatewayTimeout(response.status)) throw gatewayTimeoutError(response);
     throw new ApiClientError(
       {
         code: 'invalid_response',
@@ -89,6 +105,7 @@ export async function parseApiResponse<T>(response: Response): Promise<ApiResult
   }
 
   if (!isApiResult<T>(body)) {
+    if (isGatewayTimeout(response.status)) throw gatewayTimeoutError(response);
     throw new ApiClientError(
       {
         code: 'invalid_response',

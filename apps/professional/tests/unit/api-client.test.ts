@@ -24,6 +24,14 @@ describe('parseApiResponse', () => {
     await expect(parseApiResponse(jsonResponse(200, { hello: 'world' }))).rejects.toMatchObject({ code: 'invalid_response' });
   });
 
+  it('reports a non-envelope 502/504 (function killed at its time limit) as a timeout', async () => {
+    await expect(parseApiResponse(new Response('<html>Bad Gateway</html>', { status: 502 })))
+      .rejects.toMatchObject({ code: 'timeout', status: 502 });
+    await expect(parseApiResponse(new Response('', { status: 504 }))).rejects.toMatchObject({ code: 'timeout' });
+    await expect(parseApiResponse(jsonResponse(502, { errorType: 'Sandbox.Timedout' })))
+      .rejects.toMatchObject({ code: 'timeout' });
+  });
+
   it('recognises a platform-suspended host response instead of treating it as malformed', async () => {
     await expect(parseApiResponse(jsonResponse(503, { error: 'usage_exceeded', message: 'over limit' })))
       .rejects.toMatchObject({ code: 'usage_exceeded' });
