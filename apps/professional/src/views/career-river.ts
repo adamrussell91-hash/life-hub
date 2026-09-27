@@ -355,12 +355,11 @@ export function mountCareerRiver(
     futureLabel.textContent = 'What could';
     svg.appendChild(futureLabel);
 
-    // Role band (desktop horizontal only) — stacked lanes, collision-safe labels.
-    // Readable Work list lives below the river; SVG shows where/when only.
+    // Role band (desktop horizontal only) — stacked lanes, bars only (no text).
+    // Readable Work list below the river is the primary “where / what / how long” UX.
     if (state!.orientation === 'horizontal') {
       const bandBaseY = midPx + 20;
       const laneH = 14;
-      const roleLabelBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
       employmentJobs.forEach((job, index) => {
         const u0 = timeToUnit(yearFraction(job.valid_from!), state!.zoom, nowYear);
         const u1 = timeToUnit(
@@ -391,44 +390,6 @@ export function mountCareerRiver(
         title.textContent = tip;
         bar.appendChild(title);
         svg.appendChild(bar);
-
-        // Prefer role; fall back to workplace short name when bar is narrow.
-        const span = x1 - x0;
-        let labelText = '';
-        if (span > 72 && role) labelText = shortName(role);
-        else if (span > 96 && workplace) labelText = shortName(workplace);
-        else if (span > 120 && role) labelText = role;
-        if (!labelText) return;
-
-        const approxW = Math.min(span - 8, labelText.length * 6.2);
-        if (approxW < 28) return;
-        let lx = x0 + 4;
-        let ly = y + 7;
-        let collides = false;
-        for (const box of roleLabelBoxes) {
-          if (
-            Math.abs(ly - box.y) < 12 &&
-            !(lx + approxW < box.x || box.x + box.w < lx)
-          ) {
-            collides = true;
-            break;
-          }
-        }
-        if (collides) return;
-        const t = svgEl('text', {
-          x: lx,
-          y: ly,
-          fill: 'var(--muted)',
-          'font-size': 9,
-          'font-family': 'inherit',
-          'font-weight': 600
-        });
-        t.textContent = labelText;
-        const tipNode = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        tipNode.textContent = tip;
-        t.appendChild(tipNode);
-        svg.appendChild(t);
-        roleLabelBoxes.push({ x: lx, y: ly, w: approxW, h: 10 });
       });
     }
 
