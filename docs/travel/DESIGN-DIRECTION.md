@@ -2,14 +2,17 @@
 
 27 September 2026. This replaces the direction in `docs/Life_Hub_Travel_Conversation_and_Design_Brief.md` (PR #527). That brief stays as the research record.
 
-Mockup: `docs/mockups/travel/travel-daylight.html`, built on the real Notion bookings.
+Mockup: `docs/mockups/travel/travel-planner.html`, built on the real Notion bookings.
 
-## What the ChatGPT brief missed
+## Adam's rules
 
-1. It designed only the booked first four days. Most of the 41-day trip (1 Dec 2026 to 10 Jan 2027) is still unbooked, so planning is the main job until December.
-2. On 23 December the trip changes from solo to a honeymoon with Corey, and the brief never accounted for that.
-3. Its skyline artwork was generic. Adam called every version bland.
-4. It trusted the Notion overview, which has drifted from the bookings. Bookings are the truth, and the planner shows where plans disagree with them.
+1. **Maps feature a lot.** Every day has a map with numbered stops, the route between them and how long each hop takes. Adam will get lost, so every city has **Take me home**: the hotel address in the local language, a line to show a driver, and directions.
+2. **Travel theming with whimsy.** When you're flying there's a plane flying. On a train, a train chugs along the line saying choo choo. Each city gets its own illustrated, animated scene and colour: KL's Petronas Towers and a Grab scooter, the Istanbul ferry and gulls, the Glenfinnan viaduct with a train and a Highland cow, a London bus, a Rome Vespa, Seoul snow.
+3. **A real itinerary, not a paragraph of ideas.** Each day is timed stops you can follow: where, when, how to get to the next one, and what it costs.
+4. **One currency.** Prices show in AUD. The local currency only appears in soft-landing money tips ("RM10 is about A$3.50").
+5. **No separate trusted-contact view.** There is one public link. It shows the route, city, day plans and last check-in, and hides booking codes, costs, health details and the diary. It can be turned off.
+
+Rejected in this round: the daylight strip ("am I a beaver?") and the "Bob's view" mode.
 
 ## Decisions (Adam, 27 Sep)
 
@@ -17,37 +20,41 @@ Mockup: `docs/mockups/travel/travel-daylight.html`, built on the real Notion boo
 |----------|----------|
 | Place in Life Hub | Under **Future map** in the Life rail |
 | Source of truth | Import the trip from Notion once, then finish and run it in Life Hub |
-| Route change | Shanghai is dropped. **Rome** replaces it (London → Rome → Seoul, land by 23 Dec) |
+| Route | Sydney → KL → Istanbul → Scotland → London → **Rome** (Shanghai dropped) → Seoul |
 | Edinburgh booking | Booked for 2 adults by mistake. Adam travels alone until Seoul |
-| Corey | Watches the trip until 23 Dec, then travels with Adam in Seoul |
-| Bob | Watches the whole trip, including Korea. Check-ins never switch off |
-| Stelara | A dose is due on day 1 or 2 in Korea. This is an open problem the planner tracks |
-| Diary | Penelope is built into each day, so the trip gets documented into the diary as it happens |
-| Soft landings | Must cover getting the phone connected, how public transport works, and money |
+| Corey | Meets Adam in Seoul |
+| Bob | Follows along through the public link |
+| Stelara | A dose is due on day 1 or 2 in Korea. It shows as a private stop on that day |
+| Diary | Penelope asks one question at the end of each day and files the entry to that day |
+| Soft landings | Every arrival covers phone and eSIM, how transport works, money, and what the weather feels like |
 
-## The organising idea: the trip as daylight
+## Page structure
 
-The trip is one strip of days. Each day's column is lit from local sunrise to sunset, midnight to midnight. Booked days are solid and unbooked days are hatched. The strip moves from 12 hours of light in KL to 7 hours in Fort William, and 21 Dec (the solstice) falls in Rome. Under the strip, one line shows who is watching: Bob for the whole trip, and Corey as a watcher and then as a companion.
+1. **Route map**: a world map with the whole route. A plane flies each flight leg and a train runs the rail legs. Booked legs are solid and unbooked legs are dotted. Tap a city to open it.
+2. **City chips** and a **Still to book** list.
+3. **City**:
+   - an animated scene with a title (Kuala-ering, Not Constantinople, Choo choo Highlands, Mind the gap, When in Rome, Seoul mates)
+   - live local time, weather and money facts
+   - day tabs
+4. **Day**: timed stops beside a map.
+   - Each stop has its pin, a Directions link (Naver Map in Korea), and the price in A$.
+   - Between stops is the hop: walk, train, tram, ferry or taxi, with minutes and cost.
+   - Tickets appear inline with a moving plane or train.
+   - The map has **Take me home** and a **Where am I?** preview.
 
-Tapping a day jumps to that day in the itinerary below.
+## Production notes
 
-## Parts of the page
-
-- **Still open**: the unbooked stretches, deadlines, entry paperwork and health items, ordered by what goes wrong first.
-- **Day flow**: tickets, stays, ideas, costs and documents sit inside each day. There are no separate Budget or Documents tabs.
-- **Soft landing**: every arrival shows phone, getting in, money, where to wait if the room isn't ready, and what the weather will feel like.
-- **Two-clock check-ins**: each check-in shows local time and Sydney time, and only falls where both are awake (Istanbul at breakfast, London at 21:00).
-- **Penelope each night**: one question about the day, following `config/penelope-protocol.md` (no rating scales). She drafts the entry in Adam's voice, he confirms, and it files to the diary and pins to the day.
-- **On the day**: a "now" card with the next steps, an "I'm safe" check-in, and "Something broke".
-- **Bob's view**: a revocable link that needs no login. All times are in Bob's time. It shows the last confirmed check-in, where Adam should be, the next check-in, and what to do if one is missed. It never shows booking codes, costs, health details or the diary.
+- Maps: real vector tiles (MapLibre with OpenStreetMap data) with offline download per city. Shanghai is gone, but Korea still needs a Naver or Kakao hand-off for walking directions.
+- Scenes: authored SVG per city, animation off for reduced motion.
+- Exchange rates: live rate at booking time, stored with the booking.
 
 ## Build order
 
-1. Before 1 Dec (aim for mid-November): Notion import, the strip, Still open, day flow, soft landings, two-clock check-ins, Penelope prompts, the offline phone view, and Bob's view.
+1. Before 1 Dec (aim for mid-November): Notion import, route map, city scenes, day maps with stops, soft landings, take-me-home, check-ins, Penelope prompts, offline phone view, and the public link.
 2. After departure: the "Something broke" assistant, and the replay of the trip afterwards.
 
 ## Open
 
 - Stelara: Corey brings it from Sydney in a cool bag (recommended), Adam carries it for 3 weeks, or Dr Keily moves the dose.
 - Entry checks: UK ETA; EU EES and ETIAS for Rome; whether Korea's K-ETA still exempts Australians in Dec 2026.
-- Where Bob's view is hosted: token link on the umbrella, following the pattern of the public student URLs.
+- Rome dates are a guess (20–22 Dec, overnight to Seoul).
