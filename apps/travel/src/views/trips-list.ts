@@ -1,5 +1,6 @@
 import { createTrip, listTrips } from '@/api/travel';
 import { tripRoute } from '@/app/router';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export interface TripsListOptions {
   isCurrent: () => boolean;
@@ -50,7 +51,7 @@ export async function renderTripsList(canvas: HTMLElement, options: TripsListOpt
     const h3 = document.createElement('h3');
     h3.textContent = trip.title;
     const p = document.createElement('p');
-    p.textContent = `${trip.start_date} – ${trip.end_date} · ${statusLabel(trip.start_date, trip.end_date)}`;
+    p.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)} · ${statusLabel(trip.start_date, trip.end_date)}`;
     const chips = document.createElement('div');
     chips.className = 'chips';
     for (const cityName of trip.cities) {

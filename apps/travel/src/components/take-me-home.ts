@@ -1,4 +1,5 @@
 import type { IsoDate, StayItem } from '@/types';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 
 export interface TakeMeHomeOptions {
   home: StayItem | null;
@@ -24,7 +25,7 @@ export function renderTakeMeHome(host: HTMLElement, options: TakeMeHomeOptions, 
 
   if (!options.home) {
     const title = document.createElement('h3');
-    title.textContent = `No bed booked for ${options.date} yet`;
+    title.textContent = `No bed booked for ${formatDisplayDate(options.date)} yet`;
     const addBtn = document.createElement('button');
     addBtn.type = 'button';
     addBtn.className = 'btn';

@@ -9,6 +9,7 @@ import { renderAddForm } from '@/components/add-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { formatInZone, zonedToInstant } from '@/lib/time';
+import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
@@ -77,7 +78,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   h1.textContent = trip.title;
   const sub = document.createElement('p');
   sub.className = 'sub';
-  sub.textContent = `${trip.start_date} – ${trip.end_date}`;
+  sub.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)}`;
   titleBlock.append(crumb, h1, sub);
   const acts = document.createElement('div');
   acts.className = 'acts';
@@ -136,7 +137,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       chip.type = 'button';
       chip.className = 'chip';
       if (city.id === selectedCityId) chip.classList.add('is-on');
-      chip.innerHTML = `<b>${city.name}</b><span>${city.start_date}–${city.end_date}</span>${hasTodo ? '<span class="todo-dot"></span>' : ''}`;
+      chip.innerHTML = `<b>${city.name}</b><span>${formatDisplayDate(city.start_date)}–${formatDisplayDate(city.end_date)}</span>${hasTodo ? '<span class="todo-dot"></span>' : ''}`;
       chip.addEventListener('click', () => selectCity(city.id));
       chips.append(chip);
     }

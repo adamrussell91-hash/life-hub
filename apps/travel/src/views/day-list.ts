@@ -171,7 +171,17 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     card.append(editBtn);
   }
 
-  stop.addEventListener('click', () => options.onSelect?.(item.id));
+  stop.setAttribute('role', 'button');
+  stop.tabIndex = 0;
+  stop.setAttribute('aria-label', item.title);
+  const select = () => options.onSelect?.(item.id);
+  stop.addEventListener('click', select);
+  stop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      select();
+    }
+  });
   stop.append(rail, card);
   return stop;
 }
