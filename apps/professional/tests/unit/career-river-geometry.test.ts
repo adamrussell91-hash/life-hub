@@ -8,6 +8,7 @@ import {
   riverHeightPx,
   roleBandExtraPx,
   timeToUnit,
+  truncateRiverLabel,
   yearFraction
 } from '@/domain/career-river-geometry';
 
@@ -33,7 +34,7 @@ describe('career-river-geometry', () => {
 
   it('sizes height from the Phase 3 formula', () => {
     expect(riverHeightPx('horizontal', 3, 10)).toBe(Math.max(440, 120 + 3 * 64));
-    expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(900, 10 * 150));
+    expect(riverHeightPx('vertical', 3, 10)).toBe(Math.max(640, 10 * 100));
   });
 
   it('emits readable year axis ticks by zoom span', () => {
@@ -89,5 +90,11 @@ describe('career-river-geometry', () => {
     expect(lanes[1]).toBe(1);
     expect(lanes[2]).toBe(0);
     expect(roleBandExtraPx(2)).toBeGreaterThan(roleBandExtraPx(1));
+  });
+
+  it('truncates river labels to a pixel budget', () => {
+    expect(truncateRiverLabel('English Teacher', 12)).toBe('');
+    expect(truncateRiverLabel('English Teacher', 48)).toMatch(/Engl/);
+    expect(truncateRiverLabel('Gifted', 80)).toBe('Gifted');
   });
 });

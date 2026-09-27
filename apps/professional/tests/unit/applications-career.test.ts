@@ -461,11 +461,18 @@ describe('renderCareerView', () => {
     );
     expect(years.length).toBeGreaterThan(0);
     expect(years.every((y) => /^\d{4}$/.test(y || ''))).toBe(true);
-    // #536/#544: Work list is the reading surface — no SVG role strings on bars.
-    const svgText = [...canvas.querySelectorAll('.career-river__svg text')]
-      .map((n) => n.textContent || '')
-      .join(' ');
-    expect(svgText).not.toMatch(/English Teacher|Psychology Teacher|Gifted Education/);
+    // River is self-explanatory: labeled role bars (Tasks gantt parity), not mute grey.
+    const roleLabels = [...canvas.querySelectorAll('[data-part="role-label"]')].map(
+      (node) => node.textContent || ''
+    );
+    expect(roleLabels.length).toBeGreaterThan(0);
+    expect(roleLabels.join(' ')).toMatch(/English|Psychology|Gifted/);
+    expect(canvas.querySelectorAll('[data-part="role-bar"]').length).toBeGreaterThan(0);
+    expect(canvas.querySelector('[data-part="trunk"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-part="year-grid"]')).toBeTruthy();
+    expect(canvas.querySelector('[data-part="work-companion"]')?.textContent).toMatch(
+      /Full dates/
+    );
   });
 
   it('links application items to Career application routes', async () => {
