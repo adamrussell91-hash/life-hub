@@ -53,11 +53,12 @@ function personIdFromKey(key) {
  * granularity — e.g. Signals needs it per relationship type, Cohorts needs
  * it per organisation).
  *
- * Also merges the GitHub-canonical Professional import (the 350-person
- * Notion directory). Search and Person pages already fall back to that
- * import; People Home / cohorts / network ecology previously scanned
- * Blobs only and therefore could not see anyone imported, or who the
- * operator is. Blob-backed records win on id collision. A missing or
+ * Also merges the GitHub-canonical Professional import (Notion People +
+ * workspace owner — Communications students are excluded by
+ * `listGithubPersonCandidates`). Search and Person pages already fall
+ * back to that import; People Home / cohorts / network ecology previously
+ * scanned Blobs only and therefore could not see anyone imported, or who
+ * the operator is. Blob-backed records win on id collision. A missing or
  * unbound GitHub token degrades to the Blob-only set, same as
  * entity-search.mjs.
  */
