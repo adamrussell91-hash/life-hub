@@ -17,6 +17,7 @@ import {
   radiusForDays,
   trailPath
 } from '../../../life/js/app/chart-kit/orbit-radar.js';
+import { backlogHrefFromGraph } from '@/shell/shell';
 import { el } from '@/views/hub-kit';
 import { svgEl, token } from '@/views/graph-svg';
 
@@ -333,7 +334,9 @@ export function mountOrbitView(host: HTMLElement, first: OrbitInput): OrbitMount
       list.map((d) => `<span><i style="background:${d.color ?? domainMeta(d.id).colour}"></i>${d.label}</span>`).join('') +
       `<span><i style="background:${token('--danger', '#9b2c2c')}"></i>Closing in</span><span>Size = effort</span>`;
     const undated = input.tasks.filter((t) => !t.due_date && t.status !== 'done' && t.status !== 'dead');
-    foot.innerHTML = undated.length ? `${undated.length} undated · <a href="#/list">Backlog</a>` : '';
+    foot.innerHTML = undated.length
+      ? `${undated.length} undated · <a href="${backlogHrefFromGraph()}">Backlog</a>`
+      : '';
   };
 
   const lookCopy = (days: number) => {

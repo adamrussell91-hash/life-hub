@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  backlogHrefFromGraph,
   bindEditablePageTitle,
   canonicalizeGraphHash,
+  graphReturnFromBacklog,
   graphViewFromHash,
   hashQuery,
   isSoftViewChange,
@@ -182,6 +184,31 @@ describe('viewChrome', () => {
     expect(viewChrome('orbit')).toEqual({ eyebrow: 'Views', title: 'Orbit' });
     expect(viewChrome('board')).toEqual({ eyebrow: 'Home', title: 'Dashboard' });
     expect(viewChrome('clare')).toEqual({ eyebrow: 'Home', title: 'Chat' });
+  });
+});
+
+describe('graph ↔ backlog return', () => {
+  it('encodes and restores Graph view on Backlog links', () => {
+    expect(backlogHrefFromGraph('#/graph')).toBe('#/list?from=graph');
+    expect(backlogHrefFromGraph('#/graph?view=orbit')).toBe('#/list?from=graph&graphView=orbit');
+    expect(graphReturnFromBacklog('#/list?from=graph')).toBe('#/graph');
+    expect(graphReturnFromBacklog('#/list?from=graph&graphView=branch')).toBe('#/graph?view=branch');
+    expect(graphReturnFromBacklog('#/list')).toBeNull();
+  });
+
+  it('renders a kit page-header back link when provided', () => {
+    const root = document.createElement('div');
+    const refs = renderHubShell(root, { onLogout: vi.fn(), onRefresh: vi.fn() });
+    renderPageHeader(refs, {
+      eyebrow: 'Views',
+      title: 'Backlog',
+      back: { href: '#/graph', label: '← Graph' }
+    });
+    const back = refs.pageHeader.querySelector<HTMLAnchorElement>('.page-header__back');
+    expect(back?.textContent).toBe('← Graph');
+    expect(back?.getAttribute('href')).toBe('#/graph');
+    renderPageHeader(refs, { eyebrow: 'Views', title: 'Backlog', back: null });
+    expect(refs.pageHeader.querySelector('.page-header__back')).toBeNull();
   });
 });
 

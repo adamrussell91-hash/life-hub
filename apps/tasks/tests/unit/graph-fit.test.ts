@@ -3,7 +3,7 @@ import type { Task } from '@/schemas/task';
 import type { Project } from '@/schemas/project';
 import { fitBranchView } from '@/domain/graph-branch-layout';
 import { mountBranchView } from '@/views/graph-branch';
-import { lineLabelX, lineViewWidth, mountLinesView } from '@/views/graph-lines';
+import { lineLabelX, lineViewWidth, mountLinesView, stationLabelPlacement } from '@/views/graph-lines';
 
 function task(partial: Partial<Task> & Pick<Task, 'id' | 'title'>): Task {
   return {
@@ -78,6 +78,50 @@ describe('graph page fit', () => {
     expect(lineLabelX(28, 640)).toEqual({ x: 28, anchor: 'start' });
     expect(lineLabelX(800, 640)).toEqual({ x: 632, anchor: 'end' });
     expect(lineLabelX(-4, 640)).toEqual({ x: 8, anchor: 'start' });
+  });
+
+  it('keeps station labels inside the line viewBox at the left edge', () => {
+    expect(stationLabelPlacement(44, 640, 180, 'middle')).toEqual({ x: 44, anchor: 'start' });
+    expect(stationLabelPlacement(30, 640, 90, 'end')).toEqual({ x: 30, anchor: 'start' });
+    expect(stationLabelPlacement(320, 640, 80, 'middle')).toEqual({ x: 320, anchor: 'middle' });
+    expect(stationLabelPlacement(620, 640, 100, 'middle')).toEqual({ x: 632, anchor: 'end' });
+  });
+
+  it('does not clip the first station title past the SVG left edge', () => {
+    const host = document.createElement('div');
+    Object.defineProperty(host, 'clientWidth', { configurable: true, value: 640 });
+    document.body.append(host);
+    mountLinesView(host, {
+      tasks: [
+        task({
+          id: 'task_long',
+          title: 'Finish lesson pack for Year 12',
+          step_order: 0,
+          due_date: null
+        })
+      ],
+      projects: [project()],
+      now: new Date('2026-09-22T00:00:00.000Z'),
+      selectedId: null,
+      search: '',
+      insights: [],
+      scale: false,
+      focusedProjectId: null,
+      reducedMotion: true,
+      onSelect: () => undefined,
+      onComplete: () => undefined,
+      onFocusProject: () => undefined,
+      onAddStation: () => undefined,
+      onReviewInsight: () => undefined,
+      onToggleScale: () => undefined
+    });
+    const title = host.querySelector('[data-part="station-title"]');
+    const sub = host.querySelector('[data-part="station-sub"]');
+    expect(title?.getAttribute('text-anchor')).toBe('start');
+    expect(Number(title?.getAttribute('x'))).toBeGreaterThanOrEqual(8);
+    expect(sub?.getAttribute('text-anchor')).toBe('start');
+    expect(Number(sub?.getAttribute('x'))).toBeGreaterThanOrEqual(8);
+    host.remove();
   });
 
   it('uses the measured canvas width instead of overflowing it', () => {

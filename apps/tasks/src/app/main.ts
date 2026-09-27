@@ -42,6 +42,7 @@ import {
   renderHubShell,
   renderPageHeader,
   renderPrimaryNav,
+  graphReturnFromBacklog,
   viewChrome,
   type HubViewId
 } from '@/shell/shell';
@@ -313,8 +314,12 @@ async function bootApp(root: HTMLElement): Promise<void> {
     }
     const view = nextView ?? parseHashRoute();
     const chrome = viewChrome(view);
+    const graphReturn = view === 'list' ? graphReturnFromBacklog() : null;
     renderPrimaryNav(shell.railNav, view);
-    renderPageHeader(shell, chrome);
+    renderPageHeader(shell, {
+      ...chrome,
+      back: graphReturn ? { href: graphReturn, label: '← Graph' } : null
+    });
     clare.sync(view);
     try {
       if (!soft) await renderReminderStrip(shell.reminderHost, () => void paint({ force: true }));
