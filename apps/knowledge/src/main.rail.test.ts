@@ -218,6 +218,12 @@ describe("Knowledge Hub rail", () => {
     expect(main).toContain("function goToHome");
   });
 
+  it("keeps Thinking mounted across re-renders so protocol-deal does not replay", () => {
+    expect(main).toContain('querySelector<HTMLElement>(".protocols-root")');
+    expect(main).toContain("existing?.isConnected");
+    expect(main).toMatch(/view === "protocols"[\s\S]*existing\?\.isConnected[\s\S]*afterSignedInPaint\(\);\s*return;/);
+  });
+
   it("links out to the other umbrella hubs from the rail", () => {
     expect(main).toContain('hubSwitcherHtml("knowledge")');
   });

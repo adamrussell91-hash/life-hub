@@ -55,16 +55,40 @@ function probeImage(url: string): Promise<boolean> {
     img.src = url;
   });
 }
-/** Swaps in a named lighting-stage background once confirmed to exist; leaves the default in place otherwise. */
+/** Soft-crossfades a lighting-stage background; missing art keeps the current layer. */
 function applyStagedBackground(section: HTMLElement, protocolId: string, stage: string) {
   const url = backgroundAsset(protocolId, stage);
+  const apply = (resolved: string) => {
+    const layers = section.querySelector(".protocol-bg");
+    if (!layers) {
+      section.style.setProperty("--protocol-background", `url('${resolved}')`);
+      return;
+    }
+    const current = layers.querySelector<HTMLElement>(".protocol-bg__layer.is-shown");
+    const next = layers.querySelector<HTMLElement>(".protocol-bg__layer:not(.is-shown)");
+    if (!current || !next) {
+      section.style.setProperty("--protocol-background", `url('${resolved}')`);
+      return;
+    }
+    const shown = current.style.backgroundImage || getComputedStyle(current).backgroundImage;
+    if (shown.includes(resolved)) return;
+    next.style.backgroundImage = `url('${resolved}')`;
+    next.classList.add("is-shown");
+    current.classList.remove("is-shown");
+    section.style.setProperty("--protocol-background", `url('${resolved}')`);
+  };
   const cached = lightingArtCache.get(url);
-  if (cached === true) { section.style.setProperty("--protocol-background", `url('${url}')`); return; }
+  if (cached === true) { apply(url); return; }
   if (cached === false) return;
   void probeImage(url).then(ok => {
     lightingArtCache.set(url, ok);
-    if (ok && section.isConnected) section.style.setProperty("--protocol-background", `url('${url}')`);
+    if (ok && section.isConnected) apply(url);
   });
+}
+
+function backgroundLayersHtml(protocolId: string) {
+  const base = backgroundAsset(protocolId);
+  return `<div class="protocol-bg" aria-hidden="true"><div class="protocol-bg__layer is-shown" style="background-image:url('${base}')"></div><div class="protocol-bg__layer"></div></div>`;
 }
 
 export type ForkBranch = { label: string; body: string };
@@ -123,7 +147,7 @@ const localCatalog: Definition[] = [
   ["horizon", "The Horizon Council", "Map present trajectories against a desired future.", "Norse long hall", "full", ["Full", "Brief"], ["Ketill", "Alvar", "Sigrid"]],
   ["refinery", "The Refinery", "Build, break and reforge a defensible argument.", "Chevruta paired argument", "full", ["Full", "Build", "Break", "Reforge"], ["The Builder", "The Breaker", "The Reforger"]],
   ["cartographers", "The Cartographers", "Turn literature into a purpose-fit knowledge representation.", "Contours and bearings", "full", ["Full", "Focused", "Direct"], ["The Surveyor", "The Miner", "The Cartographer"]],
-  ["mirror", "The Mirror Council", "Clarify the gap between behaviour, aspiration and present capacity.", "Confucian reflection", "quick", ["Quick", "Deep"], ["The Retrospective", "The Prospective", "The Present"]],
+  ["mirror", "The Mirror Council", "Clarify the gap between behaviour, aspiration and present capacity.", "Confucian reflection", "quick", ["Quick", "Deep"], ["Gu Jian the Retrospective", "Wang Yuan the Prospective", "Zheng Ming the Present"]],
   ["consilium", "The Consilium", "Deliberate through incompatible ethical standpoints without a verdict.", "Roman advisory chamber", "standard", ["Standard", "Extended"], ["The Principle", "The Consequence", "The Virtue"]],
   ["witness", "The Witness", "Audit a specific thinking process before trusting its result.", "Zen and Vipassana observation", "standard", ["Standard", "Deep"], ["Process Trace", "Pattern Match", "Recalibration"]],
   ["tribunal", "The Tribunal of Frames", "Open three independent reframes of an entrenched problem.", "Nested frames and scale", "standard", ["Quick", "Standard", "Deep"], ["The Inverter", "The Scaler", "The Context Shifter"]]
@@ -240,28 +264,71 @@ function cardArt(id: string) {
   return `<svg class="protocol-card__art" viewBox="0 0 120 208" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">${paths[id] ?? paths.tribunal}</svg>`;
 }
 
+const VOICE_PROFILE_TIPS: Record<string, string> = {
+  // Mirror
+  retrospective: "Gu Jian reads the ji — what was chosen and declined over months. Past tense, sample before pattern, one instance is never a trend.",
+  prospective: "Wang Yuan reads only aspirations Adam stated. Toward, away from, or neutral — never invents a zhi to fill silence.",
+  present: "Zheng Ming rectifies the name of the conflict and asks one seven-day question. He does not choose for you.",
+  // Horizon
+  ketill: "Ketill keeps the near horizon — six months to two years. Practical forks, Miðgarðr speech, no plan.",
+  alvar: "Alvar works backwards from the far condition. Preconditions and Skuld, not advice.",
+  sigrid: "Sigrid classifies each finding as trade-off, drift, or unclassified — one closing ask.",
+  // Fates
+  clotho: "Clotho spins — hot, generative, breathless. Options and Greek sparks; she asks what to spin with.",
+  atropos: "Atropos cuts — dry, evidence-first. Demands definition or a falsification test.",
+  lachesis: "Lachesis measures — level options and decisions. She asks early and stops at the choice.",
+  weave: "The Weave witnesses only — durable threads, tensions, what remains open. No advocacy.",
+  // Refinery
+  builder: "Bezalel builds the affirmative Toulmin case — claim, grounds, warrant, backing, qualifier.",
+  breaker: "Beruriah steelmans the weakest joint. Short, dry, no rebuild.",
+  reforger: "Nechemya rebuilds accounting for each Breaker weakness — repaired or accepted.",
+  // Cartographers
+  surveyor: "Captain Everly maps the terrain — positions, contested edges, neglect. Never ranks.",
+  miner: "Miss Quarrington extracts numbered citation slips. No cross-source synthesis.",
+  cartographer: "Mr Meridith draws relations from Miner slips and leaves unsurveyed ground blank.",
+  // Consilium
+  principle: "Gaius Officius — duty and rights owed, regardless of cost. No consequentialism.",
+  consequence: "Lucius Eventus — who is affected, how badly, how likely. If/then chains.",
+  virtue: "Titus Honestus — what the choice practises in the person. Only stated aspirations.",
+  // Witness
+  trace: "Sati reconstructs the thinking sequence without story or judgement.",
+  patterns: "Pañña — sound thinking is the null hypothesis; baseline before any pattern.",
+  recalibration: "Upekkhā calibrates confidence and one disposition — not a replacement decision.",
+  // Tribunal
+  inverter: "Counselor Delacorte tests whether the problem is a solution to an unnamed problem.",
+  scaler: "Special Master Abernathy runs one downscale and one upscale of the same claim.",
+  "context-shifter": "Judge Venable names a setting where the problem would not arise.",
+};
+
 function voiceChipHtml(protocolId: string, voice: Definition["voices"][number]): string {
   const name = escapeHtml(voice.name);
-  const role = voice.role.trim();
-  if (!role) return `<span class="protocol-card__voice">${name}</span>`;
+  const role = (voice.role || VOICE_ROLES[voice.id] || "").trim();
+  const tip = VOICE_PROFILE_TIPS[voice.id] || role;
+  if (!tip) return `<span class="protocol-card__voice">${name}</span>`;
   const tipId = `protocol-voice-tip-${protocolId}-${voice.id}`;
-  const roleHtml = escapeHtml(role);
-  return `<span class="protocol-card__voice" tabindex="0" aria-describedby="${tipId}">${name}<span class="agent-protocol-pills__tip" id="${tipId}" role="tooltip">${roleHtml}</span><span class="protocol-card__voice-role">${roleHtml}</span></span>`;
+  const tipHtml = escapeHtml(tip);
+  const roleHtml = escapeHtml(role || tip);
+  return `<span class="protocol-card__voice" tabindex="0" aria-describedby="${tipId}">${name}<span class="agent-protocol-pills__tip" id="${tipId}" role="tooltip">${tipHtml}</span><span class="protocol-card__voice-role">${roleHtml}</span></span>`;
 }
 
 function cards(definitions: Definition[]) {
-  return definitions.map((d, index) => `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
+  return definitions.map((d, index) => {
+    const typeTipId = `protocol-type-tip-${d.id}`;
+    const typeTip = escapeHtml(`${d.motif}. ${d.description}`);
+    return `<article class="protocol-card protocol-card--${escapeHtml(d.id)}" data-protocol-card="${escapeHtml(d.id)}" style="--protocol-order:${index}">
     <div class="protocol-card__inner">
-      <button type="button" class="protocol-card__front" data-protocol-flip aria-expanded="false" aria-label="Show details for ${escapeHtml(d.name)}">
+      <button type="button" class="protocol-card__front" data-protocol-flip aria-expanded="false" aria-label="Show details for ${escapeHtml(d.name)}" aria-describedby="${typeTipId}">
         <img class="protocol-card__front-art" src="${frontAsset(d.id)}" alt="">
         <span class="protocol-card__corner">${String(index + 1).padStart(2, "0")}</span><span class="protocol-card__eyebrow">${escapeHtml(d.motif)}</span><strong>${escapeHtml(d.name)}</strong><span class="protocol-card__description">${escapeHtml(d.description)}</span>
+        <span class="agent-protocol-pills__tip protocol-card__type-tip" id="${typeTipId}" role="tooltip">${typeTip}</span>
       </button>
       <section class="protocol-card__back" aria-label="${escapeHtml(d.name)} details">
-        <img src="${backAsset(d.id)}" alt=""><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join("")}</p></div>
+        <div class="protocol-card__back-media"><img src="${backAsset(d.id)}" alt=""></div><div class="protocol-card__back-copy"><p>${escapeHtml(d.description)}</p><p class="protocol-card__voices">${d.voices.map(v => voiceChipHtml(d.id, v)).join("")}</p></div>
         <div class="protocol-card__actions"><button class="btn btn--ghost" data-protocol-flip type="button">Back</button><button class="btn btn--primary" data-protocol-begin="${escapeHtml(d.id)}" type="button">Begin</button></div>
       </section>
     </div>
-  </article>`).join("");
+  </article>`;
+  }).join("");
 }
 
 function modeHintText(mode: Definition["modes"][number] | undefined): string {
@@ -448,12 +515,33 @@ function renderScrubber(session: Session, index: number, isLatest: boolean, defi
   if (total === 0) return "";
   const dots = session.transcript.map((turn, i) => {
     const current = i === index;
-    const label = turn.speaker === "you" ? "You" : voiceOf(definition, turn.speaker)?.name ?? turn.speaker;
-    return `<button type="button" class="protocol-dot${current ? " is-current" : ""}" data-protocol-scrub-to="${i}" style="--dot-color:${speakerColor(definition, turn.speaker)}" aria-current="${current}" aria-label="${escapeHtml(label)}, turn ${i + 1} of ${total}"></button>`;
+    const label = turn.speaker === "you" ? "You" : turn.speaker === "controller" ? "Synthesis" : voiceOf(definition, turn.speaker)?.name ?? turn.speaker;
+    const color = turn.speaker === "controller" ? "#e4c98a" : speakerColor(definition, turn.speaker);
+    return `<button type="button" class="protocol-dot${current ? " is-current" : ""}" data-protocol-scrub-to="${i}" style="--dot-color:${color}" aria-current="${current ? "true" : "false"}" aria-label="${escapeHtml(label)}, turn ${i + 1} of ${total}"></button>`;
   }).join("");
-  const nudge = !isLatest ? `<button type="button" class="protocol-scrub-nudge" data-protocol-scrub="latest">New reply ↓</button>` : "";
-  return `<nav class="protocol-scrubber" aria-label="Conversation history"><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="prev" ${index === 0 ? "disabled" : ""} aria-label="Previous turn">‹</button><div class="protocol-scrub-dots">${dots}</div><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="next" ${index === total - 1 ? "disabled" : ""} aria-label="Next turn">›</button></nav>${nudge}`;
+  const nudge = !isLatest ? `<button type="button" class="protocol-scrub-nudge" data-protocol-scrub="latest">Continue reading ↓</button>` : "";
+  return `<nav class="protocol-scrubber" aria-label="Conversation history" data-protocol-scrub-index="${index}"><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="prev" ${index === 0 ? "disabled" : ""} aria-label="Previous turn">‹</button><div class="protocol-scrub-dots">${dots}</div><button type="button" class="protocol-scrub-arrow" data-protocol-scrub="next" ${index === total - 1 ? "disabled" : ""} aria-label="Next turn">›</button></nav>${nudge}`;
 }
+
+function summaryHtml(session: Session) {
+  const summary = session.summary;
+  if (!summary) return "";
+  return `<aside class="protocol-summary" aria-label="Run summary"><h2>${escapeHtml(summary.title || "Summary")}</h2>${summary.keyFinding ? `<p>${escapeHtml(summary.keyFinding)}</p>` : ""}<p>${escapeHtml(summary.summary || "")}</p></aside>`;
+}
+
+function portraitHtmlFor(definition: Definition, activeSpeakerId: string | null, activeVoice: Definition["voices"][number] | null) {
+  if (activeVoice) {
+    const tip = VOICE_PROFILE_TIPS[activeVoice.id] || activeVoice.role || VOICE_ROLES[activeVoice.id] || "";
+    const tipId = `protocol-portrait-tip-${definition.id}-${activeVoice.id}`;
+    return `<div class="protocol-portrait" tabindex="0" aria-describedby="${tipId}"><img src="${voiceSrc(definition, activeVoice.id)}" alt="${escapeHtml(activeVoice.name)}" width="220" height="220">${tip ? `<span class="agent-protocol-pills__tip" id="${tipId}" role="tooltip">${escapeHtml(tip)}</span>` : ""}</div>`;
+  }
+  if (activeSpeakerId === "you") return `<div class="protocol-portrait protocol-portrait--you" aria-hidden="true">You</div>`;
+  if (activeSpeakerId === "controller" || activeSpeakerId === "weave") {
+    return `<div class="protocol-portrait protocol-portrait--council" aria-hidden="true" title="Council synthesis">镜</div>`;
+  }
+  return "";
+}
+
 export function sessionView(session: Session, definition: Definition, viewingIndex?: number) {
   const total = session.transcript.length;
   const index = total === 0 ? 0 : clamp(viewingIndex ?? total - 1, 0, total - 1);
@@ -462,9 +550,20 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const turn = total > 0 ? session.transcript[index] : null;
   const cardIsLive = isLatest && (listening || Boolean(session.error) || Boolean(session.checkpoint) || !turn);
   const activeSpeakerId = cardIsLive ? session.speaker : turn ? turn.speaker : session.speaker;
-  const activeVoice = activeSpeakerId && activeSpeakerId !== "you" ? voiceOf(definition, activeSpeakerId) : null;
-  const activeRole = activeVoice ? activeVoice.role || VOICE_ROLES[activeVoice.id] || "" : "";
-  const activeName = activeVoice ? activeVoice.name : activeSpeakerId === "you" ? "You" : speakerName(session, definition);
+  const activeVoice = activeSpeakerId && activeSpeakerId !== "you" && activeSpeakerId !== "controller"
+    ? voiceOf(definition, activeSpeakerId)
+    : null;
+  const isController = activeSpeakerId === "controller" || (!activeVoice && turn?.role === "controller");
+  const activeRole = activeVoice
+    ? activeVoice.role || VOICE_ROLES[activeVoice.id] || ""
+    : isController ? "Clarified conflict" : "";
+  const activeName = activeVoice
+    ? activeVoice.name
+    : activeSpeakerId === "you"
+      ? "You"
+      : isController
+        ? "Council synthesis"
+        : speakerName(session, definition);
   const precedingTurn = cardIsLive && turn && turn.speaker !== "you" ? turn : null;
   const precedingText = precedingTurn ? precedingTurn.text : null;
   const cardHtml = cardIsLive
@@ -472,22 +571,30 @@ export function sessionView(session: Session, definition: Definition, viewingInd
     : turn
       ? readTurnCardHtml(turn, activeName, activeRole, session.evidence)
       : joiningCardHtml(activeName, activeRole);
-  const portraitHtml = activeVoice
-    ? `<div class="protocol-portrait"><img src="${voiceSrc(definition, activeVoice.id)}" alt="${escapeHtml(activeVoice.name)}" width="220" height="220"></div>`
-    : activeSpeakerId === "you"
-      ? `<div class="protocol-portrait protocol-portrait--you" aria-hidden="true">You</div>`
-      : "";
-  return `<section class="protocol-session${listening ? " is-listening" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}</div>${(session as Session & { summary?: { title?: string; keyFinding?: string; summary?: string } }).summary && isLatest ? `<aside class="protocol-summary" aria-label="Run summary"><h2>${escapeHtml((session as Session & { summary?: { title?: string } }).summary?.title || "Summary")}</h2><p>${escapeHtml((session as Session & { summary?: { keyFinding?: string } }).summary?.keyFinding || "")}</p><p>${escapeHtml((session as Session & { summary?: { summary?: string } }).summary?.summary || "")}</p></aside>` : ""}${renderScrubber(session, index, isLatest, definition)}</section>`;
+  const showSummary = Boolean(session.summary) && isLatest;
+  const complete = session.status === "completed" || showSummary;
+  const portraitHtml = portraitHtmlFor(definition, activeSpeakerId, activeVoice);
+  return `<section class="protocol-session${listening ? " is-listening" : ""}${complete ? " is-complete" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" data-view-index="${index}" data-turn-total="${total}" style="--protocol-background:url('${backgroundAsset(definition.id)}')">${backgroundLayersHtml(definition.id)}<header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}${showSummary ? summaryHtml(session) : ""}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
 }
 export function applySession(root: HTMLElement, session: Session, definition: Definition, viewingIndex?: number) {
   const total = session.transcript.length;
   const index = total === 0 ? 0 : clamp(viewingIndex ?? total - 1, 0, total - 1);
-  const key = [session.id, session.revision, session.status, session.error?.message ?? "", index, total].join("|");
+  const key = [session.id, session.revision, session.status, session.error?.message ?? "", index, total, session.summary?.title ?? ""].join("|");
   if (root.dataset.protocolRenderKey === key) return;
+  const priorBg = root.querySelector<HTMLElement>(".protocol-bg__layer.is-shown")?.style.backgroundImage ?? "";
   root.dataset.protocolRenderKey = key;
   root.innerHTML = sessionView(session, definition, index);
   const section = root.querySelector<HTMLElement>(".protocol-session");
-  if (section) applyStagedBackground(section, definition.id, lightingStage(index, total, definition.id));
+  if (!section) return;
+  if (priorBg) {
+    const shown = section.querySelector<HTMLElement>(".protocol-bg__layer.is-shown");
+    if (shown && !shown.style.backgroundImage) shown.style.backgroundImage = priorBg;
+  }
+  applyStagedBackground(section, definition.id, lightingStage(index, total, definition.id));
+}
+
+function catalogSignature(definitions: Definition[]) {
+  return definitions.map(d => `${d.id}\0${d.name}\0${d.description}`).join("\n");
 }
 
 export function renderProtocols({ host }: { host: HTMLElement }) {
@@ -504,12 +611,28 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
   let frequencyGate: string | null = null;
   let lastPrompt = "";
   let lastMode = "";
+  let libraryDealt = false;
   const effectiveIndex = () => {
     const total = currentSession?.transcript.length ?? 0;
     if (total === 0) return 0;
     return viewingIndex === null ? total - 1 : clamp(viewingIndex, 0, total - 1);
   };
   const stopPolling = () => { if (pollTimer !== null) window.clearTimeout(pollTimer); pollTimer = null; };
+  const paintPastRuns = () => {
+    const library = host.querySelector(".protocol-library");
+    if (!library) {
+      paint();
+      return;
+    }
+    library.classList.add("is-settled");
+    const wrap = document.createElement("div");
+    wrap.innerHTML = pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore });
+    const next = wrap.firstElementChild;
+    if (!next) return;
+    const current = library.querySelector(".protocol-past");
+    if (current) current.replaceWith(next);
+    else library.append(next);
+  };
   const refreshPastRuns = async ({ append = false } = {}) => {
     if (USE_LOCAL_DATA) return;
     const offset = append ? pastOffset : 0;
@@ -517,7 +640,8 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     pastRuns = append ? [...pastRuns, ...page] : page;
     pastOffset = pastRuns.length;
     pastHasMore = page.length >= PAST_PAGE;
-    if (!selected && !currentSession) paint();
+    // Patch past-runs only — do not wipe cards (that replayed protocol-deal).
+    if (!selected && !currentSession) paintPastRuns();
   };
   const paint = () => {
     if (currentSession && selected) applySession(host, currentSession, selected, effectiveIndex());
@@ -534,7 +658,17 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
         hint.hidden = !text;
       }
     } else {
-      host.innerHTML = `<section class="protocol-library"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+      const existing = host.querySelector<HTMLElement>(".protocol-library");
+      if (existing && libraryDealt) {
+        existing.classList.add("is-settled");
+        const grid = existing.querySelector(".protocol-library__grid");
+        if (grid) grid.innerHTML = cards(definitions);
+        paintPastRuns();
+        return;
+      }
+      // Re-entry after intake/session keeps is-settled so deal does not replay.
+      host.innerHTML = `<section class="protocol-library${libraryDealt ? " is-settled" : ""}"><header class="page-header"><div class="page-header__copy"><p class="page-header__eyebrow">Cognitive protocols</p><div class="page-header__title-row"><h1 class="page-header__title">Choose a way to think</h1></div><p class="page-header__supporting">Eight structured conversations, each with its own history, rhythm and discipline.</p></div></header><div class="protocol-library__grid">${cards(definitions)}</div>${pastRunsHtml(pastRuns, pastFilter, definitions, { hasMore: pastHasMore })}</section>`;
+      libraryDealt = true;
     }
   };
   const poll = async () => {
@@ -543,7 +677,14 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const response = await fetch(`${API_BASE}/protocols?sessionId=${encodeURIComponent(currentSession.id)}`, { credentials: "include" });
       if (!response.ok) throw new Error();
       const body = await response.json();
-      currentSession = body.data.session;
+      const next = body.data.session as Session;
+      const prevLen = currentSession.transcript.length;
+      const nextLen = next.transcript?.length ?? 0;
+      // Hold the turn the user is reading — do not auto-advance when new rounds arrive.
+      if (viewingIndex === null && nextLen > prevLen && prevLen > 0) {
+        viewingIndex = prevLen - 1;
+      }
+      currentSession = next;
       paint();
       if (currentSession.status === "completed") void refreshPastRuns();
       if (["queued", "running"].includes(currentSession.status)) pollTimer = window.setTimeout(poll, PROTOCOL_POLL_MS);
@@ -623,7 +764,8 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
     if (!filter) return;
     pastFilter = filter.value;
-    paint();
+    if (host.querySelector(".protocol-library")) paintPastRuns();
+    else paint();
   };
   host.onsubmit = async event => {
     const form = event.target as HTMLFormElement;
@@ -678,7 +820,13 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     }
   };
   paint();
-  void catalog().then(next => { definitions = next; if (!selected) paint(); }).catch(() => undefined);
+  const paintedCatalog = catalogSignature(definitions);
+  void catalog().then(next => {
+    const changed = catalogSignature(next) !== paintedCatalog;
+    definitions = next;
+    if (selected || currentSession || !changed) return;
+    paint();
+  }).catch(() => undefined);
   void refreshPastRuns().catch(() => undefined);
   return stopPolling;
 }
