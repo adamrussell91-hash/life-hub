@@ -17,6 +17,10 @@ function model(calls,{askCycles=false}={}) {
       const ask=p.burst===1;
       return {text:'Horizon finding spoken in character.',question:ask?'Which constraint is load-bearing here?':null,done:!ask,evidenceIds:[]};
     }
+    if(p.speaker==='retrospective'||p.speaker==='prospective'){
+      const ask=p.burst<p.maxBursts;
+      return {text:'Mirror reading spoken in character.',question:ask?'What else belongs on the record for those months?':null,done:!ask,evidenceIds:[]};
+    }
     return {text:'Grounded contribution.',question:null,done:true,evidenceIds:[],nextSpeaker:'consequence'};
   };
 }
@@ -159,6 +163,27 @@ test('Tribunal voices receive identical original context and cannot see outputs'
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});
 test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer']);for(const [mode,expected] of [['break',['breaker']],['build-break',['builder','breaker']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
 test('Mirror deep waits for framing, long arc asks what to protect; Horizon fallback explicit',async()=>{const {calls}=await run('mirror','deep');assert.equal(calls[0].stage,'framing');const s=start('mirror');s.intake.timescale='long-arc';assert.match(buildPrompt(s,{speaker:'present',stage:'present'}).system,/sit with, tolerate|protect/);const h=start('horizon');assert.match(buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system,/extrapolated from current trajectory/);});
+test('Mirror speakers receive Gu Jian / Wang Yuan / Zheng Ming writing profiles',()=>{
+  const s=start('mirror');
+  const gu=buildPrompt(s,{speaker:'retrospective',stage:'retrospective',maxBursts:3,burstWords:90}).system;
+  const wang=buildPrompt(s,{speaker:'prospective',stage:'prospective',maxBursts:3,burstWords:90}).system;
+  const zheng=buildPrompt(s,{speaker:'present',stage:'present',gate:'answer',maxBursts:1,burstWords:90}).system;
+  assert.match(gu,/You are Gu Jian only/);
+  assert.match(gu,/Ask one steering question in character/);
+  assert.match(gu,/Gu Jian, the Retrospective|old mirror|scholars' hall/);
+  assert.doesNotMatch(gu,/You are Wang Yuan only/);
+  assert.match(wang,/You are Wang Yuan only/);
+  assert.match(wang,/Ask one short real question in character/);
+  assert.match(zheng,/You are Zheng Ming only/);
+  assert.match(zheng,/seven-day/);
+});
+test('Mirror non-final bursts reject missing in-character questions',async()=>{
+  let s=start('mirror');
+  await assert.rejects(
+    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'One weekend is not a pattern.',question:null,done:true,evidenceIds:[]})}),
+    /required in-character question/
+  );
+});
 test('Horizon speakers receive their own Norse lives, and other protocols do not',()=>{
   const h=start('horizon');
   const ketill=buildPrompt(h,{speaker:'ketill',stage:'ketill'}).system;
