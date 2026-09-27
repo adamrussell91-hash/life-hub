@@ -75,6 +75,11 @@ body{display:grid;grid-template-columns:330px minmax(0,1fr)}
 .cal-src i{width:6px;height:6px;border-radius:50%;background:var(--k-stripe)}
 .cal-src--ambient{background:transparent;border-style:dashed;color:var(--muted)}
 .cal-src--corey{color:var(--pastel-peach-ink)}
+@media (max-width:719px){
+  .cal__sources{gap:var(--space-2)}
+  .cal-src{min-height:44px;min-width:max-content;padding:8px 12px;flex:none;font-size:var(--text-xs);gap:6px}
+  .cal-src i{width:8px;height:8px}
+}
 
 /* ---------- card + grid ---------- */
 .cal__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
