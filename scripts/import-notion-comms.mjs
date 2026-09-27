@@ -59,7 +59,7 @@ const rows = source.rows.flatMap((row, index) => source.matches[index] ? [parseR
 const plan = buildImportPlan({ rows, people: await loadPeople(), importMap: await loadImportMap(), todayKey: new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' }) });
 const countsBy = (items, key) => items.reduce((counts, item) => ({ ...counts, [item[key]]: (counts[item[key]] ?? 0) + 1 }), {});
 const byKind = countsBy(plan.records, 'kind'); const byStatus = countsBy(plan.promises, 'status');
-const report = `# Notion communications import preview\n\n- Rows read: ${source.rows.length}\n- Rows matched to pages: ${rows.length}\n- Rows skipped (unmatched page): ${source.unmatchedRows.length}\n- Records to create: comms ${byKind.comm?.length ?? 0}, meetings ${byKind.meeting?.length ?? 0}, events ${byKind.event?.length ?? 0}\n- Records already imported: ${plan.report.alreadyImported}\n- People to create: ${plan.report.peopleToCreate}\n- Threads to create: ${plan.threads.filter((thread) => !thread.reuse).length}\n- Promises: open ${byStatus.open?.length ?? 0}, done ${byStatus.done?.length ?? 0}, dismissed ${byStatus.dismissed?.length ?? 0}\n- Rows requiring review: ${plan.report.ambiguous.length}\n${plan.report.ambiguous.filter((item) => item.type === 'person_match').map((item) => `- Ambiguous person: ${item.name} (${item.candidates.join(', ')})`).join('\n')}\n`;
+const report = `# Notion communications import preview\n\n- Rows read: ${source.rows.length}\n- Rows matched to pages: ${rows.length}\n- Rows skipped (unmatched page): ${source.unmatchedRows.length}\n- Records skipped (missing date): ${plan.report.ambiguous.filter((item) => item.type === 'missing_date').length}\n- Records to create: comms ${byKind.comm ?? 0}, meetings ${byKind.meeting ?? 0}, events ${byKind.event ?? 0}\n- Records already imported: ${plan.report.alreadyImported}\n- People to create: ${plan.report.peopleToCreate}\n- Threads to create: ${plan.threads.filter((thread) => !thread.reuse).length}\n- Promises: open ${byStatus.open ?? 0}, done ${byStatus.done ?? 0}, dismissed ${byStatus.dismissed ?? 0}\n- Rows requiring review: ${plan.report.ambiguous.length}\n${plan.report.ambiguous.filter((item) => item.type === 'person_match').map((item) => `- Ambiguous person: ${item.name} (${item.candidates.join(', ')})`).join('\n')}\n`;
 const reportPath = path.resolve(value('--report') ?? path.join(os.tmpdir(), 'notion-comms-import-report.md'));
 if (reportPath.startsWith(`${path.resolve(process.cwd())}${path.sep}`)) throw new Error('--report must be outside this public repository.');
 await fs.writeFile(reportPath, report);
@@ -74,8 +74,8 @@ try {
   });
   console.log(JSON.stringify({ applied: true, records: result.createdRecords, people: result.createdPeople, reportPath }));
 } catch (error) {
-  // Counts and a bounded error code are safe to report; source text and
-  // private record data are never placed in terminal output.
-  console.error(JSON.stringify({ applied: false, progress, error: { code: error?.code ?? null, message: String(error?.message ?? 'Import failed.').slice(0, 240) } }));
+  // Keep terminal output to progress and source IDs: source text and private
+  // record fields must never be emitted during a failed live import.
+  console.error(JSON.stringify({ applied: false, progress, error: { code: error?.code ?? null, stage: error?.importStage ?? null, notionId: error?.notionId ?? null } }));
   process.exitCode = 1;
 }

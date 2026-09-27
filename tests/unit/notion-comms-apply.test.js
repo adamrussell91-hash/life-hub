@@ -29,6 +29,21 @@ test('applyImportPlan writes people before records and records each import mappi
   assert.deepEqual(maps.get(`imports/notion-comms/pages/${'a'.repeat(32)}`), { kind: 'comm', id: 'c_1' });
 });
 
+test('applyImportPlan annotates record failures with the safe source identifier', async () => {
+  const notionId = 'b'.repeat(32);
+  await assert.rejects(
+    applyImportPlan({
+      peopleToCreate: [],
+      records: [{ notionId, kind: 'comm', subject: 'Fixture only', channel: 'email', direction: 'outbound', date: { start: '2026-09-01T00:00:00.000Z' }, people: [] }],
+      threads: [], promises: []
+    }, {
+      communicationRepo: { createCommunication: async () => { throw new Error('store unavailable'); } },
+      setMap: async () => {}, sleep: async () => {}
+    }),
+    (error) => error.importStage === 'record' && error.notionId === notionId
+  );
+});
+
 test('applyImportPlan patches dismissed promises after creation and retains normalised pending refs', async () => {
   const created = []; const patched = [];
   const identityRepo = { createIdentity: async ({ input }) => ({ ref: `shared:person:${input.display_name}` }) };

@@ -2,6 +2,13 @@ import { normaliseName } from './people.mjs';
 
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const fallbackEnd = (iso) => new Date(Date.parse(iso) + 3_600_000).toISOString();
+const withImportContext = async (stage, notionId, task) => {
+  try { return await task(); } catch (error) {
+    error.importStage ??= stage;
+    if (notionId) error.notionId ??= notionId;
+    throw error;
+  }
+};
 
 export async function applyImportPlan(plan, deps) {
   const { identityRepo, communicationRepo, meetingRepo, eventRepo, threadRepo, ledgerRepo, linkRepo, accessContext, setMap, sleep = defaultSleep, log = () => {} } = deps;
@@ -16,14 +23,14 @@ export async function applyImportPlan(plan, deps) {
     const links = people.map((target_ref) => ({ target_ref, relationship_type: record.kind === 'comm' ? 'recipient' : 'attendee' }));
     const repo = record.kind === 'comm' ? communicationRepo : record.kind === 'meeting' ? meetingRepo : eventRepo;
     const start = record.date.start; const end = record.date.end ?? fallbackEnd(start);
-    const created = record.kind === 'comm'
-      ? await repo.createCommunication({ direction: record.direction, channel: record.channel, occurred_at: start, subject: record.subject, summary: '', ...(record.date.end ? { scheduled_start: start, scheduled_end: record.date.end, time_zone: record.date.timeZone ?? 'Australia/Sydney' } : {}), purpose_tag: record.purpose_tag ?? null, links })
+    const created = await withImportContext('record', record.notionId, async () => record.kind === 'comm'
+      ? repo.createCommunication({ direction: record.direction, channel: record.channel, occurred_at: start, subject: record.subject, summary: '', ...(record.date.end ? { scheduled_start: start, scheduled_end: record.date.end, time_zone: record.date.timeZone ?? 'Australia/Sydney' } : {}), purpose_tag: record.purpose_tag ?? null, links })
       : record.kind === 'meeting'
-        ? await repo.createMeeting({ title: record.title, scheduled_start: start, scheduled_end: end, time_zone: record.date.timeZone ?? 'Australia/Sydney', location_text: record.location ?? '', agenda: '', notes: '', links })
-        : await repo.createEvent({ title: record.title, event_type: record.event_type, start, end, time_zone: record.date.timeZone ?? 'Australia/Sydney', all_day: Boolean(record.date.allDay), location_text: record.location ?? '', hours: null, links });
+        ? repo.createMeeting({ title: record.title, scheduled_start: start, scheduled_end: end, time_zone: record.date.timeZone ?? 'Australia/Sydney', location_text: record.location ?? '', agenda: '', notes: '', links })
+        : repo.createEvent({ title: record.title, event_type: record.event_type, start, end, time_zone: record.date.timeZone ?? 'Australia/Sydney', all_day: Boolean(record.date.allDay), location_text: record.location ?? '', hours: null, links }));
     const entity = created.communication ?? created.meeting ?? created.event;
     const update = record.kind === 'comm' ? repo.updateCommunication : record.kind === 'meeting' ? repo.updateMeeting : repo.updateEvent;
-    if ((record.blocks?.length || (record.kind === 'comm' && record.summary)) && update) await update(entity.id, { ...(record.blocks?.length ? { blocks: record.blocks } : {}), ...(record.kind === 'comm' ? { summary: record.summary ?? '' } : {}) });
+    if ((record.blocks?.length || (record.kind === 'comm' && record.summary)) && update) await withImportContext('record', record.notionId, () => update(entity.id, { ...(record.blocks?.length ? { blocks: record.blocks } : {}), ...(record.kind === 'comm' ? { summary: record.summary ?? '' } : {}) }));
     recordRefs.set(record.notionId, `${record.kind === 'comm' ? 'professional:communication' : `professional:${record.kind}`}:${entity.id}`);
     await setMap(`imports/notion-comms/pages/${record.notionId}`, { kind: record.kind, id: entity.id }); await sleep(50); log('record');
   }
