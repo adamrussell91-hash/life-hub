@@ -78,7 +78,8 @@ export function riverHeightPx(
   if (orientation === 'horizontal') {
     return Math.max(440, 120 + visibleFutures * 64);
   }
-  return Math.min(2400, Math.max(900, yearsInView * 150));
+  // Phone river: denser than 150px/yr so past roles sit near Now in the first viewport.
+  return Math.min(2400, Math.max(640, yearsInView * 100));
 }
 
 export function laneOffset(
@@ -205,9 +206,25 @@ export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
   return lanes;
 }
 
-/** Extra SVG height for stacked role-band lanes under the trunk (desktop). */
+/** Lane pitch for labeled role bars (bar + optional below-bar label). */
+export const ROLE_LANE_HEIGHT_PX = 36;
+
+/** Extra SVG height for stacked role-band lanes under the trunk. */
 export function roleBandExtraPx(laneCount: number): number {
-  return laneCount <= 0 ? 0 : 22 + (laneCount - 1) * 16;
+  return laneCount <= 0 ? 0 : 16 + laneCount * ROLE_LANE_HEIGHT_PX + 10;
+}
+
+/**
+ * Truncate a river / gantt-style label to fit a pixel budget (~6px per char).
+ * Empty string when the span is too short to show any text.
+ */
+export function truncateRiverLabel(text: string, availPx: number): string {
+  const raw = text.trim();
+  if (!raw || availPx < 18) return '';
+  const maxChars = Math.max(0, Math.floor(availPx / 6));
+  if (maxChars < 2) return '';
+  if (raw.length <= maxChars) return raw;
+  return `${raw.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
 /**

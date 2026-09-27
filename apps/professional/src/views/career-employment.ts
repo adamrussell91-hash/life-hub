@@ -69,12 +69,13 @@ export function renderCareerEmployment(host: HTMLElement, model: CareerModel): v
   title.className = 'career-page__heading';
   title.textContent = 'Work';
   head.append(title);
-  if (model.stats.years_behind != null) {
-    const note = document.createElement('p');
-    note.className = 'career-page__meta';
-    note.textContent = `${model.stats.years_behind} years behind you`;
-    head.append(note);
-  }
+  const note = document.createElement('p');
+  note.className = 'career-page__meta';
+  note.setAttribute('data-part', 'work-companion');
+  const years =
+    model.stats.years_behind != null ? ` · ${model.stats.years_behind} years behind you` : '';
+  note.textContent = `Full dates & duration${years}`;
+  head.append(note);
   section.append(head);
 
   const timeline = employmentToTimeline(model.employment, model.now);
