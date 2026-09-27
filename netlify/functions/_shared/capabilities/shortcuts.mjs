@@ -37,8 +37,21 @@ import {
 } from './registry.mjs';
 import {
   CENTRAL_NODE_SECTIONS,
-  classifyCentralNodePatchRisk
+  applyCentralNodePatch,
+  centralNodePatchContentError,
+  classifyCentralNodePatchRisk,
+  readCentralNodeSectionBody
 } from '../../../../apps/life/js/core/central-node-patch.js';
+import { validateCentralNodePatchInput } from '../hammond-tools.mjs';
+import { getSydneyDateKey } from '../../../../apps/life/js/core/time.js';
+import {
+  PENDING_CN_PATCHES_PATH,
+  addPendingCnPatch,
+  createPendingCnPatchId,
+  findDuplicatePendingCnPatch,
+  parsePendingCnPatches,
+  serializePendingCnPatches
+} from '../cn-patch-queue.mjs';
 import { applyIntuitionEdit } from './intuition.mjs';
 import { executeProposeActionWrites, validateProposeActionInput } from './propose-action.mjs';
 import { newTaskId } from '../tasks-blobs.mjs';
@@ -220,17 +233,19 @@ export function shortcutSchemas() {
     coordinate_request_cn_write: {
       name: 'coordinate_request_cn_write',
       description:
-        'Request a Central Node write via CN loan. Auto-risk patches apply immediately; high-risk needs Confirm (Hammond does not re-Confirm if ask is auto).',
+        'Write to Central Node. Low-risk lines apply at once: your own Cross-Agent line ("YourName→Agent: …"), a Recent Agent Actions line starting with your name, a Today\'s Status field, or a This Week line. Everything else (Constraints, This Month, Long-Term Trends, About Me, any rewrite or deletion) is queued as a Confirm card on the Central Node page. When the result says awaiting_confirm, tell Adam it is waiting on his Confirm. Never say it is done.',
       input_schema: {
         type: 'object',
         properties: {
           section: { type: 'string', enum: [...CENTRAL_NODE_SECTIONS] },
           op: { type: 'string', enum: [...CN_OPS] },
-          path: { type: 'string' },
-          value: {},
-          reason: { type: 'string' }
+          summary: { type: 'string', description: 'One short line Adam reads on the Confirm card.' },
+          text: { type: 'string', description: 'The line (append_line, upsert_field) or the whole new section body (replace_section, condense).' },
+          field: { type: 'string', description: 'Today\'s Status field for upsert_field, e.g. Health.' },
+          match: { type: 'string', description: 'delete_lines: remove lines containing this text.' },
+          reason: { type: 'string', description: 'The evidence: dated records or what Adam said.' }
         },
-        required: ['section', 'op', 'reason'],
+        required: ['section', 'op', 'summary', 'reason'],
         additionalProperties: false
       }
     },
@@ -742,71 +757,146 @@ async function handleTrackCloseChallenge(ctx, input) {
   );
 }
 
+const CN_AGENT_NAMES = {
+  brisket: 'Brisket',
+  chadwick: 'Chadwick',
+  hyaluronica: 'Hyaluronica',
+  penelope: 'Penelope',
+  sara: 'Sara',
+  vera: 'Vera',
+  hammond: 'Hammond',
+  clare: 'Clare',
+  ann: 'Ann',
+  clementine: 'Clementine'
+};
+const CENTRAL_NODE_PATH = 'central-node.md';
+
+function cnAgentName(slug) {
+  return CN_AGENT_NAMES[slug] ?? (slug ? `${slug.charAt(0).toUpperCase()}${slug.slice(1)}` : 'Agent');
+}
+
+/** Auto lines must be signed by the agent writing them. */
+function unsignedAutoLine(patch, name) {
+  if (patch.op !== 'append_line') return null;
+  const line = patch.payload.text.replace(/^-\s*/, '').replace(/^\*\*[^*]+\*\*\s*/, '').trim();
+  if (patch.section === 'cross_agent' && !line.startsWith(`${name}\u2192`)) {
+    return `Cross-Agent lines must start "${name}\u2192<Agent>: ".`;
+  }
+  if (patch.section === 'recent_actions' && !line.startsWith(name)) {
+    return `Recent Agent Actions lines must start with "${name}".`;
+  }
+  return null;
+}
+
+async function currentTree(ctx) {
+  if (typeof ctx.client?.resolveTree === 'function') {
+    const current = await ctx.client.resolveTree();
+    if (Array.isArray(current?.tree)) return current.tree;
+  }
+  return repoTreeOf(ctx);
+}
+
+async function readTextFile(ctx, tree, path) {
+  const entry = fileFromTree(tree, path);
+  if (!entry?.sha) return { text: null, sha: null };
+  const raw = await ctx.readBlob(entry.sha);
+  return { text: typeof raw === 'string' ? raw : null, sha: entry.sha };
+}
+
+/**
+ * Central Node write for any agent. Hammond lends the write, so the path
+ * allowlist is not consulted: risk decides instead. Auto-class lines land in
+ * central-node.md now; Constraints and every other Confirm-class change go to
+ * the pending queue, which the Central Node page shows as Confirm cards.
+ */
 async function handleCoordinateRequestCnWrite(ctx, input) {
-  const section = String(input.section || '').trim();
-  const op = String(input.op || '').trim();
   const reason = String(input.reason || '').trim();
-  if (!CENTRAL_NODE_SECTIONS.includes(section)) return deny(`Invalid section: ${section}`);
-  if (!CN_OPS.includes(op)) return deny(`Invalid op: ${op}`);
+  const summary = String(input.summary || '').trim();
   if (!reason) return deny('reason is required');
-  const patch = {
-    section,
-    op,
-    path: input.path || undefined,
-    value: input.value,
-    reason,
-    requested_by: ctx.agentSlug
-  };
-  const risk = classifyCentralNodePatchRisk(patch);
-  const loan = {
-    id: newId('loan'),
-    from_agent: ctx.agentSlug,
-    to_agent: 'hammond',
-    patch,
-    risk,
-    status: risk === 'auto' ? 'applied' : 'pending',
-    created_at: new Date().toISOString(),
-    inherit_lower_risk: true
-  };
+  if (!summary) return deny('summary is required');
+  const payload = { summary };
+  for (const key of ['text', 'field', 'match']) {
+    if (typeof input[key] === 'string') payload[key] = input[key];
+  }
+  const patch = validateCentralNodePatchInput({ section: input.section, op: input.op, payload });
+  if (!patch) {
+    return deny('Invalid patch: append_line needs text; upsert_field needs field and text (Today\'s Status only); delete_lines needs match; replace_section and condense need text.');
+  }
+  const contentError = centralNodePatchContentError(patch);
+  if (contentError) {
+    return deny('This Week is weekly averages and key events only. No day-by-day logs (Writing Rule 5).');
+  }
+  const name = cnAgentName(ctx.agentSlug);
+  // Constraints is the medical source of truth: every change waits on Adam.
+  const auto = classifyCentralNodePatchRisk(patch) === 'auto' && patch.section !== 'constraints';
+  if (auto) {
+    const unsigned = unsignedAutoLine(patch, name);
+    if (unsigned) return deny(unsigned);
+  }
 
-  const { value: loansDoc, sha } = await readJson(ctx, CN_LOANS_PATH, { loans: [] });
-  if (!Array.isArray(loansDoc.loans)) loansDoc.loans = [];
-  loansDoc.loans.push(loan);
-  loansDoc.updated_at = new Date().toISOString();
-  const content = serializeJson(loansDoc);
+  const tree = await currentTree(ctx);
+  const centralNode = await readTextFile(ctx, tree, CENTRAL_NODE_PATH);
+  if (centralNode.text == null) return deny('Central Node is not available.');
 
-  if (risk === 'auto') {
-    // Capability loan inherits lower risk — apply without Hammond Confirm.
-    await writeAllowlisted(
-      ctx.client,
-      ctx.agentSlug,
-      CN_LOANS_PATH,
-      content,
-      `coordinate: CN loan ${loan.id}`,
-      sha
-    );
+  if (auto) {
+    const next = applyCentralNodePatch(centralNode.text, patch);
+    if (!next) return deny('This change could not be applied to Central Node.');
+    const result = await ctx.client.writeFile({
+      path: CENTRAL_NODE_PATH,
+      content: next,
+      sha: centralNode.sha,
+      message: `chore(cn): ${name}: ${summary}`
+    });
     return {
-      kind: 'loan_auto',
-      message: `CN loan applied (auto risk): ${section}/${op}`,
-      loan
+      kind: 'cn_applied',
+      status: 'applied',
+      message: `Central Node updated: ${summary}`,
+      summary,
+      section: patch.section,
+      content: next,
+      sha: result?.sha ?? null
     };
   }
 
+  const queueFile = await readTextFile(ctx, tree, PENDING_CN_PATCHES_PATH);
+  const queue = parsePendingCnPatches(queueFile.text ?? '');
+  const duplicate = findDuplicatePendingCnPatch(queue, patch);
+  if (duplicate) {
+    return {
+      kind: 'cn_patch_queued',
+      status: 'awaiting_confirm',
+      already_queued: true,
+      id: duplicate.id,
+      patch: duplicate.patch,
+      message: 'Already waiting on Adam\'s Confirm on the Central Node page. Not applied yet.'
+    };
+  }
+  const baseSectionText = ['replace_section', 'condense'].includes(patch.op)
+    ? readCentralNodeSectionBody(centralNode.text, patch.section)
+    : null;
+  const entry = {
+    id: createPendingCnPatchId(),
+    createdAt: isCalendarDate(ctx.today) ? ctx.today : getSydneyDateKey(new Date()),
+    slug: ctx.agentSlug,
+    patch,
+    evidence: reason,
+    ...(typeof baseSectionText === 'string' ? { base_section_text: baseSectionText } : {})
+  };
+  const nextQueue = addPendingCnPatch(queue, entry);
+  const written = await ctx.client.writeFile({
+    path: PENDING_CN_PATCHES_PATH,
+    content: serializePendingCnPatches(nextQueue),
+    ...(queueFile.sha ? { sha: queueFile.sha } : {}),
+    message: `chore(cn-patch-queue): ${name} proposes ${summary}`
+  });
   return {
-    kind: 'loan_confirm',
-    message: `CN loan needs Confirm (risk=${risk})`,
-    proposal: buildProposal({
-      agentSlug: ctx.agentSlug,
-      intent: `CN write: ${section}/${op}`,
-      surfaces: ['confirm_card', 'central_node', 'governance_log'],
-      writes: [{
-        path: CN_LOANS_PATH,
-        mode: sha ? 'overwrite' : 'create',
-        content,
-        diff: `pending CN loan ${loan.id}: ${reason}`
-      }]
-    }),
-    loan
+    kind: 'cn_patch_queued',
+    status: 'awaiting_confirm',
+    id: entry.id,
+    patch,
+    queue: nextQueue,
+    queueSha: written?.sha ?? null,
+    message: 'Queued for Adam\'s Confirm on the Central Node page. Not applied yet.'
   };
 }
 

@@ -319,6 +319,7 @@ import {
 } from './_shared/medical-overview-read.mjs';
 import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
+import { readCentralNodeSectionBody } from '../../apps/life/js/core/central-node-patch.js';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
@@ -540,6 +541,8 @@ export function createChatHandler({
         let aboutMe = '';
         let centralNodeLog = '';
         let centralNodeFull = '';
+        // Raw file text (pre-sanitize) -- the base a queued section rewrite is compared against at Confirm.
+        let centralNodeRaw = '';
         let centralNodeMarkdown = '';
         let centralNodeSha;
         let governanceLog = needsHammondTools ? emptyGovernanceLog() : '';
@@ -955,6 +958,7 @@ export function createChatHandler({
 
           const decodedCentralNode = centralNodeBlob ? decodeBlob(centralNodeBlob) : null;
           if (decodedCentralNode !== null) {
+            centralNodeRaw = decodedCentralNode;
             const centralNodeForTurn = sanitizeCentralNode(decodedCentralNode, today);
             constraints = extractConstraints(centralNodeForTurn);
             aboutMe = extractAboutMe(centralNodeForTurn);
@@ -1618,7 +1622,16 @@ export function createChatHandler({
         const proposeCentralNodePatch = async patch => {
           let persistedId = null;
           try {
-            const entry = { id: createPendingCnPatchId(), createdAt: today, slug, patch };
+            const baseSectionText = ['replace_section', 'condense'].includes(patch.op)
+              ? readCentralNodeSectionBody(centralNodeRaw, patch.section)
+              : null;
+            const entry = {
+              id: createPendingCnPatchId(),
+              createdAt: today,
+              slug,
+              patch,
+              ...(typeof baseSectionText === 'string' ? { base_section_text: baseSectionText } : {})
+            };
             const nextQueue = addPendingCnPatch(pendingCnPatches, entry);
             const result = await client.writeFile({
               path: PENDING_CN_PATCHES_PATH,
@@ -1634,6 +1647,34 @@ export function createChatHandler({
           }
           send({ type: 'cn_patch_proposal', patch, id: persistedId });
           return persistedId;
+        };
+
+        // coordinate_request_cn_write already wrote central-node.md or the pending
+        // queue; keep this turn's copies current so a later write in the same
+        // turn does not 409 on a stale sha, then surface the outcome.
+        const handleCnWriteShortcutResult = result => {
+          if (result.kind === 'cn_applied') {
+            if (centralNodeMarkdown && typeof result.content === 'string') {
+              centralNodeMarkdown = result.content;
+              centralNodeRaw = result.content;
+              if (result.sha) centralNodeSha = result.sha;
+            }
+            send({ type: 'central_node_patched', summary: result.summary, risk: 'auto' });
+            return { ok: true, status: 'applied', summary: result.summary, section: result.section };
+          }
+          if (needsHammondTools && Array.isArray(result.queue)) {
+            pendingCnPatches = result.queue;
+            if (result.queueSha) pendingCnPatchesSha = result.queueSha;
+          }
+          send({ type: 'cn_patch_proposal', patch: result.patch, id: result.id });
+          return {
+            ok: true,
+            status: 'awaiting_confirm',
+            id: result.id,
+            summary: result.patch?.payload?.summary,
+            ...(result.already_queued ? { already_queued: true } : {}),
+            message: result.message
+          };
         };
 
         // os.propose-action: validate allowlist, persist pending queue, emit Confirm card with diffs.
@@ -2136,6 +2177,7 @@ export function createChatHandler({
                         message: `chore(cn): nutrition challenge ${outcome.challenge.title}`
                       });
                       centralNodeMarkdown = nextCn;
+                      centralNodeRaw = nextCn;
                       centralNodeSha = cnResult.sha;
                       cnSynced = true;
                       send({
@@ -2203,6 +2245,7 @@ export function createChatHandler({
                         message: `chore(cn): challenge day ${mark.date} ${mark.result}`
                       });
                       centralNodeMarkdown = nextCn;
+                      centralNodeRaw = nextCn;
                       centralNodeSha = cnResult.sha;
                       cnSynced = true;
                       send({
@@ -2403,6 +2446,7 @@ export function createChatHandler({
                     message: `chore(cn): ${patch.payload.summary}`
                   });
                   centralNodeMarkdown = next;
+                  centralNodeRaw = next;
                   centralNodeSha = result.sha;
                   send({
                     type: 'central_node_patched',
@@ -2476,7 +2520,10 @@ export function createChatHandler({
                   tasksStore: hubTasksStore,
                   readBlob: async sha => decodeBlob(await client.readBlob(sha))
                 });
-                if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+                if (shortcutResult.kind === 'cn_applied' || shortcutResult.kind === 'cn_patch_queued') {
+                  return JSON.stringify(handleCnWriteShortcutResult(shortcutResult));
+                }
+                if (shortcutResult.kind === 'propose') {
                   const proposalInput = shortcutResult.proposal;
                   const validated = validateProposeActionInput(proposalInput, { agentSlug: slug });
                   if (!validated.ok) {
@@ -2496,8 +2543,7 @@ export function createChatHandler({
                       mode: write.mode,
                       diff: write.diff
                     })),
-                    ...(pendingId ? { pendingId } : {}),
-                    ...(shortcutResult.loan ? { loan: shortcutResult.loan } : {})
+                    ...(pendingId ? { pendingId } : {})
                   });
                 }
                 if (shortcutResult.kind === 'ok' && Array.isArray(shortcutResult.tasks) && shortcutResult.tasks.length) {
@@ -2731,7 +2777,9 @@ export function createChatHandler({
                 tasksStore: hubTasksStore,
                 readBlob: async sha => decodeBlob(await client.readBlob(sha))
               });
-              if (shortcutResult.kind === 'propose' || shortcutResult.kind === 'loan_confirm') {
+              if (shortcutResult.kind === 'cn_applied' || shortcutResult.kind === 'cn_patch_queued') {
+                handleCnWriteShortcutResult(shortcutResult);
+              } else if (shortcutResult.kind === 'propose') {
                 const validated = validateProposeActionInput(shortcutResult.proposal, { agentSlug: slug });
                 if (validated.ok) await proposeOsAction(validated.proposal);
                 else send({ type: 'action_rejected', error: validated.error, ...(validated.detail ? { detail: validated.detail } : {}) });

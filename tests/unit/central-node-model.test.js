@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
+import { buildCentralNodeModel, buildPendingPatchCards } from '../../apps/life/js/app/central-node-model.js';
 import { getSydneyWeekStart } from '../../apps/life/js/core/time.js';
 import { formatGovernanceEntry } from '../../apps/life/js/core/governance-log.js';
 
@@ -332,4 +332,48 @@ test('governanceHeat uses openGovernanceEntries and ignores resolved rows', () =
   assert.equal(model.governanceHeat.length, 1);
   assert.equal(model.governanceHeat[0].term, 'Open loop');
   assert.equal(model.governanceHeat[0].points.length, 8);
+});
+
+test('buildPendingPatchCards turns queued patches into newest-first Needs you cards', () => {
+  const cards = buildPendingPatchCards([
+    {
+      id: 'cnp_old',
+      createdAt: '2026-09-20',
+      slug: 'sara',
+      evidence: 'Visit 18 Sep.',
+      patch: { section: 'constraints', op: 'append_line', payload: { summary: 'Add GP visit', text: '- GP booked' } }
+    },
+    {
+      id: 'cnp_new',
+      createdAt: '2026-09-26',
+      slug: 'hammond-sweep',
+      patch: { section: 'long_term_trends', op: 'replace_section', payload: { summary: 'Fat ceiling pattern', text: 'Pattern' } }
+    },
+    { id: 'cnp_blank', createdAt: '2026-09-26', slug: 'sara', patch: { section: 'constraints', op: 'append_line', payload: { text: 'x' } } }
+  ]);
+  assert.deepEqual(cards.map(card => card.id), ['cnp_new', 'cnp_old']);
+  assert.equal(cards[0].proposer, "Hammond's daily sweep");
+  assert.equal(cards[0].section, 'Long-Term Trends');
+  assert.equal(cards[1].proposer, 'Sara');
+  assert.equal(cards[1].section, 'Constraints & Priorities');
+  assert.equal(cards[1].evidence, 'Visit 18 Sep.');
+  assert.equal(cards[1].text, '- GP booked');
+});
+
+test('buildCentralNodeModel carries pending patches through to the board', () => {
+  const model = buildCentralNodeModel({
+    events: [],
+    targetsConfig: null,
+    centralNodeMarkdown: '',
+    date: '2026-09-27',
+    governanceLogMarkdown: '',
+    pendingCnPatches: [{
+      id: 'cnp_x',
+      createdAt: '2026-09-26',
+      slug: 'hammond',
+      patch: { section: 'this_month', op: 'replace_section', payload: { summary: 'Roll month', text: '- y' } }
+    }]
+  });
+  assert.equal(model.pendingPatches.length, 1);
+  assert.equal(model.pendingPatches[0].summary, 'Roll month');
 });
