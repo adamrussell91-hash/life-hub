@@ -114,6 +114,14 @@ function derivePersonPersonLinkId(relationship) {
   return `ul_${digest}`;
 }
 
+const GITHUB_FETCH_TIMEOUT_MS = 12_000;
+
+function githubFetchSignal() {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(GITHUB_FETCH_TIMEOUT_MS)
+    : undefined;
+}
+
 async function githubJson(url, { token, fetchImpl }) {
   let response;
   try {
@@ -122,7 +130,8 @@ async function githubJson(url, { token, fetchImpl }) {
         accept: 'application/vnd.github+json',
         authorization: `Bearer ${token}`,
         'user-agent': 'life-hub'
-      }
+      },
+      signal: githubFetchSignal()
     });
   } catch {
     return null;
@@ -143,7 +152,8 @@ async function githubRaw(url, { token, fetchImpl }) {
         accept: 'application/vnd.github.raw',
         authorization: `Bearer ${token}`,
         'user-agent': 'life-hub'
-      }
+      },
+      signal: githubFetchSignal()
     });
   } catch {
     return null;

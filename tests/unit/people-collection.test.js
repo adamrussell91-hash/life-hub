@@ -10,6 +10,7 @@ import {
 import { resolveOrganisation, resolvePerson } from '../../netlify/functions/_shared/entity-resolvers.mjs';
 import { endpointNotFoundError } from '../../netlify/functions/_shared/entity-access.mjs';
 import { parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
+import { createUniversalLinkRepository } from '../../netlify/functions/_shared/universal-link-repository.mjs';
 
 test('loads every Person, each paired with an empty relationships array when none exist', async () => {
   const store = memoryStore();
@@ -224,4 +225,80 @@ test('dedupes a Blob twin of a GitHub person when ids differ but cleaned names m
   assert.equal(natalies[0].relationships[0].link.relationship_type, 'employee_at');
   assert.ok(!result.some((row) => row.person.id === blobTwin.id));
   assert.ok(result.some((row) => row.person.display_name === 'Someone Else'));
+});
+
+test('does not listForEntity Blob twins discarded by identity dedupe', async () => {
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  const nativeOnly = await makePerson(store, { display_name: 'Native Only' });
+  const discardedTwin = await makePerson(store, {
+    display_name: 'Natalie Shih (https://app.notion.com/p/Natalie-Shih-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb)'
+  });
+  // Extra relationship-empty Blob copies that used to each pay listForEntity.
+  for (let i = 0; i < 40; i += 1) {
+    await makePerson(store, {
+      display_name: `Clone ${i} (https://app.notion.com/p/Clone-${i}-cccccccccccccccccccccccccccccccc)`
+    });
+  }
+
+  const env = { GITHUB_TOKEN: 'token' };
+  const fetchImpl = githubFetch({
+    people: [
+      { legacy_id: 'leg-colleague', display_name: 'Natalie Shih' },
+      ...Array.from({ length: 40 }, (_, i) => ({
+        legacy_id: `leg-clone-${i}`,
+        display_name: `Clone ${i}`
+      }))
+    ],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    relationships: [
+      {
+        person_legacy_id: 'leg-colleague',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const resolveEntity = async (refInput, accessContext, options = {}) => {
+    const ref = typeof refInput === 'string' ? parseEntityRef(refInput) : refInput;
+    if (!ref) throw endpointNotFoundError();
+    const withGithub = { ...options, env, fetchImpl, getStore: async () => store };
+    if (ref.namespace === 'shared' && ref.kind === 'person') return resolvePerson(ref.id, accessContext, withGithub);
+    if (ref.namespace === 'shared' && ref.kind === 'organisation') {
+      return resolveOrganisation(ref.id, accessContext, withGithub);
+    }
+    throw endpointNotFoundError();
+  };
+
+  let listForEntityCalls = 0;
+  const listedRefs = [];
+  const createRepository = (opts) => {
+    const repo = createUniversalLinkRepository(opts);
+    return {
+      listForEntity: async (ref, ...rest) => {
+        listForEntityCalls += 1;
+        listedRefs.push(ref);
+        return repo.listForEntity(ref, ...rest);
+      }
+    };
+  };
+
+  const result = await loadAllPeopleWithRelationships({
+    store,
+    resolveEntity,
+    createRepository,
+    env,
+    fetchImpl
+  });
+
+  // Only Blob-sourced survivors pay listForEntity — Native Only. Discarded
+  // Natalie + 40 Clone twins must not.
+  assert.equal(listForEntityCalls, 1);
+  assert.deepEqual(listedRefs, [nativeOnly.ref]);
+  assert.ok(!result.some((row) => row.person.id === discardedTwin.id));
+  assert.equal(result.filter((row) => row.person.display_name === 'Natalie Shih').length, 1);
+  assert.equal(result.length, 42); // native only + Natalie + 40 github clones
 });

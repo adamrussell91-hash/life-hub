@@ -65,6 +65,13 @@ function personIdFromKey(key) {
  * `employee_at`). A missing or unbound GitHub token degrades to the
  * Blob-only set, same as
  * entity-search.mjs.
+ *
+ * Blobs `listForEntity` runs only for identity-dedupe survivors. GitHub
+ * rows are hydrated first (in-memory after one Contents/blob fetch) so
+ * `preferIdentityTwin` still sees their relationship counts; discarded
+ * Blob twins never pay the membership scan. That N× scan was hanging
+ * Network Ecology when hundreds of relationship-empty Blob copies sat
+ * beside the import.
  */
 export async function loadAllPeopleWithRelationships({
   store,
@@ -87,22 +94,18 @@ export async function loadAllPeopleWithRelationships({
   const personKeys = await listAuthoritativePersonKeys(store);
   const ids = [...new Set(personKeys.map(personIdFromKey).filter(Boolean))];
 
-  const results = await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
-    const record = parsePersonRecord(await getJSON(store, personKey(id)));
-    if (!record) return null;
-    const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
+  // Cheap Blob pass: person JSON only. listForEntity waits until after
+  // identity dedupe so discarded twins never hit the membership scan.
+  const nativeStubs = (
+    await mapBounded(ids, PEOPLE_BATCH_SIZE, async (id) => {
+      const record = parsePersonRecord(await getJSON(store, personKey(id)));
+      if (!record) return null;
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id });
+      return { person: { ...record, ref }, relationships: [], _source: 'blob' };
+    })
+  ).filter(Boolean);
 
-    const { outgoing, incoming } = await repo.listForEntity(ref, accessContext, { includeArchived: true });
-    const relationships = [
-      ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
-      ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
-    ];
-
-    return { person: { ...record, ref }, relationships, _source: 'blob' };
-  });
-
-  const native = results.filter(Boolean);
-  const nativeIds = new Set(native.map((row) => row.person.id));
+  const nativeIds = new Set(nativeStubs.map((row) => row.person.id));
   const githubPeople = await listGithubPersonCandidates(github);
   const endpointCache = new Map();
 
@@ -121,6 +124,7 @@ export async function loadAllPeopleWithRelationships({
     }
   }
 
+  // Hydrate GitHub before dedupe so relationship counts inform twin preference.
   const imported = await mapBounded(
     githubPeople.filter((record) => !nativeIds.has(record.id)),
     PEOPLE_BATCH_SIZE,
@@ -137,11 +141,29 @@ export async function loadAllPeopleWithRelationships({
     }
   );
 
-  const merged = dedupeIdentityRows(
-    [...native, ...imported],
+  const survivors = dedupeIdentityRows(
+    [...nativeStubs, ...imported],
     (row) => row.person,
-    (row, person) => ({ person, relationships: row.relationships }),
+    (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
     (row) => (row._source === 'github' ? 'github' : 'blob')
   );
-  return merged;
+
+  const hydrated = await mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
+    if (row._source === 'github') {
+      return { person: row.person, relationships: row.relationships };
+    }
+
+    const { outgoing, incoming } = await repo.listForEntity(row.person.ref, accessContext, {
+      includeArchived: true
+    });
+    return {
+      person: row.person,
+      relationships: [
+        ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
+        ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
+      ]
+    };
+  });
+
+  return hydrated;
 }
