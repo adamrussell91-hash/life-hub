@@ -164,7 +164,9 @@ test('Consilium reflect and Mirror advance both finish with summary and write-ba
       store,
       model: async p => {
         if (p.stage === 'summary') return { text: JSON.stringify({ title: `${protocolId} done`, keyFinding: 'One finding', summary: 'Short summary.', openQuestions: [], forHammond: null }), evidenceIds: [] };
-        if (p.stage === 'dialogue' || p.gate || p.stage === 'present' || p.stage === 'framing') {
+        // Mirror retrospective/prospective must ask in character on non-final bursts.
+        if (p.stage === 'dialogue' || p.gate || p.stage === 'present' || p.stage === 'framing'
+          || p.stage === 'retrospective' || p.stage === 'prospective') {
           return { text: 'Voice speaks.', question: 'What next?', done: true, evidenceIds: [], nextSpeaker: 'consequence' };
         }
         return { text: 'Voice speaks.', question: null, done: true, evidenceIds: [], nextSpeaker: 'consequence' };

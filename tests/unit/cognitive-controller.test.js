@@ -17,6 +17,10 @@ function model(calls,{askCycles=false}={}) {
       const ask=p.burst===1;
       return {text:'Horizon finding spoken in character.',question:ask?'Which constraint is load-bearing here?':null,done:!ask,evidenceIds:[]};
     }
+    if(p.speaker==='retrospective'||p.speaker==='prospective'){
+      const ask=p.burst<p.maxBursts;
+      return {text:'Mirror reading spoken in character.',question:ask?'What else belongs on the record for those months?':null,done:!ask,evidenceIds:[]};
+    }
     return {text:'Grounded contribution.',question:null,done:true,evidenceIds:[],nextSpeaker:'consequence'};
   };
 }
@@ -159,6 +163,70 @@ test('Tribunal voices receive identical original context and cannot see outputs'
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});
 test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer']);for(const [mode,expected] of [['break',['breaker']],['build-break',['builder','breaker']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
 test('Mirror deep waits for framing, long arc asks what to protect; Horizon fallback explicit',async()=>{const {calls}=await run('mirror','deep');assert.equal(calls[0].stage,'framing');const s=start('mirror');s.intake.timescale='long-arc';assert.match(buildPrompt(s,{speaker:'present',stage:'present'}).system,/sit with, tolerate|protect/);const h=start('horizon');assert.match(buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system,/extrapolated from current trajectory/);});
+test('Mirror speakers receive Gu Jian / Wang Yuan / Zheng Ming writing profiles',()=>{
+  const s=start('mirror');
+  const gu=buildPrompt(s,{speaker:'retrospective',stage:'retrospective',maxBursts:3,burstWords:90}).system;
+  const wang=buildPrompt(s,{speaker:'prospective',stage:'prospective',maxBursts:3,burstWords:90}).system;
+  const zheng=buildPrompt(s,{speaker:'present',stage:'present',gate:'answer',maxBursts:1,burstWords:90}).system;
+  assert.match(gu,/You are Gu Jian only/);
+  assert.match(gu,/Ask one steering question in character/);
+  assert.match(gu,/Gu Jian, the Retrospective|old mirror|scholars' hall/);
+  assert.doesNotMatch(gu,/You are Wang Yuan only/);
+  assert.match(wang,/You are Wang Yuan only/);
+  assert.match(wang,/Ask one short real question in character/);
+  assert.match(zheng,/You are Zheng Ming only/);
+  assert.match(zheng,/seven-day/);
+});
+test('Mirror non-final bursts reject missing in-character questions',async()=>{
+  let s=start('mirror');
+  await assert.rejects(
+    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'One weekend is not a pattern.',question:null,done:true,evidenceIds:[]})}),
+    /required in-character question/
+  );
+});
+test('Fates non-final Clotho bursts reject missing in-character questions',async()=>{
+  let s=start('fates','sprint');
+  s.cursor=s.steps.findIndex(st=>st.speaker==='clotho');
+  if(s.cursor<0){s.steps=[{speaker:'clotho',stage:'cycle1-clotho',maxBursts:3,burstWords:90}];s.cursor=0;}
+  s.status='queued';s.burst=0;s.retrieved=true;
+  await assert.rejects(
+    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Three threads!!',question:null,done:true,evidenceIds:[]})}),
+    /required in-character question/
+  );
+});
+test('every protocol voice receives a You-are-X-only speaker register in the prompt',()=>{
+  const samples=[
+    ['fates','sprint','lachesis','briefing','You are Lachesis only'],
+    ['fates','sprint','clotho','cycle1-clotho','You are Clotho only'],
+    ['fates','sprint','atropos','cycle1-atropos','You are Atropos only'],
+    ['horizon','full','ketill','ketill','You are Ketill only'],
+    ['horizon','full','alvar','alvar','You are Alvar only'],
+    ['horizon','full','sigrid','sigrid','You are Sigrid only'],
+    ['mirror','quick','retrospective','retrospective','You are Gu Jian only'],
+    ['mirror','quick','prospective','prospective','You are Wang Yuan only'],
+    ['mirror','quick','present','present','You are Zheng Ming only'],
+    ['refinery','full','builder','builder','You are Bezalel the Builder only'],
+    ['refinery','full','breaker','breaker','You are Beruriah the Breaker only'],
+    ['refinery','full','reforger','reforger','You are Nechemya the Reforger only'],
+    ['cartographers','full','surveyor','surveyor','You are Captain Josiah Everly the Surveyor only'],
+    ['cartographers','full','miner','miner','You are Miss Harriet Quarrington the Miner only'],
+    ['cartographers','full','cartographer','cartographer','You are Mr Ambrose Meridith the Cartographer only'],
+    ['consilium','standard','principle','dialogue','You are Gaius Officius the Principle only'],
+    ['consilium','standard','consequence','dialogue','You are Lucius Eventus the Consequence only'],
+    ['consilium','standard','virtue','dialogue','You are Titus Honestus the Virtue only'],
+    ['witness','standard','trace','trace','You are Sati the Trace only'],
+    ['witness','standard','patterns','patterns','You are Pañña the Pattern Match only'],
+    ['witness','standard','recalibration','recalibration','You are Upekkhā the Recalibration only'],
+    ['tribunal','standard','inverter','inverter','You are Counselor Frank Delacorte the Inverter only'],
+    ['tribunal','standard','scaler','scaler','You are Special Master Ruth Abernathy the Scaler only'],
+    ['tribunal','standard','context-shifter','context-shifter','You are Judge Hollis Venable the Context Shifter only'],
+  ];
+  for(const [id,mode,speaker,stage,needle] of samples){
+    const s=start(id,mode);
+    const system=buildPrompt(s,{speaker,stage,maxBursts:3,burstWords:90}).system;
+    assert.match(system,new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')),`${id}:${speaker}`);
+  }
+});
 test('Horizon speakers receive their own Norse lives, and other protocols do not',()=>{
   const h=start('horizon');
   const ketill=buildPrompt(h,{speaker:'ketill',stage:'ketill'}).system;

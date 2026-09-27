@@ -2099,6 +2099,13 @@ function render() {
       onOpenPage: id => void openPage(id),
     });
   } else if (view === "protocols") {
+    // Keep Thinking mounted across shell re-renders — remounting wiped the
+    // library and replayed protocol-deal (opacity 0) as a load flash.
+    const existing = app.querySelector<HTMLElement>(".protocols-root");
+    if (protocolTeardown && existing?.isConnected) {
+      afterSignedInPaint();
+      return;
+    }
     protocolTeardown?.();
     shell("<div class=\"protocols-root\"></div>");
     const root = app.querySelector<HTMLElement>(".protocols-root");
