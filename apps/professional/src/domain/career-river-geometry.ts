@@ -205,8 +205,8 @@ export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
   return lanes;
 }
 
-/** Lane pitch for labeled role bars (bar + label breathing room). */
-export const ROLE_LANE_HEIGHT_PX = 30;
+/** Lane pitch for labeled role bars (bar + optional below-bar label). */
+export const ROLE_LANE_HEIGHT_PX = 36;
 
 /** Extra SVG height for stacked role-band lanes under the trunk. */
 export function roleBandExtraPx(laneCount: number): number {

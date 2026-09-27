@@ -468,20 +468,23 @@ export function mountCareerRiver(
         bar.appendChild(title);
         group.appendChild(bar);
 
+        // Prefer full short label below the bar when the span is too narrow for
+        // in-bar text (Whole-career zoom). Avoid "Engl…" inside mute-width pills.
         const padX = 8;
-        const inside = truncateRiverLabel(jobRoleLabel(job), barW - padX * 2);
-        let labelText = inside;
-        let lx = x0 + padX;
-        let ly = y + ROLE_BAR_HEIGHT_PX / 2 + 4;
-        let place: 'inside' | 'below' = 'inside';
-        if (!inside) {
-          place = 'below';
-          labelText = truncateRiverLabel(jobRoleLabel(job), Math.min(140, lengthPx - x0));
-          lx = x0 + 2;
-          ly = y + ROLE_BAR_HEIGHT_PX + 12;
-        }
+        const roleShort = jobRoleLabel(job);
+        const insideBudget = barW - padX * 2;
+        const fitsInside =
+          insideBudget >= 48 && truncateRiverLabel(roleShort, insideBudget) === roleShort;
+        let place: 'inside' | 'below' = fitsInside ? 'inside' : 'below';
+        let labelText = fitsInside
+          ? roleShort
+          : truncateRiverLabel(roleShort, Math.min(160, Math.max(48, lengthPx - x0)));
+        let lx = fitsInside ? x0 + padX : x0 + 2;
+        let ly = fitsInside
+          ? y + ROLE_BAR_HEIGHT_PX / 2 + 4
+          : y + ROLE_BAR_HEIGHT_PX + 12;
         if (labelText) {
-          const approxW = Math.min(barW, labelText.length * 6.2);
+          const approxW = labelText.length * 6.2;
           const box = { x: lx, y: ly - 10, w: approxW, h: 12 };
           const hits = roleLabelBoxes.some(
             (b) =>
