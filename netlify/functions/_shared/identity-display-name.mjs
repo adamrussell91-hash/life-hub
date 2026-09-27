@@ -81,8 +81,12 @@ export function preferIdentityTwin(a, b) {
 }
 
 /**
- * Clean labels and collapse Blobs/GitHub twins that share an identity name key.
+ * Clean labels and collapse Blobs↔GitHub twins that share an identity name key.
  * Id collision is already handled by callers (skip GitHub when native id matches).
+ * Same-source rows that share a name (two Blob people both called "Test Person",
+ * or two GitHub imports) are kept — only cross-source twins collapse. Collapsing
+ * same-source rows before relationship hydration wiped distinct people that
+ * share a label.
  *
  * @template {{ relationships?: unknown[] }} TRow
  * @param {TRow[]} rows
@@ -111,14 +115,24 @@ export function dedupeIdentityRows(rows, getRecord, withRecord, getSource) {
       continue;
     }
 
+    const source = getSource(row);
     const candidate = {
       row: keyed,
       relationships: keyed.relationships,
       record: nextRecord,
-      source: getSource(row)
+      source
     };
     const prev = byKey.get(key);
-    byKey.set(key, prev ? preferIdentityTwin(candidate, prev) : candidate);
+    if (!prev) {
+      byKey.set(key, candidate);
+      continue;
+    }
+    // Same source → distinct records that happen to share a label. Keep both.
+    if (prev.source === source) {
+      passthrough.push(keyed);
+      continue;
+    }
+    byKey.set(key, preferIdentityTwin(candidate, prev));
   }
 
   return [...[...byKey.values()].map((c) => c.row), ...passthrough];
