@@ -6,7 +6,7 @@ const lifeRoot = new URL('../apps/life/', import.meta.url);
 const publishRoot = new URL('../dist/', import.meta.url);
 const publishedDirectories = ['assets', 'css', 'js'];
 const publishedFiles = ['index.html', 'manifest.webmanifest', 'service-worker.js'];
-const spaApps = ['teaching', 'knowledge', 'tasks', 'professional'];
+const spaApps = ['teaching', 'knowledge', 'tasks', 'professional', 'travel'];
 
 async function copyDesignKitStyles() {
   const kitRoot = new URL('packages/design-kit/', projectRoot);

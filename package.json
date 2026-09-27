@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:apps && node scripts/prepare-web.mjs",
-    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks && npm run build:professional",
+    "build:apps": "npm run build:teaching && npm run build:knowledge && npm run build:tasks && npm run build:professional && npm run build:travel",
     "build:teaching": "node scripts/build-spa.mjs teaching",
     "build:knowledge": "node scripts/build-spa.mjs knowledge",
     "build:tasks": "node scripts/build-spa.mjs tasks",
@@ -17,12 +17,13 @@
     "pre-pr-check": "node scripts/pre-pr-check.mjs",
     "test:unit": "node --test tests/unit/*.test.js",
     "test:integration": "node --test tests/integration/*.test.js",
-    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/hub-count.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/mind.spec.mjs tests/browser/fitness.spec.mjs tests/browser/morphing-popover.spec.mjs tests/browser/home-widgets.spec.mjs tests/browser/view-on-map.spec.mjs tests/browser/card-swipe.spec.mjs tests/browser/shortcuts.spec.mjs tests/browser/hub-map.spec.mjs tests/browser/body-charts.spec.mjs tests/browser/teaching-calendar-hub.spec.mjs tests/browser/tasks-calendar-hub.spec.mjs tests/browser/professional-calendar-hub.spec.mjs tests/browser/calendar-filter.spec.mjs tests/browser/river-routing.spec.mjs",
+    "test:browser": "node --test --test-concurrency=1 tests/browser/home.spec.mjs tests/browser/hub-count.spec.mjs tests/browser/chat.spec.mjs tests/browser/nutrition.spec.mjs tests/browser/central-node.spec.mjs tests/browser/mind.spec.mjs tests/browser/fitness.spec.mjs tests/browser/morphing-popover.spec.mjs tests/browser/home-widgets.spec.mjs tests/browser/view-on-map.spec.mjs tests/browser/card-swipe.spec.mjs tests/browser/shortcuts.spec.mjs tests/browser/hub-map.spec.mjs tests/browser/body-charts.spec.mjs tests/browser/teaching-calendar-hub.spec.mjs tests/browser/tasks-calendar-hub.spec.mjs tests/browser/professional-calendar-hub.spec.mjs tests/browser/calendar-filter.spec.mjs tests/browser/river-routing.spec.mjs tests/browser/travel.spec.mjs",
     "validate:fixtures": "node scripts/validate-fixtures.mjs",
     "forecast:report": "node scripts/forecast-report.mjs",
     "import:mind": "node scripts/import-mind-notion.mjs",
     "import:professional-people": "node scripts/import-professional-people.mjs",
-    "chadwick-voice": "bash tools/voice-lab/launch.sh --no-open"
+    "chadwick-voice": "bash tools/voice-lab/launch.sh --no-open",
+    "build:travel": "node scripts/build-spa.mjs travel"
   },
   "dependencies": {
     "@annotorious/annotorious": "^3.8.10",
