@@ -13,6 +13,7 @@ import {
   validateEventFieldUpdate,
   validateEventRescheduleInput
 } from './event-schema.mjs';
+import { mapBounded } from './blobs-list.mjs';
 import { formatEntityRef } from './entity-ref.mjs';
 import { resolveEntity as defaultResolveEntity } from './entity-resolvers.mjs';
 import {
@@ -33,6 +34,8 @@ import {
   runLinkIntents,
   simplifyIncomplete
 } from './professional-entity-links.mjs';
+
+const LIST_BATCH_SIZE = 10;
 
 function validationError(code, message) {
   return Object.assign(new Error(message), { status: 400, code });
@@ -104,18 +107,13 @@ export function createEventRepository(deps = {}) {
           .filter((id) => isValidEventId(id))
       )
     ];
-    const records = [];
-    for (const id of ids) {
-      const record = parseEventRecord(await getJSON(professionalStore, eventKey(id)));
-      if (record) records.push(record);
-    }
+    const records = (
+      await mapBounded(ids, LIST_BATCH_SIZE, async (id) => parseEventRecord(await getJSON(professionalStore, eventKey(id))))
+    ).filter(Boolean);
     records.sort(compareEventsSoonestFirst);
-    const projections = [];
-    for (const record of records) {
-      const journal = await loadOpenJournalForEvent(record.id);
-      projections.push(projectEvent(record, simplifyIncomplete(journal)));
-    }
-    return projections;
+    return mapBounded(records, LIST_BATCH_SIZE, async (record) =>
+      projectEvent(record, simplifyIncomplete(await loadOpenJournalForEvent(record.id)))
+    );
   }
 
   async function listScheduleProjections() {
