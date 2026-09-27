@@ -10,10 +10,8 @@ import {
   type RiverOrientation,
   type RiverZoom
 } from '@/domain/career-river-geometry';
-import type { buildCareerModel } from '@/domain/career-model';
+import type { CareerModel } from '@/domain/career-model';
 import { careerFutureRoute } from '@/app/router';
-
-type CareerModel = ReturnType<typeof buildCareerModel>;
 
 type RiverState = {
   zoom: RiverZoom;

@@ -1,16 +1,14 @@
 import { listCareerMoves } from '@/api/career';
-import type { buildCareerModel } from '@/domain/career-model';
-
-type CareerModel = ReturnType<typeof buildCareerModel>;
+import type { CareerModel } from '@/domain/career-model';
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
-  className?: string,
-  text?: string
+  className?: string | null,
+  text?: string | null
 ): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
+  if (text != null) node.textContent = text;
   return node;
 }
 
