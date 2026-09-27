@@ -18,12 +18,14 @@ import { createMeetingRepository } from '../netlify/functions/_shared/meeting-re
 import { createEventRepository } from '../netlify/functions/_shared/event-repository.mjs';
 import { createThreadRepository } from '../netlify/functions/_shared/thread-repository.mjs';
 import { createLedgerItemRepository } from '../netlify/functions/_shared/ledger-repository.mjs';
+import { createUniversalLinkRepository } from '../netlify/functions/_shared/universal-link-repository.mjs';
+import { createAccessContext } from '../netlify/functions/_shared/entity-access.mjs';
 import { resolveEntity as defaultResolveEntity } from '../netlify/functions/_shared/entity-resolvers.mjs';
 import { createNetlifyCliStore } from './lib/notion-comms/netlify-cli-store.mjs';
 
 const args = process.argv.slice(2); const value = (flag) => { const index = args.indexOf(flag); return index < 0 ? undefined : args[index + 1]; }; const exportDir = value('--export'); const apply = args.includes('--apply');
-if (!exportDir) throw new Error('Usage: node scripts/import-notion-comms.mjs --export <directory> [--report <path>] [--apply --confirm IMPORT]');
-if (apply && value('--confirm') !== 'IMPORT') throw new Error('Refusing to write without --confirm IMPORT.');
+if (!exportDir) throw new Error('Usage: node scripts/import-notion-comms.mjs --export <directory> [--report <path>] [--apply [--yes]]');
+if (apply && !args.includes('--yes')) { process.stdout.write('Type IMPORT to write the planned records: '); if ((await fs.readFile(0, 'utf8')).trim() !== 'IMPORT') throw new Error('Refusing to write without typing IMPORT.'); }
 const token = process.env.NETLIFY_BLOBS_TOKEN ?? '';
 const options = (name) => ({ name, siteID: UMBRELLA_BLOBS_SITE_ID, token });
 const cliTransport = value('--transport') === 'netlify-cli';
@@ -54,16 +56,20 @@ async function loadPeople() {
 const source = await readExport(exportDir);
 const rows = source.rows.flatMap((row, index) => source.matches[index] ? [parseRow(row, source.matches[index].body, source.matches[index].id)] : []);
 const plan = buildImportPlan({ rows, people: await loadPeople(), importMap: await loadImportMap(), todayKey: new Date().toLocaleDateString('en-CA', { timeZone: 'Australia/Sydney' }) });
-const report = `# Notion communications import preview\n\n- Rows read: ${source.rows.length}\n- Rows matched to pages: ${rows.length}\n- Rows skipped (unmatched page): ${source.unmatchedRows.length}\n- Records to create: ${plan.report.records}\n- People to create: ${plan.report.peopleToCreate}\n- Threads to create: ${plan.threads.length}\n- Follow-ups/action items to import: ${plan.promises.length}\n- Rows requiring review: ${plan.report.ambiguous.length}\n`;
-const reportPath = value('--report') ?? path.join(os.tmpdir(), 'notion-comms-import-report.md'); await fs.writeFile(reportPath, report);
+const countsBy = (items, key) => items.reduce((counts, item) => ({ ...counts, [item[key]]: (counts[item[key]] ?? 0) + 1 }), {});
+const byKind = countsBy(plan.records, 'kind'); const byStatus = countsBy(plan.promises, 'status');
+const report = `# Notion communications import preview\n\n- Rows read: ${source.rows.length}\n- Rows matched to pages: ${rows.length}\n- Rows skipped (unmatched page): ${source.unmatchedRows.length}\n- Records to create: comms ${byKind.comm?.length ?? 0}, meetings ${byKind.meeting?.length ?? 0}, events ${byKind.event?.length ?? 0}\n- Records already imported: ${plan.report.alreadyImported}\n- People to create: ${plan.report.peopleToCreate}\n- Threads to create: ${plan.threads.filter((thread) => !thread.reuse).length}\n- Promises: open ${byStatus.open?.length ?? 0}, done ${byStatus.done?.length ?? 0}, dismissed ${byStatus.dismissed?.length ?? 0}\n- Rows requiring review: ${plan.report.ambiguous.length}\n${plan.report.ambiguous.filter((item) => item.type === 'person_match').map((item) => `- Ambiguous person: ${item.name} (${item.candidates.join(', ')})`).join('\n')}\n`;
+const reportPath = path.resolve(value('--report') ?? path.join(os.tmpdir(), 'notion-comms-import-report.md'));
+if (reportPath.startsWith(`${path.resolve(process.cwd())}${path.sep}`)) throw new Error('--report must be outside this public repository.');
+await fs.writeFile(reportPath, report);
 if (!apply) { console.log(`Preview complete. Report: ${reportPath}`); process.exit(0); }
 const resolveEntity = (ref, context) => defaultResolveEntity(ref, context, { getStore: async () => (typeof ref === 'string' ? ref.startsWith('shared:') : ref?.namespace === 'shared') ? universalStore : professionalStore });
 const repoDeps = { store: professionalStore, resolveEntity, getUniversalLinkStore: async () => universalStore };
 const progress = { person: 0, record: 0, thread: 0, promise: 0 };
 try {
   const result = await applyImportPlan(plan, {
-    identityRepo: createIdentityRepository({ store: universalStore }), communicationRepo: createCommunicationRepository(repoDeps), meetingRepo: createMeetingRepository(repoDeps), eventRepo: createEventRepository(repoDeps), threadRepo: createThreadRepository({ store: professionalStore }), ledgerRepo: createLedgerItemRepository({ store: professionalStore }),
-    setMap: (key, map) => professionalStore.setJSON(key, map), log: (stage) => { progress[stage] += 1; }
+    identityRepo: createIdentityRepository({ store: universalStore }), communicationRepo: createCommunicationRepository(repoDeps), meetingRepo: createMeetingRepository(repoDeps), eventRepo: createEventRepository(repoDeps), threadRepo: createThreadRepository({ store: professionalStore }), ledgerRepo: createLedgerItemRepository({ store: professionalStore }), linkRepo: createUniversalLinkRepository({ store: universalStore, resolveEntity }), accessContext: createAccessContext({ workflow: 'professional' }),
+    setMap: (key, map) => professionalStore.setJSON(key, map), log: (stage) => { progress[stage] += 1; console.log(`${stage}: ${progress[stage]}`); }
   });
   console.log(JSON.stringify({ applied: true, records: result.createdRecords, people: result.createdPeople, reportPath }));
 } catch (error) {

@@ -25,3 +25,12 @@ test('parseNotionDate accepts the day-first date format exported by the live das
   });
   assert.equal(parseNotionDate('27 July 2026').start, '2026-07-27');
 });
+
+test('parseNotionDate supports a range whose end names another day', () => {
+  assert.deepEqual(parseNotionDate('August 28, 2025 11:30 PM → August 29, 2025 1:15 AM'), {
+    start: '2025-08-28T13:30:00.000Z',
+    end: '2025-08-28T15:15:00.000Z',
+    allDay: false,
+    timeZone: 'Australia/Sydney'
+  });
+});
