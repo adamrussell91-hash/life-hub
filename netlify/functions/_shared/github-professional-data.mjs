@@ -123,15 +123,64 @@ async function githubJson(url, { token, fetchImpl }) {
   }
 }
 
+async function githubRaw(url, { token, fetchImpl }) {
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      headers: {
+        accept: 'application/vnd.github.raw',
+        authorization: `Bearer ${token}`,
+        'user-agent': 'life-hub'
+      }
+    });
+  } catch {
+    return null;
+  }
+  if (!response?.ok) return null;
+  try {
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
 function decodeBase64(content) {
   return Buffer.from(String(content).replace(/\n/g, ''), 'base64').toString('utf8');
 }
 
+// Contents API embeds base64 bodies only up to ~1MB. Larger files (live
+// `people.json` after the Notion profile backfill) return encoding "none"
+// and empty `content`. Without a Git Blob fallback, `loadProfessionalData`
+// returns null for *all* files — Organisations directory goes empty even
+// though `organisations.json` itself is well under the limit.
 async function fetchDataFile(repo, token, fetchImpl, filename) {
-  const payload = await githubJson(`${GITHUB_ORIGIN}/repos/${repo}/contents/${DATA_PATH}/${filename}`, { token, fetchImpl });
-  if (!payload || typeof payload.content !== 'string') return null;
+  const payload = await githubJson(
+    `${GITHUB_ORIGIN}/repos/${repo}/contents/${DATA_PATH}/${filename}`,
+    { token, fetchImpl }
+  );
+  if (!payload || typeof payload.sha !== 'string') return null;
+
+  let text = '';
+  if (
+    payload.encoding === 'base64' &&
+    typeof payload.content === 'string' &&
+    payload.content.replace(/\n/g, '')
+  ) {
+    text = decodeBase64(payload.content);
+  }
+
+  const size = Number(payload.size) || 0;
+  if (!text || (size > 0 && Buffer.byteLength(text) < size)) {
+    text =
+      (await githubRaw(`${GITHUB_ORIGIN}/repos/${repo}/git/blobs/${payload.sha}`, {
+        token,
+        fetchImpl
+      })) ?? '';
+  }
+
+  if (!text) return null;
   try {
-    return JSON.parse(decodeBase64(payload.content));
+    return JSON.parse(text);
   } catch {
     return null;
   }

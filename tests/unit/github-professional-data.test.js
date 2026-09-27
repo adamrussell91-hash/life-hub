@@ -20,18 +20,63 @@ function githubContents(body) {
   return { sha: 'sha1', encoding: 'base64', content: Buffer.from(text).toString('base64'), size: Buffer.byteLength(text) };
 }
 
-function memoryFetch({ people = [], organisations = [], relationships = [] } = {}) {
+function memoryFetch({
+  people = [],
+  organisations = [],
+  relationships = [],
+  /** When set, Contents API returns encoding "none" + empty content for that file (GitHub >1MB behaviour). */
+  oversized = null
+} = {}) {
   const calls = [];
+  const bodies = {
+    people,
+    organisations,
+    relationships
+  };
+  const blobBySha = new Map();
+
+  function contentsFor(name, body) {
+    if (oversized === name) {
+      const text = JSON.stringify(body);
+      const sha = `sha-oversized-${name}`;
+      blobBySha.set(sha, text);
+      return {
+        sha,
+        encoding: 'none',
+        content: '',
+        size: Buffer.byteLength(text)
+      };
+    }
+    const payload = githubContents(body);
+    blobBySha.set(payload.sha, JSON.stringify(body));
+    return payload;
+  }
+
   const fetchImpl = async (url) => {
-    calls.push(String(url));
-    if (String(url).endsWith('/data/professional/people.json')) {
-      return { ok: true, status: 200, json: async () => githubContents(people) };
+    const href = String(url);
+    calls.push(href);
+    if (href.endsWith('/data/professional/people.json')) {
+      return { ok: true, status: 200, json: async () => contentsFor('people', bodies.people) };
     }
-    if (String(url).endsWith('/data/professional/organisations.json')) {
-      return { ok: true, status: 200, json: async () => githubContents(organisations) };
+    if (href.endsWith('/data/professional/organisations.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => contentsFor('organisations', bodies.organisations)
+      };
     }
-    if (String(url).endsWith('/data/professional/relationships.json')) {
-      return { ok: true, status: 200, json: async () => githubContents(relationships) };
+    if (href.endsWith('/data/professional/relationships.json')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => contentsFor('relationships', bodies.relationships)
+      };
+    }
+    const blobMatch = href.match(/\/git\/blobs\/([^/?#]+)$/);
+    if (blobMatch) {
+      const text = blobBySha.get(blobMatch[1]);
+      if (text == null) return { ok: false, status: 404 };
+      return { ok: true, status: 200, text: async () => text };
     }
     return { ok: false, status: 404 };
   };
@@ -312,4 +357,28 @@ test('a relationship whose legacy id does not resolve to a known person/organisa
   const env = { GITHUB_TOKEN: 'token' };
   const entries = await listGithubRelationshipEntries('person', derivePersonId('leg-person-1'), { env, fetchImpl });
   assert.deepEqual(entries, []);
+});
+
+test('Contents API empty body for oversized people.json still loads orgs via Git Blob fallback', async () => {
+  // Live life-hub-data people.json is >1MB; Contents returns encoding "none"
+  // and content "". Before the blob fallback, that nulls the whole professional
+  // bridge — including organisations.json which itself is small.
+  const { fetchImpl, calls } = memoryFetch({
+    people: PEOPLE,
+    organisations: ORGANISATIONS,
+    relationships: RELATIONSHIPS,
+    oversized: 'people'
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+
+  const organisations = await listGithubOrganisationCandidates({ env, fetchImpl });
+  assert.equal(organisations.length, 1);
+  assert.equal(organisations[0].display_name, 'St. Aloysius College');
+
+  const people = await listGithubPersonCandidates({ env, fetchImpl });
+  assert.equal(people.length, 2);
+
+  assert.ok(calls.some((url) => url.includes('/git/blobs/sha-oversized-people')));
+  // Small files stay on Contents base64 — no unnecessary blob round-trips.
+  assert.equal(calls.filter((url) => url.includes('/git/blobs/')).length, 1);
 });
