@@ -31,23 +31,46 @@ and are reopened:
 
 ## Phase 2 — Structure data
 
-- [ ] Pending
+- [x] `shared:unit` / `shared:position` in identity-schema + entity-ref + resolvers
+- [x] Registry keys: member_of_unit, holds_position, part_of, reports_to, shares_authority_with, works_with, answers_to
+- [x] `deriveReportingGraph` + org-structure repository/handler (`/api/org-structure`)
+- [x] Edit structure sheet on organisation page (Add unit / position / member / reports-to)
+- [x] Tests: Aloysius three lines; multi-parent; symmetric pair; cycle; temporal; W2 handler factory
+- Checks: D4 P3 V4 I3 W2
+- Diff vs mockup: structure starts empty on live Blob until Adam edits (no GitHub seed yet)
 
 ## Phase 3 — Flowchart
 
-- [ ] Pending
+- [x] `elkjs` dynamic import (`org-flowchart.ts`); separate build chunk (not main bundle)
+- [x] Layered INCLUDE_CHILDREN layout; position/person cards; unit compounds; edge marks
+- [x] Your lines highlight + `?line=` (V2); Outline / Flow / People list
+- [x] Phone Outline default; Flow pan box
+- Checks: S4 V2 V3 V4 R1 D4 Perf (elk chunk split)
+- Screens: `screens/fix-01/part-b-*` (see Part B ledger)
 
 ## Phase 4 — Opportunities
 
-- [ ] Pending
+- [x] opportunity-schema + repository + `/api/opportunities`
+- [x] Add opportunity sheet on wall + org page; dismiss; empty "No opportunities yet."
+- [x] Tests: D1 month label, D2 sort
+- Checks: D1 D2 I3 I4 S3 V4 W2
 
 ## Phase 5 — Ann's read
 
-- [ ] Pending
+- [x] OrganisationRead schema + context builder + `/api/organisation-read` Run now
+- [x] Never overwrite `author: 'adam'` threads
+- [x] Context integrity tests (availability / delivery / behaviour + negative control)
+- [x] UI: empty + Run now; failed run visible
+- Checks: agent-context-integrity I3 D5 L2
+- Note: scheduled 07:00 Sydney tick not wired in this slice — Run now is live
 
 ## Phase 7 — Compare
 
-- [ ] Pending
+- [x] Route `#/organisations/compare?ids=`
+- [x] `org-bridges.mjs` pure rules + `/api/org-bridges`
+- [x] Compare page: compact flowcharts + bridge list (390 stacks)
+- [x] Header **Compare with…** preselects current org
+- Checks: D4 V4 R2 P3 (bridges need real cross-org links in store)
 
 ## Out of this PR
 
@@ -251,7 +274,7 @@ Timeline lane from the assembler: `kind: work_study`, `start: 2025-01-22`,
 
 - [x] Items 1–4 answered with real numbers
 - [x] Part A (A1–A8) — see **Fix 01: Part A** below
-- [ ] Part B — **not started**
+- [x] Part B — see **Fix 01: Part B** below
 
 ## Fix 01: Part A (Phase 1R)
 
@@ -320,4 +343,33 @@ Phase 0 numbers. Commits: `fix(orgs): Phase 1R — …`.
 - [x] A1–A8 ticked with checks + screens
 - [x] hub-ui-guardian **PASS** (r3; L1 phone wall one-column; C1 timeline meet+scroll)
 - Failure-register checked: L1 L6 S2 S4 V4 C1 C2 C3 C5 C6 D1 D3 D4 D5 D6 I3 W2 P1 P3 P4
-- [ ] Part B — not started (do not mark PR ready)
+- [x] Part B — see **Fix 01: Part B** below (PR stays draft until Part B ticked + guardian)
+
+## Fix 01: Part B (Phases 2→3→4→5→7)
+
+Branch: `cursor/organisations-fix-01-part-b-d77e` (fresh from `main` after #542).
+PR: draft (do not mark ready until ledger + guardian + pre-pr-check).
+
+### Must / Must-not / Verify
+
+- **Must:** St. Aloysius page shows Edit / Add structure / Run now / Add opportunity / Compare with… wired; structure editor writes units; flowchart/outline when structure exists; no roadmap copy.
+- **Must-not:** Disabled placeholder buttons; Phase/arrives copy; elkjs in main bundle; invented venue chips; PR marked ready before Part B ticks.
+- **Verify:** unit tests + professional tests + live 1440/390 screens in `screens/fix-01/` + hub-ui-guardian PASS + `npm run pre-pr-check`.
+
+### Ledger
+
+| Phase | Status | IDs checked | W2 entry | Diff vs mockup |
+|---|---|---|---|---|
+| 2 Structure | [x] | D4 P3 V4 I3 W2 | `org-structure` handler + editor | Empty until structure entered (no GitHub units seed) |
+| 3 Flowchart | [x] | S4 V2 V3 V4 R1 D4 Perf | org page How section | Kit surfaces; ELK order not drag-pin |
+| 4 Opportunities | [x] | D1 D2 I3 I4 S3 V4 | `/api/opportunities` | Empty until manual add |
+| 5 Ann's read | [x] | I3 D5 L2 context-integrity | Run now → organisation-read | Scheduled tick deferred; Run now live |
+| 7 Compare | [x] | D4 V4 R2 P3 | `#/organisations/compare` | Bridges empty without cross-org UL links |
+
+### Part B status
+
+- [x] Phases 2→3→4→5→7 implemented
+- [ ] hub-ui-guardian **PASS** (pending)
+- [ ] Screens in `screens/fix-01/part-b-*` + DIFF
+- [ ] `npm run pre-pr-check` exit 0
+- [ ] PR stays **draft** until above ticked
