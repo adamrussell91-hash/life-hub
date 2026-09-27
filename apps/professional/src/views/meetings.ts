@@ -18,6 +18,7 @@ import { searchEntities } from '@/api/entities';
 import { ApiClientError } from '@/api/client';
 import { meetingRoute } from '@/app/router';
 import type { MeetingRecord } from '@/domain/types';
+import { renderScheduleDbPage, type ScheduleDbRow } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
 import {
@@ -115,57 +116,37 @@ export function buildMeetingTaskLinks(record: MeetingRecord, reload: () => Promi
   return taskPanels;
 }
 
-export async function renderMeetingsView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading meetings…');
+function toMeetingRow(record: MeetingRecord): ScheduleDbRow {
+  return {
+    id: record.id,
+    title: record.title,
+    href: meetingRoute(record.id),
+    when: record.scheduled_start,
+    meta: [record.state.replace(/_/g, ' '), record.location_text ?? ''].filter(Boolean),
+    filterTokens: [record.state],
+    facetKey: record.state,
+    facetLabel: record.state.replace(/_/g, ' ')
+  };
+}
 
-  async function load(): Promise<void> {
-    showViewLoading(canvas, 'Loading meetings…');
-    try {
+export async function renderMeetingsView(
+  canvas: HTMLElement,
+  options: { isCurrent?: () => boolean } = {}
+): Promise<void> {
+  await renderScheduleDbPage(canvas, {
+    kind: 'meetings',
+    title: 'Meetings',
+    searchPlaceholder: 'Search title or place',
+    searchAriaLabel: 'Search meetings',
+    emptyMessage: 'No meetings yet.',
+    primaryAction: { label: 'Schedule', href: '#/meeting/new' },
+    listHash: '#/meetings',
+    isCurrent: options.isCurrent,
+    loadRows: async () => {
       const { meetings } = await listMeetings();
-      paint(meetings);
-    } catch (err) {
-      renderLoadError(canvas, err, () => void load());
+      return meetings.map(toMeetingRow);
     }
-  }
-
-  function paint(meetings: MeetingRecord[]): void {
-    canvas.replaceChildren();
-    const actions = el('div', 'meetings__actions');
-    const compose = el('a', 'btn btn--primary', 'Schedule');
-    compose.href = '#/meeting/new';
-    actions.append(compose);
-    canvas.append(actions);
-
-    if (!meetings.length) {
-      canvas.append(el('p', 'empty-state', 'No meetings yet.'));
-      return;
-    }
-
-    const list = document.createElement('ul');
-    list.className = 'meetings__list';
-    for (const record of meetings) {
-      const item = document.createElement('li');
-      item.className = 'meetings__item';
-      const link = el('a', 'meetings__link', record.title);
-      link.href = meetingRoute(record.id);
-      const meta = el(
-        'p',
-        'meetings__meta',
-        [
-          record.state,
-          formatDisplayDate(record.scheduled_start) ?? record.scheduled_start.slice(0, 16),
-          record.incomplete_links ? 'incomplete links' : null
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      );
-      item.append(link, meta);
-      list.append(item);
-    }
-    canvas.append(list);
-  }
-
-  await load();
+  });
 }
 
 export async function renderMeetingNewView(canvas: HTMLElement): Promise<void> {

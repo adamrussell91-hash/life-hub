@@ -20,6 +20,7 @@ import { createUniversalLink, endUniversalLink, type UniversalLinkEntry } from '
 import { ApiClientError } from '@/api/client';
 import { eventRoute } from '@/app/router';
 import type { EventCertificate, EventOccurrenceState, EventRecord } from '@/domain/types';
+import { renderScheduleDbPage } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { utcIsoToWallLocal, wallLocalToUtcIso, isValidTimeZone } from '@/lib/wall-time';
 import { isPriorityArea, PRIORITY_AREAS, priorityAreaName, splitEventLabels } from '@/domain/priority-area';
@@ -64,59 +65,37 @@ function issuedAtDateValue(certificate: EventCertificate | null | undefined): st
   return certificate.issued_at.slice(0, 10);
 }
 
-export async function renderEventsView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading events…');
-
-  async function load(): Promise<void> {
-    showViewLoading(canvas, 'Loading events…');
-    try {
+export async function renderEventsView(
+  canvas: HTMLElement,
+  options: { isCurrent?: () => boolean } = {}
+): Promise<void> {
+  await renderScheduleDbPage(canvas, {
+    kind: 'events',
+    title: 'Events',
+    searchPlaceholder: 'Search title or place',
+    searchAriaLabel: 'Search events',
+    emptyMessage: 'No events yet.',
+    primaryAction: { label: 'Add event', href: '#/event/new' },
+    listHash: '#/events',
+    isCurrent: options.isCurrent,
+    loadRows: async () => {
       const { events } = await listEvents();
-      paint(events);
-    } catch (err) {
-      renderLoadError(canvas, err, () => void load());
+      return events.map((record) => ({
+        id: record.id,
+        title: record.title,
+        href: eventRoute(record.id),
+        when: record.start,
+        meta: [
+          record.event_type === 'professional_development' ? 'PD' : 'general',
+          record.occurrence_state.replace(/_/g, ' '),
+          record.location_text ?? ''
+        ].filter(Boolean),
+        filterTokens: [record.event_type, record.occurrence_state],
+        facetKey: record.event_type,
+        facetLabel: record.event_type === 'professional_development' ? 'PD' : 'General'
+      }));
     }
-  }
-
-  function paint(events: EventRecord[]): void {
-    canvas.replaceChildren();
-    const actions = el('div', 'events__actions');
-    const compose = el('a', 'btn btn--primary', 'Add event');
-    compose.href = '#/event/new';
-    actions.append(compose);
-    canvas.append(actions);
-
-    if (!events.length) {
-      canvas.append(el('p', 'empty-state', 'No events yet.'));
-      return;
-    }
-
-    const list = document.createElement('ul');
-    list.className = 'events__list';
-    for (const record of events) {
-      const item = document.createElement('li');
-      item.className = 'events__item';
-      const link = el('a', 'events__link', record.title);
-      link.href = eventRoute(record.id);
-      const meta = el(
-        'p',
-        'events__meta',
-        [
-          record.event_type.replace(/_/g, ' '),
-          splitEventLabels(record).priority,
-          record.occurrence_state,
-          formatDisplayDate(record.start) ?? record.start.slice(0, 16),
-          record.incomplete_links ? 'incomplete links' : null
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      );
-      item.append(link, meta);
-      list.append(item);
-    }
-    canvas.append(list);
-  }
-
-  await load();
+  });
 }
 
 const EVENT_KINDS = [

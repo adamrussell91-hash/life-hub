@@ -17,6 +17,7 @@ import { ApiClientError } from '@/api/client';
 import { communicationRoute } from '@/app/router';
 import type { CommunicationRecord, FollowUpOperationProjection } from '@/domain/types';
 import { createAutoRetry, type AutoRetryHandle } from '@/lib/auto-retry';
+import { renderScheduleDbPage, type ScheduleDbRow } from '@/components/schedule-db-page';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -36,58 +37,38 @@ function labelFor(record: CommunicationRecord): string {
   return `${record.direction} ${record.channel.replace(/_/g, ' ')}`;
 }
 
-export async function renderCommunicationsView(canvas: HTMLElement): Promise<void> {
-  showViewLoading(canvas, 'Loading communications…');
+function toRow(record: CommunicationRecord): ScheduleDbRow {
+  const when = record.scheduled_start || record.occurred_at;
+  return {
+    id: record.id,
+    title: labelFor(record),
+    href: communicationRoute(record.id),
+    when,
+    meta: [record.direction, record.channel.replace(/_/g, ' ')],
+    filterTokens: [record.direction, record.channel],
+    facetKey: record.channel,
+    facetLabel: record.channel.replace(/_/g, ' ')
+  };
+}
 
-  async function load(): Promise<void> {
-    showViewLoading(canvas, 'Loading communications…');
-    try {
+export async function renderCommunicationsView(
+  canvas: HTMLElement,
+  options: { isCurrent?: () => boolean } = {}
+): Promise<void> {
+  await renderScheduleDbPage(canvas, {
+    kind: 'comms',
+    title: 'Comms',
+    searchPlaceholder: 'Search subject or channel',
+    searchAriaLabel: 'Search communications',
+    emptyMessage: 'No communications yet.',
+    primaryAction: { label: 'Compose', href: '#/communication/new' },
+    listHash: '#/communications',
+    isCurrent: options.isCurrent,
+    loadRows: async () => {
       const { communications } = await listCommunications();
-      paint(communications);
-    } catch (err) {
-      renderLoadError(canvas, err, () => void load());
+      return communications.map(toRow);
     }
-  }
-
-  function paint(communications: CommunicationRecord[]): void {
-    canvas.replaceChildren();
-    const actions = el('div', 'communications__actions');
-    const compose = el('a', 'btn btn--primary', 'Compose');
-    compose.href = '#/communication/new';
-    actions.append(compose);
-    canvas.append(actions);
-
-    if (!communications.length) {
-      canvas.append(el('p', 'empty-state', 'No communications yet.'));
-      return;
-    }
-
-    const list = document.createElement('ul');
-    list.className = 'communications__list';
-    for (const record of communications) {
-      const item = document.createElement('li');
-      item.className = 'communications__item';
-      const link = el('a', 'communications__link', labelFor(record));
-      link.href = communicationRoute(record.id);
-      const meta = el(
-        'p',
-        'communications__meta',
-        [
-          record.direction,
-          record.channel.replace(/_/g, ' '),
-          formatDisplayDate(record.occurred_at) ?? record.occurred_at.slice(0, 10),
-          record.incomplete_links ? 'incomplete links' : null
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      );
-      item.append(link, meta);
-      list.append(item);
-    }
-    canvas.append(list);
-  }
-
-  await load();
+  });
 }
 
 export async function renderCommunicationNewView(canvas: HTMLElement): Promise<void> {

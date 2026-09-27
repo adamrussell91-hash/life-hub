@@ -38,10 +38,6 @@
   overflow: hidden;
 }
 
-.hub-rail__link--sub {
-  padding-left: calc(var(--space-4) + 18px);
-}
-
 .pro-calendar__actions {
   display: flex;
   flex-wrap: wrap;
@@ -640,6 +636,222 @@
 .career__meta {
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* Comms / Meetings / Events database views — Organisations chrome, list rows (not People warmth). */
+.schedule-db__root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  width: 100%;
+}
+
+.schedule-db__title-row,
+.schedule-db__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.schedule-db__bar[hidden] {
+  display: none;
+}
+
+.schedule-db__title {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--depth);
+  margin: 0;
+}
+
+.schedule-db__count {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0;
+}
+
+.schedule-db__spacer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.schedule-db__search {
+  min-width: 0;
+  width: min(16rem, 100%);
+  height: 2.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.schedule-db__seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.schedule-db__pill {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.schedule-db__pill.is-active {
+  background: var(--depth);
+  color: var(--on-dark);
+  border-color: var(--depth);
+}
+
+.schedule-db__pill i {
+  font-style: normal;
+  opacity: 0.7;
+  margin-left: 2px;
+}
+
+.schedule-db__tool {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.schedule-db__tool select {
+  margin-left: 4px;
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: 2px 6px;
+}
+
+.schedule-db__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.schedule-db__group {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.schedule-db__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.schedule-db__row:hover,
+.schedule-db__row:focus-visible {
+  border-color: var(--wave);
+}
+
+.schedule-db__row-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.schedule-db__row-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.schedule-db__row-meta,
+.schedule-db__empty {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  margin: 0;
+}
+
+.schedule-db__sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: color-mix(in srgb, var(--ink) 35%, transparent);
+}
+
+.schedule-db__sheet[hidden] {
+  display: none;
+}
+
+.schedule-db__sheet-inner {
+  width: min(100%, 24rem);
+  max-height: 85dvh;
+  overflow: auto;
+  background: var(--paper);
+  backdrop-filter: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--elev-2);
+}
+
+.schedule-db__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.schedule-db__field select {
+  font: inherit;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  padding: var(--space-2);
+}
+
+@media (max-width: 719px) {
+  .schedule-db__title-row {
+    gap: var(--space-2);
+  }
+
+  .schedule-db__search {
+    width: 100%;
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .schedule-db__add--icon {
+    min-width: 2.25rem;
+    padding-inline: 0;
+    text-align: center;
+  }
 }
 
 .communication-form,

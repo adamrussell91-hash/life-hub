@@ -113,10 +113,10 @@ describe('route builders', () => {
 });
 
 describe('calendar comms routes', () => {
-  it('old list routes land on the calendar', () => {
-    for (const hash of ['#/communications', '#/meetings', '#/events']) {
-      expect(parseRoute(hash)).toEqual({ name: 'calendar', zoom: 'week', redirectedFrom: hash.slice(2) });
-    }
+  it('list routes stay on their database views (not calendar redirect)', () => {
+    expect(parseRoute('#/communications')).toEqual({ name: 'communications' });
+    expect(parseRoute('#/meetings')).toEqual({ name: 'meetings' });
+    expect(parseRoute('#/events')).toEqual({ name: 'events' });
   });
   it('thread route validates the id', () => {
     const id = 'thread_00000000-0000-4000-8000-000000000001';

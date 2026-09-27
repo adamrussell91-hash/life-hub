@@ -7,26 +7,19 @@ const VALID_MEETING_ID = 'meeting_00000000-0000-4000-8000-000000000010';
 const VALID_EVENT_ID = 'event_00000000-0000-4000-8000-000000000010';
 
 describe('meeting and event routes', () => {
-  it('parses compose and detail routes; lists redirect to calendar', () => {
-    expect(parseRoute('#/meetings')).toEqual({
-      name: 'calendar',
-      zoom: 'week',
-      redirectedFrom: 'meetings'
-    });
+  it('parses list, compose and detail routes', () => {
+    expect(parseRoute('#/meetings')).toEqual({ name: 'meetings' });
     expect(parseRoute('#/meeting/new')).toEqual({ name: 'meeting-new' });
     expect(parseRoute(`#/meeting/${VALID_MEETING_ID}`)).toEqual({
       name: 'meeting',
       id: VALID_MEETING_ID
     });
-    expect(parseRoute('#/events')).toEqual({
-      name: 'calendar',
-      zoom: 'week',
-      redirectedFrom: 'events'
-    });
+    expect(parseRoute('#/events')).toEqual({ name: 'events' });
     expect(parseRoute(`#/event/${VALID_EVENT_ID}`)).toEqual({ name: 'event', id: VALID_EVENT_ID });
     expect(parseRoute('#/meeting/not-valid').name).toBe('not-found');
-    expect(railHighlightFor({ name: 'meeting-new' })).toBe('calendar');
-    expect(railHighlightFor({ name: 'event', id: VALID_EVENT_ID })).toBe('calendar');
+    expect(railHighlightFor({ name: 'meetings' })).toBe('meetings');
+    expect(railHighlightFor({ name: 'meeting-new' })).toBe('meetings');
+    expect(railHighlightFor({ name: 'event', id: VALID_EVENT_ID })).toBe('events');
     expect(meetingRoute(VALID_MEETING_ID)).toBe(`#/meeting/${VALID_MEETING_ID}`);
     expect(eventRoute(VALID_EVENT_ID)).toBe(`#/event/${VALID_EVENT_ID}`);
   });
@@ -73,6 +66,7 @@ describe('renderMeetingsView', () => {
     await renderMeetingsView(canvas);
     expect(canvas.textContent).toMatch(/Seth planning/);
     expect(canvas.querySelector('a.btn--primary')?.getAttribute('href')).toBe('#/meeting/new');
+    expect(canvas.querySelector('.schedule-db__row')).toBeTruthy();
   });
 
   it('lists meetings at 390px width', async () => {
@@ -81,7 +75,7 @@ describe('renderMeetingsView', () => {
     canvas.style.width = '390px';
     await renderMeetingsView(canvas);
     expect(canvas.textContent).toMatch(/Seth planning/);
-    expect(canvas.querySelector('.meetings__list')).toBeTruthy();
+    expect(canvas.querySelector('.schedule-db__list')).toBeTruthy();
   });
 });
 
@@ -297,7 +291,7 @@ describe('renderEventsView', () => {
     const canvas = document.createElement('div');
     await renderEventsView(canvas);
     expect(canvas.textContent).toMatch(/Gifted education PD/);
-    expect(canvas.textContent).toMatch(/professional development/i);
+    expect(canvas.querySelector('.schedule-db__row')?.textContent).toMatch(/PD · scheduled/);
   });
 });
 
