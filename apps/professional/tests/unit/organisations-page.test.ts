@@ -1,7 +1,17 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderOrganisationsView } from '@/views/organisations';
-import { layoutOrganisationTimeline } from '@/domain/organisation-timeline';
-import { layoutRelationshipArc, renderRelationshipArcSvg } from '@/domain/relationship-arc';
+import { renderOrganisationPage } from '@/views/organisation-page';
+import {
+  layoutOrganisationTimeline,
+  renderOrganisationTimelineSvg
+} from '@/domain/organisation-timeline';
+import {
+  layoutOrganisationSpark,
+  organisationSparkX,
+  renderOrganisationSparkSvg,
+  ORG_SPARK_DOMAIN_START
+} from '@/domain/organisation-spark';
+import { buildOrganisationModel } from '@/domain/organisation-model';
 
 const ORG_ID = 'organisation_00000000-0000-4000-8000-000000000002';
 
@@ -36,12 +46,22 @@ const directoryPayload = {
             first_link_at: '2023-01-15T00:00:00.000Z'
           }
         ],
+        undated_people_count: 0,
         warmth_spread: { warm: 1, cooling: 0, cold: 0, total: 1 },
-        arc_points: [{ id: 'person_1', at: '2023-01-15T00:00:00.000Z', label: '1' }],
+        arc_points: [{ id: 'person_1', at: '2023-01-15T00:00:00.000Z' }],
         is_current_workplace: true,
         first_touch_at: '2023-01-15T00:00:00.000Z',
+        first_touch_kind: 'first_contact',
         last_activity_at: '2026-01-01T00:00:00.000Z',
-        timeline_lanes: [],
+        timeline_lanes: [
+          {
+            id: 'lane_1',
+            kind: 'work_study',
+            label: 'Gifted Education Teacher',
+            start: '2025-01-22T00:00:00.000Z',
+            end: null
+          }
+        ],
         created_at: '2020-01-01T00:00:00.000Z',
         updated_at: '2026-01-01T00:00:00.000Z'
       }
@@ -72,13 +92,78 @@ describe('renderOrganisationsView (W2)', () => {
     const tile = canvas.querySelector('a.orgs-tile') as HTMLAnchorElement | null;
     expect(tile).not.toBeNull();
     expect(tile?.getAttribute('href')).toContain(`#/organisations/${ORG_ID}`);
+    expect(canvas.querySelector('.orgs-opps__empty')?.textContent).toBe('No opportunities yet.');
+    expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);
     canvas.remove();
   });
 });
 
-describe('arc / timeline getBBox collision (C1)', () => {
-  it('mounted relationship-arc SVG: no shown label getBBox intersects another', () => {
-    // happy-dom lacks SVGGeometryElement.getBBox — polyfill from attributes for the Check.
+describe('organisation page A5 empty states', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn().mockResolvedValue(jsonResponse(200, directoryPayload));
+    location.hash = `#/organisations/${ORG_ID}`;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('omits disabled Compare/Edit/Add structure/Run now and roadmap copy', async () => {
+    const canvas = document.createElement('div');
+    document.body.append(canvas);
+    await renderOrganisationPage(canvas, ORG_ID);
+    expect(canvas.querySelectorAll('button[disabled]').length).toBe(0);
+    expect(canvas.textContent).not.toMatch(/Compare with|Add structure|Run now/);
+    expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);
+    expect(canvas.textContent).toContain("Ann hasn't read Example University yet.");
+    expect(canvas.textContent).toContain('No opportunities yet.');
+    canvas.remove();
+  });
+});
+
+describe('organisation spark (A1 / C5)', () => {
+  const now = '2026-09-26T00:00:00.000Z';
+
+  it('two orgs with different dates produce different path d-strings', () => {
+    const a = layoutOrganisationSpark({
+      points: [
+        { id: '1', at: '2021-01-01T00:00:00.000Z' },
+        { id: '2', at: '2022-06-01T00:00:00.000Z' },
+        { id: '3', at: '2024-01-01T00:00:00.000Z' }
+      ],
+      now
+    });
+    const b = layoutOrganisationSpark({
+      points: [
+        { id: '1', at: '2023-01-01T00:00:00.000Z' },
+        { id: '2', at: '2025-01-01T00:00:00.000Z' }
+      ],
+      now
+    });
+    expect(a.path).not.toBe(b.path);
+    expect(a.path.length).toBeGreaterThan(0);
+    expect(b.path.length).toBeGreaterThan(0);
+  });
+
+  it('shared-scale: same date lands on the same x on every tile', () => {
+    const at = '2023-01-01T00:00:00.000Z';
+    const xAlone = organisationSparkX(at, now);
+    const layout = layoutOrganisationSpark({
+      points: [
+        { id: 'a', at: '2020-01-01T00:00:00.000Z' },
+        { id: 'b', at },
+        { id: 'c', at: '2025-01-01T00:00:00.000Z' }
+      ],
+      now
+    });
+    const point = layout.points.find((p) => p.id === 'b');
+    expect(point?.x).toBeCloseTo(xAlone, 5);
+  });
+
+  it('spark SVG text nodes are only the two axis labels (C1)', () => {
     const proto = SVGGraphicsElement.prototype as SVGGraphicsElement & {
       getBBox: () => DOMRect;
     };
@@ -88,85 +173,212 @@ describe('arc / timeline getBBox collision (C1)', () => {
         const x = Number(this.getAttribute('x') ?? 0);
         const y = Number(this.getAttribute('y') ?? 0);
         const text = this.textContent ?? '';
-        const w = Math.min(160, 6 + text.length * 6.2);
-        return { x: x - w / 2, y: y - 10, width: w, height: 12, bottom: y + 2, left: x - w / 2, right: x + w / 2, top: y - 10, toJSON() { return this; } };
+        const w = Math.min(40, 6 + text.length * 6);
+        return {
+          x,
+          y: y - 10,
+          width: w,
+          height: 12,
+          bottom: y + 2,
+          left: x,
+          right: x + w,
+          top: y - 10,
+          toJSON() {
+            return this;
+          }
+        };
       }
-      if (this instanceof SVGCircleElement) {
-        const cx = Number(this.getAttribute('cx') ?? 0);
-        const cy = Number(this.getAttribute('cy') ?? 0);
-        const r = Number(this.getAttribute('r') ?? 0);
-        return { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r, bottom: cy + r, left: cx - r, right: cx + r, top: cy - r, toJSON() { return this; } };
-      }
-      return { x: 0, y: 0, width: 0, height: 0, bottom: 0, left: 0, right: 0, top: 0, toJSON() { return this; } };
+      return {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        top: 0,
+        toJSON() {
+          return this;
+        }
+      };
     };
 
     try {
-      const svg = renderRelationshipArcSvg([
-        { id: 'a', at: '2020-01-01T00:00:00.000Z', label: 'Joined' },
-        { id: 'b', at: '2020-01-02T00:00:00.000Z', label: 'Also joined very close' },
-        { id: 'c', at: '2024-06-01T00:00:00.000Z', label: 'Later' }
-      ]);
+      const svg = renderOrganisationSparkSvg({
+        points: [
+          { id: 'a', at: '2020-01-01T00:00:00.000Z' },
+          { id: 'b', at: '2023-06-01T00:00:00.000Z' },
+          { id: 'c', at: '2025-01-01T00:00:00.000Z' }
+        ],
+        now
+      });
       document.body.append(svg);
-      const labels = [...svg.querySelectorAll('text')];
-      expect(labels.length).toBeGreaterThan(0);
-      for (let i = 0; i < labels.length; i++) {
-        for (let j = i + 1; j < labels.length; j++) {
-          const a = labels[i]!.getBBox();
-          const b = labels[j]!.getBBox();
-          const overlap =
-            a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
-          expect(overlap).toBe(false);
-        }
-      }
+      const labels = [...svg.querySelectorAll('text')].map((t) => t.textContent);
+      expect(labels).toEqual(['2019', 'now']);
+      expect(svg.querySelectorAll('circle').length).toBe(1);
       svg.remove();
     } finally {
       proto.getBBox = original;
     }
   });
 
-  it('layoutRelationshipArc does not place overlapping showLabel pairs', () => {
-    const layout = layoutRelationshipArc([
-      { id: 'a', at: '2020-01-01T00:00:00.000Z', label: 'Joined' },
-      { id: 'b', at: '2020-01-02T00:00:00.000Z', label: 'Also joined very close' },
-      { id: 'c', at: '2024-06-01T00:00:00.000Z', label: 'Later' }
-    ]);
-    const shown = layout.points.filter((p) => p.showLabel);
-    for (let i = 1; i < shown.length; i++) {
-      const prev = shown[i - 1]!;
-      const cur = shown[i]!;
-      const approx = (label: string) => Math.min(160, 6 + label.length * 6.2);
-      const overlapX =
-        Math.abs(cur.labelX - prev.labelX) < (approx(prev.label) + approx(cur.label)) / 2;
-      const overlapY = Math.abs(cur.labelY - prev.labelY) < 14;
-      expect(overlapX && overlapY).toBe(false);
-    }
+  it('domain start is 2019-01-01', () => {
+    expect(ORG_SPARK_DOMAIN_START).toBe('2019-01-01T00:00:00.000Z');
   });
+});
 
-  it('organisation timeline collision hides overlapping labels', () => {
+describe('organisation timeline A3/A4 (C6 / C1)', () => {
+  it('open-ended work_study bar ends at the now x (C6)', () => {
+    const domainEnd = '2026-09-26T00:00:00.000Z';
     const layout = layoutOrganisationTimeline({
       lanes: [
         {
           id: '1',
-          kind: 'events',
-          label: 'PD Day One Long',
-          start: '2024-01-01T00:00:00.000Z',
-          end: null
-        },
-        {
-          id: '2',
-          kind: 'events',
-          label: 'PD Day Two Long',
-          start: '2024-01-02T00:00:00.000Z',
+          kind: 'work_study',
+          label: 'Gifted Education Teacher',
+          start: '2025-01-22T00:00:00.000Z',
           end: null
         }
       ],
       peopleSteps: [],
-      domainStart: '2023-01-01T00:00:00.000Z',
-      domainEnd: '2026-01-01T00:00:00.000Z'
+      domainStart: '2019-01-01T00:00:00.000Z',
+      domainEnd,
+      width: 900
     });
-    const events = layout.lanes.find((l) => l.id === 'events');
-    expect(events).toBeTruthy();
-    const visible = events!.points.filter((p) => p.showLabel).length;
-    expect(visible).toBeLessThan(events!.points.length);
+    const work = layout.lanes.find((l) => l.id === 'work_study');
+    expect(work?.bars.length).toBe(1);
+    expect(work?.points.length).toBe(0);
+    const bar = work!.bars[0]!;
+    const nowX = 900 - 48;
+    expect(bar.x + bar.w).toBeCloseTo(nowX, 0);
+    expect(bar.labelInside || bar.labelX > bar.x).toBe(true);
+  });
+
+  it('uses rows × 32 + 24 axis height (C3)', () => {
+    const layout = layoutOrganisationTimeline({
+      lanes: [
+        {
+          id: '1',
+          kind: 'work_study',
+          label: 'English',
+          start: '2021-01-01T00:00:00.000Z',
+          end: null
+        }
+      ],
+      peopleSteps: [{ at: '2021-01-01T00:00:00.000Z', count: 1, personId: 'a' }],
+      domainStart: '2019-01-01T00:00:00.000Z',
+      domainEnd: '2026-09-26T00:00:00.000Z'
+    });
+    expect(layout.height).toBe(3 * 32 + 24);
+    expect(layout.peoplePath.startsWith('M')).toBe(true);
+    expect(layout.peopleAreaPath.length).toBeGreaterThan(0);
+    expect(layout.peopleCountLabel?.text).toBe('1 person');
+  });
+
+  it('getBBox: no timeline text intersects another or the SVG edge at 900 and 390', () => {
+    const proto = SVGGraphicsElement.prototype as SVGGraphicsElement & {
+      getBBox: () => DOMRect;
+    };
+    const original = proto.getBBox;
+    proto.getBBox = function getBBox(this: SVGGraphicsElement): DOMRect {
+      if (this instanceof SVGTextElement) {
+        const x = Number(this.getAttribute('x') ?? 0);
+        const y = Number(this.getAttribute('y') ?? 0);
+        const anchor = this.getAttribute('text-anchor') ?? 'start';
+        const text = this.textContent ?? '';
+        const w = Math.min(200, 6 + text.length * 5.5);
+        const left = anchor === 'middle' ? x - w / 2 : anchor === 'end' ? x - w : x;
+        return {
+          x: left,
+          y: y - 10,
+          width: w,
+          height: 12,
+          bottom: y + 2,
+          left,
+          right: left + w,
+          top: y - 10,
+          toJSON() {
+            return this;
+          }
+        };
+      }
+      return {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        top: 0,
+        toJSON() {
+          return this;
+        }
+      };
+    };
+
+    try {
+      for (const width of [900, 390]) {
+        const svg = renderOrganisationTimelineSvg({
+          lanes: [
+            {
+              id: '1',
+              kind: 'work_study',
+              label: 'Gifted Education Teacher · since Jan 2025',
+              start: '2025-01-22T00:00:00.000Z',
+              end: null
+            }
+          ],
+          peopleSteps: [
+            { at: '2025-01-22T00:00:00.000Z', count: 1, personId: 'adam' }
+          ],
+          domainStart: '2019-01-01T00:00:00.000Z',
+          domainEnd: '2026-09-26T00:00:00.000Z',
+          width
+        });
+        document.body.append(svg);
+        const labels = [...svg.querySelectorAll('text')];
+        const vb = svg.viewBox.baseVal;
+        for (let i = 0; i < labels.length; i++) {
+          const a = labels[i]!.getBBox();
+          expect(a.left).toBeGreaterThanOrEqual(-1);
+          expect(a.right).toBeLessThanOrEqual(vb.width + 1);
+          expect(a.top).toBeGreaterThanOrEqual(-2);
+          expect(a.bottom).toBeLessThanOrEqual(vb.height + 2);
+          for (let j = i + 1; j < labels.length; j++) {
+            const b = labels[j]!.getBBox();
+            const overlap =
+              a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+            expect(overlap).toBe(false);
+          }
+        }
+        // No per-person dots on the people line (A4).
+        expect(svg.querySelectorAll('circle').length).toBe(0);
+        svg.remove();
+      }
+    } finally {
+      proto.getBBox = original;
+    }
+  });
+});
+
+describe('A8 header meta line', () => {
+  it('says you started when firstTouchKind is you_started (D5)', () => {
+    const model = buildOrganisationModel({
+      id: ORG_ID,
+      ref: `shared:organisation:${ORG_ID}`,
+      displayName: 'St. Aloysius College',
+      chips: [
+        { kind: 'workplace', label: 'Workplace', detail: '2025–now', filterBucket: 'work' }
+      ],
+      people: [
+        { id: 'adam', warmthBand: 'cold', firstLinkAt: '2025-01-22T00:00:00.000Z' },
+        { id: 'undated', warmthBand: 'cold', firstLinkAt: null }
+      ],
+      firstTouchAt: '2025-01-22T00:00:00.000Z',
+      firstTouchKind: 'you_started'
+    });
+    expect(model.metaLine).toBe('2 people · you started Jan 2025');
+    expect(model.undatedPeopleCount).toBe(1);
   });
 });
