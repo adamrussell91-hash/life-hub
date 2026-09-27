@@ -10,12 +10,27 @@ import {
 } from './universal-link-blobs.mjs';
 import { createUniversalLinkRepository } from './universal-link-repository.mjs';
 import {
+  listGithubImportedStudentPeople,
   listGithubOrganisationCandidates,
   listGithubRelationshipEntries
 } from './github-professional-data.mjs';
 import { dedupeIdentityRows } from './identity-display-name.mjs';
 
 const ORG_BATCH_SIZE = 10;
+
+function personIdFromRef(ref) {
+  if (typeof ref !== 'string') return null;
+  const parts = ref.split(':');
+  return parts.length === 3 && parts[0] === 'shared' && parts[1] === 'person' ? parts[2] : null;
+}
+
+function withoutStudentPersonEndpoints(relationships, studentIds) {
+  return (relationships ?? []).filter((entry) => {
+    if (entry?.endpoint?.kind !== 'person') return true;
+    const id = personIdFromRef(entry.endpoint.ref);
+    return !id || !studentIds.has(id);
+  });
+}
 
 export async function listAuthoritativeOrganisationKeys(store) {
   return (await listBlobKeys(store, ORGANISATION_PREFIX)).filter((key) => !isIndexKey(key));
@@ -28,6 +43,8 @@ function organisationIdFromKey(key) {
 /**
  * Loads every Organisation with its Universal Links (Blob + GitHub import).
  * Mirrors `loadAllPeopleWithRelationships` for the organisations crest wall.
+ * Communications-database students never appear as org members / people chips
+ * (`listGithubRelationshipEntries` + endpoint filter).
  */
 export async function loadAllOrganisationsWithRelationships({
   store,
@@ -44,6 +61,10 @@ export async function loadAllOrganisationsWithRelationships({
   const repo = buildRepository({ store, resolveEntity: resolve });
   const accessContext = createAccessContext({ workflow: 'life' });
 
+  const studentIds = new Set(
+    (await listGithubImportedStudentPeople(github)).map((person) => person.id)
+  );
+
   const orgKeys = await listAuthoritativeOrganisationKeys(store);
   const ids = [...new Set(orgKeys.map(organisationIdFromKey).filter(Boolean))];
 
@@ -54,10 +75,13 @@ export async function loadAllOrganisationsWithRelationships({
     const { outgoing, incoming } = await repo.listForEntity(ref, accessContext, {
       includeArchived: true
     });
-    const relationships = [
-      ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
-      ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
-    ];
+    const relationships = withoutStudentPersonEndpoints(
+      [
+        ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
+        ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
+      ],
+      studentIds
+    );
     return { organisation: { ...record, ref }, relationships, _source: 'blob' };
   });
 
@@ -95,7 +119,7 @@ export async function loadAllOrganisationsWithRelationships({
       }
       return {
         organisation: { ...record, ref, logo_key: record.logo_key ?? null },
-        relationships,
+        relationships: withoutStudentPersonEndpoints(relationships, studentIds),
         _source: 'github'
       };
     }
