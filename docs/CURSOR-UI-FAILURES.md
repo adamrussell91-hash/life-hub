@@ -23,6 +23,8 @@
 
 **L5 · Toolbar wraps into a pile on phone.** **Seen:** Medical v2 at 390 (4 rows of controls). **Rule:** At < 720px a toolbar is search + one **Filters** button (a sheet) + an icon primary action. **Check:** the toolbar is ≤ 2 rows at 390.
 
+**L6 · Chip text wraps inside a rounded pill.** **Seen:** Organisations wall #508 (the NSW HALT "Member" chip wrapped to 3 centred lines). **Rule:** A chip is one line: `white-space: nowrap`, the detail truncates with an ellipsis at `max-width: 100%`, and the full text goes in `title`. Long detail belongs on the detail page, not the tile. **Check:** every chip has `getClientRects().length === 1` at 390 and 1440.
+
 ## S: Surfaces and CSS scope
 
 **S1 · Styles scoped to another page's container.** **Seen:** Medical v2 mini lab panel. The bloods meter CSS was scoped to `#body-bloods-dashboard`, so the reused `markerRow()` rendered as floating black dots. **Rule:** When you reuse a component somewhere new, grep its CSS for ID/parent-scoped selectors and rescope them to the component class. **Check:** screenshot the reused component in its new home next to its original home; they match.
@@ -61,15 +63,21 @@
 
 **D4 · Mapping tables that miss real values.** **Seen:** Medical v2 Mind lane missing although therapy and ADHD visits exist. **Rule:** Test a keyword/lane map against real titles and providers from the store, not invented ones. **Check:** one test per lane using real record titles.
 
+**D6 · Derived metric computed from partial input.** **Seen:** Organisations #508. Warmth was computed from only the person→organisation link (no meetings, comms or events), so everyone banded "cold" and every warmth bar was the same grey. That was a second warmth calculation disagreeing with People's. Also, import `created_at` timestamps were used as "when you got to know them". **Rule:** A derived value (warmth, a first-contact date, a count) comes from the one function and the full input the owning page uses. An import timestamp is never an event date. **Check:** a test compares the value against the owning model for the same ids, and the ledger records the real distribution (e.g. "12 warm / 9 cooling / 35 cold"). A degenerate distribution (all one value) is investigated before shipping.
+
 **D5 · Ugly or ambiguous derived text.** **Seen:** "38 in" chip; "Ordered 24 Sep" with no subject; dates not in dd/mm/yy. **Rule:** Every generated label reads as a phrase a person would write; dates use `formatDisplayDate` or relative text. **Check:** read every string in the screenshot aloud.
 
 ## C: Charts and SVG
 
-**C1 · Labels collide or clip.** **Seen:** Goals runway "Move clipped" (PAD_R); Medical strip labels cut by the TODAY line or truncated, and overlapping value labels. **Rule:** Reserve gutters in the maths; run a collision pass (flip, then hide-to-tooltip); anchor `end` near the right edge; axis labels get their own row. **Check:** a DOM test using `getBBox` shows no label box intersecting another or crossing the SVG edge, at 390 and 1440.
+**C1 · Labels collide or clip.** **Seen:** Goals runway "Move clipped" (PAD_R); Medical strip labels cut by the TODAY line or truncated, and overlapping value labels; Organisations #508 (56 overlapping count labels on the St. Aloysius tile, the role label clipped at the timeline's top edge, and axis labels under the people line), with C1 ticked in the ledger. **Rule:** Reserve gutters in the maths; run a collision pass (flip, then hide-to-tooltip); anchor `end` near the right edge; axis labels get their own row. **Check:** a DOM test using `getBBox` shows no label box intersecting another or crossing the SVG edge, at 390 and 1440.
 
 **C2 · A decorative band standing in for data.** **Seen:** Medical strip: the normal-range band was drawn full width, but the value line was never drawn. **Rule:** A chart item is done when the **data mark** renders from real values; the reference band is secondary. **Check:** the screenshot shows the line passing through the actual numbers.
 
 **C3 · Loose vertical rhythm.** **Seen:** Medical strip lanes about 70px apart with empty space at the bottom. **Rule:** Chart height comes from `rows × rowHeight` as given in the brief. **Check:** measure it.
+
+**C5 · Reused chart that ignores the data's axis.** **Seen:** Organisations #508. The tile "arc" reused People's `renderRelationshipArcSvg`, which places x and y by list position, so every organisation drew the same diagonal regardless of dates. **Rule:** Before you reuse a chart, write down what its x and y encode and check that it matches the brief. If it doesn't match, write a new renderer; don't bend the old one. Time axes are placed by date on the scale the brief names. **Check:** a test where two inputs differ only in their dates produces different paths, and a shared-scale date lands on the same x in both.
+
+**C6 · Ongoing period drawn as a point.** **Seen:** Organisations #508, where Adam's current role (2025–now) showed as a dot at 2025. **Rule:** A period with `end: null` runs to now and is drawn as a bar. Only point events are dots. **Check:** a unit test that an open-ended period's bar ends at the now x.
 
 **C4 · Pinch/gesture only tested in Chrome.** **Rule:** Safari macOS uses `gesturestart`/`gesturechange`; Chrome/Firefox use `wheel` + `ctrlKey` (non-passive); touch uses Pointer Events. Always provide buttons as well. **Check:** test in Safari.
 
@@ -95,8 +103,12 @@
 
 ## P: Process and honesty
 
-**P1 · Ticking 100% without comparing to the mockup.** **Seen:** Goals v2 (13 items reopened); Medical v2 (34/34 claimed, 18 defects). **Rule:** Before ticking any UI item, put your screenshot next to the mockup/brief section and write the differences into the ledger. **Check:** each ticked UI item has a "diff vs mockup: none" or listed-deviation line.
+**P1 · Ticking 100% without comparing to the mockup.** **Seen:** Goals v2 (13 items reopened); Medical v2 (34/34 claimed, 18 defects); Organisations #508 (C1, C2, D4 and P3 ticked while failing on every tile; the mockup diff left out the tile chart and timeline). **Rule:** Before ticking any UI item, put your screenshot next to the mockup/brief section and write the differences into the ledger. **Check:** each ticked UI item has a "diff vs mockup: none" or listed-deviation line.
 
 **P2 · Branch built on a messy or stale base.** **Seen:** Medical v2 branch showing 310 files changed vs `main`. **Rule:** Branch from fresh `main`. The PR's file count should match the scope. **Check:** `git diff --stat origin/main...HEAD` touches only files the brief names, plus tests and docs.
 
-**P3 · Silent half-fixes.** **Seen:** Medical v2 MO-05 (the vanishing note is still split from its episode). **Rule:** A fix item's check is the **user's original complaint reproduced and gone**, not an adjacent unit test. **Check:** the brief's "Adam says X → sees Y" scenario, run live.
+**P3 · Silent half-fixes.** **Seen:** Medical v2 MO-05 (the vanishing note is still split from its episode); Organisations #508 (the St. Aloysius acceptance case was never run: one chip instead of two, 56 people instead of 82). **Rule:** A fix item's check is the **user's original complaint reproduced and gone**, not an adjacent unit test. **Check:** the brief's "Adam says X → sees Y" scenario, run live.
+
+**P4 · Roadmap talk and dead controls in the product.** **Seen:** Organisations #508. Four disabled buttons had tooltips such as "Structure editor arrives in Phase 2", and the empty state read "…once the sweep is built" (that copy came from Claude's own brief). **Rule:** User-visible text never mentions phases, builds or future arrivals. A control whose feature doesn't exist yet isn't rendered; a disabled button with a tooltip isn't an empty state. Brief writers follow the same rule. **Check:** `grep -rnE "Phase [0-9]|arrives in|is built|coming soon"` over view strings returns nothing, and the live page has no `button[disabled]` at rest.
+
+**P5 · Partial build shipped as the whole build.** **Seen:** Organisations #508. The plan said one PR, ready only when every phase in scope was ticked; it was marked ready and merged with Phases 2, 3, 4, 5 and 7 still "Pending". **Rule:** Don't mark a PR ready while its ledger has unticked in-scope items. If you must stop early, the PR title and first line of the body say "PARTIAL: phases X–Y not built". **Check:** before marking ready, `grep -c "\[ \]" PROGRESS.md` for in-scope sections is 0.
