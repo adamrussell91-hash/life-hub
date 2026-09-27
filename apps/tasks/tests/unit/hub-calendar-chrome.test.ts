@@ -23,9 +23,24 @@ describe('Tasks week calendar chrome', () => {
       /\.hub-calendar--workspace\s+\.hub-calendar__workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+min\(/
     );
     expect(viewsCss).toMatch(/\.tasks-calendar-chrome__below\.hub-calendar__rail/);
-    expect(viewsCss).toMatch(
-      /\.tasks-calendar-chrome__below\s+\.calendar-locks__list\s*\{[^}]*grid-template-columns:\s*repeat\(7/
+    // Kit owns the 7-day lock strip (all hubs) — Tasks must not reintroduce a column list.
+    expect(kitCalendarCss).toMatch(
+      /\.calendar-locks__list\s*\{[^}]*grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)/
     );
+    expect(kitCalendarCss).toMatch(/\.calendar-lock-row__task\s*\{[^}]*text-overflow:\s*ellipsis/);
+    expect(kitCalendarCss).toMatch(/\.calendar-dump__actions/);
+    expect(chromeSrc).toMatch(/calendar-dump__actions/);
+    expect(chromeSrc).toMatch(/displayLockTitle/);
+    expect(viewsCss).not.toMatch(
+      /\.calendar-locks__list\s*\{[^}]*flex-direction:\s*column/
+    );
+  });
+
+  it('collapses repeated words in lock titles', async () => {
+    const { displayLockTitle } = await import('@/views/hub-calendar-chrome');
+    expect(displayLockTitle('about about Fletcher')).toBe('about Fletcher');
+    expect(displayLockTitle('Meeting about about progress')).toBe('Meeting about progress');
+    expect(displayLockTitle('Good night')).toBe('Good night');
   });
 
   it('patches locks in place on refresh (Someday #514 pattern — not full rail remount)', () => {

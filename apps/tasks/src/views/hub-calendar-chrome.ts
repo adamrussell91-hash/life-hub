@@ -149,6 +149,14 @@ function renderDayAgenda(tasks: Task[], dateKey: string): HTMLElement {
   return agenda;
 }
 
+/** Collapse accidental repeated words in lock titles ("about about …" → "about …"). */
+export function displayLockTitle(title: string): string {
+  return String(title ?? '')
+    .replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function renderLocksWidget(tasks: Task[], weekDates: string[]): HTMLElement {
   const card = el('section', 'hub-calendar__detail calendar-locks');
   card.dataset.part = 'rail-locks';
@@ -160,9 +168,12 @@ function renderLocksWidget(tasks: Task[], weekDates: string[]): HTMLElement {
     row.type = 'button';
     row.disabled = !lock;
     const day = new Date(`${date}T12:00:00`);
+    const label = lock ? displayLockTitle(lock.title) : 'Nothing due';
+    const task = el('span', 'calendar-lock-row__task', label);
+    if (lock?.title) task.title = lock.title;
     row.append(
       el('span', 'calendar-lock-row__day', day.toLocaleDateString('en-AU', { weekday: 'short' }).toUpperCase()),
-      el('span', 'calendar-lock-row__task', lock ? lock.title : 'Nothing due')
+      task
     );
     if (lock) {
       row.addEventListener('click', () => {
@@ -205,9 +216,11 @@ function renderDumpWidget(onReload: () => void): HTMLElement {
   textarea.rows = 2;
   textarea.placeholder = 'Dump away.';
   textarea.setAttribute('aria-label', 'Brain dump');
+  const actions = el('div', 'calendar-dump__actions');
   const submit = el('button', 'btn btn--primary', 'Sort it');
   submit.type = 'submit';
-  form.append(textarea, submit);
+  actions.append(submit);
+  form.append(textarea, actions);
   const results = el('div', 'calendar-dump__results');
   card.append(form, results);
   form.addEventListener('submit', (event) => {
