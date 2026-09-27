@@ -497,6 +497,42 @@ export function mountWorldCanvas(
 
     ctx.globalAlpha = 1;
 
+    // Mycelium: every recorded person↔person tie, drawn fine and quiet
+    // between the two creatures, plus a dotted thread from each person to
+    // their home island. Follows the creatures as they wander.
+    if (layers.mycelium) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(23,55,94,0.45)';
+      ctx.lineWidth = 1.1 * sf;
+      for (const thread of model.threads) {
+        const ca = creatures.get(thread.a);
+        const cb = creatures.get(thread.b);
+        if (!ca || !cb) continue;
+        const mx = (ca.x + cb.x) / 2;
+        const my = (ca.y + cb.y) / 2;
+        const dx = cb.x - ca.x;
+        const dy = cb.y - ca.y;
+        ctx.beginPath();
+        ctx.moveTo(ca.x, ca.y);
+        ctx.quadraticCurveTo(mx - dy * 0.15, my + dx * 0.15, cb.x, cb.y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(122,80,56,0.28)';
+      ctx.lineWidth = 0.9 * sf;
+      ctx.setLineDash([2 * sf, 3 * sf]);
+      for (const person of model.people) {
+        if (!person.present || !person.homeIds.length) continue;
+        const c = creatures.get(person.ref);
+        const home = regions.get(person.homeIds[0]);
+        if (!c || !home || home.rCur < 2) continue;
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y);
+        ctx.lineTo(home.cx, home.cy);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // Open sea at low zoom: aggregate dots
     if (cam.k < 0.6 && model.openSea.people.length) {
       const pts = [...openSeaPos.values()];
