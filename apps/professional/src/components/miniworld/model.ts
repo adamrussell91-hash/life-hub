@@ -135,6 +135,28 @@ export interface WorldModel {
     lastContactUnknownCount: number;
   };
   keyCounts: Record<string, number>;
+  /** Person↔person ties active this year, one per pair: the Mycelium layer's lines. */
+  threads: Thread[];
+}
+
+export interface Thread {
+  a: string;
+  b: string;
+  role: string | null;
+}
+
+/** One thread per pair of present people with a `professional_relationship` link active this year. */
+export function threadsFor(links: NetworkEcologyLink[], presentRefs: Set<string>): Thread[] {
+  const byPair = new Map<string, Thread>();
+  for (const link of links) {
+    if (link.relationship_type !== 'professional_relationship') continue;
+    if (link.source_ref === link.target_ref) continue;
+    if (!presentRefs.has(link.source_ref) || !presentRefs.has(link.target_ref)) continue;
+    const [a, b] = [link.source_ref, link.target_ref].sort();
+    const key = `${a}|${b}`;
+    if (!byPair.has(key)) byPair.set(key, { a, b, role: link.role ?? null });
+  }
+  return [...byPair.values()];
 }
 
 function yearOf(iso: string | null | undefined): number | null {
@@ -501,7 +523,8 @@ export function buildWorldModel(
       dormancyOnlyAtNow: !isNow,
       lastContactUnknownCount
     },
-    keyCounts
+    keyCounts,
+    threads: threadsFor(yearLinks, new Set(people.filter((p) => p.present).map((p) => p.ref)))
   };
 }
 

@@ -103,7 +103,7 @@
 
 ## P: Process and honesty
 
-**P1 · Ticking 100% without comparing to the mockup.** **Seen:** Goals v2 (13 items reopened); Medical v2 (34/34 claimed, 18 defects); Organisations #508 (C1, C2, D4 and P3 ticked while failing on every tile; the mockup diff left out the tile chart and timeline). **Rule:** Before ticking any UI item, put your screenshot next to the mockup/brief section and write the differences into the ledger. **Check:** each ticked UI item has a "diff vs mockup: none" or listed-deviation line.
+**P1 · Ticking 100% without comparing to the mockup.** **Seen:** Goals v2 (13 items reopened); Medical v2 (34/34 claimed, 18 defects); Organisations #508 (C1, C2, D4 and P3 ticked while failing on every tile; the mockup diff left out the tile chart and timeline); Network Ecology miniworld (the Mycelium toggle only faded the terrain; the mockup's person↔person tie lines were never drawn, so confirmed ties were invisible). **Rule:** Before ticking any UI item, put your screenshot next to the mockup/brief section and write the differences into the ledger. **Check:** each ticked UI item has a "diff vs mockup: none" or listed-deviation line.
 
 **P2 · Branch built on a messy or stale base.** **Seen:** Medical v2 branch showing 310 files changed vs `main`. **Rule:** Branch from fresh `main`. The PR's file count should match the scope. **Check:** `git diff --stat origin/main...HEAD` touches only files the brief names, plus tests and docs.
 

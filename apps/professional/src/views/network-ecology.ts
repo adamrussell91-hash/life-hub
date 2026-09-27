@@ -297,7 +297,8 @@ export async function renderNetworkEcologyView(
       insights: [],
       bridgePeople: [],
       notes: { noStartDateCount: 0, dormancyOnlyAtNow: false, lastContactUnknownCount: 0 },
-      keyCounts: {}
+      keyCounts: {},
+      threads: []
     });
   }
 
