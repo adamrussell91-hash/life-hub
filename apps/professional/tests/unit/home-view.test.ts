@@ -456,6 +456,34 @@ describe('renderHomeView', () => {
     expect(canvas.querySelector('[data-part="nudges"]')?.textContent).toContain('Email Denielle J. · 3 days late');
   });
 
+  it('keeps a single Log PD / Year / Accreditation set when two Home paints race', async () => {
+    // Mirrors boot: hashchange paint + await paint() overlapping on the same
+    // canvas while fetches await. Stale generation must not append chrome.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const baseFetch = defaultFetchMock();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      await gate;
+      return baseFetch(input, init);
+    });
+
+    let generation = 0;
+    const canvas = document.createElement('div');
+    generation = 1;
+    const first = renderHomeView(canvas, { isCurrent: () => generation === 1 });
+    generation = 2;
+    const second = renderHomeView(canvas, { isCurrent: () => generation === 2 });
+    release();
+    await Promise.all([first, second]);
+    expect(canvas.querySelectorAll('.pro-home__actions').length).toBe(1);
+    expect(canvas.querySelectorAll('.pro-home__yearstrip').length).toBe(1);
+    expect(canvas.querySelectorAll('[data-part="accreditation-progress"]').length).toBe(1);
+    expect(canvas.querySelectorAll('.pro-home__timeline').length).toBe(1);
+    expect(canvas.querySelectorAll('.pro-home__calendar-host').length).toBe(1);
+  });
+
   it('lists a quiet thread with an open they_owe item in the nudges', async () => {
     const threadId = 'thread_00000000-0000-4000-8000-000000000050';
     const memberRef = 'professional:communication:communication_00000000-0000-4000-8000-000000000051';
