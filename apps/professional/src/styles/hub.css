@@ -4699,6 +4699,14 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+
+.career-river__svg text,
+.career-river__svg tspan {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
 }
 
 .career-river__axis-year {

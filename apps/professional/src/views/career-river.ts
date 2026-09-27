@@ -836,15 +836,28 @@ export function mountCareerRiver(
   svgHost.addEventListener('gesturechange', onGestureChange as EventListener);
 
   const pointers = new Map<number, { x: number; y: number }>();
+  const lockPageSelect = (on: boolean) => {
+    const root = document.documentElement;
+    if (on) {
+      root.style.setProperty('user-select', 'none');
+      root.style.setProperty('-webkit-user-select', 'none');
+    } else {
+      root.style.removeProperty('user-select');
+      root.style.removeProperty('-webkit-user-select');
+    }
+  };
+
   const onPointerDown = (event: PointerEvent) => {
     // Mouse: kill native text-selection start (Safari blue highlight). Touch keeps
     // default so vertical page scroll still works until the gesture arms as pan.
     if (event.pointerType === 'mouse' && event.button === 0) {
       event.preventDefault();
+      lockPageSelect(true);
     }
     clearNativeSelection();
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (pointers.size === 2) {
+      lockPageSelect(true);
       svgHost.setPointerCapture?.(event.pointerId);
       const pts = [...pointers.values()];
       state!.pinch = {
@@ -890,10 +903,12 @@ export function mountCareerRiver(
           : Math.abs(dy) > Math.abs(dx) * 1.35;
         if (!alongTime) {
           state!.drag = null;
+          lockPageSelect(false);
           return;
         }
         state!.drag.armed = true;
         clearNativeSelection();
+        lockPageSelect(true);
         svgHost.classList.add('is-panning');
         svgHost.setPointerCapture?.(event.pointerId);
       }
@@ -914,17 +929,24 @@ export function mountCareerRiver(
     if (pointers.size === 0) {
       state!.drag = null;
       svgHost.classList.remove('is-panning');
+      lockPageSelect(false);
+      clearNativeSelection();
     }
+  };
+  const onDragStart = (event: DragEvent) => {
+    event.preventDefault();
   };
   svgHost.addEventListener('pointerdown', onPointerDown);
   svgHost.addEventListener('pointermove', onPointerMove);
   svgHost.addEventListener('pointerup', onPointerEnd);
   svgHost.addEventListener('pointercancel', onPointerEnd);
+  svgHost.addEventListener('dragstart', onDragStart);
 
   return {
     destroy() {
       mq.removeEventListener?.('change', onMq);
       ro.disconnect();
+      lockPageSelect(false);
       svgHost.removeEventListener('wheel', onWheel);
       svgHost.removeEventListener('selectstart', onSelectStart);
       host.removeEventListener('selectstart', onSelectStart);
@@ -934,6 +956,7 @@ export function mountCareerRiver(
       svgHost.removeEventListener('pointermove', onPointerMove);
       svgHost.removeEventListener('pointerup', onPointerEnd);
       svgHost.removeEventListener('pointercancel', onPointerEnd);
+      svgHost.removeEventListener('dragstart', onDragStart);
       host.replaceChildren();
       stateByHost.delete(host);
     }
