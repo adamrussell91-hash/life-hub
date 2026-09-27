@@ -392,7 +392,10 @@ async function quietThreads(now: Date): Promise<Array<{ title: string; days: num
   return out;
 }
 
-async function renderWalkInAndNudges(host: HTMLElement, meetings: MeetingRecord[]): Promise<void> {
+async function buildWalkInAndNudges(
+  meetings: MeetingRecord[],
+  stillCurrent: () => boolean
+): Promise<HTMLElement[]> {
   const now = new Date();
   const todayKey = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(now);
   const dayKey = (offset: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Sydney' }).format(new Date(now.getTime() + offset * 86_400_000));
@@ -401,8 +404,11 @@ async function renderWalkInAndNudges(host: HTMLElement, meetings: MeetingRecord[
     listLedgerDue(dayKey(-60), dayKey(-1)).catch(() => ({ items: [] as LedgerItem[] })),
     quietThreads(now).catch(() => [] as Array<{ title: string; days: number; href: string }>)
   ]);
+  if (!stillCurrent()) return [];
+
   const communications = commsResult.communications ?? [];
   const lateItems = ledgerResult.items ?? [];
+  const nodes: HTMLElement[] = [];
 
   const walk = nextWalkIn([
     ...communications.filter((comm) => comm.scheduled_start).map((comm) => ({ kind: 'comm' as const, id: comm.id, title: comm.subject || 'Comm', start: comm.scheduled_start!, href: communicationRoute(comm.id) })),
@@ -421,13 +427,17 @@ async function renderWalkInAndNudges(host: HTMLElement, meetings: MeetingRecord[
     start.href = walk.href;
     start.dataset.part = 'walk-in-start';
     card.append(start);
-    host.append(card);
+    nodes.push(card);
     clareBrief({ title: walk.title, kind: walk.kind, when: walk.start, people: [], previous: [], open_promises: [], notes: '' })
       .then((brief) => {
+        if (!stillCurrent()) return;
         for (const point of brief.points) list.append(el('li', undefined, point.text));
         owed.textContent = brief.owed_line ?? '';
       })
-      .catch(() => list.append(el('li', undefined, 'Open the page for the full brief.')));
+      .catch(() => {
+        if (!stillCurrent()) return;
+        list.append(el('li', undefined, 'Open the page for the full brief.'));
+      });
   }
 
   const late = lateItems
@@ -450,33 +460,46 @@ async function renderWalkInAndNudges(host: HTMLElement, meetings: MeetingRecord[
       link.href = nudge.href;
       card.append(link);
     }
-    host.append(card);
+    nodes.push(card);
   }
+  return nodes;
 }
 
-export async function renderHomeView(canvas: HTMLElement): Promise<void> {
+export async function renderHomeView(
+  canvas: HTMLElement,
+  options: { isCurrent?: () => boolean } = {}
+): Promise<void> {
+  const isCurrent = options.isCurrent ?? (() => true);
   showViewLoading(canvas, 'Loading…');
 
   async function load(): Promise<void> {
+    if (!isCurrent()) return;
     showViewLoading(canvas, 'Loading…');
     try {
       const [{ events }, { meetings }] = await Promise.all([listEvents(), listMeetings()]);
+      if (!isCurrent()) return;
       await paint(events, meetings);
     } catch (err) {
+      if (!isCurrent()) return;
       renderLoadError(canvas, err, () => void load());
     }
   }
 
   async function paint(events: EventRecord[], meetings: MeetingRecord[]): Promise<void> {
-    canvas.replaceChildren();
+    // Build off-DOM, then one replaceChildren — concurrent Home paints used to
+    // clear, await walk-in/nudges, then both append (duplicate Log PD / Year /
+    // Accreditation chrome).
+    const preface = await buildWalkInAndNudges(meetings, isCurrent);
+    if (!isCurrent()) return;
 
-    await renderWalkInAndNudges(canvas, meetings);
+    const frag = document.createDocumentFragment();
+    for (const node of preface) frag.append(node);
 
     const actions = el('div', 'pro-home__actions');
     const add = el('a', 'btn btn--primary', '+ Log PD event');
     add.href = '#/event/new';
     actions.append(add);
-    canvas.append(actions);
+    frag.append(actions);
 
     const today = sydneyParts(new Date());
 
@@ -485,16 +508,18 @@ export async function renderHomeView(canvas: HTMLElement): Promise<void> {
     const side = el('div', 'pro-home__side');
     side.append(renderAccreditation(today, events));
     lede.append(side);
-    canvas.append(lede);
+    frag.append(lede);
 
     const body = el('div', 'pro-home__body');
-    unmountProfessionalCalendar();
     const calendarHost = el('div', 'pro-home__calendar-host');
     body.append(calendarHost);
-    mountProfessionalCalendar(calendarHost, { routeZoom: false });
+    frag.append(body);
+    frag.append(renderTimeline(events));
 
-    canvas.append(body);
-    canvas.append(renderTimeline(events));
+    if (!isCurrent()) return;
+    unmountProfessionalCalendar();
+    canvas.replaceChildren(frag);
+    mountProfessionalCalendar(calendarHost, { routeZoom: false });
   }
 
   await load();
