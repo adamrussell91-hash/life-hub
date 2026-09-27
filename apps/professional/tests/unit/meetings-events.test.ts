@@ -77,6 +77,40 @@ describe('renderMeetingsView', () => {
     expect(canvas.textContent).toMatch(/Seth planning/);
     expect(canvas.querySelector('.schedule-db__list')).toBeTruthy();
   });
+
+  it('links Notion-backed meeting rows to Notion', async () => {
+    const notionId = 'b'.repeat(32);
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        data: {
+          meetings: [
+            {
+              schema_version: 2,
+              id: `notion_${notionId}`,
+              title: 'Mentoring with Sam K.',
+              scheduled_start: '2026-03-02T23:00:00.000Z',
+              scheduled_end: '2026-03-02T23:30:00.000Z',
+              time_zone: 'Australia/Sydney',
+              location_text: null,
+              agenda: null,
+              notes: null,
+              state: 'completed',
+              occurrence_history: [],
+              created_at: '2026-03-02T23:00:00.000Z',
+              updated_at: '2026-03-02T23:00:00.000Z',
+              source: 'notion'
+            }
+          ]
+        }
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderMeetingsView(canvas);
+    const row = canvas.querySelector('.schedule-db__row') as HTMLAnchorElement | null;
+    expect(row?.getAttribute('href')).toBe(`https://www.notion.so/${notionId}`);
+    expect(canvas.textContent).toMatch(/Mentoring with Sam K\./);
+  });
 });
 
 describe('renderMeetingNewView', () => {

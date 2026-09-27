@@ -111,18 +111,33 @@ const NOTION_METHOD_CHANNELS = {
   Mail: 'other'
 };
 
+/** Notion methods that belong on the Meetings DB page (not Comms). */
+const NOTION_MEETING_METHODS = new Set(['In-person Meeting', 'Video Call']);
+
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * A `communications.json` row (Notion Communications, in life-hub-data) as a
- * calendar comm. A date-only row pins at 09:00 Sydney; a timed row without a
- * later end is a pin at its time. No date → null (not placed). Opens the
- * Notion page, since there is no hub comm page for it.
- */
-export function projectNotionCommunicationSchedule(row) {
+export function isNotionMeetingMethod(method) {
+  return NOTION_MEETING_METHODS.has(method);
+}
+
+function notionIdFromRow(row) {
   const notionId = typeof row?.notion_id === 'string' ? row.notion_id.replace(/-/g, '') : '';
-  if (!/^[0-9a-f]{32}$/i.test(notionId)) return null;
-  const rawStart = typeof row.date_start === 'string' ? row.date_start.trim() : '';
+  return /^[0-9a-f]{32}$/i.test(notionId) ? notionId.toLowerCase() : null;
+}
+
+function notionRowTitle(row, fallback = 'Comm') {
+  return (
+    [row?.title, row?.meeting_type, row?.method].find((value) => typeof value === 'string' && value.trim())?.trim() ??
+    fallback
+  );
+}
+
+/**
+ * Parse Notion date_start / date_end into UTC ISO bounds.
+ * Date-only → 09:00 Sydney. Missing/invalid start → null (list rows may still use a fallback).
+ */
+export function parseNotionCommunicationBounds(row) {
+  const rawStart = typeof row?.date_start === 'string' ? row.date_start.trim() : '';
   if (!rawStart) return null;
 
   let start;
@@ -140,26 +155,132 @@ export function projectNotionCommunicationSchedule(row) {
     const endMs = typeof row.date_end === 'string' && !DATE_ONLY.test(row.date_end) ? Date.parse(row.date_end) : NaN;
     if (Number.isFinite(endMs) && endMs > startMs) end = new Date(endMs).toISOString();
   }
+  return { start, end, pin: end === null };
+}
+
+/**
+ * A `communications.json` row (Notion Communications, in life-hub-data) as a
+ * calendar comm. A date-only row pins at 09:00 Sydney; a timed row without a
+ * later end is a pin at its time. No date → null (not placed). Opens the
+ * Notion page, since there is no hub comm page for it.
+ */
+export function projectNotionCommunicationSchedule(row) {
+  const notionId = notionIdFromRow(row);
+  if (!notionId) return null;
+  const bounds = parseNotionCommunicationBounds(row);
+  if (!bounds) return null;
 
   const source_ref = communicationSourceRef(`notion_${notionId}`);
   const channel = NOTION_METHOD_CHANNELS[row.method] ?? 'other';
-  const title =
-    [row.title, row.meeting_type, row.method].find((value) => typeof value === 'string' && value.trim())?.trim() ??
-    'Comm';
   return {
     projection_id: deriveProjectionId(source_ref),
     source_ref,
     kind: 'communication',
-    title,
-    start,
-    end: end ?? start,
+    title: notionRowTitle(row, 'Comm'),
+    start: bounds.start,
+    end: bounds.end ?? bounds.start,
     time_zone: 'Australia/Sydney',
     all_day: false,
     status: 'completed',
     channel,
-    pin: end === null,
+    pin: bounds.pin,
     href: `https://www.notion.so/${notionId}`
   };
+}
+
+/**
+ * Notion Communications row → Communication list record for `#/communications`.
+ * Meeting methods are excluded (they surface on `#/meetings`). Undated rows
+ * stay listed with occurred_at = epoch so sort still works.
+ */
+export function projectNotionCommunicationListRecord(row) {
+  const notionId = notionIdFromRow(row);
+  if (!notionId) return null;
+  if (isNotionMeetingMethod(row?.method)) return null;
+
+  const bounds = parseNotionCommunicationBounds(row);
+  const occurred = bounds?.start ?? '1970-01-01T00:00:00.000Z';
+  const summary =
+    typeof row?.notes === 'string' && row.notes.trim()
+      ? row.notes.trim()
+      : typeof row?.body === 'string' && row.body.trim()
+        ? row.body.trim().slice(0, 280)
+        : '';
+
+  return {
+    schema_version: 2,
+    id: `notion_${notionId}`,
+    direction: 'outbound',
+    channel: NOTION_METHOD_CHANNELS[row.method] ?? 'other',
+    occurred_at: occurred,
+    subject: notionRowTitle(row, 'Comm'),
+    summary,
+    status: 'completed',
+    created_at: occurred,
+    updated_at: occurred,
+    scheduled_start: bounds?.start ?? null,
+    scheduled_end: bounds?.end ?? null,
+    time_zone: 'Australia/Sydney',
+    purpose_tag: typeof row?.meeting_type === 'string' ? row.meeting_type : null,
+    agenda: [],
+    blocks: [],
+    source: 'notion'
+  };
+}
+
+/**
+ * Notion Communications meeting-method row → Meeting list record for `#/meetings`.
+ * Past starts → completed; future → scheduled. Opens Notion (no hub meeting id).
+ */
+export function projectNotionMeetingListRecord(row, { now = () => Date.now() } = {}) {
+  const notionId = notionIdFromRow(row);
+  if (!notionId) return null;
+  if (!isNotionMeetingMethod(row?.method)) return null;
+
+  const bounds = parseNotionCommunicationBounds(row);
+  const start = bounds?.start ?? '1970-01-01T00:00:00.000Z';
+  const end = bounds?.end ?? start;
+  const startMs = Date.parse(start);
+  const state =
+    Number.isFinite(startMs) && startMs > now()
+      ? 'scheduled'
+      : row?.status === 'Done'
+        ? 'completed'
+        : 'completed';
+  const location =
+    typeof row?.location === 'string' && row.location.trim() ? row.location.trim() : null;
+
+  return {
+    schema_version: 2,
+    id: `notion_${notionId}`,
+    title: notionRowTitle(row, 'Meeting'),
+    scheduled_start: start,
+    scheduled_end: end,
+    time_zone: 'Australia/Sydney',
+    location_text: location,
+    agenda: null,
+    notes: typeof row?.notes === 'string' ? row.notes : null,
+    state,
+    occurrence_history: [],
+    created_at: start,
+    updated_at: start,
+    purpose: typeof row?.meeting_type === 'string' ? row.meeting_type : null,
+    blocks: [],
+    decisions: [],
+    source: 'notion'
+  };
+}
+
+/** Merge Blob list + Notion projections; Blob ids win on collision. Newest first. */
+export function mergeBlobAndNotionRecords(blobRecords, notionRecords, compareNewestFirst) {
+  const byId = new Map();
+  for (const row of notionRecords ?? []) {
+    if (row?.id) byId.set(row.id, row);
+  }
+  for (const row of blobRecords ?? []) {
+    if (row?.id) byId.set(row.id, row);
+  }
+  return [...byId.values()].sort(compareNewestFirst);
 }
 
 export function compareScheduleProjections(a, b) {
