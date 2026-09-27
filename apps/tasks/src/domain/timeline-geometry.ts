@@ -4,8 +4,9 @@
  */
 
 export const TL = {
-  labelW: 208,
-  axis: { h: 64, termY: 8, termH: 20, weekY: 42, dateY: 56 },
+  /** Plan rail — wide enough for nested project titles without early ellipsis. */
+  labelW: 264,
+  axis: { h: 68, termY: 8, termH: 24, weekY: 46, dateY: 60 },
   row: { dream: 36, goal: 36, project: 44, projectOpen: 34, task: 36, step: 30, milestone: 36, marking: 48, group: 36, ribbon: 24 },
   groupGap: 12,
   bar: { h: 24, rx: 6, stripeW: 3, stripeInset: 6, minW: 28, textPad: 16, outsideGap: 8 },
@@ -15,7 +16,8 @@ export const TL = {
   undated: { h: 22, rx: 11, padX: 10 },
   shadow: { h: 32, rx: 8 },
   ribbon: { h: 16, gap: 3, rx: 4 },
-  load: { h: 104, top: 30, colGap: 8, rx: 4 },
+  /** Tall enough for Load key + “Learning your term rhythm” without card clip. */
+  load: { h: 128, top: 30, colGap: 8, rx: 4 },
   today: { pillH: 20, pillW: 52 },
   lens: { days: 14, shoulder: 21, pillH: 20 },
   ghost: { dash: '4 3' },

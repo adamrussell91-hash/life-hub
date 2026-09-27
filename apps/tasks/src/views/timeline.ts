@@ -13,7 +13,7 @@ import {
 } from '@/domain/gantt';
 import { hydrateFocusFromHash } from '@/domain/focus';
 import { projectMilestones } from '@/domain/project-milestones';
-import { parseHubPrefs } from '@/domain/hub-prefs';
+import { parseHubPrefs, termsCoveringRange } from '@/domain/hub-prefs';
 import { toHubDateKey } from '@/domain/queries';
 import {
   addDaysKey,
@@ -73,7 +73,7 @@ const FONT = 'Inter, ui-sans-serif, sans-serif';
 
 type Kind =
   | 'bar' | 'step' | 'ms' | 'proj' | 'bracket' | 'band' | 'dream' | 'undated' | 'curve'
-  | 'label' | 'hol' | 'grid' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
+  | 'label' | 'hol' | 'grid' | 'axisrule' | 'term' | 'week' | 'today' | 'rowtitle' | 'wall'
   | 'shadow' | 'load' | 'cap' | 'ripple' | 'ghost' | 'garrow' | 'ribbon'
   | 'lens' | 'lensgrab' | 'tail';
 
@@ -142,10 +142,17 @@ function blockedLabel(since: string | null, today: string): string {
   return `blocked ${days} ${days === 1 ? 'day' : 'days'}`;
 }
 
-function termsFor(prefs: ReturnType<typeof parseHubPrefs>, today: string): SchoolTerm[] {
-  const year = Number(today.slice(0, 4));
-  const row = prefs.school_terms.find((item) => item.year === year) ?? prefs.school_terms[0];
-  return row?.terms ?? [];
+function termsFor(
+  prefs: ReturnType<typeof parseHubPrefs>,
+  range: { start: string; end: string }
+): SchoolTerm[] {
+  return termsCoveringRange(prefs, range);
+}
+
+/** Axis pill copy: year suffix once the window spans more than one calendar year. */
+function termAxisLabel(term: SchoolTerm, multiYear: boolean): string {
+  if (!multiYear) return `Term ${term.term}`;
+  return `T${term.term} · ${term.starts_on.slice(2, 4)}`;
 }
 
 function colourMap(config: { domains: Array<{ id: string; color?: string }> }): Map<string, string> {
@@ -282,7 +289,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   const today = toHubDateKey();
   const frac = todayFraction();
   const range = timelineRange(today);
-  const school = termsFor(prefs, today);
+  const school = termsFor(prefs, range);
+  const multiYearTerms = new Set(school.map((term) => term.starts_on.slice(0, 4))).size > 1;
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ?? false;
 
   const page = el('div', 'tl-page');
@@ -332,6 +340,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   card.dataset.view = 'bars';
   const barsHost = el('div', 'tl-view');
   const frame = el('div', 'tl-frame');
+  frame.style.setProperty('--tl-label-w', `${TL.labelW}px`);
+  frame.style.setProperty('--tl-load-h', `${TL.load.h}px`);
   const labels = el('div', 'tl-labels');
   labels.append(el('div', 'tl-labels__head', 'Plan'));
   const legend = el('div', 'tl-labels__load');
@@ -505,7 +515,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     if (kind === 'lens') return layers.lens!;
     if (kind === 'lensgrab') return layers.chrome!;
     if (kind === 'tail') return layers.tails!;
-    if (kind === 'term' || kind === 'week') return layers.axis!;
+    if (kind === 'term' || kind === 'week' || kind === 'axisrule') return layers.axis!;
     if (kind === 'band' || kind === 'bracket') return layers.bands!;
     if (kind === 'curve') return layers.curves!;
     if (kind === 'today') return layers.today!;
@@ -634,11 +644,20 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       g.append(svgEl('line', { class: 'tl-grid' }));
       return;
     }
+    if (kind === 'axisrule') {
+      g.setAttribute('data-part', 'axis-rule');
+      g.append(svgEl('line', { class: 'tl-axis-rule' }));
+      return;
+    }
     if (kind === 'term') {
       g.setAttribute('data-part', 'axis-term');
+      if (spec.text) g.setAttribute('aria-label', spec.text);
       const text = svgEl('text', { class: spec.flags?.holiday ? 'tl-term__label tl-term__label--hol' : 'tl-term__label' });
       text.textContent = spec.text ?? '';
       g.append(svgEl('rect', { class: spec.flags?.holiday ? 'tl-term tl-term--hol' : 'tl-term', rx: 6, height: TL.axis.termH }), text);
+      const tip = svgEl('title');
+      tip.textContent = spec.text ?? '';
+      g.append(tip);
       return;
     }
     if (kind === 'week') {
@@ -994,13 +1013,21 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       setAttrs(inner.firstElementChild!, { x1: x, x2: x, y1: TL.axis.h - 6, y2: props.h ?? 0 });
       return;
     }
+    if (spec.kind === 'axisrule') {
+      const y = TL.axis.weekY - 10;
+      setAttrs(inner.firstElementChild!, { x1: 0, x2: props.w ?? 0, y1: y, y2: y });
+      return;
+    }
     if (spec.kind === 'term') {
       host.setAttribute('transform', `translate(${x} ${TL.axis.termY})`);
       const [mark, text] = [...inner.children] as SVGElement[];
-      setAttrs(mark!, { width: w });
-      const label = w > textW(spec.text ?? '', `600 11px ${FONT}`) + 20 ? spec.text ?? '' : '';
+      setAttrs(mark!, { width: Math.max(0, w), height: TL.axis.termH });
+      const full = spec.text ?? '';
+      const label = w > textW(full, `600 12px ${FONT}`) + 20 ? full : '';
       text!.textContent = label;
       setAttrs(text!, { x: 10, y: TL.axis.termH / 2 + 4 });
+      const tip = inner.querySelector('title');
+      if (tip) tip.textContent = full;
       return;
     }
     if (spec.kind === 'week') {
@@ -1247,9 +1274,11 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       });
     }
 
+    specs.set('axis-rule', { kind: 'axisrule' });
+    entities.set('axis-rule', { x: 0, w: scale.width });
     for (const term of school) {
-      const id = `term:T${term.term}`;
-      specs.set(id, { kind: 'term', text: `Term ${term.term}` });
+      const id = `term:${term.starts_on}:T${term.term}`;
+      specs.set(id, { kind: 'term', text: termAxisLabel(term, multiYearTerms) });
       entities.set(id, { x: X(term.starts_on), w: X(addDaysKey(term.ends_on, 1)) - X(term.starts_on) - 4 });
     }
     for (const run of holidayRuns(scale)) {
@@ -1708,6 +1737,7 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
       node.dataset.painted = signature;
       node.className = `tl-label tl-label--${row.kind}`;
       node.setAttribute('data-part', 'label');
+      node.title = row.label;
       node.style.setProperty('--depth', String(row.depth));
       node.replaceChildren();
       const expandable = row.kind === 'goal' || row.kind === 'project' || row.kind === 'group' || (row.kind === 'task' && state.tasks.some((task) => task.parent === row.ref));
@@ -1730,7 +1760,9 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
         node.append(dot);
       }
       if (row.kind === 'dream') node.append(el('span', 'tl-label__tag', 'Dream'));
-      node.append(el('span', 'tl-label__text', row.label));
+      const text = el('span', 'tl-label__text', row.label);
+      text.title = row.label;
+      node.append(text);
     }
   }
 
@@ -1747,7 +1779,8 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
     labels.style.height = `${next.height}px`;
     labels.style.setProperty('--tl-top', `${TL.axis.h + 8}px`);
     legend.hidden = !state.load;
-    legend.style.top = `${next.height - TL.load.h + 8}px`;
+    // Legend is bottom-anchored in CSS to the load strip — never clip the key.
+    legend.style.removeProperty('top');
     if (reason === 'zoom' || reason === 'place') {
       for (const [id, props] of next.entities) {
         if (!nodes.has(id)) createNode(id);
@@ -1835,7 +1868,10 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   }
 
   function scrollToToday(smooth: boolean): void {
-    const target = Math.max(0, scale.x(addDaysKey(mondayOf(today), -21)) - 1);
+    // Pin today near the left third so empty past weeks do not dominate the first view.
+    const viewW = Math.max(1, scroller.clientWidth);
+    const todayX = scale.x(today) + (state.lens ? 0 : state.dayWidth * frac);
+    const target = Math.max(0, todayX - viewW * 0.3);
     scroller.scrollTo({ left: target, behavior: smooth && !reduced ? 'smooth' : 'auto' });
   }
 
@@ -2555,15 +2591,22 @@ export async function renderTimelineView(canvas: HTMLElement): Promise<void> {
   holBtn.addEventListener('click', () => {
     state.holidaysCompressed = !state.holidaysCompressed;
     holBtn.textContent = state.holidaysCompressed ? 'Holidays: compressed' : 'Holidays: full';
+    holBtn.title = state.holidaysCompressed
+      ? 'Holiday weeks are compressed to a quarter width'
+      : 'Holiday weeks use the same day width as term weeks';
     relayout('settle');
   });
   todayBtn.addEventListener('click', () => scrollToToday(true));
   const forecastCount = samplesNow().length;
   const ready = forecastReady(samplesNow());
   forecastBtn.disabled = !ready;
+  forecastBtn.setAttribute('aria-disabled', String(!ready));
   forecastBtn.title = ready
     ? `P85 from ${forecastCount} finished tasks with an estimate and an actual`
-    : 'Needs 20 finished tasks with an estimate and an actual';
+    : `Forecast unavailable · ${forecastCount} of 20 finished tasks with estimate + actual`;
+  holBtn.title = state.holidaysCompressed
+    ? 'Holiday weeks are compressed to a quarter width'
+    : 'Holiday weeks use the same day width as term weeks';
   focusBtn.addEventListener('click', () => {
     state.lens = !state.lens;
     if (state.lens) state.lensStart = mondayOf(today);

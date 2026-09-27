@@ -32,6 +32,45 @@ export const NSW_2026_TERMS: readonly SchoolTerm[] = [
   { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-17' }
 ];
 
+/** Shift a YYYY-MM-DD key by whole calendar years (month/day kept). */
+function shiftYearKey(key: string, yearDelta: number): string {
+  return `${Number(key.slice(0, 4)) + yearDelta}${key.slice(4)}`;
+}
+
+/**
+ * Approximate NSW term skeleton for a year with no saved dates.
+ * Timeline / axis only — never written into hub prefs (Tools stays empty until Adam enters real dates).
+ */
+export function provisionalNswTerms(year: number): SchoolTerm[] {
+  const delta = year - 2026;
+  return NSW_2026_TERMS.map((term) => ({
+    term: term.term,
+    starts_on: shiftYearKey(term.starts_on, delta),
+    ends_on: shiftYearKey(term.ends_on, delta)
+  }));
+}
+
+/**
+ * Terms covering every calendar year in [start, end].
+ * Prefs win when a year has saved terms; otherwise provisional NSW shape fills the gap
+ * so holiday compression cannot squash the open past/future into one thin band.
+ */
+export function termsCoveringRange(
+  prefs: { school_terms: readonly SchoolYearTerms[] },
+  range: { start: string; end: string }
+): SchoolTerm[] {
+  const y0 = Number(range.start.slice(0, 4));
+  const y1 = Number(range.end.slice(0, 4));
+  if (!Number.isFinite(y0) || !Number.isFinite(y1) || y1 < y0) return [];
+  const byYear = new Map(prefs.school_terms.map((row) => [row.year, row.terms]));
+  const out: SchoolTerm[] = [];
+  for (let year = y0; year <= y1; year += 1) {
+    const stored = byYear.get(year);
+    out.push(...(stored?.length ? stored : provisionalNswTerms(year)));
+  }
+  return out.sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+}
+
 export const DEFAULT_HUB_PREFS: HubPrefs = {
   schema_version: 1,
   timezone: HUB_TZ,
