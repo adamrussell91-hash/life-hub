@@ -61,6 +61,57 @@ test('assemblePeopleDirectory skips self and builds org groups', () => {
   assert.equal(data.organisations.length, 1);
 });
 
+test('assemblePeopleDirectory collapses hermit name twins', () => {
+  const data = assemblePeopleDirectory(
+    [
+      {
+        person: {
+          id: 'person_a',
+          display_name: 'Edward Lenzner and Ethan Lum',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-01-01T00:00:00.000Z',
+          updated_at: '2026-01-01T00:00:00.000Z',
+          ref: 'shared:person:person_a'
+        },
+        relationships: []
+      },
+      {
+        person: {
+          id: 'person_b',
+          display_name: 'Edward Lenzner and Ethan Lum',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-01-02T00:00:00.000Z',
+          updated_at: '2026-01-02T00:00:00.000Z',
+          ref: 'shared:person:person_b'
+        },
+        relationships: []
+      },
+      {
+        person: {
+          id: 'person_c',
+          display_name: 'p/Carmel Cordaro',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-01-03T00:00:00.000Z',
+          updated_at: '2026-01-03T00:00:00.000Z',
+          ref: 'shared:person:person_c'
+        },
+        relationships: []
+      }
+    ],
+    { now: '2026-09-26T00:00:00.000Z' }
+  );
+  assert.equal(data.counts.people, 2);
+  assert.equal(
+    data.people.filter((p) => p.display_name === 'Edward Lenzner and Ethan Lum').length,
+    1
+  );
+  assert.equal(data.people.find((p) => p.id === 'person_c').display_name, 'Carmel Cordaro');
+  assert.equal(data.people.find((p) => p.id === 'person_c').initials, 'CC');
+});
+
 test('parseOrgCrestSignRequest accepts PNG under 512KB and rejects oversized', () => {
   const orgId = ORG_ID;
   const ok = parseOrgCrestSignRequest({

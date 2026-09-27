@@ -168,14 +168,60 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
 
   people.sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' }));
 
+  // Collapse hermit twins that share an exact display name (common when a
+  // Communications `student_name` like "A and B" was ingested twice into Blobs
+  // with no roles/org). Distinct people who share a name but have relationship
+  // signal stay separate.
+  const deduped = collapseHermitNameTwins(people);
+
   return {
-    people,
+    people: deduped,
     organisations: [...organisationsByRef.values()].sort((a, b) =>
       a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' })
     ),
     counts: {
-      people: people.length,
+      people: deduped.length,
       organisations: organisationsByRef.size
     }
   };
+}
+
+function directoryRowSignal(row) {
+  return (
+    (row.relationship_roles?.length ?? 0) +
+    (row.organisation ? 1 : 0) +
+    (row.organisations?.length ?? 0) +
+    (row.open_item_count ?? 0) +
+    (row.you_owe_count ?? 0) +
+    (row.they_owe_count ?? 0)
+  );
+}
+
+/** Keep one row when two hermits share the same cleaned display name. */
+function collapseHermitNameTwins(people) {
+  const groups = new Map();
+  for (const row of people) {
+    const key = String(row.display_name || '')
+      .toLowerCase()
+      .trim() || `id:${row.id}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  const kept = [];
+  for (const rows of groups.values()) {
+    if (rows.length === 1) {
+      kept.push(rows[0]);
+      continue;
+    }
+    const signaled = rows.filter((r) => directoryRowSignal(r) > 0);
+    if (signaled.length) {
+      // Named people with relationship signal stay; drop hermit twins of them.
+      kept.push(...signaled);
+      continue;
+    }
+    // All hermits — keep the first (sort already alphabetical).
+    kept.push(rows[0]);
+  }
+  kept.sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' }));
+  return kept;
 }
