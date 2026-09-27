@@ -4,8 +4,8 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const name = process.argv[2];
-if (!['teaching', 'knowledge', 'tasks', 'professional'].includes(name)) {
-  console.error('usage: node scripts/build-spa.mjs <teaching|knowledge|tasks|professional>');
+if (!['teaching', 'knowledge', 'tasks', 'professional', 'travel'].includes(name)) {
+  console.error('usage: node scripts/build-spa.mjs <teaching|knowledge|tasks|professional|travel>');
   process.exit(1);
 }
 

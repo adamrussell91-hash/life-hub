@@ -8,6 +8,73 @@ const KIND_LABEL = {
   dreams_jar: 'Dreams jar'
 };
 
+function daysUntil(date) {
+  const today = new Date().toISOString().slice(0, 10);
+  const ms = new Date(`${date}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime();
+  return Math.round(ms / 86_400_000);
+}
+
+export function renderFutureMapTripsCard(root, { trips = null, error = '' } = {}) {
+  const host = root.querySelector?.('[data-future-map="trips"]');
+  if (!host) return;
+  host.replaceChildren();
+  if (error) {
+    setText(host, error);
+    return;
+  }
+  if (trips == null) {
+    setText(host, 'Loading trips…');
+    return;
+  }
+  const next = [...(Array.isArray(trips) ? trips : [])]
+    .filter((t) => t?.start_date)
+    .sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)))
+    .find((t) => String(t.end_date || t.start_date) >= new Date().toISOString().slice(0, 10))
+    || null;
+
+  const link = root.createElement('a');
+  link.href = '/travel/';
+  link.className = 'shortcuts-item';
+  link.style.display = 'block';
+  link.style.textDecoration = 'none';
+  const title = root.createElement('p');
+  title.className = 'shortcuts-item__title';
+  const detail = root.createElement('p');
+  detail.className = 'shortcuts-item__detail';
+  if (!next) {
+    title.textContent = 'Plan a trip';
+    detail.textContent = 'Open Travel to start planning.';
+  } else {
+    title.textContent = next.title || 'Next trip';
+    const n = daysUntil(next.start_date);
+    const when = n > 0 ? `Leaves in ${n} day${n === 1 ? '' : 's'}` : n === 0 ? 'Leaves today' : 'On now';
+    detail.textContent = `${formatDisplayDate(next.start_date)} – ${formatDisplayDate(next.end_date)} · ${when}`;
+  }
+  link.append(title, detail);
+  host.append(link);
+}
+
+export async function loadFutureMapTrips(root, { fetchImpl = fetch } = {}) {
+  const host = root.querySelector?.('[data-future-map="trips"]');
+  if (!host) return;
+  renderFutureMapTripsCard(root, { trips: null });
+  try {
+    // fetchImpl is Life's apiFetch — path-only `/api/…`, base URL applied upstream.
+    const response = await fetchImpl('/api/travel-trips', {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' }
+    });
+    const body = await response.json();
+    if (!body?.ok) {
+      renderFutureMapTripsCard(root, { error: 'Could not load trips.' });
+      return;
+    }
+    renderFutureMapTripsCard(root, { trips: body.data?.trips || [] });
+  } catch {
+    renderFutureMapTripsCard(root, { error: 'Could not load trips.' });
+  }
+}
+
 export function futureMapItems(tasks, kind = 'all') {
   return (Array.isArray(tasks) ? tasks : [])
     .filter(task => {

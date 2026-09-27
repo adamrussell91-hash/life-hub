@@ -100,6 +100,7 @@
               <button class="hub-nav-item" type="button" data-section="skincare"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span><span>Skincare</span></button>
               <button class="hub-nav-item" type="button" data-section="central-node"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span><span>Central Node</span></button>
               <button class="hub-nav-item" type="button" data-section="future-map"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span><span>Future map</span></button>
+              <a class="hub-nav-item" href="/travel/"><span class="nav-glyph" aria-hidden="true"><svg class="hub-rail__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 4.5 16 9l-2.2 1.1L9.5 6.8"/><path d="M3 14.5 20 7.5l-1.2 4.2L7.8 17"/><path d="m11 13 2.5 5.5"/><path d="M7.5 17.5 6 21"/></svg></span><span>Travel</span></a>
             </div>
           </div>
         </div>
@@ -1217,6 +1218,10 @@
         </section>
 
         <section id="future-map-dashboard" class="dashboard" aria-label="Future map" hidden>
+          <article class="metric-card" id="future-map-trips-card" aria-labelledby="future-map-trips-label">
+            <p class="metric-label" id="future-map-trips-label">Trips</p>
+            <div data-future-map="trips">Loading trips…</div>
+          </article>
           <article class="metric-card" aria-labelledby="future-map-label">
             <p class="metric-label" id="future-map-label">Bucket list and dreams jar</p>
             <p class="metric-context">Career someday goals stay in Tasks. Origin is when the item began.</p>
@@ -1418,6 +1423,7 @@
           <button type="button" data-section="skincare"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 7.2 6 11a6 6 0 0 1-12 0c0-3.8 6-11 6-11Z"/></svg></span>Skincare</button>
           <button type="button" data-section="central-node"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M12 4.5v3M12 16.5v3M4.5 12h3M16.5 12h3M6.6 6.6l2.1 2.1M15.3 15.3l2.1 2.1M17.4 6.6l-2.1 2.1M8.7 15.3l-2.1 2.1"/></svg></span>Central Node</button>
           <button type="button" data-section="future-map"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><path d="m14.6 9.4-1.7 4.5-4.5 1.7 1.7-4.5z"/></svg></span>Future map</button>
+          <a href="/travel/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 4.5 16 9l-2.2 1.1L9.5 6.8"/><path d="M3 14.5 20 7.5l-1.2 4.2L7.8 17"/><path d="m11 13 2.5 5.5"/><path d="M7.5 17.5 6 21"/></svg></span>Travel</a>
           <p class="hub-more-sheet__section">Hubs</p>
           <a href="/teaching/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V6.8L12 4l8 2.8V19"/><path d="M4 19h16"/><path d="M12 4v15"/></svg></span>Teaching</a>
           <a href="/knowledge/"><span class="hub-more-sheet__glyph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.5h6.5A3.5 3.5 0 0 1 15 9v10H8.5A3.5 3.5 0 0 0 5 15.5V5.5Z"/><path d="M15 9h4v10h-4"/></svg></span>Knowledge</a>
