@@ -92,7 +92,7 @@ export function createTravelRepository({
       return { trip, version: result.sha };
     } catch (error) {
       if (
-        error instanceof GitHubClientError ||
+        (error instanceof GitHubClientError && error.code === 'write_conflict') ||
         error?.status === 409 ||
         error?.status === 422 ||
         /sha does not match/i.test(String(error?.message || ''))

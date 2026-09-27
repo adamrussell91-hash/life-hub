@@ -39,12 +39,17 @@ export function createTravelParseHandler(deps = {}) {
     }
 
     try {
-      const client = anthropic ?? createAnthropicClient({ env: ctx.env });
-      const result = await client.complete?.({
-        system: SYSTEM,
-        messages: [{ role: 'user', content: text }],
-        max_tokens: 1200
-      }) ?? await callAnthropicFallback(client, text);
+      let result;
+      if (anthropic) {
+        result = await callAnthropicFallback(anthropic, text);
+      } else {
+        const apiKey = typeof ctx.env?.ANTHROPIC_API_KEY === 'string' ? ctx.env.ANTHROPIC_API_KEY : '';
+        if (!apiKey) {
+          return errorResponse(503, 'upstream_unavailable', 'Could not parse that email right now.', true, PRIVATE_CACHE);
+        }
+        const client = createAnthropicClient({ apiKey, fetchImpl: deps.fetchImpl ?? fetch });
+        result = await callAnthropicFallback(client, text);
+      }
 
       const parsed = typeof result === 'string' ? JSON.parse(extractJson(result)) : result;
       const draft = parsed.draft || parsed;
@@ -86,6 +91,21 @@ function extractJson(text) {
 }
 
 async function callAnthropicFallback(client, text) {
+  if (typeof client.complete === 'function') {
+    return client.complete({ system: SYSTEM, messages: [{ role: 'user', content: text }], max_tokens: 1200 });
+  }
+  if (typeof client.streamMessage === 'function') {
+    let out = '';
+    for await (const event of client.streamMessage({
+      system: SYSTEM,
+      messages: [{ role: 'user', content: text }],
+      maxTokens: 1200
+    })) {
+      if (event?.type === 'text_delta' && typeof event.text === 'string') out += event.text;
+      if (event?.type === 'text' && typeof event.text === 'string') out += event.text;
+    }
+    return out;
+  }
   if (typeof client.messages?.create === 'function') {
     const res = await client.messages.create({
       max_tokens: 1200,
