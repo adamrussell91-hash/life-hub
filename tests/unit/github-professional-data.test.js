@@ -10,6 +10,7 @@ import {
   isProfessionalDataRepoBound,
   listGithubOrganisationCandidates,
   listGithubPersonCandidates,
+  listGithubImportedStudentPeople,
   listGithubRelationshipEntries,
   resetProfessionalDataCache,
   STUDENT_ORIGINAL_CATEGORY
@@ -425,4 +426,71 @@ test('Contents API empty body for oversized people.json still loads orgs via Git
   assert.ok(calls.some((url) => url.includes('/git/blobs/sha-oversized-people')));
   // Small files stay on Contents base64 — no unnecessary blob round-trips.
   assert.equal(calls.filter((url) => url.includes('/git/blobs/')).length, 1);
+});
+
+test('listGithubRelationshipEntries hides student counterparts from org and adult person lists', async () => {
+  resetProfessionalDataCache();
+  const { fetchImpl } = memoryFetch({
+    people: [
+      {
+        legacy_id: 'leg-adult',
+        display_name: 'Lauren Stuart',
+        original_category: 'People (Professional Relationship Management)'
+      },
+      {
+        legacy_id: 'leg-student',
+        display_name: 'Year 10 Student',
+        original_category: STUDENT_ORIGINAL_CATEGORY
+      }
+    ],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    relationships: [
+      {
+        person_legacy_id: 'leg-adult',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      },
+      {
+        person_legacy_id: 'leg-student',
+        organisation_legacy_id: 'leg-org-1',
+        relationship_type: 'employee_at',
+        role: null,
+        valid_from: null,
+        valid_to: null
+      },
+      {
+        person_legacy_id: 'leg-adult',
+        other_person_legacy_id: 'leg-student',
+        relationship_type: 'professional_relationship',
+        role: 'other',
+        valid_from: null,
+        valid_to: null
+      }
+    ]
+  });
+  const env = { GITHUB_TOKEN: 'token' };
+  const orgId = deriveOrganisationId('leg-org-1');
+  const adultId = derivePersonId('leg-adult');
+  const studentId = derivePersonId('leg-student');
+
+  const orgMembers = await listGithubRelationshipEntries('organisation', orgId, { env, fetchImpl });
+  assert.equal(orgMembers.length, 1);
+  assert.equal(orgMembers[0].otherRef, `shared:person:${adultId}`);
+
+  const adultRels = await listGithubRelationshipEntries('person', adultId, { env, fetchImpl });
+  assert.equal(adultRels.length, 1);
+  assert.equal(adultRels[0].link.relationship_type, 'employee_at');
+  assert.ok(!adultRels.some((e) => e.otherRef === `shared:person:${studentId}`));
+
+  // Student deep-link still sees their org edge (and adult counterpart), never another student.
+  const studentRels = await listGithubRelationshipEntries('person', studentId, { env, fetchImpl });
+  assert.ok(studentRels.some((e) => e.link.relationship_type === 'employee_at'));
+  assert.ok(!studentRels.some((e) => e.otherRef === `shared:person:${studentId}`));
+
+  const students = await listGithubImportedStudentPeople({ env, fetchImpl });
+  assert.equal(students.length, 1);
+  assert.equal(students[0].id, studentId);
 });
