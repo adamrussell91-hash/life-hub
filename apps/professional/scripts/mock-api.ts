@@ -1299,7 +1299,16 @@ export function createMockApi() {
       if (action !== 'update') {
         return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
       }
-      const input = (body ?? {}) as { display_name?: unknown; sort_name?: unknown; aliases?: unknown };
+      const input = (body ?? {}) as {
+        display_name?: unknown;
+        sort_name?: unknown;
+        aliases?: unknown;
+        professional_profile?: {
+          summary?: unknown;
+          linkedin_url?: unknown;
+          current_workplace?: unknown;
+        };
+      };
       if (typeof input.display_name === 'string') {
         const displayName = input.display_name.trim();
         if (!displayName) {
@@ -1315,6 +1324,55 @@ export function createMockApi() {
       }
       if (Array.isArray(input.aliases)) {
         record.aliases = input.aliases.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      }
+      if (record.kind === 'person' && input.professional_profile && typeof input.professional_profile === 'object') {
+        const pp = input.professional_profile;
+        type MockProfile = {
+          source?: { system: string; page_url: string | null; properties: Record<string, string> };
+          summary?: string | null;
+          contact?: { email: string | null; phone: string | null; linkedin_url: string | null };
+          last_contacted?: string | null;
+          current_workplace?: string[];
+          references?: Record<string, unknown>;
+          body_markdown?: string | null;
+        };
+        const existing =
+          record.professional_profile && typeof record.professional_profile === 'object'
+            ? (record.professional_profile as MockProfile)
+            : null;
+        record.professional_profile = {
+          schema_version: 1,
+          source: existing?.source ?? { system: 'hub', page_url: null, properties: {} },
+          summary:
+            pp.summary !== undefined
+              ? typeof pp.summary === 'string'
+                ? pp.summary.trim() || null
+                : null
+              : (existing?.summary ?? null),
+          contact: {
+            email: existing?.contact?.email ?? null,
+            phone: existing?.contact?.phone ?? null,
+            linkedin_url:
+              pp.linkedin_url !== undefined
+                ? typeof pp.linkedin_url === 'string' && pp.linkedin_url.trim()
+                  ? pp.linkedin_url.trim()
+                  : null
+                : (existing?.contact?.linkedin_url ?? null)
+          },
+          last_contacted: existing?.last_contacted ?? null,
+          current_workplace:
+            pp.current_workplace !== undefined
+              ? typeof pp.current_workplace === 'string'
+                ? pp.current_workplace.trim()
+                  ? [pp.current_workplace.trim()]
+                  : []
+                : Array.isArray(pp.current_workplace)
+                  ? pp.current_workplace.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+                  : []
+              : (existing?.current_workplace ?? []),
+          references: existing?.references ?? {},
+          body_markdown: existing?.body_markdown ?? null
+        };
       }
       record.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { ref: refFor(record), ...record } });

@@ -124,7 +124,9 @@ export function createPeopleLedgerHandler(deps = {}) {
         }
 
         if (request.method === 'POST') {
-          const body = await readJsonObject(request);
+          const parsed = await readJsonObject(request);
+          if (parsed.error) return withCors(parsed.error, request, env);
+          const body = parsed.value;
           const action = body?.action ?? url.searchParams.get('action');
 
           if (action === 'clare_scan') {

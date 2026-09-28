@@ -130,6 +130,33 @@ test('validatePersonFieldUpdate never accepts is_self, id, kind, lifecycle_statu
   assert.deepEqual(patch, { display_name: 'New Name' });
 });
 
+test('validatePersonFieldUpdate accepts professional_profile notes, LinkedIn, workplace', () => {
+  const patch = validatePersonFieldUpdate({
+    professional_profile: {
+      summary: ' Mentors in gifted ed ',
+      linkedin_url: 'https://www.linkedin.com/in/joe',
+      current_workplace: 'St Aloysius College'
+    }
+  });
+  assert.deepEqual(patch, {
+    professional_profile: {
+      summary: 'Mentors in gifted ed',
+      linkedin_url: 'https://www.linkedin.com/in/joe',
+      current_workplace: ['St Aloysius College']
+    }
+  });
+});
+
+test('validatePersonFieldUpdate rejects non-https LinkedIn', () => {
+  assert.throws(
+    () =>
+      validatePersonFieldUpdate({
+        professional_profile: { linkedin_url: 'http://linkedin.com/in/x' }
+      }),
+    (error) => error.code === 'invalid_linkedin_url'
+  );
+});
+
 test('validateOrganisationCreateInput requires display_name', () => {
   assert.throws(() => validateOrganisationCreateInput({}), error => error.code === 'display_name_required');
   const result = validateOrganisationCreateInput({ display_name: 'Example University' });
