@@ -53,6 +53,8 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
   if (item.kind === 'med') card.classList.add('med-card');
   if (item.status === 'todo') card.classList.add('gap-card');
 
+  // Edit joins the card's meta row, right-aligned (.mini has margin-left:auto).
+  let editHost: HTMLElement = card;
   if (isTicket) {
     const band = document.createElement('div');
     band.className = 'band';
@@ -74,8 +76,6 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     body.append(from, flight, to);
     const perf = document.createElement('div');
     perf.className = 'perf';
-    const meta = document.createElement('div');
-    meta.className = 'meta';
     const departLabel = document.createElement('span');
     departLabel.className = 'hm';
     departLabel.innerHTML = `${item.depart_time || 'Time to set'}<b>${item.title}</b>`;
@@ -107,7 +107,11 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       openLink.textContent = 'Open ticket';
       tagsWrap.append(openLink);
     }
-    card.append(band, body, departLabel, arriveLabel, perf, tagsWrap);
+    // Times sit inside the padded .body grid (row 2 under the IATA codes);
+    // appended to the card they ran flush to its edges.
+    body.append(departLabel, arriveLabel);
+    editHost = tagsWrap;
+    card.append(band, body, perf, tagsWrap);
   } else {
     const row1 = document.createElement('div');
     row1.className = 'row1';
@@ -143,6 +147,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     }
 
     card.append(row1, h3, p, meta);
+    editHost = meta;
 
     const place = itemPlace(item);
     if (place) {
@@ -168,7 +173,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       e.stopPropagation();
       options.onEdit?.(item);
     });
-    card.append(editBtn);
+    editHost.append(editBtn);
   }
 
   stop.setAttribute('role', 'button');
@@ -225,7 +230,10 @@ export function renderDayList(
     const k = document.createElement('span');
     k.className = 'k';
     k.textContent = 'Arrival guide';
-    summary.append(k, document.createTextNode(city.arrival_guide.title));
+    const heading = document.createElement('span');
+    heading.className = 'landing__title';
+    heading.textContent = city.arrival_guide.title;
+    summary.append(k, heading);
     const dl = document.createElement('dl');
     for (const row of city.arrival_guide.rows) {
       const dt = document.createElement('dt');
