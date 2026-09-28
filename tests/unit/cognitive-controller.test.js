@@ -399,7 +399,7 @@ test('Cartographers interrogation keeps Surveyor silent, uses no search, and sto
   assert.deepEqual(s.steps.map(st=>st.speaker),['miner','miner','miner','cartographer','miner','cartographer','miner','cartographer','cartographer','controller']);
   assert.deepEqual(s.steps.filter(st=>st.gate).map(st=>st.stage),['contradictions','master-synthesis']);
   for(const st of s.steps)assert.equal(buildPrompt(s,st).tools,undefined);
-  const full=start('cartographers','full');assert.ok(buildPrompt(full,full.steps[0]).tools);
+  const full=start('cartographers','full');assert.equal(buildPrompt(full,full.steps[0]).tools,undefined);
 });
 test('Witness trace has room for the reconstruction and closes with a summary',async()=>{
   const {calls}=await run('witness');
@@ -481,7 +481,13 @@ test('third live run: Fates briefing may skip questions, interrogation passes ar
   const c=start('cartographers','interrogation');
   assert.ok(c.steps.filter(st=>!st.gate&&st.speaker!=='controller').every(st=>st.maxBursts===1));
   assert.match(buildPrompt(c,c.steps[0]).system,/Ask nothing unless this is a checkpoint/);
-  const r=start('refinery','full');assert.equal(buildPrompt(r,r.steps.find(st=>st.speaker==='builder')).tools[0].max_uses,1);
+  const r=start('refinery','full');assert.equal(buildPrompt(r,r.steps.find(st=>st.speaker==='builder')).tools,undefined,'no live search inside a voice turn');
+});
+test('a closing question with no checkpoint is dropped from the shown text',async()=>{
+  let s=start('cartographers','interrogation');
+  s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),oneStage:true,model:async()=>({text:'Two clusters: speaking share and consultation. Continue to methodology audit, or draw here?',question:null,done:true,evidenceIds:[]})});
+  assert.equal(s.transcript.at(-1).text,'Two clusters: speaking share and consultation.');
+  assert.notEqual(s.status,'waiting');
 });
 test('a loosened Consilium opener still earns a re-ask',async()=>{
   let c=start('consilium');c.cursor=1;c.status='queued';c.retrieved=true;c.dialogueCounts={principle:1};c.answered={principle:1};const cc=[];
