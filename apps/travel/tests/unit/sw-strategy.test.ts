@@ -10,6 +10,7 @@ describe('travel service worker strategy (W3)', () => {
     expect(sw).toMatch(/travel-shell-v2/);
     expect(sw).not.toMatch(/travel-shell-v1/);
     expect(sw).toMatch(/skipWaiting/);
+    expect(sw).toMatch(/client\.navigate/);
     expect(sw).toMatch(/startsWith\('travel-shell-'\)/);
     expect(sw).toMatch(/url\.origin !== self\.location\.origin/);
     expect(sw).toMatch(/network-first/i);
