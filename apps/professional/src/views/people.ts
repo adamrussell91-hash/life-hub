@@ -681,12 +681,32 @@ export async function renderPeoplePage(
         const personEntity = overview.entity;
         if (personEntity.kind === 'person') {
           const cleaned = cleanIdentityDisplayName(personEntity.display_name) || personEntity.display_name;
+          const currentRels = overview.current_relationships ?? [];
+          const proRel = currentRels.find((e) => e.link.relationship_type === 'professional_relationship');
+          const orgRel = currentRels.find(
+            (e) =>
+              (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
+              e.endpoint.kind === 'organisation'
+          );
           const editor = mountIdentityEditor(
             cleaned === personEntity.display_name
               ? personEntity
               : { ...personEntity, display_name: cleaned },
             () => {
               void loadPersonSections(id);
+            },
+            {
+              relationshipRole: proRel?.link.role ?? null,
+              relationshipLinkId: proRel?.link.id ?? null,
+              organisation: orgRel
+                ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
+                : model.organisation
+                  ? {
+                      ref: model.organisation.ref,
+                      display_label: model.organisation.displayName
+                    }
+                  : null,
+              workplaceLinkId: orgRel?.link.id ?? null
             }
           );
           editor.button.classList.add('people-pane__edit');
@@ -738,13 +758,22 @@ export async function renderPeoplePage(
           stack.append(chips);
           const checkLinks = el('button', 'btn btn--ghost people-pane__check-links', 'Check for links') as HTMLButtonElement;
           checkLinks.type = 'button';
+          const checkStatus = el('p', 'people-pane__check-status');
+          checkStatus.hidden = true;
           checkLinks.addEventListener('click', () => {
             void (async () => {
               checkLinks.disabled = true;
               checkLinks.textContent = 'Checking…';
+              checkStatus.hidden = true;
               try {
-                await runLinkInference();
+                const result = await runLinkInference();
                 await loadPersonSections(id);
+                checkStatus.hidden = false;
+                if (result.created > 0) {
+                  checkStatus.textContent = `Found ${result.created} link proposal${result.created === 1 ? '' : 's'} — accept or decline on the chips above.`;
+                } else {
+                  checkStatus.textContent = 'No new link proposals.';
+                }
               } catch (err) {
                 window.alert(err instanceof Error ? err.message : 'Check for links failed.');
               } finally {
@@ -753,7 +782,7 @@ export async function renderPeoplePage(
               }
             })();
           });
-          stack.append(checkLinks);
+          stack.append(checkLinks, checkStatus);
           row.append(stack);
           headerHost.append(row, editor.form);
         } else {

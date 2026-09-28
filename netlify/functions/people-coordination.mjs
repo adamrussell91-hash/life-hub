@@ -21,7 +21,9 @@ export function createPeopleCoordinationHandler(deps = {}) {
         if (request.method !== 'POST') {
           return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
         }
-        const body = await readJsonObject(request);
+        const parsed = await readJsonObject(request);
+        if (parsed.error) return withCors(parsed.error, request, env);
+        const body = parsed.value;
         const action = body?.action ?? 'clare_sweep';
 
         if (action === 'clare_sweep') {

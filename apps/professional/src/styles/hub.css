@@ -897,6 +897,7 @@
 .application-detail__edit select,
 .application-detail__edit textarea,
 .add-person-form input,
+.add-person-form select,
 .add-person-form textarea {
   width: 100%;
   box-sizing: border-box;
@@ -3500,6 +3501,17 @@
 .people-pane__check-links {
   margin-top: 8px;
   align-self: flex-start;
+}
+
+.people-pane__check-status {
+  margin: 4px 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.person-editor textarea {
+  min-height: 4.5rem;
+  resize: vertical;
 }
 
 .people-pane__clare-btn {

@@ -81,7 +81,30 @@ export async function renderPersonPage(
       brief.href = personBriefRoute(person.id);
       brief.textContent = 'Open Person Brief';
 
-      const editor = mountIdentityEditor(person, reload);
+      const editor = mountIdentityEditor(person, reload, {
+        relationshipRole:
+          overview.current_relationships?.find((e) => e.link.relationship_type === 'professional_relationship')
+            ?.link.role ?? null,
+        relationshipLinkId:
+          overview.current_relationships?.find((e) => e.link.relationship_type === 'professional_relationship')
+            ?.link.id ?? null,
+        organisation: (() => {
+          const orgRel = overview.current_relationships?.find(
+            (e) =>
+              (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
+              e.endpoint.kind === 'organisation'
+          );
+          return orgRel
+            ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
+            : null;
+        })(),
+        workplaceLinkId:
+          overview.current_relationships?.find(
+            (e) =>
+              (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
+              e.endpoint.kind === 'organisation'
+          )?.link.id ?? null
+      });
       const actions = el('div', 'entity-detail__profile-actions');
       actions.append(brief, editor.button);
       if (options.onHeaderReady) {

@@ -143,6 +143,10 @@ export function validatePersonCreateInput(input) {
 // `lifecycle_status`, `created_at`, and `updated_at` are never accepted
 // here — lifecycle changes go through entity-lifecycle.mjs, and is_self is
 // immutable after creation (Person rule 3).
+//
+// `professional_profile` may carry a partial operator edit (summary /
+// LinkedIn / current workplace). identity-repository merges it onto the
+// existing profile (or a hub-sourced shell) via mergeProfessionalProfile.
 export function validatePersonFieldUpdate(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw validationError('invalid_input', 'A field update requires a request body object.');
@@ -162,6 +166,65 @@ export function validatePersonFieldUpdate(input) {
   if (input.aliases !== undefined) {
     if (!isStringArray(input.aliases)) throw validationError('invalid_aliases', 'aliases must be an array of strings.');
     patch.aliases = [...input.aliases];
+  }
+  if (input.professional_profile !== undefined) {
+    const profile = input.professional_profile;
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+      throw validationError('invalid_professional_profile', 'professional_profile must be an object.');
+    }
+    const profilePatch = {};
+    if (profile.summary !== undefined) {
+      if (profile.summary !== null && typeof profile.summary !== 'string') {
+        throw validationError('invalid_summary', 'summary must be a string or null.');
+      }
+      profilePatch.summary =
+        profile.summary === null ? null : profile.summary.trim() || null;
+    }
+    if (profile.linkedin_url !== undefined) {
+      if (profile.linkedin_url !== null && typeof profile.linkedin_url !== 'string') {
+        throw validationError('invalid_linkedin_url', 'linkedin_url must be a string or null.');
+      }
+      if (profile.linkedin_url === null || profile.linkedin_url.trim() === '') {
+        profilePatch.linkedin_url = null;
+      } else {
+        try {
+          const url = new URL(profile.linkedin_url.trim());
+          if (url.protocol !== 'https:') {
+            throw validationError('invalid_linkedin_url', 'linkedin_url must be an https URL.');
+          }
+          profilePatch.linkedin_url = url.href;
+        } catch (error) {
+          if (error?.code === 'invalid_linkedin_url') throw error;
+          throw validationError('invalid_linkedin_url', 'linkedin_url must be an https URL.');
+        }
+      }
+    }
+    if (profile.current_workplace !== undefined) {
+      if (typeof profile.current_workplace === 'string') {
+        const label = profile.current_workplace.trim();
+        profilePatch.current_workplace = label ? [label] : [];
+      } else if (Array.isArray(profile.current_workplace)) {
+        if (!profile.current_workplace.every((item) => typeof item === 'string')) {
+          throw validationError(
+            'invalid_current_workplace',
+            'current_workplace must be a string or an array of strings.'
+          );
+        }
+        profilePatch.current_workplace = profile.current_workplace
+          .map((item) => item.trim())
+          .filter(Boolean);
+      } else if (profile.current_workplace === null) {
+        profilePatch.current_workplace = [];
+      } else {
+        throw validationError(
+          'invalid_current_workplace',
+          'current_workplace must be a string or an array of strings.'
+        );
+      }
+    }
+    if (Object.keys(profilePatch).length) {
+      patch.professional_profile = profilePatch;
+    }
   }
   return patch;
 }

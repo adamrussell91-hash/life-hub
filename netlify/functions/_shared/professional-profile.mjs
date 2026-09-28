@@ -70,16 +70,19 @@ function references(value) {
   return result;
 }
 
+const PROFILE_SOURCE_SYSTEMS = new Set(['notion', 'hub']);
+
 /**
- * Parses the versioned extension written by the Professional People importer.
- * An invalid extension is isolated to that profile: callers can still return
- * its stable shared Person identity rather than blanking the directory.
+ * Parses the versioned extension written by the Professional People importer
+ * (and hub-authored edits). An invalid extension is isolated to that profile:
+ * callers can still return its stable shared Person identity rather than
+ * blanking the directory.
  */
 export function parseProfessionalProfile(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   if (raw.schema_version !== PROFESSIONAL_PROFILE_SCHEMA_VERSION) return null;
   if (!raw.source || typeof raw.source !== 'object' || Array.isArray(raw.source)) return null;
-  if (raw.source.system !== 'notion') return null;
+  if (!PROFILE_SOURCE_SYSTEMS.has(raw.source.system)) return null;
 
   const properties = sourceProperties(raw.source.properties);
   const summary = raw.summary === null || raw.summary === undefined ? null : boundedString(raw.summary);
@@ -105,7 +108,7 @@ export function parseProfessionalProfile(raw) {
   return {
     schema_version: PROFESSIONAL_PROFILE_SCHEMA_VERSION,
     source: {
-      system: 'notion',
+      system: raw.source.system,
       page_url: safeHttpsUrl(raw.source.page_url),
       properties
     },
@@ -120,4 +123,50 @@ export function parseProfessionalProfile(raw) {
     references: parsedReferences,
     body_markdown: body
   };
+}
+
+function emptyHubProfile() {
+  return {
+    schema_version: PROFESSIONAL_PROFILE_SCHEMA_VERSION,
+    source: { system: 'hub', page_url: null, properties: {} },
+    summary: null,
+    contact: { email: null, phone: null, linkedin_url: null },
+    last_contacted: null,
+    current_workplace: [],
+    references: {},
+    body_markdown: null
+  };
+}
+
+/**
+ * Merge operator-authored profile fields onto an existing (or empty hub)
+ * professional_profile. Notion provenance is preserved when present.
+ */
+export function mergeProfessionalProfile(existing, patch) {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) return null;
+  const base = parseProfessionalProfile(existing) ?? emptyHubProfile();
+  const next = {
+    ...base,
+    source: {
+      system: base.source.system === 'notion' ? 'notion' : 'hub',
+      page_url: base.source.page_url,
+      properties: { ...base.source.properties }
+    },
+    summary: patch.summary !== undefined ? patch.summary : base.summary,
+    contact: {
+      email: base.contact.email,
+      phone: base.contact.phone,
+      linkedin_url: patch.linkedin_url !== undefined ? patch.linkedin_url : base.contact.linkedin_url
+    },
+    current_workplace:
+      patch.current_workplace !== undefined ? patch.current_workplace : base.current_workplace
+  };
+  return parseProfessionalProfile(next);
+}
+
+/** Validate a LinkedIn / external https URL (or null/empty → null). */
+export function normalizeProfileHttpsUrl(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value !== 'string') return undefined;
+  return safeHttpsUrl(value.trim());
 }

@@ -24,10 +24,16 @@ export interface UpdatePersonInput {
   display_name?: string;
   sort_name?: string | null;
   aliases?: string[];
+  professional_profile?: {
+    summary?: string | null;
+    linkedin_url?: string | null;
+    current_workplace?: string | string[] | null;
+  };
 }
 
 /** `PATCH /api/entities?ref=<canonical ref>&action=update` — ordinary
- * Person fields only. `is_self` and lifecycle stay off this path. */
+ * Person fields plus optional professional_profile edits (notes / LinkedIn /
+ * workplace labels). `is_self` and lifecycle stay off this path. */
 export function updatePerson(
   ref: string,
   patch: UpdatePersonInput,
