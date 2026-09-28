@@ -501,6 +501,8 @@ export function mountCareerRiver(
       }
     } else {
       // Phone: labeled ticks beside the trunk so 390 is not mute grey.
+      // Stagger + collision-hide so concurrent lanes don't paint on one glyph.
+      const vertLabelBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
       for (let index = 0; index < employmentAll.length; index++) {
         const job = employmentAll[index]!;
         const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
@@ -533,21 +535,30 @@ export function mountCareerRiver(
         title.textContent = tip;
         bar.appendChild(title);
         group.appendChild(bar);
-        const roleShort = jobRoleLabel(job);
-        // Phone: full short label beside the tick — never ellipsis mid-phrase
-        // ("Leader of…"). Tip still carries the full role if text is dense.
-        const labelText = roleShort;
+        const labelText = jobRoleLabel(job);
+        // Full short label beside the tick — never ellipsis mid-phrase.
         if (labelText) {
-          const label = svgEl('text', {
-            x: x + 8,
-            y: (y0 + y1) / 2 + 4,
-            class: 'career-river__role-label career-river__role-label--below',
-            'data-part': 'role-label',
-            'data-place': 'beside'
-          });
-          label.textContent = labelText;
-          label.setAttribute('title', tip);
-          group.appendChild(label);
+          const approxW = labelText.length * 6.2;
+          const lx = x + 8;
+          const ly = Math.min(y1 - 4, Math.max(y0 + 12, (y0 + y1) / 2 + 4 + lane * 14));
+          const box = { x: lx, y: ly - 10, w: approxW, h: 12 };
+          const hits = vertLabelBoxes.some(
+            (b) =>
+              !(box.x + box.w < b.x || b.x + b.w < box.x || box.y + box.h < b.y || b.y + b.h < box.y)
+          );
+          if (!hits) {
+            const label = svgEl('text', {
+              x: lx,
+              y: ly,
+              class: 'career-river__role-label career-river__role-label--below',
+              'data-part': 'role-label',
+              'data-place': 'beside'
+            });
+            label.textContent = labelText;
+            label.setAttribute('title', tip);
+            group.appendChild(label);
+            vertLabelBoxes.push(box);
+          }
         }
         svg.appendChild(group);
       }
