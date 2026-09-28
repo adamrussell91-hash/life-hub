@@ -1,6 +1,7 @@
 import { API_BASE } from "../api/config";
 import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
+import { stripDanglingQuestions } from "../../../../config/knowledge/cognitive/dangling-question.mjs";
 import { catalog as definitionCatalog } from "../../../../config/knowledge/cognitive/definitions.mjs";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string; description: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
@@ -509,6 +510,10 @@ function liveSlotHtml(session: Session, definition: Definition, who: string, rol
 function readTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
   return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}${sourcesHtml(turn, evidence)}</article>`;
 }
+function endedTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
+  const body = stripDanglingQuestions(turn.text);
+  return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${body ? turnBodyHtml(body) : ""}<p>Session ended.</p>${sourcesHtml(turn, evidence)}</article>`;
+}
 function joiningCardHtml(who: string, role: string): string {
   return `<div class="protocol-turn-card protocol-turn-card--live">${personaMetaHtml(who, role)}<p>${escapeHtml(who)} is joining the conversation…</p></div>`;
 }
@@ -572,7 +577,7 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const cardHtml = cardIsLive
     ? liveSlotHtml(session, definition, activeName, activeRole, precedingText, precedingTurn)
     : turn
-      ? readTurnCardHtml(turn, activeName, activeRole, session.evidence)
+      ? (ended && isLatest ? endedTurnCardHtml(turn, activeName, activeRole, session.evidence) : readTurnCardHtml(turn, activeName, activeRole, session.evidence))
       : ended
         ? `<article class="protocol-turn-card"><p>Session ended.</p></article>`
         : joiningCardHtml(activeName, activeRole);
