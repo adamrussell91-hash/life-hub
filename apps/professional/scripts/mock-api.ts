@@ -92,6 +92,8 @@ interface RelationshipSeed {
   valid_from: string | null;
   valid_to: string | null;
   occurred_at: string | null;
+  role?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface CommunicationRecord {
@@ -515,6 +517,18 @@ export function createMockApi() {
 
     if (path === '/api/people/link-proposals' && method === 'GET') {
       return json(200, { ok: true, data: { proposals: [], count: 0 } });
+    }
+
+    if (path === '/api/people/self' && method === 'GET') {
+      const self = [...people.values()].find((p) => p.is_self) ?? null;
+      return json(200, {
+        ok: true,
+        data: {
+          self: self
+            ? { ref: `shared:person:${self.id}`, display_name: self.display_name }
+            : null
+        }
+      });
     }
 
     if (path === '/api/people/link-proposals' && method === 'POST') {
@@ -2755,6 +2769,8 @@ export function createMockApi() {
         source_ref?: string;
         target_ref?: string;
         relationship_type?: string;
+        role?: string | null;
+        valid_from?: string | null;
         metadata?: Record<string, unknown>;
       };
       for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
@@ -2776,6 +2792,7 @@ export function createMockApi() {
           link.status === 'current'
       );
       if (existing) {
+        if (input.role !== undefined) existing.role = input.role;
         return json(200, {
           ok: true,
           data: {
@@ -2784,7 +2801,8 @@ export function createMockApi() {
               source_ref: existing.source_ref,
               target_ref: existing.target_ref,
               relationship_type: existing.relationship_type,
-              status: existing.status
+              status: existing.status,
+              role: existing.role ?? null
             },
             created: false
           }
@@ -2802,9 +2820,10 @@ export function createMockApi() {
         context_key: null,
         status: 'current',
         temporal_mode: 'timeless',
-        valid_from: null,
+        valid_from: input.valid_from ?? null,
         valid_to: null,
         occurred_at: null,
+        role: input.role ?? null,
         ...(input.metadata ? { metadata: input.metadata } : {})
       });
       return json(201, {
@@ -2816,6 +2835,7 @@ export function createMockApi() {
             target_ref: input.target_ref,
             relationship_type: input.relationship_type,
             status: 'current',
+            role: input.role ?? null,
             ...(input.metadata ? { metadata: input.metadata } : {})
           },
           created: true
@@ -2861,6 +2881,42 @@ export function createMockApi() {
               }
         }));
       return json(200, { ok: true, data: { outgoing, incoming } });
+    }
+
+    if (path === '/api/universal-links' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const action = url.searchParams.get('action') ?? '';
+      const link = relationships.find((r) => r.id === id);
+      if (!id || !link) {
+        return json(404, { ok: false, error: { code: 'link_not_found', message: 'Link not found.' } });
+      }
+      const input = (body ?? {}) as {
+        role?: string | null;
+        changed_at?: string;
+        valid_to?: string | null;
+        reason?: string;
+      };
+      if (action === 'end' || action === 'suppress') {
+        link.status = 'ended';
+        link.valid_to = input.valid_to ?? new Date().toISOString();
+        return json(200, { ok: true, data: { link } });
+      }
+      if (action === 'change_role') {
+        const ended = { ...link, status: 'ended', valid_to: input.changed_at ?? new Date().toISOString() };
+        link.status = 'ended';
+        link.valid_to = ended.valid_to;
+        const created: RelationshipSeed = {
+          ...link,
+          id: `${link.id}_role_${Date.now().toString(36)}`,
+          status: 'current',
+          role: input.role ?? null,
+          valid_from: input.changed_at ?? new Date().toISOString(),
+          valid_to: null
+        };
+        relationships.push(created);
+        return json(200, { ok: true, data: { ended, created } });
+      }
+      return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
     }
 
     return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown route.' } });

@@ -345,12 +345,7 @@ export function mountIdentityEditor(
         }
 
         if (warnings.length) {
-          status.hidden = false;
-          status.textContent = warnings.join(' ');
-          save.disabled = false;
-          // Profile identity saved; still refresh so the pane catches up.
-          onSaved();
-          return;
+          window.alert(warnings.join('\n'));
         }
         onSaved();
       } catch (err: unknown) {
