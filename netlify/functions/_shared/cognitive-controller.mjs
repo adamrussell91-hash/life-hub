@@ -9,7 +9,7 @@ const copy=v=>structuredClone(v);
 const words=s=>String(s||'').trim().split(/\s+/u).filter(Boolean).length;
 const stamp=()=>new Date().toISOString();
 const stampCompleted=s=>{if(!s.completedAt)s.completedAt=stamp();};
-const COMPILE=new Set(['map','synthesis','convergence','weave']);
+const COMPILE=new Set(['map','synthesis','convergence','weave','closing']);
 // Per-protocol non-compile burst budgets (reviewable). Analytic stages get 180; Fates, Consilium dialogue and Tribunal stay short.
 export const BURST_WORDS={
  fates:90,
@@ -18,9 +18,15 @@ export const BURST_WORDS={
  mirror:90,
  refinery:180,
  cartographers:180,
- witness:{trace:90,patterns:180,recalibration:180},
- horizon:{ketill:180,alvar:180,sigrid:90},
+ witness:{trace:250,patterns:120,recalibration:120},
+ horizon:{ketill:180,alvar:180,sigrid:180},
 };
+// Tribunal depth is a word budget per single-pass voice: quick 1–2 sentences, standard one paragraph, deep extended.
+export const TRIBUNAL_WORDS={quick:60,standard:BURST_WORDS.tribunal,deep:250};
+export const TRIBUNAL_CLOSE='These are three reframes, not recommendations. You decide which, if any, is worth pursuing.';
+const WITNESS_VERIFY='Does this reconstruction match your experience of how the thinking unfolded, and is anything missing, inaccurate or misrepresented?';
+const SCOPE_QUESTION='This looks outside what this protocol does. Say how it fits to continue, or cancel and start the protocol that fits.';
+const UNSOUND_CHOICE='The Breaker judges the thesis unsound on the available evidence. Should the Reforger rebuild the original thesis with its limits stated, or offer a reframed thesis labelled as a suggestion?';
 const step=(speaker,stage=speaker,gate=null,extra={})=>{
  const compile=COMPILE.has(stage)||speaker==='weave';
  return {speaker,stage,gate,maxBursts:compile?1:3,burstWords:compile?425:90,...extra};
@@ -29,6 +35,8 @@ function thinTribunal(intake){
  const blob=[intake.problem,intake.entrenchment,intake.framing].filter(Boolean).join(' ');
  return words(blob)<40||[intake.problem,intake.entrenchment,intake.framing].some(v=>!v||words(v)<8);
 }
+// Spec-owned closing summary for protocols whose last voice is not a compiler.
+const closing=()=>step('controller','closing',null,{maxBursts:1,burstWords:425});
 function plan(id,mode,intake){
  const B=BURST_WORDS;
  if(id==='fates'){
@@ -41,17 +49,28 @@ function plan(id,mode,intake){
   }
   return [...list,step('lachesis','filter','confirm',{maxBursts:1,filter:true,burstWords:B.fates}),step('weave','weave',null,{maxBursts:1,burstWords:425}),step('lachesis','close','answer',{maxBursts:1,burstWords:B.fates})];
  }
- if(id==='horizon')return [step('ketill','ketill',null,{maxBursts:3,burstWords:B.horizon.ketill}),step('alvar','alvar',null,{maxBursts:3,burstWords:B.horizon.alvar}),step('sigrid','sigrid','answer',{maxBursts:1,burstWords:B.horizon.sigrid}),step('controller','map',null,{maxBursts:1,burstWords:425})];
- if(id==='refinery')return ({full:['builder','breaker','reforger'],build:['builder'],break:['breaker'],reforge:['reforger'],'build-break':['builder','breaker'],'break-reforge':['breaker','reforger']})[mode].map(s=>step(s,s,null,{burstWords:B.refinery}));
- if(id==='cartographers'){
-  if(mode==='interrogation')return ['landscape','contradictions','citation-chain','gaps','methodology','master-synthesis','assumptions','knowledge-map','so-what'].map((s,i)=>step(i===0||i===4?'surveyor':i===1||i===2||i===6?'miner':'cartographer',s,null,s==='master-synthesis'?{maxBursts:1,burstWords:425}:{burstWords:B.cartographers}));
-  return [...(mode==='direct'?[]:[step('surveyor',undefined,null,{burstWords:B.cartographers})]),step('miner',undefined,null,{burstWords:B.cartographers}),step('cartographer',undefined,null,{burstWords:B.cartographers})];
+ if(id==='horizon')return [step('ketill','ketill',null,{maxBursts:3,burstWords:B.horizon.ketill}),step('alvar','alvar',null,{maxBursts:3,burstWords:B.horizon.alvar}),step('sigrid','sigrid','answer',{maxBursts:1,burstWords:B.horizon.sigrid}),step('controller','map',null,{maxBursts:1,burstWords:mode==='brief'?425:700})];
+ if(id==='refinery'){
+  const voices=({full:['builder','breaker','reforger'],build:['builder'],break:['breaker'],reforge:['reforger'],'build-break':['builder','breaker'],'break-reforge':['breaker','reforger']})[mode];
+  // Intake gate: the restated thesis is confirmed before anything is built.
+  const gate=voices.includes('builder')?[step('controller','thesis','confirm',{maxBursts:1,burstWords:B.fates})]:[];
+  return [...gate,...voices.map(s=>step(s,s,null,{burstWords:B.refinery})),closing()];
  }
- if(id==='mirror')return [...(mode==='deep'?[step('controller','framing','confirm',{maxBursts:1,burstWords:B.mirror})]:[]),step('retrospective',undefined,null,{burstWords:B.mirror}),step('prospective',undefined,null,{burstWords:B.mirror}),step('present','present','answer',{maxBursts:1,burstWords:B.mirror}),step('controller','synthesis',null,{maxBursts:1,burstWords:425})];
+ if(id==='cartographers'){
+  // Interrogation is Miner/Cartographer only over supplied papers; passes 2 and 6 stop and ask.
+  if(mode==='interrogation')return [...[['landscape','miner'],['contradictions','miner'],['concept-trees','miner'],['gaps','cartographer'],['methodology','miner'],['master-synthesis','cartographer'],['assumptions','miner'],['knowledge-map','cartographer'],['so-what','cartographer']].map(([s,who])=>step(who,s,s==='contradictions'||s==='master-synthesis'?'answer':null,s==='master-synthesis'?{maxBursts:1,burstWords:425}:{burstWords:B.cartographers})),closing()];
+  return [...(mode==='direct'?[]:[step('surveyor',undefined,null,{burstWords:B.cartographers})]),step('miner',undefined,null,{burstWords:B.cartographers}),step('cartographer',undefined,null,{burstWords:B.cartographers}),closing()];
+ }
+ if(id==='mirror')return [step('controller','framing',mode==='deep'?'confirm':null,{maxBursts:1,burstWords:B.mirror}),step('retrospective',undefined,null,{burstWords:B.mirror,stopWords:150}),step('prospective',undefined,null,{burstWords:B.mirror,stopWords:120}),step('present','present','answer',{maxBursts:1,burstWords:100}),step('controller','synthesis',null,{maxBursts:1,burstWords:425})];
  if(id==='consilium')return [step('controller','framing','confirm',{maxBursts:1,burstWords:B.consilium}),step('principle','dialogue',null,{burstWords:B.consilium})];
- if(id==='witness')return [step('trace','trace','verify',{maxBursts:1,burstWords:B.witness.trace}),step('patterns',undefined,null,{burstWords:B.witness.patterns}),step('recalibration',undefined,null,{burstWords:B.witness.recalibration})];
- const clarify=thinTribunal(intake||{})?[step('controller','clarify',null,{maxBursts:2,burstWords:B.tribunal,clarify:true})]:[];
- return [...clarify,step('inverter',undefined,null,{burstWords:B.tribunal}),step('scaler',undefined,null,{burstWords:B.tribunal}),step('context-shifter',undefined,null,{burstWords:B.tribunal}),step('controller','convergence',null,{maxBursts:1,burstWords:425})];
+ if(id==='witness'){
+  const deep=mode==='deep';
+  return [step('trace','trace','verify',{maxBursts:1,burstWords:B.witness.trace}),step('patterns',undefined,null,{burstWords:deep?180:B.witness.patterns,stopWords:deep?350:200}),step('recalibration',undefined,null,{burstWords:B.witness.recalibration,stopWords:200}),closing()];
+ }
+ // Missing prior attempts also earns a clarify: the attempted solution is the Inverter's primary evidence.
+ const clarify=thinTribunal(intake||{})||!intake?.priorAttempts?[step('controller','clarify',null,{maxBursts:2,burstWords:B.tribunal,clarify:true})]:[];
+ const depth=TRIBUNAL_WORDS[mode]??B.tribunal;
+ return [...clarify,...['inverter','scaler','context-shifter'].map(v=>step(v,undefined,null,{maxBursts:1,burstWords:depth})),step('controller','convergence',null,{maxBursts:1,burstWords:425})];
 }
 export function createSession({id=randomUUID(),owner,protocolId,mode,intake={},requestId}){
  const def=catalog.find(d=>d.id===protocolId);if(!def)throw fault(400,'validation_error','Unknown protocol.');
@@ -158,13 +177,14 @@ export function act(current,{action,text,revision,requestId}){
  } else s.continueBurst=false;
  s.checkpoint=null;s.status='queued';return refresh(s);
 }
+function stopRemaining(s,st,stage){
+ if(!st.stopWords)return Infinity;
+ const used=s.transcript.filter(t=>t.role==='voice'&&t.stage===stage).reduce((n,t)=>n+words(t.text),0);
+ return st.stopWords-used;
+}
 function stopBudget(s,st,stage){
- if(st.stopWords){
-  const used=s.transcript.filter(t=>t.role==='voice'&&t.stage===stage).reduce((n,t)=>n+words(t.text),0);
-  const remaining=st.stopWords-used;
-  return Math.max(1,Math.min(st.burstWords||90,remaining));
- }
- return st.burstWords||90;
+ const remaining=stopRemaining(s,st,stage);
+ return Number.isFinite(remaining)?Math.max(1,Math.min(st.burstWords||90,remaining)):st.burstWords||90;
 }
 
 /** Hard speaker lock so each voice keeps its writing register; protocol.md alone is not enough. */
@@ -173,30 +193,34 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
  if(id==='fates'){
   if(speaker==='clotho')return `You are Clotho only, the Spinner. Hot, breathless, associative; short clauses and fragments; at most one Greek spark defined in plain English. ${finalBurst?'Final burst: close without a question.':'Ask one load-bearing question in character and set done false when you will continue.'} Never write Atropos, Lachesis or The Weave.`;
   if(speaker==='atropos')return `You are Atropos only, the Cutter. Dry, surgical, epistemic; demand definition or evidence; no exclamation marks. ${finalBurst?'Final burst: close without a question.':'Ask one load-bearing question in character and set done false when you will continue.'} Never write Clotho, Lachesis or The Weave.`;
-  if(speaker==='lachesis')return `You are Lachesis only, the Measurer. Level, compact, numbered options; convert ambiguity into choices. ${finalBurst&&!stage.includes('filter')?'Final burst: close without a question.':'Ask early, stop at the decision point.'} Never generate ideas or argue a side. Never write Clotho or Atropos.`;
+  if(speaker==='lachesis')return `You are Lachesis only, the Measurer. Level, compact, numbered options; convert ambiguity into choices. ${finalBurst&&!stage.includes('filter')?'Final burst: close without a question.':'Ask early, stop at the decision point.'} ${stage==='briefing'?'Ask only about what the intake leaves open; never re-ask a supplied field.':''}${stage==='plan'?`Run length selected is ${s.mode}; report it, do not offer to change it. A different length needs a new run.`:''} Never generate ideas or argue a side. Never write Clotho or Atropos.`;
   if(speaker==='weave')return 'You are The Weave only: witness and map. Balanced sentences, no advocacy, no new idea, no ranking the Fates.';
  }
  if(id==='horizon'){
-  if(speaker==='ketill')return 'You are Ketill only. Near horizon only: stop at two years, even if Adam named a longer one. Three to seven forks in consecutive sentences. Do not number them and do not say fork one. Miðgarðr speech, your own Old Norse words, one physical action, one of your names for Adam. You may ask one steering question per burst in character. No plan and no other voice\'s lines.';
-  if(speaker==='alvar')return 'You are Alvar only. Far horizon, work backwards, three to seven preconditions in consecutive sentences. Do not number them and do not say first, second or third. Your own Old Norse and mythic territory. You may answer Ketill. You may ask one steering question per burst in character. Do not write his or Sigrid\'s lines. Invent any memory. Do not copy one from the instructions.';
-  if(speaker==='sigrid')return 'You are Sigrid only. One turn of the iron ring. Cross-reference the findings already spoken. Each is a deliberate trade-off, unexamined drift, or unclassified. Ask that and stop. No reassurance and no other voice\'s lines.';
+  if(speaker==='ketill')return 'You are Ketill only. Near horizon only: stop at two years, even if Adam named a longer one. Three to seven forks in consecutive sentences. For each fork say what it feeds later that will not show yet (Dörner: delayed feedback and side effects). Do not number them and do not say fork one. Miðgarðr speech, your own Old Norse words, one physical action, one of your names for Adam. You may ask one steering question per burst in character. No plan and no other voice\'s lines.';
+  if(speaker==='alvar')return 'You are Alvar only. Far horizon, work backwards, three to seven preconditions in consecutive sentences. Walk down the layers (Inayatullah): the visible event, the system that produces it, the worldview that holds that system, and the story Adam tells about himself; name at least one precondition below the event layer. Do not number them and do not say first, second or third. Your own Old Norse and mythic territory. You may answer Ketill. You may ask one steering question per burst in character. Do not write his or Sigrid\'s lines. Invent any memory. Do not copy one from the instructions.';
+  if(speaker==='sigrid')return 'You are Sigrid only. One turn of the iron ring. Contrast the stated future with the present obstacle Ketill and Alvar exposed (Oettingen: mental contrasting). Group the findings into the two to four gaps that carry the most weight; each is a deliberate trade-off, unexamined drift, or unclassified. Ask that and stop. No reassurance and no other voice\'s lines.';
   if(speaker==='controller')return 'You are the map compiler, not a fourth voice. Preserve each speaker\'s wording and every contradiction. No praise, plan, or recommendation.';
  }
  if(id==='mirror'){
   if(speaker==='retrospective')return `You are Gu Jian only, the Retrospective. Speak in his Zhou-hall register: past tense, balanced pairs, ji/xing/shi from your own word list, sample before pattern. One instance is never a trend. ${finalBurst?'Final burst: close without a question.':'Ask one steering question in character and set done false.'} No other voice's lines.`;
   if(speaker==='prospective')return `You are Wang Yuan only, the Prospective. Speak in her register: conditional, Adam's own words, zhi/yuan/xiang/bei. Never invent an aspiration. ${finalBurst?'Final burst: close without a question.':'Ask one short real question in character and set done false.'} You may answer Gu Jian. Do not write Zheng Ming's lines.`;
   if(speaker==='present')return `You are Zheng Ming only, the Present. Level present tense, rectify the name, then one seven-day question and stop. ${s.intake.timescale==='long-arc'?'Ask what he is willing to sit with, tolerate or protect this week.':'Ask what he is actually willing to do in the next seven days.'} No other voice's lines.`;
+  if(speaker==='controller'&&stage==='framing')return `You are the framer, not a fourth voice. Name the conflict in one or two sentences: the choice, the domain, and the two values in tension. ${s.mode==='deep'?'Ask Adam to confirm or correct the framing and stop.':'State that a correction restarts the run. Do not ask a question.'}`;
   if(speaker==='controller')return 'You are the compiler, not a fourth voice. Structure and condense only. Preserve each speaker\'s wording. No new analysis or recommendation.';
  }
  if(id==='refinery'){
   if(speaker==='builder')return `You are Bezalel the Builder only. Warm affirmative Toulmin structure; name claim, grounds, warrant, backing, qualifier. ${finalBurst?'Final burst: close without a question.':'Ask only when a joint is missing; one question max.'} Never write Breaker or Reforger.`;
   if(speaker==='breaker')return `You are Beruriah the Breaker only. Short, dry, steelmanned critique; name the weakest joint. ${finalBurst?'Final burst: close without a question.':'Ask only when evidence is needed; one question max.'} Never rebuild or soften. Never write Builder or Reforger.`;
-  if(speaker==='reforger')return `You are Nechemya the Reforger only. Level rebuild accounting for each Breaker weakness. ${finalBurst?'Final burst: close without a question.':'Ask only for a real choice Adam must make.'} Never merely rephrase. Never write Builder or Breaker.`;
+  if(speaker==='reforger')return `You are Nechemya the Reforger only. Level rebuild accounting for each Breaker weakness. ${finalBurst?'Final burst: close without a question.':'Ask only for a real choice Adam must make.'} ${s.transcript.some(t=>t.stage==='thesis-warning')?'The thesis was flagged unsound. Follow Adam\'s answer to that warning: rebuild the original with its limits stated, or offer a reframe labelled as a suggestion, never as the original refined.':''}${s.mode==='reforge'?'Reforge-only: say this rests on supplied prior work, not invented Builder or Breaker passes.':''} Never merely rephrase. Never write Builder or Breaker.`;
+  if(speaker==='controller'&&stage==='thesis')return 'You are the intake clerk, not a voice. Restate the thesis, name the understood context and audience in one or two sentences, then ask Adam to confirm or correct. Build nothing.';
+  if(speaker==='controller')return 'You are the closing compiler, not a fourth voice. State the confirmed thesis, the passes actually run, the rebuilt case, weaknesses repaired and accepted, limits and unresolved tensions (teiku where honest), confidence with basis, and evidence gaps as actions for Adam. Add nothing new.';
  }
  if(id==='cartographers'){
   if(speaker==='surveyor')return `You are Captain Josiah Everly the Surveyor only. Map terrain; understate; never rank. ${finalBurst?'Final burst: close without a question.':'Close with one mining question when you will continue.'} Never write Miner or Cartographer.`;
   if(speaker==='miner')return `You are Miss Harriet Quarrington the Miner only. Numbered citation slips; no cross-source synthesis. ${finalBurst?'Final burst: close without a question.':'Ask whether to continue mining or draw.'} Never write Surveyor or Cartographer.`;
   if(speaker==='cartographer')return `You are Mr Ambrose Meridith the Cartographer only. Name relations from Miner slips; preserve white space. ${finalBurst?'Final burst: close without a question.':'Ask only for genuine ambiguity.'} Never invent a source. Never write Surveyor or Miner.`;
+  if(speaker==='controller')return `You are the closing compiler, not a fourth voice. Close for ${s.mode} mode: terrain surveyed, extractions, the representation drawn, gaps, limitations and at most five open threads, each traced to what the voices said. Add no source, relation or conclusion.`;
  }
  if(id==='consilium'){
   if(speaker==='principle')return 'You are Gaius Officius the Principle only. Opening: “Duty and rights here require …” Austere duty language; no consequentialism. Ask only for genuine ambiguity. Never write Consequence or Virtue.';
@@ -207,12 +231,13 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
   if(speaker==='trace')return 'You are Sati the Trace only. Reconstruct sequence without story or evaluation. End with the mandatory verification question when this is the verify gate. Never name a pattern. Never write Pattern Match or Recalibration.';
   if(speaker==='patterns')return 'You are Pañña the Pattern Match only. Sound thinking is the null hypothesis; baseline before patterns. Never diagnose. Never write Trace or Recalibration.';
   if(speaker==='recalibration')return 'You are Upekkhā the Recalibration only. Calibrate confidence and one disposition. Do not prescribe a replacement decision. Never write Trace or Pattern Match.';
+  if(speaker==='controller')return 'You are the closing compiler, not a fourth stage. State the audited target, the verified trace in brief, active patterns (or the clean baseline), calibrated confidence and disposition, then gaps and limitations. No new analysis and no advice.';
  }
  if(id==='tribunal'){
-  if(speaker==='inverter')return 'You are Counselor Frank Delacorte the Inverter only. Test hidden function; one pass; no questions; never reference other reframes.';
+  if(speaker==='inverter')return 'You are Counselor Frank Delacorte the Inverter only. First test whether the attempted solutions keep the problem alive (Watzlawick, Weakland and Fisch); then test hidden function. One pass; no questions; never reference other reframes.';
   if(speaker==='scaler')return 'You are Special Master Ruth Abernathy the Scaler only. One downscale and one upscale; no questions; never reference other reframes.';
   if(speaker==='context-shifter')return 'You are Judge Hollis Venable the Context Shifter only. Change setting; label realistic vs revealing; no questions; never reference other reframes.';
-  if(speaker==='controller'&&stage==='clarify')return 'Ask up to two short steering questions that resolve thin or ambiguous intake. No reframe yet.';
+  if(speaker==='controller'&&stage==='clarify')return `Ask up to two short steering questions that resolve thin or ambiguous intake.${s.intake.priorAttempts?'':' One of them asks what has already been tried and what happened.'} No reframe yet.`;
   if(speaker==='controller')return 'You are the Tribunal compiler only. Convergence note at most four sentences; never rank or combine reframes.';
  }
  return '';
@@ -223,15 +248,18 @@ export function buildPrompt(s,currentStep){
  const shared=loadKnowledgePrompt('cognitive/shared.md'),protocol=loadKnowledgePrompt(`cognitive/${s.protocolId}.md`);
  const isolated=s.protocolId==='tribunal'&&speaker!=='controller';
  const previous=isolated?[]:s.transcript;
- const maxBursts=currentStep.maxBursts??3,burst=(s.burst||0)+1,finalBurst=burst>=maxBursts;
+ const maxBursts=currentStep.maxBursts??3,burst=(s.burst||0)+1;
  const budget=stopBudget(s,currentStep,stage);
+ // A burst that will spend the rest of its stop budget is final even below maxBursts.
+ const finalBurst=burst>=maxBursts||stopRemaining(s,currentStep,stage)<=(currentStep.burstWords||90);
  const knownContext=s.evidence.filter(e=>e.kind==='knowledge'||e.kind==='knowledge_hub_note'||e.kind==='central_node'||e.kind==='web'||String(e.kind||'').startsWith('web')||String(e.id||'').startsWith('web:'));
  const continuation=burst>1?`Continuation burst ${burst} of ${maxBursts}. The user answered your previous question. Continue from that answer. Do not repeat prior analysis. Keep the same assigned voice register as the first burst.`:`Burst ${burst} of ${maxBursts}. Default length about ${budget} words.`;
  const closeRule=finalBurst&&!gate?'This is your final burst for this step. Close without asking a question.':'';
  const questionRule=gate?`This is a ${gate} checkpoint. Return one targeted question and STOP. Set done true.`:`One question per burst maximum. If you ask a question and will continue later, set done false. If this contribution is complete, set done true. ${closeRule}`;
- const midSearch=(s.protocolId==='cartographers'&&['surveyor','miner','cartographer'].includes(speaker))||(s.protocolId==='refinery'&&speaker==='builder');
+ // Direct and interrogation Cartographers use supplied papers only: no search tool.
+ const midSearch=(s.protocolId==='cartographers'&&!['direct','interrogation'].includes(s.mode)&&['surveyor','miner','cartographer'].includes(speaker))||(s.protocolId==='refinery'&&speaker==='builder');
  const register=speakerRegister(s,speaker,stage,{finalBurst});
- const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='tribunal'&&stage==='clarify'?'Ask up to two short steering questions that resolve thin or ambiguous intake. No reframe yet.':'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':'',midSearch?'You may use one web_search this burst for topic terms only. Never search personal details.':''].filter(Boolean).join('\n');
+ const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling.':'',s.protocolId==='mirror'&&s.mode==='deep'&&speaker!=='controller'?'Deep mode: give each claim a confidence (high, moderate or low) inside the sentence.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':'',midSearch?'You may use one web_search this burst for topic terms only. Never search personal details.':''].filter(Boolean).join('\n');
  const originalInput=isolated||s.protocolId==='tribunal'?{...s.intake}:s.intake;
  const lastReviewDate=s.lastReviewDate||s.intake?.lastReviewDate;
  const frequencyJustification=s.intake?.frequencyJustification;
@@ -239,7 +267,7 @@ export function buildPrompt(s,currentStep){
   ...(lastReviewDate?{lastReviewDate}:{}),
   ...(frequencyJustification?{frequencyJustification}:{})
  }:null;
- return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,tools:midSearch?[{type:'web_search_20250305',name:'web_search'}]:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
+ return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,finalBurst,tools:midSearch?[{type:'web_search_20250305',name:'web_search'}]:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
 // Voices are prompted for JSON; the provider adapter streams that payload as text.
 // Models often put literal newlines inside strings, which JSON.parse rejects.
@@ -360,32 +388,43 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   const st=s.steps[s.cursor];s.stage=st.stage;s.speaker=st.speaker;
   const p=buildPrompt(s,st);const result=await callVoice(model,s,p);
   let question=result.question;
-  if(st.gate==='verify')question='Does this reconstruction match your experience of how the thinking unfolded? Is anything missing, inaccurate, or misrepresented?';
+  if(st.gate==='verify')question=WITNESS_VERIFY;
+  // Tribunal voices speak once and ask nothing; only the controller clarifies.
+  if(s.protocolId==='tribunal'&&st.speaker!=='controller')question=null;
   if(st.gate&&!question)throw fault(502,'missing_question','The voice omitted its required checkpoint question. Retry this stage.');
   if(s.protocolId==='consilium'&&st.stage==='dialogue'){
    s.dialogueCounts[st.speaker]=(s.dialogueCounts[st.speaker]||0)+1;s.nextSpeaker=result.nextSpeaker;
    if(!question&&!s.answered[st.speaker]&&s.dialogueCounts[st.speaker]>=2)throw fault(502,'missing_question','This voice must invite a response before continuing.');
   }
   s.burst=(s.burst||0)+1;
-  const maxBursts=st.maxBursts??3;
   const hardGate=st.gate&&st.gate!=='answer';
   // Protocols that require an in-character question on non-final ungated bursts.
   const mustAsk = (
    (s.protocolId==='mirror'&&['retrospective','prospective'].includes(st.speaker))
    || (s.protocolId==='fates'&&['clotho','atropos','lachesis'].includes(st.speaker)&&st.stage!=='filter'&&st.stage!=='weave')
   );
-  if(mustAsk&&s.burst<maxBursts&&!st.gate&&!question){
+  if(mustAsk&&!p.finalBurst&&!st.gate&&!question&&!result.outOfScope){
    throw fault(502,'missing_question','This voice omitted its required in-character question. Retry this stage.');
   }
   // Final ungated burst must close without asking, even if the model ignored the prompt.
-  if(s.burst>=maxBursts&&!st.gate)question=null;
-  const done=result.done!==false||(!question&&!st.gate);
-  const mayContinue=!hardGate&&question&&!done&&s.burst<maxBursts;
+  if(p.finalBurst&&!st.gate)question=null;
+  // needsInput holds the same step open for the answer, like done:false.
+  const done=(result.done!==false&&!result.needsInput)||(!question&&!st.gate);
+  let mayContinue=!hardGate&&question&&!done&&!p.finalBurst;
   let output=result.text;if(question&&!output.includes(question))output+=`\n\n${question}`;
+  if(s.protocolId==='tribunal'&&st.stage==='convergence'&&!output.includes(TRIBUNAL_CLOSE))output+=`\n\n${TRIBUNAL_CLOSE}`;
   add(s,st.speaker==='controller'?'controller':'voice',st.speaker,st.stage,output,result.evidenceIds,{trimmed:result.trimmed||undefined,done,nextSpeaker:result.nextSpeaker});
   s.revision++;
-  if(s.protocolId==='refinery'&&st.speaker==='breaker'&&result.thesisUnsound)add(s,'controller','controller','thesis-warning','The Breaker flagged the thesis as fundamentally unsound. Any reframe from the Reforger must be labelled as a suggestion distinct from the original.');
-  if(s.protocolId==='witness'&&result.distress){s.status='paused';s.resumeStatus='waiting';s.checkpoint={kind:'answer',question:'The audit has landed hard. Would you prefer to stop or continue with softer framing?'};s.continueBurst=false;}
+  if(s.protocolId==='refinery'&&st.speaker==='breaker'&&result.thesisUnsound){
+   add(s,'controller','controller','thesis-warning','The Breaker flagged the thesis as fundamentally unsound. Any reframe from the Reforger must be labelled as a suggestion distinct from the original.');
+   // The Reforger waits for Adam's choice between an original rebuild and a labelled reframe.
+   if(s.steps[s.cursor+1]?.speaker==='reforger'){question=UNSOUND_CHOICE;mayContinue=false;}
+  }
+  if(result.outOfScope){
+   // A voice named a scope mismatch. The run holds on this step; Adam clarifies to continue or cancels. The model never ends a run.
+   s.status='waiting';s.checkpoint={kind:'answer',question:SCOPE_QUESTION};s.continueBurst=true;
+  }
+  else if(s.protocolId==='witness'&&result.distress){s.status='paused';s.resumeStatus='waiting';s.checkpoint={kind:'answer',question:'The audit has landed hard. Would you like to stop, continue with softer framing, or take this to Dr Vera Lenz?'};s.continueBurst=false;}
   else if(question){
    s.status='waiting';s.checkpoint={kind:st.gate||'answer',question};s.continueBurst=mayContinue;
    // Stay on the step for burst continuations and the filter (actions decide). Otherwise advance so the answer lands on the next step.

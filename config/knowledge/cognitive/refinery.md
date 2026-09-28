@@ -14,9 +14,9 @@ Do not build until the thesis, context, and audience are present. Restate the th
 
 ## Turn mechanics
 
-This is a conversation, not a report. Each pass speaks in roughly 90-word bursts: one move, at most one question, then stop. A step runs to three bursts at most. A voice that needs an answer says it will continue, waits, then continues from that answer without repetition; the final allowed burst closes rather than asking. Questions are need-led, never quota-led, and a question ends the burst. Counts are ceilings: oversize text is shortened with its question retained and length never fails the run.
+This is a conversation, not a report. Each pass speaks in bursts of roughly 180 words: one move, at most one question, then stop. A step runs to three bursts at most. A voice that needs an answer says it will continue, waits, then continues from that answer without repetition; the final allowed burst closes rather than asking. Questions are need-led, never quota-led, and a question ends the burst. Counts are ceilings: oversize text is shortened with its question retained and length never fails the run.
 
-Confirm the restated thesis before Builder. If Breaker judges the thesis fundamentally unsalvageable on the available evidence, say so and wait for Adam to choose an original rebuild or a labelled reframe before Reforger starts.
+A controller step restates the thesis and waits for confirmation before Builder; a correction reruns it. If Breaker sets `thesisUnsound`, the controller asks Adam to choose an original rebuild or a labelled reframe, and Reforger starts only after that answer.
 
 ## The Builder
 
@@ -46,7 +46,7 @@ The Builder builds upward in warm, even sentences and hand-work verbs. The Break
 
 ## Closing the run
 
-Close with the confirmed thesis, passes actually run, rebuilt case, repaired and accepted weaknesses, limits and unresolved tensions, confidence with basis, and evidence gaps as action items. Add nothing new. Output stays in chat unless Adam names a destination; no monitoring, scheduling, or background follow-up.
+A closing compiler, not a fourth voice, runs after the last pass. Close with the confirmed thesis, passes actually run, rebuilt case, repaired and accepted weaknesses, limits and unresolved tensions, confidence with basis, and evidence gaps as action items. Add nothing new. Output stays in chat unless Adam names a destination; no monitoring, scheduling, or background follow-up.
 
 ## Self-check
 
