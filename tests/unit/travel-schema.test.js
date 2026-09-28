@@ -45,3 +45,30 @@ test('normalizeItem accepts https link and HH:MM', () => {
   assert.equal(item.time, '09:30');
   assert.equal(item.link, 'https://example.com/a');
 });
+
+const ticketBase = {
+  title: 'ScotRail',
+  city_id: 'lis',
+  date: '2027-03-03',
+  time: '08:22',
+  note: '',
+  status: 'booked',
+  carrier: 'ScotRail',
+  from_code: 'GLQ',
+  to_code: 'FTW',
+  depart_time: '08:22',
+  arrive_time: '12:12',
+  arrive_date: '2027-03-03'
+};
+
+test('normalizeItem accepts empty train number', () => {
+  const item = normalizeItem({ ...ticketBase, kind: 'train', number: '' });
+  assert.equal(item.number, '');
+});
+
+test('normalizeItem rejects empty flight number', () => {
+  assert.throws(
+    () => normalizeItem({ ...ticketBase, kind: 'flight', number: '', title: 'Flight' }),
+    (err) => err.code === 'validation_error' && err.message === 'number required for tickets'
+  );
+});
