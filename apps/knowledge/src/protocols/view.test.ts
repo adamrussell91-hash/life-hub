@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 import { describe, expect, it, vi } from "vitest";
-import { applySession, backgroundAsset, detectForks, lightingStage, postProtocolAction, ProtocolRequestError, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
+import { applySession, backgroundAsset, compactIntake, detectForks, lightingStage, postProtocolAction, ProtocolRequestError, sessionView, speakerName, statusLabel, thinkingStatus } from "./view";
 
 const definition = {
   id: "fates",
@@ -514,5 +514,14 @@ describe("protocol sources", () => {
     expect(html).toContain("Participation study");
     expect(html).not.toContain("https://example.test/c");
     expect(html).not.toContain("No link note");
+  });
+});
+
+describe("compactIntake", () => {
+  it("fills Cartographers source text from the brief only in supplied-paper modes", () => {
+    expect(compactIntake({ id: "cartographers" }, "Paper A says X", {}, "interrogation").sources).toBe("Paper A says X");
+    expect(compactIntake({ id: "cartographers" }, "Paper A says X", {}, "direct").sources).toBe("Paper A says X");
+    expect(compactIntake({ id: "cartographers" }, "Topic", {}, "full").sources).toBeUndefined();
+    expect(compactIntake({ id: "tribunal" }, "Stuck", {}, "standard").sources).toBeUndefined();
   });
 });

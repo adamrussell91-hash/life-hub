@@ -52,3 +52,13 @@ test('streamed JSON voice output yields a checkpoint instead of missing_question
 test('API authenticates catalog and guards origin before storage',async()=>{const handler=createKnowledgeProtocolsHandler({env,verifySessionToken:()=>({valid:false}),getStore:()=>{throw Error('must not load');}});assert.equal((await handler(request())).status,401);assert.equal((await handler(request('GET',undefined,{origin:'https://evil.test'}))).status,403);});
 test('API validates malformed JSON/IDs/actions and runs the first protocol stage directly',async()=>{const {store}=setup();const deps={env,verifySessionToken:()=>({valid:true}),getStore:async()=>store,model:goodModel,retrieve:retrieval};const handler=createKnowledgeProtocolsHandler(deps);const catalog=await (await handler(request())).json();assert.equal(catalog.data.catalog.length,8);const bad=new Request('https://example.test/api/knowledge/protocols',{method:'POST',body:'{'});assert.equal((await handler(bad)).status,400);assert.equal((await handler(request('POST',{sessionId:'../bad',action:'cancel'}))).status,400);const response=await handler(request('POST',createInput()));const body=await response.json();assert.equal(response.status,200);assert.equal(body.data.session.status,'waiting');assert.equal(body.data.session.speaker,'trace');});
 test('background runner validates auth and owner and never accepts browser transcript',async()=>{const {store,service}=setup();const s=await service.create('different-owner',createInput());const handler=createKnowledgeProtocolsRunHandler({env,verifySessionToken:()=>({valid:true}),getStore:async()=>store,model:goodModel,retrieve:retrieval});const response=await handler(request('POST',{sessionId:s.id,transcript:[{text:'fake'}]}));assert.equal(response.status,404);});
+
+test('polling a completed session still held by its runner does not call the model or write',async()=>{
+  const {service,store}=setup();const s=await service.create('owner',createInput());
+  const row=await store.read('owner',s.id);
+  await store.write('owner',s.id,{...row.value,status:'completed',lease:{id:'live',expiresAt:Date.now()+60000}},row.etag);
+  const before=(await store.read('owner',s.id)).etag;
+  const got=await service.get('owner',s.id);
+  assert.equal(got.status,'completed');assert.equal(got.summary,undefined);
+  assert.equal((await store.read('owner',s.id)).etag,before,'GET must not commit while the runner finishes');
+});

@@ -26,6 +26,7 @@ export const TRIBUNAL_WORDS={quick:60,standard:BURST_WORDS.tribunal,deep:250};
 export const TRIBUNAL_CLOSE='These are three reframes, not recommendations. You decide which, if any, is worth pursuing.';
 const WITNESS_VERIFY='Does this reconstruction match your experience of how the thinking unfolded, and is anything missing, inaccurate or misrepresented?';
 const SCOPE_QUESTION='This looks outside what this protocol does. Say how it fits to continue, or cancel and start the protocol that fits.';
+const GATE_FALLBACK={confirm:'Does this hold as stated? Confirm it, or correct what is wrong.',answer:'What would you add or change before we continue?'};
 const UNSOUND_CHOICE='The Breaker judges the thesis unsound on the available evidence. Should the Reforger rebuild the original thesis with its limits stated, or offer a reframed thesis labelled as a suggestion?';
 const step=(speaker,stage=speaker,gate=null,extra={})=>{
  const compile=COMPILE.has(stage)||speaker==='weave';
@@ -197,10 +198,10 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
   if(speaker==='weave')return 'You are The Weave only: witness and map. Balanced sentences, no advocacy, no new idea, no ranking the Fates.';
  }
  if(id==='horizon'){
-  if(speaker==='ketill')return 'You are Ketill only. Near horizon only: stop at two years, even if Adam named a longer one. Three to seven forks in consecutive sentences. For each fork say what it feeds later that will not show yet (Dörner: delayed feedback and side effects). Do not number them and do not say fork one. Miðgarðr speech, your own Old Norse words, one physical action, one of your names for Adam. You may ask one steering question per burst in character. No plan and no other voice\'s lines.';
-  if(speaker==='alvar')return 'You are Alvar only. Far horizon, work backwards, three to seven preconditions in consecutive sentences. Walk down the layers (Inayatullah): the visible event, the system that produces it, the worldview that holds that system, and the story Adam tells about himself; name at least one precondition below the event layer. Do not number them and do not say first, second or third. Your own Old Norse and mythic territory. You may answer Ketill. You may ask one steering question per burst in character. Do not write his or Sigrid\'s lines. Invent any memory. Do not copy one from the instructions.';
-  if(speaker==='sigrid')return 'You are Sigrid only. One turn of the iron ring. Contrast the stated future with the present obstacle Ketill and Alvar exposed (Oettingen: mental contrasting). Group the findings into the two to four gaps that carry the most weight; each is a deliberate trade-off, unexamined drift, or unclassified. Ask that and stop. No reassurance and no other voice\'s lines.';
-  if(speaker==='controller')return 'You are the map compiler, not a fourth voice. Preserve each speaker\'s wording and every contradiction. No praise, plan, or recommendation.';
+  if(speaker==='ketill')return 'You are Ketill only. Near horizon only: stop at two years, even if Adam named a longer one. Three to seven forks in consecutive sentences. For each fork say what it feeds later that will not show yet (Dörner: delayed feedback and side effects). Do not number them and do not say fork one. Miðgarðr speech, your own Old Norse words, one physical action, one of your names for Adam. You may ask one steering question per burst in character. Describe what each fork opens or closes; never an imperative to Adam (push, take, choose, go for). No plan and no other voice\'s lines.';
+  if(speaker==='alvar')return 'You are Alvar only. Far horizon, work backwards, three to seven preconditions in consecutive sentences. Walk down the layers (Inayatullah): the visible event, the system that produces it, the worldview that holds that system, and the story Adam tells about himself; name at least one precondition below the event layer. Do not number them and do not say first, second or third. Your own Old Norse and mythic territory. You may answer Ketill. You may ask one steering question per burst in character. State requirements time will enforce, never an instruction to Adam. Do not write his or Sigrid\'s lines. Invent any memory. Do not copy one from the instructions.';
+  if(speaker==='sigrid')return 'You are Sigrid only. One turn of the iron ring. Contrast the stated future with the present obstacle Ketill and Alvar exposed (Oettingen: mental contrasting). Group the findings into the two to four gaps that carry the most weight; each is a deliberate trade-off, unexamined drift, or unclassified. Ask that and stop. No reassurance, no advice and no other voice\'s lines.';
+  if(speaker==='controller')return 'You are the map compiler, not a fourth voice. Preserve each speaker\'s wording and every contradiction. No praise, plan, or recommendation; if a voice phrased a fork as an instruction, report it as a fork.';
  }
  if(id==='mirror'){
   if(speaker==='retrospective')return `You are Gu Jian only, the Retrospective. Speak in his Zhou-hall register: past tense, balanced pairs, ji/xing/shi from your own word list, sample before pattern. One instance is never a trend. ${finalBurst?'Final burst: close without a question.':'Ask one steering question in character and set done false.'} No other voice's lines.`;
@@ -210,9 +211,9 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
   if(speaker==='controller')return 'You are the compiler, not a fourth voice. Structure and condense only. Preserve each speaker\'s wording. No new analysis or recommendation.';
  }
  if(id==='refinery'){
-  if(speaker==='builder')return `You are Bezalel the Builder only. Warm affirmative Toulmin structure; name claim, grounds, warrant, backing, qualifier. ${finalBurst?'Final burst: close without a question.':'Ask only when a joint is missing; one question max.'} Never write Breaker or Reforger.`;
+  if(speaker==='builder')return `You are Bezalel the Builder only. Warm affirmative Toulmin structure; name claim, grounds, warrant, backing, qualifier. Build the confirmed thesis as stated; never propose a narrowed or reframed thesis (the qualifier states its reach). ${finalBurst?'Final burst: close without a question.':'Ask only when a joint is missing; one question max.'} Never write Breaker or Reforger.`;
   if(speaker==='breaker')return `You are Beruriah the Breaker only. Short, dry, steelmanned critique; name the weakest joint. ${finalBurst?'Final burst: close without a question.':'Ask only when evidence is needed; one question max.'} Never rebuild or soften. Never write Builder or Reforger.`;
-  if(speaker==='reforger')return `You are Nechemya the Reforger only. Level rebuild accounting for each Breaker weakness. ${finalBurst?'Final burst: close without a question.':'Ask only for a real choice Adam must make.'} ${s.transcript.some(t=>t.stage==='thesis-warning')?'The thesis was flagged unsound. Follow Adam\'s answer to that warning: rebuild the original with its limits stated, or offer a reframe labelled as a suggestion, never as the original refined.':''}${s.mode==='reforge'?'Reforge-only: say this rests on supplied prior work, not invented Builder or Breaker passes.':''} Never merely rephrase. Never write Builder or Breaker.`;
+  if(speaker==='reforger')return `You are Nechemya the Reforger only. Level rebuild accounting for each Breaker weakness. ${finalBurst?'Final burst: close without a question.':'Ask only for a real choice Adam must make.'} ${s.transcript.some(t=>t.stage==='thesis-warning')?'The thesis was flagged unsound. Follow Adam\'s answer to that warning: rebuild the original with its limits stated, or offer a reframe labelled as a suggestion, never as the original refined.':''}${s.mode==='reforge'?'Reforge-only: say this rests on supplied prior work, not invented Builder or Breaker passes.':''} Any thesis that differs from the confirmed one, including one hinted earlier, is introduced as "Suggested reframe:" and kept separate from the refined original. Never merely rephrase. Never write Builder or Breaker.`;
   if(speaker==='controller'&&stage==='thesis')return 'You are the intake clerk, not a voice. Restate the thesis, name the understood context and audience in one or two sentences, then ask Adam to confirm or correct. Build nothing.';
   if(speaker==='controller')return 'You are the closing compiler, not a fourth voice. State the confirmed thesis, the passes actually run, the rebuilt case, weaknesses repaired and accepted, limits and unresolved tensions (teiku where honest), confidence with basis, and evidence gaps as actions for Adam. Add nothing new.';
  }
@@ -358,13 +359,19 @@ function validateOutput(raw,s,p,{allowTrim=false}={}){
  const done=raw.done===false?false:true;
  return {...raw,text,question,done,trimmed,evidenceIds:ids,nextSpeaker:raw.nextSpeaker};
 }
-async function callVoice(model,s,p){
- let hint='',raw;
+const QUESTION_HINT='Your previous reply had no question. End this burst with exactly one question in character, returned in the question field.';
+async function callVoice(model,s,p,{requireQuestion=false}={}){
+ let hint='',raw,asked=false;
  for(let attempt=0;attempt<3;attempt++){
   const prompt=hint?{...p,system:`${p.system}\n${hint}`}:p;
   // Provider transport failures are not retried here; the service marks the stage failed for an explicit retry.
   raw=await model(prompt);
-  try{return validateOutput(raw,s,p,{allowTrim:attempt>=2});}
+  try{
+   const result=validateOutput(raw,s,p,{allowTrim:attempt>=2});
+   // A missing required question earns one re-ask; after that the controller falls back rather than failing the run.
+   if(requireQuestion&&!result.question&&!result.outOfScope&&!asked){asked=true;hint=QUESTION_HINT;continue;}
+   return result;
+  }
   catch(err){
    if(err.code==='voice_limit'&&attempt<2){hint=err.message;continue;}
    if(err.code==='voice_limit')return validateOutput(raw,s,p,{allowTrim:true});
@@ -386,26 +393,25 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
  }
  while(s.cursor<s.steps.length&&s.status==='running'){
   const st=s.steps[s.cursor];s.stage=st.stage;s.speaker=st.speaker;
-  const p=buildPrompt(s,st);const result=await callVoice(model,s,p);
+  const p=buildPrompt(s,st);
+  // Protocols that require an in-character question on non-final ungated bursts.
+  const mustAsk=(s.protocolId==='mirror'&&['retrospective','prospective'].includes(st.speaker))
+   ||(s.protocolId==='fates'&&['clotho','atropos','lachesis'].includes(st.speaker)&&st.stage!=='filter'&&st.stage!=='weave');
+  const consiliumOwes=s.protocolId==='consilium'&&st.stage==='dialogue'&&!s.answered[st.speaker]&&(s.dialogueCounts[st.speaker]||0)>=1;
+  const requireQuestion=(Boolean(st.gate)&&st.gate!=='verify')||(mustAsk&&!p.finalBurst)||consiliumOwes;
+  const result=await callVoice(model,s,p,{requireQuestion});
   let question=result.question;
   if(st.gate==='verify')question=WITNESS_VERIFY;
+  // Fallbacks keep the run moving when a voice still omits a required question after its re-ask.
+  if(st.gate&&!question&&!result.outOfScope)question=GATE_FALLBACK[st.gate]||GATE_FALLBACK.answer;
   // Tribunal voices speak once and ask nothing; only the controller clarifies.
   if(s.protocolId==='tribunal'&&st.speaker!=='controller')question=null;
-  if(st.gate&&!question)throw fault(502,'missing_question','The voice omitted its required checkpoint question. Retry this stage.');
   if(s.protocolId==='consilium'&&st.stage==='dialogue'){
    s.dialogueCounts[st.speaker]=(s.dialogueCounts[st.speaker]||0)+1;s.nextSpeaker=result.nextSpeaker;
-   if(!question&&!s.answered[st.speaker]&&s.dialogueCounts[st.speaker]>=2)throw fault(502,'missing_question','This voice must invite a response before continuing.');
+   if(!question&&!s.answered[st.speaker]&&s.dialogueCounts[st.speaker]>=2){const name=catalog.find(d=>d.id==='consilium').voices.find(v=>v.id===st.speaker)?.name||st.speaker;question=`What is your response to ${name}?`;}
   }
   s.burst=(s.burst||0)+1;
   const hardGate=st.gate&&st.gate!=='answer';
-  // Protocols that require an in-character question on non-final ungated bursts.
-  const mustAsk = (
-   (s.protocolId==='mirror'&&['retrospective','prospective'].includes(st.speaker))
-   || (s.protocolId==='fates'&&['clotho','atropos','lachesis'].includes(st.speaker)&&st.stage!=='filter'&&st.stage!=='weave')
-  );
-  if(mustAsk&&!p.finalBurst&&!st.gate&&!question&&!result.outOfScope){
-   throw fault(502,'missing_question','This voice omitted its required in-character question. Retry this stage.');
-  }
   // Final ungated burst must close without asking, even if the model ignored the prompt.
   if(p.finalBurst&&!st.gate)question=null;
   // needsInput holds the same step open for the answer, like done:false.
