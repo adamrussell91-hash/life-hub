@@ -24,12 +24,13 @@ import {
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 
 const PHONE_MQ = '(max-width: 719px)';
+const EPOCH_ISO_PREFIX = '1970-01-01';
 
 export interface ScheduleDbRow {
   id: string;
   title: string;
   href: string;
-  /** Primary sort/display instant (ISO). */
+  /** Primary sort/display instant (ISO). Empty / epoch = no date shown. */
   when: string;
   meta: string[];
   /** Values used for filter matching (lowercase tokens). */
@@ -37,6 +38,16 @@ export interface ScheduleDbRow {
   /** Group key when grouping by channel / state / type. */
   facetKey: string;
   facetLabel: string;
+}
+
+/** List meta date: real days only — never Unix epoch placeholders. */
+export function formatScheduleRowWhen(when: string | null | undefined): string {
+  if (when == null || when === '') return '';
+  const text = String(when).trim();
+  if (!text || text.startsWith(EPOCH_ISO_PREFIX)) return '';
+  const ms = Date.parse(text);
+  if (Number.isFinite(ms) && ms === 0) return '';
+  return formatDisplayDate(text) || '';
 }
 
 export interface ScheduleDbPageConfig {
@@ -328,9 +339,7 @@ export async function renderScheduleDbPage(
           a.href = row.href;
           const stack = el('div', 'schedule-db__row-stack');
           stack.append(el('span', 'schedule-db__row-title', row.title));
-          const whenLabel =
-            formatDisplayDate(row.when) ??
-            (row.when && row.when !== '1970-01-01T00:00:00.000Z' ? row.when.slice(0, 10) : '');
+          const whenLabel = formatScheduleRowWhen(row.when);
           const metaParts = [...row.meta, whenLabel].filter(Boolean);
           stack.append(el('span', 'schedule-db__row-meta', metaParts.join(' · ')));
           a.append(stack);
