@@ -376,6 +376,7 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
       node.tabIndex = 0;
       node.setAttribute('role', 'button');
       node.setAttribute('aria-label', `${boxLabel(box)}. Press Enter to edit.`);
+      node.title = [box.holderName, box.title, box.unitName].filter(Boolean).join(' · ');
       if (!box.holderRef) node.classList.add('is-vacant');
       if (
         (selection.kind === 'box' && selection.ref === box.ref) ||
@@ -599,6 +600,42 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     });
     inspector.append(field('Role name', roleTitle), addRole);
 
+    // People whose profile says they work here but who aren't on the chart
+    // (no job title yet, or you took their box off). One click adds them.
+    const offChart = (structure?.people_here ?? []).filter((p) => !p.on_chart);
+    if (offChart.length) {
+      inspector.append(
+        el('h3', undefined, `At ${options.organisationName}, not on the chart`),
+        el('p', 'org-chart__muted', 'From their profiles. Add a role and they go on the chart.')
+      );
+      const list = el('ul', 'org-chart__here-list');
+      for (const person of offChart.slice(0, 40)) {
+        const li = el('li', 'org-chart__here');
+        const name = person.display_name ?? 'Someone';
+        const role = textInput('Role', person.job_title ?? '');
+        role.setAttribute('aria-label', `Role for ${name}`);
+        const addBtn = button('Add');
+        addBtn.setAttribute('aria-label', `Add ${name} to the chart`);
+        addBtn.addEventListener('click', () => {
+          const t = role.value.trim();
+          if (!t) {
+            setStatus(`Give ${name} a role first.`);
+            role.focus();
+            return;
+          }
+          void mutate('Adding', async () => {
+            const ref = await addBox(t, person.person_ref);
+            selection = { kind: 'box', ref };
+          });
+        });
+        const row = el('div', 'org-chart__row');
+        row.append(role, addBtn);
+        li.append(el('span', 'org-chart__here-name', name), row);
+        list.append(li);
+      }
+      inspector.append(list);
+    }
+
     const legend = el('div', 'org-chart__legend');
     legend.append(el('h3', undefined, 'Lines'));
     for (const kind of ['reports_to', 'works_with', 'shares_authority_with'] as ChartLineKind[]) {
@@ -627,6 +664,11 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
     const titleRow = el('div', 'org-chart__row');
     titleRow.append(title, saveTitle);
     inspector.append(field('Role', titleRow));
+    if (box.holderName) {
+      inspector.append(
+        el('p', 'org-chart__muted', `This is ${box.holderName}’s job title on their profile — renaming updates both.`)
+      );
+    }
 
     // Person in this role
     const personBlock = el('div', 'org-chart__block');
@@ -649,7 +691,8 @@ export function openOrgChartEditor(options: OrgChartEditorOptions): HTMLElement 
       personPicker(
         (person) => void mutate('Saving', () => assignPerson(box, person.ref)),
         box.holderRef ? 'Replace with…' : 'Who holds this role?'
-      )
+      ),
+      el('p', 'org-chart__muted', `Whoever you pick gets “${box.title}” as their job title here.`)
     );
     inspector.append(personBlock);
 

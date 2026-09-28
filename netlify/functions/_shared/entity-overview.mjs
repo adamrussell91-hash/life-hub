@@ -15,6 +15,7 @@ import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries }
 import { findActiveSelfPerson } from './career-overview.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
+import { withoutSupersededImports } from './person-workplace.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
@@ -299,11 +300,13 @@ export async function assembleEntityOverview(refInput, deps = {}) {
 
   const githubEntries = await loadGithubRelationshipEntries(ref, accessContext, resolveEntity, github);
 
-  const entries = [
+  // A native workplace link (e.g. an edited job title) supersedes the
+  // read-only imported one for the same person + organisation.
+  const entries = withoutSupersededImports([
     ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
     ...incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
     ...githubEntries
-  ];
+  ]);
 
   // `metadata` (registry-declared, relationship-type-specific data — e.g.
   // `professional_relationship`'s `human_label`, Feature 1.3) already lives
@@ -377,11 +380,11 @@ export async function assembleEntityOverview(refInput, deps = {}) {
         resolveEntity,
         github
       );
-      const selfCurrent = [
+      const selfCurrent = withoutSupersededImports([
         ...selfListed.outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
         ...selfListed.incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
         ...selfGithub
-      ];
+      ]);
       const subjectOrgs = new Set(currentOrganisationContexts(current_relationships).map((org) => org.ref));
       shared_contexts_with_self = currentOrganisationContexts(selfCurrent).filter((org) => subjectOrgs.has(org.ref));
     }

@@ -761,15 +761,13 @@ export async function renderPeoplePage(
             {
               relationshipRole: proRel?.link.role ?? null,
               relationshipLinkId: proRel?.link.id ?? null,
+              // Current workplace only — a former one here would be re-joined
+              // the moment a job title is saved.
               organisation: orgRel
                 ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
-                : model.organisation
-                  ? {
-                      ref: model.organisation.ref,
-                      display_label: model.organisation.displayName
-                    }
-                  : null,
-              workplaceLinkId: orgRel?.link.id ?? null
+                : null,
+              workplaceLinkId: orgRel?.link.id ?? null,
+              jobTitle: orgRel?.link.role ?? null
             }
           );
           editor.button.classList.add('people-pane__edit');
@@ -812,8 +810,10 @@ export async function renderPeoplePage(
               c.append(accept, decline);
               chips.append(c);
             } else {
-              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
-              if (chip.title) c.title = chip.title;
+              // L6: one line; a long job title truncates, full text on hover.
+              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`);
+              c.append(el('span', 'people-pane__chip-text', chip.label));
+              c.title = chip.title ?? chip.label;
               if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
               chips.append(c);
             }

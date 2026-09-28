@@ -1048,6 +1048,134 @@ export function createMockApi() {
         }
       };
     };
+    // Profile ⇄ chart (mirrors netlify/_shared/person-workplace.mjs +
+    // org-structure.mjs syncHolderFromProfile) so the local demo behaves
+    // like production: a job title puts the person on the chart and back.
+    const mockDismissed = (globalThis as { __orgDismissed?: Set<string> }).__orgDismissed
+      ?? ((globalThis as { __orgDismissed?: Set<string> }).__orgDismissed = new Set());
+    const sameTitle = (a: unknown, b: unknown) =>
+      String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+    const isWorkplace = (l: RelationshipSeed) =>
+      l.relationship_type === 'employee_at' || l.relationship_type === 'member_of';
+    const mockSyncHolder = (orgId: string, personRef: string, title: string, respectDismissed: boolean) => {
+      const key = `${orgId}|${personRef}|${title.trim().toLowerCase()}`;
+      if (respectDismissed && mockDismissed.has(key)) return;
+      mockDismissed.delete(key);
+      const current = mockStructure(orgId);
+      const active = current.positions.filter((p) => p.lifecycle_status === 'active');
+      const holds = current.links.filter(
+        (l) =>
+          l.status === 'current' &&
+          l.relationship_type === 'holds_position' &&
+          l.source_ref === personRef &&
+          active.some((p) => `shared:position:${p.id}` === l.target_ref)
+      );
+      const heldPositions = holds.map((h) => active.find((p) => `shared:position:${p.id}` === h.target_ref)!);
+      if (heldPositions.some((p) => sameTitle(p.title, title))) return;
+      if (heldPositions.length === 1) {
+        heldPositions[0]!.title = title;
+        return;
+      }
+      if (heldPositions.length > 1) return;
+      const heldRefs = new Set(
+        current.links.filter((l) => l.status === 'current' && l.relationship_type === 'holds_position').map((l) => l.target_ref)
+      );
+      let position = active.find((p) => sameTitle(p.title, title) && !heldRefs.has(`shared:position:${p.id}`));
+      const now = new Date().toISOString();
+      if (!position) {
+        position = {
+          id: `position_${randomUUID()}`,
+          kind: 'position',
+          title,
+          organisation_ref: `shared:organisation:${orgId}`,
+          unit_ref: null,
+          is_head: false,
+          lifecycle_status: 'active',
+          created_at: now,
+          updated_at: now
+        };
+        current.positions.push(position);
+      }
+      current.links.push({
+        id: `ul_mock_${randomUUID().slice(0, 8)}`,
+        relationship_type: 'holds_position',
+        source_ref: personRef,
+        target_ref: `shared:position:${position.id}`,
+        role: null,
+        status: 'current',
+        temporal_mode: 'period',
+        valid_from: now,
+        valid_to: null,
+        metadata: {},
+        context_ref: `shared:organisation:${orgId}`
+      });
+    };
+    const mockSetWorkplace = (
+      input: { person_ref: string; organisation_ref: string | null; job_title: string | null; replace_organisation_ref?: string | null },
+      syncChart: boolean
+    ) => {
+      const now = new Date().toISOString();
+      const title = input.job_title?.trim() || null;
+      const mine = relationships.filter((l) => l.source_ref === input.person_ref && isWorkplace(l) && l.status === 'current');
+      if (input.replace_organisation_ref && input.replace_organisation_ref !== input.organisation_ref) {
+        for (const l of mine.filter((x) => x.target_ref === input.replace_organisation_ref)) {
+          l.status = 'ended';
+          l.valid_to = now;
+        }
+        if (syncChart) {
+          const oldId = input.replace_organisation_ref.replace(/^shared:organisation:/, '');
+          for (const l of mockStructure(oldId).links) {
+            if (l.status === 'current' && l.relationship_type === 'holds_position' && l.source_ref === input.person_ref) {
+              l.status = 'ended';
+              l.valid_to = now;
+            }
+          }
+        }
+      }
+      if (!input.organisation_ref) return;
+      const here = mine.find((l) => l.target_ref === input.organisation_ref);
+      if (here) here.role = title;
+      else {
+        relationships.push({
+          id: `ul_${randomUUID().slice(0, 12)}`,
+          source_ref: input.person_ref,
+          target_ref: input.organisation_ref,
+          relationship_type: 'employee_at',
+          inverse_label: 'employs',
+          context_key: null,
+          status: 'current',
+          temporal_mode: 'period',
+          valid_from: now,
+          valid_to: null,
+          occurred_at: null,
+          role: title,
+          metadata: {}
+        });
+      }
+      if (syncChart && title) {
+        mockSyncHolder(input.organisation_ref.replace(/^shared:organisation:/, ''), input.person_ref, title, false);
+      }
+    };
+    const mockPeopleHere = (orgId: string) => {
+      const orgRef = `shared:organisation:${orgId}`;
+      const onChart = new Set(
+        mockStructure(orgId)
+          .links.filter((l) => l.status === 'current' && l.relationship_type === 'holds_position')
+          .map((l) => l.source_ref)
+      );
+      const seen = new Set<string>();
+      return relationships
+        .filter((l) => l.target_ref === orgRef && isWorkplace(l) && l.status === 'current')
+        .filter((l) => (seen.has(l.source_ref) ? false : (seen.add(l.source_ref), true)))
+        .map((l) => ({
+          person_ref: l.source_ref,
+          display_name: people.get(l.source_ref.replace(/^shared:person:/, ''))?.display_name ?? 'Someone',
+          job_title: l.role?.trim() || null,
+          link_id: l.id,
+          relationship_type: l.relationship_type,
+          on_chart: onChart.has(l.source_ref)
+        }));
+    };
     const opportunitiesStore = (globalThis as { __opportunities?: Map<string, unknown> }).__opportunities
       ?? ((globalThis as { __opportunities?: Map<string, unknown> }).__opportunities = new Map());
     const orgReads = (globalThis as { __orgReads?: Map<string, unknown> }).__orgReads
@@ -1055,7 +1183,19 @@ export function createMockApi() {
 
     if (path === '/api/org-structure' && method === 'GET') {
       const orgId = url.searchParams.get('organisation_id') || url.searchParams.get('id') || '';
-      return json(200, { ok: true, data: mockStructurePayload(orgId) });
+      for (const p of mockPeopleHere(orgId)) {
+        if (p.job_title) mockSyncHolder(orgId, p.person_ref, p.job_title, true);
+      }
+      return json(200, { ok: true, data: { ...mockStructurePayload(orgId), people_here: mockPeopleHere(orgId) } });
+    }
+
+    if (path === '/api/people/workplace' && method === 'POST') {
+      const input = body as Parameters<typeof mockSetWorkplace>[0];
+      if (!input?.person_ref) {
+        return json(400, { ok: false, error: { code: 'invalid_person_ref', message: 'person_ref must be a person.' } });
+      }
+      mockSetWorkplace(input, true);
+      return json(200, { ok: true, data: { workplace: null, released_organisation_ref: input.replace_organisation_ref ?? null } });
     }
 
     if (path === '/api/org-structure' && method === 'PATCH') {
@@ -1073,6 +1213,16 @@ export function createMockApi() {
         const record = list.find((r: MockRow) => r.id === entityId);
         if (record) {
           Object.assign(record, payload, { updated_at: new Date().toISOString() });
+          if (kind === 'position' && typeof payload.title === 'string') {
+            for (const l of current.links) {
+              if (l.status === 'current' && l.relationship_type === 'holds_position' && l.target_ref === `shared:position:${record.id}`) {
+                mockSetWorkplace(
+                  { person_ref: String(l.source_ref), organisation_ref: String(record.organisation_ref), job_title: payload.title },
+                  false
+                );
+              }
+            }
+          }
           return json(200, { ok: true, data: { [kind === 'unit' ? 'unit' : 'position']: record } });
         }
       }
@@ -1136,11 +1286,24 @@ export function createMockApi() {
           context_ref: orgRef
         };
         current.links.push(link);
+        if (link.relationship_type === 'holds_position') {
+          const position = current.positions.find((p) => `shared:position:${p.id}` === link.target_ref);
+          if (position) {
+            mockSetWorkplace(
+              { person_ref: String(link.source_ref), organisation_ref: orgRef, job_title: String(position.title) },
+              false
+            );
+          }
+        }
         return json(201, { ok: true, data: { link, created: true } });
       }
       if (action === 'end_link') {
         const link = current.links.find((l) => l.id === payload.link_id);
         if (!link) return json(404, { ok: false, error: { code: 'structure_link_not_found', message: 'Not found.' } });
+        if (link.relationship_type === 'holds_position') {
+          const position = current.positions.find((p) => `shared:position:${p.id}` === link.target_ref);
+          if (position) mockDismissed.add(`${orgId}|${link.source_ref}|${String(position.title).trim().toLowerCase()}`);
+        }
         link.status = 'ended';
         link.valid_to = now;
         return json(200, { ok: true, data: { link } });
@@ -1152,6 +1315,9 @@ export function createMockApi() {
         const ended: string[] = [];
         for (const link of current.links) {
           if (link.status !== 'current' || (link.source_ref !== ref && link.target_ref !== ref)) continue;
+          if (link.relationship_type === 'holds_position') {
+            mockDismissed.add(`${orgId}|${link.source_ref}|${String(position.title).trim().toLowerCase()}`);
+          }
           link.status = 'ended';
           link.valid_to = now;
           ended.push(String(link.id));

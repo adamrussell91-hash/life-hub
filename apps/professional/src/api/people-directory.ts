@@ -9,6 +9,8 @@ export interface DirectoryPersonRow {
   initials: string;
   role_line: string;
   relationship_roles: Array<{ role: string; label: string; current: boolean }>;
+  /** Job title at their current workplace (the workplace link's role). */
+  job_title?: string | null;
   organisation: {
     ref: string;
     display_name: string;

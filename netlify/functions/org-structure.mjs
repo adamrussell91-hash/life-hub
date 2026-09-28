@@ -5,6 +5,7 @@ import { isValidOrganisationId, isValidPositionId, isValidUnitId } from './_shar
 import { formatEntityRef } from './_shared/entity-ref.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createOrgStructureRepository } from './_shared/org-structure.mjs';
+import { createPersonWorkplaceService } from './_shared/person-workplace.mjs';
 
 export const config = { path: '/api/org-structure' };
 
@@ -53,11 +54,47 @@ export function createOrgStructureHandler(deps = {}) {
       resolveEntity: deps.resolveEntity,
       getContentStore: async () => store
     });
+    const workplaces = (deps.createPersonWorkplaceService ?? createPersonWorkplaceService)({
+      store,
+      env,
+      fetchImpl: deps.fetchImpl,
+      resolveEntity: deps.resolveEntity,
+      now: identityNow
+    });
+
+    // Chart → profile: whoever holds a role has that role as their job
+    // title at this organisation. Never fails the chart write itself.
+    async function syncProfileTitle(organisationRef, personRef, title) {
+      try {
+        await workplaces.setPersonWorkplace(
+          { person_ref: personRef, organisation_ref: organisationRef, job_title: title },
+          { syncChart: false }
+        );
+      } catch (error) {
+        console.warn('[org-structure] profile title sync failed', error?.code ?? error?.message);
+      }
+    }
 
     try {
       if (request.method === 'GET') {
         const organisationId = readOrgId(url);
+        const organisationRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
+        // Profile → chart: everyone here with a job title gets a box. If the
+        // people list is unavailable the chart still loads.
+        let peopleHere = [];
+        try {
+          peopleHere = await workplaces.listOrganisationWorkplaces(organisationRef);
+          await repo.syncFromProfiles(organisationId, peopleHere);
+        } catch (error) {
+          console.warn('[org-structure] profile sync skipped', error?.code ?? error?.message);
+        }
         const payload = await repo.getDerivedGraph(organisationId);
+        const onChart = new Set(
+          (payload.links ?? [])
+            .filter((l) => l.relationship_type === 'holds_position' && l.status === 'current')
+            .map((l) => l.source_ref)
+        );
+        payload.people_here = peopleHere.map((p) => ({ ...p, on_chart: onChart.has(p.person_ref) }));
         return withCors(okResponse(200, payload), request, env);
       }
 
@@ -109,6 +146,12 @@ export function createOrgStructureHandler(deps = {}) {
             validTo: parsed.value.valid_to ?? null,
             metadata: parsed.value.metadata ?? {}
           });
+          if (parsed.value.relationship_type === 'holds_position') {
+            const positionId = String(parsed.value.target_ref ?? '').split(':')[2] ?? '';
+            const position = (await repo.loadStructure(organisationRef.slice('shared:organisation:'.length)))
+              .positions.find((p) => p.id === positionId);
+            if (position) await syncProfileTitle(organisationRef, parsed.value.source_ref, position.title);
+          }
           return withCors(okResponse(result.created ? 201 : 200, { link: result.link, created: result.created }), request, env);
         }
         if (action === 'end_link' || action === 'archive_position') {
@@ -159,6 +202,12 @@ export function createOrgStructureHandler(deps = {}) {
             return withCors(errorResponse(400, 'invalid_position_id', 'Invalid position id.', false), request, env);
           }
           const record = await repo.updatePosition(id, parsed.value);
+          if (typeof parsed.value.title === 'string') {
+            const orgId = record.organisation_ref.slice('shared:organisation:'.length);
+            for (const personRef of await repo.holdersOf(orgId, id)) {
+              await syncProfileTitle(record.organisation_ref, personRef, record.title);
+            }
+          }
           return withCors(okResponse(200, { position: record }), request, env);
         }
         return withCors(errorResponse(400, 'invalid_kind', 'kind must be unit, position, or layout.', false), request, env);

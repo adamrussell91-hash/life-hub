@@ -1,5 +1,6 @@
 import { fetchEntityOverview } from '@/api/entities';
 import { changeUniversalLinkRole } from '@/api/universal-links';
+import { setPersonWorkplace } from '@/api/people-workplace';
 import { ApiClientError } from '@/api/client';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
@@ -62,13 +63,19 @@ function renderRoleEditor(
   onChanged: () => void,
   options: { leadingSpace?: boolean } = {}
 ): void {
-  const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? 'No role set');
+  // A workplace link's role IS the person's job title; it goes through the
+  // workplace service so the organisation's org chart follows, and so an
+  // imported (read-only) title can still be edited.
+  const isWorkplace =
+    entry.link.relationship_type === 'employee_at' || entry.link.relationship_type === 'member_of';
+  const noun = isWorkplace ? 'job title' : 'role';
+  const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? `No ${noun} set`);
 
   const editButton = document.createElement('button');
   editButton.type = 'button';
   editButton.className = 'btn btn--ghost entity-detail__role-edit';
-  editButton.textContent = 'Edit role';
-  editButton.setAttribute('aria-label', `Edit role for ${entry.endpoint.display_label}`);
+  editButton.textContent = `Edit ${noun}`;
+  editButton.setAttribute('aria-label', `Edit ${noun} for ${entry.endpoint.display_label}`);
 
   const form = document.createElement('form');
   form.className = 'entity-detail__role-form';
@@ -78,7 +85,7 @@ function renderRoleEditor(
   const label = document.createElement('label');
   label.className = 'entity-detail__role-form-label';
   label.htmlFor = labelId;
-  label.textContent = `Role for ${entry.endpoint.display_label}`;
+  label.textContent = `${isWorkplace ? 'Job title' : 'Role'} for ${entry.endpoint.display_label}`;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -117,7 +124,14 @@ function renderRoleEditor(
     event.preventDefault();
     const nextRole = input.value.trim() || null;
     save.disabled = true;
-    changeUniversalLinkRole(entry.link.id, { role: nextRole, changed_at: new Date().toISOString() })
+    const write = isWorkplace
+      ? setPersonWorkplace({
+          person_ref: entry.endpoint.kind === 'person' ? entry.endpoint.ref : entry.link.source_ref,
+          organisation_ref: entry.endpoint.kind === 'organisation' ? entry.endpoint.ref : entry.link.target_ref,
+          job_title: nextRole
+        })
+      : changeUniversalLinkRole(entry.link.id, { role: nextRole, changed_at: new Date().toISOString() });
+    write
       .then(() => {
         onChanged();
       })

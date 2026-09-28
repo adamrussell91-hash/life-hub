@@ -72,6 +72,13 @@ export interface OrgStructurePayload {
   graph: OrgStructureGraph;
   /** Dragged chart box positions, keyed by `shared:position:<id>`. */
   layout?: Record<string, { x: number; y: number }>;
+  /** Everyone whose profile says they work here, and whether they're on the chart. */
+  people_here?: Array<{
+    person_ref: string;
+    display_name: string | null;
+    job_title: string | null;
+    on_chart: boolean;
+  }>;
 }
 
 export async function fetchOrgStructure(organisationId: string): Promise<OrgStructurePayload> {

@@ -116,7 +116,7 @@ describe('layout', () => {
 describe('lines', () => {
   it('draws a reporting line as an elbow from the boss down to the report', () => {
     const d = linePath('reports_to', { x: 0, y: 200 }, { x: 0, y: 0 });
-    expect(d.startsWith('M 92 68')).toBe(true);
+    expect(d.startsWith('M 92 84')).toBe(true);
     expect(d.endsWith('V 200')).toBe(true);
   });
 

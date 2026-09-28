@@ -122,7 +122,11 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     });
 
     const primaryOrg = currentOrgLinks[0] ?? formerOrgLinks[0] ?? null;
+    // Job title at their current workplace says the most; then how you know
+    // them; then just where they are.
+    const titled = currentOrgLinks.find((o) => typeof o.role === 'string' && o.role.trim());
     const roleLine =
+      (titled ? `${titled.role.trim()} · ${titled.display_name}` : null) ??
       proRoles.find((r) => r.current)?.label ??
       (primaryOrg
         ? primaryOrg.current
@@ -146,6 +150,7 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
       initials: monogram(displayName),
       role_line: importedStudent && !proRoles.length && !primaryOrg ? 'Student' : roleLine,
       relationship_roles: proRoles,
+      job_title: titled ? titled.role.trim() : null,
       organisation: primaryOrg
         ? {
             ref: primaryOrg.ref,

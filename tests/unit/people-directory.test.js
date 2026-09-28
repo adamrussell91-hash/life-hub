@@ -229,3 +229,37 @@ test('assemblePeopleDirectory lists students separately when asked — never mix
   assert.equal(data.students.find((p) => p.id === studentId).role_line, 'Student');
   assert.equal(data.counts.students, 2);
 });
+
+test('assemblePeopleDirectory leads with the job title at their current workplace', () => {
+  const data = assemblePeopleDirectory(
+    [
+      {
+        person: {
+          id: PERSON_ID,
+          display_name: 'Henry McLennan',
+          is_self: false,
+          lifecycle_status: 'active',
+          created_at: '2026-09-01T00:00:00.000Z',
+          updated_at: '2026-09-20T00:00:00.000Z',
+          ref: `shared:person:${PERSON_ID}`
+        },
+        relationships: [
+          {
+            link: {
+              id: 'w1',
+              relationship_type: 'employee_at',
+              role: 'Head of Department Learning Enrichment',
+              status: 'current',
+              metadata: {}
+            },
+            endpoint: { kind: 'organisation', ref: 'shared:organisation:org-1', display_label: 'St Aloysius' },
+            direction: 'outgoing'
+          }
+        ]
+      }
+    ],
+    { now: '2026-09-26T12:00:00.000Z' }
+  );
+  assert.equal(data.people[0].role_line, 'Head of Department Learning Enrichment · St Aloysius');
+  assert.equal(data.people[0].job_title, 'Head of Department Learning Enrichment');
+});

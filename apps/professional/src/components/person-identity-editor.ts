@@ -6,11 +6,13 @@ import {
   createUniversalLink,
   endUniversalLink
 } from '@/api/universal-links';
+import { setPersonWorkplace } from '@/api/people-workplace';
+import { fetchOrgStructure } from '@/api/org-structure';
 import { ApiClientError } from '@/api/client';
 import type { EntityRecord, ProfessionalProfile } from '@/domain/types';
 
 const ROLE_OPTIONS = [
-  { value: '', label: 'No relationship role' },
+  { value: '', label: 'Not set' },
   { value: 'colleague', label: 'Colleague' },
   { value: 'former_colleague', label: 'Former colleague' },
   { value: 'mentor', label: 'Mentor' },
@@ -59,8 +61,10 @@ export interface PersonEditorContext {
   relationshipLinkId?: string | null;
   /** Current workplace organisation from overview. */
   organisation?: SelectedOrg | null;
-  /** Existing employee_at / member_of link id to end when workplace changes. */
+  /** Existing employee_at / member_of link id (kept for callers; the server finds it). */
   workplaceLinkId?: string | null;
+  /** Job title at that organisation — the `role` on the workplace link. */
+  jobTitle?: string | null;
 }
 
 /** Stay-in-place person editor: identity + profile + relational links.
@@ -77,6 +81,7 @@ export function mountIdentityEditor(
   const initialRole = context.relationshipRole ?? '';
   const initialOrg = context.organisation ?? null;
   const initialWorkplaceText = profile?.current_workplace?.join(', ') ?? '';
+  const initialJobTitle = context.jobTitle ?? '';
   const initialNotes = profile?.summary ?? '';
   const initialLinkedin = profile?.contact.linkedin_url ?? '';
 
@@ -106,7 +111,7 @@ export function mountIdentityEditor(
   aliasesInput.setAttribute('aria-label', 'Aliases');
 
   const roleSelect = document.createElement('select');
-  roleSelect.setAttribute('aria-label', 'Role');
+  roleSelect.setAttribute('aria-label', 'How you know them');
   for (const option of ROLE_OPTIONS) {
     const opt = document.createElement('option');
     opt.value = option.value;
@@ -123,14 +128,52 @@ export function mountIdentityEditor(
   const workplaceTextInput = document.createElement('input');
   workplaceTextInput.type = 'text';
   workplaceTextInput.value = initialWorkplaceText;
-  workplaceTextInput.placeholder = 'Free-text workplace (optional)';
-  workplaceTextInput.setAttribute('aria-label', 'Workplace');
+  workplaceTextInput.placeholder = 'e.g. a school not in Life Hub yet';
+  workplaceTextInput.setAttribute('aria-label', 'Workplace (not in Life Hub)');
+  const workplaceTextLabel = el('label', 'add-person-form__label', 'Workplace (not in Life Hub)');
+
+  // Job title = the role on their workplace link. Suggestions come from the
+  // roles already on that organisation's chart; saving updates the chart.
+  const jobTitleInput = document.createElement('input');
+  jobTitleInput.type = 'text';
+  jobTitleInput.value = initialJobTitle;
+  jobTitleInput.placeholder = 'e.g. Head of Department Learning Enrichment';
+  jobTitleInput.setAttribute('aria-label', 'Job title');
+  const jobTitleList = document.createElement('datalist');
+  jobTitleList.id = `job-titles-${person.id}`;
+  jobTitleInput.setAttribute('list', jobTitleList.id);
+  const jobTitleHint = el('p', 'add-person-form__hint');
+  const jobTitleLabel = el('label', 'add-person-form__label', 'Job title');
+  let titlesFor = '';
+
+  function syncWorkplaceFields(org: SelectedOrg | null): void {
+    // With a linked organisation the free-text field is redundant.
+    workplaceTextLabel.hidden = Boolean(org);
+    workplaceTextInput.hidden = Boolean(org);
+    jobTitleHint.textContent = org
+      ? `Also puts them on ${org.display_label}’s org chart.`
+      : 'Link an organisation to put them on its org chart.';
+    const orgId = org?.ref.split(':')[2] ?? '';
+    // Suggestions only once the form is open — never a request per profile view.
+    if (form.hidden || !orgId || orgId === titlesFor) return;
+    titlesFor = orgId;
+    void fetchOrgStructure(orgId)
+      .then((structure) => {
+        if (titlesFor !== orgId) return;
+        jobTitleList.replaceChildren(
+          ...[...new Set(structure.positions.filter((p) => p.lifecycle_status === 'active').map((p) => p.title))]
+            .sort((a, b) => a.localeCompare(b))
+            .map((title) => Object.assign(document.createElement('option'), { value: title }))
+        );
+      })
+      .catch(() => undefined);
+  }
 
   let selectedOrg: SelectedOrg | null = initialOrg;
   const orgWrap = el('div', 'add-person-form__field');
   const orgInput = document.createElement('input');
   orgInput.type = 'text';
-  orgInput.placeholder = 'Type @ to link an organisation';
+  orgInput.placeholder = 'Start typing an organisation…';
   orgInput.setAttribute('aria-label', 'Organisation');
   const orgSelectedNote = el('p', 'add-person-form__selected-note');
   orgSelectedNote.hidden = true;
@@ -145,20 +188,19 @@ export function mountIdentityEditor(
       orgInput.hidden = true;
       orgSelectedNote.replaceChildren(document.createTextNode(`${next.display_label} `), orgClear);
       orgSelectedNote.hidden = false;
-      if (!workplaceTextInput.value.trim()) {
-        workplaceTextInput.value = next.display_label;
-      }
     } else {
       orgInput.value = '';
       orgInput.hidden = false;
       orgSelectedNote.hidden = true;
     }
+    syncWorkplaceFields(next);
   }
   orgClear.addEventListener('click', () => setOrg(null));
-  if (initialOrg) setOrg(initialOrg);
+  setOrg(initialOrg);
 
   const orgPicker = createEntityPicker({
     input: orgInput,
+    mode: 'field',
     allowedKinds: ['organisation'],
     emptyText: 'No matching organisations.',
     search: async (query, signal) => {
@@ -205,26 +247,31 @@ export function mountIdentityEditor(
   form.append(
     el('label', 'add-person-form__label', 'Name'),
     nameInput,
+    el('label', 'add-person-form__label', 'Organisation'),
+    orgWrap,
+    jobTitleLabel,
+    jobTitleInput,
+    jobTitleList,
+    jobTitleHint,
+    workplaceTextLabel,
+    workplaceTextInput,
+    el('label', 'add-person-form__label', 'How you know them'),
+    roleSelect,
+    el('label', 'add-person-form__label', 'Notes'),
+    notesInput,
+    el('label', 'add-person-form__label', 'LinkedIn'),
+    linkedinInput,
     el('label', 'add-person-form__label', 'Sort name'),
     sortInput,
     el('label', 'add-person-form__label', 'Aliases'),
     aliasesInput,
-    el('label', 'add-person-form__label', 'Role'),
-    roleSelect,
-    el('label', 'add-person-form__label', 'Notes'),
-    notesInput,
-    el('label', 'add-person-form__label', 'Workplace'),
-    workplaceTextInput,
-    el('label', 'add-person-form__label', 'Organisation'),
-    orgWrap,
-    el('label', 'add-person-form__label', 'LinkedIn'),
-    linkedinInput,
     status,
     actions
   );
 
   function open(): void {
     form.hidden = false;
+    syncWorkplaceFields(selectedOrg);
     nameInput.focus();
   }
 
@@ -233,6 +280,7 @@ export function mountIdentityEditor(
     sortInput.value = person.sort_name ?? '';
     aliasesInput.value = person.aliases.join(', ');
     roleSelect.value = initialRole;
+    jobTitleInput.value = initialJobTitle;
     notesInput.value = initialNotes;
     workplaceTextInput.value = initialWorkplaceText;
     linkedinInput.value = initialLinkedin;
@@ -322,26 +370,20 @@ export function mountIdentityEditor(
           }
         }
 
+        // Organisation + job title in one server call; the org chart follows.
         const nextOrg = selectedOrg;
-        const orgChanged =
-          (nextOrg?.ref ?? null) !== (initialOrg?.ref ?? null);
-        if (orgChanged) {
+        const nextTitle = jobTitleInput.value.trim();
+        const orgChanged = (nextOrg?.ref ?? null) !== (initialOrg?.ref ?? null);
+        if (orgChanged || nextTitle !== initialJobTitle.trim()) {
           try {
-            if (context.workplaceLinkId && initialOrg && (!nextOrg || nextOrg.ref !== initialOrg.ref)) {
-              await endUniversalLink(context.workplaceLinkId, {
-                valid_to: new Date().toISOString()
-              });
-            }
-            if (nextOrg) {
-              await createUniversalLink({
-                source_ref: person.ref,
-                target_ref: nextOrg.ref,
-                relationship_type: 'employee_at',
-                valid_from: new Date().toISOString()
-              });
-            }
+            await setPersonWorkplace({
+              person_ref: person.ref,
+              organisation_ref: nextOrg?.ref ?? null,
+              job_title: nextTitle || null,
+              replace_organisation_ref: orgChanged ? initialOrg?.ref ?? null : null
+            });
           } catch (err) {
-            warnings.push(`Workplace link failed: ${errorMessage(err, 'unknown error')}`);
+            warnings.push(`Workplace / job title failed: ${errorMessage(err, 'unknown error')}`);
           }
         }
 

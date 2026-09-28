@@ -313,6 +313,15 @@ const LAYOUT_COORD_LIMIT = 100000;
  * Pure: validate a diagram layout `{ [shared:position|unit ref]: { x, y } }`.
  * Only box positions the operator dragged — never structure or access data.
  */
+/** Key for "this person with this title was taken off the chart". */
+export function dismissKey(personRef, title) {
+  return `${personRef}|${String(title ?? '').trim().toLowerCase()}`;
+}
+
+function sameTitle(a, b) {
+  return String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase();
+}
+
 export function sanitizeDiagramLayout(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out = {};
@@ -332,12 +341,17 @@ export function sanitizeDiagramLayout(raw) {
 
 async function loadOrgIndex(store, organisationId) {
   const raw = await getJSON(store, orgStructureIndexKey(organisationId));
-  if (!raw || typeof raw !== 'object') return { unit_ids: [], position_ids: [], link_ids: [], diagram_layout: {} };
+  if (!raw || typeof raw !== 'object') {
+    return { unit_ids: [], position_ids: [], link_ids: [], diagram_layout: {}, sync_dismissed: [] };
+  }
   return {
     unit_ids: Array.isArray(raw.unit_ids) ? raw.unit_ids.filter(isValidUnitId) : [],
     position_ids: Array.isArray(raw.position_ids) ? raw.position_ids.filter(isValidPositionId) : [],
     link_ids: Array.isArray(raw.link_ids) ? raw.link_ids.filter((id) => typeof id === 'string') : [],
-    diagram_layout: sanitizeDiagramLayout(raw.diagram_layout)
+    diagram_layout: sanitizeDiagramLayout(raw.diagram_layout),
+    sync_dismissed: Array.isArray(raw.sync_dismissed)
+      ? raw.sync_dismissed.filter((k) => typeof k === 'string').slice(-500)
+      : []
   };
 }
 
@@ -350,6 +364,9 @@ async function saveOrgIndex(store, organisationId, index) {
     // Every writer goes through load → mutate → save, so the dragged box
     // positions survive a unit/position/link write.
     diagram_layout: sanitizeDiagramLayout(index.diagram_layout),
+    // Person + title pairs the operator took off the chart; the profile
+    // sync never re-adds those (a new title is a new pair).
+    sync_dismissed: Array.isArray(index.sync_dismissed) ? index.sync_dismissed.slice(-500) : [],
     updated_at: new Date().toISOString()
   });
 }
@@ -521,6 +538,93 @@ export function createOrgStructureRepository(deps = {}) {
       return { link, created };
     }
 
+    function currentHoldsFor(links, positions, personRef) {
+      const active = new Map(
+        positions
+          .filter((p) => p.lifecycle_status === 'active')
+          .map((p) => [formatEntityRef({ namespace: 'shared', kind: 'position', id: p.id }), p])
+      );
+      return links
+        .filter(
+          (l) =>
+            linkIsCurrent(l) &&
+            l.relationship_type === 'holds_position' &&
+            l.source_ref === personRef &&
+            active.has(l.target_ref)
+        )
+        .map((l) => ({ link: l, position: active.get(l.target_ref) }));
+    }
+
+    /**
+     * Profile → chart. Put this person on the chart in a role with this
+     * title: rename the role they hold, fill a vacant role with the same
+     * title, or add a new role. Returns what changed.
+     */
+    async function syncHolderFromProfile(organisationId, personRef, title, options = {}) {
+      const clean = typeof title === 'string' ? title.trim() : '';
+      if (!clean) return { changed: false };
+      const key = dismissKey(personRef, clean);
+      const { units, positions, links, index } = await loadStructure(organisationId);
+      void units;
+      if (options.respectDismissed && index.sync_dismissed.includes(key)) return { changed: false };
+      if (!options.respectDismissed) await clearDismissed(organisationId, key);
+      const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
+      const holds = currentHoldsFor(links, positions, personRef);
+      if (holds.some((h) => sameTitle(h.position.title, clean))) return { changed: false };
+      if (holds.length === 1) {
+        await updatePosition(holds[0].position.id, { title: clean });
+        return { changed: true, action: 'renamed', position_id: holds[0].position.id };
+      }
+      if (holds.length > 1) return { changed: false }; // ambiguous — leave their roles alone
+      const heldRefs = new Set(
+        links.filter((l) => linkIsCurrent(l) && l.relationship_type === 'holds_position').map((l) => l.target_ref)
+      );
+      const vacant = positions.find(
+        (p) =>
+          p.lifecycle_status === 'active' &&
+          sameTitle(p.title, clean) &&
+          !heldRefs.has(formatEntityRef({ namespace: 'shared', kind: 'position', id: p.id }))
+      );
+      const position = vacant ?? (await createPosition({ organisation_ref: orgRef, title: clean }));
+      await createStructureLink({
+        organisationRef: orgRef,
+        relationshipType: 'holds_position',
+        sourceRef: personRef,
+        targetRef: formatEntityRef({ namespace: 'shared', kind: 'position', id: position.id })
+      });
+      return { changed: true, action: vacant ? 'filled' : 'added', position_id: position.id };
+    }
+
+    /** They left this organisation: take them out of their roles (the boxes stay, vacant). */
+    async function releaseHolder(organisationId, personRef) {
+      const { positions, links } = await loadStructure(organisationId);
+      for (const { link } of currentHoldsFor(links, positions, personRef)) {
+        await endStructureLink(organisationId, link.id, { dismiss: false });
+      }
+    }
+
+    /** Chart load: everyone at this organisation with a job title gets a box. */
+    async function syncFromProfiles(organisationId, workplaces) {
+      let changed = 0;
+      for (const w of workplaces ?? []) {
+        if (!w?.job_title || !w.person_ref) continue;
+        const result = await syncHolderFromProfile(organisationId, w.person_ref, w.job_title, {
+          respectDismissed: true
+        });
+        if (result.changed) changed += 1;
+      }
+      return changed;
+    }
+
+    /** Current holders of a position (for chart → profile). */
+    async function holdersOf(organisationId, positionId) {
+      const { links } = await loadStructure(organisationId);
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'position', id: positionId });
+      return links
+        .filter((l) => linkIsCurrent(l) && l.relationship_type === 'holds_position' && l.target_ref === ref)
+        .map((l) => l.source_ref);
+    }
+
     // Holder/member names for the chart. Resolved through the same
     // authorised resolver as every other endpoint; a hidden or missing
     // person simply stays unnamed rather than erroring the whole chart.
@@ -584,7 +688,22 @@ export function createOrgStructureRepository(deps = {}) {
       return link && link.status === 'current';
     }
 
-    async function endStructureLink(organisationId, linkId) {
+    async function addDismissed(organisationId, keys) {
+      const index = await loadOrgIndex(resolved, organisationId);
+      const set = new Set(index.sync_dismissed);
+      for (const key of keys) set.add(key);
+      index.sync_dismissed = [...set];
+      await saveOrgIndex(resolved, organisationId, index);
+    }
+
+    async function clearDismissed(organisationId, key) {
+      const index = await loadOrgIndex(resolved, organisationId);
+      if (!index.sync_dismissed.includes(key)) return;
+      index.sync_dismissed = index.sync_dismissed.filter((k) => k !== key);
+      await saveOrgIndex(resolved, organisationId, index);
+    }
+
+    async function endStructureLink(organisationId, linkId, options = {}) {
       const index = await loadOrgIndex(resolved, organisationId);
       if (!index.link_ids.includes(linkId)) {
         throw Object.assign(new Error('That line is not part of this organisation chart.'), {
@@ -594,6 +713,12 @@ export function createOrgStructureRepository(deps = {}) {
       }
       const link = await linksRepo.getLink(linkId, accessContext);
       if (!linkIsCurrent(link)) return link;
+      if (link.relationship_type === 'holds_position' && options.dismiss !== false) {
+        const position = parsePositionRecord(
+          await getJSON(resolved, positionKey(parseEntityRef(link.target_ref)?.id ?? ''))
+        );
+        if (position) await addDismissed(organisationId, [dismissKey(link.source_ref, position.title)]);
+      }
       if (link.temporal_mode !== 'period') {
         return linksRepo.suppressLink(linkId, 'org_chart_removed', createAccessContext({ workflow: 'administration' }));
       }
@@ -624,6 +749,8 @@ export function createOrgStructureRepository(deps = {}) {
       for (const link of links) {
         if (!linkIsCurrent(link)) continue;
         if (link.source_ref !== positionRef && link.target_ref !== positionRef) continue;
+        // Ending the holder link records the dismissal, so the profile sync
+        // won't put this person straight back in a new box.
         await endStructureLink(organisationId, link.id);
         ended.push(link.id);
       }
@@ -642,7 +769,11 @@ export function createOrgStructureRepository(deps = {}) {
       getDerivedGraph,
       saveLayout,
       endStructureLink,
-      archivePosition
+      archivePosition,
+      syncHolderFromProfile,
+      releaseHolder,
+      syncFromProfiles,
+      holdersOf
     };
   }
 
@@ -676,6 +807,18 @@ export function createOrgStructureRepository(deps = {}) {
     },
     async archivePosition(organisationId, positionId) {
       return (await withStore()).archivePosition(organisationId, positionId);
+    },
+    async syncHolderFromProfile(organisationId, personRef, title, options) {
+      return (await withStore()).syncHolderFromProfile(organisationId, personRef, title, options);
+    },
+    async releaseHolder(organisationId, personRef) {
+      return (await withStore()).releaseHolder(organisationId, personRef);
+    },
+    async syncFromProfiles(organisationId, workplaces) {
+      return (await withStore()).syncFromProfiles(organisationId, workplaces);
+    },
+    async holdersOf(organisationId, positionId) {
+      return (await withStore()).holdersOf(organisationId, positionId);
     },
     /** Test helper: bind a store without reopening Blobs. */
     withStore

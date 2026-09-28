@@ -17,6 +17,7 @@ import {
   listGithubRelationshipEntries
 } from './github-professional-data.mjs';
 import { dedupeIdentityRows, identityNameKey } from './identity-display-name.mjs';
+import { withoutSupersededImports } from './person-workplace.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -233,7 +234,10 @@ export async function loadAllPeopleWithRelationships({
     }
     return {
       person: row.person,
-      relationships: withoutStudentPersonEndpoints([...native, ...imported], studentIds)
+      relationships: withoutStudentPersonEndpoints(
+        withoutSupersededImports([...native, ...imported]),
+        studentIds
+      )
     };
   });
 }

@@ -38,7 +38,7 @@ export interface ChartPoint {
 }
 
 export const BOX_W = 184;
-export const BOX_H = 68;
+export const BOX_H = 84;
 const GAP_X = 36;
 const GAP_Y = 72;
 const MARGIN = 32;
