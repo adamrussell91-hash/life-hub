@@ -115,9 +115,22 @@ const NOTION_METHOD_CHANNELS = {
 const NOTION_MEETING_METHODS = new Set(['In-person Meeting', 'Video Call']);
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const MENTION_DATE_TAG = /<mention-date\b([^>]*)\/?>/i;
+const NOTION_INLINE_TAG = /<\/?(?:mention-date|mention-page|empty-block|mention-user|mention-link)\b[^>]*\/?>/gi;
+const EPOCH_ISO = '1970-01-01T00:00:00.000Z';
 
 export function isNotionMeetingMethod(method) {
   return NOTION_MEETING_METHODS.has(method);
+}
+
+/** True for missing / Unix-epoch placeholders that must never render as a calendar day. */
+export function isMissingScheduleInstant(value) {
+  if (value == null || value === '') return true;
+  const text = String(value).trim();
+  if (!text) return true;
+  if (text === EPOCH_ISO || text.startsWith('1970-01-01')) return true;
+  const ms = Date.parse(text);
+  return Number.isFinite(ms) && ms === 0;
 }
 
 function notionIdFromRow(row) {
@@ -125,37 +138,90 @@ function notionIdFromRow(row) {
   return /^[0-9a-f]{32}$/i.test(notionId) ? notionId.toLowerCase() : null;
 }
 
+/**
+ * Strip Notion rich-text / mention markup so list titles are human-readable.
+ * Leaves plain words; drops mention-date/page tags, empty-block, and `**bold**`.
+ */
+export function cleanNotionDisplayTitle(raw) {
+  let text = String(raw ?? '');
+  if (!text) return '';
+  text = text.replace(NOTION_INLINE_TAG, ' ');
+  text = text.replace(/<\/?[a-z][^>]*>/gi, ' ');
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+  text = text.replace(/__([^_]+)__/g, '$1');
+  text = text.replace(/\*([^*]+)\*/g, '$1');
+  text = text.replace(/_([^_]+)_/g, '$1');
+  text = text.replace(/\s+/g, ' ').trim();
+  text = text.replace(/^[-–—:|/,]+\s*|\s*[-–—:|/,]+$/g, '').trim();
+  return text;
+}
+
+/**
+ * When Notion left the date only inside a title `<mention-date …/>`, recover bounds.
+ */
+export function parseMentionDateFromTitle(title) {
+  const match = MENTION_DATE_TAG.exec(String(title ?? ''));
+  if (!match) return null;
+  const attrs = match[1] ?? '';
+  const start = /\bstart="([^"]+)"/i.exec(attrs)?.[1]?.trim();
+  if (!start) return null;
+  const startTime = /\bstartTime="([^"]+)"/i.exec(attrs)?.[1]?.trim();
+  const timeZone = /\btimeZone="([^"]+)"/i.exec(attrs)?.[1]?.trim() || 'Australia/Sydney';
+
+  if (startTime && DATE_ONLY.test(start)) {
+    try {
+      const iso = wallLocalToUtcIso(`${start}T${startTime}`, timeZone);
+      return { start: iso, end: null, pin: true };
+    } catch {
+      return null;
+    }
+  }
+  if (DATE_ONLY.test(start)) {
+    try {
+      const iso = wallLocalToUtcIso(`${start}T09:00`, timeZone);
+      return { start: iso, end: null, pin: true };
+    } catch {
+      return null;
+    }
+  }
+  const startMs = Date.parse(start);
+  if (!Number.isFinite(startMs)) return null;
+  return { start: new Date(startMs).toISOString(), end: null, pin: true };
+}
+
 function notionRowTitle(row, fallback = 'Comm') {
-  return (
-    [row?.title, row?.meeting_type, row?.method].find((value) => typeof value === 'string' && value.trim())?.trim() ??
-    fallback
-  );
+  const cleaned = [row?.title, row?.meeting_type, row?.method]
+    .map((value) => (typeof value === 'string' ? cleanNotionDisplayTitle(value) : ''))
+    .find((value) => value);
+  return cleaned || fallback;
 }
 
 /**
  * Parse Notion date_start / date_end into UTC ISO bounds.
- * Date-only → 09:00 Sydney. Missing/invalid start → null (list rows may still use a fallback).
+ * Date-only → 09:00 Sydney. Missing property → mention-date in title. Still none → null.
  */
 export function parseNotionCommunicationBounds(row) {
   const rawStart = typeof row?.date_start === 'string' ? row.date_start.trim() : '';
-  if (!rawStart) return null;
-
-  let start;
-  let end = null;
-  if (DATE_ONLY.test(rawStart)) {
-    try {
-      start = wallLocalToUtcIso(`${rawStart}T09:00`, 'Australia/Sydney');
-    } catch {
-      return null;
+  if (rawStart) {
+    let start;
+    let end = null;
+    if (DATE_ONLY.test(rawStart)) {
+      try {
+        start = wallLocalToUtcIso(`${rawStart}T09:00`, 'Australia/Sydney');
+      } catch {
+        start = null;
+      }
+    } else {
+      const startMs = Date.parse(rawStart);
+      if (Number.isFinite(startMs)) {
+        start = new Date(startMs).toISOString();
+        const endMs = typeof row.date_end === 'string' && !DATE_ONLY.test(row.date_end) ? Date.parse(row.date_end) : NaN;
+        if (Number.isFinite(endMs) && endMs > startMs) end = new Date(endMs).toISOString();
+      }
     }
-  } else {
-    const startMs = Date.parse(rawStart);
-    if (!Number.isFinite(startMs)) return null;
-    start = new Date(startMs).toISOString();
-    const endMs = typeof row.date_end === 'string' && !DATE_ONLY.test(row.date_end) ? Date.parse(row.date_end) : NaN;
-    if (Number.isFinite(endMs) && endMs > startMs) end = new Date(endMs).toISOString();
+    if (start) return { start, end, pin: end === null };
   }
-  return { start, end, pin: end === null };
+  return parseMentionDateFromTitle(row?.title);
 }
 
 /**
@@ -190,8 +256,8 @@ export function projectNotionCommunicationSchedule(row) {
 
 /**
  * Notion Communications row → Communication list record for `#/communications`.
- * Meeting methods are excluded (they surface on `#/meetings`). Undated rows
- * stay listed with occurred_at = epoch so sort still works.
+ * Meeting methods are excluded (they surface on `#/meetings`). Truly undated
+ * rows keep occurred_at = epoch for sort only — the list UI must not render it.
  */
 export function projectNotionCommunicationListRecord(row) {
   const notionId = notionIdFromRow(row);
@@ -199,7 +265,7 @@ export function projectNotionCommunicationListRecord(row) {
   if (isNotionMeetingMethod(row?.method)) return null;
 
   const bounds = parseNotionCommunicationBounds(row);
-  const occurred = bounds?.start ?? '1970-01-01T00:00:00.000Z';
+  const occurred = bounds?.start ?? EPOCH_ISO;
   const summary =
     typeof row?.notes === 'string' && row.notes.trim()
       ? row.notes.trim()
@@ -238,7 +304,7 @@ export function projectNotionMeetingListRecord(row, { now = () => Date.now() } =
   if (!isNotionMeetingMethod(row?.method)) return null;
 
   const bounds = parseNotionCommunicationBounds(row);
-  const start = bounds?.start ?? '1970-01-01T00:00:00.000Z';
+  const start = bounds?.start ?? EPOCH_ISO;
   const end = bounds?.end ?? start;
   const startMs = Date.parse(start);
   const state =

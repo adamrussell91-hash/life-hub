@@ -95,6 +95,56 @@ describe('renderCommunicationsView', () => {
     expect(row?.getAttribute('href')).toBe(`https://www.notion.so/${notionId}`);
     expect(canvas.textContent).toMatch(/Email to Sam K\./);
   });
+
+  it('hides epoch placeholders and shows recovered dates without raw Notion markup', async () => {
+    const notionA = 'c'.repeat(32);
+    const notionB = 'd'.repeat(32);
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        ok: true,
+        data: {
+          communications: [
+            {
+              schema_version: 2,
+              id: `notion_${notionA}`,
+              direction: 'outbound',
+              channel: 'other',
+              occurred_at: '2026-07-22T23:00:00.000Z',
+              scheduled_start: '2026-07-22T23:00:00.000Z',
+              subject: 'Meeting',
+              summary: '',
+              status: 'completed',
+              created_at: '2026-07-22T23:00:00.000Z',
+              updated_at: '2026-07-22T23:00:00.000Z',
+              source: 'notion'
+            },
+            {
+              schema_version: 2,
+              id: `notion_${notionB}`,
+              direction: 'outbound',
+              channel: 'email',
+              occurred_at: '1970-01-01T00:00:00.000Z',
+              scheduled_start: null,
+              subject: 'Email Sharni Knox re: her son',
+              summary: '',
+              status: 'completed',
+              created_at: '1970-01-01T00:00:00.000Z',
+              updated_at: '1970-01-01T00:00:00.000Z',
+              source: 'notion'
+            }
+          ]
+        }
+      })
+    );
+    const canvas = document.createElement('div');
+    await renderCommunicationsView(canvas);
+    const text = canvas.textContent ?? '';
+    expect(text).not.toMatch(/01\/01\/70/);
+    expect(text).not.toMatch(/mention-date/);
+    expect(text).toMatch(/Meeting/);
+    expect(text).toMatch(/23\/07\/26/);
+    expect(text).toMatch(/Email Sharni Knox re: her son/);
+  });
 });
 
 describe('renderCommunicationNewView', () => {

@@ -123,11 +123,15 @@ function notionPageHref(id: string): string | null {
 
 function toMeetingRow(record: MeetingRecord): ScheduleDbRow {
   const notionHref = notionPageHref(record.id);
+  const when =
+    record.scheduled_start && !String(record.scheduled_start).startsWith('1970-01-01')
+      ? record.scheduled_start
+      : '';
   return {
     id: record.id,
     title: record.title,
     href: notionHref ?? meetingRoute(record.id),
-    when: record.scheduled_start,
+    when,
     meta: [record.state.replace(/_/g, ' '), record.location_text ?? ''].filter(Boolean),
     filterTokens: [record.state],
     facetKey: record.state,
