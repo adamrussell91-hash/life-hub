@@ -5,15 +5,10 @@ export function registerServiceWorker(): void {
   if (!('serviceWorker' in navigator)) return;
   if (import.meta.env?.MODE === 'test') return;
 
-  // After activate+claim, reload once so a fresh network HTML (new Vite hashes)
-  // replaces any document that was served from a previous shell cache.
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    location.reload();
-  });
-
+  // No reload on controllerchange: HTML is network-first, so this document is
+  // already current. A reload here re-ran the whole boot (bundle + session +
+  // trips + trip) on every first visit. Stale-shell upgrades are handled by
+  // sw.js activate, which navigates only when an older shell cache existed.
   void navigator.serviceWorker.register('/travel/sw.js', { scope: '/travel/' }).catch(() => {
     /* offline support degrades gracefully without a worker */
   });

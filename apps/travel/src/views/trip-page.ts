@@ -3,14 +3,14 @@ import { getTrip } from '@/api/travel';
 import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems } from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderWorldMap } from '@/components/world-map';
-import { renderDayMap, type DayMapHandle } from '@/components/day-map';
+import type { DayMapHandle } from '@/components/day-map';
 import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { formatInZone, zonedToInstant } from '@/lib/time';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
-import { Marker } from 'maplibre-gl';
+import type { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
   cityId?: string;
@@ -126,6 +126,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   canvas.append(wrap);
 
   let dayMapHandle: DayMapHandle | null = null;
+  // MapLibre is ~800 kB; load it after the trip paints so the world map and
+  // day list are not held behind it (and it only loads when a day map shows).
+  let dayMapRender = 0;
   let selectedCityId = options.cityId ?? trip.cities[0]?.id ?? '';
   let selectedDate = options.date ?? '';
 
@@ -194,8 +197,9 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       });
       dayBar.append(btn);
     }
-    scene.append(dayBar);
-    citySection.append(scene);
+    // Day bar sits under the scene (its CSS rounds the bottom corners); inside
+    // the fixed-height scene it overprinted the city title.
+    citySection.append(scene, dayBar);
 
     const day = document.createElement('div');
     day.className = 'day';
@@ -231,7 +235,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     whereBtn.textContent = 'Where am I?';
     whereBtn.addEventListener('click', () => {
       if (!dayMapHandle) return;
-      startWhereAmI(dayMapHandle.map, mapBox, city, selectedDate, trip);
+      void startWhereAmI(dayMapHandle.map, mapBox, city, selectedDate, trip);
     });
     const fullBtn = document.createElement('button');
     fullBtn.type = 'button';
@@ -270,11 +274,16 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
         onTellPenelope: (prompt) => writePenelopeHandoff(trip, city.id, selectedDate, prompt)
       });
       dayMapHandle?.destroy();
+      dayMapHandle = null;
       const dayItems = trip.items.filter((item) => item.city_id === city.id && item.date === selectedDate);
-      dayMapHandle = renderDayMap(mapInner, city, dayItems, { cooperativeGestures: window.innerWidth < 720 });
-      dayMapHandle.onSelect((itemId) => {
-        listCol.querySelectorAll('.stop').forEach((el) => el.classList.remove('is-on'));
-        listCol.querySelector(`[data-item-id="${itemId}"]`)?.classList.add('is-on');
+      const render = ++dayMapRender;
+      void import('@/components/day-map').then(({ renderDayMap }) => {
+        if (render !== dayMapRender || !mapInner.isConnected) return;
+        dayMapHandle = renderDayMap(mapInner, city, dayItems, { cooperativeGestures: window.innerWidth < 720 });
+        dayMapHandle.onSelect((itemId) => {
+          listCol.querySelectorAll('.stop').forEach((el) => el.classList.remove('is-on'));
+          listCol.querySelector(`[data-item-id="${itemId}"]`)?.classList.add('is-on');
+        });
       });
     }
     function renderDayBarState(): void {
@@ -327,13 +336,13 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   selectCity(selectedCityId);
 }
 
-function startWhereAmI(
+async function startWhereAmI(
   map: import('maplibre-gl').Map,
   mapBox: HTMLElement,
   city: City,
   date: string,
   trip: Trip
-): void {
+): Promise<void> {
   const today = new Date().toISOString().slice(0, 10);
   if (today < trip.start_date) {
     window.alert('The trip has not started yet — location is not needed.');
@@ -358,6 +367,8 @@ function startWhereAmI(
     return zonedToInstant(item.date, item.time, city.tz) >= now;
   });
 
+  // Already loaded: the day map this runs against imported maplibre-gl.
+  const { Marker: MarkerCtor } = await import('maplibre-gl');
   let meMarker: Marker | null = null;
   const watchId = navigator.geolocation.watchPosition(
     (pos) => {
@@ -365,7 +376,7 @@ function startWhereAmI(
       if (!meMarker) {
         const el = document.createElement('div');
         el.className = 'where-dot';
-        meMarker = new Marker({ element: el }).setLngLat([longitude, latitude]).addTo(map);
+        meMarker = new MarkerCtor({ element: el }).setLngLat([longitude, latitude]).addTo(map);
       } else {
         meMarker.setLngLat([longitude, latitude]);
       }

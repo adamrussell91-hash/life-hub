@@ -19,7 +19,7 @@ interface Leg {
 function tripLegs(trip: Trip): Leg[] {
   const tickets = trip.items
     .filter((item) => item.kind === 'flight' || item.kind === 'train')
-    .sort((a, b) => (a.date === b.date ? a.time!.localeCompare(b.time ?? '') : a.date < b.date ? -1 : 1));
+    .sort((a, b) => (a.date === b.date ? (a.time ?? '').localeCompare(b.time ?? '') : a.date < b.date ? -1 : 1));
   const legs: Leg[] = [];
   for (const t of tickets) {
     if (t.kind !== 'flight' && t.kind !== 'train') continue;
@@ -196,7 +196,9 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
     const start = performance.now();
     const perLegMs = 1400;
     function frame(now: number): void {
-      const elapsed = now - start;
+      // rAF timestamps are the frame start and can precede `start`; a negative
+      // elapsed made legIndex -1 → legs[-1].fromCity threw and froze the map.
+      const elapsed = Math.max(0, now - start);
       const legIndex = Math.min(legs.length - 1, Math.floor(elapsed / perLegMs));
       const leg = legs[legIndex]!;
       const t = Math.min(1, (elapsed - legIndex * perLegMs) / perLegMs);
