@@ -81,7 +81,7 @@ export interface ProfessionalProfileReference {
 export interface ProfessionalProfile {
   schema_version: number;
   source: {
-    system: 'notion';
+    system: 'notion' | 'hub';
     page_url: string | null;
     properties: Record<string, string>;
   };

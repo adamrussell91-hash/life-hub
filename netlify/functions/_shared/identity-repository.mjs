@@ -16,6 +16,7 @@ import {
   validatePersonCreateInput,
   validatePersonFieldUpdate
 } from './identity-schema.mjs';
+import { mergeProfessionalProfile } from './professional-profile.mjs';
 import { deriveOperationId, isValidOperationId } from './universal-link-schema.mjs';
 import { mapBounded } from './blobs-list.mjs';
 import {
@@ -892,8 +893,27 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
       ? validatePersonFieldUpdate(patch)
       : validateOrganisationFieldUpdate(patch);
 
+    const { professional_profile: profilePatch, ...fieldPatch } = validatedPatch;
+    let mergedProfile = null;
+    if (profilePatch) {
+      mergedProfile = mergeProfessionalProfile(record.professional_profile, profilePatch);
+      if (!mergedProfile) {
+        throw Object.assign(new Error('professional_profile update is invalid.'), {
+          status: 400,
+          code: 'invalid_professional_profile'
+        });
+      }
+    }
+
     const preUpdatedAt = record.updated_at;
-    const patchFingerprint = JSON.stringify(Object.keys(validatedPatch).sort().map(key => [key, validatedPatch[key]]));
+    const fingerprintSource = profilePatch
+      ? { ...fieldPatch, professional_profile: profilePatch }
+      : fieldPatch;
+    const patchFingerprint = JSON.stringify(
+      Object.keys(fingerprintSource)
+        .sort()
+        .map((key) => [key, fingerprintSource[key]])
+    );
     const operationId = deriveOperationId(['update_identity', ref.kind, ref.id, patchFingerprint]);
 
     const existingJournal = validateIdentityOperationRecord(await getJSON(store, identityOperationKey(operationId), STRONG));
@@ -902,7 +922,12 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     const timestamp = now();
     const updatedRecord = resuming
       ? existingJournal.payload.entity
-      : Object.freeze({ ...record, ...validatedPatch, updated_at: timestamp });
+      : Object.freeze({
+          ...record,
+          ...fieldPatch,
+          ...(mergedProfile ? { professional_profile: mergedProfile } : {}),
+          updated_at: timestamp
+        });
     const indexRecord = resuming ? existingJournal.payload.index : buildIndexFor(updatedRecord, ref.kind);
 
     const journal = resuming ? existingJournal : {

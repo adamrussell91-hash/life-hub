@@ -21,7 +21,9 @@ export function createPeopleAskHandler(deps = {}) {
         if (request.method !== 'POST') {
           return withCors(methodNotAllowed('POST, OPTIONS'), request, env);
         }
-        const body = await readJsonObject(request);
+        const parsed = await readJsonObject(request);
+        if (parsed.error) return withCors(parsed.error, request, env);
+        const body = parsed.value;
         const question = String(body?.question ?? body?.q ?? '').trim();
         if (!question) {
           return withCors(

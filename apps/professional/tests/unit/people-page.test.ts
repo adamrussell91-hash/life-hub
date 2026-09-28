@@ -150,6 +150,11 @@ describe('renderPeoplePage (W2 real entry)', () => {
             }
           });
         }
+        if (url.includes('/api/people/self')) {
+          return jsonResponse({
+            self: { ref: 'shared:person:person_self', display_name: 'Adam Russell' }
+          });
+        }
         if (url.includes('/api/people/ask')) {
           return jsonResponse({
             mode: 'ask',
@@ -183,7 +188,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
-  it('Edit opens the identity form (I3), not only Full record', async () => {
+  it('Edit opens the full person form (identity + role/notes/workplace/LinkedIn)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderPeoplePage(canvas, { selectedId: PERSON_ID });
@@ -195,6 +200,11 @@ describe('renderPeoplePage (W2 real entry)', () => {
     edit!.click();
     expect(form?.hidden).toBe(false);
     expect(form?.querySelector('input[aria-label="Name"]')).toBeTruthy();
+    expect(form?.querySelector('select[aria-label="Role"]')).toBeTruthy();
+    expect(form?.querySelector('textarea[aria-label="Notes"]')).toBeTruthy();
+    expect(form?.querySelector('input[aria-label="Workplace"]')).toBeTruthy();
+    expect(form?.querySelector('input[aria-label="Organisation"]')).toBeTruthy();
+    expect(form?.querySelector('input[aria-label="LinkedIn"]')).toBeTruthy();
   });
 
   it('Remember empty offers Run now; Today strip mounts (Phases 5–7)', async () => {

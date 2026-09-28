@@ -92,6 +92,8 @@ interface RelationshipSeed {
   valid_from: string | null;
   valid_to: string | null;
   occurred_at: string | null;
+  role?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface CommunicationRecord {
@@ -515,6 +517,18 @@ export function createMockApi() {
 
     if (path === '/api/people/link-proposals' && method === 'GET') {
       return json(200, { ok: true, data: { proposals: [], count: 0 } });
+    }
+
+    if (path === '/api/people/self' && method === 'GET') {
+      const self = [...people.values()].find((p) => p.is_self) ?? null;
+      return json(200, {
+        ok: true,
+        data: {
+          self: self
+            ? { ref: `shared:person:${self.id}`, display_name: self.display_name }
+            : null
+        }
+      });
     }
 
     if (path === '/api/people/link-proposals' && method === 'POST') {
@@ -1299,7 +1313,16 @@ export function createMockApi() {
       if (action !== 'update') {
         return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
       }
-      const input = (body ?? {}) as { display_name?: unknown; sort_name?: unknown; aliases?: unknown };
+      const input = (body ?? {}) as {
+        display_name?: unknown;
+        sort_name?: unknown;
+        aliases?: unknown;
+        professional_profile?: {
+          summary?: unknown;
+          linkedin_url?: unknown;
+          current_workplace?: unknown;
+        };
+      };
       if (typeof input.display_name === 'string') {
         const displayName = input.display_name.trim();
         if (!displayName) {
@@ -1315,6 +1338,55 @@ export function createMockApi() {
       }
       if (Array.isArray(input.aliases)) {
         record.aliases = input.aliases.filter((value): value is string => typeof value === 'string' && value.trim() !== '');
+      }
+      if (record.kind === 'person' && input.professional_profile && typeof input.professional_profile === 'object') {
+        const pp = input.professional_profile;
+        type MockProfile = {
+          source?: { system: string; page_url: string | null; properties: Record<string, string> };
+          summary?: string | null;
+          contact?: { email: string | null; phone: string | null; linkedin_url: string | null };
+          last_contacted?: string | null;
+          current_workplace?: string[];
+          references?: Record<string, unknown>;
+          body_markdown?: string | null;
+        };
+        const existing =
+          record.professional_profile && typeof record.professional_profile === 'object'
+            ? (record.professional_profile as MockProfile)
+            : null;
+        record.professional_profile = {
+          schema_version: 1,
+          source: existing?.source ?? { system: 'hub', page_url: null, properties: {} },
+          summary:
+            pp.summary !== undefined
+              ? typeof pp.summary === 'string'
+                ? pp.summary.trim() || null
+                : null
+              : (existing?.summary ?? null),
+          contact: {
+            email: existing?.contact?.email ?? null,
+            phone: existing?.contact?.phone ?? null,
+            linkedin_url:
+              pp.linkedin_url !== undefined
+                ? typeof pp.linkedin_url === 'string' && pp.linkedin_url.trim()
+                  ? pp.linkedin_url.trim()
+                  : null
+                : (existing?.contact?.linkedin_url ?? null)
+          },
+          last_contacted: existing?.last_contacted ?? null,
+          current_workplace:
+            pp.current_workplace !== undefined
+              ? typeof pp.current_workplace === 'string'
+                ? pp.current_workplace.trim()
+                  ? [pp.current_workplace.trim()]
+                  : []
+                : Array.isArray(pp.current_workplace)
+                  ? pp.current_workplace.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+                  : []
+              : (existing?.current_workplace ?? []),
+          references: existing?.references ?? {},
+          body_markdown: existing?.body_markdown ?? null
+        };
       }
       record.updated_at = new Date().toISOString();
       return json(200, { ok: true, data: { ref: refFor(record), ...record } });
@@ -2697,6 +2769,8 @@ export function createMockApi() {
         source_ref?: string;
         target_ref?: string;
         relationship_type?: string;
+        role?: string | null;
+        valid_from?: string | null;
         metadata?: Record<string, unknown>;
       };
       for (const key of ['actor', 'workflow', 'allowed_visibility', 'allowed_entity_kinds']) {
@@ -2718,6 +2792,7 @@ export function createMockApi() {
           link.status === 'current'
       );
       if (existing) {
+        if (input.role !== undefined) existing.role = input.role;
         return json(200, {
           ok: true,
           data: {
@@ -2726,7 +2801,8 @@ export function createMockApi() {
               source_ref: existing.source_ref,
               target_ref: existing.target_ref,
               relationship_type: existing.relationship_type,
-              status: existing.status
+              status: existing.status,
+              role: existing.role ?? null
             },
             created: false
           }
@@ -2744,9 +2820,10 @@ export function createMockApi() {
         context_key: null,
         status: 'current',
         temporal_mode: 'timeless',
-        valid_from: null,
+        valid_from: input.valid_from ?? null,
         valid_to: null,
         occurred_at: null,
+        role: input.role ?? null,
         ...(input.metadata ? { metadata: input.metadata } : {})
       });
       return json(201, {
@@ -2758,6 +2835,7 @@ export function createMockApi() {
             target_ref: input.target_ref,
             relationship_type: input.relationship_type,
             status: 'current',
+            role: input.role ?? null,
             ...(input.metadata ? { metadata: input.metadata } : {})
           },
           created: true
@@ -2803,6 +2881,42 @@ export function createMockApi() {
               }
         }));
       return json(200, { ok: true, data: { outgoing, incoming } });
+    }
+
+    if (path === '/api/universal-links' && method === 'PATCH') {
+      const id = url.searchParams.get('id');
+      const action = url.searchParams.get('action') ?? '';
+      const link = relationships.find((r) => r.id === id);
+      if (!id || !link) {
+        return json(404, { ok: false, error: { code: 'link_not_found', message: 'Link not found.' } });
+      }
+      const input = (body ?? {}) as {
+        role?: string | null;
+        changed_at?: string;
+        valid_to?: string | null;
+        reason?: string;
+      };
+      if (action === 'end' || action === 'suppress') {
+        link.status = 'ended';
+        link.valid_to = input.valid_to ?? new Date().toISOString();
+        return json(200, { ok: true, data: { link } });
+      }
+      if (action === 'change_role') {
+        const ended = { ...link, status: 'ended', valid_to: input.changed_at ?? new Date().toISOString() };
+        link.status = 'ended';
+        link.valid_to = ended.valid_to;
+        const created: RelationshipSeed = {
+          ...link,
+          id: `${link.id}_role_${Date.now().toString(36)}`,
+          status: 'current',
+          role: input.role ?? null,
+          valid_from: input.changed_at ?? new Date().toISOString(),
+          valid_to: null
+        };
+        relationships.push(created);
+        return json(200, { ok: true, data: { ended, created } });
+      }
+      return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
     }
 
     return json(404, { ok: false, error: { code: 'not_found', message: 'Unknown route.' } });
