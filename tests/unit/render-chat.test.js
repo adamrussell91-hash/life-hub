@@ -713,3 +713,22 @@ test('syncAssistantMessageTails marks only the last bubble in a consecutive assi
   assert.match(a3.className, /chat-message--tail/);
 });
 
+
+test('formatActionWriteDisplay shows people writes as plain sentences, not raw paths', () => {
+  const add = formatActionWriteDisplay({
+    path: 'people:person:new-sam',
+    mode: 'create',
+    content: '{"display_name":"Sam Lee"}',
+    diff: 'Add person: Sam Lee'
+  });
+  assert.equal(add.useCode, false);
+  assert.equal(add.label, 'Add person: Sam Lee');
+  const link = formatActionWriteDisplay({
+    path: 'people:link:new-1',
+    mode: 'create',
+    content: '{}',
+    diff: 'Link Sam Lee → Jo Example: colleague'
+  });
+  assert.equal(link.useCode, false);
+  assert.equal(link.label, 'Link Sam Lee → Jo Example: colleague');
+});

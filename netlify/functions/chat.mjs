@@ -320,6 +320,9 @@ import {
 import { promptOneLinersForAgent } from './_shared/capabilities/registry.mjs';
 import { buildCentralNodeModel } from '../../apps/life/js/app/central-node-model.js';
 import { readCentralNodeSectionBody } from '../../apps/life/js/core/central-node-patch.js';
+import { buildPeopleProposal, createPeopleNameLookup, searchPeopleForAgent } from './_shared/people-agent.mjs';
+import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import { buildBindingGoal } from '../../apps/life/js/app/binding-goal.js';
 import { lintWorkoutProposal } from './_shared/workout-lint.mjs';
 import { loadPhysiqueTarget } from './_shared/load-physique-target.mjs';
@@ -362,7 +365,9 @@ export function createChatHandler({
   loadHubAgentContext: loadHubContext = loadHubAgentContext,
   getTasksStore = defaultGetTasksStore,
   getTeachingStore = defaultGetTeachingStore,
-  getLifeEvents = null
+  getLifeEvents = null,
+  getPeopleStore = defaultGetUniversalLinkStore,
+  resolvePeopleEntity = defaultResolveEntity
 } = {}) {
   return async function chatHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -1815,6 +1820,45 @@ export function createChatHandler({
                   parseDocument: (content, path) => parseEventDocument(content, path, loadYaml)
                 });
                 return JSON.stringify(result);
+              }
+              if (event.name === 'search_people') {
+                send({ type: 'status', text: 'Searching People…' });
+                try {
+                  const store = await getPeopleStore(env);
+                  return JSON.stringify(await searchPeopleForAgent({
+                    query: event.input?.query,
+                    kinds: event.input?.kinds,
+                    store,
+                    env,
+                    fetchImpl
+                  }));
+                } catch {
+                  return JSON.stringify({ ok: false, error: 'people_unavailable' });
+                }
+              }
+              if (event.name === 'propose_people_changes') {
+                const built = await buildPeopleProposal(event.input ?? {}, {
+                  nameForRef: createPeopleNameLookup({ env, fetchImpl, resolveEntity: resolvePeopleEntity })
+                });
+                if (!built.ok) {
+                  return JSON.stringify({ ok: false, error: built.error, ...(built.detail ? { detail: built.detail } : {}) });
+                }
+                const validated = validateProposeActionInput(built.proposal, { agentSlug: slug });
+                if (!validated.ok) {
+                  return JSON.stringify({
+                    ok: false,
+                    error: validated.error,
+                    ...(validated.detail ? { detail: validated.detail } : {})
+                  });
+                }
+                const pendingId = await proposeOsAction(validated.proposal);
+                return JSON.stringify({
+                  ok: true,
+                  status: 'awaiting_confirm',
+                  message: 'Waiting on Adam\'s Confirm. Nothing is saved yet.',
+                  changes: validated.proposal.writes.map(write => write.diff),
+                  ...(pendingId ? { pendingId } : {})
+                });
               }
               if (event.name === 'search_mind_records') {
                 send({ type: 'status', text: 'Searching mind records…' });

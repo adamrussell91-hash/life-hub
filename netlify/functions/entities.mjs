@@ -5,6 +5,7 @@ import { assertRegisteredEntityRef, formatEntityRef } from './_shared/entity-ref
 import { redactIdentityRecord } from './_shared/identity-schema.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createIdentityRepository } from './_shared/identity-repository.mjs';
+import { getGithubPerson } from './_shared/github-professional-data.mjs';
 
 export const config = { path: '/api/entities' };
 
@@ -87,6 +88,7 @@ export function createEntitiesHandler(deps = {}) {
   // deterministic for tests.
   const identityNow = deps.identityNow ?? (() => new Date().toISOString());
   const createRepository = deps.createIdentityRepository ?? createIdentityRepository;
+  const getPerson = deps.getGithubPerson ?? getGithubPerson;
 
   return createOperatorHandler(async (request, context) => {
     const { env, store } = context;
@@ -121,7 +123,18 @@ export function createEntitiesHandler(deps = {}) {
         assertNoAccessFields(parsed.value);
 
         if (action === 'update') {
-          const updated = await repo.updateFields({ ref, patch: parsed.value });
+          let updated;
+          try {
+            updated = await repo.updateFields({ ref, patch: parsed.value });
+          } catch (error) {
+            // People imported from Notion live only in GitHub until their
+            // first edit. Adopt them under the same id, then apply the edit.
+            if (error?.code !== 'entity_not_found' || ref.kind !== 'person') throw error;
+            const imported = await getPerson(ref.id, { env });
+            if (!imported) throw error;
+            await repo.adoptImportedIdentity({ kind: 'person', record: imported });
+            updated = await repo.updateFields({ ref, patch: parsed.value });
+          }
           return withCors(okResponse(200, projectEntity(ref.kind, updated)), request, env);
         }
 

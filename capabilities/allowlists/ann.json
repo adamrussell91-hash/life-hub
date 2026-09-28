@@ -7,7 +7,9 @@
     "data/remember/**",
     "data/widgets/**",
     "data/os/**",
-    "intuition/**"
+    "intuition/**",
+    "people:person:*",
+    "people:link:*"
   ],
   "read_globs": [
     "data/research/**",
@@ -16,7 +18,9 @@
     "data/widgets/**",
     "data/os/**",
     "central-node.md",
-    "intuition/**"
+    "intuition/**",
+    "people:person:*",
+    "people:link:*"
   ],
-  "notes": "Teaching specialist on the shared OS floor. Lesson blobs stay on Teaching store; Life data writes use research/remember/track/widgets via propose-action."
+  "notes": "Teaching specialist on the shared OS floor. Lesson blobs stay on Teaching store; Life data writes use research/remember/track/widgets via propose-action. People: search_people reads; propose_people_changes queues `people:person:*` / `people:link:*` writes for Confirm."
 }

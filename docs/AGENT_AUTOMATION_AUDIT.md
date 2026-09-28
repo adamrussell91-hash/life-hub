@@ -187,3 +187,10 @@ Already running: tie inference 13:20 daily, Remember 07:00 and 16:00, promise nu
 18. **Term start or end (Almanac):** Ann and Clare term-setup brief and a teaching-load line to Hammond.
 
 Dropped: Hyaluronica's weekly skin check (Adam, 27 Sep).
+
+**Done 28 Sep: people tools in chat for Clare, Hammond and Ann**
+- `search_people`: read-only search of People and Organisations, covering app records and the Notion import.
+- `propose_people_changes`: add people, edit name / sort name / aliases, and link person↔person (`professional_relationship` + role) or person→organisation (`employee_at`, `member_of`, `studied_at`, `placement_at`). It is one Confirm card, and Adam can untick single lines. At Confirm, writes run through `identity-repository` and the Universal Link repository (`people:` write target in `propose-action.mjs`).
+- **Imported people can now be edited.** People from the Notion import lived only in GitHub, so `/api/entities` edits returned "not found". That also affected the People page's Edit button. An edit now adopts the person into the app under the same id. Their imported relationships still load in the People collection, and search no longer shows them twice.
+- Clare's prompt no longer claims she runs link inference or writes the ledger.
+- Still not possible from chat: delete, merge or archive people, or edit profile notes, communications or Remember facts.

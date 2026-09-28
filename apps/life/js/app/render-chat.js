@@ -743,7 +743,7 @@ export function appendCnPatchProposal(root, { patch }) {
 /** Typed blob refs like tasks:task:id / teaching:unit:id — not file paths. */
 function parseTypedWritePath(path) {
   if (typeof path !== 'string') return null;
-  const match = /^(tasks|teaching):([a-z][a-z0-9_]*):(.+)$/i.exec(path.trim());
+  const match = /^(tasks|teaching|people):([a-z][a-z0-9_]*):(.+)$/i.exec(path.trim());
   if (!match) return null;
   return { store: match[1].toLowerCase(), kind: match[2].toLowerCase(), id: match[3] };
 }

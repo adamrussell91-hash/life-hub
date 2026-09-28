@@ -1,0 +1,16 @@
+{
+  "id": "people.search",
+  "tool_name": "search_people",
+  "verb": "Lookup",
+  "agents": [
+    "clare",
+    "hammond",
+    "ann"
+  ],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "Search Professional People and Organisations by name before adding, editing or linking anyone.",
+  "surfaces": [
+    "chat"
+  ]
+}

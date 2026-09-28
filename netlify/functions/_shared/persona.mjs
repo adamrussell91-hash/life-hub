@@ -7,6 +7,9 @@ import {
 } from './load-humanizer.mjs';
 import { formatHubClockForPrompt } from '../../../apps/life/js/core/time.js';
 
+// Clare, Hammond and Ann share one truthful description of the People tools.
+const PEOPLE_TOOLS_GUIDANCE = 'People (Professional Hub): call search_people before adding, editing or linking anyone, so you never create a duplicate. Use propose_people_changes to add a person, change a name / sort name / aliases, or link two people (professional_relationship with a role such as colleague, mentor, mentee, referee or other) or a person to an organisation (employee_at, member_of, studied_at, placement_at). Nothing is saved until Adam taps Confirm: say it is waiting on his Confirm, never that it is done. You cannot delete, merge or archive people, or edit profile notes, communications or Remember facts. Say so and point him to the People page. Never add or link students, and never add, link or mention the people About Me says are invisible.';
+
 export function buildSystemPrompt({
   slug,
   today = '',
@@ -317,7 +320,8 @@ export function buildSystemPrompt({
     'When Adam asks for a weekly recap, weekly review, Sunday planning, or the week ahead, use the Week inventory in this prompt (or call get_week_review). Recap facts first, then plan the forward window. Do not start a Central Node audit unless he asked for an audit.',
     'When Adam asks what is slipping across life, call inspect_hub_signals and state which hubs lacked usable evidence.',
     'Read Clare\'s Clare→Hammond / Clare→[Agent] lines and Ann\'s Ann→Hammond / Ann→[Agent] lines the same way you already read other agents\' Cross-Agent lines. When a Life constraint should change task load or scheduling, write Hammond→Clare: via propose_central_node_patch on cross_agent. When a lesson/load collision is visible in the Other hubs block, write Hammond→Ann: via propose_central_node_patch on cross_agent, same rule as Hammond→Clare. Do not invent Teaching facts beyond that block. Do not address Clementine.',
-    'People cooling flags: only flag a relationship crossing into cooling when that person is Inner tier (mentor/mentee, workplace leader, active project collaborator) or linked to an active goal/project. Write Hammond→Clare: for People work outside Tasks/Events link inference, and Hammond→Ann: for Remember or relationship meaning. Never write a Universal Link without Adam\'s confirm.'
+    'People cooling flags: only flag a relationship crossing into cooling when that person is Inner tier (mentor/mentee, workplace leader, active project collaborator) or linked to an active goal/project. Write Hammond→Ann: for relationship meaning. Never write a Universal Link without Adam\'s confirm.',
+    PEOPLE_TOOLS_GUIDANCE
   ] : [];
 
   const clareBlocks = slug === 'clare' ? [
@@ -325,7 +329,8 @@ export function buildSystemPrompt({
       ? `Clare operating manual (follow these Life Hub / Tasks rules):\n${clareProtocol}`
       : '',
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
-    'People sweep (Professional Hub): when running Morning Sweep or when new tasks/events mention people, run the deterministic link-inference pass and refresh ledger items for people touched. Write link proposals with proposer rules or clare — Adam confirms every link. Ledger and Remember items write directly but stay editable.',
+    PEOPLE_TOOLS_GUIDANCE,
+    'When a dump or task names someone Adam works with, check them with search_people. If they are missing, or Adam states how two people are connected, offer one propose_people_changes card. Do not do this unasked for every name. Link inference, the ledger and Remember run outside chat; you do not run them.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
     'When Adam names work to capture, call create_task (title or items[]). That write lands immediately — do not ask him to Confirm a new row, and do not claim it is on the board until create_task returns status applied. When he wants an existing row changed, call get_task then update_task. update_task and clare_mutate still wait for Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
@@ -344,7 +349,8 @@ export function buildSystemPrompt({
     'When something durable must reach Hammond or another agent — a lesson/load collision, a teaching deadline hitting a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.',
     'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.',
-    'Professional practice remit (People Remember / Ask): mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. Remember facts are short (≤120 chars), sourced (note · dd/mm/yy, task, project), and never overwrite an Adam-authored fact. When you do not know enough about who knows someone, say so honestly — do not invent people or links.'
+    'Professional practice remit: mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. Remember facts are written by the background Remember pass, not by you. When you do not know enough about who knows someone, say so honestly. Do not invent people or links.',
+    PEOPLE_TOOLS_GUIDANCE
   ] : [];
 
   const clementineBlocks = slug === 'clementine' ? [
