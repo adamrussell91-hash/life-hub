@@ -39,9 +39,18 @@ export function attachPassphraseCapture(
   };
 }
 
+/** True when the API says there is no umbrella session (show passphrase gate). */
+export function isUnauthenticatedError(err: unknown): boolean {
+  return (
+    err instanceof ApiClientError &&
+    (err.code === 'unauthenticated' || err.status === 401)
+  );
+}
+
 export function messageForSignInFailure(err: unknown): string {
   if (err instanceof ApiClientError) {
     if (err.code === 'invalid_credentials') return 'Invalid passphrase';
+    if (err.code === 'unauthenticated') return 'Please sign in to continue.';
     if (err.code === 'invalid_response') {
       return 'The sign-in service did not respond. Try again.';
     }
@@ -56,6 +65,10 @@ export function messageForSignInFailure(err: unknown): string {
     }
     if (err.code === 'network_error') {
       return 'Could not reach the API.';
+    }
+    // Never surface trip/schema validation (or other non-auth) copy on the gate.
+    if (err.code === 'validation_error') {
+      return 'Unable to sign in. Please try again.';
     }
     return err.message || 'Unable to sign in. Please try again.';
   }

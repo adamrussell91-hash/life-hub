@@ -114,9 +114,15 @@ export function normalizeItem(draft, { id, now } = {}) {
     item.home_base = item.home_base !== false;
   }
   if (item.kind === 'flight' || item.kind === 'train') {
-    for (const key of ['carrier', 'number', 'from_code', 'to_code', 'depart_time', 'arrive_time', 'arrive_date']) {
+    for (const key of ['carrier', 'from_code', 'to_code', 'depart_time', 'arrive_time', 'arrive_date']) {
       if (!item[key]) throw fail(`item.${key}`, `${key} required for tickets`);
     }
+    // Flights need a flight number. Regional trains often have none (empty string).
+    if (item.kind === 'flight' && !item.number) {
+      throw fail('item.number', 'number required for tickets');
+    }
+    if (item.number == null) item.number = '';
+    else if (typeof item.number !== 'string') throw fail('item.number', 'number must be a string');
     if (!TIME_RE.test(item.depart_time) || !TIME_RE.test(item.arrive_time)) {
       throw fail('item.depart_time', 'ticket times must be HH:MM');
     }
