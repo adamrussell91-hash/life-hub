@@ -139,6 +139,17 @@ export function validateProposeActionInput(input, { agentSlug } = {}) {
     if (!isPathAllowedForAgent(agentSlug, path, { mode: 'write' })) {
       return { ok: false, error: 'write_path_denied', detail: path };
     }
+    if (classifyWriteTarget(path).store === 'people') {
+      let body = null;
+      try {
+        body = JSON.parse(content);
+      } catch {
+        body = null;
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body) || mode === 'delete' || mode === 'append') {
+        return { ok: false, error: 'invalid_people_write', detail: path };
+      }
+    }
 
     writes.push({
       path,
@@ -381,7 +392,15 @@ export function classifyWriteTarget(path) {
   if (store === 'teaching' && kind === 'unit' && BLOB_ID.test(id)) {
     return { store: 'teaching', kind, id, key: `units/${id}`, path: raw };
   }
-  if (store === 'tasks' || store === 'teaching') {
+  // Professional People: writes run through the identity and Universal Link
+  // repositories at Confirm (people-agent.mjs), never as raw Blob JSON.
+  if (store === 'people' && kind === 'person' && BLOB_ID.test(id)) {
+    return { store: 'people', kind, id, path: raw };
+  }
+  if (store === 'people' && kind === 'link' && /^new-[A-Za-z0-9_-]{1,40}$/.test(id)) {
+    return { store: 'people', kind, id, path: raw };
+  }
+  if (store === 'tasks' || store === 'teaching' || store === 'people') {
     return { store: 'unknown', path: raw };
   }
   return { store: 'github', path: raw };
@@ -663,12 +682,28 @@ export async function executeProposeActionWrites(client, proposal, {
 
   const results = [];
   const state = { ...files };
+  // People created earlier in this proposal, keyed by their `people:person:new-*` path.
+  const peopleCreated = new Map();
   const commitMessage = `chore(propose-action): ${proposal.agent} — ${proposal.intent}`.slice(0, 200);
 
   for (const write of proposal.writes) {
     const target = classifyWriteTarget(write.path);
     if (target.store === 'unknown') {
       return { ok: false, error: 'unknown_write_target', detail: write.path, results };
+    }
+
+    if (target.store === 'people') {
+      if (write.mode === 'delete') {
+        return { ok: false, error: 'people_delete_unsupported', detail: write.path, results };
+      }
+      const people = blobStores.people;
+      if (!people || typeof people.apply !== 'function') {
+        return { ok: false, error: 'people_store_unbound', detail: write.path, results };
+      }
+      const applied = await people.apply(write, target, peopleCreated);
+      if (!applied.ok) return { ...applied, results };
+      results.push(applied.result);
+      continue;
     }
 
     if (target.store === 'tasks' || target.store === 'teaching') {

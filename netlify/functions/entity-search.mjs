@@ -160,7 +160,14 @@ export async function searchIdentityKind(store, kind, listKeys, loadKey, parseAu
 // but the output shape and ranking rule are identical to
 // `searchIdentityKind`'s, so results interleave with native ones exactly
 // as if they were one list.
-async function searchGithubIdentityKind(kind, query, includeArchived, github) {
+// An imported Person adopted into Blobs keeps its GitHub id, so the same ref
+// can come back from both sources. The Blob record is authoritative.
+export function mergeNativeFirst(native, githubMatches) {
+  const seen = new Set(native.map(entry => entry.ref));
+  return [...native, ...githubMatches.filter(entry => !seen.has(entry.ref))];
+}
+
+export async function searchGithubIdentityKind(kind, query, includeArchived, github) {
   const candidates = kind === 'person'
     ? await listGithubPersonCandidates(github)
     : await listGithubOrganisationCandidates(github);
@@ -460,13 +467,13 @@ export function createEntitySearchHandler(deps = {}) {
         ? Promise.all([
           searchIdentityKind(store, 'person', listPersonIndexKeys, personKey, parsePersonRecord, query, includeArchived),
           searchGithubIdentityKind('person', query, includeArchived, github)
-        ]).then(([native, githubMatches]) => [...native, ...githubMatches])
+        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches))
         : [],
       requestedKinds.has('organisation')
         ? Promise.all([
           searchIdentityKind(store, 'organisation', listOrganisationIndexKeys, organisationKey, parseOrganisationRecord, query, includeArchived),
           searchGithubIdentityKind('organisation', query, includeArchived, github)
-        ]).then(([native, githubMatches]) => [...native, ...githubMatches])
+        ]).then(([native, githubMatches]) => mergeNativeFirst(native, githubMatches))
         : [],
       requestedKinds.has('task') ? searchTaskKind(getTasksStore, query) : [],
       requestedKinds.has('application') ? searchApplicationKind(getProfessionalStore, query) : [],

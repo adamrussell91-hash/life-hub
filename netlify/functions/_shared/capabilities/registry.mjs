@@ -20,6 +20,7 @@ import {
   setSkincareRoutineMembershipSchema
 } from '../skincare-library-tools.mjs';
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
+import { proposePeopleChangesSchema, searchPeopleSchema } from '../people-agent.mjs';
 import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
@@ -321,6 +322,10 @@ export function buildAgentTools({
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());
   }
+
+  // Professional People: search is read-only; changes are Confirm cards.
+  if (has('people.search')) tools.push(searchPeopleSchema());
+  if (has('people.propose-changes')) tools.push(proposePeopleChangesSchema());
 
   // Domain retrieval parity tools (read-only). Skip names already attached.
   const attached = new Set(tools.map(tool => tool.name).filter(Boolean));

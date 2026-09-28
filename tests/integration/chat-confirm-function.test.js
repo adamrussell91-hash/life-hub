@@ -2094,3 +2094,70 @@ test('cn_patch confirm applies a queued section rewrite when the section still m
   assert.match(written, /Taper finished/);
   assert.doesNotMatch(written, /Steroid taper active/);
 });
+
+test('action confirm runs people writes through the identity and link repositories', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    if (options?.method === 'PUT') {
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const map = new Map();
+  const peopleStore = {
+    async get(key, { type } = {}) {
+      if (!map.has(key)) return null;
+      return type === 'json' ? JSON.parse(map.get(key)) : map.get(key);
+    },
+    async setJSON(key, value) {
+      map.set(key, JSON.stringify(value));
+    },
+    async list({ prefix = '' } = {}) {
+      return { blobs: [...map.keys()].filter(key => key.startsWith(prefix)).map(key => ({ key })) };
+    }
+  };
+  const JO = 'shared:person:person_11111111-1111-1111-1111-111111111111';
+  const resolvePeopleEntity = async ref => {
+    if (ref === JO) return { ref, kind: 'person', display_label: 'Jo Example', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' };
+    const id = ref.split(':')[2];
+    const raw = map.get(`person/${id}`) ?? [...map.entries()].find(([key]) => key.endsWith(id))?.[1];
+    if (!raw) throw Object.assign(new Error('missing'), { code: 'endpoint_not_found', status: 404 });
+    return { ref, kind: 'person', display_label: JSON.parse(raw).display_name, supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' };
+  };
+  const handler = createChatConfirmHandler({
+    env: validEnv,
+    fetchImpl,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    getPeopleStore: async () => peopleStore,
+    resolvePeopleEntity
+  });
+
+  const response = await handler(request({
+    kind: 'action',
+    slug: 'clare',
+    candidate: {
+      intent: 'Add Sam Lee and link her to Jo',
+      writes: [
+        { path: 'people:person:new-sam', mode: 'create', content: JSON.stringify({ display_name: 'Sam Lee' }), diff: 'Add person: Sam Lee' },
+        {
+          path: 'people:link:new-1',
+          mode: 'create',
+          content: JSON.stringify({ source_ref: 'people:person:new-sam', target_ref: JO, relationship_type: 'professional_relationship', role: 'colleague' }),
+          diff: 'Link Sam Lee → Jo Example: colleague'
+        }
+      ]
+    }
+  }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200, JSON.stringify(payload));
+  const people = [...map.entries()].filter(([key]) => /person/.test(key) && !/index|operation/i.test(key)).map(([, raw]) => JSON.parse(raw));
+  assert.ok(people.some(record => record.display_name === 'Sam Lee'), 'Sam Lee was created');
+  assert.ok([...map.keys()].some(key => /link/i.test(key)), 'a Universal Link was written');
+  assert.equal(calls.filter(call => call.options?.method === 'PUT' && call.url.includes('people')).length, 0, 'no people data goes to GitHub');
+});

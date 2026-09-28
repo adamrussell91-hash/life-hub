@@ -75,8 +75,12 @@ function statusProseForDisplay(markdown, events, date) {
   return live;
 }
 
+// Slugs used by the Cursor Automations in life-hub-data/config/automations.
 const PATCH_PROPOSERS = {
-  'hammond-sweep': "Hammond's daily sweep"
+  'hammond-sweep': "Hammond's daily sweep",
+  'hammond-weekly': "Hammond's weekly prep",
+  'hammond-monthly': "Hammond's monthly audit prep",
+  'sara-scan': "Sara's weekly health scan"
 };
 
 function patchProposer(slug) {

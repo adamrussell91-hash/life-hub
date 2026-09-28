@@ -257,3 +257,44 @@ test('rejects a ref for an unsupported kind', async () => {
   assert.equal(response.status, 400);
   assert.equal((await response.json()).error.code, 'unsupported_entity_kind');
 });
+
+test('PATCH action=update adopts a Notion-imported person on first edit instead of returning not found', async () => {
+  const store = memoryStore();
+  const importedId = 'person_22222222-2222-2222-2222-222222222222';
+  const handler = createEntitiesHandler(baseDeps({
+    getContentStore: async () => store,
+    getGithubPerson: async id => (id === importedId
+      ? {
+        schema_version: 1,
+        id: importedId,
+        kind: 'person',
+        display_name: 'Pat Imported',
+        sort_name: null,
+        aliases: [],
+        lifecycle_status: 'active',
+        is_self: false,
+        retention_reason: null,
+        retention_review_at: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z'
+      }
+      : null)
+  }));
+  const ref = `shared:person:${importedId}`;
+  const response = await handler(request({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/entities?ref=${encodeURIComponent(ref)}&action=update`,
+    body: { display_name: 'Patrick Imported' }
+  }));
+  const body = await response.json();
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.data.ref, ref, 'the imported id is kept');
+  assert.equal(body.data.display_name, 'Patrick Imported');
+
+  const missing = await handler(request({
+    method: 'PATCH',
+    url: `https://api.adam-russell.com/api/entities?ref=${encodeURIComponent('shared:person:person_99999999-9999-9999-9999-999999999999')}&action=update`,
+    body: { display_name: 'Nobody' }
+  }));
+  assert.equal(missing.status, 404, 'a person in neither store is still not found');
+});

@@ -4334,3 +4334,65 @@ test('Sara coordinate_request_cn_write queues a Constraints change and shows a C
   assert.ok(card, 'expected a Confirm card in chat');
   assert.equal(card.id, queue[0].id);
 });
+
+test('Clare propose_people_changes queues one Confirm card with readable people lines and saves nothing', async () => {
+  const puts = [];
+  const fetchImpl = async (url, options) => {
+    if (options?.method === 'PUT') {
+      puts.push({ url });
+      return Response.json({ content: { sha: 'a'.repeat(40) }, commit: { sha: 'b'.repeat(40) } });
+    }
+    if (url.includes('/commits/')) {
+      return Response.json({ sha: 'c'.repeat(40), commit: { tree: { sha: 'd'.repeat(40) } } });
+    }
+    if (url.includes('/git/trees/')) return Response.json({ tree: [] });
+    return Response.json({ message: 'not found' }, { status: 404 });
+  };
+  const JO = 'shared:person:person_11111111-1111-1111-1111-111111111111';
+  let peopleStoreTouched = false;
+  let toolResult;
+  let receivedTools;
+  const handler = createChatHandler({
+    env: validEnv,
+    now: () => Date.parse('2026-08-01T06:00:00Z'),
+    fetchImpl,
+    loadHubAgentContext: async () => '',
+    getPeopleStore: async () => {
+      peopleStoreTouched = true;
+      return null;
+    },
+    resolvePeopleEntity: async ref => {
+      if (ref !== JO) throw Object.assign(new Error('missing'), { code: 'endpoint_not_found' });
+      return { ref, kind: 'person', display_label: 'Jo Example', visibility: 'operator' };
+    },
+    createAnthropicClient: () => ({
+      async *streamMessage(args) {
+        receivedTools = args.tools.map(tool => tool.name);
+        toolResult = JSON.parse(await args.executeTools({
+          id: 'call_people',
+          name: 'propose_people_changes',
+          input: {
+            summary: 'Add Sam Lee and link her to Jo as a colleague',
+            add_people: [{ key: 'sam', display_name: 'Sam Lee' }],
+            links: [{ from: 'new:sam', to: JO, relationship_type: 'professional_relationship', role: 'colleague' }]
+          }
+        }));
+        yield { type: 'done' };
+      }
+    })
+  });
+
+  const events = contentEvents(await readSse(await handler(request({
+    message: 'Clare, add Sam Lee and link her to Jo as a colleague',
+    priorAgentSlug: 'clare'
+  }))));
+
+  assert.ok(receivedTools.includes('search_people'));
+  assert.equal(toolResult.status, 'awaiting_confirm');
+  assert.deepEqual(toolResult.changes, ['Add person: Sam Lee', 'Link Sam Lee → Jo Example: colleague']);
+  const card = events.find(event => event.type === 'action_proposal');
+  assert.ok(card, 'expected a Confirm card');
+  assert.deepEqual(card.proposal.writes.map(write => write.path), ['people:person:new-sam', 'people:link:new-1']);
+  assert.ok(puts.some(put => put.url.includes('data/os/pending-actions.json')));
+  assert.equal(peopleStoreTouched, false, 'proposing must not touch the People store');
+});

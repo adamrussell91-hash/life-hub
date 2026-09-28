@@ -144,6 +144,7 @@ export async function loadAllPeopleWithRelationships({
 
   const nativeIds = new Set(nativeStubs.map((row) => row.person.id));
   const githubPeople = await listGithubPersonCandidates(github);
+  const githubIds = new Set(githubPeople.map((record) => record.id));
   const endpointCache = new Map();
 
   async function resolveGithubEndpoint(otherRef) {
@@ -196,15 +197,25 @@ export async function loadAllPeopleWithRelationships({
     const { outgoing, incoming } = await repo.listForEntity(row.person.ref, accessContext, {
       includeArchived: true
     });
+    const native = [
+      ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
+      ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
+    ];
+    // A Person adopted from the Notion import keeps its GitHub id, and its
+    // imported relationships still live only in GitHub. Merge them in so an
+    // edit never drops a Person's history from the network.
+    const nativeLinkIds = new Set(native.map((entry) => entry.link?.id).filter(Boolean));
+    const imported = [];
+    if (githubIds.has(row.person.id)) {
+      for (const { link, otherRef, direction } of await listGithubRelationshipEntries('person', row.person.id, github)) {
+        if (nativeLinkIds.has(link?.id)) continue;
+        const endpoint = await resolveGithubEndpoint(otherRef);
+        if (endpoint) imported.push({ link, endpoint, direction });
+      }
+    }
     return {
       person: row.person,
-      relationships: withoutStudentPersonEndpoints(
-        [
-          ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
-          ...incoming.map((entry) => ({ ...entry, direction: 'incoming' }))
-        ],
-        studentIds
-      )
+      relationships: withoutStudentPersonEndpoints([...native, ...imported], studentIds)
     };
   });
 }

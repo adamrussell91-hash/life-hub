@@ -234,6 +234,10 @@ function selfIdentityExistsError() {
   });
 }
 
+function adoptError(code, message) {
+  return Object.assign(new Error(message), { status: 400, code });
+}
+
 function identityNotFoundError() {
   return Object.assign(new Error('Entity not found.'), { status: 404, code: 'entity_not_found' });
 }
@@ -816,6 +820,60 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
     return { record, ref: formatEntityRef({ namespace: 'shared', kind, id: entityId }) };
   }
 
+  // Brings a GitHub-imported Person (Notion import in life-hub-data) into
+  // this store under its existing derived id, so ordinary field updates and
+  // lifecycle changes can target it. Every reader resolves Blob before
+  // GitHub for the same id, so the adopted record simply takes over. It is
+  // journaled as a `create_identity`, which `repairIdentityOperation`
+  // already knows how to replay. The imported self Person is never adopted
+  // here: the self pointer has its own claim protocol.
+  async function adoptImportedIdentity({ kind, record }) {
+    if (kind !== 'person') {
+      throw adoptError('unsupported_adopt_kind', 'Only imported People can be adopted.');
+    }
+    const parsed = parsePersonRecord(record);
+    if (!parsed) throw adoptError('invalid_imported_record', 'The imported Person record is not valid.');
+    if (parsed.is_self) {
+      throw adoptError('self_not_adoptable', 'The self Person cannot be adopted through this path.');
+    }
+    const existing = parsePersonRecord(await getJSON(store, entityKeyFor(kind, parsed.id), STRONG));
+    if (existing) return { record: existing, ref: formatEntityRef({ namespace: 'shared', kind, id: existing.id }), adopted: false };
+
+    const timestamp = now();
+    const adopted = Object.freeze({ ...parsed, updated_at: timestamp });
+    const indexRecord = buildIndexFor(adopted, kind);
+    const operationId = deriveOperationId(['adopt_identity', kind, parsed.id]);
+    const journal = {
+      schema_version: IDENTITY_OPERATION_SCHEMA_VERSION,
+      operation_id: operationId,
+      operation_type: 'create_identity',
+      kind,
+      entity_id: parsed.id,
+      status: 'prepared',
+      completed_steps: [],
+      payload: { entity: adopted, index: indexRecord, self_pointer_action: null },
+      created_at: timestamp,
+      updated_at: timestamp,
+      last_error_code: null
+    };
+    try {
+      await setJSON(store, identityOperationKey(operationId), journal);
+    } catch {
+      throw identityWriteIncompleteError({ operationId, entityId: parsed.id });
+    }
+    const steps = buildIdentitySteps({
+      kind,
+      entityId: parsed.id,
+      operationId,
+      entityRecord: adopted,
+      indexRecord,
+      event: null,
+      selfPointerAction: null
+    });
+    await runIdentitySteps({ journal, entityId: parsed.id, steps });
+    return { record: adopted, ref: formatEntityRef({ namespace: 'shared', kind, id: parsed.id }), adopted: true };
+  }
+
   async function updateFields({ ref, patch }) {
     const record = await loadEntity(ref);
 
@@ -1054,6 +1112,7 @@ export function createIdentityRepository({ store, now = () => new Date().toISOSt
 
   return {
     createIdentity,
+    adoptImportedIdentity,
     loadEntity,
     updateFields,
     transitionLifecycle,

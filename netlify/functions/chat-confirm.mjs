@@ -40,6 +40,9 @@ import {
   findPendingCnPatchById
 } from './_shared/cn-patch-queue.mjs';
 import { isQueuedPatchStale } from '../../apps/life/js/core/central-node-patch.js';
+import { createPeopleWriteExecutor } from './_shared/people-agent.mjs';
+import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
+import { resolveEntity as defaultResolveEntity } from './_shared/entity-resolvers.mjs';
 import {
   PENDING_ACTIONS_PATH,
   parsePendingActions,
@@ -127,7 +130,9 @@ export function createChatConfirmHandler({
   now = Date.now,
   getTasksStore = defaultGetTasksStore,
   getTeachingStore = defaultGetTeachingStore,
-  getLifeEvents = null
+  getLifeEvents = null,
+  getPeopleStore = defaultGetUniversalLinkStore,
+  resolvePeopleEntity = defaultResolveEntity
 } = {}) {
   return async function chatConfirmHandler(request) {
     if (request.method === 'OPTIONS') return preflightResponse(request, env);
@@ -768,8 +773,12 @@ export function createChatConfirmHandler({
 
     const blobStoresResult = await loadBlobStoresForWrites(accepted, {
       env,
+      fetchImpl,
+      now,
       getTasksStore,
-      getTeachingStore
+      getTeachingStore,
+      getPeopleStore,
+      resolvePeopleEntity
     });
     if (!blobStoresResult.ok) {
       return errorResponse(503, blobStoresResult.error, 'The blob store is temporarily unavailable.', true, PRIVATE_CACHE);
@@ -1718,19 +1727,40 @@ function parseActionDecisionFields(body) {
   };
 }
 
-async function loadBlobStoresForWrites(writes, { env, getTasksStore, getTeachingStore }) {
+async function loadBlobStoresForWrites(writes, {
+  env,
+  fetchImpl,
+  now,
+  getTasksStore,
+  getTeachingStore,
+  getPeopleStore,
+  resolvePeopleEntity
+}) {
   const stores = {};
   const needsTasks = writes.some(write => classifyWriteTarget(write.path).store === 'tasks');
   const needsTeaching = writes.some(write => classifyWriteTarget(write.path).store === 'teaching')
     || writes.some(write => classifyWriteTarget(write.path).kind === 'work_block');
+  const needsPeople = writes.some(write => classifyWriteTarget(write.path).store === 'people');
+  let peopleStore = null;
   try {
     if (needsTasks) stores.tasks = await getTasksStore(env);
     if (needsTeaching) stores.teaching = await getTeachingStore(env);
+    if (needsPeople) peopleStore = await getPeopleStore(env);
   } catch {
     return { ok: false, error: 'blobs_unavailable' };
   }
   if (needsTasks && !stores.tasks) return { ok: false, error: 'tasks_blobs_unbound' };
   if (needsTeaching && !stores.teaching) return { ok: false, error: 'teaching_blobs_unbound' };
+  if (needsPeople) {
+    if (!peopleStore) return { ok: false, error: 'people_blobs_unbound' };
+    stores.people = createPeopleWriteExecutor({
+      store: peopleStore,
+      env,
+      fetchImpl,
+      now: () => new Date(now()).toISOString(),
+      resolveEntity: resolvePeopleEntity
+    });
+  }
   return { ok: true, stores };
 }
 
