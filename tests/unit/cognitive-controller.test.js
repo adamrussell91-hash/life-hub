@@ -58,7 +58,7 @@ test('burst continuation re-runs the same step until done or maxBursts',async()=
 test('over-budget voice is re-asked then trimmed; length never fails the session',async()=>{
   const long='word '.repeat(400).trim();
   let attempts=0;
-  let s=start('refinery','build');
+  let s=start('refinery','break');
   s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>{attempts++;return {text:long,question:null,done:true,evidenceIds:[]};}});
   assert.equal(s.status,'completed');
   assert.ok(attempts>=3);
@@ -161,7 +161,7 @@ test('JSON voice output supplies the checkpoint question instead of failing the 
 });
 test('Tribunal voices receive identical original context and cannot see outputs',async()=>{const {calls}=await run('tribunal');const v=calls.filter(c=>['inverter','scaler','context-shifter'].includes(c.speaker));assert.equal(v.length,3);assert.equal(v[0].user,v[1].user);assert.equal(v[1].user,v[2].user);assert.ok(!v[2].user.includes('Grounded contribution'));});
 test('Consilium adapts to next-speaker proposal, never Virtue first, and never analyses final reflection',async()=>{let s=start('consilium');const calls=[];const generate=async p=>{calls.push(p);return {text:'Duty and rights here require candour. Which constraint matters?',question:'Which constraint matters?',evidenceIds:[],nextSpeaker:'virtue'};};s=await advance(s,{model:generate,retrieve:async()=>({evidence:[],status:'none'})});assert.equal(calls.length,1);s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.notEqual(calls.at(-1).speaker,'virtue');s=act(s,{action:'answer',text:'Protect anonymity',revision:s.revision,requestId:randomUUID()});s=await advance(s,{model:generate});assert.equal(calls.at(-1).speaker,'virtue');assert.ok(!s.allowedActions.includes('finish'));const {s:done,calls:all}=await run('consilium');assert.equal(done.transcript.at(-1).role,'user');assert.equal(all.at(-1).stage,'map');});
-test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer']);for(const [mode,expected] of [['break',['breaker']],['build-break',['builder','breaker']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
+test('direct sources skip search and Surveyor; partial Refinery skips excluded voices',async()=>{let s=start('cartographers','direct');const calls=[];s=await advance(s,{model:model(calls),retrieve:()=>{throw Error('search must not run');}});assert.equal(s.status,'completed');assert.deepEqual(calls.map(c=>c.speaker),['miner','cartographer','controller']);assert.ok(calls.every(c=>!c.tools));for(const [mode,expected] of [['break',['breaker','controller']],['build-break',['controller','builder','breaker','controller']]]){const {calls}=await run('refinery',mode);assert.deepEqual(calls.map(c=>c.speaker),expected);}});
 test('Mirror deep waits for framing, long arc asks what to protect; Horizon fallback explicit',async()=>{const {calls}=await run('mirror','deep');assert.equal(calls[0].stage,'framing');const s=start('mirror');s.intake.timescale='long-arc';assert.match(buildPrompt(s,{speaker:'present',stage:'present'}).system,/sit with, tolerate|protect/);const h=start('horizon');assert.match(buildPrompt(h,{speaker:'alvar',stage:'alvar'}).system,/extrapolated from current trajectory/);});
 test('Mirror speakers receive Gu Jian / Wang Yuan / Zheng Ming writing profiles',()=>{
   const s=start('mirror');
@@ -376,4 +376,67 @@ test('continuation bursts explicitly preserve the assigned voice register',()=>{
   s.burst=1;
   const prompt=buildPrompt(s,st);
   assert.match(prompt.system,/Keep the same assigned voice register as the first burst\./);
+});
+
+test('Refinery confirms the restated thesis before Builder and waits for a choice when the thesis is unsound',async()=>{
+  let s=start('refinery','full');const calls=[];const retrieve=async()=>({evidence:[],status:'none'});
+  const m=async p=>{calls.push(p);if(p.gate)return {text:'Thesis: short meetings improve participation, for the library committee.',question:'Is that the thesis you want built?',done:true,evidenceIds:[]};return {text:`${p.speaker} pass.`,question:null,done:true,evidenceIds:[],thesisUnsound:p.speaker==='breaker'};};
+  s=await advance(s,{model:m,retrieve});
+  assert.equal(s.stage,'thesis');assert.equal(s.checkpoint.kind,'confirm');assert.equal(calls.length,1);assert.ok(!calls.some(c=>c.speaker==='builder'));
+  s=act(s,{action:'confirm',revision:s.revision,requestId:randomUUID()});
+  s=await advance(s,{model:m,retrieve});
+  assert.equal(s.status,'waiting');assert.equal(s.speaker,'breaker');assert.match(s.checkpoint.question,/rebuild the original thesis|labelled as a suggestion/);
+  assert.ok(!calls.some(c=>c.speaker==='reforger'),'Reforger must wait for the choice');
+  s=act(s,{action:'answer',text:'Offer a labelled reframe',revision:s.revision,requestId:randomUUID()});
+  s=await advance(s,{model:m,retrieve});
+  assert.equal(s.status,'completed');
+  assert.match(calls.find(c=>c.speaker==='reforger').system,/flagged unsound/);
+  assert.equal(calls.at(-1).stage,'closing');
+});
+test('Cartographers interrogation keeps Surveyor silent, uses no search, and stops after passes 2 and 6',()=>{
+  const s=start('cartographers','interrogation');
+  assert.deepEqual(s.steps.map(st=>st.speaker),['miner','miner','miner','cartographer','miner','cartographer','miner','cartographer','cartographer','controller']);
+  assert.deepEqual(s.steps.filter(st=>st.gate).map(st=>st.stage),['contradictions','master-synthesis']);
+  for(const st of s.steps)assert.equal(buildPrompt(s,st).tools,undefined);
+  const full=start('cartographers','full');assert.ok(buildPrompt(full,full.steps[0]).tools);
+});
+test('Witness trace has room for the reconstruction and closes with a summary',async()=>{
+  const {calls}=await run('witness');
+  assert.equal(calls.find(c=>c.stage==='trace').wordBudget,250);
+  assert.equal(calls.at(-1).stage,'closing');
+  const s=start('witness','deep');assert.equal(s.steps.find(st=>st.stage==='patterns').stopWords,350);
+});
+test('stop budgets make the burst that spends them final',()=>{
+  const s=start('mirror');const st=s.steps.find(x=>x.speaker==='retrospective');
+  assert.equal(buildPrompt(s,st).finalBurst,false);
+  s.transcript.push({id:randomUUID(),role:'voice',speaker:'retrospective',stage:'retrospective',text:Array(90).fill('word').join(' '),createdAt:new Date().toISOString(),evidenceIds:[]});s.burst=1;
+  const p=buildPrompt(s,st);assert.equal(p.finalBurst,true);assert.equal(p.wordBudget,60);
+});
+test('Mirror quick states its framing first; Horizon budgets fit the reckoning and full map',()=>{
+  const m=start('mirror');assert.equal(m.steps[0].stage,'framing');assert.equal(m.steps[0].gate,null);
+  assert.match(buildPrompt(m,m.steps[0]).system,/correction restarts the run/);
+  const h=start('horizon');assert.equal(h.steps.find(st=>st.speaker==='sigrid').burstWords,180);assert.equal(h.steps.at(-1).burstWords,700);
+  assert.equal(start('horizon','brief').steps.at(-1).burstWords,425);
+  assert.match(buildPrompt(h,h.steps[1]).system,/event layer/);
+});
+test('Tribunal depth follows mode, voices ask nothing, clarify asks for attempts, close line is fixed',async()=>{
+  assert.equal(start('tribunal','quick').steps.find(st=>st.speaker==='inverter').burstWords,60);
+  assert.equal(start('tribunal','deep').steps.find(st=>st.speaker==='inverter').burstWords,250);
+  const withAttempts=start('tribunal','standard',{priorAttempts:'Three agenda redesigns and a timer'});
+  assert.equal(withAttempts.steps[0].speaker,'inverter');
+  const s=start('tribunal');assert.equal(s.steps[0].stage,'clarify');assert.match(buildPrompt(s,s.steps[0]).system,/already been tried/);
+  let t=withAttempts;const calls=[];
+  const m=async p=>{calls.push(p);return {text:'A reframe.',question:p.speaker==='controller'?null:'Is that right?',done:false,evidenceIds:[]};};
+  t=await advance(t,{model:m,retrieve:async()=>({evidence:[],status:'none'})});
+  assert.equal(t.status,'completed');
+  assert.ok(t.transcript.filter(x=>x.role==='voice').every(x=>!x.text.includes('Is that right?')));
+  assert.ok(t.transcript.at(-1).text.endsWith('You decide which, if any, is worth pursuing.'));
+});
+test('a voice that names a scope mismatch holds for Adam; the model cannot end the run',async()=>{
+  let s=start('mirror');const calls=[];const retrieve=async()=>({evidence:[],status:'none'});
+  s=await advance(s,{model:async p=>{calls.push(p);return {text:'This is a logistics question, not a values conflict.',question:null,done:true,evidenceIds:[],outOfScope:calls.length===1};},retrieve});
+  assert.equal(s.status,'waiting');assert.match(s.checkpoint.question,/outside what this protocol does/);assert.ok(s.allowedActions.includes('cancel'));
+  s=act(s,{action:'answer',text:'It is about which value I serve',revision:s.revision,requestId:randomUUID()});
+  s=await advance(s,{model:async p=>{calls.push(p);return {text:'Reframed.',question:'What else belongs on the record?',done:true,evidenceIds:[]};},retrieve});
+  assert.equal(calls[1].stage,calls[0].stage,'the same step reruns with the clarification');
 });

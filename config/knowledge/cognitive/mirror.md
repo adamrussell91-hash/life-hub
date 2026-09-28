@@ -14,15 +14,15 @@ Require a specific choice, pattern or stuck point. Establish domain, time horizo
 
 ## Modes
 
-`quick` is one concise pass through the positions and states its framing without confirmation. `deep` expands evidence, gives each claim confidence, and requires explicit framing confirmation before voices speak. Use deep for hard-to-reverse or long-running questions, or at Adam’s request.
+`quick` is one concise pass through the positions; a framing step states the conflict first without waiting for confirmation. `deep` expands evidence, gives each claim confidence, and requires explicit framing confirmation before voices speak. Use deep for hard-to-reverse or long-running questions, or at Adam’s request.
 
 ## Turn mechanics
 
 Frame first, in one or two sentences. Deep waits for confirm or correction; quick states that correction restarts the run. Order is fixed: Gu Jian (Retrospective), then Wang Yuan (Prospective), then Zheng Ming (Present). Never skip or reorder.
 
-Each position speaks in bursts of about 90 words: one move, **at most one question**, then stop. A position runs to three bursts at most. A position that asks a question and intends to keep going sets `done: false`, waits, and continues from the answer without repeating. The final burst for a position closes without asking. Stop budgets aim at 150 words for Gu Jian, 120 for Wang Yuan, and 100 for Zheng Ming. Limits are rewritten shorter and never fail the run.
+Each position speaks in bursts of about 90 words: one move, **at most one question**, then stop. A position runs to three bursts at most. A position that asks a question and intends to keep going sets `done: false`, waits, and continues from the answer without repeating. The final burst for a position closes without asking. Stop budgets are 150 words for Gu Jian, 120 for Wang Yuan, and 100 for Zheng Ming, enforced by the controller: the burst that spends a stop's budget is its final burst. Limits are rewritten shorter and never fail the run.
 
-Gu Jian must gather relevant workspace record before claiming a pattern, without narrating search. Thin records require a behavioural-evidence question or an explicit no-pattern conclusion. Zheng Ming’s seven-day question is the final checkpoint; nothing follows it.
+Gu Jian must gather relevant workspace record before claiming a pattern, without narrating search. Thin records require a behavioural-evidence question or an explicit no-pattern conclusion. Zheng Ming’s seven-day question is the final checkpoint; no voice speaks after it, and the compiler then only condenses.
 
 ## Register and setting
 

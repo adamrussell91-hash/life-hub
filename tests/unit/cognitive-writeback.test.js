@@ -206,7 +206,7 @@ test('failed write-back retries once on the next get then stops', async () => {
     readCentralNode: async () => '## 📝 Recent Agent Actions\n\n## 🤝 Cross-Agent Coordination\n',
     writeCentralNode: async () => { writes += 1; throw Object.assign(new Error('write_conflict'), { code: 'write_conflict' }); }
   });
-  let s = await service.create('owner', { protocolId: 'refinery', mode: 'build', intake: { claim: 'Short meetings help', context: 'Proposal', audience: 'Committee' }, requestId: randomUUID() });
+  let s = await service.create('owner', { protocolId: 'refinery', mode: 'break', intake: { claim: 'Short meetings help', context: 'Proposal', audience: 'Committee' }, requestId: randomUUID() });
   s = await service.run('owner', s.id);
   assert.equal(s.status, 'completed');
   assert.equal(s.writeBack?.ok, false);
