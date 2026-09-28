@@ -36,6 +36,24 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible { outline: 2px s
 .btn.city { background: var(--city); color: #fff; }
 .btn svg { width: 16px; height: 16px; }
 
+/* ---------- Shell (skip link + rail back link) ----------
+ * Same skip link as Professional/Tasks hub.css: off-screen until focused.
+ * Without it the link rendered as a raw "Skip to content" line above the rail. */
+.skip-link {
+  position: absolute; left: .75rem; top: .75rem; z-index: 200;
+  padding: .4rem .7rem; transform: translateY(-150%);
+  background: var(--paper); color: var(--ink); border-radius: var(--radius-sm);
+  font-family: var(--font-ui); font-size: var(--text-sm); text-decoration: none;
+}
+.skip-link:focus { transform: none; }
+.hub-canvas:focus { outline: none; }
+/* "← Life" sits on its own line above the brand eyebrow (was inline → "LifeLIFE HUB · TRAVEL"). */
+.hub-rail a.hub-rail__back {
+  display: block; margin-bottom: var(--space-2, .5rem);
+  font-size: var(--text-sm, .875rem); font-weight: 600; color: var(--on-dark, #fff); text-decoration: none;
+}
+.hub-rail a.hub-rail__back:hover, .hub-rail a.hub-rail__back:focus-visible { text-decoration: underline; }
+
 /* ---------- Header ---------- */
 .top { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; justify-content: space-between; margin-bottom: 14px; }
 .crumb { font-size: .75rem; color: var(--muted); }

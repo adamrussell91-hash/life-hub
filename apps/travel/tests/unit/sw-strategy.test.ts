@@ -11,6 +11,8 @@ describe('travel service worker strategy (W3)', () => {
     expect(sw).not.toMatch(/travel-shell-v1/);
     expect(sw).toMatch(/skipWaiting/);
     expect(sw).toMatch(/client\.navigate/);
+    // First install must not reload the tab that just loaded current HTML.
+    expect(sw).toMatch(/if \(stale\.length === 0\) return;/);
     expect(sw).toMatch(/startsWith\('travel-shell-'\)/);
     expect(sw).toMatch(/url\.origin !== self\.location\.origin/);
     expect(sw).toMatch(/network-first/i);
