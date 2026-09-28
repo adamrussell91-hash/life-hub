@@ -760,7 +760,15 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     const filter = target.closest<HTMLSelectElement>("[data-protocol-past-filter]");
     if (filter && event.type === "click") return;
     const action = target.closest<HTMLButtonElement>("[data-protocol-action]")?.dataset.protocolAction;
-    if (action && currentSession) void postAction({ sessionId: currentSession.id, revision: currentSession.revision, requestId: crypto.randomUUID(), action });
+    if (action && currentSession) {
+      const prior = currentSession;
+      // End session takes effect on screen at once; the server applies cancel to its latest state.
+      if (action === "cancel") { currentSession = { ...prior, status: "cancelled", checkpoint: null }; paint(); }
+      postAction({ sessionId: prior.id, revision: prior.revision, requestId: crypto.randomUUID(), action }).catch(reason => {
+        currentSession = { ...prior, error: { message: reason instanceof Error ? reason.message : "That did not go through.", retryable: true } };
+        paint();
+      });
+    }
   };
   host.onchange = event => {
     const filter = (event.target as HTMLElement | null)?.closest?.<HTMLSelectElement>("[data-protocol-past-filter]");
@@ -779,7 +787,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       const justification = String(data.get("frequencyJustification") ?? "").trim();
       lastPrompt = prompt;
       lastMode = String(data.get("mode") ?? selected.defaultMode);
-      currentSession = { id: "", status: "queued", stage: "briefing", speaker: selected.voices[0]?.id ?? null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
+      currentSession = { id: "", status: "queued", stage: "intake", speaker: null, revision: 0, transcript: [], checkpoint: null, allowedActions: ["cancel"], error: null };
       viewingIndex = null;
       paint();
       try {
