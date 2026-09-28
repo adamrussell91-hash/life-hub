@@ -102,7 +102,11 @@ test('desktop hub switchers stay directly with each hub navigation', async () =>
     readFile(new URL('../../apps/teaching/src/teacher/shell.ts', import.meta.url), 'utf8')
   ]);
 
-  assert.match(knowledgeCss, /\.rail__nav\s*\{[^}]*flex:\s*0 0 auto/s);
+  assert.match(knowledgeCss, /\.rail\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(
+    knowledgeCss,
+    /\.rail__nav\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s
+  );
   assert.match(knowledgeCss, /\.rail \.hub-rail__hubs\s*\{[^}]*margin-top:\s*var\(--space-4\)/s);
 
   assert.match(tasksCss, /\.hub-rail__hubs\s*\{[^}]*margin-top:\s*var\(--space-4\)/s);

@@ -19,6 +19,7 @@ Read this before adding or restyling a rail destination. Snippet: `snippets/rail
 | Item type | `--text-sm`, `--weight-medium`, title case (`Home`, `Archive`). CSS must **not** uppercase nav labels. Brand and section headings are the only uppercase micro lines. |
 | Current page | `aria-current="page"` (optional `.is-current`). Highlight is `--on-dark-hover` behind the row, `--on-dark` type. Not a second accent colour. |
 | Utilities | Refresh and sign out stay in the **canvas** header (`.hub-utilities`). Never on the rail. |
+| Overflow | Shells that pin the rail to the viewport (`height` / `max-height: 100dvh`, sticky or fixed) must let **`.hub-rail__nav` scroll** (`flex: 1 1 0`, `min-height: 0`, `overflow-y: auto`). Do not set the nav to `flex: 0 0 auto` — that clips the hub switcher (e.g. Professional) with no way to reach it. Brand stays above the scroll; status (if any) stays below. |
 
 ## Anatomy
 

@@ -38,6 +38,14 @@ describe("Knowledge Hub rail", () => {
     expect(majors).not.toContain('data-nav="graph"');
   });
 
+  it("height-locks the rail and scrolls the nav so Professional is reachable (L9)", () => {
+    expect(css).toMatch(/\.rail\s*\{[^}]*height:\s*100dvh[^}]*overflow:\s*hidden/s);
+    expect(css).toMatch(
+      /\.rail__nav\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s
+    );
+    expect(css).not.toMatch(/\.rail__nav\s*\{[^}]*flex:\s*0 0 auto/s);
+  });
+
   it("adds a university study Timeline next to Graph", () => {
     expect(main).toContain('data-nav="timeline"');
     expect(main).toContain("<span>Timeline</span>");
