@@ -25,15 +25,15 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
-      await Promise.all(
-        keys
-          .filter((key) => key.startsWith('travel-shell-') && key !== SHELL_CACHE)
-          .map((key) => caches.delete(key))
-      );
+      const stale = keys.filter((key) => key.startsWith('travel-shell-') && key !== SHELL_CACHE);
+      await Promise.all(stale.map((key) => caches.delete(key)));
       await self.clients.claim();
-      // Stuck blank tabs never run page JS (old HTML → 404 hashed bundle), so
-      // they cannot listen for controllerchange. Force a navigate so the new
-      // network-first fetch handler loads current index.html.
+      // First install (no older shell cache): the open tab already loaded
+      // current HTML from the network — reloading it only doubled load time.
+      if (stale.length === 0) return;
+      // Upgrade from an older shell: stuck blank tabs never run page JS (old
+      // HTML → 404 hashed bundle), so they cannot listen for controllerchange.
+      // Force a navigate so the network-first handler loads current index.html.
       const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       await Promise.all(
         windowClients
