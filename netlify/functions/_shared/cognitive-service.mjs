@@ -155,7 +155,15 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
       let next = act(row.value, input);
       next.requests[input.requestId] = { action: input.action, text: input.text };
       next = await finishIfCompleted(next);
-      return publicSession((await commit(owner, input.sessionId, next, row.etag)).value);
+      try { return publicSession((await commit(owner, input.sessionId, next, row.etag)).value); }
+      catch (error) {
+        // A runner commit landed between read and write. Pause and cancel re-apply to the latest state.
+        if (error?.code !== 'revision_conflict' || !['pause', 'cancel'].includes(input.action)) throw error;
+        const latest = await read(owner, input.sessionId);
+        const retried = act(latest.value, { ...input, revision: latest.value.revision });
+        retried.requests[input.requestId] = { action: input.action, text: input.text };
+        return publicSession((await commit(owner, input.sessionId, retried, latest.etag)).value);
+      }
     },
     async run(owner, id) {
       const row = await read(owner, id);

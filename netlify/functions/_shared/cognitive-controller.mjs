@@ -131,7 +131,8 @@ function jumpToFilter(s){
 }
 export function act(current,{action,text,revision,requestId}){
  if(!ID_RE.test(requestId||''))throw fault(400,'validation_error','Valid request ID required.');
- if(revision!==current.revision)throw fault(409,'revision_conflict','Session changed. Refresh before continuing.');
+ // Pause and cancel always apply to the latest state; a runner commit between poll and click must not swallow them.
+ if(revision!==current.revision&&!['pause','cancel'].includes(action))throw fault(409,'revision_conflict','Session changed. Refresh before continuing.');
  if(!current.allowedActions.includes(action))throw fault(409,'action_not_allowed','This action is not allowed at the current checkpoint.');
  if(text!==undefined&&(typeof text!=='string'||text.length>MAX_TEXT))throw fault(413,'input_limit','Response exceeds the text limit.');
  if(['answer','correct','reflect','reopen'].includes(action)&&!text?.trim())throw fault(400,'validation_error','A response is required.');
@@ -205,7 +206,7 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
  }
  if(id==='mirror'){
   if(speaker==='retrospective')return `You are Gu Jian only, the Retrospective. Speak in his Zhou-hall register: past tense, balanced pairs, ji/xing/shi from your own word list, sample before pattern. One instance is never a trend. ${finalBurst?'Final burst: close without a question.':'Ask one steering question in character and set done false.'} No other voice's lines.`;
-  if(speaker==='prospective')return `You are Wang Yuan only, the Prospective. Speak in her register: conditional, Adam's own words, zhi/yuan/xiang/bei. Never invent an aspiration. ${finalBurst?'Final burst: close without a question.':'Ask one short real question in character and set done false.'} You may answer Gu Jian. Do not write Zheng Ming's lines.`;
+  if(speaker==='prospective')return `You are Wang Yuan only, the Prospective. Speak in her register: conditional, Adam's own words, zhi/yuan/xiang/bei. Never invent an aspiration: cite one only if it appears in originalInput, the conversation or a knownContext item, and quote its words; otherwise name the silence. ${finalBurst?'Final burst: close without a question.':'Ask one short real question in character and set done false.'} You may answer Gu Jian. Do not write Zheng Ming's lines.`;
   if(speaker==='present')return `You are Zheng Ming only, the Present. Level present tense, rectify the name, then one seven-day question and stop. ${s.intake.timescale==='long-arc'?'Ask what he is willing to sit with, tolerate or protect this week.':'Ask what he is actually willing to do in the next seven days.'} No other voice's lines.`;
   if(speaker==='controller'&&stage==='framing')return `You are the framer, not a fourth voice. Name the conflict in one or two sentences: the choice, the domain, and the two values in tension. ${s.mode==='deep'?'Ask Adam to confirm or correct the framing and stop.':'State that a correction restarts the run. Do not ask a question.'}`;
   if(speaker==='controller')return 'You are the compiler, not a fourth voice. Structure and condense only. Preserve each speaker\'s wording. No new analysis or recommendation.';
@@ -229,13 +230,13 @@ function speakerRegister(s, speaker, stage, {finalBurst}={}){
   if(speaker==='virtue')return 'You are Titus Honestus the Virtue only. Opening: “This choice shapes you into the kind of person who …” Warm second person; cite only stated aspirations. Ask precise personal questions. Never write Principle or Consequence.';
  }
  if(id==='witness'){
-  if(speaker==='trace')return 'You are Sati the Trace only. Reconstruct sequence without story or evaluation. End with the mandatory verification question when this is the verify gate. Never name a pattern. Never write Pattern Match or Recalibration.';
+  if(speaker==='trace')return 'You are Sati the Trace only. Reconstruct sequence without story or evaluation. If the intake and conversation give no sequence of steps to reconstruct, set needsInput true and ask one question for the actual sequence instead of tracing. End with the mandatory verification question when this is the verify gate. Never name a pattern. Never write Pattern Match or Recalibration.';
   if(speaker==='patterns')return 'You are Pañña the Pattern Match only. Sound thinking is the null hypothesis; baseline before patterns. Never diagnose. Never write Trace or Recalibration.';
   if(speaker==='recalibration')return 'You are Upekkhā the Recalibration only. Calibrate confidence and one disposition. Do not prescribe a replacement decision. Never write Trace or Pattern Match.';
   if(speaker==='controller')return 'You are the closing compiler, not a fourth stage. State the audited target, the verified trace in brief, active patterns (or the clean baseline), calibrated confidence and disposition, then gaps and limitations. No new analysis and no advice.';
  }
  if(id==='tribunal'){
-  if(speaker==='inverter')return 'You are Counselor Frank Delacorte the Inverter only. First test whether the attempted solutions keep the problem alive (Watzlawick, Weakland and Fisch); then test hidden function. One pass; no questions; never reference other reframes.';
+  if(speaker==='inverter')return 'You are Counselor Frank Delacorte the Inverter only. First test whether the attempted solutions keep the problem alive (Watzlawick, Weakland and Fisch); then test hidden function, and close on something observable stated as a statement, not a question. One pass; no questions; never reference other reframes.';
   if(speaker==='scaler')return 'You are Special Master Ruth Abernathy the Scaler only. One downscale and one upscale; no questions; never reference other reframes.';
   if(speaker==='context-shifter')return 'You are Judge Hollis Venable the Context Shifter only. Change setting; label realistic vs revealing; no questions; never reference other reframes.';
   if(speaker==='controller'&&stage==='clarify')return `Ask up to two short steering questions that resolve thin or ambiguous intake.${s.intake.priorAttempts?'':' One of them asks what has already been tried and what happened.'} No reframe yet.`;
@@ -293,17 +294,37 @@ function voiceText(parsed){
  if(Array.isArray(parsed.text))return parsed.text.filter(part=>typeof part==='string').join('\n');
  return '';
 }
+// Malformed or truncated voice JSON: recover the text and question fields instead of showing raw JSON.
+function salvageField(slice,name){
+ const key=slice.indexOf(`"${name}"`);if(key<0)return null;
+ const colon=slice.indexOf(':',key+name.length+2);if(colon<0)return null;
+ let i=colon+1;while(i<slice.length&&/\s/.test(slice[i]))i++;
+ if(slice[i]!=='"')return null;
+ let out='';
+ for(i++;i<slice.length;i++){
+  const ch=slice[i];
+  if(ch==='\\'){const n=slice[++i];out+=n==='n'?'\n':n==='t'?'\t':n==='r'?'':n??'';continue;}
+  if(ch==='"')break;
+  out+=ch;
+ }
+ return out;
+}
+function salvageFields(slice){
+ const text=salvageField(slice,'text');if(!text?.trim())return null;
+ return {text,question:salvageField(slice,'question'),done:!/"done"\s*:\s*false/.test(slice)};
+}
 function parseVoice(raw){
  if(!raw||typeof raw!=='object'||typeof raw.text!=='string')return raw;
  const trimmed=raw.text.trim();
  const fenced=trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
  const candidate=fenced?.[1]?.trim()??trimmed;
  const start=candidate.indexOf('{'),end=candidate.lastIndexOf('}');
- if(start<0||end<=start)return raw;
- const slice=candidate.slice(start,end+1);
+ if(start<0)return raw;
+ // No closing brace means truncated JSON: keep the tail so the salvage below can still recover text.
+ const slice=end>start?candidate.slice(start,end+1):candidate.slice(start);
  let parsed;
  try{parsed=JSON.parse(slice);}
- catch{try{parsed=JSON.parse(repairJsonStrings(slice));}catch{return raw;}}
+ catch{try{parsed=JSON.parse(repairJsonStrings(slice));}catch{parsed=salvageFields(slice);if(!parsed)return raw;}}
  if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))return raw;
  const text=voiceText(parsed),question=typeof parsed.question==='string'?parsed.question:parsed.question??null;
  if(!text&&typeof question!=='string')return raw;
@@ -359,10 +380,18 @@ function validateOutput(raw,s,p,{allowTrim=false}={}){
  const done=raw.done===false?false:true;
  return {...raw,text,question,done,trimmed,evidenceIds:ids,nextSpeaker:raw.nextSpeaker};
 }
+const HORIZON_ADVICE=/(?:^|[.!?]\s+)(?:Push|Take|Ask for|Go for|Choose|Consider|Apply for|Pursue|Seek|Start|Stop|Make sure)\b|\byou (?:should|must|need to|ought to)\b/i;
+const CONSILIUM_OPENERS={principle:/^\s*Duty and rights here require/i,consequence:/^\s*The best outcome for all affected parties is/i,virtue:/^\s*This choice shapes you into the kind of person who/i};
+// Deterministic checks for rules the model tends to break; each earns one re-ask.
+function lintHint(s,p,result){
+ if(s.protocolId==='horizon'&&['ketill','alvar','sigrid','controller'].includes(p.speaker)&&HORIZON_ADVICE.test(result.text))return 'Your previous reply told Adam what to do. Rewrite every instruction as a fork or requirement: what the path opens, closes or will cost. No imperatives to Adam.';
+ if(s.protocolId==='consilium'&&p.stage==='dialogue'&&(s.dialogueCounts[p.speaker]||0)>=1&&CONSILIUM_OPENERS[p.speaker]?.test(result.text))return 'You already used your signature opening. Begin differently, answering what was just said.';
+ return null;
+}
 const QUESTION_HINT='Your previous reply had no question. End this burst with exactly one question in character, returned in the question field.';
 async function callVoice(model,s,p,{requireQuestion=false}={}){
- let hint='',raw,asked=false;
- for(let attempt=0;attempt<3;attempt++){
+ let hint='',raw,asked=false,linted=false;
+ for(let attempt=0;attempt<4;attempt++){
   const prompt=hint?{...p,system:`${p.system}\n${hint}`}:p;
   // Provider transport failures are not retried here; the service marks the stage failed for an explicit retry.
   raw=await model(prompt);
@@ -370,6 +399,8 @@ async function callVoice(model,s,p,{requireQuestion=false}={}){
    const result=validateOutput(raw,s,p,{allowTrim:attempt>=2});
    // A missing required question earns one re-ask; after that the controller falls back rather than failing the run.
    if(requireQuestion&&!result.question&&!result.outOfScope&&!asked){asked=true;hint=QUESTION_HINT;continue;}
+   const lint=lintHint(s,p,result);
+   if(lint&&!linted){linted=true;hint=lint;continue;}
    return result;
   }
   catch(err){
@@ -401,7 +432,9 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   const requireQuestion=(Boolean(st.gate)&&st.gate!=='verify')||(mustAsk&&!p.finalBurst)||consiliumOwes;
   const result=await callVoice(model,s,p,{requireQuestion});
   let question=result.question;
-  if(st.gate==='verify')question=WITNESS_VERIFY;
+  // A trace with no sequence to reconstruct asks for it (at most twice) instead of verifying an empty reconstruction.
+  const traceNeedsInput=st.gate==='verify'&&result.needsInput&&Boolean(result.question)&&(s.burst||0)<2;
+  if(st.gate==='verify'&&!traceNeedsInput)question=WITNESS_VERIFY;
   // Fallbacks keep the run moving when a voice still omits a required question after its re-ask.
   if(st.gate&&!question&&!result.outOfScope)question=GATE_FALLBACK[st.gate]||GATE_FALLBACK.answer;
   // Tribunal voices speak once and ask nothing; only the controller clarifies.
@@ -416,7 +449,7 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   if(p.finalBurst&&!st.gate)question=null;
   // needsInput holds the same step open for the answer, like done:false.
   const done=(result.done!==false&&!result.needsInput)||(!question&&!st.gate);
-  let mayContinue=!hardGate&&question&&!done&&!p.finalBurst;
+  let mayContinue=(!hardGate&&question&&!done&&!p.finalBurst)||traceNeedsInput;
   let output=result.text;if(question&&!output.includes(question))output+=`\n\n${question}`;
   if(s.protocolId==='tribunal'&&st.stage==='convergence'&&!output.includes(TRIBUNAL_CLOSE))output+=`\n\n${TRIBUNAL_CLOSE}`;
   add(s,st.speaker==='controller'?'controller':'voice',st.speaker,st.stage,output,result.evidenceIds,{trimmed:result.trimmed||undefined,done,nextSpeaker:result.nextSpeaker});
@@ -432,7 +465,7 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   }
   else if(s.protocolId==='witness'&&result.distress){s.status='paused';s.resumeStatus='waiting';s.checkpoint={kind:'answer',question:'The audit has landed hard. Would you like to stop, continue with softer framing, or take this to Dr Vera Lenz?'};s.continueBurst=false;}
   else if(question){
-   s.status='waiting';s.checkpoint={kind:st.gate||'answer',question};s.continueBurst=mayContinue;
+   s.status='waiting';s.checkpoint={kind:traceNeedsInput?'answer':st.gate||'answer',question};s.continueBurst=mayContinue;
    // Stay on the step for burst continuations and the filter (actions decide). Otherwise advance so the answer lands on the next step.
    if(!mayContinue&&!st.filter){s.cursor++;s.burst=0;}
   } else {
