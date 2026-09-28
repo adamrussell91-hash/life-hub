@@ -1,8 +1,10 @@
 import { fetchEntityOverview } from '@/api/entities';
 import { changeUniversalLinkRole } from '@/api/universal-links';
+import { setPersonWorkplace } from '@/api/people-workplace';
 import { ApiClientError } from '@/api/client';
 import { renderLoadError, showViewLoading } from '@/views/feedback';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
+import { renderLinkedEverywhere } from '@/components/linked-everywhere';
 import type { EntityOverview, RelationshipEntry } from '@/domain/types';
 
 export interface TabDef {
@@ -61,13 +63,19 @@ function renderRoleEditor(
   onChanged: () => void,
   options: { leadingSpace?: boolean } = {}
 ): void {
-  const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? 'No role set');
+  // A workplace link's role IS the person's job title; it goes through the
+  // workplace service so the organisation's org chart follows, and so an
+  // imported (read-only) title can still be edited.
+  const isWorkplace =
+    entry.link.relationship_type === 'employee_at' || entry.link.relationship_type === 'member_of';
+  const noun = isWorkplace ? 'job title' : 'role';
+  const roleLine = el('span', 'entity-detail__relationship-role', entry.link.role ?? `No ${noun} set`);
 
   const editButton = document.createElement('button');
   editButton.type = 'button';
   editButton.className = 'btn btn--ghost entity-detail__role-edit';
-  editButton.textContent = 'Edit role';
-  editButton.setAttribute('aria-label', `Edit role for ${entry.endpoint.display_label}`);
+  editButton.textContent = `Edit ${noun}`;
+  editButton.setAttribute('aria-label', `Edit ${noun} for ${entry.endpoint.display_label}`);
 
   const form = document.createElement('form');
   form.className = 'entity-detail__role-form';
@@ -77,7 +85,7 @@ function renderRoleEditor(
   const label = document.createElement('label');
   label.className = 'entity-detail__role-form-label';
   label.htmlFor = labelId;
-  label.textContent = `Role for ${entry.endpoint.display_label}`;
+  label.textContent = `${isWorkplace ? 'Job title' : 'Role'} for ${entry.endpoint.display_label}`;
 
   const input = document.createElement('input');
   input.type = 'text';
@@ -116,7 +124,14 @@ function renderRoleEditor(
     event.preventDefault();
     const nextRole = input.value.trim() || null;
     save.disabled = true;
-    changeUniversalLinkRole(entry.link.id, { role: nextRole, changed_at: new Date().toISOString() })
+    const write = isWorkplace
+      ? setPersonWorkplace({
+          person_ref: entry.endpoint.kind === 'person' ? entry.endpoint.ref : entry.link.source_ref,
+          organisation_ref: entry.endpoint.kind === 'organisation' ? entry.endpoint.ref : entry.link.target_ref,
+          job_title: nextRole
+        })
+      : changeUniversalLinkRole(entry.link.id, { role: nextRole, changed_at: new Date().toISOString() });
+    write
       .then(() => {
         onChanged();
       })
@@ -138,10 +153,15 @@ const RELATIONSHIP_KICKERS: Record<string, string> = {
   works_at: 'Works at',
   studied_at: 'Studied at',
   professional_relationship: 'Relationship',
-  collaborator: 'Collaborator'
+  collaborator: 'Collaborator',
+  tagged_with: 'Tagged',
+  related_to: 'Related',
+  member_of_unit: 'In unit',
+  holds_position: 'Holds position'
 };
 
-function relationshipKicker(type: string): string {
+/** Human word for a relationship key — never render raw `snake_case` keys. */
+export function relationshipKicker(type: string): string {
   return RELATIONSHIP_KICKERS[type] ?? type.replaceAll('_', ' ').replace(/^\w/, (char) => char.toUpperCase());
 }
 
@@ -212,7 +232,7 @@ export function renderRelationshipList(
   list.className = 'entity-detail__relationship-list';
   for (const entry of entries) {
     const item = document.createElement('li');
-    const label = el('span', 'entity-detail__relationship-label', entry.link.relationship_type);
+    const label = el('span', 'entity-detail__relationship-label', relationshipKicker(entry.link.relationship_type));
     const endpoint = el('span', 'entity-detail__relationship-endpoint', entry.endpoint.display_label);
     // Keep type and organisation on one inline run so the separator stays
     // attached. The role is a sibling so it can wrap instead of gluing on.
@@ -362,47 +382,11 @@ export async function renderEntityDetail(canvas: HTMLElement, config: EntityDeta
     activitySection.append(el('h2', 'entity-detail__heading', 'Linked activity'));
     const activityHost = el('div');
     activitySection.append(activityHost);
-    const activityBits: Array<{ label: string; href: string | null }> = [];
-    for (const item of overview.linked_records.communications) {
-      activityBits.push({ label: `Communication · ${item.display_label}`, href: item.href });
-    }
-    for (const item of overview.linked_records.tasks) {
-      activityBits.push({ label: `Task · ${item.display_label}`, href: item.href });
-    }
-    for (const item of overview.linked_records.meetings ?? []) {
-      activityBits.push({ label: `Meeting · ${item.display_label}`, href: item.href });
-    }
-    for (const item of overview.linked_records.events ?? []) {
-      activityBits.push({ label: `Event · ${item.display_label}`, href: item.href });
-    }
-    for (const item of overview.linked_records.applications ?? []) {
-      activityBits.push({ label: `Application · ${item.display_label}`, href: item.href });
-    }
-    if (!activityBits.length) {
-      activityHost.append(
-        el(
-          'p',
-          'empty-state',
-          'No linked communications, tasks, meetings, events, or applications.'
-        )
-      );
-    } else {
-      const list = document.createElement('ul');
-      list.className = 'entity-detail__relationship-list';
-      for (const bit of activityBits) {
-        const item = document.createElement('li');
-        if (bit.href) {
-          const link = document.createElement('a');
-          link.href = bit.href;
-          link.textContent = bit.label;
-          item.append(link);
-        } else {
-          item.textContent = bit.label;
-        }
-        list.append(item);
-      }
-      activityHost.append(list);
-    }
+    renderLinkedEverywhere(
+      activityHost,
+      overview.linked_records,
+      'Nothing is linked yet. Tag this organisation from a note, task, meeting or event.'
+    );
 
     const timelineSection = el('section', 'entity-detail__section');
     timelineSection.append(el('h2', 'entity-detail__heading', 'Relationship timeline'));

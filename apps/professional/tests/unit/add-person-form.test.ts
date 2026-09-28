@@ -256,26 +256,24 @@ describe('mountAddPersonForm', () => {
       const host = document.createElement('div');
       mountAddPersonForm(host, { onCreated: vi.fn() });
 
-      // The shared `@`-mention picker (design-kit's `entity-picker.js`)
-      // treats the mention token as a single whitespace-free word, same as
-      // every other picker in this app (`applications.ts`'s tests only
-      // ever pick single-word queries too) — a multi-word name isn't
-      // expressible through the mention affordance itself.
+      // A dedicated field (picker `mode: 'field'`): the whole value is the
+      // query, so a multi-word organisation name works, and a leading `@`
+      // (old habit) is ignored.
       const orgInput = host.querySelector<HTMLInputElement>('[aria-label="Organisation, when known"]')!;
-      const picker = await openPicker(host, orgInput, 'BrandNewOrg');
+      const picker = await openPicker(host, orgInput, 'Brand New Org');
       const createBtn = picker.querySelector<HTMLButtonElement>('.entity-picker__create')!;
-      expect(createBtn.textContent).toBe('Create organisation “BrandNewOrg”');
+      expect(createBtn.textContent).toBe('Create organisation “Brand New Org”');
       createBtn.click();
       await vi.advanceTimersByTimeAsync(0);
       await Promise.resolve();
 
-      expect(host.textContent).toMatch(/BrandNewOrg/);
+      expect(host.textContent).toMatch(/Brand New Org/);
       const createCall = vi.mocked(fetch).mock.calls.find(
         ([url, init]) => String(url).endsWith('/api/entities') && init?.method === 'POST'
       )!;
       expect(JSON.parse(String(createCall[1]?.body))).toEqual({
         kind: 'organisation',
-        display_name: 'BrandNewOrg'
+        display_name: 'Brand New Org'
       });
     } finally {
       vi.useRealTimers();

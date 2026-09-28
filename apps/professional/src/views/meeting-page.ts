@@ -1,3 +1,4 @@
+import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { getMeeting, updateMeeting } from '@/api/meetings';
 import { createTask, listUniversalLinksForEntity } from '@/api/universal-links';
 import { fetchPeopleDirectory } from '@/api/people-directory';
@@ -91,6 +92,9 @@ export async function renderMeetingPage(
   const mentions = el('section', 'card');
   mentions.dataset.part = 'mentions';
   side.append(actions, mentions, buildMeetingTaskLinks(record, () => renderMeetingPage(canvas, id, options)));
+  const tagCard = el('section', 'card meeting-page__tags');
+  mountTagAnythingSection(tagCard, meetingRef);
+  side.append(tagCard);
   const grid = el('div', 'meeting-page__grid');
   grid.append(main, side);
   root.append(head, purpose, grid);

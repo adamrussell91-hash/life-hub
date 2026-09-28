@@ -176,11 +176,17 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
     chips.push({ kind: 'relationship', label });
   }
   const primaryOrg = orgs.find((e) => isCurrent(e.link)) ?? orgs[0] ?? null;
+  const jobTitle =
+    primaryOrg && isCurrent(primaryOrg.link) && typeof primaryOrg.link.role === 'string' && primaryOrg.link.role.trim()
+      ? primaryOrg.link.role.trim()
+      : null;
   if (primaryOrg) {
     const name = primaryOrg.endpoint.display_label;
     chips.push({
       kind: 'organisation',
-      label: `${isCurrent(primaryOrg.link) ? 'Colleague' : 'Former'} · ${name}`,
+      label: jobTitle
+        ? `${jobTitle} · ${name}`
+        : `${isCurrent(primaryOrg.link) ? 'Colleague' : 'Former'} · ${name}`,
       orgMonogram: orgMonogram(name)
     });
   }
@@ -203,6 +209,7 @@ export function buildPersonModel(input: BuildPersonModelInput): PersonModel {
   }
 
   const roleLine =
+    (jobTitle && primaryOrg ? `${jobTitle} · ${primaryOrg.endpoint.display_label}` : null) ??
     chips.find((c) => c.kind === 'relationship')?.label ??
     (primaryOrg
       ? `${isCurrent(primaryOrg.link) ? 'At' : 'Formerly'} ${primaryOrg.endpoint.display_label}`

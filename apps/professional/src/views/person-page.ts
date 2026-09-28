@@ -81,7 +81,13 @@ export async function renderPersonPage(
       brief.href = personBriefRoute(person.id);
       brief.textContent = 'Open Person Brief';
 
+      const workplaceRel = overview.current_relationships?.find(
+        (e) =>
+          (e.link.relationship_type === 'employee_at' || e.link.relationship_type === 'member_of') &&
+          e.endpoint.kind === 'organisation'
+      );
       const editor = mountIdentityEditor(person, reload, {
+        jobTitle: workplaceRel?.link.role ?? null,
         relationshipRole:
           overview.current_relationships?.find((e) => e.link.relationship_type === 'professional_relationship')
             ?.link.role ?? null,

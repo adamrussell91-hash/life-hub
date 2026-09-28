@@ -1,3 +1,4 @@
+import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { createCommunication, getCommunication, updateCommunication } from '@/api/communications';
 import {
   createTask,
@@ -190,6 +191,9 @@ export async function renderCommPage(
 
   const main = el('div', 'comm-page__main');
   const rail = buildPeopleRail(data);
+  const tagCard = el('section', 'card comm-page__tags');
+  mountTagAnythingSection(tagCard, `professional:communication:${data.record.id}`);
+  rail.append(tagCard);
   const grid = el('div', 'comm-page__grid');
   grid.append(main, rail);
   root.append(head, threadStrip, grid);

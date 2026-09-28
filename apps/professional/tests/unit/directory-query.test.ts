@@ -18,6 +18,15 @@ describe('directory-query', () => {
     expect(SORT_LABELS[parsed.sort]).toBe('Going cold');
   });
 
+  it('keeps colleagues as the default view and round-trips the students view', () => {
+    expect(defaultDirectoryQuery().who).toBe('colleagues');
+    expect(serializeDirectoryQuery(defaultDirectoryQuery())).toBe('');
+    const qs = serializeDirectoryQuery({ ...defaultDirectoryQuery(), who: 'students' });
+    expect(qs).toContain('who=students');
+    expect(parseDirectoryQuery(qs).who).toBe('students');
+    expect(parseDirectoryQuery('?who=nonsense').who).toBe('colleagues');
+  });
+
   it('counts active filters', () => {
     expect(activeFilterCount(defaultDirectoryQuery())).toBe(0);
     expect(

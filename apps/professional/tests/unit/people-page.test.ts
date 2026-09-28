@@ -188,7 +188,7 @@ describe('renderPeoplePage (W2 real entry)', () => {
     expect(full?.open).toBe(false);
   });
 
-  it('Edit opens the full person form (identity + role/notes/workplace/LinkedIn)', async () => {
+  it('Edit opens the full person form (identity + organisation/job title/how you know them/notes/LinkedIn)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderPeoplePage(canvas, { selectedId: PERSON_ID });
@@ -200,9 +200,10 @@ describe('renderPeoplePage (W2 real entry)', () => {
     edit!.click();
     expect(form?.hidden).toBe(false);
     expect(form?.querySelector('input[aria-label="Name"]')).toBeTruthy();
-    expect(form?.querySelector('select[aria-label="Role"]')).toBeTruthy();
+    expect(form?.querySelector('select[aria-label="How you know them"]')).toBeTruthy();
+    expect(form?.querySelector('input[aria-label="Job title"]')).toBeTruthy();
     expect(form?.querySelector('textarea[aria-label="Notes"]')).toBeTruthy();
-    expect(form?.querySelector('input[aria-label="Workplace"]')).toBeTruthy();
+    expect(form?.querySelector('input[aria-label="Workplace (not in Life Hub)"]')).toBeTruthy();
     expect(form?.querySelector('input[aria-label="Organisation"]')).toBeTruthy();
     expect(form?.querySelector('input[aria-label="LinkedIn"]')).toBeTruthy();
   });

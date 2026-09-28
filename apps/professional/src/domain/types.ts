@@ -183,6 +183,14 @@ export interface LinkedRecords {
   applications?: RelationshipEndpoint[];
   organisations: RelationshipEndpoint[];
   people: RelationshipEndpoint[];
+  /** Knowledge notes (`knowledge:page`). */
+  notes?: RelationshipEndpoint[];
+  /** Tasks-hub projects, programs and goals. */
+  projects?: RelationshipEndpoint[];
+  /** Teaching units, lessons and classes. */
+  teaching?: RelationshipEndpoint[];
+  /** Every other registered kind — never silently dropped. */
+  other?: RelationshipEndpoint[];
 }
 
 export interface SharedContextWithSelf {
