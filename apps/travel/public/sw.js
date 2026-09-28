@@ -6,7 +6,7 @@
  * index.html → 404 on index-Dngzwec5.js → empty #app).
  *
  * HTML/navigation: network-first (immutable hashed assets may be cache-first).
- * Cross-origin API (api.adam-russell.com) is never intercepted.
+ * Cross-origin API / tiles / fonts are never intercepted.
  */
 const SHELL_CACHE = 'travel-shell-v2';
 const SHELL_URLS = ['/travel/', '/travel/index.html'];
@@ -23,16 +23,31 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key.startsWith('travel-shell-') && key !== SHELL_CACHE)
-            .map((key) => caches.delete(key))
-        )
-      )
-      .then(() => self.clients.claim())
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key.startsWith('travel-shell-') && key !== SHELL_CACHE)
+          .map((key) => caches.delete(key))
+      );
+      await self.clients.claim();
+      // Stuck blank tabs never run page JS (old HTML → 404 hashed bundle), so
+      // they cannot listen for controllerchange. Force a navigate so the new
+      // network-first fetch handler loads current index.html.
+      const windowClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      await Promise.all(
+        windowClients
+          .filter((client) => {
+            try {
+              const path = new URL(client.url).pathname;
+              return path === '/travel' || path.startsWith('/travel/');
+            } catch {
+              return false;
+            }
+          })
+          .map((client) => client.navigate(client.url))
+      );
+    })()
   );
 });
 
@@ -67,21 +82,6 @@ self.addEventListener('fetch', (event) => {
         if (cached) return cached;
         return fetch(event.request).then((response) => putInShellCache(event.request, response));
       })
-    );
-    return;
-  }
-
-  if (url.hostname === 'tiles.openfreemap.org' || url.hostname === 'fonts.gstatic.com') {
-    event.respondWith(
-      caches.match(event.request).then(
-        (cached) =>
-          cached ??
-          fetch(event.request).then((response) => {
-            const copy = response.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(event.request, copy)).catch(() => undefined);
-            return response;
-          })
-      )
     );
     return;
   }
