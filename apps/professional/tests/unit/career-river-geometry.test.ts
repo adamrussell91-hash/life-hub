@@ -100,11 +100,9 @@ describe('career-river-geometry', () => {
   });
 
   it('builds complete short job labels without dangling of-phrases', () => {
-    expect(riverJobShortLabel('Leader of Learning Enrichment')).toBe(
-      'Leader of Learning Enrichment'
-    );
+    expect(riverJobShortLabel('Leader of Learning Enrichment')).toBe('Leader of Learning');
     expect(riverJobShortLabel('Leader of Learning')).toBe('Leader of Learning');
-    expect(riverJobShortLabel('Head of Gifted Education')).toBe('Head of Gifted Education');
+    expect(riverJobShortLabel('Head of Gifted Education')).toBe('Head of Gifted');
     expect(riverJobShortLabel('Deputy Principal')).toBe('Deputy Principal');
     expect(riverJobShortLabel('English Teacher')).toBe('English');
     expect(riverJobShortLabel('Gifted Education Teacher')).toBe('Gifted Education');
@@ -112,6 +110,9 @@ describe('career-river-geometry', () => {
       'Professional Learning'
     );
     expect(riverJobShortLabel('HSIE Teacher')).toBe('HSIE');
+    expect(riverJobShortLabel('HSIE and Business Studies Teacher')).toBe('HSIE');
+    expect(riverJobShortLabel('English/HSIE Teacher')).toBe('English/HSIE');
     expect(riverJobShortLabel('Curriculum Leader')).toBe('Curriculum Leader');
+    expect(riverJobShortLabel('Senior Education Project Officer')).toBe('Senior Education');
   });
 });
