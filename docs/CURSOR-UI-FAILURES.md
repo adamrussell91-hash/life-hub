@@ -79,6 +79,8 @@
 
 **D5 · Ugly or ambiguous derived text.** **Seen:** "38 in" chip; "Ordered 24 Sep" with no subject; dates not in dd/mm/yy. **Rule:** Every generated label reads as a phrase a person would write; dates use `formatDisplayDate` or relative text. **Check:** read every string in the screenshot aloud.
 
+**D7 · Relationship read from a field that is always the same value.** **Seen:** Travel world map (2026-09): legs were built from each ticket's `city_id → arrive_city_id`, but tickets are filed under their arrival city so both were equal; every booked leg was zero-length and the map fell back to dotted "not booked" gaps, with no Sydney start. **Rule:** Before drawing an edge from two fields, check them on the real data file: if they are equal for every row, derive the missing end from order (previous stop / home). **Check:** a leg-builder test on the real trip shape asserts SYD→KUL and KUL→IST are `booked` and non-zero length.
+
 ## C: Charts and SVG
 
 **C1 · Labels collide or clip.** **Seen:** Goals runway "Move clipped" (PAD_R); Medical strip labels cut by the TODAY line or truncated, and overlapping value labels; Organisations #508 (56 overlapping count labels on the St. Aloysius tile, the role label clipped at the timeline's top edge, and axis labels under the people line), with C1 ticked in the ledger; Tasks Graph Lines station titles/subs middle-anchored at `padL` clipped past SVG x=0 (2026-09). **Rule:** Reserve gutters in the maths; run a collision pass (flip, then hide-to-tooltip); anchor `end` near the right edge; axis labels get their own row. **Check:** a DOM test using `getBBox` shows no label box intersecting another or crossing the SVG edge, at 390 and 1440.
