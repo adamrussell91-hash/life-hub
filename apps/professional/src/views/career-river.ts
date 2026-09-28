@@ -11,7 +11,6 @@ import {
   roleBandExtraPx,
   riverJobShortLabel,
   timeToUnit,
-  truncateRiverLabel,
   yearFraction,
   type RiverOrientation,
   type RiverZoom
@@ -535,12 +534,9 @@ export function mountCareerRiver(
         bar.appendChild(title);
         group.appendChild(bar);
         const roleShort = jobRoleLabel(job);
-        const avail = width - x - 16;
-        // Phone: prefer full short label; only clip at the canvas edge.
-        const labelText =
-          avail >= roleShort.length * 6
-            ? roleShort
-            : truncateRiverLabel(roleShort, avail);
+        // Phone: full short label beside the tick — never ellipsis mid-phrase
+        // ("Leader of…"). Tip still carries the full role if text is dense.
+        const labelText = roleShort;
         if (labelText) {
           const label = svgEl('text', {
             x: x + 8,

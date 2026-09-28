@@ -206,8 +206,8 @@ export function assignEmploymentLanes(jobs: EmploymentSpan[]): number[] {
   return lanes;
 }
 
-/** Lane pitch for labeled role bars (bar + optional below-bar label). */
-export const ROLE_LANE_HEIGHT_PX = 36;
+/** Lane pitch for labeled role bars (bar + below-bar label air). */
+export const ROLE_LANE_HEIGHT_PX = 40;
 
 /** Extra SVG height for stacked role-band lanes under the trunk. */
 export function roleBandExtraPx(laneCount: number): number {
@@ -230,17 +230,16 @@ export function truncateRiverLabel(text: string, availPx: number): string {
 
 /**
  * Compact role label for the Career river band.
- * One readable short form — never dangling "Leader of" / "Head of", never
- * width-truncated here (placement decides hide-on-collision, not ellipsis).
+ * One readable short form — never dangling "Leader of" / "Head of" / "HSIE and",
+ * never width-truncated here (placement decides hide-on-collision, not ellipsis).
  */
 export function riverJobShortLabel(title: string): string {
   const raw = (title || '').trim();
   if (!raw) return 'Role';
   const parts = raw.split(/\s+/);
-  // "Leader of Learning Enrichment" → keep through subject (never end on "of")
+  // "Leader of Learning Enrichment" → "Leader of Learning" (complete; never end on "of")
   if (/^(head|deputy|leader|director|principal)\s+of\b/i.test(raw)) {
-    const n = Math.min(parts.length, Math.max(3, parts.length >= 4 ? 4 : 3));
-    return parts.slice(0, n).join(' ');
+    return parts.slice(0, Math.min(parts.length, 3)).join(' ');
   }
   if (/^(head|deputy|leader|director|principal)\b/i.test(raw)) {
     return parts.slice(0, Math.min(2, parts.length)).join(' ');
@@ -250,8 +249,23 @@ export function riverJobShortLabel(title: string): string {
     .trim();
   const sParts = stripped.split(/\s+/).filter(Boolean);
   if (sParts.length === 0) return raw;
-  if (sParts.length <= 2) return stripped;
-  return sParts.slice(0, 2).join(' ');
+  // "HSIE and Business Studies" → primary subject only (never end on "and")
+  const andIdx = sParts.findIndex((p) => /^(and|&)$/i.test(p));
+  if (andIdx === 1) return sParts[0]!;
+  if (sParts.length <= 2) {
+    if (sParts.length === 2 && /^(and|of|the|for|&)$/i.test(sParts[1]!)) return sParts[0]!;
+    return stripped;
+  }
+  let n = 2;
+  let out = sParts.slice(0, n).join(' ');
+  while (/\b(and|of|the|for|&)$/i.test(out) && n < sParts.length) {
+    n += 1;
+    out = sParts.slice(0, n).join(' ');
+  }
+  if (/\b(and|of|the|for|&)$/i.test(out)) {
+    out = sParts.slice(0, Math.max(1, n - 1)).join(' ');
+  }
+  return out;
 }
 
 /**
