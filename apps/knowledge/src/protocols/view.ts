@@ -549,8 +549,9 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const index = total === 0 ? 0 : clamp(viewingIndex ?? total - 1, 0, total - 1);
   const isLatest = total === 0 || index === total - 1;
   const listening = ["queued", "running"].includes(session.status);
+  const ended = session.status === "cancelled";
   const turn = total > 0 ? session.transcript[index] : null;
-  const cardIsLive = isLatest && (listening || Boolean(session.error) || Boolean(session.checkpoint) || !turn);
+  const cardIsLive = !ended && isLatest && (listening || Boolean(session.error) || Boolean(session.checkpoint) || !turn);
   const activeSpeakerId = cardIsLive ? session.speaker : turn ? turn.speaker : session.speaker;
   const activeVoice = activeSpeakerId && activeSpeakerId !== "you" && activeSpeakerId !== "controller"
     ? voiceOf(definition, activeSpeakerId)
@@ -572,11 +573,13 @@ export function sessionView(session: Session, definition: Definition, viewingInd
     ? liveSlotHtml(session, definition, activeName, activeRole, precedingText, precedingTurn)
     : turn
       ? readTurnCardHtml(turn, activeName, activeRole, session.evidence)
-      : joiningCardHtml(activeName, activeRole);
+      : ended
+        ? `<article class="protocol-turn-card"><p>Session ended.</p></article>`
+        : joiningCardHtml(activeName, activeRole);
   const showSummary = Boolean(session.summary) && isLatest;
   const complete = session.status === "completed" || showSummary;
   const portraitHtml = portraitHtmlFor(definition, activeSpeakerId, activeVoice);
-  return `<section class="protocol-session${listening ? " is-listening" : ""}${complete ? " is-complete" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" data-view-index="${index}" data-turn-total="${total}" style="--protocol-background:url('${backgroundAsset(definition.id)}')">${backgroundLayersHtml(definition.id)}<header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}${showSummary ? summaryHtml(session) : ""}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
+  return `<section class="protocol-session${listening ? " is-listening" : ""}${complete ? " is-complete" : ""}" data-speaker="${escapeHtml(session.speaker ?? "")}" data-view-index="${index}" data-turn-total="${total}" style="--protocol-background:url('${backgroundAsset(definition.id)}')">${backgroundLayersHtml(definition.id)}<header><button class="btn btn--ghost" data-protocol-close type="button">← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.name)}</p>${total > 0 ? `<p class="protocol-session__position">Turn ${index + 1} of ${total}</p>` : ""}${ended ? `<p class="protocol-session__position">Session ended</p>` : ""}${session.status === "completed" ? `<button class="btn btn--ghost" data-protocol-download type="button">Download as markdown</button>` : ""}</header>${portraitHtml}<div class="protocol-turn-card-slot">${cardHtml}${showSummary ? summaryHtml(session) : ""}</div>${renderScrubber(session, index, isLatest, definition)}</section>`;
 }
 export function applySession(root: HTMLElement, session: Session, definition: Definition, viewingIndex?: number) {
   const total = session.transcript.length;
@@ -807,7 +810,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       }
       return;
     }
-    if (!form.matches("[data-protocol-reply]") || !currentSession) return;
+    if (!form.matches("[data-protocol-reply]") || !currentSession || currentSession.status !== "waiting") return;
     const data = new FormData(form);
     const submitter = (event as SubmitEvent).submitter as HTMLButtonElement | null;
     const kind = currentSession.checkpoint?.kind;
