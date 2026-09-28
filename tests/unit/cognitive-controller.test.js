@@ -485,6 +485,20 @@ test('cancel clears the checkpoint so the reply cannot continue the run',async()
   assert.doesNotMatch(c.transcript.at(-1).text,/Is that the thesis/);
   assert.throws(()=>act(c,{action:'confirm',revision:c.revision,requestId:randomUUID()}),/not allowed/);
 });
+test('cancel drops a checkpoint ask that does not end in a question mark',async()=>{
+  const ask='Confirm this thesis, context and audience as stated, or correct any part, and let me know whether this is a raw claim to build from scratch or an existing draft to strengthen.';
+  let s=start('refinery','full');
+  s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Thesis: homework should be banned in every school because students dislike it. The Builder will need that single warrant unless you tell me otherwise.',question:ask,done:true,evidenceIds:[]})});
+  assert.equal(s.status,'waiting');
+  assert.equal(s.checkpoint.question,ask);
+  assert.match(s.transcript.at(-1).text,/Confirm this thesis/);
+  const c=act(s,{action:'cancel',revision:s.revision,requestId:randomUUID()});
+  assert.equal(c.status,'cancelled');
+  assert.equal(c.checkpoint,null);
+  assert.match(c.transcript.at(-1).text,/unless you tell me otherwise/);
+  assert.doesNotMatch(c.transcript.at(-1).text,/Confirm this thesis/);
+  assert.throws(()=>act(c,{action:'confirm',revision:c.revision,requestId:randomUUID()}),/not allowed/);
+});
 test('third live run: Fates briefing may skip questions, interrogation passes are single-shot, search is capped',async()=>{
   const f=start('fates','sprint');
   assert.equal(f.steps.filter(st=>st.stage==='briefing').length,1);assert.equal(f.steps[0].gate,null);
