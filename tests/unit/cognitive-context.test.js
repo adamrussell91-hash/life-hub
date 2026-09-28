@@ -200,7 +200,7 @@ test('Refinery fake search evidence appears as web ids', async () => {
     id: randomUUID(),
     owner: 'owner',
     protocolId: 'refinery',
-    mode: 'build',
+    mode: 'break',
     intake: { claim: 'Short meetings improve participation', context: 'Proposal', audience: 'Committee' },
     requestId: randomUUID()
   });
