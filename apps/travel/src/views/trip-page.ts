@@ -8,8 +8,9 @@ import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
-import { formatInZone, zonedToInstant } from '@/lib/time';
-import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
+import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
+import { formatCountdown, formatLongRange, formatShortRange, formatWeekdayDate } from '@/lib/date-label';
+import { I } from '@/lib/icons';
 import type { Marker } from 'maplibre-gl';
 
 export interface TripPageOptions {
@@ -77,19 +78,26 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
   const h1 = document.createElement('h1');
   h1.textContent = trip.title;
   const sub = document.createElement('p');
-  sub.className = 'sub';
-  sub.textContent = `${formatDisplayDate(trip.start_date)} – ${formatDisplayDate(trip.end_date)}`;
+  sub.className = 'sub num';
+  const today = dateInZone(new Date(), trip.home_tz);
+  const trains = trip.items.filter((item) => item.kind === 'train').length;
+  sub.textContent = [
+    formatLongRange(trip.start_date, trip.end_date),
+    formatCountdown(trip.start_date, trip.end_date, today),
+    `${trip.cities.length} ${trip.cities.length === 1 ? 'city' : 'cities'}` +
+      (trains ? `, ${trains} ${trains === 1 ? 'train' : 'trains'}` : '')
+  ].join(' · ');
   titleBlock.append(crumb, h1, sub);
   const acts = document.createElement('div');
   acts.className = 'acts';
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
   addBtn.className = 'btn';
-  addBtn.textContent = '+ Add';
+  addBtn.innerHTML = `${I.plus}Add`;
   const publicBtn = document.createElement('button');
   publicBtn.type = 'button';
   publicBtn.className = 'btn ghost';
-  publicBtn.textContent = 'Public link';
+  publicBtn.innerHTML = `${I.link}Public link`;
   acts.append(addBtn, publicBtn);
   top.append(titleBlock, acts);
   wrap.append(top);
@@ -140,7 +148,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       chip.type = 'button';
       chip.className = 'chip';
       if (city.id === selectedCityId) chip.classList.add('is-on');
-      chip.innerHTML = `<b>${city.name}</b><span>${formatDisplayDate(city.start_date)}–${formatDisplayDate(city.end_date)}</span>${hasTodo ? '<span class="todo-dot"></span>' : ''}`;
+      chip.innerHTML = `<b>${city.name}${hasTodo ? '<i class="todo-dot" title="Something to book"></i>' : ''}</b><span class="num">${formatShortRange(city.start_date, city.end_date)}</span>`;
       chip.addEventListener('click', () => selectCity(city.id));
       chips.append(chip);
     }
@@ -162,8 +170,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     const titleDiv = document.createElement('div');
     titleDiv.className = 'title';
     const eyebrow = document.createElement('p');
-    eyebrow.className = 'eyebrow';
-    eyebrow.textContent = city.name;
+    eyebrow.className = 'eyebrow num';
+    eyebrow.textContent = `${city.name} · ${formatShortRange(city.start_date, city.end_date)}`;
     const h2 = document.createElement('h2');
     h2.textContent = city.title;
     const factsRow = document.createElement('div');
@@ -188,9 +196,14 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       btn.type = 'button';
       btn.className = 'daybtn';
       if (date === selectedDate) btn.classList.add('is-on');
-      const label = new Date(date + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
-      const dayNum = new Date(date + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-      btn.innerHTML = `${label}<small>${dayNum}</small>`;
+      // "Tue 1 Dec" over the day's subtitle ("Leave Sydney"), as in the mockup.
+      btn.textContent = formatWeekdayDate(date);
+      const subtitle = trip.days.find((d) => d.city_id === city.id && d.date === date)?.subtitle;
+      if (subtitle) {
+        const small = document.createElement('small');
+        small.textContent = subtitle;
+        btn.append(small);
+      }
       btn.addEventListener('click', () => {
         selectedDate = date;
         renderDay();
@@ -218,8 +231,8 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     mapTools.className = 'map-tools';
     const homeBtn = document.createElement('button');
     homeBtn.type = 'button';
-    homeBtn.className = 'btn ghost';
-    homeBtn.textContent = 'Take me home';
+    homeBtn.className = 'btn';
+    homeBtn.innerHTML = `${I.home}Take me home`;
     homeBtn.addEventListener('click', () => {
       const host = document.createElement('div');
       document.body.append(host);
@@ -232,7 +245,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     const whereBtn = document.createElement('button');
     whereBtn.type = 'button';
     whereBtn.className = 'btn ghost';
-    whereBtn.textContent = 'Where am I?';
+    whereBtn.innerHTML = `${I.locate}Where am I?`;
     whereBtn.addEventListener('click', () => {
       if (!dayMapHandle) return;
       void startWhereAmI(dayMapHandle.map, mapBox, city, selectedDate, trip);
@@ -240,16 +253,19 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     const fullBtn = document.createElement('button');
     fullBtn.type = 'button';
     fullBtn.className = 'btn ghost';
-    fullBtn.textContent = 'Full screen';
+    const fullLabel = document.createElement('span');
+    fullLabel.textContent = 'Full screen';
+    fullBtn.innerHTML = I.expand;
+    fullBtn.append(fullLabel);
     fullBtn.addEventListener('click', () => {
       const on = mapBox.classList.toggle('is-fullscreen');
-      fullBtn.textContent = on ? 'Exit full screen' : 'Full screen';
+      fullLabel.textContent = on ? 'Exit full screen' : 'Full screen';
       dayMapHandle?.map.resize();
       if (on) {
         const onKey = (e: KeyboardEvent) => {
           if (e.key === 'Escape') {
             mapBox.classList.remove('is-fullscreen');
-            fullBtn.textContent = 'Full screen';
+            fullLabel.textContent = 'Full screen';
             dayMapHandle?.map.resize();
             document.removeEventListener('keydown', onKey);
           }

@@ -27,7 +27,7 @@ function tagFor(item: Item): { cls: string; label: string } | null {
   return null;
 }
 
-function renderCard(item: Item, number: number | undefined, options: DayListOptions): HTMLElement {
+function renderCard(item: Item, number: number | undefined, options: DayListOptions, hop?: Hop): HTMLElement {
   const stop = document.createElement('div');
   stop.className = 'stop';
   if (options.selectedId === item.id) stop.classList.add('is-on');
@@ -58,7 +58,12 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
   if (isTicket) {
     const band = document.createElement('div');
     band.className = 'band';
-    band.textContent = `${item.carrier} · ${item.number}`;
+    const carrier = document.createElement('span');
+    carrier.textContent = item.carrier;
+    const flightNo = document.createElement('span');
+    flightNo.className = 'num';
+    flightNo.textContent = item.number;
+    band.append(carrier, flightNo);
     const body = document.createElement('div');
     body.className = 'body';
     const from = document.createElement('div');
@@ -78,11 +83,16 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     perf.className = 'perf';
     const departLabel = document.createElement('span');
     departLabel.className = 'hm';
-    departLabel.innerHTML = `${item.depart_time || 'Time to set'}<b>${item.title}</b>`;
-    const arriveWeekday = item.arrive_date !== item.date ? ' (next day)' : '';
+    const weekday = (d: string) =>
+      new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' });
+    const departB = document.createElement('b');
+    departB.textContent = item.depart_time ? `${weekday(item.date)} ${item.depart_time}` : 'Time to set';
+    departLabel.append('Departs', departB);
     const arriveLabel = document.createElement('span');
     arriveLabel.className = 'hm r';
-    arriveLabel.innerHTML = `Arrives${arriveWeekday}<b>${item.arrive_time}</b>`;
+    const arriveB = document.createElement('b');
+    arriveB.textContent = `${weekday(item.arrive_date || item.date)} ${item.arrive_time}`;
+    arriveLabel.append('Arrives', arriveB);
     const tagsWrap = document.createElement('div');
     tagsWrap.className = 'meta';
     const tag = tagFor(item);
@@ -91,6 +101,12 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       tagEl.className = `tag ${tag.cls}`;
       tagEl.textContent = tag.label;
       tagsWrap.append(tagEl);
+    }
+    if (item.note && !options.isPublic) {
+      const note = document.createElement('span');
+      note.style.color = 'var(--muted)';
+      note.textContent = item.note;
+      tagsWrap.append(note);
     }
     if (item.cost && !options.isPublic) {
       const price = document.createElement('span');
@@ -107,9 +123,9 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       openLink.textContent = 'Open ticket';
       tagsWrap.append(openLink);
     }
-    // Times sit inside the padded .body grid (row 2 under the IATA codes);
-    // appended to the card they ran flush to its edges.
-    body.append(departLabel, arriveLabel);
+    // Row 2 of the .body grid (mockup): Departs | spacer | Arrives. Appended to
+    // the unpadded card instead, they ran flush to its edges.
+    body.append(departLabel, document.createElement('span'), arriveLabel);
     editHost = tagsWrap;
     card.append(band, body, perf, tagsWrap);
   } else {
@@ -122,6 +138,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     if (item.kind !== 'checkin_slot' && (item as { off_map_label?: string }).off_map_label && !itemPlace(item)) {
       const offMap = document.createElement('span');
       offMap.className = 't';
+      offMap.style.color = 'var(--muted)';
       offMap.textContent = (item as { off_map_label?: string }).off_map_label!;
       row1.append(offMap);
     }
@@ -160,7 +177,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       mapsLink.target = '_blank';
       mapsLink.rel = 'noopener';
       mapsLink.textContent = useNaver ? 'Naver Map ↗' : 'Directions in Google Maps ↗';
-      card.append(mapsLink);
+      meta.append(mapsLink);
     }
   }
 
@@ -187,7 +204,12 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
       select();
     }
   });
-  stop.append(rail, card);
+  // Card column (mockup): the card, then the hop to the next stop under it, so
+  // the hop lines up with the cards rather than the timeline rail.
+  const col = document.createElement('div');
+  col.append(card);
+  if (hop) col.append(renderHopRow(hop));
+  stop.append(rail, col);
   return stop;
 }
 
@@ -197,7 +219,11 @@ function renderHopRow(hop: Hop): HTMLElement {
   const icon = document.createElement('span');
   icon.innerHTML = (I as Record<string, string>)[hop.mode] ?? I.walk;
   const text = document.createElement('span');
-  const bits = [`<b>${hop.minutes} min</b>`, hop.note, hop.cost ? formatAud(hop.cost) : null].filter(Boolean);
+  const bits = [
+    `<b>${hop.minutes} min</b>`,
+    hop.note,
+    hop.cost ? `<span class="price">${formatAud(hop.cost)}</span>` : null
+  ].filter(Boolean);
   text.innerHTML = bits.join(' · ');
   wrap.append(icon, text);
   return wrap;
@@ -224,16 +250,17 @@ export function renderDayList(
 
   if (showArrivalGuide(trip, cityId, date) && city?.arrival_guide) {
     const guide = document.createElement('details');
-    guide.className = 'landing';
+    guide.className = 'card landing';
     guide.open = true;
     const summary = document.createElement('summary');
+    // One span holds eyebrow + title so the summary's space-between leaves
+    // just two items: the heading and the +/− marker (mockup).
+    const heading = document.createElement('span');
     const k = document.createElement('span');
     k.className = 'k';
-    k.textContent = 'Arrival guide';
-    const heading = document.createElement('span');
-    heading.className = 'landing__title';
-    heading.textContent = city.arrival_guide.title;
-    summary.append(k, heading);
+    k.textContent = 'Soft landing';
+    heading.append(k, city.arrival_guide.title);
+    summary.append(heading);
     const dl = document.createElement('dl');
     for (const row of city.arrival_guide.rows) {
       const dt = document.createElement('dt');
@@ -259,16 +286,32 @@ export function renderDayList(
       row.className = 'checkin';
       const time = item.time ?? '00:00';
       const localLabel = item.time ?? 'Time to set';
+      const homeName = trip.home_tz.includes('Sydney') ? 'Sydney' : trip.home_tz;
+      // A check-in timed before this day's outbound ticket departs happens at the
+      // origin (previous city, or home before the first leg) — e.g. "Boarded" at
+      // 22:00 in Sydney, not 22:00 in Kuala Lumpur.
+      let whereName = city?.name ?? '';
+      let whereTz = city?.tz ?? trip.home_tz;
+      const departsLater = item.time
+        ? dayItems.some(
+            (t) => (t.kind === 'flight' || t.kind === 'train') && t.date === item.date && t.depart_time > item.time!
+          )
+        : false;
+      if (departsLater && city) {
+        const byStart = [...trip.cities].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
+        const prev = byStart[byStart.findIndex((c) => c.id === city.id) - 1];
+        whereName = prev?.name ?? homeName;
+        whereTz = prev?.tz ?? trip.home_tz;
+      }
       let homeLabel = '';
       let nextDay = '';
-      if (item.time && city) {
-        const instant = zonedToInstant(item.date, time, city.tz);
+      if (item.time && whereTz !== trip.home_tz) {
+        const instant = zonedToInstant(item.date, time, whereTz);
         homeLabel = formatInZone(instant, trip.home_tz);
         if (dateInZone(instant, trip.home_tz) !== item.date) nextDay = ' (next day)';
       }
-      const homeName = trip.home_tz.includes('Sydney') ? 'Sydney' : trip.home_tz;
       const left = document.createElement('span');
-      left.innerHTML = `<b>${item.title}</b> · ${localLabel} ${city?.name ?? ''}${homeLabel ? ` · ${homeLabel} ${homeName}${nextDay}` : ''}`;
+      left.innerHTML = `${item.title} · <b>${localLabel} ${whereName}</b>${homeLabel ? ` · ${homeLabel} ${homeName}${nextDay}` : ''}`;
       const follower = document.createElement('span');
       follower.style.marginLeft = 'auto';
       follower.textContent = trip.followers_label;
@@ -279,18 +322,14 @@ export function renderDayList(
 
     if (listOptions.isPublic && (item.private || item.kind === 'med')) continue;
 
-    const card = renderCard(item, numbers.get(item.id), listOptions);
-    list.append(card);
-
-    const explicitHop = item.hop;
-    if (explicitHop) {
-      list.append(renderHopRow(explicitHop));
-    } else if (numbers.has(item.id) && item.kind !== 'stay') {
+    let hop: Hop | undefined = item.hop;
+    if (!hop && numbers.has(item.id) && item.kind !== 'stay') {
       const idx = pinnedOrder.findIndex((p) => p.id === item.id);
       const next = pinnedOrder[idx + 1];
       const fallback = hopFallback(item, next);
-      if (fallback) list.append(renderHopRow({ mode: 'walk', minutes: fallback.minutes }));
+      if (fallback) hop = { mode: 'walk', minutes: fallback.minutes };
     }
+    list.append(renderCard(item, numbers.get(item.id), listOptions, hop));
   }
 
   if (!options.isPublic) {
