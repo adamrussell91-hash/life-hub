@@ -43,7 +43,9 @@ function notionPageHref(id: string): string | null {
 }
 
 function toRow(record: CommunicationRecord): ScheduleDbRow {
-  const when = record.scheduled_start || record.occurred_at;
+  const rawWhen = record.scheduled_start || record.occurred_at;
+  const when =
+    rawWhen && !String(rawWhen).startsWith('1970-01-01') ? rawWhen : '';
   const notionHref = notionPageHref(record.id);
   // Notion import has no inbound/outbound — channel filters only.
   const filterTokens = notionHref

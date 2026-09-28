@@ -9,6 +9,9 @@ import {
 import {
   isNotionMeetingMethod,
   mergeBlobAndNotionRecords,
+  cleanNotionDisplayTitle,
+  parseMentionDateFromTitle,
+  parseNotionCommunicationBounds,
   projectNotionCommunicationListRecord,
   projectNotionCommunicationSchedule,
   projectNotionMeetingListRecord
@@ -81,6 +84,64 @@ test('title falls back to meeting type, then method; unknown method is channel o
   );
   assert.equal(projectNotionCommunicationSchedule(row({ method: null })).channel, 'other');
   assert.equal(projectNotionCommunicationSchedule(row({ method: 'Video Call' })).channel, 'video');
+});
+
+test('cleanNotionDisplayTitle strips mention-date tags and markdown bold', () => {
+  assert.equal(
+    cleanNotionDisplayTitle('Meeting **<mention-date start="2026-07-23"/>**'),
+    'Meeting'
+  );
+  assert.equal(
+    cleanNotionDisplayTitle('**Tournament of Minds NSW Branch/State Finals — Pre-Event Briefing**'),
+    'Tournament of Minds NSW Branch/State Finals — Pre-Event Briefing'
+  );
+  assert.equal(
+    cleanNotionDisplayTitle(
+      'Staff Briefing <mention-date start="2026-06-15" startTime="08:10" timeZone="Australia/Sydney"/>'
+    ),
+    'Staff Briefing'
+  );
+  assert.equal(cleanNotionDisplayTitle('**<mention-date start="2025-12-10"/>**'), '');
+});
+
+test('mention-date in the title supplies bounds when date_start is missing', () => {
+  const fromDateOnly = parseMentionDateFromTitle(
+    'Meeting **<mention-date start="2026-07-23"/>**'
+  );
+  assert.equal(fromDateOnly.start, '2026-07-22T23:00:00.000Z');
+  assert.equal(fromDateOnly.pin, true);
+
+  const withTime = parseNotionCommunicationBounds({
+    date_start: null,
+    title: '**Meeting <mention-date start="2026-06-25" startTime="10:08" timeZone="Australia/Sydney"/>**'
+  });
+  assert.equal(withTime.start, '2026-06-25T00:08:00.000Z');
+
+  const list = projectNotionCommunicationListRecord(
+    row({
+      notion_id: ID_B,
+      method: 'Email',
+      date_start: null,
+      title: 'Meeting **<mention-date start="2026-07-23"/>**'
+    })
+  );
+  assert.equal(list.subject, 'Meeting');
+  assert.equal(list.occurred_at, '2026-07-22T23:00:00.000Z');
+  assert.equal(list.scheduled_start, '2026-07-22T23:00:00.000Z');
+});
+
+test('undated Notion comms keep epoch for sort but list subject is cleaned', () => {
+  const list = projectNotionCommunicationListRecord(
+    row({
+      notion_id: ID_C,
+      method: 'Email',
+      date_start: null,
+      title: '**Email Sharni Knox re: her son**'
+    })
+  );
+  assert.equal(list.subject, 'Email Sharni Knox re: her son');
+  assert.equal(list.occurred_at, '1970-01-01T00:00:00.000Z');
+  assert.equal(list.scheduled_start, null);
 });
 
 function githubFetch(rows) {
