@@ -6,6 +6,7 @@ import {
   clampZoom,
   clusterMarks,
   riverHeightPx,
+  riverJobShortLabel,
   roleBandExtraPx,
   timeToUnit,
   truncateRiverLabel,
@@ -96,5 +97,21 @@ describe('career-river-geometry', () => {
     expect(truncateRiverLabel('English Teacher', 12)).toBe('');
     expect(truncateRiverLabel('English Teacher', 48)).toMatch(/Engl/);
     expect(truncateRiverLabel('Gifted', 80)).toBe('Gifted');
+  });
+
+  it('builds complete short job labels without dangling of-phrases', () => {
+    expect(riverJobShortLabel('Leader of Learning Enrichment')).toBe(
+      'Leader of Learning Enrichment'
+    );
+    expect(riverJobShortLabel('Leader of Learning')).toBe('Leader of Learning');
+    expect(riverJobShortLabel('Head of Gifted Education')).toBe('Head of Gifted Education');
+    expect(riverJobShortLabel('Deputy Principal')).toBe('Deputy Principal');
+    expect(riverJobShortLabel('English Teacher')).toBe('English');
+    expect(riverJobShortLabel('Gifted Education Teacher')).toBe('Gifted Education');
+    expect(riverJobShortLabel('Professional Learning Coordinator')).toBe(
+      'Professional Learning'
+    );
+    expect(riverJobShortLabel('HSIE Teacher')).toBe('HSIE');
+    expect(riverJobShortLabel('Curriculum Leader')).toBe('Curriculum Leader');
   });
 });

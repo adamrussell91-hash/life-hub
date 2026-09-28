@@ -9,6 +9,7 @@ import {
   riverHeightPx,
   ROLE_LANE_HEIGHT_PX,
   roleBandExtraPx,
+  riverJobShortLabel,
   timeToUnit,
   truncateRiverLabel,
   yearFraction,
@@ -94,12 +95,7 @@ function activePreset(
 }
 
 function shortName(title: string): string {
-  const parts = title.trim().split(/\s+/);
-  if (parts.length <= 1) return title;
-  if (/^(head|deputy|leader|director|principal)\b/i.test(title)) {
-    return parts.slice(0, 2).join(' ');
-  }
-  return parts[0]!;
+  return riverJobShortLabel(title);
 }
 
 function jobTip(job: CareerModel['employment'][number]): string {
@@ -113,8 +109,8 @@ function jobTip(job: CareerModel['employment'][number]): string {
 
 function jobRoleLabel(job: CareerModel['employment'][number]): string {
   const role = (job.role || '').trim();
-  if (role) return shortName(role);
-  return shortName((job.display_label || job.label || 'Role').trim());
+  if (role) return riverJobShortLabel(role);
+  return riverJobShortLabel((job.display_label || job.label || 'Role').trim());
 }
 
 /**
@@ -471,24 +467,18 @@ export function mountCareerRiver(
         bar.appendChild(title);
         group.appendChild(bar);
 
-        // Prefer full short label below the bar when the span is too narrow for
-        // in-bar text (Whole-career zoom). Avoid "Engl…" inside mute-width pills.
-        const padX = 8;
-        const roleShort = jobRoleLabel(job);
-        const insideBudget = barW - padX * 2;
-        const fitsInside =
-          insideBudget >= 48 && truncateRiverLabel(roleShort, insideBudget) === roleShort;
-        let place: 'inside' | 'below' = fitsInside ? 'inside' : 'below';
-        let labelText = fitsInside
-          ? roleShort
-          : truncateRiverLabel(roleShort, Math.min(160, Math.max(48, lengthPx - x0)));
-        let lx = fitsInside ? x0 + padX : x0 + 2;
-        let ly = fitsInside
-          ? y + ROLE_BAR_HEIGHT_PX / 2 + 4
-          : y + ROLE_BAR_HEIGHT_PX + 12;
+        // One placement rule: full short label centered below every bar.
+        // Never ellipsis by bar width (that made "Leader of" / inside-vs-outside
+        // chaos). Collision → hide; tip still carries the full role.
+        const labelText = jobRoleLabel(job);
+        const approxW = labelText.length * 6.2;
+        let lx = x0 + barW / 2;
+        const half = approxW / 2;
+        if (lx - half < 2) lx = half + 2;
+        if (lx + half > lengthPx - 2) lx = Math.max(half + 2, lengthPx - half - 2);
+        const ly = y + ROLE_BAR_HEIGHT_PX + 12;
         if (labelText) {
-          const approxW = labelText.length * 6.2;
-          const box = { x: lx, y: ly - 10, w: approxW, h: 12 };
+          const box = { x: lx - half, y: ly - 10, w: approxW, h: 12 };
           const hits = roleLabelBoxes.some(
             (b) =>
               !(box.x + box.w < b.x || b.x + b.w < box.x || box.y + box.h < b.y || b.y + b.h < box.y)
@@ -497,11 +487,10 @@ export function mountCareerRiver(
             const label = svgEl('text', {
               x: lx,
               y: ly,
-              class:
-                place === 'inside'
-                  ? 'career-river__role-label'
-                  : 'career-river__role-label career-river__role-label--below',
-              'data-part': 'role-label'
+              'text-anchor': 'middle',
+              class: 'career-river__role-label career-river__role-label--below',
+              'data-part': 'role-label',
+              'data-place': 'below'
             });
             label.textContent = labelText;
             label.setAttribute('title', tip);
@@ -545,13 +534,20 @@ export function mountCareerRiver(
         title.textContent = tip;
         bar.appendChild(title);
         group.appendChild(bar);
-        const labelText = truncateRiverLabel(jobRoleLabel(job), width - x - 16);
+        const roleShort = jobRoleLabel(job);
+        const avail = width - x - 16;
+        // Phone: prefer full short label; only clip at the canvas edge.
+        const labelText =
+          avail >= roleShort.length * 6
+            ? roleShort
+            : truncateRiverLabel(roleShort, avail);
         if (labelText) {
           const label = svgEl('text', {
             x: x + 8,
             y: (y0 + y1) / 2 + 4,
             class: 'career-river__role-label career-river__role-label--below',
-            'data-part': 'role-label'
+            'data-part': 'role-label',
+            'data-place': 'beside'
           });
           label.textContent = labelText;
           label.setAttribute('title', tip);

@@ -4818,8 +4818,9 @@
   pointer-events: none;
 }
 
+/* Below/beside is the only placement — same ink weight as in-bar was. */
 .career-river__role-label--below {
-  fill: var(--muted);
+  fill: var(--ink);
   font-weight: var(--weight-semibold);
 }
 
