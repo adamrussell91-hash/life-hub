@@ -31,6 +31,9 @@ import {
 } from '@/api/people-directory';
 import { mountAddPersonForm } from '@/components/add-person-form';
 import { mountIdentityEditor } from '@/components/person-identity-editor';
+import { renderLinkedEverywhere } from '@/components/linked-everywhere';
+import { relationshipKicker as relationshipWord } from '@/components/entity-detail';
+import { mountTagAnythingSection } from '@/views/entity-tagger';
 import { peopleRoute, peopleTiesRoute } from '@/app/router';
 import { personRef } from '@/domain/ids';
 import {
@@ -40,7 +43,9 @@ import {
   parseDirectoryQuery,
   serializeDirectoryQuery,
   SORT_LABELS,
+  WHO_LABELS,
   type DirectoryGroup,
+  type DirectoryWho,
   type DirectoryQueryState,
   type DirectorySort
 } from '@/domain/directory-query';
@@ -68,6 +73,7 @@ const ROLE_FILTER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'referee', label: 'Referee' },
   { value: 'conference_contact', label: 'Conference contact' },
   { value: 'introduction', label: 'Introduction' },
+  { value: 'student', label: 'Student' },
   { value: 'other', label: 'Other' }
 ];
 
@@ -368,9 +374,12 @@ export async function renderPeoplePage(
   addIcon.type = 'button';
   addIcon.setAttribute('aria-label', 'Add person');
   tools.append(filterBtn, sortBtn, groupBtn, phoneFiltersBtn, addIcon);
+  const whoSwitch = el('div', 'people-page__who');
+  whoSwitch.setAttribute('role', 'group');
+  whoSwitch.setAttribute('aria-label', 'Show colleagues or students');
   const pills = el('div', 'people-page__pills');
   const listHost = el('div', 'people-page__list');
-  dir.append(tools, pills, listHost);
+  dir.append(whoSwitch, tools, pills, listHost);
 
   const sheet = el('div', 'people-page__sheet');
   sheet.hidden = true;
@@ -396,9 +405,45 @@ export async function renderPeoplePage(
     writeHash(selectedId, query);
   }
 
-  function filteredSorted(): DirectoryPersonRow[] {
+  function rowsForWho(): DirectoryPersonRow[] {
     if (!directory) return [];
-    return sortRows(directory.people.filter((r) => matchesFilters(r, query)), query.sort);
+    const students = directory.students ?? [];
+    if (query.who === 'students') return students;
+    if (query.who === 'everyone') return [...directory.people, ...students];
+    return directory.people;
+  }
+
+  function findRow(id: string): DirectoryPersonRow | undefined {
+    return directory?.people.find((p) => p.id === id) ?? directory?.students?.find((p) => p.id === id);
+  }
+
+  function filteredSorted(): DirectoryPersonRow[] {
+    return sortRows(rowsForWho().filter((r) => matchesFilters(r, query)), query.sort);
+  }
+
+  function renderWhoSwitch(): void {
+    whoSwitch.replaceChildren();
+    const counts: Record<DirectoryWho, number> = {
+      colleagues: directory?.people.length ?? 0,
+      students: directory?.students?.length ?? 0,
+      everyone: (directory?.people.length ?? 0) + (directory?.students?.length ?? 0)
+    };
+    for (const key of ['colleagues', 'students', 'everyone'] as DirectoryWho[]) {
+      const btn = el('button', `people-page__who-btn${query.who === key ? ' is-on' : ''}`) as HTMLButtonElement;
+      btn.type = 'button';
+      btn.setAttribute('aria-pressed', String(query.who === key));
+      btn.append(
+        document.createTextNode(WHO_LABELS[key]),
+        el('span', 'people-page__who-n', directory ? String(counts[key]) : '')
+      );
+      btn.addEventListener('click', () => {
+        if (query.who === key) return;
+        query = { ...query, who: key };
+        applyQueryToHash();
+        renderDirectory();
+      });
+      whoSwitch.append(btn);
+    }
   }
 
   function renderPills(): void {
@@ -476,6 +521,7 @@ export async function renderPeoplePage(
   function renderDirectory(): void {
     if (!isCurrent()) return;
     syncControlLabels();
+    renderWhoSwitch();
     renderPills();
     listHost.replaceChildren();
     const rows = filteredSorted();
@@ -484,7 +530,15 @@ export async function renderPeoplePage(
       return;
     }
     if (rows.length === 0) {
-      listHost.append(el('p', 'people-pane__empty', 'No people match these filters.'));
+      listHost.append(
+        el(
+          'p',
+          'people-pane__empty',
+          query.who === 'students' && !(directory.students ?? []).length
+            ? 'No students yet. Set someone’s relationship to Student to list them here.'
+            : 'No people match these filters.'
+        )
+      );
       return;
     }
     const groups = groupRows(rows, query.group);
@@ -523,7 +577,11 @@ export async function renderPeoplePage(
             : undefined)
         );
         const stack = el('div', 'people-page__row-stack');
-        stack.append(el('span', 'people-page__row-name', row.display_name));
+        const nameLine = el('span', 'people-page__row-name', row.display_name);
+        if (row.person_type === 'student') {
+          nameLine.append(el('span', 'people-page__type-badge', 'Student'));
+        }
+        stack.append(nameLine);
         stack.append(el('span', 'people-page__row-sub', roleLine));
         a.append(stack);
         const end = el('div', 'people-page__row-end');
@@ -580,12 +638,17 @@ export async function renderPeoplePage(
       '[data-section="remember"] .people-pane__section-body'
     ) as HTMLElement | null;
     const arcHost = pane.querySelector('[data-section="arc"] .people-pane__section-body') as HTMLElement | null;
+    const linkedHost = pane.querySelector(
+      '[data-section="linked"] .people-pane__section-body'
+    ) as HTMLElement | null;
+    const tagHost = pane.querySelector('[data-section="tags"]') as HTMLElement | null;
     const fullHost = pane.querySelector('[data-section="full"] .people-pane__section-body') as HTMLElement | null;
 
     if (nextHost) setSectionState(nextHost, 'loading');
     if (ledgerHost) setSectionState(ledgerHost, 'loading');
     if (rememberHost) setSectionState(rememberHost, 'loading');
     if (arcHost) setSectionState(arcHost, 'loading');
+    if (linkedHost) setSectionState(linkedHost, 'loading');
 
     try {
       const ref = personRef(id);
@@ -640,7 +703,7 @@ export async function renderPeoplePage(
       personModels.set(id, model);
 
       if (directory) {
-        const row = directory.people.find((p) => p.id === id);
+        const row = findRow(id);
         if (row) {
           row.open_item_count = model.openItemCount;
           row.you_owe_count = model.youOweCount;
@@ -698,15 +761,13 @@ export async function renderPeoplePage(
             {
               relationshipRole: proRel?.link.role ?? null,
               relationshipLinkId: proRel?.link.id ?? null,
+              // Current workplace only — a former one here would be re-joined
+              // the moment a job title is saved.
               organisation: orgRel
                 ? { ref: orgRel.endpoint.ref, display_label: orgRel.endpoint.display_label }
-                : model.organisation
-                  ? {
-                      ref: model.organisation.ref,
-                      display_label: model.organisation.displayName
-                    }
-                  : null,
-              workplaceLinkId: orgRel?.link.id ?? null
+                : null,
+              workplaceLinkId: orgRel?.link.id ?? null,
+              jobTitle: orgRel?.link.role ?? null
             }
           );
           editor.button.classList.add('people-pane__edit');
@@ -749,8 +810,10 @@ export async function renderPeoplePage(
               c.append(accept, decline);
               chips.append(c);
             } else {
-              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`, chip.label);
-              if (chip.title) c.title = chip.title;
+              // L6: one line; a long job title truncates, full text on hover.
+              const c = el('span', `people-pane__chip people-pane__chip--${chip.kind}`);
+              c.append(el('span', 'people-pane__chip-text', chip.label));
+              c.title = chip.title ?? chip.label;
               if (chip.orgMonogram) c.prepend(crestNode(chip.orgMonogram, 'sm'));
               chips.append(c);
             }
@@ -889,12 +952,21 @@ export async function renderPeoplePage(
         }
       }
 
+      if (linkedHost) {
+        renderLinkedEverywhere(linkedHost, overview.linked_records);
+      }
+      if (tagHost && !tagHost.childElementCount) {
+        // Tag from the person's side too — writes the same `tagged_with`
+        // link the note/task/event taggers write, and lists both directions.
+        mountTagAnythingSection(tagHost, ref);
+      }
+
       if (fullHost) {
         fullHost.replaceChildren();
         const ul = el('ul', 'people-pane__full-list');
         for (const entry of overview.current_relationships ?? []) {
           const li = el('li');
-          li.textContent = `${entry.link.relationship_type}: ${entry.endpoint.display_label}`;
+          li.textContent = `${relationshipWord(entry.link.relationship_type)}: ${entry.endpoint.display_label}`;
           ul.append(li);
         }
         if (!ul.childElementCount) {
@@ -912,6 +984,7 @@ export async function renderPeoplePage(
       if (ledgerHost) setSectionState(ledgerHost, 'error', msg);
       if (rememberHost) setSectionState(rememberHost, 'error', msg);
       if (arcHost) setSectionState(arcHost, 'error', msg);
+      if (linkedHost) setSectionState(linkedHost, 'error', msg);
     }
   }
 
@@ -1133,6 +1206,17 @@ export async function renderPeoplePage(
     remember.root.querySelector('.people-pane__h2')?.append(el('span', 'people-pane__h2-sub', 'pulled from your notes'));
     setSectionState(remember.body, 'loading');
     pane.append(remember.root);
+
+    const linked = sectionHost('people-pane__linked', 'Linked everywhere');
+    linked.root.setAttribute('data-section', 'linked');
+    linked.root.querySelector('.people-pane__h2')?.append(
+      el('span', 'people-pane__h2-sub', 'notes, tasks, meetings, events')
+    );
+    setSectionState(linked.body, 'loading');
+    const tagHost = el('div', 'people-pane__tags');
+    tagHost.setAttribute('data-section', 'tags');
+    linked.root.append(tagHost);
+    pane.append(linked.root);
 
     const arc = sectionHost('people-pane__arc', 'Your relationship so far');
     arc.root.setAttribute('data-section', 'arc');

@@ -17,6 +17,7 @@ import {
   listGithubRelationshipEntries
 } from './github-professional-data.mjs';
 import { dedupeIdentityRows, identityNameKey } from './identity-display-name.mjs';
+import { withoutSupersededImports } from './person-workplace.mjs';
 
 // The single expensive full-population scan every People Home (Phase 2)
 // aggregation function consumes — `people-home-signals.mjs` and
@@ -108,7 +109,8 @@ export async function loadAllPeopleWithRelationships({
   resolveEntity,
   createRepository,
   env,
-  fetchImpl
+  fetchImpl,
+  includeStudents = false
 } = {}) {
   if (!store) {
     throw new Error('loadAllPeopleWithRelationships requires a store.');
@@ -186,6 +188,23 @@ export async function loadAllPeopleWithRelationships({
     (row) => row._source
   );
 
+  // Opt-in only (People directory's Students view): the imported
+  // Communications students themselves, appended after identity dedupe so
+  // they can never displace or merge with a colleague. Every other caller
+  // keeps the adults-only network.
+  if (includeStudents) {
+    const studentRows = await mapBounded(githubStudents, PEOPLE_BATCH_SIZE, async (record) => {
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id: record.id });
+      const relationships = [];
+      for (const { link, otherRef, direction } of await listGithubRelationshipEntries('person', record.id, github)) {
+        const endpoint = await resolveGithubEndpoint(otherRef);
+        if (endpoint) relationships.push({ link, endpoint, direction });
+      }
+      return { person: { ...record, ref }, relationships, _source: 'github' };
+    });
+    survivors.push(...studentRows);
+  }
+
   return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
     if (row._source === 'github') {
       return {
@@ -215,7 +234,10 @@ export async function loadAllPeopleWithRelationships({
     }
     return {
       person: row.person,
-      relationships: withoutStudentPersonEndpoints([...native, ...imported], studentIds)
+      relationships: withoutStudentPersonEndpoints(
+        withoutSupersededImports([...native, ...imported]),
+        studentIds
+      )
     };
   });
 }

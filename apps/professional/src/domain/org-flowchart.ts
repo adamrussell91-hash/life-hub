@@ -92,8 +92,20 @@ function collapsedSet(options: {
  * Build ELK graph from derived structure. ponytail: no free x/y pinning —
  * unit `order` drives layer order via considerModelOrder.
  */
+/**
+ * Archived units/positions (removed from the chart) stay in the payload as
+ * history; neither renderer may draw them.
+ */
+export function activeStructure(structure: OrgStructurePayload): OrgStructurePayload {
+  return {
+    ...structure,
+    units: structure.units.filter((u) => u.lifecycle_status === 'active'),
+    positions: structure.positions.filter((p) => p.lifecycle_status === 'active')
+  };
+}
+
 export async function layoutOrgFlowchart(
-  structure: OrgStructurePayload,
+  structureInput: OrgStructurePayload,
   options: {
     selfPersonRef?: string | null;
     highlightLine?: string | null; // 'your_lines' | person_ref | `line:${unit_ref}`
@@ -102,6 +114,7 @@ export async function layoutOrgFlowchart(
     collapsedUnits?: Set<string> | Iterable<string>;
   } = {}
 ): Promise<FlowLayout> {
+  const structure = activeStructure(structureInput);
   const t0 = performance.now();
   const mod = await import('elkjs/lib/elk.bundled.js');
   const ELK = (
@@ -160,7 +173,7 @@ export async function layoutOrgFlowchart(
     boxMeta.set(pref, {
       id: pref,
       kind: 'position',
-      label: display || 'not met',
+      label: display || 'Vacant',
       sublabel: pos.title,
       dashed: !holder,
       you,
@@ -289,6 +302,7 @@ export async function layoutOrgFlowchart(
   }
 
   const elkEdges: ElkEdge[] = [];
+  const reversedEdgeIds = new Set<string>();
   for (const edge of graph.edges) {
     if (
       edge.kind === 'reports_to' &&
@@ -315,10 +329,16 @@ export async function layoutOrgFlowchart(
     const tgtMeta = boxMeta.get(target);
     if (srcMeta?.unitRef && collapsed.has(srcMeta.unitRef) && srcMeta.kind !== 'unit') continue;
     if (tgtMeta?.unitRef && collapsed.has(tgtMeta.unitRef) && tgtMeta.kind !== 'unit') continue;
+    // Layered layout puts an edge's source above its target. A reporting
+    // line runs report → boss, so feed it boss-first or every chart is drawn
+    // upside down (the principal at the bottom). The points are flipped back
+    // after layout so the arrow still points at the boss.
+    const bossFirst = edge.kind === 'reports_to' || edge.kind === 'answers_to';
+    if (bossFirst) reversedEdgeIds.add(String(edge.id));
     elkEdges.push({
       id: String(edge.id),
-      sources: [srcId],
-      targets: [target]
+      sources: [bossFirst ? target : srcId],
+      targets: [bossFirst ? srcId : target]
     });
   }
 
@@ -374,6 +394,7 @@ export async function layoutOrgFlowchart(
         ...(section.bendPoints || []).map((p) => ({ x: ox + p.x, y: oy + p.y })),
         { x: ox + section.endPoint.x, y: oy + section.endPoint.y }
       ];
+      if (reversedEdgeIds.has(e.id)) points.reverse();
       const src = graph.edges.find((ge) => String(ge.id) === e.id);
       let bold = true;
       if (highlightLine === 'your_lines' || !highlightLine) {
@@ -614,11 +635,11 @@ export function renderFlowchartSvg(
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'orgs-flow__vacant';
-      btn.setAttribute('aria-label', `Assign ${box.sublabel || 'role'} (not met)`);
+      btn.setAttribute('aria-label', `Assign someone to ${box.sublabel || 'this role'} (vacant)`);
       btn.title = 'Assign someone via Edit structure';
       const label = document.createElement('span');
       label.className = 'orgs-flow__vacant-label';
-      label.textContent = 'not met';
+      label.textContent = 'Vacant';
       const role = document.createElement('span');
       role.className = 'orgs-flow__vacant-role';
       role.textContent = box.sublabel;
@@ -644,10 +665,11 @@ export function renderFlowchartSvg(
 
 /** Phone outline: indented tree of units (Phase 3.5). */
 export function renderStructureOutline(
-  structure: OrgStructurePayload,
+  structureInput: OrgStructurePayload,
   selfPersonRef: string | null,
   peopleNames: Record<string, string> = {}
 ): HTMLElement {
+  const structure = activeStructure(structureInput);
   const root = document.createElement('div');
   root.className = 'orgs-outline';
   const units = [...structure.units].sort((a, b) => a.order - b.order);
@@ -671,7 +693,7 @@ export function renderStructureOutline(
         ? personIdFromRef(headNode.holder.person_ref)
         : null;
       const holderName =
-        (pid && peopleNames[pid]) || headNode?.holder?.display_name || 'not met';
+        (pid && peopleNames[pid]) || headNode?.holder?.display_name || 'Vacant';
       line.textContent = `${head.title} — ${holderName}`;
       block.append(line);
     }
@@ -704,11 +726,47 @@ export function renderStructureOutline(
     }
     root.append(block);
   }
-  if (!units.length) {
+  // Roles drawn on the chart without a unit — the drag-and-connect editor
+  // starts from people and roles, so these are often the whole chart.
+  const loose = structure.positions.filter((p) => !p.unit_ref);
+  if (loose.length) {
+    const block = document.createElement('div');
+    block.className = 'orgs-outline__unit';
+    const h = document.createElement('div');
+    h.className = 'orgs-outline__unit-name';
+    h.textContent = units.length ? 'Other roles' : 'Roles';
+    block.append(h);
+    const nameFor = (ref: string): string => {
+      const node = structure.graph.nodes.find((n) => n.ref === ref) as
+        | { title?: string; holder?: { display_name?: string | null; person_ref?: string } | null }
+        | undefined;
+      const pid = node?.holder?.person_ref ? personIdFromRef(node.holder.person_ref) : null;
+      const holder = (pid && peopleNames[pid]) || node?.holder?.display_name || null;
+      return holder ? `${holder} (${node?.title ?? 'role'})` : node?.title ?? 'a role';
+    };
+    for (const pos of loose) {
+      const ref = `shared:position:${pos.id}`;
+      const row = document.createElement('div');
+      row.className = 'orgs-outline__member';
+      row.textContent = nameFor(ref);
+      const boss = structure.graph.edges.find(
+        (e) => e.kind === 'reports_to' && e.flag === 'explicit' && e.source === ref
+      );
+      if (boss) {
+        const hint = document.createElement('span');
+        hint.className = 'orgs-outline__also';
+        hint.textContent = `reports to ${nameFor(boss.target)}`;
+        row.append(hint);
+      }
+      block.append(row);
+    }
+    root.append(block);
+  }
+  if (!units.length && !loose.length) {
     root.append(
       Object.assign(document.createElement('p'), {
         className: 'people-pane__empty',
-        textContent: 'No structure yet. Add units to show how this organisation is run.'
+        textContent: 'No chart yet. Use “Draw the chart” to add people and connect them.'
       })
     );
   }

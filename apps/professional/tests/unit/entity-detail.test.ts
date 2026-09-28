@@ -110,10 +110,12 @@ describe('renderPersonPage', () => {
     const patchCall = vi.mocked(fetch).mock.calls.find((call) => call[1]?.method === 'PATCH');
     expect(String(patchCall?.[0])).toContain(`ref=${encodeURIComponent(`shared:person:${PERSON_ID}`)}`);
     expect(String(patchCall?.[0])).toContain('action=update');
+    // Profile fields ride along; the server merges them (never wipes).
     expect(JSON.parse(String(patchCall?.[1]?.body))).toEqual({
       display_name: 'Seth Updated',
       sort_name: 'Updated, Seth',
-      aliases: ['Sethy']
+      aliases: ['Sethy'],
+      professional_profile: { summary: null, linkedin_url: null, current_workplace: null }
     });
   });
 
@@ -294,9 +296,9 @@ describe('renderPersonPage', () => {
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
     clickTab(canvas, 'Shared Work');
-    expect(canvas.textContent).toMatch(/Meeting · Seth planning/);
-    expect(canvas.textContent).toMatch(/Event · PD day/);
-    expect(canvas.textContent).toMatch(/Application · Classroom Teacher/);
+    expect(canvas.textContent).toMatch(/Meetings · 1\s*Seth planning/);
+    expect(canvas.textContent).toMatch(/Events · 1\s*PD day/);
+    expect(canvas.textContent).toMatch(/Applications · 1\s*Classroom Teacher/);
     const meetingLink = [...canvas.querySelectorAll('a')].find((a) =>
       a.textContent?.includes('Seth planning')
     );
@@ -640,13 +642,14 @@ describe('renderPersonPage', () => {
     // The phone card and the desktop list each get an edit control. CSS
     // shows one of them.
     expect(editButtons.length).toBe(2);
-    expect(editButtons.every((button) => button.getAttribute('aria-label') === 'Edit role for Example University')).toBe(
-      true
-    );
+    // A workplace link's role is the person's job title.
+    expect(
+      editButtons.every((button) => button.getAttribute('aria-label') === 'Edit job title for Example University')
+    ).toBe(true);
     expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Gifted Education Teacher');
     const row = editButtons[0].closest('li') ?? editButtons[1].closest('li');
     expect(row?.querySelector('.entity-detail__relationship-identity')?.textContent).toBe(
-      'employee_at · Example University'
+      'Employee · Example University'
     );
     expect(row?.textContent).toMatch(/Example University Gifted Education Teacher/);
     expect(row?.textContent).not.toMatch(/UniversityGifted/);
@@ -657,7 +660,7 @@ describe('renderPersonPage', () => {
     expect(card?.querySelector('.person-card__brief')?.getAttribute('href')).toContain('/people/');
   });
 
-  it('saving a role edit calls change_role and reloads the overview', async () => {
+  it('saving a job title edit goes through the workplace service (keeps the org chart in step) and reloads', async () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(
         jsonResponse(200, {
@@ -665,7 +668,7 @@ describe('renderPersonPage', () => {
           data: personOverview({
             current_relationships: [
               {
-                link: { id: 'l1', relationship_type: 'employee_at', status: 'current', temporal_mode: 'period', role: 'Gifted Education Teacher' },
+                link: { id: 'l1', relationship_type: 'employee_at', status: 'current', temporal_mode: 'period', role: 'Gifted Education Teacher', source_ref: `shared:person:${PERSON_ID}`, target_ref: `shared:organisation:${ORG_ID}` },
                 endpoint: { ref: `shared:organisation:${ORG_ID}`, kind: 'organisation', display_label: 'Example University', supporting_label: null, href: null, lifecycle_status: 'active', visibility: 'operator' },
                 direction: 'outgoing'
               }
@@ -676,7 +679,7 @@ describe('renderPersonPage', () => {
       .mockResolvedValueOnce(
         jsonResponse(200, {
           ok: true,
-          data: { ended: { id: 'l1' }, created: { id: 'l4', role: 'Head of Department' } }
+          data: { workplace: { id: 'l4', role: 'Head of Department' }, released_organisation_ref: null }
         })
       )
       .mockResolvedValueOnce(
@@ -706,10 +709,14 @@ describe('renderPersonPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const patchCall = vi.mocked(fetch).mock.calls[1];
-    expect(String(patchCall[0])).toMatch(/action=change_role/);
-    expect(patchCall[1]?.method).toBe('PATCH');
-    expect(JSON.parse(String(patchCall[1]?.body)).role).toBe('Head of Department');
+    const writeCall = vi.mocked(fetch).mock.calls[1];
+    expect(String(writeCall[0])).toMatch(/\/api\/people\/workplace$/);
+    expect(writeCall[1]?.method).toBe('POST');
+    expect(JSON.parse(String(writeCall[1]?.body))).toEqual({
+      person_ref: `shared:person:${PERSON_ID}`,
+      organisation_ref: `shared:organisation:${ORG_ID}`,
+      job_title: 'Head of Department'
+    });
 
     expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Head of Department');
   });
@@ -804,7 +811,7 @@ describe('renderOrganisationPage', () => {
     expect(canvas.querySelector('.orgs-page__title')?.textContent).toBe('Example University');
     expect(canvas.querySelector('.orgs-section--how')).not.toBeNull();
     expect(canvas.querySelector('.orgs-section--ann')).not.toBeNull();
-    expect(canvas.textContent).toMatch(/No structure yet/);
+    expect(canvas.textContent).toMatch(/No chart yet/);
     expect(canvas.querySelector('.orgs-section--time')).not.toBeNull();
   });
 });

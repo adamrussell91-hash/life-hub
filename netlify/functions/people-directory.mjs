@@ -25,9 +25,10 @@ export function createPeopleDirectoryHandler(deps = {}) {
           resolveEntity: deps.resolveEntity,
           createRepository: deps.createRepository,
           env,
-          fetchImpl: deps.fetchImpl
+          fetchImpl: deps.fetchImpl,
+          includeStudents: true
         });
-        const data = assemble(peopleWithRelationships, { now: nowValue });
+        const data = assemble(peopleWithRelationships, { now: nowValue, includeStudents: true });
         return withCors(okResponse(200, data), request, env);
       } catch (error) {
         const status = Number.isInteger(error?.status) ? error.status : 500;

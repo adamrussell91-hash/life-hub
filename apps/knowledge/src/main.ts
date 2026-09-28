@@ -1,6 +1,7 @@
 import "./tokens.css";
 import "./style.css";
 import "./protocols/style.css";
+import "../design-kit/entity-links.css";
 import { startHubMotion } from "../design-kit/js/hub-motion.js";
 import { openHubCommandSearch } from "../design-kit/js/hub-command-search.js";
 import { autoUpdateHubFloating, positionHubFloating } from "../design-kit/js/hub-floating.js";
@@ -115,6 +116,7 @@ import {
 import { LIVE_UNAVAILABLE, LIVE_WORKOUT_TOKEN } from "./wiki/liveTokens";
 import { decisionTraceHtml, type DecisionTrace } from "./wiki/decisionTraceHtml";
 import { inverseLinksHtml } from "./wiki/inverseLinksHtml";
+import { mountNoteTagger } from "./wiki/tagAnything";
 import { urlWatchHtml } from "./wiki/urlWatchHtml";
 import { addOrigin, isOriginKind, originKey, removeOrigin } from "./origin/normalize";
 import { resolvedOrigins } from "./origin/notesPlace";
@@ -1425,12 +1427,15 @@ function renderPage(page: LivePage) {
         relationships: page.relationships ?? null,
         relationshipsStatus: page.relationships_status ?? null,
       })}
+      <div class="reader__tags" data-note-tags></div>
       ${inverseLinksHtml(page.inverse_links, page.inverse_links_status)}
       ${urlWatchHtml(page.url_watches, page.url_watches_status)}
       ${renderAttachments(page)}
     </article>
   `);
 
+  const noteTagsHost = app.querySelector<HTMLElement>("[data-note-tags]");
+  if (noteTagsHost && !USE_LOCAL_DATA) mountNoteTagger(noteTagsHost, page.id);
   app.querySelectorAll<HTMLButtonElement>("[data-page-rate]").forEach(button => {
     button.onclick = () => void rateActivePage(Number(button.dataset.pageRate) as QuizRating);
   });

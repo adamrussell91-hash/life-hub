@@ -5013,3 +5013,8 @@ body.is-stars-fullscreen .stars-sky-wrap {
   height: 100vh;
   border-radius: 0;
 }
+
+/* Tag-anything on a note (shared design-kit entity tagger). */
+.reader__tags {
+  margin-top: var(--space-4, 1.5rem);
+}

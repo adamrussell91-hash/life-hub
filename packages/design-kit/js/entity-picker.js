@@ -24,8 +24,13 @@ const DEFAULT_DEBOUNCE_MS = 200;
  *   onSelect: (item: EntitySuggestion) => void,
  *   onCreate?: (query: string, kind: string) => void,
  *   emptyText?: string,
- *   debounceMs?: number
+ *   debounceMs?: number,
+ *   mode?: 'mention' | 'field'
  * }} options
+ *
+ * `mode: 'mention'` (default) opens on `@` inside free text. `mode: 'field'`
+ * is for a dedicated field (e.g. "Organisation"): the whole value is the
+ * query, spaces included, no `@` needed.
  */
 export function createEntityPicker(options) {
   const input = options.input;
@@ -36,6 +41,7 @@ export function createEntityPicker(options) {
   const allowedKinds = options.allowedKinds ? [...options.allowedKinds] : null;
   const emptyText = options.emptyText ?? 'No matching entities.';
   const debounceMs = Math.min(250, Math.max(150, options.debounceMs ?? DEFAULT_DEBOUNCE_MS));
+  const fieldMode = options.mode === 'field';
 
   const root = document.createElement('div');
   root.className = 'entity-picker';
@@ -204,8 +210,10 @@ export function createEntityPicker(options) {
     const item = flatItems[index];
     if (!item) return;
     onSelect(item);
-    // Strip the active @mention token from the input value when present.
-    if (mentionStart >= 0 && 'value' in input) {
+    if (fieldMode && 'value' in input) {
+      input.value = '';
+    } else if (mentionStart >= 0 && 'value' in input) {
+      // Strip the active @mention token from the input value when present.
       const before = input.value.slice(0, mentionStart);
       const after = input.value.slice(mentionStart + 1 + mentionQuery.length);
       input.value = `${before}${after}`.replace(/\s{2,}/g, ' ').trimStart();
@@ -244,6 +252,11 @@ export function createEntityPicker(options) {
   }
 
   function readMention() {
+    if (fieldMode) {
+      // A leading `@` (old habit) is ignored, not searched for.
+      const query = 'value' in input ? input.value.trim().replace(/^@+/, '').trim() : '';
+      return query ? { start: -1, query } : null;
+    }
     if (!('value' in input) || typeof input.selectionStart !== 'number') {
       return null;
     }

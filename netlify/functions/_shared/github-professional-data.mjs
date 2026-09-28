@@ -39,6 +39,9 @@ export const PROFESSIONAL_DATA_TOKEN_ENV = 'GITHUB_TOKEN';
 export const DEFAULT_PROFESSIONAL_DATA_REPO = 'adamrussell91-hash/life-hub-data';
 
 /** Notion Communications-database student rows co-imported into people.json. */
+/** Marks the in-memory links built from the GitHub professional import. */
+export const IMPORT_SOURCE = 'professional_data';
+
 export const STUDENT_ORIGINAL_CATEGORY = 'Student (Communications database)';
 
 /** True for imported student contacts — not Professional Network adults. */
@@ -326,6 +329,7 @@ function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegac
         status: row.valid_to ? 'ended' : 'current',
         visibility: 'operator',
         metadata: {},
+        import_source: IMPORT_SOURCE,
         created_at: LEGACY_IMPORT_TIMESTAMP,
         updated_at: LEGACY_IMPORT_TIMESTAMP
       };
@@ -357,6 +361,10 @@ function normalizeRelationships(rows, peopleIdByLegacyId, organisationsIdByLegac
       status: row.valid_to ? 'ended' : 'current',
       visibility: 'operator',
       metadata: {},
+      // Read-only, in-memory import. A native link for the same pair
+      // supersedes it (person-workplace.mjs) — that is how an imported
+      // job title or workplace becomes editable.
+      import_source: IMPORT_SOURCE,
       created_at: LEGACY_IMPORT_TIMESTAMP,
       updated_at: LEGACY_IMPORT_TIMESTAMP
     };

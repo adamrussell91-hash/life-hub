@@ -249,3 +249,47 @@ test('a redacted Person overview omits imported professional profile material', 
   assert.equal(overview.entity.display_name, 'Removed record');
   assert.equal('professional_profile' in overview.entity, false);
 });
+
+test('linked_records buckets every linked kind — notes, projects, teaching and other are never dropped', async () => {
+  const store = emptyStore();
+  const fetchImpl = githubFetch({ people: PEOPLE, organisations: ORGANISATIONS, relationships: [] });
+  const personId = derivePersonId('leg-person-1');
+  const personRef = `shared:person:${personId}`;
+  const incoming = [
+    ['knowledge:page:note-1', 'page', 'Coaching notes'],
+    ['tasks:project:project-1', 'project', 'Literacy push'],
+    ['tasks:goal:goal-1', 'goal', 'Lead a faculty'],
+    ['teaching:lesson:lesson-1', 'lesson', 'Poetry 3'],
+    ['teaching:unit:unit-1', 'unit', 'Year 9 poetry'],
+    ['life:decision:decision-1', 'decision', 'Take the role'],
+    ['tasks:task:task-1', 'task', 'Send reference']
+  ].map(([ref, kind, label], index) => ({
+    link: {
+      id: `link-${index}`,
+      source_ref: ref,
+      target_ref: personRef,
+      relationship_type: 'tagged_with',
+      status: 'current',
+      temporal_mode: 'timeless',
+      created_at: '2026-09-01T00:00:00.000Z'
+    },
+    endpoint: { ref, kind, display_label: label, supporting_label: null, href: null }
+  }));
+
+  const overview = await assembleEntityOverview(personRef, {
+    store,
+    env: GITHUB_ENV,
+    fetchImpl,
+    resolveEntity: makeResolveEntity(store, fetchImpl),
+    createRepository: () => ({
+      listForEntity: async () => ({ outgoing: [], incoming })
+    })
+  });
+
+  const labels = (bucket) => overview.linked_records[bucket].map((item) => item.display_label);
+  assert.deepEqual(labels('notes'), ['Coaching notes']);
+  assert.deepEqual(labels('projects'), ['Literacy push', 'Lead a faculty']);
+  assert.deepEqual(labels('teaching'), ['Poetry 3', 'Year 9 poetry']);
+  assert.deepEqual(labels('other'), ['Take the role']);
+  assert.deepEqual(labels('tasks'), ['Send reference']);
+});

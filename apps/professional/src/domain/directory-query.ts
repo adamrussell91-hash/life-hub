@@ -15,8 +15,17 @@ export type DirectoryGroup = 'organisation' | 'relationship' | 'none';
 
 export type WarmthFilter = 'all' | 'warm' | 'cooling' | 'cold';
 export type OrgScopeFilter = 'all' | 'current' | 'former';
+/** Colleagues and students are separate types of person (never mixed by default). */
+export type DirectoryWho = 'colleagues' | 'students' | 'everyone';
+
+export const WHO_LABELS: Record<DirectoryWho, string> = {
+  colleagues: 'Colleagues',
+  students: 'Students',
+  everyone: 'Everyone'
+};
 
 export interface DirectoryQueryState {
+  who: DirectoryWho;
   sort: DirectorySort;
   group: DirectoryGroup;
   role: string | null;
@@ -57,6 +66,7 @@ const GROUPS = new Set<DirectoryGroup>(['organisation', 'relationship', 'none'])
 
 export function defaultDirectoryQuery(): DirectoryQueryState {
   return {
+    who: 'colleagues',
     sort: 'needs_attention',
     group: 'organisation',
     role: null,
@@ -74,7 +84,9 @@ export function parseDirectoryQuery(search: string): DirectoryQueryState {
   const groupRaw = params.get('group') ?? 'organisation';
   const warmthRaw = params.get('warmth') ?? 'all';
   const orgScopeRaw = params.get('orgScope') ?? 'all';
+  const whoRaw = params.get('who') ?? 'colleagues';
   return {
+    who: whoRaw === 'students' || whoRaw === 'everyone' ? whoRaw : 'colleagues',
     sort: SORTS.has(sortRaw as DirectorySort) ? (sortRaw as DirectorySort) : 'needs_attention',
     group: GROUPS.has(groupRaw as DirectoryGroup) ? (groupRaw as DirectoryGroup) : 'organisation',
     role: params.get('role'),
@@ -94,6 +106,7 @@ export function parseDirectoryQuery(search: string): DirectoryQueryState {
 
 export function serializeDirectoryQuery(state: DirectoryQueryState): string {
   const params = new URLSearchParams();
+  if (state.who !== 'colleagues') params.set('who', state.who);
   if (state.sort !== 'needs_attention') params.set('sort', state.sort);
   if (state.group !== 'organisation') params.set('group', state.group);
   if (state.role) params.set('role', state.role);

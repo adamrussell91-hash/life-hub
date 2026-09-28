@@ -73,6 +73,8 @@ function buildSingleEntityField(options: {
 
   const picker = createEntityPicker({
     input,
+    // A dedicated field: type the name (spaces and all), no `@` needed.
+    mode: 'field',
     allowedKinds: [options.kind],
     emptyText: options.emptyText,
     search: async (query, signal) => {
@@ -157,7 +159,7 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
 
   const orgField = buildSingleEntityField({
     kind: 'organisation',
-    placeholder: 'Type @ to search or create an organisation',
+    placeholder: 'Start typing an organisation…',
     emptyText: 'No matching organisations.',
     ariaLabel: 'Organisation, when known',
     onError: showError
@@ -165,7 +167,7 @@ export function mountAddPersonForm(host: HTMLElement, options: AddPersonFormOpti
 
   const introducerField = buildSingleEntityField({
     kind: 'person',
-    placeholder: 'Type @ to search or create a person',
+    placeholder: 'Start typing a name…',
     emptyText: 'No matching people.',
     ariaLabel: 'Who introduced you',
     onError: showError

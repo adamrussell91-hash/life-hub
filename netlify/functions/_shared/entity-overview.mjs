@@ -15,6 +15,7 @@ import { getGithubOrganisation, getGithubPerson, listGithubRelationshipEntries }
 import { findActiveSelfPerson } from './career-overview.mjs';
 import { cleanIdentityDisplayName } from './identity-display-name.mjs';
 import { parseProfessionalProfile } from './professional-profile.mjs';
+import { withoutSupersededImports } from './person-workplace.mjs';
 
 const SUPPORTED_KINDS = new Set(['person', 'organisation']);
 
@@ -242,7 +243,14 @@ function baseTimelineEntry({ link, endpoint, direction }) {
   };
 }
 
-function bucketFor(linkedRecords, kind) {
+// Every linked kind lands in a bucket — a tag from a Knowledge note, a
+// project, a lesson, or anything else registered must never be silently
+// dropped from the profile just because it has no dedicated bucket.
+// `endpoint.kind` alone is ambiguous (`unit` is both an org unit and a
+// teaching unit), so the namespace comes from the endpoint ref.
+function bucketFor(linkedRecords, endpoint) {
+  const kind = endpoint?.kind;
+  const namespace = typeof endpoint?.ref === 'string' ? endpoint.ref.split(':')[0] : '';
   if (kind === 'task') return linkedRecords.tasks;
   if (kind === 'communication') return linkedRecords.communications;
   if (kind === 'meeting') return linkedRecords.meetings;
@@ -250,7 +258,10 @@ function bucketFor(linkedRecords, kind) {
   if (kind === 'application') return linkedRecords.applications;
   if (kind === 'organisation') return linkedRecords.organisations;
   if (kind === 'person') return linkedRecords.people;
-  return null;
+  if (kind === 'page') return linkedRecords.notes;
+  if (kind === 'project' || kind === 'program' || kind === 'goal') return linkedRecords.projects;
+  if (namespace === 'teaching') return linkedRecords.teaching;
+  return linkedRecords.other;
 }
 
 /**
@@ -289,11 +300,13 @@ export async function assembleEntityOverview(refInput, deps = {}) {
 
   const githubEntries = await loadGithubRelationshipEntries(ref, accessContext, resolveEntity, github);
 
-  const entries = [
+  // A native workplace link (e.g. an edited job title) supersedes the
+  // read-only imported one for the same person + organisation.
+  const entries = withoutSupersededImports([
     ...outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
     ...incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
     ...githubEntries
-  ];
+  ]);
 
   // `metadata` (registry-declared, relationship-type-specific data — e.g.
   // `professional_relationship`'s `human_label`, Feature 1.3) already lives
@@ -340,11 +353,15 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     events: [],
     applications: [],
     organisations: [],
-    people: []
+    people: [],
+    notes: [],
+    projects: [],
+    teaching: [],
+    other: []
   };
   const seen = new Set();
   for (const entry of entries) {
-    const bucket = bucketFor(linked_records, entry.endpoint.kind);
+    const bucket = bucketFor(linked_records, entry.endpoint);
     if (!bucket) continue;
     if (seen.has(entry.endpoint.ref)) continue;
     seen.add(entry.endpoint.ref);
@@ -363,11 +380,11 @@ export async function assembleEntityOverview(refInput, deps = {}) {
         resolveEntity,
         github
       );
-      const selfCurrent = [
+      const selfCurrent = withoutSupersededImports([
         ...selfListed.outgoing.map((entry) => ({ ...entry, direction: 'outgoing' })),
         ...selfListed.incoming.map((entry) => ({ ...entry, direction: 'incoming' })),
         ...selfGithub
-      ];
+      ]);
       const subjectOrgs = new Set(currentOrganisationContexts(current_relationships).map((org) => org.ref));
       shared_contexts_with_self = currentOrganisationContexts(selfCurrent).filter((org) => subjectOrgs.has(org.ref));
     }
