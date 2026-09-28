@@ -524,13 +524,27 @@ describe("End session in the reply form", () => {
     expect(html).not.toContain('value="cancel" type="submit"');
   });
 
-  it("drops the reply box after cancel even if a checkpoint is still attached", () => {
-    const html = sessionView(session({ status: "cancelled", allowedActions: [] }), definition);
-    expect(html).toContain("Session ended");
-    expect(html).toContain("What is prompting this now?");
+  it("ends the run and removes the unanswered question", () => {
+    const html = sessionView(session({
+      status: "cancelled",
+      allowedActions: [],
+      checkpoint: { kind: "confirm", question: "Shall I proceed?" },
+      transcript: [{
+        id: "t1",
+        role: "controller",
+        speaker: "controller",
+        stage: "thesis",
+        text: "The thesis as given: homework should be banned in every school because students dislike it. That's a raw claim rather than a complete draft, and it currently rests on a single warrant (dislike) that will need scrutiny. Before I hand this to Builder, can you confirm the thesis and framing as stated, or correct anything?\n\nShall I proceed with the thesis exactly as stated, or would you like to adjust the claim or the audience first?"
+      }]
+    }), definition);
+    expect(html).toContain("Session ended.");
+    expect(html).toContain("will need scrutiny.");
+    expect(html).not.toContain("can you confirm");
+    expect(html).not.toContain("Shall I proceed");
+    expect(html).not.toContain("?");
     expect(html).not.toContain("<textarea");
     expect(html).not.toContain(">Continue<");
-    expect(html).not.toContain('data-protocol-reply');
+    expect(html).not.toContain("data-protocol-reply");
   });
 });
 
