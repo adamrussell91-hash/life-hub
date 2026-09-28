@@ -349,9 +349,11 @@ function intake(definition: Definition, gateMessage = "") {
   return `<section class="protocol-intake" style="--protocol-background:url('${backgroundAsset(definition.id)}')"><div class="protocol-intake__content"><button class="btn btn--ghost" type="button" data-protocol-close>← Thinking</button><p class="page-header__eyebrow">${escapeHtml(definition.motif)}</p><h1>${escapeHtml(definition.name)}</h1><p>${escapeHtml(definition.description)}</p><form data-protocol-form><label>Run mode<select name="mode">${definition.modes.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === definition.defaultMode ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("")}</select></label><p class="compose__hint" data-protocol-mode-hint ${hint ? "" : "hidden"}>${escapeHtml(hint)}</p><label>What would you like to examine?<textarea name="prompt" required placeholder="Write the situation, question or claim in your own words."></textarea></label>${freq}<button class="btn btn--primary" type="submit">Begin ${escapeHtml(definition.name)}</button></form>${error}<p class="protocol-intake__note">One clear brief is enough. The protocol will ask for detail only when it needs it.</p></div></section>`;
 }
 
-function compactIntake(definition: Definition, prompt: string, extra: Record<string, string> = {}) {
+export function compactIntake(definition: Pick<Definition, "id">, prompt: string, extra: Record<string, string> = {}, mode = "") {
   const required: Record<string, string[]> = { fates: ["task"], horizon: ["focus"], refinery: ["claim", "context", "audience"], cartographers: ["topic", "purpose"], mirror: ["conflict"], consilium: ["dilemma", "parties", "constraints"], witness: ["instance"], tribunal: ["problem", "entrenchment", "framing"] };
-  return Object.fromEntries([...(required[definition.id] ?? []), "userContext"].map(key => [key, prompt]).concat(Object.entries(extra).filter(([, v]) => v.trim())));
+  // Direct and interrogation Cartographers read supplied papers only, so the single brief is also the source text.
+  const sourced = definition.id === "cartographers" && (mode === "direct" || mode === "interrogation") ? ["sources"] : [];
+  return Object.fromEntries([...(required[definition.id] ?? []), ...sourced, "userContext"].map(key => [key, prompt]).concat(Object.entries(extra).filter(([, v]) => v.trim())));
 }
 
 export const PROTOCOL_POLL_MS = 400;
@@ -781,7 +783,7 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
       viewingIndex = null;
       paint();
       try {
-        const intakePayload = compactIntake(selected, prompt, justification ? { frequencyJustification: justification } : {});
+        const intakePayload = compactIntake(selected, prompt, justification ? { frequencyJustification: justification } : {}, lastMode);
         await postAction({ protocolId: selected.id, mode: data.get("mode"), intake: intakePayload, requestId: crypto.randomUUID() });
         frequencyGate = null;
       } catch (reason) {
