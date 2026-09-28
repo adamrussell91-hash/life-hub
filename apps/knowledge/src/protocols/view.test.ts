@@ -517,6 +517,14 @@ describe("protocol sources", () => {
   });
 });
 
+describe("End session in the reply form", () => {
+  it("renders as a plain cancel button beside Continue, never a submit", () => {
+    const html = sessionView(session(), definition);
+    expect(html).toContain('data-protocol-action="cancel" type="button">End session');
+    expect(html).not.toContain('value="cancel" type="submit"');
+  });
+});
+
 describe("compactIntake", () => {
   it("fills Cartographers source text from the brief only in supplied-paper modes", () => {
     expect(compactIntake({ id: "cartographers" }, "Paper A says X", {}, "interrogation").sources).toBe("Paper A says X");
