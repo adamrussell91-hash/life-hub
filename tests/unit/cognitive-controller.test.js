@@ -472,6 +472,17 @@ test('cancel applies even with a stale revision',()=>{
   assert.equal(c.status,'cancelled');
   assert.throws(()=>act(s,{action:'answer',text:'x',revision:2,requestId:randomUUID()}),/Session changed/);
 });
+test('cancel clears the checkpoint so the reply cannot continue the run',async()=>{
+  let s=start('refinery','full');
+  s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Thesis: homework should be banned.',question:'Is that the thesis?',done:true,evidenceIds:[]})});
+  assert.equal(s.status,'waiting');
+  assert.ok(s.checkpoint);
+  const c=act(s,{action:'cancel',revision:s.revision,requestId:randomUUID()});
+  assert.equal(c.status,'cancelled');
+  assert.equal(c.checkpoint,null);
+  assert.deepEqual(c.allowedActions,[]);
+  assert.throws(()=>act(c,{action:'confirm',revision:c.revision,requestId:randomUUID()}),/not allowed/);
+});
 test('third live run: Fates briefing may skip questions, interrogation passes are single-shot, search is capped',async()=>{
   const f=start('fates','sprint');
   assert.equal(f.steps.filter(st=>st.stage==='briefing').length,1);assert.equal(f.steps[0].gate,null);

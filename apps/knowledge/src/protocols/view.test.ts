@@ -523,6 +523,15 @@ describe("End session in the reply form", () => {
     expect(html).toContain('data-protocol-action="cancel" type="button">End session');
     expect(html).not.toContain('value="cancel" type="submit"');
   });
+
+  it("drops the reply box after cancel even if a checkpoint is still attached", () => {
+    const html = sessionView(session({ status: "cancelled", allowedActions: [] }), definition);
+    expect(html).toContain("Session ended");
+    expect(html).toContain("What is prompting this now?");
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain(">Continue<");
+    expect(html).not.toContain('data-protocol-reply');
+  });
 });
 
 describe("compactIntake", () => {
