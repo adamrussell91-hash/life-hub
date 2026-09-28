@@ -260,10 +260,10 @@ export function buildPrompt(s,currentStep){
  const continuation=burst>1?`Continuation burst ${burst} of ${maxBursts}. The user answered your previous question. Continue from that answer. Do not repeat prior analysis. Keep the same assigned voice register as the first burst.`:`Burst ${burst} of ${maxBursts}. Default length about ${budget} words.`;
  const closeRule=finalBurst&&!gate?'This is your final burst for this step. Close without asking a question.':'';
  const questionRule=gate?`This is a ${gate} checkpoint. Return one targeted question and STOP. Set done true.`:`One question per burst maximum. If you ask a question and will continue later, set done false. If this contribution is complete, set done true. ${closeRule}`;
- // Direct and interrogation Cartographers use supplied papers only: no search tool.
- const midSearch=(s.protocolId==='cartographers'&&!['direct','interrogation'].includes(s.mode)&&['surveyor','miner','cartographer'].includes(speaker))||(s.protocolId==='refinery'&&speaker==='builder');
+ // No live search inside a voice turn: each re-ask repeated the search and stalled Refinery for minutes.
+ // Web findings arrive once, at retrieval, as knownContext.
  const register=speakerRegister(s,speaker,stage,{finalBurst});
- const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling. No desired future was given in this run: never call anything "the stated future", even if the brief or knownContext hints at ambitions.':'',s.protocolId==='mirror'&&s.mode==='deep'&&speaker!=='controller'?'Deep mode: give each claim a confidence (high, moderate or low) inside the sentence.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':'',midSearch?'You may use one web_search this burst for topic terms only. Never search personal details.':''].filter(Boolean).join('\n');
+ const instructions=[`Assigned speaker: ${speaker}. Assigned stage: ${stage}. Mode: ${s.mode}. Maximum ${budget} words including question.`,continuation,questionRule,'Speak in conversation. Never mention Knowledge Hub notes, retrieval, evidence status, self-report, or a missing archive. If knownContext is relevant, use it as something you already know.',register,s.protocolId==='fates'&&!COMPILE.has(stage)?'A prior confirmed plan supplies fixed creative/critical roles. At most 250 words across this stop.':'',s.protocolId==='fates'&&stage==='weave'&&s.filterCaution?`Hold with caution from the filter: ${s.filterCaution}`:'',s.protocolId==='consilium'&&stage==='dialogue'?`${s.dialogueCounts[speaker]?'Already spoke: no repeated signature opening.':'First contribution: use your signature opening.'} ${!s.answered[speaker]&&(s.dialogueCounts[speaker]||0)>=1?'User has not yet responded to you. Ask one meaningful decision/fact question now.':''}`:'',s.protocolId==='horizon'&&speaker==='alvar'&&s.intake.desiredFuture?'A desired future was supplied. Work backwards from it. Do not use the extrapolation fallback.':'',s.protocolId==='horizon'&&speaker==='alvar'&&!s.intake.desiredFuture?'Fallback required: extrapolated from current trajectory, not from a stated goal. Moderate-to-low confidence ceiling. No desired future was given in this run: never call anything "the stated future", even if the brief or knownContext hints at ambitions.':'',s.protocolId==='mirror'&&s.mode==='deep'&&speaker!=='controller'?'Deep mode: give each claim a confidence (high, moderate or low) inside the sentence.':'',s.protocolId==='witness'&&speaker==='patterns'?`Trace verification: ${s.verification}. Sound thinking is the null hypothesis. Uncertain verification lowers confidence.`:'',s.protocolId==='fates'&&stage==='filter'?'Name actual fallacies only. Set nextSpeaker to atropos for unsupported claims or clotho for narrowed options when a reopen may help. Ask whether to hold with caution, reopen, or close.':''].filter(Boolean).join('\n');
  const originalInput=isolated||s.protocolId==='tribunal'?{...s.intake}:s.intake;
  const lastReviewDate=s.lastReviewDate||s.intake?.lastReviewDate;
  const frequencyJustification=s.intake?.frequencyJustification;
@@ -271,7 +271,7 @@ export function buildPrompt(s,currentStep){
   ...(lastReviewDate?{lastReviewDate}:{}),
   ...(frequencyJustification?{frequencyJustification}:{})
  }:null;
- return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,finalBurst,tools:midSearch?[{type:'web_search_20250305',name:'web_search',max_uses:1}]:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
+ return {speaker,stage,gate,wordBudget:budget,burst,maxBursts,finalBurst,tools:undefined,system:[shared,protocol,instructions].join('\n\n'),user:JSON.stringify({originalInput,mode:s.mode,...(cadence?{cadence}:{}),...(knownContext.length?{knownContext}:{}),...(!isolated?{conversation:previous,verification:s.verification??null}:{})})};
 }
 // Voices are prompted for JSON; the provider adapter streams that payload as text.
 // Models often put literal newlines inside strings, which JSON.parse rejects.
@@ -382,6 +382,12 @@ function validateOutput(raw,s,p,{allowTrim=false}={}){
  const done=raw.done===false?false:true;
  return {...raw,text,question,done,trimmed,evidenceIds:ids,nextSpeaker:raw.nextSpeaker};
 }
+function dropTrailingQuestion(text){
+ const m=text.match(/(?:^|[\n.!])\s*[^\n.!?][^?\n.!]*\?\s*$/u);
+ if(!m)return text;
+ const kept=text.slice(0,m.index+(/^[.!]/.test(m[0])?1:0)).trim();
+ return kept||text;
+}
 const HORIZON_ADVICE=/(?:^|[.!?]\s+)(?:Push|Take|Ask for|Go for|Choose|Consider|Apply for|Pursue|Seek|Start|Stop|Make sure)\b|\byou (?:should|must|need to|ought to)\b/i;
 // Loose on purpose: "Duty and rights here still require…" is the same opener.
 const CONSILIUM_OPENERS={principle:/^\s*Duty and rights here\b/i,consequence:/^\s*The best outcome for all\b/i,virtue:/^\s*This choice shapes you\b/i};
@@ -454,6 +460,8 @@ export async function advance(current,{model,retrieve,onProgress=async()=>{},one
   const done=(result.done!==false&&!result.needsInput)||(!question&&!st.gate);
   let mayContinue=(!hardGate&&question&&!done&&!p.finalBurst)||traceNeedsInput;
   let output=result.text;if(question&&!output.includes(question))output+=`\n\n${question}`;
+  // No checkpoint means no reply box: a closing question in the text would dangle unanswerable.
+  if(!question&&!result.outOfScope)output=dropTrailingQuestion(output);
   if(s.protocolId==='tribunal'&&st.stage==='convergence'&&!output.includes(TRIBUNAL_CLOSE))output+=`\n\n${TRIBUNAL_CLOSE}`;
   add(s,st.speaker==='controller'?'controller':'voice',st.speaker,st.stage,output,result.evidenceIds,{trimmed:result.trimmed||undefined,done,nextSpeaker:result.nextSpeaker});
   s.revision++;
