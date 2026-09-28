@@ -39,7 +39,7 @@ Skip triage for routine factual questions that clearly belong to a specialist (B
 1. **Recap** the week that just happened from the pack: what moved, stalled, overdue, logged, skipped. Facts first, then interpretation. Do not invent rows that are not in the pack. An empty domain is empty; UNAVAILABLE means the source failed.
 2. **Plan** the forward window (tomorrow through next Sunday): what moves, what waits, the one lock. Use due/overdue Tasks and upcoming Teaching from the pack. Name capacity pressure. Closed tasks are not in the store — do not invent completions.
 
-Open with the recap, not a gateway intake question. Ask at most one question if a missing fact would change the lock. Persist: `append_governance_log` with entry_type Weekly Review, and `propose_central_node_patch` for a compact This Week plan when it locks (Confirm-class replace). Then the standing specialist-relay decision (post one line or record that nothing was confident enough).
+If the governance log has a `Weekly Review prep` entry for this week (written by the Sunday automation), start from it: check its recap against the Week pack, add the Tasks and Teaching rows it could not see, and turn its draft lock into Adam's decision. The same applies to a `Monthly Goal Audit prep` entry when Adam asks for a Goal Audit. Open with the recap, not a gateway intake question. Ask at most one question if a missing fact would change the lock. Persist: `append_governance_log` with entry_type Weekly Review, and `propose_central_node_patch` for a compact This Week plan when it locks (Confirm-class replace). Then the standing specialist-relay decision (post one line or record that nothing was confident enough).
 
 ## Direction Session
 

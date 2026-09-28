@@ -343,3 +343,34 @@ test('excludes GitHub Communications students and Blob name-twins from People co
     1
   );
 });
+
+test('a GitHub person adopted into Blobs keeps its imported relationships', async () => {
+  resetProfessionalDataCache();
+  const store = memoryStore();
+  const env = { GITHUB_TOKEN: 'token' };
+  const fetchImpl = githubFetch({
+    people: [{ legacy_id: 'leg-colleague', display_name: 'Natalie Shih' }],
+    organisations: [{ legacy_id: 'leg-org-1', display_name: 'St. Aloysius College' }],
+    relationships: [{
+      person_legacy_id: 'leg-colleague',
+      organisation_legacy_id: 'leg-org-1',
+      relationship_type: 'employee_at',
+      role: null,
+      valid_from: null,
+      valid_to: null
+    }]
+  });
+  const resolveEntity = makeGithubResolveEntity(store, env, fetchImpl);
+  const { createIdentityRepository } = await import('../../netlify/functions/_shared/identity-repository.mjs');
+  const { getGithubPerson } = await import('../../netlify/functions/_shared/github-professional-data.mjs');
+  const id = derivePersonId('leg-colleague');
+  const repo = createIdentityRepository({ store });
+  await repo.adoptImportedIdentity({ kind: 'person', record: await getGithubPerson(id, { env, fetchImpl }) });
+  await repo.updateFields({ ref: { namespace: 'shared', kind: 'person', id }, patch: { display_name: 'Natalie Shih-Lee' } });
+
+  const result = await loadAllPeopleWithRelationships({ store, resolveEntity, env, fetchImpl });
+  assert.equal(result.length, 1, 'the adopted record replaces the GitHub row, no twin');
+  assert.equal(result[0].person.display_name, 'Natalie Shih-Lee');
+  assert.equal(result[0].relationships.length, 1, 'the imported employee_at link is still there');
+  assert.equal(result[0].relationships[0].endpoint.display_label, 'St. Aloysius College');
+});

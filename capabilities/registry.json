@@ -594,6 +594,33 @@
         "governance_log"
       ],
       "tool_name": "reconcile_clare_schedule"
+    },
+    "people.search": {
+      "file": "people/search.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "auto",
+      "surfaces": [
+        "chat"
+      ],
+      "tool_name": "search_people"
+    },
+    "people.propose-changes": {
+      "file": "people/propose-changes.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_people_changes"
     }
   }
 }

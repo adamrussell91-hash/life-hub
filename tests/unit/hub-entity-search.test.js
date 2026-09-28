@@ -68,3 +68,13 @@ test('substring still works for exact needles', () => {
   const hits = filterCommandGroups(groups, 'working mem');
   assert.ok(hits.some((g) => g.items.some((i) => i.id === 'mem')));
 });
+
+test('mergeNativeFirst drops a GitHub row whose ref an adopted Blob record already returned', async () => {
+  const { mergeNativeFirst } = await import('../../netlify/functions/entity-search.mjs');
+  const native = [{ ref: 'shared:person:person_a', display_label: 'Pat Edited' }];
+  const imported = [
+    { ref: 'shared:person:person_a', display_label: 'Pat Imported' },
+    { ref: 'shared:person:person_b', display_label: 'Other' }
+  ];
+  assert.deepEqual(mergeNativeFirst(native, imported).map(entry => entry.display_label), ['Pat Edited', 'Other']);
+});

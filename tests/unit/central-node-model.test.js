@@ -377,3 +377,16 @@ test('buildCentralNodeModel carries pending patches through to the board', () =>
   assert.equal(model.pendingPatches.length, 1);
   assert.equal(model.pendingPatches[0].summary, 'Roll month');
 });
+
+test('buildPendingPatchCards names each automation that can queue a patch', () => {
+  const card = slug => buildPendingPatchCards([{
+    id: `cnp_${slug}`,
+    createdAt: '2026-09-28',
+    slug,
+    patch: { section: 'constraints', op: 'replace_section', payload: { summary: 's', text: 't' } }
+  }])[0].proposer;
+  assert.equal(card('hammond-sweep'), "Hammond's daily sweep");
+  assert.equal(card('hammond-weekly'), "Hammond's weekly prep");
+  assert.equal(card('hammond-monthly'), "Hammond's monthly audit prep");
+  assert.equal(card('sara-scan'), "Sara's weekly health scan");
+});
