@@ -147,7 +147,7 @@ test('JSON voice output supplies the checkpoint question instead of failing the 
     assert.match(s.transcript.at(-1).text,/two live tensions/);
     assert.equal(s.transcript.at(-1).text.includes('{"text"'),false);
   }
-  let s=start('fates','sprint');
+  let s=start('refinery','full');
   {const calls=[];const g=await advance(s,{model:async p=>{calls.push(p);return {text:JSON.stringify({text:'Only analysis.',question:null,evidenceIds:[]}),evidenceIds:[]};},retrieve});
    assert.equal(g.status,'waiting');assert.ok(g.checkpoint.question,'gate falls back to a checkpoint question');
    assert.match(calls[1].system,/had no question/,'the voice is re-asked once first');}
@@ -471,4 +471,20 @@ test('cancel applies even with a stale revision',()=>{
   const c=act(s,{action:'cancel',revision:2,requestId:randomUUID()});
   assert.equal(c.status,'cancelled');
   assert.throws(()=>act(s,{action:'answer',text:'x',revision:2,requestId:randomUUID()}),/Session changed/);
+});
+test('third live run: Fates briefing may skip questions, interrogation passes are single-shot, search is capped',async()=>{
+  const f=start('fates','sprint');
+  assert.equal(f.steps.filter(st=>st.stage==='briefing').length,1);assert.equal(f.steps[0].gate,null);
+  let s=f;const calls=[];
+  s=await advance(s,{retrieve:async()=>({evidence:[],status:'none'}),oneStage:true,model:async p=>{calls.push(p);return {text:'The brief is complete.',question:null,done:true,evidenceIds:[]};}});
+  assert.equal(calls.length,1,'no forced re-ask when the brief is complete');assert.equal(s.steps[s.cursor].stage,'plan');
+  const c=start('cartographers','interrogation');
+  assert.ok(c.steps.filter(st=>!st.gate&&st.speaker!=='controller').every(st=>st.maxBursts===1));
+  assert.match(buildPrompt(c,c.steps[0]).system,/Ask nothing unless this is a checkpoint/);
+  const r=start('refinery','full');assert.equal(buildPrompt(r,r.steps.find(st=>st.speaker==='builder')).tools[0].max_uses,1);
+});
+test('a loosened Consilium opener still earns a re-ask',async()=>{
+  let c=start('consilium');c.cursor=1;c.status='queued';c.retrieved=true;c.dialogueCounts={principle:1};c.answered={principle:1};const cc=[];
+  c=await advance(c,{retrieve:async()=>({evidence:[],status:'none'}),oneStage:true,model:async p=>{cc.push(p);return {text:cc.length===1?'Duty and rights here still require correction.':'The list must be corrected.',question:'Who tells them?',done:true,evidenceIds:[]};}});
+  assert.equal(cc.length,2);
 });
