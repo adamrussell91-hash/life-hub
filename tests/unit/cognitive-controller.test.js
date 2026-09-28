@@ -441,3 +441,34 @@ test('a voice that names a scope mismatch holds for Adam; the model cannot end t
   s=await advance(s,{model:async p=>{calls.push(p);return {text:'Reframed.',question:'What else belongs on the record?',done:true,evidenceIds:[]};},retrieve});
   assert.equal(calls[1].stage,calls[0].stage,'the same step reruns with the clarification');
 });
+test('malformed voice JSON is salvaged into text instead of rendering raw JSON',async()=>{
+  let s=start('tribunal','standard',{priorAttempts:'Timed agenda'});const retrieve=async()=>({evidence:[],status:'none'});
+  s=await advance(s,{retrieve,model:async p=>p.stage==='convergence'?{text:'{"text":"All three frames point at the chair.\\nNone ranks.","question":null,"evidenceIds":[] trailing junk',evidenceIds:[]}:{text:'A reframe.',question:null,done:true,evidenceIds:[]}});
+  const last=s.transcript.at(-1).text;
+  assert.ok(!last.includes('"text"'),last);assert.match(last,/All three frames point at the chair/);
+});
+test('Horizon advice and a repeated Consilium opener each earn one re-ask',async()=>{
+  const retrieve=async()=>({evidence:[],status:'none'});
+  let h=start('horizon');const hc=[];
+  h=await advance(h,{retrieve,oneStage:true,model:async p=>{hc.push(p);return {text:hc.length===1?'Push for the next rung now.':'The next rung opens a door and closes your evenings.',question:null,done:true,evidenceIds:[]};}});
+  assert.equal(hc.length,2);assert.match(hc[1].system,/told Adam what to do/);assert.doesNotMatch(h.transcript.at(-1).text,/Push for/);
+  let c=start('consilium');c.cursor=1;c.status='queued';c.retrieved=true;c.dialogueCounts={principle:1};c.answered={principle:1};
+  const cc=[];
+  c=await advance(c,{retrieve,oneStage:true,model:async p=>{cc.push(p);return {text:cc.length===1?'Duty and rights here require candour again.':'The committee is owed the corrected list.',question:'Who tells the student?',done:true,evidenceIds:[]};}});
+  assert.equal(cc.length,2);assert.match(cc[1].system,/signature opening/);
+});
+test('Witness trace asks for a missing sequence before verifying',async()=>{
+  let s=start('witness');const retrieve=async()=>({evidence:[],status:'none'});const calls=[];
+  const m=async p=>{calls.push(p);return calls.length===1?{text:'There is no sequence here to reconstruct yet.',question:'What did you do first, and then?',needsInput:true,done:true,evidenceIds:[]}:{text:'Attention went first to price.',question:null,done:true,evidenceIds:[]};};
+  s=await advance(s,{retrieve,model:m});
+  assert.equal(s.checkpoint.kind,'answer');assert.match(s.checkpoint.question,/What did you do first/);
+  s=act(s,{action:'answer',text:'Opened both quotes, booked the cheaper',revision:s.revision,requestId:randomUUID()});
+  s=await advance(s,{retrieve,model:m});
+  assert.equal(s.stage,'trace');assert.equal(s.checkpoint.kind,'verify');
+});
+test('cancel applies even with a stale revision',()=>{
+  const s=start('mirror');s.revision=5;
+  const c=act(s,{action:'cancel',revision:2,requestId:randomUUID()});
+  assert.equal(c.status,'cancelled');
+  assert.throws(()=>act(s,{action:'answer',text:'x',revision:2,requestId:randomUUID()}),/Session changed/);
+});
