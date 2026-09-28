@@ -242,7 +242,14 @@ function baseTimelineEntry({ link, endpoint, direction }) {
   };
 }
 
-function bucketFor(linkedRecords, kind) {
+// Every linked kind lands in a bucket — a tag from a Knowledge note, a
+// project, a lesson, or anything else registered must never be silently
+// dropped from the profile just because it has no dedicated bucket.
+// `endpoint.kind` alone is ambiguous (`unit` is both an org unit and a
+// teaching unit), so the namespace comes from the endpoint ref.
+function bucketFor(linkedRecords, endpoint) {
+  const kind = endpoint?.kind;
+  const namespace = typeof endpoint?.ref === 'string' ? endpoint.ref.split(':')[0] : '';
   if (kind === 'task') return linkedRecords.tasks;
   if (kind === 'communication') return linkedRecords.communications;
   if (kind === 'meeting') return linkedRecords.meetings;
@@ -250,7 +257,10 @@ function bucketFor(linkedRecords, kind) {
   if (kind === 'application') return linkedRecords.applications;
   if (kind === 'organisation') return linkedRecords.organisations;
   if (kind === 'person') return linkedRecords.people;
-  return null;
+  if (kind === 'page') return linkedRecords.notes;
+  if (kind === 'project' || kind === 'program' || kind === 'goal') return linkedRecords.projects;
+  if (namespace === 'teaching') return linkedRecords.teaching;
+  return linkedRecords.other;
 }
 
 /**
@@ -340,11 +350,15 @@ export async function assembleEntityOverview(refInput, deps = {}) {
     events: [],
     applications: [],
     organisations: [],
-    people: []
+    people: [],
+    notes: [],
+    projects: [],
+    teaching: [],
+    other: []
   };
   const seen = new Set();
   for (const entry of entries) {
-    const bucket = bucketFor(linked_records, entry.endpoint.kind);
+    const bucket = bucketFor(linked_records, entry.endpoint);
     if (!bucket) continue;
     if (seen.has(entry.endpoint.ref)) continue;
     seen.add(entry.endpoint.ref);

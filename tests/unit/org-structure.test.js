@@ -297,3 +297,118 @@ test('org-structure GET through real handler (W2)', async () => {
   // Also exercise handler factory exists.
   assert.equal(typeof handler, 'function');
 });
+
+// Round trip through the real Universal Link repository: a line drawn on the
+// chart must come back on the next load (it used to be dropped because the
+// load path read links without an access context).
+function chartResolver(orgRef, names) {
+  return async (refInput) => {
+    const ref = typeof refInput === 'string' ? refInput : formatEntityRef(refInput);
+    const [, kind, id] = ref.split(':');
+    if (ref === orgRef || kind === 'unit' || kind === 'position' || (kind === 'person' && names[id])) {
+      return {
+        ref,
+        kind,
+        display_label: kind === 'person' ? names[id] : ref,
+        supporting_label: null,
+        href: null,
+        lifecycle_status: 'active',
+        visibility: 'operator'
+      };
+    }
+    throw Object.assign(new Error('not found'), { status: 404, code: 'endpoint_not_found' });
+  };
+}
+
+async function chartFixture() {
+  const store = memoryStore();
+  const orgId = generateOrganisationId();
+  const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: orgId });
+  const personId = generatePersonId();
+  const personRef = formatEntityRef({ namespace: 'shared', kind: 'person', id: personId });
+  const repo = createOrgStructureRepository({
+    store,
+    resolveEntity: chartResolver(orgRef, { [personId]: 'Jo Principal' }),
+    getContentStore: async () => store,
+    now: () => new Date().toISOString()
+  });
+  const principal = await repo.createPosition({ organisation_ref: orgRef, title: 'Principal' });
+  const deputy = await repo.createPosition({ organisation_ref: orgRef, title: 'Deputy' });
+  const principalRef = formatEntityRef({ namespace: 'shared', kind: 'position', id: principal.id });
+  const deputyRef = formatEntityRef({ namespace: 'shared', kind: 'position', id: deputy.id });
+  return { store, repo, orgId, orgRef, personRef, principal, deputy, principalRef, deputyRef };
+}
+
+test('drawn lines and holders survive a reload, with the holder named', async () => {
+  const f = await chartFixture();
+  const validFrom = new Date(Date.now() - 1000).toISOString();
+  await f.repo.createStructureLink({
+    organisationRef: f.orgRef,
+    relationshipType: 'holds_position',
+    sourceRef: f.personRef,
+    targetRef: f.principalRef,
+    validFrom
+  });
+  await f.repo.createStructureLink({
+    organisationRef: f.orgRef,
+    relationshipType: 'reports_to',
+    sourceRef: f.deputyRef,
+    targetRef: f.principalRef,
+    validFrom
+  });
+
+  const payload = await f.repo.getDerivedGraph(f.orgId);
+  assert.equal(payload.links.length, 2);
+  const principalNode = payload.graph.nodes.find((n) => n.ref === f.principalRef);
+  assert.equal(principalNode.holder.person_ref, f.personRef);
+  assert.equal(principalNode.holder.display_name, 'Jo Principal');
+  assert.ok(
+    payload.graph.edges.some(
+      (e) => e.kind === 'reports_to' && e.source === f.deputyRef && e.target === f.principalRef
+    )
+  );
+});
+
+test('diagram layout persists and survives later structure writes', async () => {
+  const f = await chartFixture();
+  await f.repo.saveLayout(f.orgId, {
+    [f.principalRef]: { x: 120.4, y: 40 },
+    'not-a-ref': { x: 1, y: 2 },
+    [f.deputyRef]: { x: 'nope', y: 3 }
+  });
+  await f.repo.createPosition({ organisation_ref: f.orgRef, title: 'Business manager' });
+  const payload = await f.repo.getDerivedGraph(f.orgId);
+  assert.deepEqual(payload.layout, { [f.principalRef]: { x: 120, y: 40 } });
+});
+
+test('removing a line ends it; archiving a box ends every line touching it', async () => {
+  const f = await chartFixture();
+  const validFrom = new Date(Date.now() - 1000).toISOString();
+  const { link: holds } = await f.repo.createStructureLink({
+    organisationRef: f.orgRef,
+    relationshipType: 'holds_position',
+    sourceRef: f.personRef,
+    targetRef: f.deputyRef,
+    validFrom
+  });
+  const { link: reports } = await f.repo.createStructureLink({
+    organisationRef: f.orgRef,
+    relationshipType: 'reports_to',
+    sourceRef: f.deputyRef,
+    targetRef: f.principalRef,
+    validFrom
+  });
+
+  const ended = await f.repo.endStructureLink(f.orgId, reports.id);
+  assert.equal(ended.status, 'ended');
+  let payload = await f.repo.getDerivedGraph(f.orgId);
+  assert.ok(!payload.graph.edges.some((e) => e.id === reports.id));
+
+  const result = await f.repo.archivePosition(f.orgId, f.deputy.id);
+  assert.deepEqual(result.ended_link_ids, [holds.id]);
+  payload = await f.repo.getDerivedGraph(f.orgId);
+  assert.ok(!payload.graph.nodes.some((n) => n.ref === f.deputyRef));
+  assert.ok(payload.graph.nodes.some((n) => n.ref === f.principalRef));
+
+  await assert.rejects(() => f.repo.endStructureLink(generateOrganisationId(), holds.id), /not part of this organisation/);
+});

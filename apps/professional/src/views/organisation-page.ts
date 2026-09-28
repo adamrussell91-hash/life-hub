@@ -25,6 +25,7 @@ import {
 } from '@/api/organisation-read';
 import { organisationsRoute } from '@/app/router';
 import { openStructureEditor } from '@/components/org-structure-editor';
+import { openOrgChartEditor } from '@/components/org-chart-editor';
 import { crestNode, el, sectionHost, setSectionState } from '@/components/org-ui';
 import {
   layoutOrgFlowchart,
@@ -228,7 +229,7 @@ export async function renderOrganisationPage(
   compareBtn.className = 'btn btn--ghost';
   compareBtn.textContent = 'Compare with…';
   compareBtn.href = `#/organisations/compare?ids=${encodeURIComponent(organisationId)}`;
-  const editBtn = el('button', 'btn btn--ghost', 'Edit') as HTMLButtonElement;
+  const editBtn = el('button', 'btn btn--ghost', 'Edit chart') as HTMLButtonElement;
   editBtn.type = 'button';
   switchBar.append(back, switchSpacer, compareBtn, editBtn);
 
@@ -275,17 +276,26 @@ export async function renderOrganisationPage(
       structure = null;
     }
 
-    const hasStructure = Boolean(structure && structure.units.length > 0);
+    // A chart made only of roles (no units) is still a structure — the
+    // drag-and-connect editor starts from people and roles, not units.
+    const hasStructure = Boolean(
+      structure &&
+        (structure.units.length > 0 || structure.positions.some((p) => p.lifecycle_status === 'active'))
+    );
     const toolbar = el('div', 'orgs-how__toolbar');
-    const addStructure = el('button', 'btn btn--ghost', hasStructure ? 'Edit structure' : 'Add structure') as HTMLButtonElement;
+    const addStructure = el('button', 'btn btn--primary', hasStructure ? 'Edit chart' : 'Draw the chart') as HTMLButtonElement;
     addStructure.type = 'button';
-    addStructure.addEventListener('click', () => openEditor());
+    addStructure.addEventListener('click', () => openChartEditor());
     toolbar.append(addStructure);
 
     if (!hasStructure || !structure) {
       const howEmpty = el('div', 'orgs-how__empty');
       howEmpty.append(
-        el('p', 'people-pane__empty', 'No structure yet. Add units to show how this organisation is run.'),
+        el(
+          'p',
+          'people-pane__empty',
+          'No chart yet. Add people, then drag lines between them to show who reports to whom.'
+        ),
         addStructure
       );
       how.body.append(howEmpty);
@@ -411,7 +421,7 @@ export async function renderOrganisationPage(
             else collapsedUnits.add(uref);
             void paintView();
           },
-          onVacantPosition: () => openEditor()
+          onVacantPosition: () => openChartEditor()
         });
         stage.append(svg);
         const applyZoom = () => {
@@ -513,7 +523,28 @@ export async function renderOrganisationPage(
     root.append(editorSheet);
   }
 
-  editBtn.addEventListener('click', () => openEditor());
+  function openChartEditor(): void {
+    if (!model) return;
+    editorSheet?.remove();
+    editorSheet = openOrgChartEditor({
+      organisationId: model.id,
+      organisationRef: model.ref,
+      organisationName: model.displayName,
+      structure,
+      peopleNames: Object.fromEntries(directoryPeople.map((p) => [p.id, p.display_name])),
+      onOpenAdvanced: () => openEditor(),
+      onChanged: async () => {
+        await patchHowSection();
+      },
+      onClose: () => {
+        editorSheet?.remove();
+        editorSheet = null;
+      }
+    });
+    root.append(editorSheet);
+  }
+
+  editBtn.addEventListener('click', () => openChartEditor());
 
   async function patchAnn(): Promise<void> {
     if (!model) return;

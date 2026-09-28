@@ -111,6 +111,28 @@ export function createOrgStructureHandler(deps = {}) {
           });
           return withCors(okResponse(result.created ? 201 : 200, { link: result.link, created: result.created }), request, env);
         }
+        if (action === 'end_link' || action === 'archive_position') {
+          const organisationId = organisationRef?.startsWith('shared:organisation:')
+            ? organisationRef.slice('shared:organisation:'.length)
+            : '';
+          if (!isValidOrganisationId(organisationId)) {
+            return withCors(
+              errorResponse(400, 'organisation_ref_required', 'organisation_ref is required.', false),
+              request,
+              env
+            );
+          }
+          if (action === 'end_link') {
+            const linkId = typeof parsed.value.link_id === 'string' ? parsed.value.link_id : '';
+            if (!linkId) {
+              return withCors(errorResponse(400, 'link_id_required', 'link_id is required.', false), request, env);
+            }
+            const link = await repo.endStructureLink(organisationId, linkId);
+            return withCors(okResponse(200, { link }), request, env);
+          }
+          const result = await repo.archivePosition(organisationId, parsed.value.position_id);
+          return withCors(okResponse(200, result), request, env);
+        }
         return withCors(errorResponse(400, 'invalid_action', 'Unsupported action.', false), request, env);
       }
 
@@ -120,6 +142,11 @@ export function createOrgStructureHandler(deps = {}) {
         assertNoAccessFields(parsed.value);
         const kind = url.searchParams.get('kind') || parsed.value.kind;
         const id = url.searchParams.get('entity_id') || parsed.value.id;
+        if (kind === 'layout') {
+          const organisationId = readOrgId(url);
+          const layout = await repo.saveLayout(organisationId, parsed.value.layout);
+          return withCors(okResponse(200, { layout }), request, env);
+        }
         if (kind === 'unit') {
           if (!isValidUnitId(id)) {
             return withCors(errorResponse(400, 'invalid_unit_id', 'Invalid unit id.', false), request, env);
@@ -134,7 +161,7 @@ export function createOrgStructureHandler(deps = {}) {
           const record = await repo.updatePosition(id, parsed.value);
           return withCors(okResponse(200, { position: record }), request, env);
         }
-        return withCors(errorResponse(400, 'invalid_kind', 'kind must be unit or position.', false), request, env);
+        return withCors(errorResponse(400, 'invalid_kind', 'kind must be unit, position, or layout.', false), request, env);
       }
 
       return withCors(methodNotAllowed('GET, POST, PATCH, OPTIONS'), request, env);

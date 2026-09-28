@@ -70,6 +70,8 @@ export interface OrgStructurePayload {
   positions: OrgStructurePosition[];
   links: Array<Record<string, unknown>>;
   graph: OrgStructureGraph;
+  /** Dragged chart box positions, keyed by `shared:position:<id>`. */
+  layout?: Record<string, { x: number; y: number }>;
 }
 
 export async function fetchOrgStructure(organisationId: string): Promise<OrgStructurePayload> {
@@ -136,4 +138,32 @@ export async function createOrgStructureLink(input: {
   metadata?: Record<string, unknown>;
 }): Promise<{ link: Record<string, unknown>; created: boolean }> {
   return apiPost('/api/org-structure?action=create_link', input);
+}
+
+/** Persist dragged box positions for the chart editor (merged server-side). */
+export async function saveOrgLayout(
+  organisationId: string,
+  layout: Record<string, { x: number; y: number }>
+): Promise<Record<string, { x: number; y: number }>> {
+  const res = await apiPatch<{ layout: Record<string, { x: number; y: number }> }>(
+    `/api/org-structure?kind=layout&organisation_id=${encodeURIComponent(organisationId)}`,
+    { layout }
+  );
+  return res.layout;
+}
+
+/** Remove one line (or holder) from the chart — ends the link, keeps history. */
+export async function endOrgStructureLink(input: {
+  organisation_ref: string;
+  link_id: string;
+}): Promise<{ link: Record<string, unknown> }> {
+  return apiPost('/api/org-structure?action=end_link', input);
+}
+
+/** Remove a box from the chart — archives it and ends every line touching it. */
+export async function archiveOrgPosition(input: {
+  organisation_ref: string;
+  position_id: string;
+}): Promise<{ position: OrgStructurePosition; ended_link_ids: string[] }> {
+  return apiPost('/api/org-structure?action=archive_position', input);
 }

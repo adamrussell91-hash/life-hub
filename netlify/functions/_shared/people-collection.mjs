@@ -108,7 +108,8 @@ export async function loadAllPeopleWithRelationships({
   resolveEntity,
   createRepository,
   env,
-  fetchImpl
+  fetchImpl,
+  includeStudents = false
 } = {}) {
   if (!store) {
     throw new Error('loadAllPeopleWithRelationships requires a store.');
@@ -185,6 +186,23 @@ export async function loadAllPeopleWithRelationships({
     (row, person) => ({ person, relationships: row.relationships, _source: row._source }),
     (row) => row._source
   );
+
+  // Opt-in only (People directory's Students view): the imported
+  // Communications students themselves, appended after identity dedupe so
+  // they can never displace or merge with a colleague. Every other caller
+  // keeps the adults-only network.
+  if (includeStudents) {
+    const studentRows = await mapBounded(githubStudents, PEOPLE_BATCH_SIZE, async (record) => {
+      const ref = formatEntityRef({ namespace: 'shared', kind: 'person', id: record.id });
+      const relationships = [];
+      for (const { link, otherRef, direction } of await listGithubRelationshipEntries('person', record.id, github)) {
+        const endpoint = await resolveGithubEndpoint(otherRef);
+        if (endpoint) relationships.push({ link, endpoint, direction });
+      }
+      return { person: { ...record, ref }, relationships, _source: 'github' };
+    });
+    survivors.push(...studentRows);
+  }
 
   return mapBounded(survivors, PEOPLE_BATCH_SIZE, async (row) => {
     if (row._source === 'github') {

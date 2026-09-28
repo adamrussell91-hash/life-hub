@@ -1,5 +1,6 @@
 import { renderRelationshipList, type TabDef } from '@/components/entity-detail';
 import { renderRelationshipTimeline } from '@/components/relationship-timeline';
+import { renderLinkedEverywhere } from '@/components/linked-everywhere';
 import { buildObservationsTab } from '@/components/observations-tab';
 import { buildEvidenceTab } from '@/components/evidence-tab';
 import { renderProfessionalProfileTab } from '@/components/professional-profile';
@@ -183,54 +184,15 @@ function renderTimelineTab(host: HTMLElement, overview: EntityOverview): void {
   host.append(section);
 }
 
-// Direct port of today's "Linked activity" section — flattens
-// tasks/communications/meetings/events/applications into one list.
+// Everything anywhere in Life Hub linked to this person — tasks, notes,
+// meetings, events, projects, teaching — via the shared renderer.
 function renderSharedWorkTab(host: HTMLElement, overview: EntityOverview): void {
   host.replaceChildren();
   const section = el('div', 'entity-detail__section');
-  section.append(el('h2', 'entity-detail__heading', 'Linked activity'));
+  section.append(el('h2', 'entity-detail__heading', 'Linked everywhere'));
   const activityHost = el('div');
   section.append(activityHost);
-
-  const activityBits: Array<{ label: string; href: string | null }> = [];
-  for (const item of overview.linked_records.communications) {
-    activityBits.push({ label: `Communication · ${item.display_label}`, href: item.href });
-  }
-  for (const item of overview.linked_records.tasks) {
-    activityBits.push({ label: `Task · ${item.display_label}`, href: item.href });
-  }
-  for (const item of overview.linked_records.meetings ?? []) {
-    activityBits.push({ label: `Meeting · ${item.display_label}`, href: item.href });
-  }
-  for (const item of overview.linked_records.events ?? []) {
-    activityBits.push({ label: `Event · ${item.display_label}`, href: item.href });
-  }
-  for (const item of overview.linked_records.applications ?? []) {
-    activityBits.push({ label: `Application · ${item.display_label}`, href: item.href });
-  }
-
-  if (!activityBits.length) {
-    activityHost.append(
-      el('p', 'empty-state', 'No linked communications, tasks, meetings, events, or applications.')
-    );
-  } else {
-    const list = document.createElement('ul');
-    list.className = 'entity-detail__relationship-list';
-    for (const bit of activityBits) {
-      const item = document.createElement('li');
-      if (bit.href) {
-        const link = document.createElement('a');
-        link.href = bit.href;
-        link.textContent = bit.label;
-        item.append(link);
-      } else {
-        item.textContent = bit.label;
-      }
-      list.append(item);
-    }
-    activityHost.append(list);
-  }
-
+  renderLinkedEverywhere(activityHost, overview.linked_records);
   host.append(section);
 }
 

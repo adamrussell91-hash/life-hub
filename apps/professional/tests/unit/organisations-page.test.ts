@@ -157,13 +157,14 @@ describe('organisation page A5 / Part B wired controls', () => {
     vi.restoreAllMocks();
   });
 
-  it('wires Compare/Edit/Add structure/Run now live with no roadmap copy (I3/P4)', async () => {
+  it('wires Compare/Edit chart/Draw the chart/Run now live with no roadmap copy (I3/P4)', async () => {
     const canvas = document.createElement('div');
     document.body.append(canvas);
     await renderOrganisationPage(canvas, ORG_ID);
     expect(canvas.querySelectorAll('button[disabled]').length).toBe(0);
     expect(canvas.textContent).toMatch(/Compare with/);
-    expect(canvas.textContent).toMatch(/Add structure/);
+    expect(canvas.textContent).toMatch(/Draw the chart/);
+    expect(canvas.textContent).toMatch(/Edit chart/);
     expect(canvas.textContent).toMatch(/Run now/);
     expect(canvas.textContent).toContain('Add opportunity');
     expect(canvas.textContent).not.toMatch(/Phase [0-9]|arrives in|is built|coming soon/);

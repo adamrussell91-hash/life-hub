@@ -502,6 +502,18 @@ export function createMockApi() {
         ok: true,
         data: {
           people: peopleRows,
+          // Synthetic student so the Students view has something locally.
+          students: [
+            {
+              ...(peopleRows[0] ?? {}),
+              id: 'person_00000000-0000-4000-8000-000000000501',
+              ref: 'shared:person:person_00000000-0000-4000-8000-000000000501',
+              display_name: 'Sample Student',
+              initials: 'SS',
+              role_line: 'Student',
+              person_type: 'student'
+            }
+          ],
           organisations: [...organisations.values()].map((o) => ({
             ref: `shared:organisation:${o.id}`,
             id: o.id,
@@ -953,8 +965,89 @@ export function createMockApi() {
     }
 
     // --- Org structure / opportunities / Ann read (Part B) ---
-    const structureByOrg = (globalThis as { __orgStructure?: Map<string, unknown> }).__orgStructure
-      ?? ((globalThis as { __orgStructure?: Map<string, unknown> }).__orgStructure = new Map());
+    type MockRow = Record<string, unknown> & { id: string };
+    type MockStructure = {
+      units: MockRow[];
+      positions: MockRow[];
+      links: MockRow[];
+      layout: Record<string, { x: number; y: number }>;
+    };
+    const mockStructures = (globalThis as { __orgStructure?: Map<string, MockStructure> }).__orgStructure
+      ?? ((globalThis as { __orgStructure?: Map<string, MockStructure> }).__orgStructure = new Map());
+    const mockStructure = (orgId: string): MockStructure => {
+      let current = mockStructures.get(orgId);
+      if (!current) {
+        current = { units: [], positions: [], links: [], layout: {} };
+        mockStructures.set(orgId, current);
+      }
+      return current;
+    };
+    // Mirrors the production derive (holders, explicit lines, members) so the
+    // chart editor behaves locally the way it does against real Blobs.
+    const mockStructurePayload = (orgId: string) => {
+      const organisation_ref = orgId ? `shared:organisation:${orgId}` : null;
+      const current = mockStructure(orgId);
+      const units = current.units.filter((u) => u.lifecycle_status === 'active');
+      const positions = current.positions.filter((p) => p.lifecycle_status === 'active');
+      const live = current.links.filter((l) => l.status === 'current');
+      const personName = (ref: unknown) => {
+        const id = String(ref ?? '').replace(/^shared:person:/, '');
+        return people.get(id)?.display_name ?? null;
+      };
+      const nodes: Array<Record<string, unknown>> = [
+        ...units.map((u) => ({ id: `shared:unit:${u.id}`, kind: 'unit', ref: `shared:unit:${u.id}`, name: u.name, unit_kind: u.unit_kind, order: u.order, organisation_ref })),
+        ...positions.map((p) => {
+          const ref = `shared:position:${p.id}`;
+          const holds = live.find((l) => l.relationship_type === 'holds_position' && l.target_ref === ref);
+          return {
+            id: ref,
+            kind: 'position',
+            ref,
+            title: p.title,
+            unit_ref: p.unit_ref,
+            is_head: p.is_head,
+            organisation_ref,
+            holder: holds
+              ? { person_ref: holds.source_ref, display_name: personName(holds.source_ref), role: holds.role ?? null, warmth_band: null }
+              : null
+          };
+        })
+      ];
+      const nodeRefs = new Set(nodes.map((n) => n.ref));
+      const edges = live
+        .filter((l) => ['reports_to', 'works_with', 'shares_authority_with'].includes(String(l.relationship_type)))
+        .filter((l) => nodeRefs.has(l.source_ref as string) && nodeRefs.has(l.target_ref as string))
+        .map((l) => ({ id: l.id, source: l.source_ref, target: l.target_ref, kind: l.relationship_type, flag: 'explicit' }));
+      const members_by_unit: Record<string, unknown[]> = {};
+      const memberships_by_person: Record<string, unknown[]> = {};
+      const memberIds = new Set<string>();
+      for (const l of live) {
+        if (l.relationship_type === 'member_of_unit') {
+          (members_by_unit[l.target_ref as string] ??= []).push({ person_ref: l.source_ref, role: l.role ?? null, link_id: l.id });
+          (memberships_by_person[l.source_ref as string] ??= []).push({ unit_ref: l.target_ref, role: l.role ?? null, link_id: l.id });
+        }
+        if (l.relationship_type === 'member_of_unit' || l.relationship_type === 'holds_position') {
+          memberIds.add(String(l.source_ref).replace(/^shared:person:/, ''));
+        }
+      }
+      return {
+        organisation_ref,
+        units,
+        positions,
+        links: current.links,
+        layout: current.layout,
+        graph: {
+          organisation_ref,
+          nodes,
+          edges,
+          members_by_unit,
+          memberships_by_person,
+          member_person_ids: [...memberIds],
+          member_count: memberIds.size,
+          cycles: []
+        }
+      };
+    };
     const opportunitiesStore = (globalThis as { __opportunities?: Map<string, unknown> }).__opportunities
       ?? ((globalThis as { __opportunities?: Map<string, unknown> }).__opportunities = new Map());
     const orgReads = (globalThis as { __orgReads?: Map<string, unknown> }).__orgReads
@@ -962,166 +1055,109 @@ export function createMockApi() {
 
     if (path === '/api/org-structure' && method === 'GET') {
       const orgId = url.searchParams.get('organisation_id') || url.searchParams.get('id') || '';
-      const existing = structureByOrg.get(orgId) as {
-        units: unknown[];
-        positions: unknown[];
-        links: unknown[];
-        graph: unknown;
-      } | undefined;
-      const organisation_ref = orgId ? `shared:organisation:${orgId}` : null;
-      return json(200, {
-        ok: true,
-        data: existing ?? {
-          organisation_ref,
-          units: [],
-          positions: [],
-          links: [],
-          graph: {
-            organisation_ref,
-            nodes: [],
-            edges: [],
-            members_by_unit: {},
-            memberships_by_person: {},
-            member_person_ids: [],
-            member_count: 0,
-            cycles: []
-          }
+      return json(200, { ok: true, data: mockStructurePayload(orgId) });
+    }
+
+    if (path === '/api/org-structure' && method === 'PATCH') {
+      const kind = url.searchParams.get('kind');
+      const payload = (body ?? {}) as Record<string, unknown>;
+      if (kind === 'layout') {
+        const orgId = url.searchParams.get('organisation_id') || '';
+        const current = mockStructure(orgId);
+        current.layout = { ...current.layout, ...((payload.layout as Record<string, { x: number; y: number }>) ?? {}) };
+        return json(200, { ok: true, data: { layout: current.layout } });
+      }
+      const entityId = url.searchParams.get('entity_id') || '';
+      for (const current of mockStructures.values()) {
+        const list = kind === 'unit' ? current.units : current.positions;
+        const record = list.find((r: MockRow) => r.id === entityId);
+        if (record) {
+          Object.assign(record, payload, { updated_at: new Date().toISOString() });
+          return json(200, { ok: true, data: { [kind === 'unit' ? 'unit' : 'position']: record } });
         }
-      });
+      }
+      return json(404, { ok: false, error: { code: 'not_found', message: 'Not found.' } });
     }
 
     if (path === '/api/org-structure' && method === 'POST') {
-      const action = url.searchParams.get('action') || (body as { action?: string })?.action || 'create_unit';
-      const orgRef =
-        typeof (body as { organisation_ref?: string })?.organisation_ref === 'string'
-          ? (body as { organisation_ref: string }).organisation_ref
-          : '';
+      const payload = (body ?? {}) as Record<string, unknown>;
+      const action = url.searchParams.get('action') || (payload.action as string | undefined) || 'create_unit';
+      const orgRef = typeof payload.organisation_ref === 'string' ? payload.organisation_ref : '';
       const orgId = orgRef.replace(/^shared:organisation:/, '');
-      const current = (structureByOrg.get(orgId) as {
-        organisation_ref: string;
-        units: Array<Record<string, unknown>>;
-        positions: Array<Record<string, unknown>>;
-        links: Array<Record<string, unknown>>;
-        graph: Record<string, unknown>;
-      }) || {
-        organisation_ref: orgRef,
-        units: [],
-        positions: [],
-        links: [],
-        graph: {
-          organisation_ref: orgRef,
-          nodes: [],
-          edges: [],
-          members_by_unit: {},
-          memberships_by_person: {},
-          member_person_ids: [],
-          member_count: 0,
-          cycles: []
-        }
-      };
+      const current = mockStructure(orgId);
+      const now = new Date().toISOString();
 
       if (action === 'create_unit') {
-        const id = `unit_${randomUUID()}`;
         const unit = {
           schema_version: 1,
-          id,
+          id: `unit_${randomUUID()}`,
           kind: 'unit',
-          name: String((body as { name?: string }).name || '').trim(),
+          name: String(payload.name || '').trim(),
           organisation_ref: orgRef,
-          unit_kind: (body as { unit_kind?: string }).unit_kind || 'other',
-          order: Number((body as { order?: number }).order) || current.units.length,
+          unit_kind: (payload.unit_kind as string) || 'other',
+          order: Number(payload.order) || current.units.length,
           lifecycle_status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: now,
+          updated_at: now
         };
         current.units.push(unit);
-        (current.graph.nodes as unknown[]).push({
-          id: `shared:unit:${id}`,
-          kind: 'unit',
-          ref: `shared:unit:${id}`,
-          name: unit.name,
-          unit_kind: unit.unit_kind,
-          order: unit.order,
-          organisation_ref: orgRef
-        });
-        structureByOrg.set(orgId, current);
         return json(201, { ok: true, data: { unit } });
       }
       if (action === 'create_position') {
-        const id = `position_${randomUUID()}`;
+        const title = String(payload.title || '').trim();
+        if (!title) return json(400, { ok: false, error: { code: 'title_required', message: 'title is required.' } });
         const position = {
           schema_version: 1,
-          id,
+          id: `position_${randomUUID()}`,
           kind: 'position',
-          title: String((body as { title?: string }).title || '').trim(),
+          title,
           organisation_ref: orgRef,
-          unit_ref: (body as { unit_ref?: string | null }).unit_ref ?? null,
-          is_head: Boolean((body as { is_head?: boolean }).is_head),
+          unit_ref: (payload.unit_ref as string | null) ?? null,
+          is_head: Boolean(payload.is_head),
           lifecycle_status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: now,
+          updated_at: now
         };
         current.positions.push(position);
-        (current.graph.nodes as unknown[]).push({
-          id: `shared:position:${id}`,
-          kind: 'position',
-          ref: `shared:position:${id}`,
-          title: position.title,
-          unit_ref: position.unit_ref,
-          is_head: position.is_head,
-          organisation_ref: orgRef,
-          holder: null
-        });
-        structureByOrg.set(orgId, current);
         return json(201, { ok: true, data: { position } });
       }
       if (action === 'create_link') {
         const link = {
           id: `ul_mock_${randomUUID().slice(0, 8)}`,
-          relationship_type: (body as { relationship_type?: string }).relationship_type,
-          source_ref: (body as { source_ref?: string }).source_ref,
-          target_ref: (body as { target_ref?: string }).target_ref,
-          role: (body as { role?: string | null }).role ?? null,
-          status: 'active',
-          valid_from: (body as { valid_from?: string | null }).valid_from ?? null,
+          relationship_type: payload.relationship_type,
+          source_ref: payload.source_ref,
+          target_ref: payload.target_ref,
+          role: (payload.role as string | null) ?? null,
+          status: 'current',
+          temporal_mode: payload.relationship_type === 'answers_to' ? 'timeless' : 'period',
+          valid_from: (payload.valid_from as string | null) ?? now,
           valid_to: null,
-          metadata: (body as { metadata?: Record<string, unknown> }).metadata ?? {},
+          metadata: (payload.metadata as Record<string, unknown>) ?? {},
           context_ref: orgRef
         };
         current.links.push(link);
-        if (link.relationship_type === 'member_of_unit' && link.source_ref && link.target_ref) {
-          const members = (current.graph.members_by_unit as Record<string, unknown[]>) || {};
-          const list = (members[link.target_ref] as unknown[]) || [];
-          list.push({ person_ref: link.source_ref, role: link.role, link_id: link.id });
-          members[link.target_ref] = list;
-          current.graph.members_by_unit = members;
-          const byPerson = (current.graph.memberships_by_person as Record<string, unknown[]>) || {};
-          const plist = (byPerson[link.source_ref] as unknown[]) || [];
-          plist.push({ unit_ref: link.target_ref, role: link.role, link_id: link.id });
-          byPerson[link.source_ref] = plist;
-          current.graph.memberships_by_person = byPerson;
-          const personId = String(link.source_ref).replace(/^shared:person:/, '');
-          const ids = new Set((current.graph.member_person_ids as string[]) || []);
-          ids.add(personId);
-          current.graph.member_person_ids = [...ids];
-          current.graph.member_count = ids.size;
-          // Derived reports_to to unit head if present
-          const head = current.positions.find(
-            (p) => p.is_head && p.unit_ref === link.target_ref
-          );
-          if (head) {
-            (current.graph.edges as unknown[]).push({
-              id: `derived:member:${link.id}:shared:position:${head.id}`,
-              source: link.source_ref,
-              target: `shared:position:${head.id}`,
-              kind: 'reports_to',
-              flag: 'derived',
-              via: link.target_ref
-            });
-          }
-        }
-        structureByOrg.set(orgId, current);
         return json(201, { ok: true, data: { link, created: true } });
+      }
+      if (action === 'end_link') {
+        const link = current.links.find((l) => l.id === payload.link_id);
+        if (!link) return json(404, { ok: false, error: { code: 'structure_link_not_found', message: 'Not found.' } });
+        link.status = 'ended';
+        link.valid_to = now;
+        return json(200, { ok: true, data: { link } });
+      }
+      if (action === 'archive_position') {
+        const position = current.positions.find((p) => p.id === payload.position_id);
+        if (!position) return json(404, { ok: false, error: { code: 'position_not_found', message: 'Not found.' } });
+        const ref = `shared:position:${position.id}`;
+        const ended: string[] = [];
+        for (const link of current.links) {
+          if (link.status !== 'current' || (link.source_ref !== ref && link.target_ref !== ref)) continue;
+          link.status = 'ended';
+          link.valid_to = now;
+          ended.push(String(link.id));
+        }
+        position.lifecycle_status = 'archived';
+        return json(200, { ok: true, data: { position, ended_link_ids: ended } });
       }
       return json(400, { ok: false, error: { code: 'invalid_action', message: 'Unsupported action.' } });
     }

@@ -305,13 +305,39 @@ export function deriveReportingGraph({
   };
 }
 
+const LAYOUT_REF_PATTERN = /^shared:(position|unit):[A-Za-z0-9_-]{1,80}$/;
+const LAYOUT_LIMIT = 2000;
+const LAYOUT_COORD_LIMIT = 100000;
+
+/**
+ * Pure: validate a diagram layout `{ [shared:position|unit ref]: { x, y } }`.
+ * Only box positions the operator dragged — never structure or access data.
+ */
+export function sanitizeDiagramLayout(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  let count = 0;
+  for (const [ref, point] of Object.entries(raw)) {
+    if (count >= LAYOUT_LIMIT) break;
+    if (!LAYOUT_REF_PATTERN.test(ref)) continue;
+    const x = Number(point?.x);
+    const y = Number(point?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    if (Math.abs(x) > LAYOUT_COORD_LIMIT || Math.abs(y) > LAYOUT_COORD_LIMIT) continue;
+    out[ref] = { x: Math.round(x), y: Math.round(y) };
+    count += 1;
+  }
+  return out;
+}
+
 async function loadOrgIndex(store, organisationId) {
   const raw = await getJSON(store, orgStructureIndexKey(organisationId));
-  if (!raw || typeof raw !== 'object') return { unit_ids: [], position_ids: [], link_ids: [] };
+  if (!raw || typeof raw !== 'object') return { unit_ids: [], position_ids: [], link_ids: [], diagram_layout: {} };
   return {
     unit_ids: Array.isArray(raw.unit_ids) ? raw.unit_ids.filter(isValidUnitId) : [],
     position_ids: Array.isArray(raw.position_ids) ? raw.position_ids.filter(isValidPositionId) : [],
-    link_ids: Array.isArray(raw.link_ids) ? raw.link_ids.filter((id) => typeof id === 'string') : []
+    link_ids: Array.isArray(raw.link_ids) ? raw.link_ids.filter((id) => typeof id === 'string') : [],
+    diagram_layout: sanitizeDiagramLayout(raw.diagram_layout)
   };
 }
 
@@ -321,6 +347,9 @@ async function saveOrgIndex(store, organisationId, index) {
     unit_ids: index.unit_ids,
     position_ids: index.position_ids,
     link_ids: index.link_ids,
+    // Every writer goes through load → mutate → save, so the dragged box
+    // positions survive a unit/position/link write.
+    diagram_layout: sanitizeDiagramLayout(index.diagram_layout),
     updated_at: new Date().toISOString()
   });
 }
@@ -356,7 +385,9 @@ export function createOrgStructureRepository(deps = {}) {
       const links = [];
       for (const id of index.link_ids) {
         try {
-          const link = await linksRepo.getLink(id);
+          // Must pass the access context: without it every link fails the
+          // visibility check and the chart silently loses all its lines.
+          const link = await linksRepo.getLink(id, accessContext);
           if (link) links.push(link);
         } catch {
           /* missing link — skip */
@@ -470,7 +501,10 @@ export function createOrgStructureRepository(deps = {}) {
           target_ref: target,
           relationship_type: relationshipType,
           role,
-          valid_from: validFrom,
+          // Server clock by default: a client-stamped start that runs ahead
+          // of the server would make an immediate "remove line" fail
+          // (valid_to before valid_from).
+          valid_from: validFrom ?? now(),
           context_ref: organisationRef,
           metadata,
           visibility: 'operator'
@@ -487,22 +521,115 @@ export function createOrgStructureRepository(deps = {}) {
       return { link, created };
     }
 
-    async function getDerivedGraph(organisationId, peopleById = {}) {
+    // Holder/member names for the chart. Resolved through the same
+    // authorised resolver as every other endpoint; a hidden or missing
+    // person simply stays unnamed rather than erroring the whole chart.
+    async function resolvePeopleNames(links) {
+      const refs = new Set();
+      for (const link of links) {
+        if (link?.relationship_type !== 'holds_position' && link?.relationship_type !== 'member_of_unit') continue;
+        if (typeof link.source_ref === 'string' && link.source_ref.startsWith('shared:person:')) refs.add(link.source_ref);
+      }
+      const byId = {};
+      const personAccess = createAccessContext({ workflow: 'life' });
+      for (const ref of refs) {
+        try {
+          const endpoint = await resolveEntity(ref, personAccess);
+          const id = parseEntityRef(ref)?.id;
+          if (id && endpoint?.display_label) byId[id] = { display_name: endpoint.display_label };
+        } catch {
+          /* hidden or missing person — leave unnamed */
+        }
+      }
+      return byId;
+    }
+
+    async function getDerivedGraph(organisationId, peopleById = null) {
       const organisationRef = formatEntityRef({
         namespace: 'shared',
         kind: 'organisation',
         id: organisationId
       });
-      const { units, positions, links } = await loadStructure(organisationId);
+      const { units, positions, links, index } = await loadStructure(organisationId);
+      const names = peopleById ?? (await resolvePeopleNames(links));
       const graph = deriveReportingGraph({
         organisationRef,
         units,
         positions,
         links,
-        peopleById,
+        peopleById: names,
         now: Date.parse(now()) || Date.now()
       });
-      return { organisation_ref: organisationRef, units, positions, links, graph };
+      return {
+        organisation_ref: organisationRef,
+        units,
+        positions,
+        links,
+        graph,
+        layout: index.diagram_layout ?? {}
+      };
+    }
+
+    async function saveLayout(organisationId, layout) {
+      if (!isValidOrganisationId(organisationId)) {
+        throw Object.assign(new Error('Invalid organisation id.'), { status: 400, code: 'invalid_organisation_id' });
+      }
+      const index = await loadOrgIndex(resolved, organisationId);
+      index.diagram_layout = { ...index.diagram_layout, ...sanitizeDiagramLayout(layout) };
+      await saveOrgIndex(resolved, organisationId, index);
+      return index.diagram_layout;
+    }
+
+    function linkIsCurrent(link) {
+      return link && link.status === 'current';
+    }
+
+    async function endStructureLink(organisationId, linkId) {
+      const index = await loadOrgIndex(resolved, organisationId);
+      if (!index.link_ids.includes(linkId)) {
+        throw Object.assign(new Error('That line is not part of this organisation chart.'), {
+          status: 404,
+          code: 'structure_link_not_found'
+        });
+      }
+      const link = await linksRepo.getLink(linkId, accessContext);
+      if (!linkIsCurrent(link)) return link;
+      if (link.temporal_mode !== 'period') {
+        return linksRepo.suppressLink(linkId, 'org_chart_removed', createAccessContext({ workflow: 'administration' }));
+      }
+      return linksRepo.endLink(linkId, now(), accessContext);
+    }
+
+    // Remove a box from the chart: archive the position (history stays in
+    // Blobs) and end every current line touching it — holder, reporting
+    // lines, works-with — so no edge is left pointing at a missing box.
+    async function archivePosition(organisationId, positionId) {
+      if (!isValidPositionId(positionId)) {
+        throw Object.assign(new Error('Invalid position id.'), { status: 400, code: 'invalid_position_id' });
+      }
+      const existing = parsePositionRecord(await getJSON(resolved, positionKey(positionId)));
+      if (!existing) {
+        throw Object.assign(new Error('Position not found.'), { status: 404, code: 'position_not_found' });
+      }
+      const orgRef = formatEntityRef({ namespace: 'shared', kind: 'organisation', id: organisationId });
+      if (existing.organisation_ref !== orgRef) {
+        throw Object.assign(new Error('Position belongs to another organisation.'), {
+          status: 400,
+          code: 'position_organisation_mismatch'
+        });
+      }
+      const positionRef = formatEntityRef({ namespace: 'shared', kind: 'position', id: positionId });
+      const { links } = await loadStructure(organisationId);
+      const ended = [];
+      for (const link of links) {
+        if (!linkIsCurrent(link)) continue;
+        if (link.source_ref !== positionRef && link.target_ref !== positionRef) continue;
+        await endStructureLink(organisationId, link.id);
+        ended.push(link.id);
+      }
+      const updated = { ...existing, lifecycle_status: 'archived', updated_at: now() };
+      await setJSON(resolved, positionKey(positionId), updated);
+      return { position: updated, ended_link_ids: ended };
     }
 
     return {
@@ -512,7 +639,10 @@ export function createOrgStructureRepository(deps = {}) {
       createPosition,
       updatePosition,
       createStructureLink,
-      getDerivedGraph
+      getDerivedGraph,
+      saveLayout,
+      endStructureLink,
+      archivePosition
     };
   }
 
@@ -537,6 +667,15 @@ export function createOrgStructureRepository(deps = {}) {
     },
     async getDerivedGraph(organisationId, peopleById) {
       return (await withStore()).getDerivedGraph(organisationId, peopleById);
+    },
+    async saveLayout(organisationId, layout) {
+      return (await withStore()).saveLayout(organisationId, layout);
+    },
+    async endStructureLink(organisationId, linkId) {
+      return (await withStore()).endStructureLink(organisationId, linkId);
+    },
+    async archivePosition(organisationId, positionId) {
+      return (await withStore()).archivePosition(organisationId, positionId);
     },
     /** Test helper: bind a store without reopening Blobs. */
     withStore

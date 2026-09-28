@@ -2,6 +2,8 @@ import { apiGet, apiPatch, apiPost } from './client';
 
 export interface DirectoryPersonRow {
   id: string;
+  /** Students are a separate type from colleagues (server-classified). */
+  person_type?: 'colleague' | 'student';
   ref: string;
   display_name: string;
   initials: string;
@@ -47,8 +49,10 @@ export interface DirectoryOrganisation {
 
 export interface PeopleDirectoryResponse {
   people: DirectoryPersonRow[];
+  /** Students — never mixed into `people` (the colleague network). */
+  students?: DirectoryPersonRow[];
   organisations: DirectoryOrganisation[];
-  counts: { people: number; organisations: number };
+  counts: { people: number; organisations: number; students?: number };
 }
 
 export function fetchPeopleDirectory(options: { signal?: AbortSignal } = {}): Promise<PeopleDirectoryResponse> {

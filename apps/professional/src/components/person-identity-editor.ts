@@ -21,6 +21,7 @@ const ROLE_OPTIONS = [
   { value: 'referee', label: 'Referee' },
   { value: 'conference_contact', label: 'Conference contact' },
   { value: 'introduction', label: 'Introduction' },
+  { value: 'student', label: 'Student' },
   { value: 'other', label: 'Other' }
 ] as const;
 

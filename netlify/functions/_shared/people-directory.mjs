@@ -22,6 +22,7 @@ const ROLE_LABELS = {
   referee: 'Referee',
   conference_contact: 'Conference contact',
   introduction: 'Introduction',
+  student: 'Student',
   other: 'Other'
 };
 
@@ -64,10 +65,16 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
   const organisationsByRef = new Map();
   const people = [];
 
+  // Students are their own type: never mixed into `people` (the colleague
+  // network every other surface reads), listed separately under `students`
+  // so the People page can show them on their own. Imported Communications
+  // students only arrive when the caller opted in (`includeStudents`).
+  const students = [];
+
   for (const { person, relationships } of peopleWithRelationships) {
     if (!person || person.is_self) continue;
-    // Prefer hide, not badge — Communications students are not network colleagues.
-    if (isImportedStudentPerson(person)) continue;
+    const importedStudent = isImportedStudentPerson(person);
+    if (importedStudent && !options.includeStudents) continue;
     if (person.lifecycle_status === 'deleted' || person.lifecycle_status === 'deidentified') continue;
 
     const personRef = person.ref ?? formatEntityRef({ namespace: 'shared', kind: 'person', id: person.id });
@@ -127,12 +134,17 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
     // Never surface Notion URL / `p/` debris in the directory name or avatar.
     const displayName = cleanIdentityDisplayName(person.display_name) || person.display_name;
 
-    people.push({
+    const isStudent =
+      importedStudent || proRoles.some((r) => r.role === 'student' && r.current);
+    const target = isStudent ? students : people;
+
+    target.push({
       id: person.id,
+      person_type: isStudent ? 'student' : 'colleague',
       ref: personRef,
       display_name: displayName,
       initials: monogram(displayName),
-      role_line: roleLine,
+      role_line: importedStudent && !proRoles.length && !primaryOrg ? 'Student' : roleLine,
       relationship_roles: proRoles,
       organisation: primaryOrg
         ? {
@@ -173,14 +185,18 @@ export function assemblePeopleDirectory(peopleWithRelationships, options = {}) {
   // with no roles/org). Distinct people who share a name but have relationship
   // signal stay separate.
   const deduped = collapseHermitNameTwins(people);
+  students.sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' }));
+  const dedupedStudents = collapseHermitNameTwins(students);
 
   return {
     people: deduped,
+    students: dedupedStudents,
     organisations: [...organisationsByRef.values()].sort((a, b) =>
       a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' })
     ),
     counts: {
       people: deduped.length,
+      students: dedupedStudents.length,
       organisations: organisationsByRef.size
     }
   };

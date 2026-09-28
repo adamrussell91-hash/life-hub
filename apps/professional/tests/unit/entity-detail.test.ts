@@ -294,9 +294,9 @@ describe('renderPersonPage', () => {
     const canvas = document.createElement('div');
     await renderPersonPage(canvas, PERSON_ID);
     clickTab(canvas, 'Shared Work');
-    expect(canvas.textContent).toMatch(/Meeting · Seth planning/);
-    expect(canvas.textContent).toMatch(/Event · PD day/);
-    expect(canvas.textContent).toMatch(/Application · Classroom Teacher/);
+    expect(canvas.textContent).toMatch(/Meetings · 1\s*Seth planning/);
+    expect(canvas.textContent).toMatch(/Events · 1\s*PD day/);
+    expect(canvas.textContent).toMatch(/Applications · 1\s*Classroom Teacher/);
     const meetingLink = [...canvas.querySelectorAll('a')].find((a) =>
       a.textContent?.includes('Seth planning')
     );
@@ -646,7 +646,7 @@ describe('renderPersonPage', () => {
     expect(canvas.querySelector('.entity-detail__relationship-role')?.textContent).toBe('Gifted Education Teacher');
     const row = editButtons[0].closest('li') ?? editButtons[1].closest('li');
     expect(row?.querySelector('.entity-detail__relationship-identity')?.textContent).toBe(
-      'employee_at · Example University'
+      'Employee · Example University'
     );
     expect(row?.textContent).toMatch(/Example University Gifted Education Teacher/);
     expect(row?.textContent).not.toMatch(/UniversityGifted/);
@@ -804,7 +804,7 @@ describe('renderOrganisationPage', () => {
     expect(canvas.querySelector('.orgs-page__title')?.textContent).toBe('Example University');
     expect(canvas.querySelector('.orgs-section--how')).not.toBeNull();
     expect(canvas.querySelector('.orgs-section--ann')).not.toBeNull();
-    expect(canvas.textContent).toMatch(/No structure yet/);
+    expect(canvas.textContent).toMatch(/No chart yet/);
     expect(canvas.querySelector('.orgs-section--time')).not.toBeNull();
   });
 });

@@ -151,7 +151,7 @@ const REGISTRY = new Map([
       allowedRoles: [
         'colleague', 'former_colleague', 'mentor', 'mentee',
         'academic_contact', 'research_collaborator', 'recruiter',
-        'referee', 'conference_contact', 'introduction', 'other'
+        'referee', 'conference_contact', 'introduction', 'student', 'other'
       ],
       metadataKeys: ['human_label', 'tie_pair_key', 'evidence_count', 'pair_names']
     })
