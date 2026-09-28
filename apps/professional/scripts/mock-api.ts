@@ -2397,6 +2397,33 @@ export function createMockApi() {
           valid_from: '2025-01-22',
           valid_to: null,
           link_status: 'current'
+        },
+        {
+          ref: 'shared:organisation:org_aloysius',
+          kind: 'organisation',
+          display_label: "St Aloysius' College",
+          role: 'Leader of Learning Enrichment',
+          valid_from: '2025-01-22',
+          valid_to: null,
+          link_status: 'current'
+        },
+        {
+          ref: 'shared:organisation:org_aloysius',
+          kind: 'organisation',
+          display_label: "St Aloysius' College",
+          role: 'Curriculum Leader',
+          valid_from: '2024-01-01',
+          valid_to: '2024-12-20',
+          link_status: 'ended'
+        },
+        {
+          ref: 'shared:organisation:org_aloysius',
+          kind: 'organisation',
+          display_label: "St Aloysius' College",
+          role: 'Professional Learning Coordinator',
+          valid_from: '2024-08-19',
+          valid_to: '2024-12-20',
+          link_status: 'ended'
         }
       ];
       return json(200, {
