@@ -16,7 +16,11 @@
   color: var(--on-dark);
   position: sticky;
   top: 0;
+  align-self: start;
   height: 100dvh;
+  max-height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 /* Maps to kit `.hub-rail__brand`: single line, CSS uppercase micro brand. */
@@ -39,12 +43,18 @@
   cursor: pointer;
 }
 
+/* Same scroll contract as kit `.hub-rail__nav` / Professional: tall Library +
+   HUBS lists must scroll inside the height-locked rail, not clip Professional. */
 .rail__nav {
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 1 1 0;
   gap: var(--space-1);
   width: 100%;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .rail .hub-rail__hubs {
