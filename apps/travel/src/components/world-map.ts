@@ -1,50 +1,86 @@
 import { geoInterpolate, geoNaturalEarth1, geoPath } from 'd3-geo';
 import { feature } from 'topojson-client';
 import worldAtlas from 'world-atlas/land-110m.json';
-import type { City, Trip } from '@/types';
+import type { Trip, TicketItem } from '@/types';
+import { I } from '@/lib/icons';
 import { zoomable } from '@/lib/zoomable';
 import { formatWeekdayDate } from '@/lib/date-label';
 
 const VIEW_W = 1000;
 const VIEW_H = 540;
 
-interface Leg {
-  fromCity: City;
-  toCity: City;
-  booked: boolean;
-  rail: boolean;
-  statusText: string;
+/** A dot on the route: a trip city, or home (where the trip starts). */
+interface RoutePoint {
+  id: string;
+  name: string;
+  center: { lat: number; lon: number };
+  isHome?: boolean;
 }
 
-function tripLegs(trip: Trip): Leg[] {
-  const tickets = trip.items
-    .filter((item) => item.kind === 'flight' || item.kind === 'train')
-    .sort((a, b) => (a.date === b.date ? (a.time ?? '').localeCompare(b.time ?? '') : a.date < b.date ? -1 : 1));
+interface Leg {
+  fromCity: RoutePoint;
+  toCity: RoutePoint;
+  booked: boolean;
+  rail: boolean;
+  statusHtml: string;
+}
+
+/** Trips store only `home_tz`; this places home on the map so the first leg
+ * (e.g. SYD → KUL) is drawn, as in the mockup. */
+const HOME_POINTS: Record<string, Omit<RoutePoint, 'id' | 'isHome'>> = {
+  'Australia/Sydney': { name: 'Sydney', center: { lat: -33.8688, lon: 151.2093 } }
+};
+
+function routeStops(trip: Trip): RoutePoint[] {
+  const ordered = [...trip.cities].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
+  const home = HOME_POINTS[trip.home_tz];
+  return home ? [{ id: 'home', ...home, isHome: true }, ...ordered] : ordered;
+}
+
+const escapeHtml = (text: string): string =>
+  text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+
+/** One leg per consecutive pair of route stops, in trip order. Tickets are
+ * filed under their arrival city (`city_id === arrive_city_id`), so the
+ * from-city is the previous stop; a ticket is the leg into a city only when it
+ * departs or lands on that city's first day (a Glasgow → Fort William train
+ * inside Scotland is not the Istanbul → Scotland leg). */
+export function tripLegs(trip: Trip): Leg[] {
+  const stops = routeStops(trip);
+  const tickets = trip.items.filter(
+    (item): item is TicketItem => item.kind === 'flight' || item.kind === 'train'
+  );
   const legs: Leg[] = [];
-  for (const t of tickets) {
-    if (t.kind !== 'flight' && t.kind !== 'train') continue;
-    const fromCity = trip.cities.find((c) => c.id === t.city_id);
-    const toCity = trip.cities.find((c) => c.id === t.arrive_city_id);
-    if (!fromCity || !toCity) continue;
-    const label = `${formatWeekdayDate(t.date)} · ${t.from_code} → ${t.to_code}. ${t.carrier} ${t.number}.`;
-    legs.push({
-      fromCity,
-      toCity,
-      booked: t.status === 'booked',
-      rail: t.kind === 'train',
-      statusText: t.status === 'booked' ? `${label} Booked.` : `${label} Not booked yet.`
-    });
-  }
-  // Gaps: consecutive cities (by start_date) with no ticket between them.
-  const orderedCities = [...trip.cities].sort((a, b) => (a.start_date < b.start_date ? -1 : 1));
-  for (let i = 0; i < orderedCities.length - 1; i++) {
-    const a = orderedCities[i]!;
-    const b = orderedCities[i + 1]!;
-    const hasLeg = legs.some(
-      (l) => (l.fromCity.id === a.id && l.toCity.id === b.id) || (l.fromCity.id === b.id && l.toCity.id === a.id)
-    );
-    if (!hasLeg) {
-      legs.push({ fromCity: a, toCity: b, booked: false, rail: false, statusText: 'Not booked yet.' });
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i]!;
+    const b = stops[i + 1]!;
+    const city = trip.cities.find((c) => c.id === b.id);
+    const t = city
+      ? tickets.find(
+          (x) =>
+            (x.arrive_city_id ?? x.city_id) === b.id &&
+            (x.date === city.start_date || x.arrive_date === city.start_date)
+        )
+      : undefined;
+    if (t) {
+      const head = `${formatWeekdayDate(t.date)} · ${t.from_code} → ${t.to_code}.`;
+      legs.push({
+        fromCity: a,
+        toCity: b,
+        booked: t.status === 'booked',
+        rail: t.kind === 'train',
+        statusHtml: `<b>${escapeHtml(head)}</b> ${escapeHtml(`${t.carrier} ${t.number}`)}. ${
+          t.status === 'booked' ? 'Booked.' : 'Not booked yet.'
+        }`
+      });
+    } else {
+      legs.push({
+        fromCity: a,
+        toCity: b,
+        booked: false,
+        rail: false,
+        statusHtml: `<b>${escapeHtml(`${a.name} → ${b.name}.`)}</b> Not booked yet.`
+      });
     }
   }
   return legs;
@@ -70,20 +106,22 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
   svg.setAttribute('aria-label', 'Route map');
 
   const projection = geoNaturalEarth1().rotate([-70, 0]);
-  const cities = trip.cities;
-  if (cities.length > 0) {
+  const stops = routeStops(trip);
+  if (stops.length > 0) {
     const box = {
       type: 'Feature',
       geometry: {
         type: 'LineString',
-        coordinates: cities.map((c) => [c.center.lon, c.center.lat])
+        coordinates: stops.map((c) => [c.center.lon, c.center.lat])
       },
       properties: {}
     };
     projection.fitExtent(
       [
-        [40, 40],
-        [VIEW_W - 40, VIEW_H - 40]
+        // Bottom and right leave room for the status chip / Replay footer and
+        // the zoom control, which overlay the map (Sydney sat under Replay).
+        [40, 50],
+        [VIEW_W - 90, VIEW_H - 90]
       ],
       box as never
     );
@@ -128,33 +166,59 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
   svg.append(legsGroup);
 
   const stopsGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  const placedLabels: { x: number; y: number; w: number; h: number }[] = [];
-  for (const city of cities) {
-    const p = projection([city.center.lon, city.center.lat]);
-    if (!p) continue;
+  type Box = { x: number; y: number; w: number; h: number };
+  const hit = (p: Box, q: Box) => p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h;
+  const projected = stops
+    .map((stop) => ({ stop, p: projection([stop.center.lon, stop.center.lat]) }))
+    .filter((e): e is { stop: RoutePoint; p: [number, number] } => Boolean(e.p));
+  // Dots are obstacles for every label; labels are placed in route order.
+  const taken: Box[] = projected.map(({ p }) => ({ x: p[0] - 9, y: p[1] - 9, w: 18, h: 18 }));
+  // Label to the right of the dot (mockup), then below/above, then the left side.
+  const candidates: { anchor: 'start' | 'end' | 'middle'; dx: number; dy: number }[] = [
+    { anchor: 'start', dx: 12, dy: 6 },
+    { anchor: 'start', dx: 12, dy: 22 },
+    { anchor: 'start', dx: 12, dy: -8 },
+    { anchor: 'end', dx: -12, dy: 6 },
+    { anchor: 'end', dx: -12, dy: 22 },
+    { anchor: 'end', dx: -12, dy: -8 },
+    { anchor: 'middle', dx: 0, dy: -14 },
+    { anchor: 'middle', dx: 0, dy: 28 }
+  ];
+  for (const { stop, p } of projected) {
     const [x, y] = p;
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.setAttribute('class', 'stop cs');
-    g.dataset.cityId = city.id;
     g.dataset.x = String(x);
     g.dataset.y = String(y);
     g.setAttribute('transform', `translate(${x},${y})`);
-    g.setAttribute('tabindex', '0');
-    g.setAttribute('role', 'button');
-    g.setAttribute('aria-label', city.name);
+    if (!stop.isHome) {
+      g.dataset.cityId = stop.id;
+      g.setAttribute('tabindex', '0');
+      g.setAttribute('role', 'button');
+      g.setAttribute('aria-label', stop.name);
+    } else {
+      g.classList.add('is-home');
+    }
 
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('r', '7');
     g.append(circle);
 
-    // Label offset: alternate above/below to reduce overlap (C1 basic pass).
-    const above = placedLabels.length % 2 === 0;
+    const w = stop.name.length * 9.4;
+    const boxFor = (c: (typeof candidates)[number]): Box => ({
+      x: x + c.dx - (c.anchor === 'end' ? w : c.anchor === 'middle' ? w / 2 : 0),
+      y: y + c.dy - 14,
+      w,
+      h: 18
+    });
+    const pick = candidates.find((c) => !taken.some((t) => hit(boxFor(c), t))) ?? candidates[0]!;
+    taken.push(boxFor(pick));
     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    text.textContent = city.name;
-    text.setAttribute('text-anchor', 'middle');
-    text.setAttribute('y', above ? '-14' : '22');
+    text.textContent = stop.name;
+    text.setAttribute('text-anchor', pick.anchor);
+    text.setAttribute('x', String(pick.dx));
+    text.setAttribute('y', String(pick.dy));
     g.append(text);
-    placedLabels.push({ x, y, w: city.name.length * 8, h: 16 });
 
     stopsGroup.append(g);
   }
@@ -162,9 +226,23 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
 
   const mover = document.createElementNS('http://www.w3.org/2000/svg', 'g');
   mover.setAttribute('class', 'mover cs');
-  const moverPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  moverPath.setAttribute('d', 'M-8 0h16l-4 4h-8z');
-  mover.append(moverPath);
+  const planePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  planePath.setAttribute(
+    'd',
+    'M16 21h-2l-5-8H3.5a1.5 1.5 0 0 1 0-3H9l5-8h2l-2.5 8H19l1.5-2H22l-1 3.5 1 3.5h-1.5L19 13h-5.5z'
+  );
+  const trainG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  const trainPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  trainPath.setAttribute('d', 'M2 8h11v9H2zM13 11h6l4 3v3H13zM6 3h3v5H6z');
+  trainPath.setAttribute('transform', 'translate(-14,-14) scale(1.2)');
+  const puff = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  puff.setAttribute('class', 'puff');
+  puff.setAttribute('x', '14');
+  puff.setAttribute('y', '-16');
+  puff.textContent = 'choo choo!';
+  trainG.append(trainPath, puff);
+  trainG.setAttribute('visibility', 'hidden');
+  mover.append(planePath, trainG);
   mover.dataset.x = '0';
   mover.dataset.y = '0';
   svg.append(mover);
@@ -176,15 +254,17 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
   const statusChip = document.createElement('div');
   statusChip.className = 'status-chip';
   const firstLeg = legs[0];
-  statusChip.textContent = firstLeg ? firstLeg.statusText : 'No legs yet.';
+  statusChip.setAttribute('aria-live', 'polite');
+  statusChip.innerHTML = firstLeg ? firstLeg.statusHtml : 'No legs yet.';
   const replayBtn = document.createElement('button');
   replayBtn.type = 'button';
-  replayBtn.className = 'btn ghost';
-  replayBtn.textContent = 'Replay';
+  replayBtn.className = 'btn';
+  replayBtn.innerHTML = `${I.play}Replay the trip`;
   footer.append(statusChip, replayBtn);
   wrap.append(footer);
   host.append(wrap);
 
+  let zoomK = 1;
   let animationFrame: number | null = null;
   function animateMover(): void {
     if (animationFrame) cancelAnimationFrame(animationFrame);
@@ -203,7 +283,10 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
       const leg = legs[legIndex]!;
       const t = Math.min(1, (elapsed - legIndex * perLegMs) / perLegMs);
       placeMoverAt(leg, t);
-      statusChip.textContent = leg.statusText;
+      if (statusChip.dataset.leg !== String(legIndex)) {
+        statusChip.dataset.leg = String(legIndex);
+        statusChip.innerHTML = leg.statusHtml;
+      }
       if (elapsed < legs.length * perLegMs) {
         animationFrame = requestAnimationFrame(frame);
       }
@@ -223,13 +306,21 @@ export function renderWorldMap(host: HTMLElement, trip: Trip): WorldMapHandle {
     mover.dataset.y = String(p[1]);
     let angleDeg = 0;
     if (pNext) angleDeg = (Math.atan2(pNext[1] - p[1], pNext[0] - p[0]) * 180) / Math.PI;
-    mover.setAttribute('transform', `translate(${p[0]},${p[1]}) rotate(${angleDeg})`);
+    mover.setAttribute('transform', `translate(${p[0]},${p[1]}) scale(${zoomK})`);
+    // The plane path's nose points left: flip it, then turn it along the leg.
+    planePath.setAttribute('transform', `rotate(${angleDeg}) scale(-1.4,1.4) translate(-12,-12)`);
+    planePath.setAttribute('visibility', leg.rail ? 'hidden' : 'visible');
+    trainG.setAttribute('visibility', leg.rail ? 'visible' : 'hidden');
   }
 
   replayBtn.addEventListener('click', animateMover);
   animateMover();
 
-  zoomable(svg, wrap, {});
+  zoomable(svg, wrap, {
+    onChange: (k) => {
+      zoomK = k;
+    }
+  });
 
   let onSelectCb: ((cityId: string) => void) | null = null;
   stopsGroup.querySelectorAll<SVGGElement>('.stop').forEach((g) => {
