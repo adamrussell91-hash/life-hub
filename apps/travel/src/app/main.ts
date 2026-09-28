@@ -86,8 +86,20 @@ async function bootApp(root: HTMLElement): Promise<void> {
       if (route.name === 'trips') {
         const { trips } = await listTrips();
         if (generation !== routeGeneration) return;
+        // One trip → paint it in this turn (V3). Do not `location.hash =` and
+        // return with an empty canvas while waiting on hashchange.
         if (trips.length === 1) {
-          location.hash = `#/trip/${encodeURIComponent(trips[0]!.id)}`;
+          const tripId = trips[0]!.id;
+          const tripHash = `#/trip/${encodeURIComponent(tripId)}`;
+          if (location.hash !== tripHash) {
+            history.replaceState(null, '', tripHash);
+          }
+          currentTripId = tripId;
+          renderHighlight('trip');
+          renderPageHeader(shell, { eyebrow: 'Life Hub · Travel', title: '' });
+          await renderTripPage(shell.canvas, tripId, {
+            isCurrent: () => generation === routeGeneration
+          });
           return;
         }
         renderHighlight('trips');
@@ -138,7 +150,10 @@ async function bootApp(root: HTMLElement): Promise<void> {
     void paint();
   });
 
-  if (!location.hash || location.hash === '#/') location.hash = '#/';
+  // V3: default hash via replaceState — never location.hash= when hashchange also paints.
+  if (!location.hash || location.hash === '#/') {
+    history.replaceState(null, '', '#/');
+  }
   await paint();
 }
 
