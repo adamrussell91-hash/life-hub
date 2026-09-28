@@ -228,44 +228,39 @@ export function truncateRiverLabel(text: string, availPx: number): string {
   return `${raw.slice(0, Math.max(1, maxChars - 1))}…`;
 }
 
+const LEAD_OF = /^(head|deputy|leader|director|principal)\s+of\b/i;
+const LEAD = /^(head|deputy|leader|director|principal)\b/i;
+const TRAILING_ROLE = /\s+(Teacher|Coordinator|Officer|Specialist|Educator)$/i;
+const GLUE = /^(and|of|the|for|&)$/i;
+const AND = /^(and|&)$/i;
+
 /**
  * Compact role label for the Career river band.
- * One readable short form — never dangling "Leader of" / "Head of" / "HSIE and",
- * never width-truncated here (placement decides hide-on-collision, not ellipsis).
+ * Complete short phrases only — never dangling "of" / "and"; never width-truncated
+ * (placement hides on collision instead of ellipsis).
  */
 export function riverJobShortLabel(title: string): string {
   const raw = (title || '').trim();
   if (!raw) return 'Role';
   const parts = raw.split(/\s+/);
-  // "Leader of Learning Enrichment" → "Leader of Learning" (complete; never end on "of")
-  if (/^(head|deputy|leader|director|principal)\s+of\b/i.test(raw)) {
-    return parts.slice(0, Math.min(parts.length, 3)).join(' ');
-  }
-  if (/^(head|deputy|leader|director|principal)\b/i.test(raw)) {
-    return parts.slice(0, Math.min(2, parts.length)).join(' ');
-  }
-  const stripped = raw
-    .replace(/\s+(Teacher|Coordinator|Officer|Specialist|Educator)$/i, '')
-    .trim();
-  const sParts = stripped.split(/\s+/).filter(Boolean);
-  if (sParts.length === 0) return raw;
-  // "HSIE and Business Studies" → primary subject only (never end on "and")
-  const andIdx = sParts.findIndex((p) => /^(and|&)$/i.test(p));
-  if (andIdx === 1) return sParts[0]!;
-  if (sParts.length <= 2) {
-    if (sParts.length === 2 && /^(and|of|the|for|&)$/i.test(sParts[1]!)) return sParts[0]!;
+  // "Leader of Learning Enrichment" → "Leader of Learning"
+  if (LEAD_OF.test(raw)) return parts.slice(0, 3).join(' ');
+  if (LEAD.test(raw)) return parts.slice(0, 2).join(' ');
+
+  const stripped = raw.replace(TRAILING_ROLE, '').trim();
+  const words = stripped.split(/\s+/).filter(Boolean);
+  if (!words.length) return raw;
+  // "HSIE and Business Studies" → primary subject
+  if (words.length >= 2 && AND.test(words[1]!)) return words[0]!;
+  if (words.length <= 2) {
+    if (words.length === 2 && GLUE.test(words[1]!)) return words[0]!;
     return stripped;
   }
+
   let n = 2;
-  let out = sParts.slice(0, n).join(' ');
-  while (/\b(and|of|the|for|&)$/i.test(out) && n < sParts.length) {
-    n += 1;
-    out = sParts.slice(0, n).join(' ');
-  }
-  if (/\b(and|of|the|for|&)$/i.test(out)) {
-    out = sParts.slice(0, Math.max(1, n - 1)).join(' ');
-  }
-  return out;
+  while (n < words.length && GLUE.test(words[n - 1]!)) n += 1;
+  if (GLUE.test(words[n - 1]!)) n = Math.max(1, n - 1);
+  return words.slice(0, n).join(' ');
 }
 
 /**
