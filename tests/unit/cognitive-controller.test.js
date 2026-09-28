@@ -148,7 +148,9 @@ test('JSON voice output supplies the checkpoint question instead of failing the 
     assert.equal(s.transcript.at(-1).text.includes('{"text"'),false);
   }
   let s=start('fates','sprint');
-  await assert.rejects(()=>advance(s,{model:async()=>({text:JSON.stringify({text:'Only analysis.',question:null,evidenceIds:[]}),evidenceIds:[]}),retrieve}),/omitted its required checkpoint question/);
+  {const calls=[];const g=await advance(s,{model:async p=>{calls.push(p);return {text:JSON.stringify({text:'Only analysis.',question:null,evidenceIds:[]}),evidenceIds:[]};},retrieve});
+   assert.equal(g.status,'waiting');assert.ok(g.checkpoint.question,'gate falls back to a checkpoint question');
+   assert.match(calls[1].system,/had no question/,'the voice is re-asked once first');}
   s=start('fates','sprint');
   s=await advance(s,{model:async()=>({text:'{"text":"Audience is still open.\\nTime is not.","question":"Which constraint should govern the first pass?","evidenceIds":[]}'.replace('\\n','\n'),evidenceIds:[]}),retrieve});
   assert.equal(s.status,'waiting');
@@ -177,22 +179,21 @@ test('Mirror speakers receive Gu Jian / Wang Yuan / Zheng Ming writing profiles'
   assert.match(zheng,/You are Zheng Ming only/);
   assert.match(zheng,/seven-day/);
 });
-test('Mirror non-final bursts reject missing in-character questions',async()=>{
-  let s=start('mirror');
-  await assert.rejects(
-    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'One weekend is not a pattern.',question:null,done:true,evidenceIds:[]})}),
-    /required in-character question/
-  );
+test('Mirror and Fates re-ask a missing in-character question once, then continue instead of failing',async()=>{
+  const retrieve=async()=>({evidence:[],status:'none'});
+  for(const [id,mode,speaker] of [['mirror','quick','retrospective'],['fates','sprint','clotho']]){
+    let s=start(id,mode);s.cursor=s.steps.findIndex(st=>st.speaker===speaker);s.status='queued';s.burst=0;s.retrieved=true;
+    const calls=[];
+    s=await advance(s,{retrieve,oneStage:true,model:async p=>{calls.push(p);return {text:'A reading with no question.',question:null,done:true,evidenceIds:[]};}});
+    assert.notEqual(s.status,'failed',`${id} must not fail`);
+    assert.equal(calls.length,2,`${id} re-asks once`);assert.match(calls[1].system,/had no question/);
+  }
 });
-test('Fates non-final Clotho bursts reject missing in-character questions',async()=>{
-  let s=start('fates','sprint');
-  s.cursor=s.steps.findIndex(st=>st.speaker==='clotho');
-  if(s.cursor<0){s.steps=[{speaker:'clotho',stage:'cycle1-clotho',maxBursts:3,burstWords:90}];s.cursor=0;}
-  s.status='queued';s.burst=0;s.retrieved=true;
-  await assert.rejects(
-    ()=>advance(s,{retrieve:async()=>({evidence:[],status:'none'}),model:async()=>({text:'Three threads!!',question:null,done:true,evidenceIds:[]})}),
-    /required in-character question/
-  );
+test('Consilium falls back to an invitation when a voice still will not ask',async()=>{
+  let s=start('consilium');const retrieve=async()=>({evidence:[],status:'none'});
+  s.cursor=1;s.status='queued';s.retrieved=true;s.dialogueCounts={principle:1};s.stage='dialogue';
+  s=await advance(s,{retrieve,oneStage:true,model:async()=>({text:'Duty and rights here require candour.',question:null,done:true,evidenceIds:[]})});
+  assert.equal(s.status,'waiting');assert.match(s.checkpoint.question,/What is your response to Gaius Officius/);
 });
 test('every protocol voice receives a You-are-X-only speaker register in the prompt',()=>{
   const samples=[

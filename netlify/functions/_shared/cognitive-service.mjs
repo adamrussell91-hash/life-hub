@@ -120,7 +120,12 @@ export function createCognitiveService({ store, model, retrieve, now = Date.now,
     },
     async get(owner, id) {
       const row = await read(owner, id);
-      if (row.value.status === 'completed') return touchCompleted(owner, id, row);
+      // Polling must stay fast: the runner that holds the lease writes the summary and Central Node lines.
+      // A GET only finishes a completed session nobody is running, and never fails the refresh over it.
+      if (row.value.status === 'completed' && !(row.value.lease?.expiresAt > now())) {
+        try { return await touchCompleted(owner, id, row); }
+        catch { return publicSession((await store.read(owner, id))?.value ?? row.value); }
+      }
       return publicSession(row.value);
     },
     async list(owner, { limit = 100, offset = 0 } = {}) {
