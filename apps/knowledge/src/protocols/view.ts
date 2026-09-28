@@ -1,7 +1,7 @@
 import { API_BASE } from "../api/config";
 import { USE_LOCAL_DATA } from "../api/client";
 import { escapeHtml } from "../lib/dom";
-import { stripDanglingQuestions } from "../../../../config/knowledge/cognitive/dangling-question.mjs";
+import { dropCheckpointAsk } from "../../../../config/knowledge/cognitive/dangling-question.mjs";
 import { catalog as definitionCatalog } from "../../../../config/knowledge/cognitive/definitions.mjs";
 
 type Definition = { id: string; name: string; description: string; motif: string; defaultMode: string; modes: { id: string; label: string; description: string }[]; intake: { id: string; label: string; required: boolean; type: string; options?: { value: string; label: string }[] }[]; voices: { id: string; name: string; role: string }[] };
@@ -510,8 +510,8 @@ function liveSlotHtml(session: Session, definition: Definition, who: string, rol
 function readTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
   return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${turnBodyHtml(turn.text)}${sourcesHtml(turn, evidence)}</article>`;
 }
-function endedTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = []): string {
-  const body = stripDanglingQuestions(turn.text);
+function endedTurnCardHtml(turn: Turn, who: string, role: string, evidence: Evidence[] = [], question?: string): string {
+  const body = dropCheckpointAsk(turn.text, question);
   return `<article class="protocol-turn-card" data-turn-id="${escapeHtml(turn.id)}">${personaMetaHtml(who, role)}${body ? turnBodyHtml(body) : ""}<p>Session ended.</p>${sourcesHtml(turn, evidence)}</article>`;
 }
 function joiningCardHtml(who: string, role: string): string {
@@ -577,7 +577,7 @@ export function sessionView(session: Session, definition: Definition, viewingInd
   const cardHtml = cardIsLive
     ? liveSlotHtml(session, definition, activeName, activeRole, precedingText, precedingTurn)
     : turn
-      ? (ended && isLatest ? endedTurnCardHtml(turn, activeName, activeRole, session.evidence) : readTurnCardHtml(turn, activeName, activeRole, session.evidence))
+      ? (ended && isLatest ? endedTurnCardHtml(turn, activeName, activeRole, session.evidence, session.checkpoint?.question) : readTurnCardHtml(turn, activeName, activeRole, session.evidence))
       : ended
         ? `<article class="protocol-turn-card"><p>Session ended.</p></article>`
         : joiningCardHtml(activeName, activeRole);
@@ -771,7 +771,17 @@ export function renderProtocols({ host }: { host: HTMLElement }) {
     if (action && currentSession) {
       const prior = currentSession;
       // End session takes effect on screen at once; the server applies cancel to its latest state.
-      if (action === "cancel") { currentSession = { ...prior, status: "cancelled", checkpoint: null }; paint(); }
+      if (action === "cancel") {
+        const ask = prior.checkpoint?.question;
+        const last = [...prior.transcript].reverse().find(turn => turn.role !== "user");
+        currentSession = {
+          ...prior,
+          status: "cancelled",
+          checkpoint: null,
+          transcript: prior.transcript.map(turn => turn === last ? { ...turn, text: dropCheckpointAsk(turn.text, ask) } : turn)
+        };
+        paint();
+      }
       postAction({ sessionId: prior.id, revision: prior.revision, requestId: crypto.randomUUID(), action }).catch(reason => {
         currentSession = { ...prior, error: { message: reason instanceof Error ? reason.message : "That did not go through.", retryable: true } };
         paint();
