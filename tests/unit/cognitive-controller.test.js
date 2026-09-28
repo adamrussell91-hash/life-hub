@@ -481,6 +481,8 @@ test('cancel clears the checkpoint so the reply cannot continue the run',async()
   assert.equal(c.status,'cancelled');
   assert.equal(c.checkpoint,null);
   assert.deepEqual(c.allowedActions,[]);
+  assert.doesNotMatch(c.transcript.at(-1).text,/\?/);
+  assert.doesNotMatch(c.transcript.at(-1).text,/Is that the thesis/);
   assert.throws(()=>act(c,{action:'confirm',revision:c.revision,requestId:randomUUID()}),/not allowed/);
 });
 test('third live run: Fates briefing may skip questions, interrogation passes are single-shot, search is capped',async()=>{

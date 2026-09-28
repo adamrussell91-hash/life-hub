@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { catalog } from '../../../config/knowledge/cognitive/definitions.mjs';
+import { dropTrailingQuestion, stripDanglingQuestions } from '../../../config/knowledge/cognitive/dangling-question.mjs';
 import { loadKnowledgePrompt } from './knowledge-prompts.mjs';
 export { catalog };
 export const MAX_TEXT=12000, MAX_TURNS=500, MAX_BYTES=1000000;
@@ -139,7 +140,7 @@ export function act(current,{action,text,revision,requestId}){
  if(['answer','correct','reflect','reopen'].includes(action)&&!text?.trim())throw fault(400,'validation_error','A response is required.');
  const s=copy(current);s.revision++;s.error=null;
  if(action==='pause'){s.resumeStatus=s.status;s.status='paused';s.lease=null;return refresh(s);}
- if(action==='cancel'){s.status='cancelled';s.checkpoint=null;s.lease=null;return refresh(s);}
+ if(action==='cancel'){s.status='cancelled';s.checkpoint=null;s.lease=null;const last=[...s.transcript].reverse().find(t=>t.role!=='user');if(last)last.text=stripDanglingQuestions(last.text);return refresh(s);}
  if(action==='resume'){s.status=s.resumeStatus==='waiting'?'waiting':'queued';return refresh(s);}
  if(action==='retry'){s.status='queued';s.lease=null;return refresh(s);}
  if(action==='wrap'){add(s,'user','you',s.stage,text?.trim()||'Wrap to the filter.');jumpToFilter(s);s.continueBurst=false;s.burst=0;s.checkpoint=null;s.status='queued';return refresh(s);}
@@ -381,12 +382,6 @@ function validateOutput(raw,s,p,{allowTrim=false}={}){
  }
  const done=raw.done===false?false:true;
  return {...raw,text,question,done,trimmed,evidenceIds:ids,nextSpeaker:raw.nextSpeaker};
-}
-function dropTrailingQuestion(text){
- const m=text.match(/(?:^|[\n.!])\s*[^\n.!?][^?\n.!]*\?\s*$/u);
- if(!m)return text;
- const kept=text.slice(0,m.index+(/^[.!]/.test(m[0])?1:0)).trim();
- return kept||text;
 }
 const HORIZON_ADVICE=/(?:^|[.!?]\s+)(?:Push|Take|Ask for|Go for|Choose|Consider|Apply for|Pursue|Seek|Start|Stop|Make sure)\b|\byou (?:should|must|need to|ought to)\b/i;
 // Loose on purpose: "Duty and rights here still require…" is the same opener.
