@@ -217,6 +217,7 @@ export function roleBandExtraPx(laneCount: number): number {
 /**
  * Truncate a river / gantt-style label to fit a pixel budget (~6px per char).
  * Empty string when the span is too short to show any text.
+ * Prefer {@link riverJobShortLabel} + below-bar placement over truncating role titles.
  */
 export function truncateRiverLabel(text: string, availPx: number): string {
   const raw = text.trim();
@@ -225,6 +226,32 @@ export function truncateRiverLabel(text: string, availPx: number): string {
   if (maxChars < 2) return '';
   if (raw.length <= maxChars) return raw;
   return `${raw.slice(0, Math.max(1, maxChars - 1))}…`;
+}
+
+/**
+ * Compact role label for the Career river band.
+ * One readable short form — never dangling "Leader of" / "Head of", never
+ * width-truncated here (placement decides hide-on-collision, not ellipsis).
+ */
+export function riverJobShortLabel(title: string): string {
+  const raw = (title || '').trim();
+  if (!raw) return 'Role';
+  const parts = raw.split(/\s+/);
+  // "Leader of Learning Enrichment" → keep through subject (never end on "of")
+  if (/^(head|deputy|leader|director|principal)\s+of\b/i.test(raw)) {
+    const n = Math.min(parts.length, Math.max(3, parts.length >= 4 ? 4 : 3));
+    return parts.slice(0, n).join(' ');
+  }
+  if (/^(head|deputy|leader|director|principal)\b/i.test(raw)) {
+    return parts.slice(0, Math.min(2, parts.length)).join(' ');
+  }
+  const stripped = raw
+    .replace(/\s+(Teacher|Coordinator|Officer|Specialist|Educator)$/i, '')
+    .trim();
+  const sParts = stripped.split(/\s+/).filter(Boolean);
+  if (sParts.length === 0) return raw;
+  if (sParts.length <= 2) return stripped;
+  return sParts.slice(0, 2).join(' ');
 }
 
 /**
