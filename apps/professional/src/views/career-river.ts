@@ -11,7 +11,6 @@ import {
   roleBandExtraPx,
   riverJobShortLabel,
   timeToUnit,
-  truncateRiverLabel,
   yearFraction,
   type RiverOrientation,
   type RiverZoom
@@ -94,10 +93,6 @@ function activePreset(
   return null;
 }
 
-function shortName(title: string): string {
-  return riverJobShortLabel(title);
-}
-
 function jobTip(job: CareerModel['employment'][number]): string {
   return (
     [job.role, job.display_label || job.label]
@@ -109,8 +104,44 @@ function jobTip(job: CareerModel['employment'][number]): string {
 
 function jobRoleLabel(job: CareerModel['employment'][number]): string {
   const role = (job.role || '').trim();
-  if (role) return riverJobShortLabel(role);
-  return riverJobShortLabel((job.display_label || job.label || 'Role').trim());
+  return riverJobShortLabel(role || (job.display_label || job.label || 'Role').trim());
+}
+
+type RoleLabelBox = { x: number; y: number; w: number; h: number };
+
+function roleLabelsOverlap(a: RoleLabelBox, b: RoleLabelBox): boolean {
+  return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+/** Full short label; hide when the box collides with an earlier one. */
+function appendRoleLabel(args: {
+  group: SVGElement;
+  boxes: RoleLabelBox[];
+  text: string;
+  tip: string;
+  x: number;
+  y: number;
+  place: 'below' | 'beside';
+}): void {
+  const { group, boxes, text, tip, x, y, place } = args;
+  if (!text) return;
+  const w = text.length * 6.2;
+  const box: RoleLabelBox =
+    place === 'below' ? { x: x - w / 2, y: y - 10, w, h: 12 } : { x, y: y - 10, w, h: 12 };
+  if (boxes.some((b) => roleLabelsOverlap(box, b))) return;
+  const attrs: Record<string, string | number> = {
+    x,
+    y,
+    class: 'career-river__role-label career-river__role-label--below',
+    'data-part': 'role-label',
+    'data-place': place
+  };
+  if (place === 'below') attrs['text-anchor'] = 'middle';
+  const label = svgEl('text', attrs);
+  label.textContent = text;
+  label.setAttribute('title', tip);
+  group.appendChild(label);
+  boxes.push(box);
 }
 
 /**
@@ -260,7 +291,7 @@ export function mountCareerRiver(
       if (future.fading) chip.classList.add('career-river__chip--fading');
       chip.classList.toggle('is-selected', state!.selectedId === future.id);
       const fadingNote = future.fading ? ' · fading' : '';
-      chip.textContent = `${shortName(future.title)} · ${future.readiness_label}${fadingNote}`;
+      chip.textContent = `${riverJobShortLabel(future.title)} · ${future.readiness_label}${fadingNote}`;
       chip.addEventListener('click', () => {
         if (state!.locked && state!.selectedId === future.id) {
           state!.locked = false;
@@ -427,7 +458,7 @@ export function mountCareerRiver(
     }
 
     // Role band: labeled duration bars (Tasks gantt-bar-text parity). Work list = dates detail.
-    const roleLabelBoxes: Array<{ x: number; y: number; w: number; h: number }> = [];
+    const roleLabelBoxes: RoleLabelBox[] = [];
     const employmentAll = model.employment.filter(
       (job): job is typeof job & { valid_from: string } => Boolean(job.valid_from)
     );
@@ -467,41 +498,26 @@ export function mountCareerRiver(
         bar.appendChild(title);
         group.appendChild(bar);
 
-        // One placement rule: full short label centered below every bar.
-        // Never ellipsis by bar width (that made "Leader of" / inside-vs-outside
-        // chaos). Collision → hide; tip still carries the full role.
+        // Full short label centered below the bar; collision → hide (tip keeps full role).
         const labelText = jobRoleLabel(job);
-        const approxW = labelText.length * 6.2;
-        let lx = x0 + barW / 2;
-        const half = approxW / 2;
-        if (lx - half < 2) lx = half + 2;
-        if (lx + half > lengthPx - 2) lx = Math.max(half + 2, lengthPx - half - 2);
-        const ly = y + ROLE_BAR_HEIGHT_PX + 12;
-        if (labelText) {
-          const box = { x: lx - half, y: ly - 10, w: approxW, h: 12 };
-          const hits = roleLabelBoxes.some(
-            (b) =>
-              !(box.x + box.w < b.x || b.x + b.w < box.x || box.y + box.h < b.y || b.y + b.h < box.y)
-          );
-          if (!hits) {
-            const label = svgEl('text', {
-              x: lx,
-              y: ly,
-              'text-anchor': 'middle',
-              class: 'career-river__role-label career-river__role-label--below',
-              'data-part': 'role-label',
-              'data-place': 'below'
-            });
-            label.textContent = labelText;
-            label.setAttribute('title', tip);
-            group.appendChild(label);
-            roleLabelBoxes.push(box);
-          }
-        }
+        const half = (labelText.length * 6.2) / 2;
+        const lx = Math.min(
+          Math.max(x0 + barW / 2, half + 2),
+          Math.max(half + 2, lengthPx - half - 2)
+        );
+        appendRoleLabel({
+          group,
+          boxes: roleLabelBoxes,
+          text: labelText,
+          tip,
+          x: lx,
+          y: y + ROLE_BAR_HEIGHT_PX + 12,
+          place: 'below'
+        });
         svg.appendChild(group);
       }
     } else {
-      // Phone: labeled ticks beside the trunk so 390 is not mute grey.
+      // Phone: labeled ticks beside the trunk; lane stagger + collision-hide.
       for (let index = 0; index < employmentAll.length; index++) {
         const job = employmentAll[index]!;
         const u0 = timeToUnit(yearFraction(job.valid_from), state!.zoom, nowYear);
@@ -534,25 +550,15 @@ export function mountCareerRiver(
         title.textContent = tip;
         bar.appendChild(title);
         group.appendChild(bar);
-        const roleShort = jobRoleLabel(job);
-        const avail = width - x - 16;
-        // Phone: prefer full short label; only clip at the canvas edge.
-        const labelText =
-          avail >= roleShort.length * 6
-            ? roleShort
-            : truncateRiverLabel(roleShort, avail);
-        if (labelText) {
-          const label = svgEl('text', {
-            x: x + 8,
-            y: (y0 + y1) / 2 + 4,
-            class: 'career-river__role-label career-river__role-label--below',
-            'data-part': 'role-label',
-            'data-place': 'beside'
-          });
-          label.textContent = labelText;
-          label.setAttribute('title', tip);
-          group.appendChild(label);
-        }
+        appendRoleLabel({
+          group,
+          boxes: roleLabelBoxes,
+          text: jobRoleLabel(job),
+          tip,
+          x: x + 8,
+          y: Math.min(y1 - 4, Math.max(y0 + 12, (y0 + y1) / 2 + 4 + lane * 14)),
+          place: 'beside'
+        });
         svg.appendChild(group);
       }
     }
@@ -736,7 +742,7 @@ export function mountCareerRiver(
       // Label
       const isVert = state!.orientation === 'vertical';
       let labelText = isVert
-        ? `${shortName(future.title)} · ${future.readiness_label}`
+        ? `${riverJobShortLabel(future.title)} · ${future.readiness_label}`
         : `${future.title} · ${future.readiness_label}${future.arrival_label ? ` · ${future.arrival_label}` : ''}`;
       let lx = isVert ? tip.x : tip.x + 10;
       let ly = isVert ? tip.y - 10 : tip.y + 4;
@@ -747,7 +753,7 @@ export function mountCareerRiver(
         }
       }
       if (lx + approxW > width - 4) {
-        labelText = `${shortName(future.title)} · ${future.readiness_label}`;
+        labelText = `${riverJobShortLabel(future.title)} · ${future.readiness_label}`;
       }
       if (ly < 12 || ly > height - 8) {
         // hide into title attribute only

@@ -4818,12 +4818,6 @@
   pointer-events: none;
 }
 
-/* Below/beside is the only placement — same ink weight as in-bar was. */
-.career-river__role-label--below {
-  fill: var(--ink);
-  font-weight: var(--weight-semibold);
-}
-
 .career-river__axis-note {
   margin: 0;
   color: var(--muted);
