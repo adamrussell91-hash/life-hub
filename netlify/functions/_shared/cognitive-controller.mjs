@@ -139,7 +139,7 @@ export function act(current,{action,text,revision,requestId}){
  if(['answer','correct','reflect','reopen'].includes(action)&&!text?.trim())throw fault(400,'validation_error','A response is required.');
  const s=copy(current);s.revision++;s.error=null;
  if(action==='pause'){s.resumeStatus=s.status;s.status='paused';s.lease=null;return refresh(s);}
- if(action==='cancel'){s.status='cancelled';s.lease=null;return refresh(s);}
+ if(action==='cancel'){s.status='cancelled';s.checkpoint=null;s.lease=null;return refresh(s);}
  if(action==='resume'){s.status=s.resumeStatus==='waiting'?'waiting':'queued';return refresh(s);}
  if(action==='retry'){s.status='queued';s.lease=null;return refresh(s);}
  if(action==='wrap'){add(s,'user','you',s.stage,text?.trim()||'Wrap to the filter.');jumpToFilter(s);s.continueBurst=false;s.burst=0;s.checkpoint=null;s.status='queued';return refresh(s);}
