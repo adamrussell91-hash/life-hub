@@ -642,8 +642,8 @@ function shell(main: string) {
         <button class="rail__btn hub-rail__link ${view === "protocols" ? "is-current" : ""}" data-nav="protocols" type="button">${icons.protocols}<span>Thinking</span></button>
         <button class="rail__btn hub-rail__link ${view === "podcast" ? "is-current" : ""}" data-nav="podcast" type="button">${icons.podcast}<span>Podcast</span></button>
         <button class="rail__btn hub-rail__link ${view === "quiz" ? "is-current" : ""}" data-nav="quiz" type="button">${icons.quiz}<span>Quiz</span></button>
+        ${hubSwitcherHtml("knowledge")}
       </nav>
-      ${hubSwitcherHtml("knowledge")}
     </aside>
     <main class="canvas">${main}</main>
   </div>`;
@@ -2146,7 +2146,9 @@ function renderLoadError() {
   app.innerHTML = `<div class="app-shell">
     <aside class="rail hub-rail" aria-label="Knowledge Hub">
       <div class="hub-rail__brand-block"><a href="/" class="hub-rail__brand">Knowledge Hub</a></div>
-      ${hubSwitcherHtml("knowledge")}
+      <nav class="rail__nav hub-rail__nav" aria-label="Hub">
+        ${hubSwitcherHtml("knowledge")}
+      </nav>
     </aside>
     <main class="canvas">
       <div class="sign-in__card">

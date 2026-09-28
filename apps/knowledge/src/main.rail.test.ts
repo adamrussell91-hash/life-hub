@@ -38,6 +38,21 @@ describe("Knowledge Hub rail", () => {
     expect(majors).not.toContain('data-nav="graph"');
   });
 
+  it("height-locks the rail and scrolls the nav so Professional is reachable (L9)", () => {
+    expect(css).toMatch(/\.rail\s*\{[^}]*height:\s*100dvh[^}]*overflow:\s*hidden/s);
+    expect(css).toMatch(
+      /\.rail__nav\s*\{[^}]*flex:\s*1 1 0[^}]*min-height:\s*0[^}]*overflow-y:\s*auto/s
+    );
+    expect(css).not.toMatch(/\.rail__nav\s*\{[^}]*flex:\s*0 0 auto/s);
+    // Hub switcher must live inside the scrolling nav (sibling placement clips Professional).
+    const navOpen = main.indexOf('<nav class="rail__nav hub-rail__nav">');
+    const navClose = main.indexOf("</nav>", navOpen);
+    const switcher = main.indexOf('hubSwitcherHtml("knowledge")');
+    expect(navOpen).toBeGreaterThan(-1);
+    expect(switcher).toBeGreaterThan(navOpen);
+    expect(switcher).toBeLessThan(navClose);
+  });
+
   it("adds a university study Timeline next to Graph", () => {
     expect(main).toContain('data-nav="timeline"');
     expect(main).toContain("<span>Timeline</span>");

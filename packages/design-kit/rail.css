@@ -8,6 +8,10 @@
   flex-direction: column;
   gap: var(--space-1);
   min-height: 100%;
+  /* Height-lock the rail so a long destination list scrolls inside
+     .hub-rail__nav instead of clipping the hub switcher (Professional). */
+  max-height: 100dvh;
+  overflow: hidden;
   padding: var(--space-5) var(--space-3);
   background: linear-gradient(180deg, var(--depth) 0%, var(--marine) 100%);
   color: var(--on-dark);
@@ -87,8 +91,11 @@ a.hub-rail__brand:focus-visible {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 /* Home / Dashboard / Archive + Chat (+ Life Calendar) sit above the rest. */
