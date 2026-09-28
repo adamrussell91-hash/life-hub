@@ -409,6 +409,13 @@ describe('renderCareerView', () => {
                 valid_from: '2025-01-22',
                 valid_to: null,
                 link_status: 'current'
+              },
+              {
+                display_label: "St Aloysius' College",
+                role: 'Leader of Learning Enrichment',
+                valid_from: '2025-01-22',
+                valid_to: null,
+                link_status: 'current'
               }
             ]
           },
@@ -428,6 +435,12 @@ describe('renderCareerView', () => {
             {
               display_label: "St Aloysius' College",
               role: 'Gifted Education Teacher',
+              valid_from: '2025-01-22',
+              valid_to: null
+            },
+            {
+              display_label: "St Aloysius' College",
+              role: 'Leader of Learning Enrichment',
               valid_from: '2025-01-22',
               valid_to: null
             }
@@ -450,9 +463,10 @@ describe('renderCareerView', () => {
     expect(work?.textContent).toMatch(/English Teacher/);
     expect(work?.textContent).toMatch(/Psychology Teacher/);
     expect(work?.textContent).toMatch(/Gifted Education Teacher/);
+    expect(work?.textContent).toMatch(/Leader of Learning Enrichment/);
     expect(work?.textContent).toMatch(/St Pius X/);
     expect(work?.textContent).toMatch(/Aloysius/);
-    expect(work?.querySelectorAll('.relationship-timeline__entry').length).toBe(3);
+    expect(work?.querySelectorAll('.relationship-timeline__entry').length).toBe(4);
     expect(canvas.querySelector('.career-river__svg-host')?.getAttribute('style') || '').toMatch(
       /pan-y/
     );
@@ -461,12 +475,17 @@ describe('renderCareerView', () => {
     );
     expect(years.length).toBeGreaterThan(0);
     expect(years.every((y) => /^\d{4}$/.test(y || ''))).toBe(true);
-    // River is self-explanatory: labeled role bars (Tasks gantt parity), not mute grey.
-    const roleLabels = [...canvas.querySelectorAll('[data-part="role-label"]')].map(
-      (node) => node.textContent || ''
-    );
+    // River is self-explanatory: labeled role bars below every span (one placement).
+    const roleLabelEls = [...canvas.querySelectorAll('[data-part="role-label"]')];
+    const roleLabels = roleLabelEls.map((node) => node.textContent || '');
     expect(roleLabels.length).toBeGreaterThan(0);
-    expect(roleLabels.join(' ')).toMatch(/English|Psychology|Gifted/);
+    expect(roleLabels.join(' ')).toMatch(/English/);
+    expect(roleLabels.join(' ')).toMatch(/Psychology/);
+    expect(roleLabels.join(' ')).toMatch(/Gifted Education/);
+    expect(roleLabels.join(' ')).toMatch(/Leader of Learning/);
+    expect(roleLabels.every((t) => t !== 'Leader of')).toBe(true);
+    expect(roleLabelEls.every((el) => el.getAttribute('data-place') === 'below')).toBe(true);
+    expect(roleLabels.every((t) => !t.includes('…') && !/\bof$/i.test(t.trim()))).toBe(true);
     expect(canvas.querySelectorAll('[data-part="role-bar"]').length).toBeGreaterThan(0);
     expect(canvas.querySelector('[data-part="trunk"]')).toBeTruthy();
     expect(canvas.querySelector('[data-part="year-grid"]')).toBeTruthy();
