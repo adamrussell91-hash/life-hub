@@ -546,6 +546,104 @@ describe("End session in the reply form", () => {
     expect(html).not.toContain(">Continue<");
     expect(html).not.toContain("data-protocol-reply");
   });
+
+  it("removes a checkpoint ask that does not end in a question mark", () => {
+    const ask = "Confirm this thesis, context and audience as stated, or correct any part, and let me know whether this is a raw claim to build from scratch or an existing draft to strengthen.";
+    const html = sessionView(session({
+      status: "cancelled",
+      allowedActions: [],
+      speaker: "controller",
+      checkpoint: { kind: "confirm", question: ask },
+      transcript: [{
+        id: "t1",
+        role: "controller",
+        speaker: "controller",
+        stage: "thesis",
+        text: `Thesis as given: homework should be banned in every school because students dislike it. The Builder will need that single warrant unless you tell me otherwise.\n\n${ask}`
+      }]
+    }), definition);
+    expect(html).toContain("Session ended.");
+    expect(html).toContain("unless you tell me otherwise.");
+    expect(html).not.toContain("Confirm this thesis");
+    expect(html).not.toContain("<textarea");
+    expect(html).not.toContain(">Continue<");
+    expect(html).not.toContain("data-protocol-reply");
+  });
+
+  it("drops that ask on the first paint when End session is clicked", async () => {
+    const { renderProtocols } = await import("./view");
+    const ask = "Confirm this thesis, context and audience as stated, or correct any part, and let me know whether this is a raw claim to build from scratch or an existing draft to strengthen.";
+    const analysis = "Thesis as given: homework should be banned in every school because students dislike it. The Builder will need that single warrant unless you tell me otherwise.";
+    const waiting = {
+      id: "sess-1",
+      protocolId: "refinery",
+      status: "waiting",
+      stage: "thesis",
+      speaker: "controller",
+      revision: 3,
+      transcript: [{ id: "t1", role: "controller", speaker: "controller", stage: "thesis", text: `${analysis}\n\n${ask}` }],
+      checkpoint: { kind: "confirm", question: ask },
+      allowedActions: ["confirm", "correct", "cancel"],
+      error: null
+    };
+    const cancelled = { ...waiting, status: "cancelled", revision: 4, checkpoint: null, allowedActions: [], transcript: [{ ...waiting.transcript[0], text: analysis }] };
+    let ended = false;
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (init?.method === "POST") {
+        await new Promise(resolve => { setTimeout(resolve, 30); });
+        ended = true;
+        return new Response(JSON.stringify({ data: { session: cancelled } }), { status: 200 });
+      }
+      if (url.includes("sessionId=")) {
+        return new Response(JSON.stringify({ data: { session: ended ? cancelled : waiting } }), { status: 200 });
+      }
+      if (url.includes("list=1")) {
+        return new Response(JSON.stringify({
+          data: {
+            sessions: [{
+              id: "sess-1",
+              protocolId: "refinery",
+              mode: "full",
+              status: "waiting",
+              title: "Homework",
+              updatedAt: "2026-09-28T00:00:00.000Z",
+              createdAt: "2026-09-28T00:00:00.000Z"
+            }]
+          }
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: { message: "unavailable" } }), { status: 503 });
+    });
+    const previous = globalThis.fetch;
+    globalThis.fetch = fetchImpl as unknown as typeof fetch;
+    const host = document.createElement("div");
+    try {
+      const stop = renderProtocols({ host });
+      await vi.waitFor(() => {
+        expect(host.querySelector('[data-protocol-open-run="sess-1"]')).toBeTruthy();
+      });
+      host.querySelector<HTMLButtonElement>('[data-protocol-open-run="sess-1"]')!.click();
+      await vi.waitFor(() => {
+        expect(host.textContent).toContain("Confirm this thesis");
+        expect(host.querySelector("[data-protocol-action='cancel']")).toBeTruthy();
+      });
+      host.querySelector<HTMLButtonElement>("[data-protocol-action='cancel']")!.click();
+      expect(host.textContent).not.toContain("Confirm this thesis");
+      expect(host.textContent).toContain("unless you tell me otherwise.");
+      expect(host.textContent).toContain("Session ended");
+      expect(host.querySelector("textarea")).toBeNull();
+      expect(host.textContent).not.toContain("Continue");
+      await vi.waitFor(() => {
+        expect(ended).toBe(true);
+      });
+      expect(host.textContent).not.toContain("Confirm this thesis");
+      expect(host.textContent).toContain("Session ended");
+      stop();
+    } finally {
+      globalThis.fetch = previous;
+    }
+  });
 });
 
 describe("compactIntake", () => {

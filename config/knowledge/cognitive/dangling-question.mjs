@@ -17,3 +17,11 @@ export function stripDanglingQuestions(text) {
   }
   return next;
 }
+
+// The checkpoint question is appended verbatim, including asks that do not end in "?".
+export function dropCheckpointAsk(text, question) {
+  let next = String(text || "");
+  const ask = String(question || "").trim();
+  if (ask && next.includes(ask)) next = next.split(ask).join("");
+  return stripDanglingQuestions(next);
+}
