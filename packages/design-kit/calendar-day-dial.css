@@ -188,3 +188,25 @@
 .dd-arc.tx-recovery{opacity:.75}
 .dd-arc.tx-callback_wait{stroke:var(--navy);stroke-dasharray:1 2}
 .dd-arc.is-regained{stroke:var(--pastel-sage-ink);stroke-width:2}
+/* Leave-by (step 9): get ready → leave → board, outside the event ring; narrows as leaving nears. */
+[data-part="leave-wedge"]{cursor:pointer}
+.dd-leave.is-ready{fill:color-mix(in srgb,var(--wave) 30%,transparent)}
+.dd-leave.is-go{fill:var(--navy)}
+.dd-leave.is-ride{fill:color-mix(in srgb,var(--wave) 55%,transparent)}
+[data-part="leave-wedge"]:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.dd-go{display:grid;gap:4px}
+.dd-go__legs{margin:0;font-size:var(--text-sm);color:var(--ink)}
+.dd-go__sub{margin:0;font-size:var(--text-xs);color:var(--muted)}
+.dd-go__sub.is-late{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+.dd-go__err{margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
+.dd-go__places{display:grid;gap:6px}
+.dd-go__field{display:grid;gap:2px;font-size:var(--text-2xs);color:var(--muted)}
+.dd-go__field input{min-height:2rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;font-size:var(--text-sm);background:#fff}
+@media (max-width:719px){.dd-go__field input{font-size:16px}}
+/* Mio opportunities (step 11): an offer in a real gap, one tap to plan, one to let it go. */
+.dd-mio{fill:color-mix(in srgb,var(--pastel-sage) 50%,transparent);stroke:var(--pastel-sage-ink);stroke-width:1.2;stroke-dasharray:2 3;pointer-events:visiblePainted}
+.dd-mio-panel{display:grid;gap:var(--space-2)}
+.dd-mio-offer{display:grid;gap:2px;padding:var(--space-2) var(--space-3);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--pastel-sage) 45%,#fff);border:1px solid color-mix(in srgb,var(--pastel-sage-ink) 18%,transparent)}
+.dd-mio-offer b{font-size:var(--text-sm)}
+.dd-mio-offer__why{margin:0;font-size:var(--text-xs);color:var(--ink);font-style:italic}
+.dd-mio-offer .dd-acts{flex-wrap:wrap}
