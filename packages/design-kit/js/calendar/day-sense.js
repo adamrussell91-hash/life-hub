@@ -142,3 +142,31 @@ export function dayCost(day, days, today) {
     move: { id: chip.id, title: chip.title, to: target.other.date, toPct: target.otherPct }
   };
 }
+
+/**
+ * The moment to leave a way back in: a work block for a task is running and either
+ * ends within 10 minutes, or a fixed commitment (a class, a meeting, an appointment)
+ * starts within 10 minutes and will cut it off.
+ * @returns {null | { blockId, taskId, title, reason: 'ending'|'interrupted', at: number, next?: string, previous: string }}
+ */
+export function bookmarkMoment(day, nowHour, { dismissed = new Set(), within = 10 / 60 } = {}) {
+  if (!day) return null;
+  const running = (day.chips ?? []).find((chip) => chip.source === 'work_block' && !chip.ghost
+    && chip.record?.task_id && chip.start <= nowHour && nowHour < chip.end && !dismissed.has(chip.id));
+  if (!running) return null;
+  const recent = Date.parse(running.bookmark?.at ?? '');
+  if (Number.isFinite(recent) && Date.now() - recent < 30 * 60 * 1000) return null;
+  const fixed = (day.chips ?? [])
+    .filter((chip) => chip.id !== running.id && !chip.ghost && !chip.ambient && chip.start > nowHour && chip.start <= nowHour + within && chip.start < running.end
+      && (chip.isClass || chip.protected || ['professional_meeting', 'professional_event', 'medical', 'ical_event'].includes(chip.source)))
+    .sort((a, b) => a.start - b.start)[0];
+  const base = {
+    blockId: running.id,
+    taskId: running.record.task_id,
+    title: running.title,
+    previous: running.bookmark?.note ?? ''
+  };
+  if (fixed) return { ...base, reason: 'interrupted', at: fixed.start, next: fixed.title };
+  if (running.end - nowHour <= within) return { ...base, reason: 'ending', at: running.end };
+  return null;
+}

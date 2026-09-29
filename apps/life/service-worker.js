@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v187';
+const CACHE_NAME = 'life-hub-shell-v188';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,

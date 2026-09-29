@@ -762,7 +762,10 @@ function mountAllDay(grid, date) {
       : '';
     const kindLabel = due.kind === 'promise' ? 'Promise' : due.kind === 'allday' ? 'All day' : 'Task';
     const hint = [kindLabel, due.meta].filter(Boolean).join(' · ');
-    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${due.meta ? `<span class="cal-due__meta">${escapeHtml(due.meta)}</span>` : ''}`, cell, {
+    const progress = due.progress ? `${due.progress.done} of ${due.progress.total} ${due.progress.unit}` : '';
+    const dueMeta = [due.meta, progress].filter(Boolean).join(' · ');
+    const bookmarkHtml = due.bookmark?.note ? `<span class="cal-due__bm" title="Where you left it">↳ ${escapeHtml(due.bookmark.note)}</span>` : '';
+    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${dueMeta ? `<span class="cal-due__meta">${escapeHtml(dueMeta)}</span>` : ''}${bookmarkHtml}`, cell, {
       'data-part': 'due',
       'data-id': due.id,
       tabindex: '0',
@@ -862,7 +865,9 @@ function mountChip(body, chip) {
   const acts = ghost && ghost.kind !== 'bedtime'
     ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button><button type="button" data-dismiss="${ghost.id}">Dismiss</button></div>`
     : ghost ? `<div class="cal-chip__acts"><button type="button" class="is-yes" data-accept="${ghost.id}" data-label="Accept">Accept</button></div>` : '';
-  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${chip.meta}</div>${acts}`, body, {
+  const progress = chip.progress ? ` · ${chip.progress.done}/${chip.progress.total}` : '';
+  const bookmark = chip.bookmark?.note ? `<div class="cal-chip__bm" title="Where you left it">↳ ${escapeHtml(chip.bookmark.note)}</div>` : '';
+  const node = el('div', classes.join(' '), `${agent}<div class="cal-chip__title">${title}</div><div class="cal-chip__meta">${chip.meta}${progress}</div>${bookmark}${acts}`, body, {
     'data-part': ghost ? 'ghost' : chip.isClass ? 'class' : 'chip',
     'data-id': chip.id,
     'data-kind': chip.kind,

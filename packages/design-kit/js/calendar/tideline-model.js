@@ -514,6 +514,27 @@ export function buildTidelineModel({
     };
   });
   for (const day of days) day.cost = dayCost(day, days, today);
+  // Where Adam left each task (bookmark) and its count progress, on its Due row and on
+  // any work block linked to it.
+  const taskCtx = new Map();
+  for (const event of events ?? []) {
+    const record = event?.record;
+    if ((record?.type === 'task' || record?.type === 'task_context') && record.id) {
+      taskCtx.set(record.id, { title: record.title, bookmark: record.bookmark ?? null, progress: record.progress ?? null });
+    }
+  }
+  for (const day of days) {
+    for (const chip of day.chips) {
+      const ctx = chip.record?.task_id ? taskCtx.get(chip.record.task_id) : null;
+      if (ctx?.bookmark) chip.bookmark = ctx.bookmark;
+      if (ctx?.progress) chip.progress = ctx.progress;
+    }
+    for (const due of day.due) {
+      const ctx = taskCtx.get(due.id);
+      if (ctx?.bookmark) due.bookmark = ctx.bookmark;
+      if (ctx?.progress) due.progress = ctx.progress;
+    }
+  }
   const title = periodTitle(week, schoolTerms);
   return {
     week,

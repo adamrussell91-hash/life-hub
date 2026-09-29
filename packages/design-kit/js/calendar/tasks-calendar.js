@@ -1,8 +1,52 @@
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_KEY = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
+/**
+ * Count progress the task already keeps: marking scripts, else finished steps.
+ * Never asks Adam for a percentage.
+ */
+export function taskProgress(task, steps = []) {
+  const marking = task?.marking;
+  if (marking && Number.isInteger(marking.scripts) && marking.scripts > 0) {
+    return { done: Math.min(marking.scripts, Number(marking.scripts_marked) || 0), total: marking.scripts, unit: 'scripts' };
+  }
+  if (steps.length) {
+    return { done: steps.filter(step => step.status === 'done').length, total: steps.length, unit: 'steps' };
+  }
+  return null;
+}
+
+function bookmarkOf(task) {
+  return task?.bookmark && typeof task.bookmark.note === 'string' && task.bookmark.note.trim()
+    ? { note: task.bookmark.note.trim(), at: task.bookmark.at ?? null }
+    : null;
+}
+
 export function tasksEventsFromTasks(tasks) {
-  return (tasks ?? [])
+  const stepsOf = new Map();
+  for (const task of tasks ?? []) {
+    if (typeof task?.parent_task_id === 'string' && task.parent_task_id) {
+      stepsOf.set(task.parent_task_id, [...(stepsOf.get(task.parent_task_id) ?? []), task]);
+    }
+  }
+  // Undated open tasks with a bookmark or progress: context only (never drawn), so a
+  // work block linked to them can show "where you left it".
+  const context = (tasks ?? [])
+    .filter(task => task && typeof task.id === 'string' && !DATE_KEY.test(task.due_date) && task.status !== 'done' && task.status !== 'dead')
+    .map(task => ({ task, bookmark: bookmarkOf(task), progress: taskProgress(task, stepsOf.get(task.id)) }))
+    .filter(row => row.bookmark || row.progress)
+    .map(({ task, bookmark, progress }) => ({
+      path: `task_context:${task.id}`,
+      record: {
+        type: 'task_context',
+        id: task.id,
+        title: typeof task.title === 'string' && task.title ? task.title : task.id,
+        ...(bookmark ? { bookmark } : {}),
+        ...(progress ? { progress } : {})
+      },
+      body: ''
+    }));
+  return [...(tasks ?? [])
     .filter(task =>
       task &&
       typeof task.id === 'string' &&
@@ -24,10 +68,11 @@ export function tasksEventsFromTasks(tasks) {
         description: typeof task.description === 'string' ? task.description : '',
         waiting_on: typeof task.waiting_on === 'string' && task.waiting_on ? task.waiting_on : undefined,
         estimated_duration: Number.isFinite(task.estimated_duration) ? task.estimated_duration : undefined,
-        ...(task.bookmark && typeof task.bookmark.note === 'string' ? { bookmark: { note: task.bookmark.note, at: task.bookmark.at ?? null } } : {})
+        ...(bookmarkOf(task) ? { bookmark: bookmarkOf(task) } : {}),
+        ...(taskProgress(task, stepsOf.get(task.id)) ? { progress: taskProgress(task, stepsOf.get(task.id)) } : {})
       },
       body: ''
-    }));
+    })), ...context];
 }
 
 /** Emit planned work blocks with time — distinct from hard deadlines. */

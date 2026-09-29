@@ -75,7 +75,8 @@ export function itemCardValues(item) {
     time: start,
     end,
     duration,
-    notes: typeof record.description === 'string' ? record.description : typeof record.notes === 'string' ? record.notes : ''
+    notes: typeof record.description === 'string' ? record.description : typeof record.notes === 'string' ? record.notes : '',
+    bookmark: record.bookmark?.note ?? row.bookmark?.note ?? ''
   };
 }
 
@@ -109,6 +110,10 @@ function contextRows(item, values) {
   if (typeof record.location === 'string' && record.location) rows.push(['Where', record.location]);
   if (record.feed) rows.push(['From', 'iCloud · read-only here']);
   if (typeof record.status === 'string' && record.status) rows.push(['Status', record.status.replace(/_/g, ' ')]);
+  const progress = record.progress ?? row.progress;
+  if (progress?.total) rows.push(['Progress', `${progress.done} of ${progress.total} ${progress.unit}`]);
+  const bookmark = record.bookmark?.note ?? row.bookmark?.note;
+  if (bookmark && itemType(item) !== 'task') rows.push(['Way back in', bookmark]);
   if (typeof record.priority === 'string' && record.priority) rows.push(['Priority', record.priority]);
   if (typeof record.project_title === 'string' && record.project_title) rows.push(['Project', record.project_title]);
   if (typeof record.waiting_on === 'string' && record.waiting_on) rows.push(['Waiting on', record.waiting_on]);
@@ -133,6 +138,9 @@ function fieldHtml(field, values) {
   }
   if (field === 'duration') {
     return `<label class="cal-card__field"><span>End</span><input type="time" name="end" step="300" value="${escapeHtml(values.end)}"></label>`;
+  }
+  if (field === 'bookmark') {
+    return `<label class="cal-card__field cal-card__field--wide"><span>Way back in</span><input type="text" name="bookmark" maxlength="280" value="${escapeHtml(values.bookmark)}" placeholder="Where you left it, e.g. stopped at Q4 feedback"></label>`;
   }
   if (field === 'notes') {
     return `<label class="cal-card__field cal-card__field--wide"><span>Notes</span><textarea name="notes" rows="3" placeholder="Add a note">${escapeHtml(values.notes)}</textarea></label>`;
@@ -203,6 +211,7 @@ export function itemCardPatch(item, form) {
     }
   }
   if (fields.includes('notes') && typeof form.notes === 'string' && form.notes !== before.notes) patch.notes = form.notes;
+  if (fields.includes('bookmark') && typeof form.bookmark === 'string' && form.bookmark.trim() !== before.bookmark) patch.bookmark = form.bookmark.trim();
   if (patch.date === undefined && Object.keys(patch).length && fields.includes('date')) patch.date = before.date;
   return patch;
 }

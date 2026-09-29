@@ -323,7 +323,7 @@ export function createAppController(dependencies) {
     const incoming = tasksEventsFromTasks(tasks);
     const ids = new Set(incoming.map(item => item.record?.id).filter(Boolean));
     tasksEvents = [
-      ...tasksEvents.filter(item => item.record?.type !== 'task' || !ids.has(item.record.id)),
+      ...tasksEvents.filter(item => (item.record?.type !== 'task' && item.record?.type !== 'task_context') || !ids.has(item.record.id)),
       ...incoming
     ];
   });
