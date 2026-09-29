@@ -1,5 +1,5 @@
 import type { Currency, HopMode, Item, ItemDraft, Place, Status, Trip } from '@/types';
-import { addItem, editItem, parseEmail, searchPlaces } from '@/api/travel';
+import { addItem, editItem, parseEmail, removeItem, searchPlaces } from '@/api/travel';
 import { daysForCity } from '@/model/day';
 
 type FormKind = 'do' | 'food' | 'stay' | 'flight' | 'train';
@@ -428,6 +428,61 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     options.onClose();
   });
   actions.append(saveBtn, cancelBtn);
+
+  // TR-30: Remove lives in the edit sheet with an in-sheet confirm (never window.confirm).
+  if (editing) {
+    const item = editing;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn ghost danger';
+    removeBtn.textContent = 'Remove';
+
+    function showEditActions(): void {
+      actions.replaceChildren(saveBtn, cancelBtn, removeBtn);
+    }
+
+    function showRemoveConfirm(): void {
+      const confirmMsg = document.createElement('p');
+      confirmMsg.className = 'hint remove-confirm';
+      confirmMsg.textContent = `Remove ${item.title.trim() || 'this item'}?`;
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'btn danger';
+      confirmBtn.textContent = 'Remove';
+
+      const keepBtn = document.createElement('button');
+      keepBtn.type = 'button';
+      keepBtn.className = 'btn ghost';
+      keepBtn.textContent = 'Cancel';
+
+      function restoreEditActions(): void {
+        confirmMsg.remove();
+        showEditActions();
+      }
+
+      keepBtn.addEventListener('click', restoreEditActions);
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
+        keepBtn.disabled = true;
+        try {
+          const saved = await removeItem(options.tripId, item.id, options.version);
+          options.onSaved(saved.trip, saved.version);
+          host.replaceChildren();
+        } catch {
+          errorNote.hidden = false;
+          errorNote.textContent = 'Could not remove. Try again.';
+          restoreEditActions();
+        }
+      });
+
+      actions.replaceChildren(confirmBtn, keepBtn);
+      actions.before(confirmMsg);
+    }
+
+    removeBtn.addEventListener('click', showRemoveConfirm);
+    actions.append(removeBtn);
+  }
   form.append(actions);
 
   function syncType(): void {
