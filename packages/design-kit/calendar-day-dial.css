@@ -188,3 +188,18 @@
 .dd-arc.tx-recovery{opacity:.75}
 .dd-arc.tx-callback_wait{stroke:var(--navy);stroke-dasharray:1 2}
 .dd-arc.is-regained{stroke:var(--pastel-sage-ink);stroke-width:2}
+/* Leave-by (step 9): get ready → leave → board, outside the event ring; narrows as leaving nears. */
+[data-part="leave-wedge"]{cursor:pointer}
+.dd-leave.is-ready{fill:color-mix(in srgb,var(--wave) 30%,transparent)}
+.dd-leave.is-go{fill:var(--navy)}
+.dd-leave.is-ride{fill:color-mix(in srgb,var(--wave) 55%,transparent)}
+[data-part="leave-wedge"]:focus-visible{outline:2px solid var(--wave);outline-offset:2px}
+.dd-go{display:grid;gap:4px}
+.dd-go__legs{margin:0;font-size:var(--text-sm);color:var(--ink)}
+.dd-go__sub{margin:0;font-size:var(--text-xs);color:var(--muted)}
+.dd-go__sub.is-late{color:var(--high-sea-ink);font-weight:var(--weight-semibold)}
+.dd-go__err{margin:0;font-size:var(--text-xs);color:var(--high-sea-ink)}
+.dd-go__places{display:grid;gap:6px}
+.dd-go__field{display:grid;gap:2px;font-size:var(--text-2xs);color:var(--muted)}
+.dd-go__field input{min-height:2rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;font-size:var(--text-sm);background:#fff}
+@media (max-width:719px){.dd-go__field input{font-size:16px}}
