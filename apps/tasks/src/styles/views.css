@@ -3496,6 +3496,11 @@
     font-size: var(--text-lg);
   }
 
+  /* Engaged phone Chat: who-header + Tools / New chat replace the page title. */
+  .hub-layout[data-hub-view='clare']:has(.chat-view[data-chrome='engaged']:not([hidden])) .page-header {
+    display: none;
+  }
+
   .hub-layout[data-hub-view='clare'] .clare-extras {
     display: none;
   }
