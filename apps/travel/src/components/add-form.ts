@@ -316,7 +316,7 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
     currencyTouched = true;
   }
   const costRow = document.createElement('div');
-  costRow.className = 'place-row';
+  costRow.className = 'place-row cost-row';
   costRow.append(amountInput, currencySelect);
   const audHint = document.createElement('p');
   audHint.className = 'aud hint';
