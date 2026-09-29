@@ -183,7 +183,7 @@ describe('renderSomedayView', () => {
     location.hash = '';
   });
 
-  it('stays closed until opened, and shows fields only after Edit', async () => {
+  it('keeps the card mounted when opened and sends Edit to the full task page', async () => {
     const dream = task({
       id: 't1',
       title: 'Study at Cambridge',
@@ -196,6 +196,7 @@ describe('renderSomedayView', () => {
     const canvas = document.createElement('div');
     await renderSomedayView(canvas);
 
+    const originalHash = location.hash;
     const card = canvas.querySelector<HTMLElement>('.someday-card')!;
     expect(card.querySelector('select')).toBeNull();
     expect(card.querySelector('.someday-card__copy')).toBeNull();
@@ -205,6 +206,7 @@ describe('renderSomedayView', () => {
 
     card.click();
     const opened = canvas.querySelector<HTMLElement>('.someday-card')!;
+    expect(opened).toBe(card);
     expect(opened.classList.contains('someday-card--open')).toBe(true);
     expect(opened.querySelector('.someday-card__copy')?.textContent).toContain('A long-held one');
     expect(opened.querySelector('.someday-card__if-then')).toBeTruthy();
@@ -214,11 +216,11 @@ describe('renderSomedayView', () => {
     [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')]
       .find((btn) => btn.textContent === 'Edit')
       ?.click();
-    expect(canvas.querySelector('select')).toBeTruthy();
-    expect(canvas.textContent).not.toContain('Promote to task');
+    expect(location.hash).toBe('#/task/t1');
+    location.hash = originalHash;
   });
 
-  it('keeps the Someday shell mounted across open, edit, and field save', async () => {
+  it('keeps the Someday shell mounted when a card opens', async () => {
     const dream = task({
       id: 't1',
       title: 'Study at Cambridge',
@@ -228,11 +230,6 @@ describe('renderSomedayView', () => {
     });
     vi.mocked(tasksApi.listTasks).mockResolvedValue([dream]);
     vi.mocked(tasksApi.listProjects).mockResolvedValue([]);
-    vi.mocked(tasksApi.updateTask).mockImplementation(async (_id, body) => ({
-      ...dream,
-      ...(body as Partial<Task>)
-    }));
-
     const canvas = document.createElement('div');
     await renderSomedayView(canvas);
 
@@ -240,31 +237,12 @@ describe('renderSomedayView', () => {
     const wash = canvas.querySelector('.someday-wash')!;
     const toolbar = canvas.querySelector('.someday-toolbar')!;
 
-    canvas.querySelector<HTMLElement>('.someday-card')!.click();
+    const card = canvas.querySelector<HTMLElement>('.someday-card')!;
+    card.click();
     expect(canvas.querySelector('.someday-view')).toBe(root);
     expect(canvas.querySelector('.someday-wash')).toBe(wash);
     expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
-
-    canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
-    [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')]
-      .find((btn) => btn.textContent === 'Edit')
-      ?.click();
-    expect(canvas.querySelector('.someday-view')).toBe(root);
-    expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
-
-    const maturity = canvas.querySelector<HTMLSelectElement>(
-      'select[aria-label="How developed “Study at Cambridge” is"]'
-    )!;
-    maturity.value = 'set';
-    maturity.dispatchEvent(new Event('change', { bubbles: true }));
-    await vi.waitFor(() => {
-      expect(tasksApi.updateTask).toHaveBeenCalledWith('t1', { maturity: 'set' });
-    });
-    expect(canvas.querySelector('.someday-view')).toBe(root);
-    expect(canvas.querySelector('.someday-wash')).toBe(wash);
-    expect(canvas.querySelector('.someday-toolbar')).toBe(toolbar);
-    expect(canvas.querySelector('.someday-card--open')).toBeTruthy();
-    expect(canvas.textContent).toContain('Set');
+    expect(canvas.querySelector('.someday-card')).toBe(card);
   });
 
   it('filters by category and shows origin dates only for bucket list and dreams jar', async () => {
@@ -343,6 +321,7 @@ describe('renderSomedayView', () => {
 
     const canvas = document.createElement('div');
     await renderSomedayView(canvas);
+    const card = canvas.querySelector('.someday-card');
 
     canvas.querySelector<HTMLButtonElement>('.someday-card .card-menu')?.click();
     const promoteButton = [...document.querySelectorAll<HTMLButtonElement>('.card-menu__panel .hub-menu__opt')].find(
@@ -365,6 +344,7 @@ describe('renderSomedayView', () => {
       expect(tasksApi.deleteTask).not.toHaveBeenCalled();
       expect(canvas.textContent).toContain('Retrain as a sailing instructor');
     });
+    expect(canvas.querySelector('.someday-card')).toBe(card);
   });
 
   it('promoting to goal keeps the dream and records the backlink, without deleting it', async () => {

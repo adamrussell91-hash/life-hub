@@ -22,7 +22,6 @@ import {
   type SomedayKindFilter
 } from '@/domain/someday';
 import { errorMessage, showViewLoading } from '@/views/feedback';
-import { mountLifeWallEditor } from '@/views/life-wall-editor';
 import { createCollapsibleFilters } from '@/views/collapsible-filters';
 import {
   createHubField,
@@ -38,12 +37,12 @@ import { renderCardMenu, type CardMenuItem } from '@/views/card-menu';
 import type { TaskDomain } from '@/schemas/task';
 import { formatDisplayDate } from '../../design-kit/js/format-display-date.js';
 import { openPromoteToGoalPopover } from '@/views/promote-to-goal';
+import { taskPageHash } from '@/domain/cards';
 
 let somedayDomain: TaskDomain | 'all' = 'all';
 let somedayKind: SomedayKindFilter = 'all';
 let somedayQuery = '';
 let openSomedayId: string | null = null;
-let editingSomedayId: string | null = null;
 
 /** Tests share this module. Clear filters so one case cannot hide another. */
 export function resetSomedayViewFilters(): void {
@@ -51,7 +50,6 @@ export function resetSomedayViewFilters(): void {
   somedayKind = 'all';
   somedayQuery = '';
   openSomedayId = null;
-  editingSomedayId = null;
 }
 
 function isSomedayReviewNow(
@@ -72,31 +70,6 @@ export function groupSomedayForReview(
     else parked.push(item);
   }
   return { reviewNow, parked };
-}
-
-function selectField(options: {
-  ariaLabel: string;
-  value: string;
-  choices: Array<{ id: string; label: string }>;
-  placeholder: string;
-  onChange: (value: string) => void;
-}): HTMLSelectElement {
-  const select = document.createElement('select');
-  select.className = 'hub-search__input someday-select';
-  select.setAttribute('aria-label', options.ariaLabel);
-  const blank = document.createElement('option');
-  blank.value = '';
-  blank.textContent = options.placeholder;
-  select.append(blank);
-  for (const choice of options.choices) {
-    const option = document.createElement('option');
-    option.value = choice.id;
-    option.textContent = choice.label;
-    if (choice.id === options.value) option.selected = true;
-    select.append(option);
-  }
-  select.addEventListener('change', () => options.onChange(select.value));
-  return select;
 }
 
 /** Create the next project attempt for a Someday idea — a fresh project, same anchor, milestone seeded. */
@@ -165,13 +138,6 @@ function renderStalledPaths(
   return wrap;
 }
 
-function persistSomeday(task: Task, patch: Partial<Task>, onChange: (next: Task | null) => void): void {
-  void tasksApi
-    .updateTask(task.id, patch)
-    .then((next) => onChange(next))
-    .catch((err) => window.alert(errorMessage(err)));
-}
-
 function isSomedayControl(target: EventTarget | null): boolean {
   return (
     target instanceof Element &&
@@ -185,11 +151,9 @@ function isSomedayControl(target: EventTarget | null): boolean {
 
 type SomedayCardHandlers = {
   open: boolean;
-  editing: boolean;
   onChange: (next: Task | null) => void;
   onToggle: () => void;
   onEdit: () => void;
-  onDone: () => void;
 };
 
 /** Closed summary. Open the card, then choose Edit — same shape as the other hub cards. */
@@ -219,9 +183,7 @@ function renderSomedayCard(
   }
   titleRow.append(el('h3', 'someday-card__title', task.title));
   const menu: CardMenuItem[] = [
-    handlers.editing
-      ? { id: 'done', label: 'Done', onSelect: handlers.onDone }
-      : { id: 'edit', label: 'Edit', onSelect: handlers.onEdit },
+    { id: 'edit', label: 'Edit', onSelect: handlers.onEdit },
     {
       id: 'branch',
       label: 'Branch it',
@@ -315,74 +277,6 @@ function renderSomedayCard(
       handlers.onChange(next)
     );
     if (stalledPaths) card.append(stalledPaths);
-  }
-
-  if (handlers.editing) {
-    const fieldsRow = el('div', 'someday-card__fields');
-    const maturitySelect = selectField({
-      ariaLabel: `How developed “${task.title}” is`,
-      value: task.maturity ?? '',
-      placeholder: 'Maturity…',
-      choices: MATURITY_LEVELS.map((m) => ({ id: m.id, label: m.label })),
-      onChange: (value) => persistSomeday(task, { maturity: value || null }, handlers.onChange)
-    });
-    fieldsRow.append(labeledField('Maturity', maturitySelect, 'hub-field hub-field--compact'));
-    const areaSelect = selectField({
-      ariaLabel: `Life area for “${task.title}”`,
-      value: task.life_area ?? '',
-      placeholder: 'Life area…',
-      choices: LIFE_AREAS,
-      onChange: (value) => persistSomeday(task, { life_area: value || null }, handlers.onChange)
-    });
-    fieldsRow.append(labeledField('Life area', areaSelect, 'hub-field hub-field--compact'));
-    const horizonSelect = selectField({
-      ariaLabel: `What altitude “${task.title}” would land at`,
-      value: task.horizon_target ?? '',
-      placeholder: 'If promoted…',
-      choices: HORIZON_TARGETS,
-      onChange: (value) => persistSomeday(task, { horizon_target: value || null }, handlers.onChange)
-    });
-    fieldsRow.append(labeledField('Horizon', horizonSelect, 'hub-field hub-field--compact'));
-    const kindSelect = selectField({
-      ariaLabel: `Category for “${task.title}”`,
-      value: task.someday_kind ?? '',
-      placeholder: 'Category…',
-      choices: SOMEDAY_KINDS.map((kind) => ({ id: kind.id, label: kind.label })),
-      onChange: (value) => persistSomeday(task, { someday_kind: value || null }, handlers.onChange)
-    });
-    fieldsRow.append(labeledField('Category', kindSelect, 'hub-field hub-field--compact'));
-    if (showsOriginDate(task.someday_kind)) {
-      const origin = createHubField({
-        type: 'date',
-        ariaLabel: `Origin date for ${task.title}`,
-        value: task.origin_date ?? ''
-      });
-      origin.input.addEventListener('change', () => {
-        persistSomeday(task, { origin_date: origin.input.value || null }, handlers.onChange);
-      });
-      fieldsRow.append(labeledField('Origin', origin.el, 'hub-field hub-field--compact'));
-    }
-    const review = createHubField({
-      type: 'date',
-      ariaLabel: `Review date for ${task.title}`,
-      value: task.review_at ?? ''
-    });
-    review.input.addEventListener('change', () => {
-      persistSomeday(task, { review_at: review.input.value || null }, handlers.onChange);
-    });
-    fieldsRow.append(labeledField('Review', review.el, 'hub-field hub-field--compact'));
-    card.append(fieldsRow);
-    card.append(
-      mountLifeWallEditor({
-        title: task.title,
-        wall: task.life_wall,
-        suggest: () => {
-          const date = task.target_date || task.review_at || task.origin_date;
-          return date ? { starts_on: date, ends_on: date } : null;
-        },
-        onCommit: (wall) => persistSomeday(task, { life_wall: wall }, handlers.onChange)
-      }).el
-    );
   }
 
   const toggle = () => handlers.onToggle();
@@ -720,26 +614,17 @@ function somedayCardHandlers(session: SomedaySession, item: Task): SomedayCardHa
   const refreshCard = () => replaceSomedayCard(session, item.id);
   return {
     open: openSomedayId === item.id,
-    editing: editingSomedayId === item.id,
     onChange: (next) => applySomedayCardChange(session, item, next),
     onToggle: () => {
       if (openSomedayId === item.id) {
         openSomedayId = null;
-        editingSomedayId = null;
       } else {
         openSomedayId = item.id;
-        editingSomedayId = null;
       }
       refreshCard();
     },
     onEdit: () => {
-      openSomedayId = item.id;
-      editingSomedayId = item.id;
-      refreshCard();
-    },
-    onDone: () => {
-      editingSomedayId = null;
-      refreshCard();
+      location.hash = taskPageHash(item.id);
     }
   };
 }
@@ -747,7 +632,6 @@ function somedayCardHandlers(session: SomedaySession, item: Task): SomedayCardHa
 function applySomedayCardChange(session: SomedaySession, item: Task, next: Task | null): void {
   if (!next) {
     if (openSomedayId === item.id) openSomedayId = null;
-    if (editingSomedayId === item.id) editingSomedayId = null;
     session.items = session.items.filter((entry) => entry.id !== item.id);
     syncSomedayChrome(session);
     paintSomedayList(session);
@@ -771,7 +655,12 @@ function replaceSomedayCard(session: SomedaySession, itemId: string): void {
     paintSomedayList(session);
     return;
   }
-  existing.replaceWith(buildSomedayCard(session, item, isSomedayReviewNow(item)));
+  const replacement = buildSomedayCard(session, item, isSomedayReviewNow(item));
+  existing.className = replacement.className;
+  existing.tabIndex = replacement.tabIndex;
+  existing.setAttribute('aria-expanded', replacement.getAttribute('aria-expanded') ?? 'false');
+  existing.setAttribute('aria-label', replacement.getAttribute('aria-label') ?? 'Someday card');
+  existing.replaceChildren(...Array.from(replacement.childNodes));
 }
 
 function appendSomedayCards(
