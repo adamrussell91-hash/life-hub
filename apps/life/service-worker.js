@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-hub-shell-v186';
+const CACHE_NAME = 'life-hub-shell-v187';
 const SHARE_CACHE = 'life-hub-share-target-v1';
 const SHARE_HANDOFF = 'share-handoff';
 // Deployed under a GitHub Pages project subpath (e.g. /life-hub/), not domain root,
@@ -189,6 +189,8 @@ const SHELL_FILES = [
   'packages/design-kit/js/calendar/day-sense.js',
   'packages/design-kit/js/calendar/rescue-plan.js',
   'packages/design-kit/js/calendar/rescue-sheet.js',
+  'packages/design-kit/js/calendar/day-review-sheet.js',
+  'packages/design-kit/js/push-client.js',
   'packages/design-kit/js/calendar/render-day-dial.js',
   'packages/design-kit/js/calendar/render-almanac.js',
   'packages/design-kit/js/calendar/render-term-river.js',
@@ -314,6 +316,39 @@ self.addEventListener('activate', event => {
         .map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
+});
+
+// Day Sense notifications (dexy, train-home pass). Tapping opens the right place in Life.
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'Life Hub', body: event.data ? event.data.text() : '' };
+  }
+  const title = typeof data.title === 'string' && data.title ? data.title : 'Life Hub';
+  event.waitUntil(self.registration.showNotification(title, {
+    body: typeof data.body === 'string' ? data.body : '',
+    tag: typeof data.tag === 'string' ? data.tag : undefined,
+    icon: SCOPE_PATH + 'assets/icons/life-hub-192.png',
+    badge: SCOPE_PATH + 'assets/icons/life-hub-192.png',
+    data: { url: typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/' }
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const open = windows.find(client => new URL(client.url).origin === self.location.origin);
+    if (open) {
+      await open.focus();
+      if ('navigate' in open) return open.navigate(target);
+      return undefined;
+    }
+    return self.clients.openWindow(target);
+  })());
 });
 
 self.addEventListener('fetch', event => {

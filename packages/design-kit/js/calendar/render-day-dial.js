@@ -30,6 +30,8 @@ import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
 import { tonightFit, trackedHours } from './day-sense.js';
 import { openRescueSheet } from './rescue-sheet.js';
+import { openDayReview } from './day-review-sheet.js';
+import { disablePush, enablePush, pushState } from '../push-client.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -93,6 +95,49 @@ let rings = null;
 let arcs = [];
 let nowHour = 12;
 let profileSleep = 22;
+/** Train-home pass: date → reviewed (server GET once per day), and push state for this device. */
+const reviewed = new Map();
+let pushNow = null;
+let deepLinkHandled = '';
+
+/** Leave time for the pass: 45 min before "home" (start of Yours) unless the profile says. */
+function leaveHourFor() {
+  const explicit = input?.dayProfile?.leave_school;
+  const m = /^(\d{2}):(\d{2})$/.exec(String(explicit ?? ''));
+  if (m) return Number(m[1]) + Number(m[2]) / 60;
+  const home = (model?.bands ?? []).find(band => band.id === 'yours')?.from ?? 17.5;
+  return home - 0.75;
+}
+
+function openReview() {
+  openDayReview({
+    doc,
+    model,
+    today: input.today,
+    nowHour,
+    apiFetch: input?.apiFetch,
+    onSaved: () => {
+      reviewed.set(input.today, true);
+      void input?.onSourcesChanged?.();
+    }
+  });
+}
+
+async function checkReviewed(date) {
+  if (reviewed.has(date) || typeof input?.apiFetch !== 'function') return;
+  reviewed.set(date, false);
+  try {
+    const response = await input.apiFetch(`/api/day-review?date=${date}`);
+    const payload = await response.json().catch(() => null);
+    if (payload?.data?.done) {
+      reviewed.set(date, true);
+      doc?.querySelector?.('[data-part="review-entry"]')?.remove();
+    }
+  } catch {
+    /* unknown: keep the entry */
+  }
+}
+
 /** Tonight's overflow this paint (tonightFit), or null. */
 let overflowNow = null;
 
@@ -363,6 +408,8 @@ function mount({ entrance = false } = {}) {
   ensureHatch(svg);
   mountDial(size);
   mountSide(side);
+  mountPushControl(side);
+  handleDeepLink(view);
   for (const chip of dayChips) {
     if (isItemVisible(chip, filterState)) continue;
     const arc = nodes.get(`arc:${chip.id}`);
@@ -781,9 +828,72 @@ async function saveDose(button) {
   }
 }
 
+function mountReviewEntry(side, date) {
+  if (date !== input.today || nowHour < leaveHourFor() || reviewed.get(date) === true) return;
+  const entry = el('section', 'dd-review-entry', undefined, side, { 'data-part': 'review-entry' });
+  el('button', 'btn btn--primary', 'Today, in 60 seconds', entry, { type: 'button', 'data-review-open': '' });
+  el('span', 'dd-review-entry__sub', 'How it went, a way back in, tomorrow’s first thing.', entry);
+  void checkReviewed(date);
+}
+
+/** Notification taps land on #/calendar/day?review=1 or ?sheet=dexy. Handle once, then tidy the URL. */
+function handleDeepLink(view) {
+  const hash = String(view?.location?.hash ?? '');
+  const query = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)) : null;
+  if (!query || deepLinkHandled === hash) return;
+  deepLinkHandled = hash;
+  if (state.day !== input.today) return;
+  const clean = () => {
+    try {
+      view.history?.replaceState?.(null, '', hash.slice(0, hash.indexOf('?')) || '#/calendar/day');
+    } catch {
+      /* not fatal */
+    }
+  };
+  if (query.get('review') === '1') {
+    clean();
+    queueMicrotask(() => openReview());
+  } else if (query.get('sheet') === 'dexy') {
+    clean();
+    const panel = doc.querySelector?.('[data-part="medication"]');
+    panel?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    panel?.querySelector?.('button')?.focus?.({ preventScroll: true });
+  }
+}
+
+function mountPushControl(side) {
+  if ((input?.hub || 'life') !== 'life') return;
+  const row = el('div', 'dd-push', undefined, side, { 'data-part': 'push' });
+  const paint = (status) => {
+    pushNow = status;
+    const text = status === 'on' ? 'Phone notifications on' : status === 'denied' ? 'Notifications blocked in Settings' : status === 'unsupported' ? '' : 'Get the dexy nudge and the train-home pass on your phone';
+    const action = status === 'on' ? 'Turn off' : status === 'off' ? 'Turn on' : '';
+    row.innerHTML = text ? `<span>${escapeHtml(text)}</span>${action ? `<button type="button" class="dd-link" data-push="${status === 'on' ? 'off' : 'on'}">${action}</button>` : ''}` : '';
+  };
+  if (pushNow) paint(pushNow);
+  void pushState(doc?.defaultView).then(paint);
+}
+
+async function togglePush(button) {
+  const want = button.getAttribute('data-push');
+  button.disabled = true;
+  try {
+    const status = want === 'on'
+      ? await enablePush({ win: doc.defaultView, apiFetch: input?.apiFetch, label: doc.defaultView?.navigator?.platform ?? '' })
+      : await disablePush({ win: doc.defaultView, apiFetch: input?.apiFetch });
+    pushNow = status;
+    showToast(status === 'on' ? '<b>Notifications on.</b> At most four a day, only when they matter.' : '<b>Notifications off</b> on this device.');
+    mount({ entrance: false });
+  } catch (error) {
+    button.disabled = false;
+    showToast(`<b>Not turned on.</b> ${escapeHtml(error?.message || 'Try again from the Home Screen app.')}`);
+  }
+}
+
 function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
+  mountReviewEntry(side, date);
   mountMedication(side, date);
   if (date === input.today) {
     const plannedDinnerAt = dayAt(date)?.med?.evening?.rows?.find(row => row.at === MEDICATION.dinnerAt)?.at ?? null;
@@ -1169,6 +1279,9 @@ function wire(section) {
     if (day) return setDay(day.getAttribute('data-day'));
     const stepper = target.closest?.('[data-step]');
     if (stepper) return step(Number(stepper.getAttribute('data-step')));
+    if (target.closest?.('[data-review-open]')) return openReview();
+    const pushButton = target.closest?.('[data-push]');
+    if (pushButton) return void togglePush(pushButton);
     if (target.closest?.('[data-rescue-open]')) {
       return openRescueSheet({
         doc,

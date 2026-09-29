@@ -168,3 +168,10 @@
 .dd-arc.k-study{fill:var(--pastel-gold);stroke:var(--pastel-gold-ink);stroke-width:1.2}
 .dd-arc.k-comm{fill:var(--pastel-blue);stroke:var(--wave);stroke-width:1.2}
 .dd-arc{fill:color-mix(in srgb,var(--navy) 12%,#fff)}
+
+/* Train-home pass entry + phone notifications (29/09/26) */
+.dd-review-entry{display:grid;gap:4px;padding:var(--space-3);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--pastel-blue) 40%,#fff);border:1px solid color-mix(in srgb,var(--wave) 30%,transparent)}
+.dd-review-entry .btn{justify-self:start}
+.dd-review-entry__sub{font-size:var(--text-xs);color:var(--muted)}
+.dd-push{display:flex;flex-wrap:wrap;gap:4px var(--space-2);align-items:baseline;font-size:var(--text-xs);color:var(--muted);padding-top:var(--space-3);border-top:1px solid var(--line)}
+.dd-push:empty{display:none}
