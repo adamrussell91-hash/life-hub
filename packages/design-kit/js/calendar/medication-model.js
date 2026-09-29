@@ -162,3 +162,45 @@ export function doseCandidate({ date, status, time, slot }) {
     }
   };
 }
+
+/**
+ * Almanac context (Day Sense §3.1 Term/Almanac): adherence over the last `days`, and the
+ * forecast days that follow a skipped dose. Honest overlay only: those days are drawn with
+ * a lighter band; the forecast number never changes. A day with no log is "not logged",
+ * never counted as missed.
+ * @param {object[]} logs medication records
+ * @returns {{ summary: string, taken: number, skipped: number, unlogged: number, days: number, lighter: string[] }}
+ */
+export function medicationContext(logs, { today, from, to, days = 14 }) {
+  const DAY = 86_400_000;
+  const key = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const at = Date.parse(`${today}T00:00:00Z`);
+  const window = Array.from({ length: days }, (_, i) => key(at - (days - 1 - i) * DAY));
+  const byDate = new Map();
+  for (const log of logs ?? []) {
+    if (log?.type !== 'medication' && log?.record?.type !== 'medication') continue;
+    const row = log.record ?? log;
+    if (!byDate.has(row.date)) byDate.set(row.date, []);
+    byDate.get(row.date).push(row);
+  }
+  let taken = 0;
+  let skipped = 0;
+  let unlogged = 0;
+  const skippedDates = [];
+  for (const date of window) {
+    const rows = byDate.get(date) ?? [];
+    if (rows.some((row) => row.status === 'skipped')) {
+      skipped += 1;
+      skippedDates.push(date);
+    } else if (rows.some((row) => row.status === 'taken')) taken += 1;
+    else unlogged += 1;
+  }
+  // The day after a skipped dose (and a skip today's own evening) carries the lighter band.
+  const lighter = [...new Set(skippedDates.flatMap((date) => [date, key(Date.parse(`${date}T00:00:00Z`) + DAY)]))]
+    .filter((date) => (!from || date >= from) && (!to || date <= to))
+    .sort();
+  const parts = [`taken ${taken} of the last ${days} days`];
+  if (skipped) parts.push(`${skipped} skipped`);
+  if (unlogged) parts.push(`${unlogged} not logged`);
+  return { summary: `Dexy: ${parts.join(' · ')}`, taken, skipped, unlogged, days, lighter };
+}

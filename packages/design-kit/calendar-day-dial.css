@@ -210,3 +210,5 @@
 .dd-mio-offer b{font-size:var(--text-sm)}
 .dd-mio-offer__why{margin:0;font-size:var(--text-xs);color:var(--ink);font-style:italic}
 .dd-mio-offer .dd-acts{flex-wrap:wrap}
+/* Rescue morph on the dial. */
+.dd-arc.is-moving-out{opacity:.35;stroke-dasharray:3 3}
