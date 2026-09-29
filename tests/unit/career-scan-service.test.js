@@ -13,7 +13,7 @@ test('sourceRefsHash is order-insensitive', () => {
   );
 });
 
-test('shouldRunCareerScanNow is Sunday 17 Sydney only', () => {
+test('shouldRunCareerScanNow is Sunday 17–19 Sydney with once-per-week success', () => {
   // 2026-09-27 is a Sunday. 07:00 UTC = 17:00 Sydney (AEST, UTC+10).
   const sunday1700 = new Date('2026-09-27T07:00:00Z');
   const gate = shouldRunCareerScanNow(sunday1700, {});
@@ -22,6 +22,9 @@ test('shouldRunCareerScanNow is Sunday 17 Sydney only', () => {
 
   const already = shouldRunCareerScanNow(sunday1700, { last_success_week: gate.weekKey });
   assert.equal(already.run, false);
+
+  assert.equal(shouldRunCareerScanNow(new Date('2026-09-27T08:00:00Z'), {}).run, true);
+  assert.equal(shouldRunCareerScanNow(new Date('2026-09-27T09:00:00Z'), {}).run, true);
 
   const monday = new Date('2026-09-28T07:00:00Z');
   assert.equal(shouldRunCareerScanNow(monday, {}).run, false);

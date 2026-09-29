@@ -33,14 +33,14 @@ export function sourceRefsHash(refs) {
   return createHash('sha256').update(JSON.stringify(sorted)).digest('hex');
 }
 
-/** Sunday 17:00 Sydney, once per ISO week. */
+/** Sunday 17:00–19:00 Sydney, once per ISO week (retry if 17:00 failed). */
 export function shouldRunCareerScanNow(now = new Date(), state = {}) {
   const { hour, dayKey } = sydneyHourParts(now);
   const dow = new Intl.DateTimeFormat('en-AU', {
     timeZone: 'Australia/Sydney',
     weekday: 'short'
   }).format(now);
-  if (dow !== 'Sun' || hour !== 17) {
+  if (dow !== 'Sun' || (hour !== 17 && hour !== 18 && hour !== 19)) {
     return { run: false, dayKey, weekKey: isoWeekKey(now) };
   }
   const weekKey = isoWeekKey(now);

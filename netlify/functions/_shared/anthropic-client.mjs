@@ -19,6 +19,73 @@ export class AnthropicClientError extends Error {
   }
 }
 
+/**
+ * One-shot non-streaming Messages call. Prefer this over ad-hoc fetch for
+ * short Haiku/Sonnet JSON turns (weekly judgment, tidy, verdicts).
+ * Returns concatenated text content, or throws AnthropicClientError.
+ */
+export async function completeMessage({
+  apiKey,
+  fetchImpl = fetch,
+  baseUrl = ANTHROPIC_ORIGIN,
+  model = MODEL,
+  maxTokens = MAX_TOKENS,
+  system,
+  messages,
+  signal,
+  thinking = { type: 'disabled' }
+} = {}) {
+  if (typeof apiKey !== 'string' || apiKey.length === 0) {
+    throw new TypeError('An Anthropic API key is required.');
+  }
+
+  const url = `${String(baseUrl).replace(/\/$/, '')}/v1/messages`;
+  const body = JSON.stringify({
+    model,
+    max_tokens: Number(maxTokens) > 0 ? Number(maxTokens) : MAX_TOKENS,
+    thinking,
+    ...(system ? { system } : {}),
+    messages,
+    stream: false
+  });
+
+  let response;
+  try {
+    response = await fetchImpl(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': API_VERSION
+      },
+      body,
+      signal
+    });
+  } catch {
+    throw new AnthropicClientError('anthropic_unavailable', true);
+  }
+
+  if (!response.ok) {
+    const retryable = response.status === 429 || response.status >= 500;
+    throw new AnthropicClientError(
+      retryable ? 'anthropic_unavailable' : 'anthropic_request_failed',
+      retryable
+    );
+  }
+
+  let json;
+  try {
+    json = await response.json();
+  } catch {
+    throw new AnthropicClientError('anthropic_invalid_response', true);
+  }
+
+  if (!Array.isArray(json?.content)) return '';
+  return json.content
+    .map(part => (typeof part?.text === 'string' ? part.text : ''))
+    .join('');
+}
+
 export function createAnthropicClient({ apiKey, fetchImpl = fetch, baseUrl = ANTHROPIC_ORIGIN } = {}) {
   if (typeof apiKey !== 'string' || apiKey.length === 0) {
     throw new TypeError('An Anthropic API key is required.');
