@@ -39,7 +39,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
   dot.className = 'dot';
   if (item.kind === 'stay') dot.classList.add('stay');
   if (!itemPlace(item) && item.kind !== 'flight' && item.kind !== 'train' && item.kind !== 'stay') dot.classList.add('off');
-  if (item.kind === 'flight') dot.innerHTML = I.plane;
+  if (item.kind === 'flight') dot.innerHTML = I.planeR;
   else if (item.kind === 'train') dot.innerHTML = I.trainR;
   else if (item.kind === 'stay') dot.innerHTML = I.bed;
   else dot.textContent = number ? String(number) : '';
@@ -73,7 +73,7 @@ function renderCard(item: Item, number: number | undefined, options: DayListOpti
     flight.className = 'flight';
     const mover = document.createElement('div');
     mover.className = 'v';
-    mover.innerHTML = item.kind === 'flight' ? I.plane : I.trainR;
+    mover.innerHTML = item.kind === 'flight' ? I.planeR : I.trainR;
     flight.append(mover);
     const to = document.createElement('div');
     to.className = 'iata';

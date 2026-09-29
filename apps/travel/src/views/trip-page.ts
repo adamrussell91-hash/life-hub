@@ -1,11 +1,12 @@
 import type { City, Trip } from '@/types';
 import { getTrip } from '@/api/travel';
-import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems } from '@/model/day';
+import { buildTodo, daysForCity, homeBaseForNight, itemPlace, orderDayItems, otherCitiesSharingDate, travelDayCue } from '@/model/day';
 import { renderScene } from '@/scenes';
 import { renderWorldMap } from '@/components/world-map';
 import type { DayMapHandle } from '@/components/day-map';
 import { renderDayList } from '@/views/day-list';
 import { renderAddForm } from '@/components/add-form';
+import { renderCityDatesForm } from '@/components/city-dates-form';
 import { renderTakeMeHome } from '@/components/take-me-home';
 import { renderShareSheet } from '@/components/share-sheet';
 import { dateInZone, formatInZone, zonedToInstant } from '@/lib/time';
@@ -185,6 +186,12 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       factsRow.append(f);
     }
     titleDiv.append(eyebrow, h2, factsRow);
+    const datesEdit = document.createElement('button');
+    datesEdit.type = 'button';
+    datesEdit.className = 'btn ghost city-dates-edit';
+    datesEdit.textContent = 'Edit dates';
+    datesEdit.addEventListener('click', () => openCityDates(city));
+    titleDiv.append(datesEdit);
     scene.append(titleDiv);
 
     const dates = daysForCity(trip, city.id);
@@ -196,12 +203,15 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       btn.type = 'button';
       btn.className = 'daybtn';
       if (date === selectedDate) btn.classList.add('is-on');
+      const cue = travelDayCue(trip, city.id, date);
+      if (cue) btn.classList.add('is-travel');
       // "Tue 1 Dec" over the day's subtitle ("Leave Sydney"), as in the mockup.
       btn.textContent = formatWeekdayDate(date);
       const subtitle = trip.days.find((d) => d.city_id === city.id && d.date === date)?.subtitle;
-      if (subtitle) {
+      const smallText = [subtitle, cue].filter(Boolean).join(' · ');
+      if (smallText) {
         const small = document.createElement('small');
-        small.textContent = subtitle;
+        small.textContent = smallText;
         btn.append(small);
       }
       btn.addEventListener('click', () => {
@@ -282,7 +292,12 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     function renderDay(): void {
       updateChips();
       renderDayBarState();
-      renderDayList(listCol, trip, city.id, selectedDate, {
+      listCol.replaceChildren();
+      const siblings = otherCitiesSharingDate(trip, city.id, selectedDate);
+      if (siblings.length) listCol.append(travelDayNote(siblings));
+      const listHost = document.createElement('div');
+      listCol.append(listHost);
+      renderDayList(listHost, trip, city.id, selectedDate, {
         selectedId: null,
         onSelect: (itemId) => dayMapHandle?.selectStop(itemId),
         onEdit: (item) => openForm(item),
@@ -308,15 +323,49 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     renderDay();
   }
 
-  function selectCity(cityId: string): void {
+  /** Switch city without clearing the selected date (used for travel-day jumps). */
+  function showCity(cityId: string): void {
     selectedCityId = cityId;
-    selectedDate = '';
     worldMap.selectCity(cityId);
     updateChips();
     renderCityScene();
   }
 
+  function selectCity(cityId: string): void {
+    selectedDate = '';
+    showCity(cityId);
+  }
+
+  function travelDayNote(siblings: City[]): HTMLElement {
+    const note = document.createElement('div');
+    note.className = 'travel-day-note';
+    const label = document.createElement('p');
+    label.textContent = `Travel day — also in ${siblings.map((s) => s.name).join(', ')}. Items stay under the city you tagged them with.`;
+    note.append(label);
+    for (const sibling of siblings) {
+      const jump = document.createElement('button');
+      jump.type = 'button';
+      jump.className = 'btn ghost';
+      jump.textContent = `Open ${sibling.name}`;
+      jump.addEventListener('click', () => showCity(sibling.id));
+      note.append(jump);
+    }
+    return note;
+  }
+
   worldMap.onSelect((cityId) => selectCity(cityId));
+
+  function sheetHandlers(formHost: HTMLElement) {
+    return {
+      onSaved: (updated: Trip, nextVersion: string) => {
+        trip = updated;
+        version = nextVersion;
+        formHost.remove();
+        renderCityScene();
+      },
+      onClose: () => formHost.remove()
+    };
+  }
 
   function openForm(item?: (typeof trip.items)[number], cityId?: string, date?: string): void {
     const formHost = document.createElement('div');
@@ -328,13 +377,19 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       editing: item,
       cityId: cityId ?? selectedCityId,
       date: date ?? selectedDate,
-      onSaved: (updated, nextVersion) => {
-        trip = updated;
-        version = nextVersion;
-        formHost.remove();
-        renderCityScene();
-      },
-      onClose: () => formHost.remove()
+      ...sheetHandlers(formHost)
+    });
+  }
+
+  function openCityDates(city: City): void {
+    const formHost = document.createElement('div');
+    document.body.append(formHost);
+    renderCityDatesForm(formHost, {
+      trip,
+      tripId,
+      version,
+      city,
+      ...sheetHandlers(formHost)
     });
   }
   addBtn.addEventListener('click', () => openForm());
