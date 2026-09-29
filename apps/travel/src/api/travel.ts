@@ -35,8 +35,8 @@ export function patchTrip(id: string, ifVersion: string, patch: Partial<Trip>): 
   return apiPatch(`/api/travel-trip?id=${encodeURIComponent(id)}`, { if_version: ifVersion, patch });
 }
 
-export function deleteTrip(id: string): Promise<{ id: string; deleted: true }> {
-  return apiDelete(`/api/travel-trip?id=${encodeURIComponent(id)}`);
+export function deleteTrip(id: string, ifVersion: string): Promise<{ id: string; deleted: true }> {
+  return apiDelete(`/api/travel-trip?id=${encodeURIComponent(id)}`, { if_version: ifVersion });
 }
 
 export function addItem(tripId: string, ifVersion: string, item: ItemDraft): Promise<TripEnvelope> {
