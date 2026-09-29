@@ -8,7 +8,7 @@ import {
 import { formatHubClockForPrompt } from '../../../apps/life/js/core/time.js';
 
 // Clare, Hammond and Ann share one truthful description of the People tools.
-const PEOPLE_TOOLS_GUIDANCE = 'People (Professional Hub): call search_people before adding, editing or linking anyone, so you never create a duplicate. Use propose_people_changes to add a person, change a name / sort name / aliases, or link two people (professional_relationship with a role such as colleague, mentor, mentee, referee or other) or a person to an organisation (employee_at, member_of, studied_at, placement_at). Nothing is saved until Adam taps Confirm: say it is waiting on his Confirm, never that it is done. When Adam says he emailed, called, messaged, or met someone, call search_people then propose_log_communication (direction, channel, date, optional time, subject/title, summary, person_refs) — or propose_calendar_ghost with kind log_comm. That queues a Confirm card and a dashed calendar ghost on the occurred date; never refuse and never say you cannot log communications. You still cannot send email, or silently edit an existing communication. You cannot delete, merge or archive people, or edit profile notes or Remember facts. Say so and point him to the People page. Never add or link students, and never add, link or mention the people About Me says are invisible.';
+const PEOPLE_TOOLS_GUIDANCE = 'People (Professional Hub): call search_people before adding, editing or linking anyone, so you never create a duplicate. Use propose_people_changes to add a person, change a name / sort name / aliases, profile notes (summary), LinkedIn, or workplace, or link two people (professional_relationship with a role such as colleague, mentor, mentee, referee or other) or a person to an organisation (employee_at, member_of, studied_at, placement_at). Use propose_organisation_changes to add or edit Organisations. Use propose_observation for a free-text note about a person or org. Use propose_remember_fact for a short Remember line Adam stated about someone. Nothing is saved until Adam taps Confirm: say it is waiting on his Confirm, never that it is done. When Adam says he emailed, called, messaged, or met someone, call search_people then propose_log_communication (direction, channel, date, optional time, subject/title, summary, person_refs) — or propose_calendar_ghost with kind log_comm. That queues a Confirm card and a dashed calendar ghost on the occurred date; never refuse and never say you cannot log communications. You still cannot send email, or silently edit an existing communication. You cannot delete, merge or archive people. Never invent Remember facts Adam did not state. Never add or link students, and never add, link or mention the people About Me says are invisible.';
 
 export function buildSystemPrompt({
   slug,
@@ -127,14 +127,20 @@ export function buildSystemPrompt({
     ? String(intuition).trim()
     : '';
 
+  const BODY_TASK_CAPTURE = new Set(['brisket', 'chadwick', 'hyaluronica', 'penelope', 'vera', 'sara']);
   const capability = [
     agent.recordTypes.length
       ? `You may propose a log_entry tool call for these record types: ${agent.recordTypes.join(', ')}.`
       : 'You do not log structured domain records via log_entry.',
     'You can propose any durable action via `os_propose_action`. If a shortcut exists for it (log_entry, Central Node patch, library save, etc.), prefer the shortcut. You never lack the ability to act, only the ability to act without Adam seeing the diff first. Never tell Adam you have no memory, no tracker, or no way to write something durable when `os_propose_action` can propose an allowlisted write for Confirm.',
     'Operate like a tool-using specialist: when a domain read or write tool exists for what Adam asked, call it in this turn before answering. Never claim Life Hub data lives in Notion, that you lack live read access to your own domain store, or that you cannot see history the tools can retrieve. Central Node is coordination context — not a substitute for calling your domain tools.',
-    'Never name tools, schemas, batch caps, or Confirm plumbing in chat. If a write needs two calls, make them. Ask Adam only about the work itself.'
-  ].join(' ');
+    'Never name tools, schemas, batch caps, or Confirm plumbing in chat. If a write needs two calls, make them. Ask Adam only about the work itself.',
+    BODY_TASK_CAPTURE.has(slug)
+      ? (slug === 'sara'
+        ? 'When Adam names a health to-do, reminder, or follow-up to capture, call create_task with domain health — do not refuse or say you cannot create Tasks Hub rows. Sara may only create health-domain tasks.'
+        : 'When Adam names a to-do, reminder, or follow-up to capture, call create_task — do not refuse or say you cannot create Tasks Hub rows.')
+      : ''
+  ].filter(Boolean).join(' ');
 
   const capacityBlock = capacities
     ? `Your capacities this turn (prefer these named tools; os_propose_action covers anything else allowlisted):\n${String(capacities).trim()}`
@@ -330,7 +336,7 @@ export function buildSystemPrompt({
       : '',
     'Read Central Node Cross-Agent for Hammond→Clare (and any other →Clare line) before triaging a dump or proposing task writes. Those lines are live directives, not background colour.',
     PEOPLE_TOOLS_GUIDANCE,
-    'When a dump or task names someone Adam works with, check them with search_people. If they are missing, or Adam states how two people are connected, offer one propose_people_changes card. Do not do this unasked for every name. Link inference, the ledger and Remember run outside chat; you do not run them.',
+    'When a dump or task names someone Adam works with, check them with search_people. If they are missing, or Adam states how two people are connected, offer one propose_people_changes card. Do not do this unasked for every name. Link inference and the ledger still run outside chat.',
     'When something durable must reach Hammond or another agent — task load spiking, a deadline colliding with a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Clare→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine. Do not invent Tasks or Teaching rows that are not in your own tools.',
     'When Adam names work to capture, call create_task (title or items[]). That write lands immediately — do not ask him to Confirm a new row, and do not claim it is on the board until create_task returns status applied. When he wants an existing row changed, call get_task then update_task. update_task and clare_mutate still wait for Confirm. Do not invent GitHub file paths for tasks, and do not dump a task list into Central Node cross_agent — that tool is one observational Clare→[Agent] line, not a write path for work.',
@@ -349,7 +355,7 @@ export function buildSystemPrompt({
     'When something durable must reach Hammond or another agent — a lesson/load collision, a teaching deadline hitting a Life constraint — call propose_central_node_patch with section: cross_agent and op: append_line. Chat-only lines are not memory.',
     'One line, observation not instruction, Ann→[Agent]: prefix. Do not claim a Cross-Agent line was logged unless the tool returned success / auto-applied. Do not mention Knowledge or Clementine.',
     'Before recommending or changing teaching work, call search_teaching and/or get_teaching_context for the relevant class, calendar lesson, and unit.',
-    'Professional practice remit: mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. Remember facts are written by the background Remember pass, not by you. When you do not know enough about who knows someone, say so honestly. Do not invent people or links.',
+    'Professional practice remit: mentoring, APST focus, colleagues and relationship meaning sit in your lane alongside lessons. When Adam states a short lasting fact about someone, propose_remember_fact (Confirm); the background Remember pass may still add more. When you do not know enough about who knows someone, say so honestly. Do not invent people, links, or Remember facts.',
     PEOPLE_TOOLS_GUIDANCE
   ] : [];
 

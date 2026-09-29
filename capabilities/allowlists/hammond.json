@@ -16,7 +16,10 @@
     "tasks:work_block:*",
     "tasks:work_session:*",
     "people:person:*",
-    "people:link:*"
+    "people:organisation:*",
+    "people:link:*",
+    "people:observation:*",
+    "people:remember:*"
   ],
   "read_globs": [
     "central-node.md",
@@ -30,7 +33,10 @@
     "tasks:work_block:*",
     "tasks:work_session:*",
     "people:person:*",
-    "people:link:*"
+    "people:organisation:*",
+    "people:link:*",
+    "people:observation:*",
+    "people:remember:*"
   ],
-  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules. People: search_people reads; propose_people_changes queues `people:person:*` / `people:link:*` writes for Confirm."
+  "notes": "Longitudinal owner. Full CN + governance write rights; can loan CN writes to specialists in Phase 1. May read/write Tasks work blocks when reconciling Clare schedules. People: search_people reads; propose_* tools queue `people:person:*` / `people:organisation:*` / `people:link:*` / `people:observation:*` / `people:remember:*` writes for Confirm."
 }

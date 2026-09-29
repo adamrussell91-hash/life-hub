@@ -320,10 +320,9 @@
     "tasks.create": {
       "file": "tasks/create-task.json",
       "agents": [
-        "clare",
-        "sara"
+        "*"
       ],
-      "risk": "confirm",
+      "risk": "auto",
       "surfaces": [
         "confirm_card",
         "governance_log"
@@ -620,6 +619,48 @@
         "governance_log"
       ],
       "tool_name": "propose_people_changes"
+    },
+    "people.propose-observation": {
+      "file": "people/propose-observation.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_observation"
+    },
+    "people.propose-organisation-changes": {
+      "file": "people/propose-organisation-changes.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_organisation_changes"
+    },
+    "people.propose-remember-fact": {
+      "file": "people/propose-remember-fact.json",
+      "agents": [
+        "clare",
+        "hammond",
+        "ann"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "governance_log"
+      ],
+      "tool_name": "propose_remember_fact"
     },
     "comms.propose-log-communication": {
       "file": "comms/propose-log-communication.json",

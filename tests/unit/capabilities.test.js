@@ -117,9 +117,21 @@ test('every agent gets os.propose-action plus domain shortcuts', () => {
   assert.ok(capabilityIdsForAgent('clare').includes('publish.cn-patch'));
   assert.ok(capabilityIdsForAgent('clare').includes('tasks.create'));
   assert.ok(capabilityIdsForAgent('clare').includes('tasks.update'));
-  assert.ok(!capabilityIdsForAgent('hammond').includes('tasks.create'));
+  assert.ok(capabilityIdsForAgent('hammond').includes('tasks.create'));
   assert.ok(capabilityIdsForAgent('ann').includes('publish.cn-patch'));
   assert.ok(!capabilityIdsForAgent('clementine').includes('publish.cn-patch'));
+});
+
+test('create_task is available to every agent including brisket', () => {
+  resetCapabilityCaches();
+  assert.ok(capabilityIdsForAgent('brisket').includes('tasks.create'));
+  const tools = buildAgentTools({ slug: 'brisket', allowedTypes: ['meal'], message: 'Add a task for meal prep' });
+  assert.ok(tools.some(tool => tool.name === 'create_task'));
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_abc', { mode: 'write' }), true);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_abc', { mode: 'read' }), true);
+  const def = loadCapability('tasks.create');
+  assert.equal(def.risk, 'auto');
+  assert.ok(def.agents.includes('*'));
 });
 
 test('buildAgentTools registers CN patch for clare and ann without needsHammondTools', () => {
@@ -453,6 +465,22 @@ test('create_task writes immediately when a Tasks store is bound', async () => {
   assert.ok((store.data.get('tasks/_index') ?? []).includes(result.ids[0]));
 });
 
+test('Sara create_task is health-domain only; other agents are not', async () => {
+  resetCapabilityCaches();
+  const sara = mockCtx('sara');
+  const denied = await executeShortcut('create_task', { title: 'Mark essays', domain: 'teaching' }, sara.ctx);
+  assert.equal(denied.kind, 'error');
+  assert.match(denied.error, /health/);
+  const ok = await executeShortcut('create_task', { title: 'Book bloods', domain: 'health' }, sara.ctx);
+  assert.equal(ok.kind, 'propose');
+  assert.equal(JSON.parse(ok.proposal.writes[0].content).domain, 'health');
+
+  const brisket = mockCtx('brisket');
+  const life = await executeShortcut('create_task', { title: 'Meal prep', domain: 'life' }, brisket.ctx);
+  assert.equal(life.kind, 'propose');
+  assert.equal(JSON.parse(life.proposal.writes[0].content).domain, 'life');
+});
+
 test('create_task accepts an 11-item teaching day and rejects 17', async () => {
   resetCapabilityCaches();
   const { ctx } = mockCtx('clare');
@@ -499,7 +527,7 @@ test('clare keeps create_task attached on a focus-today turn', () => {
     allowedTypes: ['meal'],
     message: 'Add a task for appraisal'
   }).map(tool => tool.name);
-  assert.ok(!brisket.includes('create_task'));
+  assert.ok(brisket.includes('create_task'));
 });
 
 test('track_open_challenge returns Confirm proposal', async () => {
@@ -909,7 +937,7 @@ test('classifyWriteTarget routes typed refs to Tasks and Teaching blobs', () => 
   });
 });
 
-test('clare and hammond may write typed blob refs; brisket may not', () => {
+test('clare and hammond may write typed blob refs; brisket may write tasks not projects', () => {
   resetCapabilityCaches();
   assert.equal(isPathAllowedForAgent('clare', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('clare', 'tasks:task:task_1'), true);
@@ -918,10 +946,10 @@ test('clare and hammond may write typed blob refs; brisket may not', () => {
   assert.equal(isPathAllowedForAgent('hammond', 'tasks:project:proj_aotfw'), true);
   assert.equal(isPathAllowedForAgent('hammond', 'teaching:unit:unit_aotfw'), true);
   assert.equal(isPathAllowedForAgent('brisket', 'tasks:project:proj_aotfw'), false);
-  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_1'), false);
+  assert.equal(isPathAllowedForAgent('brisket', 'tasks:task:task_1'), true);
 });
 
-test('clare may propose tasks:task writes; unknown typed targets still reject', () => {
+test('agents with tasks:task allowlist may propose task writes; unknown typed targets still reject', () => {
   resetCapabilityCaches();
   const clare = validateProposeActionInput({
     intent: 'rewrite a task',
@@ -931,11 +959,17 @@ test('clare may propose tasks:task writes; unknown typed targets still reject', 
   assert.equal(clare.proposal.writes[0].path, 'tasks:task:task_1');
 
   const brisket = validateProposeActionInput({
-    intent: 'rewrite a task',
-    writes: [{ path: 'tasks:task:task_1', mode: 'overwrite', content: '{}' }]
+    intent: 'capture a task',
+    writes: [{ path: 'tasks:task:task_1', mode: 'create', content: '{"id":"task_1","title":"Meal prep"}' }]
   }, { agentSlug: 'brisket' });
-  assert.equal(brisket.ok, false);
-  assert.equal(brisket.error, 'write_path_denied');
+  assert.equal(brisket.ok, true);
+
+  const brisketProject = validateProposeActionInput({
+    intent: 'rewrite a project',
+    writes: [{ path: 'tasks:project:proj_x', mode: 'overwrite', content: '{}' }]
+  }, { agentSlug: 'brisket' });
+  assert.equal(brisketProject.ok, false);
+  assert.equal(brisketProject.error, 'write_path_denied');
 
   const unknown = validateProposeActionInput({
     intent: 'rewrite a mystery row',
