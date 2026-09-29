@@ -10,6 +10,8 @@ export interface CityDatesFormOptions {
   onClose: () => void;
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 /** Edit a city's inclusive date range (and title). Uses existing PATCH /api/travel-trip. */
 export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOptions): void {
   const { trip, city } = options;
@@ -38,35 +40,33 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
   titleInput.type = 'text';
   titleInput.value = city.title;
   titleInput.required = true;
-  grid.append(labeled('City title', titleInput, true));
+  grid.append(field('City title', titleInput, true));
 
-  const startInput = document.createElement('input');
-  startInput.type = 'date';
-  startInput.value = city.start_date;
-  startInput.required = true;
-  startInput.min = trip.start_date;
-  startInput.max = trip.end_date;
-  grid.append(labeled('First day here', startInput));
-
-  const endInput = document.createElement('input');
-  endInput.type = 'date';
-  endInput.value = city.end_date;
-  endInput.required = true;
-  endInput.min = trip.start_date;
-  endInput.max = trip.end_date;
-  grid.append(labeled('Last day here', endInput));
+  const startInput = dateInput(city.start_date, trip);
+  grid.append(field('First day here', startInput));
+  const endInput = dateInput(city.end_date, trip);
+  grid.append(field('Last day here', endInput));
 
   const hint = document.createElement('p');
   hint.className = 'hint full';
   hint.textContent = `Trip runs ${trip.start_date} → ${trip.end_date}. Inclusive dates.`;
   grid.append(hint);
-
   form.append(grid);
 
   const errorNote = document.createElement('p');
   errorNote.className = 'hint';
   errorNote.hidden = true;
   form.append(errorNote);
+
+  function close(): void {
+    host.replaceChildren();
+    options.onClose();
+  }
+
+  function fail(message: string): void {
+    errorNote.hidden = false;
+    errorNote.textContent = message;
+  }
 
   const actions = document.createElement('div');
   actions.className = 'row';
@@ -78,10 +78,7 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
   cancelBtn.type = 'button';
   cancelBtn.className = 'btn ghost';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => {
-    host.replaceChildren();
-    options.onClose();
-  });
+  cancelBtn.addEventListener('click', close);
   actions.append(saveBtn, cancelBtn);
   form.append(actions);
 
@@ -90,50 +87,51 @@ export function renderCityDatesForm(host: HTMLElement, options: CityDatesFormOpt
     errorNote.hidden = true;
     const start = startInput.value;
     const end = endInput.value;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) {
-      errorNote.hidden = false;
-      errorNote.textContent = 'Pick a start and end date.';
+    if (!ISO_DATE.test(start) || !ISO_DATE.test(end)) {
+      fail('Pick a start and end date.');
       return;
     }
     if (start > end) {
-      errorNote.hidden = false;
-      errorNote.textContent = 'First day must be on or before the last day.';
+      fail('First day must be on or before the last day.');
       return;
     }
     if (start < trip.start_date || end > trip.end_date) {
-      errorNote.hidden = false;
-      errorNote.textContent = 'City dates must sit inside the trip dates.';
+      fail('City dates must sit inside the trip dates.');
       return;
     }
     const nextTitle = titleInput.value.trim() || city.title;
     const cities = trip.cities.map((c) =>
-      c.id === city.id
-        ? { ...c, title: nextTitle, start_date: start, end_date: end }
-        : c
+      c.id === city.id ? { ...c, title: nextTitle, start_date: start, end_date: end } : c
     );
     try {
       const saved = await patchTrip(options.tripId, options.version, { cities });
       options.onSaved(saved.trip, saved.version);
       host.replaceChildren();
     } catch {
-      errorNote.hidden = false;
-      errorNote.textContent = 'Could not save. Try again.';
+      fail('Could not save. Try again.');
     }
   });
 
   sheet.append(form);
   back.append(sheet);
   back.addEventListener('click', (e) => {
-    if (e.target === back) {
-      host.replaceChildren();
-      options.onClose();
-    }
+    if (e.target === back) close();
   });
   host.append(back);
   startInput.focus();
 }
 
-function labeled(labelText: string, control: HTMLElement, full = false): HTMLElement {
+function dateInput(value: string, trip: Trip): HTMLInputElement {
+  const input = document.createElement('input');
+  input.type = 'date';
+  input.value = value;
+  input.required = true;
+  input.min = trip.start_date;
+  input.max = trip.end_date;
+  return input;
+}
+
+function field(labelText: string, control: HTMLElement, full = false): HTMLElement {
   const wrap = document.createElement('label');
   if (full) wrap.classList.add('full');
   const label = document.createElement('span');

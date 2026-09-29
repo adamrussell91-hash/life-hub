@@ -30,9 +30,15 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
   return [...dates].sort();
 }
 
+/** True when the city's range or an item tags this date (travel days can hit two cities). */
+function cityCoversDate(trip: Trip, city: City, date: IsoDate): boolean {
+  if (city.start_date <= date && date <= city.end_date) return true;
+  return trip.items.some((item) => item.city_id === city.id && item.date === date);
+}
+
 /** Cities whose day list includes this date (range or item). Travel days land in two. */
 export function citiesSharingDate(trip: Trip, date: IsoDate): City[] {
-  return trip.cities.filter((city) => daysForCity(trip, city.id).includes(date));
+  return trip.cities.filter((city) => cityCoversDate(trip, city, date));
 }
 
 export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate): City[] {
@@ -46,11 +52,12 @@ export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate
 export function travelDayCue(trip: Trip, cityId: string, date: IsoDate): string | null {
   const others = otherCitiesSharingDate(trip, cityId, date);
   if (!others.length) return null;
+  const names = (cities: City[]) => cities.map((city) => city.name).join(', ');
   const outbound = others.filter((city) => city.start_date === date);
-  if (outbound.length) return `→ ${outbound.map((city) => city.name).join(', ')}`;
+  if (outbound.length) return `→ ${names(outbound)}`;
   const inbound = others.filter((city) => city.end_date === date);
-  if (inbound.length) return `← ${inbound.map((city) => city.name).join(', ')}`;
-  return `also ${others.map((city) => city.name).join(', ')}`;
+  if (inbound.length) return `← ${names(inbound)}`;
+  return `also ${names(others)}`;
 }
 
 function toIsoUtc(d: Date): IsoDate {

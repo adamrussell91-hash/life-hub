@@ -208,10 +208,10 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       // "Tue 1 Dec" over the day's subtitle ("Leave Sydney"), as in the mockup.
       btn.textContent = formatWeekdayDate(date);
       const subtitle = trip.days.find((d) => d.city_id === city.id && d.date === date)?.subtitle;
-      const smallBits = [subtitle, cue].filter(Boolean) as string[];
-      if (smallBits.length) {
+      const smallText = [subtitle, cue].filter(Boolean).join(' · ');
+      if (smallText) {
         const small = document.createElement('small');
-        small.textContent = smallBits.join(' · ');
+        small.textContent = smallText;
         btn.append(small);
       }
       btn.addEventListener('click', () => {
@@ -294,28 +294,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       renderDayBarState();
       listCol.replaceChildren();
       const siblings = otherCitiesSharingDate(trip, city.id, selectedDate);
-      if (siblings.length) {
-        const travelNote = document.createElement('div');
-        travelNote.className = 'travel-day-note';
-        const label = document.createElement('p');
-        label.textContent = `Travel day — also in ${siblings.map((s) => s.name).join(', ')}. Items stay under the city you tagged them with.`;
-        travelNote.append(label);
-        for (const sibling of siblings) {
-          const jump = document.createElement('button');
-          jump.type = 'button';
-          jump.className = 'btn ghost';
-          jump.textContent = `Open ${sibling.name}`;
-          jump.addEventListener('click', () => {
-            selectedCityId = sibling.id;
-            selectedDate = selectedDate;
-            worldMap.selectCity(sibling.id);
-            updateChips();
-            renderCityScene();
-          });
-          travelNote.append(jump);
-        }
-        listCol.append(travelNote);
-      }
+      if (siblings.length) listCol.append(travelDayNote(siblings));
       const listHost = document.createElement('div');
       listCol.append(listHost);
       renderDayList(listHost, trip, city.id, selectedDate, {
@@ -344,15 +323,49 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
     renderDay();
   }
 
-  function selectCity(cityId: string): void {
+  /** Switch city without clearing the selected date (used for travel-day jumps). */
+  function showCity(cityId: string): void {
     selectedCityId = cityId;
-    selectedDate = '';
     worldMap.selectCity(cityId);
     updateChips();
     renderCityScene();
   }
 
+  function selectCity(cityId: string): void {
+    selectedDate = '';
+    showCity(cityId);
+  }
+
+  function travelDayNote(siblings: City[]): HTMLElement {
+    const note = document.createElement('div');
+    note.className = 'travel-day-note';
+    const label = document.createElement('p');
+    label.textContent = `Travel day — also in ${siblings.map((s) => s.name).join(', ')}. Items stay under the city you tagged them with.`;
+    note.append(label);
+    for (const sibling of siblings) {
+      const jump = document.createElement('button');
+      jump.type = 'button';
+      jump.className = 'btn ghost';
+      jump.textContent = `Open ${sibling.name}`;
+      jump.addEventListener('click', () => showCity(sibling.id));
+      note.append(jump);
+    }
+    return note;
+  }
+
   worldMap.onSelect((cityId) => selectCity(cityId));
+
+  function sheetHandlers(formHost: HTMLElement) {
+    return {
+      onSaved: (updated: Trip, nextVersion: string) => {
+        trip = updated;
+        version = nextVersion;
+        formHost.remove();
+        renderCityScene();
+      },
+      onClose: () => formHost.remove()
+    };
+  }
 
   function openForm(item?: (typeof trip.items)[number], cityId?: string, date?: string): void {
     const formHost = document.createElement('div');
@@ -364,13 +377,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       editing: item,
       cityId: cityId ?? selectedCityId,
       date: date ?? selectedDate,
-      onSaved: (updated, nextVersion) => {
-        trip = updated;
-        version = nextVersion;
-        formHost.remove();
-        renderCityScene();
-      },
-      onClose: () => formHost.remove()
+      ...sheetHandlers(formHost)
     });
   }
 
@@ -382,13 +389,7 @@ export async function renderTripPage(canvas: HTMLElement, tripId: string, option
       tripId,
       version,
       city,
-      onSaved: (updated, nextVersion) => {
-        trip = updated;
-        version = nextVersion;
-        formHost.remove();
-        renderCityScene();
-      },
-      onClose: () => formHost.remove()
+      ...sheetHandlers(formHost)
     });
   }
   addBtn.addEventListener('click', () => openForm());
