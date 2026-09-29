@@ -158,9 +158,11 @@ Ordered. Each step has Must / Must-not / Verify / Files / Tests. **Do not skip D
 
 ---
 
-## Step 0 — Docs only (this PR / follow-up on #590)
+## Step 0 — Docs only (landed on PR #590 with this revision)
 
 **Goal:** Stop promising deleted Network / intuitive-scan behaviour; align automation audit with C1–C2.
+
+**Status:** Done in this docs revision (`clare-protocol.md`, `apps/tasks/AGENTS.md`, `AGENT_AUTOMATION_AUDIT.md`, this file, `CLAUDE.md`). Claude should still re-verify with the Step 0.1 Verify grep.
 
 ### 0.1 Remove dead Network / flags promises
 
