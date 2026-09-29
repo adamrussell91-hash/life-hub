@@ -14,6 +14,7 @@ import {
   newRecordId,
   readIndex,
   setJSON,
+  TASK_PREFIX,
   writeIndex
 } from './_shared/tasks-blobs.mjs';
 
@@ -57,8 +58,14 @@ export function createWorkBlocksHandler(deps = {}) {
           }
           return withCors(okResponse(200, normalizeBlock(block)), request, env);
         }
+        const deadTaskIds = new Set(
+          (await listJSON(store, TASK_PREFIX))
+            .filter((task) => task?.status === 'dead' && typeof task.id === 'string')
+            .map((task) => task.id)
+        );
         const blocks = (await listJSON(store, WORK_BLOCK_PREFIX))
           .filter((item) => typeof item?.id === 'string')
+          .filter((item) => !deadTaskIds.has(item.task_id))
           .map(normalizeBlock);
         return withCors(okResponse(200, { work_blocks: blocks }), request, env);
       }

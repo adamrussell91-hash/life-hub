@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createSessionToken } from '../../netlify/functions/_shared/auth-security.mjs';
 import { createTasksHandler } from '../../netlify/functions/tasks.mjs';
+import { createWorkBlocksHandler } from '../../netlify/functions/work-blocks.mjs';
 
 const SECRET = 's'.repeat(32);
 const env = {
@@ -111,6 +112,54 @@ test('Tasks list returns stored records the remounted SPA can render', async () 
   const response = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
   assert.equal(response.status, 200);
   assert.deepEqual((await response.json()).data.tasks, [stored]);
+});
+
+test('Dead tasks do not appear in the task list and cannot be fetched directly', async () => {
+  const handler = createTasksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore({
+      'tasks/_index': ['task-open', 'task-dead'],
+      'tasks/task-open': { id: 'task-open', title: 'Visible task', status: 'open', kind: 'task' },
+      'tasks/task-dead': { id: 'task-dead', title: 'Hidden task', status: 'dead', kind: 'task' }
+    })
+  });
+
+  const listed = await handler(request({ origin: 'https://tasks-hub.adam-russell.com' }));
+  assert.equal(listed.status, 200);
+  assert.deepEqual((await listed.json()).data.tasks.map((item) => item.id), ['task-open']);
+
+  const direct = await handler(
+    request({
+      origin: 'https://tasks-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/tasks?id=task-dead'
+    })
+  );
+  assert.equal(direct.status, 404);
+});
+
+test('Work blocks linked to dead tasks do not appear in calendar data', async () => {
+  const handler = createWorkBlocksHandler({
+    env,
+    now: () => Date.parse('2026-08-01T01:00:00Z'),
+    getContentStore: async () => memoryStore({
+      'tasks/_index': ['task-open', 'task-dead'],
+      'tasks/task-open': { id: 'task-open', title: 'Visible task', status: 'open', kind: 'task' },
+      'tasks/task-dead': { id: 'task-dead', title: 'Hidden task', status: 'dead', kind: 'task' },
+      'work_blocks/_index': ['block-open', 'block-dead'],
+      'work_blocks/block-open': { id: 'block-open', title: 'Visible block', task_id: 'task-open' },
+      'work_blocks/block-dead': { id: 'block-dead', title: 'Hidden block', task_id: 'task-dead' }
+    })
+  });
+
+  const response = await handler(
+    request({
+      origin: 'https://tasks-hub.adam-russell.com',
+      url: 'https://api.adam-russell.com/api/work-blocks'
+    })
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).data.work_blocks.map((block) => block.id), ['block-open']);
 });
 
 test('Tasks list rejects Professional meetings, events, and schedule projections', async () => {

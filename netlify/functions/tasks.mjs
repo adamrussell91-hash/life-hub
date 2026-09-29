@@ -102,14 +102,15 @@ export function createTasksHandler(deps = {}) {
         const id = readTaskId(request);
         if (id) {
           const task = await getJSON(store, taskKey(id));
-          if (!isTaskDomainRecord(task)) {
+          if (!isTaskDomainRecord(task) || task.status === 'dead') {
             return withCors(errorResponse(404, 'not_found', 'Task not found', false), request, env);
           }
           return withCors(okResponse(200, normalizeTaskRecord(task)), request, env);
         }
         const tasks = (await listJSON(store, TASK_PREFIX))
           .filter(isTaskDomainRecord)
-          .map(normalizeTaskRecord);
+          .map(normalizeTaskRecord)
+          .filter((task) => task.status !== 'dead');
         return withCors(okResponse(200, { tasks }), request, env);
       }
 
