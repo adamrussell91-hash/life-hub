@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAnthropicClient,
+  completeMessage,
   AnthropicClientError,
   MAX_TOOL_ROUNDS,
   MAX_PAUSE_CONTINUATIONS
@@ -661,4 +662,36 @@ test('createAnthropicClient uses injectable baseUrl for mock servers', async () 
   }
   assert.equal(seen[0], 'https://mock.anthropic.test/v1/messages');
   assert.ok(chunks.some((c) => c.type === 'text' || c.type === 'done'));
+});
+
+test('completeMessage returns concatenated text from a non-streaming response', async () => {
+  let body;
+  const text = await completeMessage({
+    apiKey: 'k',
+    model: 'claude-haiku-4-5',
+    maxTokens: 400,
+    system: 'Be brief.',
+    messages: [{ role: 'user', content: 'Hi' }],
+    fetchImpl: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return new Response(JSON.stringify({
+        content: [{ type: 'text', text: '{"ok":true}' }]
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+  });
+  assert.equal(text, '{"ok":true}');
+  assert.equal(body.stream, false);
+  assert.equal(body.model, 'claude-haiku-4-5');
+  assert.equal(body.max_tokens, 400);
+});
+
+test('completeMessage throws AnthropicClientError on HTTP failure', async () => {
+  await assert.rejects(
+    () => completeMessage({
+      apiKey: 'k',
+      messages: [{ role: 'user', content: 'x' }],
+      fetchImpl: async () => new Response(null, { status: 500 })
+    }),
+    (err) => err instanceof AnthropicClientError && err.retryable === true
+  );
 });
