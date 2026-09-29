@@ -30,6 +30,29 @@ export function daysForCity(trip: Trip, cityId: string): IsoDate[] {
   return [...dates].sort();
 }
 
+/** Cities whose day list includes this date (range or item). Travel days land in two. */
+export function citiesSharingDate(trip: Trip, date: IsoDate): City[] {
+  return trip.cities.filter((city) => daysForCity(trip, city.id).includes(date));
+}
+
+export function otherCitiesSharingDate(trip: Trip, cityId: string, date: IsoDate): City[] {
+  return citiesSharingDate(trip, date).filter((city) => city.id !== cityId);
+}
+
+/**
+ * Short daybar label when this date is shared with another city.
+ * Prefer → toward a city that starts today, ← from a city that ends today.
+ */
+export function travelDayCue(trip: Trip, cityId: string, date: IsoDate): string | null {
+  const others = otherCitiesSharingDate(trip, cityId, date);
+  if (!others.length) return null;
+  const outbound = others.filter((city) => city.start_date === date);
+  if (outbound.length) return `→ ${outbound.map((city) => city.name).join(', ')}`;
+  const inbound = others.filter((city) => city.end_date === date);
+  if (inbound.length) return `← ${inbound.map((city) => city.name).join(', ')}`;
+  return `also ${others.map((city) => city.name).join(', ')}`;
+}
+
 function toIsoUtc(d: Date): IsoDate {
   return d.toISOString().slice(0, 10);
 }

@@ -8,7 +8,9 @@ import {
   hopFallback,
   numberStops,
   orderDayItems,
-  showArrivalGuide
+  otherCitiesSharingDate,
+  showArrivalGuide,
+  travelDayCue
 } from '@/model/day';
 
 const trip = fixtureTrip as unknown as Trip;
@@ -24,6 +26,18 @@ describe('daysForCity (§3 rule 1)', () => {
     const opoDays = daysForCity(trip, 'opo');
     expect(lisDays).toContain('2027-03-05');
     expect(opoDays).toContain('2027-03-05');
+  });
+});
+
+describe('travelDayCue (§3 travel days)', () => {
+  it('marks the shared Lisbon→Porto day with an outbound cue from Lisbon', () => {
+    expect(travelDayCue(trip, 'lis', '2027-03-05')).toBe('→ Porto');
+    expect(travelDayCue(trip, 'opo', '2027-03-05')).toBe('← Lisbon');
+    expect(otherCitiesSharingDate(trip, 'lis', '2027-03-05').map((c) => c.id)).toEqual(['opo']);
+  });
+
+  it('returns null on ordinary single-city days', () => {
+    expect(travelDayCue(trip, 'lis', '2027-03-04')).toBeNull();
   });
 });
 
