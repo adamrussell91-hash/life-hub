@@ -127,7 +127,7 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BODY_TOO_LARGE = Symbol('body_too_large');
 const CENTRAL_NODE_PATH = 'central-node.md';
 const HAMMOND_SLUG = 'hammond';
-const BODY_LOG_TYPES = new Set(['weight', 'composition', 'measurements']);
+const BODY_LOG_TYPES = new Set(['weight', 'composition', 'measurements', 'medication']);
 
 export const config = { path: '/api/chat/confirm' };
 

@@ -45,7 +45,7 @@
 
 **S4 · Shell class with no CSS in this hub.** **Seen:** Travel `/travel/` (2026-09): `.skip-link` had no rule in Travel (Professional/Tasks define it in their own `hub.css`), so a raw "Skip to content" line sat above the rail; `.hub-rail__back` had no rule anywhere, so "← Life" ran into the brand as "LifeLIFE HUB · TRAVEL". **Rule:** When you copy a shell from another hub, copy the hub-local CSS it depends on too; every class the shell emits is defined somewhere this hub loads. **Check:** for each class in `shell.ts`, `grep` finds a rule in a stylesheet this app imports; `.skip-link`'s bounding box is off-screen at rest.
 
-**S4 · SVG falling back to default black fill.** **Seen:** Medical v2 meter dots. **Rule:** Every SVG shape gets an explicit `fill`/`stroke` via class or attribute. **Check:** no pure `#000` in the computed fills of the new SVG.
+**S4 · SVG falling back to default black fill.** **Seen:** Medical v2 meter dots; Day dial work-block and study arcs (29/09/26): `.dd-arc` had fills for teaching, professional, health and Corey only, so every Tasks work block drew solid black on the dial and the mini week dials. **Rule:** Every SVG shape gets an explicit `fill`/`stroke` via class or attribute. **Check:** no pure `#000` in the computed fills of the new SVG.
 
 ## V: Visibility and state
 

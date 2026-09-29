@@ -49,7 +49,8 @@ const ICON = {
   bolt: '<svg viewBox="0 0 12 12"><path d="M6.8 1 3 7h3l-.8 4L9 5H6z"/></svg>',
   fork: '<svg viewBox="0 0 12 12"><path d="M3.5 1v4a1.5 1.5 0 0 0 3 0V1M5 5.5V11M9 1c-1 .5-1.5 2-1.5 3.5S8 6.5 9 6.5V11"/></svg>',
   lock: '<svg viewBox="0 0 10 10"><rect x="1.5" y="4.5" width="7" height="5" rx="1"/><path d="M3 4.5V3a2 2 0 0 1 4 0v1.5"/></svg>',
-  chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>'
+  chev: '<svg viewBox="0 0 10 10"><path d="M2.5 4 5 6.5 7.5 4"/></svg>',
+  pill: '<svg viewBox="0 0 12 12"><rect x="1.5" y="4" width="9" height="4" rx="2" transform="rotate(-35 6 6)"/><path d="M6 3.6 4.9 7.9" transform="rotate(-35 6 6)"/></svg>'
 };
 
 function readBandSession() {
@@ -716,6 +717,19 @@ function mountHead(grid, date) {
   css(cap, '--cap', capColour(day.cap?.pct ?? 0));
   el('div', 'cal-cap__bar', `<span class="cal-cap__fill" style="width:${day.cap?.pct ?? 0}%"></span>`, cap);
   el('div', 'cal-cap__text', `<b>${day.cap?.pct ?? ''}%</b> · ${day.cap?.note ?? ''}`, cap);
+  // What this day costs you: booked hours, and one concrete move when it is over.
+  if (day.cost?.text) {
+    const move = day.cost.move;
+    const cost = el('div', `cal-cost${day.cost.over ? ' is-over' : ''}`, escapeHtml(day.cost.text), head, { 'data-part': 'day-cost' });
+    if (move) {
+      el('button', 'cal-cost__move', `move ${escapeHtml(move.title)} to ${DOW(move.to).charAt(0)}${DOW(move.to).slice(1, 3).toLowerCase()} (${move.toPct}%)`, cost, {
+        type: 'button',
+        'data-cost-move': move.id,
+        'data-cost-to': move.to,
+        title: `Move ${move.title} to ${formatDisplayDate(move.to)}, the best day this week with room`
+      });
+    }
+  }
   const chips = el('div', 'cal-head__chips', undefined, head, { 'data-part': 'day-chips' });
   if (day.over) el('span', 'cal-over', 'over', chips, { 'data-part': 'over-flag' });
   if (tag) el('span', `cal-tag${tag.tone === 'term' ? ' cal-tag--term' : ''}`, tag.text, chips);
@@ -724,6 +738,10 @@ function mountHead(grid, date) {
   if (day.energy) bits.push(`<span class="${day.energy === 'low' ? 'is-low' : ''}">${ICON.bolt}${day.energy}</span>`);
   if (day.meals) bits.push(`<span>${ICON.fork}${day.meals}</span>`);
   if (day.symptom) bits.push(`<span class="is-symptom">● ${day.symptom}</span>`);
+  if (day.med?.summary) {
+    const flagged = day.med.doses.some((dose) => dose.status === 'skipped' || dose.late);
+    bits.push(`<span class="cal-vit__med${flagged ? ' is-flag' : ''}" title="Dexy · ${escapeHtml(day.med.summary)}">${ICON.pill}${escapeHtml(day.med.summary)}</span>`);
+  }
   el('div', 'cal-vit', bits.join('') || '<span>nothing logged yet</span>', chips, { 'data-part': 'vitals' });
   nodes.set(`colhead:${date}`, head);
 }
@@ -1300,6 +1318,11 @@ function wire(section) {
       input?.onQuickAdd?.();
       return;
     }
+    const costMove = target.closest('[data-cost-move]');
+    if (costMove) {
+      void moveFromCostLine(costMove.dataset.costMove, costMove.dataset.costTo, costMove);
+      return;
+    }
     // Every chip and Due row opens the item card (context, edit, ↗ new tab).
     const chip = target.closest('.cal-chip') || target.closest('.cal-due');
     if (chip && !target.closest('[data-part="chip-popover"]')) {
@@ -1599,6 +1622,25 @@ function applyOptimistic(current, target) {
       if (meta) meta.textContent = item.meta;
     }
   };
+}
+
+/** The "costs you" line's one-click move: same time, the suggested day. */
+async function moveFromCostLine(id, to, button) {
+  const item = chipById(id);
+  const node = nodes.get(`chip:${id}`);
+  if (!item || !node || !/^\d{4}-\d{2}-\d{2}$/.test(String(to))) return;
+  const target = { date: to, start: item.start, end: item.end, start_time: hoursToDueTime(item.start), end_time: hoursToDueTime(item.end) };
+  const patch = dragPatch(item, { date: to, start_time: target.start_time, end_time: target.end_time });
+  if (button) button.disabled = true;
+  const undo = applyOptimistic({ node, item, isDue: false }, target);
+  try {
+    await persistItem(item, patch);
+    showToast(`<b>Moved.</b> ${escapeHtml(item.title)} → ${escapeHtml(dayText(to))} · ${escapeHtml(nowLabel(item.start))}`);
+  } catch (error) {
+    undo();
+    if (button) button.disabled = false;
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
 }
 
 async function onDragEnd() {

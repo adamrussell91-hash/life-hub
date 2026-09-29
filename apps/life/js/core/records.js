@@ -13,6 +13,7 @@ export const TYPE_DOMAINS = {
   measurements: 'body',
   bloods: 'body',
   medical: 'body',
+  medication: 'body',
   sleep: 'sleep',
   heart: 'heart',
   skincare: 'skincare',

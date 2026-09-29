@@ -73,5 +73,5 @@ test('routeAgent requires a string message', () => {
 
 test('findAgent returns the matching agent or null', () => {
   assert.equal(findAgent('nope'), null);
-  assert.deepEqual(findAgent('sara')?.recordTypes, ['weight', 'composition', 'measurements', 'bloods', 'medical']);
+  assert.deepEqual(findAgent('sara')?.recordTypes, ['weight', 'composition', 'measurements', 'bloods', 'medical', 'medication']);
 });
