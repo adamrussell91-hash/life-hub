@@ -1,0 +1,10 @@
+{
+  "id": "people.propose-remember-fact",
+  "tool_name": "propose_remember_fact",
+  "verb": "People",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose a short Remember fact about a Person. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

@@ -96,7 +96,13 @@ function eventKind(record) {
   if (record.type === 'professional_meeting' || record.type === 'professional_event') return 'professional';
   if (record.type === 'workout') return 'fitness';
   if (record.type === 'medical') return 'health';
-  if (record.type === 'calendar_block') return record.kind === 'corey' ? 'corey' : record.kind === 'focus' ? 'study' : 'health';
+  if (record.type === 'calendar_block') {
+    if (record.kind === 'corey') return 'corey';
+    if (record.kind === 'focus') return 'study';
+    if (record.kind === 'workout') return 'fitness';
+    // plan (outing / meal_block) and rest → health chip
+    return 'health';
+  }
   if (record.type === 'work_block' || record.type === 'task') return 'task';
   return 'task';
 }
@@ -119,6 +125,7 @@ function chipFromEvent(event) {
   const record = event.record ?? {};
   if (!record.time || LOG_TYPES.has(record.type) || record.type === 'knowledge_page') return null;
   if (record.type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) return null;
+  if (record.type === 'calendar_block' && record.status === 'cancelled') return null;
   if (record.type === 'task' && !record.end_time) return null;
   const workout = workoutOnGrid(record);
   if (workout === 'omit') return null;

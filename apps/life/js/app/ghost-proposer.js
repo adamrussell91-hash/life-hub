@@ -55,7 +55,7 @@ export function ghostId(agent, kind, date) {
  */
 export function ghostTarget(ghost) {
   if (!ghost || typeof ghost !== 'object') return '';
-  for (const key of ['workoutPath', 'taskId', 'start', 'time']) {
+  for (const key of ['workoutPath', 'taskId', 'path', 'start', 'time', 'title', 'subject']) {
     const value = ghost[key];
     if (typeof value === 'string' && value) return value;
   }

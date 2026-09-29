@@ -1,0 +1,10 @@
+{
+  "id": "tasks.propose-follow-up",
+  "tool_name": "propose_follow_up",
+  "verb": "Tasks",
+  "agents": ["clare", "hammond"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "One Confirm: create a follow-up task and optionally queue an outing/protect calendar ghost for the same slot.",
+  "surfaces": ["confirm_card", "calendar", "governance_log"]
+}

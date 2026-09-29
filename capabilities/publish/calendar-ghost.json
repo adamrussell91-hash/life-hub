@@ -2,8 +2,8 @@
   "id": "publish.calendar-ghost",
   "tool_name": "propose_calendar_ghost",
   "verb": "Publish",
-  "agents": ["hammond", "sara", "clare"],
-  "risk": "auto",
+  "agents": ["*"],
+  "risk": "confirm",
   "kind": "capacity",
   "legacy_tool": "propose_calendar_ghost",
   "inputs": {
@@ -13,9 +13,10 @@
   },
   "side_effects": [
     "Appends a validated ghost to pending-calendar-ghosts.json",
-    "Never writes Life, Central Node or Tasks"
+    "Queues a chat Confirm card bound to the same ghost id",
+    "Never writes Life, Central Node, Professional or Tasks until Confirm / Accept"
   ],
-  "surfaces": ["calendar"],
-  "prompt_one_liner": "Propose a dashed ghost on the calendar. Adam Accepts or dismisses it there — nothing else is written yet.",
+  "surfaces": ["confirm_card", "calendar"],
+  "prompt_one_liner": "Propose something on Adam’s calendar (outing, meal time, workout time, protect, tasks, reschedule/cancel) or log a communication (kind log_comm). Queues a dashed ghost; Confirm in chat or Accept on the calendar.",
   "reads": ["pending-calendar-ghosts.json", "calendar-ghost-decisions.jsonl"]
 }

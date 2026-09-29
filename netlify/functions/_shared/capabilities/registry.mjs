@@ -20,7 +20,24 @@ import {
   setSkincareRoutineMembershipSchema
 } from '../skincare-library-tools.mjs';
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
-import { proposePeopleChangesSchema, searchPeopleSchema } from '../people-agent.mjs';
+import {
+  proposeOrganisationChangesSchema,
+  proposePeopleChangesSchema,
+  searchPeopleSchema
+} from '../people-agent.mjs';
+import { proposeObservationSchema } from '../observation-agent.mjs';
+import { proposeRememberFactSchema } from '../remember-fact-agent.mjs';
+import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
+import { listCalendarBlocksSchema } from '../list-calendar-blocks.mjs';
+import { proposeMeetingSchema, proposeEventSchema } from '../meeting-event-agent.mjs';
+import { proposeApplicationSchema, proposeFutureSchema } from '../career-agent.mjs';
+import { proposeTieDecisionSchema } from '../tie-decision-agent.mjs';
+import { proposeGoalSchema, proposeGoalCheckinSchema } from '../goal-agent.mjs';
+import { saveWorkoutTemplateSchema } from '../workout-template-agent.mjs';
+import { proposeTravelCheckinSchema, proposeTravelItemSchema } from '../travel-agent.mjs';
+import { proposeKnowledgePageSchema } from '../knowledge-page-agent.mjs';
+import { proposeHubPrefsSchema } from '../hub-prefs-agent.mjs';
+import { proposeFollowUpSchema } from '../follow-up-agent.mjs';
 import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
@@ -316,8 +333,14 @@ export function buildAgentTools({
   if (has('publish.cn-patch') && (needsHammondTools || slug === 'clare' || slug === 'ann')) {
     tools.push(proposeCentralNodePatchSchema());
   }
-  if (has('publish.calendar-ghost') && (slug === 'hammond' || slug === 'sara' || slug === 'clare' || needsHammondTools)) {
+  if (has('publish.calendar-ghost')) {
     tools.push(proposeCalendarGhostSchema());
+  }
+  if (has('comms.propose-log-communication')) {
+    tools.push(proposeLogCommunicationSchema());
+  }
+  if (has('calendar.list-blocks')) {
+    tools.push(listCalendarBlocksSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());
@@ -326,6 +349,22 @@ export function buildAgentTools({
   // Professional People: search is read-only; changes are Confirm cards.
   if (has('people.search')) tools.push(searchPeopleSchema());
   if (has('people.propose-changes')) tools.push(proposePeopleChangesSchema());
+  if (has('people.propose-organisation-changes')) tools.push(proposeOrganisationChangesSchema());
+  if (has('people.propose-observation')) tools.push(proposeObservationSchema());
+  if (has('people.propose-remember-fact')) tools.push(proposeRememberFactSchema());
+  if (has('people.propose-tie-decision')) tools.push(proposeTieDecisionSchema());
+  if (has('professional.propose-meeting')) tools.push(proposeMeetingSchema());
+  if (has('professional.propose-event')) tools.push(proposeEventSchema());
+  if (has('career.propose-application')) tools.push(proposeApplicationSchema());
+  if (has('career.propose-future')) tools.push(proposeFutureSchema());
+  if (has('goals.propose')) tools.push(proposeGoalSchema());
+  if (has('goals.checkin')) tools.push(proposeGoalCheckinSchema());
+  if (has('fitness.save-workout-template')) tools.push(saveWorkoutTemplateSchema());
+  if (has('travel.propose-item')) tools.push(proposeTravelItemSchema());
+  if (has('travel.propose-checkin')) tools.push(proposeTravelCheckinSchema());
+  if (has('knowledge.propose-page')) tools.push(proposeKnowledgePageSchema());
+  if (has('prefs.propose-hub-prefs')) tools.push(proposeHubPrefsSchema());
+  if (has('tasks.propose-follow-up')) tools.push(proposeFollowUpSchema());
 
   // Domain retrieval parity tools (read-only). Skip names already attached.
   const attached = new Set(tools.map(tool => tool.name).filter(Boolean));

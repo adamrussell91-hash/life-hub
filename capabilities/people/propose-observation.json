@@ -1,0 +1,10 @@
+{
+  "id": "people.propose-observation",
+  "tool_name": "propose_observation",
+  "verb": "People",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose a free-text observation about a Person or Organisation. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

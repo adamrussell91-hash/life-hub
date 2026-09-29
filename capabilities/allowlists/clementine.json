@@ -6,7 +6,9 @@
     "data/remember/**",
     "data/widgets/**",
     "data/os/**",
-    "intuition/**"
+    "intuition/**",
+    "tasks:task:*",
+    "knowledge:page:*"
   ],
   "read_globs": [
     "data/research/**",
@@ -15,7 +17,9 @@
     "data/widgets/**",
     "data/os/**",
     "central-node.md",
-    "intuition/**"
+    "intuition/**",
+    "tasks:task:*",
+    "knowledge:page:*"
   ],
-  "notes": "Knowledge specialist on the shared OS floor. Notes live in knowledge-hub-data; Life research briefs and trackers use propose-action here."
+  "notes": "Knowledge specialist on the shared OS floor. Archive page creates/patches use propose_knowledge_page → knowledge:page:* (Confirm → saveKnowledgePage on knowledge-hub-data, not life-data globs). Life research briefs and trackers use propose-action here."
 }

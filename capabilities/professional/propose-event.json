@@ -1,0 +1,10 @@
+{
+  "id": "professional.propose-event",
+  "tool_name": "propose_event",
+  "verb": "Events",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose booking a Professional PD/general event. Confirm card always; timed starts also queue a calendar ghost.",
+  "surfaces": ["confirm_card", "governance_log", "calendar"]
+}
