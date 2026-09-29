@@ -43,7 +43,7 @@ export const GHOST_AGENTS = Object.freeze({
 export const GHOST_KINDS = Object.freeze([
   'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm',
   'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm',
-  'pro_meeting', 'pro_event'
+  'pro_meeting', 'pro_event', 'move_block'
 ]);
 
 const LOG_COMM_DIRECTIONS = new Set(['outbound', 'inbound']);
@@ -172,6 +172,13 @@ export function validateGhost(ghost) {
     }
     if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
   }
+  if (ghost.kind === 'move_block') {
+    if (typeof ghost.blockId !== 'string' || !ghost.blockId) throw new TypeError('move_block needs blockId');
+    if (!DATE_KEY.test(ghost.from ?? '')) throw new TypeError('move_block needs from (YYYY-MM-DD)');
+    if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
+      throw new TypeError('move_block needs start < end (HH:MM)');
+    }
+  }
   if (ghost.kind === 'move_task') {
     if (typeof ghost.taskId !== 'string' || !ghost.taskId) throw new TypeError('move_task needs taskId');
     if (!DATE_KEY.test(ghost.to ?? '') || !DATE_KEY.test(ghost.from ?? '')) throw new TypeError('move_task needs from and to dates');
@@ -277,6 +284,23 @@ export function acceptPlan(ghost, { today = null } = {}) {
       steps.push(cn('this_week', 'append_line', { summary: `${title} ${short(ghost.date)}`, text: `- ${span}: ${title}${withCorey ? ' with Corey' : ''} (protected).` }));
       steps.push(cn('cross_agent', 'append_line', { summary: `${who}→Clare: keep ${short(ghost.date)} clear`, text: `- ${who}→Clare: keep ${span} clear${withCorey ? ' (Corey)' : ''}.` }));
       receipt = `${who} → Life: “${title}”${withCorey ? ' with Corey' : ''}, ${span}, tentative and protected. ${who}→Clare: keep it clear. Nothing is booked or paid without you.`;
+      break;
+    }
+    case 'move_block': {
+      const [sh, sm] = ghost.start.split(':').map(Number);
+      const [eh, em] = ghost.end.split(':').map(Number);
+      const minutes = eh * 60 + em - (sh * 60 + sm);
+      const title = oneLine(ghost.title) || 'Work block';
+      steps.push({
+        target: 'tasks',
+        method: 'PATCH',
+        collection: 'work_blocks',
+        id: ghost.blockId,
+        body: { date: ghost.date, start_time: ghost.start, duration_minutes: minutes }
+      });
+      const where = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}`;
+      steps.push(recentAction(actedOn, who, `moved “${title}” ${short(ghost.from)} → ${where}${why}`));
+      receipt = `${who} → Tasks: “${title}” → ${where}.`;
       break;
     }
     case 'move_task': {

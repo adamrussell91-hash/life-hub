@@ -655,6 +655,20 @@ export async function applyTaskStep(store, step, { ghostId } = {}) {
     await setJSON(store, key, normalizeGoalRecord({ ...existing, ...(step.body ?? {}), updated_at: new Date().toISOString() }));
     return;
   }
+  if (step.method === 'PATCH' && step.collection === 'work_blocks') {
+    const key = `work_blocks/${step.id}`;
+    const existing = await getJSON(store, key);
+    if (!existing || typeof existing !== 'object') {
+      throw Object.assign(new Error('Work block not found'), { code: 'work_block_not_found' });
+    }
+    const body = step.body ?? {};
+    const next = { ...existing, updated_at: new Date().toISOString() };
+    if (typeof body.date === 'string') next.date = body.date;
+    if (typeof body.start_time === 'string') next.start_time = body.start_time;
+    if (Number.isFinite(body.duration_minutes) && body.duration_minutes > 0) next.duration_minutes = body.duration_minutes;
+    await setJSON(store, key, next);
+    return;
+  }
   if (step.method === 'PATCH') {
     const existing = await getJSON(store, taskKey(step.id));
     if (!existing || typeof existing !== 'object') {
