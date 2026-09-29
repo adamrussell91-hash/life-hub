@@ -5,6 +5,7 @@
  *
  *   dexy   — a usual dose (learned from Adam's logs) is 30–60 min overdue with no log
  *   review — the train-home pass: school day, around leave time, review not done
+ *   bookmark — a task's work block (30 min+) ends within 10 min: leave a way back in (max 2/day)
  *
  * Cap: 4 a day. Each key once a day. An ignored notification changes nothing.
  */
@@ -12,13 +13,17 @@ import { load as loadYaml } from 'js-yaml';
 import { parseEventDocument } from '../../../apps/life/js/core/records.js';
 import { getSydneyDateKey } from '../../../apps/life/js/core/time.js';
 import { medicationDay, usualDoseTimes, clock } from '../../../packages/design-kit/js/calendar/medication-model.js';
-import { getJSON } from './tasks-blobs.mjs';
+import { getJSON, listJSON } from './tasks-blobs.mjs';
 import { PUSH_DAILY_CAP, readPushLog, readSubscriptions, sendToAll, writePushLog } from './push.mjs';
 
 export const DAY_REVIEW_PREFIX = 'meta/day_review/';
 const DEX_PATH = /^data\/body\/\d{4}\/\d{2}\/(\d{4}-\d{2}-\d{2})-dex-[a-z0-9-]+\.md$/;
 const LEAVE_BEFORE_HOME_H = 0.75;
 const REVIEW_WINDOW_H = 1;
+const BOOKMARK_LEAD_H = 10 / 60;
+const BOOKMARK_MIN_BLOCK_H = 0.5;
+const BOOKMARK_DAILY_CAP = 2;
+const BLOCKS_REFRESH_MS = 60 * 60 * 1000;
 
 const hourOf = (hhmm) => {
   const m = /^(\d{2}):(\d{2})$/.exec(String(hhmm ?? ''));
@@ -51,7 +56,7 @@ export function isSchoolDay(date, terms) {
  * Pure: which notifications are due now.
  * @returns {Array<{ key: string, title: string, body: string, url: string }>}
  */
-export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log }) {
+export function decideNotifications({ today, nowHour, med, schoolDay, leave, reviewDone, log, blocks = [] }) {
   const out = [];
   const sentCount = Object.keys(log?.sent ?? {}).length;
   const unsent = (key) => !log?.sent?.[key];
@@ -74,7 +79,40 @@ export function decideNotifications({ today, nowHour, med, schoolDay, leave, rev
       url: '/#/calendar/day?review=1'
     });
   }
+  const bookmark = bookmarkCandidate(blocks, nowHour, log);
+  if (bookmark) {
+    out.push({
+      key: `bookmark-${bookmark.id}`,
+      title: bookmark.title,
+      body: `Ends at ${clock(bookmark.end)}. Leave yourself a way back in?`,
+      url: `/#/calendar/day?bookmark=${encodeURIComponent(bookmark.task_id)}`
+    });
+  }
   return out.slice(0, Math.max(0, PUSH_DAILY_CAP - sentCount));
+}
+
+/**
+ * Pure: the task block (30 min+) ending in the next 10 minutes, if it has not been
+ * asked about and today's two bookmark nudges are not spent. Finished tasks never ask.
+ * @param {Array<{ id, task_id, title, start: number, end: number, taskDone?: boolean }>} blocks
+ */
+export function bookmarkCandidate(blocks, nowHour, log) {
+  const sent = Object.keys(log?.sent ?? {});
+  if (sent.filter((key) => key.startsWith('bookmark-')).length >= BOOKMARK_DAILY_CAP) return null;
+  return (blocks ?? [])
+    .filter((block) => block.task_id && !block.taskDone && block.end - block.start >= BOOKMARK_MIN_BLOCK_H
+      && nowHour < block.end && nowHour >= block.end - BOOKMARK_LEAD_H && !log?.sent?.[`bookmark-${block.id}`])
+    .sort((a, b) => a.end - b.end)[0] ?? null;
+}
+
+/** Today's task blocks as { id, task_id, title, start, end } (hours). */
+export function todaysTaskBlocks(rows, today) {
+  return (rows ?? [])
+    .filter((row) => row?.date === today && typeof row.task_id === 'string' && row.task_id && hourOf(row.start_time) != null)
+    .map((row) => {
+      const start = hourOf(row.start_time);
+      return { id: String(row.id), task_id: row.task_id, title: String(row.title || 'Work block'), start, end: start + (Number(row.duration_minutes) || 0) / 60 };
+    });
 }
 
 /** Dose logs from the data repo: all dex files in the last four weeks (small). */
@@ -136,6 +174,22 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
     med = medicationDay({ date: today, today, nowHour, logs: log.todayLogs ?? [], usual: log.usual });
   }
 
+  // Task blocks: listed at most hourly (a moved block is picked up within the hour).
+  if (!log.blocksAt || now.getTime() - Date.parse(log.blocksAt) > BLOCKS_REFRESH_MS) {
+    try {
+      log.blocks = todaysTaskBlocks(await listJSON(store, 'work_blocks/'), today);
+      log.blocksAt = now.toISOString();
+    } catch {
+      log.blocks = log.blocks ?? [];
+    }
+  }
+  const candidate = bookmarkCandidate(log.blocks, nowHour, log);
+  if (candidate) {
+    // Only a live candidate costs a task read: finished tasks never ask.
+    const task = await getJSON(store, `tasks/${candidate.task_id}`).catch(() => null);
+    if (!task || task.status === 'done' || task.status === 'dead' || task.deleted_at) candidate.taskDone = true;
+  }
+
   const profile = await loadProfile().catch(() => null);
   const terms = await loadTerms().catch(() => []);
   const review = await getJSON(store, `${DAY_REVIEW_PREFIX}${today}`).catch(() => null);
@@ -146,7 +200,8 @@ export async function runDaySenseNotify({ store, now = new Date(), loadProfile, 
     schoolDay: isSchoolDay(today, terms),
     leave: leaveHour(profile),
     reviewDone: Boolean(review),
-    log
+    log,
+    blocks: log.blocks ?? []
   });
   const sent = [];
   for (const message of due) {

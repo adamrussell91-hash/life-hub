@@ -419,3 +419,11 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-review-err[hidden]{display:none}
 .cal-rescue__tell input{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px}
 @media (max-width:719px){.cal-review-q__opts{grid-template-columns:1fr 1fr}.cal-rescue__tell input{font-size:16px}}
+
+/* Bookmarks: where Adam left a task (29/09/26) */
+.cal-due__bm{font-size:var(--text-2xs);color:var(--navy);font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cal-chip__bm{font-size:var(--text-2xs);color:var(--navy);font-style:italic;opacity:var(--m,1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-chip[data-density="line"] > .cal-chip__bm,.cal-chip[data-density="sliver"] > .cal-chip__bm{display:none}
+.cal-rescue__bookmarks{display:grid;gap:var(--space-2);padding:var(--space-3);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--pastel-gold) 40%,#fff)}
+.cal-rescue__bm{display:grid;gap:2px;font-size:var(--text-sm)}
+.cal-rescue__bm input{min-height:2.25rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;background:#fff}

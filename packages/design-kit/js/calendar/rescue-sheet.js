@@ -5,6 +5,7 @@
  *   3. One receipt: what moved, what stayed, what is still due today.
  * Accept goes through POST /api/calendar-ghosts, one ghost at a time, like any ghost.
  */
+import { saveCalendarItem } from './calendar-item-actions.js';
 import { buildRescuePlan, RESCUE_REASONS } from './rescue-plan.js';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -175,12 +176,42 @@ function paintProposals(opts, plan, queued) {
         failed.push(`${ghost.label}: ${error?.message || 'not saved'}`);
       }
     }
-    paintReceipt({ moved, failed, plan, headline: failed.length ? 'Partly done.' : 'Done.' });
+    paintReceipt({ moved, failed, plan, headline: failed.length ? 'Partly done.' : 'Done.', apiFetch: opts.apiFetch, onDone: opts.onDone });
     opts.onDone?.();
   });
 }
 
-function paintReceipt({ moved, failed, plan, headline, lead = '' }) {
+function bookmarkFields(rows) {
+  if (!rows?.length) return '';
+  return `<section class="cal-rescue__bookmarks" data-part="rescue-bookmarks"><b>Leave yourself a way back in?</b>`
+    + rows.map((row) => `<label class="cal-rescue__bm"><span>${esc(row.title)}</span>`
+      + `<input type="text" maxlength="280" data-task="${esc(row.taskId)}" placeholder="${esc(row.previous ? `Last time: ${row.previous}` : 'Where you were up to')}"></label>`).join('')
+    + `<div class="cal-rescue__acts"><button type="button" class="btn btn--secondary" data-rescue="bookmarks">Keep these</button></div></section>`;
+}
+
+async function saveBookmarks(section, apiFetch, onDone) {
+  const inputs = [...section.querySelectorAll('input[data-task]')].filter((input) => input.value.trim());
+  const button = section.querySelector('[data-rescue="bookmarks"]');
+  if (!inputs.length) {
+    section.remove();
+    return;
+  }
+  if (button) button.disabled = true;
+  let failed = 0;
+  for (const input of inputs) {
+    try {
+      await saveCalendarItem(apiFetch, { record: { type: 'task', id: input.dataset.task } }, { bookmark: input.value });
+    } catch {
+      failed += 1;
+    }
+  }
+  section.innerHTML = failed
+    ? `<p class="cal-rescue__sub is-failed">${failed} not saved. Add it from the task card.</p>`
+    : '<p class="cal-rescue__sub">Kept. They will be waiting on the tasks.</p>';
+  onDone?.();
+}
+
+function paintReceipt({ moved, failed, plan, headline, lead = '', apiFetch, onDone }) {
   const p = panel(
     `<div class="cal-rescue__head"><b>${esc(headline)}</b><button type="button" class="cal-rescue__x" data-rescue="close" aria-label="Close">×</button></div>`
     + (lead ? `<p class="cal-rescue__sub">${esc(lead)}</p>` : '')
@@ -188,10 +219,13 @@ function paintReceipt({ moved, failed, plan, headline, lead = '' }) {
     + list('Not saved (still pending, try from Review)', failed, 'is-failed')
     + list('Untouched', plan.kept.slice(0, 6), 'is-kept')
     + list('Still due today (your call)', plan.dueToday.slice(0, 4), 'is-due')
+    + (moved.length ? bookmarkFields(plan.interrupted) : '')
     + `<p class="cal-rescue__sub">Receipts are in Central Node › Recent Agent Actions.</p>`
     + `<div class="cal-rescue__acts"><button type="button" class="btn btn--primary" data-rescue="close">Close</button></div>`
   );
   p?.addEventListener('click', (event) => {
     if (event.target?.closest?.('[data-rescue="close"]')) closeRescueSheet();
+    const keep = event.target?.closest?.('[data-rescue="bookmarks"]');
+    if (keep) void saveBookmarks(keep.closest('[data-part="rescue-bookmarks"]'), apiFetch, onDone);
   });
 }
