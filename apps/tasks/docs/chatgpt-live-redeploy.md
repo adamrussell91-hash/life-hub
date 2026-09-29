@@ -114,7 +114,7 @@ The API host is what failed last time (`Failed to fetch` on Clare; Network/Corey
 
 ## 6. Success checks (all required)
 
-Do these on a hard-reloaded tab. Record HTTP status, UI behaviour, and asset hashes. There is **no** `/api/bootstrap`, `/api/health`, `/api/network`, or `/api/corey` route — do not treat those as missing-deploy evidence. Network UI is `#/stress` → `GET /api/stress-flags`. Corey UI is `#/corey` → `GET /api/capacity`.
+Do these on a hard-reloaded tab. Record HTTP status, UI behaviour, and asset hashes. There is **no** `/api/bootstrap`, `/api/health`, `/api/network`, `/api/corey`, `/api/stress-flags`, or `/api/capacity` route — do not treat those as missing-deploy evidence. Network (`#/stress`) and Corey (`#/corey`) were **retired** with the Network tab.
 
 ### 6.1 Hosts, cache, and build identity
 
@@ -148,8 +148,8 @@ Authenticated success envelope is `{ "ok": true, "data": … }`.
 | Tasks, signed in | `GET https://tasks-api.adam-russell.com/api/tasks` | HTTP **200** `{ "ok": true, "data": { "tasks": […] } }` |
 | Projects, signed in | `GET https://tasks-api.adam-russell.com/api/projects` | HTTP **200** `{ "ok": true, "data": { "projects": […] } }` |
 | Maps API | `GET https://tasks-api.adam-russell.com/api/maps` | HTTP **200** `{ "ok": true, "data": { "maps": […] } }` — not HTML 404 |
-| Network API | `GET https://tasks-api.adam-russell.com/api/stress-flags` | HTTP **200** `{ "ok": true, "data": { "flags": […] } }` — must not hang |
-| Corey API | `GET https://tasks-api.adam-russell.com/api/capacity` | HTTP **200** `{ "ok": true, "data": { "snapshot": …, "share": … } }` — must not hang |
+| ~~Network API~~ | ~~`GET …/api/stress-flags`~~ | **SKIP — retired** (404 expected; not a deploy fail) |
+| ~~Corey API~~ | ~~`GET …/api/capacity`~~ | **SKIP — retired** |
 | Stall API | `GET https://tasks-api.adam-russell.com/api/stall` | HTTP **200** `{ "ok": true, "data": { "reviews": […] } }` |
 | Clare propose | `POST https://tasks-api.adam-russell.com/api/clare` from `#/clare` | HTTP **200** `{ "ok": true, … }` |
 
@@ -160,8 +160,8 @@ Prefer the API host so `/api/*` is same-origin.
 | Check | Exact URL | Pass |
 |---|---|---|
 | Maps | `https://tasks-api.adam-russell.com/#/maps` and `https://tasks-hub.adam-russell.com/#/maps` | Heading Maps / Pathways. **Not** Board columns. No infinite load. |
-| Network | `https://tasks-api.adam-russell.com/#/stress` | Leaves **Scanning pressure patterns…**. Data or **Retry**. Not an infinite spinner. |
-| Corey | `https://tasks-api.adam-russell.com/#/corey` | Leaves **Loading capacity…**. Headlines / grid or **Retry**. |
+| ~~Network~~ | ~~`#/stress`~~ | **SKIP — retired** (do not report missing Network as a fail) |
+| ~~Corey~~ | ~~`#/corey`~~ | **SKIP — retired** |
 | Clare | `https://tasks-api.adam-russell.com/#/clare` | Ask Clare on `[LIVE-TEST] deploy check` → proposal, not `Failed to fetch`. |
 | Unknown hash | `https://tasks-api.adam-russell.com/#/definitely-missing` | Not-found (**That view isn’t in Tasks Hub** / Back to Board). **Not** Board. |
 
@@ -172,7 +172,8 @@ Discard the Clare confirm after you see a proposal (no need to create a task). I
 - API `/` still says Functions only.
 - Netlify Actions skipped for missing `NETLIFY_AUTH_TOKEN` and no manual `--prod` / UI publish was done.
 - Asset hashes on production HTML are from an older commit than the merge.
-- `GET /api/maps` or `GET /api/stress-flags` returns HTML 404.
+- `GET /api/maps` returns HTML 404.
+- (`GET /api/stress-flags` or `/api/capacity` 404 is **expected** after Network retirement — not a fail.)
 - You cannot state the merge SHA, both Actions run URLs (or the Netlify deploy ID), and both hosts’ `index-*.js` hashes.
 
 ## 7. If you are blocked
@@ -223,13 +224,13 @@ Do not try a second product. Do not “fix” code. This task is merge + deploy 
 | GET /api/session signed in → authenticated true | | |
 | GET /api/tasks 200 | | |
 | GET /api/maps 200 | | |
-| GET /api/stress-flags 200 | | |
-| GET /api/capacity 200 | | |
+| ~~GET /api/stress-flags 200~~ | SKIP — retired | |
+| ~~GET /api/capacity 200~~ | SKIP — retired | |
 | Maps on API host #/maps | | |
 | Maps on Pages #/maps | | |
 | POST /api/clare | | |
-| #/stress left Loading/Scanning | | |
-| #/corey left Loading capacity | | |
+| ~~#/stress left Loading/Scanning~~ | SKIP — retired | |
+| ~~#/corey left Loading capacity~~ | SKIP — retired | |
 | #/definitely-missing not-found | | |
 
 ## Rollback (if used)

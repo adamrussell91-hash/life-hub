@@ -156,24 +156,28 @@ Verified against `main` / PR #590 tip. **Fix the brief and related docs before a
 
 Ordered. Each step has Must / Must-not / Verify / Files / Tests. **Do not skip Docs before Slice A.**
 
+**29 Sep evening tightenings (Claude #2):** locked decisions below — build agent must not re-pick windows, date helpers, ghost pipelines, or waiting age fields.
+
 ---
 
-## Step 0 — Docs only (landed on PR #590 with this revision)
+## Step 0 — Docs only
 
-**Goal:** Stop promising deleted Network / intuitive-scan behaviour; align automation audit with C1–C2.
+**Goal:** Stop promising deleted Network / intuitive-scan behaviour; stop stress-test / live-test scripts from treating `#/stress` and `/api/stress-flags` as live.
 
-**Status:** Done in this docs revision (`clare-protocol.md`, `apps/tasks/AGENTS.md`, `AGENT_AUTOMATION_AUDIT.md`, this file, `CLAUDE.md`). Claude should still re-verify with the Step 0.1 Verify grep.
+**Status:** Core protocol/`AGENTS.md`/automation-audit cleanup landed earlier on #590. **Remaining in this revision:** stress-test + Tasks live-test / understand-anything references (0.1b).
 
 ### 0.1 Remove dead Network / flags promises
 
 | | |
 |---|---|
-| **Must** | `clare-protocol.md` no longer promises a scheduled Haiku `intuitive` flags pass or StressFlags Network behaviour that has no runtime. |
+| **Must** | `clare-protocol.md` no longer promises a scheduled Haiku `intuitive` flags pass or StressFlags Network behaviour. |
 | **Must** | `apps/tasks/AGENTS.md` no longer documents `POST /api/stress-flags`, hourly `intuitive-scan`, or Network “Look with judgment.” |
-| **Must** | `AGENT_AUTOMATION_AUDIT.md` §2.4 and “restore existing code” / “Morning Sweep cache” priorities updated to match C1–C2. |
-| **Must-not** | Reintroduce Network tab, stress-flag store, or fake cron stubs in docs. |
-| **Files** | `apps/tasks/config/clare-protocol.md`, `apps/tasks/AGENTS.md`, `docs/AGENT_AUTOMATION_AUDIT.md`, this file. |
-| **Verify** | `rg -n "intuitive-scan|stress-flags|Look with judgment|scheduled Haiku" apps/tasks docs/CLAUDE.md` — only historical plans (`docs/superpowers/plans/2026-09-26-retire-network-tab.md`) or explicit “deleted” notes. |
+| **Must** | `AGENT_AUTOMATION_AUDIT.md` §2.4 matches “code deleted”; Morning Sweep cache / “restore flags” deprioritised. |
+| **Must (0.1b)** | Living runbooks no longer instruct testers to open Network / call `/api/stress-flags` as a required pass: `docs/STRESS-TEST.md` (§4.15 + Tasks hash list), `apps/tasks/docs/chatgpt-live-site-test.md`, `apps/tasks/docs/chatgpt-live-redeploy.md`, `apps/tasks/docs/understand-anything.md`. Also strip required Network checks from `apps/tasks/docs/chatgpt-live-regression-test.md` if still present. |
+| **Must-not** | Rewrite historical *reports* (`claude-code-ux-ui-design-report.md`, etc.) as if the pages still exist — leave past findings; only fix docs that drive *future* runs. |
+| **Must-not** | Reintroduce Network tab, stress-flag store, or fake cron stubs. |
+| **Files** | Protocol / AGENTS / automation audit / this file / STRESS-TEST / the chatgpt + understand-anything docs named above. |
+| **Verify** | `rg -n "intuitive-scan|/api/stress-flags|#/stress|Look with judgment" apps/tasks docs/STRESS-TEST.md docs/CLAUDE.md` — only historical plans (`docs/superpowers/plans/2026-09-26-retire-network-tab.md`), explicit “deleted/retired” notes, or past-tense report archives. |
 
 ### 0.2 Optional future flags (design note only — not built)
 
@@ -190,113 +194,120 @@ If Adam later wants weekly Clare “judgment”:
 
 **Goal:** Active Board Done column shows recent completions only; older done remain in storage and all metrics paths.
 
-### 1.1 Product contract
+**Rough size:** ~two product files (`domain` helper + `views/board.ts`) + extend existing tests. Timeline unchanged.
+
+### 1.1 Product contract (locked)
 
 | Field | Decision |
 |-------|----------|
-| Retention window | **7 calendar days** ending today in Australia/Sydney (or “since Monday 00:00 Sydney” — pick one in implementation and document it; default proposal: **rolling 7×24h from `now`** using the same completion-date helper as overview). |
-| Completion instant | `parse(completed_at) ?? (status==='done' ? parse(updated_at) : null)` — same spirit as `dashboard-overview.ts`. |
-| In Done column if | `status === 'done'` (or column maps to done) **and** completion instant ≥ cutoff **or** user toggled “Show older”. |
-| Out of Done column if | done and completion instant &lt; cutoff and “Show older” is off. Task remains `status: 'done'` in Blobs. |
-| Reopen | Drag / toggle out of Done → `open` (already implemented). Must keep working for both recent and revealed-older cards. |
-| Dead tasks | Stay filtered out of Board (`status !== 'dead'`) as today. |
+| Retention window | **Rolling 7×24h from `now`** (not “since Monday”). Cutoff = `now - 7 days`. |
+| Completion instant | **Export and reuse** existing `completionStamp` from `apps/tasks/src/domain/dashboard-overview.ts` (today it is file-private — **export it**; do **not** copy the rule into a second function). Same rule: `completed_at` else `updated_at` when `status === 'done'`. |
+| In Done column if | column is done **and** (`showOlder` **or** `completionStamp(task) >= cutoff`). Missing stamp → treat as not recent (hidden unless Show older). |
+| Out of Done column if | done, stamp older than cutoff, Show older off. Status stays `done` in Blobs. |
+| Show older control | Label **with count**, e.g. `Show 23 older` / `Hide older`. Session-local state for v1. |
+| Reopen | Drag / toggle out of Done → `open` (already implemented). Works for recent and revealed-older cards. |
+| Dead tasks | Filtered out of Board as today (`status !== 'dead'`). |
+| Timeline | **Leave alone** in v1. |
 | API | **Unchanged.** `GET /api/tasks` / `listTasks()` still return all tasks. |
+| Project close | **Out of Slice A.** No child cascade until Adam picks live `archived_dead` vs mock `completed`. |
 
 ### 1.2 Implementation sketch
 
-1. **Pure helper** (new small domain module or add to `domain/board.ts`):
-   - `completionInstant(task): Date | null`
-   - `isRecentDone(task, now, windowMs): boolean`
-   - `filterBoardDoneColumn(tasks, { now, showOlder, windowMs }): Task[]` — only affects which done tasks appear in the done column list; other columns unchanged.
-2. **Board view** (`views/board.ts`):
-   - When painting the `done` column, pass tasks through the helper.
-   - Add a control under Done: **“Show older”** / **“Hide older”** (session-local state is enough for v1; persist in `meta/hub_prefs` only if trivial).
-   - Empty copy when filtered: e.g. “Nothing done in the last 7 days” vs true empty.
-3. **Do not** change `mergeTask`, Clare `complete_task`, Timeline (unless Timeline is explicitly an “active Done” surface — default: **leave Timeline alone in v1**; call out if Claude disagrees), dashboard overview, weekly review, goals.
-4. **Project close:** **out of Slice A.** Document the live vs mock divergence; do not cascade children until Adam picks `completed` vs `archived_dead` as the intentional close status.
+1. Export `completionStamp` from `dashboard-overview.ts`.
+2. Add board helpers in `domain/board.ts` (or thin `domain/done-retention.ts` that **imports** `completionStamp` — no duplicate date logic):
+   - `DONE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000`
+   - `isRecentDone(task, now)`
+   - `countOlderDone(tasks, now)` / `filterDoneColumnTasks(tasks, { now, showOlder })`
+3. `views/board.ts`: when painting the `done` column only, apply the filter; render the counted Show/Hide control; empty copy “Nothing done in the last 7 days” when filtered empty but older exist.
+4. Do **not** change `mergeTask`, Clare tools, dashboard math (other than the export), weekly review, goals.
 
 ### 1.3 Must / Must-not / Verify
 
 | | |
 |---|---|
-| **Must** | Board Done with “Show older” off shows ≤7-day done (by completionInstant). |
-| **Must** | “Show older” reveals older done without changing stored status. |
-| **Must** | Dashboard weekly completion counts still see old done (API unchanged). |
-| **Must** | Reopen from Done still sets `open` and clears done semantics as today. |
-| **Must-not** | Add `include_completed` default filter on GET `/api/tasks`. |
-| **Must-not** | Hard-delete or auto-`dead` old done. |
-| **Must-not** | Touch Clare tools for this. |
-| **Verify** | Unit tests: completionInstant fallback; filter in/out at boundary; showOlder bypass. Board view test if one exists for column paint. Manual: complete a task → appears in Done; with clock skew / fixture older than 7d → hidden until Show older. |
-| **Files** | `apps/tasks/src/domain/board.ts` (or new `domain/done-retention.ts`), `apps/tasks/src/views/board.ts`, tests under `apps/tasks/tests/unit/`. |
-| **UI** | Design kit only; both desktop and 390px. Touch target ≥44px for Show older. Failure register checks that apply (read `docs/CURSOR-UI-FAILURES.md`). |
+| **Must** | Done column with Show older off shows only done with `completionStamp >= now - 7d`. |
+| **Must** | Button shows older count (`Show N older`). |
+| **Must** | Dashboard weekly completion still sees old done (API unchanged; same `completionStamp`). |
+| **Must** | Reopen from Done still sets `open`. |
+| **Must-not** | Second copy of the completion-date rule. |
+| **Must-not** | Filter GET `/api/tasks`. Hard-delete / auto-`dead`. Touch Clare tools. Change Timeline. |
+| **Verify** | Extend **`apps/tasks/tests/unit/board.test.ts`** and **`apps/tasks/tests/unit/board-view.test.ts`** (do not invent a parallel suite). Cases: stamp fallback; in/out at 7d boundary; showOlder bypass; count label. Manual: desktop + 390 Board. |
+| **Files** | `apps/tasks/src/domain/dashboard-overview.ts` (export), `apps/tasks/src/domain/board.ts` and/or `done-retention.ts`, `apps/tasks/src/views/board.ts`, the two test files above. |
+| **UI** | Design kit; touch target ≥44px; `docs/CURSOR-UI-FAILURES.md` checks that apply. |
 
 ### 1.4 Later (not Slice A) — cold storage note
 
-When/if `listJSON` latency hurts:
-
-- Move done older than e.g. 90d into `tasks_archive/` (or similar) **after** metrics are updated to read a compact completion ledger or week aggregates.
-- Until then, Board filter only. Do not pretend UI hide = perf fix.
+`listJSON` still loads every task blob. UI hide ≠ perf fix. Cold-store only after metrics have another source.
 
 ---
 
 ## Step 2 — Slice B: cheap proactive loop (deterministic first)
 
-**Order inside B:** B1 heartbeat → B2 deadline runway ghosts → B3 waiting-on follow-ups.  
-**Explicitly deferred:** Morning Sweep cache; weekly Haiku flags; Ann teaching forecast; Teaching job runner; Clementine CN (those stay on the automation audit backlog).
+**Order inside B (locked):** **B2 → B3 → B1**.  
+B2/B3 extend already-running Netlify paths. B1 is Life UI over an existing governance file — specified below, but scheduled after the Tasks PA wins.
 
-### B1 — Missed-sweep heartbeat (no LLM)
+**Explicitly deferred:** Morning Sweep cache; weekly Haiku flags; Ann teaching forecast; Teaching job runner; Clementine CN.
+
+### B2 — Deadline runway → calendar ghost (first)
 
 | | |
 |---|---|
-| **Goal** | If Hammond Daily Sweep hasn’t landed in ~36h, surface a fail-visible flag (CN Status and/or Home), not silence. |
-| **Pattern** | Read newest governance `Daily Sweep` entry (or commit stamp the automation already writes). Compare to Sydney now. |
-| **Must** | Flag appears when stale; clears or softens when a fresh sweep exists. |
-| **Must-not** | Trigger an emergency Sonnet sweep by itself. |
-| **Files (expected)** | Life CN / Home surfaces; possibly a tiny helper reading governance log from `life-hub-data` via existing GitHub client paths. Exact files: implementer traces from automation audit §2.6. |
-| **Verify** | Unit test with fixture timestamps; no network required. |
+| **Goal** | Open task with hard due ≤48h and insufficient runway / no work coverage → one **calendar ghost** proposal. Adam accepts or dismisses. |
+| **Queue** | Ghosts live in **`life-hub-data`** file `pending-calendar-ghosts.json` (not Tasks Blobs). Writes go through `enqueueCalendarGhost` / `appendPendingCalendarGhost` (`netlify/functions/_shared/calendar-ghost-queue.mjs`, `netlify/functions/calendar-ghosts.mjs`). Each *new* id is a git commit today — **stable ghost `id` + existing `alreadyQueued` / semantic-key de-dupe** so the same task does **not** mint a new proposal every morning. |
+| **Logic** | Reuse **`computeDeadlineRunway`** in `netlify/functions/_shared/productivity-os.mjs` (~line 1025). Do not rewrite runway math. Map `risk` / missing coverage → ghost entry shape used by the existing propose pipeline. |
+| **Schedule** | **Extend the existing morning ghost-propose run** (`calendar-ghosts-propose-scheduled.mjs` → `calendar-ghosts-propose.mjs`). **No new cron.** Add a Tasks runway section inside that pass. |
+| **Must** | Never move `due_date`. Never auto-accept. Idempotent per task/day (or stronger) via ghost id / semantic key. |
+| **Must-not** | Anthropic. Nested agent turns. Second scheduled function. |
+| **Verify** | Unit: due tomorrow + insufficient runway → one enqueue with `added: true`; second pass → `added: false`. Already-covered task → no enqueue. |
+| **Cost** | $0 model; at most one commit per *new* ghost. |
+
+### B3 — Waiting-on follow-ups (second)
+
+| | |
+|---|---|
+| **Goal** | Open task with `waiting_on` and **`waiting_since` age ≥ 5 days** → follow-up **draft** on the calendar ghost queue. Never auto-send. |
+| **Age field** | **`waiting_since` only** (`productivity-os.mjs` `listWaitingItems` / `apps/tasks/src/domain/waiting.ts`). **Do not** fall back to `updated_at` (changes on every edit). |
+| **Missing `waiting_since`** | **Stamp in `mergeTask`** (`netlify/functions/tasks.mjs`) when `waiting_on` transitions from empty → set and `waiting_since` is absent (mirror Clare `set_waiting_on` which already stamps). Until that lands, **skip** tasks that still lack `waiting_since` rather than guessing age. |
+| **Reuse** | `listWaitingItems` / waiting helpers in `productivity-os.mjs`; enqueue via same ghost queue as promise-nudges (`runPromiseNudges` pattern in `promise-nudges.mjs`). |
+| **Cap / commits** | Prefer **one batched write** to `pending-calendar-ghosts.json` per run (append all new drafts, single commit). If forced to reuse one-entry `enqueueCalendarGhost`, cap **≤10** new drafts/run (≤10 commits) — acceptable but batch is better. |
+| **Schedule** | Daily. While touching this path, **DST-gate `promise-nudges-scheduled`** on Sydney hour so it stays ~07:00 after AEDT (bundle with B3). Waiting-on can ride the same gate or the morning ghost pass if batching is cleaner — pick one pipeline, document it in the PR; do not add a third cron. |
+| **Must** | Draft only; de-dupe like ghosts; N=5 days from `waiting_since`. |
+| **Must-not** | Auto-send; LLM rewrite; age from `updated_at`. |
+| **Verify** | Unit: `waiting_since` 6d ago → draft; 2d ago → none; missing `waiting_since` → none (and after mergeTask stamp, new waits get a stamp). Batch write → one commit for multiple drafts if implemented. |
 | **Cost** | $0 model. |
 
-### B2 — Deadline runway → calendar ghost (deterministic)
+### B1 — Missed-sweep heartbeat (third; fully named — no open-ended search)
 
 | | |
 |---|---|
-| **Goal** | Task with hard due ≤48h, no work block / insufficient runway → propose a **calendar ghost** (existing ghost queue). Adam accepts or dismisses. |
-| **Reuse** | `deadline_runway` / Productivity OS logic where possible; `calendar-ghosts-propose.mjs` + scheduled pattern (`calendar-ghosts-propose-scheduled.mjs` Sydney gate + `last_run`). |
-| **Must** | Never move `due_date`. Never auto-accept ghosts. Deduplicate proposals. |
-| **Must-not** | Call Anthropic. Nested agent turns. |
-| **Schedule** | Daily Sydney morning window (same dual-UTC + gate pattern as ghosts), or extend existing propose pass with a Tasks runway section. Prefer **one** propose pipeline over a second cron if clean. |
-| **Verify** | Unit: fixture task due tomorrow, no blocks → one ghost proposal shape. Fixture already blocked → no proposal. Integration against mock store if present. |
+| **Goal** | If newest Hammond **Daily Sweep** is older than **36h**, fail-visible warning on Life Home + Central Node. |
+| **Data source** | `life-hub-data` path **`data/governance/governance-log.md`**. Sweep headings written by Cursor Automation as `## {YYYY-MM-DD} — Daily Sweep` (`life-hub-data/config/hammond-daily-sweep.md`). |
+| **Parse** | Existing `parseGovernanceEntries` in `apps/life/js/core/governance-log.js` (already used by Home / CN). Add a tiny helper next to `latestHammondReview`, e.g. `latestDailySweep(markdown)` → newest entry with `entryType === 'Daily Sweep'`, then compare `dateKey` (and/or entry time if present) to Sydney now. Note: `"Daily Sweep"` is **not** in `GOVERNANCE_ENTRY_TYPES` (write allowlist) but **is** parseable from headings — do not require adding it to the write allowlist for this read-only check. |
+| **Surfaces** | **Home** via `apps/life/js/app/home-model.js` (same family as Hammond review line). **Central Node** via `apps/life/js/app/central-node-model.js` / CN Status or Needs-you chrome (fail-visible, not a nag toast loop). |
+| **Must** | Warning when stale; absent/soft when a sweep from the last ~36h exists; works offline against fixture markdown in unit tests. |
+| **Must-not** | Trigger an emergency model sweep. Open-ended “find the log” exploration at build time — paths are named here. |
+| **Verify** | Unit: fixture log with yesterday’s Daily Sweep → OK; with entry 3 days ago → warning; empty log → warning. |
 | **Cost** | $0 model. |
-
-### B3 — Waiting-on follow-ups (deterministic drafts)
-
-| | |
-|---|---|
-| **Goal** | Task with `waiting_on` older than N days (propose **N=5** unless Adam chooses otherwise) → follow-up **draft** on the calendar / ghost queue (same spirit as `promise-nudges-scheduled.mjs`). Never auto-send. |
-| **Reuse** | `waiting_review` in `productivity-os.mjs`; `runPromiseNudges` pattern for queueing drafts. |
-| **Must** | Draft only; Confirm/accept UX unchanged from ghosts/nudges. Cap per run (e.g. ≤10). |
-| **Must-not** | Email/SMS send; LLM rewrite of every draft unless template insufficient. |
-| **Schedule** | Daily, DST-safe Sydney gate (fix existing promise-nudges DST issue while touching it: gate on Sydney hour so it stays 07:00 after AEDT). |
-| **Verify** | Unit: aged waiting_on → one draft; fresh waiting_on → none; cap respected. |
-| **Cost** | $0 model (templates). |
 
 ### B — Explicit non-goals for first pass
 
 - Morning Sweep Blobs cache.
-- Resurrecting intuitive-scan / stress-flags.
+- Resurrecting intuitive-scan / stress-flags / `#/stress`.
 - Daily Clare or Hammond Sonnet “be useful” turn.
 - Cascading task archive on project close.
 - Filtering done at the API.
 - Putting Tasks blobs into `life-hub-data`.
+- New cron solely for runway (must extend morning ghost propose).
 
 ---
 
-## Suggested Cursor execution order (after Claude audits this plan)
+## Suggested Cursor execution order
 
-1. Land **Step 0** docs on this PR (or immediately after).
-2. Implement **Slice A** as its own PR with tests + Board screenshots (desktop + 390).
-3. Implement **B1 → B2 → B3** as separate small PRs (heartbeat can be Life-only; B2/B3 Netlify scheduled / shared).
-4. Only then revisit weekly judgment flags / Ann forecast / Teaching runner from `AGENT_AUTOMATION_AUDIT.md`.
+1. Finish **Step 0** (including 0.1b stress-test / live-test docs) on this PR.
+2. **Slice A** — own PR; export `completionStamp`; extend `board.test.ts` + `board-view.test.ts`; Board screenshots desktop + 390.
+3. **B2** then **B3** (extend existing schedules; batch ghost writes if practical).
+4. **B1** heartbeat on Life Home + CN.
+5. Only then revisit weekly judgment flags / Ann forecast / Teaching runner from `AGENT_AUTOMATION_AUDIT.md`.
 
 ---
 
@@ -305,8 +316,9 @@ When/if `listJSON` latency hurts:
 ```text
 Tier 0 — Deterministic (build these)
   existing ghosts · Remember · promise nudges ·
-  Board Done retention (Slice A) · sweep heartbeat ·
-  deadline runway ghosts · waiting-on follow-up drafts
+  Board Done retention (Slice A) ·
+  deadline runway ghosts (B2) · waiting-on follow-up drafts (B3) ·
+  sweep heartbeat (B1)
 
 Tier 1 — Bounded Haiku (later, only if Adam asks)
   Knowledge tidy · NEW weekly Clare judgment → Confirm/Status
