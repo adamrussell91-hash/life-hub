@@ -431,46 +431,56 @@ export function renderAddForm(host: HTMLElement, options: AddFormOptions): void 
 
   // TR-30: Remove lives in the edit sheet with an in-sheet confirm (never window.confirm).
   if (editing) {
+    const item = editing;
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'btn ghost danger';
     removeBtn.textContent = 'Remove';
-    removeBtn.addEventListener('click', () => {
-      const label = editing.title.trim() || 'this item';
+
+    function showEditActions(): void {
+      actions.replaceChildren(saveBtn, cancelBtn, removeBtn);
+    }
+
+    function showRemoveConfirm(): void {
       const confirmMsg = document.createElement('p');
       confirmMsg.className = 'hint remove-confirm';
-      confirmMsg.textContent = `Remove ${label}?`;
-      const confirmRemove = document.createElement('button');
-      confirmRemove.type = 'button';
-      confirmRemove.className = 'btn danger';
-      confirmRemove.textContent = 'Remove';
+      confirmMsg.textContent = `Remove ${item.title.trim() || 'this item'}?`;
+
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'btn danger';
+      confirmBtn.textContent = 'Remove';
+
       const keepBtn = document.createElement('button');
       keepBtn.type = 'button';
       keepBtn.className = 'btn ghost';
       keepBtn.textContent = 'Cancel';
-      const restoreActions = () => {
-        actions.replaceChildren(saveBtn, cancelBtn, removeBtn);
+
+      function restoreEditActions(): void {
         confirmMsg.remove();
-      };
-      keepBtn.addEventListener('click', restoreActions);
-      confirmRemove.addEventListener('click', async () => {
-        confirmRemove.disabled = true;
+        showEditActions();
+      }
+
+      keepBtn.addEventListener('click', restoreEditActions);
+      confirmBtn.addEventListener('click', async () => {
+        confirmBtn.disabled = true;
         keepBtn.disabled = true;
         try {
-          const saved = await removeItem(options.tripId, editing.id, options.version);
+          const saved = await removeItem(options.tripId, item.id, options.version);
           options.onSaved(saved.trip, saved.version);
           host.replaceChildren();
         } catch {
-          confirmRemove.disabled = false;
-          keepBtn.disabled = false;
           errorNote.hidden = false;
           errorNote.textContent = 'Could not remove. Try again.';
-          restoreActions();
+          restoreEditActions();
         }
       });
-      actions.replaceChildren(confirmRemove, keepBtn);
+
+      actions.replaceChildren(confirmBtn, keepBtn);
       actions.before(confirmMsg);
-    });
+    }
+
+    removeBtn.addEventListener('click', showRemoveConfirm);
     actions.append(removeBtn);
   }
   form.append(actions);

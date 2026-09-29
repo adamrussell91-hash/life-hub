@@ -21,6 +21,17 @@ import { renderAddForm } from '@/components/add-form';
 const trip = fixtureTrip as unknown as Trip;
 const editing = trip.items.find((item) => item.id === 'itm_testtodo01') as Item;
 
+function findButton(host: ParentNode, text: string): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('button')].find((b) => b.textContent === text);
+}
+
+/** Solid (non-ghost) Remove — the in-sheet confirm action. */
+function findConfirmRemove(host: ParentNode): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('button')].find(
+    (b) => b.textContent === 'Remove' && !b.classList.contains('ghost')
+  );
+}
+
 describe('renderAddForm remove (TR-30)', () => {
   beforeEach(() => {
     removeItem.mockReset();
@@ -43,14 +54,12 @@ describe('renderAddForm remove (TR-30)', () => {
       onClose
     });
 
-    const remove = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Remove');
+    const remove = findButton(host, 'Remove');
     expect(remove).toBeTruthy();
     remove!.click();
 
     expect(host.textContent).toContain('Remove Book Belém tram tickets?');
-    const confirm = [...host.querySelectorAll('button')].find(
-      (b) => b.textContent === 'Remove' && b.classList.contains('btn') && !b.classList.contains('ghost')
-    );
+    const confirm = findConfirmRemove(host);
     expect(confirm).toBeTruthy();
 
     const nextTrip = {
@@ -77,7 +86,6 @@ describe('renderAddForm remove (TR-30)', () => {
       onSaved: vi.fn(),
       onClose: vi.fn()
     });
-    const remove = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Remove');
-    expect(remove).toBeUndefined();
+    expect(findButton(host, 'Remove')).toBeUndefined();
   });
 });
