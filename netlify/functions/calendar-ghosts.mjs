@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { load as loadYaml } from 'js-yaml';
 import { verifySessionToken, serializeExpiredSessionCookie } from './_shared/auth-security.mjs';
 import {
@@ -32,9 +33,11 @@ import {
   readSchoolTerms
 } from './almanac.mjs';
 import { defaultGetCognitiveStore } from './_shared/cognitive-store.mjs';
-import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { defaultGetProfessionalStore, getJSON as getProfessionalJSON, setJSON as setProfessionalJSON } from './_shared/professional-blobs.mjs';
 import { defaultGetUniversalLinkStore } from './_shared/universal-link-blobs.mjs';
 import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createMeetingRepository } from './_shared/meeting-repository.mjs';
+import { createEventRepository } from './_shared/event-repository.mjs';
 import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
 import { createAccessContext } from './_shared/entity-access.mjs';
 import { mergeTask } from './tasks.mjs';
@@ -127,8 +130,74 @@ export function serializePendingCalendarGhosts(list, last_run) {
 }
 
 /**
+ * Content fingerprint for chat ghost ids — same day can hold breakfast AND dinner.
+ * Tideline auto-proposer still uses bare ghostId(agent, kind, date).
+ */
+export function chatGhostContentHash(input) {
+  const refs = Array.isArray(input?.person_refs)
+    ? input.person_refs.filter(ref => typeof ref === 'string').join(',')
+    : '';
+  const payload = [
+    input?.start, input?.end, input?.time, input?.title, input?.subject,
+    input?.path, input?.direction, input?.channel, refs,
+    input?.follow_up_task?.title, input?.follow_up_task?.due
+  ].map(value => String(value ?? '')).join('\0');
+  return createHash('sha256').update(payload).digest('hex').slice(0, 8);
+}
+
+export function ghostContentFingerprint(ghost) {
+  const refs = Array.isArray(ghost?.person_refs)
+    ? ghost.person_refs.filter(ref => typeof ref === 'string').join(',')
+    : '';
+  return [
+    ghost?.start, ghost?.end, ghost?.time, ghost?.title, ghost?.subject,
+    ghost?.path, ghost?.direction, ghost?.channel, refs,
+    ghost?.follow_up_task?.title, ghost?.follow_up_task?.due
+  ].map(value => String(value ?? '')).join('\0');
+}
+
+/** Display chip kind for a pending ghost on Tideline (matches accepted block colours). */
+export function ghostChipDisplayKind(kind) {
+  if (kind === 'schedule_workout') return 'fitness';
+  if (kind === 'log_comm' || kind === 'book_comm') return 'comm';
+  if (kind === 'pro_meeting') return 'professional';
+  if (kind === 'pro_event') return 'event';
+  return 'health';
+}
+
+function addMinutesHhmm(hhmm, minutes) {
+  const [h, m] = String(hhmm).split(':').map(Number);
+  const total = h * 60 + m + minutes;
+  const wrapped = ((total % (24 * 60)) + (24 * 60)) % (24 * 60);
+  return `${String(Math.floor(wrapped / 60)).padStart(2, '0')}:${String(wrapped % 60).padStart(2, '0')}`;
+}
+
+function chipForChatGhost(input, dateKey) {
+  const kind = input.kind;
+  const timedKinds = new Set([
+    'outing', 'meal_block', 'schedule_workout', 'protect_block', 'bedtime',
+    'log_comm', 'book_comm', 'pro_meeting', 'pro_event', 'reschedule_block'
+  ]);
+  if (!timedKinds.has(kind) || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  let start = typeof input.start === 'string' && input.start ? input.start : null;
+  let end = typeof input.end === 'string' && input.end ? input.end : null;
+  if (!start && typeof input.time === 'string' && input.time) {
+    start = input.time;
+    end = addMinutesHhmm(input.time, 30);
+  }
+  if (!start || !end) return null;
+  return {
+    date: dateKey,
+    start,
+    end,
+    kind: ghostChipDisplayKind(kind)
+  };
+}
+
+/**
  * Build and validate a queue entry from a chat tool call.
- * Agent is forced to the calling slug. Id is deterministic.
+ * Agent is forced to the calling slug. Id is deterministic and content-hashed
+ * so two outings on the same day do not collide.
  */
 export function calendarGhostFromToolInput(input, { agent, nowIso }) {
   if (!agent || !(agent in GHOST_AGENTS)) throw new TypeError(`Unknown agent: ${agent}`);
@@ -136,6 +205,12 @@ export function calendarGhostFromToolInput(input, { agent, nowIso }) {
     throw new TypeError('Ghost input must be an object');
   }
   const kind = input.kind;
+  if (kind === 'reschedule_block' || kind === 'cancel_block') {
+    const path = typeof input.path === 'string' ? input.path : '';
+    if (!path.startsWith('data/calendar/')) {
+      throw new TypeError(`${kind} path must start with data/calendar/`);
+    }
+  }
   const dateKey = typeof input.date === 'string' && input.date
     ? input.date
     : typeof input.from === 'string' && input.from
@@ -143,19 +218,31 @@ export function calendarGhostFromToolInput(input, { agent, nowIso }) {
       : typeof input.due === 'string' && input.due
         ? input.due
         : 'undated';
-  const id = ghostId(agent, kind, dateKey);
+  const id = `${ghostId(agent, kind, dateKey)}-${chatGhostContentHash(input)}`;
   const ghost = { ...input, id, agent };
   validateGhost(ghost);
+  const chip = chipForChatGhost(ghost, dateKey);
+  const label = typeof ghost.title === 'string' && ghost.title.trim()
+    ? ghost.title.trim()
+    : (typeof ghost.subject === 'string' && ghost.subject.trim() ? ghost.subject.trim() : kind);
   return {
     ...ghost,
+    ...(chip ? { chip, label } : {}),
     created_at: nowIso,
     status: 'pending',
     via: 'chat'
   };
 }
 
-/** True if id or semantic key (agent+kind+date+target) already appears in the list. */
+/**
+ * True if this entry is already in the list.
+ * Chat proposals use content-hashed ids (breakfast ≠ dinner same day) — match by id only.
+ * Tideline auto-proposer still dedupes by semantic key (agent+kind+date+target).
+ */
 export function alreadyQueued(list, entry) {
+  if (entry?.via === 'chat') {
+    return (list ?? []).some(item => item.id === entry.id);
+  }
   const key = ghostSemanticKey(entry);
   return (list ?? []).some(item =>
     item.id === entry.id || (key && ghostSemanticKey(item) === key));
@@ -303,8 +390,102 @@ export function ghostTaskId(ghostId) {
   return `ghost-${ghostId}`;
 }
 
-/** Accept of a book_comm ghost: create the comm, then join it to its thread. */
-export async function applyProfessionalStep(deps, step) {
+/** Stable professional blob key so Confirm + Accept cannot double-create. */
+export function ghostProfessionalAcceptKey(ghostId) {
+  return `ghost-accept/${ghostId}`;
+}
+
+function uuidFromGhostSeed(seed) {
+  const hex = createHash('sha256').update(String(seed)).digest('hex');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+/** Accept of a book_comm / log_comm / pro_meeting / pro_event ghost. */
+export async function applyProfessionalStep(deps, step, { ghostId = null } = {}) {
+  const boundGhostId = ghostId || step.ghostId || null;
+  if (boundGhostId && typeof deps.getJSON === 'function') {
+    const prior = await deps.getJSON(ghostProfessionalAcceptKey(boundGhostId));
+    if (prior && typeof prior === 'object' && prior.record) return prior.record;
+  }
+
+  const remember = async (record) => {
+    if (boundGhostId && typeof deps.setJSON === 'function') {
+      await deps.setJSON(ghostProfessionalAcceptKey(boundGhostId), {
+        action: step.action,
+        record,
+        at: new Date().toISOString()
+      });
+    }
+    return record;
+  };
+
+  if (step.action === 'log_communication') {
+    const time = typeof step.time === 'string' && step.time ? step.time : '12:00';
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const occurred = wallLocalToUtcIso(`${step.date}T${time}`, timeZone);
+    const personRefs = Array.isArray(step.person_refs) ? step.person_refs : [];
+    const createInput = {
+      direction: step.direction,
+      channel: step.channel,
+      occurred_at: occurred,
+      time_zone: timeZone,
+      subject: step.title || step.subject || '',
+      summary: typeof step.summary === 'string' ? step.summary : '',
+      links: personRefs.map((ref) => ({ relationship_type: 'recipient', target_ref: ref }))
+    };
+    if (boundGhostId && typeof deps.createCommunicationWithId === 'function') {
+      const id = `communication_${uuidFromGhostSeed(`log_comm:${boundGhostId}`)}`;
+      const { communication } = await deps.createCommunicationWithId(id, createInput);
+      return remember(communication);
+    }
+    const { communication } = await deps.createCommunication(createInput);
+    return remember(communication);
+  }
+  if (step.action === 'create_meeting') {
+    if (typeof deps.createMeeting !== 'function') {
+      throw new TypeError('createMeeting is not available for this ghost accept');
+    }
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const scheduled_start = step.scheduled_start
+      || wallLocalToUtcIso(`${step.date}T${step.start}`, timeZone);
+    const scheduled_end = step.scheduled_end
+      || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
+    const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
+    const { meeting } = await deps.createMeeting({
+      title: step.title,
+      scheduled_start,
+      scheduled_end,
+      time_zone: timeZone,
+      location_text: step.location_text ?? null,
+      agenda: step.agenda ?? null,
+      notes: step.notes ?? null,
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref })),
+      ...(boundGhostId ? { client_key: `ghost:${boundGhostId}` } : {})
+    });
+    return remember(meeting);
+  }
+  if (step.action === 'create_event') {
+    if (typeof deps.createEvent !== 'function') {
+      throw new TypeError('createEvent is not available for this ghost accept');
+    }
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const start = step.start_iso || wallLocalToUtcIso(`${step.date}T${step.start}`, timeZone);
+    const end = step.end_iso || wallLocalToUtcIso(`${step.date}T${step.end}`, timeZone);
+    const attendeeRefs = Array.isArray(step.attendee_refs) ? step.attendee_refs : [];
+    const { event } = await deps.createEvent({
+      title: step.title,
+      start,
+      end,
+      time_zone: timeZone,
+      event_type: step.event_type || 'professional_development',
+      all_day: step.all_day === true,
+      location_text: step.location_text ?? null,
+      hours: step.hours ?? null,
+      links: attendeeRefs.map((ref) => ({ relationship_type: 'attendee', target_ref: ref })),
+      ...(boundGhostId ? { client_key: `ghost:${boundGhostId}` } : {})
+    });
+    return remember(event);
+  }
   if (step.action !== 'create_communication') throw new TypeError(`Unknown professional step: ${step.action}`);
   const start = wallLocalToUtcIso(`${step.date}T${step.time}`, step.time_zone);
   const end = new Date(Date.parse(start) + step.duration_min * 60_000).toISOString();
@@ -322,7 +503,146 @@ export async function applyProfessionalStep(deps, step) {
   if (step.thread_ref) {
     await deps.createLink({ source_ref: `professional:communication:${communication.id}`, target_ref: step.thread_ref, relationship_type: 'in_thread' });
   }
-  return communication;
+  return remember(communication);
+}
+
+/**
+ * Display-only propose-action payload for chat Confirm, bound to a queued ghost id.
+ * Confirm executes runGhostDecision — this write is never applied as a real file change.
+ */
+export function calendarGhostConfirmProposal(ghost) {
+  const id = typeof ghost?.id === 'string' ? ghost.id : 'ghost';
+  const kind = typeof ghost?.kind === 'string' ? ghost.kind : 'ghost';
+  const title = String(ghost?.title || ghost?.subject || kind).replace(/\s+/g, ' ').trim();
+  const date = ghost?.date || ghost?.due || ghost?.from || '';
+  const when = date
+    ? (ghost?.start && ghost?.end
+      ? `${date} ${ghost.start}–${ghost.end}`
+      : ghost?.time
+        ? `${date} ${ghost.time}`
+        : date)
+    : '';
+  const intent = when
+    ? `Confirm calendar proposal: ${kind} — ${title} (${when})`
+    : `Confirm calendar proposal: ${kind} — ${title}`;
+  const reason = typeof ghost?.reason === 'string' && ghost.reason.trim()
+    ? `\n\nWhy: ${ghost.reason.trim()}`
+    : '';
+  const content = `# Calendar ghost (confirm only)\n\nId: ${id}\nKind: ${kind}\n${title ? `Title: ${title}\n` : ''}${when ? `When: ${when}\n` : ''}${reason}\n\nAccepting runs the same plan as calendar Accept. This file is not written.\n`;
+  return {
+    intent,
+    reads: ['pending-calendar-ghosts.json'],
+    writes: [{
+      path: `data/os/calendar-ghost-confirm/${id}.md`,
+      mode: 'create',
+      content,
+      diff: intent
+    }],
+    surfaces: ['confirm_card', 'calendar']
+  };
+}
+
+/**
+ * Queue a pending calendar ghost and open a chat Confirm card bound to the
+ * same ghost id. Shared by propose_calendar_ghost and propose_log_communication.
+ *
+ * `validateProposeActionInput` is injected so this module stays free of the
+ * propose-action ↔ registry import cycle.
+ */
+export async function queueCalendarGhostDualPath({
+  client,
+  entry,
+  agentSlug,
+  proposeOsAction,
+  send,
+  validateProposeActionInput,
+  extraWrites = null,
+  intent = null,
+  surfaces = null
+}) {
+  const tree = await client.resolveTree();
+  const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
+  const prior = blob ? decodeBlob(await client.readBlob(blob.sha)) : '[]';
+  const { content, added, list } = appendPendingCalendarGhost(prior, entry);
+  let bound = entry;
+  if (!added) {
+    const matched = (list ?? []).find(item => item.id === entry.id)
+      || (list ?? []).find(item => ghostSemanticKey(item) && ghostSemanticKey(item) === ghostSemanticKey(entry));
+    if (!matched) {
+      return { ok: false, error: 'ghost_conflict', detail: 'Could not bind to an existing calendar proposal.' };
+    }
+    const matchedStatus = statusOf(matched);
+    if (matchedStatus === 'accepted' || matchedStatus === 'dismissed') {
+      return {
+        ok: false,
+        error: 'ghost_already_decided',
+        detail: `This calendar proposal was already ${matchedStatus}.`,
+        id: matched.id
+      };
+    }
+    if (ghostContentFingerprint(matched) !== ghostContentFingerprint(entry)) {
+      return {
+        ok: false,
+        error: 'ghost_conflict',
+        detail: 'A different proposal is already queued for this slot.',
+        id: matched.id
+      };
+    }
+    bound = matched;
+  } else {
+    await client.writeFile({
+      path: PENDING_CALENDAR_GHOSTS_PATH,
+      content,
+      ...(blob?.sha ? { sha: blob.sha } : {}),
+      message: `chore(calendar): propose ${entry.id}`
+    });
+  }
+  const reply = bound.kind === 'log_comm'
+    ? 'Ready to log — Confirm here or Accept on the calendar.'
+    : 'Proposed on your calendar. Confirm here or Accept on the calendar.';
+  if (typeof send === 'function') {
+    send({
+      type: 'calendar_ghost_proposed',
+      id: bound.id,
+      reply
+    });
+  }
+  const confirmInput = calendarGhostConfirmProposal(bound);
+  const companions = Array.isArray(extraWrites) ? extraWrites.filter(Boolean) : [];
+  const proposalInput = companions.length
+    ? {
+      ...confirmInput,
+      intent: (typeof intent === 'string' && intent.trim()) || confirmInput.intent,
+      surfaces: Array.isArray(surfaces) && surfaces.length
+        ? surfaces
+        : ['confirm_card', 'calendar', 'governance_log'],
+      writes: [...companions, ...confirmInput.writes]
+    }
+    : confirmInput;
+  const validated = typeof validateProposeActionInput === 'function'
+    ? validateProposeActionInput(proposalInput, { agentSlug })
+    : { ok: false };
+  let pendingId = null;
+  if (validated.ok && typeof proposeOsAction === 'function') {
+    pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: bound.id });
+  }
+  const writes = validated.ok
+    ? validated.proposal.writes
+    : proposalInput.writes;
+  return {
+    ok: true,
+    status: 'awaiting_confirm',
+    id: bound.id,
+    ghost_status: added ? 'queued' : 'already_queued',
+    intent: validated.ok ? validated.proposal.intent : proposalInput.intent,
+    writes: writes.map(write => ({
+      path: write.path,
+      mode: write.mode,
+      diff: write.diff
+    })),
+    ...(pendingId ? { pendingId } : {}),
+    reply
+  };
 }
 
 export async function applyTaskStep(store, step, { ghostId } = {}) {
@@ -729,7 +1049,7 @@ async function finishTasks({ open, commit, tasksStore, professionalDeps, id, set
     const store = await tasksStore();
     for (const step of settlement.taskSteps) {
       if (step.target === 'professional') {
-        await applyProfessionalStep(await professionalDeps(), step);
+        await applyProfessionalStep(await professionalDeps(), step, { ghostId: step.ghostId ?? id });
       } else {
         await applyTaskStep(store, step, { ghostId: step.ghostId ?? id });
       }
@@ -914,12 +1234,18 @@ export function createCalendarGhostsHandler({
         professionalDeps: async () => {
           const professionalStore = await defaultGetProfessionalStore(env);
           const repo = createCommunicationRepository({ store: professionalStore, env });
+          const meetingRepo = createMeetingRepository({ store: professionalStore, env });
+          const eventRepo = createEventRepository({ store: professionalStore, env });
           const universalLinkStore = await defaultGetUniversalLinkStore(env);
           const links = createUniversalLinkRepository({ store: universalLinkStore });
           const accessContext = createAccessContext({ workflow: 'life' });
           return {
             createCommunication: (input) => repo.createCommunication(input),
-            createLink: (link) => links.createLink(link, accessContext)
+            createMeeting: (input) => meetingRepo.createMeeting(input),
+            createEvent: (input) => eventRepo.createEvent(input),
+            createLink: (link) => links.createLink(link, accessContext),
+            getJSON: (key) => getProfessionalJSON(professionalStore, key),
+            setJSON: (key, value) => setProfessionalJSON(professionalStore, key, value)
           };
         },
         decision,

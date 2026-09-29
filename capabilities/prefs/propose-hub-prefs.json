@@ -1,0 +1,10 @@
+{
+  "id": "prefs.propose-hub-prefs",
+  "tool_name": "propose_hub_prefs",
+  "verb": "Prefs",
+  "agents": ["clare", "hammond"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Patch hub prefs (timezone, school terms, marking minutes). Constraints/About Me use CN patch; bedtime uses calendar ghost bedtime.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

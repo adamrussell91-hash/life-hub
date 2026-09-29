@@ -1,0 +1,10 @@
+{
+  "id": "knowledge.propose-page",
+  "tool_name": "propose_knowledge_page",
+  "verb": "Knowledge",
+  "agents": ["clementine"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Create or patch a Knowledge Hub archive page. Saved only after Adam's Confirm (knowledge store, not life-data).",
+  "surfaces": ["confirm_card", "knowledge", "governance_log"]
+}

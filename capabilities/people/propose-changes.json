@@ -9,7 +9,7 @@
   ],
   "risk": "confirm",
   "kind": "capacity",
-  "prompt_one_liner": "Add People, edit names/aliases, or link People to each other or to Organisations. Saved only after Adam's Confirm.",
+  "prompt_one_liner": "Add People, edit names/aliases/notes/LinkedIn/workplace, or link People to each other or to Organisations. Saved only after Adam's Confirm.",
   "surfaces": [
     "confirm_card",
     "governance_log"

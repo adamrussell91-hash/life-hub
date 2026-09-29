@@ -1,0 +1,15 @@
+{
+  "id": "comms.propose-log-communication",
+  "tool_name": "propose_log_communication",
+  "verb": "Comms",
+  "agents": ["*"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Log a past/present email, call, or message after search_people. Confirm card + calendar ghost; nothing saved until Confirm.",
+  "surfaces": ["confirm_card", "calendar"],
+  "side_effects": [
+    "Appends a log_comm ghost to pending-calendar-ghosts.json",
+    "Queues a chat Confirm card bound to the same ghost id",
+    "Never writes Professional communications until Confirm / Accept"
+  ]
+}

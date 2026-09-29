@@ -1,0 +1,10 @@
+{
+  "id": "goals.propose",
+  "tool_name": "propose_goal",
+  "verb": "Goals",
+  "agents": ["hammond", "clare"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose creating a Goals Hub goal (or grow a someday). Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

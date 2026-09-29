@@ -1,0 +1,11 @@
+{
+  "id": "fitness.save-workout-template",
+  "tool_name": "save_workout_template",
+  "verb": "Fitness",
+  "agents": ["chadwick"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Save or update a named workout template under Fitness templates. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "fitness_tab", "governance_log"],
+  "side_effects": ["Writes data/fitness/templates/<slug>.md after Confirm"]
+}

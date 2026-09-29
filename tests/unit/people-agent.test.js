@@ -1,17 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildOrganisationProposal,
   buildPeopleProposal,
   createPeopleWriteExecutor,
+  proposeOrganisationChangesSchema,
   proposePeopleChangesSchema,
   searchPeopleSchema
 } from '../../netlify/functions/_shared/people-agent.mjs';
+import { buildObservationProposal } from '../../netlify/functions/_shared/observation-agent.mjs';
+import { buildRememberFactProposal } from '../../netlify/functions/_shared/remember-fact-agent.mjs';
+import { observationKey, rememberFactKey } from '../../netlify/functions/_shared/professional-blobs.mjs';
 import {
   classifyWriteTarget,
   executeProposeActionWrites,
   validateProposeActionInput
 } from '../../netlify/functions/_shared/capabilities/propose-action.mjs';
-import { buildAgentTools, isPathAllowedForAgent } from '../../netlify/functions/_shared/capabilities/registry.mjs';
+import {
+  buildAgentTools,
+  isPathAllowedForAgent,
+  resetCapabilityCaches
+} from '../../netlify/functions/_shared/capabilities/registry.mjs';
 import { createIdentityRepository } from '../../netlify/functions/_shared/identity-repository.mjs';
 import { IDENTITY_SCHEMA_VERSION, parsePersonRecord } from '../../netlify/functions/_shared/identity-schema.mjs';
 import { formatEntityRef, parseEntityRef } from '../../netlify/functions/_shared/entity-ref.mjs';
@@ -86,20 +95,29 @@ function resolverFor(store) {
 }
 
 test('people tools are offered to Clare, Hammond and Ann only', () => {
+  resetCapabilityCaches();
   for (const slug of ['clare', 'hammond', 'ann']) {
     const names = buildAgentTools({ slug }).map(tool => tool.name);
     assert.ok(names.includes('search_people'), slug);
     assert.ok(names.includes('propose_people_changes'), slug);
+    assert.ok(names.includes('propose_organisation_changes'), slug);
+    assert.ok(names.includes('propose_observation'), slug);
+    assert.ok(names.includes('propose_remember_fact'), slug);
     assert.equal(isPathAllowedForAgent(slug, 'people:person:new-sam', { mode: 'write' }), true, slug);
+    assert.equal(isPathAllowedForAgent(slug, 'people:organisation:new-x', { mode: 'write' }), true, slug);
+    assert.equal(isPathAllowedForAgent(slug, 'people:observation:new-1', { mode: 'write' }), true, slug);
+    assert.equal(isPathAllowedForAgent(slug, 'people:remember:new-1', { mode: 'write' }), true, slug);
     assert.equal(isPathAllowedForAgent(slug, 'people:link:new-1', { mode: 'write' }), true, slug);
   }
   for (const slug of ['brisket', 'sara', 'vera', 'clementine']) {
     const names = buildAgentTools({ slug }).map(tool => tool.name);
     assert.ok(!names.includes('propose_people_changes'), slug);
+    assert.ok(!names.includes('propose_observation'), slug);
     assert.equal(isPathAllowedForAgent(slug, 'people:person:new-sam', { mode: 'write' }), false, slug);
   }
   assert.equal(searchPeopleSchema().name, 'search_people');
   assert.equal(proposePeopleChangesSchema().name, 'propose_people_changes');
+  assert.equal(proposeOrganisationChangesSchema().name, 'propose_organisation_changes');
 });
 
 test('classifyWriteTarget recognises people paths and rejects malformed ones', () => {
@@ -107,7 +125,9 @@ test('classifyWriteTarget recognises people paths and rejects malformed ones', (
   assert.equal(classifyWriteTarget(`people:person:${IMPORTED_ID}`).store, 'people');
   assert.equal(classifyWriteTarget('people:link:new-2').kind, 'link');
   assert.equal(classifyWriteTarget('people:link:ul_abc').store, 'unknown');
-  assert.equal(classifyWriteTarget('people:organisation:new-x').store, 'unknown');
+  assert.equal(classifyWriteTarget('people:organisation:new-x').kind, 'organisation');
+  assert.equal(classifyWriteTarget('people:observation:new-1').kind, 'observation');
+  assert.equal(classifyWriteTarget('people:remember:new-1').kind, 'remember');
 });
 
 test('buildPeopleProposal turns add, edit and link into one Confirm proposal with readable lines', async () => {
@@ -247,4 +267,125 @@ test('search_people finds app-created people by name and returns refs the propos
   assert.equal(found.results[0].name, 'Sam Lee');
 
   assert.equal((await searchPeopleForAgent({ query: '  ', store, env: {} })).error, 'query_required');
+});
+
+test('buildPeopleProposal maps notes, LinkedIn and workplace into professional_profile', async () => {
+  const built = await buildPeopleProposal({
+    summary: 'Add notes for Jo',
+    update_people: [{
+      ref: JO,
+      summary: 'Met at APST workshop',
+      linkedin_url: 'https://www.linkedin.com/in/jo-example',
+      current_workplace: ['Example College']
+    }]
+  }, { nameForRef });
+  assert.equal(built.ok, true, built.error);
+  const patch = JSON.parse(built.proposal.writes[0].content);
+  assert.deepEqual(patch.professional_profile, {
+    summary: 'Met at APST workshop',
+    linkedin_url: 'https://www.linkedin.com/in/jo-example',
+    current_workplace: ['Example College']
+  });
+  assert.match(built.proposal.writes[0].diff, /notes updated/);
+  assert.equal(validateProposeActionInput(built.proposal, { agentSlug: 'clare' }).ok, true);
+});
+
+test('Confirm applies professional_profile on create', async () => {
+  const store = createMemoryStore();
+  const built = await buildPeopleProposal({
+    summary: 'Add Sam with notes',
+    add_people: [{
+      key: 'sam',
+      display_name: 'Sam Lee',
+      summary: 'New hire',
+      linkedin_url: 'https://www.linkedin.com/in/sam-lee',
+      current_workplace: ['Example College']
+    }]
+  }, { nameForRef });
+  const people = createPeopleWriteExecutor({
+    store,
+    env: {},
+    now: () => '2026-09-28T00:00:00.000Z',
+    resolveEntity: resolverFor(store)
+  });
+  const result = await executeProposeActionWrites(null, { agent: 'clare', ...built.proposal }, { blobStores: { people } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const samId = parseEntityRef(result.results[0].ref).id;
+  const record = store._raw(personKey(samId));
+  assert.equal(record.professional_profile.summary, 'New hire');
+  assert.equal(record.professional_profile.contact.linkedin_url, 'https://www.linkedin.com/in/sam-lee');
+  assert.deepEqual(record.professional_profile.current_workplace, ['Example College']);
+});
+
+test('buildOrganisationProposal and Confirm create an organisation', async () => {
+  const built = await buildOrganisationProposal({
+    summary: 'Add Example Uni',
+    add_organisations: [{ key: 'uni', display_name: 'Example University', aliases: ['EU'] }]
+  }, { nameForRef });
+  assert.equal(built.ok, true, built.error);
+  assert.equal(built.proposal.writes[0].path, 'people:organisation:new-uni');
+  assert.equal(validateProposeActionInput(built.proposal, { agentSlug: 'ann' }).ok, true);
+
+  const store = createMemoryStore();
+  const people = createPeopleWriteExecutor({
+    store,
+    env: {},
+    now: () => '2026-09-28T00:00:00.000Z',
+    resolveEntity: resolverFor(store)
+  });
+  const result = await executeProposeActionWrites(null, { agent: 'ann', ...built.proposal }, { blobStores: { people } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.match(result.results[0].ref, /^shared:organisation:/);
+});
+
+test('propose_observation Confirm writes through professional store', async () => {
+  const built = await buildObservationProposal({
+    summary: 'Note about Jo',
+    about_ref: JO,
+    text: 'Considering a move next term.',
+    source: 'manual'
+  }, { nameForRef, nowIso: '2026-09-28T01:00:00.000Z' });
+  assert.equal(built.ok, true, built.error);
+  assert.equal(validateProposeActionInput(built.proposal, { agentSlug: 'hammond' }).ok, true);
+
+  const identityStore = createMemoryStore();
+  const professionalStore = createMemoryStore();
+  const people = createPeopleWriteExecutor({
+    store: identityStore,
+    professionalStore,
+    env: {},
+    now: () => '2026-09-28T01:00:00.000Z',
+    resolveEntity: resolverFor(identityStore)
+  });
+  const result = await executeProposeActionWrites(null, { agent: 'hammond', ...built.proposal }, { blobStores: { people } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const observationId = result.results[0].observation_id;
+  assert.match(observationId, /^observation_/);
+  assert.equal(professionalStore._raw(observationKey(observationId)).text, 'Considering a move next term.');
+});
+
+test('propose_remember_fact Confirm creates an Adam-authored fact', async () => {
+  const built = await buildRememberFactProposal({
+    summary: 'Remember Jo prefers email',
+    person_ref: JO,
+    text: 'Prefers email over phone'
+  }, { nameForRef });
+  assert.equal(built.ok, true, built.error);
+  assert.equal(JSON.parse(built.proposal.writes[0].content).author, 'adam');
+  assert.equal(validateProposeActionInput(built.proposal, { agentSlug: 'ann' }).ok, true);
+
+  const identityStore = createMemoryStore();
+  const professionalStore = createMemoryStore();
+  const people = createPeopleWriteExecutor({
+    store: identityStore,
+    professionalStore,
+    env: {},
+    now: () => '2026-09-28T01:00:00.000Z',
+    resolveEntity: resolverFor(identityStore)
+  });
+  const result = await executeProposeActionWrites(null, { agent: 'ann', ...built.proposal }, { blobStores: { people } });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  const rememberId = result.results[0].remember_id;
+  assert.equal(professionalStore._raw(rememberFactKey(rememberId)).author, 'adam');
+  assert.equal(professionalStore._raw(rememberFactKey(rememberId)).text, 'Prefers email over phone');
 });

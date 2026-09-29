@@ -41,6 +41,7 @@ export function riverItemsFromHubEvents(events) {
     const type = record.type;
     if (!type || LOG_TYPES.has(type) || type === 'knowledge_page' || type === 'ledger_item') continue;
     if (type === 'calendar_block' && (record.kind === 'wall' || record.kind === 'protected')) continue;
+    if (type === 'calendar_block' && record.status === 'cancelled') continue;
     if (type === 'workout' && record.status === 'completed') continue;
 
     const id = record.id || event.path;

@@ -3,12 +3,11 @@
   "tool_name": "create_task",
   "verb": "Tasks",
   "agents": [
-    "clare",
-    "sara"
+    "*"
   ],
-  "risk": "confirm",
+  "risk": "auto",
   "kind": "capacity",
-  "prompt_one_liner": "Create one or more Tasks Hub rows. Prefer this over inventing a file path or dumping work into Central Node. Confirm before writing.",
+  "prompt_one_liner": "Create one or more Tasks Hub rows immediately (applied when the Tasks store is bound). Any agent may capture a task; Sara is restricted to domain health. Prefer this over inventing a file path or dumping work into Central Node.",
   "surfaces": [
     "confirm_card",
     "governance_log"

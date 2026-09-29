@@ -1,0 +1,11 @@
+{
+  "id": "calendar.list-blocks",
+  "tool_name": "list_calendar_blocks",
+  "verb": "Calendar",
+  "agents": ["*"],
+  "risk": "auto",
+  "kind": "capacity",
+  "prompt_one_liner": "List Life calendar_block paths in a date range (max 31 days). Use before reschedule_block / cancel_block. Read-only.",
+  "surfaces": ["calendar"],
+  "reads": ["data/calendar/**"]
+}

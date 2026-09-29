@@ -1,0 +1,10 @@
+{
+  "id": "career.propose-application",
+  "tool_name": "propose_application",
+  "verb": "Career",
+  "agents": ["clare", "hammond", "ann"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Propose adding a Career application. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "governance_log"]
+}

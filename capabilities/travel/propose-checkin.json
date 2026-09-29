@@ -1,0 +1,10 @@
+{
+  "id": "travel.propose-checkin",
+  "tool_name": "propose_travel_checkin",
+  "verb": "Travel",
+  "agents": ["clare", "hammond"],
+  "risk": "confirm",
+  "kind": "capacity",
+  "prompt_one_liner": "Record a Travel city check-in. Saved only after Adam's Confirm.",
+  "surfaces": ["confirm_card", "travel", "governance_log"]
+}
