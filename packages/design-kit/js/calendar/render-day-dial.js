@@ -28,7 +28,7 @@ import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
 import { saveCalendarItem } from './calendar-item-actions.js';
 import { presetBand } from './render-tideline.js';
 import { clock as medClock, doseCandidate, MEDICATION, toHHMM } from './medication-model.js';
-import { tonightFit, trackedHours } from './day-sense.js';
+import { bookmarkMoment, tonightFit, trackedHours } from './day-sense.js';
 import { openRescueSheet } from './rescue-sheet.js';
 import { openDayReview } from './day-review-sheet.js';
 import { disablePush, enablePush, pushState } from '../push-client.js';
@@ -409,7 +409,7 @@ function mount({ entrance = false } = {}) {
   mountDial(size);
   mountSide(side);
   mountPushControl(side);
-  handleDeepLink(view);
+  handleDeepLink(view, side);
   for (const chip of dayChips) {
     if (isItemVisible(chip, filterState)) continue;
     const arc = nodes.get(`arc:${chip.id}`);
@@ -671,6 +671,8 @@ function mountDial(size) {
         text: chip.kind === 'corey' ? 'Corey' : String(chip.title ?? '').replace(/ · Dr .*$/, ''),
         sub: proposal
           ? `${agentName(proposal.agent)}: ${String(proposal.label ?? '').toLowerCase()}`
+          : chip.bookmark?.note
+            ? `↳ ${chip.bookmark.note}`
           : chip.kind === 'corey'
             ? String(chip.title ?? '').replace(/ with Corey$/, '')
             : String(chip.meta ?? '').split(' · ')[0],
@@ -828,6 +830,67 @@ async function saveDose(button) {
   }
 }
 
+/** Blocks whose bookmark prompt was answered this session (never ask twice). */
+const bookmarkDismissed = new Set();
+
+/** A notification tapped after the block ended: ask about that task's latest block today anyway. */
+function askedMoment(day, taskId) {
+  const chip = (day?.chips ?? [])
+    .filter((row) => row.source === 'work_block' && !row.ghost && row.record?.task_id === taskId && row.start <= nowHour)
+    .sort((a, b) => b.start - a.start)[0];
+  if (!chip || bookmarkDismissed.has(chip.id)) return null;
+  return { blockId: chip.id, taskId, title: chip.title, previous: chip.bookmark?.note ?? '', reason: 'ending', at: chip.end };
+}
+
+function mountBookmarkPrompt(side, date, askedTask = null) {
+  if (date !== input.today || !side) return null;
+  if (side.querySelector?.('[data-part="bookmark-prompt"]')) return null;
+  const moment = askedTask ? askedMoment(dayAt(date), askedTask) : bookmarkMoment(dayAt(date), nowHour, { dismissed: bookmarkDismissed });
+  if (!moment) return null;
+  const lead = moment.reason === 'interrupted'
+    ? `${moment.next} starts at ${clock12(moment.at)} and cuts into ${moment.title}.`
+    : `${moment.title} ${moment.at > nowHour ? 'ends' : 'ended'} at ${clock12(moment.at)}.`;
+  const section = el('section', 'dd-bookmark', undefined, side, { 'data-part': 'bookmark-prompt', 'data-block': moment.blockId, 'data-task': moment.taskId });
+  el('p', 'dd-bookmark__lead', `${escapeHtml(lead)} Leave yourself a way back in?`, section);
+  el('label', 'dd-bookmark__field', `<span class="dd-sr">Where you're up to</span><input type="text" name="bookmark" maxlength="280" placeholder="${escapeHtml(moment.previous ? `Last time: ${moment.previous}` : 'e.g. stopped at Q4 feedback')}">`, section);
+  el('div', 'dd-acts', '<button type="button" class="btn btn--primary" data-bookmark-act="save">Save</button>'
+    + '<button type="button" class="btn btn--secondary" data-bookmark-act="none">Nothing to add</button>'
+    + '<button type="button" class="btn btn--ghost" data-bookmark-act="finished">Finished for now</button>', section);
+  // Sit at the top of the panel: this is the one thing worth doing right now.
+  if (side.firstChild && side.firstChild !== section) side.insertBefore?.(section, side.firstChild);
+  return section;
+}
+
+async function answerBookmark(button) {
+  const section = button.closest('[data-part="bookmark-prompt"]');
+  if (!section) return;
+  const act = button.getAttribute('data-bookmark-act');
+  const blockId = section.getAttribute('data-block');
+  const taskId = section.getAttribute('data-task');
+  if (act !== 'save') {
+    // Nothing to add / finished for now: never ask again for this block; nothing is written.
+    bookmarkDismissed.add(blockId);
+    section.remove();
+    return;
+  }
+  const note = section.querySelector('input')?.value?.trim() ?? '';
+  if (!note) {
+    section.querySelector('input')?.focus();
+    return;
+  }
+  button.disabled = true;
+  try {
+    await saveCalendarItem(input?.apiFetch, { record: { type: 'task', id: taskId } }, { bookmark: note });
+    bookmarkDismissed.add(blockId);
+    section.remove();
+    showToast('<b>Kept.</b> It will be waiting on the task next time.');
+    void input?.onSourcesChanged?.();
+  } catch (error) {
+    button.disabled = false;
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
+}
+
 function mountReviewEntry(side, date) {
   if (date !== input.today || nowHour < leaveHourFor() || reviewed.get(date) === true) return;
   const entry = el('section', 'dd-review-entry', undefined, side, { 'data-part': 'review-entry' });
@@ -837,7 +900,7 @@ function mountReviewEntry(side, date) {
 }
 
 /** Notification taps land on #/calendar/day?review=1 or ?sheet=dexy. Handle once, then tidy the URL. */
-function handleDeepLink(view) {
+function handleDeepLink(view, side) {
   const hash = String(view?.location?.hash ?? '');
   const query = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)) : null;
   if (!query || deepLinkHandled === hash) return;
@@ -853,6 +916,11 @@ function handleDeepLink(view) {
   if (query.get('review') === '1') {
     clean();
     queueMicrotask(() => openReview());
+  } else if (query.get('bookmark')) {
+    clean();
+    const prompt = doc.querySelector?.('[data-part="bookmark-prompt"]') ?? mountBookmarkPrompt(side, state.day, query.get('bookmark'));
+    prompt?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    prompt?.querySelector?.('input')?.focus?.({ preventScroll: true });
   } else if (query.get('sheet') === 'dexy') {
     clean();
     const panel = doc.querySelector?.('[data-part="medication"]');
@@ -893,6 +961,7 @@ async function togglePush(button) {
 function mountSide(side) {
   const date = state.day;
   const ghosts = ghostsNow();
+  mountBookmarkPrompt(side, date);
   mountReviewEntry(side, date);
   mountMedication(side, date);
   if (date === input.today) {
@@ -1280,6 +1349,8 @@ function wire(section) {
     const stepper = target.closest?.('[data-step]');
     if (stepper) return step(Number(stepper.getAttribute('data-step')));
     if (target.closest?.('[data-review-open]')) return openReview();
+    const bookmarkButton = target.closest?.('[data-bookmark-act]');
+    if (bookmarkButton) return void answerBookmark(bookmarkButton);
     const pushButton = target.closest?.('[data-push]');
     if (pushButton) return void togglePush(pushButton);
     if (target.closest?.('[data-rescue-open]')) {

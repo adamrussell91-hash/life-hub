@@ -74,7 +74,8 @@ function freeStart(day, from, length, limit, ignore) {
 
 /**
  * @param {{ model: object, today: string, nowHour: number, reason: keyof RESCUE_REASONS, lateMinutes?: number, note?: string, lightsOut?: number }} input
- * @returns {{ ghosts: object[], moved: string[], kept: string[], dueToday: string[], why: string }}
+ * @returns {{ ghosts: object[], moved: string[], kept: string[], dueToday: string[], why: string,
+ *   interrupted: Array<{ taskId: string, title: string, previous: string }> }}
  */
 export function buildRescuePlan({ model, today, nowHour, reason, lateMinutes = 0, note = '', lightsOut = 22 }) {
   const day = model?.days?.find((row) => row.date === today);
@@ -82,7 +83,7 @@ export function buildRescuePlan({ model, today, nowHour, reason, lateMinutes = 0
   const why = reason === 'late'
     ? `${label} (${lateMinutes} min)`
     : note ? `${label}: ${String(note).replace(/\s+/g, ' ').trim().slice(0, 80)}` : label;
-  const out = { ghosts: [], moved: [], kept: [], dueToday: [], why };
+  const out = { ghosts: [], moved: [], kept: [], dueToday: [], why, interrupted: [] };
   if (!day) return out;
 
   const remaining = (day.chips ?? []).filter((c) => c.end > nowHour && !c.ghost);
@@ -114,7 +115,7 @@ export function buildRescuePlan({ model, today, nowHour, reason, lateMinutes = 0
         moveToLaterDay(chip);
       }
     }
-    return out;
+    return withInterrupted(out, flexible, nowHour);
   }
 
   // Derailed: keep the first remaining block that serves something due today; move the rest.
@@ -146,6 +147,19 @@ export function buildRescuePlan({ model, today, nowHour, reason, lateMinutes = 0
         reason: why
       });
     }
+  }
+  return withInterrupted(out, flexible, nowHour);
+}
+
+/** Work cut off mid-block: the receipt offers a way back in for each task. */
+function withInterrupted(out, flexible, nowHour) {
+  const movedIds = new Set(out.ghosts.filter((g) => g.kind === 'move_block').map((g) => g.blockId));
+  const seen = new Set();
+  for (const chip of flexible) {
+    const taskId = chip.record?.task_id;
+    if (!taskId || seen.has(taskId) || !movedIds.has(chip.id) || !(chip.start <= nowHour && nowHour < chip.end)) continue;
+    seen.add(taskId);
+    out.interrupted.push({ taskId, title: chip.title, previous: chip.bookmark?.note ?? '' });
   }
   return out;
 }

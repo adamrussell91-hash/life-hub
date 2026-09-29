@@ -175,3 +175,8 @@
 .dd-review-entry__sub{font-size:var(--text-xs);color:var(--muted)}
 .dd-push{display:flex;flex-wrap:wrap;gap:4px var(--space-2);align-items:baseline;font-size:var(--text-xs);color:var(--muted);padding-top:var(--space-3);border-top:1px solid var(--line)}
 .dd-push:empty{display:none}
+/* Way back in (docs/proposals/calendar-day-sense.md §3.3): asked only at the end or interruption of a task block. */
+.dd-bookmark{display:grid;gap:6px;padding:var(--space-3);border-radius:var(--radius-sm);background:color-mix(in srgb,var(--pastel-gold) 45%,#fff);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent)}
+.dd-bookmark__lead{margin:0;font-size:var(--text-sm);line-height:1.35}
+.dd-bookmark__field input{width:100%;box-sizing:border-box;min-height:2rem;padding:4px var(--space-2);border:1px solid color-mix(in srgb,var(--ink) 22%,transparent);border-radius:var(--radius-sm);font:inherit;font-size:var(--text-sm);background:#fff}
+.dd-bookmark .dd-acts{flex-wrap:wrap}

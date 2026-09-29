@@ -93,7 +93,7 @@ export function canResizeItem(item) {
 export function editableFields(item) {
   if (!canMoveItem(item)) return [];
   const type = itemType(item);
-  if (type === 'task') return ['title', 'date', 'time', 'notes'];
+  if (type === 'task') return ['title', 'date', 'time', 'bookmark', 'notes'];
   if (type === 'work_block') return ['title', 'date', 'time', 'duration'];
   if (type === 'scheduled_lesson') return ['date', 'time'];
   return [];
@@ -176,6 +176,10 @@ export function itemPatchRequest(item, patch) {
     if (time !== undefined) body.due_time = time;
     if (title) body.title = title;
     if (typeof patch.notes === 'string') body.description = patch.notes;
+    if (typeof patch.bookmark === 'string') {
+      const note = patch.bookmark.replace(/\s+/g, ' ').trim().slice(0, 280);
+      body.bookmark = note ? { note, at: new Date().toISOString(), source: 'calendar' } : null;
+    }
     if (!Object.keys(body).length) return null;
     return { path: `/api/tasks?id=${encodeURIComponent(id)}`, method: 'PATCH', body };
   }

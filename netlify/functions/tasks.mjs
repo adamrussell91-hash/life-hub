@@ -62,6 +62,16 @@ function isTaskDomainRecord(item) {
   return !kind || kind === 'task' || kind === 'step';
 }
 
+/** A way back in: { note ≤280, at, source } or null. Anything else clears it. */
+export function coerceBookmark(value) {
+  if (!value || typeof value !== 'object') return null;
+  const note = typeof value.note === 'string' ? value.note.replace(/\s+/g, ' ').trim().slice(0, 280) : '';
+  if (!note) return null;
+  const at = typeof value.at === 'string' && Number.isFinite(Date.parse(value.at)) ? value.at : new Date().toISOString();
+  const source = typeof value.source === 'string' ? value.source.slice(0, 40) : 'calendar';
+  return { note, at, source };
+}
+
 export function mergeTask(existing, patch) {
   const next = { ...existing };
   for (const [key, value] of Object.entries(patch)) {
@@ -72,6 +82,10 @@ export function mergeTask(existing, patch) {
     }
     if (key === 'origin_date') {
       next.origin_date = coerceOriginDate(value);
+      continue;
+    }
+    if (key === 'bookmark') {
+      next.bookmark = coerceBookmark(value);
       continue;
     }
     next[key] = value;
