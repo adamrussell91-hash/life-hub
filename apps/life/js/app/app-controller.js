@@ -1509,7 +1509,10 @@ export function createAppController(dependencies) {
       calendarVisual: latestResult.calendarVisual ?? null,
       calendarGhosts,
       apiFetch,
-      onSourcesChanged: () => refreshGhostSources(),
+      // Calendar writes (accept, drag, item card) reload sources, then paint the saved state in place.
+      onSourcesChanged: () => refreshGhostSources().then(() => {
+        if (currentSection === 'calendar') renderCalendarSection();
+      }),
       planningProfile: calendarPlanningProfile,
       onTogglePlanningLens: () => {
         calendarPlanningLens = !calendarPlanningLens;

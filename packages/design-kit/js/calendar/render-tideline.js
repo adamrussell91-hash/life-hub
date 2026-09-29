@@ -28,7 +28,9 @@ import {
   readFilterState,
   writeFilterState
 } from './calendar-filter.js';
-import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
+import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
+import { canMoveItem, canResizeItem, dragPatch, saveCalendarItem } from './calendar-item-actions.js';
+import { formatDisplayDate } from '../format-display-date.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 /** Site-root portraits used across hubs (umbrella `dist/assets/agents/`). */
@@ -500,7 +502,9 @@ function mount({ entrance = false } = {}) {
       'data-calendar-quick-add': ''
     });
   }
-  const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', nav, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
+  // Zoom and Focus are one matched pair: same size, same row, wrap together.
+  const views = el('div', 'cal__views', undefined, nav, { 'data-part': 'view-controls' });
+  const zoom = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', views, { role: 'group', 'aria-label': 'Zoom', 'data-part': 'zoom-pills' });
   for (const name of ['Day', 'Week', 'Term', 'Year', 'Almanac']) {
     el('button', `hub-pills__btn${name === 'Week' ? ' is-active' : ''}`, name, zoom, {
       type: 'button',
@@ -508,8 +512,7 @@ function mount({ entrance = false } = {}) {
       'data-zoom': name.toLowerCase()
     });
   }
-  el('div', 'cal__spacer', undefined, nav);
-  const focusWrap = el('div', 'cal__focus', 'Focus', nav);
+  const focusWrap = el('div', 'cal__focus', '<span class="cal__focus-label">Focus</span>', views);
   const focus = el('div', 'hub-pills', '<span class="hub-pills__thumb"></span>', focusWrap, { role: 'group', 'aria-label': 'Focus band', 'data-part': 'focus-pills' });
   if (state.expanded != null && (state.expanded < 0 || state.expanded >= bands.length)) {
     state.expanded = null;
@@ -729,7 +732,18 @@ function mountAllDay(grid, date) {
     const promiseClass = due.kind === 'promise'
       ? ` is-promise ${due.direction === 'they_owe' ? 'is-them' : 'is-you'}${due.late ? ' is-late' : ''}`
       : '';
-    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>`, cell, { 'data-part': 'due', 'data-id': due.id, ...(due.kind === 'promise' ? { 'data-kind': 'promise' } : {}) });
+    const kindLabel = due.kind === 'promise' ? 'Promise' : 'Task';
+    const hint = [kindLabel, due.meta].filter(Boolean).join(' · ');
+    const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${due.meta ? `<span class="cal-due__meta">${escapeHtml(due.meta)}</span>` : ''}`, cell, {
+      'data-part': 'due',
+      'data-id': due.id,
+      tabindex: '0',
+      role: 'button',
+      title: `${due.title}\n${hint} · click for details`,
+      'aria-label': `${due.title}. ${hint}. Open for details.`,
+      ...(due.kind === 'promise' ? { 'data-kind': 'promise' } : {})
+    });
+    if (chipIsMovable(due) && !due.moved) chip.dataset.movable = '1';
     const movedTo = due.movedTo || (moved?.outcome === 'accepted' && moved.ghost.kind === 'move_task' ? moved.ghost.to : null);
     if (ghost && ghost.kind === 'move_task' && !due.moved) {
       el('span', 'cal-due__move', `<span class="cal-av cal-av--sm">${AGENT_INITIAL[ghost.agent] || ''}</span>${escapeHtml(ghost.label)}<button type="button" data-accept="${ghost.id}" data-label="Move">Move</button>`, chip, { 'data-ghost': ghost.id });
@@ -800,8 +814,9 @@ function mountBody(grid, date) {
 }
 
 function chipIsMovable(chip) {
-  if (!chip || chip.ghost || typeof input?.onReschedule !== 'function') return false;
-  return chip.source === 'scheduled_lesson' || chip.source === 'task' || chip.isClass === true;
+  if (!chip || chip.ghost) return false;
+  if (typeof input?.onReschedule !== 'function' && typeof input?.apiFetch !== 'function') return false;
+  return canMoveItem(chip);
 }
 
 function mountChip(body, chip) {
@@ -834,8 +849,11 @@ function mountChip(body, chip) {
     ...(chip.class_id ? { 'data-class-id': chip.class_id } : {})
   });
   if (chipIsMovable(chip)) {
-    node.draggable = true;
     node.dataset.movable = '1';
+    if (canResizeItem(chip) && typeof node.insertAdjacentHTML === 'function') {
+      node.dataset.resizable = '1';
+      node.insertAdjacentHTML('beforeend', '<span class="cal-chip__grip is-start" data-grip="start" aria-hidden="true"></span><span class="cal-chip__grip is-end" data-grip="end" aria-hidden="true"></span>');
+    }
   }
   const proposal = model.ghosts.find(item => item.overItem === chip.id && !state.settled.has(item.id));
   if (proposal && typeof node.insertAdjacentHTML === 'function') {
@@ -846,28 +864,6 @@ function mountChip(body, chip) {
     node.setAttribute('aria-label', `${chip.title}. ${chip.meta}. Proposal: ${proposal.label}. Open for details.`);
   }
   nodes.set(`chip:${chip.id}`, node);
-}
-
-function navigateHref(href) {
-  if (!href) return;
-  if (typeof input?.onNavigate === 'function') {
-    input.onNavigate(href);
-    return;
-  }
-  const loc = root.defaultView?.location;
-  if (!loc) return;
-  if (href.startsWith('#')) loc.hash = href;
-  else loc.assign(href);
-}
-
-function dropPatchFromEvent(event, body) {
-  const date = body?.dataset?.date;
-  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  const rect = body.getBoundingClientRect?.();
-  if (!rect) return { date, start_time: null };
-  const y = event.clientY - rect.top;
-  const hour = snapHours(hourForY(bands, heights, y));
-  return { date, start_time: hoursToDueTime(hour) };
 }
 
 export function layout(nextHeights) {
@@ -1195,13 +1191,23 @@ function openPop(chipId) {
       html += `<p class="cal-pop__label">Accept writes</p><p class="cal-pop__writes" data-part="write-preview">${escapeHtml(preview)}</p>`;
     }
     html += `<div class="cal-pop__acts"><button type="button" class="btn btn--primary" data-accept="${ghost.id}" data-label="Accept">Accept</button>${ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${ghost.id}">Dismiss</button>`}</div>`;
-  } else {
-    html += openInHubLinkHtml(item || due || { kind: chip.dataset.kind, source: chip.dataset.source, id: chipId }, {
-      hub: input?.hub || 'life',
-      routeFor: input?.routeFor
+  }
+  const cardItem = ghost ? null : (item || due || { kind: chip.dataset.kind, source: chip.dataset.source, id: chipId, title: chip.title });
+  if (cardItem) {
+    html = itemCardHtml(cardItem, {
+      kind: item?.kind ?? (due?.kind === 'promise' ? 'promise' : 'task'),
+      routeFor: input?.routeFor,
+      location: root.defaultView?.location ?? null
     });
   }
   markup(pop, html);
+  pop.classList?.toggle?.('cal-pop--card', Boolean(cardItem));
+  if (cardItem) {
+    bindItemCard(pop, cardItem, {
+      onSave: (patch) => persistItem(cardItem, patch),
+      onClose: () => closePop()
+    });
+  }
   pop.hidden = false;
   pop.removeAttribute?.('hidden');
   const section = host.querySelector?.('.cal') ?? host;
@@ -1214,6 +1220,7 @@ function openPop(chipId) {
   popFor = chipId;
   engine.place('__pop', { opacity: 0, y: CAL.popRise });
   engine.to('__pop', { opacity: 1, y: 0 }, { duration: CAL.popMs });
+  // First button (Accept on proposals, Close on the item card) — never pop the phone keyboard on open.
   pop.querySelector?.('button')?.focus?.({ preventScroll: true });
 }
 
@@ -1284,18 +1291,10 @@ function wire(section) {
       input?.onQuickAdd?.();
       return;
     }
-    const chip = target.closest('.cal-chip');
-    if (chip) {
-      const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chip.dataset.id);
-      const hub = input?.hub || 'life';
-      if (item && isOwnHubItem(item, hub) && typeof input?.routeFor === 'function') {
-        const href = openInHubHref(item, input.routeFor);
-        if (href) {
-          closePop();
-          navigateHref(href);
-          return;
-        }
-      }
+    // Every chip and Due row opens the item card (context, edit, ↗ new tab).
+    const chip = target.closest('.cal-chip') || target.closest('.cal-due');
+    if (chip && !target.closest('[data-part="chip-popover"]')) {
+      if (perfNow() < suppressClickUntil) return;
       if (chip.dataset.id === popFor) closePop();
       else openPop(chip.dataset.id);
       return;
@@ -1335,59 +1334,294 @@ function wire(section) {
   });
   section.addEventListener?.('keydown', event => {
     if (event.target?.closest?.('input,textarea')) return;
+    if (event.target?.closest?.('[data-part="chip-popover"]')) {
+      if (event.key === 'Escape') closePop();
+      return;
+    }
     if (/^[1-4]$/.test(event.key)) {
       toggleBand(Number(event.key) - 1);
       event.preventDefault();
     } else if (event.key === 'Escape' && popFor) closePop();
     else if (event.key === '0' || event.key === 'Escape') setBand(null);
-    else if ((event.key === 'Enter' || event.key === ' ') && event.target?.classList?.contains?.('cal-chip')) {
+    else if ((event.key === 'Enter' || event.key === ' ') && (event.target?.classList?.contains?.('cal-chip') || event.target?.classList?.contains?.('cal-due'))) {
       openPop(event.target.dataset.id);
       event.preventDefault();
     }
   });
-  section.addEventListener?.('dragstart', event => {
-    const chip = event.target?.closest?.('.cal-chip[data-movable="1"]');
-    if (!chip || typeof input?.onReschedule !== 'function') return;
-    event.dataTransfer?.setData('text/calendar-chip-id', chip.dataset.id || '');
-    event.dataTransfer?.setData('text/scheduled-id', chip.dataset.id || '');
-    if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
-    chip.classList.add('is-dragging');
+  section.addEventListener?.('pointerdown', onDragPointerDown);
+}
+
+/* ---------- item writes (drag, resize, item card) ---------- */
+
+/** Save through the hub adapter for moves (Tasks plan-work rules), else straight to the owning API. */
+async function persistItem(item, patch) {
+  const moveOnly = Object.keys(patch).every((key) => key === 'date' || key === 'start_time' || key === 'duration_min');
+  if (moveOnly && typeof input?.onReschedule === 'function') await input.onReschedule(item, patch);
+  else await saveCalendarItem(input?.apiFetch, item, patch);
+  void input?.onSourcesChanged?.();
+}
+
+/*
+ * Pointer drag, same model as the Tasks sprint board: a 4px threshold so a click
+ * still opens the card, a floating copy under the pointer, the target day lit.
+ * Mouse only — on touch the grid scrolls, and the item card edits date and time.
+ *   chip body  → another day and/or time (snaps to the grid)
+ *   chip edge  → new start or end (work blocks)
+ *   Due row    → another day
+ */
+const DRAG_THRESHOLD_PX = 4;
+const MIN_SPAN_H = 0.25;
+let drag = null;
+let suppressClickUntil = 0;
+
+function chipById(id) {
+  for (const day of model?.days ?? []) {
+    const hit = day.chips.find((chip) => chip.id === id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function dueById(id) {
+  for (const day of model?.days ?? []) {
+    const hit = day.due.find((row) => row.id === id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function spanText(start, end) {
+  return `${nowLabel(start)} – ${nowLabel(end)}`;
+}
+
+function dayText(date) {
+  return `${DOW(date).charAt(0)}${DOW(date).slice(1).toLowerCase()} ${formatDisplayDate(date)}`;
+}
+
+function setDropTarget(cell) {
+  host?.querySelectorAll?.('.is-drop-target')?.forEach((node) => {
+    if (node !== cell) node.classList.remove('is-drop-target');
   });
-  section.addEventListener?.('dragend', event => {
-    event.target?.closest?.('.cal-chip')?.classList?.remove?.('is-dragging');
-    section.querySelectorAll?.('.cal-body.is-drop-target').forEach((node) => node.classList.remove('is-drop-target'));
+  cell?.classList?.add('is-drop-target');
+}
+
+function onDragPointerDown(event) {
+  if (event.button !== undefined && event.button !== 0) return;
+  if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
+  const target = event.target;
+  if (!target?.closest || target.closest('button, a, input, textarea, select')) return;
+  const node = target.closest('.cal-chip[data-movable="1"], .cal-due[data-movable="1"]');
+  if (!node || !host?.contains?.(node)) return;
+  const isDue = node.classList.contains('cal-due');
+  const item = isDue ? dueById(node.dataset.id) : chipById(node.dataset.id);
+  if (!item) return;
+  const grip = target.closest('[data-grip]')?.dataset?.grip;
+  const view = root.defaultView;
+  if (!view) return;
+  drag = {
+    node,
+    item,
+    isDue,
+    mode: grip === 'start' || grip === 'end' ? `resize-${grip}` : 'move',
+    startX: event.clientX,
+    startY: event.clientY,
+    active: false,
+    float: null,
+    when: null,
+    target: null,
+    orig: { date: item.date, start: item.start, end: item.end }
+  };
+  if (grip) event.preventDefault();
+  view.addEventListener('pointermove', onDragMove, { passive: false });
+  view.addEventListener('pointerup', onDragEnd);
+  view.addEventListener('pointercancel', onDragCancel);
+  view.addEventListener('keydown', onDragKey, true);
+}
+
+function activateDrag() {
+  const rect = drag.node.getBoundingClientRect();
+  drag.active = true;
+  drag.offsetX = drag.startX - rect.left;
+  drag.offsetY = drag.startY - rect.top;
+  closePop();
+  host.querySelector?.('.cal')?.classList?.add('is-dragging-item');
+  if (drag.mode !== 'move') {
+    drag.node.classList.add('is-resizing');
+    return;
+  }
+  const float = drag.node.cloneNode(true);
+  float.classList.add('cal-drag-float');
+  float.classList.remove('is-filter-hidden');
+  float.removeAttribute('data-part');
+  float.removeAttribute('tabindex');
+  float.setAttribute('aria-hidden', 'true');
+  float.style.width = `${rect.width}px`;
+  float.style.height = `${rect.height}px`;
+  float.style.left = `${rect.left}px`;
+  float.style.top = `${rect.top}px`;
+  const when = root.createElement('span');
+  when.className = 'cal-drag-float__when';
+  float.append(when);
+  // Inside .cal so the --cal-* surface tokens still apply; position:fixed keeps it under the pointer.
+  (host.querySelector?.('.cal') ?? host).append(float);
+  drag.float = float;
+  drag.when = when;
+  drag.node.classList.add('is-dragging');
+}
+
+function onDragMove(event) {
+  if (!drag) return;
+  if (!drag.active) {
+    if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < DRAG_THRESHOLD_PX) return;
+    activateDrag();
+  }
+  event.preventDefault();
+  const { item } = drag;
+  if (drag.mode === 'move') {
+    drag.float.style.left = `${event.clientX - drag.offsetX}px`;
+    drag.float.style.top = `${event.clientY - drag.offsetY}px`;
+    const under = root.elementFromPoint?.(event.clientX, event.clientY);
+    const cell = under?.closest?.('.cal-body[data-date], .cal-allday[data-date]');
+    if (!cell || !host.contains(cell)) {
+      setDropTarget(null);
+      drag.target = null;
+      drag.when.textContent = '';
+      return;
+    }
+    setDropTarget(cell);
+    const date = cell.dataset.date;
+    if (!drag.isDue && cell.classList.contains('cal-body')) {
+      const length = Math.max(MIN_SPAN_H, item.end - item.start);
+      const top = cell.getBoundingClientRect().top;
+      let start = snapHours(hourForY(bands, heights, event.clientY - drag.offsetY - top));
+      start = Math.min(Math.max(0, start), 24 - length);
+      drag.target = { date, start, end: start + length, start_time: hoursToDueTime(start), end_time: hoursToDueTime(start + length) };
+      drag.when.textContent = `${dayText(date)} · ${nowLabel(start)}`;
+    } else {
+      drag.target = { date };
+      drag.when.textContent = dayText(date);
+    }
+    return;
+  }
+  const body = drag.node.closest('.cal-body');
+  if (!body) return;
+  const hour = snapHours(hourForY(bands, heights, event.clientY - body.getBoundingClientRect().top));
+  let { start, end } = drag.orig;
+  if (drag.mode === 'resize-end') end = Math.min(24, Math.max(start + MIN_SPAN_H, hour));
+  else start = Math.max(0, Math.min(end - MIN_SPAN_H, hour));
+  drag.target = { date: item.date, start, end, start_time: hoursToDueTime(start), end_time: hoursToDueTime(end) };
+  engine.place(`chip:${item.id}`, blockGeometry(bands, heights, start, end));
+  const meta = drag.node.querySelector('.cal-chip__meta');
+  if (meta) meta.textContent = spanText(start, end);
+}
+
+function stopDrag() {
+  const view = root?.defaultView;
+  view?.removeEventListener('pointermove', onDragMove);
+  view?.removeEventListener('pointerup', onDragEnd);
+  view?.removeEventListener('pointercancel', onDragCancel);
+  view?.removeEventListener('keydown', onDragKey, true);
+  const current = drag;
+  drag = null;
+  if (!current) return null;
+  current.float?.remove();
+  current.node.classList.remove('is-dragging', 'is-resizing');
+  host?.querySelector?.('.cal')?.classList?.remove('is-dragging-item');
+  setDropTarget(null);
+  return current;
+}
+
+function restoreResize(current) {
+  if (!current || current.mode === 'move' || current.isDue) return;
+  const { item, orig, node } = current;
+  engine.place(`chip:${item.id}`, blockGeometry(bands, heights, orig.start, orig.end));
+  const meta = node.querySelector('.cal-chip__meta');
+  if (meta && !item.isClass) meta.textContent = item.meta;
+}
+
+function onDragCancel() {
+  restoreResize(stopDrag());
+}
+
+function onDragKey(event) {
+  if (event.key !== 'Escape' || !drag) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (drag.active) suppressClickUntil = perfNow() + 350;
+  onDragCancel();
+}
+
+/** Paint the move now; the returned function puts it back if the save fails. */
+function applyOptimistic(current, target) {
+  const { node, item, isDue } = current;
+  const parent = node.parentElement;
+  const next = node.nextSibling;
+  const before = { date: item.date, start: item.start, end: item.end, record: item.record, meta: item.meta };
+  item.date = target.date;
+  if (target.start != null) {
+    item.start = target.start;
+    item.end = target.end;
+  }
+  item.record = {
+    ...(item.record ?? {}),
+    date: target.date,
+    ...(target.start_time ? { time: target.start_time, duration_min: Math.round((item.end - item.start) * 60) } : {})
+  };
+  const destination = nodes.get(`${isDue ? 'colallday' : 'colbody'}:${target.date}`);
+  if (destination && destination !== parent) destination.append(node);
+  if (!isDue) {
+    node.dataset.start = String(item.start);
+    node.dataset.end = String(item.end);
+    engine.place(`chip:${item.id}`, blockGeometry(bands, heights, item.start, item.end));
+    if (!item.isClass) {
+      item.meta = spanText(item.start, item.end);
+      const meta = node.querySelector('.cal-chip__meta');
+      if (meta) meta.textContent = item.meta;
+    }
+  }
+  return () => {
+    Object.assign(item, before);
+    if (parent) parent.insertBefore(node, next && next.parentNode === parent ? next : null);
+    if (!isDue) {
+      node.dataset.start = String(item.start);
+      node.dataset.end = String(item.end);
+      engine.place(`chip:${item.id}`, blockGeometry(bands, heights, item.start, item.end));
+      const meta = node.querySelector('.cal-chip__meta');
+      if (meta) meta.textContent = item.meta;
+    }
+  };
+}
+
+async function onDragEnd() {
+  const current = stopDrag();
+  if (!current?.active) return;
+  suppressClickUntil = perfNow() + 350;
+  const { item, orig, mode } = current;
+  const target = current.target;
+  if (!target) {
+    restoreResize(current);
+    return;
+  }
+  const sameTime = target.start == null || Math.abs(target.start - orig.start) < 1e-6;
+  const sameEnd = target.end == null || Math.abs(target.end - orig.end) < 1e-6;
+  if (target.date === orig.date && sameTime && sameEnd) return;
+  const patch = dragPatch(item, {
+    date: target.date,
+    ...(target.start_time ? { start_time: target.start_time, end_time: target.end_time } : {})
   });
-  section.addEventListener?.('dragover', event => {
-    if (typeof input?.onReschedule !== 'function') return;
-    const body = event.target?.closest?.('.cal-body[data-date]');
-    if (!body) return;
-    event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
-    section.querySelectorAll?.('.cal-body.is-drop-target').forEach((node) => {
-      if (node !== body) node.classList.remove('is-drop-target');
-    });
-    body.classList.add('is-drop-target');
-  });
-  section.addEventListener?.('dragleave', event => {
-    const body = event.target?.closest?.('.cal-body[data-date]');
-    if (body && !body.contains(event.relatedTarget)) body.classList.remove('is-drop-target');
-  });
-  section.addEventListener?.('drop', event => {
-    if (typeof input?.onReschedule !== 'function') return;
-    const body = event.target?.closest?.('.cal-body[data-date]');
-    const chipId =
-      event.dataTransfer?.getData('text/calendar-chip-id') ||
-      event.dataTransfer?.getData('text/scheduled-id');
-    if (!body || !chipId) return;
-    event.preventDefault();
-    body.classList.remove('is-drop-target');
-    const item = model.days.flatMap(day => day.chips).find(chipItem => chipItem.id === chipId);
-    const patch = dropPatchFromEvent(event, body);
-    if (!item || !patch) return;
-    Promise.resolve(input.onReschedule(item, patch)).then(() => {
-      void input?.onSourcesChanged?.();
-    });
-  });
+  const undo = applyOptimistic(current, target);
+  const when = target.start != null
+    ? `${dayText(target.date)} · ${mode === 'move' ? nowLabel(target.start) : spanText(target.start, target.end)}`
+    : dayText(target.date);
+  const live = nodes.get('__live');
+  try {
+    await persistItem(item, patch);
+    showToast(`<b>${mode === 'move' ? 'Moved' : 'Retimed'}.</b> ${escapeHtml(item.title)} → ${escapeHtml(when)}`);
+    if (live) live.textContent = `${item.title} moved to ${when}`;
+  } catch (error) {
+    undo();
+    showToast(`<b>Not saved.</b> ${escapeHtml(error?.message || 'Could not reach the server.')}`);
+  }
 }
 
 function publish(view) {

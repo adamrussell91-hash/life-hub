@@ -24,7 +24,8 @@ import {
   paintSourceFilter,
   readFilterState
 } from './calendar-filter.js';
-import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
+import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
+import { saveCalendarItem } from './calendar-item-actions.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -784,9 +785,21 @@ function openPop(arcId) {
     const dismiss = ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(ghost.id)}">Dismiss</button>`;
     html += `<div class="dd-pop__acts"><button type="button" class="btn btn--primary" data-accept="${escapeHtml(ghost.id)}" data-label="Accept">Accept</button>${dismiss}</div>`;
   } else if (item) {
-    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
+    html = itemCardHtml(item, { kind: item.kind, routeFor: input?.routeFor, location: doc?.defaultView?.location ?? null });
   }
   pop.innerHTML = html;
+  pop.classList.toggle('cal-pop--card', Boolean(item && !ghost));
+  if (item && !ghost) {
+    bindItemCard(pop, item, {
+      onSave: async (patch) => {
+        const moveOnly = Object.keys(patch).every((key) => key === 'date' || key === 'start_time' || key === 'duration_min');
+        if (moveOnly && typeof input?.onReschedule === 'function') await input.onReschedule(item, patch);
+        else await saveCalendarItem(input?.apiFetch, item, patch);
+        void input?.onSourcesChanged?.();
+      },
+      onClose: () => closePop()
+    });
+  }
   pop.hidden = false;
   pop.removeAttribute('hidden');
   const bounds = root.getBoundingClientRect();
@@ -932,21 +945,7 @@ function wire(section) {
     const arc = target.closest?.('.dd-arc[data-id]');
     if (arc) {
       const id = arc.getAttribute('data-id');
-      const item = chipsFor(state.day).find(chip => chip.id === id);
-      const hub = input?.hub || 'life';
-      if (item && isOwnHubItem(item, hub) && typeof input?.routeFor === 'function') {
-        const href = openInHubHref(item, input.routeFor);
-        if (href) {
-          closePop();
-          const loc = doc.defaultView?.location;
-          if (href.startsWith('#')) {
-            if (loc) loc.hash = href;
-          } else if (loc) {
-            loc.assign(href);
-          }
-          return;
-        }
-      }
+      // Every arc opens the item card (context, edit, ↗ new tab) — never a silent jump.
       return id === popFor ? closePop() : openPop(id);
     }
     if (!target.closest?.('[data-part="popover"]')) closePop();

@@ -34,7 +34,8 @@ import {
   readFilterState,
   writeFilterState
 } from './calendar-filter.js';
-import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
+import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
+import { saveCalendarItem } from './calendar-item-actions.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -1050,9 +1051,19 @@ function openPop(itemId) {
       + `<button type="button" class="btn btn--primary" data-accept="${escapeHtml(item.id)}" data-label="Accept">Accept</button>`
       + `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(item.id)}">Dismiss</button></div>`;
   } else {
-    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
+    html = itemCardHtml(item, { kind: item.kind, routeFor: input?.routeFor, location: root?.ownerDocument?.defaultView?.location ?? null });
   }
   pop.innerHTML = html;
+  pop.classList.toggle('cal-pop--card', !(ghost && receipt));
+  if (!(ghost && receipt)) {
+    bindItemCard(pop, item, {
+      onSave: async (patch) => {
+        await saveCalendarItem(input?.apiFetch, item, patch);
+        void input?.onSourcesChanged?.();
+      },
+      onClose: () => closePop()
+    });
+  }
   pop.hidden = false;
   pop.removeAttribute('hidden');
   const bounds = root.getBoundingClientRect();
@@ -1178,21 +1189,7 @@ function wire(section) {
     const item = target.closest?.('[data-part="item"],[data-part="ghost"]');
     if (item && !item.classList?.contains?.('is-sample')) {
       const id = item.getAttribute('data-id');
-      const row = itemById(id);
-      const hub = input?.hub || 'life';
-      if (row && !ghostFor(row) && isOwnHubItem(row, hub) && typeof input?.routeFor === 'function') {
-        const href = openInHubHref(row, input.routeFor);
-        if (href) {
-          closePop();
-          const loc = doc?.defaultView?.location;
-          if (href.startsWith('#')) {
-            if (loc) loc.hash = href;
-          } else if (loc) {
-            loc.assign(href);
-          }
-          return;
-        }
-      }
+      // Every item opens the item card (context, ↗ new tab) — never a silent jump.
       return id === popFor ? closePop() : openPop(id);
     }
     if (!target.closest?.('[data-part="popover"]')) closePop();
