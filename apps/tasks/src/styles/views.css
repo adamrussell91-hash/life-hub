@@ -1932,6 +1932,13 @@
   --rail-color: var(--success);
 }
 
+.board-done-reveal {
+  display: block;
+  margin-top: var(--space-3);
+  min-height: 44px;
+  width: 100%;
+}
+
 .board-col__title,
 .column-title {
   margin: 0;

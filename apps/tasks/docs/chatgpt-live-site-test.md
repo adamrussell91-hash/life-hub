@@ -78,12 +78,12 @@ This is **not** a simple to-do list. It is Clare DeMind’s task/project hub. Sa
 | Backlog | `#/list` | Inbox / Backlog | Open tasks with **no due date**. Quick-add. Done / Reopen. |
 | Projects | `#/projects` | Arcs / Projects | Stall revive / Frankenstein / bury. Close-with-retrospective. Review log. |
 | Excursions | `#/excursions` | Events / Excursions | Create from Ethics Olympiad / Da Vinci templates. Admin tasks + drafts. |
-| Network | `#/stress` | Network / StressFlags | Scan pressure patterns. Flags + Hammond inbox. |
-| Corey | `#/corey` | Share / Corey capacity | Workload shape + public share URL. Copy / rotate. |
+| ~~Network~~ | ~~`#/stress`~~ | **Retired** | Network / StressFlags / `/api/stress-flags` removed — do not test. |
+| ~~Corey~~ | ~~`#/corey`~~ | **Retired** | Corey capacity page / public `#/capacity/<token>` removed with Network — do not test. |
 | Templates | `#/templates` | Reuse / Templates | Use task template → Today. Use excursion template → Excursions. |
 | Search | `#/search` | Find / Search | Live search of task + project titles/descriptions (min 2 chars). |
 
-**Public (no sign-in):** `#/capacity/<token>` — headlines + day levels only. **Never** task titles.
+**Public (no sign-in):** capacity share routes were retired with Corey — skip.
 
 Seeded content you should see (production may already have extra user data on top):
 
@@ -159,7 +159,7 @@ Also record:
 
 - requests that **never fire** when a button is clicked (silent no-op)
 - requests that fire twice
-- 404 on a path that the UI clearly expects (`/api/clare`, `/api/stall`, `/api/maps`, `/api/capacity`, `/api/reviews`, `/api/stress-flags`)
+- 404 on a path that the UI clearly expects (`/api/clare`, `/api/stall`, `/api/maps`, `/api/reviews`). Do **not** treat `/api/stress-flags` or `/api/capacity` 404s as failures — those routes were retired.
 - HTML returned instead of JSON (`invalid_response` / “Unexpected response shape”)
 
 ### 5.4 DOM / UI
@@ -201,8 +201,8 @@ Take a screenshot for every **fail** and every **layout/UX** issue. Name them in
 | GET/POST | `/api/templates` | list; actions `save_task_as_template`, `create_task_from_template`, `create_excursion_from_template` |
 | GET/POST | `/api/clare` | calibrations; actions `propose`, `accept`, `record_actual` |
 | POST | `/api/stall` | `flag_stalled`, `resolve` |
-| GET/POST | `/api/stress-flags` | list / `?inbox=`; actions `scan`, `raise` |
-| GET/POST | `/api/capacity` | snapshot; `ensure_share`, `rotate_share`; public `?token=` |
+| ~~GET/POST~~ | ~~`/api/stress-flags`~~ | **Retired — do not call** |
+| ~~GET/POST~~ | ~~`/api/capacity`~~ | **Retired — do not call** |
 | GET/POST | `/api/reviews` | review log; `close` |
 | GET | `/api/search?q=` | Search view |
 | GET/POST | `/api/maps` | list / create |
@@ -369,22 +369,13 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 76. Click the other seed excursion cards (Ethics Olympiad heat, Da Vinci Decathlon heat). Detail swaps. Keyboard Enter/Space on a focused card works.
 77. Seed excursions may lack drafts/key dates — empty-state copy, not a crash.
 
-### K. Network (`#/stress`)
+### K. Network (`#/stress`) — **RETIRED — SKIP**
 
-78. Load scans: `POST /api/stress-flags` `{ action: "scan" }` then `GET /api/stress-flags` and `GET /api/stress-flags?inbox=General%20Hammond`.
-79. Status line: raised / skipped / none. Not stuck on “Scanning pressure patterns…”.
-80. **Scan again** re-runs without duplicating forever (skipped count may rise).
-81. Open flags list textured descriptions (e.g. overlapping Ethics + Da Vinci). Chips for Hammond / Penelope / Vera.
-82. Hammond inbox section lists routed flags or “Inbox empty.”
+78–82. **Do not run.** `#/stress` and `GET/POST /api/stress-flags` were deleted with the Network tab. A 404 here is expected and is **not** a deploy failure.
 
-### L. Corey (`#/corey`) + public share
+### L. Corey (`#/corey`) + public share — **RETIRED — SKIP**
 
-83. Headlines + overall level (`slammed` / `busy` / `light` / `free`). 14-day grid with weekday + level.
-84. “Your detail (not shared)” may show open counts + minutes. That is Adam-only.
-85. Share URL looks like `https://<host>/#/capacity/<token>`. **Copy link** → clipboard or input selected. Button may read “Copied”.
-86. Open the share URL in a **new tab** (or the same tab, then return). **No sign-in.** Title/availability only. **Fail if any task title, project title, or MindWorks appears.**
-87. Invalid token `#/capacity/not-a-real-token`: “unknown or was rotated”, not a stack trace.
-88. Rotate: **skip unless safe** (§4). If you rotate: old URL must fail; new URL must work; record both tokens’ last 4 chars only.
+83–88. **Do not run.** `#/corey` and `#/capacity/<token>` were removed with Network. Do not treat missing capacity API as a live regression.
 
 ### M. Templates + Search
 
@@ -397,7 +388,7 @@ Open DevTools (Console + Network) first. Start at **`https://tasks-api.adam-russ
 
 ### N. Cross-cutting
 
-95. Click **every remaining rail item** you have not opened in this session (complete the 18). Each sets `aria-current="page"`, correct header, and a painted canvas (not the previous view leftover).
+95. Click **every remaining live rail item** you have not opened in this session (Network / Corey are retired — skip those hashes). Each live item sets `aria-current="page"`, correct header, and a painted canvas (not the previous view leftover).
 96. Browser Back / Forward through 4 hashes. Views remount correctly.
 97. Hard reload on `#/gantt` and `#/clare` (deep link). Session persists; correct view paints.
 98. Unknown API outage simulation: DevTools → Network → Offline, click Board. Expect a sign-in fallback or visible error, **not** a permanent white screen. Go online again and recover.

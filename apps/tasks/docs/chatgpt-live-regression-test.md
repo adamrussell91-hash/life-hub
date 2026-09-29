@@ -46,11 +46,11 @@ Click rail **Maps**. URL `#/maps`. Header eyebrow **Pathways**, title **Maps**. 
 ### R2 — Clare propose works
 `#/clare` → task `[LIVE-TEST] regression clare`, Ask Clare. Must get a proposal (framework + minutes), not raw `Failed to fetch` and not a hang on “Clare is thinking…”. Propose write → Discard. Propose write → Confirm. Task exists on Board/Today. Network: `POST /api/clare` propose then accept, both `ok: true`.
 
-### R3 — Network leaves loading
-`#/stress` must leave “Scanning pressure patterns…”. Either flags + Hammond inbox, or an error + **Retry**. Never an infinite scan.
+### R3 — Network leaves loading — **RETIRED — SKIP**
+`#/stress` / `/api/stress-flags` were deleted. Do not fail the run for their absence.
 
-### R4 — Corey leaves loading
-`#/corey` must leave “Loading capacity…”. Headlines + 14-day grid, or error + Retry. Copy link. Open `#/capacity/<token>` in a new tab — **no task titles**. Invalid `#/capacity/not-a-real-token` → unknown/rotated. **Do not rotate** unless you will record the new URL.
+### R4 — Corey leaves loading — **RETIRED — SKIP**
+`#/corey` / `#/capacity/<token>` were deleted with Network. Do not fail the run for their absence.
 
 ### R5 — Dates stay on the picked day
 Excursions: set the date picker to a visible date (e.g. `2026-10-05`). Preview **event** text must use **that same date**, not the day before. Confirmation text must match. Week: a task whose chip/meta says `Due 2026-08-21` (or today) must sit in that weekday’s column, not the next day.
@@ -80,7 +80,7 @@ From a long page (Projects), jump to Orbit. The Orbit heading must be in view (s
 
 Click every rail item. Each must paint (or show Retry), set `aria-current`, and match its header.
 
-Board, Clare, Graph, Maps, Gantt, Orbit, Branch, Sky, Today, Week, Month, Backlog, Projects, Excursions, Network, Corey, Templates, Search.
+Board, Clare, Graph, Maps, Gantt, Orbit, Branch, Sky, Today, Week, Month, Backlog, Projects, Excursions, Templates, Search. (Network / Corey retired — skip.)
 
 Graph/Orbit/Branch/Gantt/Sky: a list or table of items exists under the picture (keyboard reachable). Labels must not be an unreadable pile.
 
@@ -105,8 +105,8 @@ Prefix new records `[LIVE-TEST]`. Discard destructive confirms on real projects.
 |----|--------|----------|
 | R1 Maps | | |
 | R2 Clare | | |
-| R3 Network | | |
-| R4 Corey | | |
+| R3 Network | SKIP — retired | |
+| R4 Corey | SKIP — retired | |
 | R5 Dates | | |
 | R6 Excursion | | |
 | R7 Templates | | |
