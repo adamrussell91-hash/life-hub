@@ -52,6 +52,7 @@
     "photoswipe": "^5.4.4",
     "topojson-client": "^3.1.0",
     "wavesurfer.js": "^7.12.11",
+    "web-push": "^3.6.7",
     "world-atlas": "^2.0.2",
     "yjs": "13.6.18"
   },
