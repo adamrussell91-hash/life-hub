@@ -348,8 +348,8 @@ export function isDailySweepMissed(markdown, today, { maxAgeDays = DAILY_SWEEP_M
 export function formatDailySweepMissedLine(markdown, today) {
   if (!isDailySweepMissed(markdown, today)) return null;
   const sweep = latestDailySweep(markdown);
-  if (!sweep) return 'Hammond: Daily Sweep missed — no sweep in the log.';
-  return `Hammond: Daily Sweep missed — last ${sweep.dateKey}.`;
+  if (!sweep) return 'Hammond: Daily Sweep missed — no sweep in the log';
+  return `Hammond: Daily Sweep missed — last ${sweep.dateKey}`;
 }
 
 /**
