@@ -316,7 +316,7 @@ export function buildAgentTools({
   if (has('publish.cn-patch') && (needsHammondTools || slug === 'clare' || slug === 'ann')) {
     tools.push(proposeCentralNodePatchSchema());
   }
-  if (has('publish.calendar-ghost') && (slug === 'hammond' || slug === 'sara' || slug === 'clare' || needsHammondTools)) {
+  if (has('publish.calendar-ghost')) {
     tools.push(proposeCalendarGhostSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {

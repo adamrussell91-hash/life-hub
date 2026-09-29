@@ -124,36 +124,63 @@ const CALENDAR_GHOST_KIND_ENUM = [
   'bedtime',
   'protect_block',
   'move_task',
-  'create_task'
+  'create_task',
+  'outing',
+  'meal_block',
+  'schedule_workout',
+  'reschedule_block',
+  'cancel_block',
+  'log_comm',
+  'draft_message',
+  'split_task',
+  'goal_rest_weeks',
+  'book_comm'
 ];
 
 export function proposeCalendarGhostSchema() {
   return {
     name: 'propose_calendar_ghost',
     description:
-      'Propose a dashed ghost on Adam’s calendar (skip workout, bedtime, protect a block, move/create a task). Validated and queued only — nothing is written to Life, Central Node or Tasks until he Accepts on the calendar.',
+      'Propose something on Adam’s calendar (outing, meal time, workout time, protect, bedtime, tasks, reschedule/cancel, or log a communication). Queues a dashed ghost and a chat Confirm card — nothing is written until he Confirms in chat or Accepts on the calendar.',
     input_schema: {
       type: 'object',
       properties: {
         kind: {
           type: 'string',
           enum: [...CALENDAR_GHOST_KIND_ENUM],
-          description: 'Ghost kind'
+          description: 'Ghost kind. Prefer outing for named plans (breakfast/dinner/errand); meal_block for meal times; schedule_workout for training; log_comm to log an email/call; reschedule_block / cancel_block for existing Life calendar_block paths.'
         },
         date: { type: 'string', description: 'YYYY-MM-DD for dated kinds' },
         reason: { type: 'string', description: 'Short why, shown on the chip' },
-        time: { type: 'string', description: 'bedtime lights-out HH:MM' },
-        start: { type: 'string', description: 'protect_block start HH:MM' },
-        end: { type: 'string', description: 'protect_block end HH:MM' },
-        title: { type: 'string', description: 'protect_block / create_task / move_task title' },
-        with: { type: 'string', description: 'protect_block companion (e.g. corey)' },
+        time: { type: 'string', description: 'bedtime / log_comm time HH:MM (log_comm defaults to 12:00)' },
+        start: { type: 'string', description: 'protect_block / outing / meal_block / schedule_workout / reschedule start HH:MM' },
+        end: { type: 'string', description: 'protect_block / outing / meal_block / schedule_workout / reschedule end HH:MM' },
+        title: { type: 'string', description: 'Block / task / communication title or subject' },
+        subject: { type: 'string', description: 'log_comm subject (alias of title)' },
+        with: { type: 'string', description: 'companion (e.g. corey) for outing / protect_block' },
+        place: { type: 'string', description: 'optional place for outing (stored in notes)' },
+        notes: { type: 'string', description: 'create_task notes or outing/meal notes' },
+        path: { type: 'string', description: 'Life record path for reschedule_block / cancel_block' },
         workoutPath: { type: 'string', description: 'skip_workout Life record path' },
         overItem: { type: 'string', description: 'skip_workout chip id to decorate' },
         taskId: { type: 'string', description: 'move_task id' },
         from: { type: 'string', description: 'move_task from date' },
         to: { type: 'string', description: 'move_task to date' },
         due: { type: 'string', description: 'create_task due date' },
-        notes: { type: 'string', description: 'create_task notes' }
+        direction: { type: 'string', enum: ['outbound', 'inbound'], description: 'log_comm direction' },
+        channel: {
+          type: 'string',
+          enum: ['email', 'phone', 'message', 'in_person', 'video', 'other'],
+          description: 'log_comm / book_comm channel'
+        },
+        summary: { type: 'string', description: 'log_comm summary body' },
+        person_refs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'log_comm / book_comm people refs (e.g. shared:person:…)'
+        },
+        time_zone: { type: 'string', description: 'IANA tz for log_comm / book_comm (default Australia/Sydney)' },
+        duration_min: { type: 'integer', description: 'book_comm duration minutes' }
       },
       required: ['kind']
     }

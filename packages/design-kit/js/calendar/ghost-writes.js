@@ -34,12 +34,19 @@ export const GHOST_AGENTS = Object.freeze({
   chadwick: 'Chadwick',
   brisket: 'Brisket',
   penelope: 'Penelope',
-  vera: 'Vera'
+  vera: 'Vera',
+  hyaluronica: 'Hyaluronica',
+  ann: 'Ann',
+  clementine: 'Clementine'
 });
 
 export const GHOST_KINDS = Object.freeze([
-  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm'
+  'skip_workout', 'bedtime', 'protect_block', 'move_task', 'create_task', 'draft_message', 'split_task', 'goal_rest_weeks', 'book_comm',
+  'outing', 'meal_block', 'schedule_workout', 'reschedule_block', 'cancel_block', 'log_comm'
 ]);
+
+const LOG_COMM_DIRECTIONS = new Set(['outbound', 'inbound']);
+const LOG_COMM_CHANNELS = new Set(['email', 'phone', 'message', 'in_person', 'video', 'other']);
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -109,6 +116,43 @@ export function validateGhost(ghost) {
       throw new TypeError('protect_block needs start < end (HH:MM)');
     }
     if (!oneLine(ghost.title)) throw new TypeError('protect_block needs a title');
+  }
+  if (ghost.kind === 'outing' || ghost.kind === 'meal_block' || ghost.kind === 'schedule_workout') {
+    if (!HHMM.test(ghost.start ?? '') || !HHMM.test(ghost.end ?? '') || ghost.start >= ghost.end) {
+      throw new TypeError(`${ghost.kind} needs start < end (HH:MM)`);
+    }
+    if (!oneLine(ghost.title)) throw new TypeError(`${ghost.kind} needs a title`);
+  }
+  if (ghost.kind === 'reschedule_block') {
+    if (typeof ghost.path !== 'string' || !ghost.path) throw new TypeError('reschedule_block needs path');
+    const hasChange = DATE_KEY.test(ghost.date ?? '')
+      || HHMM.test(ghost.start ?? '')
+      || HHMM.test(ghost.end ?? '')
+      || Boolean(oneLine(ghost.title));
+    if (!hasChange) throw new TypeError('reschedule_block needs date, start, end, and/or title');
+    if (ghost.start != null && ghost.start !== '' && !HHMM.test(ghost.start)) {
+      throw new TypeError('reschedule_block start must be HH:MM');
+    }
+    if (ghost.end != null && ghost.end !== '' && !HHMM.test(ghost.end)) {
+      throw new TypeError('reschedule_block end must be HH:MM');
+    }
+    if (HHMM.test(ghost.start ?? '') && HHMM.test(ghost.end ?? '') && ghost.start >= ghost.end) {
+      throw new TypeError('reschedule_block needs start < end (HH:MM)');
+    }
+  }
+  if (ghost.kind === 'cancel_block') {
+    if (typeof ghost.path !== 'string' || !ghost.path) throw new TypeError('cancel_block needs path');
+  }
+  if (ghost.kind === 'log_comm') {
+    if (!LOG_COMM_DIRECTIONS.has(ghost.direction)) throw new TypeError('log_comm needs direction outbound|inbound');
+    if (!LOG_COMM_CHANNELS.has(ghost.channel)) throw new TypeError('log_comm needs a valid channel');
+    if (!oneLine(ghost.title) && !oneLine(ghost.subject)) throw new TypeError('log_comm needs a title or subject');
+    if (ghost.time != null && ghost.time !== '' && !HHMM.test(ghost.time)) {
+      throw new TypeError('log_comm time must be HH:MM');
+    }
+    if (ghost.person_refs != null && (!Array.isArray(ghost.person_refs) || ghost.person_refs.some(ref => typeof ref !== 'string' || !ref))) {
+      throw new TypeError('log_comm person_refs must be an array of refs');
+    }
   }
   if (ghost.kind === 'move_task') {
     if (typeof ghost.taskId !== 'string' || !ghost.taskId) throw new TypeError('move_task needs taskId');
@@ -268,6 +312,82 @@ export function acceptPlan(ghost, { today = null } = {}) {
       });
       steps.push(recentAction(actedOn, who, `booked “${oneLine(ghost.title)}” ${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.time)}${why}`));
       receipt = `${who} → Calendar: “${oneLine(ghost.title)}”, ${weekday(ghost.date)} ${formatDisplayDate(ghost.date)} at ${clock12(ghost.time)}.`;
+      break;
+    }
+    case 'outing':
+    case 'meal_block':
+    case 'schedule_workout': {
+      const withCorey = ghost.with === 'corey';
+      const title = oneLine(ghost.title);
+      const span = `${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}–${clock12(ghost.end)}`;
+      const blockKind = ghost.kind === 'schedule_workout'
+        ? 'focus'
+        : (withCorey ? 'corey' : 'protected');
+      const notes = oneLine(ghost.notes) || oneLine(ghost.place) || '';
+      steps.push({
+        target: 'life_record',
+        mode: 'create',
+        record: {
+          type: 'calendar_block',
+          date: ghost.date,
+          time: ghost.start,
+          end_time: ghost.end,
+          kind: blockKind,
+          status: 'tentative',
+          protected: ghost.kind !== 'schedule_workout',
+          title,
+          source_agent: ghost.agent,
+          ...(notes ? { notes } : {})
+        }
+      });
+      steps.push(recentAction(actedOn, who, `${ghost.kind === 'outing' ? 'outing' : ghost.kind === 'meal_block' ? 'meal' : 'workout'} “${title}” ${span}${why}`));
+      receipt = `${who} → Life: “${title}”, ${span}, tentative${ghost.kind === 'schedule_workout' ? '' : ' and protected'}.`;
+      break;
+    }
+    case 'reschedule_block': {
+      const fields = {};
+      if (DATE_KEY.test(ghost.date ?? '')) fields.date = ghost.date;
+      if (HHMM.test(ghost.start ?? '')) fields.time = ghost.start;
+      if (HHMM.test(ghost.end ?? '')) fields.end_time = ghost.end;
+      if (oneLine(ghost.title)) fields.title = oneLine(ghost.title);
+      steps.push({ target: 'life_record', mode: 'update', path: ghost.path, fields });
+      const label = oneLine(ghost.title) || ghost.path;
+      const when = DATE_KEY.test(ghost.date ?? '') && HHMM.test(ghost.start ?? '')
+        ? ` → ${weekday(ghost.date)} ${short(ghost.date)} ${clock12(ghost.start)}${HHMM.test(ghost.end ?? '') ? `–${clock12(ghost.end)}` : ''}`
+        : '';
+      steps.push(recentAction(actedOn, who, `rescheduled “${label}”${when}${why}`));
+      receipt = `${who} → Life: rescheduled “${label}”${when}.`;
+      break;
+    }
+    case 'cancel_block': {
+      steps.push({
+        target: 'life_record',
+        mode: 'update',
+        path: ghost.path,
+        fields: { status: 'cancelled' }
+      });
+      const label = oneLine(ghost.title) || ghost.path;
+      steps.push(recentAction(actedOn, who, `cancelled “${label}”${why}`));
+      receipt = `${who} → Life: cancelled “${label}”.`;
+      break;
+    }
+    case 'log_comm': {
+      const time = HHMM.test(ghost.time ?? '') ? ghost.time : '12:00';
+      const subject = oneLine(ghost.title) || oneLine(ghost.subject);
+      steps.push({
+        target: 'professional',
+        action: 'log_communication',
+        date: ghost.date,
+        time,
+        time_zone: ghost.time_zone || 'Australia/Sydney',
+        direction: ghost.direction,
+        channel: ghost.channel,
+        title: subject,
+        summary: typeof ghost.summary === 'string' ? ghost.summary.trim() : '',
+        person_refs: Array.isArray(ghost.person_refs) ? [...ghost.person_refs] : []
+      });
+      steps.push(recentAction(actedOn, who, `logged ${ghost.direction} ${ghost.channel} “${subject}” ${weekday(ghost.date)} ${short(ghost.date)}${why}`));
+      receipt = `${who} → Comms: logged ${ghost.direction} ${ghost.channel} “${subject}” on ${formatDisplayDate(ghost.date)}.`;
       break;
     }
     default:

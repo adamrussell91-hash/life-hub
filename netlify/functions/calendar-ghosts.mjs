@@ -303,8 +303,24 @@ export function ghostTaskId(ghostId) {
   return `ghost-${ghostId}`;
 }
 
-/** Accept of a book_comm ghost: create the comm, then join it to its thread. */
+/** Accept of a book_comm / log_comm ghost: create the communication (and optional thread link). */
 export async function applyProfessionalStep(deps, step) {
+  if (step.action === 'log_communication') {
+    const time = typeof step.time === 'string' && step.time ? step.time : '12:00';
+    const timeZone = step.time_zone || 'Australia/Sydney';
+    const occurred = wallLocalToUtcIso(`${step.date}T${time}`, timeZone);
+    const personRefs = Array.isArray(step.person_refs) ? step.person_refs : [];
+    const { communication } = await deps.createCommunication({
+      direction: step.direction,
+      channel: step.channel,
+      occurred_at: occurred,
+      time_zone: timeZone,
+      subject: step.title || step.subject || '',
+      summary: typeof step.summary === 'string' ? step.summary : '',
+      links: personRefs.map((ref) => ({ relationship_type: 'recipient', target_ref: ref }))
+    });
+    return communication;
+  }
   if (step.action !== 'create_communication') throw new TypeError(`Unknown professional step: ${step.action}`);
   const start = wallLocalToUtcIso(`${step.date}T${step.time}`, step.time_zone);
   const end = new Date(Date.parse(start) + step.duration_min * 60_000).toISOString();
@@ -323,6 +339,42 @@ export async function applyProfessionalStep(deps, step) {
     await deps.createLink({ source_ref: `professional:communication:${communication.id}`, target_ref: step.thread_ref, relationship_type: 'in_thread' });
   }
   return communication;
+}
+
+/**
+ * Display-only propose-action payload for chat Confirm, bound to a queued ghost id.
+ * Confirm executes runGhostDecision — this write is never applied as a real file change.
+ */
+export function calendarGhostConfirmProposal(ghost) {
+  const id = typeof ghost?.id === 'string' ? ghost.id : 'ghost';
+  const kind = typeof ghost?.kind === 'string' ? ghost.kind : 'ghost';
+  const title = String(ghost?.title || ghost?.subject || kind).replace(/\s+/g, ' ').trim();
+  const date = ghost?.date || ghost?.due || ghost?.from || '';
+  const when = date
+    ? (ghost?.start && ghost?.end
+      ? `${date} ${ghost.start}–${ghost.end}`
+      : ghost?.time
+        ? `${date} ${ghost.time}`
+        : date)
+    : '';
+  const intent = when
+    ? `Confirm calendar proposal: ${kind} — ${title} (${when})`
+    : `Confirm calendar proposal: ${kind} — ${title}`;
+  const reason = typeof ghost?.reason === 'string' && ghost.reason.trim()
+    ? `\n\nWhy: ${ghost.reason.trim()}`
+    : '';
+  const content = `# Calendar ghost (confirm only)\n\nId: ${id}\nKind: ${kind}\n${title ? `Title: ${title}\n` : ''}${when ? `When: ${when}\n` : ''}${reason}\n\nAccepting runs the same plan as calendar Accept. This file is not written.\n`;
+  return {
+    intent,
+    reads: ['pending-calendar-ghosts.json'],
+    writes: [{
+      path: `data/os/calendar-ghost-confirm/${id}.md`,
+      mode: 'create',
+      content,
+      diff: intent
+    }],
+    surfaces: ['confirm_card', 'calendar']
+  };
 }
 
 export async function applyTaskStep(store, step, { ghostId } = {}) {

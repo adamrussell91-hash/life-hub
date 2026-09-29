@@ -202,7 +202,8 @@ import {
 import {
   PENDING_CALENDAR_GHOSTS_PATH,
   calendarGhostFromToolInput,
-  appendPendingCalendarGhost
+  appendPendingCalendarGhost,
+  calendarGhostConfirmProposal
 } from './calendar-ghosts.mjs';
 import { buildAgentTools } from './_shared/capabilities/registry.mjs';
 import {
@@ -2537,13 +2538,33 @@ export function createChatHandler({
                   send({
                     type: 'calendar_ghost_proposed',
                     id: entry.id,
-                    reply: 'Proposed on your calendar. Accept or dismiss it there.'
+                    reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
                   });
+                  const confirmInput = calendarGhostConfirmProposal(entry);
+                  const validated = validateProposeActionInput(confirmInput, { agentSlug: slug });
+                  let pendingId = null;
+                  if (validated.ok) {
+                    pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: entry.id });
+                  }
                   return JSON.stringify({
                     ok: true,
-                    status: added ? 'queued' : 'already_queued',
+                    status: 'awaiting_confirm',
                     id: entry.id,
-                    reply: 'Proposed on your calendar. Accept or dismiss it there.'
+                    ghost_status: added ? 'queued' : 'already_queued',
+                    intent: validated.ok ? validated.proposal.intent : confirmInput.intent,
+                    writes: validated.ok
+                      ? validated.proposal.writes.map(write => ({
+                        path: write.path,
+                        mode: write.mode,
+                        diff: write.diff
+                      }))
+                      : confirmInput.writes.map(write => ({
+                        path: write.path,
+                        mode: write.mode,
+                        diff: write.diff
+                      })),
+                    ...(pendingId ? { pendingId } : {}),
+                    reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
                   });
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });

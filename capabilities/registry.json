@@ -66,12 +66,11 @@
     "publish.calendar-ghost": {
       "file": "publish/calendar-ghost.json",
       "agents": [
-        "hammond",
-        "sara",
-        "clare"
+        "*"
       ],
-      "risk": "auto",
+      "risk": "confirm",
       "surfaces": [
+        "confirm_card",
         "calendar"
       ],
       "tool_name": "propose_calendar_ghost",

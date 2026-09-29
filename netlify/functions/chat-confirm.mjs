@@ -108,6 +108,11 @@ import {
   appendGovernanceEntry,
   emptyGovernanceLog
 } from '../../apps/life/js/core/governance-log.js';
+import { runGhostDecision } from './calendar-ghosts.mjs';
+import { defaultGetProfessionalStore } from './_shared/professional-blobs.mjs';
+import { createCommunicationRepository } from './_shared/communication-repository.mjs';
+import { createUniversalLinkRepository } from './_shared/universal-link-repository.mjs';
+import { createAccessContext } from './_shared/entity-access.mjs';
 
 const PRIVATE_CACHE = { 'cache-control': 'private, no-store' };
 const MAX_BODY_BYTES = 16 * 1024;
@@ -118,6 +123,57 @@ const HAMMOND_SLUG = 'hammond';
 const BODY_LOG_TYPES = new Set(['weight', 'composition', 'measurements']);
 
 export const config = { path: '/api/chat/confirm' };
+
+function calendarGhostIdFromStored(stored) {
+  if (!stored || typeof stored !== 'object') return null;
+  if (typeof stored.calendarGhostId === 'string' && stored.calendarGhostId.trim()) {
+    return stored.calendarGhostId.trim();
+  }
+  const extras = stored.extras;
+  if (extras && typeof extras === 'object' && typeof extras.calendarGhostId === 'string' && extras.calendarGhostId.trim()) {
+    return extras.calendarGhostId.trim();
+  }
+  return null;
+}
+
+function githubOpenCommit(client) {
+  const open = async () => {
+    const resolved = await client.resolveTree();
+    const blobs = new Map(
+      (resolved.tree ?? [])
+        .filter(entry => entry?.type === 'blob' && typeof entry.path === 'string')
+        .map(entry => [entry.path, entry.sha])
+    );
+    return {
+      base: { commitSha: resolved.commitSha, treeSha: resolved.treeSha },
+      listPaths() { return [...blobs.keys()]; },
+      async readFile(path) {
+        const sha = blobs.get(path);
+        if (!sha) return null;
+        return decodeBlob(await client.readBlob(sha));
+      }
+    };
+  };
+  const commit = (changed, base, message) => client.commitFiles({
+    files: [...changed.entries()].map(([path, content]) => ({ path, content })),
+    message,
+    parentSha: base.commitSha,
+    baseTreeSha: base.treeSha
+  });
+  return { open, commit };
+}
+
+async function professionalDepsForGhosts(env) {
+  const professionalStore = await defaultGetProfessionalStore(env);
+  const repo = createCommunicationRepository({ store: professionalStore, env });
+  const universalLinkStore = await defaultGetUniversalLinkStore(env);
+  const links = createUniversalLinkRepository({ store: universalLinkStore });
+  const accessContext = createAccessContext({ workflow: 'life' });
+  return {
+    createCommunication: (input) => repo.createCommunication(input),
+    createLink: (link) => links.createLink(link, accessContext)
+  };
+}
 
 export function createChatConfirmHandler({
   env = process.env,
@@ -741,6 +797,72 @@ export function createChatConfirmHandler({
     const recheck = validateProposeActionInput(proposal, { agentSlug: proposal.agent || parsed.slug });
     if (!recheck.ok) {
       return errorResponse(400, 'write_path_denied', 'A write path is outside this agent\'s allowlist.', false, PRIVATE_CACHE);
+    }
+
+    const boundGhostId = calendarGhostIdFromStored(stored);
+    if (boundGhostId) {
+      const instant = new Date(now());
+      const { open, commit } = githubOpenCommit(client);
+      let ghostResult;
+      try {
+        ghostResult = await runGhostDecision({
+          open,
+          commit,
+          tasksStore: () => getTasksStore(env),
+          professionalDeps: () => professionalDepsForGhosts(env),
+          decision: { id: boundGhostId, decision: 'accept', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
+          today: getSydneyDateKey(instant),
+          nowIso: getSydneyTimestamp(instant)
+        });
+      } catch (error) {
+        return mapRepositoryError(error);
+      }
+      const ghostCode = ghostResult?.payload?.error?.code;
+      const ghostOk = ghostResult?.payload?.ok === true
+        || ghostCode === 'already_accepted';
+      if (!ghostOk) {
+        if (ghostCode === 'already_dismissed') {
+          return errorResponse(409, 'already_dismissed', 'This calendar proposal was already dismissed.', false, PRIVATE_CACHE);
+        }
+        if (ghostCode === 'ghost_not_found') {
+          return errorResponse(404, 'ghost_not_found', 'No pending calendar ghost matches this Confirm.', false, PRIVATE_CACHE);
+        }
+        return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
+          ok: false,
+          error: { code: 'ghost_accept_failed', message: 'The calendar proposal could not be accepted.', retryable: false }
+        }, PRIVATE_CACHE);
+      }
+
+      if (parsed.id) {
+        const consumedAt = new Date(now()).toISOString();
+        const markedQueue = markPendingActionConsumed(queue, parsed.id, {
+          consumedAt,
+          extra: { writesApplied: true, calendarGhostId: boundGhostId }
+        });
+        try {
+          await client.writeFile({
+            path: PENDING_ACTIONS_PATH,
+            content: serializePendingActions(markedQueue),
+            ...(queueSha ? { sha: queueSha } : {}),
+            message: `chore(propose-action): consume calendar ghost ${boundGhostId}`.slice(0, 200)
+          });
+        } catch (error) {
+          if (!(error instanceof GitHubClientError && error.code === 'write_conflict')) {
+            return mapRepositoryError(error);
+          }
+        }
+      }
+
+      return jsonResponse(200, {
+        ok: true,
+        data: {
+          id: parsed.id || null,
+          calendarGhostId: boundGhostId,
+          receipt: ghostResult?.payload?.receipt || 'Accepted.',
+          writes: ghostCode === 'already_accepted' ? 'already_applied' : (ghostResult?.payload?.writes || 'applied'),
+          alreadyAccepted: ghostCode === 'already_accepted' || undefined
+        }
+      }, PRIVATE_CACHE);
     }
 
     const selected = selectAcceptedWrites(proposal.writes, parsed.accept);
@@ -1415,6 +1537,35 @@ export function createChatConfirmHandler({
           ok: true,
           data: { id: parsed.id, dismissed: true, alreadyDismissed: true }
         }, PRIVATE_CACHE);
+      }
+
+      const boundGhostId = calendarGhostIdFromStored(dismissTarget);
+      if (boundGhostId) {
+        const instant = new Date(now());
+        const { open, commit } = githubOpenCommit(client);
+        try {
+          const ghostResult = await runGhostDecision({
+            open,
+            commit,
+            tasksStore: () => getTasksStore(env),
+            professionalDeps: () => professionalDepsForGhosts(env),
+            decision: { id: boundGhostId, decision: 'dismiss', reason: typeof parsed.reason === 'string' ? parsed.reason : null },
+            today: getSydneyDateKey(instant),
+            nowIso: getSydneyTimestamp(instant)
+          });
+          const ghostCode = ghostResult?.payload?.error?.code;
+          if (ghostResult?.payload?.ok !== true && ghostCode !== 'already_dismissed' && ghostCode !== 'ghost_not_found') {
+            if (ghostCode === 'already_accepted') {
+              return errorResponse(409, 'already_accepted', 'This calendar proposal was already accepted.', false, PRIVATE_CACHE);
+            }
+            return jsonResponse(ghostResult?.status || 400, ghostResult?.payload || {
+              ok: false,
+              error: { code: 'ghost_dismiss_failed', message: 'The calendar proposal could not be dismissed.', retryable: false }
+            }, PRIVATE_CACHE);
+          }
+        } catch (error) {
+          return mapRepositoryError(error);
+        }
       }
 
       // Authoritative dismissal: persist pending → dismissed tombstone (do not remove).
