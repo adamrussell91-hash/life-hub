@@ -62,10 +62,13 @@ export function itemCardValues(item) {
   const date = String(record.date || row.date || '');
   const start = typeof record.time === 'string' ? record.time : Number.isFinite(row.start) ? hoursToHHMM(row.start) : '';
   let duration = Number(record.duration_min);
-  if (!Number.isFinite(duration) || duration <= 0) {
+  const spans = Number.isFinite(duration) && duration > 0;
+  if (!spans) {
     duration = Number.isFinite(row.start) && Number.isFinite(row.end) ? Math.round((row.end - row.start) * 60) : 60;
   }
-  const end = start ? hoursToHHMM(Number(start.slice(0, 2)) + Number(start.slice(3, 5)) / 60 + duration / 60) : '';
+  // Logs (a meal at 12:30) and due times are moments, not spans: no invented end.
+  const hasEnd = spans || (Number.isFinite(row.start) && Number.isFinite(row.end));
+  const end = start && hasEnd ? hoursToHHMM(Number(start.slice(0, 2)) + Number(start.slice(3, 5)) / 60 + duration / 60) : '';
   return {
     title: String(record.title || row.title || ''),
     date,

@@ -21,7 +21,22 @@ const TYPE_LABEL = Object.freeze({
   calendar_block: 'Block',
   workout: 'Workout',
   medical: 'Health',
-  knowledge_page: 'Note'
+  knowledge_page: 'Note',
+  meal: 'Meal',
+  diary: 'Diary',
+  sleep: 'Sleep',
+  skincare: 'Skincare'
+});
+
+/** Life sections that own each log type (umbrella hash routes). */
+const LIFE_SECTION = Object.freeze({
+  meal: '/#/nutrition',
+  workout: '/#/fitness',
+  diary: '/#/mind',
+  skincare: '/#/skincare',
+  sleep: '/#/body',
+  medical: '/#/body-medical',
+  calendar_block: '/#/calendar'
 });
 
 /** @param {unknown} item */
@@ -105,6 +120,7 @@ function umbrellaPath(item) {
     return '/professional/#/calendar';
   }
   if (type === 'ledger_item') return '/professional/#/people';
+  if (LIFE_SECTION[type]) return LIFE_SECTION[type];
   if (type === 'knowledge_page') return `/knowledge/#page/${encodeURIComponent(id)}`;
   return null;
 }

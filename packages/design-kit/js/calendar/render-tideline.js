@@ -77,6 +77,13 @@ function writeBandSession(next) {
 /** Test hooks for session band memory (design key life.calendar.band). */
 export { readBandSession, writeBandSession };
 
+/** Open the next Tideline paint with this band expanded (Day Dial ring → Linear). */
+export function presetBand(index) {
+  const next = Number.isInteger(index) && index >= 0 ? index : null;
+  state.expanded = next;
+  writeBandSession(next);
+}
+
 const state = {
   expanded: readBandSession(),
   settled: new Map(),

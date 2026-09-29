@@ -1,7 +1,7 @@
 /** Port exactly from docs/proposals/calendar-reference/day-dial/src/dial-ref.ts. */
 export const DD = {
-  maxSize: 620, // the dial never grows past this, however wide the column
-  sidePanel: 340,
+  maxSize: 860, // the dial never grows past this, however wide the column (was 620: too small to read on a laptop)
+  sidePanel: 272,
   sweepMs: 900, // entrance: the day is revealed clockwise from noon
   handMs: 700, // the now hand swings from noon to now (OVERSHOOT), starting at handDelay
   handDelay: 260,

@@ -7,6 +7,7 @@ import { knowledgeEventsFromPages } from '../shell/knowledge-calendar.js';
 import { tasksEventsFromTasks, tasksEventsFromWorkBlocks, scheduleDiffActiveProposed } from '../shell/tasks-calendar.js';
 import { professionalEventsFromProjections } from '../shell/professional-calendar.js';
 import { teachingEventsFromCurriculum } from '../shell/teaching-calendar.js';
+import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
 import { shiftYearMonth } from './calendar-model.js';
 import { deriveRiverZooms } from './term-river.js';
 import { clearEphemeralMessage, showEphemeralMessage } from './ephemeral-message.js';
@@ -189,6 +190,8 @@ export function createAppController(dependencies) {
   let cnHubSignals = { scheduledLessons: [], tasks: [], knowledgePages: [] };
   let cnHubSignalsInFlight = null;
   let tasksEvents = [];
+  let calendarHubPrefs = null;
+  let calendarHubPrefsInFlight = null;
   let tasksCalendarInFlight = null;
   let professionalEvents = [];
   let professionalCalendarInFlight = null;
@@ -840,8 +843,25 @@ export function createAppController(dependencies) {
     if (lifeDomain) openHubAccordion(root.querySelector('[data-hub-accordion]') ?? root, 'life');
   }
 
+  /** Term dates live in Hub prefs (Tools › Term dates) — the same source Almanac reads. */
+  function loadCalendarHubPrefs() {
+    if (calendarHubPrefs || calendarHubPrefsInFlight) return calendarHubPrefsInFlight ?? Promise.resolve();
+    calendarHubPrefsInFlight = apiFetch('/api/hub-prefs')
+      .then(response => (response.ok ? response.json() : null))
+      .then(payload => {
+        if (payload?.data && typeof payload.data === 'object') calendarHubPrefs = payload.data;
+      })
+      .catch(() => {})
+      .finally(() => {
+        calendarHubPrefsInFlight = null;
+        if (calendarHubPrefs && currentSection === 'calendar') renderCalendarSection();
+      });
+    return calendarHubPrefsInFlight;
+  }
+
   function loadHubCalendars() {
     return Promise.all([
+      loadCalendarHubPrefs(),
       loadTeachingCalendar(),
       loadKnowledgeCalendar(),
       loadTasksCalendar(),
@@ -1401,9 +1421,11 @@ export function createAppController(dependencies) {
       const river = latestResult?.calendarVisual?.RIVER;
       const year = river?.ZOOMS?.year;
       if (year?.from && year?.to) return { from: year.from, to: year.to };
-      const terms = latestResult?.calendarVisual?.school_terms
-        ?? calendarPlanningProfile?.school_terms
-        ?? [];
+      const terms = resolveSchoolTerms({
+        hubPrefs: calendarHubPrefs,
+        planningProfile: calendarPlanningProfile,
+        visual: latestResult?.calendarVisual
+      });
       const derived = deriveRiverZooms(terms, latestResult?.date ?? calendarSelectedDate);
       return { from: derived.year.from, to: derived.year.to };
     }
@@ -1507,6 +1529,7 @@ export function createAppController(dependencies) {
         ...tasksEvents
       ],
       calendarVisual: latestResult.calendarVisual ?? null,
+      hubPrefs: calendarHubPrefs,
       calendarGhosts,
       apiFetch,
       // Calendar writes (accept, drag, item card) reload sources, then paint the saved state in place.

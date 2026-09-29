@@ -205,3 +205,29 @@ test('zoom and Focus pills share one view-controls row', () => {
   assert.ok(views.querySelector('[data-part="zoom-pills"]'));
   assert.ok(views.querySelector('[data-part="focus-pills"]'));
 });
+
+test('a logged moment (meal) gets no invented end time in the card', async () => {
+  const { itemCardValues } = await import('../../packages/design-kit/js/calendar/calendar-item-card.js');
+  const meal = { id: 'log-lunch', kind: 'health', title: 'Lunch', record: { type: 'meal', date: TODAY, time: '12:30' } };
+  assert.equal(itemCardValues(meal).end, '');
+  assert.equal(newTabHref(meal, { location: { href: 'https://life-hub.adam-russell.com/' } }), 'https://life-hub.adam-russell.com/#/nutrition');
+});
+
+test('day brief rows carry the item id so the Day dial side list opens the card', async () => {
+  const { tomorrow } = await import('../../packages/design-kit/js/calendar/day-brief.js');
+  const brief = tomorrow({ date: TODAY, chips: [{ id: 'c1', title: 'Gym', start: 7, end: 8, kind: 'fitness' }], due: [{ id: 'task-emails', title: 'Emails' }] });
+  assert.deepEqual(brief.rows.map((row) => row.itemId), ['c1', 'task-emails']);
+});
+
+test('Life calendar reads term dates from Hub prefs first (holidays stop painting School)', async () => {
+  const { resolveSchoolTerms } = await import('../../packages/design-kit/js/calendar/school-terms.js');
+  const terms = resolveSchoolTerms({
+    hubPrefs: { school_terms: [{ year: 2026, terms: [{ term: 3, starts_on: '2026-07-20', ends_on: '2026-09-25' }, { term: 4, starts_on: '2026-10-13', ends_on: '2026-12-18' }] }] },
+    planningProfile: null,
+    visual: null
+  });
+  const model = buildTidelineModel({ events: [], week: WEEK, today: TODAY, nowHour: 12, terms });
+  assert.equal(model.days.find((day) => day.date === TODAY).school, false);
+  const source = readFileSync(join(rootDir, 'apps/life/js/app/render-calendar.js'), 'utf8');
+  assert.match(source, /resolveSchoolTerms\(\{ hubPrefs/);
+});

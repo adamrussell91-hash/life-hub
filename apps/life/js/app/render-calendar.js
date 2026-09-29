@@ -1,5 +1,6 @@
 import { formatDisplayDate, parseDisplayDate } from '../core/time.js';
 import { renderTideline } from './render-tideline.js';
+import { resolveSchoolTerms } from '../../../../packages/design-kit/js/calendar/school-terms.js';
 import { renderAlmanac, unmountAlmanac } from './render-almanac.js';
 import { renderDayDial, unmountDayDial } from './render-day-dial.js';
 import { renderTermRiver, unmountTermRiver } from './render-term-river.js';
@@ -77,6 +78,7 @@ export function renderCalendar(root, model, {
   now = new Date(),
   events = [],
   calendarVisual = null,
+  hubPrefs = null,
   planningProfile = null,
   calendarGhosts = null,
   apiFetch = null,
@@ -104,7 +106,10 @@ export function renderCalendar(root, model, {
   unmountAlmanac();
 
   const weekDates = (model.weekDays ?? []).map(day => day.date);
-  const terms = calendarVisual?.school_terms ?? planningProfile?.school_terms ?? null;
+  // Same precedence as every hub calendar and Almanac: Hub prefs → planning profile → visual.
+  // Without Hub prefs, holidays had no terms and every weekday painted School.
+  const resolvedTerms = resolveSchoolTerms({ hubPrefs, planningProfile, visual: calendarVisual });
+  const terms = resolvedTerms.length ? resolvedTerms : null;
   const tidelineInput = {
     hub: 'life',
     events,
