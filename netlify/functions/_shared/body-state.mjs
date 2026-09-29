@@ -1,11 +1,16 @@
-// Chadwick's (and, from Phase 3, Brisket's) eyes on Adam's body: a bounded read of the
-// most recent composition/measurements records, formatted into a compact prompt block.
+// Chadwick / Brisket / Sara eyes on Adam's body: a bounded read of the most
+// recent composition/measurements records, formatted into a compact prompt block.
 //
 // Budget discipline: selectLatestBodyEntries only inspects the already-fetched repo tree
 // (a single resolveTree() call, no extra cost) and returns at most `limit` paths per type.
 // The caller reads only those blobs -- never a full history scan.
+//
+// Path shape must stay aligned with repo-policy EVENT_PATH name rules for body files:
+// chat persist writes …-composition-0923.md; Body-page sync already accepts that. A
+// stricter regex here silently drops those rows and makes Aug look "latest".
 
-export const BODY_ENTRY_PATH = /^data\/body\/\d{4}\/\d{2}\/\d{4}-\d{2}-\d{2}-(composition|measurements)\.md$/;
+export const BODY_ENTRY_PATH =
+  /^data\/body\/\d{4}\/\d{2}\/(?<date>\d{4}-\d{2}-\d{2})-(?<type>composition|measurements)(?:-(?<suffix>[a-z0-9]+))?\.md$/;
 
 const COMPOSITION_FIELDS = [
   { key: 'weight_kg', label: 'weight', unit: 'kg' },
@@ -32,19 +37,45 @@ const MEASUREMENT_FIELDS = [
   { key: 'calves', label: 'calves' }
 ];
 
+/** Newest-first sort key from a tree path (date + HHMM; bare same-day ranks below timed). */
+export function bodyEntryRecencyKey(path) {
+  const match = typeof path === 'string' ? BODY_ENTRY_PATH.exec(path) : null;
+  if (!match?.groups?.date) return '';
+  const suffix = match.groups.suffix || '';
+  const hhmm = /^\d{4}$/.test(suffix) ? suffix : '0000';
+  const letter = /^[a-z]+$/i.test(suffix) ? suffix.toLowerCase() : '';
+  return `${match.groups.date}T${hhmm}${letter}`;
+}
+
+/** Newest-first sort key from a parsed record (date + time). */
+export function bodyRecordRecencyKey(record) {
+  const date = typeof record?.date === 'string' ? record.date : '';
+  if (!date) return '';
+  const raw = typeof record?.time === 'string' ? record.time : '00:00';
+  const digits = raw.replace(/\D/g, '').slice(0, 4).padStart(4, '0');
+  return `${date}T${digits}`;
+}
+
+export function sortBodyRecordsNewestFirst(records) {
+  if (!Array.isArray(records)) return [];
+  return records
+    .slice()
+    .sort((a, b) => bodyRecordRecencyKey(b).localeCompare(bodyRecordRecencyKey(a)));
+}
+
 export function selectLatestBodyEntries(tree, { limit = 2 } = {}) {
   const byType = { composition: [], measurements: [] };
   if (!Array.isArray(tree)) return byType;
   for (const entry of tree) {
     if (!entry || entry.type !== 'blob' || typeof entry.path !== 'string') continue;
     const match = BODY_ENTRY_PATH.exec(entry.path);
-    if (!match) continue;
-    byType[match[1]].push(entry);
+    if (!match?.groups?.type) continue;
+    byType[match.groups.type].push(entry);
   }
   for (const type of Object.keys(byType)) {
     byType[type] = byType[type]
       .slice()
-      .sort((a, b) => b.path.localeCompare(a.path))
+      .sort((a, b) => bodyEntryRecencyKey(b.path).localeCompare(bodyEntryRecencyKey(a.path)))
       .slice(0, limit);
   }
   return byType;
@@ -85,7 +116,10 @@ export function formatBodyStateForPrompt({
   targetRatio
 } = {}) {
   const lines = [];
-  const [latestComposition, previousComposition] = compositionRecords;
+  // Defense in depth: never trust caller order. Tools historically assumed newest-first.
+  const compositions = sortBodyRecordsNewestFirst(compositionRecords);
+  const measurements = sortBodyRecordsNewestFirst(measurementRecords);
+  const [latestComposition, previousComposition] = compositions;
   if (latestComposition) {
     const bits = COMPOSITION_FIELDS
       .map(({ key, label, unit }) => {
@@ -98,7 +132,7 @@ export function formatBodyStateForPrompt({
     if (bits.length) lines.push(`Body composition (${latestComposition.date ?? 'latest'}): ${bits.join(', ')}.`);
   }
 
-  const [latestMeasurements, previousMeasurements] = measurementRecords;
+  const [latestMeasurements, previousMeasurements] = measurements;
   if (latestMeasurements) {
     const tapeBits = MEASUREMENT_FIELDS
       .map(({ key, label }) => {

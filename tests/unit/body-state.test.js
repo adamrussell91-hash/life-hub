@@ -3,14 +3,22 @@ import assert from 'node:assert/strict';
 import {
   BODY_ENTRY_PATH,
   selectLatestBodyEntries,
+  bodyEntryRecencyKey,
+  sortBodyRecordsNewestFirst,
   computeShoulderWaistRatio,
   formatBodyStateForPrompt
 } from '../../netlify/functions/_shared/body-state.mjs';
+import { getWeightTrend } from '../../netlify/functions/_shared/domain-retrieval.mjs';
+import { getBodyState } from '../../netlify/functions/_shared/fitness-tools.mjs';
 
 test('BODY_ENTRY_PATH matches canonical composition/measurements paths only', () => {
   assert.ok(BODY_ENTRY_PATH.test('data/body/2026/07/2026-07-29-composition.md'));
   assert.ok(BODY_ENTRY_PATH.test('data/body/2026/07/2026-07-29-measurements.md'));
+  assert.ok(BODY_ENTRY_PATH.test('data/body/2026/09/2026-09-19-composition-0923.md'));
+  assert.ok(BODY_ENTRY_PATH.test('data/body/2026/09/2026-09-19-measurements-0925.md'));
+  assert.ok(BODY_ENTRY_PATH.test('data/body/2023/03/2023-03-26-composition-a.md'));
   assert.ok(!BODY_ENTRY_PATH.test('data/body/2026/07/2026-07-29-weight.md'));
+  assert.ok(!BODY_ENTRY_PATH.test('data/body/2026/09/2026-09-24-medical-sore-throat-0740.md'));
   assert.ok(!BODY_ENTRY_PATH.test('data/fitness/2026/07/2026-07-29-composition.md'));
 });
 
@@ -30,6 +38,45 @@ test('selectLatestBodyEntries returns only the most recent N per type from the t
   ]);
   assert.deepEqual(result.measurements.map(e => e.path), [
     'data/body/2026/07/2026-07-29-measurements.md'
+  ]);
+});
+
+test('selectLatestBodyEntries includes chat-logged HHMM suffixes so Sep beats Aug', () => {
+  // Real life-hub-data shape: chat persist writes …-composition-0923.md.
+  // The bare-name regex used to drop those, so Sara treated 1 Aug as latest.
+  const tree = [
+    { path: 'data/body/2026/08/2026-08-01-composition.md', type: 'blob', sha: 'aug' },
+    { path: 'data/body/2026/08/2026-08-01-measurements.md', type: 'blob', sha: 'aug-m' },
+    { path: 'data/body/2026/09/2026-09-19-composition-0923.md', type: 'blob', sha: 'sep' },
+    { path: 'data/body/2026/09/2026-09-19-measurements-0924.md', type: 'blob', sha: 'sep-m1' },
+    { path: 'data/body/2026/09/2026-09-19-measurements-0925.md', type: 'blob', sha: 'sep-m2' },
+    { path: 'data/body/2026/09/2026-09-24-medical-sore-throat-0740.md', type: 'blob', sha: 'med' }
+  ];
+  const result = selectLatestBodyEntries(tree, { limit: 2 });
+  assert.deepEqual(result.composition.map(e => e.path), [
+    'data/body/2026/09/2026-09-19-composition-0923.md',
+    'data/body/2026/08/2026-08-01-composition.md'
+  ]);
+  assert.deepEqual(result.measurements.map(e => e.path), [
+    'data/body/2026/09/2026-09-19-measurements-0925.md',
+    'data/body/2026/09/2026-09-19-measurements-0924.md'
+  ]);
+});
+
+test('same-day HHMM composition outranks a bare composition.md path', () => {
+  // localeCompare on full path prefers bare …composition.md over …composition-0923.md
+  // because '.' > '-'. Recency key must use HHMM so chat logs win.
+  assert.ok(
+    bodyEntryRecencyKey('data/body/2026/09/2026-09-19-composition-0923.md') >
+      bodyEntryRecencyKey('data/body/2026/09/2026-09-19-composition.md')
+  );
+  const tree = [
+    { path: 'data/body/2026/09/2026-09-19-composition.md', type: 'blob', sha: 'bare' },
+    { path: 'data/body/2026/09/2026-09-19-composition-0923.md', type: 'blob', sha: 'timed' }
+  ];
+  const result = selectLatestBodyEntries(tree, { limit: 1 });
+  assert.deepEqual(result.composition.map(e => e.path), [
+    'data/body/2026/09/2026-09-19-composition-0923.md'
   ]);
 });
 
@@ -67,6 +114,25 @@ test('formatBodyStateForPrompt reports composition deltas vs the previous readin
   assert.match(text, /-0\.8kg vs last reading/);
   assert.match(text, /19%/);
   assert.match(text, /40\.1kg/);
+});
+
+test('formatBodyStateForPrompt and tools pick newest even when caller order is oldest-first', () => {
+  const oldestFirst = [
+    { date: '2026-08-01', time: '12:00', weight_kg: 86.9, body_fat_pct: 20 },
+    { date: '2026-09-19', time: '09:23', weight_kg: 86.3, body_fat_pct: 18.9 }
+  ];
+  assert.equal(sortBodyRecordsNewestFirst(oldestFirst)[0].date, '2026-09-19');
+  const prompt = formatBodyStateForPrompt({ compositionRecords: oldestFirst });
+  assert.match(prompt, /Body composition \(2026-09-19\)/);
+  assert.match(prompt, /86\.3kg/);
+  assert.doesNotMatch(prompt, /Body composition \(2026-08-01\)/);
+
+  const trend = getWeightTrend({ compositionRecords: oldestFirst });
+  assert.equal(trend.latest.date, '2026-09-19');
+  assert.equal(trend.latest.weight_kg, 86.3);
+
+  const state = getBodyState({ compositionRecords: oldestFirst });
+  assert.equal(state.latest_composition.date, '2026-09-19');
 });
 
 test('formatBodyStateForPrompt reports the shoulder:waist ratio, trend, and gap to target', () => {
