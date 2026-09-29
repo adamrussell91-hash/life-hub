@@ -169,3 +169,21 @@
   .alm-toast{left:var(--space-3);right:var(--space-3);bottom:var(--space-3)}
   .alm-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
 }
+
+/* Saved copy + decisions (29/09/26) */
+.alm__fresh{all:unset;display:block;font-size:var(--text-2xs);color:var(--muted);cursor:pointer;margin-top:1px}
+.alm__fresh:hover{color:var(--navy);text-decoration:underline;text-underline-offset:2px}
+.alm__fresh:focus-visible{outline:2px solid var(--wave);outline-offset:2px;border-radius:4px}
+.alm__fresh:disabled{cursor:progress}
+.alm-t-lab.is-live{cursor:pointer}
+.alm-t-lab.is-live:hover{text-decoration:underline;text-underline-offset:2px}
+.alm-t-lab.is-live:focus-visible{outline:none;text-decoration:underline}
+h3.is-live{cursor:pointer}
+.alm-pop__acts .btn--ghost{margin-left:auto}
+.alm-pop__link{all:unset;display:block;margin-top:var(--space-3);font-size:var(--text-xs);color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.alm-pop__link:hover{color:var(--navy)}
+.alm-pop__link:focus-visible{outline:2px solid var(--wave);outline-offset:2px;border-radius:4px}
+.alm-pop__field{display:grid;gap:3px;margin-top:var(--space-3);font-size:var(--text-2xs);font-weight:var(--weight-medium);color:var(--muted)}
+.alm-pop__field input{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
+.alm-pop__note{margin:var(--space-2) 0 0;font-size:var(--text-2xs);color:var(--muted)}
+@media (max-width:719px){.alm-pop__field input{font-size:16px}}

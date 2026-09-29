@@ -574,7 +574,7 @@ function mount({ entrance = false } = {}) {
   capCorner.style.gridColumn = '1';
   capCorner.style.gridRow = '1';
   for (const date of days) mountHead(grid, date);
-  const dueCorner = el('div', 'cal-allday cal-corner', 'Due', grid);
+  const dueCorner = el('div', 'cal-allday cal-corner', 'Due · all day', grid);
   dueCorner.style.gridColumn = '1';
   dueCorner.style.gridRow = '2';
   for (const date of days) mountAllDay(grid, date);
@@ -736,10 +736,11 @@ function mountAllDay(grid, date) {
   for (const due of day.due) {
     const ghost = model.ghosts.find(item => item.id === due.ghostId);
     const moved = state.settled.get(due.ghostId);
-    const promiseClass = due.kind === 'promise'
+    const allDayClass = due.kind === 'allday' ? ` is-allday k-${due.filterKey === 'events' ? 'event' : due.filterKey}${due.ambient ? ' is-ambient' : ''}` : '';
+    const promiseClass = allDayClass || due.kind === 'promise'
       ? ` is-promise ${due.direction === 'they_owe' ? 'is-them' : 'is-you'}${due.late ? ' is-late' : ''}`
       : '';
-    const kindLabel = due.kind === 'promise' ? 'Promise' : 'Task';
+    const kindLabel = due.kind === 'promise' ? 'Promise' : due.kind === 'allday' ? 'All day' : 'Task';
     const hint = [kindLabel, due.meta].filter(Boolean).join(' · ');
     const chip = el('div', `cal-due${promiseClass}`, `<b>${escapeHtml(due.title)}</b>${due.meta ? `<span class="cal-due__meta">${escapeHtml(due.meta)}</span>` : ''}`, cell, {
       'data-part': 'due',
@@ -833,6 +834,7 @@ function mountChip(body, chip) {
   if (chip.skipped) classes.push('is-skipped');
   if (chip.kind === 'corey') classes.push('is-corey');
   if (chip.pin) classes.push('is-pin');
+  if (chip.ambient) classes.push('is-ambient');
   if (ghost) classes.push('is-ghost');
   if (chip.ghost?.settled === 'accepted') classes.push('is-accepted');
   const title = `${chip.kind === 'corey' ? '<span class="cal-mark"></span>' : ''}${chip.title}`;
@@ -1202,7 +1204,7 @@ function openPop(chipId) {
   const cardItem = ghost ? null : (item || due || { kind: chip.dataset.kind, source: chip.dataset.source, id: chipId, title: chip.title });
   if (cardItem) {
     html = itemCardHtml(cardItem, {
-      kind: item?.kind ?? (due?.kind === 'promise' ? 'promise' : 'task'),
+      kind: item?.kind ?? (due?.kind === 'promise' ? 'promise' : due?.kind === 'allday' ? (due.filterKey === 'events' ? 'event' : due.filterKey) : 'task'),
       routeFor: input?.routeFor,
       location: root.defaultView?.location ?? null
     });

@@ -314,7 +314,7 @@ function mount({ entrance = false } = {}) {
 
   const filterState = readFilterState(input?.hub || 'life');
   const dayChips = (model.days.find((day) => day.date === state.day)?.chips ?? []).concat(
-    model.days.find((day) => day.date === state.day)?.due?.map((due) => ({ ...due, kind: 'task', filterKey: 'tasks' })) ?? []
+    model.days.find((day) => day.date === state.day)?.due?.map((due) => (due.kind === 'allday' ? due : { ...due, kind: 'task', filterKey: 'tasks' })) ?? []
   );
   const sources = el('div', 'cal__sources', undefined, root, { 'data-part': 'sources' });
   paintSourceFilter(doc, sources, {
@@ -633,7 +633,7 @@ function mountSide(side) {
   const brief = tomorrowBrief({
     date: next,
     chips: chipsFor(next),
-    due: (nextDay?.due ?? []).map(item => ({ id: item.id, title: item.title })),
+    due: (nextDay?.due ?? []).filter(item => item.kind !== 'allday').map(item => ({ id: item.id, title: item.title })),
     ghosts,
     capacity: nextDay?.cap,
     tag: nextDay?.tag ?? null,
@@ -822,7 +822,7 @@ function findDialItem(id) {
     const chip = day.chips.find(entry => entry.id === id);
     if (chip) return chip;
     const due = day.due.find(entry => entry.id === id);
-    if (due) return { ...due, kind: due.kind === 'promise' ? 'promise' : 'task' };
+    if (due) return { ...due, kind: due.kind === 'promise' ? 'promise' : due.kind === 'allday' ? (due.filterKey === 'events' ? 'event' : due.filterKey) : 'task' };
   }
   return logItems.get(id) ?? null;
 }
