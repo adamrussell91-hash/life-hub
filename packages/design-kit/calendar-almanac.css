@@ -187,3 +187,6 @@ h3.is-live{cursor:pointer}
 .alm-pop__field input{font:inherit;font-size:var(--text-sm);color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:5px 8px}
 .alm-pop__note{margin:var(--space-2) 0 0;font-size:var(--text-2xs);color:var(--muted)}
 @media (max-width:719px){.alm-pop__field input{font-size:16px}}
+/* Dexy context (Day Sense §3.1): lighter, not lower. */
+.alm-wave-dex{fill:color-mix(in srgb,var(--pastel-gold) 70%,var(--paper,#fbf8f2));opacity:.85;stroke:var(--pastel-gold-ink);stroke-dasharray:2 2;stroke-width:1}
+.alm-t-dex{fill:var(--pastel-gold-ink)}

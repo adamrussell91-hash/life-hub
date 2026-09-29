@@ -139,6 +139,9 @@ function list(title, rows, cls = '') {
 }
 
 function paintProposals(opts, plan, queued) {
+  // Dock aside so the proposals can be watched sliding into place on the calendar.
+  open?.node?.classList?.add?.('is-docked');
+  open?.node?.setAttribute?.('aria-modal', 'false');
   const p = panel(
     `<div class="cal-rescue__head"><b>${esc(plan.why)}</b><button type="button" class="cal-rescue__x" data-rescue="close" aria-label="Close">×</button></div>`
     + `<p class="cal-rescue__sub">Hammond suggests ${queued.length} change${queued.length === 1 ? '' : 's'}. They're on the calendar as dashed proposals.</p>`

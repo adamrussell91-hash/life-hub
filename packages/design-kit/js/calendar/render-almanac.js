@@ -183,6 +183,7 @@ function present(body) {
     openings: body.openings ?? [],
     world: (body.world ?? []).filter(entry => entry.date >= from && entry.date <= horizon),
     tasked: body.tasked ?? [],
+    medication: body.medication && typeof body.medication.summary === 'string' ? body.medication : null,
     builtAt: typeof body.snapshot?.built_at === 'string' ? body.snapshot.built_at : null
   };
 }
@@ -917,6 +918,14 @@ function paint(doc, host, view, options) {
     lab(72, 'The world', 'BOM · NSW · NESA · listings');
     lab(118, 'Anchors', 'things already fixed');
     lab(186, 'Forecast you', 'capacity from your logs');
+    if (view.medication) {
+      // Dexy context sits under the label: short lines, the full sentence on hover.
+      const med = view.medication;
+      const extra = [med.skipped ? `${med.skipped} skipped` : '', med.unlogged ? `${med.unlogged} not logged` : ''].filter(Boolean).join(' · ');
+      const note = s('text', { class: 'alm-t-sub alm-t-dex', x: ALM.labelX, y: 186 + 32, 'data-part': 'dex-context' }, back, `Dexy ${med.taken}/${med.days} days`);
+      s('title', {}, note, `${med.summary}. Days after a skipped dose are drawn lighter, not lower.`);
+      if (extra) s('text', { class: 'alm-t-sub alm-t-dex', x: ALM.labelX, y: 186 + 46 }, back, extra);
+    }
 
     const world = g('alm-layer-world');
     for (const entry of view.world) {
@@ -954,6 +963,34 @@ function paint(doc, host, view, options) {
     const line = view.series.map((point, index) => `${index ? 'L' : 'M'}${pt(index, point.pct)}`).join(' ');
     s('path', { class: 'alm-wave-area', d: `${line} L${pt(N - 1, 0)} L${pt(0, 0)} Z` }, wave);
     s('path', { class: 'alm-wave-band', d: `${up} ${down} Z` }, wave);
+    // Days after a skipped Dexy dose: the band is washed out (less certain), the number stays.
+    // Runs of days merge; each run is at least 6px so a single day reads at year scale.
+    const lighter = (view.medication?.lighter ?? []).filter(date => indexOf.has(date)).map(date => idx(date)).sort((a, b) => a - b);
+    const runs = [];
+    for (const i of lighter) {
+      const last = runs[runs.length - 1];
+      if (last && i === last.to + 1) last.to = i;
+      else runs.push({ from: i, to: i });
+    }
+    for (const run of runs) {
+      const points = view.series.slice(run.from, run.to + 1);
+      const top = Math.min(...points.map(point => Y(point.high)));
+      const bottom = Math.max(...points.map(point => Y(point.low)));
+      const mid = ALM.x0 + ((run.from + run.to) / 2) * DX;
+      const width = Math.max(6, (run.to - run.from + 1) * DX);
+      const x1 = Math.max(ALM.x0, mid - width / 2); // at the chart's edge, grow right, never clip
+      const light = s('rect', {
+        class: 'alm-wave-dex',
+        'data-part': 'dex-lighter',
+        x: x1.toFixed(1),
+        y: top.toFixed(1),
+        width: width.toFixed(1),
+        height: Math.max(2, bottom - top).toFixed(1),
+        rx: 2
+      }, wave);
+      const label = run.from === run.to ? dd(view.series[run.from].date) : `${dd(view.series[run.from].date)} – ${dd(view.series[run.to].date)}`;
+      s('title', {}, light, `${label}: after a skipped Dexy dose. Forecast drawn lighter, not lower.`);
+    }
     s('line', { class: 'alm-wave-soften', x1: ALM.x0, x2: X(view.to), y1: Y(ALM.wave.softenPct), y2: Y(ALM.wave.softenPct) }, wave);
     s('text', { class: 'alm-t-soften', x: X(view.to), y: Y(ALM.wave.softenPct) + 14 }, wave, '40%');
     s('path', { class: 'alm-wave-line', d: line }, wave);

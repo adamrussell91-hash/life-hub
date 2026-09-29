@@ -32,6 +32,7 @@ import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
 import { canMoveItem, canResizeItem, dragPatch, saveCalendarItem } from './calendar-item-actions.js';
 import { formatDisplayDate } from '../format-display-date.js';
 import { openRescueSheet } from './rescue-sheet.js';
+import { captureChips, morphPairs, playChips } from './rescue-morph.js';
 
 const AGENT_INITIAL = { sara: 'S', hammond: 'H', clare: 'C', chadwick: 'Ch' };
 /** Site-root portraits used across hubs (umbrella `dist/assets/agents/`). */
@@ -1362,8 +1363,12 @@ function wire(section) {
         lightsOut: bands[bands.length - 1]?.to ?? 22,
         apiFetch: input?.apiFetch,
         onQueued: (queued) => {
+          // Rescue morph: blocks glide from where they were to the proposed places.
+          const pairs = morphPairs(queued);
+          const rects = captureChips(host, pairs);
           input = { ...input, ghosts: [...(input.ghosts ?? []), ...queued] };
           mount({ entrance: false });
+          playChips(host, pairs, rects, { view: root.defaultView });
         },
         onDone: () => { void input?.onSourcesChanged?.(); }
       });

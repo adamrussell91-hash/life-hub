@@ -447,3 +447,10 @@ button.cal-src{appearance:none;-webkit-appearance:none}
 .cal-card__drop{display:grid;gap:var(--space-2);margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--line)}
 .cal-card__drop .btn{justify-self:start}
 .cal-card__drop .cal-card__hint{margin:0}
+/* Rescue morph: the block being moved stays, dimmed and dashed, until Accept. */
+.cal-chip.is-moving-out{opacity:.4;outline:1.5px dashed color-mix(in srgb,var(--navy) 45%,transparent);outline-offset:-2px}
+.cal-chip.is-morphing{will-change:transform}
+/* Proposals up: the sheet steps aside (no backdrop) so the morph reads, then one Accept. */
+.cal-rescue.is-docked{background:transparent;place-items:end end;pointer-events:none}
+.cal-rescue.is-docked .cal-rescue__panel{pointer-events:auto;width:min(380px,100%);max-height:min(70vh,560px)}
+@media (max-width:719px){.cal-rescue.is-docked{place-items:end stretch}.cal-rescue.is-docked .cal-rescue__panel{width:auto;max-height:45vh}}
