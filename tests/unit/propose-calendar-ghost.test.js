@@ -110,3 +110,18 @@ test('outing ghost from any agent validates and builds Confirm proposal', () => 
     assert.equal(validated.ok, true, `${agent}: ${validated.error}`);
   }
 });
+
+test('log_comm via propose_calendar_ghost still builds Confirm proposal', () => {
+  resetCapabilityCaches();
+  const entry = calendarGhostFromToolInput({
+    kind: 'log_comm',
+    direction: 'outbound',
+    channel: 'email',
+    date: '2026-10-03',
+    subject: 'Emailed Kate',
+    person_refs: ['shared:person:person_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa']
+  }, { agent: 'clare', nowIso: '2026-10-03T12:00:00+10:00' });
+  assert.equal(entry.kind, 'log_comm');
+  const validated = validateProposeActionInput(calendarGhostConfirmProposal(entry), { agentSlug: 'clare' });
+  assert.equal(validated.ok, true, validated.error);
+});

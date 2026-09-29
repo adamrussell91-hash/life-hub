@@ -200,11 +200,10 @@ import {
   formatPendingCnPatchesForPrompt
 } from './_shared/cn-patch-queue.mjs';
 import {
-  PENDING_CALENDAR_GHOSTS_PATH,
   calendarGhostFromToolInput,
-  appendPendingCalendarGhost,
-  calendarGhostConfirmProposal
+  queueCalendarGhostDualPath
 } from './calendar-ghosts.mjs';
+import { buildLogCommGhostInput } from './_shared/log-comm-agent.mjs';
 import { buildAgentTools } from './_shared/capabilities/registry.mjs';
 import {
   buildPromotedShortcutToolSchemas,
@@ -2508,64 +2507,37 @@ export function createChatHandler({
                 }
               }
 
-              if (event.name === 'propose_calendar_ghost') {
+              if (event.name === 'propose_calendar_ghost' || event.name === 'propose_log_communication') {
                 let entry;
                 try {
-                  entry = calendarGhostFromToolInput(event.input, {
-                    agent: slug,
-                    nowIso: getSydneyTimestamp(nowInstant)
-                  });
+                  const ghostInput = event.name === 'propose_log_communication'
+                    ? buildLogCommGhostInput(event.input ?? {}, { agent: slug })
+                    : event.input;
+                  entry = calendarGhostFromToolInput(
+                    event.name === 'propose_log_communication'
+                      ? { ...ghostInput, kind: 'log_comm' }
+                      : ghostInput,
+                    {
+                      agent: slug,
+                      nowIso: getSydneyTimestamp(nowInstant)
+                    }
+                  );
                 } catch (error) {
                   return JSON.stringify({
                     ok: false,
-                    error: 'invalid_ghost',
-                    detail: error instanceof Error ? error.message : 'invalid ghost'
+                    error: event.name === 'propose_log_communication' ? 'invalid_log_comm' : 'invalid_ghost',
+                    detail: error instanceof Error ? error.message : 'invalid input'
                   });
                 }
                 try {
-                  const tree = await client.resolveTree();
-                  const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
-                  const prior = blob ? decodeBlob(await client.readBlob(blob.sha)) : '[]';
-                  const { content, added } = appendPendingCalendarGhost(prior, entry);
-                  if (added) {
-                    await client.writeFile({
-                      path: PENDING_CALENDAR_GHOSTS_PATH,
-                      content,
-                      ...(blob?.sha ? { sha: blob.sha } : {}),
-                      message: `chore(calendar): propose ${entry.id}`
-                    });
-                  }
-                  send({
-                    type: 'calendar_ghost_proposed',
-                    id: entry.id,
-                    reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
-                  });
-                  const confirmInput = calendarGhostConfirmProposal(entry);
-                  const validated = validateProposeActionInput(confirmInput, { agentSlug: slug });
-                  let pendingId = null;
-                  if (validated.ok) {
-                    pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: entry.id });
-                  }
-                  return JSON.stringify({
-                    ok: true,
-                    status: 'awaiting_confirm',
-                    id: entry.id,
-                    ghost_status: added ? 'queued' : 'already_queued',
-                    intent: validated.ok ? validated.proposal.intent : confirmInput.intent,
-                    writes: validated.ok
-                      ? validated.proposal.writes.map(write => ({
-                        path: write.path,
-                        mode: write.mode,
-                        diff: write.diff
-                      }))
-                      : confirmInput.writes.map(write => ({
-                        path: write.path,
-                        mode: write.mode,
-                        diff: write.diff
-                      })),
-                    ...(pendingId ? { pendingId } : {}),
-                    reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
-                  });
+                  return JSON.stringify(await queueCalendarGhostDualPath({
+                    client,
+                    entry,
+                    agentSlug: slug,
+                    proposeOsAction,
+                    send,
+                    validateProposeActionInput
+                  }));
                 } catch {
                   return JSON.stringify({ ok: false, error: 'write_failed' });
                 }

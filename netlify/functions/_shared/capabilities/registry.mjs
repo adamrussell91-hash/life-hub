@@ -21,6 +21,7 @@ import {
 } from '../skincare-library-tools.mjs';
 import { getMindSessionSchema, searchMindRecordsSchema } from '../mind-session-read.mjs';
 import { proposePeopleChangesSchema, searchPeopleSchema } from '../people-agent.mjs';
+import { proposeLogCommunicationSchema } from '../log-comm-agent.mjs';
 import {
   searchMedicalRecordsSchema,
   briefMedicalAppointmentSchema
@@ -318,6 +319,9 @@ export function buildAgentTools({
   }
   if (has('publish.calendar-ghost')) {
     tools.push(proposeCalendarGhostSchema());
+  }
+  if (has('comms.propose-log-communication')) {
+    tools.push(proposeLogCommunicationSchema());
   }
   if (has('publish.governance-log-entry') && needsHammondTools) {
     tools.push(appendGovernanceLogSchema());

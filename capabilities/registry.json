@@ -620,6 +620,18 @@
         "governance_log"
       ],
       "tool_name": "propose_people_changes"
+    },
+    "comms.propose-log-communication": {
+      "file": "comms/propose-log-communication.json",
+      "agents": [
+        "*"
+      ],
+      "risk": "confirm",
+      "surfaces": [
+        "confirm_card",
+        "calendar"
+      ],
+      "tool_name": "propose_log_communication"
     }
   }
 }

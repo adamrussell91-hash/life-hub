@@ -377,6 +377,67 @@ export function calendarGhostConfirmProposal(ghost) {
   };
 }
 
+/**
+ * Queue a pending calendar ghost and open a chat Confirm card bound to the
+ * same ghost id. Shared by propose_calendar_ghost and propose_log_communication.
+ *
+ * `validateProposeActionInput` is injected so this module stays free of the
+ * propose-action ↔ registry import cycle.
+ */
+export async function queueCalendarGhostDualPath({
+  client,
+  entry,
+  agentSlug,
+  proposeOsAction,
+  send,
+  validateProposeActionInput
+}) {
+  const tree = await client.resolveTree();
+  const blob = (tree.tree ?? []).find(item => item.path === PENDING_CALENDAR_GHOSTS_PATH && item.type === 'blob');
+  const prior = blob ? decodeBlob(await client.readBlob(blob.sha)) : '[]';
+  const { content, added } = appendPendingCalendarGhost(prior, entry);
+  if (added) {
+    await client.writeFile({
+      path: PENDING_CALENDAR_GHOSTS_PATH,
+      content,
+      ...(blob?.sha ? { sha: blob.sha } : {}),
+      message: `chore(calendar): propose ${entry.id}`
+    });
+  }
+  if (typeof send === 'function') {
+    send({
+      type: 'calendar_ghost_proposed',
+      id: entry.id,
+      reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
+    });
+  }
+  const confirmInput = calendarGhostConfirmProposal(entry);
+  const validated = typeof validateProposeActionInput === 'function'
+    ? validateProposeActionInput(confirmInput, { agentSlug })
+    : { ok: false };
+  let pendingId = null;
+  if (validated.ok && typeof proposeOsAction === 'function') {
+    pendingId = await proposeOsAction(validated.proposal, { calendarGhostId: entry.id });
+  }
+  const writes = validated.ok
+    ? validated.proposal.writes
+    : confirmInput.writes;
+  return {
+    ok: true,
+    status: 'awaiting_confirm',
+    id: entry.id,
+    ghost_status: added ? 'queued' : 'already_queued',
+    intent: validated.ok ? validated.proposal.intent : confirmInput.intent,
+    writes: writes.map(write => ({
+      path: write.path,
+      mode: write.mode,
+      diff: write.diff
+    })),
+    ...(pendingId ? { pendingId } : {}),
+    reply: 'Proposed on your calendar. Confirm here or Accept on the calendar.'
+  };
+}
+
 export async function applyTaskStep(store, step, { ghostId } = {}) {
   if (step.method === 'PATCH' && step.collection === 'goals') {
     const key = `goals/${step.id}`;
