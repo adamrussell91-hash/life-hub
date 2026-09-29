@@ -22,9 +22,9 @@
 .dd__spacer{flex:1}
 /* card */
 .dd__card{background:var(--hub-glass-fill);border:1px solid var(--line);border-radius:var(--radius-md);box-shadow:var(--hub-elev-card);backdrop-filter:blur(var(--hub-glass-blur));-webkit-backdrop-filter:blur(var(--hub-glass-blur));overflow:hidden}
-.dd__body{display:grid;grid-template-columns:minmax(0,1fr) 340px}
+.dd__body{display:grid;grid-template-columns:minmax(0,1fr) 272px}
 .dd__dialcell{display:grid;place-items:start center;padding:var(--space-5) 0;min-width:0}
-.dd__side{border-left:1px solid var(--line);padding:var(--space-5);display:grid;gap:var(--space-5);align-content:start;min-width:0}
+.dd__side{border-left:1px solid var(--line);padding:var(--space-5) var(--space-4);display:grid;gap:var(--space-5);align-content:start;min-width:0}
 .dd-dial{display:block;font-family:var(--font-ui)} /* width/height set in px at mount: laid out, never scaled */
 /* dial parts */
 .dd-disc{fill:color-mix(in srgb,#fff 55%,transparent);stroke:var(--dd-rule)}
@@ -120,3 +120,15 @@
   .dd-pop{left:var(--space-3)!important;right:var(--space-3);width:auto}
   .dd-wd span{display:none}
 }
+
+/* live dial: every part answers a click (29/09/26) */
+.dd-log{cursor:pointer}
+.dd-log:hover,.dd-log:focus-visible{outline:none;stroke-width:2.6}
+.dd-t-call[data-part="callout"]{cursor:pointer}
+.dd-t-call[data-part="callout"]:hover{text-decoration:underline;text-underline-offset:2px}
+.dd-ctx.is-zoomable{cursor:zoom-in;transition:filter .15s}
+.dd-ctx.is-zoomable:hover,.dd-ctx.is-zoomable:focus-visible{outline:none;filter:brightness(.94) saturate(1.25)}
+.dd-row.is-live{cursor:pointer;border-radius:8px;margin:0 calc(-1 * var(--space-2));padding-left:var(--space-2);padding-right:var(--space-2)}
+.dd-row.is-live:hover{background:color-mix(in srgb,var(--navy) 4%,transparent)}
+.dd-row.is-live:focus-visible{outline:2px solid var(--wave);outline-offset:-2px}
+@media (prefers-reduced-motion:reduce){.dd-ctx.is-zoomable{transition:none}}

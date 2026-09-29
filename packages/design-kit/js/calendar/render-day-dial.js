@@ -24,7 +24,9 @@ import {
   paintSourceFilter,
   readFilterState
 } from './calendar-filter.js';
-import { isOwnHubItem, openInHubHref, openInHubLinkHtml } from './open-in-hub.js';
+import { bindItemCard, itemCardHtml } from './calendar-item-card.js';
+import { saveCalendarItem } from './calendar-item-actions.js';
+import { presetBand } from './render-tideline.js';
 
 /* ======================================================================== 1. Constants */
 
@@ -185,6 +187,21 @@ const bandsFor = date => bandsFromProfile(
   input.dayProfile ?? input.visual?.day_profile ?? {},
   { school: !isHoliday(date) && weekday(date) }
 );
+
+const BAND_NAMES = { morning: 'Morning', school: 'School', after: 'After bell', yours: 'Yours', day: 'Day', sleep: 'Sleep wall' };
+const bandName = id => BAND_NAMES[id] ?? id;
+/** Log dots on the dial this paint, by dot id (for the item card). */
+const logItems = new Map();
+
+/** Tap a band on the ring: Linear day with that band expanded (same as the week's Focus pills). */
+function zoomToBand(id) {
+  const target = id === 'day' ? 'school' : id;
+  const index = (model?.bands ?? []).findIndex(band => band.id === target);
+  if (index < 0 || typeof input?.onLinear !== 'function') return;
+  closePop();
+  presetBand(index);
+  input.onLinear();
+}
 
 /** The hours the bands leave over. The reference hardcoded 22 → 6.25; the profile owns both ends here. */
 const sleepWall = bands => ({ id: 'sleep', h1: bands[bands.length - 1].to, h2: bands[0].from });
@@ -402,7 +419,18 @@ function mountDial(size) {
   const [c1, c2] = rings.context;
   const segs = [sleepWall(bands), ...bands.map(band => ({ id: band.id, h1: band.from, h2: band.to }))];
   for (const seg of segs) {
-    nodes.set(`ctx:${seg.id}`, s('path', { class: `dd-ctx dd-ctx--${seg.id}`, 'data-h1': seg.h1, 'data-h2': seg.h2 }, ctx));
+    const zoomable = seg.id !== 'sleep';
+    const path = s('path', {
+      class: `dd-ctx dd-ctx--${seg.id}${zoomable ? ' is-zoomable' : ''}`,
+      'data-h1': seg.h1,
+      'data-h2': seg.h2,
+      'data-band-id': seg.id,
+      ...(zoomable ? { role: 'button', tabindex: 0, 'aria-label': `${bandName(seg.id)}, ${clock12(seg.h1)} to ${clock12(seg.h2)}. Open in Linear, zoomed to this band.` } : {})
+    }, ctx);
+    s('title', {}, path, zoomable
+      ? `${bandName(seg.id)} · ${clock12(seg.h1)} – ${clock12(seg.h2)} · click to zoom in`
+      : `Sleep wall · ${clock12(seg.h1)} – ${clock12(seg.h2)}`);
+    nodes.set(`ctx:${seg.id}`, path);
   }
   // Ring labels, only when there's room.
   if (!rings.compact) {
@@ -472,9 +500,25 @@ function mountDial(size) {
   if ((!isToday || nowHour > 15) && logs.length && !meals.some(hour => hour >= 11 && hour < 15)) {
     logDots.push({ id: 'log-nolunch', h: 12.75, cls: 'is-missing', label: 'no lunch' });
   }
+  logItems.clear();
   for (const dot of logDots) {
     const p = point(cx, cy, rings.log, dot.h);
-    s('circle', { class: `dd-log ${dot.cls}`, cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 5, 'data-part': 'log-dot', 'data-id': dot.id }, logRing);
+    const record = logs.find(log => log.time && Math.abs(toHour(log.time) - dot.h) < 1e-6 && (log.type === 'meal' ? `log-${log.meal}` === dot.id : dot.id === 'log-symptom')) ?? null;
+    const title = dot.id === 'log-nolunch' ? 'No lunch logged' : `${String(dot.label).charAt(0).toUpperCase()}${String(dot.label).slice(1)}`;
+    logItems.set(dot.id, {
+      id: dot.id,
+      kind: 'health',
+      date,
+      title,
+      meta: dot.id === 'log-nolunch' ? 'Nothing logged between 11 am and 3 pm' : `Logged ${clock12(dot.h)}`,
+      source: record?.type ?? 'meal',
+      ...(record ? { record } : {})
+    });
+    const circle = s('circle', {
+      class: `dd-log ${dot.cls}`, cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: 5,
+      'data-part': 'log-dot', 'data-id': dot.id, role: 'button', tabindex: 0, 'aria-label': `${title}. Open for details.`
+    }, logRing);
+    s('title', {}, circle, `${title} · ${clock12(dot.h)}`);
   }
 
   // Hour ticks and labels
@@ -604,7 +648,11 @@ function mountSide(side) {
 
 function renderRows(wrap, rows, ghosts) {
   for (const row of rows) {
-    const node = el('div', `dd-row k-${row.kind}${row.struck ? ' is-struck' : ''}`, undefined, wrap, { 'data-part': 'row', 'data-title': row.title });
+    const node = el('div', `dd-row k-${row.kind}${row.struck ? ' is-struck' : ''}${row.itemId ? ' is-live' : ''}`, undefined, wrap, {
+      'data-part': 'row',
+      'data-title': row.title,
+      ...(row.itemId ? { 'data-row-item': row.itemId, role: 'button', tabindex: '0', title: `${row.title} · click for details` } : {})
+    });
     el('div', 'dd-row__t', row.time, node);
     const mark = row.kind === 'corey' ? '<span class="dd-mark"></span>' : '';
     const words = el('div', 'dd-row__w', `<b>${mark}${escapeHtml(row.title)}</b><span>${escapeHtml(row.note)}</span>`, node);
@@ -768,11 +816,22 @@ function writePreview(ghost) {
   }
 }
 
-function openPop(arcId) {
+/** A chip or Due row on any day of the week, or a log dot on the dial. */
+function findDialItem(id) {
+  for (const day of model?.days ?? []) {
+    const chip = day.chips.find(entry => entry.id === id);
+    if (chip) return chip;
+    const due = day.due.find(entry => entry.id === id);
+    if (due) return { ...due, kind: due.kind === 'promise' ? 'promise' : 'task' };
+  }
+  return logItems.get(id) ?? null;
+}
+
+function openPop(arcId, anchor = null) {
   const pop = nodes.get('__pop');
-  const arc = nodes.get(`arc:${arcId}`);
+  const arc = anchor ?? nodes.get(`arc:${arcId}`) ?? svg?.querySelector?.(`[data-id="${arcId}"]`);
   if (!pop || !arc) return;
-  const item = chipsFor(state.day).find(chip => chip.id === arcId);
+  const item = chipsFor(state.day).find(chip => chip.id === arcId) ?? findDialItem(arcId);
   const ghost = ghostsNow().find(item2 => (item2.id === arcId || item2.overItem === arcId) && item2.status === 'pending');
   let html = `<b>${escapeHtml(item?.title ?? ghost?.label ?? '')}</b><p class="dd-pop__meta">${escapeHtml(item?.meta ?? ghost?.meta ?? '')}</p>`;
   if (ghost) {
@@ -784,9 +843,21 @@ function openPop(arcId) {
     const dismiss = ghost.kind === 'bedtime' ? '' : `<button type="button" class="btn btn--ghost" data-dismiss="${escapeHtml(ghost.id)}">Dismiss</button>`;
     html += `<div class="dd-pop__acts"><button type="button" class="btn btn--primary" data-accept="${escapeHtml(ghost.id)}" data-label="Accept">Accept</button>${dismiss}</div>`;
   } else if (item) {
-    html += openInHubLinkHtml(item, { hub: input?.hub || 'life', routeFor: input?.routeFor });
+    html = itemCardHtml(item, { kind: item.kind, routeFor: input?.routeFor, location: doc?.defaultView?.location ?? null });
   }
   pop.innerHTML = html;
+  pop.classList.toggle('cal-pop--card', Boolean(item && !ghost));
+  if (item && !ghost) {
+    bindItemCard(pop, item, {
+      onSave: async (patch) => {
+        const moveOnly = Object.keys(patch).every((key) => key === 'date' || key === 'start_time' || key === 'duration_min');
+        if (moveOnly && typeof input?.onReschedule === 'function') await input.onReschedule(item, patch);
+        else await saveCalendarItem(input?.apiFetch, item, patch);
+        void input?.onSourcesChanged?.();
+      },
+      onClose: () => closePop()
+    });
+  }
   pop.hidden = false;
   pop.removeAttribute('hidden');
   const bounds = root.getBoundingClientRect();
@@ -932,28 +1003,37 @@ function wire(section) {
     const arc = target.closest?.('.dd-arc[data-id]');
     if (arc) {
       const id = arc.getAttribute('data-id');
-      const item = chipsFor(state.day).find(chip => chip.id === id);
-      const hub = input?.hub || 'life';
-      if (item && isOwnHubItem(item, hub) && typeof input?.routeFor === 'function') {
-        const href = openInHubHref(item, input.routeFor);
-        if (href) {
-          closePop();
-          const loc = doc.defaultView?.location;
-          if (href.startsWith('#')) {
-            if (loc) loc.hash = href;
-          } else if (loc) {
-            loc.assign(href);
-          }
-          return;
-        }
-      }
+      // Every arc opens the item card (context, edit, ↗ new tab) — never a silent jump.
       return id === popFor ? closePop() : openPop(id);
     }
+    const dot = target.closest?.('[data-part="log-dot"],[data-part="callout"]');
+    if (dot) {
+      const id = dot.getAttribute('data-id');
+      return id === popFor ? closePop() : openPop(id, nodes.get(`arc:${id}`) ?? dot);
+    }
+    const row = target.closest?.('[data-row-item]');
+    if (row && !target.closest?.('button')) {
+      const id = row.getAttribute('data-row-item');
+      return id === popFor ? closePop() : openPop(id, row);
+    }
+    const band = target.closest?.('.dd-ctx.is-zoomable');
+    if (band) return zoomToBand(band.getAttribute('data-band-id'));
     if (!target.closest?.('[data-part="popover"]')) closePop();
   });
   section.addEventListener('keydown', event => {
     const target = event.target;
     if (event.key === 'Escape') closePop();
+    if ((event.key === 'Enter' || event.key === ' ') && target?.classList?.contains?.('is-zoomable')) {
+      zoomToBand(target.getAttribute('data-band-id'));
+      event.preventDefault();
+      return;
+    }
+    if ((event.key === 'Enter' || event.key === ' ') && (target?.getAttribute?.('data-row-item') || target?.classList?.contains?.('dd-log'))) {
+      const id = target.getAttribute('data-row-item') || target.getAttribute('data-id');
+      openPop(id, target);
+      event.preventDefault();
+      return;
+    }
     if ((event.key === 'Enter' || event.key === ' ') && target?.classList?.contains?.('dd-arc')) {
       openPop(target.getAttribute('data-id'));
       event.preventDefault();
